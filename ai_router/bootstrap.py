@@ -1,6 +1,6 @@
-"""Consumer-project bootstrap: orchestrator instruction files plus the two
-scaffolded bootstrap session sets (plan the project, then decompose it
-into work sets).
+"""Consumer-project bootstrap: orchestrator instruction files, the
+``.dabbler/`` ignore rule, plus the two scaffolded bootstrap session sets
+(plan the project, then decompose it into work sets).
 
 One canonical instruction block carries the whole session workflow; it is
 written into ``AGENTS.md`` (Codex, Copilot, Gemini — every orchestrator
@@ -17,6 +17,12 @@ close), so the very first thing the Work Explorer shows is the on-ramp
 and the plan itself lands on the record. A project that already has any
 set keeps its numbering and history; scaffolding is skipped. The
 ``--print-*-prompt`` flags remain for running the same work untracked.
+
+Bootstrap also writes the ``.dabbler/`` rule into the project's
+``.gitignore``. That directory is the router's machine-side record, and
+every round lands there *after* the tree snapshot it describes — so a
+tracked ledger presents itself to the close gate as work done after
+verification, and no number of re-verifications can clear it.
 """
 
 from __future__ import annotations
@@ -27,6 +33,8 @@ from pathlib import Path
 
 MANAGED_START = "<!-- dabbler:managed:start -->"
 MANAGED_END = "<!-- dabbler:managed:end -->"
+
+_IGNORE_RULE = ".dabbler/"
 
 _SHARED_BODY = """\
 # AI orchestrator instructions — `{repo_name}`
@@ -287,6 +295,45 @@ def scaffold_bootstrap_sets(project_dir) -> list:
     return written
 
 
+def ensure_gitignore(project_dir) -> bool:
+    """Ensure the consumer project ignores the router's machine-side
+    ``.dabbler/`` directory; return True when the rule was added.
+
+    The run ledger is appended *after* the tree snapshot each round
+    describes. A tracked ledger therefore reports itself as work done
+    after verification, and the close gate correctly refuses — so the
+    ignore rule is part of setup, not a convention the operator is
+    trusted to know. Existing content is preserved; the rule is added
+    once and never duplicated.
+    """
+    path = Path(project_dir) / ".gitignore"
+    try:
+        existing = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeError):
+        existing = ""
+    for line in existing.splitlines():
+        stripped = line.strip()
+        if stripped.rstrip("/") in (_IGNORE_RULE.rstrip("/"), "*"):
+            return False
+    block = "" if not existing.strip() else (
+        existing if existing.endswith("\n") else existing + "\n"
+    )
+    if block:
+        block += "\n"
+    block += (
+        "# Dabbler router machine-side state: the run ledger records each\n"
+        "# verification round after the tree it describes, so committing it\n"
+        "# makes verified work look like it changed post-verification.\n"
+        f"{_IGNORE_RULE}\n"
+    )
+    try:
+        with open(path, "w", encoding="utf-8", newline="") as f:
+            f.write(block)
+    except OSError:
+        return False
+    return True
+
+
 def render_engine_file(existing: str, repo_name: str, tail: str) -> str:
     """The managed section replaced in place, or appended after existing
     user content. User text outside the fence is never modified."""
@@ -348,6 +395,8 @@ def main(argv=None) -> int:
     written = write_instruction_files(project, args.repo_name)
     for path in written:
         print(f"bootstrap: wrote managed section in {path}")
+    if ensure_gitignore(project):
+        print(f"bootstrap: added {_IGNORE_RULE} to {project / '.gitignore'}")
     scaffolded = scaffold_bootstrap_sets(project)
     for path in scaffolded:
         print(f"bootstrap: scaffolded {path}")

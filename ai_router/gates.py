@@ -26,6 +26,7 @@ from pathlib import Path
 from .evidence import (
     changed_paths_between,
     detect_out_of_band_write,
+    is_machine_state_path,
     repo_root_for,
     run_git,
     snapshot_worktree_tree,
@@ -189,6 +190,8 @@ def check_working_tree_clean(set_dir) -> tuple:
             and basename in _SET_BOOKKEEPING_BASENAMES
         ):
             continue  # the close commits its own bookkeeping after the flip
+        if is_machine_state_path(path):
+            continue  # the run ledger is the record, not the work
         blocking.append(path)
     if not blocking:
         return True, ""

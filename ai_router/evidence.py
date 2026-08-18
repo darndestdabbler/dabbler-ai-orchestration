@@ -27,7 +27,26 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
-from .ledger import RUNS_DIRNAME
+from .ledger import MACHINE_DIRNAME, RUNS_DIRNAME
+
+
+# --- Machine-side state -----------------------------------------------------
+
+def is_machine_state_path(path) -> bool:
+    """True for anything under the router's own ``.dabbler/`` directory.
+
+    The one place that decides what is *the record of* a session rather
+    than *the work of* one. A round is appended after the tree snapshot it
+    describes, so counting the ledger as session content makes every
+    verified session look like it drifted the instant it was verified.
+    """
+    normalized = str(path).replace("\\", "/")
+    if normalized.startswith("./"):
+        normalized = normalized[2:]
+    return (
+        normalized == MACHINE_DIRNAME
+        or normalized.startswith(MACHINE_DIRNAME + "/")
+    )
 
 
 # --- Git primitives ---------------------------------------------------------
@@ -56,7 +75,11 @@ def snapshot_worktree_tree(repo_root) -> Optional[str]:
     """A tree object capturing tracked AND untracked non-ignored files,
     via a throwaway index — the real index and worktree are untouched.
     Both ends of a fix-delta diff must be snapshots like this one: a
-    tree-vs-worktree diff reports an untracked file as deleted."""
+    tree-vs-worktree diff reports an untracked file as deleted.
+
+    The machine-side ``.dabbler/`` directory is dropped unconditionally,
+    so the ledger cannot appear in a snapshot even in a repo that never
+    got the ignore rule (or that committed the ledger before it did)."""
     fd, tmp_index = tempfile.mkstemp(prefix="dabbler-verify-index-")
     os.close(fd)
     os.unlink(tmp_index)  # let git create it
@@ -70,6 +93,12 @@ def snapshot_worktree_tree(repo_root) -> Optional[str]:
         rc, _, _ = run_git(repo_root, "add", "-A", env=env)
         if rc != 0:
             return None
+        # After the add, so it also clears entries inherited from HEAD.
+        # rc is ignored: --ignore-unmatch makes "nothing to drop" normal.
+        run_git(
+            repo_root, "rm", "--cached", "-r", "-f", "--ignore-unmatch",
+            "-q", "--", MACHINE_DIRNAME, env=env,
+        )
         rc, out, _ = run_git(repo_root, "write-tree", env=env)
         return out if rc == 0 and out else None
     finally:

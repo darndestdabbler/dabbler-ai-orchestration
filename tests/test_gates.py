@@ -122,6 +122,26 @@ class TestVerificationClean:
         assert not row.passed
         assert "failing closed" in row.remediation
 
+    def test_closes_in_repo_that_never_ignored_the_ledger(self, sandbox_repo):
+        """A project whose .gitignore lacks the .dabbler/ rule must still
+        close. The round is written after the tree it describes, so
+        counting it as work made every verified session unclosable no
+        matter how many times it was re-verified."""
+        repo, set_dir = sandbox_repo
+        (repo / ".gitignore").write_text("__pycache__/\n", encoding="utf-8")
+        register_session_start(set_dir, 1, engine="claude-code",
+                               provider="anthropic")
+        (repo / "widget.py").write_text("WIDGET = 1\n", encoding="utf-8")
+        _record_round(repo, set_dir)
+        # The orchestrator commits and pushes; the untracked ledger goes
+        # along with it, exactly as -A would take it.
+        _git(repo, "add", "-A")
+        _git(repo, "commit", "-q", "-m", "work")
+        _git(repo, "push", "-q")
+        results = by_name(run_gates(set_dir))
+        for name, row in results.items():
+            assert row.passed, f"{name}: {row.remediation}"
+
 
 class TestWorkingTreeClean:
     def test_uncommitted_work_blocks_with_preview(self, close_ready):

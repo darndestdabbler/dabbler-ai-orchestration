@@ -127,6 +127,30 @@ class TestTreeSnapshots:
         ).stdout
         assert "?? new.txt" in status  # still untracked
 
+    def test_snapshot_excludes_machine_state_when_not_ignored(self, git_repo):
+        """A round is appended after the snapshot it describes, so a
+        visible ledger makes verified work look changed-since-verified.
+        This repo has no .gitignore at all — the exclusion cannot depend
+        on one."""
+        before = snapshot_worktree_tree(git_repo)
+        runs = git_repo / ".dabbler" / "runs" / "010-demo" / "s1"
+        runs.mkdir(parents=True)
+        (runs / "rounds.jsonl").write_text('{"round": 1}\n', encoding="utf-8")
+        assert snapshot_worktree_tree(git_repo) == before
+
+    def test_snapshot_excludes_machine_state_already_committed(self, git_repo):
+        """The rule holds for a repo that committed its ledger before the
+        ignore rule existed: the entry is inherited from HEAD, not the add."""
+        runs = git_repo / ".dabbler" / "runs"
+        runs.mkdir(parents=True)
+        (runs / "state-writes.jsonl").write_text("{}\n", encoding="utf-8")
+        for args in (["add", "-A"], ["commit", "-q", "-m", "ledger"]):
+            subprocess.run(["git", "-C", str(git_repo), *args],
+                           capture_output=True)
+        before = snapshot_worktree_tree(git_repo)
+        (runs / "state-writes.jsonl").write_text("{}\n{}\n", encoding="utf-8")
+        assert snapshot_worktree_tree(git_repo) == before
+
 
 class TestOutOfBandWrites:
     def _set_dir(self, git_repo):

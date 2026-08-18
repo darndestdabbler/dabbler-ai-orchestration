@@ -3,8 +3,42 @@ from ai_router.bootstrap import (
     MANAGED_END,
     MANAGED_START,
     PLAN_PROMPT,
+    ensure_gitignore,
     write_instruction_files,
 )
+
+
+class TestGitignoreRule:
+    """Setup must establish the .dabbler/ ignore rule, not assume it: the
+    run ledger is appended after the tree snapshot each round describes,
+    so a tracked ledger permanently blocks the close gate."""
+
+    def test_creates_file_with_rule(self, tmp_path):
+        assert ensure_gitignore(tmp_path) is True
+        assert ".dabbler/" in (
+            tmp_path / ".gitignore"
+        ).read_text(encoding="utf-8").splitlines()
+
+    def test_appends_without_disturbing_existing_rules(self, tmp_path):
+        path = tmp_path / ".gitignore"
+        path.write_text("node_modules/\n*.log\n", encoding="utf-8")
+        assert ensure_gitignore(tmp_path) is True
+        lines = path.read_text(encoding="utf-8").splitlines()
+        assert "node_modules/" in lines and "*.log" in lines
+        assert ".dabbler/" in lines
+
+    def test_is_idempotent(self, tmp_path):
+        ensure_gitignore(tmp_path)
+        first = (tmp_path / ".gitignore").read_text(encoding="utf-8")
+        assert ensure_gitignore(tmp_path) is False
+        assert (tmp_path / ".gitignore").read_text(encoding="utf-8") == first
+
+    def test_existing_equivalent_rule_is_left_alone(self, tmp_path):
+        path = tmp_path / ".gitignore"
+        path.write_text(".dabbler\n", encoding="utf-8")
+        assert ensure_gitignore(tmp_path) is False
+        assert path.read_text(encoding="utf-8") == ".dabbler\n"
+
 
 
 class TestInstructionFiles:

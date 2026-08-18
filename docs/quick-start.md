@@ -20,6 +20,12 @@ the orchestrator instructions every engine reads (Claude Code reads
 Existing files keep their user content; only the fenced section is
 refreshed. Re-run the command any time to refresh it.
 
+It also adds `.dabbler/` to the project's `.gitignore` (once; existing
+rules are preserved). That directory is the router's machine-side
+record — each verification round is written there *after* the tree
+snapshot it describes, so a committed ledger would present itself to the
+close gate as work done after verification.
+
 Into a project with no session sets yet, it also scaffolds the two
 bootstrap sets — `001-default-plan` and `002-default-decomposition` —
 as ordinary spec-only sets. Tell your AI agent to **"start the next

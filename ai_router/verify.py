@@ -78,6 +78,7 @@ _UNTRACKED_INLINE_CAP = 64 * 1024
 
 DEFAULT_DIFF_EXCLUDES = (
     "dist", "out", "node_modules", ".venv", "__pycache__", "*.vsix",
+    ".dabbler",
 )
 
 

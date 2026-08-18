@@ -7,10 +7,13 @@ backstop: the record is trustworthy because nothing else writes it, and a
 row that fails schema validation on read is a refusal, never a skip — a
 hand-edited ledger blocks the close instead of passing it.
 
-The directory lives outside the git working tree (``.dabbler/`` is
-gitignored), so round artifacts never dirty the tree or explode the set
-directory. Raw verifier output is saved beside the ledger for the operator
-who wants to read it.
+The directory is machine-side, not session work: ``ai_router.bootstrap``
+writes the ``.dabbler/`` ignore rule into the consumer project, and the
+evidence primitives exclude the directory from every tree snapshot and
+diff regardless — a round record must never look like a change the
+session made, since it is appended *after* the tree it describes. Raw
+verifier output is saved beside the ledger for the operator who wants to
+read it.
 """
 
 from __future__ import annotations
@@ -23,7 +26,11 @@ import jsonschema
 _SCHEMAS_DIR = Path(__file__).parent / "schemas"
 _schema_cache: dict = {}
 
-RUNS_DIRNAME = ".dabbler/runs"
+# The router's machine-side directory. Everything beneath it is written
+# by the router about the session, never by the session — see
+# ``evidence.is_machine_state_path`` for the one predicate that says so.
+MACHINE_DIRNAME = ".dabbler"
+RUNS_DIRNAME = f"{MACHINE_DIRNAME}/runs"
 
 
 class LedgerError(RuntimeError):

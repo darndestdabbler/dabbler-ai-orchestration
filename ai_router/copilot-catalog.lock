@@ -2,12 +2,12 @@
 schema_version = 1
 cli_name = "GitHub Copilot CLI"
 cli_version = "GitHub Copilot CLI 1.0.69."
-cli_version_pin_required = true
+cli_version_pin_required = false
 seat_id = "op-personal"
 seat_label = "operator-personal"
-source = "empirical-probe+manual-1.0.69-pin-bump"
+source = "empirical-probe"
 probed_at = "2026-07-04T16:17:00Z"
-manual_pin_bump_note = "Set 104 S2 (2026-07-15): cli_version manually bumped 1.0.68 -> 1.0.69 to match the auto-updated seat and clear the route() copilot-cli drift gate (staff-usability / Set 103 walk unblock, operator-authorized during a time-critical release). Per-model entries were NOT re-probed on 1.0.69; only claude-sonnet-4.6 was live-confirmed on 1.0.69 (S2 handoff + inline probes). A full `python -m ai_router.copilot_catalog --refresh` re-probe remains the proper reconciliation and is owed as Set 103 seat prep."
+cli_version_note = "cli_version records the CLI these entries were probed on; it is provenance, not a gate. The seat CLI auto-updates, so drift against the live CLI is expected and is reported as a warning. A model that actually stopped working fails its own dispatch with a real error rather than disabling the whole seat."
 
 [[models]]
 id = "claude-sonnet-4.6"

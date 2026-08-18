@@ -716,8 +716,10 @@ def load_catalog(path) -> Catalog:
             )
     meta = CatalogMeta(
         cli_version=str(meta_raw["cli_version"]),
+        # Default off: the seat CLI updates itself, so a pin that defaults
+        # to strict turns every routine auto-update into a dead seat.
         cli_version_pin_required=bool(
-            meta_raw.get("cli_version_pin_required", True)
+            meta_raw.get("cli_version_pin_required", False)
         ),
         seat_id=str(meta_raw["seat_id"]),
         seat_label=str(meta_raw.get("seat_label", "")),
@@ -747,6 +749,7 @@ def load_catalog(path) -> Catalog:
 class CatalogValidationResult:
     ok: bool
     reasons: tuple = ()
+    warnings: tuple = ()
 
     def __bool__(self) -> bool:
         return self.ok
@@ -755,21 +758,37 @@ class CatalogValidationResult:
 def validate_catalog(
     catalog: Catalog, *, live_cli_version: Optional[str] = None
 ) -> CatalogValidationResult:
-    """Fail-closed catalog rules: version drift (when a live version is
-    known), provenance on every confirmed entry, and provider diversity
-    (cross-provider verification needs >= 2 distinct providers). Never
-    raises — callers branch on ``.ok``/``.reasons``."""
-    reasons: list = []
+    """Fail-closed catalog rules: provenance on every confirmed entry and
+    provider diversity (cross-provider verification needs >= 2 distinct
+    providers). Never raises — callers branch on ``.ok``/``.reasons``.
 
-    if (
-        catalog.meta.cli_version_pin_required
-        and live_cli_version is not None
-        and live_cli_version != catalog.meta.cli_version
-    ):
-        reasons.append(
+    CLI version drift is a **warning**, not a failure. The seat CLI
+    auto-updates on its own schedule, so a pinned lockfile goes stale
+    with no action by the operator; refusing the whole seat for that
+    stranded two people on a working seat and taught both to hand-edit
+    the pin, which is the one outcome that destroys the signal. A model
+    that genuinely vanished from the seat fails its own dispatch with a
+    real error — per-model and honest, rather than all-or-nothing on a
+    version string. Strict pinning remains available for an operator who
+    wants it via ``cli_version_pin_required = true``.
+    """
+    reasons: list = []
+    warnings: list = []
+
+    if live_cli_version is not None and live_cli_version != catalog.meta.cli_version:
+        drift = (
             f"CLI version drift: lock pinned to {catalog.meta.cli_version!r}, "
             f"live CLI reports {live_cli_version!r}"
         )
+        if catalog.meta.cli_version_pin_required:
+            reasons.append(
+                drift + " (strict pinning is on via cli_version_pin_required)"
+            )
+        else:
+            warnings.append(
+                drift + "; entries confirmed on the pinned version are still "
+                "trusted. Re-probe the seat to refresh the lockfile."
+            )
 
     confirmed = catalog.confirmed_models()
     for entry in confirmed:
@@ -786,7 +805,9 @@ def validate_catalog(
             f"{sorted(distinct)} (need >= 2 distinct providers)"
         )
 
-    return CatalogValidationResult(ok=not reasons, reasons=tuple(reasons))
+    return CatalogValidationResult(
+        ok=not reasons, reasons=tuple(reasons), warnings=tuple(warnings)
+    )
 
 
 def resolve_role_candidates(

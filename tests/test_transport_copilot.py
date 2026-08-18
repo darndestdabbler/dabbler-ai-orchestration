@@ -294,6 +294,38 @@ class TestCatalog:
         assert not result.ok
         assert "drift" in result.reasons[0]
 
+    def test_version_drift_is_a_warning_by_default(self):
+        """The seat CLI auto-updates, so drift is the normal steady state.
+        Refusing the seat for it stranded working seats and taught people
+        to hand-edit the pin, destroying the signal."""
+        catalog = _catalog(
+            _entry("a", "anthropic"), _entry("b", "openai"), version="v1",
+        )
+        result = validate_catalog(catalog, live_cli_version="v2")
+        assert result.ok
+        assert not result.reasons
+        assert any("drift" in w for w in result.warnings)
+
+    def test_no_drift_warning_when_versions_match(self):
+        catalog = _catalog(
+            _entry("a", "anthropic"), _entry("b", "openai"), version="v1",
+        )
+        assert validate_catalog(catalog, live_cli_version="v1").warnings == ()
+
+    def test_pin_defaults_off_when_lockfile_omits_it(self, tmp_path):
+        lock = tmp_path / "c.lock"
+        lock.write_text(
+            '[meta]\ncli_version = "v1"\nseat_id = "s"\n\n'
+            '[[models]]\nid = "a"\nprovider = "anthropic"\n'
+            'enablement = "confirmed"\n\n'
+            '[[models]]\nid = "b"\nprovider = "openai"\n'
+            'enablement = "confirmed"\n',
+            encoding="utf-8",
+        )
+        catalog = load_catalog(lock)
+        assert catalog.meta.cli_version_pin_required is False
+        assert validate_catalog(catalog, live_cli_version="v9").ok
+
     def test_unknown_live_version_skips_drift_check(self):
         catalog = _catalog(
             _entry("a", "anthropic"), _entry("b", "openai"), pin=True

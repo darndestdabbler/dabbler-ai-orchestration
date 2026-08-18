@@ -8,7 +8,7 @@ from .route import (
     route,
 )
 
-__version__ = "1.0.7"
+__version__ = "1.0.8"
 
 __all__ = [
     "DispatchError",

@@ -26,6 +26,16 @@ record — each verification round is written there *after* the tree
 snapshot it describes, so a committed ledger would present itself to the
 close gate as work done after verification.
 
+Finally it settles the transport **once**, with no question asked: if a
+GitHub Copilot seat is detected and you have no existing preference, it
+writes `DABBLER_TRANSPORT=copilot-cli` as a **system** environment
+variable (HKLM on Windows, `/etc/profile.d/dabbler-ai-router.sh` on
+POSIX) so every shell, terminal, and reboot inherits it. Machine scope
+needs an elevated terminal; unelevated, bootstrap says so rather than
+silently writing a weaker scope. An existing preference is never
+overridden. Force it either way with `--transport api|copilot-cli`, or
+leave it untouched with `--no-transport-detect`.
+
 Into a project with no session sets yet, it also scaffolds the two
 bootstrap sets — `001-default-plan` and `002-default-decomposition` —
 as ordinary spec-only sets. Tell your AI agent to **"start the next

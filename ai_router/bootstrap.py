@@ -28,8 +28,16 @@ verification, and no number of re-verifications can clear it.
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from pathlib import Path
+from typing import Optional
+
+from .config import (
+    TRANSPORT_COPILOT_CLI,
+    TRANSPORT_ENV_VAR,
+    VALID_TRANSPORTS,
+)
 
 MANAGED_START = "<!-- dabbler:managed:start -->"
 MANAGED_END = "<!-- dabbler:managed:end -->"
@@ -334,6 +342,113 @@ def ensure_gitignore(project_dir) -> bool:
     return True
 
 
+def detect_copilot_seat(binary: str = "copilot") -> Optional[str]:
+    """The live Copilot CLI version string, or None when no seat resolves.
+    Detection is a fact about the machine, so nobody should be asked."""
+    from .transports.copilot import get_cli_version
+
+    try:
+        return get_cli_version(binary=binary)
+    except Exception:
+        return None
+
+
+_WIN_SYSTEM_ENV_KEY = (
+    r"SYSTEM\CurrentControlSet\Control\Session Manager\Environment"
+)
+
+
+def _persist_env_var_windows(name: str, value: str) -> bool:
+    """Write a SYSTEM-wide (HKLM) environment variable and broadcast the
+    change so newly opened shells inherit it. Machine scope requires an
+    elevated process; without it the write is refused and the caller
+    reports that plainly rather than silently writing a weaker scope."""
+    import ctypes
+    import winreg
+
+    try:
+        with winreg.OpenKey(
+            winreg.HKEY_LOCAL_MACHINE, _WIN_SYSTEM_ENV_KEY, 0,
+            winreg.KEY_SET_VALUE,
+        ) as key:
+            winreg.SetValueEx(key, name, 0, winreg.REG_SZ, value)
+    except OSError:
+        return False
+    # Without the broadcast the value is live only for shells started
+    # after the next sign-out.
+    try:
+        HWND_BROADCAST, WM_SETTINGCHANGE, SMTO_ABORTIFHUNG = 0xFFFF, 0x001A, 0x0002
+        ctypes.windll.user32.SendMessageTimeoutW(
+            HWND_BROADCAST, WM_SETTINGCHANGE, 0, "Environment",
+            SMTO_ABORTIFHUNG, 5000, ctypes.byref(ctypes.c_ulong()),
+        )
+    except Exception:
+        pass  # the value is written; only the live-broadcast is best-effort
+    return True
+
+
+def is_elevated() -> bool:
+    """True when this process can write machine-scope settings."""
+    if os.name == "nt":
+        try:
+            import ctypes
+
+            return bool(ctypes.windll.shell32.IsUserAnAdmin())
+        except Exception:
+            return False
+    try:
+        return os.geteuid() == 0
+    except AttributeError:
+        return False
+
+
+_POSIX_MARKER = "# dabbler-ai-router: transport preference"
+_POSIX_SYSTEM_PROFILE = Path("/etc/profile.d/dabbler-ai-router.sh")
+
+
+def _persist_env_var_posix(name: str, value: str) -> bool:
+    """Write the system-wide profile drop-in (/etc/profile.d), the POSIX
+    equivalent of a machine-scope variable. Requires root."""
+    try:
+        _POSIX_SYSTEM_PROFILE.parent.mkdir(parents=True, exist_ok=True)
+        with open(_POSIX_SYSTEM_PROFILE, "w", encoding="utf-8") as f:
+            f.write(f'{_POSIX_MARKER}\nexport {name}="{value}"\n')
+        os.chmod(_POSIX_SYSTEM_PROFILE, 0o644)
+    except OSError:
+        return False
+    return True
+
+
+def persist_transport_preference(value: str) -> bool:
+    """Remember the operator's transport in a durable SYSTEM environment
+    variable (HKLM on Windows, ``/etc/profile.d`` on POSIX) so it survives
+    the shell, the terminal, the reboot, and applies to every account on
+    the machine — and is never asked again. Also applied to this process
+    so the current run sees it. Machine scope needs elevation; the return
+    value says whether the durable write actually landed."""
+    os.environ[TRANSPORT_ENV_VAR] = value
+    if os.name == "nt":
+        return _persist_env_var_windows(TRANSPORT_ENV_VAR, value)
+    return _persist_env_var_posix(TRANSPORT_ENV_VAR, value)
+
+
+def resolve_bootstrap_transport(explicit=None) -> tuple:
+    """``(value, reason)`` for what to persist, or ``(None, reason)`` to
+    leave the preference alone. Precedence: an explicit ``--transport``
+    wins; otherwise an already-persisted preference is respected; failing
+    both, a detected seat decides. Detection never overrides a choice the
+    operator already made."""
+    if explicit:
+        return explicit, f"--transport {explicit}"
+    current = (os.environ.get(TRANSPORT_ENV_VAR) or "").strip().lower()
+    if current in VALID_TRANSPORTS:
+        return None, f"{TRANSPORT_ENV_VAR} is already set to {current!r}"
+    version = detect_copilot_seat()
+    if version:
+        return TRANSPORT_COPILOT_CLI, f"detected a Copilot seat ({version})"
+    return None, "no Copilot seat detected; leaving the default (api)"
+
+
 def render_engine_file(existing: str, repo_name: str, tail: str) -> str:
     """The managed section replaced in place, or appended after existing
     user content. User text outside the fence is never modified."""
@@ -379,6 +494,19 @@ def main(argv=None) -> int:
     parser.add_argument("--repo-name")
     parser.add_argument("--print-plan-prompt", action="store_true")
     parser.add_argument("--print-decomposition-prompt", action="store_true")
+    parser.add_argument(
+        "--transport", choices=sorted(VALID_TRANSPORTS), default=None,
+        help=(
+            "remember this transport in the persistent "
+            f"{TRANSPORT_ENV_VAR} environment variable. Omitted: an "
+            "existing preference is kept, otherwise a detected Copilot "
+            "seat sets it automatically."
+        ),
+    )
+    parser.add_argument(
+        "--no-transport-detect", action="store_true",
+        help="do not touch the transport preference at all",
+    )
     args = parser.parse_args(argv)
 
     if args.print_plan_prompt:
@@ -397,6 +525,30 @@ def main(argv=None) -> int:
         print(f"bootstrap: wrote managed section in {path}")
     if ensure_gitignore(project):
         print(f"bootstrap: added {_IGNORE_RULE} to {project / '.gitignore'}")
+    if not args.no_transport_detect:
+        value, reason = resolve_bootstrap_transport(args.transport)
+        if value is None:
+            print(f"bootstrap: transport unchanged — {reason}")
+        elif persist_transport_preference(value):
+            print(
+                f"bootstrap: {reason}; persisted system environment "
+                f"variable {TRANSPORT_ENV_VAR}={value} (open a new "
+                "terminal to pick it up)"
+            )
+        else:
+            hint = (
+                "re-run this command from an elevated (Run as "
+                "administrator) terminal"
+                if os.name == "nt" else
+                f"re-run with sudo, or add {TRANSPORT_ENV_VAR}={value} to "
+                f"{_POSIX_SYSTEM_PROFILE}"
+            )
+            detail = "" if is_elevated() else " (not elevated)"
+            print(
+                f"bootstrap: {reason}, but the system environment variable "
+                f"{TRANSPORT_ENV_VAR} could not be written{detail}. "
+                f"{hint}.", file=sys.stderr,
+            )
     scaffolded = scaffold_bootstrap_sets(project)
     for path in scaffolded:
         print(f"bootstrap: scaffolded {path}")

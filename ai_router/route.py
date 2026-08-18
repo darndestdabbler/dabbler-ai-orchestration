@@ -16,6 +16,7 @@ escalation can override it) and this module stops there.
 
 from __future__ import annotations
 
+import sys
 import threading
 import time
 from dataclasses import dataclass, field
@@ -255,6 +256,8 @@ def _get_copilot(config: dict):
             "validation: " + "; ".join(validation.reasons)
             + ". Re-probe the seat to refresh it."
         )
+    for warning in validation.warnings:
+        print(f"ai_router: copilot-cli catalog: {warning}", file=sys.stderr)
 
     _state["copilot_catalog"] = catalog
     _state["copilot_transport"] = CopilotCliTransport(

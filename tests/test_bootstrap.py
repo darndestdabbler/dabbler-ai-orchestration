@@ -4,8 +4,42 @@ from ai_router.bootstrap import (
     MANAGED_START,
     PLAN_PROMPT,
     ensure_gitignore,
+    resolve_bootstrap_transport,
     write_instruction_files,
 )
+
+
+class TestTransportPreference:
+    """The seat choice is a fact about the machine, remembered in a system
+    environment variable — never a question asked twice."""
+
+    def test_explicit_choice_wins(self, monkeypatch):
+        monkeypatch.setenv("DABBLER_TRANSPORT", "api")
+        value, _ = resolve_bootstrap_transport("copilot-cli")
+        assert value == "copilot-cli"
+
+    def test_existing_preference_is_never_overridden(self, monkeypatch):
+        monkeypatch.setenv("DABBLER_TRANSPORT", "api")
+        value, reason = resolve_bootstrap_transport(None)
+        assert value is None
+        assert "already set" in reason
+
+    def test_detected_seat_sets_the_preference(self, monkeypatch):
+        monkeypatch.delenv("DABBLER_TRANSPORT", raising=False)
+        monkeypatch.setattr(
+            "ai_router.bootstrap.detect_copilot_seat", lambda *a, **k: "CLI 9.9"
+        )
+        value, reason = resolve_bootstrap_transport(None)
+        assert value == "copilot-cli"
+        assert "9.9" in reason
+
+    def test_no_seat_leaves_the_api_default(self, monkeypatch):
+        monkeypatch.delenv("DABBLER_TRANSPORT", raising=False)
+        monkeypatch.setattr(
+            "ai_router.bootstrap.detect_copilot_seat", lambda *a, **k: None
+        )
+        value, _ = resolve_bootstrap_transport(None)
+        assert value is None
 
 
 class TestGitignoreRule:

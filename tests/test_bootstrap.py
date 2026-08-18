@@ -3,10 +3,131 @@ from ai_router.bootstrap import (
     MANAGED_END,
     MANAGED_START,
     PLAN_PROMPT,
+    SCOPE_MACHINE,
+    SCOPE_USER,
+    _manual_persist_hint,
     ensure_gitignore,
+    main,
+    persist_transport_preference,
     resolve_bootstrap_transport,
     write_instruction_files,
 )
+
+
+class TestPersistenceScope:
+    """The preference is a property of the operator's account. A machine
+    whose admin account is a different user gains nothing from a
+    machine-scope write, and the account that runs the router never sees
+    it — so user scope is the default and machine scope is opt-in."""
+
+    def _record_writes(self, monkeypatch, *, machine_ok=False, user_ok=True,
+                       elevated=True):
+        calls = []
+
+        def writer(name, value, *, machine):
+            calls.append({"name": name, "value": value, "machine": machine})
+            return machine_ok if machine else user_ok
+        monkeypatch.setattr(
+            "ai_router.bootstrap._persist_env_var_windows", writer
+        )
+        monkeypatch.setattr(
+            "ai_router.bootstrap._persist_env_var_posix", writer
+        )
+        monkeypatch.setattr(
+            "ai_router.bootstrap.is_elevated", lambda: elevated
+        )
+        return calls
+
+    def test_default_is_user_scope(self, monkeypatch):
+        calls = self._record_writes(monkeypatch)
+        assert persist_transport_preference("copilot-cli") == SCOPE_USER
+        assert [c["machine"] for c in calls] == [False]
+
+    def test_elevated_machine_request_writes_machine_scope(self, monkeypatch):
+        self._record_writes(monkeypatch, machine_ok=True, elevated=True)
+        assert persist_transport_preference(
+            "copilot-cli", machine=True
+        ) == SCOPE_MACHINE
+
+    def test_unelevated_machine_request_falls_back_to_user_scope(
+        self, monkeypatch
+    ):
+        """A preference that landed for the operator beats one that landed
+        nowhere; the caller reports the downgrade."""
+        calls = self._record_writes(monkeypatch, elevated=False)
+        assert persist_transport_preference(
+            "copilot-cli", machine=True
+        ) == SCOPE_USER
+        assert [c["machine"] for c in calls] == [False]
+
+    def test_failed_machine_write_falls_back_to_user_scope(self, monkeypatch):
+        calls = self._record_writes(
+            monkeypatch, machine_ok=False, elevated=True
+        )
+        assert persist_transport_preference(
+            "copilot-cli", machine=True
+        ) == SCOPE_USER
+        assert [c["machine"] for c in calls] == [True, False]
+
+    def test_failure_at_every_scope_reports_nothing_landed(self, monkeypatch):
+        self._record_writes(monkeypatch, machine_ok=False, user_ok=False)
+        assert persist_transport_preference(
+            "copilot-cli", machine=True
+        ) is None
+
+    def test_the_current_process_sees_it_even_when_nothing_persists(
+        self, monkeypatch
+    ):
+        monkeypatch.delenv("DABBLER_TRANSPORT", raising=False)
+        self._record_writes(monkeypatch, user_ok=False)
+        assert persist_transport_preference("copilot-cli") is None
+        import os
+        assert os.environ["DABBLER_TRANSPORT"] == "copilot-cli"
+
+    def test_manual_hint_never_requires_an_account_the_operator_lacks(self):
+        hint = _manual_persist_hint("copilot-cli")
+        assert "admin" not in hint.lower()
+        assert "sudo" not in hint.lower()
+        assert "copilot-cli" in hint
+
+
+class TestBootstrapReporting:
+    def _run(self, tmp_path, monkeypatch, capsys, *, scope, extra=()):
+        monkeypatch.delenv("DABBLER_TRANSPORT", raising=False)
+        monkeypatch.setattr(
+            "ai_router.bootstrap.detect_copilot_seat", lambda *a, **k: "CLI 9.9"
+        )
+        monkeypatch.setattr(
+            "ai_router.bootstrap.persist_transport_preference",
+            lambda value, machine=False: scope,
+        )
+        main(["--project-dir", str(tmp_path), *extra])
+        return capsys.readouterr()
+
+    def test_success_names_the_scope_that_landed(
+        self, tmp_path, monkeypatch, capsys
+    ):
+        out = self._run(tmp_path, monkeypatch, capsys, scope=SCOPE_USER)
+        assert f"at {SCOPE_USER} scope" in out.out
+        assert "DABBLER_TRANSPORT=copilot-cli" in out.out
+
+    def test_failure_prints_the_unelevated_command(
+        self, tmp_path, monkeypatch, capsys
+    ):
+        out = self._run(tmp_path, monkeypatch, capsys, scope=None)
+        assert "could not be written" in out.err
+        assert _manual_persist_hint("copilot-cli") in out.err
+
+    def test_a_machine_scope_downgrade_is_announced(
+        self, tmp_path, monkeypatch, capsys
+    ):
+        out = self._run(
+            tmp_path, monkeypatch, capsys, scope=SCOPE_USER,
+            extra=["--machine-scope"],
+        )
+        assert f"at {SCOPE_USER} scope" in out.out
+        assert "your account only" in out.out
+
 
 
 class TestTransportPreference:

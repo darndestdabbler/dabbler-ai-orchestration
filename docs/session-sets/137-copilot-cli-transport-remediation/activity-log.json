@@ -100,6 +100,86 @@
       "dateTime": "2026-08-18T15:31:50.316388-04:00",
       "description": "Registered session 1 (copilot).",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-18T15:47:50.666803-04:00",
+      "description": "Register.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 2,
+      "stepKey": "make-persisttransportpreference-scope-aware-in-a",
+      "dateTime": "2026-08-18T15:47:50.666803-04:00",
+      "description": "Make `persist_transport_preference` scope-aware in `ai_router/bootstrap.py`. Prefer **user scope** \u2014 HKCU `Environment` on Windows, a marked block in the user's shell profile on POSIX \u2014 because the variable is a property of the operator's working account, not the machine; a workstation whose admin account is a *different user* (this one) gets nothing useful from a machine-scope write. Attempt machine scope only when explicitly asked for it and the process is elevated. Broadcast `WM_SETTINGCHANGE` on the Windows path so shells launched afterwards inherit it. Return which scope actually landed rather than a bare bool, and set the value in `os.environ` so the current run sees it either way.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 3,
+      "stepKey": "make-the-bootstrap-output-say-what",
+      "dateTime": "2026-08-18T15:47:50.666803-04:00",
+      "description": "Make the bootstrap output say what happened: which variable, which value, which scope, and that a new shell is needed to inherit it. Only a failure at every scope it tried prints a manual fallback command, and that command must be the unelevated one (`[Environment]::SetEnvironmentVariable('DABBLER_TRANSPORT', 'copilot-cli','User')` on Windows) \u2014 never one that requires an admin account the operator is not signed into.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 4,
+      "stepKey": "stop-routed-dispatches-inheriting-the-workspace",
+      "dateTime": "2026-08-18T15:47:50.666803-04:00",
+      "description": "Stop routed dispatches inheriting the workspace's orchestrator instructions. The CLI loads `AGENTS.md` / `CLAUDE.md` as custom instructions by default; a routed verifier call is not an orchestrator session, and on this repo those files are large and actively mis-framing. Pass `--no-custom-instructions` on every routed dispatch and say why in the module docstring.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 5,
+      "stepKey": "tests-in-tests-testbootstrap",
+      "dateTime": "2026-08-18T15:47:50.666803-04:00",
+      "description": "Tests in `tests/test_bootstrap.py` and `tests/test_transport_copilot.py`: elevated writes machine scope; unelevated falls back to user scope and reports it; both-scopes failure reports failure; an existing preference is still never overridden; `--transport` still forces; `--no-transport-detect` still opts out; and the routed argv carries `--no-custom-instructions`.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 6,
+      "stepKey": "cross-provider-verification-through-the-copilot",
+      "dateTime": "2026-08-18T15:47:50.666803-04:00",
+      "description": "Cross-provider verification through the `copilot-cli` transport.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 7,
+      "stepKey": "required-portion-of-the-full-test",
+      "dateTime": "2026-08-18T15:47:50.666803-04:00",
+      "description": "Required portion of the full test suite.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 8,
+      "stepKey": "close-out",
+      "dateTime": "2026-08-18T15:47:50.666803-04:00",
+      "description": "Close-out.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-18T15:47:50.678180-04:00",
+      "description": "Registered session 2 (copilot).",
+      "status": "complete"
     }
   ]
 }

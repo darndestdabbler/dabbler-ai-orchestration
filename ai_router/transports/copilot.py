@@ -25,7 +25,12 @@ A routed call cannot mutate the workspace on either transport. The API path
 sends no tools; here the agentic CLI gets a read-only tool allowlist
 (``--available-tools view,grep,glob``) — ``--allow-all-tools`` stays because
 it governs auto-approval, and once the tool universe is read-only, "allow
-all" allows only read-only tools.
+all" allows only read-only tools. ``--no-custom-instructions`` is part of the
+same parity: the CLI otherwise loads the workspace's ``AGENTS.md`` /
+``CLAUDE.md`` into the system prompt, which would hand a routed verifier the
+orchestrator's own instructions — text the API path never sends, that
+inflates the payload, and that tells the verifier it is running the session
+it was asked to judge.
 
 Large prompts travel as a PULL, not as argv. The CLI's only non-interactive
 prompt input is ``-p <text>``, so the whole composed prompt would otherwise
@@ -625,6 +630,7 @@ class CopilotCliTransport:
             "--model", model_id,
             "--allow-all-tools",
             "--available-tools", ",".join(READ_ONLY_TOOLS),
+            "--no-custom-instructions",
             "--output-format", "json",
             _NO_AUTO_UPDATE_FLAG,
         ]

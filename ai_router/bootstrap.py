@@ -356,34 +356,43 @@ def detect_copilot_seat(binary: str = "copilot") -> Optional[str]:
 _WIN_SYSTEM_ENV_KEY = (
     r"SYSTEM\CurrentControlSet\Control\Session Manager\Environment"
 )
+_WIN_USER_ENV_KEY = "Environment"
+
+#: What a persistence attempt achieved. ``None`` means nothing was written.
+SCOPE_MACHINE = "machine"
+SCOPE_USER = "user"
 
 
-def _persist_env_var_windows(name: str, value: str) -> bool:
-    """Write a SYSTEM-wide (HKLM) environment variable and broadcast the
-    change so newly opened shells inherit it. Machine scope requires an
-    elevated process; without it the write is refused and the caller
-    reports that plainly rather than silently writing a weaker scope."""
-    import ctypes
-    import winreg
-
+def _broadcast_environment_change() -> None:
+    """Tell running shells the environment changed. Without it the value is
+    live only for processes started after the next sign-out."""
     try:
-        with winreg.OpenKey(
-            winreg.HKEY_LOCAL_MACHINE, _WIN_SYSTEM_ENV_KEY, 0,
-            winreg.KEY_SET_VALUE,
-        ) as key:
-            winreg.SetValueEx(key, name, 0, winreg.REG_SZ, value)
-    except OSError:
-        return False
-    # Without the broadcast the value is live only for shells started
-    # after the next sign-out.
-    try:
+        import ctypes
+
         HWND_BROADCAST, WM_SETTINGCHANGE, SMTO_ABORTIFHUNG = 0xFFFF, 0x001A, 0x0002
         ctypes.windll.user32.SendMessageTimeoutW(
             HWND_BROADCAST, WM_SETTINGCHANGE, 0, "Environment",
             SMTO_ABORTIFHUNG, 5000, ctypes.byref(ctypes.c_ulong()),
         )
     except Exception:
-        pass  # the value is written; only the live-broadcast is best-effort
+        pass  # the value is written; only the live broadcast is best-effort
+
+
+def _persist_env_var_windows(name: str, value: str, *, machine: bool) -> bool:
+    """Write an environment variable to the user hive (HKCU) or, when
+    *machine* is set and the process is elevated, the machine hive (HKLM)."""
+    import winreg
+
+    root, key_path = (
+        (winreg.HKEY_LOCAL_MACHINE, _WIN_SYSTEM_ENV_KEY) if machine
+        else (winreg.HKEY_CURRENT_USER, _WIN_USER_ENV_KEY)
+    )
+    try:
+        with winreg.OpenKey(root, key_path, 0, winreg.KEY_SET_VALUE) as key:
+            winreg.SetValueEx(key, name, 0, winreg.REG_SZ, value)
+    except OSError:
+        return False
+    _broadcast_environment_change()
     return True
 
 
@@ -404,32 +413,81 @@ def is_elevated() -> bool:
 
 _POSIX_MARKER = "# dabbler-ai-router: transport preference"
 _POSIX_SYSTEM_PROFILE = Path("/etc/profile.d/dabbler-ai-router.sh")
+_POSIX_USER_PROFILE = Path.home() / ".profile"
 
 
-def _persist_env_var_posix(name: str, value: str) -> bool:
-    """Write the system-wide profile drop-in (/etc/profile.d), the POSIX
-    equivalent of a machine-scope variable. Requires root."""
+def _persist_env_var_posix(name: str, value: str, *, machine: bool) -> bool:
+    """Write the system-wide profile drop-in (requires root) or a marked
+    block in the user's own ``~/.profile``."""
+    line = f'{_POSIX_MARKER}\nexport {name}="{value}"\n'
+    if machine:
+        try:
+            _POSIX_SYSTEM_PROFILE.parent.mkdir(parents=True, exist_ok=True)
+            _POSIX_SYSTEM_PROFILE.write_text(line, encoding="utf-8")
+            os.chmod(_POSIX_SYSTEM_PROFILE, 0o644)
+        except OSError:
+            return False
+        return True
     try:
-        _POSIX_SYSTEM_PROFILE.parent.mkdir(parents=True, exist_ok=True)
-        with open(_POSIX_SYSTEM_PROFILE, "w", encoding="utf-8") as f:
-            f.write(f'{_POSIX_MARKER}\nexport {name}="{value}"\n')
-        os.chmod(_POSIX_SYSTEM_PROFILE, 0o644)
+        existing = (
+            _POSIX_USER_PROFILE.read_text(encoding="utf-8")
+            if _POSIX_USER_PROFILE.exists() else ""
+        )
+        kept = [
+            ln for ln in existing.splitlines()
+            if _POSIX_MARKER not in ln and not ln.startswith(f"export {name}=")
+        ]
+        _POSIX_USER_PROFILE.write_text(
+            "\n".join(kept).rstrip("\n") + ("\n\n" if kept else "") + line,
+            encoding="utf-8",
+        )
     except OSError:
         return False
     return True
 
 
-def persist_transport_preference(value: str) -> bool:
-    """Remember the operator's transport in a durable SYSTEM environment
-    variable (HKLM on Windows, ``/etc/profile.d`` on POSIX) so it survives
-    the shell, the terminal, the reboot, and applies to every account on
-    the machine — and is never asked again. Also applied to this process
-    so the current run sees it. Machine scope needs elevation; the return
-    value says whether the durable write actually landed."""
+def persist_transport_preference(
+    value: str, *, machine: bool = False
+) -> Optional[str]:
+    """Remember the operator's transport in a durable environment variable
+    and return the scope that actually landed, or ``None`` if none did.
+
+    User scope is the default because the preference is a property of the
+    operator's account, not of the hardware: a workstation whose admin
+    account is a *different user* gains nothing from a machine-scope write,
+    and the account that actually runs the router would still never see it.
+    ``machine=True`` asks for every account and needs elevation; when that
+    is unavailable the write falls back to user scope rather than failing,
+    because a preference that landed for the operator beats one that landed
+    nowhere. The return value names the scope reached, so a caller can
+    report the downgrade — the fallback is announced, never silent.
+
+    The value is also applied to this process so the current run sees it
+    whatever happened durably.
+    """
     os.environ[TRANSPORT_ENV_VAR] = value
+    writer = (
+        _persist_env_var_windows if os.name == "nt" else _persist_env_var_posix
+    )
+    if machine and is_elevated() and writer(
+        TRANSPORT_ENV_VAR, value, machine=True
+    ):
+        return SCOPE_MACHINE
+    if writer(TRANSPORT_ENV_VAR, value, machine=False):
+        return SCOPE_USER
+    return None
+
+
+def _manual_persist_hint(value: str) -> str:
+    """The command an operator can run themselves. It must never require an
+    account they are not signed into — a hint that says "re-run elevated" is
+    useless when the admin account is a different user."""
     if os.name == "nt":
-        return _persist_env_var_windows(TRANSPORT_ENV_VAR, value)
-    return _persist_env_var_posix(TRANSPORT_ENV_VAR, value)
+        return (
+            "[Environment]::SetEnvironmentVariable("
+            f"'{TRANSPORT_ENV_VAR}','{value}','User')"
+        )
+    return f'echo \'export {TRANSPORT_ENV_VAR}="{value}"\' >> ~/.profile'
 
 
 def resolve_bootstrap_transport(explicit=None) -> tuple:
@@ -507,6 +565,14 @@ def main(argv=None) -> int:
         "--no-transport-detect", action="store_true",
         help="do not touch the transport preference at all",
     )
+    parser.add_argument(
+        "--machine-scope", action="store_true",
+        help=(
+            "persist the transport preference for every account on the "
+            "machine instead of this one. Requires elevation, and is the "
+            "wrong choice when the admin account is a different user."
+        ),
+    )
     args = parser.parse_args(argv)
 
     if args.print_plan_prompt:
@@ -529,26 +595,28 @@ def main(argv=None) -> int:
         value, reason = resolve_bootstrap_transport(args.transport)
         if value is None:
             print(f"bootstrap: transport unchanged — {reason}")
-        elif persist_transport_preference(value):
-            print(
-                f"bootstrap: {reason}; persisted system environment "
-                f"variable {TRANSPORT_ENV_VAR}={value} (open a new "
-                "terminal to pick it up)"
-            )
         else:
-            hint = (
-                "re-run this command from an elevated (Run as "
-                "administrator) terminal"
-                if os.name == "nt" else
-                f"re-run with sudo, or add {TRANSPORT_ENV_VAR}={value} to "
-                f"{_POSIX_SYSTEM_PROFILE}"
+            scope = persist_transport_preference(
+                value, machine=args.machine_scope
             )
-            detail = "" if is_elevated() else " (not elevated)"
-            print(
-                f"bootstrap: {reason}, but the system environment variable "
-                f"{TRANSPORT_ENV_VAR} could not be written{detail}. "
-                f"{hint}.", file=sys.stderr,
-            )
+            if scope is not None:
+                downgrade = (
+                    " (machine scope was requested but unavailable, so this "
+                    "applies to your account only)"
+                    if args.machine_scope and scope == SCOPE_USER else ""
+                )
+                print(
+                    f"bootstrap: {reason}; persisted {TRANSPORT_ENV_VAR}="
+                    f"{value} at {scope} scope{downgrade} (open a new "
+                    "terminal to pick it up)"
+                )
+            else:
+                print(
+                    f"bootstrap: {reason}, but {TRANSPORT_ENV_VAR} could not "
+                    f"be written at {SCOPE_USER} scope either. Set it "
+                    f"yourself: {_manual_persist_hint(value)}",
+                    file=sys.stderr,
+                )
     scaffolded = scaffold_bootstrap_sets(project)
     for path in scaffolded:
         print(f"bootstrap: scaffolded {path}")

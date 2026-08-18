@@ -665,3 +665,21 @@ class TestArgvCeiling:
             model_id="m", system_prompt="", user_message="u"
         )
         assert result.metadata["error_class"] == "generic-unknown"
+
+
+class TestRoutedCallIsolation:
+    """A routed call is not an orchestrator session. The CLI would
+    otherwise load the workspace's AGENTS.md/CLAUDE.md into the system
+    prompt -- text the api transport never sends."""
+
+    def test_argv_disables_workspace_custom_instructions(self):
+        spawner = _spawner_for(FakeProcess(stdout=OK_STDOUT))
+        CopilotCliTransport(spawner=spawner).dispatch(
+            model_id="m", system_prompt="", user_message="u"
+        )
+        assert "--no-custom-instructions" in spawner.argv
+
+    def test_the_handoff_branch_disables_them_too(self):
+        spawner = HandoffSpawner(respond=_ack_stdout)
+        _dispatch_big(spawner)
+        assert "--no-custom-instructions" in spawner.argv

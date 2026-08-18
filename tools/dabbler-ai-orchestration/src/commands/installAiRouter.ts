@@ -1,38 +1,29 @@
-// Install the router: ONE command, one terminal, `pip install
-// dabbler-ai-router`. The interpreter comes from the same resolution
-// every router invocation uses (explicit setting, workspace .venv, bare
-// python), so the install lands where the extension will look for it.
+// Install the router: the same setup sequence Set Up New Project runs,
+// minus the bootstrap — create the workspace venv when it is missing and
+// `pip install --upgrade dabbler-ai-router` into the interpreter the
+// extension will actually resolve. With no workspace open, a bare
+// `python` install is the best available fallback.
 
 import * as vscode from "vscode";
-import { resolvePythonInterpreter } from "../utils/pythonInterpreter";
-import { quoteForDisplay } from "../utils/routerCli";
+import { runSetupSequenceInTerminal, installCommandLine } from "./bootstrapProject";
 
-export const ROUTER_DISTRIBUTION = "dabbler-ai-router";
-
-export function installCommandLine(pythonPath: string): string {
-  return [
-    quoteForDisplay(pythonPath),
-    "-m",
-    "pip",
-    "install",
-    "--upgrade",
-    ROUTER_DISTRIBUTION,
-  ].join(" ");
-}
+export { ROUTER_DISTRIBUTION, installCommandLine } from "./bootstrapProject";
 
 export function registerInstallAiRouterCommand(
   context: vscode.ExtensionContext,
 ): void {
   context.subscriptions.push(
     vscode.commands.registerCommand("dabblerSessionSets.installAiRouter", () => {
-      const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? undefined;
-      const python = root ? resolvePythonInterpreter(root) : "python";
-      const terminal = vscode.window.createTerminal({
-        name: "Dabbler Install",
-        ...(root ? { cwd: root } : {}),
-      });
-      terminal.show();
-      terminal.sendText(installCommandLine(python), true);
+      const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+      if (!root) {
+        const terminal = vscode.window.createTerminal({ name: "Dabbler Install" });
+        terminal.show();
+        terminal.sendText(installCommandLine("python"), true);
+        return;
+      }
+      runSetupSequenceInTerminal(
+        "Dabbler Install", root, false, "Install ai-router",
+      );
     }),
   );
 }

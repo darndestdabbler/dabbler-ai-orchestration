@@ -14,7 +14,10 @@ import {
   closeSessionCommandLine,
   startSessionCommandLine,
 } from "../../commands/sessionTerminalCommands";
-import { bootstrapCommandLine } from "../../commands/bootstrapProject";
+import {
+  bootstrapCommandLine,
+  setupCommandSequence,
+} from "../../commands/bootstrapProject";
 import { installCommandLine } from "../../commands/installAiRouter";
 
 suite("routerCli: outcome classification", () => {
@@ -109,6 +112,46 @@ suite("CLI argv contracts", () => {
     assert.ok(bootstrapCommandLine("python", "D:\\proj").includes("ai_router.bootstrap"));
     const install = installCommandLine("python");
     assert.ok(install.includes("pip install --upgrade dabbler-ai-router"));
+  });
+
+  test("setup sequence on a fresh project creates the venv, installs, bootstraps", () => {
+    const lines = setupCommandSequence({
+      projectDir: "D:\\proj",
+      python: null,
+      basePython: "python",
+      runBootstrap: true,
+    });
+    assert.ok(lines);
+    assert.strictEqual(lines.length, 3);
+    assert.ok(lines[0].includes("-m venv .venv"));
+    // Later lines run under the venv interpreter just created, never
+    // the bare PATH python that has no router.
+    assert.ok(lines[1].includes(".venv"));
+    assert.ok(lines[1].includes("pip install --upgrade dabbler-ai-router"));
+    assert.ok(lines[2].includes(".venv"));
+    assert.ok(lines[2].includes("ai_router.bootstrap"));
+  });
+
+  test("setup sequence with a usable interpreter skips venv creation", () => {
+    const lines = setupCommandSequence({
+      projectDir: "D:\\proj",
+      python: "D:\\proj\\.venv\\Scripts\\python.exe",
+      basePython: null,
+      runBootstrap: false,
+    });
+    assert.ok(lines);
+    assert.strictEqual(lines.length, 1);
+    assert.ok(lines[0].includes("pip install --upgrade dabbler-ai-router"));
+  });
+
+  test("setup sequence with no interpreter at all is null, not a doomed command", () => {
+    assert.strictEqual(
+      setupCommandSequence({
+        projectDir: "D:\\proj", python: null, basePython: null,
+        runBootstrap: true,
+      }),
+      null,
+    );
   });
 
   test("describeLifecycleFailure states the nothing-was-written guarantee on refusal", () => {

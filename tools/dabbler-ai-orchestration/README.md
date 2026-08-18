@@ -88,8 +88,10 @@ incident got past a weaker check — none of them guards a hypothetical.
 ## Requirements
 
 - **VS Code** 1.85+
-- **Python 3.11+** with a workspace `.venv/` (the
-  **`Dabbler: Install ai-router`** command sets it up)
+- **Python 3.11+** on PATH (or pointed to by the
+  `dabblerSessionSets.pythonPath` setting) — **`Dabbler: Set Up New
+  Project`** creates the workspace `.venv/` and installs the router
+  into it
 - **A provider for the router to call** — either two of the three
   `DABBLER_*_API_KEY` variables (the normal provider-issued keys from
   Anthropic, OpenAI, and Google; Dabbler only prefixes the names), or an
@@ -100,11 +102,12 @@ incident got past a weaker check — none of them guards a hypothetical.
 ## Get started
 
 Open a project folder and run **`Dabbler: Set Up New Project`** from the
-Command Palette — it runs `python -m ai_router.bootstrap` in your
-terminal, which writes the managed instruction blocks your AI agent
-reads and prints the prompts for the two bootstrap sessions (project
-plan, then decomposition into session sets). From there, tell your agent
-**"start the next session"** and watch the tree.
+Command Palette — it creates the workspace `.venv` (when missing),
+installs the router into it, and runs `python -m ai_router.bootstrap`
+in your terminal, which writes the managed instruction blocks your AI
+agent reads and prints the prompts for the two bootstrap sessions
+(project plan, then decomposition into session sets). From there, tell
+your agent **"start the next session"** and watch the tree.
 
 The full workflow, command by command, is in the
 [quick start](https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/quick-start.md);

@@ -73,7 +73,7 @@ export function detectWorkspaceVenvInterpreter(
  * distinguish "operator set it" from "the default fired", so a naive
  * `?? next` chain would never reach the venv-autodetect / bare fallback.
  */
-function explicitPythonPathSetting(): string | undefined {
+export function explicitPythonPathSetting(): string | undefined {
   const inspected = vscode.workspace
     .getConfiguration("dabblerSessionSets")
     .inspect<string>("pythonPath");

@@ -113,6 +113,14 @@
       "dateTime": "2026-08-18T19:28:37.850134-04:00",
       "description": "Full Python suite green: 449 passed in 140s, against the 480-test ceiling (414 before this session; +35 for the manifest validation, the seven-tier scope, the prompt-size refusal, and the truncation false-positive).",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 7,
+      "stepKey": "close-out",
+      "dateTime": "2026-08-18T19:30:10.416766-04:00",
+      "description": "Closed WAIVED: five gates green, work committed as d5d1b782 and pushed. Verdict is the operator waiver on round 3 finding 0, adjudication having been unavailable.",
+      "status": "complete"
     }
   ]
 }

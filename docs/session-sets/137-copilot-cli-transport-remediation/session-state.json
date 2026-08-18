@@ -1,7 +1,7 @@
 {
   "schemaVersion": 4,
   "sessionSetName": "137-copilot-cli-transport-remediation",
-  "status": "in-progress",
+  "status": "complete",
   "sessions": [
     {
       "number": 1,
@@ -48,9 +48,9 @@
     {
       "number": 3,
       "title": "Live seat probe, end to end",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-18T16:07:25.967062-04:00",
-      "completedAt": null,
+      "completedAt": "2026-08-18T17:02:13.512104-04:00",
       "orchestrator": {
         "engine": "copilot",
         "provider": "anthropic",

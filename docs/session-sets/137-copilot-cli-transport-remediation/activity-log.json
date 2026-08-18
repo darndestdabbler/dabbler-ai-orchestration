@@ -1,0 +1,105 @@
+{
+  "sessionSetName": "137-copilot-cli-transport-remediation",
+  "createdDate": "2026-08-18T15:31:50.311983-04:00",
+  "totalSessions": 3,
+  "entries": [
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-18T15:31:50.312016-04:00",
+      "description": "Register. Read this spec, then read the v1 implementation and its spec out of git history (`96a2f17c^`) \u2014 the design is locked; the task is a faithful port into v2's structure, not a redesign.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "add-the-size-measurement-and-the",
+      "dateTime": "2026-08-18T15:31:50.312016-04:00",
+      "description": "Add the size measurement and the threshold to `ai_router/transports/copilot.py`: a helper returning UTF-16 code units in the *rendered* command line (`subprocess.list2cmdline`), and the module constant `HANDOFF_THRESHOLD_UTF16_UNITS = 24000`. Build the inline argv first and measure it; the same rule runs on every OS.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "add-the-handoff-branch-to-dispatch",
+      "dateTime": "2026-08-18T15:31:50.312016-04:00",
+      "description": "Add the handoff branch to `dispatch()`: a per-request `tempfile.mkstemp` payload file, UTF-8 with no BOM, containing the exact composed prompt followed by a delimited transport-control footer; written, flushed and **closed before spawn**; a short `-p` bootstrap that names the payload's absolute path in POSIX forward-slash form, tells the model to read the whole file from first byte to EOF before acting, to execute its contents as the full instructions, not to summarize it back, and to end its response with the exact acknowledgement line the footer specifies.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "add-the-integrity-acknowledgement",
+      "dateTime": "2026-08-18T15:31:50.312016-04:00",
+      "description": "Add the integrity acknowledgement: a per-request 128-bit nonce (`secrets.token_hex(16)`) that appears **only in the footer, never in argv**; the footer requires a final line of exactly `HANDOFF-ACK <nonce>`; the transport validates the final content line and strips it before returning content. Absence or mismatch is the new non-retryable error class `handoff-incomplete` with the content discarded.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "add-the-lifecycle-and-metadata",
+      "dateTime": "2026-08-18T15:31:50.312016-04:00",
+      "description": "Add the lifecycle and metadata: delete the payload file in `finally` on every path \u2014 success, spawn failure, first-byte timeout, total timeout, the kill-and-reap paths, and malformed-JSONL classification. Additive `metadata` fields on both result shapes: `handoff` (bool), `payload_bytes`, the ack outcome, and `payload_file_modified` (sha256 before spawn vs after exit \u2014 recorded, never gated). Payload content never appears in argv, metadata or logs; log byte length only.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 6,
+      "stepKey": "name-the-ceiling-failure",
+      "dateTime": "2026-08-18T15:31:50.312016-04:00",
+      "description": "Name the ceiling failure. A spawn that still fails the OS argv limit must classify as its own error class rather than `generic-unknown`, so this defect can never again present as an unnamed failure. Detect it from the OS error (`WinError 206` / `E2BIG`-class `OSError`), not from the message text alone.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 7,
+      "stepKey": "extend-tests-testtransportcopilot",
+      "dateTime": "2026-08-18T15:31:50.312016-04:00",
+      "description": "Extend `tests/test_transport_copilot.py` against the existing fake spawner \u2014 no test invokes a real CLI. One test per behavior: threshold selection below / at / above the boundary; payload file present with the exact bytes and no open handle at spawn time; bootstrap carries the POSIX path and no nonce; ack valid / missing / mismatched; ack stripped from returned content; cleanup on success, spawn failure, both timeout classes and malformed output; UTF-16 measurement with quotes, backslashes, spaces and non-BMP characters; `payload_file_modified`; and a regression asserting the inline path is unchanged below threshold.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 8,
+      "stepKey": "cross-provider-verification-through-the-copilot",
+      "dateTime": "2026-08-18T15:31:50.312016-04:00",
+      "description": "Cross-provider verification through the `copilot-cli` transport, using the handoff this session just built. This is the session's own acceptance evidence, not a formality: the verification bundle is a large payload, so a broken handoff fails the session's own close.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 9,
+      "stepKey": "required-portion-of-the-full-test",
+      "dateTime": "2026-08-18T15:31:50.312016-04:00",
+      "description": "Required portion of the full test suite.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 10,
+      "stepKey": "close-out",
+      "dateTime": "2026-08-18T15:31:50.312016-04:00",
+      "description": "Close-out.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-18T15:31:50.316388-04:00",
+      "description": "Registered session 1 (copilot).",
+      "status": "complete"
+    }
+  ]
+}

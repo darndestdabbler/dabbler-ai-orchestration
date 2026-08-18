@@ -9,8 +9,10 @@ from ai_router.transports.copilot import (
     Catalog,
     CatalogMeta,
     CopilotCliTransport,
+    HANDOFF_THRESHOLD_UTF16_UNITS,
     ModelEntry,
     TransportTimeouts,
+    _rendered_utf16_units,
     load_catalog,
     resolve_role_candidates,
     validate_catalog,
@@ -411,3 +413,255 @@ class TestRoleResolution:
             config, self._catalog(), "generator"
         )
         assert candidates == [("gpt-x", "openai")]
+
+
+# --- Large-prompt file handoff ----------------------------------------------
+
+BIG_PROMPT = "x" * 30_000
+
+
+def _payload_path_from(argv):
+    """The handoff payload path the bootstrap points the model at."""
+    bootstrap = argv[argv.index("-p") + 1]
+    for line in bootstrap.splitlines():
+        if line.endswith(".txt"):
+            return line.strip()
+    raise AssertionError(f"no payload path in bootstrap: {bootstrap!r}")
+
+
+def _ack_stdout(nonce, body="answer body"):
+    return _event_lines(
+        {"type": "assistant.message",
+         "data": {"content": f"{body}\n\nHANDOFF-ACK {nonce}",
+                  "model": "m", "outputTokens": 7}},
+        {"type": "result", "sessionId": "s1", "usage": {"premiumRequests": 1}},
+    )
+
+
+class HandoffSpawner:
+    """Reads the payload at spawn time (proving the handle is closed), then
+    answers with whatever the test asked for."""
+
+    def __init__(self, *, respond=None, process=None, raises=None,
+                 mutate_payload=False):
+        self._respond = respond
+        self._process = process
+        self._raises = raises
+        self._mutate = mutate_payload
+        self.argv = None
+        self.payload_text = None
+        self.payload_path = None
+
+    def __call__(self, argv, env):
+        self.argv = list(argv)
+        self.payload_path = _payload_path_from(argv)
+        self.payload_text = Path(self.payload_path).read_text(encoding="utf-8")
+        if self._mutate:
+            Path(self.payload_path).write_text("clobbered", encoding="utf-8")
+        if self._raises is not None:
+            raise self._raises
+        if self._process is not None:
+            return self._process
+        nonce = self.payload_text.strip().splitlines()[-2].split()[-1]
+        return FakeProcess(stdout=self._respond(nonce))
+
+
+def _dispatch_big(spawner, **kwargs):
+    return CopilotCliTransport(spawner=spawner, **kwargs).dispatch(
+        model_id="m", system_prompt="sys", user_message=BIG_PROMPT
+    )
+
+
+class TestHandoffThreshold:
+    @pytest.mark.parametrize("argv,expected", [
+        (["a"], 2),                       # "a" + NUL
+        (["a b"], 6),                     # quoting adds two chars
+        (["a\\b"], 4),                    # a lone backslash is not escaped
+        (["\U0001F600"], 3),              # one astral char is two UTF-16 units
+    ])
+    def test_measurement_counts_rendered_utf16_units(self, argv, expected):
+        assert _rendered_utf16_units(argv) == expected
+
+    def test_below_threshold_stays_inline(self):
+        spawner = _spawner_for(FakeProcess(stdout=OK_STDOUT))
+        result = CopilotCliTransport(spawner=spawner).dispatch(
+            model_id="m", system_prompt="sys", user_message="small"
+        )
+        assert spawner.argv[spawner.argv.index("-p") + 1] == "sys\n\nsmall"
+        assert result.metadata["handoff"] is False
+        assert "payload_bytes" not in result.metadata
+
+    def test_threshold_boundary_is_inclusive(self):
+        """One unit under the threshold stays inline; exactly at it pulls."""
+        transport = CopilotCliTransport(spawner=_spawner_for(None))
+        # Overhead measured against a one-character prompt, so an empty
+        # string's own quoting does not skew the arithmetic.
+        overhead = _rendered_utf16_units(transport._build_argv("z", "m")) - 1
+        exact = "z" * (HANDOFF_THRESHOLD_UTF16_UNITS - overhead)
+        assert _rendered_utf16_units(
+            transport._build_argv(exact, "m")
+        ) == HANDOFF_THRESHOLD_UTF16_UNITS
+
+        under = _spawner_for(FakeProcess(stdout=OK_STDOUT))
+        below = CopilotCliTransport(spawner=under).dispatch(
+            model_id="m", system_prompt="", user_message=exact[:-1]
+        )
+        assert below.metadata["handoff"] is False
+
+        at = HandoffSpawner(respond=_ack_stdout)
+        result = CopilotCliTransport(spawner=at).dispatch(
+            model_id="m", system_prompt="", user_message=exact
+        )
+        assert result.metadata["handoff"] is True
+
+    def test_bootstrap_names_a_posix_path_and_carries_no_nonce(self):
+        spawner = HandoffSpawner(respond=_ack_stdout)
+        _dispatch_big(spawner)
+        bootstrap = spawner.argv[spawner.argv.index("-p") + 1]
+        assert "\\" not in _payload_path_from(spawner.argv)
+        assert BIG_PROMPT not in bootstrap
+        nonce = spawner.payload_text.strip().splitlines()[-2].split()[-1]
+        assert nonce not in " ".join(spawner.argv)
+
+    def test_payload_holds_the_exact_prompt_plus_footer(self):
+        spawner = HandoffSpawner(respond=_ack_stdout)
+        _dispatch_big(spawner)
+        assert spawner.payload_text.startswith(f"sys\n\n{BIG_PROMPT}")
+        assert "HANDOFF-ACK " in spawner.payload_text
+
+    def test_argv_is_otherwise_identical_on_both_branches(self):
+        inline_spawner = _spawner_for(FakeProcess(stdout=OK_STDOUT))
+        CopilotCliTransport(spawner=inline_spawner).dispatch(
+            model_id="m", system_prompt="sys", user_message="small"
+        )
+        handoff_spawner = HandoffSpawner(respond=_ack_stdout)
+        _dispatch_big(handoff_spawner)
+
+        def without_prompt(argv):
+            i = argv.index("-p")
+            return argv[:i] + argv[i + 2:]
+
+        assert without_prompt(handoff_spawner.argv) == without_prompt(
+            inline_spawner.argv
+        )
+
+
+class TestHandoffAcknowledgement:
+    def test_valid_ack_is_stripped_from_returned_content(self):
+        spawner = HandoffSpawner(respond=_ack_stdout)
+        result = _dispatch_big(spawner)
+        assert result.ok
+        assert result.content == "answer body"
+        assert result.metadata["handoff_ack"] == "validated"
+        assert result.metadata["payload_bytes"] == len(
+            spawner.payload_text.encode("utf-8")
+        )
+
+    def test_missing_ack_fails_closed_and_discards_content(self):
+        spawner = HandoffSpawner(
+            respond=lambda nonce: _event_lines(
+                {"type": "assistant.message",
+                 "data": {"content": "answer with no ack", "model": "m"}},
+                {"type": "result", "sessionId": "s1", "usage": {}},
+            )
+        )
+        result = _dispatch_big(spawner)
+        assert not result.ok
+        assert result.metadata["error_class"] == "handoff-incomplete"
+        assert result.metadata["handoff_ack"] == "missing"
+        assert result.content == ""
+
+    def test_mismatched_ack_is_distinguished_from_a_missing_one(self):
+        spawner = HandoffSpawner(
+            respond=lambda nonce: _ack_stdout("deadbeef" * 4)
+        )
+        result = _dispatch_big(spawner)
+        assert result.metadata["error_class"] == "handoff-incomplete"
+        assert result.metadata["handoff_ack"] == "mismatch"
+
+    def test_handoff_incomplete_is_never_retryable(self):
+        spawner = HandoffSpawner(respond=lambda nonce: _ack_stdout("nope"))
+        assert _dispatch_big(spawner).metadata["retryable"] is False
+
+    def test_payload_mutation_is_recorded_not_gated(self):
+        spawner = HandoffSpawner(respond=_ack_stdout, mutate_payload=True)
+        result = _dispatch_big(spawner)
+        assert result.ok
+        assert result.metadata["payload_file_modified"] is True
+
+
+class TestHandoffCleanup:
+    def _assert_removed(self, spawner):
+        assert spawner.payload_path is not None
+        assert not Path(spawner.payload_path).exists()
+
+    def test_payload_deleted_after_success(self):
+        spawner = HandoffSpawner(respond=_ack_stdout)
+        _dispatch_big(spawner)
+        self._assert_removed(spawner)
+
+    def test_payload_deleted_after_spawn_failure(self):
+        spawner = HandoffSpawner(raises=RuntimeError("boom"))
+        result = _dispatch_big(spawner)
+        assert result.metadata["error_class"] == "generic-unknown"
+        self._assert_removed(spawner)
+
+    def test_payload_deleted_after_first_byte_timeout(self):
+        proc = FakeProcess()
+        proc.stdout = BlockingStream()
+        spawner = HandoffSpawner(process=proc)
+        result = _dispatch_big(
+            spawner, timeouts=TransportTimeouts(0.5, 0.1, 0.3)
+        )
+        assert result.metadata["error_class"] == "first-byte-timeout"
+        self._assert_removed(spawner)
+
+    def test_payload_deleted_after_total_timeout(self):
+        proc = FakeProcess()
+        proc.stdout = BlockingStream(lines=['{"type":"x"}\n'])
+        spawner = HandoffSpawner(process=proc)
+        result = _dispatch_big(
+            spawner, timeouts=TransportTimeouts(1.0, 2.0, 0.2)
+        )
+        assert result.metadata["error_class"] == "total-timeout"
+        self._assert_removed(spawner)
+
+    def test_payload_deleted_after_malformed_output(self):
+        spawner = HandoffSpawner(respond=lambda nonce: "not json\n")
+        result = _dispatch_big(spawner)
+        assert result.metadata["error_class"] == "generic-unknown"
+        assert result.metadata["handoff"] is True
+        self._assert_removed(spawner)
+
+    def test_diagnostics_toggle_retains_the_payload(self, monkeypatch):
+        monkeypatch.setenv("DABBLER_COPILOT_DIAGNOSTICS", "1")
+        spawner = HandoffSpawner(respond=_ack_stdout)
+        _dispatch_big(spawner)
+        try:
+            assert Path(spawner.payload_path).exists()
+        finally:
+            Path(spawner.payload_path).unlink(missing_ok=True)
+
+
+class TestArgvCeiling:
+    def test_os_size_refusal_gets_its_own_error_class(self):
+        too_long = OSError(206, "The filename or extension is too long")
+        too_long.winerror = 206
+
+        def raising(argv, env):
+            raise too_long
+
+        result = CopilotCliTransport(spawner=raising).dispatch(
+            model_id="m", system_prompt="", user_message="u"
+        )
+        assert result.metadata["error_class"] == "argv-too-large"
+        assert result.metadata["retryable"] is False
+
+    def test_other_spawn_errors_stay_generic(self):
+        def raising(argv, env):
+            raise OSError(2, "No such file or directory")
+
+        result = CopilotCliTransport(spawner=raising).dispatch(
+            model_id="m", system_prompt="", user_message="u"
+        )
+        assert result.metadata["error_class"] == "generic-unknown"

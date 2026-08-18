@@ -1,6 +1,6 @@
-"""Consumer-project bootstrap: orchestrator instruction files and the two
-bootstrap-session prompts (plan the project, then decompose it into
-session sets).
+"""Consumer-project bootstrap: orchestrator instruction files plus the two
+scaffolded bootstrap session sets (plan the project, then decompose it
+into work sets).
 
 One canonical instruction block carries the whole session workflow; it is
 written into ``AGENTS.md`` (Codex, Copilot, Gemini — every orchestrator
@@ -8,6 +8,15 @@ that reads that convention) and ``CLAUDE.md`` (Claude Code), differing only
 in a short engine tail. When a file already exists, only the fenced managed
 section is refreshed — user content above and below the fence is never
 touched.
+
+Into a project with no session sets at all, bootstrap also scaffolds
+``001-default-plan`` and ``002-default-decomposition`` — ordinary
+spec-only sets that run the planning and decomposition work through the
+standard tracked pipeline (register, work, cross-provider verification,
+close), so the very first thing the Work Explorer shows is the on-ramp
+and the plan itself lands on the record. A project that already has any
+set keeps its numbering and history; scaffolding is skipped. The
+``--print-*-prompt`` flags remain for running the same work untracked.
 """
 
 from __future__ import annotations
@@ -143,8 +152,10 @@ For EACH session set, scaffold `docs/session-sets/<NNN-slug>/spec.md`.
 
 Hard requirements (do not deviate):
 - **Slug:** `NNN-kebab-title` — three-digit, zero-padded, monotonically
-  increasing prefix, then a kebab-case title (e.g. `001-user-auth`).
-  Never a bare, un-prefixed slug; never two sets sharing a prefix.
+  increasing prefix continuing after the highest existing set number,
+  then a kebab-case title (e.g. `003-user-auth` when the scaffolded
+  bootstrap sets 001/002 exist). Never a bare, un-prefixed slug; never
+  two sets sharing a prefix.
 - **spec.md layout:** one `# <Title>` heading; a `## Sessions` section;
   one `### Session K of N: <title>` heading per session; each session's
   steps as a top-level ordered list. Step 1 registers the session; the
@@ -159,6 +170,121 @@ Authoring guidance:
 - Keep scope tight: prefer 2-4 sessions per set, at most ~3 work steps
   per session.
 """
+
+
+_PLAN_SET_DIRNAME = "001-default-plan"
+_DECOMPOSITION_SET_DIRNAME = "002-default-decomposition"
+
+_PLAN_SPEC = """\
+# Project plan
+
+> **Purpose:** Create — or import — `docs/planning/project-plan.md`, the
+> stable artifact the decomposition set reads from. The plan is the
+> deliverable: it runs through the normal pipeline — cross-provider
+> verification reviews it — like any other session-set output.
+> **Session Set:** `docs/session-sets/001-default-plan/`
+> **Workflow:** Full
+> **Prerequisite:** none.
+
+---
+
+## Session Set Configuration
+
+```yaml
+module: default
+totalSessions: 1
+```
+
+---
+
+## Sessions
+
+### Session 1 of 1: Author or import the project plan
+
+1. Register.
+2. Create — or import — `docs/planning/project-plan.md`: overview, goals
+   and success criteria, high-level phases or feature areas, and each
+   phase's key deliverables. Keep it concise — the decomposition set
+   turns each phase into session sets, so scope each phase to a handful
+   of focused AI sessions. If a plan already exists outside this repo (a
+   doc, a ticket, notes), bring its content into that path in this same
+   shape, preserving intent.
+3. Cross-provider verification.
+4. Close-out.
+
+**Creates:** `docs/planning/project-plan.md`. A later revision is just
+another plan session that amends the same file.
+"""
+
+_DECOMPOSITION_SPEC = """\
+# Session-set decomposition
+
+> **Purpose:** Decompose `docs/planning/project-plan.md` into the work
+> session sets — each a focused, independently deployable unit of work.
+> **Session Set:** `docs/session-sets/002-default-decomposition/`
+> **Workflow:** Full
+> **Prerequisite:** `001-default-plan` closed (the plan is its input).
+
+---
+
+## Session Set Configuration
+
+```yaml
+module: default
+totalSessions: 1
+```
+
+---
+
+## Sessions
+
+### Session 1 of 1: Decompose the plan into session sets
+
+1. Register.
+2. Read `docs/planning/project-plan.md` and decompose it into a sequence
+   of session sets, scaffolding `docs/session-sets/<NNN-slug>/spec.md`
+   for each. Hard requirements: the slug is `NNN-kebab-title` — a
+   three-digit, zero-padded, monotonically increasing prefix continuing
+   after the highest existing set number (003 onward here), then a
+   kebab-case title; never two sets sharing a prefix. Each spec.md has
+   one `# <Title>` heading, a `## Sessions` section, one
+   `### Session K of N: <title>` heading per session, and each session's
+   steps as a top-level ordered list — step 1 registers the session, the
+   last steps run cross-provider verification and close-out, the middle
+   steps are the work. Order sets so earlier ones unblock later ones;
+   prefer 2-4 sessions per set and at most ~3 work steps per session.
+   Do NOT hand-author `session-state.json` — each set's own first
+   `session start` bootstraps it from the spec.
+3. Cross-provider verification.
+4. Close-out.
+
+**Creates:** one `docs/session-sets/<NNN-slug>/spec.md` per work set.
+"""
+
+_BOOTSTRAP_SETS = (
+    (_PLAN_SET_DIRNAME, _PLAN_SPEC),
+    (_DECOMPOSITION_SET_DIRNAME, _DECOMPOSITION_SPEC),
+)
+
+
+def scaffold_bootstrap_sets(project_dir) -> list:
+    """Scaffold the two bootstrap sets into a project with NO session
+    sets at all; return the written spec paths. Any existing set — work
+    set or bootstrap set, any state — means the project has its own
+    numbering and history, so nothing is written and nothing is ever
+    overwritten."""
+    root = Path(project_dir) / "docs" / "session-sets"
+    if root.is_dir() and any(p.is_dir() for p in root.iterdir()):
+        return []
+    written = []
+    for dirname, content in _BOOTSTRAP_SETS:
+        set_dir = root / dirname
+        set_dir.mkdir(parents=True, exist_ok=True)
+        spec = set_dir / "spec.md"
+        with open(spec, "w", encoding="utf-8", newline="") as f:
+            f.write(content)
+        written.append(spec)
+    return written
 
 
 def render_engine_file(existing: str, repo_name: str, tail: str) -> str:
@@ -222,11 +348,20 @@ def main(argv=None) -> int:
     written = write_instruction_files(project, args.repo_name)
     for path in written:
         print(f"bootstrap: wrote managed section in {path}")
-    print(
-        "bootstrap: next, run the plan session "
-        "(--print-plan-prompt) and then the decomposition session "
-        "(--print-decomposition-prompt)."
-    )
+    scaffolded = scaffold_bootstrap_sets(project)
+    for path in scaffolded:
+        print(f"bootstrap: scaffolded {path}")
+    if scaffolded:
+        print(
+            "bootstrap: next, tell your AI agent to \"start the next "
+            "session\" — 001-default-plan authors the project plan, then "
+            "002-default-decomposition turns it into work sets."
+        )
+    else:
+        print(
+            "bootstrap: session sets already exist; set scaffolding "
+            "skipped (instruction files refreshed only)."
+        )
     return 0
 
 

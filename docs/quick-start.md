@@ -20,18 +20,23 @@ the orchestrator instructions every engine reads (Claude Code reads
 Existing files keep their user content; only the fenced section is
 refreshed. Re-run the command any time to refresh it.
 
-Then run the two bootstrap sessions with your AI of choice, using the
-prompts the package provides:
+Into a project with no session sets yet, it also scaffolds the two
+bootstrap sets — `001-default-plan` and `002-default-decomposition` —
+as ordinary spec-only sets. Tell your AI agent to **"start the next
+session"**: the plan set authors (or imports)
+`docs/planning/project-plan.md` through the normal tracked pipeline
+(register → work → cross-provider verification → close), and the
+decomposition set then turns the plan into work sets
+(`docs/session-sets/<NNN-slug>/spec.md`, numbered from 003). Do not
+hand-author `session-state.json` — the first session start creates it
+from the spec.
+
+Prefer the untracked route? The same prompts are available loose:
 
 ```
 python -m ai_router.bootstrap --print-plan-prompt
 python -m ai_router.bootstrap --print-decomposition-prompt
 ```
-
-The plan session produces `docs/planning/project-plan.md`; the
-decomposition session turns it into session sets, each a
-`docs/session-sets/<NNN-slug>/spec.md`. Do not hand-author
-`session-state.json` — the first session start creates it from the spec.
 
 ## 2. Start a session
 

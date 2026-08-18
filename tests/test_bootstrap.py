@@ -61,3 +61,41 @@ class TestPrompts:
         assert "NNN-kebab-title" in DECOMPOSITION_PROMPT
         assert "session-state.json" in DECOMPOSITION_PROMPT
         assert "never authored by hand" in DECOMPOSITION_PROMPT
+
+
+class TestScaffoldBootstrapSets:
+    def test_fresh_project_gets_both_sets_with_parseable_specs(
+        self, tmp_path
+    ):
+        from ai_router.bootstrap import scaffold_bootstrap_sets
+        from ai_router.session import parse_session_plans
+
+        written = scaffold_bootstrap_sets(tmp_path)
+        assert [p.parent.name for p in written] == [
+            "001-default-plan", "002-default-decomposition",
+        ]
+        for spec in written:
+            plans = parse_session_plans(spec.read_text(encoding="utf-8"))
+            assert len(plans) == 1 and plans[0]["number"] == 1
+            steps = plans[0]["steps"]
+            assert steps[0].startswith("Register")
+            assert any("verification" in s.lower() for s in steps)
+            assert steps[-1].startswith("Close")
+
+    def test_any_existing_set_skips_scaffolding_entirely(self, tmp_path):
+        from ai_router.bootstrap import scaffold_bootstrap_sets
+
+        existing = tmp_path / "docs" / "session-sets" / "001-user-auth"
+        existing.mkdir(parents=True)
+        (existing / "spec.md").write_text("# Mine\n", encoding="utf-8")
+        assert scaffold_bootstrap_sets(tmp_path) == []
+        sets = sorted(
+            p.name for p in (tmp_path / "docs" / "session-sets").iterdir()
+        )
+        assert sets == ["001-user-auth"]  # nothing added beside it
+        # A re-run after a successful scaffold is the same no-op.
+        fresh = tmp_path / "fresh"
+        fresh.mkdir()
+        first = scaffold_bootstrap_sets(fresh)
+        assert len(first) == 2
+        assert scaffold_bootstrap_sets(fresh) == []

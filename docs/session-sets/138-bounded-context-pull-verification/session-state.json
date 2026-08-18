@@ -6,9 +6,9 @@
     {
       "number": 1,
       "title": "The manifest and the scope builder",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-18T18:09:50.496323-04:00",
-      "completedAt": null,
+      "completedAt": "2026-08-18T19:30:01.120251-04:00",
       "orchestrator": {
         "engine": "copilot",
         "provider": "anthropic",

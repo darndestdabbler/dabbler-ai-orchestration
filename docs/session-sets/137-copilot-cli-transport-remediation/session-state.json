@@ -6,9 +6,9 @@
     {
       "number": 1,
       "title": "Restore the threshold-gated large-prompt handoff",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-18T15:31:50.151755-04:00",
-      "completedAt": null,
+      "completedAt": "2026-08-18T15:47:35.839001-04:00",
       "orchestrator": {
         "engine": "copilot",
         "provider": "anthropic",

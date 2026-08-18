@@ -2,7 +2,7 @@
   "name": "dabbler-ai-orchestration",
   "displayName": "Dabbler AI Orchestration",
   "description": "Organize AI-led development like work: modules, session sets and step-by-step session plans in a native tree — plus routed verification before every close, normally cross-provider, recorded as evidence you can check.",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "publisher": "DarndestDabbler",
   "private": true,
   "engines": {

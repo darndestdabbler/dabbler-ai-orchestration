@@ -101,13 +101,17 @@ incident got past a weaker check — none of them guards a hypothetical.
 
 ## Get started
 
-Open a project folder and run **`Dabbler: Set Up New Project`** from the
-Command Palette — it creates the workspace `.venv` (when missing),
-installs the router into it, and runs `python -m ai_router.bootstrap`
-in your terminal, which writes the managed instruction blocks your AI
-agent reads and prints the prompts for the two bootstrap sessions
-(project plan, then decomposition into session sets). From there, tell
-your agent **"start the next session"** and watch the tree.
+Open a project folder and click the **AI Work Explorer** icon — in a
+workspace with no session sets yet, the extension offers to set the
+project up for you (or run **`Dabbler: Set Up New Project`** from the
+Command Palette yourself). Setup creates the workspace `.venv` (when
+missing), installs the router into it, writes the managed instruction
+blocks your AI agent reads, and scaffolds the two bootstrap session
+sets: `001-default-plan` (author or import the project plan) and
+`002-default-decomposition` (turn the plan into work sets). From there,
+tell your agent **"start the next session"** and watch the tree — the
+plan and decomposition run through the same tracked, verified pipeline
+as every other session.
 
 The full workflow, command by command, is in the
 [quick start](https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/quick-start.md);

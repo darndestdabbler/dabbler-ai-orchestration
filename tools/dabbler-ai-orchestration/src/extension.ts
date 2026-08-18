@@ -9,7 +9,7 @@ import { registerSessionTerminalCommands } from "./commands/sessionTerminalComma
 import { registerBootstrapProjectCommand } from "./commands/bootstrapProject";
 import { registerInstallAiRouterCommand } from "./commands/installAiRouter";
 import { registerWorkExplorerTreeCommands } from "./commands/workExplorerTreeCommands";
-import { discoverRoots } from "./utils/fileSystem";
+import { discoverRoots, listSessionSetDirNames } from "./utils/fileSystem";
 import { WorkExplorerTreeProvider } from "./providers/WorkExplorerTreeProvider";
 
 const SESSION_SETS_REL = path.join("docs", "session-sets");
@@ -37,6 +37,34 @@ export function activate(context: vscode.ExtensionContext): void {
   treeProvider.onDiagnostic((message) => {
     treeView.message = message;
   });
+
+  // First-run on-ramp: the first time the view becomes visible in a
+  // workspace with no session sets at all, offer to run Set Up New
+  // Project — one confirmation prompt, once per window, never silently.
+  // A declined offer stays declined for this window; the command remains
+  // in the palette.
+  let setupOffered = false;
+  const maybeOfferSetup = async (): Promise<void> => {
+    if (setupOffered || !treeView.visible) return;
+    const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (!root || listSessionSetDirNames(root).length > 0) return;
+    setupOffered = true;
+    const choice = await vscode.window.showInformationMessage(
+      "This workspace has no Dabbler session sets yet. Set it up now? " +
+        "This creates the workspace .venv, installs the ai-router into " +
+        "it, and scaffolds the plan and decomposition session sets.",
+      "Set Up New Project",
+      "Not Now",
+    );
+    if (choice === "Set Up New Project") {
+      void vscode.commands.executeCommand("dabbler.setupNewProject");
+    }
+  };
+  context.subscriptions.push(
+    treeView.onDidChangeVisibility(() => void maybeOfferSetup()),
+  );
+  // The view can already be visible at activation (restored layout).
+  void maybeOfferSetup();
 
   // --- File watchers ---
   let watcherSubs: vscode.Disposable[] = [];

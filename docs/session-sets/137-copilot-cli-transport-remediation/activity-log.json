@@ -180,6 +180,86 @@
       "dateTime": "2026-08-18T15:47:50.678180-04:00",
       "description": "Registered session 2 (copilot).",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-18T16:07:26.163070-04:00",
+      "description": "Register. Confirm the seat with the existing CLI preflight; if it does not authenticate, stop and reschedule rather than running a session whose only purpose is unrunnable.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 2,
+      "stepKey": "run-the-bootstrap-for-real-on",
+      "dateTime": "2026-08-18T16:07:26.163070-04:00",
+      "description": "Run the bootstrap for real on this unelevated account and confirm `DABBLER_TRANSPORT=copilot-cli` is readable from a **newly opened** shell. Record the scope it landed in.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 3,
+      "stepKey": "live-probe-through-the-real-cli",
+      "dateTime": "2026-08-18T16:07:26.163070-04:00",
+      "description": "Live probe through the real CLI, operator-sanctioned premium requests: (a) one dispatch whose composed prompt is comfortably past the cliff (\u2265 40,000 chars) with three distinct retrieval facts placed at the beginning, the middle, and immediately before the footer, and a task whose answer needs all three \u2014 assert the answer uses all three, the ack validated and was stripped, and the metadata shows `handoff: true` with a plausible `payload_bytes`; (b) one control dispatch below the threshold asserting `handoff: false`.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 4,
+      "stepKey": "confirm-the-retrieval-quality-of-the",
+      "dateTime": "2026-08-18T16:07:26.163070-04:00",
+      "description": "Confirm the retrieval quality of the pull, not just its mechanics. The ack proves the model reached EOF; it does not prove the payload was used. The three-fact probe in step 3 is what distinguishes them, and its result is recorded verbatim whether or not it flatters the design.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 5,
+      "stepKey": "fix-whatever-the-live-probe-surfaces",
+      "dateTime": "2026-08-18T16:07:26.163070-04:00",
+      "description": "Fix whatever the live probe surfaces, and re-probe the failed case. Every fix lands with a fake-spawner regression test \u2014 live dogfood finds wire-shape realities fakes cannot, and the fake suite stays the CI gate.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 6,
+      "stepKey": "record-the-raw-results-and-metadata",
+      "dateTime": "2026-08-18T16:07:26.163070-04:00",
+      "description": "Record the raw results and metadata as `s3-live-probe.md` in this set directory; correct the catalog lock's `cli_version` provenance line from what the probe actually observed; bump the version and update `STATUS.md` to say the seat transport is exercised, not merely implemented.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 7,
+      "stepKey": "required-portion-of-the-full-test",
+      "dateTime": "2026-08-18T16:07:26.163070-04:00",
+      "description": "Required portion of the full test suite.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 8,
+      "stepKey": "close-out-cross-provider-verification-through",
+      "dateTime": "2026-08-18T16:07:26.163070-04:00",
+      "description": "Close-out (cross-provider verification through `copilot-cli` as in every session of this set), and the end-of-set `change-log.md`.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-18T16:07:26.171261-04:00",
+      "description": "Registered session 3 (copilot).",
+      "status": "complete"
     }
   ]
 }

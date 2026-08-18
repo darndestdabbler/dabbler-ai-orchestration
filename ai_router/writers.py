@@ -148,8 +148,11 @@ def _build_sessions_array(
         else:
             status = STATUS_NOT_STARTED
         record = {"number": n, "title": title, "status": status}
+        # "verification" (the summary block: verifier identity, rounds,
+        # cost) must ride along with the verdict — dropping it here erased
+        # every earlier session's summary at each registration.
         for key in ("startedAt", "completedAt", "orchestrator",
-                    "verificationVerdict"):
+                    "verificationVerdict", "verification"):
             if prior.get(key) is not None:
                 record[key] = prior[key]
         record.setdefault("startedAt", None)
@@ -218,6 +221,9 @@ def register_session_start(
                 engine, provider, model, effort
             )
             record["verificationVerdict"] = None
+            # The session being (re)started owes fresh verification; a
+            # leftover summary beside a null verdict would be a lie.
+            record.pop("verification", None)
 
     state = {
         "schemaVersion": SCHEMA_VERSION,

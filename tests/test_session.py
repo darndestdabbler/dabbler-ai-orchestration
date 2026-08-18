@@ -198,6 +198,32 @@ class TestWriters:
         assert state["sessions"][0]["verificationVerdict"] == "VERIFIED"
         assert state["sessions"][0]["verification"]["rounds"] == 2
 
+    def test_register_preserves_prior_sessions_verification_block(
+        self, set_dir
+    ):
+        # Registering session 2 rebuilds the sessions array; session 1's
+        # verification summary (verifier identity, rounds, cost) must ride
+        # along with its verdict — it was silently erased at every
+        # registration.
+        register_session_start(set_dir, 1, engine="claude-code",
+                               provider="anthropic")
+        record_session_verification(
+            set_dir, 1, "VERIFIED",
+            summary={"rounds": 2, "verifierProvider": "openai",
+                     "costUsd": 0.31},
+        )
+        flip_state_to_closed(set_dir)
+        state = register_session_start(set_dir, 2, engine="claude-code",
+                                       provider="anthropic")
+        first = state["sessions"][0]
+        assert first["verificationVerdict"] == "VERIFIED"
+        assert first["verification"] == {
+            "rounds": 2, "verifierProvider": "openai", "costUsd": 0.31,
+        }
+        # The freshly registered session owes its own verification.
+        assert state["sessions"][1]["verificationVerdict"] is None
+        assert "verification" not in state["sessions"][1]
+
     def test_seed_plan_once(self, set_dir):
         register_session_start(set_dir, 1, engine="claude-code",
                                provider="anthropic")

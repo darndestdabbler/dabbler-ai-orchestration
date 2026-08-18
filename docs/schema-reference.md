@@ -47,6 +47,7 @@ Each `sessions[]` record (required: `number`, `title`, `status`):
 | `startedAt`, `completedAt` | string \| null | timestamps |
 | `orchestrator` | object \| null | see below |
 | `verificationVerdict` | string \| null | canonical `VERIFIED` / `ISSUES_FOUND` (plus `WAIVED`); the writer fails closed against an exact allowlist, readers prefix-match leniently |
+| `verification` | object | summary stamped when the loop finishes: `rounds`, `verifierModel`, `verifierProvider`, `transport`, `costUsd` (null when unpriced); carried across later registrations like the verdict |
 
 The `orchestrator` block (required: `engine`; omit-null — missing keys
 are valid, `null` values are not):

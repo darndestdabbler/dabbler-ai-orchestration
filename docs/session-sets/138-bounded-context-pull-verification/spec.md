@@ -62,17 +62,28 @@ that it should never have needed to send all of it.
 ## The bounded scope (locked — this is the specification)
 
 Given a diff and the module it belongs to, the evidence is exactly these
-seven tiers and nothing else.
+seven tiers and nothing else. The module is **one** boundary, not the
+only one: tiers 1–4 are bounded by the change, tiers 5–7 by the module.
+A change that reaches outside the module's `codeRoots` is still reviewed
+in full — `codeRoots` bounds tier 7.
 
 **Full content:**
-1. Modified files (in-module).
-2. Direct in-module callers of the changed symbols.
+1. Every modified file.
+2. Direct callers of the changed symbols, wherever they live.
 3. Test files that import the modified files.
 
-**Interface surface only** — signatures, types, contracts; no
-implementation bodies:
+**Interface surface only where a real parser can say what a body is** —
+signatures, types, contracts:
 4. Files referenced *in code* (not in comments) by the modified files.
-   **One hop. No transitive closure.**
+   **One hop. No transitive closure.** Python is reduced to its interface
+   surface through `ast`. Any other language is carried **in full**: a
+   hand-rolled scanner that guesses at a contract is worse than no
+   extraction, because it hands the reviewer text that reads like a
+   signature but is not one — the silent-truncation failure wearing a
+   different hat. The bound that matters is already one hop plus the
+   per-file cap and the scope budget. If measurement shows tier 4 is too
+   heavy for a language, the answer is that language's own declaration
+   emitter (`tsc --emitDeclarationOnly`), never a scanner.
 
 **Reference material:**
 5. Spec sections mapped to the module in the manifest — *mapped*, not
@@ -85,15 +96,20 @@ implementation bodies:
 excluded, and the exclusion is the artifact's normal state, not a
 degradation to apologize for.
 
-**One escalation channel.** The verifier may request a *named* file with
-a justification. The request is approved by policy or by a human, and it
-is logged. There is no second channel, no wildcard request, and no
-silent widening.
-
-**The fork is closed-with-escalation, not hard-closed.** If the diff
-touches the module's **exposed API**, the answer is to route to the
-**wider review tier** — not to expand this scope. Scope creep and tier
-promotion are different decisions and this set keeps them different.
+**The pull has two steps, and neither has a human in it.** Within the
+**domain** — the paths the scope already names — the verifier may
+request a *named* file and gets it mechanically. No justification:
+nothing needs to weigh a request for a file the scope already declared
+eligible. Outside the domain — a path the verifier saw referenced in a
+comment, or inferred — the request is an **escalation**: it names the
+file and says why, and the **orchestrating engine** decides. A human
+decision mid-verification stalls the session, and the orchestrator can
+only *widen* context, never narrow it, so the safe direction is the only
+one available. Every request and every escalation is logged with its
+file, its outcome, and its decider. There is no wildcard request and no
+silent widening. **A refusal is not grounds for abstaining:** the
+verifier returns a verdict on the evidence it holds. A refused
+escalation is neither an unverified result nor a stalemate.
 
 ## Module accounting (ground rule 1)
 
@@ -119,8 +135,15 @@ second manifest.
 - **No transitive closure at tier 4.** One hop. A second hop is how a
   bounded scope becomes the whole repo in three commits.
 - **No new gate.** The existing `verification_clean` reads the latest
-  ledger row; escalations and tier promotions are expressed as rows that
-  gate already reads.
+  ledger row; escalations are expressed as rows that gate already reads.
+- **No exposed-API fork.** An earlier draft routed a diff touching the
+  module's exposed API to a wider review tier. That existed to cover a
+  blindness this set does not have: tiers 1–4 are bounded by the change,
+  not by the module, so tier 2 pulls direct callers of a changed symbol
+  wherever they live — including outside `codeRoots`. A fork would be a
+  guard guarding a guard. The too-broad case is already answered by the
+  scope's char-budget refusal, which names its remedy instead of quietly
+  promoting the session.
 - **The monolithic path stays** for sessions with no module mapping.
   A repo without `docs/modules.yaml` must verify exactly as it does today.
 
@@ -137,11 +160,13 @@ second manifest.
    keeps rendering them. Reject an unknown key rather than ignoring it.
 3. Add `context_scope.py`: given a diff and a module slug, resolve the
    seven tiers and return a structured scope. Tiers 1–3 carry full
-   content; tier 4 carries interface surface only, extracted by parsing
-   rather than by asking a model, one hop, comments excluded; tiers 5–6
-   come from the manifest; tier 7 is names only. Everything unmatched is
-   excluded, and the scope records what it excluded and why — an
-   exclusion nobody can see is indistinguishable from a bug.
+   content; tier 4 is one hop, comments excluded, reduced to its
+   interface surface by a real parser where one exists (`ast` for
+   Python) and carried in full otherwise — never by asking a model and
+   never by a hand-rolled scanner; tiers 5–6 come from the manifest;
+   tier 7 is names only. Everything unmatched is excluded, and the scope
+   records what it excluded and why — an exclusion nobody can see is
+   indistinguishable from a bug.
 4. Fold `prompting.py` into `route.py` and replace the silent
    tail-truncation with a refusal that names the overrun, the budget, and
    the module-scoping remedy. Assert in a test that no code path returns
@@ -153,7 +178,7 @@ second manifest.
 **Creates:** the manifest extension, `context_scope.py`, the truncation
 refusal; `prompting.py` deleted. Est. 16–20 new Python tests.
 
-### Session 2 of 3: Wire it into verification, with the escalation channel
+### Session 2 of 3: Wire it into verification, with the two-step pull
 
 1. Register.
 2. Make the scope the evidence builder for module-mapped sessions:
@@ -161,16 +186,20 @@ refusal; `prompting.py` deleted. Est. 16–20 new Python tests.
    that resolves in the manifest, and from today's monolithic bundle when
    it does not. The round-1 / fix-delta distinction is unchanged.
 3. Render the scope so the verifier knows what it was and was not given:
-   each tier labelled, tier 4 visibly interface-only, tier 7 visibly
-   names-only, and an explicit statement that everything else is excluded
-   by default and is available by request. A verifier that does not know
-   its context is bounded will confabulate the rest.
-4. Add the escalation channel: the verifier requests a **named** file
-   with a justification; the request is approved by policy (a manifest
-   allow-rule) or by a human, and every request — granted or refused — is
-   logged as a ledger row with its justification and its decider. A
-   wildcard or unnamed request is refused, and the refusal says what a
-   valid request looks like.
+   each tier labelled, tier 4 visibly marked interface-or-full, tier 7
+   visibly names-only, and an explicit statement that everything else is
+   excluded by default and what the domain is. A verifier that does not
+   know its context is bounded will confabulate the rest.
+4. Add the two-step pull. An **in-domain request** names a file the
+   scope already listed and is served mechanically — no justification,
+   because nothing needs to weigh it. An **escalation** names a file
+   outside the domain and says why; the **orchestrating engine** decides,
+   with no human in the loop, and may only widen. Both are logged as
+   ledger rows naming the file, the outcome, and the decider. A wildcard
+   or unnamed request is refused, and the refusal says what a valid
+   request looks like. A refusal never licenses abstention: the verifier
+   returns a verdict on the evidence it holds, and "my escalation was
+   refused" is not a verdict.
 5. Cross-provider verification through `copilot-cli`.
 6. Required portion of the full test suite.
 7. Close-out.
@@ -178,31 +207,33 @@ refusal; `prompting.py` deleted. Est. 16–20 new Python tests.
 **Creates:** scope-driven evidence, the rendered tier labels, the
 escalation record. Est. 12–16 new Python tests.
 
-### Session 3 of 3: The API fork, the measurement, and the docs
+### Session 3 of 3: The measurement, the logging seam, and the docs
 
 1. Register.
-2. Implement the exposed-API fork: when the diff touches the module's
-   exposed API — as declared in the manifest, not guessed — the session
-   is routed to the **wider review tier** rather than having its scope
-   expanded. The routing decision is a ledger row naming which API
-   surface triggered it. Closed-with-escalation, never hard-closed: every
-   refusal in this set names the command that resolves it.
-3. Measure the thing this set exists for, on two real corpora — this repo
+2. Measure the thing this set exists for, on two real corpora — this repo
    and `../certs`. For a representative change in each: bundle size
    monolithic vs scoped, and whether the scoped review still catches a
    **planted cross-file defect** that only shows up when a caller and its
    callee are read together. A scope that is smaller but blind is a
    regression, and the measurement must be able to say so.
-4. Documentation: `docs/quick-start.md` gains the module-mapping and
-   escalation flow; `docs/schema-reference.md` documents the extended
-   manifest entry, the scope artifact, and the escalation and
-   tier-promotion rows.
+3. Close the step-logging seam. Every other lifecycle action has a
+   command; logging a plan step makes the orchestrator reach into
+   `ai_router.writers` through `python -c`. Add a `log` subcommand to the
+   **existing** `ai_router.session` CLI — no new module — that resolves
+   the step against the seeded plan rows (a typo'd key refuses rather
+   than appending an orphan row), enforces the closed status vocabulary
+   at the boundary, and is idempotent. Deterministic by construction: no
+   model in the bookkeeping path.
+4. Documentation: `docs/quick-start.md` gains the module-mapping flow,
+   the escalation flow, and the `session log` command;
+   `docs/schema-reference.md` documents the extended manifest entry, the
+   scope artifact, and the escalation rows.
 5. Cross-provider verification through `copilot-cli`.
 6. Required portion of the full test suite.
 7. Close-out, and the end-of-set `change-log.md`.
 
-**Creates:** the API fork, `s3-scope-measurement.md`, the docs. Est. 8–12
-new Python tests.
+**Creates:** `s3-scope-measurement.md`, the `session log` subcommand, the
+docs. Est. 11–16 new Python tests.
 
 ---
 
@@ -212,8 +243,9 @@ A module-mapped session verifies from a scope that is **materially
 smaller** than its monolithic bundle — measured on this repo and on
 `../certs`, recorded in `s3-scope-measurement.md` — while still catching
 a planted cross-file defect that requires reading a caller and its callee
-together. A verifier that asks for a file outside the scope gets it only
-by named, justified, logged request; a diff touching the module's exposed
-API is routed to the wider tier instead of quietly widening this one. A
-repo with no `docs/modules.yaml` verifies exactly as it does today, and no
-code path anywhere returns a silently truncated prompt.
+together. A verifier that wants a file the scope already listed gets it
+by naming it; one outside the domain gets it only by a logged escalation
+the orchestrating engine granted, and a refusal never licenses
+abstention. A repo with no `docs/modules.yaml`
+verifies exactly as it does today, and no code path anywhere returns a
+silently truncated prompt.

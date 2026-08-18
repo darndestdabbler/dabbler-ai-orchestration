@@ -3,6 +3,7 @@
 from .route import (
     DispatchError,
     NoCandidateError,
+    PromptTooLargeError,
     RouteResult,
     RouterError,
     route,
@@ -13,6 +14,7 @@ __version__ = "1.0.9"
 __all__ = [
     "DispatchError",
     "NoCandidateError",
+    "PromptTooLargeError",
     "RouteResult",
     "RouterError",
     "route",

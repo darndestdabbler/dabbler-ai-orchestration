@@ -1,9 +1,9 @@
 _Task prompt templates — one section per routed task type._
 
-This file contains the user-message template applied by `prompting.py`
+This file contains the user-message template applied by `route.py`
 for each routed task type. `config.py` parses the `#` (H1) headers; the
 slug of each header becomes the key in `config["_task_templates"]` that
-`prompting.py` looks up. H1 is used rather than H2 because the template
+`build_prompt` looks up. H1 is used rather than H2 because the template
 content itself begins with H2 headers that would otherwise collide with
 the section-boundary parser.
 
@@ -14,9 +14,9 @@ these two:
   the subject to analyze, the objective to plan, etc.).
 - `{context}` — any supporting material (surrounding files, existing
   patterns, specific questions). If the caller provides no context,
-  `prompting.py` substitutes the literal string `(no additional context)`.
+  `build_prompt` substitutes the literal string `(no additional context)`.
 
-`prompting.py` does the substitution. Do not add other placeholders
+`build_prompt` does the substitution. Do not add other placeholders
 here without updating the loader.
 
 # analysis

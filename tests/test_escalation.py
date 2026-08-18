@@ -71,6 +71,16 @@ class TestDetectTruncation:
     def test_brace_imbalance_flags(self):
         assert detect_truncation('var sql = {"SELECT Reports', "end_turn")
 
+    def test_prose_about_braces_that_ends_cleanly_is_not_truncation(self):
+        # A complete review of brace-matching code: unbalanced braces in
+        # prose, but it stops at a full sentence.
+        assert not detect_truncation(
+            "`_opens_a_body` treats any `{` following `):` as a body, but "
+            "the file has an inline object return type `{ path: string } "
+            "before the real body, so the body is not elided.",
+            "end_turn",
+        )
+
     def test_clean_prose_passes(self):
         assert not detect_truncation("All good (really).", "end_turn")
 

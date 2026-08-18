@@ -246,3 +246,42 @@ class TestCopilotTransport:
         _install_fake_copilot("not json at all\n")
         with pytest.raises(RouterError, match="generic-unknown"):
             route("x")
+
+
+class TestPromptSizeRefusal:
+    """The prompt is never silently truncated: a tail-chopped review
+    bundle still returns a clean-looking verdict, because the handoff
+    acknowledgement is appended after prompting."""
+
+    def test_a_prompt_within_budget_is_returned_intact(self):
+        content = "x" * 4000
+        _system, message = route_mod.build_prompt(
+            content=content, context="", task_type="general",
+            model_cfg={"max_context_tokens": 2000}, config={},
+        )
+        assert message == content
+
+    def test_an_over_budget_prompt_is_refused_with_overrun_and_remedy(self):
+        with pytest.raises(route_mod.PromptTooLargeError) as excinfo:
+            route_mod.build_prompt(
+                content="x" * 8000, context="", task_type="general",
+                model_cfg={"max_context_tokens": 1000}, config={},
+            )
+        message = str(excinfo.value)
+        assert "8000 chars" in message          # the overrun, named
+        assert "800 tokens" in message          # the budget, named
+        assert "docs/modules.yaml" in message   # the remedy, named
+
+    def test_route_refuses_before_dispatching(
+        self, config_on_disk, monkeypatch
+    ):
+        config = make_config()
+        for model in config["models"].values():
+            model["max_context_tokens"] = 1000
+        config_on_disk(config)
+        dispatched = []
+        _mock_api(monkeypatch, lambda req: dispatched.append(req)
+                  or _google_response("never"))
+        with pytest.raises(route_mod.PromptTooLargeError):
+            route("x" * 8000, task_type="formatting")
+        assert dispatched == []

@@ -1,0 +1,118 @@
+{
+  "sessionSetName": "138-bounded-context-pull-verification",
+  "createdDate": "2026-08-18T18:09:50.615882-04:00",
+  "totalSessions": 3,
+  "entries": [
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-18T18:09:50.615912-04:00",
+      "description": "Register.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "extend-the-docs-modules",
+      "dateTime": "2026-08-18T18:09:50.615912-04:00",
+      "description": "Extend the `docs/modules.yaml` entry shape with the fields tiers 5\u20137 need \u2014 `codeRoots`, `specSections`, `contextAssets` \u2014 additively, so entries written by today's `modules.py` stay valid and the extension keeps rendering them. Reject an unknown key rather than ignoring it.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "add-contextscope",
+      "dateTime": "2026-08-18T18:09:50.615912-04:00",
+      "description": "Add `context_scope.py`: given a diff and a module slug, resolve the seven tiers and return a structured scope. Tiers 1\u20133 carry full content; tier 4 carries interface surface only, extracted by parsing rather than by asking a model, one hop, comments excluded; tiers 5\u20136 come from the manifest; tier 7 is names only. Everything unmatched is excluded, and the scope records what it excluded and why \u2014 an exclusion nobody can see is indistinguishable from a bug.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "fold-prompting",
+      "dateTime": "2026-08-18T18:09:50.615912-04:00",
+      "description": "Fold `prompting.py` into `route.py` and replace the silent tail-truncation with a refusal that names the overrun, the budget, and the module-scoping remedy. Assert in a test that no code path returns a silently truncated prompt.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "cross-provider-verification-through-copilot-cli",
+      "dateTime": "2026-08-18T18:09:50.615912-04:00",
+      "description": "Cross-provider verification through `copilot-cli`.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 6,
+      "stepKey": "required-portion-of-the-full-test",
+      "dateTime": "2026-08-18T18:09:50.615912-04:00",
+      "description": "Required portion of the full test suite.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 7,
+      "stepKey": "close-out",
+      "dateTime": "2026-08-18T18:09:50.615912-04:00",
+      "description": "Close-out.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-18T18:09:50.619199-04:00",
+      "description": "Registered session 1 (copilot).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "extend-the-docs-modules",
+      "dateTime": "2026-08-18T18:29:20.469620-04:00",
+      "description": "Extended the docs/modules.yaml entry shape with codeRoots, specSections and contextAssets; unknown keys are rejected, entries written by the old writer stay valid.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "add-contextscope",
+      "dateTime": "2026-08-18T18:29:20.473529-04:00",
+      "description": "Added context_scope.py: seven tiers resolved mechanically -- 1-4 bounded by the change, 5-7 by the module -- with every exclusion recorded and its reason.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "fold-prompting",
+      "dateTime": "2026-08-18T18:29:20.476375-04:00",
+      "description": "Folded prompting.py into route.py and replaced the silent tail-truncation with PromptTooLargeError naming the overrun, the budget and the module-scoping remedy; prompting.py deleted.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "cross-provider-verification-through-copilot-cli",
+      "dateTime": "2026-08-18T19:27:06.710533-04:00",
+      "description": "Cross-provider verification through copilot-cli: 3 rounds, each finding a distinct real defect, each remediated -- r1 tier 4 blind to extensionless TS imports (gpt-5.5/openai); r2 the TS extractor kept bodies and dropped contracts (gemini-3.1-pro-preview/google); r3 code contradicted the locked spec, resolved by an operator-directed spec amendment (gpt-5.5/openai). Round cap reached; r3 finding 0 disputed on the record; adjudication unavailable (every seat provider had already participated); operator attested the waiver at an interactive prompt.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 6,
+      "stepKey": "required-portion-of-the-full-test",
+      "dateTime": "2026-08-18T19:28:37.850134-04:00",
+      "description": "Full Python suite green: 449 passed in 140s, against the 480-test ceiling (414 before this session; +35 for the manifest validation, the seven-tier scope, the prompt-size refusal, and the truncation false-positive).",
+      "status": "complete"
+    }
+  ]
+}

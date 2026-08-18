@@ -8,10 +8,10 @@ rates on the API path; ``cost_usd=None`` with ``cost_status="unmeasured"``
 on the Copilot path — the CLI reports no billing-authoritative usage, and
 an absent cost is never 0.0).
 
-Verification wiring is deferred to Session 2: callers pass
-``exclude_providers`` (a hard constraint honored inside
-``surviving_candidates`` and the catalog role walk — no pin, preference, or
-escalation can override it) and this module stops there.
+Prompt rendering lives here rather than in its own module because
+``route`` is its only caller and the size decision it makes — refuse an
+over-budget prompt, never trim one — belongs to the dispatch path that
+would otherwise ship the truncated result.
 """
 
 from __future__ import annotations
@@ -31,7 +31,6 @@ from .config import (
 )
 from .metrics import record_call
 from .pricing import calculate_cost
-from .prompting import build_prompt
 from .runtime_mode import is_no_router_mode
 from .selection import estimate_complexity, next_escalation_model, pick_model
 from .transports.api import DirectApiTransport
@@ -67,6 +66,70 @@ class DispatchError(RouterError):
         super().__init__(message)
         self.provider = provider
         self.model = model
+
+
+class PromptTooLargeError(RouterError):
+    """The rendered prompt exceeds the model's input budget. Refused, not
+    trimmed: tail-chopping a review bundle drops the end of the diff while
+    the handoff acknowledgement -- appended by the transport after
+    prompting -- still validates, so a truncated review returns a
+    clean-looking verdict."""
+
+
+# --- Prompt rendering -------------------------------------------------------
+
+_DEFAULT_SYSTEM_PROMPT = "You are an expert software engineer. Be direct " \
+    "and precise."
+
+# Input share of the context window; the remainder is reserved for output.
+_INPUT_BUDGET_FRACTION = 0.8
+_DEFAULT_MAX_CONTEXT_TOKENS = 200000
+_CHARS_PER_TOKEN = 4
+
+
+def build_prompt(
+    content: str,
+    context: str,
+    task_type: str,
+    model_cfg: dict,
+    config: dict,
+) -> tuple[str, str]:
+    """Returns ``(system_prompt, user_message)``. Applies the task-type
+    template when one exists, otherwise raw content + context. Raises
+    :class:`PromptTooLargeError` when the message exceeds the model's
+    input budget -- no code path returns a silently truncated prompt."""
+    system_prompt = model_cfg.get("_system_prompt", _DEFAULT_SYSTEM_PROMPT)
+
+    templates = config.get("_task_templates", {})
+    if task_type in templates:
+        user_message = templates[task_type].replace(
+            "{content}", content
+        ).replace("{context}", context or "(no additional context)")
+    elif context:
+        user_message = f"{content}\n\n---\n\nContext:\n{context}"
+    else:
+        user_message = content
+
+    max_input = model_cfg.get(
+        "max_context_tokens", _DEFAULT_MAX_CONTEXT_TOKENS
+    )
+    budget_tokens = int(max_input * _INPUT_BUDGET_FRACTION)
+    estimated_tokens = len(user_message) // _CHARS_PER_TOKEN
+    if estimated_tokens > budget_tokens:
+        raise PromptTooLargeError(
+            f"the rendered {task_type!r} prompt is {len(user_message)} chars "
+            f"(~{estimated_tokens} tokens) against an input budget of "
+            f"{budget_tokens} tokens ({budget_tokens * _CHARS_PER_TOKEN} "
+            f"chars, {int(_INPUT_BUDGET_FRACTION * 100)}% of the model's "
+            f"{max_input}-token window) -- an overrun of "
+            f"{estimated_tokens - budget_tokens} tokens. Map the session to "
+            "a module in docs/modules.yaml so verification builds a bounded "
+            "scope instead of a whole-session bundle, split the session, or "
+            "route to a model with a larger window. The prompt is never "
+            "silently truncated to fit."
+        )
+
+    return system_prompt, user_message
 
 
 @dataclass
@@ -150,10 +213,18 @@ def classify_escalation_reason(result, escalation_cfg: dict) -> str:
     return "unknown"
 
 
+_SENTENCE_ENDINGS = ".!?)`\"'"
+
+
 def detect_truncation(content: str, stop_reason: str) -> bool:
     """Provider signal plus a conservative syntactic heuristic: an odd
-    count of triple-backtick fences or more ``{`` than ``}``. Parentheses
-    are deliberately not checked (prose false-positives)."""
+    count of triple-backtick fences, or more ``{`` than ``}`` in output
+    that also *stops abruptly*. The abrupt-ending condition is what
+    separates cut-off code from prose that merely discusses braces — a
+    complete review of brace-matching code quoted seven ``{`` against six
+    ``}``, ended in a full sentence, and was discarded as truncated,
+    losing the verdict. Parentheses are deliberately not checked (prose
+    false-positives)."""
     if stop_reason == "max_tokens":
         return True
     stripped = content.rstrip()
@@ -161,9 +232,9 @@ def detect_truncation(content: str, stop_reason: str) -> bool:
         return False  # empty response is a different failure mode
     if stripped.count("```") % 2 == 1:
         return True
-    if stripped.count("{") > stripped.count("}"):
-        return True
-    return False
+    if stripped[-1] in _SENTENCE_ENDINGS:
+        return False
+    return stripped.count("{") > stripped.count("}")
 
 
 class RateLimiter:

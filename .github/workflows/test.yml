@@ -40,7 +40,9 @@ jobs:
           python -m pip install pytest pytest-xdist
 
       - name: Run pytest
-        run: python -m pytest -q
+        # -n 0 overrides pytest.ini's local two-worker default: on the
+        # hosted runner, sequential beats xdist worker startup.
+        run: python -m pytest -q -n 0
 
   extension:
     name: Extension suite (unit + typecheck + lint)

@@ -1,4 +1,64 @@
-# STATUS — after set 139 session 3 (the lockfile has a writer, a stamp, and a fresh probe)
+# STATUS — after set 141 (the critique contracts exist, and decide nothing)
+
+- **Set 141 is complete on `experiment/verification-pipeline-v3`.** All
+  three sessions VERIFIED by gpt-5.5/openai over `copilot-cli` (rounds
+  2 / 3 / 3). Nothing merged to `master`; the merge is one deliberate
+  decision after set 145 passes the plan's §11 gates, not a sequence of
+  partially enabled sets.
+- **Nothing reads any of it.** `verify` and `session close` behave exactly
+  as they did at `8be18fb8`: same rounds, same verdicts, same five gates.
+  The pipeline is `off` by default, `shadow` is the only other accepted
+  value, and `enforce` is refused at load by the name of the set that will
+  enable it.
+- **Suite: 455 green**, which is set 141's whole 11-test allocation
+  (444 + 11). The 480 ceiling is unchanged; **25 slots are free**.
+- **The re-scope decision the spec deferred to this close is now due, and
+  the real numbers do not change it.** Sets 142–145 are allocated 10 / 13
+  / 8 / 6 = **37** against **25** free — 12 short, exactly as estimated.
+  Sets 142 and 143 fit (23 of 25). **Set 144 still may not begin until
+  its allocation is re-scoped downward or further slots are reclaimed
+  under the session-1 rules**, and set 145's 6 sit behind the same wall.
+  This is an operator decision; nothing here funds it.
+- **The framework checks the worker, and the check checks the quote.** A
+  quote is re-read from the *reviewed tree* by digest — never the
+  worktree, which keeps moving — re-hashed, and matched against the
+  enclosing AST node chain. The kinds a quote must satisfy are derived
+  from the check's own `Kind:dotted.name` vocabulary, not from the row
+  answering it: an optional worker-declared `ast_kind` would have made
+  the discrimination opt-in for the party it constrains, which is what
+  round 1 caught. The seeded fixture spells `os.system(cmd)` inside a
+  string literal precisely so that a quote of it cannot answer a check
+  about calls.
+- **A blocked result has no way back.** Blocked for `unprovable-absence`,
+  `authorized-pulls-insufficient`, `bounds-exhausted` or
+  `tooling-unavailable` means the check has no `pass` in its future at
+  all. The exits are the plan's ladder — deterministic test or analyzer,
+  a narrower check, adjudication, human review — and a later attempt with
+  more context or tools is a bigger budget, which is not evidence about
+  the code. Round 2 was right that letting re-executed evidence discharge
+  it reopened exactly the door the plan closes.
+- **A result for an unregistered check is refused** (round 2's second
+  finding): an unregistered `check_id` carries no objective, no scope and
+  no evidence contract, so accepting one turned the quote contract off at
+  the moment a worker named a check nobody wrote.
+- **Absence is measured here or not at all.** The worker declares query,
+  kind and closed scope; the framework re-runs it and records scope,
+  query, tool version and count. A declared count that disagrees with the
+  re-run is refused rather than corrected, and a scope resolving to no
+  searchable file is refused outright — absence proved over nothing is
+  the cheapest false proof there is.
+- **`tests/fixtures/critique-roundtrip/` is the seeded round trip** —
+  `widget.py`, `claims.json`, `checks.json` — travelling from `verify
+  prepare` through the real writers and the real verifiers to a validated
+  result, with no model called anywhere. Sets 142–145 should extend it
+  rather than build a second one.
+- **Test execution order is the plan's, not habit's** (§2.4): targeted
+  runs before verification, the full suite after, as the run of record.
+  Set 142 makes that enforceable; here it was followed by hand.
+- **This environment still has no provider API keys** — seat transport
+  only, so the `api` path stays unexercised and routed verification is
+  unpriced.
+
 
 - **Released: `dabbler-ai-router` 1.1.0 is on PyPI** (2026-08-19), tag
   `v1.1.0` on `3ebda389`. The release workflow builds from the tagged

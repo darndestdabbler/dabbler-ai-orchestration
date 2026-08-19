@@ -1,3 +1,73 @@
+# STATUS — after set 139 session 3 (the lockfile has a writer, a stamp, and a fresh probe)
+
+- **Set 139 session 3 is done; the set is closed.** The seat catalog
+  lockfile is machine-written end to end. `refresh --quorum --dry-run`
+  projected **2** premium requests on the live seat at CLI 1.0.80, the
+  real run spent exactly that, re-dated the pin from 1.0.68, and left the
+  15 unprobed entries byte-identical. Full record, with the before/after
+  diff, in
+  `docs/session-sets/139-seat-catalog-refresh/s3-refresh-evidence.md`.
+  **Nothing in this set required a human to open the lockfile in an
+  editor** — which is the outcome the missing writer made impossible.
+- **Hand-editing is now detectable.** The writer stamps `written_by`,
+  `written_at` and a `content_digest` over what it wrote; `load_catalog`
+  reports three states — `machine-written`, `hand-edited` (contents
+  disagree with the stamp, *including* a stamp whose digest line was
+  deleted), `unstamped` — and the last two surface as warnings in the
+  same channel as version drift. Detection, not enforcement: the seat
+  still loads. The digest covers rendered **content**, not mtime,
+  because the lockfile is committed and every checkout rewrites mtime.
+- **Every stale-catalog message now names the refresh invocation.** The
+  drift warning, the missing-provenance refusal, the fewer-than-two-
+  providers refusal, and `route.py`'s two lockfile errors. The absence
+  of that verb is the whole incident: an operator told the file is
+  wrong, and handed no command, edits the file.
+- **`claude-opus-4.7` failed its probe with `invalid-model`** and kept
+  its 1.0.68 confirmation with `last_probe_error` recorded beside it —
+  the merge rule demonstrated on the live seat rather than in a fake. A
+  withdrawn model and a policy-blocked one return the identical CLI
+  error, so nothing is inferred from it.
+- **`premiumRequests` is fractional, and the coercion now says so.**
+  Round 1 of verification returned one Major and it was right: the seat
+  reports `0.33` for `claude-haiku-4.5` and `0` for `gpt-5-mini`, and
+  session 1's coercion read every float as malformed. The seat's
+  *cheapest* models therefore recorded as unknown-cost, an unknown sorts
+  after every known sample, and `--quorum` picked `claude-sonnet-4.6` at
+  1.0 over `claude-haiku-4.5` at 0.33. `_coerce_probe_premium_requests`
+  now accepts any finite non-negative int or float; a bool, string, list,
+  negative or non-finite value is still not a count. The writer renders a
+  float through `repr` — the shortest text that reads back as the same
+  float — so the sample survives a rewrite and the digest holds. **The
+  quorum now costs 1.33, not 2**; the set's acceptance criterion names 2,
+  which is what it cost while the cheapest model read as unknown. The
+  invariant is untouched: the sample is a one-call observation, never a
+  price, and it never feeds model selection.
+- **Every quorum-relevant sample was re-measured post-fix** and came back
+  identical (`no change: all 3 probed entries answered exactly as the
+  lockfile already records`), so no stale v1 value is hiding behind a
+  float the old coercion discarded.
+- **Test fixtures were decoupled from the live seat record.** Four tests
+  asserted exact values of `ai_router/copilot-catalog.lock`, so an honest
+  refresh broke the suite — pressure to edit the record to make tests
+  pass, which is the pathology this set exists to remove. The behaviour
+  tests now read a frozen `tests/fixtures/seat-catalog.lock`; only the
+  two contracts that must hold for *any* lockfile (byte-for-byte round
+  trip, universe declares every id) still read the shipped file.
+- **Suite: 475 green**, 5 free against the 480 ceiling. Session 3 added
+  7 tests against an 8–12 estimate.
+- **Docs.** `README.md`'s transport-precedence list, `docs/quick-start.md`
+  and `docs/schema-reference.md` all now carry `local-overrides.yaml`
+  (where it lives, never published, unknown keys refused at load, the
+  seat-only worked example) and the refresh flow with its cost table.
+  `schema-reference.md` documents the lockfile schema, the declared
+  candidate universe, and the writer stamp.
+- **The packaged default is untouched and must stay that way.**
+  `ai_router/router-config.yaml` still reads `transport: profile: api`;
+  this machine reaches the seat through `local-overrides.yaml` with
+  `DABBLER_TRANSPORT` unset and no `--transport` flag. Version is still
+  **1.1.0**; PyPI still has 1.0.0. The `dist/` artifacts predate this
+  set — rebuild before publishing, since the packaged lockfile changed.
+
 # STATUS — after set 140 (the cancelled scope is gone; 1.1.0 is built, not published)
 
 - **Set 139 is next, and it is now the only open set.** Its spec was

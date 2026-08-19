@@ -12,13 +12,18 @@ from ai_router.transports.copilot import (
     ERROR_CLASS_INVALID_MODEL,
     HANDOFF_THRESHOLD_UTF16_UNITS,
     ModelEntry,
+    PROVENANCE_HAND_EDITED,
+    PROVENANCE_MACHINE_WRITTEN,
+    PROVENANCE_UNSTAMPED,
     PROVIDER_SOURCE_HEURISTIC,
+    REFRESH_COMMAND,
     SCOPE_ALL,
     SCOPE_MODELS,
     SCOPE_QUORUM,
     SCOPE_STALE,
     TransportTimeouts,
     _rendered_utf16_units,
+    catalog_provenance,
     discover_models,
     dumps_catalog,
     format_plan,
@@ -32,7 +37,13 @@ from ai_router.transports.copilot import (
     write_catalog,
 )
 
-V1_LOCK = (
+V1_LOCK = Path(__file__).parent / "fixtures" / "seat-catalog.lock"
+
+# The operator's live seat record, which a real refresh rewrites. Only the
+# contracts that must hold for ANY lockfile are asserted against it; a test
+# that pinned its values would fail on the next honest refresh, and a test
+# that fails when the record is updated is pressure to edit the record.
+SHIPPED_LOCK = (
     Path(__file__).parent.parent / "ai_router" / "copilot-catalog.lock"
 )
 
@@ -325,7 +336,8 @@ class TestCatalog:
         catalog = _catalog(
             _entry("a", "anthropic"), _entry("b", "openai"), version="v1",
         )
-        assert validate_catalog(catalog, live_cli_version="v1").warnings == ()
+        result = validate_catalog(catalog, live_cli_version="v1")
+        assert not any("drift" in w for w in result.warnings)
 
     def test_pin_defaults_off_when_lockfile_omits_it(self, tmp_path):
         lock = tmp_path / "c.lock"
@@ -406,8 +418,8 @@ class TestCatalogWriter:
     def test_shipped_lockfile_round_trips_byte_for_byte(self):
         """The contract that makes a partial refresh honest: a catalog
         nothing touched renders back to the bytes it was read from."""
-        assert dumps_catalog(load_catalog(V1_LOCK)) == V1_LOCK.read_text(
-            encoding="utf-8"
+        assert dumps_catalog(load_catalog(SHIPPED_LOCK)) == (
+            SHIPPED_LOCK.read_text(encoding="utf-8")
         )
 
     def test_keys_this_version_does_not_model_survive_the_writer(
@@ -424,7 +436,7 @@ class TestCatalogWriter:
 
     def test_unrenderable_value_is_refused_by_the_writer(self):
         catalog = _catalog(_entry("a", "anthropic"))
-        catalog.models[0].raw = {"probe_latency_seconds": 1.5}
+        catalog.models[0].raw = {"probe_detail": {"nested": "table"}}
         with pytest.raises(ValueError, match="cannot represent"):
             dumps_catalog(catalog)
 
@@ -443,11 +455,109 @@ class TestCatalogWriter:
         assert validate_catalog(load_catalog(path)).ok
 
 
+class TestWriterStamp:
+    def _written(self, tmp_path, *entries, **kwargs):
+        path = tmp_path / "seat.lock"
+        write_catalog(path, _catalog(*entries), **kwargs)
+        return path
+
+    def test_the_writer_records_what_wrote_the_file_and_when(self, tmp_path):
+        path = self._written(
+            tmp_path, _entry("a", "anthropic"), _entry("b", "openai"),
+            written_at=_STAMP,
+        )
+        meta = load_catalog(path).meta
+        assert meta.written_at == _STAMP
+        assert meta.written_by.startswith("ai_router.transports.copilot")
+        assert catalog_provenance(load_catalog(path)) == (
+            PROVENANCE_MACHINE_WRITTEN
+        )
+
+    def test_an_edit_after_the_write_is_reported_as_hand_edited(
+        self, tmp_path
+    ):
+        """The rule this repo already holds for .dabbler/runs/ — never
+        hand-repaired — made checkable rather than aspirational. Two people
+        hand-edited this file's pin, which is exactly what it must report."""
+        path = self._written(
+            tmp_path, _entry("a", "anthropic"), _entry("b", "openai")
+        )
+        path.write_text(
+            path.read_text(encoding="utf-8").replace(
+                'cli_version = "v1"', 'cli_version = "v2"'
+            ),
+            encoding="utf-8",
+        )
+        catalog = load_catalog(path)
+        result = validate_catalog(catalog)
+        assert catalog_provenance(catalog) == PROVENANCE_HAND_EDITED
+        # Detection, not enforcement: the seat still loads, and says so.
+        assert result.ok
+        assert any("hand-edited" in w for w in result.warnings)
+
+    def test_deleting_the_digest_reads_as_hand_edited_not_unstamped(
+        self, tmp_path
+    ):
+        """Removing the line that would convict is itself the edit."""
+        path = self._written(tmp_path, _entry("a", "anthropic"))
+        path.write_text(
+            "".join(
+                f"{line}\n"
+                for line in path.read_text(encoding="utf-8").splitlines()
+                if not line.startswith("content_digest")
+            ),
+            encoding="utf-8",
+        )
+        assert catalog_provenance(load_catalog(path)) == PROVENANCE_HAND_EDITED
+
+    def test_a_lockfile_no_writer_ever_touched_reads_as_unstamped(self):
+        catalog = load_catalog(V1_LOCK)
+        assert catalog_provenance(catalog) == PROVENANCE_UNSTAMPED
+        assert any(
+            "no writer stamp" in w for w in validate_catalog(catalog).warnings
+        )
+
+    def test_a_refreshed_lockfile_reads_back_as_machine_written(
+        self, tmp_path
+    ):
+        lock = _lock_copy(tmp_path)
+        run_refresh(
+            catalog_path=lock,
+            transport=CopilotCliTransport(spawner=_seat_spawner({
+                "claude-sonnet-4.6": _probe_ok("claude-sonnet-4.6"),
+                "gemini-3.1-pro-preview": _probe_ok("gemini-3.1-pro-preview"),
+                "gpt-5.5": _probe_ok("gpt-5.5"),
+            })),
+            live_cli_version=SEAT_VERSION, clock=lambda: _STAMP,
+        )
+        catalog = load_catalog(lock)
+        assert catalog_provenance(catalog) == PROVENANCE_MACHINE_WRITTEN
+        assert catalog.meta.written_at == _STAMP
+
+    def test_no_stale_catalog_message_omits_the_command_that_fixes_it(self):
+        """The absence of that verb is the incident: an operator told the
+        file is wrong, and handed no command, edits the file."""
+        results = (
+            validate_catalog(
+                _catalog(_entry("a", "anthropic"), _entry("b", "openai")),
+                live_cli_version="v9",
+            ),
+            validate_catalog(_catalog(_entry("a", ""), _entry("b", "openai"))),
+            validate_catalog(
+                _catalog(_entry("a", "openai"), _entry("b", "openai"))
+            ),
+        )
+        for result in results:
+            messages = result.reasons + result.warnings
+            assert messages
+            assert all(REFRESH_COMMAND in message for message in messages)
+
+
 class TestCandidateUniverse:
     def test_shipped_lockfile_declares_every_id_it_carries(self):
         """The CLI cannot enumerate models, so the universe is data in the
         file rather than a list in code."""
-        catalog = load_catalog(V1_LOCK)
+        catalog = load_catalog(SHIPPED_LOCK)
         assert catalog.meta.candidate_universe == tuple(
             e.id for e in catalog.models
         )
@@ -485,14 +595,31 @@ class TestDiscoverModels:
         assert entry.last_probe_at == _STAMP
         assert entry.confirmed_at is None
 
-    def test_malformed_premium_sample_is_coerced_to_unknown(self):
-        # Unknown, never free: a float off the wire is not a request count,
-        # and a zero would read as a measurement.
+    def test_a_fractional_sample_is_a_measurement_not_malformation(
+        self, tmp_path
+    ):
+        """The seat reports 0.33 for sub-premium models. Discarding that
+        files the cheapest models on the seat as the most uncertain, since
+        unknown sorts after every known sample."""
         [entry] = _probe(
-            ["gpt-5.5"],
-            {"gpt-5.5": _probe_ok("gpt-5.5", {"premiumRequests": 1.5})},
+            ["claude-haiku-4.5"],
+            {"claude-haiku-4.5": _probe_ok(
+                "claude-haiku-4.5", {"premiumRequests": 0.33}
+            )},
         )
-        assert entry.probe_premium_requests is None
+        assert entry.probe_premium_requests == 0.33
+        path = tmp_path / "seat.lock"
+        write_catalog(path, _catalog(entry, _entry("o", "openai")))
+        assert load_catalog(path).models[0].probe_premium_requests == 0.33
+
+    def test_a_sample_that_is_not_a_count_is_coerced_to_unknown(self):
+        # Unknown, never free: a zero would read as a measurement.
+        for wire in ("1", [1], True, -1, float("nan"), float("inf")):
+            [entry] = _probe(
+                ["gpt-5.5"],
+                {"gpt-5.5": _probe_ok("gpt-5.5", {"premiumRequests": wire})},
+            )
+            assert entry.probe_premium_requests is None, wire
 
     def test_provider_is_inferred_by_prefix_with_its_source_declared(self):
         [entry] = _probe(
@@ -568,7 +695,7 @@ SEAT_VERSION = "GitHub Copilot CLI 1.0.80."
 
 
 def _lock_copy(tmp_path):
-    """The shipped lockfile, somewhere a test may write to."""
+    """The frozen seat fixture, somewhere a test may write to."""
     dest = tmp_path / "copilot-catalog.lock"
     dest.write_text(V1_LOCK.read_text(encoding="utf-8"), encoding="utf-8")
     return dest

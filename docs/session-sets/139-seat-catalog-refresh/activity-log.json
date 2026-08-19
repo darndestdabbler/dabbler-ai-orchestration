@@ -258,6 +258,150 @@
       "dateTime": "2026-08-19T07:26:44.948438-04:00",
       "description": "VERIFIED at round 2 by gpt-5.5/openai over copilot-cli; round 1 Major was the circular 'steps 5-6 pending' ledger finding",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-19T07:33:10.849583-04:00",
+      "description": "Register.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 2,
+      "stepKey": "make-hand-editing-detectable-rather-than",
+      "dateTime": "2026-08-19T07:33:10.849583-04:00",
+      "description": "Make hand-editing detectable rather than merely discouraged. The writer stamps the lockfile with what wrote it and when; `load_catalog` surfaces a file whose contents postdate its own stamp as **hand-edited provenance**, reported in the same channel as version drift. The rule the repo already holds for `.dabbler/runs/` \u2014 machine-written, never hand-repaired \u2014 becomes checkable here instead of aspirational. Detection, not enforcement: an operator may still edit, but the record will say they did.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 3,
+      "stepKey": "point-every-stale-catalog-message-at",
+      "dateTime": "2026-08-19T07:33:10.849583-04:00",
+      "description": "Point every stale-catalog message at the command that fixes it. The drift warning, the missing-provenance refusal and the fewer-than-two-providers refusal each name the exact `refresh` invocation that resolves them. The absence of that verb is what caused this incident; no message may report a stale catalog without naming it.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 4,
+      "stepKey": "live-seat-run",
+      "dateTime": "2026-08-19T07:33:10.849583-04:00",
+      "description": "Live seat run: `--dry-run` first, then a real `--quorum` refresh on the operator's seat at CLI 1.0.80. Record the projected cost, the actual cost, the resulting diff, and the file before and after in `s3-refresh-evidence.md`. Then a `--models` run over the two entries set 137 could not confirm (`claude-haiku-4.5`, `claude-opus-4.7`), so the unknown-cost entries stop being unknown.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 5,
+      "stepKey": "documentation",
+      "dateTime": "2026-08-19T07:33:10.849583-04:00",
+      "description": "Documentation: `docs/quick-start.md` gains the refresh flow and the cost table; `docs/schema-reference.md` documents the lockfile schema, the declared universe, and the writer stamp. Both, plus `README.md`'s transport-precedence list, gain `local-overrides.yaml`: where it lives, that it is never published, that an unknown key is refused at load, and the worked example of a seat-only machine setting `transport.profile: copilot-cli` without touching the packaged default.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 6,
+      "stepKey": "cross-provider-verification-through-copilot-cli",
+      "dateTime": "2026-08-19T07:33:10.849583-04:00",
+      "description": "Cross-provider verification through `copilot-cli`.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 7,
+      "stepKey": "required-portion-of-the-full-test",
+      "dateTime": "2026-08-19T07:33:10.849583-04:00",
+      "description": "Required portion of the full test suite.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 8,
+      "stepKey": "close-out-and-the-end-of",
+      "dateTime": "2026-08-19T07:33:10.849583-04:00",
+      "description": "Close-out, and the end-of-set `change-log.md`.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-19T07:33:10.853592-04:00",
+      "description": "Registered session 3 (copilot).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 2,
+      "stepKey": "make-hand-editing-detectable-rather-than",
+      "dateTime": "2026-08-19T07:48:58.706990-04:00",
+      "description": "Make hand-editing detectable rather than merely discouraged. The writer stamps the lockfile with what wrote it and when; `load_catalog` surfaces a file whose contents postdate its own stamp as **hand-edited provenance**, reported in the same channel as version drift. The rule the repo already holds for `.dabbler/runs/` \u2014 machine-written, never hand-repaired \u2014 becomes checkable here instead of aspirational. Detection, not enforcement: an operator may still edit, but the record will say they did.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 3,
+      "stepKey": "point-every-stale-catalog-message-at",
+      "dateTime": "2026-08-19T07:48:59.138400-04:00",
+      "description": "Point every stale-catalog message at the command that fixes it. The drift warning, the missing-provenance refusal and the fewer-than-two-providers refusal each name the exact `refresh` invocation that resolves them. The absence of that verb is what caused this incident; no message may report a stale catalog without naming it.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 4,
+      "stepKey": "live-seat-run",
+      "dateTime": "2026-08-19T07:48:59.583677-04:00",
+      "description": "Live seat run: `--dry-run` first, then a real `--quorum` refresh on the operator's seat at CLI 1.0.80. Record the projected cost, the actual cost, the resulting diff, and the file before and after in `s3-refresh-evidence.md`. Then a `--models` run over the two entries set 137 could not confirm (`claude-haiku-4.5`, `claude-opus-4.7`), so the unknown-cost entries stop being unknown.",
+      "status": "in-progress"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 4,
+      "stepKey": "live-seat-run",
+      "dateTime": "2026-08-19T08:05:14.196337-04:00",
+      "description": "Live seat run: `--dry-run` first, then a real `--quorum` refresh on the operator's seat at CLI 1.0.80. Record the projected cost, the actual cost, the resulting diff, and the file before and after in `s3-refresh-evidence.md`. Then a `--models` run over the two entries set 137 could not confirm (`claude-haiku-4.5`, `claude-opus-4.7`), so the unknown-cost entries stop being unknown.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 5,
+      "stepKey": "documentation",
+      "dateTime": "2026-08-19T08:05:14.705135-04:00",
+      "description": "Documentation: `docs/quick-start.md` gains the refresh flow and the cost table; `docs/schema-reference.md` documents the lockfile schema, the declared universe, and the writer stamp. Both, plus `README.md`'s transport-precedence list, gain `local-overrides.yaml`: where it lives, that it is never published, that an unknown key is refused at load, and the worked example of a seat-only machine setting `transport.profile: copilot-cli` without touching the packaged default.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 6,
+      "stepKey": "cross-provider-verification-through-copilot-cli",
+      "dateTime": "2026-08-19T08:08:18.777499-04:00",
+      "description": "Cross-provider verification through `copilot-cli`.",
+      "status": "in-progress"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 6,
+      "stepKey": "cross-provider-verification-through-copilot-cli",
+      "dateTime": "2026-08-19T08:21:20.614153-04:00",
+      "description": "Cross-provider verification through `copilot-cli`.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 7,
+      "stepKey": "required-portion-of-the-full-test",
+      "dateTime": "2026-08-19T08:21:21.073670-04:00",
+      "description": "Required portion of the full test suite.",
+      "status": "complete"
     }
   ]
 }

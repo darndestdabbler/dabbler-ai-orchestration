@@ -34,6 +34,7 @@ from .runtime_mode import is_no_router_mode
 from .selection import estimate_complexity, next_escalation_model, pick_model
 from .transports.api import DirectApiTransport
 from .transports.copilot import (
+    REFRESH_COMMAND,
     CopilotCliTransport,
     get_cli_version,
     load_catalog,
@@ -309,8 +310,9 @@ def _get_copilot(config: dict):
     except (OSError, ValueError) as exc:
         raise RouterError(
             f"the copilot-cli catalog lockfile at {str(lockfile)!r} could "
-            f"not be loaded ({exc}). Probe the seat to regenerate it, or "
-            "switch the transport back to 'api'."
+            f"not be loaded ({exc}). Rebuild it with "
+            f"`{REFRESH_COMMAND} --all`, or switch the transport back to "
+            "'api'."
         ) from exc
 
     binary = cli_cfg.get("binary", "copilot")
@@ -321,7 +323,6 @@ def _get_copilot(config: dict):
         raise RouterError(
             "the copilot-cli catalog lockfile failed fail-closed "
             "validation: " + "; ".join(validation.reasons)
-            + ". Re-probe the seat to refresh it."
         )
     for warning in validation.warnings:
         print(f"ai_router: copilot-cli catalog: {warning}", file=sys.stderr)

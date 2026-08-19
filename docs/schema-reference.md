@@ -3,7 +3,9 @@
 The four per-set artifacts live in `docs/session-sets/<NNN-slug>/` in
 the consumer project. Two ledgers live outside the set directory: the
 verification round ledger under `.dabbler/runs/` (gitignored) and the
-router metrics ledger `router-metrics.jsonl`.
+router metrics ledger `router-metrics.jsonl`. Two more files are
+machine-scoped rather than per-set: the config overlay
+`local-overrides.yaml` and the seat catalog lockfile.
 
 Writers emit only the canonical shapes below. Readers are more
 tolerant: schema v3 state files, status aliases (`completed`, `done`),
@@ -227,3 +229,106 @@ per-task / per-set spend, requested-vs-served mismatches, and
 Opus-equivalent savings (what the priced calls would have cost at the
 tier-3 rate, minus actual). Unpriced groups render `-`, mixed groups a
 `+` suffix — never $0.00.
+
+## Config overlay — `local-overrides.yaml`
+
+Project-root YAML, deep-merged over the packaged
+`ai_router/router-config.yaml`. **Never committed and never packaged**:
+`.gitignore` reserves the name and it is not listed as package data, so
+it can state a fact about one machine that would be wrong for anyone
+else.
+
+| Rule | Behaviour |
+|---|---|
+| Partial | carries only the keys it changes; everything else comes from the packaged base |
+| Validated | the *merged* result goes through the same schema and semantic checks as any config, so an overlay cannot produce a config the router would have refused |
+| Unknown keys | **refused at load**, not ignored — where the schema names its properties, that list is the vocabulary; where it declares an open object, recursion stops |
+| Scope | applies only to the packaged default; an explicit `--config` or `AI_ROUTER_CONFIG` path takes no overlay |
+| Location | the git toplevel of the working directory, resolved with the same root discovery the evidence and gate paths use |
+
+It is a config *source*, not a precedence tier: it changes what
+`transport.profile` says, and `--transport` and `DABBLER_TRANSPORT`
+still outrank it. The loaded config records it as
+`_local_overrides_path` (null when there is none).
+
+The worked case — a machine with a Copilot seat and no provider API
+keys, where the packaged default's `profile: api` would fail on a
+missing key and must not be edited because it is what ships:
+
+```yaml
+transport:
+  profile: copilot-cli
+```
+
+## Seat catalog lockfile — `copilot-catalog.lock`
+
+Seat-scoped, empirically-probed TOML: the load-bearing record of what a
+Copilot seat can dispatch, named by
+`transports.copilot-cli.lockfile`. The CLI has no `list-models` command
+and no first-party provider field, so every value here was earned by a
+real billed call. `ai_router.transports.copilot` is its only writer —
+see `refresh` in the quick start.
+
+A restricted TOML subset: one flat `[meta]` table, then repeated flat
+`[[models]]` tables, scalars and flat string arrays only. Keys the
+reader does not model survive a rewrite in place, so a newer writer
+never silently drops them.
+
+`[meta]`:
+
+| Key | Notes |
+|---|---|
+| `cli_version` | required; the CLI build these entries were probed on. Provenance, not a gate |
+| `cli_version_pin_required` | default **false**. True makes drift a refusal; false makes it a warning |
+| `seat_id`, `seat_label` | required / optional seat identity |
+| `probed_at` | last refresh timestamp |
+| `candidate_universe` | array of ids a refresh may probe — a **maintained list**, not an enumeration, because the CLI cannot enumerate. An id absent here is unprobed, not unavailable, and a refresh refuses to probe one, so a typo cannot buy a premium request |
+| `written_by`, `written_at`, `content_digest` | the writer stamp (below) |
+
+`[[models]]`, one per entry:
+
+| Key | Notes |
+|---|---|
+| `id` | required |
+| `provider` | `anthropic` \| `openai` \| `google`, inferred from the id prefix |
+| `provider_source` | always `name-prefix-heuristic` — a declared guess, never presented as first-party truth |
+| `enablement` | `confirmed` \| `unconfirmed`. Strictly empirical: an invalid model name and a policy-blocked one return the identical CLI error, so nothing is inferred from a name |
+| `confirmed_at`, `confirmed_on_cli_version` | provenance of the last successful probe |
+| `echoed_model` | the model id the CLI reported serving |
+| `probe_premium_requests` | a **one-call sample**, not a price. An integer for premium models and a **fraction** for sub-premium ones (`claude-haiku-4.5` measures `0.33`). Absent means unknown and **never free**. It funds the refresh cost preview and never feeds selection; real spend is measured by `python -m ai_router.seat_cost`. v1 lockfiles spell it `premium_request_weight`, which still reads and is written back under the name it was read under |
+| `last_probe_error`, `last_probe_at` | the most recent *failed* probe, by its own error class. It annotates rather than replaces the confirmation above it: a transient CLI failure is not a withdrawn model |
+
+Fail-closed rules (`validate_catalog`), which refuse the seat:
+provenance on every confirmed entry, and ≥2 distinct confirmed
+providers — cross-provider verification has no meaning without them.
+Warnings, which do not: CLI version drift (the seat CLI auto-updates on
+its own schedule; refusing a working seat for that is what taught two
+people to hand-edit the pin) and hand-edited provenance. Every one of
+these messages names the exact `refresh` invocation that resolves it.
+
+### The writer stamp
+
+The writer records what wrote the file, when, and a SHA-256 over what it
+wrote:
+
+```toml
+written_by = "ai_router.transports.copilot 1.1.0"
+written_at = "2026-08-19T11:42:07Z"
+content_digest = "sha256:…"
+```
+
+The digest covers the catalog **as rendered with the digest key itself
+elided** — content, not the file's mtime, because the lockfile is
+committed and every checkout rewrites mtime. Three states on load:
+
+| State | Meaning |
+|---|---|
+| `machine-written` | the digest matches; the file is what the writer wrote |
+| `hand-edited` | a stamp is present and the contents disagree with it — including a stamp whose `content_digest` line was deleted, since removing the line that would convict is itself the edit |
+| `unstamped` | no stamp at all; the file predates the writer |
+
+Detection, not enforcement. The seat still loads; the record says what
+happened. This is the rule `.dabbler/runs/` already holds — machine
+written, never hand-repaired — made checkable here rather than
+aspirational, because a hand-written value is not evidence and this file
+carries nothing but evidence.

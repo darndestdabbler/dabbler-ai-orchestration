@@ -1,12 +1,12 @@
 [meta]
 schema_version = 1
 cli_name = "GitHub Copilot CLI"
-cli_version = "GitHub Copilot CLI 1.0.80."
+cli_version = "GitHub Copilot CLI 1.0.68."
 cli_version_pin_required = false
 seat_id = "op-personal"
 seat_label = "operator-personal"
 source = "empirical-probe"
-probed_at = "2026-08-19T12:13:37Z"
+probed_at = "2026-07-04T16:17:00Z"
 cli_version_note = "cli_version records the CLI these entries were probed on; it is provenance, not a gate. The seat CLI auto-updates, so drift against the live CLI is expected and is reported as a warning. A model that actually stopped working fails its own dispatch with a real error rather than disabling the whole seat."
 candidate_universe_note = "The CLI has no list-models command, so this is a maintained list, not an enumeration: it is every id a refresh may probe, and an id absent here is unprobed rather than unavailable. Adding a model is a data edit to this array followed by a probe; nothing infers enablement from a name."
 candidate_universe = [
@@ -29,17 +29,14 @@ candidate_universe = [
     "gemini-3.1-pro-preview",
     "gemini-3.5-flash",
 ]
-written_by = "ai_router.transports.copilot 1.1.0"
-written_at = "2026-08-19T12:13:37Z"
-content_digest = "sha256:7816e62faafe67cd75464f4bd188f620479847f83fbdf4645553ab77dcbd9599"
 
 [[models]]
 id = "claude-sonnet-4.6"
 provider = "anthropic"
 provider_source = "name-prefix-heuristic"
 enablement = "confirmed"
-confirmed_at = "2026-08-19T12:13:37Z"
-confirmed_on_cli_version = "GitHub Copilot CLI 1.0.80."
+confirmed_at = "2026-07-04T16:17:00Z"
+confirmed_on_cli_version = "GitHub Copilot CLI 1.0.68."
 premium_request_weight = 1
 echoed_model = "claude-sonnet-4.6"
 
@@ -58,10 +55,9 @@ id = "claude-haiku-4.5"
 provider = "anthropic"
 provider_source = "name-prefix-heuristic"
 enablement = "confirmed"
-confirmed_at = "2026-08-19T12:12:59Z"
-confirmed_on_cli_version = "GitHub Copilot CLI 1.0.80."
+confirmed_at = "2026-07-04T16:17:00Z"
+confirmed_on_cli_version = "GitHub Copilot CLI 1.0.68."
 echoed_model = "claude-haiku-4.5"
-probe_premium_requests = 0.33
 
 [[models]]
 id = "claude-fable-5"
@@ -91,8 +87,6 @@ enablement = "confirmed"
 confirmed_at = "2026-07-04T16:17:00Z"
 confirmed_on_cli_version = "GitHub Copilot CLI 1.0.68."
 echoed_model = "claude-opus-4.7"
-last_probe_error = "invalid-model"
-last_probe_at = "2026-08-19T11:59:01Z"
 
 [[models]]
 id = "claude-opus-4.6"
@@ -125,7 +119,7 @@ id = "gpt-5.5"
 provider = "openai"
 provider_source = "name-prefix-heuristic"
 enablement = "confirmed"
-confirmed_at = "2026-08-19T12:13:37Z"
+confirmed_at = "2026-08-18T19:40:00Z"
 confirmed_on_cli_version = "GitHub Copilot CLI 1.0.80."
 premium_request_weight = 0
 echoed_model = "gpt-5.5"
@@ -187,8 +181,8 @@ id = "gemini-3.1-pro-preview"
 provider = "google"
 provider_source = "name-prefix-heuristic"
 enablement = "confirmed"
-confirmed_at = "2026-08-19T12:13:37Z"
-confirmed_on_cli_version = "GitHub Copilot CLI 1.0.80."
+confirmed_at = "2026-07-04T16:17:00Z"
+confirmed_on_cli_version = "GitHub Copilot CLI 1.0.68."
 premium_request_weight = 1
 echoed_model = "gemini-3.1-pro-preview"
 

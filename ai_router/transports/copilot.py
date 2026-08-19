@@ -47,6 +47,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import os
 import queue
 import secrets
@@ -975,6 +976,13 @@ ENABLEMENT_CONFIRMED = "confirmed"
 ENABLEMENT_UNCONFIRMED = "unconfirmed"
 KNOWN_PROVIDERS = frozenset({"anthropic", "openai", "google"})
 
+# The verb whose absence is the whole incident: with no refresh command, the
+# only remedy for a stale lockfile was hand-editing, and two people took it.
+# No message may report a stale catalog without naming the invocation that
+# resolves it -- an operator told "re-probe the seat" and given no verb does
+# the only thing left.
+REFRESH_COMMAND = "python -m ai_router.transports.copilot refresh"
+
 # v1 lockfiles spell the probe sample `premium_request_weight`; v2 renamed it
 # because "weight" reads as a rate and the value is a one-call sample. It is
 # NOT a price and never feeds selection; absent means unknown, never free.
@@ -1019,7 +1027,10 @@ class ModelEntry:
     id: str
     provider: str = ""
     enablement: str = ENABLEMENT_UNCONFIRMED
-    probe_premium_requests: Optional[int] = None
+    # A one-call sample of what this model cost, which the seat reports as an
+    # integer for premium models and a fraction for sub-premium ones. Not a
+    # price, never fed to selection; ``None`` is unknown and never free.
+    probe_premium_requests: Optional[float] = None
     echoed_model: Optional[str] = None
     provider_source: str = ""
     confirmed_at: Optional[str] = None
@@ -1046,6 +1057,12 @@ class CatalogMeta:
     # enumerate its models, so this is a maintained list and adding a model
     # must be a data edit that leaves the file the whole truth about the seat.
     candidate_universe: tuple = ()
+    # The writer stamp: what wrote the file, when, and a digest of what was
+    # written. All three absent means no writer has ever touched it. See the
+    # writer-stamp section below for why the digest and not the mtime.
+    written_by: Optional[str] = None
+    written_at: Optional[str] = None
+    content_digest: Optional[str] = None
     raw: dict = field(default_factory=dict, repr=False, compare=False)
 
 
@@ -1071,6 +1088,24 @@ def _optional_str(value) -> Optional[str]:
     """A string off the wire or ``None``; anything else is not a string and
     must not become one by coercion."""
     return value if isinstance(value, str) and value else None
+
+
+def _coerce_probe_premium_requests(value):
+    """A request-count sample off the wire, or ``None`` for unknown.
+
+    The seat reports ``usage.premiumRequests`` as ``0`` for included models
+    and as a **fraction** for sub-premium ones — ``0.33`` measured on
+    ``claude-haiku-4.5`` — so a float here is a measurement, not noise, and
+    discarding it would file the cheapest models on the seat as the most
+    uncertain. A bool, a string, a list, a negative or a non-finite value is
+    not a count, and unknown is the honest answer for those — never zero,
+    which would read as free.
+    """
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    if value < 0 or not math.isfinite(value):
+        return None
+    return value
 
 
 def _read_candidate_universe(meta_raw: dict, path) -> tuple:
@@ -1111,6 +1146,9 @@ def load_catalog(path) -> Catalog:
         seat_label=str(meta_raw.get("seat_label", "")),
         probed_at=_optional_str(meta_raw.get("probed_at")),
         candidate_universe=_read_candidate_universe(meta_raw, path),
+        written_by=_optional_str(meta_raw.get("written_by")),
+        written_at=_optional_str(meta_raw.get("written_at")),
+        content_digest=_optional_str(meta_raw.get("content_digest")),
         raw=dict(meta_raw),
     )
     entries = []
@@ -1124,11 +1162,7 @@ def load_catalog(path) -> Catalog:
             id=str(md["id"]),
             provider=str(md.get("provider", "")),
             enablement=str(md.get("enablement", ENABLEMENT_UNCONFIRMED)),
-            probe_premium_requests=(
-                raw_probe
-                if isinstance(raw_probe, int) and not isinstance(raw_probe, bool)
-                else None
-            ),
+            probe_premium_requests=_coerce_probe_premium_requests(raw_probe),
             echoed_model=md.get("echoed_model"),
             provider_source=str(md.get("provider_source", "")),
             confirmed_at=_optional_str(md.get("confirmed_at")),
@@ -1168,6 +1202,10 @@ def validate_catalog(
     real error — per-model and honest, rather than all-or-nothing on a
     version string. Strict pinning remains available for an operator who
     wants it via ``cli_version_pin_required = true``.
+
+    Every message about a stale or unstamped catalog names the exact
+    refresh invocation that resolves it. An operator told only that the
+    file is wrong, and given no verb, edits the file.
     """
     reasons: list = []
     warnings: list = []
@@ -1179,27 +1217,51 @@ def validate_catalog(
         )
         if catalog.meta.cli_version_pin_required:
             reasons.append(
-                drift + " (strict pinning is on via cli_version_pin_required)"
+                drift + " (strict pinning is on via cli_version_pin_required). "
+                f"Re-date the lock with `{REFRESH_COMMAND} --quorum`, or turn "
+                "strict pinning off."
             )
         else:
             warnings.append(
                 drift + "; entries confirmed on the pinned version are still "
-                "trusted. Re-probe the seat to refresh the lockfile."
+                f"trusted. Re-date the lock with `{REFRESH_COMMAND} --quorum` "
+                f"(or `{REFRESH_COMMAND} --stale` to re-confirm every entry "
+                "earned on another build)."
             )
+
+    provenance = catalog_provenance(catalog)
+    if provenance == PROVENANCE_HAND_EDITED:
+        warnings.append(
+            "hand-edited provenance: the contents do not match the digest "
+            f"this file's own writer stamp records ({catalog.meta.written_by} "
+            f"at {catalog.meta.written_at}). A hand edit is not evidence — "
+            "the values here are empirical or they are nothing. Re-establish "
+            f"them with `{REFRESH_COMMAND} --quorum`."
+        )
+    elif provenance == PROVENANCE_UNSTAMPED:
+        warnings.append(
+            "no writer stamp: this lockfile predates the writer, so a hand "
+            f"edit cannot be ruled out. `{REFRESH_COMMAND} --quorum` writes "
+            "one."
+        )
 
     confirmed = catalog.confirmed_models()
     for entry in confirmed:
         if not entry.provider or entry.provider not in KNOWN_PROVIDERS:
             reasons.append(
                 f"Missing/unknown provenance on confirmed entry {entry.id!r}: "
-                f"provider={entry.provider!r}"
+                f"provider={entry.provider!r}. Re-probe it with "
+                f"`{REFRESH_COMMAND} --models {entry.id}`."
             )
 
     distinct = {e.provider for e in confirmed if e.provider in KNOWN_PROVIDERS}
     if len(distinct) < 2:
         reasons.append(
             "Same-provider-only catalog: confirmed entries resolve to "
-            f"{sorted(distinct)} (need >= 2 distinct providers)"
+            f"{sorted(distinct)} (need >= 2 distinct providers). A quorum "
+            "refresh only re-probes what is already confirmed, so widen it: "
+            f"`{REFRESH_COMMAND} --models <ids>`, or `{REFRESH_COMMAND} --all` "
+            "for the whole declared universe."
         )
 
     return CatalogValidationResult(
@@ -1242,6 +1304,15 @@ def _render_value(key: str, value) -> str:
         return "true" if value else "false"
     if isinstance(value, int):
         return str(value)
+    if isinstance(value, float):
+        # repr is the shortest text that reads back as the same float, so a
+        # sample survives a rewrite unchanged and the content digest holds.
+        if not math.isfinite(value):
+            raise ValueError(
+                f"catalog key {key!r} holds a non-finite number, which is not "
+                "a measurement of anything"
+            )
+        return repr(value)
     if isinstance(value, str):
         return _render_string(value)
     if isinstance(value, (list, tuple)):
@@ -1278,6 +1349,9 @@ def _meta_mapping(meta: CatalogMeta) -> dict:
     _set_or_drop(
         out, "candidate_universe", list(meta.candidate_universe) or None
     )
+    _set_or_drop(out, "written_by", meta.written_by)
+    _set_or_drop(out, "written_at", meta.written_at)
+    _set_or_drop(out, "content_digest", meta.content_digest)
     return out
 
 
@@ -1337,28 +1411,93 @@ def dumps_catalog(catalog: Catalog) -> str:
     return "\n\n".join(tables) + "\n"
 
 
-def write_catalog(path, catalog: Catalog) -> None:
-    """Write the lockfile. The only writer there is — a lockfile with no
-    writer leaves hand-editing as the sole remedy for staleness."""
+def write_catalog(path, catalog: Catalog, *, written_at=None) -> Catalog:
+    """Write the lockfile, stamped. The only writer there is — a lockfile
+    with no writer leaves hand-editing as the sole remedy for staleness.
+    Returns the stamped catalog that was written."""
+    stamped = stamp_catalog(catalog, written_at=written_at)
     Path(path).write_text(
-        dumps_catalog(catalog), encoding="utf-8", newline="\n"
+        dumps_catalog(stamped), encoding="utf-8", newline="\n"
     )
+    return stamped
 
 
-# --- Seat catalog discovery -------------------------------------------------
+# --- Writer stamp and hand-edit detection -----------------------------------
+#
+# The rule this repo already holds for ``.dabbler/runs/`` — machine-written,
+# never hand-repaired — is checkable here instead of aspirational. The writer
+# records what wrote the file, when, and a digest of what it wrote; a later
+# reader recomputes the digest and reports a mismatch as hand-edited
+# provenance. Detection, not enforcement: an operator may still edit the file,
+# but the record will say they did, and the value it carries is empirical or
+# it is nothing.
+#
+# The digest covers the catalog's rendered content, not the file's mtime. The
+# lockfile is committed, and every checkout rewrites mtime, so a timestamp
+# comparison would report a clean clone as hand-edited — a guard that fires on
+# the innocent case teaches people to ignore it.
 
-def _coerce_probe_premium_requests(value) -> Optional[int]:
-    """The CLI's ``premiumRequests`` arrives as arbitrary JSON. A float, a
-    string or a list is not a request count, and unknown (``None``) is the
-    honest answer — never zero, which would read as free."""
-    if type(value) is not int or value < 0:
-        return None
-    return value
+PROVENANCE_MACHINE_WRITTEN = "machine-written"
+PROVENANCE_HAND_EDITED = "hand-edited"
+PROVENANCE_UNSTAMPED = "unstamped"
 
 
 def _utc_now() -> str:
     return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 
+
+def _writer_id() -> str:
+    from .. import __version__
+
+    return f"ai_router.transports.copilot {__version__}"
+
+
+def catalog_digest(catalog: Catalog) -> str:
+    """SHA-256 over the catalog rendered with the digest key itself elided.
+
+    Elided rather than blanked, so the digest is a function of the content it
+    covers and of nothing else: the same content digests the same whether or
+    not the file has been stamped before.
+    """
+    unstamped = Catalog(
+        meta=replace(catalog.meta, content_digest=None), models=catalog.models
+    )
+    return "sha256:" + hashlib.sha256(
+        dumps_catalog(unstamped).encode("utf-8")
+    ).hexdigest()
+
+
+def stamp_catalog(catalog: Catalog, *, written_at=None) -> Catalog:
+    """The catalog with a fresh writer stamp over its current contents."""
+    meta = replace(
+        catalog.meta,
+        written_by=_writer_id(),
+        written_at=written_at or _utc_now(),
+        content_digest=None,
+    )
+    unstamped = Catalog(meta=meta, models=catalog.models)
+    return Catalog(
+        meta=replace(meta, content_digest=catalog_digest(unstamped)),
+        models=catalog.models,
+    )
+
+
+def catalog_provenance(catalog: Catalog) -> str:
+    """How this file came to hold what it holds.
+
+    A stamp stripped of its digest reads as hand-edited, not as unstamped:
+    removing the line that would convict is itself the edit. A file carrying
+    no stamp at all is merely older than the writer.
+    """
+    meta = catalog.meta
+    if not (meta.content_digest or meta.written_by or meta.written_at):
+        return PROVENANCE_UNSTAMPED
+    if meta.content_digest and meta.content_digest == catalog_digest(catalog):
+        return PROVENANCE_MACHINE_WRITTEN
+    return PROVENANCE_HAND_EDITED
+
+
+# --- Seat catalog discovery -------------------------------------------------
 
 def discover_models(
     model_ids: Sequence[str],
@@ -1561,8 +1700,6 @@ SCOPE_ALL = "all"
 # v1's did.
 CONFIRM_THRESHOLD_PREMIUM_REQUESTS = 5
 
-REFRESH_COMMAND = "python -m ai_router.transports.copilot refresh"
-
 
 def _cost_order(entry: ModelEntry) -> tuple:
     """Sort key for "cheapest first". An unknown sample sorts after every
@@ -1572,7 +1709,7 @@ def _cost_order(entry: ModelEntry) -> tuple:
     return (1, 0) if sample is None else (0, sample)
 
 
-def _sample_text(sample: Optional[int]) -> str:
+def _sample_text(sample: Optional[float]) -> str:
     return "unknown" if sample is None else str(sample)
 
 
@@ -1590,7 +1727,7 @@ class RefreshPlan:
         return tuple(model_id for model_id, _ in self.samples)
 
     @property
-    def known_premium_requests(self) -> int:
+    def known_premium_requests(self) -> float:
         return sum(s for _, s in self.samples if s is not None)
 
     @property
@@ -1857,7 +1994,7 @@ def run_refresh(
     after = merge_catalog(
         before, probed, cli_version=live_cli_version, probed_at=stamp,
     )
-    write_catalog(catalog_path, after)
+    write_catalog(catalog_path, after, written_at=stamp)
 
     changes = diff_catalogs(before, after)
     if changes:

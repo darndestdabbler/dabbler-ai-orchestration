@@ -101,8 +101,34 @@ Resolved in this precedence (first set wins):
    `resolve_transport(config, cli_flag=…)`)
 2. the `DABBLER_TRANSPORT` env var (`api` | `copilot-cli`) — the
    operator's standing preference
-3. `transport.profile` in `router-config.yaml`
+3. `transport.profile` in the loaded config — the packaged
+   `router-config.yaml` with a project-local `local-overrides.yaml`
+   deep-merged over it
 4. default: `api`
+
+The overlay is a config *source*, not a precedence tier: it changes what
+tier 3 says and nothing above it. It lives at the project root
+(`local-overrides.yaml`), carries only the keys it changes, and is
+never committed and never packaged — `.gitignore` reserves the name and
+it is not package data. A key the schema does not declare is **refused
+at load**, not dropped, because an override the router silently ignores
+is the failure the file exists to prevent.
+
+This is how a machine disagrees with the published default. The packaged
+`router-config.yaml` keeps `transport: profile: api`, which is correct
+for a fresh install holding provider API keys; a seat-only machine says
+so once, in a file it does not publish:
+
+```yaml
+# local-overrides.yaml — this machine has a Copilot seat and no API keys
+transport:
+  profile: copilot-cli
+```
+
+Config is the only layer that is client-, model- and
+transport-independent. The env var reaches only processes started after
+it was written; `--transport` has to be repeated on every command; and
+instruction files are read by some clients and not others.
 
 This selects the transport for routine dispatch; verifier selection may
 still use the other transport when provider independence requires it.

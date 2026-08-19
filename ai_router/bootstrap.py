@@ -47,10 +47,9 @@ _IGNORE_RULE = ".dabbler/"
 _SHARED_BODY = """\
 # AI orchestrator instructions — `{repo_name}`
 
-> `CLAUDE.md` and `AGENTS.md` share this managed body and differ only in
-> the engine tail. The next session may be run by a different engine —
-> that is why both files exist. Do not hand-edit inside the fence; re-run
-> `python -m ai_router.bootstrap` to refresh it.
+> `AGENTS.md` is the single source of this managed body; `CLAUDE.md` and
+> `GEMINI.md` import it and add only their engine tail. Do not hand-edit
+> inside the fence; re-run `python -m ai_router.bootstrap` to refresh it.
 
 ## Your role
 
@@ -123,19 +122,39 @@ active set's `spec.md`.
 _CLAUDE_TAIL = """\
 ## Engine tail (Claude Code)
 
-You are **Claude Code**; you read this `CLAUDE.md` automatically. Codex,
-GitHub Copilot, and Gemini read `AGENTS.md` — the managed body is
-identical, so hand-off between engines is seamless.
+You are **Claude Code**. The managed body above arrived through the
+`@AGENTS.md` import, which Claude Code expands at load time — `AGENTS.md`
+is the one copy, so nothing here can drift from what the other engines
+read.
 """
 
 _AGENTS_TAIL = """\
-## Engine tail (Codex / GitHub Copilot / Gemini)
+## Engine tail (Codex / GitHub Copilot)
 
-You read this `AGENTS.md`; Claude Code reads `CLAUDE.md` (same managed
-body). Copilot seats: declare `--model` at session start and prefer
+You read this `AGENTS.md` directly. `CLAUDE.md` and `GEMINI.md` import
+it rather than repeating it, so this file is the one place the body
+exists. GitHub Copilot loads all three files at once and de-duplicates
+nothing, which is exactly why only this one carries the body.
+
+Copilot seats: declare `--model` at session start and prefer
 `DABBLER_TRANSPORT=copilot-cli` when routing through the seat. Cross-
 provider verification stays cross-provider on every transport.
 """
+
+_GEMINI_TAIL = """\
+## Engine tail (Gemini CLI)
+
+You are **Gemini CLI**. The managed body above arrived through the
+`@AGENTS.md` import, expanded by the memory import processor —
+`AGENTS.md` is the one copy. If your seat is configured with
+`context.fileName`, keep `AGENTS.md` in the list.
+"""
+
+# CLAUDE.md and GEMINI.md carry this instead of the body. Both engines
+# expand `@file` at load time, so the import is a loader directive, not
+# a request the model may decline. Neither reads AGENTS.md natively,
+# which is why the file cannot simply be deleted.
+_IMPORT_LINE = "@AGENTS.md"
 
 PLAN_PROMPT = """\
 You are preparing a project plan for the Dabbler session-set workflow.
@@ -507,12 +526,21 @@ def resolve_bootstrap_transport(explicit=None) -> tuple:
     return None, "no Copilot seat detected; leaving the default (api)"
 
 
-def render_engine_file(existing: str, repo_name: str, tail: str) -> str:
+def render_engine_file(existing: str, repo_name: str, tail: str,
+                       body: str = None) -> str:
     """The managed section replaced in place, or appended after existing
-    user content. User text outside the fence is never modified."""
+    user content. User text outside the fence is never modified.
+
+    *body* defaults to the shared managed body; the importing files pass
+    the one-line `@AGENTS.md` directive instead, so the body exists in
+    exactly one file."""
+    rendered_body = (
+        _SHARED_BODY.format(repo_name=repo_name) if body is None
+        else body.rstrip("\n") + "\n"
+    )
     managed = (
         f"{MANAGED_START}\n"
-        + _SHARED_BODY.format(repo_name=repo_name)
+        + rendered_body
         + "\n---\n\n" + tail
         + f"\n{MANAGED_END}\n"
     )
@@ -526,11 +554,21 @@ def render_engine_file(existing: str, repo_name: str, tail: str) -> str:
 
 
 def write_instruction_files(project_dir, repo_name=None) -> list:
+    """Write the three engine files. `AGENTS.md` carries the body;
+    `CLAUDE.md` and `GEMINI.md` import it.
+
+    All three are written because no engine reads all three: Codex and
+    Copilot read `AGENTS.md`, Claude Code reads only `CLAUDE.md`, and
+    Gemini CLI reads only `GEMINI.md` unless its `context.fileName` is
+    reconfigured. Copilot reads every one of them and de-duplicates
+    nothing, so only one may carry the body."""
     project = Path(project_dir)
     name = repo_name or project.resolve().name
     written = []
-    for filename, tail in (
-        ("AGENTS.md", _AGENTS_TAIL), ("CLAUDE.md", _CLAUDE_TAIL),
+    for filename, tail, body in (
+        ("AGENTS.md", _AGENTS_TAIL, None),
+        ("CLAUDE.md", _CLAUDE_TAIL, _IMPORT_LINE),
+        ("GEMINI.md", _GEMINI_TAIL, _IMPORT_LINE),
     ):
         path = project / filename
         existing = ""
@@ -538,7 +576,7 @@ def write_instruction_files(project_dir, repo_name=None) -> list:
             existing = path.read_text(encoding="utf-8")
         except (OSError, UnicodeError):
             pass
-        content = render_engine_file(existing, name, tail)
+        content = render_engine_file(existing, name, tail, body)
         with open(path, "w", encoding="utf-8", newline="") as f:
             f.write(content)
         written.append(path)

@@ -95,9 +95,9 @@ orchestrator provider) holds on both paths.
 
 Resolved in this precedence (first set wins):
 
-1. an explicit `--transport api|copilot-cli` value supplied by the
-   caller (programmatic today — `resolve_transport(config, cli_flag=…)`;
-   no shipped CLI exposes the flag yet)
+1. an explicit `--transport api|copilot-cli` flag
+   (`python -m ai_router.verify --transport …`; programmatically,
+   `resolve_transport(config, cli_flag=…)`)
 2. the `DABBLER_TRANSPORT` env var (`api` | `copilot-cli`) — the
    operator's standing preference
 3. `transport.profile` in `router-config.yaml`

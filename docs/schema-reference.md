@@ -95,6 +95,17 @@ Machine-written step log. Shape:
   unclaimed planned rows stay pending. Nothing is dropped either way.
   `session start` prints the seeded keys and numbers so the logger
   never has to re-derive the slug.
+- Progress entries are written by `python -m ai_router.session log
+  --session-set-dir <dir> --step <stepKey|stepNumber> --status <s>`,
+  the only sanctioned writer. The step must resolve against a seeded
+  `plan-step` row: an unresolvable `--step` is **refused**, listing the
+  valid addresses, rather than appending an orphan row nobody planned.
+  The status vocabulary is enforced at the CLI boundary as well as at
+  the writer, and re-logging an identical status and description is a
+  noop, so the command is safe to repeat after a context reset.
+  `--session-number` overrides the target; with no session in flight it
+  defaults to the last closed one, which is where a close-out step
+  belongs.
 - Session start also logs the `register` plan step complete itself —
   registration is the fact the start call established, not something
   the engine reports afterward.

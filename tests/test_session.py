@@ -382,3 +382,67 @@ class TestCancelRestoreCLI:
         assert main(["restore", str(set_dir)]) == EXIT_BOUNDARY
         assert "not cancelled" in capsys.readouterr().err
         assert self._state(set_dir)["status"] == "complete"
+
+
+class TestLogCLI:
+    """`log --session-set-dir <dir> --step <key|number> --status <s>`:
+    the lifecycle seam that replaces reaching into the writers by hand."""
+
+    def _entries(self, set_dir):
+        log = json.loads(
+            (set_dir / "activity-log.json").read_text(encoding="utf-8")
+        )
+        return [e for e in log["entries"] if "kind" not in e]
+
+    def _log(self, set_dir, step, status, *extra):
+        return main([
+            "log", "--session-set-dir", str(set_dir), "--step", step,
+            "--status", status, *extra,
+        ])
+
+    def test_step_resolves_by_key_or_by_number(self, set_dir):
+        start(set_dir, engine="claude-code", provider="anthropic")
+        assert self._log(set_dir, "build-the-widget", "in-progress") == EXIT_OK
+        assert self._log(set_dir, "2", "complete") == EXIT_OK
+        rows = [e for e in self._entries(set_dir)
+                if e["stepKey"] == "build-the-widget"]
+        assert [r["status"] for r in rows] == ["in-progress", "complete"]
+        # The spec's own wording is the default description, so the
+        # planned row is ticked rather than paraphrased.
+        assert rows[0]["stepNumber"] == 2
+        assert "Build the widget" in rows[0]["description"]
+
+    def test_unresolvable_step_refuses_without_writing_an_orphan(
+        self, set_dir, capsys
+    ):
+        start(set_dir, engine="claude-code", provider="anthropic")
+        before = self._entries(set_dir)
+        assert self._log(set_dir, "build-the-widgets", "complete") == 2
+        err = capsys.readouterr().err
+        assert "no orphan row was written" in err
+        assert "2. build-the-widget" in err  # the valid addresses
+        assert self._entries(set_dir) == before
+
+    def test_status_outside_the_vocabulary_is_refused(self, set_dir):
+        start(set_dir, engine="claude-code", provider="anthropic")
+        with pytest.raises(SystemExit):  # argparse choices, at the boundary
+            self._log(set_dir, "build-the-widget", "done")
+
+    def test_re_logging_the_same_status_is_a_noop(self, set_dir):
+        start(set_dir, engine="claude-code", provider="anthropic")
+        self._log(set_dir, "build-the-widget", "complete")
+        assert self._log(set_dir, "build-the-widget", "complete") == EXIT_OK
+        assert len([e for e in self._entries(set_dir)
+                    if e["stepKey"] == "build-the-widget"]) == 1
+
+    def test_close_out_is_logged_against_the_last_closed_session(
+        self, set_dir
+    ):
+        start(set_dir, engine="claude-code", provider="anthropic")
+        flip_state_to_closed(set_dir, verdict="VERIFIED")
+        assert self._log(set_dir, "close-out", "complete",
+                         "--note", "Closed and pushed.") == EXIT_OK
+        row = [e for e in self._entries(set_dir)
+               if e["stepKey"] == "close-out"][0]
+        assert row["sessionNumber"] == 1
+        assert row["description"] == "Closed and pushed."

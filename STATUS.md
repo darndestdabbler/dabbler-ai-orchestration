@@ -1,3 +1,62 @@
+# STATUS — after set 140 (the cancelled scope is gone; 1.1.0 is built, not published)
+
+- **Set 139 is next, and it is now the only open set.** Its spec was
+  amended during 140: it absorbs the `local-overrides.yaml` project-local
+  config tier, as session 1 step 2, because all three of its sessions
+  dispatch through `copilot-cli` and cannot today without a per-command
+  flag. Estimate is now **41–55** against **50 free** slots, so the
+  re-scope trigger written into its spec is live, not decorative — if the
+  count trends to the top of the range by the end of its session 2,
+  re-scope session 3 rather than spending the margin.
+- **Done (set 140, 1.1.0).** Set 138's dormant code is gone: 2,577 lines
+  and 51 tests. `verify.py` and `ledger.py` were restored to their
+  pre-138 state rather than patched — set 138 touched each in exactly one
+  commit and that commit was purely additive, so the file-level restore
+  was the exact surgery. Kept deliberately: `PromptTooLargeError` and the
+  truncation refusal in `route.py`, `parse_set_config`, the `modules.py`
+  manifest extension, and the `module:` key in every spec. Shipped:
+  `session log`, plus two stale-doc corrections.
+- **The instruction files are consolidated, and the reason matters.**
+  Verified against vendor docs 2026-08-19: **Copilot CLI loads
+  `CLAUDE.md`, `GEMINI.md` and `AGENTS.md` all at once, whatever the
+  model, and de-duplicates nothing** — file loading is a *client*
+  property, not a model one. Claude Code does **not** read `AGENTS.md`
+  natively; Gemini CLI does not either without a `context.fileName`
+  opt-in. Both do expand `@file` at load time, which is a loader
+  directive rather than a request the model may decline. So: `AGENTS.md`
+  carries the managed body, `CLAUDE.md` and `GEMINI.md` carry
+  `@AGENTS.md` plus their tail at 9 lines each. `GEMINI.md` is restored —
+  v1 wrote three engine files and the v2 rebuild wrote two while its own
+  tail claimed Gemini read `AGENTS.md`. **This repo's ground rules moved
+  from `CLAUDE.md` to `AGENTS.md`**: they had been outside the fence in
+  `CLAUDE.md` only, so a Codex session never saw them.
+- **Publishing is prepared and stopped.** `pyproject.toml` and
+  `__init__.py` are at **1.1.0**; sdist and wheel are in `dist/`. Minor,
+  not patch: `session log` and the third instruction file are additive
+  behaviour, and the removed `context_scope` surface never reached PyPI.
+  **PyPI still has 1.0.0** (2026-08-15). The wheel carries no
+  `context_scope.py`, no `pulls.schema.json`, and a bundled
+  `router-config.yaml` that still reads `profile: api` — that default is
+  correct for a fresh install with API keys and must not be edited to
+  suit this machine, which is exactly what set 139's overlay is for.
+- **Suite: 430 green** (475 → 424 → 430), 50 free against the 480 ceiling.
+  Both sessions VERIFIED round 1 by gpt-5.5/openai over `copilot-cli`.
+- **This environment still has no provider API keys** — seat transport
+  only, so the `api` path is unexercised here. `DABBLER_TRANSPORT` is set
+  at user scope but was absent from the VS Code process environment all
+  session (the window predates the write), so every routed call used an
+  explicit `--transport copilot-cli`. Restarting VS Code fixes it; set
+  139's overlay removes the need for either.
+- **The catalog lock still pins CLI 1.0.68 while the live seat reports
+  1.0.80.** That is set 139's subject, and the drift warning fired on
+  every verification this set.
+- **Set 138's salvage is still outside the repo** at
+  `.copilot/session-state/350c17da-bf29-422c-93ab-b828baf275db/files/set-138-salvage/`.
+  Everything worth re-applying has now been applied; what remains there
+  is the measurement, the verbatim verifier responses, and the two
+  scope-only fixes that are meaningless without the cancelled code. The
+  redesign discussion it feeds is still open and still unprejudged.
+
 # STATUS — after set 138 was cancelled (read this before starting anything)
 
 - **Run set 140 before set 139.** The lowest-numbered not-started set is

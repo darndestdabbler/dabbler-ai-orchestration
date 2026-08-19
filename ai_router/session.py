@@ -479,6 +479,133 @@ def start(
         release_lock(lock)
 
 
+# --- log --------------------------------------------------------------------
+
+def _plan_rows_for(entries, session_number: int) -> list:
+    return [
+        e for e in entries
+        if isinstance(e, dict) and e.get("sessionNumber") == session_number
+        and e.get("kind") == "plan-step"
+    ]
+
+
+def _resolve_plan_row(step: str, plan_rows: list):
+    """The planned row *step* addresses, by exact stepKey or by stepNumber.
+    Exact only: a near-miss that resolved by similarity would tick a row
+    the caller did not mean, which is worse than refusing."""
+    token = (step or "").strip()
+    if not token:
+        return None
+    for row in plan_rows:
+        if row.get("stepKey") == token:
+            return row
+    if token.isdigit():
+        number = int(token)
+        for row in plan_rows:
+            if row.get("stepNumber") == number:
+                return row
+    return None
+
+
+def log(set_dir, *, step: str, status: str, note=None,
+        session_number: Optional[int] = None) -> int:
+    """Record one plan step's status. The step must resolve against the
+    rows ``start`` seeded: an unresolvable key refuses rather than
+    appending an orphan row nobody planned, and the closed status
+    vocabulary is enforced here as well as at the writer."""
+    set_path = Path(set_dir)
+    if not set_path.is_dir():
+        print(f"log: not a directory: {set_path}", file=sys.stderr)
+        return EXIT_USAGE
+    if status not in STEP_STATUSES:
+        print(
+            f"log: refused -- status must be one of "
+            f"{', '.join(STEP_STATUSES)}; got {status!r}.", file=sys.stderr,
+        )
+        return EXIT_USAGE
+
+    try:
+        lock = acquire_lock_with_timeout(
+            set_path, worker_id=f"log_step/{os.getpid()}"
+        )
+    except LockContentionError as exc:
+        print(f"log: refused -- lifecycle lock contention: {exc}",
+              file=sys.stderr)
+        return EXIT_LOCK_CONTENTION
+    try:
+        raw = read_raw_session_state(set_path)
+        normalized = (
+            normalize_to_v4_shape(raw, set_path / "spec.md") if raw else None
+        )
+        target = session_number
+        if target is None:
+            current = (normalized or {}).get("currentSession")
+            completed = sorted(_completed_numbers(normalized))
+            # The close-out step is logged after `close`, when nothing is
+            # in flight; the last closed session is still the right home
+            # for it.
+            target = current if current is not None else (
+                max(completed) if completed else None
+            )
+        if target is None:
+            print(
+                f"log: refused -- no session has been started under "
+                f"{set_path}. Run `session start` first.", file=sys.stderr,
+            )
+            return EXIT_BOUNDARY
+
+        activity = read_activity_log(set_path) or {}
+        entries = [
+            e for e in activity.get("entries", []) if isinstance(e, dict)
+        ]
+        plan_rows = _plan_rows_for(entries, target)
+        if not plan_rows:
+            print(
+                f"log: refused -- session {target} of {set_path.name} has no "
+                "seeded plan rows to log against. Run `session start` "
+                "first.", file=sys.stderr,
+            )
+            return EXIT_BOUNDARY
+
+        row = _resolve_plan_row(step, plan_rows)
+        if row is None:
+            known = "\n".join(
+                f"  {r.get('stepNumber')}. {r.get('stepKey')}"
+                for r in plan_rows
+            )
+            print(
+                f"log: refused -- {step!r} is not a plan step of session "
+                f"{target}. Use one of these stepKeys or its number "
+                f"(no orphan row was written):\n{known}", file=sys.stderr,
+            )
+            return EXIT_USAGE
+
+        key = row.get("stepKey")
+        description = note if note else (row.get("description") or key)
+        prior = [
+            e for e in entries
+            if e.get("sessionNumber") == target and e.get("stepKey") == key
+            and is_logged_step(e)
+        ]
+        if (prior and prior[-1].get("status") == status
+                and (prior[-1].get("description") or "") == description):
+            print(
+                f"log: step {key} of session {target} is already {status} "
+                "(noop)."
+            )
+            return EXIT_OK
+
+        log_step(set_path, target, key, description, status,
+                 step_number=row.get("stepNumber"))
+        print(
+            f"log: session {target} step {row.get('stepNumber')} "
+            f"({key}) -> {status}."
+        )
+        return EXIT_OK
+    finally:
+        release_lock(lock)
+
+
 # --- close ------------------------------------------------------------------
 
 def _local_only(repo_root) -> bool:
@@ -760,6 +887,20 @@ def main(argv=None) -> int:
     p_start.add_argument("--session-number", type=int)
     p_start.add_argument("--total-sessions", type=int)
 
+    p_log = sub.add_parser(
+        "log", help="record a plan step's status in activity-log.json"
+    )
+    p_log.add_argument("--session-set-dir", required=True)
+    p_log.add_argument("--step", required=True,
+                       help="the plan row's stepKey, or its stepNumber")
+    p_log.add_argument("--status", required=True, choices=list(STEP_STATUSES))
+    p_log.add_argument("--note",
+                       help="description to record instead of the spec's "
+                            "wording for the step")
+    p_log.add_argument("--session-number", type=int,
+                       help="defaults to the in-flight session, or the last "
+                            "closed one when none is in flight")
+
     p_close = sub.add_parser("close", help="run gates and close the session")
     p_close.add_argument("--session-set-dir", required=True)
     p_close.add_argument("--dry-run", action="store_true",
@@ -803,6 +944,11 @@ def main(argv=None) -> int:
         return cancel(set_dir, reason=args.reason, force=args.force)
     if args.command == "restore":
         return restore(set_dir, reason=args.reason)
+    if args.command == "log":
+        return log(
+            set_dir, step=args.step, status=args.status, note=args.note,
+            session_number=args.session_number,
+        )
     return close(set_dir, dry_run=args.dry_run, forced=args.force)
 
 

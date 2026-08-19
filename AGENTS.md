@@ -1,10 +1,49 @@
+# dabbler-ai-orchestration v2
+
+Rebuild of the AI-led coding-session framework. Python package `ai_router`
+(distribution `dabbler-ai-router`), plus a VS Code extension under `tools/`
+(Session 3). The compatibility contract, module inventory, and session plan
+live in the rebuild work plan; `STATUS.md` carries the inter-session handoff.
+
+## Ground rules
+
+1. **No new module without deleting one.** The module inventory in the rebuild
+   work plan is the ceiling.
+2. **No guard may guard another guard.** Every gate must cite the concrete v1
+   incident it would have prevented (the five kept gates each have one; see
+   Session 2).
+3. **One implementation of any rule, in one language.** TS renders; Python
+   decides.
+4. **Test budget is a ceiling: 480 Python / 215 TS.** One test per behavior.
+   No falsifier-twin doctrine, no tests of test infrastructure, no source-text
+   assertions (use ruff/ESLint), no migration-path tests, no tests asserting
+   exact markdown strings.
+5. **The machine owns the record.** Nothing under `.dabbler/runs/` is ever
+   hand-edited or exempted; no code path may accept a hand-written verdict.
+6. **No process ceremony on this repo itself.** Plain git commits with plain
+   messages. Do not use v1's session machinery, and do not build v2's own
+   machinery around v2's development.
+7. **Comments state constraints, not history.** No "Set NNN" archaeology. If a
+   lesson matters, encode it structurally.
+8. **LOC budgets are targets ±30%, not gates.** If a module wants to be 2× its
+   budget, stop and reconsider the design instead of writing a justification.
+
+## Environment
+
+- Windows 11, PowerShell primary. Python 3.11+; `.venv` in the repo root.
+- Run tests: `.venv/Scripts/python -m pytest` (no live network outside the
+  `e2e` marker).
+- Provider keys via env vars: `DABBLER_ANTHROPIC_API_KEY`,
+  `DABBLER_OPENAI_API_KEY`, `DABBLER_GEMINI_API_KEY`. Never in config or logs.
+- Transport preference: CLI flag `--transport` > `DABBLER_TRANSPORT` env >
+  `transport.profile` in router-config.yaml > default `api`.
+
 <!-- dabbler:managed:start -->
 # AI orchestrator instructions — `dabbler-ai-orchestration`
 
-> `CLAUDE.md` and `AGENTS.md` share this managed body and differ only in
-> the engine tail. The next session may be run by a different engine —
-> that is why both files exist. Do not hand-edit inside the fence; re-run
-> `python -m ai_router.bootstrap` to refresh it.
+> `AGENTS.md` is the single source of this managed body; `CLAUDE.md` and
+> `GEMINI.md` import it and add only their engine tail. Do not hand-edit
+> inside the fence; re-run `python -m ai_router.bootstrap` to refresh it.
 
 ## Your role
 
@@ -75,10 +114,14 @@ active set's `spec.md`.
 
 ---
 
-## Engine tail (Codex / GitHub Copilot / Gemini)
+## Engine tail (Codex / GitHub Copilot)
 
-You read this `AGENTS.md`; Claude Code reads `CLAUDE.md` (same managed
-body). Copilot seats: declare `--model` at session start and prefer
+You read this `AGENTS.md` directly. `CLAUDE.md` and `GEMINI.md` import
+it rather than repeating it, so this file is the one place the body
+exists. GitHub Copilot loads all three files at once and de-duplicates
+nothing, which is exactly why only this one carries the body.
+
+Copilot seats: declare `--model` at session start and prefer
 `DABBLER_TRANSPORT=copilot-cli` when routing through the seat. Cross-
 provider verification stays cross-provider on every transport.
 

@@ -28,11 +28,12 @@ close gate as work done after verification.
 
 Finally it settles the transport **once**, with no question asked: if a
 GitHub Copilot seat is detected and you have no existing preference, it
-writes `DABBLER_TRANSPORT=copilot-cli` as a **system** environment
-variable (HKLM on Windows, `/etc/profile.d/dabbler-ai-router.sh` on
-POSIX) so every shell, terminal, and reboot inherits it. Machine scope
-needs an elevated terminal; unelevated, bootstrap says so rather than
-silently writing a weaker scope. An existing preference is never
+persists `DABBLER_TRANSPORT=copilot-cli` at **user** scope (HKCU on
+Windows, a marked block in `~/.profile` on POSIX) so every new shell and
+reboot inherits it. `--machine-scope` asks for the machine hive instead
+(HKLM, or `/etc/profile.d/dabbler-ai-router.sh`), which needs an elevated
+terminal; when it cannot be honoured the write falls back to user scope
+and says so rather than landing nowhere. An existing preference is never
 overridden. Force it either way with `--transport api|copilot-cli`, or
 leave it untouched with `--no-transport-detect`.
 
@@ -76,6 +77,22 @@ Follow the spec's step list for the current session: make the edits,
 run the tests, log progress. **Do not commit yet** — verification
 reviews the working tree, and an already-committed tree presents an
 empty diff.
+
+Log each step against the rows the start seeded:
+
+```
+python -m ai_router.session log --session-set-dir docs/session-sets/<set> \
+    --step <stepKey|stepNumber> --status <pending|in-progress|complete|blocked>
+```
+
+`start` prints the addressable `stepKey`s; either the key or its number
+resolves the same row. A step that resolves to nothing is **refused**
+with the valid addresses printed — it never lands as an orphan row
+nobody planned. Re-logging the same status is a noop, so the command is
+safe to repeat after a context reset. `--note` records your own wording
+instead of the spec's; `--session-number` addresses a session other than
+the one in flight (with none in flight it defaults to the last closed
+one, which is where a close-out step belongs).
 
 ## 4. Verify (mandatory, before commit)
 

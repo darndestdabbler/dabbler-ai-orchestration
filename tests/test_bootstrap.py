@@ -197,23 +197,34 @@ class TestGitignoreRule:
 
 
 class TestInstructionFiles:
-    def test_writes_both_files_with_managed_section(self, tmp_path):
+    def test_writes_three_files_with_managed_section(self, tmp_path):
         written = write_instruction_files(tmp_path, repo_name="acme-app")
         names = {p.name for p in written}
-        assert names == {"AGENTS.md", "CLAUDE.md"}
+        assert names == {"AGENTS.md", "CLAUDE.md", "GEMINI.md"}
         for path in written:
             text = path.read_text(encoding="utf-8")
             assert MANAGED_START in text and MANAGED_END in text
-            assert "`acme-app`" in text
-            assert "ai_router.verify" in text
             assert len(text.splitlines()) <= 150
+
+    def test_only_agents_carries_the_body(self, tmp_path):
+        # Copilot loads all three at once and de-duplicates nothing, so
+        # exactly one file may hold the body; the other two import it.
+        write_instruction_files(tmp_path, repo_name="acme-app")
+        agents = (tmp_path / "AGENTS.md").read_text(encoding="utf-8")
+        assert "`acme-app`" in agents and "ai_router.verify" in agents
+        for name in ("CLAUDE.md", "GEMINI.md"):
+            text = (tmp_path / name).read_text(encoding="utf-8")
+            assert "@AGENTS.md" in text
+            assert "ai_router.verify" not in text
 
     def test_engine_tails_differ(self, tmp_path):
         write_instruction_files(tmp_path, repo_name="x")
         claude = (tmp_path / "CLAUDE.md").read_text(encoding="utf-8")
         agents = (tmp_path / "AGENTS.md").read_text(encoding="utf-8")
+        gemini = (tmp_path / "GEMINI.md").read_text(encoding="utf-8")
         assert "Claude Code" in claude
         assert "Copilot" in agents
+        assert "Gemini CLI" in gemini
 
     def test_existing_user_content_never_touched(self, tmp_path):
         target = tmp_path / "CLAUDE.md"

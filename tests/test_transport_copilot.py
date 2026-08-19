@@ -9,14 +9,20 @@ from ai_router.transports.copilot import (
     Catalog,
     CatalogMeta,
     CopilotCliTransport,
+    ERROR_CLASS_INVALID_MODEL,
     HANDOFF_THRESHOLD_UTF16_UNITS,
     ModelEntry,
+    PROVIDER_SOURCE_HEURISTIC,
     TransportTimeouts,
     _rendered_utf16_units,
+    discover_models,
+    dumps_catalog,
     load_catalog,
+    merge_catalog,
     resolve_role_candidates,
     validate_catalog,
     validate_transport_timeouts,
+    write_catalog,
 )
 
 V1_LOCK = (
@@ -345,6 +351,210 @@ class TestCatalog:
         result = validate_catalog(catalog)
         assert not result.ok
         assert any("Same-provider-only" in r for r in result.reasons)
+
+
+def _seat_spawner(by_model):
+    """A fake seat that answers per requested model, so a multi-model probe
+    runs the real dispatch state machine once per call."""
+    def spawner(argv, env):
+        stdout, stderr, exit_code = by_model[argv[argv.index("--model") + 1]]
+        return FakeProcess(stdout=stdout, stderr=stderr, exit_code=exit_code)
+    return spawner
+
+
+def _probe_ok(model, usage=None):
+    return (
+        _event_lines(
+            {"type": "assistant.message",
+             "data": {"content": "OK", "model": model, "outputTokens": 2}},
+            {"type": "result", "sessionId": "conv-1", "usage": usage or {}},
+        ),
+        "", 0,
+    )
+
+
+_PROBE_REFUSED = ("", "model from --model flag is not available", 1)
+_STAMP = "2026-08-19T00:00:00Z"
+
+
+def _probe(model_ids, by_model, **kwargs):
+    return discover_models(
+        model_ids,
+        transport=CopilotCliTransport(spawner=_seat_spawner(by_model)),
+        clock=lambda: _STAMP,
+        **kwargs,
+    )
+
+
+def _model_blocks(text):
+    """Rendered ``[[models]]`` blocks keyed by their id line."""
+    blocks = {}
+    for chunk in text.split("\n\n"):
+        if chunk.startswith("[[models]]"):
+            blocks[chunk.splitlines()[1]] = chunk
+    return blocks
+
+
+class TestCatalogWriter:
+    def test_shipped_lockfile_round_trips_byte_for_byte(self):
+        """The contract that makes a partial refresh honest: a catalog
+        nothing touched renders back to the bytes it was read from."""
+        assert dumps_catalog(load_catalog(V1_LOCK)) == V1_LOCK.read_text(
+            encoding="utf-8"
+        )
+
+    def test_keys_this_version_does_not_model_survive_the_writer(
+        self, tmp_path
+    ):
+        lock = tmp_path / "c.lock"
+        lock.write_text(
+            '[meta]\ncli_version = "v1"\nseat_id = "s"\n\n'
+            '[[models]]\nid = "a"\nprovider = "anthropic"\n'
+            'enablement = "confirmed"\nfuture_key = "keep me"\n',
+            encoding="utf-8",
+        )
+        assert 'future_key = "keep me"' in dumps_catalog(load_catalog(lock))
+
+    def test_unrenderable_value_is_refused_by_the_writer(self):
+        catalog = _catalog(_entry("a", "anthropic"))
+        catalog.models[0].raw = {"probe_latency_seconds": 1.5}
+        with pytest.raises(ValueError, match="cannot represent"):
+            dumps_catalog(catalog)
+
+    def test_unknown_fields_are_written_by_omission(self):
+        # TOML has no null, and an absent key already means unknown; a
+        # placeholder would read as a measured zero.
+        text = dumps_catalog(_catalog(_entry("a", "anthropic")))
+        assert "echoed_model" not in text
+        assert "probe_premium_requests" not in text
+
+    def test_written_lockfile_is_one_the_reader_accepts(self, tmp_path):
+        path = tmp_path / "seat.lock"
+        write_catalog(
+            path, _catalog(_entry("a", "anthropic"), _entry("b", "openai"))
+        )
+        assert validate_catalog(load_catalog(path)).ok
+
+
+class TestCandidateUniverse:
+    def test_shipped_lockfile_declares_every_id_it_carries(self):
+        """The CLI cannot enumerate models, so the universe is data in the
+        file rather than a list in code."""
+        catalog = load_catalog(V1_LOCK)
+        assert catalog.meta.candidate_universe == tuple(
+            e.id for e in catalog.models
+        )
+
+    def test_malformed_universe_is_refused_at_load(self, tmp_path):
+        lock = tmp_path / "c.lock"
+        lock.write_text(
+            '[meta]\ncli_version = "v1"\nseat_id = "s"\n'
+            "candidate_universe = [1, 2]\n",
+            encoding="utf-8",
+        )
+        with pytest.raises(ValueError, match="candidate_universe"):
+            load_catalog(lock)
+
+
+class TestDiscoverModels:
+    def test_successful_probe_records_its_provenance(self):
+        [entry] = _probe(
+            ["claude-sonnet-4.6"],
+            {"claude-sonnet-4.6": _probe_ok(
+                "claude-sonnet-4.6", {"premiumRequests": 1}
+            )},
+            cli_version="GitHub Copilot CLI 1.0.80.",
+        )
+        assert entry.enablement == "confirmed"
+        assert entry.confirmed_at == _STAMP
+        assert entry.confirmed_on_cli_version == "GitHub Copilot CLI 1.0.80."
+        assert entry.echoed_model == "claude-sonnet-4.6"
+        assert entry.probe_premium_requests == 1
+
+    def test_failed_probe_records_the_failures_own_error_class(self):
+        [entry] = _probe(["ghost-1"], {"ghost-1": _PROBE_REFUSED})
+        assert entry.enablement == "unconfirmed"
+        assert entry.last_probe_error == ERROR_CLASS_INVALID_MODEL
+        assert entry.last_probe_at == _STAMP
+        assert entry.confirmed_at is None
+
+    def test_malformed_premium_sample_is_coerced_to_unknown(self):
+        # Unknown, never free: a float off the wire is not a request count,
+        # and a zero would read as a measurement.
+        [entry] = _probe(
+            ["gpt-5.5"],
+            {"gpt-5.5": _probe_ok("gpt-5.5", {"premiumRequests": 1.5})},
+        )
+        assert entry.probe_premium_requests is None
+
+    def test_provider_is_inferred_by_prefix_with_its_source_declared(self):
+        [entry] = _probe(
+            ["gemini-3.5-flash"],
+            {"gemini-3.5-flash": _probe_ok("gemini-3.5-flash")},
+        )
+        assert entry.provider == "google"
+        assert entry.provider_source == PROVIDER_SOURCE_HEURISTIC
+
+    def test_unrecognised_prefix_yields_no_provider(self):
+        [entry] = _probe(["mystery-1"], {"mystery-1": _probe_ok("mystery-1")})
+        assert entry.provider == ""
+        assert entry.provider_source == ""
+
+
+class TestCatalogMerge:
+    def test_unprobed_entries_survive_byte_for_byte(self):
+        merged = dumps_catalog(merge_catalog(
+            load_catalog(V1_LOCK),
+            _probe(["gpt-5.5"], {"gpt-5.5": _probe_ok(
+                "gpt-5.5", {"premiumRequests": 0}
+            )}, cli_version="GitHub Copilot CLI 1.0.80."),
+            cli_version="GitHub Copilot CLI 1.0.80.", probed_at=_STAMP,
+        ))
+        before = _model_blocks(V1_LOCK.read_text(encoding="utf-8"))
+        after = _model_blocks(merged)
+        assert {k for k in before if before[k] != after[k]} == {
+            'id = "gpt-5.5"'
+        }
+
+    def test_failed_probe_keeps_the_prior_confirmation(self):
+        """A transient CLI failure is not a withdrawn model — the entry
+        goes visibly stale rather than silently unconfirmed."""
+        catalog = _catalog(_entry("a", "anthropic"))
+        catalog.models[0].confirmed_at = "2026-07-04T16:17:00Z"
+        merged = merge_catalog(
+            catalog,
+            _probe(["a"], {"a": _PROBE_REFUSED}),
+        )
+        entry = merged.models[0]
+        assert entry.enablement == "confirmed"
+        assert entry.confirmed_at == "2026-07-04T16:17:00Z"
+        assert entry.last_probe_error == ERROR_CLASS_INVALID_MODEL
+        assert entry.last_probe_at == _STAMP
+
+    def test_probing_an_id_the_catalog_lacks_appends_it(self):
+        merged = merge_catalog(
+            _catalog(_entry("a", "anthropic")),
+            _probe(["gpt-5.5"], {"gpt-5.5": _probe_ok("gpt-5.5")}),
+        )
+        assert [e.id for e in merged.models] == ["a", "gpt-5.5"]
+
+    def test_refresh_redates_the_cli_version_and_probe_time(self):
+        merged = merge_catalog(
+            _catalog(_entry("a", "anthropic"), version="v1"),
+            [], cli_version="v2", probed_at=_STAMP,
+        )
+        assert merged.meta.cli_version == "v2"
+        assert merged.meta.probed_at == _STAMP
+
+    def test_a_run_reporting_no_sample_keeps_the_prior_one(self):
+        # The sample is a one-call observation the cost preview depends on;
+        # dropping it on a silent run would blind the next refresh.
+        catalog = _catalog(_entry("a", "anthropic"))
+        catalog.models[0].probe_premium_requests = 15
+        merged = merge_catalog(
+            catalog, _probe(["a"], {"a": _probe_ok("a")}),
+        )
+        assert merged.models[0].probe_premium_requests == 15
 
 
 class TestRoleResolution:

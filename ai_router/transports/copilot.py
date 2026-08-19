@@ -5,8 +5,9 @@ The CLI has no list-models command and no first-party provider field: a
 model's provider is inferable only from its name prefix, and whether a model
 is enabled on a seat is discoverable only by invoking it. The lockfile is
 therefore seat-scoped, empirically-probed truth — the load-bearing record of
-what this seat can dispatch — and is read (stdlib ``tomllib``), never written
-here.
+what this seat can dispatch — and this module is its only writer. A reader
+without a writer leaves hand-editing as the only remedy for a stale file,
+which destroys exactly the empirical signal the file exists to carry.
 
 Dispatch is an invocation state machine: three-tier timeouts
 (spawn < first_byte < total), JSONL event parsing, stderr-substring error
@@ -54,7 +55,7 @@ import tempfile
 import threading
 import time
 import tomllib
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Callable, Optional, Protocol, Sequence
 
@@ -970,21 +971,67 @@ def preflight(
 # --- Seat catalog lockfile --------------------------------------------------
 
 ENABLEMENT_CONFIRMED = "confirmed"
+ENABLEMENT_UNCONFIRMED = "unconfirmed"
 KNOWN_PROVIDERS = frozenset({"anthropic", "openai", "google"})
 
 # v1 lockfiles spell the probe sample `premium_request_weight`; v2 renamed it
 # because "weight" reads as a rate and the value is a one-call sample. It is
 # NOT a price and never feeds selection; absent means unknown, never free.
 _LEGACY_PROBE_PREMIUM_KEY = "premium_request_weight"
+_PROBE_PREMIUM_KEY = "probe_premium_requests"
+
+# Provider is inferred from the model id and nothing else, because the CLI
+# exposes no provider field. Every inference is stamped with this source so
+# the guess is never read as first-party truth.
+PROVIDER_SOURCE_HEURISTIC = "name-prefix-heuristic"
+_PROVIDER_PREFIXES = (
+    ("claude", "anthropic"),
+    ("gpt", "openai"),
+    ("o1", "openai"),
+    ("o3", "openai"),
+    ("o4", "openai"),
+    ("gemini", "google"),
+)
+
+# One trivial turn is the only way to learn whether a model is enabled on a
+# seat: an invalid model name and a policy-blocked one return the identical
+# CLI error shape, so nothing may be inferred from the name.
+PROBE_PROMPT = "Reply with the single word OK and nothing else."
+
+
+def infer_provider(model_id: str) -> str:
+    """Provider by name prefix, or ``""`` when the name says nothing.
+
+    A declared heuristic: callers record :data:`PROVIDER_SOURCE_HEURISTIC`
+    alongside it. Guessing wrong is worse than admitting ignorance, because
+    provider is what a same-provider verification exclusion turns on.
+    """
+    normalized = str(model_id).strip().lower()
+    for prefix, provider in _PROVIDER_PREFIXES:
+        if normalized.startswith(prefix):
+            return provider
+    return ""
 
 
 @dataclass
 class ModelEntry:
     id: str
     provider: str = ""
-    enablement: str = "unconfirmed"
+    enablement: str = ENABLEMENT_UNCONFIRMED
     probe_premium_requests: Optional[int] = None
     echoed_model: Optional[str] = None
+    provider_source: str = ""
+    confirmed_at: Optional[str] = None
+    confirmed_on_cli_version: Optional[str] = None
+    # The most recent probe that FAILED, with the failure's own error class.
+    # A failed probe is not a withdrawn model, so it annotates rather than
+    # replaces the confirmation above it.
+    last_probe_error: Optional[str] = None
+    last_probe_at: Optional[str] = None
+    # Keys this version does not model, in file order, so a writer never
+    # silently drops what a future version wrote. Not compared: it is the
+    # unmodelled remainder, and byte-identity is asserted on rendered text.
+    raw: dict = field(default_factory=dict, repr=False, compare=False)
 
 
 @dataclass
@@ -993,6 +1040,12 @@ class CatalogMeta:
     cli_version_pin_required: bool
     seat_id: str
     seat_label: str = ""
+    probed_at: Optional[str] = None
+    # The candidate universe lives in the file, not in code: the CLI cannot
+    # enumerate its models, so this is a maintained list and adding a model
+    # must be a data edit that leaves the file the whole truth about the seat.
+    candidate_universe: tuple = ()
+    raw: dict = field(default_factory=dict, repr=False, compare=False)
 
 
 @dataclass
@@ -1011,6 +1064,27 @@ class Catalog:
             if entry.id == model_id:
                 return entry.provider
         return None
+
+
+def _optional_str(value) -> Optional[str]:
+    """A string off the wire or ``None``; anything else is not a string and
+    must not become one by coercion."""
+    return value if isinstance(value, str) and value else None
+
+
+def _read_candidate_universe(meta_raw: dict, path) -> tuple:
+    declared = meta_raw.get("candidate_universe")
+    if declared is None:
+        return ()
+    if not isinstance(declared, list) or not all(
+        isinstance(item, str) and item for item in declared
+    ):
+        raise ValueError(
+            f"catalog lockfile {path!r} declares a malformed "
+            "[meta].candidate_universe: it must be an array of model id "
+            "strings"
+        )
+    return tuple(declared)
 
 
 def load_catalog(path) -> Catalog:
@@ -1034,24 +1108,35 @@ def load_catalog(path) -> Catalog:
         ),
         seat_id=str(meta_raw["seat_id"]),
         seat_label=str(meta_raw.get("seat_label", "")),
+        probed_at=_optional_str(meta_raw.get("probed_at")),
+        candidate_universe=_read_candidate_universe(meta_raw, path),
+        raw=dict(meta_raw),
     )
     entries = []
     for md in data.get("models", []):
         if not isinstance(md, dict) or "id" not in md:
             raise ValueError(f"catalog lockfile has a malformed [[models]] entry: {md!r}")
         raw_probe = md.get(
-            "probe_premium_requests", md.get(_LEGACY_PROBE_PREMIUM_KEY)
+            _PROBE_PREMIUM_KEY, md.get(_LEGACY_PROBE_PREMIUM_KEY)
         )
         entries.append(ModelEntry(
             id=str(md["id"]),
             provider=str(md.get("provider", "")),
-            enablement=str(md.get("enablement", "unconfirmed")),
+            enablement=str(md.get("enablement", ENABLEMENT_UNCONFIRMED)),
             probe_premium_requests=(
                 raw_probe
                 if isinstance(raw_probe, int) and not isinstance(raw_probe, bool)
                 else None
             ),
             echoed_model=md.get("echoed_model"),
+            provider_source=str(md.get("provider_source", "")),
+            confirmed_at=_optional_str(md.get("confirmed_at")),
+            confirmed_on_cli_version=_optional_str(
+                md.get("confirmed_on_cli_version")
+            ),
+            last_probe_error=_optional_str(md.get("last_probe_error")),
+            last_probe_at=_optional_str(md.get("last_probe_at")),
+            raw=dict(md),
         ))
     return Catalog(meta=meta, models=entries)
 
@@ -1119,6 +1204,273 @@ def validate_catalog(
     return CatalogValidationResult(
         ok=not reasons, reasons=tuple(reasons), warnings=tuple(warnings)
     )
+
+
+# --- Seat catalog writer ----------------------------------------------------
+#
+# The restricted TOML subset the reader accepts, and the only shape written:
+# one flat ``[meta]`` table then repeated flat ``[[models]]`` tables, holding
+# scalars and flat arrays of strings. Nothing nested, so the writer needs no
+# TOML library and the file stays legible to the operator who must never have
+# to edit it.
+
+_TOML_STRING_ESCAPES = {
+    "\\": "\\\\", '"': '\\"', "\n": "\\n", "\r": "\\r", "\t": "\\t",
+}
+
+
+def _render_string(value: str) -> str:
+    out = []
+    for char in value:
+        escaped = _TOML_STRING_ESCAPES.get(char)
+        if escaped is not None:
+            out.append(escaped)
+        elif ord(char) < 0x20 or ord(char) == 0x7F:
+            raise ValueError(
+                f"catalog value contains an unrenderable control character "
+                f"{char!r}"
+            )
+        else:
+            out.append(char)
+    return '"' + "".join(out) + '"'
+
+
+def _render_value(key: str, value) -> str:
+    # bool first: it is an int subclass, and `true` must not render as `1`.
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, int):
+        return str(value)
+    if isinstance(value, str):
+        return _render_string(value)
+    if isinstance(value, (list, tuple)):
+        if not all(isinstance(item, str) for item in value):
+            raise ValueError(
+                f"catalog key {key!r} holds an array the lockfile cannot "
+                "represent: arrays are flat arrays of strings"
+            )
+        body = "".join(f"    {_render_string(item)},\n" for item in value)
+        return "[\n" + body + "]"
+    raise ValueError(
+        f"catalog key {key!r} holds a value the lockfile cannot represent: "
+        f"{value!r} ({type(value).__name__}). Coerce it where it arrived "
+        "from — a value the writer cannot render must never reach the writer."
+    )
+
+
+def _set_or_drop(mapping: dict, key: str, value) -> None:
+    """An absent key and a null key are the same fact, and TOML has only the
+    first: unknown is written by omission, never by a placeholder."""
+    if value is None:
+        mapping.pop(key, None)
+    else:
+        mapping[key] = value
+
+
+def _meta_mapping(meta: CatalogMeta) -> dict:
+    out = dict(meta.raw)
+    out["cli_version"] = meta.cli_version
+    out["cli_version_pin_required"] = meta.cli_version_pin_required
+    out["seat_id"] = meta.seat_id
+    _set_or_drop(out, "seat_label", meta.seat_label or None)
+    _set_or_drop(out, "probed_at", meta.probed_at)
+    _set_or_drop(
+        out, "candidate_universe", list(meta.candidate_universe) or None
+    )
+    return out
+
+
+def _entry_mapping(entry: ModelEntry) -> dict:
+    # Starting from the entry as read keeps unmodelled keys, and keeps every
+    # key in its original position: an untouched entry re-renders byte for
+    # byte, which is what makes a partial refresh safe.
+    out = dict(entry.raw)
+    out["id"] = entry.id
+    _set_or_drop(out, "provider", entry.provider or None)
+    _set_or_drop(out, "provider_source", entry.provider_source or None)
+    out["enablement"] = entry.enablement
+    _set_or_drop(out, "confirmed_at", entry.confirmed_at)
+    _set_or_drop(
+        out, "confirmed_on_cli_version", entry.confirmed_on_cli_version
+    )
+    # Write the sample back under the name it was read under, in place, so
+    # a v1-spelled entry nobody probed re-renders unchanged.
+    probe_key = (
+        _LEGACY_PROBE_PREMIUM_KEY
+        if _LEGACY_PROBE_PREMIUM_KEY in out and _PROBE_PREMIUM_KEY not in out
+        else _PROBE_PREMIUM_KEY
+    )
+    out.pop(
+        _PROBE_PREMIUM_KEY
+        if probe_key == _LEGACY_PROBE_PREMIUM_KEY
+        else _LEGACY_PROBE_PREMIUM_KEY,
+        None,
+    )
+    _set_or_drop(out, probe_key, entry.probe_premium_requests)
+    _set_or_drop(out, "echoed_model", entry.echoed_model)
+    _set_or_drop(out, "last_probe_error", entry.last_probe_error)
+    _set_or_drop(out, "last_probe_at", entry.last_probe_at)
+    return out
+
+
+def _render_table(header: str, mapping: dict) -> str:
+    lines = [header]
+    lines.extend(
+        f"{key} = {_render_value(key, value)}" for key, value in mapping.items()
+    )
+    return "\n".join(lines)
+
+
+def dumps_catalog(catalog: Catalog) -> str:
+    """Render *catalog* back to the lockfile text the reader accepts.
+
+    Round-trip is the contract: ``load_catalog`` of this text yields an
+    equal catalog, and a catalog nothing has touched renders back to the
+    bytes it was read from.
+    """
+    tables = [_render_table("[meta]", _meta_mapping(catalog.meta))]
+    tables.extend(
+        _render_table("[[models]]", _entry_mapping(entry))
+        for entry in catalog.models
+    )
+    return "\n\n".join(tables) + "\n"
+
+
+def write_catalog(path, catalog: Catalog) -> None:
+    """Write the lockfile. The only writer there is — a lockfile with no
+    writer leaves hand-editing as the sole remedy for staleness."""
+    Path(path).write_text(
+        dumps_catalog(catalog), encoding="utf-8", newline="\n"
+    )
+
+
+# --- Seat catalog discovery -------------------------------------------------
+
+def _coerce_probe_premium_requests(value) -> Optional[int]:
+    """The CLI's ``premiumRequests`` arrives as arbitrary JSON. A float, a
+    string or a list is not a request count, and unknown (``None``) is the
+    honest answer — never zero, which would read as free."""
+    if type(value) is not int or value < 0:
+        return None
+    return value
+
+
+def _utc_now() -> str:
+    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+
+
+def discover_models(
+    model_ids: Sequence[str],
+    *,
+    transport,
+    cli_version: Optional[str] = None,
+    clock: Callable[[], str] = _utc_now,
+) -> list[ModelEntry]:
+    """Probe each id in *model_ids* and report what the seat did.
+
+    One billed turn per id, in the order given, with no opinion about which
+    ids are worth probing — scope selection is the caller's policy and its
+    cost. Entries come back detached from any catalog; :func:`merge_catalog`
+    decides what they do to the file.
+    """
+    stamp = clock()
+    entries: list[ModelEntry] = []
+    for model_id in model_ids:
+        result = transport.dispatch(
+            model_id=model_id, system_prompt="", user_message=PROBE_PROMPT,
+        )
+        provider = infer_provider(model_id)
+        if result.ok:
+            entries.append(ModelEntry(
+                id=model_id,
+                provider=provider,
+                provider_source=PROVIDER_SOURCE_HEURISTIC if provider else "",
+                enablement=ENABLEMENT_CONFIRMED,
+                confirmed_at=stamp,
+                confirmed_on_cli_version=cli_version,
+                echoed_model=_optional_str(result.served_model_id),
+                probe_premium_requests=_coerce_probe_premium_requests(
+                    result.metadata.get("premium_requests")
+                ),
+            ))
+            continue
+        entries.append(ModelEntry(
+            id=model_id,
+            provider=provider,
+            provider_source=PROVIDER_SOURCE_HEURISTIC if provider else "",
+            enablement=ENABLEMENT_UNCONFIRMED,
+            last_probe_error=str(
+                result.metadata.get("error_class") or ERROR_CLASS_GENERIC
+            ),
+            last_probe_at=stamp,
+        ))
+    return entries
+
+
+def _merge_entry(prior: ModelEntry, fresh: ModelEntry) -> ModelEntry:
+    if fresh.enablement != ENABLEMENT_CONFIRMED:
+        # A transient CLI failure is not a withdrawn model. Demoting a
+        # confirmed entry on one bad probe would discard provenance that
+        # cost a billed call to earn, so the failure annotates and the
+        # confirmation stands, visibly stale, until an operator says
+        # otherwise.
+        return replace(
+            prior,
+            last_probe_error=fresh.last_probe_error,
+            last_probe_at=fresh.last_probe_at,
+        )
+    return replace(
+        prior,
+        provider=fresh.provider or prior.provider,
+        provider_source=fresh.provider_source or prior.provider_source,
+        enablement=ENABLEMENT_CONFIRMED,
+        confirmed_at=fresh.confirmed_at,
+        confirmed_on_cli_version=fresh.confirmed_on_cli_version,
+        # A run that reported no sample leaves the previous one standing:
+        # the sample is a one-call observation, and losing it would blind
+        # the cost preview that keeps a refresh from being all-or-nothing.
+        probe_premium_requests=(
+            fresh.probe_premium_requests
+            if fresh.probe_premium_requests is not None
+            else prior.probe_premium_requests
+        ),
+        echoed_model=fresh.echoed_model or prior.echoed_model,
+        last_probe_error=None,
+        last_probe_at=None,
+    )
+
+
+def merge_catalog(
+    catalog: Catalog,
+    probed: Sequence[ModelEntry],
+    *,
+    cli_version: Optional[str] = None,
+    probed_at: Optional[str] = None,
+) -> Catalog:
+    """Fold *probed* results into *catalog*, touching nothing else.
+
+    A refresh that probed three models rewrites those three; every other
+    entry, including its provenance and any key this version does not
+    model, survives unchanged. That is what makes a cheap partial refresh
+    honest — a scoped run must never present itself as a full re-probe.
+    """
+    fresh_by_id = {entry.id: entry for entry in probed}
+    existing_ids = {entry.id for entry in catalog.models}
+    merged = [
+        _merge_entry(entry, fresh_by_id[entry.id])
+        if entry.id in fresh_by_id
+        else entry
+        for entry in catalog.models
+    ]
+    merged.extend(
+        entry for entry in probed if entry.id not in existing_ids
+    )
+    meta = replace(
+        catalog.meta,
+        cli_version=cli_version or catalog.meta.cli_version,
+        probed_at=probed_at or catalog.meta.probed_at,
+    )
+    return Catalog(meta=meta, models=merged)
 
 
 def resolve_role_candidates(

@@ -8,6 +8,27 @@ seat_label = "operator-personal"
 source = "empirical-probe"
 probed_at = "2026-07-04T16:17:00Z"
 cli_version_note = "cli_version records the CLI these entries were probed on; it is provenance, not a gate. The seat CLI auto-updates, so drift against the live CLI is expected and is reported as a warning. A model that actually stopped working fails its own dispatch with a real error rather than disabling the whole seat."
+candidate_universe_note = "The CLI has no list-models command, so this is a maintained list, not an enumeration: it is every id a refresh may probe, and an id absent here is unprobed rather than unavailable. Adding a model is a data edit to this array followed by a probe; nothing infers enablement from a name."
+candidate_universe = [
+    "claude-sonnet-4.6",
+    "claude-sonnet-4.5",
+    "claude-haiku-4.5",
+    "claude-fable-5",
+    "claude-opus-4.8",
+    "claude-opus-4.7",
+    "claude-opus-4.6",
+    "claude-opus-4.6-fast",
+    "claude-opus-4.5",
+    "gpt-5.5",
+    "gpt-5.4",
+    "gpt-5.3-codex",
+    "gpt-5.2-codex",
+    "gpt-5.2",
+    "gpt-5.4-mini",
+    "gpt-5-mini",
+    "gemini-3.1-pro-preview",
+    "gemini-3.5-flash",
+]
 
 [[models]]
 id = "claude-sonnet-4.6"

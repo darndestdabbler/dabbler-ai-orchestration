@@ -5,6 +5,16 @@ Structural validation runs through the JSON schema at
 ``schemas/router-config.schema.json``. Semantic rules a schema cannot express
 (cross-references, pricing periods) run here, all at load time so a bad
 config fails at startup rather than mid-call.
+
+The bundled ``router-config.yaml`` is package data and therefore the
+*published* default: it must stay correct for a fresh install that has
+provider API keys and no seat. A machine that disagrees says so in a
+project-local ``local-overrides.yaml``, which is deep-merged over the bundled
+base and never published. Config is the only layer that is
+client-independent, model-independent and transport-independent — an
+instruction file cannot carry a machine fact because which instruction files
+load at all is a property of the client, and an env var reaches only
+processes started after it was written.
 """
 
 from __future__ import annotations
@@ -13,15 +23,19 @@ import copy
 import json
 import os
 from pathlib import Path
+from typing import Optional
 
 import jsonschema
 import yaml
 
+from .evidence import repo_root_for
 from .pricing import validate_model_rates
 from .transports.copilot import validate_transport_timeouts
 
 _THIS_DIR = Path(__file__).parent
 _SCHEMA_PATH = _THIS_DIR / "schemas" / "router-config.schema.json"
+
+LOCAL_OVERRIDES_FILENAME = "local-overrides.yaml"
 
 TRANSPORT_API = "api"
 TRANSPORT_COPILOT_CLI = "copilot-cli"
@@ -52,8 +66,86 @@ def _resolve_config_path(path: str | None = None) -> Path:
     return _THIS_DIR / "router-config.yaml"
 
 
+def _resolve_config_sources(
+    path: str | None = None,
+) -> tuple[Path, Optional[Path]]:
+    """``(base config, project-local overlay or None)``.
+
+    An explicitly-named config — by argument or by ``AI_ROUTER_CONFIG`` — is
+    the whole answer and takes no overlay: a caller that named a file means
+    that file. The overlay layers only over the bundled default, which is
+    the one config nobody on this machine chose.
+    """
+    base = _resolve_config_path(path)
+    if path is not None or os.environ.get("AI_ROUTER_CONFIG"):
+        return base, None
+    return base, local_overrides_path()
+
+
+# Resolved once per working directory: the overlay's location is a property
+# of the project, and re-shelling out to git on every config load is not.
+_project_root_cache: dict[str, Optional[str]] = {}
+
+
+def project_root() -> Optional[str]:
+    """The git toplevel of the working directory, or ``None`` outside a
+    repository. The router already discovers the project this way for
+    evidence and gates; a second notion of "the project" would be a second
+    thing to disagree."""
+    cwd = str(Path.cwd().resolve())
+    if cwd not in _project_root_cache:
+        _project_root_cache[cwd] = repo_root_for(cwd)
+    return _project_root_cache[cwd]
+
+
+def local_overrides_path() -> Optional[Path]:
+    """The project-local overlay, when the project has one."""
+    root = project_root()
+    if root is None:
+        return None
+    candidate = Path(root) / LOCAL_OVERRIDES_FILENAME
+    return candidate if candidate.is_file() else None
+
+
+def _reject_unknown_overlay_keys(
+    overlay: dict, schema: dict, source: Path, trail: tuple = ()
+) -> None:
+    """Refuse an overlay key the schema declares no vocabulary for.
+
+    A dropped override is the failure this file exists to prevent: the
+    operator states a machine fact, the router ignores it, and the symptom
+    surfaces somewhere else entirely. Where the schema names its properties,
+    that list is the vocabulary and a key outside it is refused; where it
+    declares an open object — a provider or model name, or a block the
+    schema deliberately leaves unstructured — anything goes and recursion
+    stops. The seat transport block therefore has to be *declared* in the
+    schema rather than left opaque, because it is the block a seat-only
+    machine most needs to override and a typo there would be silent.
+    """
+    properties = schema.get("properties")
+    additional = schema.get("additionalProperties")
+    for key, value in overlay.items():
+        if properties is not None and key in properties:
+            subschema = properties[key]
+        elif isinstance(additional, dict):
+            subschema = additional
+        elif properties is not None:
+            dotted = ".".join(trail + (str(key),))
+            raise ValueError(
+                f"{source} sets unknown key {dotted!r}: "
+                "router-config.schema.json declares no such setting. An "
+                "override the router would silently drop is refused instead."
+            )
+        else:
+            continue
+        if isinstance(value, dict):
+            _reject_unknown_overlay_keys(
+                value, subschema, source, trail + (str(key),)
+            )
+
+
 def load_config(path: str | None = None) -> dict:
-    config_path = _resolve_config_path(path)
+    config_path, overrides_path = _resolve_config_sources(path)
     if not config_path.exists():
         raise FileNotFoundError(
             f"Router config not found: {config_path}. Create it from the "
@@ -62,6 +154,9 @@ def load_config(path: str | None = None) -> dict:
 
     with open(config_path, encoding="utf-8") as f:
         config = yaml.safe_load(f)
+
+    if overrides_path is not None:
+        config = _apply_local_overrides(config, overrides_path)
 
     try:
         jsonschema.validate(config, _load_schema())
@@ -103,7 +198,30 @@ def load_config(path: str | None = None) -> dict:
     _load_prompt_templates(config, config_path.parent)
 
     config["_config_path"] = str(config_path.resolve())
+    config["_local_overrides_path"] = (
+        str(overrides_path.resolve()) if overrides_path is not None else None
+    )
     return config
+
+
+def _apply_local_overrides(config: dict, overrides_path: Path) -> dict:
+    """Deep-merge the project-local overlay onto the bundled base.
+
+    The overlay is partial — only the keys it changes — and the merged
+    result goes through the same schema and semantic checks as any config,
+    so an overlay cannot produce a config the router would have refused.
+    """
+    with open(overrides_path, encoding="utf-8") as f:
+        overrides = yaml.safe_load(f)
+    if overrides is None:
+        return config
+    if not isinstance(overrides, dict):
+        raise ValueError(
+            f"{overrides_path} must be a mapping of config keys to override, "
+            f"got {type(overrides).__name__}"
+        )
+    _reject_unknown_overlay_keys(overrides, _load_schema(), overrides_path)
+    return _deep_merge(config, overrides)
 
 
 def _validate_copilot_block(config: dict) -> None:
@@ -127,10 +245,14 @@ def resolve_transport(config: dict, cli_flag: str | None = None) -> str:
     """The effective transport for routine dispatch.
 
     Precedence: CLI flag > ``DABBLER_TRANSPORT`` env var (the operator's
-    standing preference) > ``transport.profile`` in router-config.yaml >
-    default ``api``. An unknown value fails loud at whichever level supplied
-    it. This selects the transport for routine dispatch; verifier selection
-    may still use the other transport when provider independence requires it.
+    standing preference) > ``transport.profile`` in the loaded config >
+    default ``api``. The config value may come from the bundled
+    ``router-config.yaml`` or from a project-local ``local-overrides.yaml``
+    merged over it — the overlay is a config source, not a precedence tier,
+    so nothing above it changes its answer. An unknown value fails loud at
+    whichever level supplied it. This selects the transport for routine
+    dispatch; verifier selection may still use the other transport when
+    provider independence requires it.
     """
     for source, value in (
         ("--transport flag", cli_flag),

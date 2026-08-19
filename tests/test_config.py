@@ -1,4 +1,5 @@
 import copy
+import subprocess
 
 import pytest
 import yaml
@@ -16,6 +17,18 @@ def _write_config(tmp_path, config):
     path = tmp_path / "router-config.yaml"
     path.write_text(yaml.safe_dump(config), encoding="utf-8")
     return str(path)
+
+
+@pytest.fixture
+def project(tmp_path, monkeypatch):
+    """A working directory the overlay can live in. Config discovers the
+    project through git, the same discovery the gates use, so the fixture
+    has to be a real repository rather than a bare directory."""
+    subprocess.run(
+        ["git", "init", "-q"], cwd=str(tmp_path), capture_output=True,
+    )
+    monkeypatch.chdir(tmp_path)
+    return tmp_path
 
 
 class TestLoadConfig:
@@ -114,6 +127,80 @@ class TestResolveTransport:
         monkeypatch.setenv("DABBLER_TRANSPORT", "carrier-pigeon")
         with pytest.raises(ValueError, match="DABBLER_TRANSPORT"):
             resolve_transport(base_config)
+
+
+class TestLocalOverrides:
+    """The project-local overlay: how a machine states a fact about itself
+    without editing the packaged default every install would inherit."""
+
+    def _overlay(self, project, body):
+        (project / "local-overrides.yaml").write_text(
+            yaml.safe_dump(body), encoding="utf-8"
+        )
+
+    def test_overlay_merges_over_the_bundled_base(self, project):
+        self._overlay(project, {"transport": {"profile": "copilot-cli"}})
+        config = load_config()
+        assert resolve_transport(config) == "copilot-cli"
+        # Partial: the overlay named one key and inherited the rest.
+        assert config["models"]
+        assert config["_local_overrides_path"].endswith("local-overrides.yaml")
+
+    def test_unknown_top_level_key_is_refused_not_dropped(self, project):
+        self._overlay(project, {"transprot": {"profile": "copilot-cli"}})
+        with pytest.raises(ValueError, match="transprot"):
+            load_config()
+
+    def test_unknown_nested_key_is_refused_not_dropped(self, project):
+        self._overlay(project, {"transport": {"porfile": "copilot-cli"}})
+        with pytest.raises(ValueError, match=r"transport\.porfile"):
+            load_config()
+
+    def test_typo_in_the_seat_transport_block_is_refused(self, project):
+        # The block a seat-only machine most needs to override: a dropped
+        # `timeotus` would leave the bundled ceilings quietly in force.
+        self._overlay(
+            project,
+            {"transports": {"copilot-cli": {"timeotus": {"total_seconds": 60}}}},
+        )
+        with pytest.raises(ValueError, match=r"copilot-cli\.timeotus"):
+            load_config()
+
+    def test_open_block_accepts_keys_the_schema_does_not_name(self, project):
+        # metrics is an object the schema deliberately leaves unstructured;
+        # refusing there would refuse overrides the schema never described.
+        self._overlay(project, {"metrics": {"sink": "stdout"}})
+        config = load_config()
+        assert config["metrics"]["sink"] == "stdout"
+        assert config["metrics"]["enabled"] is True  # base survived
+
+    def test_valid_seat_transport_override_still_loads(self, project):
+        self._overlay(
+            project, {"transports": {"copilot-cli": {"lockfile": "seat.lock"}}}
+        )
+        config = load_config()
+        assert config["transports"]["copilot-cli"]["lockfile"] == "seat.lock"
+        assert config["transports"]["copilot-cli"]["roles"]  # base survived
+
+    def test_merged_result_is_schema_validated(self, project):
+        self._overlay(project, {"transport": {"profile": "carrier-pigeon"}})
+        with pytest.raises(ValueError, match="schema validation"):
+            load_config()
+
+    def test_explicitly_named_config_takes_no_overlay(self, project):
+        self._overlay(project, {"transport": {"profile": "copilot-cli"}})
+        config = load_config(_write_config(project, make_config()))
+        assert config["_local_overrides_path"] is None
+        assert resolve_transport(config) == "api"
+
+    def test_env_named_config_takes_no_overlay(self, project, monkeypatch):
+        self._overlay(project, {"transport": {"profile": "copilot-cli"}})
+        monkeypatch.setenv(
+            "AI_ROUTER_CONFIG", _write_config(project, make_config())
+        )
+        config = load_config()
+        assert config["_local_overrides_path"] is None
+        assert resolve_transport(config) == "api"
 
 
 class TestGenerationParams:

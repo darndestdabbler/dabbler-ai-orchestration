@@ -129,8 +129,46 @@
         "profile": { "enum": ["api", "copilot-cli"] }
       }
     },
-    "transports": { "type": "object" },
+    "transports": {
+      "type": "object",
+      "properties": {
+        "copilot-cli": {
+          "type": "object",
+          "properties": {
+            "binary": { "type": "string", "minLength": 1 },
+            "lockfile": { "type": "string", "minLength": 1 },
+            "billed_usage_unavailable": { "type": "boolean" },
+            "max_invocations_per_session": {
+              "type": "integer", "exclusiveMinimum": 0
+            },
+            "timeouts": {
+              "type": "object",
+              "properties": {
+                "spawn_seconds": { "type": "number", "exclusiveMinimum": 0 },
+                "first_byte_seconds": {
+                  "type": "number", "exclusiveMinimum": 0
+                },
+                "total_seconds": { "type": "number", "exclusiveMinimum": 0 }
+              }
+            },
+            "roles": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "object",
+                "properties": {
+                  "prefer": { "type": "array", "items": { "type": "string" } },
+                  "require_provider_in": {
+                    "type": "array", "items": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "task_type_params": { "type": "object" },
+    "testing": { "type": "object" },
     "verification": { "type": "object" },
     "metrics": { "type": "object" },
     "metadata": { "type": "object" }

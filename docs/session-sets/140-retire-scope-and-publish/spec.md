@@ -80,8 +80,11 @@ The removal is surgical, and the surgery is the work.
   outside the repository; this set does not prejudge it.
 - **No new verification architecture.** The monolithic bundle is the
   only path after this set, exactly as it was before set 138.
-- **No test added that was not already written.** The only new tests are
-  the five that come with `session log`, already written and green.
+- **No test added that was not already written**, with one
+  operator-authorized exception: the instruction-file consolidation in
+  session 2, added 2026-08-19, brings its own small set. Everything else
+  new is the five tests that come with `session log`, already written
+  and green.
 
 ---
 
@@ -118,14 +121,43 @@ The removal is surgical, and the surgery is the work.
    default, `--machine-scope` for the machine hive, with an announced
    fallback). Document `session log` in `quick-start.md` and
    `schema-reference.md`.
-4. Bump the version and build the artifact. Publishing itself is
+4. Consolidate the engine instruction files onto one source of truth.
+   Verified against the vendors' own docs, 2026-08-19: Copilot CLI loads
+   `CLAUDE.md`, `GEMINI.md` **and** `AGENTS.md` simultaneously whatever
+   the model, and de-duplicates nothing — so today it ingests the shared
+   managed body twice. Claude Code does **not** read `AGENTS.md`
+   natively, and Gemini CLI does not either without a `context.fileName`
+   opt-in, so a single file is not available. Both, however, expand an
+   `@file` import inline at load time, and the `@AGENTS.md` import is
+   Anthropic's own documented remedy for this exact case.
+   - `AGENTS.md` carries the managed body. `CLAUDE.md` and `GEMINI.md`
+     carry `@AGENTS.md` plus their engine tail, and nothing else.
+   - **Restore `GEMINI.md`.** v1 wrote all three engine files; the v2
+     rebuild's `write_instruction_files` writes only two, while the tail
+     still claims Gemini reads `AGENTS.md`. `google` is a supported
+     provider, so this is a live gap, not a tidy-up.
+   - **Correct both tails.** Each currently asserts a per-engine file
+     split that is false on Copilot.
+   - No symlink. Anthropic endorses one, but it needs Developer Mode and
+     `core.symlinks` on Windows, which is this repo's primary platform.
+   - Out-of-fence user content stays untouched, as `render_engine_file`
+     already guarantees.
+5. Move this repo's own preamble from `CLAUDE.md` to `AGENTS.md`. The v2
+   ground rules — the test budget, "no new module without deleting one",
+   the transport precedence — sit outside the fence in `CLAUDE.md` only,
+   so a Codex session reading `AGENTS.md` never sees them. That is a
+   correctness bug independent of the duplication, and it is why the
+   body's new home must be `AGENTS.md` rather than the other way round.
+6. Bump the version and build the artifact. Publishing itself is
    operator-gated: the session prepares the build and stops.
-5. Cross-provider verification.
-6. Required portion of the full test suite.
-7. Close-out, and the end-of-set `change-log.md`.
+7. Cross-provider verification.
+8. Required portion of the full test suite.
+9. Close-out, and the end-of-set `change-log.md`.
 
-**Creates:** the `session log` subcommand, the doc corrections, a
-release build. Est. 5 new Python tests, all already written.
+**Creates:** the `session log` subcommand, the doc corrections, the
+single-source instruction files with `GEMINI.md` restored, a release
+build. Est. 5 new Python tests already written, plus a small set for the
+instruction-file change.
 
 ---
 
@@ -139,3 +171,8 @@ against the 480 ceiling, so set 139 can fit its estimate. `session log`
 closes the lifecycle seam that made logging a plan step reach into
 `ai_router.writers` through `python -c`. A release build exists, and the
 two stale docs no longer tell an operator something untrue.
+
+The managed body exists in exactly one file. `AGENTS.md` carries it,
+`CLAUDE.md` and `GEMINI.md` import it, all three engine files exist
+again, and this repo's ground rules are readable by an engine that opens
+only `AGENTS.md` — which was not true before.

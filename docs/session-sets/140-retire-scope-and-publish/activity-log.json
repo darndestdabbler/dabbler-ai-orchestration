@@ -96,6 +96,14 @@
       "dateTime": "2026-08-19T04:48:42.837507-04:00",
       "description": "Full pytest suite green: 424 passed in 137s (475 before, minus the 51 removed), 56 slots free against the 480 ceiling. No suites are declared under testing.suites in router-config.yaml, so there is no separate test-evidence record to write.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 6,
+      "stepKey": "close-out",
+      "dateTime": "2026-08-19T04:49:23.389619-04:00",
+      "description": "Work committed (62340a19) and pushed; 5/5 close gates pass.",
+      "status": "complete"
     }
   ]
 }

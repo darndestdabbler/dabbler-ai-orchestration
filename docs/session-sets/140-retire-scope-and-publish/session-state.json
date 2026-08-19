@@ -6,9 +6,9 @@
     {
       "number": 1,
       "title": "Take the cancelled scope out",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-19T04:36:07.689817-04:00",
-      "completedAt": null,
+      "completedAt": "2026-08-19T04:49:25.220806-04:00",
       "orchestrator": {
         "engine": "copilot",
         "provider": "anthropic",

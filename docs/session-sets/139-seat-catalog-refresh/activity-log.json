@@ -131,6 +131,133 @@
       "dateTime": "2026-08-19T06:34:59.827505-04:00",
       "description": "candidate_universe seeded in [meta] from the 18 ids present, written through the writer rather than by hand, with a note that the CLI has no list-models command.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-19T07:06:51.754634-04:00",
+      "description": "Register.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 2,
+      "stepKey": "add-python-m-airouter",
+      "dateTime": "2026-08-19T07:06:51.754634-04:00",
+      "description": "Add `python -m ai_router.transports.copilot refresh` with explicit scopes, no default that spends 39 requests: - `--quorum` (the default): probe the cheapest confirmed model of each provider \u2014 2 premium requests today \u2014 which is exactly enough to re-establish the \u22652-provider invariant and re-date the CLI version. - `--models a,b,c`: probe named candidates only. - `--stale`: probe entries whose `confirmed_on_cli_version` differs from the live CLI, cheapest first. - `--all`: the full universe, which must be asked for by name.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 3,
+      "stepKey": "price-the-run-before-spending-it",
+      "dateTime": "2026-08-19T07:06:51.754634-04:00",
+      "description": "Price the run **before** spending it. Print the projected premium-request cost from the recorded samples, name the entries with unknown cost as unknown rather than assuming zero, and require confirmation above a threshold. `--dry-run` prints the plan and probes nothing. The samples in the lockfile exist for exactly this; a refresh that cannot estimate its own cost has not read its own file.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 4,
+      "stepKey": "report-what-changed-as-a-diff",
+      "dateTime": "2026-08-19T07:06:51.754634-04:00",
+      "description": "Report what changed as a diff, not a success message: entries confirmed, entries newly failing, samples that moved, and the CLI version re-dated. An unchanged refresh says so.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 5,
+      "stepKey": "cross-provider-verification-through-copilot-cli",
+      "dateTime": "2026-08-19T07:06:51.754634-04:00",
+      "description": "Cross-provider verification through `copilot-cli`.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 6,
+      "stepKey": "required-portion-of-the-full-test",
+      "dateTime": "2026-08-19T07:06:51.754634-04:00",
+      "description": "Required portion of the full test suite.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 7,
+      "stepKey": "close-out",
+      "dateTime": "2026-08-19T07:06:51.754634-04:00",
+      "description": "Close-out.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-19T07:06:51.759207-04:00",
+      "description": "Registered session 2 (copilot).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-19T07:21:30.837236-04:00",
+      "description": "Registered session 2 (copilot/claude-opus-5, anthropic)",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 2,
+      "stepKey": "add-python-m-airouter",
+      "dateTime": "2026-08-19T07:21:31.282121-04:00",
+      "description": "refresh subcommand with --quorum/--models/--stale/--all; lockfile path resolution moved into the module that owns the file",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 3,
+      "stepKey": "price-the-run-before-spending-it",
+      "dateTime": "2026-08-19T07:21:31.816532-04:00",
+      "description": "Cost projected from the file's own samples before any spend; unknown named unknown; --dry-run and a non-tty refusal spend nothing",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 4,
+      "stepKey": "report-what-changed-as-a-diff",
+      "dateTime": "2026-08-19T07:21:32.363727-04:00",
+      "description": "diff_catalogs reports confirmed/re-confirmed/failed/sample-moved/re-dated; an unchanged refresh says so",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 5,
+      "stepKey": "cross-provider-verification-through-copilot-cli",
+      "dateTime": "2026-08-19T07:24:59.474028-04:00",
+      "description": "Round 1 dispatched to gpt-5.5/openai over copilot-cli; this step completes when the loop returns clean",
+      "status": "in-progress"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 6,
+      "stepKey": "required-portion-of-the-full-test",
+      "dateTime": "2026-08-19T07:24:59.935282-04:00",
+      "description": "pytest: 468 passed in 183s, run after the last code change; 12 slots left under the 480 ceiling",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 5,
+      "stepKey": "cross-provider-verification-through-copilot-cli",
+      "dateTime": "2026-08-19T07:26:44.948438-04:00",
+      "description": "VERIFIED at round 2 by gpt-5.5/openai over copilot-cli; round 1 Major was the circular 'steps 5-6 pending' ledger finding",
+      "status": "complete"
     }
   ]
 }

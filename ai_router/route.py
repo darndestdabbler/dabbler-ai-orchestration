@@ -20,7 +20,6 @@ import sys
 import threading
 import time
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import Optional
 
 from .config import (
@@ -38,6 +37,7 @@ from .transports.copilot import (
     CopilotCliTransport,
     get_cli_version,
     load_catalog,
+    resolve_lockfile_path,
     resolve_role_candidates,
     resolve_transport_timeouts,
     validate_catalog,
@@ -303,11 +303,7 @@ def _get_copilot(config: dict):
             "the copilot-cli transport is selected but router-config.yaml "
             "has no transports.copilot-cli block"
         )
-    lockfile = Path(cli_cfg["lockfile"])
-    if not lockfile.is_absolute():
-        config_path = config.get("_config_path")
-        base = Path(config_path).parent if config_path else Path.cwd()
-        lockfile = base / lockfile
+    lockfile = resolve_lockfile_path(config)
     try:
         catalog = load_catalog(lockfile)
     except (OSError, ValueError) as exc:

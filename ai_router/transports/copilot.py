@@ -44,6 +44,7 @@ when the model did not read the file through. See the handoff section below.
 
 from __future__ import annotations
 
+import argparse
 import hashlib
 import json
 import os
@@ -1473,6 +1474,28 @@ def merge_catalog(
     return Catalog(meta=meta, models=merged)
 
 
+def resolve_lockfile_path(config: dict) -> Path:
+    """The lockfile ``transports.copilot-cli.lockfile`` names, resolved
+    relative to the config that named it.
+
+    One resolution, in the module that owns the file: a reader and a writer
+    that disagree about which file they mean would let a refresh spend real
+    requests updating a lockfile nothing dispatches from.
+    """
+    cli_cfg = (config.get("transports") or {}).get("copilot-cli")
+    if not isinstance(cli_cfg, dict) or not cli_cfg.get("lockfile"):
+        raise ValueError(
+            "router-config.yaml has no transports.copilot-cli.lockfile, so "
+            "no seat catalog is named"
+        )
+    lockfile = Path(cli_cfg["lockfile"])
+    if lockfile.is_absolute():
+        return lockfile
+    config_path = config.get("_config_path")
+    base = Path(config_path).parent if config_path else Path.cwd()
+    return base / lockfile
+
+
 def resolve_role_candidates(
     config: dict,
     catalog: Catalog,
@@ -1517,3 +1540,438 @@ def resolve_role_candidates(
             if _qualifies(entry) and (entry.id, entry.provider) not in candidates:
                 candidates.append((entry.id, entry.provider))
     return candidates
+
+
+# --- Seat catalog refresh ---------------------------------------------------
+#
+# Scope is the design, not a convenience. v1's refresh had exactly one mode --
+# the whole universe, 39+ premium requests -- so it was run once and never
+# again, and a lockfile whose only writer is too expensive to run is a
+# lockfile people edit by hand. Every scope here is named, the cheap one is
+# the default, and the expensive one has to be asked for.
+
+SCOPE_QUORUM = "quorum"
+SCOPE_MODELS = "models"
+SCOPE_STALE = "stale"
+SCOPE_ALL = "all"
+
+# Projected premium requests above which the run asks before spending. The
+# quorum's cost on a three-provider seat sits well under it: the cheap path
+# must never acquire friction, or it stops being run for the same reason
+# v1's did.
+CONFIRM_THRESHOLD_PREMIUM_REQUESTS = 5
+
+REFRESH_COMMAND = "python -m ai_router.transports.copilot refresh"
+
+
+def _cost_order(entry: ModelEntry) -> tuple:
+    """Sort key for "cheapest first". An unknown sample sorts after every
+    known one: unknown means never measured, and never measured is never
+    free."""
+    sample = entry.probe_premium_requests
+    return (1, 0) if sample is None else (0, sample)
+
+
+def _sample_text(sample: Optional[int]) -> str:
+    return "unknown" if sample is None else str(sample)
+
+
+@dataclass(frozen=True)
+class RefreshPlan:
+    """What a refresh would probe and what the file says that costs."""
+
+    scope: str
+    # (model_id, recorded sample or None) in probe order.
+    samples: tuple = ()
+    threshold: int = CONFIRM_THRESHOLD_PREMIUM_REQUESTS
+
+    @property
+    def model_ids(self) -> tuple:
+        return tuple(model_id for model_id, _ in self.samples)
+
+    @property
+    def known_premium_requests(self) -> int:
+        return sum(s for _, s in self.samples if s is not None)
+
+    @property
+    def unknown_cost_ids(self) -> tuple:
+        return tuple(model_id for model_id, s in self.samples if s is None)
+
+    @property
+    def needs_confirmation(self) -> bool:
+        """An unknown-cost entry asks too. A plan that cannot bound its own
+        spend has not been priced, and an unknown that turns out to be 15 is
+        precisely what the threshold is for."""
+        return (
+            self.known_premium_requests > self.threshold
+            or bool(self.unknown_cost_ids)
+        )
+
+
+def _quorum_ids(catalog: Catalog) -> list[str]:
+    """The cheapest confirmed entry of each provider — the smallest probe
+    that re-establishes the >=2-distinct-provider invariant and re-dates the
+    CLI version, which is what "did my seat survive the auto-update?"
+    actually asks."""
+    cheapest: dict[str, ModelEntry] = {}
+    for entry in catalog.confirmed_models():
+        if entry.provider not in KNOWN_PROVIDERS:
+            continue
+        held = cheapest.get(entry.provider)
+        if held is None or _cost_order(entry) < _cost_order(held):
+            cheapest[entry.provider] = entry
+    return [cheapest[provider].id for provider in sorted(cheapest)]
+
+
+def _stale_ids(catalog: Catalog, live_cli_version: Optional[str]) -> list[str]:
+    """Entries whose confirmation was earned on some other CLI build.
+
+    An entry with no confirmation at all is not stale, it is unprobed, and
+    sweeping it in here would quietly turn a targeted re-confirmation into a
+    universe probe — the cost blowout this whole command exists to avoid.
+    """
+    if not live_cli_version:
+        raise ValueError(
+            "--stale needs the live CLI version to tell stale from current, "
+            "and 'copilot --version' did not answer. Name the entries with "
+            "--models instead."
+        )
+    stale = [
+        entry for entry in catalog.models
+        if entry.confirmed_on_cli_version
+        and entry.confirmed_on_cli_version != live_cli_version
+    ]
+    return [entry.id for entry in sorted(stale, key=_cost_order)]
+
+
+def _universe_ids(catalog: Catalog) -> list[str]:
+    if not catalog.meta.candidate_universe:
+        raise ValueError(
+            "the lockfile declares no [meta].candidate_universe and the CLI "
+            "has no list-models command to stand in for one. Add the ids to "
+            "that array: it is a maintained list, and that data edit is how "
+            "a model becomes probeable."
+        )
+    return list(catalog.meta.candidate_universe)
+
+
+def _named_ids(catalog: Catalog, models) -> list[str]:
+    requested: list[str] = []
+    for raw in models:
+        for token in str(raw).split(","):
+            token = token.strip()
+            if token and token not in requested:
+                requested.append(token)
+    if not requested:
+        raise ValueError("--models needs at least one model id")
+    universe = set(catalog.meta.candidate_universe)
+    unknown = [m for m in requested if m not in universe] if universe else []
+    if unknown:
+        raise ValueError(
+            "not in the lockfile's declared candidate universe: "
+            + ", ".join(unknown)
+            + ". Every probe costs a premium request, so a typo must not buy "
+            "one -- add the id to [meta].candidate_universe first."
+        )
+    return requested
+
+
+def plan_refresh(
+    catalog: Catalog,
+    *,
+    scope: str = SCOPE_QUORUM,
+    models=None,
+    live_cli_version: Optional[str] = None,
+    threshold: int = CONFIRM_THRESHOLD_PREMIUM_REQUESTS,
+) -> RefreshPlan:
+    """Select a scope and price it from the samples already in the file.
+
+    That is what those samples are for: a refresh that cannot estimate its
+    own cost has not read its own file, and an operator's only defence
+    against an unpriced billed run is to never run it.
+    """
+    if scope == SCOPE_QUORUM:
+        ids = _quorum_ids(catalog)
+    elif scope == SCOPE_MODELS:
+        ids = _named_ids(catalog, models or ())
+    elif scope == SCOPE_STALE:
+        ids = _stale_ids(catalog, live_cli_version)
+    elif scope == SCOPE_ALL:
+        ids = _universe_ids(catalog)
+    else:
+        raise ValueError(f"unknown refresh scope {scope!r}")
+
+    by_id = {entry.id: entry for entry in catalog.models}
+    samples = tuple(
+        (
+            model_id,
+            by_id[model_id].probe_premium_requests
+            if model_id in by_id else None,
+        )
+        for model_id in ids
+    )
+    return RefreshPlan(scope=scope, samples=samples, threshold=threshold)
+
+
+def format_plan(plan: RefreshPlan) -> str:
+    lines = [
+        f"refresh plan: scope={plan.scope}, "
+        f"{len(plan.samples)} model(s) to probe"
+    ]
+    lines.extend(
+        f"  {model_id}  (sample: {_sample_text(sample)})"
+        for model_id, sample in plan.samples
+    )
+    lines.append(
+        f"projected cost: {plan.known_premium_requests} premium request(s) "
+        "from recorded samples"
+    )
+    if plan.unknown_cost_ids:
+        lines.append(
+            f"  plus {len(plan.unknown_cost_ids)} of unknown cost "
+            f"({', '.join(plan.unknown_cost_ids)}) -- unknown is not zero, so "
+            "this projection is a floor"
+        )
+    return "\n".join(lines)
+
+
+def diff_catalogs(before: Catalog, after: Catalog) -> tuple:
+    """What the refresh changed, in the lockfile's own terms.
+
+    A success message would be a claim about the seat; this is the evidence
+    for one. Silence about an entry means the run did not touch it.
+    """
+    lines: list[str] = []
+    if before.meta.cli_version != after.meta.cli_version:
+        lines.append(
+            f"cli version re-dated: {before.meta.cli_version!r} -> "
+            f"{after.meta.cli_version!r}"
+        )
+    prior = {entry.id: entry for entry in before.models}
+    for entry in after.models:
+        was = prior.get(entry.id)
+        if was is None:
+            lines.append(f"added: {entry.id} ({entry.enablement})")
+            continue
+        confirmed_now = entry.enablement == ENABLEMENT_CONFIRMED
+        if confirmed_now and was.enablement != ENABLEMENT_CONFIRMED:
+            lines.append(f"confirmed: {entry.id}")
+        elif (
+            confirmed_now
+            and was.confirmed_on_cli_version != entry.confirmed_on_cli_version
+        ):
+            lines.append(
+                f"re-confirmed: {entry.id} on "
+                f"{entry.confirmed_on_cli_version!r}"
+            )
+        if (
+            entry.last_probe_error
+            and entry.last_probe_error != was.last_probe_error
+        ):
+            kept = (
+                "; the prior confirmation stands, visibly stale"
+                if was.enablement == ENABLEMENT_CONFIRMED else ""
+            )
+            lines.append(
+                f"probe failed: {entry.id} ({entry.last_probe_error}){kept}"
+            )
+        if was.probe_premium_requests != entry.probe_premium_requests:
+            lines.append(
+                f"sample moved: {entry.id} "
+                f"{_sample_text(was.probe_premium_requests)} -> "
+                f"{_sample_text(entry.probe_premium_requests)}"
+            )
+    return tuple(lines)
+
+
+def _prompt_to_confirm(plan: RefreshPlan, out) -> bool:
+    if not sys.stdin.isatty():
+        print(
+            "this plan needs confirmation and stdin is not a terminal. "
+            "Re-run with --yes to authorize the spend, or --dry-run to see "
+            "the plan without spending anything.",
+            file=out,
+        )
+        return False
+    unknown = " plus entries of unknown cost" if plan.unknown_cost_ids else ""
+    answer = input(
+        f"spend {plan.known_premium_requests} premium request(s)"
+        f"{unknown}? [y/N] "
+    )
+    return answer.strip().lower() in ("y", "yes")
+
+
+def run_refresh(
+    *,
+    catalog_path,
+    transport,
+    live_cli_version: Optional[str] = None,
+    scope: str = SCOPE_QUORUM,
+    models=None,
+    dry_run: bool = False,
+    assume_yes: bool = False,
+    threshold: int = CONFIRM_THRESHOLD_PREMIUM_REQUESTS,
+    confirm: Optional[Callable[[RefreshPlan], bool]] = None,
+    clock: Callable[[], str] = _utc_now,
+    out=None,
+) -> int:
+    """Plan, price, probe, merge, write, report. Returns a process exit code.
+
+    The order is the point: nothing is spent before the projection is on
+    screen, and nothing is written that the diff does not account for.
+    """
+    out = out or sys.stdout
+    before = load_catalog(catalog_path)
+    plan = plan_refresh(
+        before,
+        scope=scope,
+        models=models,
+        live_cli_version=live_cli_version,
+        threshold=threshold,
+    )
+    print(format_plan(plan), file=out)
+    if not plan.samples:
+        print(
+            "nothing to probe: this scope selects no entry.", file=out
+        )
+        return 0
+    if dry_run:
+        print("dry run: nothing probed, lockfile untouched.", file=out)
+        return 0
+    if plan.needs_confirmation and not assume_yes:
+        approve = confirm or (lambda p: _prompt_to_confirm(p, out))
+        if not approve(plan):
+            print(
+                "refresh declined: nothing probed, lockfile untouched.",
+                file=out,
+            )
+            return 1
+
+    stamp = clock()
+    probed = discover_models(
+        plan.model_ids,
+        transport=transport,
+        cli_version=live_cli_version,
+        clock=lambda: stamp,
+    )
+    after = merge_catalog(
+        before, probed, cli_version=live_cli_version, probed_at=stamp,
+    )
+    write_catalog(catalog_path, after)
+
+    changes = diff_catalogs(before, after)
+    if changes:
+        print("changed:", file=out)
+        for line in changes:
+            print(f"  {line}", file=out)
+    else:
+        print(
+            f"no change: all {len(plan.model_ids)} probed entr"
+            f"{'y' if len(plan.model_ids) == 1 else 'ies'} answered exactly "
+            "as the lockfile already records; provenance re-dated.",
+            file=out,
+        )
+    return 0
+
+
+def _build_refresh_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="python -m ai_router.transports.copilot",
+        description="seat catalog lockfile maintenance",
+    )
+    sub = parser.add_subparsers(dest="command", required=True)
+    cmd = sub.add_parser(
+        "refresh",
+        help="re-probe the seat and rewrite the catalog lockfile",
+        description=(
+            "Probe a named scope of models and fold the answers into the "
+            "lockfile. Merge, never clobber: an entry this run did not probe "
+            "survives byte for byte, provenance included."
+        ),
+    )
+    scope = cmd.add_mutually_exclusive_group()
+    scope.add_argument(
+        "--quorum", dest="scope", action="store_const", const=SCOPE_QUORUM,
+        help="(default) the cheapest confirmed model of each provider -- "
+             "enough to re-establish the >=2-provider invariant and re-date "
+             "the CLI version",
+    )
+    scope.add_argument(
+        "--stale", dest="scope", action="store_const", const=SCOPE_STALE,
+        help="entries confirmed on a CLI version other than the live one, "
+             "cheapest first",
+    )
+    scope.add_argument(
+        "--all", dest="scope", action="store_const", const=SCOPE_ALL,
+        help="the whole declared candidate universe; costs what it costs, "
+             "which is why it must be asked for by name",
+    )
+    scope.add_argument(
+        "--models", metavar="a,b,c",
+        help="probe these ids only, comma-separated",
+    )
+    cmd.set_defaults(scope=SCOPE_QUORUM)
+    cmd.add_argument(
+        "--dry-run", action="store_true",
+        help="print the plan and its projected cost; probe nothing",
+    )
+    cmd.add_argument(
+        "--yes", action="store_true",
+        help="authorize a plan that would otherwise ask first",
+    )
+    cmd.add_argument(
+        "--confirm-threshold", type=int,
+        default=CONFIRM_THRESHOLD_PREMIUM_REQUESTS,
+        help="projected premium requests above which the run asks first "
+             f"(default {CONFIRM_THRESHOLD_PREMIUM_REQUESTS})",
+    )
+    cmd.add_argument(
+        "--lockfile",
+        help="lockfile to refresh (default: the one router-config.yaml names)",
+    )
+    cmd.add_argument(
+        "--binary",
+        help="Copilot CLI binary (default: the one router-config.yaml names)",
+    )
+    return parser
+
+
+def main(argv=None) -> int:
+    args = _build_refresh_parser().parse_args(argv)
+    from ..config import load_config
+
+    try:
+        config = load_config()
+        cli_cfg = (config.get("transports") or {}).get("copilot-cli") or {}
+        binary = args.binary or cli_cfg.get("binary", "copilot")
+        lockfile = (
+            Path(args.lockfile) if args.lockfile
+            else resolve_lockfile_path(config)
+        )
+        return run_refresh(
+            catalog_path=lockfile,
+            transport=CopilotCliTransport(
+                binary=binary,
+                timeouts=resolve_transport_timeouts(cli_cfg),
+                max_invocations=cli_cfg.get("max_invocations_per_session"),
+            ),
+            live_cli_version=get_cli_version(binary=binary),
+            scope=SCOPE_MODELS if args.models else args.scope,
+            models=[args.models] if args.models else None,
+            dry_run=args.dry_run,
+            assume_yes=args.yes,
+            threshold=args.confirm_threshold,
+        )
+    except (OSError, ValueError) as exc:
+        print(f"refresh: {exc}", file=sys.stderr)
+        return 2
+
+
+if __name__ == "__main__":
+    # ``python -m`` re-executes this file under the name ``__main__`` while
+    # the package root has already imported it (ai_router -> route -> here),
+    # so hand off to the canonical module: two copies of the catalog
+    # dataclasses answering the same command is a trap worth not setting.
+    from ai_router.transports.copilot import main as _canonical_main
+
+    raise SystemExit(_canonical_main())

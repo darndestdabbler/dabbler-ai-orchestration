@@ -13,13 +13,20 @@ from ai_router.transports.copilot import (
     HANDOFF_THRESHOLD_UTF16_UNITS,
     ModelEntry,
     PROVIDER_SOURCE_HEURISTIC,
+    SCOPE_ALL,
+    SCOPE_MODELS,
+    SCOPE_QUORUM,
+    SCOPE_STALE,
     TransportTimeouts,
     _rendered_utf16_units,
     discover_models,
     dumps_catalog,
+    format_plan,
     load_catalog,
     merge_catalog,
+    plan_refresh,
     resolve_role_candidates,
+    run_refresh,
     validate_catalog,
     validate_transport_timeouts,
     write_catalog,
@@ -555,6 +562,214 @@ class TestCatalogMerge:
             catalog, _probe(["a"], {"a": _probe_ok("a")}),
         )
         assert merged.models[0].probe_premium_requests == 15
+
+
+SEAT_VERSION = "GitHub Copilot CLI 1.0.80."
+
+
+def _lock_copy(tmp_path):
+    """The shipped lockfile, somewhere a test may write to."""
+    dest = tmp_path / "copilot-catalog.lock"
+    dest.write_text(V1_LOCK.read_text(encoding="utf-8"), encoding="utf-8")
+    return dest
+
+
+def _write_lock(tmp_path, meta_lines, *entries):
+    lock = tmp_path / "small.lock"
+    tables = ["[meta]\n" + "\n".join(meta_lines)]
+    tables.extend("[[models]]\n" + "\n".join(lines) for lines in entries)
+    lock.write_text("\n\n".join(tables) + "\n", encoding="utf-8")
+    return lock
+
+
+def _sampled(model_id, provider, sample=None, on_version=None,
+             enablement="confirmed"):
+    return ModelEntry(
+        id=model_id, provider=provider, enablement=enablement,
+        probe_premium_requests=sample, confirmed_on_cli_version=on_version,
+    )
+
+
+def _refuse_to_spawn(argv, env):
+    raise AssertionError(
+        f"a plan that was not approved spawned the CLI: {argv!r}"
+    )
+
+
+class TestRefreshScope:
+    def test_quorum_is_the_cheapest_confirmed_model_of_each_provider(self):
+        """The 2-request common case. A refresh that costs 39 to answer 'did
+        my seat survive the auto-update?' is one nobody runs, which is what
+        left hand-editing as the only remedy."""
+        plan = plan_refresh(load_catalog(V1_LOCK), scope=SCOPE_QUORUM)
+        assert plan.model_ids == (
+            "claude-sonnet-4.6", "gemini-3.1-pro-preview", "gpt-5.5",
+        )
+        assert plan.known_premium_requests == 2
+
+    def test_quorum_prefers_a_measured_sample_to_an_unmeasured_one(self):
+        """Unknown is never free, so an unmeasured entry is not the cheap
+        one — picking it would make the projection meaningless."""
+        catalog = _catalog(
+            _sampled("a-unmeasured", "anthropic"),
+            _sampled("a-measured", "anthropic", sample=3),
+            _sampled("o-1", "openai", sample=0),
+        )
+        plan = plan_refresh(catalog, scope=SCOPE_QUORUM)
+        assert plan.model_ids == ("a-measured", "o-1")
+
+    def test_stale_is_confirmation_on_another_cli_version_cheapest_first(self):
+        """An entry with no confirmation at all is unprobed, not stale:
+        sweeping it in here would turn a targeted re-confirmation into a
+        universe probe."""
+        catalog = _catalog(
+            _sampled("dear", "anthropic", sample=15, on_version="v1"),
+            _sampled("cheap", "anthropic", sample=1, on_version="v1"),
+            _sampled("current", "openai", sample=0, on_version="v2"),
+            _sampled("never-probed", "google", enablement="unconfirmed"),
+        )
+        plan = plan_refresh(catalog, scope=SCOPE_STALE, live_cli_version="v2")
+        assert plan.model_ids == ("cheap", "dear")
+
+    def test_all_is_the_declared_universe_priced_from_the_file(self):
+        plan = plan_refresh(load_catalog(V1_LOCK), scope=SCOPE_ALL)
+        assert plan.model_ids == load_catalog(V1_LOCK).meta.candidate_universe
+        assert plan.known_premium_requests == 39
+        assert len(plan.unknown_cost_ids) == 5
+
+    def test_the_declared_universe_bounds_what_a_refresh_may_probe(self):
+        """The CLI has no list-models command, so the universe in the file is
+        the only list there is: an id outside it is a data edit away, and a
+        probe costs a premium request a typo must not buy."""
+        catalog = load_catalog(V1_LOCK)
+        with pytest.raises(ValueError, match="candidate universe"):
+            plan_refresh(catalog, scope=SCOPE_MODELS, models=["claude-opus-9"])
+        with pytest.raises(ValueError, match="candidate_universe"):
+            plan_refresh(_catalog(_entry("a", "anthropic")), scope=SCOPE_ALL)
+
+
+class TestRefreshCost:
+    def test_unknown_cost_is_named_rather_than_costed_zero(self):
+        text = format_plan(plan_refresh(
+            _catalog(_sampled("a", "anthropic"), _sampled("b", "openai", 1)),
+            scope=SCOPE_QUORUM,
+        ))
+        assert "projected cost: 1 premium request(s)" in text
+        assert "unknown is not zero" in text
+        assert "floor" in text
+
+    def test_the_quorum_never_asks_and_the_full_universe_always_does(self):
+        """Friction on the cheap path is what made v1's writer unrunnable."""
+        catalog = load_catalog(V1_LOCK)
+        assert not plan_refresh(catalog, scope=SCOPE_QUORUM).needs_confirmation
+        assert plan_refresh(catalog, scope=SCOPE_ALL).needs_confirmation
+
+    def test_dry_run_prints_the_plan_and_probes_nothing(self, tmp_path,
+                                                        capsys):
+        lock = _lock_copy(tmp_path)
+        before = lock.read_bytes()
+        code = run_refresh(
+            catalog_path=lock,
+            transport=CopilotCliTransport(spawner=_refuse_to_spawn),
+            scope=SCOPE_ALL, dry_run=True,
+        )
+        assert code == 0
+        assert "refresh plan: scope=all" in capsys.readouterr().out
+        assert lock.read_bytes() == before
+
+    def test_an_unapproved_plan_spends_nothing(self, tmp_path, capsys):
+        """pytest's stdin is not a terminal, which is the case that matters:
+        an unattended run must fail closed rather than prompt into the void
+        or assume yes."""
+        lock = _lock_copy(tmp_path)
+        before = lock.read_bytes()
+        code = run_refresh(
+            catalog_path=lock,
+            transport=CopilotCliTransport(spawner=_refuse_to_spawn),
+            scope=SCOPE_ALL,
+        )
+        out = capsys.readouterr().out
+        assert code == 1
+        assert "--yes" in out and "declined" in out
+        assert lock.read_bytes() == before
+
+
+class TestRefreshRun:
+    def _quorum_seat(self, **overrides):
+        by_model = {
+            "claude-sonnet-4.6": _probe_ok(
+                "claude-sonnet-4.6", {"premiumRequests": 1}
+            ),
+            "gemini-3.1-pro-preview": _probe_ok(
+                "gemini-3.1-pro-preview", {"premiumRequests": 1}
+            ),
+            "gpt-5.5": _probe_ok("gpt-5.5", {"premiumRequests": 0}),
+        }
+        by_model.update(overrides)
+        return CopilotCliTransport(spawner=_seat_spawner(by_model))
+
+    def _run(self, lock, transport, **kwargs):
+        return run_refresh(
+            catalog_path=lock, transport=transport,
+            live_cli_version=SEAT_VERSION, clock=lambda: _STAMP, **kwargs,
+        )
+
+    def test_a_refresh_writes_its_merge_and_reports_it_as_a_diff(
+        self, tmp_path, capsys
+    ):
+        lock = _lock_copy(tmp_path)
+        before = _model_blocks(lock.read_text(encoding="utf-8"))
+        assert self._run(lock, self._quorum_seat()) == 0
+        out = capsys.readouterr().out
+        after_text = lock.read_text(encoding="utf-8")
+
+        assert load_catalog(lock).meta.cli_version == SEAT_VERSION
+        assert "cli version re-dated" in out
+        assert "re-confirmed: claude-sonnet-4.6" in out
+        # Merge, never clobber: the 15 entries this run did not probe are
+        # byte-identical, provenance included.
+        after = _model_blocks(after_text)
+        assert {k for k in before if before[k] != after[k]} == {
+            'id = "claude-sonnet-4.6"',
+            'id = "gemini-3.1-pro-preview"',
+            'id = "gpt-5.5"',
+        }
+
+    def test_a_failed_probe_is_reported_and_the_confirmation_stands(
+        self, tmp_path, capsys
+    ):
+        lock = _lock_copy(tmp_path)
+        code = self._run(
+            lock, self._quorum_seat(**{"gpt-5.5": _PROBE_REFUSED}),
+        )
+        out = capsys.readouterr().out
+        assert code == 0
+        assert f"probe failed: gpt-5.5 ({ERROR_CLASS_INVALID_MODEL})" in out
+        assert "stands, visibly stale" in out
+        assert load_catalog(lock).provider_of("gpt-5.5") == "openai"
+
+    def test_an_unchanged_refresh_says_so(self, tmp_path, capsys):
+        lock = _write_lock(
+            tmp_path,
+            ['cli_version = "v1"', 'seat_id = "s"',
+             'candidate_universe = [\n    "a",\n    "o",\n]'],
+            ['id = "a"', 'provider = "anthropic"', 'enablement = "confirmed"',
+             'confirmed_on_cli_version = "v1"', "probe_premium_requests = 1"],
+            ['id = "o"', 'provider = "openai"', 'enablement = "confirmed"',
+             'confirmed_on_cli_version = "v1"', "probe_premium_requests = 0"],
+        )
+        code = run_refresh(
+            catalog_path=lock,
+            transport=CopilotCliTransport(spawner=_seat_spawner({
+                "a": _probe_ok("a", {"premiumRequests": 1}),
+                "o": _probe_ok("o", {"premiumRequests": 0}),
+            })),
+            live_cli_version="v1", clock=lambda: _STAMP,
+        )
+        out = capsys.readouterr().out
+        assert code == 0
+        assert "no change" in out
+        assert "changed:" not in out
 
 
 class TestRoleResolution:

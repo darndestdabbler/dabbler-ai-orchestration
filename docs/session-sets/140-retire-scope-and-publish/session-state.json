@@ -1,7 +1,7 @@
 {
   "schemaVersion": 4,
   "sessionSetName": "140-retire-scope-and-publish",
-  "status": "in-progress",
+  "status": "complete",
   "sessions": [
     {
       "number": 1,
@@ -27,9 +27,9 @@
     {
       "number": 2,
       "title": "Ship the salvaged fixes and publish",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-19T05:55:55.044066-04:00",
-      "completedAt": null,
+      "completedAt": "2026-08-19T06:16:03.633492-04:00",
       "orchestrator": {
         "engine": "copilot",
         "provider": "anthropic",
@@ -38,7 +38,7 @@
       },
       "verificationVerdict": "VERIFIED",
       "verification": {
-        "rounds": 1,
+        "rounds": 2,
         "verifierModel": "gpt-5.5",
         "verifierProvider": "openai",
         "transport": "copilot-cli",

@@ -59,3 +59,10 @@ ceiling, so set 139 fits its revised 41-55 estimate.
 The wheel carries no `context_scope.py` and no `pulls.schema.json`, and
 its bundled `router-config.yaml` still reads `profile: api`. PyPI still
 has 1.0.0. Publishing stays operator-gated.
+
+## Session 2 verification — VERIFIED after 2 round(s)
+
+- Verifier: gpt-5.5 (openai) over copilot-cli
+- Orchestrator provider (excluded): anthropic
+- Routed verification cost: unpriced (seat transport)
+- Raw round output: `.dabbler/runs/140-retire-scope-and-publish/s2/`

@@ -27,9 +27,9 @@
     {
       "number": 2,
       "title": "The refusal, and instructions that name the right command",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-19T17:15:51.240529-04:00",
-      "completedAt": null,
+      "completedAt": "2026-08-19T18:37:51.409767-04:00",
       "orchestrator": {
         "engine": "copilot",
         "provider": "anthropic",

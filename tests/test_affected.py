@@ -1,4 +1,5 @@
-"""Affected-test selection: the reasons, and the refusal to widen."""
+"""Affected-test selection: the reasons, the refusal to widen, and the
+policy a pre-verification command is held to."""
 
 from __future__ import annotations
 
@@ -11,8 +12,17 @@ from ai_router.affected import (
     REASON_SMOKE,
     RISK_SELECTION_UNKNOWN,
     SelectionConfig,
+    classify_preverify_command,
     load_selection_config,
+    preverify_gate,
     select_tests,
+    targeted_command,
+)
+from ai_router.test_evidence import (
+    POLICY_ALL_TESTS_AFFECTED,
+    POLICY_OPERATOR_OVERRIDE,
+    POLICY_TARGETED,
+    POLICY_VIOLATION,
 )
 
 
@@ -139,3 +149,147 @@ class TestDeclarationErrors:
         }}})
         assert not loaded.ok
         assert any("select" in e for e in loaded.errors)
+
+
+class TestPreverificationPolicy:
+    def test_a_full_suite_run_is_not_pre_verification_evidence(
+        self, tree, selection
+    ):
+        result = select_tests(tree, ["ai_router/engine.py"], selection)
+        sanctioned = targeted_command("python -m pytest", result)
+
+        # The whole set exists for this line: the habitual command, on an
+        # ordinary change, buys nothing.
+        verdict = classify_preverify_command("python -m pytest", result)
+        assert verdict.policy == POLICY_VIOLATION
+        assert not verdict.accepted
+        assert set(verdict.missing) == set(result.test_paths)
+
+        # Nor does pointing the runner at the directory they live in.
+        assert classify_preverify_command(
+            "python -m pytest tests/", result
+        ).policy == POLICY_VIOLATION
+
+        # The selector's own command passes, node ids included.
+        assert classify_preverify_command(sanctioned, result).policy == (
+            POLICY_TARGETED
+        )
+        assert classify_preverify_command(
+            "python -m pytest tests/test_engine.py::TestX::test_y "
+            "tests/test_widget.py",
+            result,
+        ).policy == POLICY_TARGETED
+
+    def test_a_proved_repo_wide_change_carries_its_own_exception(
+        self, tree, selection
+    ):
+        result = select_tests(tree, ["tests/conftest.py"], selection)
+        verdict = classify_preverify_command("python -m pytest", result)
+
+        assert verdict.policy == POLICY_ALL_TESTS_AFFECTED
+        assert verdict.accepted
+        # Proved, not asserted: the record carries what proved it.
+        assert "conftest" in verdict.reason
+        assert targeted_command("python -m pytest", result) == (
+            "python -m pytest"
+        )
+
+    def test_an_operator_override_is_an_exception_only_with_a_reason(
+        self, tree, selection
+    ):
+        result = select_tests(tree, ["ai_router/engine.py"], selection)
+
+        given = classify_preverify_command(
+            "python -m pytest", result,
+            override_reason="pytest plugin upgrade; selection is untrusted",
+        )
+        assert given.policy == POLICY_OPERATOR_OVERRIDE
+        assert given.reason.startswith("pytest plugin upgrade")
+
+        blank = classify_preverify_command(
+            "python -m pytest", result, override_reason="   ",
+        )
+        assert blank.policy == POLICY_VIOLATION
+
+    def test_a_change_affecting_no_test_asks_for_no_run_and_accepts_none(
+        self, tree, selection
+    ):
+        """Zero selected tests is the most ordinary change there is. If it
+        sanctioned the bare suite command, the policy would recommend the
+        one run it exists to refuse."""
+        result = select_tests(tree, ["docs/plan.md"], selection)
+        assert not result.all_tests_affected and not result.test_paths
+
+        assert targeted_command("python -m pytest", result) == ""
+        assert classify_preverify_command(
+            "python -m pytest", result
+        ).policy == POLICY_VIOLATION
+
+
+class TestTheGate:
+    CONFIG = {"testing": {
+        "suites": [{"name": "python", "command": "python -m pytest",
+                    "covers": ["docs/"], "expensive": True}],
+        "selection": {"test_root": "tests", "repo_wide": ["pyproject.toml"],
+                      "rules": [
+            {"when": "docs/", "select": []},
+            {"when": "src/", "select": ["tests/test_thing.py"]},
+        ]},
+    }}
+
+    def test_evidence_is_skipped_only_for_a_declared_empty_mapping(
+        self, sandbox_repo
+    ):
+        """"Nothing is affected" and "nobody knows what is affected" look
+        identical from the selected-test list and must never be treated
+        alike: the second is the state the whole stage exists to surface."""
+        repo, set_dir = sandbox_repo
+        (repo / "docs" / "notes.md").write_text("x\n", encoding="utf-8")
+        assert preverify_gate(repo, set_dir, self.CONFIG).ok
+
+        (repo / "scripts").mkdir()
+        (repo / "scripts" / "deploy.rb").write_text("x\n", encoding="utf-8")
+        gate = preverify_gate(repo, set_dir, self.CONFIG)
+        assert not gate.ok
+        assert "scripts/deploy.rb" in gate.reason
+        # No command is offered, because none would measure anything.
+        assert gate.command == ""
+
+        # And a mapped path alongside it does not cover for it: tests chosen
+        # for one file say nothing about the file nothing chose tests for.
+        (repo / "src").mkdir()
+        (repo / "src" / "app.py").write_text("x = 1\n", encoding="utf-8")
+        mixed = preverify_gate(repo, set_dir, self.CONFIG)
+        assert not mixed.ok
+        assert "scripts/deploy.rb" in mixed.reason
+
+    def test_a_remediation_is_measured_by_the_fix_not_the_session(
+        self, sandbox_repo
+    ):
+        """A repository-wide edit buys one full run, at the round that
+        reviewed it. Judging later rounds against HEAD would re-buy it every
+        time, which is how this stage would end up prescribing the very run
+        it exists to delete."""
+        from ai_router import ledger
+        from ai_router.evidence import snapshot_worktree_tree
+        from ai_router.session import register_session_start
+
+        repo, set_dir = sandbox_repo
+        register_session_start(set_dir, 1, engine="claude-code",
+                               provider="anthropic")
+        (repo / "pyproject.toml").write_text("[p]\n", encoding="utf-8")
+        assert preverify_gate(repo, set_dir, self.CONFIG).command == (
+            "python -m pytest"
+        )
+
+        ledger.append_round(repo, set_dir.name, 1, {
+            "round": 1, "verdict": "ISSUES_FOUND", "blocking": True,
+            "findings": [], "recorded_at": "2026-08-19T18:00:00-04:00",
+            "verifier_model": "m", "verifier_provider": "openai",
+            "completion_tree": snapshot_worktree_tree(repo),
+        })
+        (repo / "src").mkdir()
+        (repo / "src" / "app.py").write_text("x = 1\n", encoding="utf-8")
+
+        gate = preverify_gate(repo, set_dir, self.CONFIG)
+        assert gate.command == "python -m pytest tests/test_thing.py"

@@ -44,6 +44,24 @@ STAGE_PREVERIFY_TARGETED = "preverify-targeted"
 STAGE_FINAL_FULL = "final-full"
 STAGES = (STAGE_PREVERIFY_TARGETED, STAGE_FINAL_FULL)
 
+# What made a pre-verification command acceptable, or what made it invalid.
+# ``final-full`` runs carry none of these: the complete suite IS the declared
+# command, so the vocabulary cannot apply to it.
+POLICY_TARGETED = "targeted"
+POLICY_ALL_TESTS_AFFECTED = "all-tests-affected"
+POLICY_OPERATOR_OVERRIDE = "operator-override"
+POLICY_VIOLATION = "policy_violation"
+POLICIES = (
+    POLICY_TARGETED, POLICY_ALL_TESTS_AFFECTED, POLICY_OPERATOR_OVERRIDE,
+    POLICY_VIOLATION,
+)
+# The three that make a run count as pre-verification evidence. A violation
+# is still written -- the wasted run is exactly what the record is for -- and
+# satisfies nothing.
+ACCEPTED_POLICIES = (
+    POLICY_TARGETED, POLICY_ALL_TESTS_AFFECTED, POLICY_OPERATOR_OVERRIDE,
+)
+
 TEST_RUNS_FILENAME = "test-runs.jsonl"
 
 # Set-dir files the sanctioned writers own; they change during a session
@@ -83,6 +101,9 @@ class TestRunRecord:
     recorded_at: str
     stage: str = ""
     tree_digest: str = ""
+    policy: str = ""
+    policy_reason: str = ""
+    selected_tests: tuple = ()
     session_number: Optional[int] = None
     detail: str = ""
     duration_seconds: Optional[float] = None
@@ -97,6 +118,15 @@ class TestRunRecord:
             out["stage"] = self.stage
         if self.tree_digest:
             out["treeDigest"] = self.tree_digest
+        if self.policy:
+            out["policy"] = self.policy
+        if self.policy_reason:
+            out["policyReason"] = self.policy_reason
+        if self.selected_tests:
+            out["selectedTests"] = [
+                {"path": path, "reason": reason}
+                for path, reason in self.selected_tests
+            ]
         if self.session_number is not None:
             out["sessionNumber"] = self.session_number
         if self.detail:
@@ -303,11 +333,23 @@ def read_records(repo_root, set_slug: str) -> list:
         # be mistaken for `final-full` downstream.
         stage = row.get("stage")
         stage = stage if stage in STAGES else ""
+        # Same for the policy: an unknown token is no exception at all.
+        policy = row.get("policy")
+        policy = policy if policy in POLICIES else ""
+        selected = []
+        for entry in row.get("selectedTests") or ():
+            if isinstance(entry, dict) and isinstance(entry.get("path"), str):
+                selected.append(
+                    (entry["path"], str(entry.get("reason") or ""))
+                )
         records.append(TestRunRecord(
             suite=suite, command=str(row.get("command") or ""),
             outcome=str(row.get("outcome") or ""), surface_digest=digest,
             recorded_at=str(row.get("recordedAt") or ""),
             stage=stage, tree_digest=str(row.get("treeDigest") or ""),
+            policy=policy,
+            policy_reason=str(row.get("policyReason") or ""),
+            selected_tests=tuple(selected),
             session_number=session_number,
             detail=str(row.get("detail") or ""),
             duration_seconds=duration,
@@ -317,19 +359,46 @@ def read_records(repo_root, set_slug: str) -> list:
 
 def record_run(
     session_set_dir, suite: SuiteSpec, outcome: str, *, stage: str,
-    duration_seconds, session_number=None, detail: str = "",
-    repo_root=None,
+    duration_seconds, command=None, policy: str = "",
+    policy_reason: str = "", selected_tests=(), session_number=None,
+    detail: str = "", repo_root=None,
 ) -> TestRunRecord:
     """Append one run record. Strict at the write boundary (an optional
     field never gets populated); ``read_records`` stays lenient for old
     rows. An unrecordable run is an error, not a silently-empty record.
 
     *stage* is required and closed: what a run proves depends entirely on
-    when it was taken, so it can never be inferred at read time."""
+    when it was taken, so it can never be inferred at read time.
+
+    A ``preverify-targeted`` run must name the command that actually ran and
+    the policy that judged it -- the whole point is that the command is
+    evidence, not a formality. A ``final-full`` run may name neither: it is
+    the declared suite command by definition, and a caller-supplied one
+    would let the run of record be something other than the suite."""
     if outcome not in OUTCOMES:
         raise ValueError(f"outcome must be one of {OUTCOMES}, got {outcome!r}")
     if stage not in STAGES:
         raise ValueError(f"stage must be one of {STAGES}, got {stage!r}")
+    if stage == STAGE_PREVERIFY_TARGETED:
+        if not str(command or "").strip():
+            raise ValueError(
+                "a preverify-targeted record must name the command that ran"
+            )
+        if policy not in POLICIES:
+            raise ValueError(
+                f"policy must be one of {POLICIES}, got {policy!r}"
+            )
+    else:
+        if command is not None:
+            raise ValueError(
+                "a final-full run is the declared suite command; a "
+                "caller-supplied command does not apply"
+            )
+        if policy:
+            raise ValueError(
+                "the pre-verification policy vocabulary does not apply to a "
+                "final-full run"
+            )
     if isinstance(duration_seconds, bool) or not isinstance(
         duration_seconds, (int, float)
     ) or not math.isfinite(duration_seconds) or duration_seconds <= 0:
@@ -353,10 +422,14 @@ def record_run(
         if not whole_tree:
             raise RuntimeError("could not digest the tree")
     record = TestRunRecord(
-        suite=suite.name, command=suite.command, outcome=outcome,
-        surface_digest=digest,
+        suite=suite.name, command=str(command or suite.command),
+        outcome=outcome, surface_digest=digest,
         recorded_at=datetime.datetime.now().astimezone().isoformat(),
         stage=stage, tree_digest=whole_tree,
+        policy=policy, policy_reason=policy_reason,
+        selected_tests=tuple(
+            (str(path), str(reason)) for path, reason in selected_tests
+        ),
         session_number=session_number, detail=detail,
         duration_seconds=float(duration_seconds),
     )
@@ -502,6 +575,62 @@ def evaluate_freshness(
 
 # --- CLI (record is the only subcommand an orchestrator needs) --------------
 
+def _judge_preverify_command(config, suite: SuiteSpec, args):
+    """``(policy, reason, selected_tests, sanctioned_command)`` for a
+    pre-verification run, or a CLI exit code when the selection cannot be
+    computed at all. Imported here rather than at module scope: ``affected``
+    reads this module's vocabulary, and the dependency runs one way."""
+    from .affected import (
+        classify_preverify_command,
+        load_selection_config,
+        preverify_baseline,
+        select_tests,
+        targeted_command,
+        working_tree_changes,
+    )
+
+    if not str(args.command or "").strip():
+        print(
+            "test_evidence: --command is required for a preverify-targeted "
+            "record; the command that ran is what the policy judges.",
+            file=sys.stderr,
+        )
+        return 2
+    root = repo_root_for(args.session_set_dir)
+    if root is None:
+        print(
+            f"test_evidence: no git repository found above "
+            f"{args.session_set_dir}", file=sys.stderr,
+        )
+        return 2
+    loaded = load_selection_config(config)
+    if not loaded.ok:
+        print(
+            "test_evidence: testing.selection is malformed: "
+            + "; ".join(loaded.errors), file=sys.stderr,
+        )
+        return 2
+    changed = working_tree_changes(
+        root, preverify_baseline(root, args.session_set_dir)
+    )
+    if changed is None:
+        print(
+            "test_evidence: could not determine the change set; a targeted "
+            "run cannot be proved targeted against an unknown one.",
+            file=sys.stderr,
+        )
+        return 2
+    result = select_tests(root, changed, loaded.config)
+    verdict = classify_preverify_command(
+        args.command, result, override_reason=args.allow_full_preverify,
+    )
+    return (
+        verdict.policy, verdict.reason,
+        tuple((s.path, s.reason) for s in result.selected),
+        targeted_command(suite.command, result),
+    )
+
+
 def main(argv=None) -> int:
     from .config import load_config
 
@@ -523,11 +652,28 @@ def main(argv=None) -> int:
         help="record honestly; a red run recorded beats silence",
     )
     rec.add_argument("--duration-seconds", required=True, type=float)
+    rec.add_argument(
+        "--command",
+        help=(
+            "the command that actually ran; required for "
+            "preverify-targeted, where it is judged against the selection. "
+            "A final-full run is the declared suite command and takes none."
+        ),
+    )
+    rec.add_argument(
+        "--allow-full-preverify", metavar="REASON",
+        help=(
+            "operator exception: accept a pre-verification run that does "
+            "not name the selected tests. The reason is mandatory and is "
+            "recorded; an override nobody can audit is not an exception."
+        ),
+    )
     rec.add_argument("--session-number", type=int)
     rec.add_argument("--detail", default="")
     args = parser.parse_args(argv)
 
-    loaded = load_suites_checked(load_config())
+    config = load_config()
+    loaded = load_suites_checked(config)
     if loaded.errors:
         print(
             "test_evidence: testing.suites is malformed: "
@@ -543,18 +689,54 @@ def main(argv=None) -> int:
             file=sys.stderr,
         )
         return 2
+
+    policy = policy_reason = sanctioned = ""
+    selected = ()
+    if args.stage == STAGE_PREVERIFY_TARGETED:
+        judged = _judge_preverify_command(config, suite, args)
+        if isinstance(judged, int):
+            return judged
+        policy, policy_reason, selected, sanctioned = judged
+    elif args.command or args.allow_full_preverify is not None:
+        print(
+            "test_evidence: --command and --allow-full-preverify describe a "
+            "pre-verification run; a final-full run is the declared suite "
+            f"command ({suite.command}) against the final verified tree.",
+            file=sys.stderr,
+        )
+        return 2
     try:
         record = record_run(
             args.session_set_dir, suite, args.outcome,
             stage=args.stage,
             duration_seconds=args.duration_seconds,
+            command=args.command, policy=policy,
+            policy_reason=policy_reason, selected_tests=selected,
             session_number=args.session_number, detail=args.detail,
         )
     except (ValueError, RuntimeError) as exc:
         print(f"test_evidence: {exc}", file=sys.stderr)
         return 2
+    if record.policy == POLICY_VIOLATION:
+        # Written, then refused: the wasted run is the evidence, and a
+        # refusal that suppressed its own record would hide the ceremony it
+        # exists to price.
+        remedy = (
+            f"Run the affected tests, then record that command:\n"
+            f"  {sanctioned}"
+            if sanctioned
+            else "Nothing needed to run here; record nothing and go "
+                 "straight to verification."
+        )
+        print(
+            f"test_evidence: recorded and REFUSED as {POLICY_VIOLATION} -- "
+            f"{record.policy_reason}\n{remedy}",
+            file=sys.stderr,
+        )
+        return 2
     print(f"recorded {record.suite} [{record.stage}]: {record.outcome} "
-          f"(digest {record.surface_digest[:12]})")
+          f"(digest {record.surface_digest[:12]})"
+          + (f" policy {record.policy}" if record.policy else ""))
     return 0
 
 

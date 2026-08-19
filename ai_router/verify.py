@@ -12,6 +12,12 @@ from a label) is excluded, so verification is always cross-provider, on
 either transport. One retry excludes a failed provider too; when nothing
 survives, the close stays blocked and only the operator can resolve it.
 
+No round opens on unproved work. The tests a change makes necessary cost
+nothing next to a model, so they run first: a round is refused until an
+accepted ``preverify-targeted`` record exists for the surfaces as they
+currently stand. The complete suite is not that evidence — it is the run
+of record, and it belongs after the final verified tree.
+
 Outcomes append to the machine-only ledger; raw verifier output is saved
 before any parsing. The loop suspends at the round cap
 (``verification.settings.max_rounds``, default 3) — the closed severity
@@ -475,7 +481,11 @@ def run_round(
     """One verification round: assemble evidence, dispatch cross-provider,
     record the outcome. Returns a CLI exit code; re-invoking after
     remediation continues the loop automatically. *transport* overrides the
-    resolved transport preference for this round's dispatch."""
+    resolved transport preference for this round's dispatch.
+
+    A round never opens on unproved work: the affected tests come first, and
+    a full-suite run is not a substitute for them."""
+    from .affected import preverify_gate
     from .config import load_config
     from .route import NoCandidateError, RouterError
     from .session import append_change_log_block, record_session_verification
@@ -557,6 +567,36 @@ def run_round(
     except (EvidenceEmptyError, EvidenceTooLargeError, VerifyError) as exc:
         print(f"verify: {exc}", file=sys.stderr)
         return EXIT_UNAVAILABLE
+
+    # After the bundle exists and before any model sees it: there is
+    # something to review, so the tests that review costs nothing must have
+    # run first.
+    gate = preverify_gate(repo_root, set_path, config)
+    if not gate.ok:
+        remedy = (
+            "Run the affected tests, then record that command:\n"
+            f"  {gate.command}\n"
+            f"  python -m ai_router.test_evidence record --session-set-dir "
+            f"{set_path} --suite {gate.suite} --stage preverify-targeted "
+            f"--command \"{gate.command}\" --outcome passed "
+            "--duration-seconds <elapsed>"
+        ) if gate.command else (
+            "There is no targeted command to offer you: declare the missing "
+            "mapping under testing.selection so the selector can answer for "
+            "these paths."
+        )
+        print(
+            "verify: refused -- no valid targeted selection evidence for "
+            f"this tree: {gate.reason}.\n"
+            "Verification is not the first thing a change meets; the tests "
+            "the change affects are. The full suite is neither required nor "
+            "accepted here -- it is the run of record, and it comes AFTER "
+            f"the final verified tree.\n{remedy}\n"
+            "`python -m ai_router.affected` prints the selection and the "
+            "reason behind each row.",
+            file=sys.stderr,
+        )
+        return EXIT_USAGE
 
     disputes = ledger.read_disputes(repo_root, slug, current)
     prompt_body = build_verification_prompt(

@@ -54,6 +54,42 @@ def sandbox_repo(tmp_path):
     _git(repo, "push", "-q", "-u", "origin", "main")
     return repo, set_dir
 
+
+def record_preverify(repo, set_dir):
+    """The sanctioned pre-verification evidence for whatever this tree
+    currently changes: the selector's own command, run and recorded. A round
+    cannot open without it, so every loop test needs the real thing rather
+    than a hand-shaped row."""
+    from ai_router.affected import (
+        classify_preverify_command,
+        load_selection_config,
+        select_tests,
+        targeted_command,
+        working_tree_changes,
+    )
+    from ai_router.config import load_config
+    from ai_router.test_evidence import (
+        STAGE_PREVERIFY_TARGETED,
+        load_suites_checked,
+        record_run,
+    )
+
+    config = load_config()
+    suite = next(s for s in load_suites_checked(config).suites if s.expensive)
+    result = select_tests(
+        repo, working_tree_changes(repo) or (),
+        load_selection_config(config).config,
+    )
+    command = targeted_command(suite.command, result)
+    verdict = classify_preverify_command(command, result)
+    return record_run(
+        set_dir, suite, "passed", stage=STAGE_PREVERIFY_TARGETED,
+        duration_seconds=1.0, command=command, policy=verdict.policy,
+        policy_reason=verdict.reason,
+        selected_tests=tuple((s.path, s.reason) for s in result.selected),
+    )
+
+
 KEY_ENV = {
     "anthropic": "TEST_ANTHROPIC_KEY",
     "google": "TEST_GOOGLE_KEY",

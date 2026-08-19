@@ -13,12 +13,14 @@ from ai_router.evidence import (
     validate_transcript,
 )
 from ai_router.test_evidence import (
+    POLICY_TARGETED,
     STAGE_FINAL_FULL,
     STAGE_PREVERIFY_TARGETED,
     SuiteSpec,
     evaluate_freshness,
     load_suites_checked,
     matching_prefixes,
+    read_records,
     record_run,
     surface_digest,
 )
@@ -233,7 +235,8 @@ class TestRunStages:
         repo, set_dir = sandbox_repo
         record_run(set_dir, self.SUITE, "passed",
                    stage=STAGE_PREVERIFY_TARGETED, duration_seconds=1.0,
-                   repo_root=repo)
+                   command="pytest tests/test_widget.py",
+                   policy=POLICY_TARGETED, repo_root=repo)
         verdict = self._verdict(repo, set_dir)
         assert not verdict.passed
         assert STAGE_PREVERIFY_TARGETED in verdict.reason
@@ -241,6 +244,40 @@ class TestRunStages:
         record_run(set_dir, self.SUITE, "passed", stage=STAGE_FINAL_FULL,
                    duration_seconds=1.0, repo_root=repo)
         assert self._verdict(repo, set_dir).passed
+
+    def test_a_targeted_record_must_name_its_command_and_policy(
+        self, sandbox_repo
+    ):
+        """The command is the evidence, so it cannot be optional; and the
+        vocabulary that judges it cannot leak onto the run of record, which
+        is the whole suite by definition."""
+        repo, set_dir = sandbox_repo
+        with pytest.raises(ValueError):
+            record_run(set_dir, self.SUITE, "passed",
+                       stage=STAGE_PREVERIFY_TARGETED, duration_seconds=1.0,
+                       policy=POLICY_TARGETED, repo_root=repo)
+        with pytest.raises(ValueError):
+            record_run(set_dir, self.SUITE, "passed",
+                       stage=STAGE_PREVERIFY_TARGETED, duration_seconds=1.0,
+                       command="pytest tests/test_widget.py", repo_root=repo)
+        with pytest.raises(ValueError):
+            record_run(set_dir, self.SUITE, "passed",
+                       stage=STAGE_FINAL_FULL, duration_seconds=1.0,
+                       policy=POLICY_TARGETED, repo_root=repo)
+
+        record_run(
+            set_dir, self.SUITE, "passed", stage=STAGE_PREVERIFY_TARGETED,
+            duration_seconds=1.0, command="pytest tests/test_widget.py",
+            policy=POLICY_TARGETED, policy_reason="names all 1 selected",
+            selected_tests=(("tests/test_widget.py", "module-ownership"),),
+            repo_root=repo,
+        )
+        stored = read_records(repo, set_dir.name)[-1]
+        assert stored.command == "pytest tests/test_widget.py"
+        assert stored.policy == POLICY_TARGETED
+        assert stored.selected_tests == (
+            ("tests/test_widget.py", "module-ownership"),
+        )
 
     def test_a_final_full_run_binds_to_the_tree_it_ran_against(
         self, sandbox_repo

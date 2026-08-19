@@ -78,26 +78,61 @@ active set's `spec.md`.
    re-run after a context reset.
 
 3. **Do the work.** Follow the active spec's step list for the current
-   session. Log progress, make the edits, run the tests. Do NOT commit
-   yet — verification reviews the working tree, and an already-committed
-   tree presents an empty diff.
+   session. Log progress and make the edits. Do NOT commit yet —
+   verification reviews the working tree, and an already-committed tree
+   presents an empty diff.
 
-4. **Run cross-provider verification (mandatory — there is no skip).**
+4. **Run the tests this change makes necessary — only those.**
+
+       python -m ai_router.affected --session-set-dir <dir>
+
+   prints the selected tests, the reason each was selected, and the exact
+   command to run. Pass `--session-set-dir`: once a verification round
+   exists, selection is measured against that round's snapshot, so a
+   remediation runs what the fix touched instead of re-running what the
+   session touched. Run the printed command, then record it:
+
+       python -m ai_router.test_evidence record --session-set-dir <dir> \\
+           --suite <name> --stage preverify-targeted \\
+           --command "<the command you ran>" --outcome passed \\
+           --duration-seconds <elapsed>
+
+   The complete suite is neither required nor accepted here. A command
+   that does not name the selected tests is recorded as a
+   `policy_violation` and verification refuses to start. Two exceptions
+   exist and both are auditable: the selector proving every test affected
+   (it says so, and the bare suite command is then correct), or
+   `--allow-full-preverify "<reason>"`, whose reason is mandatory.
+
+5. **Run cross-provider verification (mandatory — there is no skip).**
 
        python -m ai_router.verify --session-set-dir docs/session-sets/<slug>
 
    The verifier is a different provider than you, on either transport.
    Round outcomes land in `.dabbler/runs/` (machine-written; never edit).
-   Blocking findings: remediate, re-run the same command — rounds ≥2
-   review only your fix delta. The loop suspends at the round cap.
+   Blocking findings: remediate, rerun step 4 for the fix, then re-run the
+   same command — rounds ≥2 review only your fix delta. The loop suspends
+   at the round cap.
 
-5. **Record the test run of record** after your last code change, then
-   **commit and push the verified work**:
+6. **Run the complete suite once, against the final verified tree**, and
+   record it as the run of record. The command is the `command` the suite
+   declares under `testing.suites` in `router-config.yaml` — the same one
+   `--suite <name>` names here:
 
        python -m ai_router.test_evidence record --session-set-dir <dir> \\
-           --suite <name> --outcome passed --duration-seconds <elapsed>
+           --suite <name> --stage final-full --outcome passed \\
+           --duration-seconds <elapsed>
 
-6. **Close via the gate.**
+   This is the only stage the close accepts, and it binds to the tree it
+   ran against. A failed run of record is not reusable proof: fix, rerun
+   the affected tests, re-verify, then run the suite again.
+
+7. **Commit the verified work, then push — once.** Commit as often as the
+   work wants; push exactly once, here, immediately before close. CI runs
+   on push, so a mid-session push buys a full matrix run of work that is
+   not finished.
+
+8. **Close via the gate.**
 
        python -m ai_router.session close --session-set-dir docs/session-sets/<slug>
 
@@ -194,8 +229,10 @@ Hard requirements (do not deviate):
 - **spec.md layout:** one `# <Title>` heading; a `## Sessions` section;
   one `### Session K of N: <title>` heading per session; each session's
   steps as a top-level ordered list. Step 1 registers the session; the
-  last steps run cross-provider verification, the required test suites,
-  and close-out; the middle steps are the work.
+  last steps run the affected tests, cross-provider verification, the
+  complete suite once against the verified tree, and close-out; the
+  middle steps are the work. Never write a step that says "run the
+  tests" without saying which run it means.
 - Do NOT hand-author `session-state.json`: each set's own first
   `session start` bootstraps it from the spec — state files are the
   runtime writers' job, never authored by hand.

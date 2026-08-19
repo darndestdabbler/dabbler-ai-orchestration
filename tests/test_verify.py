@@ -15,6 +15,8 @@ from ai_router.verify import (
     run_round,
 )
 
+from .conftest import record_preverify
+
 
 def _interactive(monkeypatch, text):
     """A TTY stdin and a scripted attestation — the operator at the
@@ -76,13 +78,14 @@ class FakeVerifier:
 
 @pytest.fixture
 def flight(sandbox_repo, monkeypatch):
-    """A registered session with uncommitted work, plus a hook to script
-    the verifier."""
+    """A registered session with uncommitted work whose affected tests have
+    run and been recorded, plus a hook to script the verifier."""
     repo, set_dir = sandbox_repo
     register_session_start(set_dir, 1, engine="claude-code",
                            provider="anthropic")
     (repo / "widget.py").write_text("def f(xs): return 1/len(xs)\n",
                                     encoding="utf-8")
+    record_preverify(repo, set_dir)
 
     def install(outcomes):
         import importlib
@@ -180,6 +183,32 @@ class TestRoundOne:
         install([make_result(CLEAN_RESPONSE, truncated=True)])
         assert run_round(set_dir) == EXIT_UNAVAILABLE
         assert ledger.read_rounds(repo, set_dir.name, 1) == []
+
+    def test_a_round_needs_targeted_evidence_before_it_opens(
+        self, sandbox_repo, monkeypatch, capsys
+    ):
+        """The cheap check precedes the expensive one. A change whose
+        affected tests have not run is returned to its author, with the
+        command that would have run them — not sent to a model."""
+        repo, set_dir = sandbox_repo
+        register_session_start(set_dir, 1, engine="claude-code",
+                               provider="anthropic")
+        (repo / "widget.py").write_text("def f(xs): return 1/len(xs)\n",
+                                        encoding="utf-8")
+        import importlib
+        fake = FakeVerifier([make_result(CLEAN_RESPONSE)])
+        monkeypatch.setattr(
+            importlib.import_module("ai_router.route"), "route", fake
+        )
+
+        assert run_round(set_dir) == EXIT_USAGE
+        assert fake.calls == []
+        err = capsys.readouterr().err
+        assert "tests/test_config.py" in err       # the command, not a scold
+        assert "--stage preverify-targeted" in err
+
+        record_preverify(repo, set_dir)
+        assert run_round(set_dir) == EXIT_OK
 
 
 class TestLoop:

@@ -129,6 +129,150 @@
       "dateTime": "2026-08-19T17:06:58.092981-04:00",
       "description": "Session 1 closed VERIFIED; five gates green.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-19T17:15:51.357006-04:00",
+      "description": "Register.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 2,
+      "stepKey": "detect-full-suite-command-fingerprints-and",
+      "dateTime": "2026-08-19T17:15:51.357006-04:00",
+      "description": "Detect full-suite command fingerprints and **reject them before verification** unless the selector proves all tests are affected or the operator recorded `--allow-full-preverify` with a non-empty reason. The record says which exception applied; an override without a reason is refused.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 3,
+      "stepKey": "make-verify-refuse-to-dispatch-until",
+      "dateTime": "2026-08-19T17:15:51.357006-04:00",
+      "description": "Make `verify` refuse to dispatch until valid targeted selection evidence exists. This is the mechanism the set exists for: not a warning, not an annotation on the bundle \u2014 a refusal with the correct command in the message.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 4,
+      "stepKey": "rewrite-the-generated-orchestrator-instructions",
+      "dateTime": "2026-08-19T17:15:51.357006-04:00",
+      "description": "Rewrite the generated orchestrator instructions through `bootstrap.py` so they print the targeted command before verification and the full-suite command only after the final verified tree. Remove every generic phrase an agent can read as \"run all tests\" \u2014 including this repository's own current step wording, which says exactly that.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 5,
+      "stepKey": "state-the-push-policy-in-the",
+      "dateTime": "2026-08-19T17:15:51.357006-04:00",
+      "description": "State the push policy in the same generated text: **commit during a session, push once at the end.** CI runs on push, so a mid-session push buys a full Windows matrix run of work that is not finished. The `pushed_to_remote` close gate already requires the branch to be pushed at close and nowhere earlier; the instructions must stop implying otherwise.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 6,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-19T17:15:51.357006-04:00",
+      "description": "Cross-provider verification.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 7,
+      "stepKey": "affected-tests-before-verification",
+      "dateTime": "2026-08-19T17:15:51.357006-04:00",
+      "description": "Affected tests before verification; the full suite once, after.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 8,
+      "stepKey": "close-out",
+      "dateTime": "2026-08-19T17:15:51.357006-04:00",
+      "description": "Close-out.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-19T17:15:51.361068-04:00",
+      "description": "Registered session 2 (copilot).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-19T17:22:02.056052-04:00",
+      "description": "Register.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 2,
+      "stepKey": "detect-full-suite-command-fingerprints-and",
+      "dateTime": "2026-08-19T17:22:02.538548-04:00",
+      "description": "Detect full-suite command fingerprints and **reject them before verification** unless the selector proves all tests are affected or the operator recorded `--allow-full-preverify` with a non-empty reason. The record says which exception applied; an override without a reason is refused.",
+      "status": "in-progress"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 2,
+      "stepKey": "detect-full-suite-command-fingerprints-and",
+      "dateTime": "2026-08-19T17:37:09.402137-04:00",
+      "description": "Detect full-suite command fingerprints and **reject them before verification** unless the selector proves all tests are affected or the operator recorded `--allow-full-preverify` with a non-empty reason. The record says which exception applied; an override without a reason is refused.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 3,
+      "stepKey": "make-verify-refuse-to-dispatch-until",
+      "dateTime": "2026-08-19T17:37:09.845375-04:00",
+      "description": "Make `verify` refuse to dispatch until valid targeted selection evidence exists. This is the mechanism the set exists for: not a warning, not an annotation on the bundle \u2014 a refusal with the correct command in the message.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 4,
+      "stepKey": "rewrite-the-generated-orchestrator-instructions",
+      "dateTime": "2026-08-19T17:37:10.305820-04:00",
+      "description": "Rewrite the generated orchestrator instructions through `bootstrap.py` so they print the targeted command before verification and the full-suite command only after the final verified tree. Remove every generic phrase an agent can read as \"run all tests\" \u2014 including this repository's own current step wording, which says exactly that.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 5,
+      "stepKey": "state-the-push-policy-in-the",
+      "dateTime": "2026-08-19T17:37:10.827032-04:00",
+      "description": "State the push policy in the same generated text: **commit during a session, push once at the end.** CI runs on push, so a mid-session push buys a full Windows matrix run of work that is not finished. The `pushed_to_remote` close gate already requires the branch to be pushed at close and nowhere earlier; the instructions must stop implying otherwise.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 6,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-19T18:32:43.580622-04:00",
+      "description": "Cross-provider verification.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 7,
+      "stepKey": "affected-tests-before-verification",
+      "dateTime": "2026-08-19T18:36:37.691273-04:00",
+      "description": "Affected tests before verification; the full suite once, after.",
+      "status": "complete"
     }
   ]
 }

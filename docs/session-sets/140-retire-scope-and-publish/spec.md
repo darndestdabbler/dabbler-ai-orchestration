@@ -24,6 +24,7 @@
 ```yaml
 requiresUAT: false
 requiresE2E: false
+module: default
 totalSessions: 2
 prerequisites: []
 ```
@@ -63,6 +64,15 @@ The removal is surgical, and the surgery is the work.
   `contextAssets`) and its tests. Additive, already validated, rendered
   by the VS Code extension, and plausibly reused by whatever the
   redesign produces. Removing it would be churn, not accounting.
+- **The `module:` key in every set spec's configuration block**, this
+  set's included. It is the Work Explorer's **grouping** attribute, and
+  the extension parses it from the spec in TypeScript
+  (`utils/fileSystem.ts`) — `progress.py` never reads it. Deleting
+  `declared_module_slug` removes the *Python* reader that fed the
+  cancelled scope; it does not touch grouping. Do not strip `module:`
+  from any spec as though it were a set-138 artifact: it predates the
+  set, every set from 136 on declares it, and a set without it drops out
+  of the group its siblings render in.
 
 ## What this set does NOT do (do not reopen)
 

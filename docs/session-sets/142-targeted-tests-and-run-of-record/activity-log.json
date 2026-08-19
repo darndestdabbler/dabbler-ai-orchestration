@@ -1,0 +1,126 @@
+{
+  "sessionSetName": "142-targeted-tests-and-run-of-record",
+  "createdDate": "2026-08-19T16:30:21.602088-04:00",
+  "totalSessions": 3,
+  "entries": [
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-19T16:30:21.602118-04:00",
+      "description": "Register.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "record-the-relaxation-in-agents",
+      "dateTime": "2026-08-19T16:30:21.602118-04:00",
+      "description": "Record the relaxation in `AGENTS.md`, above the managed fence: ground rules 1 and 4 are suspended for sets 142\u2013145, the +33% envelope replaces them with its four numbers, and the two surviving rules (one test per behavior; a new module must shrink another) are stated. A staff session reading only `AGENTS.md` must see the real constraint, not a stale ceiling.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "implement-deterministic-affected-test-selection",
+      "dateTime": "2026-08-19T16:30:21.602118-04:00",
+      "description": "Implement deterministic affected-test selection from changed paths, module ownership, dependency edges, and configured repository rules. Every selection carries the named reason that produced it; a changed path that maps to nothing records `selection_unknown` and raises risk rather than widening the run.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "extend-testevidence",
+      "dateTime": "2026-08-19T16:30:21.602118-04:00",
+      "description": "Extend `test_evidence.py` with the closed stage vocabulary `preverify-targeted` and `final-full`. Only `final-full` can satisfy `test_run_fresh`, and it binds to the tree digest it ran against.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-19T16:30:21.602118-04:00",
+      "description": "Cross-provider verification.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 6,
+      "stepKey": "affected-tests-before-verification",
+      "dateTime": "2026-08-19T16:30:21.602118-04:00",
+      "description": "Affected tests before verification; the full suite once, after.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 7,
+      "stepKey": "close-out",
+      "dateTime": "2026-08-19T16:30:21.602118-04:00",
+      "description": "Close-out.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-19T16:30:21.604895-04:00",
+      "description": "Registered session 1 (copilot).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-19T16:31:05.721540-04:00",
+      "description": "Session 1 registered; working directly on experiment/verification-pipeline-v3 per the 141 operator deviation.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "record-the-relaxation-in-agents",
+      "dateTime": "2026-08-19T16:33:31.583746-04:00",
+      "description": "AGENTS.md now states the +33% envelope above the managed fence; rules 1 and 4 marked suspended for sets 142-145, surviving rules stated.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "implement-deterministic-affected-test-selection",
+      "dateTime": "2026-08-19T16:53:24.791042-04:00",
+      "description": "ai_router/affected.py: changed-test, module-ownership, configured-rule and dependency-edge reasons; unmapped paths record selection_unknown and pull smoke tests instead of widening.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "extend-testevidence",
+      "dateTime": "2026-08-19T16:53:25.874922-04:00",
+      "description": "Closed stage vocabulary preverify-targeted/final-full; only final-full satisfies test_run_fresh, and it binds to the tree digest it ran against.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-19T17:00:16.998358-04:00",
+      "description": "VERIFIED by gpt-5.5/openai over copilot-cli in round 2; round 1 blocking finding was an uncollected test-support file treated as mapped.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 6,
+      "stepKey": "affected-tests-before-verification",
+      "dateTime": "2026-08-19T17:05:25.821114-04:00",
+      "description": "Targeted run (10 of 22 files, 217 tests) before verification; full suite 464 passed recorded as final-full after the last change.",
+      "status": "complete"
+    }
+  ]
+}

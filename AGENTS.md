@@ -16,7 +16,8 @@ treat this branch as the trunk for day-to-day work.
 ## Ground rules
 
 1. **No new module without deleting one.** The module inventory in the rebuild
-   work plan is the ceiling.
+   work plan is the ceiling. *(Suspended for sets 142–145 — see "The envelope
+   sets 142–145 run under" below.)*
 2. **No guard may guard another guard.** Every gate must cite the concrete v1
    incident it would have prevented (the five kept gates each have one; see
    Session 2).
@@ -25,7 +26,9 @@ treat this branch as the trunk for day-to-day work.
 4. **Test budget is a ceiling: 480 Python / 215 TS.** One test per behavior.
    No falsifier-twin doctrine, no tests of test infrastructure, no source-text
    assertions (use ruff/ESLint), no migration-path tests, no tests asserting
-   exact markdown strings.
+   exact markdown strings. *(Numbers suspended for sets 142–145 — see "The
+   envelope sets 142–145 run under" below. The one-test-per-behavior rule and
+   the banned-test-kinds list are **not** suspended.)*
 5. **The machine owns the record.** Nothing under `.dabbler/runs/` is ever
    hand-edited or exempted; no code path may accept a hand-written verdict.
 6. **No process ceremony on this repo itself.** Plain git commits with plain
@@ -35,6 +38,34 @@ treat this branch as the trunk for day-to-day work.
    lesson matters, encode it structurally.
 8. **LOC budgets are targets ±30%, not gates.** If a module wants to be 2× its
    budget, stop and reconsider the design instead of writing a justification.
+
+## The envelope sets 142–145 run under
+
+The operator has relaxed ground rules 1 and 4 for sets 142–145, on the grounds
+that the verification-pipeline rewrite is a replacement rather than an
+increment. One envelope replaces both, measured against the post-141 baseline
+and acting as a **ceiling for the whole four-set sequence**, not a per-set
+budget to spend down:
+
+| Dimension | Baseline (`fa3c28c7`) | Ceiling |
+| --- | ---: | ---: |
+| Python source | 12,650 LOC | **16,800** |
+| Python modules | 25 | **33** |
+| Python tests | 455 | **605** |
+| TypeScript tests | 161 | **215** (unchanged) |
+
+Two rules survive the relaxation unchanged, because they are what the ceilings
+were protecting:
+
+- **One test per behavior.** No falsifier twins, no source-text assertions, no
+  migration-path tests, no tests of test infrastructure.
+- **A module earns its existence by making another module smaller.** New
+  modules are permitted; new modules that only add are not. `verify.py` is the
+  named target: this sequence must leave it **under 1,200 lines**, by moving
+  code out rather than by adding beside it.
+
+When the sequence ends — merged or killed — rules 1 and 4 resume with their
+original numbers.
 
 ## Environment
 

@@ -13,7 +13,10 @@ from ai_router.evidence import (
     validate_transcript,
 )
 from ai_router.test_evidence import (
+    STAGE_FINAL_FULL,
+    STAGE_PREVERIFY_TARGETED,
     SuiteSpec,
+    evaluate_freshness,
     load_suites_checked,
     matching_prefixes,
     record_run,
@@ -194,10 +197,16 @@ class TestSurfaceDigests:
         suite = SuiteSpec(name="s", command="c", covers=("",),
                           expensive=True)
         with pytest.raises(ValueError):
-            record_run(set_dir, suite, "green", duration_seconds=1)
+            record_run(set_dir, suite, "green", stage="final-full",
+                       duration_seconds=1)
         with pytest.raises(ValueError):
-            record_run(set_dir, suite, "passed", duration_seconds=0)
-        record = record_run(set_dir, suite, "failed", duration_seconds=2.5)
+            record_run(set_dir, suite, "passed", stage="final-full",
+                       duration_seconds=0)
+        with pytest.raises(ValueError):
+            record_run(set_dir, suite, "passed", stage="smoke",
+                       duration_seconds=1)
+        record = record_run(set_dir, suite, "failed", stage="final-full",
+                            duration_seconds=2.5)
         assert record.outcome == "failed"  # honesty beats silence
 
     def test_suite_declaration_unknown_key_is_an_error(self):
@@ -207,3 +216,40 @@ class TestSurfaceDigests:
         ]}})
         assert loaded.errors
         assert loaded.suites  # the suite still loads; the gate blocks
+
+
+class TestRunStages:
+    """What a run proves depends on when it was taken."""
+
+    SUITE = SuiteSpec(name="pytest", command="pytest", covers=("",),
+                      expensive=True)
+
+    def _verdict(self, repo, set_dir):
+        return evaluate_freshness(
+            set_dir, None, [self.SUITE], repo_root=repo
+        )[0]
+
+    def test_a_targeted_run_never_satisfies_the_close(self, sandbox_repo):
+        repo, set_dir = sandbox_repo
+        record_run(set_dir, self.SUITE, "passed",
+                   stage=STAGE_PREVERIFY_TARGETED, duration_seconds=1.0,
+                   repo_root=repo)
+        verdict = self._verdict(repo, set_dir)
+        assert not verdict.passed
+        assert STAGE_PREVERIFY_TARGETED in verdict.reason
+
+        record_run(set_dir, self.SUITE, "passed", stage=STAGE_FINAL_FULL,
+                   duration_seconds=1.0, repo_root=repo)
+        assert self._verdict(repo, set_dir).passed
+
+    def test_a_final_full_run_binds_to_the_tree_it_ran_against(
+        self, sandbox_repo
+    ):
+        repo, set_dir = sandbox_repo
+        record_run(set_dir, self.SUITE, "passed", stage=STAGE_FINAL_FULL,
+                   duration_seconds=1.0, repo_root=repo)
+        assert self._verdict(repo, set_dir).passed
+
+        (repo / "widget.py").write_text("W = 1\n", encoding="utf-8")
+        verdict = self._verdict(repo, set_dir)
+        assert not verdict.passed

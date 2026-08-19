@@ -34,6 +34,16 @@ OUTCOME_FAILED = "failed"
 OUTCOME_ABORTED = "aborted"
 OUTCOMES = (OUTCOME_PASSED, OUTCOME_FAILED, OUTCOME_ABORTED)
 
+# A run's stage says what it is evidence *of*, and the two are not
+# interchangeable. ``preverify-targeted`` is the affected-test run that
+# precedes verification; it is never proof that the suite is green.
+# ``final-full`` is the one complete run, taken against the final verified
+# tree, and it alone can satisfy the close gate. A record with neither stage
+# satisfies nothing -- the safe direction when a row predates the vocabulary.
+STAGE_PREVERIFY_TARGETED = "preverify-targeted"
+STAGE_FINAL_FULL = "final-full"
+STAGES = (STAGE_PREVERIFY_TARGETED, STAGE_FINAL_FULL)
+
 TEST_RUNS_FILENAME = "test-runs.jsonl"
 
 # Set-dir files the sanctioned writers own; they change during a session
@@ -71,6 +81,8 @@ class TestRunRecord:
     outcome: str
     surface_digest: str
     recorded_at: str
+    stage: str = ""
+    tree_digest: str = ""
     session_number: Optional[int] = None
     detail: str = ""
     duration_seconds: Optional[float] = None
@@ -81,6 +93,10 @@ class TestRunRecord:
             "outcome": self.outcome, "surfaceDigest": self.surface_digest,
             "recordedAt": self.recorded_at,
         }
+        if self.stage:
+            out["stage"] = self.stage
+        if self.tree_digest:
+            out["treeDigest"] = self.tree_digest
         if self.session_number is not None:
             out["sessionNumber"] = self.session_number
         if self.detail:
@@ -236,6 +252,14 @@ def surface_digest(
     return hashlib.sha256(joined.encode("utf-8")).hexdigest()
 
 
+def tree_digest(repo_root, *, session_set_dir=None) -> Optional[str]:
+    """The digest of the whole tree a run was taken against. A ``final-full``
+    record binds to this, so a suite that ran and was then followed by an edit
+    anywhere -- including outside the suite's own ``covers`` -- is no longer
+    proof about the tree being closed."""
+    return surface_digest(repo_root, ("",), session_set_dir=session_set_dir)
+
+
 # --- Records ----------------------------------------------------------------
 
 def _runs_path(repo_root, set_slug: str) -> Path:
@@ -275,10 +299,15 @@ def read_records(repo_root, set_slug: str) -> list:
             duration, (int, float)
         ) or not math.isfinite(duration):
             duration = None
+        # An unrecognised stage is dropped rather than carried: it must not
+        # be mistaken for `final-full` downstream.
+        stage = row.get("stage")
+        stage = stage if stage in STAGES else ""
         records.append(TestRunRecord(
             suite=suite, command=str(row.get("command") or ""),
             outcome=str(row.get("outcome") or ""), surface_digest=digest,
             recorded_at=str(row.get("recordedAt") or ""),
+            stage=stage, tree_digest=str(row.get("treeDigest") or ""),
             session_number=session_number,
             detail=str(row.get("detail") or ""),
             duration_seconds=duration,
@@ -287,15 +316,20 @@ def read_records(repo_root, set_slug: str) -> list:
 
 
 def record_run(
-    session_set_dir, suite: SuiteSpec, outcome: str, *,
+    session_set_dir, suite: SuiteSpec, outcome: str, *, stage: str,
     duration_seconds, session_number=None, detail: str = "",
     repo_root=None,
 ) -> TestRunRecord:
     """Append one run record. Strict at the write boundary (an optional
     field never gets populated); ``read_records`` stays lenient for old
-    rows. An unrecordable run is an error, not a silently-empty record."""
+    rows. An unrecordable run is an error, not a silently-empty record.
+
+    *stage* is required and closed: what a run proves depends entirely on
+    when it was taken, so it can never be inferred at read time."""
     if outcome not in OUTCOMES:
         raise ValueError(f"outcome must be one of {OUTCOMES}, got {outcome!r}")
+    if stage not in STAGES:
+        raise ValueError(f"stage must be one of {STAGES}, got {stage!r}")
     if isinstance(duration_seconds, bool) or not isinstance(
         duration_seconds, (int, float)
     ) or not math.isfinite(duration_seconds) or duration_seconds <= 0:
@@ -313,10 +347,16 @@ def record_run(
     )
     if digest is None:
         raise RuntimeError("could not digest the covered surfaces")
+    whole_tree = ""
+    if stage == STAGE_FINAL_FULL:
+        whole_tree = tree_digest(root, session_set_dir=session_set_dir) or ""
+        if not whole_tree:
+            raise RuntimeError("could not digest the tree")
     record = TestRunRecord(
         suite=suite.name, command=suite.command, outcome=outcome,
         surface_digest=digest,
         recorded_at=datetime.datetime.now().astimezone().isoformat(),
+        stage=stage, tree_digest=whole_tree,
         session_number=session_number, detail=detail,
         duration_seconds=float(duration_seconds),
     )
@@ -389,19 +429,38 @@ def evaluate_freshness(
                 changed,
             ))
             continue
-        mine = [r for r in records if r.suite == suite.name]
+        mine = [
+            r for r in records
+            if r.suite == suite.name and r.stage == STAGE_FINAL_FULL
+        ]
         if not mine:
+            targeted = [
+                r for r in records
+                if r.suite == suite.name
+                and r.stage == STAGE_PREVERIFY_TARGETED
+            ]
+            preamble = (
+                f"this session changed {suite.name}'s covered surfaces but "
+                "no final-full run of record exists"
+            )
+            if targeted:
+                preamble += (
+                    f" ({len(targeted)} preverify-targeted record(s) are "
+                    "present; a targeted run precedes verification and never "
+                    "proves the suite is green)"
+                )
             verdicts.append(FreshnessVerdict(
                 suite.name, True, False,
-                f"this session changed {suite.name}'s covered surfaces but "
-                f"no run of record exists; run `{suite.command}` after your "
-                f"last code change, then `python -m ai_router.test_evidence "
-                f"record --session-set-dir <dir> --suite {suite.name} "
-                f"--outcome passed --duration-seconds <elapsed>`",
+                f"{preamble}; run `{suite.command}` after your last code "
+                f"change, then `python -m ai_router.test_evidence record "
+                f"--session-set-dir <dir> --suite {suite.name} "
+                f"--stage {STAGE_FINAL_FULL} --outcome passed "
+                f"--duration-seconds <elapsed>`",
                 changed,
             ))
             continue
         latest = mine[-1]
+        current_tree = tree_digest(root, session_set_dir=session_set_dir)
         if latest.surface_digest != current:
             verdicts.append(FreshnessVerdict(
                 suite.name, True, False,
@@ -418,6 +477,19 @@ def evaluate_freshness(
                 f"the {suite.name} run of record is fresh but its outcome "
                 f"is {latest.outcome!r}; a close needs a green run of "
                 "record",
+                changed,
+            ))
+        elif (
+            latest.tree_digest and current_tree
+            and latest.tree_digest != current_tree
+        ):
+            verdicts.append(FreshnessVerdict(
+                suite.name, True, False,
+                f"the {suite.name} run of record is green but the tree moved "
+                "under it: a final-full run binds to the tree it ran "
+                f"against, and this one does not match. Re-run "
+                f"`{suite.command}` against the final tree and record it "
+                "again",
                 changed,
             ))
         else:
@@ -438,6 +510,14 @@ def main(argv=None) -> int:
     rec = sub.add_parser("record", help="record a completed test run")
     rec.add_argument("--session-set-dir", required=True)
     rec.add_argument("--suite", required=True)
+    rec.add_argument(
+        "--stage", required=True, choices=list(STAGES),
+        help=(
+            "preverify-targeted: the affected-test run before verification. "
+            "final-full: the one complete run against the final verified "
+            "tree, and the only stage a close accepts."
+        ),
+    )
     rec.add_argument(
         "--outcome", required=True, choices=OUTCOMES,
         help="record honestly; a red run recorded beats silence",
@@ -466,13 +546,14 @@ def main(argv=None) -> int:
     try:
         record = record_run(
             args.session_set_dir, suite, args.outcome,
+            stage=args.stage,
             duration_seconds=args.duration_seconds,
             session_number=args.session_number, detail=args.detail,
         )
     except (ValueError, RuntimeError) as exc:
         print(f"test_evidence: {exc}", file=sys.stderr)
         return 2
-    print(f"recorded {record.suite}: {record.outcome} "
+    print(f"recorded {record.suite} [{record.stage}]: {record.outcome} "
           f"(digest {record.surface_digest[:12]})")
     return 0
 

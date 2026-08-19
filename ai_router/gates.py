@@ -260,15 +260,33 @@ def check_pushed_to_remote(set_dir) -> tuple:
     )
 
 
+def _governing_config(set_dir):
+    """The configuration that actually governs *set_dir*'s repository.
+
+    The ambient config describes the repository the router was invoked in.
+    A session set living in a different repository never made those
+    declarations, and gating it against them would demand a run of record
+    for suites that repository does not have. Only the alternative is worse:
+    a repository silently gated by another's testing policy."""
+    from .config import load_config, project_root
+
+    set_root = repo_root_for(Path(set_dir))
+    ambient = project_root()
+    if set_root is None or ambient is None:
+        return None
+    try:
+        if Path(set_root).resolve() != Path(ambient).resolve():
+            return None
+        return load_config()
+    except Exception:
+        return None
+
+
 def check_test_run_fresh(set_dir, config=None) -> tuple:
     from .test_evidence import evaluate_freshness, load_suites_checked
 
     if config is None:
-        try:
-            from .config import load_config
-            config = load_config()
-        except Exception:
-            config = None
+        config = _governing_config(set_dir)
     loaded = load_suites_checked(config)
     if loaded.errors:
         # "No expensive suites declared" and "every declared suite was a

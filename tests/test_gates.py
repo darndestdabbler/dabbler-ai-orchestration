@@ -223,7 +223,7 @@ class TestTestRunFresh:
         ]})
         row = by_name(run_gates(set_dir, config=config))["test_run_fresh"]
         assert not row.passed
-        assert "no run of record" in row.remediation
+        assert "no final-full run of record" in row.remediation
 
     def test_fresh_green_record_passes(self, close_ready):
         from ai_router.test_evidence import SuiteSpec, record_run
@@ -231,7 +231,8 @@ class TestTestRunFresh:
         repo, set_dir = close_ready
         suite = SuiteSpec(name="pytest", command="pytest", covers=(".",),
                           expensive=True)
-        record_run(set_dir, suite, "passed", duration_seconds=1.5)
+        record_run(set_dir, suite, "passed", stage="final-full",
+                   duration_seconds=1.5)
         config = make_config(testing={"suites": [
             {"name": "pytest", "command": "pytest", "covers": ["."],
              "expensive": True},
@@ -245,7 +246,8 @@ class TestTestRunFresh:
         repo, set_dir = close_ready
         suite = SuiteSpec(name="pytest", command="pytest", covers=(".",),
                           expensive=True)
-        record_run(set_dir, suite, "passed", duration_seconds=1.5)
+        record_run(set_dir, suite, "passed", stage="final-full",
+                   duration_seconds=1.5)
         (repo / "widget.py").write_text("WIDGET = 3\n", encoding="utf-8")
         config = make_config(testing={"suites": [
             {"name": "pytest", "command": "pytest", "covers": ["."],

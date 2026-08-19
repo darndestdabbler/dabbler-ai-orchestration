@@ -17,6 +17,22 @@
 
 > **Note on rule 6:** operator-authorized exception, as sets 136 and 137.
 
+> **Amendment, session 2, operator-authorized.** The acceptance criterion
+> originally required the scoped bundle to be *materially smaller* than
+> the monolithic one. Measured on a real 14-file session change, that is
+> unachievable without degrading the review: today's bundle is already
+> near-minimal for the change (hunks plus new-file contents), and the two
+> things that would shrink it — dropping the diff, and eliding callers and
+> tests to signatures — are the two things independent review by a second
+> and third provider both refused. Dropping the diff leaves the verifier
+> unable to separate this session's defects from pre-existing ones; eliding
+> a caller's body hides exactly the argument-order class of cross-file
+> defect this set's own criterion demands be caught. A bounded scope adds
+> context the monolithic bundle never had, so it is *bigger* and *better*.
+> The criterion is amended to the property the set can actually deliver:
+> **materially better-targeted and hard-bounded.** Session 3 measures size
+> honestly and is not required to report a shrink.
+
 ---
 
 ## Session Set Configuration
@@ -240,9 +256,10 @@ docs. Est. 11–16 new Python tests.
 ## Acceptance criterion for the set
 
 A module-mapped session verifies from a scope that is **materially
-smaller** than its monolithic bundle — measured on this repo and on
-`../certs`, recorded in `s3-scope-measurement.md` — while still catching
-a planted cross-file defect that requires reading a caller and its callee
+better-targeted and hard-bounded** — measured on this repo and on
+`../certs`, recorded in `s3-scope-measurement.md`, with its size reported
+honestly rather than required to shrink — while still catching a planted
+cross-file defect that requires reading a caller and its callee
 together. A verifier that wants a file the scope already listed gets it
 by naming it; one outside the domain gets it only by a logged escalation
 the orchestrating engine granted, and a refusal never licenses

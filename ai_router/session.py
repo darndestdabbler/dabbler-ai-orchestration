@@ -338,6 +338,46 @@ def extract_spec_excerpt(spec_text: str, session_number: int) -> str:
     return spec_text.strip()
 
 
+_SET_CONFIG_RE = re.compile(
+    r"^##\s+Session\s+Set\s+Configuration\s*$.*?^```(?:yaml|yml)?\s*$"
+    r"(?P<body>.*?)^```\s*$",
+    re.MULTILINE | re.DOTALL | re.IGNORECASE,
+)
+
+
+def parse_set_config(spec_text: str) -> dict:
+    """The ``Session Set Configuration`` fenced YAML block as a mapping.
+
+    Absent, unfenced, unparseable, or non-mapping content all yield ``{}``:
+    the block is optional, and a spec that predates a key must keep
+    working. Callers treat an unresolvable value as "not declared" and
+    stay on their default path — never as a licence to guess."""
+    match = _SET_CONFIG_RE.search(spec_text or "")
+    if not match:
+        return {}
+    try:
+        import yaml
+
+        doc = yaml.safe_load(match.group("body"))
+    except Exception:
+        return {}
+    return doc if isinstance(doc, dict) else {}
+
+
+def declared_module_slug(set_dir) -> Optional[str]:
+    """The module slug the set's spec declares, or ``None``. Resolving the
+    slug against ``docs/modules.yaml`` is the caller's job — an undeclared
+    or unresolvable module is the cue to stay on the unscoped path."""
+    try:
+        text = (Path(set_dir) / "spec.md").read_text(encoding="utf-8")
+    except (OSError, UnicodeError):
+        return None
+    value = parse_set_config(text).get("module")
+    if not isinstance(value, str) or not value.strip():
+        return None
+    return value.strip()
+
+
 # --- start ------------------------------------------------------------------
 
 def start(

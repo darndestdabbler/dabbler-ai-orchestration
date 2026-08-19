@@ -727,3 +727,320 @@ def resolve_scope(repo_root, diff: str, module_slug: str,
             "trimmed to fit."
         )
     return scope
+
+
+# --- rendering --------------------------------------------------------------
+
+#: Tier 2 is resolved by whole-word symbol matching over comment-stripped
+#: code, not by a semantic call graph. That finds callers a signature
+#: index would miss and also admits false positives; the render says so,
+#: because a reviewer told "these are the callers" will trust the list.
+TIER_NOTES = {
+    TIER_MODIFIED: "Full content. The change under review is confined to "
+                   "the line ranges named on each file; the rest of each "
+                   "file is there so you read the change in context.",
+    TIER_CALLERS: "Full content. These are caller CANDIDATES, found by "
+                  "whole-word matching of the changed symbol names over "
+                  "comment-stripped code -- not a semantic call graph. "
+                  "Expect some false positives, and judge each one.",
+    TIER_TESTS: "Full content. Tests whose text references a modified "
+                "file's module name.",
+    TIER_INTERFACE: "One hop from the modified files, no transitive "
+                    "closure. Each file is marked below as interface "
+                    "surface or full content.",
+    TIER_SPEC: "Reference material, mapped to this module in "
+               "docs/modules.yaml -- not retrieved by search.",
+    TIER_ASSETS: "Reference material the manifest declares for this "
+                 "module: schemas, config, migrations.",
+    TIER_MODULE_PATHS: "NAMES ONLY -- no contents. Every path here is in "
+                       "the domain: name one and you get it.",
+}
+
+_INTERFACE_MARKER = (
+    "interface surface only -- function bodies elided by Python `ast`; "
+    "signatures, annotations, class and constant declarations and "
+    "docstrings are intact"
+)
+_FULL_MARKER = (
+    "full content -- no real parser exists here for an interface surface, "
+    "and a guessed one would read like a contract without being one"
+)
+
+#: The verifier may ask for this many paths in one response. A batched
+#: request costs one re-dispatch; a one-file-at-a-time loop costs one per
+#: file, and every dispatch re-sends the whole accumulated prompt.
+MAX_REQUESTS_PER_RESPONSE = 10
+
+REQUEST_TOKEN = "CONTEXT-REQUEST:"
+ESCALATION_TOKEN = "ESCALATION:"
+
+
+def scope_domain(scope) -> tuple:
+    """Every repo path this scope names, in any tier -- including the
+    names-only tier 7 listing. This is *the domain*: a request for one of
+    these is served mechanically, and anything else is an escalation."""
+    return tuple(sorted({
+        entry.path.partition("#")[0] for entry in scope.entries
+    }))
+
+
+def _fence(*texts) -> str:
+    """A backtick fence longer than any run inside *texts*. A file that
+    contains a fence would otherwise close the block early and hand the
+    reviewer a bundle that silently ends mid-file."""
+    longest = 0
+    for text in texts:
+        for run in re.findall(r"`+", text or ""):
+            longest = max(longest, len(run))
+    return "`" * max(3, longest + 1)
+
+
+def _ranges_label(ranges) -> str:
+    if not ranges:
+        return ""
+    return "  (changed lines: " + ", ".join(
+        str(lo) if lo == hi else f"{lo}-{hi}" for lo, hi in ranges
+    ) + ")"
+
+
+def _render_entry(entry, changed_ranges) -> list:
+    if entry.content_kind == CONTENT_NAMES:
+        return [f"- {entry.path}"]
+    label = f"**{entry.path}**"
+    if entry.tier == TIER_MODIFIED:
+        label += _ranges_label((changed_ranges or {}).get(entry.path))
+    elif entry.tier == TIER_INTERFACE:
+        marker = (
+            _INTERFACE_MARKER if entry.content_kind == CONTENT_INTERFACE
+            else _FULL_MARKER
+        )
+        label += f"  [{marker}]"
+    fence = _fence(entry.text)
+    return ["", label, fence, entry.text, fence]
+
+
+def render_pull_protocol(domain_size: int) -> str:
+    """The two-step pull, stated to the verifier. Placeholders are angle
+    bracketed so an echo of this block never parses as a request."""
+    return "\n".join([
+        "#### Asking for more context",
+        "",
+        f"The **domain** is every path this bundle names -- {domain_size} "
+        "path(s), including the names-only listing above. Two kinds of "
+        "request, and both are recorded:",
+        "",
+        "1. **In-domain request** -- a path the bundle already names. It "
+        "is served mechanically; no justification is weighed, because "
+        "nothing needs to weigh a request for a file already declared "
+        "eligible. On its own line:",
+        "",
+        f"       {REQUEST_TOKEN} <exact-repo-relative-path>",
+        "",
+        "2. **Escalation** -- a path the bundle does NOT name. Say why. "
+        "The orchestrating engine decides; it may only widen, never "
+        "narrow. On its own line:",
+        "",
+        f"       {ESCALATION_TOKEN} <exact-repo-relative-path> -- <why "
+        "you need it>",
+        "",
+        f"Name exact paths. A wildcard, a bare directory, or an unnamed "
+        f"request is refused. Ask for at most {MAX_REQUESTS_PER_RESPONSE} "
+        "path(s), batched into this one response -- every request costs a "
+        "full re-dispatch, so ask once for everything you need.",
+        "",
+        "**A refusal never licenses abstention.** Return your verdict on "
+        "the evidence you hold. \"My escalation was refused\" is not a "
+        "verdict, and neither is \"I could not review this without X\".",
+    ])
+
+
+def render_scope(scope, *, change_block: str = "", changed_ranges=None) -> str:
+    """The bounded scope as the verifier sees it: every tier labelled,
+    every exclusion named, the domain stated, and the pull protocol at the
+    end. A verifier that does not know its context is bounded will
+    confabulate the rest, so the bound is stated rather than implied."""
+    domain = scope_domain(scope)
+    parts = [
+        f"The session's work, reviewed from a BOUNDED CONTEXT SCOPE for "
+        f"module `{scope.module}`.",
+        "",
+        "This is **not** a whole-session bundle. What follows is seven "
+        "declared tiers of evidence, resolved mechanically from the change "
+        "and from `docs/modules.yaml`. **Everything else in this "
+        "repository is excluded by default.** That exclusion is this "
+        "artifact's normal state, not a degradation to apologise for, and "
+        "it is recorded below rather than left for you to infer.",
+        "",
+        "The absence of a file here does not mean it does not exist. Do "
+        "not guess at what you were not given: ask for it, using the "
+        "protocol at the end of this bundle.",
+    ]
+    if scope.changed_symbols:
+        parts += [
+            "",
+            "Changed symbols the tiers were resolved against: "
+            + ", ".join(f"`{s}`" for s in scope.changed_symbols),
+        ]
+    if scope.changes_outside_code_roots:
+        parts += [
+            "",
+            "This change reaches outside the module's `codeRoots`, and "
+            "those files are reviewed in full anyway -- the module bounds "
+            "the reference tiers, never the change: "
+            + ", ".join(f"`{p}`" for p in scope.changes_outside_code_roots),
+        ]
+    if change_block:
+        parts += ["", change_block]
+
+    for tier in range(TIER_MODIFIED, TIER_MODULE_PATHS + 1):
+        entries = scope.tier(tier)
+        parts += ["", f"#### Tier {tier} — {TIER_TITLES[tier]}", "",
+                  TIER_NOTES[tier]]
+        if not entries:
+            parts.append("")
+            parts.append("(nothing in this tier for this change)")
+            continue
+        for entry in entries:
+            parts += _render_entry(entry, changed_ranges)
+
+    parts += ["", "#### Excluded by default, and why", ""]
+    parts += [f"- {e.subject} — {e.reason}" for e in scope.exclusions]
+    parts += ["", render_pull_protocol(len(domain))]
+    return "\n".join(parts)
+
+
+# --- the two-step pull ------------------------------------------------------
+
+@dataclass(frozen=True)
+class ContextRequest:
+    path: str
+    kind: str            # "request" | "escalation"
+    reason: str = ""
+    refusal: str = ""    # non-empty when the request cannot stand as made
+
+
+_REQUEST_LINE = re.compile(
+    r"^[\s>*\-+#]*(?:\*\*|__)?\s*(CONTEXT-REQUEST|ESCALATION)\s*"
+    r"(?:\*\*|__)?\s*:\s*(?:\*\*|__)?\s*(.*)$",
+    re.IGNORECASE,
+)
+_WILDCARD_CHARS = "*?[]{}"
+_REASON_SPLIT = re.compile(r"\s+(?:--|—|–|-|:)\s+")
+_UNNAMED = "(unnamed request)"
+
+
+def _clean_path_token(token: str) -> str:
+    token = token.strip().strip("`\"'").strip()
+    # Markdown emphasis around the path is presentation, not filename.
+    token = token.strip("*_").strip()
+    # A trailing sentence period is punctuation, not part of a filename.
+    while token.endswith((".", ",", ";")):
+        token = token[:-1]
+    return _norm(token)
+
+
+def parse_context_requests(text: str, domain) -> list:
+    """Every context request in a verifier response, in order.
+
+    A request naming a path in *domain* is in-domain whichever token
+    introduced it -- a verifier that escalates for a file it was already
+    entitled to should get it, not a lecture. Anything malformed carries a
+    ``refusal`` that says what a valid request looks like; a refusal is
+    recorded, never silently dropped."""
+    domain = set(domain or ())
+    out: list = []
+    seen: set = set()
+    for line in (text or "").splitlines():
+        match = _REQUEST_LINE.match(line)
+        if not match:
+            continue
+        token = match.group(1).upper()
+        remainder = match.group(2).strip()
+        if _REASON_SPLIT.search(remainder):
+            raw_path, reason = _REASON_SPLIT.split(remainder, maxsplit=1)
+        else:
+            raw_path, reason = remainder, ""
+        if raw_path.startswith("<"):
+            continue  # an echo of the protocol block's placeholder
+        path = _clean_path_token(raw_path)
+        kind = "escalation" if token == "ESCALATION" else "request"
+        if not path:
+            path = _UNNAMED
+        if path in seen:
+            continue
+        seen.add(path)
+        if path == _UNNAMED:
+            out.append(ContextRequest(
+                path, kind, reason,
+                f"a request must name one exact repo-relative path, as "
+                f"`{REQUEST_TOKEN} path/to/file.py`",
+            ))
+            continue
+        if any(char in path for char in _WILDCARD_CHARS) or path.endswith("/"):
+            out.append(ContextRequest(
+                path, kind, reason,
+                "wildcards and bare directories are refused; name one "
+                "exact repo-relative file path per request line",
+            ))
+            continue
+        if path in domain:
+            out.append(ContextRequest(path, "request", reason))
+            continue
+        if kind == "request":
+            out.append(ContextRequest(
+                path, "escalation", reason,
+                "" if reason else
+                f"`{path}` is not in the domain, so it needs an "
+                f"escalation that says why: "
+                f"`{ESCALATION_TOKEN} {path} -- <reason>`",
+            ))
+            continue
+        out.append(ContextRequest(
+            path, "escalation", reason,
+            "" if reason else
+            "an escalation must say why the file is needed: "
+            f"`{ESCALATION_TOKEN} {path} -- <reason>`",
+        ))
+    if len(out) > MAX_REQUESTS_PER_RESPONSE:
+        kept = out[:MAX_REQUESTS_PER_RESPONSE]
+        for extra in out[MAX_REQUESTS_PER_RESPONSE:]:
+            kept.append(ContextRequest(
+                extra.path, extra.kind, extra.reason,
+                f"over the per-response limit of "
+                f"{MAX_REQUESTS_PER_RESPONSE} request(s); ask for the "
+                "paths that matter most in one batch",
+            ))
+        return kept
+    return out
+
+
+def serve_in_domain(repo_root, paths) -> tuple:
+    """``(rendered, served, refused)`` for mechanically served files. A
+    path that cannot be read is refused with its reason rather than
+    served as an empty block -- an empty file and an unreadable one must
+    not look alike to a reviewer."""
+    repo_root = Path(repo_root)
+    blocks, served, refused = [], [], []
+    for rel in paths:
+        text, refusal = read_text(repo_root / rel)
+        if text is None:
+            refused.append((rel, refusal or "unreadable"))
+            continue
+        fence = _fence(text)
+        blocks += ["", f"**{rel}**", fence, text, fence]
+        served.append(rel)
+    if not blocks and not refused:
+        return "", served, refused
+    header = [
+        "#### Files you asked for (in-domain, served mechanically)",
+        "",
+        "These were named in your previous response and are inside the "
+        "domain, so they are served without justification. The bundle "
+        "above still stands; this is added to it, nothing was removed.",
+    ]
+    if refused:
+        header += [""] + [
+            f"- REFUSED `{rel}` — {reason}" for rel, reason in refused
+        ]
+    return "\n".join(header + blocks), served, refused
+

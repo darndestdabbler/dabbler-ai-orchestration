@@ -1,3 +1,60 @@
+# STATUS — after set 138 was cancelled (read this before starting anything)
+
+- **Run set 140 before set 139.** The lowest-numbered not-started set is
+  139, but 139 estimates 36–48 new Python tests and the budget has
+  **5 slots free** (475 of 480). Set 140 frees 51 by removing cancelled
+  code. Starting 139 first walks into a wall at its first session.
+- **Set 138 is cancelled**, during its own session 3, on its own
+  measurement. `CANCELLED.md` carries the reason. Two premises failed.
+  (1) *Billing*: the spec rejected an agentic pull because "it bills per
+  turn", but Copilot and the direct APIs bill **per token**, so bundle
+  size is the dominant cost and a bounded-scope *push* optimises the
+  wrong variable — the same review measured 121,820 chars scoped vs
+  16,233 monolithic, ~7.5× per round, forever. (2) *Contracts beat
+  review*: the planted cross-file defect is caught by the existing
+  pytest suite in 7 seconds at zero marginal cost, and is not expressible
+  at all against a keyword-only API.
+- **The correctness finding survives, and is worth keeping in mind.**
+  With no ambient filesystem access, the same verifier returned **Major
+  from the scoped bundle and VERIFIED from the monolithic one**, on both
+  corpora — the monolithic path approved a repository whose main path was
+  broken. The variable that matters is not scoped-vs-monolithic; it is
+  whether the repository has enforceable contracts. `../certs` has no
+  tests, and there the review was the only net.
+- **Two findings for the redesign discussion, not yet acted on.**
+  (1) Tier 2 resolved "direct callers" by whole-word match, so generic
+  symbols (`log`, `main`, `start`) pulled most of the repo. (2) On
+  `copilot-cli` run inside a repository the verifier holds read-only
+  `view`/`grep`/`glob` over the workspace, so any context bound is
+  advisory and an escalation channel is bypassable — a verifier can read
+  a file instead of asking, and no ledger row records it. Demonstrated:
+  an in-repo monolithic control caught the defect by opening a file its
+  bundle never mentioned.
+- **Salvaged outside the repo**, at
+  `.copilot/session-state/350c17da-bf29-422c-93ab-b828baf275db/files/set-138-salvage/`:
+  the full measurement, every uncommitted session-3 change as one patch,
+  seven verbatim verifier responses, and the harness scripts. Its
+  `README.md` separates what is reusable from what should not come back
+  without the redesign. Set 140 session 2 draws the `session log`
+  subcommand and the doc corrections from it.
+- **Still on `main`, dormant**: set 138's sessions 1 and 2 — ~1,900 lines
+  (`context_scope.py` 1,046, the `verify.py` scope fork ~545, the
+  `pulls.jsonl` ledger and escalation CLI ~140) and 51 tests. Inert
+  unless a repository ships `docs/modules.yaml`, and none does. Set 140
+  removes them. Note that `tests/test_escalation.py` is **not** part of
+  this — it predates set 138 and covers response escalation.
+- **Do not `git revert` set 138's work commits.** Session 1 also deleted
+  `prompting.py`, folded it into `route.py`, and replaced silent
+  tail-truncation of a verification bundle with a named refusal
+  (`PromptTooLargeError`). That fix is independent and must survive.
+- Publishing: `pyproject.toml` is at **1.0.9**, PyPI has **1.0.0**
+  (2026-08-15), suite green at 475. The current build is publishable;
+  set 140 session 2 bumps and prepares the artifact, and publishing
+  stays operator-gated.
+- This environment has **no provider API keys** — seat transport only —
+  so the `api` path is unexercised here. The catalog lock still pins CLI
+  1.0.68 while the live seat reports 1.0.80; that is set 139's subject.
+
 # STATUS — after set 137 (the Copilot seat transport works, and is exercised)
 
 - Done (set 137, 1.0.9): the `copilot-cli` transport was dark on a

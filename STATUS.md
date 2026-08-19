@@ -11,14 +11,29 @@
   value, and `enforce` is refused at load by the name of the set that will
   enable it.
 - **Suite: 455 green**, which is set 141's whole 11-test allocation
-  (444 + 11). The 480 ceiling is unchanged; **25 slots are free**.
-- **The re-scope decision the spec deferred to this close is now due, and
-  the real numbers do not change it.** Sets 142–145 are allocated 10 / 13
-  / 8 / 6 = **37** against **25** free — 12 short, exactly as estimated.
-  Sets 142 and 143 fit (23 of 25). **Set 144 still may not begin until
-  its allocation is re-scoped downward or further slots are reclaimed
-  under the session-1 rules**, and set 145's 6 sit behind the same wall.
-  This is an operator decision; nothing here funds it.
+  (444 + 11).
+- **The re-scope decision is RESOLVED, and sets 142–145 were rewritten**
+  (2026-08-19, commits `2e21d53c` and `6839fbbe`). The operator answered
+  the 12-slot shortfall by relaxing the constraint rather than shrinking
+  the work: **ground rules 1 and 4 are suspended for sets 142–145**,
+  replaced by a +33% envelope on this baseline — **16,800 LOC / 33 modules
+  / 605 Python tests / 215 TS tests**. The old allocation (10/13/8/6 = 37)
+  is void. **No set is blocked; 142 is next and may begin.**
+- **The design changed with it.** The manager/worker critique pipeline is
+  replaced by a plan-first, step-wise design: proof declared before code,
+  deterministic tools first and free, a model reading one step's diff
+  rather than a session bundle, and the framework committing each step.
+  New allocations are 142: 14, 143: 16, 144: 20, 145: 10 — sixty tests,
+  reaching 515 of 605. Two rules survive the relaxation: one test per
+  behavior, and a new module must make another smaller (`verify.py` is
+  1,886 lines and must end below 1,200).
+- **Three constraints the rewrite holds and must not be traded away.**
+  Session-level cross-provider verification stays mandatory with no skip
+  or waiver — the step-level check is a different granularity. A step may
+  skip its model check only when all its evidence is deterministic, all
+  green, **and** changed-line coverage shows every changed line executed.
+  The framework commits per step and **never pushes**: CI runs on push to
+  `master` and on PRs against it, so the push is one act at close.
 - **The framework checks the worker, and the check checks the quote.** A
   quote is re-read from the *reviewed tree* by digest — never the
   worktree, which keeps moving — re-hashed, and matched against the

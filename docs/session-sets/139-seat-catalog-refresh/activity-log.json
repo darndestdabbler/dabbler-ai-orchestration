@@ -1,0 +1,136 @@
+{
+  "sessionSetName": "139-seat-catalog-refresh",
+  "createdDate": "2026-08-19T06:17:31.458689-04:00",
+  "totalSessions": 3,
+  "entries": [
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-19T06:17:31.458745-04:00",
+      "description": "Register.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "restore-the-project-local-config-tier",
+      "dateTime": "2026-08-19T06:17:31.458745-04:00",
+      "description": "Restore the project-local config tier in `config.py`, first, because every remaining session of this set dispatches through `copilot-cli` and today cannot without a per-command flag. `_resolve_config_path` becomes a *layering* step, not a choice of one file: the bundled `router-config.yaml` is the base, and a project-local `local-overrides.yaml` is deep-merged over it using the `_deep_merge` already in the module. The resolution order becomes explicit path > `AI_ROUTER_CONFIG` > bundled + local overlay. Constraints: - The overlay is **partial** \u2014 it carries only the keys it changes, and the merged result is validated against the existing schema, so an overlay cannot produce a config the router would have refused. - **A key the schema does not know is refused at load, not ignored** (v1's rule). A silently-dropped override is the failure this file exists to prevent, and it is the same failure mode as the misspelled `codeRoot` in `modules.py`. - The file is **never written by the router in this session** and never published: `.gitignore` already reserves the name, and `pyproject.toml` must not list it as package data. - Transport precedence after this step: `--transport` flag > `DABBLER_TRANSPORT` > `local-overrides.yaml` > bundled `transport.profile` > `api`. Nothing above the new tier changes. - Resolve the project root once, reusing the existing git-root discovery rather than adding a second notion of \"the project\".",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "add-the-serializer-to-the-catalog",
+      "dateTime": "2026-08-19T06:17:31.458745-04:00",
+      "description": "Add the serializer to the catalog section of `transports/copilot.py`: render a `Catalog` back to the restricted TOML subset the reader already accepts \u2014 one flat `[meta]` table plus repeated flat `[[models]]` tables, scalar values only. Round-trip is the contract: `load(dump(catalog))` must equal the catalog, asserted on the shipped lockfile itself. Values that the serializer cannot render are coerced at the boundary, not trusted through it \u2014 a malformed `premiumRequests` off the wire (a float, a list) must not reach the writer, per v1's round-4 finding.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "add-discovermodels",
+      "dateTime": "2026-08-19T06:17:31.458745-04:00",
+      "description": "Add `discover_models()`: probe named candidates through the existing transport with a trivial prompt, recording per entry \u2014 on success, `confirmed` with `confirmed_at`, `confirmed_on_cli_version`, `echoed_model`, and `probe_premium_requests` read from the dispatch metadata; on failure, the failure's own error class. It takes the models to probe as an argument and has no opinion about which; the selection policy is Session 2's job.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "make-it-merge-never-clobber",
+      "dateTime": "2026-08-19T06:17:31.458745-04:00",
+      "description": "Make it **merge, never clobber**. A refresh that probed three models rewrites those three and preserves every other entry byte-for-byte including its provenance. A previously-confirmed entry whose probe fails today is **not** silently demoted: a transient CLI failure is not a withdrawn model, so record the failed attempt and keep the prior confirmation, visibly stale, until an operator says otherwise.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 6,
+      "stepKey": "declare-the-candidate-universe-explicitly-in",
+      "dateTime": "2026-08-19T06:17:31.458745-04:00",
+      "description": "Declare the candidate universe explicitly, in the lockfile rather than in code, so adding a model is a data edit and the file remains the whole truth about the seat. Seed it from the 18 ids already present.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 7,
+      "stepKey": "cross-provider-verification-through-copilot-cli",
+      "dateTime": "2026-08-19T06:17:31.458745-04:00",
+      "description": "Cross-provider verification through `copilot-cli`.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 8,
+      "stepKey": "required-portion-of-the-full-test",
+      "dateTime": "2026-08-19T06:17:31.458745-04:00",
+      "description": "Required portion of the full test suite.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 9,
+      "stepKey": "close-out",
+      "dateTime": "2026-08-19T06:17:31.458745-04:00",
+      "description": "Close-out.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-19T06:17:31.465242-04:00",
+      "description": "Registered session 1 (copilot).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "restore-the-project-local-config-tier",
+      "dateTime": "2026-08-19T06:34:58.070731-04:00",
+      "description": "config.py layers a project-local local-overrides.yaml over the bundled router-config.yaml via _deep_merge; project root is the existing git-root discovery; an explicitly-named config takes no overlay; a key the schema declares no vocabulary for is refused at load.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "add-the-serializer-to-the-catalog",
+      "dateTime": "2026-08-19T06:34:58.507735-04:00",
+      "description": "dumps_catalog/write_catalog render a Catalog back to the restricted TOML subset (flat [meta] + [[models]], scalars and flat string arrays). The shipped lockfile round-trips byte-for-byte; unrenderable values are refused at the writer.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "add-discovermodels",
+      "dateTime": "2026-08-19T06:34:58.958603-04:00",
+      "description": "discover_models() probes named candidates through the transport, recording confirmed_at/confirmed_on_cli_version/echoed_model/probe_premium_requests on success and the failure's own error class on failure. premiumRequests is coerced at the boundary.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "make-it-merge-never-clobber",
+      "dateTime": "2026-08-19T06:34:59.396631-04:00",
+      "description": "merge_catalog() rewrites only probed entries; a failed probe of a confirmed entry keeps the prior confirmation and records last_probe_error/last_probe_at.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 6,
+      "stepKey": "declare-the-candidate-universe-explicitly-in",
+      "dateTime": "2026-08-19T06:34:59.827505-04:00",
+      "description": "candidate_universe seeded in [meta] from the 18 ids present, written through the writer rather than by hand, with a note that the CLI has no list-models command.",
+      "status": "complete"
+    }
+  ]
+}

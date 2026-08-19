@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 4,
+  "sessionSetName": "139-seat-catalog-refresh",
+  "status": "in-progress",
+  "sessions": [
+    {
+      "number": 1,
+      "title": "The local override, the writer, and one owner for the lockfile",
+      "status": "complete",
+      "startedAt": "2026-08-19T06:17:31.353798-04:00",
+      "completedAt": "2026-08-19T06:51:40.355575-04:00",
+      "orchestrator": {
+        "engine": "copilot",
+        "provider": "anthropic",
+        "model": "claude-opus-5",
+        "identityProvenance": "asserted"
+      },
+      "verificationVerdict": "VERIFIED",
+      "verification": {
+        "rounds": 3,
+        "verifierModel": "gpt-5.5",
+        "verifierProvider": "openai",
+        "transport": "copilot-cli",
+        "costUsd": null
+      }
+    },
+    {
+      "number": 2,
+      "title": "The refresh command, and the 2-request common case",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    },
+    {
+      "number": 3,
+      "title": "Close the hand-edit hole, and prove it on the live seat",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    }
+  ]
+}

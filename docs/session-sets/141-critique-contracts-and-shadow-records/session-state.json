@@ -6,9 +6,9 @@
     {
       "number": 1,
       "title": "The entry gate, the frozen schemas, and a switch that is off",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-19T10:34:55.116507-04:00",
-      "completedAt": null,
+      "completedAt": "2026-08-19T11:25:05.693253-04:00",
       "orchestrator": {
         "engine": "copilot",
         "provider": "anthropic",

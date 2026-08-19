@@ -103,6 +103,45 @@ class TestRawOutput:
         assert path.read_bytes() == content.encode("utf-8")
 
 
+class TestCritiqueArtifacts:
+    def test_invalid_record_is_refused_and_quarantined(self, tmp_path):
+        # Both write shapes fail the same way — whole-file replace and
+        # append — because a record that does not validate is never
+        # half-written and never best-effort skipped. The rejected payload
+        # is kept beside the subtree so a refusal can be diagnosed instead
+        # of guessed at.
+        bad_run = {
+            "schema_version": 1, "change_id": "abcdef1",
+            "set_slug": "010-demo", "session_number": 1,
+            "opened_at": "2026-08-19T00:00:00Z",
+            "attempts": [{"attempt": 1, "opened_at": "2026-08-19T00:00:00Z",
+                          "completion_tree": "abcdef1",
+                          "status": "invented"}],
+        }
+        with pytest.raises(ledger.LedgerError, match="quarantined"):
+            ledger.write_review_run(tmp_path, "010-demo", 1, bad_run)
+        assert not ledger.review_run_path(
+            tmp_path, "010-demo", 1, "abcdef1").exists()
+
+        blocked = {
+            "schema_version": 1, "change_id": "abcdef1", "check_id": "c1",
+            "attempt": 1, "result": "blocked",
+            "recorded_at": "2026-08-19T00:00:00Z",
+        }
+        with pytest.raises(ledger.LedgerError, match="quarantined"):
+            ledger.append_worker_result(tmp_path, "010-demo", 1, blocked)
+        assert ledger.read_worker_results(
+            tmp_path, "010-demo", 1, "abcdef1") == []
+
+        kept = sorted(
+            ledger.quarantine_dir(tmp_path, "010-demo", 1).glob("*.json")
+        )
+        payloads = [
+            json.loads(p.read_text(encoding="utf-8"))["record"] for p in kept
+        ]
+        assert payloads == [bad_run, blocked]
+
+
 class TestAdjudicationRow:
     def test_type_tagged_row_requires_its_fields(self, tmp_path):
         # The additive schema: an untyped row stays valid (every other test

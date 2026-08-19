@@ -1,3 +1,4 @@
+import json
 import subprocess
 
 import pytest
@@ -949,3 +950,145 @@ class TestAutoVerify:
         generated = make_result("answer", provider="anthropic")
         assert auto_verify(generated, "task", "code-review",
                            base_config) is None
+
+
+class TestCritiquePrepare:
+    """The critique pipeline's entry point: additive, off by default, and
+    deciding nothing. No round, verdict or gate reads what it writes."""
+
+    @pytest.fixture
+    def shadow(self, flight, monkeypatch):
+        import ai_router.config as config_module
+
+        monkeypatch.setattr(
+            config_module, "load_config",
+            lambda *a, **k: {"critique": {"pipeline": "shadow"}},
+        )
+        return flight[0], flight[1]
+
+    def test_writes_only_in_shadow_and_only_a_derived_change_id(
+        self, flight, monkeypatch, tmp_path, capsys
+    ):
+        import ai_router.config as config_module
+        from ai_router.verify import derive_change_id, main, run_prepare
+
+        repo, set_dir, _install = flight
+        # Off is the default, and off writes nothing at all.
+        monkeypatch.setattr(config_module, "load_config", lambda *a, **k: {})
+        assert run_prepare(set_dir) == EXIT_USAGE
+        assert "critique.pipeline is 'off'" in capsys.readouterr().err
+        assert not ledger.critique_root(repo, set_dir.name, 1).exists()
+
+        monkeypatch.setattr(
+            config_module, "load_config",
+            lambda *a, **k: {"critique": {"pipeline": "shadow"}},
+        )
+        # The identity is a pure function of the trees bounding the change.
+        first = derive_change_id("a" * 40, "b" * 40)
+        assert first == derive_change_id("a" * 40, "b" * 40)
+        assert first != derive_change_id("a" * 40, "c" * 40)
+
+        # No flag supplies one...
+        assert main(["prepare", "--session-set-dir", str(set_dir),
+                     "--change-id", first]) == EXIT_USAGE
+        assert "no --change-id option" in capsys.readouterr().err
+
+        # ...a claims file carrying one is refused rather than honoured...
+        claims = tmp_path / "claims.json"
+        claims.write_text(json.dumps({"change_id": first, "claims": []}),
+                          encoding="utf-8")
+        assert run_prepare(set_dir, claims_path=claims) == EXIT_USAGE
+        assert "cannot be supplied" in capsys.readouterr().err
+        assert ledger.read_review_runs(repo, set_dir.name, 1) == []
+
+        # ...and a value that is not a digest never becomes a directory.
+        with pytest.raises(ledger.LedgerError, match="derived digest"):
+            ledger.critique_dir(repo, set_dir.name, 1, "../../elsewhere")
+
+        # A claims file the author got wrong is refused before any machine
+        # state moves — no run, no attempt for a retry to stumble over —
+        # and the rejected payload is still preserved.
+        for payload in (
+            {"claims": [{"claim_id": "c1"}]},          # no statement
+            {"claim_id": "c1", "statement": "a bare claim, unwrapped"},
+        ):
+            claims.write_text(json.dumps(payload), encoding="utf-8")
+            assert run_prepare(set_dir, claims_path=claims) == EXIT_USAGE
+            assert ledger.read_review_runs(repo, set_dir.name, 1) == []
+        kept = list(
+            ledger.quarantine_dir(repo, set_dir.name, 1).glob("*.json")
+        )
+        assert [json.loads(p.read_text(encoding="utf-8"))["record"]["claims"]
+                for p in kept] == [[{"claim_id": "c1"}]]
+
+    def test_remediation_links_an_attempt_without_rewriting_the_first(
+        self, shadow, tmp_path
+    ):
+        from ai_router.verify import run_prepare
+
+        repo, set_dir = shadow
+        claims = tmp_path / "claims.json"
+        claims.write_text(
+            json.dumps({"claims": [{
+                "claim_id": "c1", "kind": "behavior-changed",
+                "statement": "the widget stops dividing by zero",
+            }]}),
+            encoding="utf-8",
+        )
+        assert run_prepare(set_dir, claims_path=claims) == EXIT_OK
+        runs = ledger.read_review_runs(repo, set_dir.name, 1)
+        change_id = runs[0]["change_id"]
+        first_attempt = dict(runs[0]["attempts"][0])
+        recorded = ledger.read_review_claims(repo, set_dir.name, 1, change_id)
+        assert [c["claim_id"] for c in recorded["claims"]] == ["c1"]
+
+        # The tree moves; the review run does not fork.
+        (repo / "widget.py").write_text("def f(xs): return 2\n",
+                                        encoding="utf-8")
+        assert run_prepare(set_dir, claims_path=claims) == EXIT_OK
+        runs = ledger.read_review_runs(repo, set_dir.name, 1)
+        assert len(runs) == 1 and runs[0]["change_id"] == change_id
+        attempts = runs[0]["attempts"]
+        assert attempts[0] == first_attempt
+        assert attempts[1]["attempt"] == 2
+        assert attempts[1]["previous_attempt"] == 1
+        assert (attempts[1]["completion_tree"]
+                != first_attempt["completion_tree"])
+
+        # Silence on a later attempt leaves the claims standing; it is not
+        # a withdrawal.
+        (repo / "widget.py").write_text("def f(xs): return 4\n",
+                                        encoding="utf-8")
+        assert run_prepare(set_dir) == EXIT_OK
+        assert ledger.read_review_claims(
+            repo, set_dir.name, 1, change_id)["claims"] == recorded["claims"]
+
+        # A recorded attempt is not rewritable, by any caller.
+        runs = ledger.read_review_runs(repo, set_dir.name, 1)
+        rewritten = {
+            **runs[0],
+            "attempts": [{**runs[0]["attempts"][0], "status": "closed"}],
+        }
+        with pytest.raises(ledger.LedgerError, match="append-only"):
+            ledger.write_review_run(repo, set_dir.name, 1, rewritten)
+
+    def test_the_claims_markdown_twin_is_decorative(self, shadow):
+        from ai_router.verify import run_prepare
+
+        repo, set_dir = shadow
+        assert run_prepare(set_dir) == EXIT_OK
+        change_id = ledger.read_review_runs(
+            repo, set_dir.name, 1)[0]["change_id"]
+        twin = ledger.review_claims_twin_path(repo, set_dir.name, 1, change_id)
+        assert twin.exists()
+        canonical = ledger.read_review_claims(repo, set_dir.name, 1, change_id)
+
+        twin.unlink()
+        assert ledger.read_review_claims(
+            repo, set_dir.name, 1, change_id) == canonical
+        (repo / "widget.py").write_text("def f(xs): return 3\n",
+                                        encoding="utf-8")
+        assert run_prepare(set_dir) == EXIT_OK
+        runs = ledger.read_review_runs(repo, set_dir.name, 1)
+        assert runs[0]["change_id"] == change_id
+        assert [a["attempt"] for a in runs[0]["attempts"]] == [1, 2]

@@ -1,10 +1,14 @@
 """The critique artifact contracts frozen at v1.
 
-Nothing reads these artifacts yet. What is worth pinning now is the part a
+The artifacts decide nothing yet. What is worth pinning now is the part a
 later set cannot renegotiate cheaply: that the version is frozen, so a
 record written against a different vocabulary is refused rather than
 half-understood, and that the check IR stays a bounded description of work
 rather than drifting into a programming language.
+
+The surfaces that *use* these schemas are tested where they live: the
+machine-owned paths and writers in ``test_ledger.py``, and ``verify
+prepare`` with its derived change-id in ``test_verify.py``.
 """
 
 import json
@@ -98,3 +102,4 @@ def test_check_ir_refuses_condition_nesting_past_two_levels():
     jsonschema.validate({**base, "condition": two}, schema)
     with pytest.raises(jsonschema.ValidationError):
         jsonschema.validate({**base, "condition": three}, schema)
+

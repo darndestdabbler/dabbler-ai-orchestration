@@ -171,6 +171,159 @@
       "dateTime": "2026-08-19T11:24:25.090184-04:00",
       "description": "Run of record after the final verification, no code changed since: 449 passed in 283s. 444 after the 31 reclamations, plus this session's 5 new tests. 31 slots free against the unchanged 480 ceiling. No suites are declared under testing.suites in router-config.yaml, so there is no separate test-evidence record to write.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-19T11:35:13.747715-04:00",
+      "description": "Register.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 2,
+      "stepKey": "add-the-critique-artifact-paths-readers",
+      "dateTime": "2026-08-19T11:35:13.747715-04:00",
+      "description": "Add the critique artifact paths, readers, and writers to `ledger.py`, as machine-only surfaces: validate against the frozen schema, then atomic-replace or append. A record that fails validation is refused and quarantined, never partially written and never best-effort skipped.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 3,
+      "stepKey": "derive-change-id-from-the-reviewed",
+      "dateTime": "2026-08-19T11:35:13.747715-04:00",
+      "description": "Derive `change-id` from the reviewed tree/diff digest inside `verify.py`, and make it structurally unchoosable by a model: the prepare path computes it, no CLI flag supplies it, and a caller-supplied value is refused rather than honoured.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 4,
+      "stepKey": "add-verify-prepare-to-verify",
+      "dateTime": "2026-08-19T11:35:13.747715-04:00",
+      "description": "Add `verify prepare` to `verify.py`: it validates author-supplied claims, writes the canonical `review-claims.json` under the machine-owned run directory, and opens `review-run.json` for the attempt. A remediation records a **linked attempt** against the same review run; it never rewrites the prior attempt's evidence.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 5,
+      "stepKey": "generate-the-human-readable-markdown-twin",
+      "dateTime": "2026-08-19T11:35:13.747715-04:00",
+      "description": "Generate the human-readable Markdown twin of the claims, and prove it is decorative: no code path reads it, and deleting it changes no behavior. Test that, rather than asserting its text.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 6,
+      "stepKey": "prove-old-ledgers-still-read",
+      "dateTime": "2026-08-19T11:35:13.747715-04:00",
+      "description": "Prove old ledgers still read. A run directory written before this set loads unchanged, and the existing `verify` command's behavior on it is byte-identical to `8be18fb8`.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 7,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-19T11:35:13.747715-04:00",
+      "description": "Cross-provider verification.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 8,
+      "stepKey": "required-portion-of-the-full-test",
+      "dateTime": "2026-08-19T11:35:13.747715-04:00",
+      "description": "Required portion of the full test suite.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 9,
+      "stepKey": "close-out",
+      "dateTime": "2026-08-19T11:35:13.747715-04:00",
+      "description": "Close-out.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-19T11:35:13.753120-04:00",
+      "description": "Registered session 2 (copilot).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-19T11:45:15.075952-04:00",
+      "description": "Session 2 registered (copilot / claude-opus-5 / anthropic)",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 2,
+      "stepKey": "add-the-critique-artifact-paths-readers",
+      "dateTime": "2026-08-19T11:45:15.522644-04:00",
+      "description": "ledger.py: critique/<change-id>/ paths, the five validators, whole-file atomic writers and jsonl appenders; an invalid record is refused and a copy quarantined beside the subtree",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 3,
+      "stepKey": "derive-change-id-from-the-reviewed",
+      "dateTime": "2026-08-19T11:45:15.954454-04:00",
+      "description": "derive_change_id() digests the baseline and completion trees; no flag supplies one and a claims file carrying change_id is refused",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 4,
+      "stepKey": "add-verify-prepare-to-verify",
+      "dateTime": "2026-08-19T11:45:16.413156-04:00",
+      "description": "verify prepare writes review-claims.json and opens review-run.json; a remediation links an attempt onto the same run and never rewrites the prior one",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 5,
+      "stepKey": "generate-the-human-readable-markdown-twin",
+      "dateTime": "2026-08-19T11:45:16.880367-04:00",
+      "description": "review-claims.md rendered beside the canonical record; nothing reads it and deleting it changes no behavior",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 6,
+      "stepKey": "prove-old-ledgers-still-read",
+      "dateTime": "2026-08-19T11:45:17.328721-04:00",
+      "description": "A pre-141 run directory reads unchanged (2 rounds off the live s1 ledger); run_round is untouched, so verify behaviour is as at 8be18fb8",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 7,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-19T12:07:53.864554-04:00",
+      "description": "VERIFIED round 3 by gpt-5.5/openai over copilot-cli; rounds 1 and 2 each returned a Major that was real (partial write before claims validation; then the pre-check bypassing the quarantining writer)",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 8,
+      "stepKey": "required-portion-of-the-full-test",
+      "dateTime": "2026-08-19T12:11:21.100807-04:00",
+      "description": "Full Python suite run once on the verified tree: 453 passed in 185s (449 -> 453, the 4 tests this session spends)",
+      "status": "complete"
     }
   ]
 }

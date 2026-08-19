@@ -40,12 +40,19 @@ is the mechanical distinction between an operator attestation and a
 confabulated one. WAIVED means the operator accepts UNVERIFIED work; it
 never means "verified another way". Every refusal in this loop names
 its sanctioned next command — no message describes a dead end.
+
+``verify prepare`` is the critique pipeline's entry point, additive and
+off by default: it derives the ``change-id`` from the reviewed tree,
+records the author's claims as the canonical ``review-claims.json``, and
+opens the review run. It decides nothing — no round, no verdict and no
+gate reads what it writes.
 """
 
 from __future__ import annotations
 
 import argparse
 import datetime
+import hashlib
 import json
 import os
 import re
@@ -687,6 +694,256 @@ def run_round(
         f"verify: round {round_number} — {verdict} "
         f"(verifier {result.model_name}/{result.provider}); "
         f"session {current} is clear to close."
+    )
+    return EXIT_OK
+
+
+# --- The critique prepare path -----------------------------------------------
+#
+# Additive and default-off: nothing here reads a verdict, changes a round,
+# or touches the close. It writes the canonical author claims and opens the
+# review run that later sets will hang evidence from.
+
+CHANGE_ID_LENGTH = 16
+
+
+class ChangeIdSuppliedError(VerifyError):
+    """A caller tried to name the change under review. The identity is
+    derived from the tree, so a supplied value is refused rather than
+    honoured — an id a model may choose is an id a model may reuse to file
+    fresh evidence against a review it has already passed."""
+
+
+def derive_change_id(baseline_tree, completion_tree: str) -> str:
+    """The reviewed change's identity: a digest over the two tree objects
+    that bound it. Pure and reproducible — the same reviewed tree always
+    yields the same id, and nothing outside this function produces one."""
+    if not completion_tree:
+        raise VerifyError(
+            "cannot derive a change-id: the working tree could not be "
+            "snapshotted"
+        )
+    payload = f"baseline={baseline_tree or ''}\ncompletion={completion_tree}"
+    return hashlib.sha256(
+        payload.encode("utf-8")
+    ).hexdigest()[:CHANGE_ID_LENGTH]
+
+
+def _head_tree(repo_root) -> Optional[str]:
+    rc, out, _ = run_git(repo_root, "rev-parse", "HEAD^{tree}")
+    return out if rc == 0 and out else None
+
+
+def load_author_claims(claims_path) -> list:
+    """The author's claims, as a list. A missing path is no claims at all,
+    which is a valid input and is not the same as a missing claims file."""
+    if claims_path is None:
+        return []
+    path = Path(claims_path)
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except OSError as exc:
+        raise VerifyError(f"claims file unreadable: {exc}") from exc
+    except json.JSONDecodeError as exc:
+        raise VerifyError(f"claims file is not valid JSON: {exc}") from exc
+    if isinstance(payload, dict):
+        if "change_id" in payload:
+            raise ChangeIdSuppliedError(
+                f"{path} supplies a change_id. The change-id is derived from "
+                "the reviewed tree by this command and cannot be supplied; "
+                "remove the key and re-run."
+            )
+        if "claims" not in payload:
+            raise VerifyError(
+                f"{path} is an object with no 'claims' key. Supply "
+                '{"claims": [...]} — an explicit empty list is the way to '
+                "say the author claims nothing. A bare claim object is not "
+                "read as a claims file, because reading it as zero claims "
+                "would silently discard what the author wrote."
+            )
+        claims = payload["claims"]
+    else:
+        claims = payload
+    if not isinstance(claims, list):
+        raise VerifyError(
+            f"{path} must hold a list of claims, or an object with a "
+            "'claims' list"
+        )
+    return claims
+
+
+def render_claims_markdown(record: dict) -> str:
+    """The human-readable twin of review-claims.json. Decorative: nothing
+    parses it, and deleting it changes no behavior."""
+    lines = [
+        f"# Review claims — change {record['change_id']}",
+        "",
+        "Generated from `review-claims.json`, which is the artifact code "
+        "reads. This rendering is for people; nothing parses it.",
+        "",
+        f"- Attempt: {record.get('attempt', 1)}",
+        f"- Recorded: {record['recorded_at']}",
+        "",
+    ]
+    claims = record.get("claims") or []
+    if not claims:
+        lines.append("The author claims nothing about this change.")
+    for claim in claims:
+        lines.append(f"## {claim['claim_id']}")
+        lines.append("")
+        lines.append(claim["statement"])
+        if claim.get("kind"):
+            lines.append("")
+            lines.append(f"- Kind: {claim['kind']}")
+        for path in claim.get("paths") or []:
+            lines.append(f"- Path: `{path}`")
+        lines.append("")
+    return "\n".join(lines).rstrip() + "\n"
+
+
+def run_prepare(set_dir, *, claims_path=None) -> int:
+    """Open (or extend) the review run for the current working tree and
+    record the author's claims under the machine-owned run directory.
+
+    A remediation does not open a second review run: it links a new attempt
+    onto the one already open for this session, so the prior attempt's
+    evidence stays exactly where it was recorded."""
+    from .config import (
+        CRITIQUE_PIPELINE_DEFAULT,
+        CRITIQUE_PIPELINE_SHADOW,
+        load_config,
+    )
+    from .progress import read_session_state
+
+    set_path = Path(set_dir)
+    repo_root = repo_root_for(set_path)
+    if repo_root is None:
+        print(f"verify prepare: not inside a git repository: {set_path}",
+              file=sys.stderr)
+        return EXIT_STATE
+    state = read_session_state(set_path)
+    current = (state or {}).get("currentSession")
+    if current is None:
+        print(
+            f"verify prepare: no session is in flight under {set_path}; run "
+            "start_session first.", file=sys.stderr,
+        )
+        return EXIT_STATE
+
+    config = load_config()
+    mode = (config.get("critique") or {}).get(
+        "pipeline", CRITIQUE_PIPELINE_DEFAULT
+    )
+    if mode != CRITIQUE_PIPELINE_SHADOW:
+        print(
+            f"verify prepare: refused -- critique.pipeline is {mode!r}, which "
+            "writes nothing. Set it to "
+            f"{CRITIQUE_PIPELINE_SHADOW!r} in router-config.yaml (or in the "
+            "project-local local-overrides.yaml) to record critique "
+            "artifacts without letting them decide anything.",
+            file=sys.stderr,
+        )
+        return EXIT_USAGE
+
+    try:
+        claims = load_author_claims(claims_path)
+    except VerifyError as exc:
+        print(f"verify prepare: {exc}", file=sys.stderr)
+        return EXIT_USAGE
+
+    completion_tree = snapshot_worktree_tree(repo_root)
+    if completion_tree is None:
+        print("verify prepare: could not snapshot the working tree; nothing "
+              "recorded.", file=sys.stderr)
+        return EXIT_CALL_FAILED
+    baseline_tree = _head_tree(repo_root)
+
+    slug = set_path.name
+    now = datetime.datetime.now().astimezone().isoformat()
+    try:
+        existing = ledger.read_review_runs(repo_root, slug, current)
+        if existing:
+            run = existing[-1]
+            change_id = run["change_id"]
+            attempts = list(run["attempts"])
+            attempt = attempts[-1]["attempt"] + 1
+            attempts.append({
+                "attempt": attempt,
+                "opened_at": now,
+                "baseline_tree": baseline_tree,
+                "completion_tree": completion_tree,
+                "previous_attempt": attempts[-1]["attempt"],
+                "status": "open",
+            })
+            run = {**run, "attempts": attempts}
+            if claims_path is None:
+                # Silence on a remediation means the claims are unchanged,
+                # not that the author has withdrawn them. Only an explicit
+                # --claims replaces what is on the record.
+                prior = ledger.read_review_claims(
+                    repo_root, slug, current, change_id
+                )
+                claims = (prior or {}).get("claims", claims)
+        else:
+            change_id = derive_change_id(baseline_tree, completion_tree)
+            attempt = 1
+            run = {
+                "schema_version": 1,
+                "change_id": change_id,
+                "set_slug": slug,
+                "session_number": current,
+                "opened_at": now,
+                "attempts": [{
+                    "attempt": 1,
+                    "opened_at": now,
+                    "baseline_tree": baseline_tree,
+                    "completion_tree": completion_tree,
+                    "previous_attempt": None,
+                    "status": "open",
+                }],
+            }
+
+        claims_record = {
+            "schema_version": 1,
+            "change_id": change_id,
+            "attempt": attempt,
+            "recorded_at": now,
+            "claims": claims,
+        }
+    except ledger.LedgerError as exc:
+        print(f"verify prepare: {exc}", file=sys.stderr)
+        return EXIT_STATE
+    except VerifyError as exc:
+        print(f"verify prepare: {exc}", file=sys.stderr)
+        return EXIT_CALL_FAILED
+
+    # Author-supplied content is screened before any machine state moves:
+    # a refusal must leave no opened attempt behind for the retry to
+    # stumble over, and must still preserve what it rejected.
+    try:
+        ledger.screen_review_claims(repo_root, slug, current, claims_record)
+    except ledger.LedgerError as exc:
+        print(
+            f"verify prepare: {exc} No attempt was opened. Correct the "
+            "claims file and re-run.",
+            file=sys.stderr,
+        )
+        return EXIT_USAGE
+
+    try:
+        run_path = ledger.write_review_run(repo_root, slug, current, run)
+        ledger.write_review_claims(repo_root, slug, current, claims_record)
+    except ledger.LedgerError as exc:
+        print(f"verify prepare: {exc}", file=sys.stderr)
+        return EXIT_STATE
+    ledger.write_review_claims_twin(
+        repo_root, slug, current, change_id,
+        render_claims_markdown(claims_record),
+    )
+
+    print(
+        f"verify prepare: change {change_id}, attempt {attempt} "
+        f"({len(claims)} claim(s)) recorded under {run_path.parent}"
     )
     return EXIT_OK
 
@@ -1557,6 +1814,40 @@ def _waive_main(argv) -> int:
     return run_waive(set_dir, max_rounds=args.max_rounds)
 
 
+def _prepare_main(argv) -> int:
+    # There is no --change-id flag, and this is the message that says so:
+    # argparse's "unrecognized arguments" would read like an oversight.
+    for token in argv:
+        if token == "--change-id" or token.startswith("--change-id="):
+            print(
+                "verify prepare: refused -- there is no --change-id option. "
+                "The change-id is derived from the reviewed tree; a supplied "
+                "value is refused rather than honoured.",
+                file=sys.stderr,
+            )
+            return EXIT_USAGE
+    parser = argparse.ArgumentParser(
+        prog="python -m ai_router.verify prepare",
+        description="Open the review run for the current working tree and "
+                    "record the author's claims. Writes only when "
+                    "critique.pipeline is 'shadow'; decides nothing.",
+    )
+    parser.add_argument("--session-set-dir", required=True,
+                        help="directory, slug, or bare set number")
+    parser.add_argument(
+        "--claims",
+        help="JSON file holding the author's claims (a list, or an object "
+             "with a 'claims' list). Omit for no claims.",
+    )
+    args = parser.parse_args(argv)
+    try:
+        set_dir = resolve_session_set_dir(args.session_set_dir)
+    except ValueError as exc:
+        print(f"verify prepare: {exc}", file=sys.stderr)
+        return EXIT_USAGE
+    return run_prepare(set_dir, claims_path=args.claims)
+
+
 def main(argv=None) -> int:
     from .config import VALID_TRANSPORTS
 
@@ -1567,6 +1858,8 @@ def main(argv=None) -> int:
         return _adjudicate_main(argv[1:])
     if argv[:1] == ["waive"]:
         return _waive_main(argv[1:])
+    if argv[:1] == ["prepare"]:
+        return _prepare_main(argv[1:])
 
     parser = argparse.ArgumentParser(prog="python -m ai_router.verify")
     parser.add_argument("--session-set-dir", required=True,

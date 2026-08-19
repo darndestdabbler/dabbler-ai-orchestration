@@ -1,5 +1,6 @@
 """The machine-only run ledger: ``.dabbler/runs/<set>/s<N>/rounds.jsonl``
-and, beside it, ``disputes.jsonl`` (one row per disputed finding).
+and, beside it, ``disputes.jsonl`` (one row per disputed finding) and the
+``critique/<change-id>/`` subtree of critique artifacts.
 
 One row per completed verification round, appended only by the CLI
 (``ai_router.verify``). The close gate reads it. There is no stamp and no
@@ -18,8 +19,13 @@ read it.
 
 from __future__ import annotations
 
+import datetime
 import json
+import os
+import re
+import tempfile
 from pathlib import Path
+from typing import Optional
 
 import jsonschema
 
@@ -201,3 +207,422 @@ def append_dispute(
     with open(path, "a", encoding="utf-8") as f:
         f.write(json.dumps(record) + "\n")
     return record
+
+
+# --- critique/<change-id>/ ---------------------------------------------------
+#
+# The frozen layout, one directory per reviewed change:
+#
+#   .dabbler/runs/<set>/s<N>/critique/<change-id>/
+#       review-run.json  g0-summary.json  review-claims.json  checks.json
+#       worker-results.jsonl  dispositions.jsonl  audits.jsonl
+#
+# Every surface here is machine-only: validate against the frozen schema
+# first, then atomic-replace or append. A record that fails validation is
+# never partially written and never best-effort skipped — it is refused and
+# a copy is quarantined beside the subtree, so the rejected payload survives
+# for diagnosis without ever being mistaken for the record.
+
+CRITIQUE_DIRNAME = "critique"
+QUARANTINE_DIRNAME = "quarantine"
+
+REVIEW_RUN_FILENAME = "review-run.json"
+G0_SUMMARY_FILENAME = "g0-summary.json"
+REVIEW_CLAIMS_FILENAME = "review-claims.json"
+REVIEW_CLAIMS_TWIN_FILENAME = "review-claims.md"
+CHECKS_FILENAME = "checks.json"
+WORKER_RESULTS_FILENAME = "worker-results.jsonl"
+DISPOSITIONS_FILENAME = "dispositions.jsonl"
+AUDITS_FILENAME = "audits.jsonl"
+
+# A change-id is a digest, so it is lowercase hex and nothing else. The
+# constraint is a path guard as much as a format one: a value that is not a
+# digest never becomes a directory name.
+_CHANGE_ID_RE = re.compile(r"^[0-9a-f]{7,64}$")
+
+
+def _require_change_id(change_id) -> str:
+    if not isinstance(change_id, str) or not _CHANGE_ID_RE.match(change_id):
+        raise LedgerError(
+            f"change-id {change_id!r} is not a derived digest (7-64 lowercase "
+            "hex characters). It is computed from the reviewed tree by "
+            "python -m ai_router.verify prepare; it is never supplied."
+        )
+    return change_id
+
+
+def critique_root(repo_root, set_slug: str, session_number: int) -> Path:
+    return (
+        session_run_dir(repo_root, set_slug, session_number)
+        / CRITIQUE_DIRNAME
+    )
+
+
+def critique_dir(
+    repo_root, set_slug: str, session_number: int, change_id: str
+) -> Path:
+    return (
+        critique_root(repo_root, set_slug, session_number)
+        / _require_change_id(change_id)
+    )
+
+
+def critique_path(
+    repo_root, set_slug: str, session_number: int, change_id: str,
+    filename: str,
+) -> Path:
+    return critique_dir(repo_root, set_slug, session_number, change_id) / filename
+
+
+def validate_review_run(record: dict) -> dict:
+    return _validate(record, "review-run.schema.json", "review run")
+
+
+def validate_review_claims(record: dict) -> dict:
+    return _validate(record, "review-claims.schema.json", "review claims")
+
+
+def validate_check(record: dict) -> dict:
+    return _validate(record, "check-ir.schema.json", "check")
+
+
+def validate_worker_result(record: dict) -> dict:
+    return _validate(record, "worker-results.schema.json", "worker result")
+
+
+def validate_disposition(record: dict) -> dict:
+    return _validate(record, "dispositions.schema.json", "disposition")
+
+
+def quarantine_dir(repo_root, set_slug: str, session_number: int) -> Path:
+    """Beside the per-change subtree, never inside it: the frozen layout
+    lists seven files and a rejected payload is none of them."""
+    return (
+        critique_root(repo_root, set_slug, session_number)
+        / QUARANTINE_DIRNAME
+    )
+
+
+def _quarantine(
+    repo_root, set_slug: str, session_number: int, noun: str, record,
+    reason: str,
+) -> Optional[Path]:
+    directory = quarantine_dir(repo_root, set_slug, session_number)
+    stamp = (
+        datetime.datetime.now(datetime.timezone.utc)
+        .strftime("%Y%m%dT%H%M%S%fZ")
+    )
+    slug = re.sub(r"[^a-z0-9]+", "-", noun.lower()).strip("-") or "record"
+    path = directory / f"{slug}-{stamp}.json"
+    try:
+        directory.mkdir(parents=True, exist_ok=True)
+        payload = {"kind": noun, "reason": reason, "record": record}
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(payload, f, indent=2, default=str)
+            f.write("\n")
+    except (OSError, TypeError, ValueError):
+        return None
+    return path
+
+
+def _validated_or_quarantined(
+    repo_root, set_slug: str, session_number: int, record, validate, noun: str,
+):
+    """Validate before anything is written. On failure the record is
+    refused *and* preserved: a rejected payload that is silently dropped
+    leaves an operator with a refusal message and no way to see what was
+    rejected, which is how a bad writer gets blamed on a bad reader."""
+    try:
+        return validate(record)
+    except LedgerError as exc:
+        path = _quarantine(
+            repo_root, set_slug, session_number, noun, record, str(exc)
+        )
+        where = f" A copy is quarantined at {path}." if path else ""
+        raise LedgerError(
+            f"{exc} Nothing was written to the run directory.{where}"
+        ) from exc
+
+
+def _atomic_write_json(path: Path, payload) -> Path:
+    """Replace whole-file artifacts in one step, so a reader never sees a
+    half-written record."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(prefix=path.name + ".", dir=str(path.parent))
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(payload, f, indent=2)
+            f.write("\n")
+        os.replace(tmp, path)
+        tmp = None
+    finally:
+        if tmp is not None and os.path.exists(tmp):
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass
+    return path
+
+
+def _read_json(path: Path, validate, noun: str):
+    if not path.exists():
+        return None
+    try:
+        record = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise LedgerError(f"{path} is not valid JSON: {exc}") from exc
+    except OSError as exc:
+        raise LedgerError(f"{path} is unreadable: {exc}") from exc
+    if not isinstance(record, (dict, list)):
+        raise LedgerError(f"{path} does not hold a {noun} record")
+    return validate(record)
+
+
+# --- review-run.json ---------------------------------------------------------
+
+def review_run_path(
+    repo_root, set_slug: str, session_number: int, change_id: str
+) -> Path:
+    return critique_path(
+        repo_root, set_slug, session_number, change_id, REVIEW_RUN_FILENAME
+    )
+
+
+def read_review_run(
+    repo_root, set_slug: str, session_number: int, change_id: str
+) -> Optional[dict]:
+    return _read_json(
+        review_run_path(repo_root, set_slug, session_number, change_id),
+        validate_review_run, "review run",
+    )
+
+
+def read_review_runs(repo_root, set_slug: str, session_number: int) -> list:
+    """Every review run recorded for the session, oldest first. A directory
+    that holds no readable review run is not a review run."""
+    root = critique_root(repo_root, set_slug, session_number)
+    if not root.is_dir():
+        return []
+    runs = []
+    for child in sorted(root.iterdir()):
+        if not child.is_dir() or child.name == QUARANTINE_DIRNAME:
+            continue
+        record = _read_json(
+            child / REVIEW_RUN_FILENAME, validate_review_run, "review run"
+        )
+        if record is not None:
+            runs.append(record)
+    runs.sort(key=lambda r: (r["opened_at"], r["change_id"]))
+    return runs
+
+
+def write_review_run(
+    repo_root, set_slug: str, session_number: int, record: dict
+) -> Path:
+    """Atomic-replace the run record. Attempts are append-only: a write
+    that shortens or rewrites an earlier attempt is refused, because a
+    remediation's whole point is that the prior attempt's evidence stays
+    exactly as it was recorded."""
+    _validated_or_quarantined(
+        repo_root, set_slug, session_number, record, validate_review_run,
+        "review run",
+    )
+    change_id = _require_change_id(record["change_id"])
+    path = review_run_path(repo_root, set_slug, session_number, change_id)
+    existing = read_review_run(repo_root, set_slug, session_number, change_id)
+    if existing is not None:
+        prior = existing["attempts"]
+        proposed = record["attempts"]
+        if len(proposed) < len(prior) or proposed[:len(prior)] != prior:
+            raise LedgerError(
+                f"review run {change_id} already records "
+                f"{len(prior)} attempt(s); attempts are append-only and a "
+                "recorded attempt is never rewritten. A remediation adds a "
+                "linked attempt."
+            )
+    return _atomic_write_json(path, record)
+
+
+# --- review-claims.json ------------------------------------------------------
+
+def review_claims_path(
+    repo_root, set_slug: str, session_number: int, change_id: str
+) -> Path:
+    return critique_path(
+        repo_root, set_slug, session_number, change_id, REVIEW_CLAIMS_FILENAME
+    )
+
+
+def review_claims_twin_path(
+    repo_root, set_slug: str, session_number: int, change_id: str
+) -> Path:
+    """The human-readable rendering. Decorative by construction: no reader
+    in this package opens it, and deleting it changes no behavior."""
+    return critique_path(
+        repo_root, set_slug, session_number, change_id,
+        REVIEW_CLAIMS_TWIN_FILENAME,
+    )
+
+
+def read_review_claims(
+    repo_root, set_slug: str, session_number: int, change_id: str
+) -> Optional[dict]:
+    return _read_json(
+        review_claims_path(repo_root, set_slug, session_number, change_id),
+        validate_review_claims, "review claims",
+    )
+
+
+def write_review_claims(
+    repo_root, set_slug: str, session_number: int, record: dict
+) -> Path:
+    screen_review_claims(repo_root, set_slug, session_number, record)
+    return _atomic_write_json(
+        review_claims_path(
+            repo_root, set_slug, session_number, record["change_id"]
+        ),
+        record,
+    )
+
+
+def screen_review_claims(
+    repo_root, set_slug: str, session_number: int, record: dict
+) -> dict:
+    """The writer's own check, without the write. A caller that must not
+    move machine state until author input is known-good gets the identical
+    refusal and the identical quarantine copy — pre-checking through a
+    plain validator instead would drop the rejected payload on the floor."""
+    return _validated_or_quarantined(
+        repo_root, set_slug, session_number, record, validate_review_claims,
+        "review claims",
+    )
+
+
+def write_review_claims_twin(
+    repo_root, set_slug: str, session_number: int, change_id: str, text: str
+) -> Path:
+    path = review_claims_twin_path(
+        repo_root, set_slug, session_number, change_id
+    )
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+    return path
+
+
+# --- checks.json -------------------------------------------------------------
+
+def checks_path(
+    repo_root, set_slug: str, session_number: int, change_id: str
+) -> Path:
+    return critique_path(
+        repo_root, set_slug, session_number, change_id, CHECKS_FILENAME
+    )
+
+
+def read_checks(
+    repo_root, set_slug: str, session_number: int, change_id: str
+) -> list:
+    def _validate_all(records):
+        if not isinstance(records, list):
+            raise LedgerError("checks.json does not hold a list of checks")
+        for record in records:
+            validate_check(record)
+        return records
+
+    records = _read_json(
+        checks_path(repo_root, set_slug, session_number, change_id),
+        _validate_all, "checks",
+    )
+    return records or []
+
+
+def write_checks(
+    repo_root, set_slug: str, session_number: int, change_id: str,
+    records: list,
+) -> Path:
+    for record in records:
+        _validated_or_quarantined(
+            repo_root, set_slug, session_number, record, validate_check,
+            "check",
+        )
+    return _atomic_write_json(
+        checks_path(repo_root, set_slug, session_number, change_id),
+        list(records),
+    )
+
+
+# --- worker-results.jsonl and dispositions.jsonl -----------------------------
+
+def worker_results_path(
+    repo_root, set_slug: str, session_number: int, change_id: str
+) -> Path:
+    return critique_path(
+        repo_root, set_slug, session_number, change_id,
+        WORKER_RESULTS_FILENAME,
+    )
+
+
+def dispositions_path(
+    repo_root, set_slug: str, session_number: int, change_id: str
+) -> Path:
+    return critique_path(
+        repo_root, set_slug, session_number, change_id, DISPOSITIONS_FILENAME
+    )
+
+
+def audits_path(
+    repo_root, set_slug: str, session_number: int, change_id: str
+) -> Path:
+    return critique_path(
+        repo_root, set_slug, session_number, change_id, AUDITS_FILENAME
+    )
+
+
+def _append_validated(
+    repo_root, set_slug: str, session_number: int, record: dict, validate,
+    noun: str, path_for,
+) -> dict:
+    _validated_or_quarantined(
+        repo_root, set_slug, session_number, record, validate, noun
+    )
+    path = path_for(repo_root, set_slug, session_number, record["change_id"])
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "a", encoding="utf-8") as f:
+        f.write(json.dumps(record) + "\n")
+    return record
+
+
+def read_worker_results(
+    repo_root, set_slug: str, session_number: int, change_id: str
+) -> list:
+    return _read_jsonl(
+        worker_results_path(repo_root, set_slug, session_number, change_id),
+        validate_worker_result,
+    )
+
+
+def append_worker_result(
+    repo_root, set_slug: str, session_number: int, record: dict
+) -> dict:
+    return _append_validated(
+        repo_root, set_slug, session_number, record, validate_worker_result,
+        "worker result", worker_results_path,
+    )
+
+
+def read_dispositions(
+    repo_root, set_slug: str, session_number: int, change_id: str
+) -> list:
+    return _read_jsonl(
+        dispositions_path(repo_root, set_slug, session_number, change_id),
+        validate_disposition,
+    )
+
+
+def append_disposition(
+    repo_root, set_slug: str, session_number: int, record: dict
+) -> dict:
+    return _append_validated(
+        repo_root, set_slug, session_number, record, validate_disposition,
+        "disposition", dispositions_path,
+    )

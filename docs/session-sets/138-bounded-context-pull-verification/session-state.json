@@ -1,7 +1,7 @@
 {
   "schemaVersion": 4,
   "sessionSetName": "138-bounded-context-pull-verification",
-  "status": "in-progress",
+  "status": "cancelled",
   "sessions": [
     {
       "number": 1,
@@ -47,5 +47,6 @@
       "orchestrator": null,
       "verificationVerdict": null
     }
-  ]
+  ],
+  "preCancelStatus": "in-progress"
 }

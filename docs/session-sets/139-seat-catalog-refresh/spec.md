@@ -1,4 +1,4 @@
-# Seat catalog refresh
+# Seat catalog refresh, and the local override the rebuild dropped
 
 > **Purpose:** The seat catalog lockfile is the load-bearing record of
 > what a Copilot seat can dispatch, and v2 ships **no way to write it**.
@@ -9,12 +9,17 @@
 > did, destroying the empirical signal the file exists to carry. This set
 > restores the writer **and fixes the design flaw that made v1's version
 > unrunnable**: it probed all 18 models every time, at 39+ premium
-> requests, so nobody ran it.
+> requests, so nobody ran it. It also restores a second dropped writer of
+> the same class — `local-overrides.yaml`, the per-machine config layer
+> whose `.gitignore` entry v2 still carries with nothing left that reads
+> it — because a seat-only machine currently cannot state that fact
+> anywhere the router will read without an env var or a per-command flag.
 > **Session Set:** `docs/session-sets/139-seat-catalog-refresh/`
 > **Created:** 2026-08-18
 > **Workflow:** Full
 > **Prerequisite:** set 137 (the transport must dispatch before it can
-> probe). Independent of set 138 — either may run first.
+> probe), and set 140 session 1, which freed the test budget this set
+> needs. Set 138 is cancelled; 140 removed its code.
 
 > **Note on rule 6:** operator-authorized exception, as sets 136–138.
 
@@ -59,6 +64,42 @@ The lockfile today still claims all but one entry was confirmed on CLI
 1.0.68 while the live CLI is 1.0.80. That is not a data problem to be
 tidied. It is the absence of a command.
 
+## The second dropped writer, same class
+
+The catalog is not the only place the v2 rebuild kept a reader and left
+the writer behind. `.gitignore` still reserves `local-overrides.yaml`,
+and nothing in v2 reads or writes it. In v1 that file was the
+per-machine config layer, and `Dabbler: Set Up Copilot Seat` created it
+for precisely the situation this machine is in.
+
+The consequence, measured on 2026-08-19 during set 140 session 1:
+
+1. `config.py` resolves the config by `explicit path > AI_ROUTER_CONFIG
+   env > bundled ai_router/router-config.yaml`. There is **no
+   project-local tier**.
+2. The bundled file is `package-data` in `pyproject.toml`, so it is the
+   published default. It correctly carries `transport: profile: api`
+   for a fresh install that has provider API keys. Editing it to say
+   `copilot-cli` would ship that to every consumer — the file's own
+   comment says so.
+3. That leaves a seat-only machine two ways to state "no API keys here":
+   `DABBLER_TRANSPORT`, which reaches only processes started after the
+   write and so was silently absent from a VS Code launched before it;
+   or `--transport copilot-cli` on every single command.
+4. Neither survives the general case. An instruction file cannot cover
+   it either: instruction loading is a **client** property — Copilot CLI
+   reads `CLAUDE.md`, `GEMINI.md` and `AGENTS.md` all at once regardless
+   of model, Claude Code reads only `CLAUDE.md`, and a direct-API
+   orchestrator has no ambient instruction loading at all. Set 137
+   deliberately passes `--no-custom-instructions` on routed dispatches
+   for the same reason.
+
+Config is the only layer that is client-independent, model-independent
+and transport-independent. v1 had it; v2 has the `.gitignore` line and
+nothing else. This set restores it, because every session below
+dispatches through `copilot-cli` and currently cannot do so without a
+per-command flag.
+
 ## Why restoring v1 verbatim would fail
 
 v1's `--refresh` was **all-or-nothing**: `discover_catalog()` walked the
@@ -98,15 +139,45 @@ writer" but **make the common case cost 2 instead of 39**.
   v1's principle — one module owns the lockfile — still points.
 - **No `list-models` fiction.** The CLI has no enumeration command; the
   candidate universe is a maintained list, and the file must say so.
+- **The bundled `router-config.yaml` keeps `profile: api`.** It is
+  package data and therefore the published default; a fresh install with
+  provider keys and no seat must keep working. The local layer is how a
+  machine disagrees, and it is never published.
+- **No new precedence tier above the env var.** `local-overrides.yaml`
+  slots *below* `DABBLER_TRANSPORT` and the `--transport` flag, so
+  nothing that works today changes its answer.
 
 ---
 
 ## Sessions
 
-### Session 1 of 3: The writer, and the lockfile gets a single owner
+### Session 1 of 3: The local override, the writer, and one owner for the lockfile
 
 1. Register.
-2. Add the serializer to the catalog section of
+2. Restore the project-local config tier in `config.py`, first, because
+   every remaining session of this set dispatches through `copilot-cli`
+   and today cannot without a per-command flag. `_resolve_config_path`
+   becomes a *layering* step, not a choice of one file: the bundled
+   `router-config.yaml` is the base, and a project-local
+   `local-overrides.yaml` is deep-merged over it using the `_deep_merge`
+   already in the module. The resolution order becomes explicit path >
+   `AI_ROUTER_CONFIG` > bundled + local overlay. Constraints:
+   - The overlay is **partial** — it carries only the keys it changes,
+     and the merged result is validated against the existing schema, so
+     an overlay cannot produce a config the router would have refused.
+   - **A key the schema does not know is refused at load, not ignored**
+     (v1's rule). A silently-dropped override is the failure this file
+     exists to prevent, and it is the same failure mode as the
+     misspelled `codeRoot` in `modules.py`.
+   - The file is **never written by the router in this session** and
+     never published: `.gitignore` already reserves the name, and
+     `pyproject.toml` must not list it as package data.
+   - Transport precedence after this step: `--transport` flag >
+     `DABBLER_TRANSPORT` > `local-overrides.yaml` > bundled
+     `transport.profile` > `api`. Nothing above the new tier changes.
+   - Resolve the project root once, reusing the existing git-root
+     discovery rather than adding a second notion of "the project".
+3. Add the serializer to the catalog section of
    `transports/copilot.py`: render a `Catalog` back to the restricted
    TOML subset the reader already accepts — one flat `[meta]` table plus
    repeated flat `[[models]]` tables, scalar values only. Round-trip is
@@ -115,29 +186,30 @@ writer" but **make the common case cost 2 instead of 39**.
    render are coerced at the boundary, not trusted through it — a
    malformed `premiumRequests` off the wire (a float, a list) must not
    reach the writer, per v1's round-4 finding.
-3. Add `discover_models()`: probe named candidates through the existing
+4. Add `discover_models()`: probe named candidates through the existing
    transport with a trivial prompt, recording per entry — on success,
    `confirmed` with `confirmed_at`, `confirmed_on_cli_version`,
    `echoed_model`, and `probe_premium_requests` read from the dispatch
    metadata; on failure, the failure's own error class. It takes the
    models to probe as an argument and has no opinion about which; the
    selection policy is Session 2's job.
-4. Make it **merge, never clobber**. A refresh that probed three models
+5. Make it **merge, never clobber**. A refresh that probed three models
    rewrites those three and preserves every other entry byte-for-byte
    including its provenance. A previously-confirmed entry whose probe
    fails today is **not** silently demoted: a transient CLI failure is
    not a withdrawn model, so record the failed attempt and keep the prior
    confirmation, visibly stale, until an operator says otherwise.
-5. Declare the candidate universe explicitly, in the lockfile rather than
+6. Declare the candidate universe explicitly, in the lockfile rather than
    in code, so adding a model is a data edit and the file remains the
    whole truth about the seat. Seed it from the 18 ids already present.
-6. Cross-provider verification through `copilot-cli`.
-7. Required portion of the full test suite.
-8. Close-out.
+7. Cross-provider verification through `copilot-cli`.
+8. Required portion of the full test suite.
+9. Close-out.
 
-**Creates:** the serializer, `discover_models()`, merge semantics, the
-declared universe. Every test uses the fake spawner; none invokes a real
-CLI. Est. 16–20 new Python tests.
+**Creates:** the project-local config overlay, the serializer,
+`discover_models()`, merge semantics, the declared universe. Every test
+uses the fake spawner; none invokes a real CLI. Est. 21–27 new Python
+tests (16–20 as originally planned, plus 5–7 for the overlay).
 
 ### Session 2 of 3: The refresh command, and the 2-request common case
 
@@ -192,7 +264,12 @@ report. Est. 12–16 new Python tests.
    the unknown-cost entries stop being unknown.
 5. Documentation: `docs/quick-start.md` gains the refresh flow and the
    cost table; `docs/schema-reference.md` documents the lockfile schema,
-   the declared universe, and the writer stamp.
+   the declared universe, and the writer stamp. Both, plus `README.md`'s
+   transport-precedence list, gain `local-overrides.yaml`: where it
+   lives, that it is never published, that an unknown key is refused at
+   load, and the worked example of a seat-only machine setting
+   `transport.profile: copilot-cli` without touching the packaged
+   default.
 6. Cross-provider verification through `copilot-cli`.
 7. Required portion of the full test suite.
 8. Close-out, and the end-of-set `change-log.md`.
@@ -213,3 +290,21 @@ afterwards is reported as hand-edited on the next load. No stale-catalog
 message anywhere fails to name the refresh command that resolves it — and
 nothing in this set required a human to open the lockfile in an editor,
 which is the outcome its absence made impossible.
+
+Separately: on this seat-only machine, with `DABBLER_TRANSPORT` unset in
+the process environment and no `--transport` flag, `python -m
+ai_router.verify` dispatches through `copilot-cli` because
+`local-overrides.yaml` says so — while the packaged
+`router-config.yaml` still reads `transport: profile: api` and the built
+wheel still carries that default. An overlay naming a key the schema does
+not know is refused at load rather than dropped.
+
+## Test budget
+
+Set 140 leaves **56 slots** free against the 480 ceiling. This set now
+estimates **41–55** (21–27 + 12–16 + 8–12). That fits, but the top of
+the range leaves 1 slot, so the overlay's tests are a ceiling, not an
+invitation: one test per behavior, and the merge/refusal/precedence
+cases are the behaviors — not the layering mechanism itself. If the
+estimate is trending to the top of the range by the end of Session 2,
+stop and re-scope Session 3 rather than spending the margin.

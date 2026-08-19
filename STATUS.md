@@ -1,5 +1,19 @@
 # STATUS — after set 139 session 3 (the lockfile has a writer, a stamp, and a fresh probe)
 
+- **Released: `dabbler-ai-router` 1.1.0 is on PyPI** (2026-08-19), tag
+  `v1.1.0` on `3ebda389`. The release workflow builds from the tagged
+  commit, so the stale `dist/` artifacts in the working tree were not
+  what shipped — they were built at 06:05, before this set started, and
+  contain none of it. Published wheel verified after upload: it carries
+  `run_refresh`, the writer stamp, the fractional-sample coercion and the
+  `local-overrides` tier; its bundled `router-config.yaml` still reads
+  `profile: api`; its lockfile pins CLI 1.0.80; and `local-overrides.yaml`
+  is not in it. **Correction to the note below: PyPI had 1.0.8, not
+  1.0.0** — tags v1.0.1–v1.0.8 had all published. Rebuild `dist/` locally
+  before trusting it for anything.
+- **The VS Code extension was not released.** `tools/` has zero changes
+  since `vsix-v1.0.4`; the Marketplace pipeline (`publish-vscode.yml`,
+  `vsix-v*` tags) is a separate track and nothing warranted a bump.
 - **Set 139 session 3 is done; the set is closed.** The seat catalog
   lockfile is machine-written end to end. `refresh --quorum --dry-run`
   projected **2** premium requests on the live seat at CLI 1.0.80, the
@@ -64,9 +78,7 @@
 - **The packaged default is untouched and must stay that way.**
   `ai_router/router-config.yaml` still reads `transport: profile: api`;
   this machine reaches the seat through `local-overrides.yaml` with
-  `DABBLER_TRANSPORT` unset and no `--transport` flag. Version is still
-  **1.1.0**; PyPI still has 1.0.0. The `dist/` artifacts predate this
-  set — rebuild before publishing, since the packaged lockfile changed.
+  `DABBLER_TRANSPORT` unset and no `--transport` flag.
 
 # STATUS — after set 140 (the cancelled scope is gone; 1.1.0 is built, not published)
 

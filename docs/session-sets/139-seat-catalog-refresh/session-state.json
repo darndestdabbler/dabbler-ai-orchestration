@@ -1,7 +1,7 @@
 {
   "schemaVersion": 4,
   "sessionSetName": "139-seat-catalog-refresh",
-  "status": "in-progress",
+  "status": "complete",
   "sessions": [
     {
       "number": 1,
@@ -48,9 +48,9 @@
     {
       "number": 3,
       "title": "Close the hand-edit hole, and prove it on the live seat",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-19T07:33:10.744333-04:00",
-      "completedAt": null,
+      "completedAt": "2026-08-19T08:22:52.452593-04:00",
       "orchestrator": {
         "engine": "copilot",
         "provider": "anthropic",

@@ -402,6 +402,14 @@
       "dateTime": "2026-08-19T08:21:21.073670-04:00",
       "description": "Required portion of the full test suite.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 8,
+      "stepKey": "close-out-and-the-end-of",
+      "dateTime": "2026-08-19T08:22:50.377614-04:00",
+      "description": "Close-out, and the end-of-set `change-log.md`.",
+      "status": "in-progress"
     }
   ]
 }

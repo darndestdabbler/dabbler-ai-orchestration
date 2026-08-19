@@ -5,6 +5,14 @@ Rebuild of the AI-led coding-session framework. Python package `ai_router`
 (Session 3). The compatibility contract, module inventory, and session plan
 live in the rebuild work plan; `STATUS.md` carries the inter-session handoff.
 
+## Working branch
+
+Work happens on `experiment/verification-pipeline-v3`, not `master`. The
+branch explores a cheaper approach to verification after an earlier rewrite
+ran into trouble. Branch from it, commit to it, and push it; leave `master`
+alone. If the approach proves out it merges back to `master` — until then,
+treat this branch as the trunk for day-to-day work.
+
 ## Ground rules
 
 1. **No new module without deleting one.** The module inventory in the rebuild

@@ -11,13 +11,3 @@ is the one copy, so nothing here can drift from what the other engines
 read.
 
 <!-- dabbler:managed:end -->
-
----
-
-## Working branch
-
-Work happens on `experiment/verification-pipeline-v3`, not `master`. The
-branch explores a cheaper approach to verification after an earlier rewrite
-ran into trouble. Branch from it, commit to it, and push it; leave `master`
-alone. If the approach proves out it merges back to `master` — until then,
-treat this branch as the trunk for day-to-day work.

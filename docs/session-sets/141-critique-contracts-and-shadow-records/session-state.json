@@ -27,9 +27,9 @@
     {
       "number": 2,
       "title": "Machine-owned paths, verify prepare, and the immutable change-id",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-19T11:35:13.650536-04:00",
-      "completedAt": null,
+      "completedAt": "2026-08-19T12:12:37.481121-04:00",
       "orchestrator": {
         "engine": "copilot",
         "provider": "anthropic",

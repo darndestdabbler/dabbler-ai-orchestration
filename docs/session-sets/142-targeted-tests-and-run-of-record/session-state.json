@@ -6,9 +6,9 @@
     {
       "number": 1,
       "title": "The relaxation on the record, and deterministic selection",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-19T16:30:21.503801-04:00",
-      "completedAt": null,
+      "completedAt": "2026-08-19T17:06:44.851602-04:00",
       "orchestrator": {
         "engine": "copilot",
         "provider": "anthropic",

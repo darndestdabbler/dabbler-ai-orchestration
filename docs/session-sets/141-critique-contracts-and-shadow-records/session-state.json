@@ -1,7 +1,7 @@
 {
   "schemaVersion": 4,
   "sessionSetName": "141-critique-contracts-and-shadow-records",
-  "status": "in-progress",
+  "status": "complete",
   "sessions": [
     {
       "number": 1,
@@ -48,9 +48,9 @@
     {
       "number": 3,
       "title": "Evidence provenance, and one fixture that round-trips",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-19T12:33:09.957415-04:00",
-      "completedAt": null,
+      "completedAt": "2026-08-19T13:06:20.284762-04:00",
       "orchestrator": {
         "engine": "copilot",
         "provider": "anthropic",

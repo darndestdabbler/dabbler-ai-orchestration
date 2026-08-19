@@ -4,14 +4,14 @@ The manifest is a YAML mapping with a ``modules`` list; each entry is
 ``{slug, title?, planPath?, codeRoots?, touches?, specSections?,
 contextAssets?}``. ``codeRoots`` bounds the module on disk,
 ``specSections`` maps reference spec sections to it, and
-``contextAssets`` names its schemas/config/migrations —
-:mod:`ai_router.context_scope` reads all three. The extension's reader
-takes the keys it knows and ignores the rest, so the extension keeps
-rendering entries carrying the newer keys.
+``contextAssets`` names its schemas/config/migrations. The extension's
+reader takes the keys it knows and ignores the rest, so the extension
+keeps rendering entries carrying the newer keys.
 
 An unknown key is rejected rather than ignored: a misspelled
-``codeRoot`` that is silently dropped produces a scope that is quietly
-wrong, which is the failure this manifest exists to prevent.
+``codeRoot`` that is silently dropped leaves the module bounded by
+something other than what was written, which is the failure this
+manifest exists to prevent.
 
 Create-only by design: rename, delete, and reorganization stay manual
 edits to the file.
@@ -153,7 +153,8 @@ def load_entries(workspace_root) -> list:
 
 def find_entry(workspace_root, slug: str):
     """The entry for *slug*, or ``None`` when the manifest does not
-    declare it (the caller's cue to stay on the unscoped path)."""
+    declare it — an unresolvable slug is the caller's cue to fall back,
+    never to guess at what the module covers."""
     if not slug:
         return None
     wanted = slug.strip()

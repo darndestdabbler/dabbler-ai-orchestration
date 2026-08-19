@@ -1,27 +1,10 @@
 """The cross-provider verification loop.
 
 Round 1 evidence is the full session: spec excerpt, ``git status``, the
-complete diff, and untracked file contents — unless the set's spec
-declares a ``module`` that resolves in ``docs/modules.yaml``, in which
-case round 1 is built from :mod:`ai_router.context_scope`: seven declared
-tiers of bounded context, an explicit record of what was excluded, and
-the two-step pull. A repo with no manifest, or a set with no module,
-verifies exactly as it did before. Rounds ≥2 see only the fix-delta — a
-tree-to-tree diff from the previous round's recorded snapshot — plus the
-prior rounds' unresolved findings and any escalated context the
-orchestrating engine has granted, so a verifier reviews the remediation
-instead of re-reviewing the world.
-
-The pull has two steps and no human in either. A request naming a path
-the scope already listed is *in-domain* and is served mechanically, then
-the round is re-dispatched once with the widened evidence; nothing
-weighs a request for a file already declared eligible. A path outside
-the domain is an *escalation*: it is recorded pending, and the
-orchestrating engine grants or refuses it through ``verify grant`` /
-``verify refuse``, which may only widen. Every request, refusal, and
-decision is a ``pulls.jsonl`` row naming the file, the outcome, and the
-decider. A refusal never licenses abstention — the verifier returns a
-verdict on the evidence it holds.
+complete diff, and untracked file contents. Rounds ≥2 see only the
+fix-delta — a tree-to-tree diff from the previous round's recorded
+snapshot — plus the prior rounds' unresolved findings, so a verifier
+reviews the remediation instead of re-reviewing the world.
 
 The verifier is picked by route() under a hard provider exclusion: the
 orchestrator's effective provider (derived by ``identity``, never trusted
@@ -240,247 +223,6 @@ def assemble_evidence(repo_root, set_dir, session_number: int) -> str:
     )
     _check_cap(rendered)
     return rendered
-
-
-# --- The bounded scope, for module-mapped sets ------------------------------
-
-def resolve_scope_for_set(repo_root, set_dir):
-    """``(scope, changed_ranges, module_slug)`` for a set whose spec
-    declares a module that resolves in ``docs/modules.yaml``.
-
-    Returns ``(None, None, slug_or_None)`` when there is no scope to
-    build: no declaration, or a declaration the manifest does not carry.
-    A repo with no manifest verifies exactly as it does today —
-    unresolvable is never a licence to guess at what the module is."""
-    from .context_scope import ScopeUnavailable, changed_paths, resolve_scope
-    from .session import declared_module_slug
-
-    slug = declared_module_slug(set_dir)
-    if not slug:
-        return None, None, None
-    pathspecs = build_diff_pathspecs()
-    rc, diff, err = run_git(
-        repo_root, "diff", "--no-color", "HEAD", "--", *pathspecs
-    )
-    if rc != 0:
-        raise VerifyError(f"git diff failed: {err}")
-    inlined, _, _ = _untracked_contents(repo_root, pathspecs)
-    extra = [rel for rel, _ in inlined]
-    try:
-        scope = resolve_scope(repo_root, diff, slug, extra_changed_paths=extra)
-    except ScopeUnavailable:
-        return None, None, slug
-    return scope, changed_paths(diff), slug
-
-
-def assemble_scoped_evidence(repo_root, set_dir, session_number: int, scope,
-                             changed_ranges) -> str:
-    """Round 1 for a module-mapped set: the seven declared tiers, the
-    change that produced them, the exclusion record, and the pull
-    protocol. Tier 1 already carries every modified and untracked file in
-    full, so the monolithic untracked-contents section is not repeated —
-    the diff stays because it is the only thing that says which lines
-    *this session* wrote."""
-    from .context_scope import render_scope
-
-    pathspecs = build_diff_pathspecs()
-    rc, status, err = run_git(repo_root, "status", "--short")
-    if rc != 0:
-        raise VerifyError(f"git status failed: {err}")
-    rc, diff, err = run_git(
-        repo_root, "diff", "--no-color", "HEAD", "--", *pathspecs
-    )
-    if rc != 0:
-        raise VerifyError(f"git diff failed: {err}")
-    if not diff.strip() and not scope.tier(1):
-        raise EvidenceEmptyError(
-            "the bounded scope is empty (no diff vs HEAD, no modified "
-            "files). If the session's work is already committed, verify "
-            "against the commit range instead of routing an empty review."
-        )
-    fence = "```"
-    change_block = "\n".join([
-        "#### The change under review",
-        "",
-        "`git status --short`:",
-        "",
-        fence,
-        status or "(clean -- no changes reported)",
-        fence,
-        "",
-        "Diff against `HEAD` (generated-bundle exclusions: "
-        f"{', '.join(DEFAULT_DIFF_EXCLUDES)}). Tier 1 below carries these "
-        "files whole; this diff is what tells you which lines the session "
-        "wrote and which were already there.",
-        "",
-        "```diff",
-        diff or "(empty diff -- the change is entirely untracked files)",
-        "```",
-    ])
-    rendered = render_scope(
-        scope, change_block=change_block, changed_ranges=changed_ranges
-    )
-    _check_cap(rendered)
-    return rendered
-
-
-def _granted_context_block(repo_root, slug: str, session_number: int) -> str:
-    """Files the orchestrating engine granted by escalation. Widening is
-    permanent for the session that granted it, so every later round
-    carries them."""
-    from .context_scope import serve_in_domain
-
-    granted = ledger.granted_paths(repo_root, slug, session_number)
-    if not granted:
-        return ""
-    rendered, _, _ = serve_in_domain(repo_root, granted)
-    return rendered.replace(
-        "#### Files you asked for (in-domain, served mechanically)",
-        "#### Files granted by escalation in an earlier round",
-    ) if rendered else ""
-
-
-_PENDING_DECIDER = "(undecided)"
-
-
-def _record_requests(
-    repo_root, slug: str, session_number: int, round_number: int,
-    content: str, scope, *, serve: bool = True,
-) -> str:
-    """Record every context request in a verifier response and return the
-    block of files served mechanically — ``""`` when nothing is served.
-
-    Nothing served means no re-dispatch: a call that only carries
-    "refused" back costs a full metered dispatch and tells the verifier
-    something it was already told, and the protocol already required a
-    verdict on the evidence held. Refusals and escalations are still
-    recorded as rows, and the caller surfaces them.
-
-    With *serve* false the requests are recorded but not answered: this
-    is the response that came back *after* the round's single re-dispatch
-    was spent. Recording them still matters — an escalation raised only
-    once the requested files arrived is exactly the one the orchestrating
-    engine should be able to grant for the next round."""
-    from .context_scope import (
-        parse_context_requests, scope_domain, serve_in_domain,
-    )
-
-    requests = parse_context_requests(content, scope_domain(scope))
-    if not requests:
-        return ""
-    now = datetime.datetime.now().astimezone().isoformat()
-    root = Path(repo_root)
-    rows: list = []
-    refusals: list = []
-    pending: list = []
-    wanted: list = []
-    for request in requests:
-        path = request.path
-        if request.kind == "escalation" and not request.refusal:
-            # Canonicalize at record time so the pending row and the
-            # decision row share one key -- otherwise `readme.md` is
-            # granted as `README.md` and stays pending forever.
-            resolved, _ = _resolve_repo_relative(root, path)
-            path = resolved or path
-        if request.refusal:
-            refusals.append((path, request.refusal))
-            rows.append({
-                "round": round_number, "kind": request.kind,
-                "path": path, "outcome": "refused",
-                "decider": "scope", "reason": request.refusal,
-                "recorded_at": now,
-            })
-        elif request.kind != "request":
-            pending.append(path)
-            rows.append({
-                "round": round_number, "kind": "escalation",
-                "path": path, "outcome": "pending",
-                "decider": _PENDING_DECIDER,
-                "reason": request.reason, "recorded_at": now,
-            })
-        elif serve:
-            wanted.append(path)
-        else:
-            rows.append({
-                "round": round_number, "kind": "request", "path": path,
-                "outcome": "refused", "decider": "scope",
-                "reason": "requested after this round's single "
-                          "re-dispatch was already spent; every dispatch "
-                          "re-sends the whole prompt and is separately "
-                          "metered",
-                "recorded_at": now,
-            })
-
-    block, served, unreadable = serve_in_domain(repo_root, wanted)
-    for rel in served:
-        rows.append({
-            "round": round_number, "kind": "request", "path": rel,
-            "outcome": "served", "decider": "scope", "recorded_at": now,
-        })
-    for rel, why in unreadable:
-        rows.append({
-            "round": round_number, "kind": "request", "path": rel,
-            "outcome": "refused", "decider": "scope", "reason": why,
-            "recorded_at": now,
-        })
-    for row in rows:
-        ledger.append_pull(repo_root, slug, session_number, row)
-
-    if not served:
-        return ""
-    notes = []
-    if refusals:
-        notes += ["", "Refused requests:"] + [
-            f"- `{path}` — {why}" for path, why in refusals
-        ]
-    if pending:
-        notes += [
-            "",
-            "Escalated, and NOT available in this round — the "
-            "orchestrating engine has not decided them yet:",
-        ] + [f"- `{path}`" for path in pending]
-    if notes:
-        notes += [
-            "",
-            "This does not license abstention. Return your verdict on the "
-            "evidence you hold.",
-        ]
-        return block + "\n" + "\n".join(notes)
-    return block
-
-
-def _pending_escalation_notice(repo_root, slug: str, session_number: int,
-                               set_path) -> str:
-    """What the orchestrating engine must decide, and the commands that
-    decide it. Surfaced, never auto-decided: the decision is the engine's,
-    and it is recorded with the engine's own identity as the decider."""
-    try:
-        pending = ledger.pending_escalations(repo_root, slug, session_number)
-    except ledger.LedgerError:
-        return ""
-    if not pending:
-        return ""
-    lines = [
-        "",
-        f"The verifier escalated for {len(pending)} path(s) outside the "
-        "domain. The orchestrating engine decides — no human in the loop, "
-        "and a decision may only widen. A granted path rides every later "
-        "round of this session:",
-    ]
-    for row in pending:
-        lines.append(
-            f"  - {row['path']} — {row.get('reason') or '(no reason given)'} "
-            f"(round {row['round']})"
-        )
-    lines += [
-        f"  grant:  python -m ai_router.verify grant --session-set-dir "
-        f"{set_path} --round <R> --path <PATH>",
-        f"  refuse: python -m ai_router.verify refuse --session-set-dir "
-        f"{set_path} --round <R> --path <PATH> --grounds \"...\"",
-        "A refusal is not an unverified result and not a stalemate; the "
-        "verdict already recorded stands on the evidence the verifier held.",
-    ]
-    return "\n".join(lines)
 
 
 def assemble_fix_delta_evidence(
@@ -728,7 +470,6 @@ def run_round(
     remediation continues the loop automatically. *transport* overrides the
     resolved transport preference for this round's dispatch."""
     from .config import load_config
-    from .context_scope import ScopeTooLarge
     from .route import NoCandidateError, RouterError
     from .session import append_change_log_block, record_session_verification
     from .progress import read_session_state
@@ -798,66 +539,36 @@ def run_round(
         )
         return EXIT_USAGE
 
-    scope = None
     try:
         if round_number == 1:
-            scope, changed_ranges, declared = resolve_scope_for_set(
-                repo_root, set_path
-            )
-            if scope is None and declared:
-                print(
-                    f"verify: the set declares module {declared!r} but "
-                    "docs/modules.yaml does not carry it, so this round "
-                    "builds the unscoped whole-session bundle. Declare the "
-                    "module to bound it:\n"
-                    f"  python -m ai_router.modules create {repo_root} "
-                    f"--slug {declared} --title \"...\" --code-root <dir>"
-                )
-            evidence = (
-                assemble_scoped_evidence(
-                    repo_root, set_path, current, scope, changed_ranges
-                )
-                if scope is not None
-                else assemble_evidence(repo_root, set_path, current)
-            )
+            evidence = assemble_evidence(repo_root, set_path, current)
         else:
             baseline = prior_rounds[-1]["completion_tree"]
             evidence = assemble_fix_delta_evidence(
                 repo_root, set_path, current, baseline
             )
-            granted = _granted_context_block(repo_root, slug, current)
-            if granted:
-                evidence = f"{evidence}\n\n{granted}"
-                _check_cap(evidence)
-    except ScopeTooLarge as exc:
-        print(f"verify: refused -- {exc}", file=sys.stderr)
-        return EXIT_UNAVAILABLE
     except (EvidenceEmptyError, EvidenceTooLargeError, VerifyError) as exc:
         print(f"verify: {exc}", file=sys.stderr)
         return EXIT_UNAVAILABLE
-    except ledger.LedgerError as exc:
-        print(f"verify: {exc}", file=sys.stderr)
-        return EXIT_STATE
 
     disputes = ledger.read_disputes(repo_root, slug, current)
-    task_block = _build_task_block(
-        set_path, current, round_number, prior_rounds, disputes, repo_root,
-    )
-    template = config.get("_verification_template", "")
     prompt_body = build_verification_prompt(
-        template, task_block, "session-verification", evidence,
+        config.get("_verification_template", ""),
+        _build_task_block(
+            set_path, current, round_number, prior_rounds, disputes,
+            repo_root,
+        ),
+        "session-verification",
+        evidence,
     )
 
     exclude = [orchestrator.effective_provider]
-
-    def _dispatch(body):
-        return _dispatch_verification(
-            body, exclude_providers=exclude, session_set=slug,
-            session_number=current, transport=transport,
-        )
-
     try:
-        result = _dispatch(prompt_body)
+        result = _dispatch_verification(
+            prompt_body, exclude_providers=exclude,
+            session_set=slug, session_number=current,
+            transport=transport,
+        )
     except NoCandidateError as exc:
         print(
             "verify: VERIFICATION UNAVAILABLE -- no eligible verifier "
@@ -886,61 +597,6 @@ def run_round(
             "evidence; nothing was written.", file=sys.stderr,
         )
         return EXIT_UNAVAILABLE
-
-    # The two-step pull. In-domain requests are served mechanically and
-    # the round is re-dispatched once with the widened evidence; a
-    # per-file loop would re-send the whole prompt for every file, and
-    # every dispatch is metered.
-    attempt_costs = [result.cost_usd]
-    if scope is not None:
-        try:
-            served_block = _record_requests(
-                repo_root, slug, current, round_number, result.content, scope,
-            )
-        except ledger.LedgerError as exc:
-            print(f"verify: {exc}", file=sys.stderr)
-            return EXIT_STATE
-        if served_block:
-            ledger.save_raw_output(
-                repo_root, slug, current, round_number, result.content,
-                attempt=1,
-            )
-            widened = f"{evidence}\n\n{served_block}"
-            try:
-                _check_cap(widened)
-                result = _dispatch(build_verification_prompt(
-                    template, task_block, "session-verification", widened,
-                ))
-            except EvidenceTooLargeError as exc:
-                print(f"verify: the served files overrun the bundle: {exc}",
-                      file=sys.stderr)
-                return EXIT_UNAVAILABLE
-            except (NoCandidateError, RouterError) as exc:
-                print(
-                    "verify: the re-dispatch carrying the requested files "
-                    f"failed: {exc}\nNothing was written; re-run the same "
-                    "command.", file=sys.stderr,
-                )
-                return EXIT_CALL_FAILED
-            if result.truncated:
-                print(
-                    "verify: the verifier response is truncated — invalid "
-                    "evidence; nothing was written.", file=sys.stderr,
-                )
-                return EXIT_UNAVAILABLE
-            attempt_costs.append(result.cost_usd)
-            # The widened bundle re-states the protocol, so the answer to
-            # it can carry requests too. The re-dispatch bound is spent,
-            # but an escalation raised only now is exactly the one worth
-            # granting for the next round — record it rather than drop it.
-            try:
-                _record_requests(
-                    repo_root, slug, current, round_number, result.content,
-                    scope, serve=False,
-                )
-            except ledger.LedgerError as exc:
-                print(f"verify: {exc}", file=sys.stderr)
-                return EXIT_STATE
 
     # Raw output first, before any parsing or display.
     raw_path = ledger.save_raw_output(
@@ -980,10 +636,7 @@ def run_round(
         "verifier_provider": result.provider,
         "orchestrator_provider": orchestrator.effective_provider,
         "findings": findings,
-        "cost_usd": (
-            sum(c for c in attempt_costs if c is not None)
-            if any(c is not None for c in attempt_costs) else None
-        ),
+        "cost_usd": result.cost_usd,
         "completion_tree": completion_tree,
         "recorded_at": datetime.datetime.now().astimezone().isoformat(),
         "transport": result.transport,
@@ -999,7 +652,6 @@ def run_round(
             f"(verifier {result.model_name}/{result.provider}). Raw output: "
             f"{raw_path}\nRemediate, then re-run the same command to open "
             f"round {round_number + 1}."
-            + _pending_escalation_notice(repo_root, slug, current, set_path)
         )
         return EXIT_BLOCKING
 
@@ -1035,7 +687,6 @@ def run_round(
         f"verify: round {round_number} — {verdict} "
         f"(verifier {result.model_name}/{result.provider}); "
         f"session {current} is clear to close."
-        + _pending_escalation_notice(repo_root, slug, current, set_path)
     )
     return EXIT_OK
 
@@ -1192,128 +843,8 @@ def record_dispute(
     return EXIT_OK
 
 
-# --- The escalation channel --------------------------------------------------
-
-def decide_escalation(
-    set_dir, *, round_number: int, path: str, grant: bool, grounds: str = "",
-) -> int:
-    """The orchestrating engine's decision on one recorded escalation.
-
-    No human is in this loop and none is wanted: a human decision
-    mid-verification stalls the session, and the engine can only widen
-    context, never narrow it, so the unsafe direction is not available.
-    The decider is the engine's *resolved* identity, not a label it
-    asserts about itself."""
-    from .progress import read_session_state
-
-    set_path = Path(set_dir)
-    repo_root = repo_root_for(set_path)
-    if repo_root is None:
-        print(f"verify escalation: not inside a git repository: {set_path}",
-              file=sys.stderr)
-        return EXIT_STATE
-    state = read_session_state(set_path)
-    current = (state or {}).get("currentSession")
-    if current is None:
-        print(
-            f"verify escalation: no session is in flight under {set_path}; "
-            "an escalation belongs to the session whose round raised it.",
-            file=sys.stderr,
-        )
-        return EXIT_STATE
-    if not grant and not (grounds or "").strip():
-        print(
-            "verify escalation: refused -- a refusal must say why, so the "
-            "record shows what was withheld and on what reasoning. Use "
-            "--grounds.", file=sys.stderr,
-        )
-        return EXIT_USAGE
-
-    slug = set_path.name
-    try:
-        pending = ledger.pending_escalations(repo_root, slug, current)
-    except ledger.LedgerError as exc:
-        print(f"verify escalation: {exc}", file=sys.stderr)
-        return EXIT_STATE
-    wanted = str(path).replace("\\", "/").strip()
-    row = next(
-        (r for r in pending
-         if r["path"] == wanted and r["round"] == round_number), None
-    )
-    if row is None:
-        listing = "\n".join(
-            f"  - round {r['round']}: {r['path']}" for r in pending
-        )
-        print(
-            f"verify escalation: round {round_number} records no pending "
-            f"escalation for {wanted!r}. A decision answers a request the "
-            "verifier actually made; it is not a way to inject context.\n"
-            f"Pending escalations:\n{listing or '  (none)'}",
-            file=sys.stderr,
-        )
-        return EXIT_STATE
-
-    if grant:
-        rel, why = _resolve_repo_relative(Path(repo_root), wanted)
-        if rel is None:
-            reason = (
-                "is outside the repository" if why == "outside"
-                else "does not name a file in the repository"
-            )
-            print(
-                f"verify escalation: refused -- {wanted!r} {reason}, so "
-                "there is nothing to widen the scope with. Refuse the "
-                "escalation instead:\n  python -m ai_router.verify refuse "
-                f"--session-set-dir {set_path} --round {round_number} "
-                f"--path {wanted} --grounds \"...\"",
-                file=sys.stderr,
-            )
-            return EXIT_USAGE
-
-    try:
-        orchestrator = resolve_session_orchestrator_identity(set_path, current)
-    except IdentityResolutionError as exc:
-        print(f"verify escalation: {exc}", file=sys.stderr)
-        return EXIT_STATE
-    decider = "/".join(
-        part for part in (orchestrator.engine, orchestrator.model) if part
-    ) or orchestrator.effective_provider
-    decider = f"{decider} ({orchestrator.effective_provider})"
-
-    decision = {
-        "round": round_number,
-        "kind": "escalation",
-        "path": wanted,
-        "outcome": "granted" if grant else "refused",
-        "decider": decider,
-        "recorded_at": datetime.datetime.now().astimezone().isoformat(),
-    }
-    if (grounds or "").strip():
-        decision["reason"] = grounds.strip()
-    try:
-        ledger.append_pull(repo_root, slug, current, decision)
-    except ledger.LedgerError as exc:
-        print(f"verify escalation: {exc}", file=sys.stderr)
-        return EXIT_STATE
-
-    if grant:
-        print(
-            f"verify grant: {wanted} is granted by {decider} and rides "
-            f"every later round of session {current}. Re-run verification "
-            "when the remediation is ready:\n"
-            f"  python -m ai_router.verify --session-set-dir {set_path}"
-        )
-    else:
-        print(
-            f"verify refuse: {wanted} is refused by {decider}. The verdict "
-            "already recorded stands on the evidence the verifier held — a "
-            "refused escalation is neither an unverified result nor a "
-            "stalemate, and it is not grounds for abstaining."
-        )
-    return EXIT_OK
-
-
 # --- The adjudication round --------------------------------------------------
+
 def _adjudication_exclusions(orchestrator, rounds: list) -> list:
     """The exclusion superset: the orchestrator's effective provider AND
     every provider that verified any round. The adjudicator is a third
@@ -2004,40 +1535,6 @@ def _adjudicate_main(argv) -> int:
     )
 
 
-def _escalation_main(argv, *, grant: bool) -> int:
-    verb = "grant" if grant else "refuse"
-    parser = argparse.ArgumentParser(
-        prog=f"python -m ai_router.verify {verb}",
-        description=(
-            "Widen the verifier's context with one escalated path; the "
-            "decision is the orchestrating engine's and is recorded with "
-            "its resolved identity." if grant else
-            "Refuse one escalated path, on the record. A refusal never "
-            "licenses abstention — the recorded verdict stands."
-        ),
-    )
-    parser.add_argument("--session-set-dir", required=True,
-                        help="directory, slug, or bare set number")
-    parser.add_argument("--round", type=int, required=True,
-                        help="the round whose verifier raised the escalation")
-    parser.add_argument("--path", required=True,
-                        help="the exact repo-relative path the verifier "
-                             "escalated for")
-    parser.add_argument("--grounds", default="",
-                        help="the reasoning, required for a refusal so the "
-                             "record shows what was withheld and why")
-    args = parser.parse_args(argv)
-    try:
-        set_dir = resolve_session_set_dir(args.session_set_dir)
-    except ValueError as exc:
-        print(f"verify {verb}: {exc}", file=sys.stderr)
-        return EXIT_USAGE
-    return decide_escalation(
-        set_dir, round_number=args.round, path=args.path, grant=grant,
-        grounds=args.grounds,
-    )
-
-
 def _waive_main(argv) -> int:
     parser = argparse.ArgumentParser(
         prog="python -m ai_router.verify waive",
@@ -2068,10 +1565,6 @@ def main(argv=None) -> int:
         return _dispute_main(argv[1:])
     if argv[:1] == ["adjudicate"]:
         return _adjudicate_main(argv[1:])
-    if argv[:1] == ["grant"]:
-        return _escalation_main(argv[1:], grant=True)
-    if argv[:1] == ["refuse"]:
-        return _escalation_main(argv[1:], grant=False)
     if argv[:1] == ["waive"]:
         return _waive_main(argv[1:])
 

@@ -1,0 +1,101 @@
+{
+  "sessionSetName": "140-retire-scope-and-publish",
+  "createdDate": "2026-08-19T04:36:07.784094-04:00",
+  "totalSessions": 2,
+  "entries": [
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-19T04:36:07.784124-04:00",
+      "description": "Register.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "remove-the-files-and-the-code",
+      "dateTime": "2026-08-19T04:36:07.784124-04:00",
+      "description": "Remove the files and the code named in \"What goes\" above. Keep everything named in \"What stays\". The monolithic evidence path must behave exactly as it did before set 138 touched `verify.py`.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "confirm-the-accounting",
+      "dateTime": "2026-08-19T04:36:07.784124-04:00",
+      "description": "Confirm the accounting: the suite drops by 51 tests, and no import, CLI verb, or schema reference to the removed surface survives anywhere \u2014 including `ai_router/__init__.py`, the prompt templates, and the VS Code extension's command list.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-19T04:36:07.784124-04:00",
+      "description": "Cross-provider verification.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "required-portion-of-the-full-test",
+      "dateTime": "2026-08-19T04:36:07.784124-04:00",
+      "description": "Required portion of the full test suite.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 6,
+      "stepKey": "close-out",
+      "dateTime": "2026-08-19T04:36:07.784124-04:00",
+      "description": "Close-out.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-19T04:36:07.786843-04:00",
+      "description": "Registered session 1 (copilot).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "remove-the-files-and-the-code",
+      "dateTime": "2026-08-19T04:42:45.168967-04:00",
+      "description": "Deleted context_scope.py, pulls.schema.json and the two scope test modules; restored verify.py and ledger.py to their pre-138 state (the set-138 diff to both was purely additive scope work); removed declared_module_slug from session.py, keeping parse_set_config.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "confirm-the-accounting",
+      "dateTime": "2026-08-19T04:42:45.173350-04:00",
+      "description": "Suite drops 475 -> 424, exactly the 51 removed. No import, CLI verb, schema, doc or extension reference to context_scope/pulls survives; verify grant/refuse are rejected by argparse while dispute/adjudicate/waive and --transport are intact. PromptTooLargeError, parse_set_config and the modules.py manifest extension all remain.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-19T04:45:46.336465-04:00",
+      "description": "Round 1 VERIFIED by gpt-5.5/openai over copilot-cli (orchestrator claude-opus-5/anthropic).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "required-portion-of-the-full-test",
+      "dateTime": "2026-08-19T04:48:42.837507-04:00",
+      "description": "Full pytest suite green: 424 passed in 137s (475 before, minus the 51 removed), 56 slots free against the 480 ceiling. No suites are declared under testing.suites in router-config.yaml, so there is no separate test-evidence record to write.",
+      "status": "complete"
+    }
+  ]
+}

@@ -1,7 +1,5 @@
 """The machine-only run ledger: ``.dabbler/runs/<set>/s<N>/rounds.jsonl``
-and, beside it, ``disputes.jsonl`` (one row per disputed finding) and
-``pulls.jsonl`` (one row per context request, refusal, or escalation
-decision).
+and, beside it, ``disputes.jsonl`` (one row per disputed finding).
 
 One row per completed verification round, appended only by the CLI
 (``ai_router.verify``). The close gate reads it. There is no stamp and no
@@ -22,7 +20,6 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Optional
 
 import jsonschema
 
@@ -61,14 +58,10 @@ def rounds_path(repo_root, set_slug: str, session_number: int) -> Path:
 
 
 def raw_output_path(
-    repo_root, set_slug: str, session_number: int, round_number: int,
-    attempt: Optional[int] = None,
+    repo_root, set_slug: str, session_number: int, round_number: int
 ) -> Path:
-    stem = f"round-{int(round_number)}"
-    if attempt is not None:
-        stem += f"-pull-{int(attempt)}"
     return session_run_dir(repo_root, set_slug, session_number) / (
-        f"{stem}-verifier-output.md"
+        f"round-{int(round_number)}-verifier-output.md"
     )
 
 
@@ -90,10 +83,6 @@ def validate_round(record: dict) -> dict:
 
 def validate_dispute(record: dict) -> dict:
     return _validate(record, "disputes.schema.json", "dispute")
-
-
-def validate_pull(record: dict) -> dict:
-    return _validate(record, "pulls.schema.json", "pull")
 
 
 def _read_jsonl(path: Path, validate) -> list[dict]:
@@ -157,16 +146,12 @@ def append_round(
 
 def save_raw_output(
     repo_root, set_slug: str, session_number: int, round_number: int,
-    content: str, attempt: Optional[int] = None,
+    content: str,
 ) -> Path:
     """Save the verifier's raw response before any parsing or display.
     ``newline=""`` keeps on-disk bytes identical to the response — no CRLF
-    translation on Windows. *attempt* names a pre-pull response, so the
-    answer that asked for context is kept beside the answer that used
-    it — a re-dispatch must not overwrite the record of why it happened."""
-    path = raw_output_path(
-        repo_root, set_slug, session_number, round_number, attempt
-    )
+    translation on Windows."""
+    path = raw_output_path(repo_root, set_slug, session_number, round_number)
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w", encoding="utf-8", newline="") as f:
         f.write(content)
@@ -216,82 +201,3 @@ def append_dispute(
     with open(path, "a", encoding="utf-8") as f:
         f.write(json.dumps(record) + "\n")
     return record
-
-
-# --- pulls.jsonl -------------------------------------------------------------
-
-_DECIDED = ("granted", "refused")
-
-
-def pulls_path(repo_root, set_slug: str, session_number: int) -> Path:
-    return session_run_dir(repo_root, set_slug, session_number) / "pulls.jsonl"
-
-
-def read_pulls(repo_root, set_slug: str, session_number: int) -> list[dict]:
-    return _read_jsonl(
-        pulls_path(repo_root, set_slug, session_number), validate_pull
-    )
-
-
-def append_pull(
-    repo_root, set_slug: str, session_number: int, record: dict
-) -> dict:
-    """Append one validated context-request row.
-
-    Re-recording a fact already on the record is a no-op, not an error:
-    a round that failed after writing its pull rows must be re-runnable,
-    and the append-only invariant is about never *rewriting* history, not
-    about refusing to restate an identical fact. What is refused is a
-    second, contradicting decision — a granted file cannot be un-granted,
-    because the orchestrating engine may only widen."""
-    validate_pull(record)
-    existing = read_pulls(repo_root, set_slug, session_number)
-    same_path = [
-        r for r in existing
-        if r["round"] == record["round"] and r["path"] == record["path"]
-    ]
-    if any(
-        r["outcome"] == record["outcome"] and r["kind"] == record["kind"]
-        for r in same_path
-    ):
-        return record
-    if record["outcome"] in _DECIDED and any(
-        r["outcome"] in _DECIDED for r in same_path
-    ):
-        decided = next(r for r in same_path if r["outcome"] in _DECIDED)
-        raise LedgerError(
-            f"the escalation for {record['path']!r} in round "
-            f"{record['round']} was already {decided['outcome']} by "
-            f"{decided['decider']}; a decision is final and the "
-            "orchestrating engine may only widen, never narrow"
-        )
-    path = pulls_path(repo_root, set_slug, session_number)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, "a", encoding="utf-8") as f:
-        f.write(json.dumps(record) + "\n")
-    return record
-
-
-def granted_paths(repo_root, set_slug: str, session_number: int) -> list[str]:
-    """Escalation paths the orchestrating engine granted, in grant order.
-    Later rounds carry them, because widening is permanent for the
-    session that granted it."""
-    out: list[str] = []
-    for row in read_pulls(repo_root, set_slug, session_number):
-        if row["outcome"] == "granted" and row["path"] not in out:
-            out.append(row["path"])
-    return out
-
-
-def pending_escalations(
-    repo_root, set_slug: str, session_number: int
-) -> list[dict]:
-    """Escalations recorded but not yet decided."""
-    rows = read_pulls(repo_root, set_slug, session_number)
-    decided = {
-        (r["round"], r["path"]) for r in rows if r["outcome"] in _DECIDED
-    }
-    return [
-        r for r in rows
-        if r["outcome"] == "pending" and (r["round"], r["path"]) not in decided
-    ]

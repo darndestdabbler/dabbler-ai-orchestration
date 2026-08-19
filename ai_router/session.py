@@ -364,20 +364,6 @@ def parse_set_config(spec_text: str) -> dict:
     return doc if isinstance(doc, dict) else {}
 
 
-def declared_module_slug(set_dir) -> Optional[str]:
-    """The module slug the set's spec declares, or ``None``. Resolving the
-    slug against ``docs/modules.yaml`` is the caller's job — an undeclared
-    or unresolvable module is the cue to stay on the unscoped path."""
-    try:
-        text = (Path(set_dir) / "spec.md").read_text(encoding="utf-8")
-    except (OSError, UnicodeError):
-        return None
-    value = parse_set_config(text).get("module")
-    if not isinstance(value, str) or not value.strip():
-        return None
-    return value.strip()
-
-
 # --- start ------------------------------------------------------------------
 
 def start(

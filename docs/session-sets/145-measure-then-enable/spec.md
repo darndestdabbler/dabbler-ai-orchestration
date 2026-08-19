@@ -159,7 +159,13 @@ head-to-head comparison report. Est. 4 Python tests.
 5. Add the additive Python projection fields for plan state, step state,
    and unresolved findings, and the TypeScript parser and tree-descriptor
    tests that render them. Python decides; TypeScript renders; no rule
-   crosses the boundary.
+   crosses the boundary. **Deferred, not scheduled:** `progress.py`
+   projects steps only for the in-flight session, so a completed session
+   always renders an empty step list even though its activity log retains
+   every row. Relaxing that guard would show step history on completed
+   sets, and a set-level date stamp is derivable from the per-session
+   `startedAt`/`completedAt` already in the projection. Neither is in this
+   set's scope; both are recorded here so nobody re-derives them.
 6. Report the envelope: final LOC, module count, Python tests, and TS
    tests against the +33% ceilings, and `verify.py`'s final size.
 7. Cross-provider verification.

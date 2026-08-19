@@ -58,6 +58,15 @@ one-commit-per-step for localization *and* preserves the working-tree-vs-
 `HEAD` model that the whole verifier is built on, so nothing in the
 fix-delta or adjudication paths has to be rewritten.
 
+**The framework commits. It never pushes.** Pushing is a session-boundary
+act, once, at close. CI (`.github/workflows/test.yml`) runs a two-job
+Windows matrix on `push` to `master` and on `pull_request` against it, so
+a per-step push against an open PR would buy one full CI run per step for
+work that is not finished. On this experiment branch with no PR open,
+pushes do not trigger CI at all — which makes the policy free to adopt now
+and expensive to retrofit later. The `pushed_to_remote` close gate already
+expects the push at close and checks nothing before it.
+
 One residual remains and session 3 pays it: after N step commits, the
 session-level cross-provider verification sees an empty working tree, so
 its round-1 baseline must resolve to the session's start ref rather than
@@ -155,7 +164,12 @@ pass, the manual-commit refusal. Est. 7 Python tests.
    the two-attempt bound on fix and the red-green rule on disprove.
 5. Have the framework commit the step once its evidence is satisfied, with
    a message naming the step and its evidence outcome. The author never
-   commits.
+   commits, and **nothing pushes** — the push is one act at close.
+   Writing the step record is the framework's job here too: the step is
+   marked complete by the code that committed it, not by an agent
+   remembering to log it afterwards. `start_session` already sets this
+   precedent for the `register` step, and this is the same move for the
+   rest of them.
 6. Cross-provider verification.
 7. Affected tests before verification; the full suite once, after.
 8. Close-out.

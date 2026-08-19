@@ -158,6 +158,12 @@ stages. Est. 6 Python tests.
    full-suite command only after the final verified tree. Remove every
    generic phrase an agent can read as "run all tests" — including this
    repository's own current step wording, which says exactly that.
+5. State the push policy in the same generated text: **commit during a
+   session, push once at the end.** CI runs on push, so a mid-session push
+   buys a full Windows matrix run of work that is not finished. The
+   `pushed_to_remote` close gate already requires the branch to be pushed
+   at close and nowhere earlier; the instructions must stop implying
+   otherwise.
 5. Cross-provider verification.
 6. Affected tests before verification; the full suite once, after.
 7. Close-out.

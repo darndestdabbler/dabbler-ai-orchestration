@@ -68,17 +68,6 @@ def test_create_writes_the_scope_fields(tmp_path, capsys):
     assert entry.context_assets == ("schemas/*.json",)
 
 
-def test_an_entry_written_by_the_old_writer_stays_valid(tmp_path):
-    _write_manifest(tmp_path, [
-        {"slug": "greeter", "title": "Greeter", "planPath": "docs/p.md",
-         "touches": ["src/**"]},
-    ])
-    entry = load_entries(tmp_path)[0]
-    assert entry.plan_path == "docs/p.md"
-    assert entry.touches == ("src/**",)
-    assert entry.code_roots == ()
-
-
 def test_an_unknown_entry_key_is_rejected_not_ignored(tmp_path):
     _write_manifest(tmp_path, [{"slug": "greeter", "codeRoot": "src"}])
     with pytest.raises(ValueError) as excinfo:

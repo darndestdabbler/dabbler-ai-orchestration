@@ -170,6 +170,16 @@
     "task_type_params": { "type": "object" },
     "testing": { "type": "object" },
     "verification": { "type": "object" },
+    "critique": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "pipeline": {
+          "enum": ["off", "shadow", "enforce"],
+          "description": "The critique pipeline's authority. 'off' is the default and writes nothing. 'shadow' records critique artifacts without letting them decide anything. 'enforce' is declared here so the vocabulary lives in one place, and is refused at load until the set that implements it lands — see config.py, which names that set in the refusal."
+        }
+      }
+    },
     "metrics": { "type": "object" },
     "metadata": { "type": "object" }
   }

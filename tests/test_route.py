@@ -253,14 +253,6 @@ class TestPromptSizeRefusal:
     bundle still returns a clean-looking verdict, because the handoff
     acknowledgement is appended after prompting."""
 
-    def test_a_prompt_within_budget_is_returned_intact(self):
-        content = "x" * 4000
-        _system, message = route_mod.build_prompt(
-            content=content, context="", task_type="general",
-            model_cfg={"max_context_tokens": 2000}, config={},
-        )
-        assert message == content
-
     def test_an_over_budget_prompt_is_refused_with_overrun_and_remedy(self):
         with pytest.raises(route_mod.PromptTooLargeError) as excinfo:
             route_mod.build_prompt(

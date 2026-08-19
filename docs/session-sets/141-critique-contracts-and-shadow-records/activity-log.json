@@ -1,0 +1,176 @@
+{
+  "sessionSetName": "141-critique-contracts-and-shadow-records",
+  "createdDate": "2026-08-19T10:34:55.217266-04:00",
+  "totalSessions": 3,
+  "entries": [
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-19T10:34:55.217296-04:00",
+      "description": "Register.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "reconcile-the-post-139-state-on",
+      "dateTime": "2026-08-19T10:34:55.217296-04:00",
+      "description": "Reconcile the post-139 state on the experiment branch: confirm the working tree matches `8be18fb8` plus any merged `master` drift, confirm the suite collects 475, and record the exact starting count that the reclamation is measured against.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "audit-the-suite-for-reclaimable-slots",
+      "dateTime": "2026-08-19T10:34:55.217296-04:00",
+      "description": "Audit the suite for reclaimable slots and produce a written ledger of candidates before deleting anything \u2014 file, test, the behavior it covers, and the specific test or mechanism that still covers that behavior afterwards. Reclaim at least 43. Do not delete a test whose behavior would then be untested, and do not count a parameterized collapse as a reclamation.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "decision-point",
+      "dateTime": "2026-08-19T10:34:55.217296-04:00",
+      "description": "**Decision point.** If 43 defensible slots exist, delete them, confirm the suite is green at the reduced count, and continue. If they do not, stop the set here and report the shortfall with the audit ledger attached: the honest outcomes are a smaller allocation or the kill criterion, and neither is an agent's call to make silently.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "freeze-schema-v1-for-the-five",
+      "dateTime": "2026-08-19T10:34:55.217296-04:00",
+      "description": "Freeze schema v1 for the five new artifacts \u2014 review run, review claims, check IR, worker results, dispositions \u2014 as JSON Schema files under `ai_router/schemas/`, each carrying an explicit `schema_version` that readers check and refuse on mismatch. The check IR schema follows plan \u00a74: identity, one imperative objective, one closed selector, the fixed condition operators (`for_each`, `all`, `any`, `not`, `if`, `exists`, `equals`, `count`), explicit scope, branch nesting depth at most 2, complete `pass`/`fail`/`blocked` evidence shapes, authorized pulls, and resource bounds. Nothing recursive, unbounded, or whole-program belongs in it.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 6,
+      "stepKey": "add-the-feature-configuration-to-config",
+      "dateTime": "2026-08-19T10:34:55.217296-04:00",
+      "description": "Add the feature configuration to `config.py` and the config schema: the pipeline is `off` by default, `shadow` is the only other value this set accepts, and `enforce` is declared but refused at load with a message naming the set that will enable it. An unknown key is refused at load, not ignored \u2014 the rule set 139 established for the local overlay.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 7,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-19T10:34:55.217296-04:00",
+      "description": "Cross-provider verification.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 8,
+      "stepKey": "required-portion-of-the-full-test",
+      "dateTime": "2026-08-19T10:34:55.217296-04:00",
+      "description": "Required portion of the full test suite.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 9,
+      "stepKey": "close-out",
+      "dateTime": "2026-08-19T10:34:55.217296-04:00",
+      "description": "Close-out.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-19T10:34:55.221480-04:00",
+      "description": "Registered session 1 (copilot).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-19T10:35:45.933750-04:00",
+      "description": "Register.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "reconcile-the-post-139-state-on",
+      "dateTime": "2026-08-19T10:35:46.399638-04:00",
+      "description": "Reconciled on experiment/verification-pipeline-v3: diff vs baseline 8be18fb8 is docs-only (sets 141-145 specs, v3 plan, AGENTS.md branch note); no production code differs. Suite collects 475 -- the exact starting count reclamation is measured against.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "audit-the-suite-for-reclaimable-slots",
+      "dateTime": "2026-08-19T10:35:46.833114-04:00",
+      "description": "Audit the suite for reclaimable slots and produce a written ledger of candidates before deleting anything \u2014 file, test, the behavior it covers, and the specific test or mechanism that still covers that behavior afterwards. Reclaim at least 43. Do not delete a test whose behavior would then be untested, and do not count a parameterized collapse as a reclamation.",
+      "status": "in-progress"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "audit-the-suite-for-reclaimable-slots",
+      "dateTime": "2026-08-19T11:00:56.840140-04:00",
+      "description": "Two-round audit of all 475 tests across 19 files (pairwise pass, then a cluster pass over shared production branches). Ledger at docs/session-sets/141-critique-contracts-and-shadow-records/reclamation-ledger.md: 31 defensible slots, each with a named residual cover. One candidate rejected as circular (two bootstrap tests citing each other). No parameterization used.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "decision-point",
+      "dateTime": "2026-08-19T11:00:57.283586-04:00",
+      "description": "Decision point: audit found 31 of the 43 slots the gate asked for; no further defensible slack exists. Operator elected to proceed under the existing 480 ceiling rather than raise it or delete load-bearing coverage. Set 141 needs 11 of the 36 now-free slots. Sets 142-145 remain 12 short and must be re-scoped downward or reclaim further before set 144; that decision is deferred until this set closes. Deletions applied: suite 475 -> 444, all green.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "freeze-schema-v1-for-the-five",
+      "dateTime": "2026-08-19T11:12:51.734947-04:00",
+      "description": "Froze v1 schemas under ai_router/schemas/: review-run, review-claims, check-ir, worker-results, dispositions. Each pins schema_version as a const so a reader refuses a mismatch rather than interpreting it. Check IR follows plan section 4: closed operator set (for_each/all/any/not/if/exists/equals/count), one closed selector, explicit scope, complete pass/fail/blocked evidence shapes, authorized pulls, resource bounds; nesting is bounded at two levels structurally via depth-limited defs, not by prose. All nine repo schemas check clean as draft 2020-12.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 6,
+      "stepKey": "add-the-feature-configuration-to-config",
+      "dateTime": "2026-08-19T11:12:52.872304-04:00",
+      "description": "Added critique.pipeline to router-config.schema.json (additionalProperties false) and _resolve_critique_block in config.py. Default off when the block is absent; shadow accepted; enforce declared in the schema but refused at load naming set 145-lite-enforcement-and-projection. Unknown keys stay refused by the existing generic overlay walk, so no critique-specific duplicate of that rule was added. 5 new tests (3 config, 2 contracts), within the session estimate of 4-5.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 7,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-19T11:12:54.082436-04:00",
+      "description": "Cross-provider verification.",
+      "status": "in-progress"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 7,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-19T11:19:04.632857-04:00",
+      "description": "Round 1 ISSUES_FOUND (gpt-5.5/openai): one major finding that the session continued past the entry gate while the spec text still demanded 43. Remediated by recording the operator's smaller-allocation decision in spec.md -- the gate outcome, the 36 free slots, the unchanged 480 ceiling, and the binding condition that set 144 may not begin until 142-145 are re-scoped -- and correcting the acceptance criterion and test-budget sections that still asserted 48 free. Round 2 VERIFIED.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 8,
+      "stepKey": "required-portion-of-the-full-test",
+      "dateTime": "2026-08-19T11:24:25.090184-04:00",
+      "description": "Run of record after the final verification, no code changed since: 449 passed in 283s. 444 after the 31 reclamations, plus this session's 5 new tests. 31 slots free against the unchanged 480 ceiling. No suites are declared under testing.suites in router-config.yaml, so there is no separate test-evidence record to write.",
+      "status": "complete"
+    }
+  ]
+}

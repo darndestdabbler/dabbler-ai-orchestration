@@ -45,12 +45,15 @@ The plan makes branch isolation a hard constraint, because this is an
 experiment with a declared kill criterion (plan §11.3) and `master` is a
 released line.
 
-- Every session of sets 141–145 runs on a short-lived child branch off
-  `experiment/verification-pipeline-v3`. This set's child branch is
-  `verification-v3/set-141-contracts`.
-- A child branch merges into the experiment branch only after its scoped
-  tests and cross-provider verification pass. **No child branch merges to
-  `master`.**
+- Every session of sets 141–145 runs directly on
+  `experiment/verification-pipeline-v3`. **No experiment work merges to
+  `master`** until the §11 gates pass after set 145.
+- **Operator-authorized deviation (2026-08-19):** the per-set child
+  branches this spec originally required — this set's would have been
+  `verification-v3/set-141-contracts` — are dropped. The isolation they
+  existed to provide is already supplied by the experiment branch, which
+  no release consumes, so reverting a set there costs no more than
+  abandoning a child branch. Rule 6 disfavors the extra ceremony.
 - Ordinary production fixes continue on `master`. Merge `master` *into*
   the experiment branch at set boundaries, resolve drift there, and rerun
   the affected checks. Never merge unfinished experiment work into a
@@ -58,9 +61,9 @@ released line.
 - No package or extension release is cut from the experiment branch. The
   merge to `master` is a single deliberate release decision after set 145
   passes the §11 gates — not a sequence of partially enabled sets.
-- Creating and switching branches is an **operator action**. This spec
-  records the topology; it does not authorize an agent to create a branch
-  on its own initiative.
+- Creating and switching branches remains an **operator action**. This
+  spec records the topology; it does not authorize an agent to create a
+  branch on its own initiative.
 
 This contradicts the repository's usual trunk-based habit. That is the
 point: the usual habit assumes the work is going to ship.
@@ -92,6 +95,35 @@ reclaimed** before production code is written. The rules on how:
 - If 43 defensible slots cannot be found, **stop**. Re-scope the
   allocation downward or invoke the kill criterion. Do not proceed on a
   promise to find them later, and do not raise the ceiling.
+
+### Gate outcome, 2026-08-19: the shortfall and the decision taken
+
+The gate ran and **did not** reach 43. A two-round audit of all 475 tests
+across 19 files — a pairwise pass, then a cluster pass over shared
+production branches — found **31** defensible slots and no more. The
+evidence is in `reclamation-ledger.md`; the auditors' rejected candidates
+are recorded there and in the activity log.
+
+The operator took the **smaller-allocation** outcome this section
+prescribes, not the kill criterion, and specifically **did not raise the
+ceiling**:
+
+- The 31 deletions were applied. The suite went 475 → 444 and is green at
+  the reduced count, leaving **36 free slots** against the unchanged 480
+  ceiling.
+- Set 141's own allocation is 11, so this set proceeds inside the existing
+  ceiling with room to spare. Sessions 2 and 3 continue as specified.
+- Sets 142–145 remain **12 short** of their combined allocation. That tail
+  is **not** funded by this decision and is **not** a promise to find the
+  slots later: sets 142 and 143 (10 and 13) still fit in what remains, and
+  **set 144 may not begin until its allocation is re-scoped downward or
+  further slots are reclaimed under the rules above.** The re-scope
+  decision is deferred to set 141's close, when it can be made against
+  real numbers rather than an estimate.
+
+This paragraph records a decision already taken through the operator. It
+does not weaken the rules above for any later set, and it is not a
+precedent for proceeding past the gate on an agent's own initiative.
 
 The allocations above are **ceilings, not targets**. One test per
 behavior; no source-text assertions, no migration-path tests, no tests of
@@ -272,18 +304,23 @@ reviewed tree is refused.
 The pipeline configuration is `off`. Setting it to `enforce` is refused
 at load, by name.
 
-Above all: the suite is green with **at least 48 slots free** against the
-480 ceiling, and every reclaimed slot is accounted for in the session 1
-ledger by the behavior that still covers it. If that ledger could not be
-written honestly, this set stopped at session 1, and that is a successful
-outcome of the gate rather than a failure of the set.
+Above all: the suite is green, every reclaimed slot is accounted for in
+the session 1 ledger by the behavior that still covers it, and the 480
+ceiling is unchanged. The original target was 48 free slots; the gate
+found 31 and the operator took the smaller-allocation outcome, so the
+standing figure is **36 free before this set's own additions** (see "Gate
+outcome" above). If that ledger could not be written honestly, this set
+stopped at session 1, and that is a successful outcome of the gate rather
+than a failure of the set.
 
 ## Test budget
 
-Baseline 475/480. Session 1 reclaims ≥43 before writing production code,
-taking the suite to ≤432. This set then adds at most **11**, leaving sets
-142–145 their 37. The three session estimates (4–5, 4–5, 3–4) sum to
-11–14 against a ceiling of 11 — so the ranges are pressure, not slack. If
-sessions 1 and 2 together have spent more than 8, session 3 tightens to
-the two behaviors that must be covered (hash mismatch refused, `blocked`
-cannot become `pass`) rather than borrowing from set 142.
+Baseline 475/480. Session 1 reclaimed 31 — short of the 43 the gate asked
+for — taking the suite to 444 with 36 slots free. This set still adds at
+most **11**, so sets 142–145 inherit 25 against the 37 they were allocated
+and must be re-scoped before set 144 begins. The three session estimates
+(4–5, 4–5, 3–4) sum to 11–14 against a ceiling of 11 — so the ranges are
+pressure, not slack. Session 1 spent 5. If sessions 1 and 2 together have
+spent more than 8, session 3 tightens to the two behaviors that must be
+covered (hash mismatch refused, `blocked` cannot become `pass`) rather
+than borrowing from set 142.

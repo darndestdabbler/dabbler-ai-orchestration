@@ -81,8 +81,3 @@ class TestDetectTruncation:
             "end_turn",
         )
 
-    def test_clean_prose_passes(self):
-        assert not detect_truncation("All good (really).", "end_turn")
-
-    def test_empty_content_is_not_truncation(self):
-        assert not detect_truncation("", "end_turn")

@@ -55,15 +55,6 @@ class TestTamperRefusal:
         path.parent.mkdir(parents=True, exist_ok=True)
         return path
 
-    def test_hand_written_severity_refused_on_read(self, tmp_path):
-        row = make_row()
-        row["findings"][0]["severity"] = "totally-fine"
-        self._path(tmp_path).write_text(
-            json.dumps(row) + "\n", encoding="utf-8"
-        )
-        with pytest.raises(ledger.LedgerError):
-            ledger.read_rounds(tmp_path, "010-demo", 1)
-
     def test_invented_verdict_refused_on_read(self, tmp_path):
         row = make_row(verdict="manual-override-development")
         self._path(tmp_path).write_text(

@@ -40,10 +40,6 @@ class TestValidateModelRates:
         with pytest.raises(PricingError, match="both"):
             validate_model_rates("m", entry)
 
-    def test_pricing_null_on_routable_entry_is_rejected(self):
-        with pytest.raises(PricingError, match="declares no rates"):
-            validate_model_rates("m", {"pricing": None})
-
     def test_duplicate_tier_bounds_rejected(self):
         entry = {"pricing": [
             {"input_cost_per_1m": 1, "output_cost_per_1m": 1,
@@ -59,14 +55,6 @@ class TestValidateModelRates:
         entry = {"pricing": [
             {"input_cost_per_1m": 1, "output_cost_per_1m": 1,
              "max_input_tokens": 100},
-        ]}
-        with pytest.raises(PricingError, match="unbounded"):
-            validate_model_rates("m", entry)
-
-    def test_period_with_two_unbounded_rows_rejected(self):
-        entry = {"pricing": [
-            {"input_cost_per_1m": 1, "output_cost_per_1m": 1},
-            {"input_cost_per_1m": 2, "output_cost_per_1m": 2},
         ]}
         with pytest.raises(PricingError, match="unbounded"):
             validate_model_rates("m", entry)

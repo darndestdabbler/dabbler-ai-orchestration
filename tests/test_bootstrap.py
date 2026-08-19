@@ -1,8 +1,6 @@
 from ai_router.bootstrap import (
-    DECOMPOSITION_PROMPT,
     MANAGED_END,
     MANAGED_START,
-    PLAN_PROMPT,
     SCOPE_MACHINE,
     SCOPE_USER,
     _manual_persist_hint,
@@ -84,13 +82,6 @@ class TestPersistenceScope:
         import os
         assert os.environ["DABBLER_TRANSPORT"] == "copilot-cli"
 
-    def test_manual_hint_never_requires_an_account_the_operator_lacks(self):
-        hint = _manual_persist_hint("copilot-cli")
-        assert "admin" not in hint.lower()
-        assert "sudo" not in hint.lower()
-        assert "copilot-cli" in hint
-
-
 class TestBootstrapReporting:
     def _run(self, tmp_path, monkeypatch, capsys, *, scope, extra=()):
         monkeypatch.delenv("DABBLER_TRANSPORT", raising=False)
@@ -117,18 +108,6 @@ class TestBootstrapReporting:
         out = self._run(tmp_path, monkeypatch, capsys, scope=None)
         assert "could not be written" in out.err
         assert _manual_persist_hint("copilot-cli") in out.err
-
-    def test_a_machine_scope_downgrade_is_announced(
-        self, tmp_path, monkeypatch, capsys
-    ):
-        out = self._run(
-            tmp_path, monkeypatch, capsys, scope=SCOPE_USER,
-            extra=["--machine-scope"],
-        )
-        assert f"at {SCOPE_USER} scope" in out.out
-        assert "your account only" in out.out
-
-
 
 class TestTransportPreference:
     """The seat choice is a fact about the machine, remembered in a system
@@ -195,7 +174,6 @@ class TestGitignoreRule:
         assert path.read_text(encoding="utf-8") == ".dabbler\n"
 
 
-
 class TestInstructionFiles:
     def test_writes_three_files_with_managed_section(self, tmp_path):
         written = write_instruction_files(tmp_path, repo_name="acme-app")
@@ -250,17 +228,6 @@ class TestInstructionFiles:
         assert "stale body" not in text
         assert "`fresh-name`" in text
         assert text.count(MANAGED_START) == 1
-
-
-class TestPrompts:
-    def test_plan_prompt_shape(self):
-        assert "project-plan.md" in PLAN_PROMPT
-        assert "Import" in PLAN_PROMPT
-
-    def test_decomposition_prompt_hard_rules(self):
-        assert "NNN-kebab-title" in DECOMPOSITION_PROMPT
-        assert "session-state.json" in DECOMPOSITION_PROMPT
-        assert "never authored by hand" in DECOMPOSITION_PROMPT
 
 
 class TestScaffoldBootstrapSets:

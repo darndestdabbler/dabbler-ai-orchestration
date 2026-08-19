@@ -138,20 +138,6 @@ class TestTreeSnapshots:
         (runs / "rounds.jsonl").write_text('{"round": 1}\n', encoding="utf-8")
         assert snapshot_worktree_tree(git_repo) == before
 
-    def test_snapshot_excludes_machine_state_already_committed(self, git_repo):
-        """The rule holds for a repo that committed its ledger before the
-        ignore rule existed: the entry is inherited from HEAD, not the add."""
-        runs = git_repo / ".dabbler" / "runs"
-        runs.mkdir(parents=True)
-        (runs / "state-writes.jsonl").write_text("{}\n", encoding="utf-8")
-        for args in (["add", "-A"], ["commit", "-q", "-m", "ledger"]):
-            subprocess.run(["git", "-C", str(git_repo), *args],
-                           capture_output=True)
-        before = snapshot_worktree_tree(git_repo)
-        (runs / "state-writes.jsonl").write_text("{}\n{}\n", encoding="utf-8")
-        assert snapshot_worktree_tree(git_repo) == before
-
-
 class TestOutOfBandWrites:
     def _set_dir(self, git_repo):
         set_dir = git_repo / "docs" / "session-sets" / "010-x"

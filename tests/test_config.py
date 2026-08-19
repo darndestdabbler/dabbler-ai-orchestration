@@ -1,10 +1,10 @@
-import copy
 import subprocess
 
 import pytest
 import yaml
 
 from ai_router.config import (
+    CRITIQUE_ENFORCE_SET,
     load_config,
     resolve_generation_params,
     resolve_transport,
@@ -146,16 +146,6 @@ class TestLocalOverrides:
         assert config["models"]
         assert config["_local_overrides_path"].endswith("local-overrides.yaml")
 
-    def test_unknown_top_level_key_is_refused_not_dropped(self, project):
-        self._overlay(project, {"transprot": {"profile": "copilot-cli"}})
-        with pytest.raises(ValueError, match="transprot"):
-            load_config()
-
-    def test_unknown_nested_key_is_refused_not_dropped(self, project):
-        self._overlay(project, {"transport": {"porfile": "copilot-cli"}})
-        with pytest.raises(ValueError, match=r"transport\.porfile"):
-            load_config()
-
     def test_typo_in_the_seat_transport_block_is_refused(self, project):
         # The block a seat-only machine most needs to override: a dropped
         # `timeotus` would leave the bundled ceilings quietly in force.
@@ -232,11 +222,6 @@ class TestSplitSections:
         assert sections["alpha"] == "body a\n## nested\ndeep"
         assert sections["beta-two"] == "body b"
 
-    def test_deeper_headers_stay_inside_sections(self):
-        sections = _split_sections(self.TEXT, header_level=2)
-        assert list(sections) == ["nested"]
-
-
 class TestPromptTemplates:
     def test_bundled_templates_resolve(self):
         config = load_config()
@@ -254,3 +239,27 @@ class TestPromptTemplates:
         assert "expert software engineer" in (
             loaded["models"]["flash"]["_system_prompt"]
         )
+
+
+class TestCritiquePipeline:
+    """The critique pipeline's authority switch. It ships off, and the mode
+    that would let critique artifacts decide anything is refused until the
+    code that honours it exists."""
+
+    def _overlay(self, project, body):
+        (project / "local-overrides.yaml").write_text(
+            yaml.safe_dump(body), encoding="utf-8"
+        )
+
+    def test_pipeline_is_off_when_the_block_is_absent(self, project):
+        assert load_config()["critique"]["pipeline"] == "off"
+
+    def test_shadow_is_accepted(self, project):
+        self._overlay(project, {"critique": {"pipeline": "shadow"}})
+        assert load_config()["critique"]["pipeline"] == "shadow"
+
+    def test_enforce_is_refused_by_name(self, project):
+        self._overlay(project, {"critique": {"pipeline": "enforce"}})
+        with pytest.raises(ValueError) as excinfo:
+            load_config()
+        assert CRITIQUE_ENFORCE_SET in str(excinfo.value)

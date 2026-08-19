@@ -213,10 +213,6 @@ class TestProjectionOverCorpus:
         assert titles[0] != "Session 1"
         assert "activation" in titles[0].lower()
 
-    def test_force_closed_historical_set(self):
-        p = self._projection("004-cost-enforcement-and-capacity")
-        assert p["set"]["status"] == "complete"
-
     def test_spec_only_folder_infers_not_started(self, tmp_path):
         (tmp_path / "spec.md").write_text("# X\n", encoding="utf-8")
         p = build_projection(tmp_path)

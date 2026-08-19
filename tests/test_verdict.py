@@ -74,12 +74,6 @@ class TestVerdictParsing:
         assert verdict == VERDICT_VERIFIED
         assert len(issues) == 1  # contradictory evidence is never dropped
 
-    def test_prose_mention_of_issue_is_not_a_block(self):
-        text = "ISSUES FOUND\nThe issue template needs work overall."
-        _, issues = parse_verification_response(text)
-        assert len(issues) == 1  # synthetic, not a parsed "Issue" block
-        assert issues[0]["severity"] == "unknown"
-
     def test_empty_response_fails_closed(self):
         verdict, issues = parse_verification_response("")
         assert verdict == VERDICT_ISSUES_FOUND
@@ -89,9 +83,6 @@ class TestVerdictParsing:
 class TestSeverityAndBlocking:
     def test_unrecognized_severity_blocks(self):
         assert is_blocking_issue({"description": "x", "severity": "High"})
-
-    def test_missing_severity_blocks(self):
-        assert is_blocking_issue({"description": "x"})
 
     def test_minor_does_not_block(self):
         assert not is_blocking_issue({"description": "x", "severity": "minor"})
@@ -123,14 +114,6 @@ class TestSeverityAndBlocking:
         # A non-VERIFIED verdict with nothing parseable blocks (fail closed).
         assert classify_blocking(VERDICT_ISSUES_FOUND, []).blocking
 
-    def test_classify_all_minor_is_non_blocking(self):
-        result = classify_blocking(
-            VERDICT_ISSUES_FOUND,
-            [{"description": "x", "severity": "minor"}],
-        )
-        assert not result.blocking
-        assert result.nit_issues
-
     def test_classify_partitions(self):
         result = classify_blocking(VERDICT_ISSUES_FOUND, [
             {"description": "a", "severity": "critical"},
@@ -152,7 +135,6 @@ class TestSessionVerdictVocabulary:
     @pytest.mark.parametrize("token", [
         "manual-override-development",  # the 2026-07-08 incident token
         "VERIFIED_NOT_REALLY",          # prefix look-alike
-        "ISSUES_FOUNDATION",
         "", None, "verified ",
     ])
     def test_invented_tokens_refused(self, token):

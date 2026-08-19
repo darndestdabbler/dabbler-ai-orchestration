@@ -195,10 +195,6 @@ class TestNextEscalationModel:
         )
         assert picked == "gpt-mini"
 
-    def test_disabled_assignment_falls_to_cheapest_survivor(self, base_config):
-        base_config["models"]["opus"]["is_enabled"] = False
-        assert next_escalation_model("pro", base_config, 0) == "gpt"
-
     def test_returns_none_when_no_next_tier_candidate_survives(self, base_config):
         picked = next_escalation_model(
             "pro", base_config, 0,

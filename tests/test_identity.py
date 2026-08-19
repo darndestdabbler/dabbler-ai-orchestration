@@ -21,9 +21,6 @@ class TestModelResolution:
     def test_exact_model_id(self):
         assert resolve_model_provider("gpt-5.4", REGISTRY) == "openai"
 
-    def test_normalized_token_dots_to_hyphens(self):
-        assert resolve_model_provider("gpt-5-4", REGISTRY) == "openai"
-
     def test_claude_date_suffix_stripped(self):
         assert resolve_model_provider(
             "claude-sonnet-5-20260101", REGISTRY

@@ -353,12 +353,6 @@ class TestCatalog:
         assert catalog.meta.cli_version_pin_required is False
         assert validate_catalog(catalog, live_cli_version="v9").ok
 
-    def test_unknown_live_version_skips_drift_check(self):
-        catalog = _catalog(
-            _entry("a", "anthropic"), _entry("b", "openai"), pin=True
-        )
-        assert validate_catalog(catalog, live_cli_version=None).ok
-
     def test_missing_provenance_fails(self):
         catalog = _catalog(_entry("a", ""), _entry("b", "openai"))
         result = validate_catalog(catalog)
@@ -1131,10 +1125,6 @@ class TestHandoffAcknowledgement:
         assert result.metadata["error_class"] == "handoff-incomplete"
         assert result.metadata["handoff_ack"] == "mismatch"
 
-    def test_handoff_incomplete_is_never_retryable(self):
-        spawner = HandoffSpawner(respond=lambda nonce: _ack_stdout("nope"))
-        assert _dispatch_big(spawner).metadata["retryable"] is False
-
     def test_payload_mutation_is_recorded_not_gated(self):
         spawner = HandoffSpawner(respond=_ack_stdout, mutate_payload=True)
         result = _dispatch_big(spawner)
@@ -1150,32 +1140,6 @@ class TestHandoffCleanup:
     def test_payload_deleted_after_success(self):
         spawner = HandoffSpawner(respond=_ack_stdout)
         _dispatch_big(spawner)
-        self._assert_removed(spawner)
-
-    def test_payload_deleted_after_spawn_failure(self):
-        spawner = HandoffSpawner(raises=RuntimeError("boom"))
-        result = _dispatch_big(spawner)
-        assert result.metadata["error_class"] == "generic-unknown"
-        self._assert_removed(spawner)
-
-    def test_payload_deleted_after_first_byte_timeout(self):
-        proc = FakeProcess()
-        proc.stdout = BlockingStream()
-        spawner = HandoffSpawner(process=proc)
-        result = _dispatch_big(
-            spawner, timeouts=TransportTimeouts(0.5, 0.1, 0.3)
-        )
-        assert result.metadata["error_class"] == "first-byte-timeout"
-        self._assert_removed(spawner)
-
-    def test_payload_deleted_after_total_timeout(self):
-        proc = FakeProcess()
-        proc.stdout = BlockingStream(lines=['{"type":"x"}\n'])
-        spawner = HandoffSpawner(process=proc)
-        result = _dispatch_big(
-            spawner, timeouts=TransportTimeouts(1.0, 2.0, 0.2)
-        )
-        assert result.metadata["error_class"] == "total-timeout"
         self._assert_removed(spawner)
 
     def test_payload_deleted_after_malformed_output(self):
@@ -1209,16 +1173,6 @@ class TestArgvCeiling:
         assert result.metadata["error_class"] == "argv-too-large"
         assert result.metadata["retryable"] is False
 
-    def test_other_spawn_errors_stay_generic(self):
-        def raising(argv, env):
-            raise OSError(2, "No such file or directory")
-
-        result = CopilotCliTransport(spawner=raising).dispatch(
-            model_id="m", system_prompt="", user_message="u"
-        )
-        assert result.metadata["error_class"] == "generic-unknown"
-
-
 class TestRoutedCallIsolation:
     """A routed call is not an orchestrator session. The CLI would
     otherwise load the workspace's AGENTS.md/CLAUDE.md into the system
@@ -1231,7 +1185,3 @@ class TestRoutedCallIsolation:
         )
         assert "--no-custom-instructions" in spawner.argv
 
-    def test_the_handoff_branch_disables_them_too(self):
-        spawner = HandoffSpawner(respond=_ack_stdout)
-        _dispatch_big(spawner)
-        assert "--no-custom-instructions" in spawner.argv

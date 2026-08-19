@@ -5,7 +5,7 @@ import pytest
 
 from ai_router import ledger
 from ai_router.evidence import snapshot_worktree_tree
-from ai_router.gates import GateResult, run_gates
+from ai_router.gates import run_gates
 from ai_router.session import register_session_start
 from tests.conftest import make_config
 
@@ -318,6 +318,3 @@ class TestDriver:
         assert "skipped" in results["working_tree_clean"].remediation
         assert not results["verification_clean"].passed  # still enforced
 
-    def test_results_are_typed_rows(self, close_ready):
-        repo, set_dir = close_ready
-        assert all(isinstance(r, GateResult) for r in run_gates(set_dir))

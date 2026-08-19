@@ -114,17 +114,6 @@ class TestAnthropic:
                 _provider_cfg(base_config, "anthropic"),
             )
 
-    def test_served_model_mismatch_warns(self, base_config, monkeypatch, capsys):
-        _mock_httpx(
-            monkeypatch, lambda req: httpx.Response(200, json=ANTHROPIC_OK)
-        )
-        call_model(
-            "anthropic", "a-sonnet", "s", "u", 100,
-            _provider_cfg(base_config, "anthropic"),
-        )
-        assert "served" in capsys.readouterr().err
-
-
 class TestGoogle:
     def test_key_travels_in_header_not_url(self, base_config, monkeypatch):
         captured = _mock_httpx(

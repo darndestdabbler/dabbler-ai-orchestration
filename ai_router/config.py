@@ -43,6 +43,13 @@ VALID_TRANSPORTS = (TRANSPORT_API, TRANSPORT_COPILOT_CLI)
 
 TRANSPORT_ENV_VAR = "DABBLER_TRANSPORT"
 
+CRITIQUE_PIPELINE_DEFAULT = "off"
+CRITIQUE_PIPELINE_SHADOW = "shadow"
+CRITIQUE_PIPELINE_ENFORCE = "enforce"
+# The set that implements enforcement. Named in the refusal so an operator
+# who sets 'enforce' early learns what they are waiting for.
+CRITIQUE_ENFORCE_SET = "145-lite-enforcement-and-projection"
+
 # Keys required in transports.copilot-cli when that transport is selected.
 _COPILOT_CLI_REQUIRED_KEYS = frozenset({"lockfile", "roles"})
 
@@ -195,6 +202,7 @@ def load_config(path: str | None = None) -> dict:
             )
 
     _validate_copilot_block(config)
+    _resolve_critique_block(config)
     _load_prompt_templates(config, config_path.parent)
 
     config["_config_path"] = str(config_path.resolve())
@@ -202,6 +210,29 @@ def load_config(path: str | None = None) -> dict:
         str(overrides_path.resolve()) if overrides_path is not None else None
     )
     return config
+
+
+def _resolve_critique_block(config: dict) -> None:
+    """Resolve the critique pipeline's authority, refusing a mode no code honours.
+
+    `enforce` is declared in the schema so the vocabulary lives in one
+    place, and refused here because nothing yet reads critique artifacts to
+    decide anything. Downgrading it silently to `shadow` would leave an
+    operator believing their work is being gated when it is not, which is
+    the failure this refusal exists to prevent.
+    """
+    block = config.get("critique") or {}
+    mode = block.get("pipeline", CRITIQUE_PIPELINE_DEFAULT)
+    if mode == CRITIQUE_PIPELINE_ENFORCE:
+        raise ValueError(
+            f"critique.pipeline: {CRITIQUE_PIPELINE_ENFORCE!r} is refused at "
+            f"load. Enforcement arrives with set {CRITIQUE_ENFORCE_SET}; "
+            f"until then the accepted values are "
+            f"{CRITIQUE_PIPELINE_DEFAULT!r} (the default, which writes "
+            f"nothing) and {CRITIQUE_PIPELINE_SHADOW!r}, which records "
+            "critique artifacts without letting them decide anything."
+        )
+    config["critique"] = {**block, "pipeline": mode}
 
 
 def _apply_local_overrides(config: dict, overrides_path: Path) -> dict:

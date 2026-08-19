@@ -22,7 +22,8 @@ Components:
    `session-state.json` and seeds the spec's step plan into
    `activity-log.json`, once.
 2. The orchestrating AI (Claude Code, Codex, Copilot, Gemini — any engine
-   that reads `CLAUDE.md`/`AGENTS.md`) does the work.
+   that reads `AGENTS.md` or the `CLAUDE.md`/`GEMINI.md` that import it)
+   does the work.
 3. `python -m ai_router.verify` runs the verification loop **before
    commit**: round 1 reviews the full working-tree diff; rounds ≥ 2
    review only the fix delta. The verifier is always a different

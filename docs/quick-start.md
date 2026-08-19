@@ -14,9 +14,15 @@ From your project root:
 python -m ai_router.bootstrap --project-dir .
 ```
 
-This writes a fenced managed block into `AGENTS.md` and `CLAUDE.md` —
-the orchestrator instructions every engine reads (Claude Code reads
-`CLAUDE.md`; Codex, Copilot, and Gemini read `AGENTS.md`; same body).
+This writes a fenced managed block into `AGENTS.md`, `CLAUDE.md` and
+`GEMINI.md`. `AGENTS.md` carries the body; the other two carry a
+one-line `@AGENTS.md` import plus their engine tail, so the instructions
+exist in exactly one place. All three are written because no single
+engine reads all three: Codex and Copilot read `AGENTS.md`, Claude Code
+reads only `CLAUDE.md`, and Gemini CLI reads only `GEMINI.md` unless its
+`context.fileName` setting is changed — while Copilot reads every one of
+them and de-duplicates nothing, which is why only one may hold the body.
+Claude Code and Gemini CLI both expand `@file` imports at load time.
 Existing files keep their user content; only the fenced section is
 refreshed. Re-run the command any time to refresh it.
 

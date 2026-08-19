@@ -332,6 +332,167 @@
       "dateTime": "2026-08-19T12:12:35.409247-04:00",
       "description": "Closing through the gate",
       "status": "in-progress"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-19T12:33:10.065701-04:00",
+      "description": "Register.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 2,
+      "stepKey": "implement-positive-evidence-provenance-in-eviden",
+      "dateTime": "2026-08-19T12:33:10.065701-04:00",
+      "description": "Implement positive-evidence provenance in `evidence.py`: every quote carries path, byte-or-line span, and content hash, and the framework \u2014 not the worker \u2014 verifies the quote against the reviewed tree. Where a supported parser exists, also check the AST kind at that location, so a string literal containing code-like text cannot satisfy a call-site contract.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 3,
+      "stepKey": "implement-framework-executed-absence-searches",
+      "dateTime": "2026-08-19T12:33:10.065701-04:00",
+      "description": "Implement framework-executed absence searches. The worker declares the literal, regex, or AST query and the closed scope; the framework reruns it and records scope, query, tool version, and result. A worker's assertion that it searched is not evidence that it searched.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 4,
+      "stepKey": "encode-the-unprovable-absence-fallback-ladder",
+      "dateTime": "2026-08-19T12:33:10.065701-04:00",
+      "description": "Encode the unprovable-absence fallback ladder, in order: deterministic test or analyzer, then a narrower positive counterexample check, then `blocked` plus manager adjudication, then human review for a designated class. **A `blocked` result may never be converted to `pass` because the worker ran out of context or tools** \u2014 that conversion must be structurally impossible, not merely discouraged.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 5,
+      "stepKey": "round-trip-one-seeded-fixture-end",
+      "dateTime": "2026-08-19T12:33:10.065701-04:00",
+      "description": "Round-trip one seeded fixture end to end: `prepare` through validated *empty* results, with the quote verifier, the absence re-execution, and the schema validators all exercised. No model is called.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 6,
+      "stepKey": "prove-the-fail-closed-edges",
+      "dateTime": "2026-08-19T12:33:10.065701-04:00",
+      "description": "Prove the fail-closed edges: a hand-edited artifact, a malformed record, a schema-version mismatch, and a quote whose hash does not match the tree each fail closed with a named refusal.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 7,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-19T12:33:10.065701-04:00",
+      "description": "Cross-provider verification.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 8,
+      "stepKey": "required-portion-of-the-full-test",
+      "dateTime": "2026-08-19T12:33:10.065701-04:00",
+      "description": "Required portion of the full test suite.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 9,
+      "stepKey": "close-out-and-the-end-of",
+      "dateTime": "2026-08-19T12:33:10.065701-04:00",
+      "description": "Close-out, and the end-of-set `change-log.md`.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-19T12:33:10.071892-04:00",
+      "description": "Registered session 3 (copilot).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-19T12:48:57.296165-04:00",
+      "description": "Registered session 3 (copilot/anthropic, claude-opus-5).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 2,
+      "stepKey": "implement-positive-evidence-provenance-in-eviden",
+      "dateTime": "2026-08-19T12:48:57.709429-04:00",
+      "description": "evidence.py: read_tree_blob/tree_paths read the reviewed tree by digest, not the worktree; verify_quote re-slices byte or line spans and re-hashes them; ast_kinds_at returns the enclosing node chain so a string literal cannot satisfy a call-site contract.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 3,
+      "stepKey": "implement-framework-executed-absence-searches",
+      "dateTime": "2026-08-19T12:48:58.156498-04:00",
+      "description": "run_absence_search re-executes the declared literal/regex/AST query over the closed scope and records scope, query, tool version and match count; a worker-declared count that disagrees is refused, and an empty scope is refused.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 4,
+      "stepKey": "encode-the-unprovable-absence-fallback-ladder",
+      "dateTime": "2026-08-19T12:49:10.377317-04:00",
+      "description": "UNPROVABLE_ABSENCE_LADDER plus next_absence_fallback in plan order; blocked->pass is closed structurally at two points: ledger.append_worker_result refuses a second row for a check already decided in an attempt, and verify_worker_result refuses a later pass on a check blocked for an out-of-reach reason unless the row carries framework-verified evidence.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 5,
+      "stepKey": "round-trip-one-seeded-fixture-end",
+      "dateTime": "2026-08-19T12:49:10.806416-04:00",
+      "description": "tests/fixtures/critique-roundtrip seeds widget.py, claims.json and checks.json; the round trip runs verify prepare, writes the check IR, and records a validated pass through the real quote verifier and absence re-execution. No model is called.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 6,
+      "stepKey": "prove-the-fail-closed-edges",
+      "dateTime": "2026-08-19T12:49:11.260268-04:00",
+      "description": "Named refusals: quote-hash-mismatch, quote-ast-kind-mismatch, quote-span-out-of-range, quote-malformed, quote-path-missing, quote-ast-unsupported/unparseable, absence-scope-empty, absence-search-disagrees, blocked-not-dischargeable. Hand-edited and malformed artifacts and schema-version drift stay the ledger's refusals from session 2.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 7,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-19T12:49:11.686575-04:00",
+      "description": "Targeted run first per plan 2.4: tests/test_critique_contracts.py, 4 passed. The full suite is the run of record after verification, not before.",
+      "status": "in-progress"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 7,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-19T13:05:01.224795-04:00",
+      "description": "VERIFIED round 3 (gpt-5.5/openai over copilot-cli). Round 1 returned two Majors and round 2 one, all correct: an optional ast_kind left the string-literal discrimination opt-in for the party it constrains; framework-verified evidence was allowed to discharge an out-of-reach blocked result; and an unregistered check_id silently disabled the quote contract.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 8,
+      "stepKey": "required-portion-of-the-full-test",
+      "dateTime": "2026-08-19T13:05:01.641710-04:00",
+      "description": "Full suite 455 passed in 159s, run after verification per plan 2.4. 444 + 11 is the set's whole allocation; the 480 ceiling is unchanged and 25 slots are free.",
+      "status": "complete"
     }
   ]
 }

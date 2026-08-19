@@ -580,11 +580,13 @@ def audits_path(
 
 def _append_validated(
     repo_root, set_slug: str, session_number: int, record: dict, validate,
-    noun: str, path_for,
+    noun: str, path_for, precheck=None,
 ) -> dict:
     _validated_or_quarantined(
         repo_root, set_slug, session_number, record, validate, noun
     )
+    if precheck is not None:
+        precheck(record)
     path = path_for(repo_root, set_slug, session_number, record["change_id"])
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "a", encoding="utf-8") as f:
@@ -604,9 +606,29 @@ def read_worker_results(
 def append_worker_result(
     repo_root, set_slug: str, session_number: int, record: dict
 ) -> dict:
+    """One result per check per attempt. A second row for a check already
+    decided in this attempt is not an append, it is a supersession — and a
+    superseded ``blocked`` is exactly how "we ran it again with more
+    context" turns into a pass. A remediation records a new attempt."""
+
+    def _one_result_per_attempt(row: dict) -> None:
+        for prior in read_worker_results(
+            repo_root, set_slug, session_number, row["change_id"]
+        ):
+            if (prior["check_id"], prior["attempt"]) == (
+                row["check_id"], row["attempt"]
+            ):
+                raise LedgerError(
+                    f"check {prior['check_id']} already has a "
+                    f"{prior['result']!r} result for attempt "
+                    f"{prior['attempt']}; worker results are append-only and "
+                    "a recorded result is never superseded within an attempt."
+                )
+
     return _append_validated(
         repo_root, set_slug, session_number, record, validate_worker_result,
         "worker result", worker_results_path,
+        precheck=_one_result_per_attempt,
     )
 
 

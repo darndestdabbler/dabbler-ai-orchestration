@@ -1,0 +1,31 @@
+[
+  {
+    "schema_version": 1,
+    "check_id": "no-shell-out",
+    "source": "corpus:seeded-round-trip",
+    "executor": "worker-model",
+    "objective": "Does the changed module call os.system anywhere?",
+    "selector": { "from": "changed-files", "filter": ["*.py"] },
+    "condition": { "not": { "exists": "Call:os.system" } },
+    "scope": { "paths": ["*.py"], "changed_only": true },
+    "branch": {
+      "shells_out": {
+        "when": { "exists": "Call:os.system" },
+        "outcome": "fail"
+      },
+      "clean": {
+        "when": {
+          "count": { "of": "Call:os.system", "operator": "eq", "value": 0 }
+        },
+        "outcome": "pass"
+      }
+    },
+    "evidence": {
+      "pass": { "requires": ["absence-search"] },
+      "fail": { "requires": ["quote"], "min_quotes": 1 },
+      "blocked": { "requires": ["adjudication-note"] }
+    },
+    "authorized_pulls": ["*.py"],
+    "bounds": { "max_files": 20, "max_bytes": 200000, "timeout_seconds": 30 }
+  }
+]

@@ -27,9 +27,9 @@
     {
       "number": 2,
       "title": "The refresh command, and the 2-request common case",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-19T07:06:51.646183-04:00",
-      "completedAt": null,
+      "completedAt": "2026-08-19T07:30:38.784790-04:00",
       "orchestrator": {
         "engine": "copilot",
         "provider": "anthropic",

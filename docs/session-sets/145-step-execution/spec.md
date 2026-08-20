@@ -245,8 +245,8 @@ failure produces a bisect range rather than an accusation.
 
 ## Test budget
 
-Sets 142–144 leave the count at **483**; this set adds **19** (7, 7, 5),
-reaching 502 of
+Sets 142–144 leave the count at **494**; this set adds **19** (7, 7, 5),
+reaching 513 of
 the 605 envelope. Session 2 is the largest allocation in the sequence
 because the step check is what every step's review rests on, and its
 distinct outcomes — fix, disprove, escalate, and the two-attempt bound on

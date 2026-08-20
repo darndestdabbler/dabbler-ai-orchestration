@@ -208,7 +208,7 @@ being quietly restated.
 
 ## Test budget
 
-Sets 142–145 leave the count at **502**; this set adds **10** (4, 4, 2),
-reaching **512 of 605**. Ninety-three slots remain unspent against the
+Sets 142–145 leave the count at **513**; this set adds **10** (4, 4, 2),
+reaching **523 of 605**. Eighty-two slots remain unspent against the
 envelope, which is the margin for being wrong — not budget to find a use
 for.

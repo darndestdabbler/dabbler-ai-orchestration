@@ -143,23 +143,35 @@ three and six.
    is invalid — the schema, not a reviewer, refuses it. So is a session
    declaring more than seven steps: the plan holds the session's own work
    only, never the lifecycle steps around it.
-3. Write the plan through the machine-owned writers set 141 built: validate
+3. Give sessions and steps one **authored** slug each, so a single name
+   addresses a step in `spec.md`, in `activity-log.json`, and as the plan's
+   `step_id` — rather than three naming schemes that agree by accident. Sets
+   already carry one in their directory name; a session declares its own in
+   its heading and a step declares its own inline, and `parse_session_plans`
+   and `parse_step_texts` read them. `plan_step_key`'s six-word truncation
+   stays as the fallback for a spec that declares none, so every existing
+   spec seeds exactly as it does today. The number remains the stable
+   address and the slug is the readable label: `[a-z0-9-]`, unique within
+   its session, short, and refused at write time like every other malformed
+   field.
+4. Write the plan through the machine-owned writers set 141 built: validate
    against the schema, then atomic replace. Hand-written or malformed plans
    fail closed, as every other artifact under the run directory does.
-4. Hash the plan at approval and bind the hash into the record. After
+5. Hash the plan at approval and bind the hash into the record. After
    approval the plan is immutable: the only legal change is an appended
    amendment, and any edit that is not an appended amendment is detected on
    the next read rather than tolerated.
-5. Derive risk flags mechanically from the file envelope and the repository
+6. Derive risk flags mechanically from the file envelope and the repository
    manifest — public interface, integration module, sensitive path,
    dependency change. A supervisor does not declare its own risk.
-6. Affected tests, recorded as the `preverify-targeted` evidence.
-7. Cross-provider verification; then the full suite once, against the
+7. Affected tests, recorded as the `preverify-targeted` evidence.
+8. Cross-provider verification; then the full suite once, against the
    final verified tree.
-8. Close-out.
+9. Close-out.
 
 **Creates:** `approved-plan.schema.json`, the machine-owned plan writer,
-approval hashing, derived risk flags. Est. 6 Python tests.
+authored slugs as the one step identity, approval hashing, derived risk
+flags. Est. 8 Python tests.
 
 ### Session 2 of 3: Checking the plan — free first, then cheap
 
@@ -237,13 +249,17 @@ only on derived high risk or repeated objection, and the record says which.
 
 An amendment re-checks only the changed part.
 
+One authored slug addresses a step everywhere it appears — the spec, the
+activity log, and the plan's `step_id`. A spec that declares none still
+seeds exactly as it does today, and the number is still the stable address.
+
 The 136–141 replay is published with its counts, and the operator has the
 amendment rate in hand before set 145 builds execution on top of it.
 
 ## Test budget
 
-Set 142 spent 22 and set 143 returns 11, leaving **466**; this set adds
-**17** (7, 7, 3), reaching 483 of the
+Set 142 spent 22 and set 143 returned 1, leaving **476**; this set adds
+**18** (8, 7, 3), reaching 494 of the
 605 envelope. Session 2 carries the largest allocation because the cheap
 reviewer's judgment is the load-bearing joint of the whole design — the
 one place where a weak criterion either gets caught or gets blessed.

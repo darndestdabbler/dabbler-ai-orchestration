@@ -290,3 +290,17 @@ class TestRunStages:
         (repo / "widget.py").write_text("W = 1\n", encoding="utf-8")
         verdict = self._verdict(repo, set_dir)
         assert not verdict.passed
+
+
+def test_the_run_of_record_recipe_names_what_stands_before_a_close():
+    """A verified session is not a closeable one. The message that says so
+    must name the complete run, its record, and the push -- a message that
+    stopped at "verified" is how a close gets attempted two steps early."""
+    from ai_router.test_evidence import run_of_record_recipe
+
+    text = run_of_record_recipe("docs/session-sets/s", "python",
+                                "python -m pytest")
+    assert "python -m pytest" in text
+    assert f"--stage {STAGE_FINAL_FULL}" in text
+    assert "git push" in text
+    assert "ai_router.session close" in text

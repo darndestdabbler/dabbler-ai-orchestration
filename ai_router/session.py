@@ -543,6 +543,14 @@ def start(
             )
             for r in plan_rows:
                 print(f"  {r.get('stepNumber')}. {r.get('stepKey')}")
+        print(
+            "Next, once the edits are made:\n"
+            f"  python -m ai_router.affected --session-set-dir {set_path}\n"
+            "It prints the tests this change makes necessary and the exact "
+            "command to run. The complete suite is not accepted before "
+            "verification -- it is the run of record, and it comes after the "
+            "final verified tree."
+        )
         return EXIT_OK
     finally:
         release_lock(lock)

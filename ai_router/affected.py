@@ -437,6 +437,47 @@ def targeted_command(base: str, result: SelectionResult) -> str:
     return " ".join((base, *result.test_paths))
 
 
+RECORD_PLACEHOLDER = "<the command you ran>"
+
+
+def record_command(session_set_dir, suite: str, command: str = "") -> str:
+    """The one rendering of the record line. Every message that asks for
+    pre-verification evidence prints this, so a caller cannot invent a
+    variant that names a flag the CLI does not take."""
+    return (
+        f"python -m ai_router.test_evidence record --session-set-dir "
+        f"{session_set_dir} --suite {suite or '<name>'} "
+        f"--stage preverify-targeted "
+        f"--command \"{command or RECORD_PLACEHOLDER}\" --outcome passed "
+        "--duration-seconds <elapsed>"
+    )
+
+
+def preverify_recipe(session_set_dir, suite: str, command: str) -> str:
+    """Run the selected tests, then record that run. Both lines or neither:
+    a message that named the run without the record would leave the caller
+    one refusal short of where it thought it was."""
+    return (
+        "Run the affected tests, then record that command:\n"
+        f"  {command}\n"
+        f"  {record_command(session_set_dir, suite, command)}"
+    )
+
+
+def remediation_recipe(session_set_dir, suite: str = "") -> str:
+    """What a fix must do before another round opens. The selector answers
+    again rather than being quoted from the last round: a fix moves the
+    surfaces, so the tests it now affects are not the tests the session
+    affected."""
+    return (
+        "Prove the fix before the next round:\n"
+        f"  python -m ai_router.affected --session-set-dir {session_set_dir}\n"
+        "  <run the command it prints>\n"
+        f"  {record_command(session_set_dir, suite)}\n"
+        f"  python -m ai_router.verify --session-set-dir {session_set_dir}"
+    )
+
+
 def _override_or_violation(override_reason, why: str, missing: tuple):
     """The two audited ways past a refusal, and the refusal itself."""
     if override_reason is not None:

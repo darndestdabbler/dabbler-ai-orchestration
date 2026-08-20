@@ -64,6 +64,22 @@ ACCEPTED_POLICIES = (
 
 TEST_RUNS_FILENAME = "test-runs.jsonl"
 
+
+def run_of_record_recipe(session_set_dir, suite: str, command: str) -> str:
+    """What stands between a verified tree and a close. A verified session is
+    not a closeable one: the complete suite has not yet run against the tree
+    that was verified, and nothing has been pushed."""
+    return (
+        "The run of record and the push remain:\n"
+        f"  {command}\n"
+        f"  python -m ai_router.test_evidence record --session-set-dir "
+        f"{session_set_dir} --suite {suite} --stage {STAGE_FINAL_FULL} "
+        "--outcome passed --duration-seconds <elapsed>\n"
+        "  git commit, then git push -- once, here\n"
+        f"  python -m ai_router.session close --session-set-dir "
+        f"{session_set_dir}"
+    )
+
 # Set-dir files the sanctioned writers own; they change during a session
 # and must not count as "the covered surfaces changed".
 SET_BOOKKEEPING_BASENAMES = frozenset({
@@ -721,9 +737,10 @@ def main(argv=None) -> int:
         # Written, then refused: the wasted run is the evidence, and a
         # refusal that suppressed its own record would hide the ceremony it
         # exists to price.
+        from .affected import preverify_recipe
+
         remedy = (
-            f"Run the affected tests, then record that command:\n"
-            f"  {sanctioned}"
+            preverify_recipe(args.session_set_dir, suite.name, sanctioned)
             if sanctioned
             else "Nothing needed to run here; record nothing and go "
                  "straight to verification."
@@ -737,6 +754,18 @@ def main(argv=None) -> int:
     print(f"recorded {record.suite} [{record.stage}]: {record.outcome} "
           f"(digest {record.surface_digest[:12]})"
           + (f" policy {record.policy}" if record.policy else ""))
+    if record.outcome == OUTCOME_PASSED:
+        if record.stage == STAGE_PREVERIFY_TARGETED:
+            print(
+                f"Next: python -m ai_router.verify --session-set-dir "
+                f"{args.session_set_dir}"
+            )
+        elif record.stage == STAGE_FINAL_FULL:
+            print(
+                "Next: git commit, then git push -- once -- then\n"
+                f"  python -m ai_router.session close --session-set-dir "
+                f"{args.session_set_dir}"
+            )
     return 0
 
 

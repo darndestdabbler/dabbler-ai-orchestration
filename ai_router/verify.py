@@ -311,6 +311,22 @@ def _dispatch_verification(
 
 # --- The loop entry point ----------------------------------------------------
 
+def _run_of_record_lines(set_path, config) -> str:
+    """The close is two steps away from a verified tree, and this names them.
+    A malformed or suite-less config says nothing rather than guessing a
+    command: a wrong command here is what the message exists to prevent."""
+    from .test_evidence import load_suites_checked, run_of_record_recipe
+
+    loaded = load_suites_checked(config)
+    suite = next((s for s in loaded.suites if s.expensive), None)
+    if loaded.errors or suite is None:
+        return (
+            "The run of record and the push remain before "
+            "`python -m ai_router.session close`."
+        )
+    return run_of_record_recipe(set_path, suite.name, suite.command)
+
+
 def run_round(
     set_dir, *, max_rounds: Optional[int] = None, transport: Optional[str] = None,
 ) -> int:
@@ -321,7 +337,7 @@ def run_round(
 
     A round never opens on unproved work: the affected tests come first, and
     a full-suite run is not a substitute for them."""
-    from .affected import preverify_gate
+    from .affected import preverify_gate, preverify_recipe, remediation_recipe
     from .config import load_config
     from .route import NoCandidateError, RouterError
     from .session import append_change_log_block, record_session_verification
@@ -410,13 +426,8 @@ def run_round(
     # run first.
     gate = preverify_gate(repo_root, set_path, config)
     if not gate.ok:
-        remedy = (
-            "Run the affected tests, then record that command:\n"
-            f"  {gate.command}\n"
-            f"  python -m ai_router.test_evidence record --session-set-dir "
-            f"{set_path} --suite {gate.suite} --stage preverify-targeted "
-            f"--command \"{gate.command}\" --outcome passed "
-            "--duration-seconds <elapsed>"
+        remedy = preverify_recipe(
+            set_path, gate.suite, gate.command
         ) if gate.command else (
             "There is no targeted command to offer you: declare the missing "
             "mapping under testing.selection so the selector can answer for "
@@ -548,8 +559,8 @@ def run_round(
             f"verify: round {round_number} — {verdict} with "
             f"{len(classification.blocking_issues)} blocking finding(s) "
             f"(verifier {result.model_name}/{result.provider}). Raw output: "
-            f"{raw_path}\nRemediate, then re-run the same command to open "
-            f"round {round_number + 1}."
+            f"{raw_path}\n"
+            + remediation_recipe(set_path, gate.suite)
         )
         return EXIT_BLOCKING
 
@@ -584,7 +595,8 @@ def run_round(
     print(
         f"verify: round {round_number} — {verdict} "
         f"(verifier {result.model_name}/{result.provider}); "
-        f"session {current} is clear to close."
+        f"session {current} is verified.\n"
+        + _run_of_record_lines(set_path, config)
     )
     return EXIT_OK
 

@@ -254,13 +254,12 @@ class TestProjectionSteps:
         assert steps[0]["status"] == "complete"
         assert steps[0]["isPlanned"]
         assert steps[0]["startedAt"] == "t2"  # the logged time, not the seed
-        # The next planned row derives active (in-flight, nothing answers).
-        assert steps[1]["isActive"]
-        assert steps[1]["box"] == "[~]"
+        # An unlogged planned row is not active, and does not borrow a start
+        # time: only the record marks a step.
+        assert not steps[1]["isActive"]
+        assert steps[1]["box"] == "[ ]"
         assert steps[1]["status"] == "pending"  # the record is never edited
-        # The derived-active row starts when it became the frontier: the
-        # last logged event. Display-only, like the active marker.
-        assert steps[1]["startedAt"] == "t2"
+        assert steps[1]["startedAt"] is None
 
     def test_logged_start_survives_later_status_entries(self, tmp_path):
         # A step logged in-progress and later complete keeps the

@@ -483,7 +483,6 @@ UNKNOWN_BOX = "[?]"
 _BOX_TO_STATE = {"[ ]": "pending", "[~]": "in-progress", "[x]": "complete",
                  "[!]": "blocked"}
 _RECORD_ANSWERS_BOXES = {"[~]", "[!]"}
-_UNSTARTED_STATUSES = {"pending", "not-started"}
 
 # The four icon assets the extension ships; blocked/failed fold into
 # cancelled ("this did not go well") and an unknown token falls back to
@@ -594,27 +593,6 @@ def build_step_rows(set_dir, session_number: int) -> list:
     return rows
 
 
-def _mark_active_step(rows: list, in_flight: bool) -> None:
-    """Derive the one 'active' row: display-only, never written back. Only
-    when the session is in flight, no row already answers with [~]/[!],
-    and the candidate's status is a token the table knows is unstarted."""
-    for row in rows:
-        row["isActive"] = False
-    if not in_flight:
-        return
-    for row in rows:
-        if STATUS_BOXES.get(_py_str(row.get("status")).lower()) in (
-            _RECORD_ANSWERS_BOXES
-        ):
-            return
-    for row in rows:
-        if row.get("isPlanned") and _py_str(
-            row.get("status")
-        ).lower() in _UNSTARTED_STATUSES:
-            row["isActive"] = True
-            return
-
-
 # --- The projection ---------------------------------------------------------
 
 def build_projection(set_dir) -> dict:
@@ -677,43 +655,29 @@ def build_projection(set_dir) -> dict:
         }
         if in_flight and isinstance(number, int):
             rows = build_step_rows(set_path, number)
-            _mark_active_step(rows, in_flight=True)
-            # The derived active row's start is the moment it became the
-            # frontier: the last logged event (falling back to the session
-            # start). Display-only inference, like the active marker
-            # itself — engines log completions, not beginnings, so the
-            # record has no start line to read.
-            logged_times = [
-                r.get("dateTime") for r in rows
-                if is_logged_step(r) and r.get("dateTime")
-            ]
-            frontier = (
-                max(logged_times) if logged_times else entry.get("startedAt")
-            )
+            # Only the record marks a step. A row is never active because it
+            # is the first one not yet logged: that inference put the marker
+            # five rows behind a session whose verification had already
+            # opened, and a confidently wrong marker is worse than none.
             for position, row in enumerate(rows):
-                raw_status = row.get("status")
-                effective = (
-                    "in-progress" if row.get("isActive") else raw_status
+                status = row.get("status")
+                # A plan row's dateTime is only when the plan was seeded, so
+                # only a logged row can say when its step began.
+                started = (
+                    row.get("firstDateTime") or row.get("dateTime")
+                    if is_logged_step(row) else None
                 )
-                if is_logged_step(row):
-                    # The step's start, not its latest status change — a
-                    # plan row's dateTime is only when the plan was seeded.
-                    started = row.get("firstDateTime") or row.get("dateTime")
-                elif row.get("isActive"):
-                    started = frontier
-                else:
-                    started = None
                 session_out["steps"].append({
                     "position": position,
                     "stepNumber": row.get("stepNumber"),
                     "stepKey": _py_str(row.get("stepKey")) or None,
                     "description": _py_str(row.get("description")),
-                    "status": raw_status,
-                    "state": step_state(effective),
+                    "status": status,
+                    "state": step_state(status),
                     "box": STATUS_BOXES.get(
-                        _py_str(effective).lower(), UNKNOWN_BOX
+                        _py_str(status).lower(), UNKNOWN_BOX
                     ),
-                    "iconKey": step_icon_key(effective),
+                    "iconKey": step_icon_key(status),
                     "isPlanned": bool(row.get("isPlanned")),
                     "isActive": bool(row.get("isActive")),
                     "startedAt": started,

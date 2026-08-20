@@ -574,6 +574,10 @@ testing:
         select:
           - tests/test_affected.py
           - tests/test_verify.py
+      - when: ai_router/approved_plan.py
+        select:
+          - tests/test_approved_plan.py
+          - tests/test_session.py
       - when: ai_router/bootstrap.py
         select:
           - tests/test_bootstrap.py

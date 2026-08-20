@@ -283,3 +283,29 @@ class TestTheGate:
 
         gate = preverify_gate(repo, set_dir, self.CONFIG)
         assert gate.command == "python -m pytest tests/test_thing.py"
+
+
+class TestNextCommandMessages:
+    """Every message that asks for pre-verification evidence names the whole
+    recipe. Naming the run without the record, or the round without the run,
+    leaves the reader one refusal short of where the message implied."""
+
+    def test_the_preverify_recipe_names_the_run_and_the_record(self):
+        from ai_router.affected import preverify_recipe
+
+        text = preverify_recipe("docs/session-sets/s", "python",
+                                "python -m pytest tests/test_thing.py")
+        assert "python -m pytest tests/test_thing.py" in text
+        assert "--stage preverify-targeted" in text
+        assert "--suite python" in text
+
+    def test_the_remediation_recipe_routes_back_through_the_selector(self):
+        """A blocking round that said only 're-run verify' would earn a
+        refusal at the gate: the fix moved the surfaces, so the evidence the
+        round was opened on no longer answers for them."""
+        from ai_router.affected import remediation_recipe
+
+        text = remediation_recipe("docs/session-sets/s", "python")
+        assert "ai_router.affected" in text
+        assert "--stage preverify-targeted" in text
+        assert "ai_router.verify" in text

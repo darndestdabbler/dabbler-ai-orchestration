@@ -1,0 +1,109 @@
+{
+  "sessionSetName": "148-model-direction-check",
+  "createdDate": "2026-08-20T08:03:20.137424-04:00",
+  "totalSessions": 1,
+  "entries": [
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-20T08:03:20.137695-04:00",
+      "description": "Register.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "correct-the-four-stale-self-references",
+      "dateTime": "2026-08-20T08:03:20.137695-04:00",
+      "description": "Correct the four stale self-references named in the table above, in the two spec files, and change nothing else.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "affected-tests-as-preverify",
+      "dateTime": "2026-08-20T08:03:20.137695-04:00",
+      "description": "Affected tests as preverify.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-20T08:03:20.137695-04:00",
+      "description": "Cross-provider verification.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "full-test-suite-recorded-as-the",
+      "dateTime": "2026-08-20T08:03:20.137695-04:00",
+      "description": "Full test suite, recorded as the `final-full` run of record.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 6,
+      "stepKey": "close-out",
+      "dateTime": "2026-08-20T08:03:20.137695-04:00",
+      "description": "Close-out.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-20T08:03:20.143956-04:00",
+      "description": "Registered session 1 (copilot).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-20T08:03:53.456181-04:00",
+      "description": "Register.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "correct-the-four-stale-self-references",
+      "dateTime": "2026-08-20T08:03:54.068552-04:00",
+      "description": "Correct the four stale self-references named in the table above, in the two spec files, and change nothing else.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "affected-tests-as-preverify",
+      "dateTime": "2026-08-20T08:04:35.888814-04:00",
+      "description": "Ran ai_router.affected: selector reports 'no tests affected by this change set' (scope HEAD), so no targeted run was needed and no preverify-targeted record was made - recording one would be a policy_violation.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-20T08:13:24.188055-04:00",
+      "description": "Cross-provider verification.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "full-test-suite-recorded-as-the",
+      "dateTime": "2026-08-20T08:13:25.045357-04:00",
+      "description": "Full test suite, recorded as the `final-full` run of record.",
+      "status": "complete"
+    }
+  ]
+}

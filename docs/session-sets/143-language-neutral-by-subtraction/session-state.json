@@ -1,7 +1,7 @@
 {
   "schemaVersion": 4,
   "sessionSetName": "143-language-neutral-by-subtraction",
-  "status": "in-progress",
+  "status": "complete",
   "sessions": [
     {
       "number": 1,
@@ -47,9 +47,9 @@
     {
       "number": 3,
       "title": "Delete the coverage path, and prove the envelope shrank",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-20T01:17:56.572791-04:00",
-      "completedAt": null,
+      "completedAt": "2026-08-20T01:54:36.359451-04:00",
       "orchestrator": {
         "engine": "copilot",
         "provider": "anthropic",

@@ -162,10 +162,11 @@ be a gate guarding a habit.
 7. Add the step to `docs/quick-start.md` between "Work the steps" and
    "Close", where a developer following the lifecycle will meet it in the
    order they will actually run it.
-8. Affected tests, recorded as the `preverify-targeted` evidence.
-9. Cross-provider verification; then the full suite once, against the
-   final verified tree.
-10. Close-out.
+8. Affected tests as preverify.
+9. Cross-provider verification.
+10. Full test suite, recorded as the `final-full` run of record.
+11. Close-out.
+12. Technical/educational documentation.
 
 **Creates:** the seeded step, the `walkthrough` subcommand, the fence
 writer, the projection field, the lifecycle documentation. Est. 7 Python
@@ -191,10 +192,11 @@ tests.
 6. Write both of this set's own walkthroughs, session 1's included. If the
    template cannot explain the work of the session that built it, it is
    the wrong template.
-7. Affected tests, recorded as the `preverify-targeted` evidence.
-8. Cross-provider verification; then the full suite once, against the
-   final verified tree.
-9. Close-out, and the end-of-set `change-log.md`.
+7. Affected tests as preverify.
+8. Cross-provider verification.
+9. Full test suite, recorded as the `final-full` run of record.
+10. Close-out, and the end-of-set `change-log.md`.
+11. Technical/educational documentation.
 
 **Creates:** the watcher and cache wiring, the session-row action, two
 worked examples. Est. 3 TypeScript tests.

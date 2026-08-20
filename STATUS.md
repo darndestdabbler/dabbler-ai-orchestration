@@ -58,18 +58,21 @@ still need their one test. LOC is where the subtraction shows: **−466**, or
   declared mapping an acceptable replacement for an inferred one.
 - **Three stale skip-path passages were corrected** in the specs for sets 144
   and 145, all left behind by the resequencing.
-- **Session step lists change from set 145.** The full-suite run becomes its
-  own plan row rather than a clause on the verification row — it is a
-  separately recorded stage bound to its own digest, and burying it hides the
-  run of record from the activity log. Technical/educational documentation
-  becomes a plan row **after close**, alongside STATUS.md, for the same
-  reason STATUS.md lands there: content written after the verified snapshot
-  fails `verification_clean`.
+- **Session step lists changed from set 145**, and are written into the specs
+  for 145, 146 and 147. The full-suite run is its own plan row rather than a
+  clause on the verification row — it is a separately recorded stage bound to
+  its own digest, and burying it hid the run of record from the activity log.
+  Technical/educational documentation is a plan row **after close**, alongside
+  STATUS.md, for the same reason STATUS.md lands there: content written after
+  the verified snapshot fails `verification_clean`. "Affected tests as
+  preverify" replaces the longer wording. Set 144 keeps the old lifecycle rows
+  and names both new ones as lifecycle, so its plan schema still excludes them.
 - **Plan step keys are derived, not declared.** `plan_step_key` truncates the
   step's first clause to six words, which produces keys like
   `close-out-and-the-end-of`. `stepNumber` is the stable address and the key
-  is a label, so nothing is broken — but set 144's approved-plan schema is
-  where a declared per-step slug belongs.
+  is a label, so nothing is broken — but **set 144 session 1 now owns** giving
+  sessions and steps one authored slug, used by `spec.md`, `activity-log.json`
+  and the plan's `step_id` alike, with the derived key as the fallback.
 
 **Next: set 144** (the approved plan), then 145 (step execution), 146
 (measure then enable), 147 (session walkthroughs).

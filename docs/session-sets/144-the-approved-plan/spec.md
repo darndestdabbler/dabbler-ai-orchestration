@@ -98,8 +98,9 @@ That is why session 2 spends its whole budget on judging proofs.
 ## What the plan contains, and how much of it
 
 The plan carries the session's **own** steps and nothing else. Register,
-the affected-test run, cross-provider verification, the run of record and
-close-out are the lifecycle, not the work: they have no file envelope, no
+the affected-test run, cross-provider verification, the run of record,
+close-out and the documentation pass that follows it are the lifecycle, not
+the work: they have no file envelope, no
 evidence of their own to declare, and no diff for set 145 to review. Keeping
 them out is structural rather than a flag — a step kind a supervisor sets is
 a step kind a supervisor sets wrong, and a ceremony step that never enters
@@ -111,7 +112,8 @@ at.
 so it is refused at write time and no model is ever asked to count. Seven is
 deliberately generous: every session pays the same fixed ceremony — register,
 the affected-test run, cross-provider verification, the run of record,
-close-out — and a tight cap does not remove that toll, it makes the session
+close-out, documentation — and a tight cap does not remove that toll, it
+makes the session
 pay it more often. The bound is here to keep step-level review cost from
 growing without limit, not to force decomposition. The sets planned so far sit between
 three and six.

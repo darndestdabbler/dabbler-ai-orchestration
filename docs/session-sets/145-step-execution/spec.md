@@ -156,10 +156,11 @@ framework; `blocked` is terminal.
    spend.
 5. Refuse a manual commit while a step is open, with a message naming the
    step and the command that closes it.
-6. Affected tests, recorded as the `preverify-targeted` evidence.
-7. Cross-provider verification; then the full suite once, against the
-   final verified tree.
-8. Close-out.
+6. Affected tests as preverify.
+7. Cross-provider verification.
+8. Full test suite, recorded as the `final-full` run of record.
+9. Close-out.
+10. Technical/educational documentation.
 
 **Creates:** step open/close, envelope enforcement, the deterministic
 pass, the manual-commit refusal. Est. 7 Python tests.
@@ -186,10 +187,11 @@ pass, the manual-commit refusal. Est. 7 Python tests.
    remembering to log it afterwards. `start_session` already sets this
    precedent for the `register` step, and this is the same move for the
    rest of them.
-6. Affected tests, recorded as the `preverify-targeted` evidence.
-7. Cross-provider verification; then the full suite once, against the
-   final verified tree.
-8. Close-out.
+6. Affected tests as preverify.
+7. Cross-provider verification.
+8. Full test suite, recorded as the `final-full` run of record.
+9. Close-out.
+10. Technical/educational documentation.
 
 **Creates:** the narrow step check, the evidence question, the three
 responses, framework-owned commits. Est. 7 Python tests.
@@ -210,10 +212,11 @@ responses, framework-owned commits. Est. 7 Python tests.
    `verify.py` below 1,200 lines. The module count may rise; this is the
    set where the extraction has to land, because it is the last one that
    adds substantial execution code.
-6. Affected tests, recorded as the `preverify-targeted` evidence.
-7. Cross-provider verification; then the full suite once, against the
-   final verified tree.
-8. Close-out, and the end-of-set `change-log.md`.
+6. Affected tests as preverify.
+7. Cross-provider verification.
+8. Full test suite, recorded as the `final-full` run of record.
+9. Close-out, and the end-of-set `change-log.md`.
+10. Technical/educational documentation.
 
 **Creates:** session-start baseline resolution, the bisect report, the
 `verify.py` extraction. Est. 5 Python tests.

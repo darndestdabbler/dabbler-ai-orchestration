@@ -27,9 +27,9 @@
     {
       "number": 2,
       "title": "Checking the plan \u2014 free first, then cheap",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-20T04:15:28.429238-04:00",
-      "completedAt": null,
+      "completedAt": "2026-08-20T05:09:13.373911-04:00",
       "orchestrator": {
         "engine": "copilot",
         "provider": "anthropic",

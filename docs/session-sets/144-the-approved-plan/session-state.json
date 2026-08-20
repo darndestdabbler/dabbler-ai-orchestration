@@ -1,7 +1,7 @@
 {
   "schemaVersion": 4,
   "sessionSetName": "144-the-approved-plan",
-  "status": "in-progress",
+  "status": "complete",
   "sessions": [
     {
       "number": 1,
@@ -48,9 +48,9 @@
     {
       "number": 3,
       "title": "Amendments, and the completeness question",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-20T05:13:03.126878-04:00",
-      "completedAt": null,
+      "completedAt": "2026-08-20T05:52:36.043226-04:00",
       "orchestrator": {
         "engine": "copilot",
         "provider": "anthropic",

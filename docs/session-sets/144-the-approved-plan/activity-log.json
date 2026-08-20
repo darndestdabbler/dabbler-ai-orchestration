@@ -91,6 +91,134 @@
       "dateTime": "2026-08-20T02:08:38.340677-04:00",
       "description": "Registered session 1 (copilot).",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-20T04:15:28.530097-04:00",
+      "description": "Register.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 2,
+      "stepKey": "implement-the-free-mechanical-checks-which",
+      "dateTime": "2026-08-20T04:15:28.530097-04:00",
+      "description": "Implement the free mechanical checks, which run before any model: does every session goal have at least one step; does every step declare an evidence contract; does every step declare a file envelope; do the envelopes collectively cover the goals; were risk flags derived. These are the dumb, valuable checks and they cost nothing.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 3,
+      "stepKey": "implement-the-cheap-model-review-against",
+      "dateTime": "2026-08-20T04:15:28.530097-04:00",
+      "description": "Implement the cheap model review against a short fixed checklist, answering per step: **approve, amend, or send to a human**. Its assignment is the proof, not the prose \u2014 *would this evidence actually tell us the step worked?* \u2014 and the checklist is fixed text, not free-form critique.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 4,
+      "stepKey": "implement-the-anti-grind-rules-mechanically",
+      "dateTime": "2026-08-20T04:15:28.530097-04:00",
+      "description": "Implement the anti-grind rules, mechanically: a revision that does not touch the fields the reviewer objected to **bounces automatically** without a model call, and after two rejected revisions the expensive model or the human takes over. A supervisor cannot resubmit its way to an approval.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 5,
+      "stepKey": "route-to-the-expensive-model-only",
+      "dateTime": "2026-08-20T04:15:28.530097-04:00",
+      "description": "Route to the expensive model only when a step carries a high risk flag, or when the cheap reviewer has objected twice. Record which trigger fired.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 6,
+      "stepKey": "affected-tests-recorded-as-the-preverify",
+      "dateTime": "2026-08-20T04:15:28.530097-04:00",
+      "description": "Affected tests, recorded as the `preverify-targeted` evidence.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 7,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-20T04:15:28.530097-04:00",
+      "description": "Cross-provider verification; then the full suite once, against the final verified tree.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 8,
+      "stepKey": "close-out",
+      "dateTime": "2026-08-20T04:15:28.530097-04:00",
+      "description": "Close-out.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-20T04:15:28.533811-04:00",
+      "description": "Registered session 2 (copilot).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 2,
+      "stepKey": "implement-the-free-mechanical-checks-which",
+      "dateTime": "2026-08-20T04:53:22.668496-04:00",
+      "description": "Free mechanical checks: schema (reported, not restated), goal-without-step, step-without-goal, envelope-omits-named-file, risk-flags-not-derived.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 3,
+      "stepKey": "implement-the-cheap-model-review-against",
+      "dateTime": "2026-08-20T04:53:23.138272-04:00",
+      "description": "Cheap checklist review: fixed checklist and response form, per-step approve/amend/human, unanswered or unreadable fails closed to human.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 4,
+      "stepKey": "implement-the-anti-grind-rules-mechanically",
+      "dateTime": "2026-08-20T04:53:23.613389-04:00",
+      "description": "Anti-grind: objected-field digests bounce a resubmission with no model call; two cheap-reviewer objections escalate.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 5,
+      "stepKey": "route-to-the-expensive-model-only",
+      "dateTime": "2026-08-20T04:53:24.089402-04:00",
+      "description": "Premium routing on derived high risk or repeat objection, with the triggers recorded as a list.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 6,
+      "stepKey": "affected-tests-recorded-as-the-preverify",
+      "dateTime": "2026-08-20T05:08:30.587800-04:00",
+      "description": "Targeted preverify recorded for the session and for each remediation.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 7,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-20T05:08:31.057945-04:00",
+      "description": "VERIFIED round 3 (gpt-5.5/openai); round-1 premium-routing finding disputed and withdrawn. Full suite 524 passed, recorded final-full.",
+      "status": "complete"
     }
   ]
 }

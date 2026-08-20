@@ -625,6 +625,9 @@ testing:
       - when: ai_router/modules.py
         select:
           - tests/test_modules.py
+      - when: ai_router/plan_review.py
+        select:
+          - tests/test_plan_review.py
       - when: ai_router/pricing.py
         select:
           - tests/test_pricing.py
@@ -716,6 +719,8 @@ testing:
       - when: ai_router/schemas/
         select:
           - tests/test_critique_contracts.py
+          - tests/test_approved_plan.py
+          - tests/test_plan_review.py
       - when: ai_router/prompt-templates/
         select:
           - tests/test_verify.py

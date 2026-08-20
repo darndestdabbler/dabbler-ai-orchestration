@@ -6,9 +6,9 @@
     {
       "number": 1,
       "title": "Envelope enforcement and the deterministic pass",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-20T05:58:48.992113-04:00",
-      "completedAt": null,
+      "completedAt": "2026-08-20T08:52:48.067102-04:00",
       "orchestrator": {
         "engine": "copilot",
         "provider": "anthropic",
@@ -17,7 +17,7 @@
       },
       "verificationVerdict": "VERIFIED",
       "verification": {
-        "rounds": 4,
+        "rounds": 5,
         "verifierModel": "gpt-5.5",
         "verifierProvider": "openai",
         "transport": "copilot-cli",

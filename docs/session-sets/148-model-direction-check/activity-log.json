@@ -104,6 +104,14 @@
       "dateTime": "2026-08-20T08:13:25.045357-04:00",
       "description": "Full test suite, recorded as the `final-full` run of record.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 6,
+      "stepKey": "close-out",
+      "dateTime": "2026-08-20T08:14:03.548345-04:00",
+      "description": "Close-out.",
+      "status": "complete"
     }
   ]
 }

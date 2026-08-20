@@ -1,14 +1,14 @@
 {
   "schemaVersion": 4,
   "sessionSetName": "148-model-direction-check",
-  "status": "in-progress",
+  "status": "complete",
   "sessions": [
     {
       "number": 1,
       "title": "Correct the stale self-references",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-20T08:03:19.982447-04:00",
-      "completedAt": null,
+      "completedAt": "2026-08-20T08:14:08.069848-04:00",
       "orchestrator": {
         "engine": "copilot",
         "provider": "anthropic",

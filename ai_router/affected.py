@@ -500,6 +500,11 @@ class PreverifyGate:
     reason: str = ""
     suite: str = ""
     command: str = ""
+    # ((suite, command, policy), ...) for each run that satisfied the gate.
+    # A verdict that says only "accepted" cannot be audited later: the
+    # record has to name the command it accepted and what made it
+    # acceptable, or nothing downstream can tell which run was blessed.
+    accepted: tuple = ()
 
 
 def _command_tokens(command) -> frozenset:
@@ -660,6 +665,7 @@ def preverify_gate(repo_root, session_set_dir, config) -> PreverifyGate:
         # front of verification on the most ordinary change there is.
         return PreverifyGate(True)
     records = read_records(repo_root, Path(session_set_dir).name)
+    accepted = []
     for suite in expensive:
         current = surface_digest(
             repo_root, suite.covers, session_set_dir=session_set_dir,
@@ -675,12 +681,17 @@ def preverify_gate(repo_root, session_set_dir, config) -> PreverifyGate:
             r for r in records
             if r.suite == suite.name and r.stage == STAGE_PREVERIFY_TARGETED
         ]
-        if any(
-            r.policy in ACCEPTED_POLICIES
-            and r.outcome == OUTCOME_PASSED
-            and r.surface_digest == current
-            for r in mine
-        ):
+        blessed = next(
+            (
+                r for r in mine
+                if r.policy in ACCEPTED_POLICIES
+                and r.outcome == OUTCOME_PASSED
+                and r.surface_digest == current
+            ),
+            None,
+        )
+        if blessed is not None:
+            accepted.append((suite.name, blessed.command, blessed.policy))
             continue
         if not mine:
             why = f"no pre-verification run of {suite.name} is recorded"
@@ -705,7 +716,7 @@ def preverify_gate(repo_root, session_set_dir, config) -> PreverifyGate:
         return PreverifyGate(
             False, why, suite.name, targeted_command(suite.command, result),
         )
-    return PreverifyGate(True)
+    return PreverifyGate(True, accepted=tuple(accepted))
 
 
 # --- CLI ---------------------------------------------------------------------

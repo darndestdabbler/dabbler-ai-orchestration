@@ -210,6 +210,43 @@ class TestRoundOne:
         record_preverify(repo, set_dir)
         assert run_round(set_dir) == EXIT_OK
 
+    def test_a_red_required_control_returns_before_any_model_spend(
+        self, flight, monkeypatch, capsys
+    ):
+        """Deterministic controls are the cheapest reader the work will ever
+        get. A required one that is not green comes back to its author, and
+        the fact is on the record either way -- a refusal that leaves no
+        trace is indistinguishable from a round nobody ran."""
+        import importlib
+
+        repo, set_dir, install = flight
+        fake = install([make_result(CLEAN_RESPONSE)])
+        config_module = importlib.import_module("ai_router.config")
+        real_load = config_module.load_config
+
+        def with_a_missing_linter(*args, **kwargs):
+            config = real_load(*args, **kwargs)
+            config["testing"] = dict(config.get("testing") or {})
+            config["testing"]["controls"] = [{
+                "kind": "lint", "command": "definitely-not-a-real-binary",
+                "required": True,
+            }]
+            return config
+
+        monkeypatch.setattr(config_module, "load_config",
+                            with_a_missing_linter)
+
+        assert run_round(set_dir) == EXIT_USAGE
+        assert fake.calls == []
+        assert ledger.read_rounds(repo, set_dir.name, 1) == []
+        err = capsys.readouterr().err
+        assert "lint" in err and "UNKNOWN" in err
+        recorded = json.loads(
+            (repo / ".dabbler" / "runs" / set_dir.name
+             / "deterministic-facts.jsonl").read_text(encoding="utf-8")
+        )
+        assert recorded["changedLineCoverage"]["status"] == "unknown"
+
 
 class TestLoop:
     def test_round_two_is_fix_delta_with_prior_findings(self, flight):

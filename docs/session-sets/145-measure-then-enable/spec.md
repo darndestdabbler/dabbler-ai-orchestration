@@ -110,8 +110,9 @@ abstract baseline. For each corpus case, run both and report:
    plan-first path from sets 142–144 in shadow. Same cases, same trees,
    same provider mix. A comparison that changes two variables measures
    nothing.
-5. Cross-provider verification.
-6. Affected tests before verification; the full suite once, after.
+5. Affected tests, recorded as the `preverify-targeted` evidence.
+6. Cross-provider verification; then the full suite once, against the
+   final verified tree.
 7. Close-out.
 
 **Creates:** the corpus with its holdout, the extended acceptance script,
@@ -133,8 +134,9 @@ the paired shadow run. Est. 4 Python tests.
 4. Produce the comparison report: cost per case, recall with denominators,
    ceremony share, amendment rate, and the completeness gap. State plainly
    where a denominator is too small to support a claim.
-5. Cross-provider verification.
-6. Affected tests before verification; the full suite once, after.
+5. Affected tests, recorded as the `preverify-targeted` evidence.
+6. Cross-provider verification; then the full suite once, against the
+   final verified tree.
 7. Close-out.
 
 **Creates:** token-cost recording, the corrected refresh preview, the
@@ -168,8 +170,9 @@ head-to-head comparison report. Est. 4 Python tests.
    set's scope; both are recorded here so nobody re-derives them.
 6. Report the envelope: final LOC, module count, Python tests, and TS
    tests against the +33% ceilings, and `verify.py`'s final size.
-7. Cross-provider verification.
-8. Affected tests before verification; the full suite once, after.
+7. Affected tests, recorded as the `preverify-targeted` evidence.
+8. Cross-provider verification; then the full suite once, against the
+   final verified tree.
 9. Close-out, the end-of-set `change-log.md`, and the merge recommendation
    for the operator's go/no-go on the complete branch diff.
 

@@ -134,8 +134,9 @@ edit -> affected tests + cheap deterministic checks -> verification
 4. Extend `test_evidence.py` with the closed stage vocabulary
    `preverify-targeted` and `final-full`. Only `final-full` can satisfy
    `test_run_fresh`, and it binds to the tree digest it ran against.
-5. Cross-provider verification.
-6. Affected tests before verification; the full suite once, after.
+5. Affected tests, recorded as the `preverify-targeted` evidence.
+6. Cross-provider verification; then the full suite once, against the
+   final verified tree.
 7. Close-out.
 
 **Creates:** the recorded relaxation, the selector, the two evidence
@@ -164,8 +165,9 @@ stages. Est. 6 Python tests.
    `pushed_to_remote` close gate already requires the branch to be pushed
    at close and nowhere earlier; the instructions must stop implying
    otherwise.
-5. Cross-provider verification.
-6. Affected tests before verification; the full suite once, after.
+5. Affected tests, recorded as the `preverify-targeted` evidence.
+6. Cross-provider verification; then the full suite once, against the
+   final verified tree.
 7. Close-out.
 
 **Creates:** the fingerprint detector, the dispatch refusal, the rewritten
@@ -186,8 +188,9 @@ instructions. Est. 5 Python tests.
 4. Extract the deterministic-facts surface out of `verify.py` into its own
    module, and leave `verify.py` measurably smaller than it started. The
    module count may rise; `verify.py` must fall.
-5. Cross-provider verification.
-6. Affected tests before verification; the full suite once, after.
+5. Affected tests, recorded as the `preverify-targeted` evidence.
+6. Cross-provider verification; then the full suite once, against the
+   final verified tree.
 7. Close-out, and the end-of-set `change-log.md`.
 
 **Creates:** changed-line coverage, normalized deterministic facts, the

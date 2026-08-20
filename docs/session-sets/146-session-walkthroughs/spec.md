@@ -162,8 +162,9 @@ be a gate guarding a habit.
 7. Add the step to `docs/quick-start.md` between "Work the steps" and
    "Close", where a developer following the lifecycle will meet it in the
    order they will actually run it.
-8. Cross-provider verification.
-9. Affected tests before verification; the full suite once, after.
+8. Affected tests, recorded as the `preverify-targeted` evidence.
+9. Cross-provider verification; then the full suite once, against the
+   final verified tree.
 10. Close-out.
 
 **Creates:** the seeded step, the `walkthrough` subcommand, the fence
@@ -190,8 +191,9 @@ tests.
 6. Write both of this set's own walkthroughs, session 1's included. If the
    template cannot explain the work of the session that built it, it is
    the wrong template.
-7. Cross-provider verification.
-8. Affected tests before verification; the full suite once, after.
+7. Affected tests, recorded as the `preverify-targeted` evidence.
+8. Cross-provider verification; then the full suite once, against the
+   final verified tree.
 9. Close-out, and the end-of-set `change-log.md`.
 
 **Creates:** the watcher and cache wiring, the session-row action, two

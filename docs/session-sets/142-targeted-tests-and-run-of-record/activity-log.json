@@ -281,6 +281,133 @@
       "dateTime": "2026-08-19T18:37:48.526532-04:00",
       "description": "Close-out.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-19T18:51:06.286390-04:00",
+      "description": "Register.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 2,
+      "stepKey": "implement-changed-line-coverage",
+      "dateTime": "2026-08-19T18:51:06.286390-04:00",
+      "description": "Implement changed-line coverage: which lines the change touched, which of those the selected tests actually executed, and which are uncovered. This is a deterministic fact here and becomes load-bearing in set 144, where it is what stops a step from skipping review by declaring only mechanically-checkable evidence.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 3,
+      "stepKey": "normalize-the-configured-compile-typecheck-lint",
+      "dateTime": "2026-08-19T18:51:06.286390-04:00",
+      "description": "Normalize the configured compile, typecheck, lint, and analyzer outputs alongside the selected test command into one deterministic fact record. An unsupported control reports `not_applicable` or `unknown` \u2014 **never** `pass`. Return red required facts to the author before any model spend.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 4,
+      "stepKey": "extract-the-deterministic-facts-surface-out",
+      "dateTime": "2026-08-19T18:51:06.286390-04:00",
+      "description": "Extract the deterministic-facts surface out of `verify.py` into its own module, and leave `verify.py` measurably smaller than it started. The module count may rise; `verify.py` must fall.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 5,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-19T18:51:06.286390-04:00",
+      "description": "Cross-provider verification.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 6,
+      "stepKey": "affected-tests-before-verification",
+      "dateTime": "2026-08-19T18:51:06.286390-04:00",
+      "description": "Affected tests before verification; the full suite once, after.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 7,
+      "stepKey": "close-out-and-the-end-of",
+      "dateTime": "2026-08-19T18:51:06.286390-04:00",
+      "description": "Close-out, and the end-of-set `change-log.md`.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-19T18:51:06.290713-04:00",
+      "description": "Registered session 3 (copilot).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-19T19:10:33.799274-04:00",
+      "description": "Register.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 2,
+      "stepKey": "implement-changed-line-coverage",
+      "dateTime": "2026-08-19T19:10:34.271300-04:00",
+      "description": "Changed-line coverage: added lines parsed from a -U0 tree-to-tree diff, intersected with a coverage.py JSON report, uncovered lines named. No report reads unknown, never pass.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 3,
+      "stepKey": "normalize-the-configured-compile-typecheck-lint",
+      "dateTime": "2026-08-19T19:10:34.721586-04:00",
+      "description": "Normalized controls: compile/typecheck/lint/analyzer plus the selected test command in one fact record under .dabbler/runs/. Undeclared kind is not_applicable, unlaunchable tool is unknown, and a red required control returns to the author before dispatch.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 4,
+      "stepKey": "extract-the-deterministic-facts-surface-out",
+      "dateTime": "2026-08-19T19:10:35.159365-04:00",
+      "description": "ai_router/facts.py created; the changed-surface block moved out of verify.py, which fell from 1926 to 1777 lines.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 6,
+      "stepKey": "affected-tests-before-verification",
+      "dateTime": "2026-08-19T19:18:34.474043-04:00",
+      "description": "110 selected tests passed in 176s; recorded as preverify-targeted, policy targeted.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 5,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-19T19:58:41.607206-04:00",
+      "description": "VERIFIED by gpt-5.5/openai over copilot-cli after 3 rounds.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 7,
+      "stepKey": "close-out-and-the-end-of",
+      "dateTime": "2026-08-19T19:58:42.052824-04:00",
+      "description": "Close-out, and the end-of-set `change-log.md`.",
+      "status": "in-progress"
     }
   ]
 }

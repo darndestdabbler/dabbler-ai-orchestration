@@ -129,7 +129,11 @@ framework; `blocked` is terminal.
 
 1. Register.
 2. Open and close a step against the approved plan: a step is in flight or
-   it is not, exactly one at a time, and the record says which.
+   it is not, exactly one at a time, and the record says which. Only the
+   session's own steps are in the plan — set 143 keeps register,
+   verification, the run of record, and close-out out of it — so there is no
+   ceremony step to open an envelope for, review, or commit an empty diff
+   against.
 3. Enforce the file envelope mechanically. A write outside the step's
    declared paths is refused at the boundary and surfaces as an amendment
    requirement, not a warning. The framework compares the tree against the
@@ -140,8 +144,9 @@ framework; `blocked` is terminal.
    spend.
 5. Refuse a manual commit while a step is open, with a message naming the
    step and the command that closes it.
-6. Cross-provider verification.
-7. Affected tests before verification; the full suite once, after.
+6. Affected tests, recorded as the `preverify-targeted` evidence.
+7. Cross-provider verification; then the full suite once, against the
+   final verified tree.
 8. Close-out.
 
 **Creates:** step open/close, envelope enforcement, the deterministic
@@ -170,8 +175,9 @@ pass, the manual-commit refusal. Est. 7 Python tests.
    remembering to log it afterwards. `start_session` already sets this
    precedent for the `register` step, and this is the same move for the
    rest of them.
-6. Cross-provider verification.
-7. Affected tests before verification; the full suite once, after.
+6. Affected tests, recorded as the `preverify-targeted` evidence.
+7. Cross-provider verification; then the full suite once, against the
+   final verified tree.
 8. Close-out.
 
 **Creates:** the coverage-gated skip, the narrow residual check, the three
@@ -193,8 +199,9 @@ responses, framework-owned commits. Est. 8 Python tests.
    `verify.py` below 1,200 lines. The module count may rise; this is the
    set where the extraction has to land, because it is the last one that
    adds substantial execution code.
-6. Cross-provider verification.
-7. Affected tests before verification; the full suite once, after.
+6. Affected tests, recorded as the `preverify-targeted` evidence.
+7. Cross-provider verification; then the full suite once, against the
+   final verified tree.
 8. Close-out, and the end-of-set `change-log.md`.
 
 **Creates:** session-start baseline resolution, the bisect report, the

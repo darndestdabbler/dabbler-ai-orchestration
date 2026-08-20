@@ -16,7 +16,10 @@ No round opens on unproved work. The tests a change makes necessary cost
 nothing next to a model, so they run first: a round is refused until an
 accepted ``preverify-targeted`` record exists for the surfaces as they
 currently stand. The complete suite is not that evidence — it is the run
-of record, and it belongs after the final verified tree.
+of record, and it belongs after the final verified tree. The same
+economy governs the declared controls: ``facts`` settles compile,
+typecheck, lint, and analyzer before dispatch, and a red required one
+returns to the author instead of being bought a verifier's opinion.
 
 Outcomes append to the machine-only ledger; raw verifier output is saved
 before any parsing. The loop suspends at the round cap
@@ -60,7 +63,6 @@ import argparse
 import datetime
 import hashlib
 import json
-import os
 import re
 import sys
 from pathlib import Path
@@ -68,6 +70,18 @@ from typing import Optional
 
 from . import ledger
 from .evidence import repo_root_for, run_git, snapshot_worktree_tree
+from .facts import (
+    EvidenceEmptyError,
+    EvidenceTooLargeError,
+    FactsError,
+    append_facts,
+    assemble_evidence,
+    assemble_fix_delta_evidence,
+    build_diff_pathspecs,
+    check_evidence_cap,
+    collect_facts,
+    red_facts_refusal,
+)
 from .identity import IdentityResolutionError, resolve_session_orchestrator_identity
 from .session import extract_spec_excerpt, resolve_session_set_dir
 from .verdict import (
@@ -86,51 +100,10 @@ EXIT_CALL_FAILED = 6
 EXIT_UNAVAILABLE = 7
 
 DEFAULT_MAX_ROUNDS = 3
-DEFAULT_EVIDENCE_CHAR_CAP = 600 * 1024
-_UNTRACKED_INLINE_CAP = 64 * 1024
-
-DEFAULT_DIFF_EXCLUDES = (
-    "dist", "out", "node_modules", ".venv", "__pycache__", "*.vsix",
-    ".dabbler",
-)
 
 
 class VerifyError(RuntimeError):
     pass
-
-
-class EvidenceEmptyError(VerifyError):
-    """Nothing to review: a bundle a verifier cannot review must never be
-    routed — a session that already committed its work once verified
-    nothing and nearly closed clean."""
-
-
-class EvidenceTooLargeError(VerifyError):
-    pass
-
-
-def evidence_char_cap() -> int:
-    raw = os.environ.get("AI_ROUTER_VERIFY_MAX_EVIDENCE_CHARS")
-    try:
-        return int(raw) if raw else DEFAULT_EVIDENCE_CHAR_CAP
-    except ValueError:
-        return DEFAULT_EVIDENCE_CHAR_CAP
-
-
-def build_diff_pathspecs(excludes=DEFAULT_DIFF_EXCLUDES) -> list:
-    """Depth-agnostic exclusions: the anchored form missed nested
-    ``tools/x/dist``."""
-    pathspecs = ["."]
-    for pattern in excludes:
-        pathspecs.append(f":(exclude,glob)**/{pattern}")
-        if "*" not in pattern:
-            pathspecs.append(f":(exclude,glob)**/{pattern}/**")
-    return pathspecs
-
-
-_BOOKKEEPING_BASENAMES = frozenset({
-    "session-state.json", "activity-log.json", "change-log.md",
-})
 
 
 def _spec_excerpt(set_dir, session_number: int) -> str:
@@ -139,143 +112,6 @@ def _spec_excerpt(set_dir, session_number: int) -> str:
     except (OSError, UnicodeError):
         return "(spec.md unavailable)"
     return extract_spec_excerpt(text, session_number)
-
-
-def _untracked_contents(repo_root, pathspecs) -> tuple:
-    """(inlined, omitted, bookkeeping): git diff shows only names for new
-    files, so their contents ride separately. Exclusion is never silent —
-    omitted files are listed with the reason."""
-    rc, out, _ = run_git(
-        repo_root, "ls-files", "--others", "--exclude-standard", "-z", "--",
-        *pathspecs,
-    )
-    if rc != 0:
-        return [], [], []
-    inlined, omitted, bookkeeping = [], [], []
-    for rel in (p for p in out.split("\0") if p):
-        basename = rel.replace("\\", "/").rsplit("/", 1)[-1]
-        if basename in _BOOKKEEPING_BASENAMES:
-            bookkeeping.append(rel)
-            continue
-        full = Path(repo_root) / rel
-        try:
-            if full.is_symlink():
-                omitted.append((rel, "symlink (not followed)"))
-                continue
-            size = full.stat().st_size
-            if size > _UNTRACKED_INLINE_CAP:
-                omitted.append((rel, f"oversized ({size} bytes)"))
-                continue
-            text = full.read_bytes().decode("utf-8")
-        except UnicodeDecodeError:
-            omitted.append((rel, "binary / non-UTF-8"))
-            continue
-        except OSError:
-            omitted.append((rel, "unreadable"))
-            continue
-        inlined.append((rel, text))
-    return inlined, omitted, bookkeeping
-
-
-def _render_evidence(
-    status: str, diff: str, diff_heading: str, inlined, omitted, bookkeeping
-) -> str:
-    parts = [
-        "The session's work, as the working tree presents it.",
-        "",
-        "#### git status --short",
-        "```",
-        status or "(clean -- no changes reported)",
-        "```",
-        "",
-        f"#### {diff_heading}",
-        "",
-        "```diff",
-        diff or "(empty diff)",
-        "```",
-    ]
-    if inlined:
-        parts.append(
-            "\n#### Untracked file contents (new files, absent from the diff)"
-        )
-        for rel, text in inlined:
-            parts.extend([f"\n**{rel}**", "```", text, "```"])
-    if omitted:
-        parts.append("\n#### Untracked paths NOT inlined")
-        parts.extend(f"- {rel} — {reason}" for rel, reason in omitted)
-    if bookkeeping:
-        parts.append("\n#### Expected framework bookkeeping (paths only)")
-        parts.extend(f"- {rel}" for rel in bookkeeping)
-    return "\n".join(parts)
-
-
-def assemble_evidence(repo_root, set_dir, session_number: int) -> str:
-    """Round 1: full working-tree evidence vs HEAD."""
-    pathspecs = build_diff_pathspecs()
-    rc, status, err = run_git(repo_root, "status", "--short")
-    if rc != 0:
-        raise VerifyError(f"git status failed: {err}")
-    rc, diff, err = run_git(
-        repo_root, "diff", "--no-color", "HEAD", "--", *pathspecs
-    )
-    if rc != 0:
-        raise VerifyError(f"git diff failed: {err}")
-    inlined, omitted, bookkeeping = _untracked_contents(repo_root, pathspecs)
-    if not diff.strip() and not inlined:
-        raise EvidenceEmptyError(
-            "the evidence bundle is empty (no diff vs HEAD, no untracked "
-            "files). If the session's work is already committed, verify "
-            "against the commit range instead of routing an empty review."
-        )
-    heading = (
-        "Complete diff (working tree vs `HEAD`; generated-bundle "
-        f"exclusions: {', '.join(DEFAULT_DIFF_EXCLUDES)})"
-    )
-    rendered = _render_evidence(
-        status, diff, heading, inlined, omitted, bookkeeping
-    )
-    _check_cap(rendered)
-    return rendered
-
-
-def assemble_fix_delta_evidence(
-    repo_root, set_dir, session_number: int, baseline_tree: str
-) -> str:
-    """Rounds ≥2: tree-to-tree fix delta only. The untracked collector is
-    deliberately absent — the tree diff already carries new files as added
-    hunks."""
-    current_tree = snapshot_worktree_tree(repo_root)
-    if current_tree is None:
-        raise VerifyError(
-            "could not snapshot the working tree for the fix delta "
-            "(failing closed)"
-        )
-    pathspecs = build_diff_pathspecs()
-    rc, status, _ = run_git(repo_root, "status", "--short")
-    rc, diff, err = run_git(
-        repo_root, "diff", "--no-color", baseline_tree, current_tree, "--",
-        *pathspecs,
-    )
-    if rc != 0:
-        raise VerifyError(f"fix-delta diff failed: {err}")
-    heading = (
-        f"FIX DELTA ONLY (tree-to-tree: previous round "
-        f"{baseline_tree[:12]} -> current working tree "
-        f"{current_tree[:12]}). This is NOT the full session diff — new "
-        "defects are admissible only within these hunks."
-    )
-    rendered = _render_evidence(status, diff, heading, [], [], [])
-    _check_cap(rendered)
-    return rendered
-
-
-def _check_cap(rendered: str) -> None:
-    cap = evidence_char_cap()
-    if len(rendered) > cap:
-        raise EvidenceTooLargeError(
-            f"evidence bundle is {len(rendered)} chars (cap {cap}). Split "
-            "the session or raise AI_ROUTER_VERIFY_MAX_EVIDENCE_CHARS."
-        )
 
 
 _DISPUTE_EVIDENCE_INLINE_CAP = 16 * 1024
@@ -564,7 +400,8 @@ def run_round(
             evidence = assemble_fix_delta_evidence(
                 repo_root, set_path, current, baseline
             )
-    except (EvidenceEmptyError, EvidenceTooLargeError, VerifyError) as exc:
+    except (EvidenceEmptyError, EvidenceTooLargeError, FactsError,
+            VerifyError) as exc:
         print(f"verify: {exc}", file=sys.stderr)
         return EXIT_UNAVAILABLE
 
@@ -596,6 +433,20 @@ def run_round(
             "reason behind each row.",
             file=sys.stderr,
         )
+        return EXIT_USAGE
+
+    # Still before any model sees the bundle: everything the machine can
+    # settle by itself, settled. A red required control is the author's to
+    # fix, and a verification round spent rediscovering it buys nothing the
+    # exit code already said.
+    facts = collect_facts(
+        repo_root, set_path, config, gate=gate, round_number=round_number,
+        session_number=current,
+    )
+    append_facts(repo_root, slug, facts)
+    refusal = red_facts_refusal(facts)
+    if refusal:
+        print(refusal, file=sys.stderr)
         return EXIT_USAGE
 
     disputes = ledger.read_disputes(repo_root, slug, current)
@@ -1357,7 +1208,7 @@ def run_adjudication(
     prompt = _adjudication_prompt(
         set_path, current, disputed, fix_delta, repo_root
     )
-    _check_cap(prompt)
+    check_evidence_cap(prompt)
 
     excluded = _adjudication_exclusions(orchestrator, rounds)
     try:

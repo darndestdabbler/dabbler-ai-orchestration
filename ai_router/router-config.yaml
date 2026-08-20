@@ -518,13 +518,30 @@ metrics:
 testing:
   suites:
     - name: python
-      command: python -m pytest
+      # Coverage rides on the declared command, not on the orchestrator
+      # remembering a second one: changed-line coverage is only a fact if
+      # the run that produces it is the run the selector prescribes.
+      command: python -m pytest --cov=ai_router --cov=tests --cov-report=json:.dabbler/coverage.json
       expensive: true
       covers:
         - ai_router/
         - tests/
         - pyproject.toml
         - pytest.ini
+
+  # Where the test run leaves its executed-line report. Machine-side and
+  # gitignored, like everything else the framework writes for itself.
+  coverage:
+    report: .dabbler/coverage.json
+
+  # Deterministic controls are declared here — one entry per kind, from
+  # compile, typecheck, lint, analyzer. A declared control runs before
+  # verification and its exit code is the fact; `required` sends a red
+  # result back to the author instead of buying a verifier's opinion on
+  # something the exit code already settled. This repository declares none:
+  # it ships no typechecker, linter, or analyzer, and the record says
+  # `not_applicable` rather than inventing a green row for a tool nobody
+  # runs.
 
   selection:
     test_root: tests

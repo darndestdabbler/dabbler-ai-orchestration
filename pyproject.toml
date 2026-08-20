@@ -20,6 +20,7 @@ dependencies = [
 tests = [
     "pytest>=7.0",
     "pytest-xdist>=3.5",
+    "pytest-cov>=5.0",
 ]
 
 [tool.setuptools]
@@ -32,3 +33,10 @@ ai_router = [
     "prompt-templates/*.md",
     "schemas/*.json",
 ]
+
+# Coverage writes under the machine-side directory, never the repo root.
+# A stray `.coverage` is an untracked, unignored path, and the selector is
+# obliged to treat one as a change it cannot map — which would turn the very
+# command it just printed into a policy violation.
+[tool.coverage.run]
+data_file = ".dabbler/.coverage"

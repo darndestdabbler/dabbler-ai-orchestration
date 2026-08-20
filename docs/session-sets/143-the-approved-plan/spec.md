@@ -92,6 +92,27 @@ step no model will need to read in set 144 — which makes the plan review
 the only thing standing between a weak criterion and an unreviewed change.
 That is why session 2 spends its whole budget on judging proofs.
 
+## What the plan contains, and how much of it
+
+The plan carries the session's **own** steps and nothing else. Register,
+the affected-test run, cross-provider verification, the run of record and
+close-out are the lifecycle, not the work: they have no file envelope, no
+evidence of their own to declare, and no diff for set 144 to review. Keeping
+them out is structural rather than a flag — a step kind a supervisor sets is
+a step kind a supervisor sets wrong, and a ceremony step that never enters
+the plan cannot be opened, reviewed, or committed as one. The activity log
+goes on seeding them for human-visible progress, which is the job it is good
+at.
+
+**A session declares at most seven such steps.** The bound is the schema's,
+so it is refused at write time and no model is ever asked to count. Seven is
+deliberately generous: every session pays the same fixed ceremony — register,
+the affected-test run, cross-provider verification, the run of record,
+close-out — and a tight cap does not remove that toll, it makes the session
+pay it more often. The bound is here to keep step-level review cost from
+growing without limit, not to force decomposition. Sets 142–146 sit between
+three and six.
+
 ## What this set does NOT do (do not reopen)
 
 - **No execution.** Nothing here runs a step or commits anything. The plan
@@ -116,7 +137,9 @@ That is why session 2 spends its whole budget on judging proofs.
    `step_id`, intent, file envelope, the evidence contract with each item
    typed `deterministic` or `judgment`, derived risk flags, and an
    append-only `amendments` array. A step with an empty evidence contract
-   is invalid — the schema, not a reviewer, refuses it.
+   is invalid — the schema, not a reviewer, refuses it. So is a session
+   declaring more than seven steps: the plan holds the session's own work
+   only, never the lifecycle steps around it.
 3. Write the plan through the machine-owned writers set 141 built: validate
    against the schema, then atomic replace. Hand-written or malformed plans
    fail closed, as every other artifact under the run directory does.
@@ -127,8 +150,9 @@ That is why session 2 spends its whole budget on judging proofs.
 5. Derive risk flags mechanically from the file envelope and the repository
    manifest — public interface, integration module, sensitive path,
    dependency change. A supervisor does not declare its own risk.
-6. Cross-provider verification.
-7. Affected tests before verification; the full suite once, after.
+6. Affected tests, recorded as the `preverify-targeted` evidence.
+7. Cross-provider verification; then the full suite once, against the
+   final verified tree.
 8. Close-out.
 
 **Creates:** `approved-plan.schema.json`, the machine-owned plan writer,
@@ -155,8 +179,9 @@ approval hashing, derived risk flags. Est. 6 Python tests.
 5. Route to the expensive model only when a step carries a high risk flag,
    or when the cheap reviewer has objected twice. Record which trigger
    fired.
-6. Cross-provider verification.
-7. Affected tests before verification; the full suite once, after.
+6. Affected tests, recorded as the `preverify-targeted` evidence.
+7. Cross-provider verification; then the full suite once, against the
+   final verified tree.
 8. Close-out.
 
 **Creates:** the free plan checks, the cheap checklist review, the
@@ -184,8 +209,9 @@ Est. 7 Python tests.
 5. Act on what the replay says. A high amendment rate means the plan is
    paperwork rather than a constraint, and that is a finding for the
    operator — not something to absorb by loosening the envelope check.
-6. Cross-provider verification.
-7. Affected tests before verification; the full suite once, after.
+6. Affected tests, recorded as the `preverify-targeted` evidence.
+7. Cross-provider verification; then the full suite once, against the
+   final verified tree.
 8. Close-out, and the end-of-set `change-log.md`.
 
 **Creates:** the amendment flow, the mechanical envelope comparison, the

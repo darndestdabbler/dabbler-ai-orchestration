@@ -9,7 +9,9 @@ from ai_router.progress import SessionStateInvariantError
 from ai_router.session import (
     EXIT_BOUNDARY,
     EXIT_OK,
+    DuplicateSlugError,
     LockContentionError,
+    MalformedSlugError,
     SetCollisionError,
     SetNotFoundError,
     acquire_lock,
@@ -25,6 +27,7 @@ from ai_router.session import (
     release_lock,
     resolve_session_set_dir,
     seed_session_plan,
+    split_slug_marker,
     start,
 )
 from tests.conftest import SPEC_MD
@@ -120,6 +123,48 @@ class TestSpecParser:
             "build-the-widget"
         )
         assert plan_step_key("???", 3) == "step-3"
+
+    def test_session_heading_slug_marker_is_parsed_and_stripped(self):
+        spec = (
+            "### Session 1 of 1: The artifact, hashed (slug: the-artifact)\n"
+            "1. Register.\n"
+        )
+        plan = parse_session_plans(spec)[0]
+        assert plan["title"] == "The artifact, hashed"
+        assert plan["slug"] == "the-artifact"
+
+    def test_session_heading_without_slug_marker_is_none(self):
+        assert parse_session_plans(SPEC_MD)[0]["slug"] is None
+
+    def test_split_slug_marker(self):
+        assert split_slug_marker("Register. (slug: register)") == (
+            "Register.", "register"
+        )
+        assert split_slug_marker("Register.") == ("Register.", None)
+
+    def test_split_slug_marker_refuses_malformed_content(self):
+        with pytest.raises(MalformedSlugError):
+            split_slug_marker("Register. (slug: Bad_Slug!)")
+
+    def test_split_slug_marker_refuses_slug_like_typos(self):
+        # Missing colon and wrong case are typos, not "no marker" --
+        # silently falling back would break the one-identity promise.
+        with pytest.raises(MalformedSlugError):
+            split_slug_marker("Register. (slug plan-schema)")
+        with pytest.raises(MalformedSlugError):
+            split_slug_marker("Register. (Slug: plan-schema)")
+
+    def test_split_slug_marker_refuses_unclosed_marker(self):
+        with pytest.raises(MalformedSlugError):
+            split_slug_marker("Define schema. (slug: plan-schema")
+
+    def test_duplicate_session_slug_refused(self):
+        spec = (
+            "### Session 1 of 2: First (slug: same)\n1. Register.\n"
+            "### Session 2 of 2: Second (slug: same)\n1. Register.\n"
+        )
+        with pytest.raises(DuplicateSlugError):
+            parse_session_plans(spec)
 
 
 @pytest.fixture
@@ -237,6 +282,37 @@ class TestWriters:
         assert len(plan_rows) == 4
         assert plan_rows[0]["stepKey"] == "register"
         assert plan_rows[0]["status"] == "pending"
+
+    def test_seed_plan_uses_authored_step_slug(self, tmp_path):
+        d = tmp_path / "010-demo"
+        d.mkdir()
+        (d / "spec.md").write_text(
+            "### Session 1 of 1: X\n"
+            "1. Register. (slug: register)\n"
+            "2. Define the schema at v1. (slug: plan-schema)\n",
+            encoding="utf-8",
+        )
+        register_session_start(d, 1, engine="claude-code",
+                               provider="anthropic")
+        seed_session_plan(d, 1)
+        log = json.loads((d / "activity-log.json").read_text(encoding="utf-8"))
+        rows = [e for e in log["entries"] if e.get("kind") == "plan-step"]
+        assert [r["stepKey"] for r in rows] == ["register", "plan-schema"]
+        assert rows[1]["description"] == "Define the schema at v1."
+
+    def test_seed_plan_refuses_duplicate_step_slug(self, tmp_path):
+        d = tmp_path / "010-demo"
+        d.mkdir()
+        (d / "spec.md").write_text(
+            "### Session 1 of 1: X\n"
+            "1. Register. (slug: dup)\n"
+            "2. Also register. (slug: dup)\n",
+            encoding="utf-8",
+        )
+        register_session_start(d, 1, engine="claude-code",
+                               provider="anthropic")
+        with pytest.raises(DuplicateSlugError):
+            seed_session_plan(d, 1)
 
     def test_log_step_closed_vocabulary(self, set_dir):
         with pytest.raises(ValueError):

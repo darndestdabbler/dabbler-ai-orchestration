@@ -1,0 +1,96 @@
+{
+  "sessionSetName": "144-the-approved-plan",
+  "createdDate": "2026-08-20T02:08:38.336709-04:00",
+  "totalSessions": 3,
+  "entries": [
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-20T02:08:38.336759-04:00",
+      "description": "Register.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "define-approved-plan",
+      "dateTime": "2026-08-20T02:08:38.336759-04:00",
+      "description": "Define `approved-plan.schema.json` at v1: plan identity, per-step `step_id`, intent, file envelope, the evidence contract with each item typed `deterministic` or `judgment`, derived risk flags, and an append-only `amendments` array. A step with an empty evidence contract is invalid \u2014 the schema, not a reviewer, refuses it. So is a session declaring more than seven steps: the plan holds the session's own work only, never the lifecycle steps around it.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "give-sessions-and-steps-one-authored",
+      "dateTime": "2026-08-20T02:08:38.336759-04:00",
+      "description": "Give sessions and steps one **authored** slug each, so a single name addresses a step in `spec.md`, in `activity-log.json`, and as the plan's `step_id` \u2014 rather than three naming schemes that agree by accident. Sets already carry one in their directory name; a session declares its own in its heading and a step declares its own inline, and `parse_session_plans` and `parse_step_texts` read them. `plan_step_key`'s six-word truncation stays as the fallback for a spec that declares none, so every existing spec seeds exactly as it does today. The number remains the stable address and the slug is the readable label: `[a-z0-9-]`, unique within its session, short, and refused at write time like every other malformed field.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "write-the-plan-through-the-machine",
+      "dateTime": "2026-08-20T02:08:38.336759-04:00",
+      "description": "Write the plan through the machine-owned writers set 141 built: validate against the schema, then atomic replace. Hand-written or malformed plans fail closed, as every other artifact under the run directory does.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "hash-the-plan-at-approval-and",
+      "dateTime": "2026-08-20T02:08:38.336759-04:00",
+      "description": "Hash the plan at approval and bind the hash into the record. After approval the plan is immutable: the only legal change is an appended amendment, and any edit that is not an appended amendment is detected on the next read rather than tolerated.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 6,
+      "stepKey": "derive-risk-flags-mechanically-from-the",
+      "dateTime": "2026-08-20T02:08:38.336759-04:00",
+      "description": "Derive risk flags mechanically from the file envelope and the repository manifest \u2014 public interface, integration module, sensitive path, dependency change. A supervisor does not declare its own risk.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 7,
+      "stepKey": "affected-tests-recorded-as-the-preverify",
+      "dateTime": "2026-08-20T02:08:38.336759-04:00",
+      "description": "Affected tests, recorded as the `preverify-targeted` evidence.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 8,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-20T02:08:38.336759-04:00",
+      "description": "Cross-provider verification; then the full suite once, against the final verified tree.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 9,
+      "stepKey": "close-out",
+      "dateTime": "2026-08-20T02:08:38.336759-04:00",
+      "description": "Close-out.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-20T02:08:38.340677-04:00",
+      "description": "Registered session 1 (copilot).",
+      "status": "complete"
+    }
+  ]
+}

@@ -244,6 +244,60 @@ _FENCE_RE = re.compile(r"^\s*(?:```|~~~)")
 _MAX_TOP_LEVEL_INDENT = 3
 _TAB_WIDTH = 4
 
+_SLUG_MARKER_LOOSE_RE = re.compile(
+    r"\(\s*slug\s*:?\s*([^)]*)\)\s*$", re.IGNORECASE
+)
+_SLUG_MARKER_LITERAL_RE = re.compile(r"^\(slug: [a-z0-9-]+\)$")
+_SLUG_OPEN_RE = re.compile(r"\(\s*slug\b", re.IGNORECASE)
+
+
+class MalformedSlugError(ValueError):
+    """A trailing parenthetical looked like an authored ``(slug: ...)``
+    marker but was not the exact literal form -- refused at parse time
+    rather than silently treated as absent, since a typo here would
+    otherwise fall back to a different, unannounced identity."""
+
+
+class DuplicateSlugError(ValueError):
+    """Two sessions or two steps within one session declared the same
+    authored slug -- refused rather than silently disambiguated, since a
+    silently renamed slug breaks the one-identity promise across
+    spec.md, activity-log.json and the plan's step_id."""
+
+
+def split_slug_marker(text: str) -> tuple:
+    """Split a trailing ``(slug: xxx)`` marker off a session heading or a
+    step's own text. A session *set* already carries a short, hand-picked
+    label beside its number in its own directory name (``NNN-slug``); this
+    is the same model applied one level down, minus the restated ordinal
+    -- the number staying the stable address, the slug staying the
+    readable one. Returns ``(text, None)`` unchanged when nothing declares
+    a marker, so a spec that names none parses exactly as it always has.
+    Anything that merely *looks* like an attempted marker -- wrong case,
+    a missing colon, an invalid slug charset, or a missing closing
+    parenthesis -- raises :class:`MalformedSlugError` rather than being
+    silently read as no marker at all."""
+    stripped = text.rstrip()
+    m = _SLUG_MARKER_LOOSE_RE.search(stripped)
+    if m:
+        if not _SLUG_MARKER_LITERAL_RE.match(m.group(0)):
+            raise MalformedSlugError(
+                f"slug-like marker {m.group(0)!r} is not the literal "
+                "'(slug: xxx)' form with xxx matching [a-z0-9-]+"
+            )
+        return stripped[:m.start()].rstrip(), m.group(1).strip()
+    # An opening "(slug" with no closing ")" anywhere after it is an
+    # unclosed marker, not ordinary prose that happens to mention one.
+    last_open = None
+    for candidate in _SLUG_OPEN_RE.finditer(stripped):
+        last_open = candidate
+    if last_open is not None and ")" not in stripped[last_open.start():]:
+        raise MalformedSlugError(
+            f"slug-like marker {stripped[last_open.start():]!r} is "
+            "missing its closing ')'"
+        )
+    return text, None
+
 
 def _strip_fenced_blocks(text: str) -> str:
     """Blank out fenced code blocks preserving line count and offsets, so
@@ -310,15 +364,30 @@ def parse_step_texts(segment: str) -> list:
 
 
 def parse_session_plans(spec_text: str) -> list:
-    """``[{"number", "title", "steps"}, ...]`` from spec.md."""
+    """``[{"number", "title", "slug", "steps"}, ...]`` from spec.md.
+    ``slug`` is the session's authored ``(slug: xxx)`` marker, or ``None``
+    when the heading declares none. Two sessions declaring the same slug
+    is refused here, at parse time, rather than left for a later reader
+    to resolve however it likes."""
     stripped = _strip_fenced_blocks(spec_text)
     matches = list(_SESSION_HEAD_RE.finditer(stripped))
     plans = []
+    seen_slugs: dict = {}
     for i, m in enumerate(matches):
         end = matches[i + 1].start() if i + 1 < len(matches) else len(stripped)
+        title, slug = split_slug_marker(m.group(3).strip())
+        number = int(m.group(1))
+        if slug is not None:
+            if slug in seen_slugs:
+                raise DuplicateSlugError(
+                    f"session slug {slug!r} is declared by both session "
+                    f"{seen_slugs[slug]} and session {number}"
+                )
+            seen_slugs[slug] = number
         plans.append({
-            "number": int(m.group(1)),
-            "title": m.group(3).strip(),
+            "number": number,
+            "title": title,
+            "slug": slug,
             "steps": parse_step_texts(stripped[m.end():end]),
         })
     return plans

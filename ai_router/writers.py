@@ -393,7 +393,9 @@ def seed_session_plan(set_dir, session_number: int, total_sessions=None) -> int:
     A spec edited mid-flight shows new work only when it is logged."""
     # The spec parser lives with the lifecycle flows; imported lazily so
     # the writer module carries no import-time edge back to session.py.
-    from .session import parse_session_plans
+    from .session import (
+        DuplicateSlugError, parse_session_plans, split_slug_marker,
+    )
 
     spec_path = Path(set_dir) / "spec.md"
     try:
@@ -415,19 +417,40 @@ def seed_session_plan(set_dir, session_number: int, total_sessions=None) -> int:
         for e in entries
     ):
         return 0
-    now = _now_iso()
+
+    # Resolve every step's key before writing anything: an authored
+    # `(slug: xxx)` marker is the step's one identity, shared with the
+    # plan's step_id, and declaring the same one twice is refused rather
+    # than silently renamed. The six-word truncation is only the fallback
+    # for a step that declares none.
+    resolved = []
+    seen_authored: set = set()
     seen_keys: set = set()
     for ordinal, text in enumerate(plan["steps"], start=1):
-        key = plan_step_key(text, ordinal)
-        if key in seen_keys:
-            key = f"{key}-{ordinal}"
+        clean_text, slug = split_slug_marker(text)
+        if slug is not None:
+            if slug in seen_authored:
+                raise DuplicateSlugError(
+                    f"{set_dir}: step slug {slug!r} is declared more than "
+                    f"once in session {session_number}"
+                )
+            seen_authored.add(slug)
+            key = slug
+        else:
+            key = plan_step_key(clean_text, ordinal)
+            if key in seen_keys:
+                key = f"{key}-{ordinal}"
         seen_keys.add(key)
+        resolved.append((key, clean_text))
+
+    now = _now_iso()
+    for ordinal, (key, clean_text) in enumerate(resolved, start=1):
         entries.append({
             "sessionNumber": session_number,
             "stepNumber": ordinal,
             "stepKey": key,
             "dateTime": now,
-            "description": text,
+            "description": clean_text,
             "status": "pending",
             "kind": "plan-step",
         })

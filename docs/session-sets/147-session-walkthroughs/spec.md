@@ -9,13 +9,13 @@
 > machine-written from that record and half authored prose, opened from the
 > session row it describes. **Orientation, not documentation** — enough to
 > teach a developer what the tooling is and how it was driven.
-> **Session Set:** `docs/session-sets/146-session-walkthroughs/`
+> **Session Set:** `docs/session-sets/147-session-walkthroughs/`
 > **Created:** 2026-08-19
 > **Workflow:** Full
 > **Baseline commit:** head of `experiment/verification-pipeline-v3` after
 > set 146.
 > **Integration branch:** `experiment/verification-pipeline-v3`; child
-> branch `verification-v3/set-146-walkthroughs`. **Not** developed on
+> branch `verification-v3/set-147-walkthroughs`. **Not** developed on
 > `master`.
 > **Prerequisite:** set 146 complete.
 

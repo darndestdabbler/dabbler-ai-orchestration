@@ -632,8 +632,13 @@ def build_projection(set_dir) -> dict:
             if normalized.get("status") == STATUS_COMPLETE:
                 normalized["status"] = STATUS_IN_PROGRESS
 
-    status = normalized.get("status")
-    icon_key = status if status in TOP_LEVEL_STATUSES else STATUS_NOT_STARTED
+    # Named for the payload it reaches, not for the loop that follows: a
+    # step row's status is a different vocabulary, and a name shared with
+    # one would put a step's word where the set's word belongs.
+    set_status = normalized.get("status")
+    icon_key = (
+        set_status if set_status in TOP_LEVEL_STATUSES else STATUS_NOT_STARTED
+    )
     sessions_out = []
     for entry in normalized.get("sessions") or []:
         number = entry.get("number")
@@ -660,7 +665,7 @@ def build_projection(set_dir) -> dict:
             # five rows behind a session whose verification had already
             # opened, and a confidently wrong marker is worse than none.
             for position, row in enumerate(rows):
-                status = row.get("status")
+                row_status = row.get("status")
                 # A plan row's dateTime is only when the plan was seeded, so
                 # only a logged row can say when its step began.
                 started = (
@@ -672,12 +677,12 @@ def build_projection(set_dir) -> dict:
                     "stepNumber": row.get("stepNumber"),
                     "stepKey": _py_str(row.get("stepKey")) or None,
                     "description": _py_str(row.get("description")),
-                    "status": status,
-                    "state": step_state(status),
+                    "status": row_status,
+                    "state": step_state(row_status),
                     "box": STATUS_BOXES.get(
-                        _py_str(status).lower(), UNKNOWN_BOX
+                        _py_str(row_status).lower(), UNKNOWN_BOX
                     ),
-                    "iconKey": step_icon_key(status),
+                    "iconKey": step_icon_key(row_status),
                     "isPlanned": bool(row.get("isPlanned")),
                     "isActive": bool(row.get("isActive")),
                     "startedAt": started,
@@ -690,7 +695,7 @@ def build_projection(set_dir) -> dict:
         "generatedAt": datetime.datetime.now().astimezone().isoformat(),
         "set": {
             "slug": slug,
-            "status": status,
+            "status": set_status,
             "iconKey": icon_key,
             "schemaVersionOnDisk": (raw or {}).get("schemaVersion"),
             "totalSessions": normalized.get("totalSessions"),

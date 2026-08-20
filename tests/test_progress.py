@@ -261,6 +261,30 @@ class TestProjectionSteps:
         assert steps[1]["status"] == "pending"  # the record is never edited
         assert steps[1]["startedAt"] is None
 
+    def test_set_status_is_not_overwritten_by_a_step_row(self, tmp_path):
+        # The set's status and a step row's status are different
+        # vocabularies. An in-flight session whose last row is "pending"
+        # must still project the set as in-progress: "pending" is not a
+        # set status, so a consumer narrowing the payload rejects the
+        # whole projection and falls back to guessing from file presence.
+        (tmp_path / "session-state.json").write_text(json.dumps({
+            "schemaVersion": 4, "sessionSetName": tmp_path.name,
+            "status": "in-progress",
+            "sessions": [{"number": 1, "title": "One",
+                          "status": "in-progress"}],
+        }), encoding="utf-8")
+        (tmp_path / "activity-log.json").write_text(json.dumps({
+            "sessionSetName": tmp_path.name, "entries": [
+                {"sessionNumber": 1, "stepNumber": 1, "stepKey": "work",
+                 "dateTime": "t", "description": "Do the work.",
+                 "status": "pending", "kind": "plan-step"},
+            ],
+        }), encoding="utf-8")
+        p = build_projection(tmp_path)
+        assert p["sessions"][0]["steps"][-1]["status"] == "pending"
+        assert p["set"]["status"] == "in-progress"
+        assert p["set"]["iconKey"] == "in-progress"
+
     def test_logged_start_survives_later_status_entries(self, tmp_path):
         # A step logged in-progress and later complete keeps the
         # in-progress entry's time as its start — the latest entry owns

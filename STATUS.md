@@ -1,3 +1,91 @@
+# STATUS — after set 144 (the plan is pre-registered, hashed, and cannot answer the completeness question)
+
+- **Set 144 is complete on `experiment/verification-pipeline-v3`.** All three
+  sessions VERIFIED over `copilot-cli` — session 1 by gemini-3.1-pro-preview
+  after adjudication overruled every disputed finding, sessions 2 and 3 by
+  gpt-5.5/openai (rounds 4 / 3 / 2). Nothing merged to `master`.
+- **A plan is a machine-owned artifact now.** `approved-plan.json` is
+  schema-validated, written only through the sanctioned writers, hashed at
+  approval, and immutable afterwards except by an appended amendment. The
+  hash covers every field but `amendments`, so an append never moves it, and
+  a write ledger tells a true append from a rewritten history. A step with no
+  evidence contract cannot be written; a plan with more than seven steps
+  cannot be written; the schema refuses both, so no reviewer is ever asked to
+  count.
+- **Checking it is free until it cannot be.** The mechanical checks run
+  first and settle the round alone. The cheap model reads what survives
+  against fixed checklist text — approve, amend, or human, per step. A
+  revision that does not touch the objected-to fields bounces with **no model
+  call**. Premium review fires only on derived high risk or a second
+  objection, and the record names which trigger fired.
+- **Amendments carry the change, not a note about it.** `added_files` widens
+  the amended step's envelope, `evidence_contract` replaces its proof, and
+  `effective_plan` folds them over a core that is never rewritten. Risk is
+  re-derived from the widened envelope, so a supervisor cannot amend past the
+  review its own risk earns. Only the amended step is re-checked.
+- **The outside-the-plan test is mechanical.** `compare_to_envelope` diffs the
+  working tree against the declared envelope; set difference decides and no
+  model is asked. **Set 145 has to call it** — this set built the mechanism,
+  not the caller.
+- **Suite: 531 green.** Envelope: **15,556 LOC / 29 modules / 531 Python
+  tests** against 16,800 / 33 / 605; TS unchanged at 161. `verify.py` is still
+  **1,789** and must end below 1,200 — **set 145 session 3 owns that
+  extraction**, and it is now the only structural debt the sequence has left.
+
+## What the replay could not answer, and what it did
+
+`scripts/plan_replay.py` replays all 16 closed sessions of 136–141 and
+publishes counts to the set's `replay-136-141.md`. **The result is negative
+and is reported as one:** 14 of 15 measurable sessions would have needed an
+amendment against an envelope reconstructed from spec-named files. That is
+the reconstruction failing, not the design — a spec names two to eight files
+and a session touches three to twenty-five. **The amendment rate cannot be
+estimated from history; set 145 must measure it against authored envelopes,
+and 146 is where the decision on it belongs.**
+
+The usable half is the distribution: escapes concentrate in the source tree
+(45) and the test tree (43). **A step whose evidence contract says a test
+proves it must declare that test in its envelope**, or it amends its plan the
+moment it writes the test. Set 145 should author envelopes from the evidence
+contract, not from the spec's prose.
+
+Of 16 verification findings on disk, exactly 1 cited only files inside the
+reconstructed envelope. `coverable` is the ceiling of what this measurement
+can claim — a declared proof *could* have covered it. Whether it *would* have
+is the completeness question, and **pre-registration cannot answer it by
+construction**: a weak criterion inside the envelope passes. What it does
+guarantee is that the criterion could not be rewritten once the code was
+seen. Sets 145–147 must not be written as though it guarantees more.
+
+## Decisions taken during set 144
+
+- **The plan is a new artifact, not a reused one.** `spec.md` is
+  hand-editable and its seeding is one-shot; `review-claims` v1 has no
+  evidence field, blesses claiming nothing, and is frozen shut. Neither was
+  bent to fit.
+- **Ceremony is excluded structurally, not by a flag.** Register, affected
+  tests, verification, the run of record, close-out and the documentation
+  pass never enter a plan, because a step kind a supervisor sets is a step
+  kind a supervisor sets wrong.
+- **`change-log.md` is lifecycle-written.** Close-out writes it, close-out is
+  never a plan step, so no envelope may declare it — and counting it would
+  refuse every session for obeying the lifecycle. It joins
+  `session-state.json` and `activity-log.json`. **`spec.md` deliberately did
+  not join them:** a session editing its own spec mid-flight is the drift the
+  plan exists to catch.
+- **Those three filenames now have one declaration.** `gates`, `facts` and
+  `test_evidence` each had their own copy and the plan work was about to add
+  a fourth; they read `ledger.LIFECYCLE_WRITTEN_SET_FILES` instead, beside
+  `MACHINE_DIRNAME`, which owns the same record-versus-work distinction.
+- **The test forecast ran low again.** 18 forecast, 55 spent. Session 3 alone
+  forecast 3 and spent 7. Across 142–144 the pattern holds: estimates made
+  before the behaviours are enumerated understate them. **Set 145's forecast
+  should be read as a floor.**
+
+**Next: set 145** (step execution — and the `verify.py` extraction), then 146
+(measure then enable), 147 (session walkthroughs).
+
+---
 # STATUS — after set 143 (the framework stopped assuming its subject was Python)
 
 - **Set 143 is complete on `experiment/verification-pipeline-v3`.** All three

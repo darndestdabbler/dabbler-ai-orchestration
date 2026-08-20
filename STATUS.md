@@ -10,14 +10,16 @@
   the selector proving every test affected, and `--allow-full-preverify`
   with a non-empty reason. `final-full` is the run of record, bound to its
   tree digest, and it alone satisfies `test_run_fresh`.
-- **Changed-line coverage is real, and it earns its keep.** The declared
-  suite command carries `--cov ... --cov-report=json:.dabbler/coverage.json`,
-  so the fact comes from the run the selector prescribes. Session 3''s own
-  coverage fact found an unreachable branch in the change that introduced
-  it. Only executable statements count: a changed comment is not a gap.
-  Coverage''s data file lives under `.dabbler/` — a stray `.coverage` in the
-  repo root is an unmappable changed path, and would turn the very command
-  the selector printed into a `policy_violation`.
+- **Changed-line coverage is real, and it earns its keep — and set 143
+  removes it.** The declared suite command carries
+  `--cov ... --cov-report=json:.dabbler/coverage.json`, so the fact comes
+  from the run the selector prescribes. Session 3's own coverage fact found
+  an unreachable branch in the change that introduced it. Only executable
+  statements count: a changed comment is not a gap. Coverage's data file
+  lives under `.dabbler/` — a stray `.coverage` in the repo root is an
+  unmappable changed path, and would turn the very command the selector
+  printed into a `policy_violation`. It works; it is going anyway, for the
+  reason set out below.
 - **Deterministic controls read `pass | fail | not_applicable | unknown`.**
   This repository declares none, so all four read `not_applicable`. A tool
   that cannot be launched reads `unknown`, and a required `unknown` is red —
@@ -25,9 +27,11 @@
 - **Suite: 477 green.** Envelope: **14,473 LOC / 27 modules / 477 Python
   tests** against 16,800 / 33 / 605. `verify.py` is **1,777** (from 1,926);
   it must end below 1,200, and set 145 session 3 owns that extraction.
+- **Set 143 is expected to move the envelope down**, not up: every change in
+  it is a deletion.
 - **Set 142 spent 22 tests against an estimate of 14.** The budget
-  arithmetic in the later specs still assumes 14 and needs one correction
-  pass when set 144 is authored.
+  arithmetic in the later specs has been corrected: 477 now, 466 after 143,
+  483 after 144, 502 after 145, 512 after 146.
 
 ## The language-neutrality gap, and what it changed
 
@@ -35,7 +39,7 @@ The framework is *written* in Python, which is fine. It also **assumes its
 subject is Python**, which is not. Three places, and only three:
 
 - `affected.py` hardcodes `PACKAGE = "ai_router"` and builds its dependency
-  graph with `ast.parse`. The selector''s two strongest reasons —
+  graph with `ast.parse`. The selector's two strongest reasons —
   module-ownership and dependency-edge — therefore work only for *this*
   repository. Any other codebase, Python included, falls through to
   `selection_unknown`.
@@ -49,33 +53,52 @@ replace AST quote provenance with digest-pinned line-range provenance; keep
 one small stdlib reader per report format behind the seam that already
 exists. Cobertura and JaCoCo are both XML with per-line hit counts.
 
-This is critical and has its own set. **Sets 144–146 were renumbered to
-145–147; the new set 144 is not yet authored.** It slots after 143 because
-145 makes changed-line coverage load-bearing and 146 is "measure then
-enable" — building either on a self-referential selector means reworking
-both.
+This is critical, and it is **set 143 — the next set to run**, authored as
+`143-language-neutral-by-subtraction`. It goes ahead of the approved plan
+because 144 freezes an evidence-contract schema at v1 the moment it hashes
+one, and that schema must not be written around coverage that 143 removes;
+and because 144's derived risk flags — *public interface*, *integration
+module* — are exactly where the next language assumption would enter.
 
-Open question for 144: **whether changed-line coverage is needed at all.**
-It exists for one purpose, letting a step skip its model check safely. A
-design where no step may skip does not need it. Whole-file granularity is
-not a substitute — it collapses to "was the module imported", true almost
-always. Symbol granularity is the right human unit but needs an AST per
-language, so it would *increase* language coupling.
+**The skip path is settled: it goes, and changed-line coverage goes with
+it.** Coverage existed for one job — letting a step skip its model check
+safely — and was needed only because the other two skip conditions are
+author-declared. Remove the exemption and there is nothing left to police.
+**Every step gets its model check.** Three alternatives were rejected:
+falsifier twins (double the tests for no new behavior; real mutation
+testing does prove discrimination but needs an engine per language and
+heavy compute), execution logging (coverage hand-rolled — same information,
+more overhead, and it edits the code under test), and verifier-authored
+tests with stubs (fixes an author shaping the test to the code, but assumes
+work always starts from nothing, so refactors and config work route around
+it).
+
+Two consequences, both deliberate. Per-step review cost is now a function
+of step count, so 144's seven-step cap and file envelope are load-bearing
+rather than hygienic. And since nothing mechanical judges test quality, the
+step reviewer's fixed checklist must ask *would this evidence actually tell
+us the step worked* — a question, not a subsystem. Set 145 carries it.
+
+Granularity is not the lever: whole-file collapses to "was the module
+imported", true almost always; symbol-level is the right human unit but
+needs an AST per language, so it would *increase* coupling. Line-level was
+never the language-specific part — only the report reader was.
 
 ## Other decisions taken during set 142
 
-- **The approved plan carries only the session''s own steps**, never
+- **The approved plan carries only the session's own steps**, never
   register, verification, the run of record, or close-out, and a session
   declares at most seven — refused by the schema at write time. Encoded in
-  143 and 145.
+  144 and 145.
 - **The spec step lists across 142–147 had verification before the tests.**
   Corrected in all fourteen; the code always enforced the right order.
 - **STATUS.md lands as its own commit after a set closes**, not inside the
   session commit — a content edit after the verified snapshot fails
   `verification_clean`.
 
-**Next: set 143** (the approved plan), with set 144 to be authored before it
-finishes.
+**Next: set 143** (language neutrality by subtraction), then 144 (the
+approved plan), 145 (step execution), 146 (measure then enable), 147
+(session walkthroughs).
 
 ---
 # STATUS — after set 141 (the critique contracts exist, and decide nothing)

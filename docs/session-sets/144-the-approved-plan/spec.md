@@ -9,18 +9,20 @@
 > out to be. Reviewing a plan is also far cheaper than reviewing a diff: it
 > is shorter, it is structured, and it is the last moment where a defect
 > costs nothing to fix.
-> **Session Set:** `docs/session-sets/143-the-approved-plan/`
+> **Session Set:** `docs/session-sets/144-the-approved-plan/`
 > **Created:** 2026-08-19
-> **Revised:** 2026-08-19 — rewritten for the plan-first, step-wise design.
+> **Revised:** 2026-08-19 — rewritten for the plan-first, step-wise design;
+> resequenced after the language-neutrality set.
 > **Workflow:** Full
-> **Baseline commit:** `fa3c28c7`, plus set 142.
+> **Baseline commit:** `fa3c28c7`, plus sets 142 and 143.
 > **Integration branch:** `experiment/verification-pipeline-v3`; child
-> branch `verification-v3/set-143-approved-plan`. **Not** developed on
+> branch `verification-v3/set-144-approved-plan`. **Not** developed on
 > `master`.
-> **Prerequisite:** set 142 complete — the plan's evidence contracts refer
-> to targeted test selection and changed-line coverage, which 142 builds.
+> **Prerequisite:** sets 142 and 143 complete. 143 runs first on purpose:
+> the evidence-contract vocabulary is frozen at v1 the moment it is hashed,
+> and it must not be written around changed-line coverage that 143 removes.
 
-> **Note on rule 6:** operator-authorized exception, as sets 136–142.
+> **Note on rule 6:** operator-authorized exception, as sets 136–143.
 
 ---
 
@@ -239,7 +241,8 @@ amendment rate in hand before set 145 builds execution on top of it.
 
 ## Test budget
 
-14 spent in set 142; this set adds **16** (6, 7, 3), reaching 485 of the
+Set 142 spent 22 and set 143 returns 11, leaving **466**; this set adds
+**17** (7, 7, 3), reaching 483 of the
 605 envelope. Session 2 carries the largest allocation because the cheap
 reviewer's judgment is the load-bearing joint of the whole design — the
 one place where a weak criterion either gets caught or gets blessed.

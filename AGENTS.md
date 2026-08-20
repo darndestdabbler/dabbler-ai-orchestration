@@ -54,7 +54,7 @@ spend down:
 | Python tests | 455 | **605** | 477 |
 | TypeScript tests | 161 | **215** (unchanged) | 161 |
 
-Set 144 is expected to move these *down*: it removes the framework's
+Set 143 is expected to move these *down*: it removes the framework's
 language-specific machinery rather than adding a layer beside it.
 
 Two rules survive the relaxation unchanged, because they are what the ceilings

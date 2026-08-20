@@ -7,17 +7,17 @@
 > Deterministic tools run first and free; a model is invoked only for the
 > evidence a model has to judge; and the framework, not the author, decides
 > what changed by committing each step itself.
-> **Session Set:** `docs/session-sets/144-step-execution/`
+> **Session Set:** `docs/session-sets/145-step-execution/`
 > **Created:** 2026-08-19
-> **Revised:** 2026-08-19 — rewritten for the plan-first, step-wise design.
+> **Revised:** 2026-08-19 — rewritten for the plan-first, step-wise design;
+> the skip path struck after set 144.
 > **Workflow:** Full
 > **Baseline commit:** `fa3c28c7`, plus sets 142–144.
 > **Integration branch:** `experiment/verification-pipeline-v3`; child
 > branch `verification-v3/set-145-step-execution`. **Not** developed on
 > `master`.
-> **Prerequisite:** sets 142, 143, and 144 complete. There is nothing to execute
-> without an approved plan, and no way to skip a model check without
-> changed-line coverage.
+> **Prerequisite:** sets 142, 143, and 144 complete. There is nothing to
+> execute without an approved plan.
 
 > **Note on rule 6:** operator-authorized exception, as sets 136–143.
 
@@ -72,23 +72,28 @@ session-level cross-provider verification sees an empty working tree, so
 its round-1 baseline must resolve to the session's start ref rather than
 `HEAD`. That is one change to baseline resolution — not a rewrite.
 
-## When a model is not called, and the gate that makes that safe
+## Every step is reviewed, and what that buys instead
 
-If every item in the step's evidence contract is `deterministic` and every
-one of them ran green, **no model reads the diff.** That is the largest
-saving in the design and also its largest risk, because a step could
-declare only mechanically-checkable evidence and buy itself an unreviewed
-change.
+An earlier draft let a step skip its model check when every evidence item
+was `deterministic` and green, policed by a changed-line coverage gate. Set
+144 struck both. The saving was real but so was the attack surface: the
+first two conditions are author-declared, so the coverage gate existed only
+to stop an author buying an unreviewed change with weak criteria. Removing
+the exemption removes the thing that had to be policed, and the coverage
+machinery leaves with it.
 
-Set 143's plan review is the first defence. **Changed-line coverage is the
-second, and it is the mechanical one:** a step may skip its model check
-only if the selected tests actually executed every changed line. An
-uncovered changed line forces the model check regardless of what the
-evidence contract said. An author cannot buy silence by writing weak
-criteria, because the criteria do not decide — the coverage does.
+**Every step gets its model check.** The saving in this design was never
+skipping — it is *context*. A checker that reads one step's diff, its
+evidence contract, and its authorized paths is answering a small question,
+and a cheap model answers it. That is where the cost falls, and it survives
+intact.
 
-This is the single rule that makes the skip defensible. It is not
-negotiable and it is not configurable off.
+Two consequences, both deliberate. Review cost is now a function of step
+count, which is why set 144 caps a session at seven steps and enforces a
+file envelope: that discipline is load-bearing here, not hygiene. And since
+nothing mechanical judges whether a test is any good, the reviewer's fixed
+checklist must ask it — *would this evidence actually tell us the step
+worked* — as a question put to a model, not a subsystem.
 
 ## Three responses to a problem, and nothing else
 
@@ -130,7 +135,7 @@ framework; `blocked` is terminal.
 1. Register.
 2. Open and close a step against the approved plan: a step is in flight or
    it is not, exactly one at a time, and the record says which. Only the
-   session's own steps are in the plan — set 143 keeps register,
+   session's own steps are in the plan — set 144 keeps register,
    verification, the run of record, and close-out out of it — so there is no
    ceremony step to open an envelope for, review, or commit an empty diff
    against.
@@ -152,19 +157,18 @@ framework; `blocked` is terminal.
 **Creates:** step open/close, envelope enforcement, the deterministic
 pass, the manual-commit refusal. Est. 7 Python tests.
 
-### Session 2 of 3: The residual model check, and the coverage gate
+### Session 2 of 3: The step's model check, in the narrowest context
 
 1. Register.
-2. Implement the skip decision, in this order and no other: every evidence
-   item is `deterministic`, **and** every one ran green, **and**
-   changed-line coverage shows the selected tests executed every changed
-   line. All three, or the model check runs. Record which condition forced
-   the check when one did.
-3. Build the residual check as a narrow context: the step's diff, its
-   evidence contract, and the authorized paths it may read — not the
-   session bundle. Reuse set 141's check IR for the shape and its evidence
-   verifier for the answers, so a `judgment` item arrives as a bounded
-   check with a real evidence contract rather than an open question.
+2. Build the step check as a narrow context: the step's diff, its evidence
+   contract, and the authorized paths it may read — not the session bundle.
+   Reuse set 141's check IR for the shape and its evidence verifier for the
+   answers, so a `judgment` item arrives as a bounded check with a real
+   evidence contract rather than an open question. Every step is checked;
+   there is no skip to decide.
+3. Put the evidence question in the fixed checklist — *would this evidence
+   actually tell us the step worked* — so the reviewer judges the proof as
+   well as the diff. Nothing mechanical asks this once coverage is gone.
 4. Implement fix / disprove / escalate as the only three responses, with
    the two-attempt bound on fix and the red-green rule on disprove.
 5. Have the framework commit the step once its evidence is satisfied, with
@@ -180,8 +184,8 @@ pass, the manual-commit refusal. Est. 7 Python tests.
    final verified tree.
 8. Close-out.
 
-**Creates:** the coverage-gated skip, the narrow residual check, the three
-responses, framework-owned commits. Est. 8 Python tests.
+**Creates:** the narrow step check, the evidence question, the three
+responses, framework-owned commits. Est. 7 Python tests.
 
 ### Session 3 of 3: The end of the session
 
@@ -235,7 +239,8 @@ failure produces a bisect range rather than an accusation.
 
 ## Test budget
 
-30 spent in sets 142–143; this set adds **20** (7, 8, 5), reaching 505 of
+Sets 142–144 leave the count at **483**; this set adds **19** (7, 7, 5),
+reaching 502 of
 the 605 envelope. Session 2 is the largest allocation in the sequence
 because the coverage gate is the rule the whole cost saving rests on, and
 its failure modes — all-deterministic-and-green but uncovered,

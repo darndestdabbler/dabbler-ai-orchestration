@@ -70,7 +70,7 @@ abstract baseline. For each corpus case, run both and report:
   is too small to support a claim, say so instead of rounding.
 - **Ceremony** — time and tokens spent on plan writing, plan review,
   amendments, and bounces that produced no finding.
-- **Amendment rate**, carried forward from set 143's replay. A design whose
+- **Amendment rate**, carried forward from set 144's replay. A design whose
   plans need constant amendment is paperwork wearing a constraint's
   clothes.
 - **The completeness gap** — defects the current pipeline caught by reading
@@ -208,6 +208,7 @@ being quietly restated.
 
 ## Test budget
 
-50 spent in sets 142–145; this set adds **10** (4, 4, 2), reaching **515 of
-605**. Ninety slots remain unspent against the envelope, which is the
-margin for being wrong — not budget to find a use for.
+Sets 142–145 leave the count at **502**; this set adds **10** (4, 4, 2),
+reaching **512 of 605**. Ninety-three slots remain unspent against the
+envelope, which is the margin for being wrong — not budget to find a use
+for.

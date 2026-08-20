@@ -2,7 +2,7 @@
 
 > **Purpose:** Decide whether the rewrite earns its place, against the only
 > comparator that matters — the current pipeline, on the same work. Sets
-> 142–144 built machinery in shadow; this set runs both designs over the
+> 142–145 built machinery in shadow; this set runs both designs over the
 > same corpus, compares cost and recall with denominators attached, and
 > either enables the new path or reports honestly that it did not earn it.
 > It also closes the loop that keeps the framework from growing: a defect
@@ -12,11 +12,11 @@
 > **Created:** 2026-08-19
 > **Revised:** 2026-08-19 — rewritten for the plan-first, step-wise design.
 > **Workflow:** Full
-> **Baseline commit:** `fa3c28c7`, plus sets 142–144.
+> **Baseline commit:** `fa3c28c7`, plus sets 142–145.
 > **Integration branch:** `experiment/verification-pipeline-v3`; child
 > branch `verification-v3/set-145-measure-then-enable`. **Not** developed
 > on `master`.
-> **Prerequisite:** sets 142, 143, and 144 complete.
+> **Prerequisite:** sets 142–145 complete.
 
 > **Note on rule 6:** operator-authorized exception, as sets 136–144.
 
@@ -107,7 +107,7 @@ abstract baseline. For each corpus case, run both and report:
    keeping legacy sets additive and tolerant. An existing corpus set that
    predates these fields must still pass.
 4. Run **both** designs over the corpus: the current pipeline, and the
-   plan-first path from sets 142–144 in shadow. Same cases, same trees,
+   plan-first path from sets 142–145 in shadow. Same cases, same trees,
    same provider mix. A comparison that changes two variables measures
    nothing.
 5. Affected tests, recorded as the `preverify-targeted` evidence.
@@ -208,6 +208,6 @@ being quietly restated.
 
 ## Test budget
 
-50 spent in sets 142–144; this set adds **10** (4, 4, 2), reaching **515 of
+50 spent in sets 142–145; this set adds **10** (4, 4, 2), reaching **515 of
 605**. Ninety slots remain unspent against the envelope, which is the
 margin for being wrong — not budget to find a use for.

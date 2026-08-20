@@ -16,8 +16,8 @@ treat this branch as the trunk for day-to-day work.
 ## Ground rules
 
 1. **No new module without deleting one.** The module inventory in the rebuild
-   work plan is the ceiling. *(Suspended for sets 142–146 — see "The envelope
-   sets 142–146 run under" below.)*
+   work plan is the ceiling. *(Suspended for sets 142–147 — see "The envelope
+   sets 142–147 run under" below.)*
 2. **No guard may guard another guard.** Every gate must cite the concrete v1
    incident it would have prevented (the five kept gates each have one; see
    Session 2).
@@ -26,8 +26,8 @@ treat this branch as the trunk for day-to-day work.
 4. **Test budget is a ceiling: 480 Python / 215 TS.** One test per behavior.
    No falsifier-twin doctrine, no tests of test infrastructure, no source-text
    assertions (use ruff/ESLint), no migration-path tests, no tests asserting
-   exact markdown strings. *(Numbers suspended for sets 142–146 — see "The
-   envelope sets 142–146 run under" below. The one-test-per-behavior rule and
+   exact markdown strings. *(Numbers suspended for sets 142–147 — see "The
+   envelope sets 142–147 run under" below. The one-test-per-behavior rule and
    the banned-test-kinds list are **not** suspended.)*
 5. **The machine owns the record.** Nothing under `.dabbler/runs/` is ever
    hand-edited or exempted; no code path may accept a hand-written verdict.
@@ -39,20 +39,23 @@ treat this branch as the trunk for day-to-day work.
 8. **LOC budgets are targets ±30%, not gates.** If a module wants to be 2× its
    budget, stop and reconsider the design instead of writing a justification.
 
-## The envelope sets 142–146 run under
+## The envelope sets 142–147 run under
 
-The operator has relaxed ground rules 1 and 4 for sets 142–146, on the grounds
+The operator has relaxed ground rules 1 and 4 for sets 142–147, on the grounds
 that the verification-pipeline rewrite is a replacement rather than an
 increment. One envelope replaces both, measured against the post-141 baseline
-and acting as a **ceiling for the whole five-set sequence**, not a per-set
-budget to spend down:
+and acting as a **ceiling for the whole sequence**, not a per-set budget to
+spend down:
 
-| Dimension | Baseline (`fa3c28c7`) | Ceiling |
-| --- | ---: | ---: |
-| Python source | 12,650 LOC | **16,800** |
-| Python modules | 25 | **33** |
-| Python tests | 455 | **605** |
-| TypeScript tests | 161 | **215** (unchanged) |
+| Dimension | Baseline (`fa3c28c7`) | Ceiling | After 142 |
+| --- | ---: | ---: | ---: |
+| Python source | 12,650 LOC | **16,800** | 14,473 |
+| Python modules | 25 | **33** | 27 |
+| Python tests | 455 | **605** | 477 |
+| TypeScript tests | 161 | **215** (unchanged) | 161 |
+
+Set 144 is expected to move these *down*: it removes the framework's
+language-specific machinery rather than adding a layer beside it.
 
 Two rules survive the relaxation unchanged, because they are what the ceilings
 were protecting:

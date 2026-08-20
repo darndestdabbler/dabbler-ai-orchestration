@@ -1,3 +1,83 @@
+# STATUS — after set 142 (the cheap proof runs first, and the machine insists)
+
+- **Set 142 is complete on `experiment/verification-pipeline-v3`.** All three
+  sessions VERIFIED by gpt-5.5/openai over `copilot-cli` (rounds 2 / 5 / 3).
+  Nothing merged to `master`.
+- **The lifecycle is now mechanical, not advisory.** `verify` refuses to
+  dispatch without an accepted `preverify-targeted` record for the current
+  surfaces, and the refusal names the targeted command. A full-suite run is
+  not ordinary pre-verification evidence; the two auditable exceptions are
+  the selector proving every test affected, and `--allow-full-preverify`
+  with a non-empty reason. `final-full` is the run of record, bound to its
+  tree digest, and it alone satisfies `test_run_fresh`.
+- **Changed-line coverage is real, and it earns its keep.** The declared
+  suite command carries `--cov ... --cov-report=json:.dabbler/coverage.json`,
+  so the fact comes from the run the selector prescribes. Session 3''s own
+  coverage fact found an unreachable branch in the change that introduced
+  it. Only executable statements count: a changed comment is not a gap.
+  Coverage''s data file lives under `.dabbler/` — a stray `.coverage` in the
+  repo root is an unmappable changed path, and would turn the very command
+  the selector printed into a `policy_violation`.
+- **Deterministic controls read `pass | fail | not_applicable | unknown`.**
+  This repository declares none, so all four read `not_applicable`. A tool
+  that cannot be launched reads `unknown`, and a required `unknown` is red —
+  never a quiet `pass`.
+- **Suite: 477 green.** Envelope: **14,473 LOC / 27 modules / 477 Python
+  tests** against 16,800 / 33 / 605. `verify.py` is **1,777** (from 1,926);
+  it must end below 1,200, and set 145 session 3 owns that extraction.
+- **Set 142 spent 22 tests against an estimate of 14.** The budget
+  arithmetic in the later specs still assumes 14 and needs one correction
+  pass when set 144 is authored.
+
+## The language-neutrality gap, and what it changed
+
+The framework is *written* in Python, which is fine. It also **assumes its
+subject is Python**, which is not. Three places, and only three:
+
+- `affected.py` hardcodes `PACKAGE = "ai_router"` and builds its dependency
+  graph with `ast.parse`. The selector''s two strongest reasons —
+  module-ownership and dependency-edge — therefore work only for *this*
+  repository. Any other codebase, Python included, falls through to
+  `selection_unknown`.
+- `evidence.py` pins quote provenance to `PARSED_SUFFIXES = (".py",)` and
+  matches enclosing AST node chains.
+- `facts.py` reads only coverage.py JSON.
+
+**The direction is elimination, not pluggability**, and all three make the
+framework smaller: delete the AST import graph in favour of declared rules;
+replace AST quote provenance with digest-pinned line-range provenance; keep
+one small stdlib reader per report format behind the seam that already
+exists. Cobertura and JaCoCo are both XML with per-line hit counts.
+
+This is critical and has its own set. **Sets 144–146 were renumbered to
+145–147; the new set 144 is not yet authored.** It slots after 143 because
+145 makes changed-line coverage load-bearing and 146 is "measure then
+enable" — building either on a self-referential selector means reworking
+both.
+
+Open question for 144: **whether changed-line coverage is needed at all.**
+It exists for one purpose, letting a step skip its model check safely. A
+design where no step may skip does not need it. Whole-file granularity is
+not a substitute — it collapses to "was the module imported", true almost
+always. Symbol granularity is the right human unit but needs an AST per
+language, so it would *increase* language coupling.
+
+## Other decisions taken during set 142
+
+- **The approved plan carries only the session''s own steps**, never
+  register, verification, the run of record, or close-out, and a session
+  declares at most seven — refused by the schema at write time. Encoded in
+  143 and 145.
+- **The spec step lists across 142–147 had verification before the tests.**
+  Corrected in all fourteen; the code always enforced the right order.
+- **STATUS.md lands as its own commit after a set closes**, not inside the
+  session commit — a content edit after the verified snapshot fails
+  `verification_clean`.
+
+**Next: set 143** (the approved plan), with set 144 to be authored before it
+finishes.
+
+---
 # STATUS — after set 141 (the critique contracts exist, and decide nothing)
 
 - **Set 141 is complete on `experiment/verification-pipeline-v3`.** All
@@ -349,3 +429,4 @@
   7,855 vs the ~9,000 budget. PyPI already has a 1.0.0 (uploaded
   2026-08-15); publishing this build needs 1.0.1. Copilot lock still pins
   CLI 1.0.69 (re-probe before a live seat run).
+

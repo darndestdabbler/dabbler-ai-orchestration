@@ -178,7 +178,7 @@ instructions. Est. 5 Python tests.
 1. Register.
 2. Implement changed-line coverage: which lines the change touched, which
    of those the selected tests actually executed, and which are uncovered.
-   This is a deterministic fact here and becomes load-bearing in set 144,
+   This is a deterministic fact here and becomes load-bearing in set 145,
    where it is what stops a step from skipping review by declaring only
    mechanically-checkable evidence.
 3. Normalize the configured compile, typecheck, lint, and analyzer outputs

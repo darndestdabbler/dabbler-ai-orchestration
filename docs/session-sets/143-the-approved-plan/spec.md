@@ -88,7 +88,7 @@ declares none is refused at approval.**
   module, sensitive path, dependency change.
 
 Evidence is the point. A step whose evidence is all `deterministic` is a
-step no model will need to read in set 144 — which makes the plan review
+step no model will need to read in set 145 — which makes the plan review
 the only thing standing between a weak criterion and an unreviewed change.
 That is why session 2 spends its whole budget on judging proofs.
 
@@ -97,7 +97,7 @@ That is why session 2 spends its whole budget on judging proofs.
 The plan carries the session's **own** steps and nothing else. Register,
 the affected-test run, cross-provider verification, the run of record and
 close-out are the lifecycle, not the work: they have no file envelope, no
-evidence of their own to declare, and no diff for set 144 to review. Keeping
+evidence of their own to declare, and no diff for set 145 to review. Keeping
 them out is structural rather than a flag — a step kind a supervisor sets is
 a step kind a supervisor sets wrong, and a ceremony step that never enters
 the plan cannot be opened, reviewed, or committed as one. The activity log
@@ -110,13 +110,13 @@ deliberately generous: every session pays the same fixed ceremony — register,
 the affected-test run, cross-provider verification, the run of record,
 close-out — and a tight cap does not remove that toll, it makes the session
 pay it more often. The bound is here to keep step-level review cost from
-growing without limit, not to force decomposition. Sets 142–146 sit between
+growing without limit, not to force decomposition. The sets planned so far sit between
 three and six.
 
 ## What this set does NOT do (do not reopen)
 
 - **No execution.** Nothing here runs a step or commits anything. The plan
-  is written, checked, approved, and hashed; set 144 executes it.
+  is written, checked, approved, and hashed; set 145 executes it.
 - **No change to session-level verification.** Cross-provider verification
   remains mandatory with no skip. A plan is not a substitute for it.
 - **No manager/worker hierarchy.** The old design's manager authoring,
@@ -235,7 +235,7 @@ only on derived high risk or repeated objection, and the record says which.
 An amendment re-checks only the changed part.
 
 The 136–141 replay is published with its counts, and the operator has the
-amendment rate in hand before set 144 builds execution on top of it.
+amendment rate in hand before set 145 builds execution on top of it.
 
 ## Test budget
 

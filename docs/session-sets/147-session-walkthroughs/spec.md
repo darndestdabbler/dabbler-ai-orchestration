@@ -13,11 +13,11 @@
 > **Created:** 2026-08-19
 > **Workflow:** Full
 > **Baseline commit:** head of `experiment/verification-pipeline-v3` after
-> set 145.
+> set 146.
 > **Integration branch:** `experiment/verification-pipeline-v3`; child
 > branch `verification-v3/set-146-walkthroughs`. **Not** developed on
 > `master`.
-> **Prerequisite:** set 145 complete.
+> **Prerequisite:** set 146 complete.
 
 > **Note on rule 6:** operator-authorized exception, as sets 136–145.
 
@@ -55,7 +55,7 @@ that idea.
 
 **This set is not part of the verification-pipeline rewrite.** It shares
 the window and nothing else. The sequence obligation to leave `verify.py`
-under 1,200 lines belongs to sets 143–145; this set does not touch
+under 1,200 lines belongs to sets 143–146; this set does not touch
 `verify.py`, does not discharge that obligation, and must not be treated as
 absorbing it.
 
@@ -119,7 +119,7 @@ be a gate guarding a habit.
 
 ## What this set does NOT do (do not reopen)
 
-- **No retroactive walkthroughs.** Sets 142–145 are not backfilled. The
+- **No retroactive walkthroughs.** Sets 142–146 are not backfilled. The
   session that did the work is the only one that can honestly say why, and
   it is finished. A backfill would be a reconstruction wearing the
   record's clothes.

@@ -11,11 +11,11 @@
 > **Created:** 2026-08-19
 > **Revised:** 2026-08-19 — rewritten for the plan-first, step-wise design.
 > **Workflow:** Full
-> **Baseline commit:** `fa3c28c7`, plus sets 142 and 143.
+> **Baseline commit:** `fa3c28c7`, plus sets 142–144.
 > **Integration branch:** `experiment/verification-pipeline-v3`; child
-> branch `verification-v3/set-144-step-execution`. **Not** developed on
+> branch `verification-v3/set-145-step-execution`. **Not** developed on
 > `master`.
-> **Prerequisite:** sets 142 and 143 complete. There is nothing to execute
+> **Prerequisite:** sets 142, 143, and 144 complete. There is nothing to execute
 > without an approved plan, and no way to skip a model check without
 > changed-line coverage.
 

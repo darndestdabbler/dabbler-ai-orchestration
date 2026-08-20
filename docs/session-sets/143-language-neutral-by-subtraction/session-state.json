@@ -26,9 +26,9 @@
     {
       "number": 2,
       "title": "Provenance without a parser",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-19T21:09:41.304964-04:00",
-      "completedAt": null,
+      "completedAt": "2026-08-19T21:40:19.080761-04:00",
       "orchestrator": {
         "engine": "copilot",
         "provider": "anthropic",

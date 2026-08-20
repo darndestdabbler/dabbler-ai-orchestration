@@ -6,9 +6,9 @@
     {
       "number": 1,
       "title": "The artifact, hashed and machine-owned",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-20T02:08:38.236625-04:00",
-      "completedAt": null,
+      "completedAt": "2026-08-20T03:17:34.429207-04:00",
       "orchestrator": {
         "engine": "copilot",
         "provider": "anthropic",

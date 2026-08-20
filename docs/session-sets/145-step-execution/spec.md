@@ -88,12 +88,19 @@ evidence contract, and its authorized paths is answering a small question,
 and a cheap model answers it. That is where the cost falls, and it survives
 intact.
 
-Two consequences, both deliberate. Review cost is now a function of step
-count, which is why set 144 caps a session at seven steps and enforces a
-file envelope: that discipline is load-bearing here, not hygiene. And since
-nothing mechanical judges whether a test is any good, the reviewer's fixed
-checklist must ask it — *would this evidence actually tell us the step
-worked* — as a question put to a model, not a subsystem.
+Note what this does *not* cost. Review spend is not a function of step
+count: the diff is partitioned across steps, not duplicated, so seven
+step-sized reviews come to roughly one session-sized review plus a constant
+per call. Losing the skip costs exactly the reviews of the steps that would
+have skipped — the all-deterministic, all-green ones — and nothing else.
+
+The consequence that does bite is that nothing mechanical judges whether a
+test is any good, so the reviewer's fixed checklist must ask it — *would
+this evidence actually tell us the step worked* — as a question put to a
+model, not a subsystem. Set 144's seven-step cap and file envelope still
+matter here, but for their own reasons: the cap bounds what the plan
+reviewer holds in view at approval, and the envelope is what the mechanical
+outside-the-plan test compares against.
 
 ## Three responses to a problem, and nothing else
 

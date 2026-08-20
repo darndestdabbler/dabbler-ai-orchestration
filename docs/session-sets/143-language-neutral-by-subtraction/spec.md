@@ -127,12 +127,19 @@ keeping:
   large share of real sessions, and a workflow that fits only greenfield
   gets routed around.
 
-Two consequences follow, both deliberate. Per-step review cost becomes a
-function of step count, which is why set 144 caps a session at seven steps
-and enforces a file envelope — that discipline is now load-bearing rather
-than hygienic. And because nothing mechanical judges test quality once
-coverage is gone, the step reviewer must judge the evidence as well as the
-code: a line in a fixed checklist, not a subsystem. Set 145 owns that
+One consequence follows, and it is smaller than it first appears. Removing
+the skip does not make review cost a function of step count: the diff is
+partitioned, not duplicated, so a session costs about the same to review in
+seven step-sized pieces as in one bundle. Step count adds only per-call
+overhead — checklist, evidence contract, output tokens — against which a
+narrow context is cheaper to reason over and admits a cheaper model. What
+the removal actually costs is the reviews of the steps that would have
+skipped: the all-deterministic, all-green ones, bounded by how many of those
+there are rather than by how many steps exist.
+
+The real consequence is that nothing mechanical judges test quality once
+coverage is gone, so the step reviewer must judge the evidence as well as
+the code: a line in a fixed checklist, not a subsystem. Set 145 owns that
 checklist and carries the question.
 
 ## What this set does NOT do (do not reopen)

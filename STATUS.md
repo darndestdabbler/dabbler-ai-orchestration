@@ -73,11 +73,17 @@ tests with stubs (fixes an author shaping the test to the code, but assumes
 work always starts from nothing, so refactors and config work route around
 it).
 
-Two consequences, both deliberate. Per-step review cost is now a function
-of step count, so 144's seven-step cap and file envelope are load-bearing
-rather than hygienic. And since nothing mechanical judges test quality, the
-step reviewer's fixed checklist must ask *would this evidence actually tell
-us the step worked* — a question, not a subsystem. Set 145 carries it.
+Two consequences, both deliberate. Review spend is **not** a function of
+step count — the diff is partitioned across steps, not duplicated, so seven
+step-sized reviews come to about one session-sized review plus a constant
+per call, and a narrow context is cheaper to reason over besides. Losing the
+skip costs exactly the reviews of the steps that would have skipped: the
+all-deterministic, all-green ones. And since nothing mechanical judges test
+quality, the step reviewer's fixed checklist must ask *would this evidence
+actually tell us the step worked* — a question, not a subsystem. Set 145
+carries it. 144's seven-step cap survives on its own merits: it bounds what
+the plan reviewer holds in view at approval, and a session wanting twenty
+steps is more than one session.
 
 Granularity is not the lever: whole-file collapses to "was the module
 imported", true almost always; symbol-level is the right human unit but

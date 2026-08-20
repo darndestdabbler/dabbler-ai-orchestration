@@ -544,7 +544,11 @@ testing:
   # runs.
 
   selection:
-    test_root: tests
+    # Where the tests live and what this repository calls them. Declared,
+    # because a framework that guesses either one has guessed an ecosystem.
+    test_roots:
+      - tests
+    test_glob: "test_*.py"
 
     # Changing one of these changes what every test does, so the selector can
     # prove the whole suite is affected instead of an operator asserting it.
@@ -558,10 +562,157 @@ testing:
     smoke:
       - tests/test_config.py
 
-    # Paths whose test mapping convention and import edges cannot express.
-    # An empty `select` declares "this path affects no test", which is a
-    # mapping, not an unknown.
+    # Which tests answer for which path. Every mapping is declared here:
+    # nothing is inferred from imports, because inferring it costs a parser
+    # per language and buys an economy, not a proof. The proof is the
+    # complete suite against the final verified tree, so a rule that has gone
+    # stale costs a late discovery there and cannot ship a defect.
+    #
+    # A rule names the tests that would notice this path breaking -- the ones
+    # that drive it, directly or through one thin caller. An empty `select`
+    # declares "this path affects no test", which is a mapping, not an
+    # unknown. A path no rule covers records `selection_unknown`, runs the
+    # smoke tests, and raises a risk; that is the loud state, and it is the
+    # signal that a rule is missing.
     rules:
+      - when: ai_router/__init__.py
+        select:
+          - tests/test_route.py
+      - when: ai_router/affected.py
+        select:
+          - tests/test_affected.py
+          - tests/test_verify.py
+      - when: ai_router/bootstrap.py
+        select:
+          - tests/test_bootstrap.py
+      - when: ai_router/config.py
+        select:
+          - tests/test_config.py
+          - tests/test_critique_contracts.py
+          - tests/test_route.py
+          - tests/test_verify.py
+      - when: ai_router/evidence.py
+        select:
+          - tests/test_evidence_protocol.py
+          - tests/test_affected.py
+          - tests/test_critique_contracts.py
+          - tests/test_gates.py
+          - tests/test_session.py
+          - tests/test_verify.py
+      - when: ai_router/facts.py
+        select:
+          - tests/test_facts.py
+          - tests/test_verify.py
+      - when: ai_router/gates.py
+        select:
+          - tests/test_gates.py
+          - tests/test_session.py
+          - tests/test_verify.py
+      - when: ai_router/identity.py
+        select:
+          - tests/test_identity.py
+          - tests/test_session.py
+          - tests/test_verify.py
+      - when: ai_router/ledger.py
+        select:
+          - tests/test_ledger.py
+          - tests/test_affected.py
+          - tests/test_critique_contracts.py
+          - tests/test_gates.py
+          - tests/test_session.py
+          - tests/test_verify.py
+      - when: ai_router/metrics.py
+        select:
+          - tests/test_metrics.py
+          - tests/test_route.py
+          - tests/test_verify.py
+      - when: ai_router/modules.py
+        select:
+          - tests/test_modules.py
+      - when: ai_router/pricing.py
+        select:
+          - tests/test_pricing.py
+          - tests/test_selection.py
+          - tests/test_metrics.py
+          - tests/test_route.py
+      - when: ai_router/progress.py
+        select:
+          - tests/test_progress.py
+          - tests/test_session.py
+          - tests/test_gates.py
+          - tests/test_verify.py
+      - when: ai_router/route.py
+        select:
+          - tests/test_route.py
+          - tests/test_escalation.py
+          - tests/test_verify.py
+      - when: ai_router/runtime_mode.py
+        select:
+          - tests/test_route.py
+          - tests/test_verify.py
+      - when: ai_router/seat_cost.py
+        select:
+          - tests/test_seat_cost.py
+      - when: ai_router/secret_resolver.py
+        select:
+          - tests/test_selection.py
+          - tests/test_route.py
+          - tests/test_transport_api.py
+      - when: ai_router/selection.py
+        select:
+          - tests/test_selection.py
+          - tests/test_route.py
+          - tests/test_escalation.py
+      - when: ai_router/session.py
+        select:
+          - tests/test_session.py
+          - tests/test_affected.py
+          - tests/test_bootstrap.py
+          - tests/test_critique_contracts.py
+          - tests/test_gates.py
+          - tests/test_verify.py
+      - when: ai_router/test_evidence.py
+        select:
+          - tests/test_evidence_protocol.py
+          - tests/test_affected.py
+          - tests/test_gates.py
+          - tests/test_verify.py
+      - when: ai_router/verdict.py
+        select:
+          - tests/test_verdict.py
+          - tests/test_gates.py
+          - tests/test_session.py
+          - tests/test_verify.py
+      - when: ai_router/verify.py
+        select:
+          - tests/test_verify.py
+          - tests/test_critique_contracts.py
+      - when: ai_router/writers.py
+        select:
+          - tests/test_session.py
+          - tests/test_progress.py
+          - tests/test_bootstrap.py
+          - tests/test_gates.py
+      - when: ai_router/transports/__init__.py
+        select:
+          - tests/test_transport_api.py
+          - tests/test_escalation.py
+      - when: ai_router/transports/api.py
+        select:
+          - tests/test_transport_api.py
+          - tests/test_route.py
+      - when: ai_router/transports/base.py
+        select:
+          - tests/test_escalation.py
+          - tests/test_transport_api.py
+          - tests/test_transport_copilot.py
+          - tests/test_route.py
+      - when: ai_router/transports/copilot.py
+        select:
+          - tests/test_transport_copilot.py
+          - tests/test_bootstrap.py
+          - tests/test_identity.py
+          - tests/test_route.py
       - when: ai_router/router-config.yaml
         select:
           - tests/test_config.py

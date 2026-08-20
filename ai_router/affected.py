@@ -25,11 +25,19 @@ A remediation is measured against the previous round's snapshot, not the
 session's start. Otherwise one repository-wide edit early in a session makes
 every later round demand the whole suite again, and the stage that exists to
 delete that run becomes the thing prescribing it.
+
+Nothing here reads the code under review. What maps to what is declared by
+the repository in its own configuration, in whatever language it is written:
+an inferred mapping needs a parser per ecosystem, and buys an optimization on
+an optimization. The proof a change is sound is the complete suite against the
+final verified tree; selection is only the economy on the way there. A rule
+that has gone stale therefore costs a late discovery in that run and cannot
+ship a defect, while a mapping the framework guesses is wrong silently.
 """
 
 from __future__ import annotations
 
-import ast
+import fnmatch
 import shlex
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -48,28 +56,22 @@ from .test_evidence import (
     surface_digest,
 )
 
-PACKAGE = "ai_router"
-
 REASON_CHANGED_TEST = "changed-test"
-REASON_MODULE_OWNERSHIP = "module-ownership"
 REASON_CONFIGURED_RULE = "configured-rule"
-REASON_DEPENDENCY_EDGE = "dependency-edge"
 REASON_SMOKE = "selection-unknown-smoke"
 
 # Strongest first. A test selected by several routes is recorded once, under
 # the most specific reason that reached it.
 REASON_PRECEDENCE = (
     REASON_CHANGED_TEST,
-    REASON_MODULE_OWNERSHIP,
     REASON_CONFIGURED_RULE,
-    REASON_DEPENDENCY_EDGE,
     REASON_SMOKE,
 )
 
 RISK_SELECTION_UNKNOWN = "selection_unknown"
 
 SELECTION_FIELDS = frozenset({
-    "test_root", "smoke", "repo_wide", "rules",
+    "test_roots", "test_glob", "smoke", "repo_wide", "rules",
 })
 RULE_FIELDS = frozenset({"when", "select"})
 
@@ -90,7 +92,10 @@ class SelectionRisk:
 
 @dataclass(frozen=True)
 class SelectionConfig:
-    test_root: str = "tests"
+    # Where this repository's tests live and what it calls them. Both are
+    # declared: guessing either one is guessing an ecosystem's convention.
+    test_roots: tuple = ()
+    test_glob: str = ""
     smoke: tuple = ()
     repo_wide: tuple = ()
     rules: tuple = ()  # ((when_prefix, (test_path, ...)), ...)
@@ -169,10 +174,13 @@ def load_selection_config(config) -> SelectionConfigResult:
             return ()
         return tuple(v.strip() for v in value if v.strip())
 
-    test_root = raw.get("test_root", "tests")
-    if not isinstance(test_root, str) or not test_root.strip():
-        errors.append("testing.selection.test_root must be a non-empty string")
-        test_root = "tests"
+    test_roots = _str_list(
+        raw.get("test_roots"), "testing.selection.test_roots"
+    )
+    test_glob = raw.get("test_glob", "")
+    if not isinstance(test_glob, str):
+        errors.append("testing.selection.test_glob must be a string")
+        test_glob = ""
 
     smoke = _str_list(raw.get("smoke"), "testing.selection.smoke")
     repo_wide = _str_list(raw.get("repo_wide"), "testing.selection.repo_wide")
@@ -208,142 +216,41 @@ def load_selection_config(config) -> SelectionConfigResult:
 
     return SelectionConfigResult(
         SelectionConfig(
-            test_root=test_root.strip(), smoke=smoke, repo_wide=repo_wide,
-            rules=tuple(rules),
+            test_roots=test_roots, test_glob=test_glob.strip(), smoke=smoke,
+            repo_wide=repo_wide, rules=tuple(rules),
         ),
         tuple(errors),
     )
 
 
-# --- The import graph --------------------------------------------------------
+# --- Paths ------------------------------------------------------------------
 
 def _posix(path) -> str:
     return str(path).replace("\\", "/").strip("/")
 
 
-def module_name_for(rel: str):
-    """``ai_router/foo.py`` -> ``ai_router.foo``; ``None`` for anything that
-    is not a module of this package."""
-    rel = _posix(rel)
-    if not rel.startswith(PACKAGE + "/") or not rel.endswith(".py"):
-        return None
-    parts = rel[:-3].split("/")
-    if parts[-1] == "__init__":
-        parts = parts[:-1]
-    return ".".join(parts) if parts else None
+def is_test_file(repo_root, rel: str, selection: SelectionConfig) -> bool:
+    """Whether *rel* is one of this repository's tests.
 
+    Three conditions, all declared or observed rather than assumed: the path
+    sits under a declared test root, its filename matches the declared
+    test-file glob, and the file is present in the tree. Presence is what
+    keeps a deleted test out of the command -- naming it would fail the very
+    run it was meant to prove.
 
-def _imports_in(source: bytes, rel: str) -> frozenset:
-    """Package modules imported by one file, with relative imports resolved
-    against the file's own package."""
-    try:
-        tree = ast.parse(source)
-    except (SyntaxError, ValueError):
-        return frozenset()
-    package_parts = _posix(rel).split("/")[:-1]
-    found = set()
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Import):
-            for alias in node.names:
-                if alias.name == PACKAGE or alias.name.startswith(
-                    PACKAGE + "."
-                ):
-                    found.add(alias.name)
-            continue
-        if not isinstance(node, ast.ImportFrom):
-            continue
-        if node.level:
-            base = package_parts[:len(package_parts) - (node.level - 1)]
-            module = ".".join(base + ([node.module] if node.module else []))
-        else:
-            module = node.module or ""
-        if module != PACKAGE and not module.startswith(PACKAGE + "."):
-            continue
-        found.add(module)
-        if module == PACKAGE:
-            # `from ai_router import verify` names a submodule, not an
-            # attribute of the package's __init__.
-            for alias in node.names:
-                found.add(f"{PACKAGE}.{alias.name}")
-    return frozenset(found)
-
-
-def _read(repo_root, rel: str):
-    try:
-        return (Path(repo_root) / rel).read_bytes()
-    except OSError:
-        return None
-
-
-def build_import_graph(repo_root) -> dict:
-    """``{module: {package modules it imports}}`` for every module of the
-    package present in the tree."""
-    graph = {}
-    package_dir = Path(repo_root) / PACKAGE
-    if not package_dir.is_dir():
-        return graph
-    for path in sorted(package_dir.rglob("*.py")):
-        rel = _posix(path.relative_to(repo_root))
-        module = module_name_for(rel)
-        if module is None:
-            continue
-        source = _read(repo_root, rel)
-        if source is None:
-            continue
-        graph[module] = set(_imports_in(source, rel))
-    return graph
-
-
-def _closure(seeds, graph: dict) -> set:
-    """Modules reachable from *seeds*, not expanding the package root.
-
-    ``ai_router/__init__.py`` re-exports the router entry points, so a module
-    that reaches for ``from .. import __version__`` would otherwise inherit
-    every dependency the package surface has. Expanding that hub makes every
-    module reachable from every other and reduces ``dependency-edge`` to
-    "everything" -- a reason that explains nothing. The root is still a
-    reachable node, so editing ``__init__.py`` itself still selects its
-    dependents."""
-    seen, queue = set(), list(seeds)
-    while queue:
-        module = queue.pop()
-        if module in seen:
-            continue
-        seen.add(module)
-        if module == PACKAGE:
-            continue
-        queue.extend(graph.get(module, ()))
-    return seen
-
-
-def test_files(repo_root, test_root: str) -> tuple:
-    root = Path(repo_root) / test_root
-    if not root.is_dir():
-        return ()
-    return tuple(sorted(
-        _posix(p.relative_to(repo_root))
-        for p in root.rglob("test_*.py")
-    ))
-
-
-def build_test_dependencies(repo_root, test_root: str) -> dict:
-    """``{test file: {package modules it reaches, directly or through the
-    package's own imports}}``."""
-    graph = build_import_graph(repo_root)
-    out = {}
-    for rel in test_files(repo_root, test_root):
-        source = _read(repo_root, rel)
-        if source is None:
-            continue
-        out[rel] = _closure(_imports_in(source, rel), graph)
-    return out
+    Matching is case-sensitive on every platform. Selection is evidence, and
+    evidence that depends on which filesystem produced it proves nothing.
+    """
+    if not selection.test_glob:
+        return False
+    if not matching_prefixes(rel, selection.test_roots):
+        return False
+    if not fnmatch.fnmatchcase(rel.rsplit("/", 1)[-1], selection.test_glob):
+        return False
+    return (Path(repo_root) / rel).is_file()
 
 
 # --- Selection ---------------------------------------------------------------
-
-def _is_test_path(rel: str, test_root: str) -> bool:
-    return bool(matching_prefixes(rel, (test_root,)))
-
 
 def select_tests(repo_root, changed_paths, selection: SelectionConfig):
     """The tests *changed_paths* make necessary, each with the reason that
@@ -366,8 +273,6 @@ def select_tests(repo_root, changed_paths, selection: SelectionConfig):
             ),
         )
 
-    dependencies = build_test_dependencies(repo_root, selection.test_root)
-    known_tests = set(dependencies)
     # Best reason wins: {test path: (precedence index, reason, selected_by)}
     best: dict = {}
 
@@ -382,15 +287,14 @@ def select_tests(repo_root, changed_paths, selection: SelectionConfig):
     for rel in changed:
         matched = False
 
-        if _is_test_path(rel, selection.test_root):
-            if rel in known_tests:
-                _offer(rel, REASON_CHANGED_TEST, rel)
-                matched = True
-            # A non-collected file under the test root -- a shared helper, a
-            # package marker -- maps to nothing on its own. It must fall
-            # through to the rules and, failing those, to selection_unknown:
-            # treating it as mapped would return clean targeted evidence for
-            # a change that can break any test importing it.
+        if is_test_file(repo_root, rel, selection):
+            _offer(rel, REASON_CHANGED_TEST, rel)
+            matched = True
+        # Everything else under a test root -- a shared helper, a fixture, a
+        # package marker -- maps to nothing on its own. It must fall through
+        # to the rules and, failing those, to selection_unknown: treating it
+        # as mapped would return clean targeted evidence for a change that
+        # can break any test using it.
 
         for when, targets in selection.rules:
             if matching_prefixes(rel, (when,)):
@@ -399,17 +303,6 @@ def select_tests(repo_root, changed_paths, selection: SelectionConfig):
                 matched = True
                 for target in targets:
                     _offer(target, REASON_CONFIGURED_RULE, rel)
-
-        module = module_name_for(rel)
-        if module is not None:
-            owner = f"{selection.test_root}/test_{module.split('.')[-1]}.py"
-            if owner in known_tests:
-                _offer(owner, REASON_MODULE_OWNERSHIP, rel)
-                matched = True
-            for test_path, reached in dependencies.items():
-                if module in reached:
-                    _offer(test_path, REASON_DEPENDENCY_EDGE, rel)
-                    matched = True
 
         if not matched:
             unknown.append(rel)

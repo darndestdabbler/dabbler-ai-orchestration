@@ -1,7 +1,7 @@
 {
   "schemaVersion": 4,
   "sessionSetName": "142-targeted-tests-and-run-of-record",
-  "status": "in-progress",
+  "status": "complete",
   "sessions": [
     {
       "number": 1,
@@ -48,7 +48,7 @@
     {
       "number": 3,
       "title": "Changed-line coverage, and normalized deterministic facts",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-19T18:51:06.186164-04:00",
       "orchestrator": {
         "engine": "copilot",
@@ -56,7 +56,7 @@
         "model": "claude-opus-5",
         "identityProvenance": "asserted"
       },
-      "completedAt": null,
+      "completedAt": "2026-08-19T20:09:23.226616-04:00",
       "verificationVerdict": "VERIFIED",
       "verification": {
         "rounds": 3,

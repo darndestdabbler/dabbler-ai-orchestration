@@ -129,6 +129,117 @@
       "dateTime": "2026-08-19T21:07:29.320337-04:00",
       "description": "Complete suite green (476) against the final verified tree and recorded as final-full; work committed and pushed; closing through the gate.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-19T21:09:41.414232-04:00",
+      "description": "Register.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 2,
+      "stepKey": "replace-ast-chain-quote-provenance-with",
+      "dateTime": "2026-08-19T21:09:41.414232-04:00",
+      "description": "Replace AST-chain quote provenance with digest-pinned line-range provenance: the reviewed tree's digest, the exact line range, and a byte-exact match of the quoted text. That triple is what makes a quote checkable; the enclosing node chain was a refinement available in one language.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 3,
+      "stepKey": "delete-parsedsuffixes-and-the-ast",
+      "dateTime": "2026-08-19T21:09:41.414232-04:00",
+      "description": "Delete `PARSED_SUFFIXES` and the `ast.parse` call sites over reviewed source, so a quote from a `.cs`, `.java`, `.ts` or `.sql` file is checked exactly as rigorously as one from a `.py` file. Today it is refused.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 4,
+      "stepKey": "state-the-residual-honestly-in-the",
+      "dateTime": "2026-08-19T21:09:41.414232-04:00",
+      "description": "State the residual honestly in the check vocabulary: line-range provenance proves *where a quote came from*, not *what kind of construct it is*. A check that needs the difference is a check for a deterministic analyzer, which the control surface already routes.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 5,
+      "stepKey": "affected-tests-recorded-as-the-preverify",
+      "dateTime": "2026-08-19T21:09:41.414232-04:00",
+      "description": "Affected tests, recorded as the `preverify-targeted` evidence.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 6,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-19T21:09:41.414232-04:00",
+      "description": "Cross-provider verification; then the full suite once, against the final verified tree.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 7,
+      "stepKey": "close-out",
+      "dateTime": "2026-08-19T21:09:41.414232-04:00",
+      "description": "Close-out.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-19T21:09:41.417343-04:00",
+      "description": "Registered session 2 (copilot).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 2,
+      "stepKey": "replace-ast-chain-quote-provenance-with",
+      "dateTime": "2026-08-19T21:19:26.529420-04:00",
+      "description": "Simplified verify_quote to path/content_hash/span only (digest-pinned line-range provenance); removed ast_kind and required_kinds. Updated worker-results.schema.json to drop ast_kind.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 3,
+      "stepKey": "delete-parsedsuffixes-and-the-ast",
+      "dateTime": "2026-08-19T21:19:31.484483-04:00",
+      "description": "Deleted PARSED_SUFFIXES, ast_kinds_at, _count_ast_matches, _node_dotted_name, contract_ast_kinds, and all ast.parse call sites in evidence.py; ABSENCE_QUERY_KINDS is now (literal, regex). A quote from any file the tree contains is now checked identically.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 4,
+      "stepKey": "state-the-residual-honestly-in-the",
+      "dateTime": "2026-08-19T21:19:40.174430-04:00",
+      "description": "verify_quote and the provenance section docstring now state the residual: a quote proves where its text came from, never what construct it is; a check needing that difference routes to a deterministic analyzer (g0-deterministic executor). Updated the checks.json/widget.py fixture to drop the Kind:dotted.name AST vocabulary in favour of plain text existence/count.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 5,
+      "stepKey": "affected-tests-recorded-as-the-preverify",
+      "dateTime": "2026-08-19T21:23:43.173243-04:00",
+      "description": "Selector printed 7 files (157 tests); ran the exact command, all passed; recorded as preverify-targeted, policy targeted.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 6,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-19T21:35:18.220194-04:00",
+      "description": "Round 1/2 ISSUES_FOUND (pass-on-forbidden-literal in the seeded fixture); remediated by recording result:fail for the matches:2 case and made the narrower-check demo internally consistent (subprocess.run( literal absent -> pass). Round 2's residual demand for a code-level condition/branch evaluator was disputed as out of session 2's scope (critique artifacts decide nothing yet per test_critique_contracts.py:4 and STATUS.md:110-119; that belongs to 144/145). Round 3 VERIFIED by gpt-5.5/openai over copilot-cli, dispute withdrawn.",
+      "status": "complete"
     }
   ]
 }

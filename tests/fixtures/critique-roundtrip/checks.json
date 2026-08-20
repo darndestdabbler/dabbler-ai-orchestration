@@ -4,18 +4,18 @@
     "check_id": "no-shell-out",
     "source": "corpus:seeded-round-trip",
     "executor": "worker-model",
-    "objective": "Does the changed module call os.system anywhere?",
+    "objective": "Does the changed module contain the literal text os.system anywhere?",
     "selector": { "from": "changed-files", "filter": ["*.py"] },
-    "condition": { "not": { "exists": "Call:os.system" } },
+    "condition": { "not": { "exists": "os.system" } },
     "scope": { "paths": ["*.py"], "changed_only": true },
     "branch": {
-      "shells_out": {
-        "when": { "exists": "Call:os.system" },
+      "mentions_it": {
+        "when": { "exists": "os.system" },
         "outcome": "fail"
       },
       "clean": {
         "when": {
-          "count": { "of": "Call:os.system", "operator": "eq", "value": 0 }
+          "count": { "of": "os.system", "operator": "eq", "value": 0 }
         },
         "outcome": "pass"
       }

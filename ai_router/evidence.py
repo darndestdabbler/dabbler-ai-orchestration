@@ -23,7 +23,6 @@ this claim be trusted?" — with the same tools:
 
 from __future__ import annotations
 
-import ast
 import hashlib
 import json
 import os
@@ -420,14 +419,15 @@ class EvidenceError(RuntimeError):
 
 
 # --- Quote provenance --------------------------------------------------------
+#
+# Provenance is the triple that makes a quote checkable regardless of what
+# language it was written in: the reviewed tree's digest, the exact line or
+# byte range, and a byte-exact match of the quoted text against that tree.
+# It proves *where* a quote came from, never *what kind of construct it is*
+# — a check that needs the latter is a check for a deterministic analyzer,
+# which the control surface already routes.
 
 SPAN_KINDS = ("byte", "line")
-
-# Only where a parser actually exists. Claiming an AST kind for a file this
-# process cannot parse is refused rather than recorded unchecked: an
-# unverifiable claim written down as verified is the failure this whole
-# surface exists to prevent.
-PARSED_SUFFIXES = (".py",)
 
 
 def _line_start_offsets(blob: bytes) -> list:
@@ -475,69 +475,15 @@ def _span_bounds(blob: bytes, span) -> tuple:
     return starts[start - 1], tail
 
 
-def _position_at(starts: list, offset: int) -> tuple:
-    """``(lineno, col_offset)`` for a byte offset, in the units the ``ast``
-    module uses: 1-based lines, and columns counted in UTF-8 bytes."""
-    lineno = 1
-    for index, line_start in enumerate(starts):
-        if line_start > offset:
-            break
-        lineno = index + 1
-    return lineno, offset - starts[lineno - 1]
-
-
-def ast_kinds_at(blob: bytes, start: int, end: int) -> tuple:
-    """The chain of AST node kinds enclosing a byte span, innermost first.
-
-    A chain rather than a single kind, because a worker cites the token it
-    read and not the node boundary: ``foo`` inside ``foo(bar)`` is a
-    ``Name`` whose chain contains ``Call``. What the chain cannot contain
-    is a node the span is not inside — so the same ``foo(bar)`` written
-    inside a string literal yields ``Constant`` and never ``Call``, which
-    is the discrimination this check exists for.
-    """
-    tree = ast.parse(blob)
-    starts = _line_start_offsets(blob)
-    span_start = _position_at(starts, start)
-    span_end = _position_at(starts, max(end - 1, start))
-    enclosing = []
-    for node in ast.walk(tree):
-        lineno = getattr(node, "lineno", None)
-        end_lineno = getattr(node, "end_lineno", None)
-        if lineno is None or end_lineno is None:
-            continue
-        node_start = (lineno, node.col_offset)
-        node_end = (end_lineno, node.end_col_offset)
-        if node_start <= span_start and node_end >= span_end:
-            size = (
-                _offset_of(starts, blob, *node_end)
-                - _offset_of(starts, blob, *node_start)
-            )
-            enclosing.append((size, type(node).__name__))
-    enclosing.sort(key=lambda item: item[0])
-    return tuple(kind for _, kind in enclosing) + ("Module",)
-
-
-def _offset_of(starts: list, blob: bytes, lineno: int, col: int) -> int:
-    if lineno < 1 or lineno > len(starts):
-        return len(blob)
-    return starts[lineno - 1] + col
-
-
-def verify_quote(
-    repo_root, reviewed_tree: str, quote, *, required_kinds=()
-) -> dict:
+def verify_quote(repo_root, reviewed_tree: str, quote) -> dict:
     """Re-derive a quote from the reviewed tree and return the framework's
     own record of it. Raises :class:`EvidenceError` on any mismatch.
 
     The returned ``content_hash`` is the one computed here. The worker's
-    value is only ever an assertion to be tested against the tree.
-
-    *required_kinds* comes from the check being answered, never from the
-    row: a check that asks about ``Call:os.system`` is asking about calls,
-    so a quote is refused unless a node of that kind encloses it. Leaving
-    that to a worker-declared ``ast_kind`` would make the discrimination
-    opt-in for the party it constrains.
+    value is only ever an assertion to be tested against the tree. Path,
+    span and hash are the whole contract: they prove where a quote came
+    from and that its bytes match, in any file the tree contains, and
+    nothing here asks what kind of construct those bytes form.
     """
     if not isinstance(quote, dict):
         raise EvidenceError("quote-malformed", "quote must be an object")
@@ -566,63 +512,16 @@ def verify_quote(
             "come from the reviewed tree",
         )
 
-    declared_kind = quote.get("ast_kind")
-    required = tuple(required_kinds)
-    wanted = (
-        f"the declared ast_kind {declared_kind!r}" if declared_kind is not None
-        else f"the kinds {list(required)} the check asks about"
-    )
-    observed_kinds: tuple = ()
-    if path.endswith(PARSED_SUFFIXES):
-        try:
-            observed_kinds = ast_kinds_at(blob, start, end)
-        except (SyntaxError, ValueError) as exc:
-            if declared_kind is not None or required:
-                raise EvidenceError(
-                    "quote-ast-unparseable",
-                    f"{path} does not parse, so {wanted} cannot be checked "
-                    f"({exc})",
-                ) from exc
-    elif declared_kind is not None or required:
-        raise EvidenceError(
-            "quote-ast-unsupported",
-            f"no parser here handles {path}, so {wanted} cannot be checked; "
-            "an unverifiable quote is refused rather than recorded as "
-            "verified",
-        )
-    if declared_kind is not None and declared_kind not in observed_kinds:
-        raise EvidenceError(
-            "quote-ast-kind-mismatch",
-            f"the span quoted from {path} is enclosed by "
-            f"{list(observed_kinds)}, which does not include the declared "
-            f"{declared_kind!r}",
-        )
-    if required and not set(required) & set(observed_kinds):
-        raise EvidenceError(
-            "quote-contract-unsatisfied",
-            f"the span quoted from {path} is enclosed by "
-            f"{list(observed_kinds)}; the check asks about {list(required)}, "
-            "and text that merely spells one of those is not one of those",
-        )
-
-    record = {
+    return {
         "path": path,
         "content_hash": actual,
         "span": dict(quote["span"]),
     }
-    if declared_kind is not None or observed_kinds:
-        record["ast_kind"] = declared_kind or observed_kinds[0]
-    return record
 
 
 # --- Framework-executed absence search ---------------------------------------
 
-ABSENCE_QUERY_KINDS = ("literal", "regex", "ast")
-
-_AST_QUERY_RE = re.compile(
-    r"^(?P<kind>[A-Za-z_][A-Za-z0-9_]*)"
-    r"(?::(?P<name>[A-Za-z_][A-Za-z0-9_.]*))?$"
-)
+ABSENCE_QUERY_KINDS = ("literal", "regex")
 
 
 def _glob_to_regex(pattern: str):
@@ -663,45 +562,6 @@ def scope_paths(repo_root, reviewed_tree: str, scope) -> list:
     )
 
 
-def _count_ast_matches(blob: bytes, query: str, path: str) -> int:
-    match = _AST_QUERY_RE.match(query)
-    if match is None:
-        raise EvidenceError(
-            "absence-query-invalid",
-            f"{query!r} is not an AST query; the form is NodeKind or "
-            "NodeKind:dotted.name",
-        )
-    kind = match.group("kind")
-    wanted = match.group("name")
-    try:
-        tree = ast.parse(blob)
-    except (SyntaxError, ValueError) as exc:
-        raise EvidenceError(
-            "absence-ast-unparseable",
-            f"{path} does not parse, so an AST search over it cannot come "
-            f"back empty honestly ({exc})",
-        ) from exc
-    return sum(
-        1 for node in ast.walk(tree)
-        if type(node).__name__ == kind
-        and (wanted is None or _node_dotted_name(node) == wanted)
-    )
-
-
-def _node_dotted_name(node) -> Optional[str]:
-    if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
-        return node.name
-    target = node.func if isinstance(node, ast.Call) else node
-    parts = []
-    while isinstance(target, ast.Attribute):
-        parts.append(target.attr)
-        target = target.value
-    if not isinstance(target, ast.Name):
-        return None
-    parts.append(target.id)
-    return ".".join(reversed(parts))
-
-
 def run_absence_search(repo_root, reviewed_tree: str, declaration) -> dict:
     """Re-run a declared search here and return the framework's row.
 
@@ -728,8 +588,6 @@ def run_absence_search(repo_root, reviewed_tree: str, declaration) -> dict:
         )
     scope = declaration.get("scope")
     selected = scope_paths(repo_root, reviewed_tree, scope)
-    if query_kind == "ast":
-        selected = [p for p in selected if p.endswith(PARSED_SUFFIXES)]
     if not selected:
         raise EvidenceError(
             "absence-scope-empty",
@@ -757,19 +615,15 @@ def run_absence_search(repo_root, reviewed_tree: str, declaration) -> dict:
                 f"{path} is in the declared scope but unreadable from the "
                 f"reviewed tree {reviewed_tree}",
             )
-        if query_kind == "ast":
-            matches += _count_ast_matches(blob, query, path)
-        else:
-            matches += sum(
-                1 for _ in pattern.finditer(blob.decode("utf-8", "replace"))
-            )
+        matches += sum(
+            1 for _ in pattern.finditer(blob.decode("utf-8", "replace"))
+        )
 
-    tool = "python-ast" if query_kind == "ast" else "python-re"
     return {
         "query": query,
         "query_kind": query_kind,
         "scope": [str(pattern) for pattern in scope],
-        "tool_version": f"{tool}/{platform.python_version()}",
+        "tool_version": f"python-re/{platform.python_version()}",
         "matches": matches,
     }
 
@@ -805,36 +659,13 @@ def next_absence_fallback(exhausted=()) -> Optional[str]:
     return None
 
 
-def contract_ast_kinds(check) -> tuple:
-    """The node kinds a check's own vocabulary requires of a quote.
-
-    Read out of the check, never out of the row it is answering. Only the
-    ``Kind:dotted.name`` form counts: a bare operand like ``docstring`` is
-    prose about the file, while ``Call:os.system`` is a question about
-    calls and can only be answered by quoting one.
-    """
-    kinds = set()
-    pending = [(check or {}).get("condition"), (check or {}).get("branch")]
-    while pending:
-        node = pending.pop()
-        if isinstance(node, dict):
-            pending.extend(node.values())
-        elif isinstance(node, (list, tuple)):
-            pending.extend(node)
-        elif isinstance(node, str) and ":" in node:
-            match = _AST_QUERY_RE.match(node)
-            if match is not None:
-                kinds.add(match.group("kind"))
-    return tuple(sorted(kinds))
-
-
 def verify_worker_result(
-    repo_root, reviewed_tree: str, row, *, check=None, prior_results=()
+    repo_root, reviewed_tree: str, row, *, prior_results=()
 ) -> dict:
     """The framework's version of a worker's result row.
 
     Every quote is re-read from the reviewed tree, re-hashed, and matched
-    against the node kinds *check* asks about; every declared absence
+    byte-for-byte against the span it claims; every declared absence
     search is re-executed and its count replaced by the one measured here.
     A worker that reported a different count reported something untrue,
     and the row is refused rather than corrected — a silently corrected
@@ -882,9 +713,8 @@ def verify_worker_result(
                 "which is not evidence about the code.",
             )
 
-    required = contract_ast_kinds(check)
     quotes = [
-        verify_quote(repo_root, reviewed_tree, quote, required_kinds=required)
+        verify_quote(repo_root, reviewed_tree, quote)
         for quote in row.get("quotes") or []
     ]
     searches = []
@@ -935,7 +765,7 @@ def record_worker_result(
             "and bound it before recording an answer to it.",
         )
     verified = verify_worker_result(
-        repo_root, reviewed_tree, row, check=check,
+        repo_root, reviewed_tree, row,
         prior_results=ledger.read_worker_results(
             repo_root, set_slug, session_number, change_id
         ),

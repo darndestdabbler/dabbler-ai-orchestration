@@ -156,43 +156,40 @@ def test_evidence_is_re_derived_from_the_reviewed_tree(seeded):
         start = blob.index(needle)
         return {"kind": "byte", "start": start, "end": start + len(needle)}
 
-    call = b"os.linesep.join(str(row) for row in rows)"
+    mention = b"os.system(cmd)"
     recorded = evidence.record_worker_result(repo, slug, 1, tree, {
         "schema_version": 1,
         "change_id": change_id,
         "check_id": "no-shell-out",
         "attempt": 1,
-        "result": "pass",
+        "result": "fail",
+        "severity": "major",
+        "defect_class": "boundary-auth",
         "recorded_at": "2026-08-19T00:00:00Z",
         "quotes": [{
             "path": "widget.py",
-            "span": span(call),
-            "content_hash": evidence.hash_bytes(call),
-            "ast_kind": "Call",
+            "span": span(mention),
+            "content_hash": evidence.hash_bytes(mention),
         }],
         "absence_searches": [{
-            "query": "Call:os.system",
-            "query_kind": "ast",
+            "query": "os.system",
+            "query_kind": "literal",
             "scope": ["*.py"],
             "tool_version": "whatever the worker says it used",
-            "matches": 0,
+            "matches": 2,
         }],
     })
 
     # The recorded search is the framework's re-execution, named by the
-    # tool that actually ran it.
+    # tool that actually ran it. Two literal matches is what puts this
+    # result on the check's own "mentions_it" branch, not "clean" — the
+    # fixture stays honest about what the measured count actually means.
     search = recorded["absence_searches"][0]
-    assert search["matches"] == 0
-    assert search["tool_version"].startswith("python-ast/")
+    assert search["matches"] == 2
+    assert search["tool_version"].startswith("python-re/")
     assert ledger.read_worker_results(repo, slug, 1, change_id) == [recorded]
     assert ledger.read_checks(
         repo, slug, 1, change_id)[0]["check_id"] == "no-shell-out"
-
-    # Text search and parse disagree over the same closed scope, which is
-    # why the framework runs the one the check asked for.
-    assert evidence.run_absence_search(repo, tree, {
-        "query": "os.system", "query_kind": "literal", "scope": ["*.py"],
-    })["matches"] == 2
 
     # A worker that reports a count the re-run does not produce is refused,
     # not quietly corrected.
@@ -220,39 +217,33 @@ def test_evidence_is_re_derived_from_the_reviewed_tree(seeded):
     with pytest.raises(evidence.EvidenceError) as stale:
         evidence.verify_quote(repo, tree, {
             **recorded["quotes"][0],
-            "content_hash": evidence.hash_bytes(b"os.system(cmd)"),
+            "content_hash": evidence.hash_bytes(b"os.system(other)"),
         })
     assert stale.value.code == "quote-hash-mismatch"
 
-    # And a quote from inside a string literal cannot answer a check about
-    # calls — including when the worker declares no ast_kind at all, since
-    # the required kinds come from the check and not from the row.
-    inside_a_string = b"os.system(cmd)"
-    bait = {
-        "schema_version": 1,
-        "change_id": change_id,
-        "check_id": "no-shell-out",
-        "attempt": 2,
-        "result": "fail",
-        "severity": "major",
-        "defect_class": "boundary-auth",
-        "recorded_at": "2026-08-19T00:00:00Z",
-        "quotes": [{
-            "path": "widget.py",
-            "span": span(inside_a_string),
-            "content_hash": evidence.hash_bytes(inside_a_string),
-        }],
-    }
-    with pytest.raises(evidence.EvidenceError) as not_a_call:
-        evidence.record_worker_result(repo, slug, 1, tree, bait)
-    assert not_a_call.value.code == "quote-contract-unsatisfied"
 
-    with pytest.raises(evidence.EvidenceError) as declared_wrong:
-        evidence.verify_quote(repo, tree, {
-            **bait["quotes"][0], "ast_kind": "Call",
-        })
-    assert declared_wrong.value.code == "quote-ast-kind-mismatch"
-    assert ledger.read_worker_results(repo, slug, 1, change_id) == [recorded]
+def test_a_quote_is_verified_from_any_file_the_tree_contains(sandbox_repo):
+    """Provenance is the digest, the span and the byte-exact hash — never
+    the file's extension. A quote from a non-Python file is checked exactly
+    as rigorously as one from a ``.py`` file, where before it was refused
+    outright with ``quote-ast-unsupported``."""
+    repo, _ = sandbox_repo
+    source = b"export function render(rows: Row[]): string {\n  return rows.join('\\n');\n}\n"
+    (repo / "widget.ts").write_bytes(source)
+    tree = evidence.snapshot_worktree_tree(repo)
+
+    needle = b"rows.join('\\n')"
+    start = source.index(needle)
+    record = evidence.verify_quote(repo, tree, {
+        "path": "widget.ts",
+        "span": {"kind": "byte", "start": start, "end": start + len(needle)},
+        "content_hash": evidence.hash_bytes(needle),
+    })
+    assert record == {
+        "path": "widget.ts",
+        "content_hash": evidence.hash_bytes(needle),
+        "span": {"kind": "byte", "start": start, "end": start + len(needle)},
+    }
 
 
 def test_a_blocked_check_cannot_be_retried_into_a_pass(seeded):
@@ -265,8 +256,8 @@ def test_a_blocked_check_cannot_be_retried_into_a_pass(seeded):
         "recorded_at": "2026-08-19T00:00:00Z",
     }
     searched = [{
-        "query": "Call:os.system", "query_kind": "ast", "scope": ["*.py"],
-        "tool_version": "whatever the worker says it used", "matches": 0,
+        "query": "os.system", "query_kind": "literal", "scope": ["*.py"],
+        "tool_version": "whatever the worker says it used", "matches": 2,
     }]
 
     evidence.record_worker_result(repo, slug, 1, tree, {
@@ -303,18 +294,39 @@ def test_a_blocked_check_cannot_be_retried_into_a_pass(seeded):
         repo, slug, 1, change_id)] == ["blocked"]
 
     # The exit is the ladder, and rung two is a narrower check — which
-    # has to be written down and bounded before it can be answered.
+    # has to be written down and bounded before it can be answered. Its
+    # own vocabulary must match what it actually queries: a literal that
+    # is genuinely absent from the file, so "pass" and "clean" agree.
     narrower = {
         **json.loads((FIXTURE / "checks.json").read_text(encoding="utf-8"))[0],
         "check_id": "no-shell-out-in-render",
         "source": "ladder:narrower-positive-counterexample",
-        "objective": "Does render() call os.system?",
+        "objective": "Does render() call subprocess.run?",
+        "condition": {"not": {"exists": "subprocess.run("}},
+        "branch": {
+            "mentions_it": {
+                "when": {"exists": "subprocess.run("}, "outcome": "fail",
+            },
+            "clean": {
+                "when": {
+                    "count": {
+                        "of": "subprocess.run(", "operator": "eq", "value": 0,
+                    },
+                },
+                "outcome": "pass",
+            },
+        },
         "scope": {"paths": ["widget.py"], "changed_only": True},
     }
     answer = {
         **base, "check_id": narrower["check_id"], "attempt": 2,
         "result": "pass",
-        "absence_searches": [{**searched[0], "scope": ["widget.py"]}],
+        "absence_searches": [{
+            "query": "subprocess.run(", "query_kind": "literal",
+            "scope": ["widget.py"],
+            "tool_version": "whatever the worker says it used",
+            "matches": 0,
+        }],
     }
     with pytest.raises(evidence.EvidenceError) as unregistered:
         evidence.record_worker_result(repo, slug, 1, tree, answer)

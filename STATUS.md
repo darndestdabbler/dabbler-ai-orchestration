@@ -1,3 +1,80 @@
+# STATUS — after set 143 (the framework stopped assuming its subject was Python)
+
+- **Set 143 is complete on `experiment/verification-pipeline-v3`.** All three
+  sessions VERIFIED by gpt-5.5/openai over `copilot-cli` (rounds 2 / 3 / 2).
+  Nothing merged to `master`.
+- **Every change in the set was a deletion**, and the arithmetic is published
+  in the set's `change-log.md`. Against baseline `9e5a1111`: **14,473 →
+  14,007 LOC** (−466), **27 → 27 modules** (0), **477 → 476 Python tests**
+  (−1), TS unchanged at 161. Per module: `affected.py` 804 → 697,
+  `evidence.py` 944 → 774, `facts.py` 810 → 621 — and no other module
+  changed, so those three deltas are the whole.
+- **Selection is declared, not parsed.** `PACKAGE`, the AST import graph and
+  `test_*.py` discovery are gone. A repository states its test roots, its
+  test-file glob, and which tests answer for which path. The reasons that
+  remain carry no language knowledge. An unmappable path still records
+  `selection_unknown`, runs the declared smoke tests, and raises a risk.
+- **Quote provenance is a digest, a line range, and byte-exact text.**
+  `PARSED_SUFFIXES` and `ast.parse` over reviewed source are gone, so a quote
+  from a `.cs`, `.java`, `.ts` or `.sql` file is now checked as rigorously as
+  one from a `.py` file. Today's residual is honest: line-range provenance
+  proves *where* a quote came from, not *what construct* it is. A check
+  needing that difference is a check for a deterministic analyzer.
+- **Changed-line coverage is gone from the code, the config and the
+  dependencies**, and the skip path went with it. Coverage existed only to
+  police an exemption; remove the exemption and nothing needs policing.
+  **Every step gets its model check** — sets 145 and 146 must not rebuild it.
+  The git-side changed-line extraction stays, as review context on the fact
+  record that nothing is judged by.
+- **Suite: 476 green.** Envelope: **14,007 LOC / 27 modules / 476 Python
+  tests** against 16,800 / 33 / 605. `verify.py` is untouched at **1,777**;
+  it must end below 1,200, and set 145 session 3 owns that extraction.
+
+## What the set could not do, and said so
+
+The set's acceptance criterion demanded the framework be smaller on all three
+counts. **Module count did not fall**, and the criterion was re-scoped in
+session 3, with operator authorization, to measure and publish the number
+rather than require it to move. The three assumptions removed were spread
+*inside* `affected.py`, `evidence.py` and `facts.py`, each of which still has
+work to do; none was a module that could go, and deleting an unrelated one to
+move the number is arithmetic theatre.
+
+The test estimate missed the same way. The set forecast returning **11** and
+returned **1** (−1, +1, −1 across the sessions). The forecast assumed a
+deleted feature takes its tests one for one, but the deletions landed in a
+few tests each covering several behaviours, and the surviving behaviours
+still need their one test. LOC is where the subtraction shows: **−466**, or
+3.2% of the framework.
+
+## Decisions taken during set 143
+
+- **Elimination, not pluggability.** A language-provider registry was the
+  obvious answer and the wrong one: it adds an interface plus one
+  implementation per ecosystem, and buys an inference nobody asked for.
+- **Targeted selection is an economy, not a proof.** The proof is
+  `final-full` against the final verified tree. A stale selection rule costs
+  a late discovery there and cannot ship a defect — which is what makes a
+  declared mapping an acceptable replacement for an inferred one.
+- **Three stale skip-path passages were corrected** in the specs for sets 144
+  and 145, all left behind by the resequencing.
+- **Session step lists change from set 145.** The full-suite run becomes its
+  own plan row rather than a clause on the verification row — it is a
+  separately recorded stage bound to its own digest, and burying it hides the
+  run of record from the activity log. Technical/educational documentation
+  becomes a plan row **after close**, alongside STATUS.md, for the same
+  reason STATUS.md lands there: content written after the verified snapshot
+  fails `verification_clean`.
+- **Plan step keys are derived, not declared.** `plan_step_key` truncates the
+  step's first clause to six words, which produces keys like
+  `close-out-and-the-end-of`. `stepNumber` is the stable address and the key
+  is a label, so nothing is broken — but set 144's approved-plan schema is
+  where a declared per-step slug belongs.
+
+**Next: set 144** (the approved plan), then 145 (step execution), 146
+(measure then enable), 147 (session walkthroughs).
+
+---
 # STATUS — after set 142 (the cheap proof runs first, and the machine insists)
 
 - **Set 142 is complete on `experiment/verification-pipeline-v3`.** All three
@@ -458,4 +535,5 @@ approved plan), 145 (step execution), 146 (measure then enable), 147
   7,855 vs the ~9,000 budget. PyPI already has a 1.0.0 (uploaded
   2026-08-15); publishing this build needs 1.0.1. Copilot lock still pins
   CLI 1.0.69 (re-probe before a live seat run).
+
 

@@ -1,0 +1,101 @@
+{
+  "sessionSetName": "148-model-direction-check",
+  "createdDate": "2026-08-20T08:03:39.828279-04:00",
+  "totalSessions": 1,
+  "entries": [
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-20T08:03:39.828654-04:00",
+      "description": "Register.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "correct-the-four-stale-self-references",
+      "dateTime": "2026-08-20T08:03:39.828654-04:00",
+      "description": "Correct the four stale self-references named in the table above, in the two spec files, and change nothing else.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "affected-tests-as-preverify",
+      "dateTime": "2026-08-20T08:03:39.828654-04:00",
+      "description": "Affected tests as preverify.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-20T08:03:39.828654-04:00",
+      "description": "Cross-provider verification.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "full-test-suite-recorded-as-the",
+      "dateTime": "2026-08-20T08:03:39.828654-04:00",
+      "description": "Full test suite, recorded as the `final-full` run of record.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 6,
+      "stepKey": "close-out",
+      "dateTime": "2026-08-20T08:03:39.828654-04:00",
+      "description": "Close-out.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-20T08:03:39.833294-04:00",
+      "description": "Registered session 1 (copilot).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "correct-the-four-stale-self-references",
+      "dateTime": "2026-08-20T08:07:50.722686-04:00",
+      "description": "Corrected the four stale self-references: 146 spec Session Set path and child branch name (145 -> 146), and 147 spec Session Set path and child branch name (146 -> 147). Verified via git diff that only these four lines changed and the neighbouring correct Baseline commit / Prerequisite lines were untouched.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "affected-tests-as-preverify",
+      "dateTime": "2026-08-20T08:08:08.436497-04:00",
+      "description": "Ran 'python -m ai_router.affected --session-set-dir docs/session-sets/148-model-direction-check'; it reported 'no tests affected by this change set' (selected=[], allTestsAffected=false per --json). Per affected.py's preverify_gate/classify_preverify_command, a change mapped to no test needs no run and no preverify-targeted record -- recording one here would itself be a policy_violation ('evidence of nothing'). No test_evidence record was made for this stage; proceeding directly to verification is the sanctioned path.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-20T08:09:43.039388-04:00",
+      "description": "Round 1: ISSUES_FOUND (verifier gpt-5.5/openai) -- 1 blocking finding: plan-step log entries for the edit and the affected-test step were still 'pending'. Remediated by logging both steps via ai_router.session log with notes. Round 2: VERIFIED (verifier gpt-5.5/openai); session verified clean.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "full-test-suite-recorded-as-the",
+      "dateTime": "2026-08-20T08:16:00.416144-04:00",
+      "description": "Ran 'python -m pytest -q' against the final verified tree: 531 passed in 358.46s. Recorded via ai_router.test_evidence record --stage final-full --outcome passed --duration-seconds 358.46 (digest 7733c4afc3e6).",
+      "status": "complete"
+    }
+  ]
+}

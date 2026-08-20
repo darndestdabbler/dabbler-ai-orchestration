@@ -8,13 +8,13 @@
 > It also closes the loop that keeps the framework from growing: a defect
 > caught late becomes a test or a lint rule, and only becomes prose when it
 > provably cannot be code.
-> **Session Set:** `docs/session-sets/145-measure-then-enable/`
+> **Session Set:** `docs/session-sets/146-measure-then-enable/`
 > **Created:** 2026-08-19
 > **Revised:** 2026-08-19 — rewritten for the plan-first, step-wise design.
 > **Workflow:** Full
 > **Baseline commit:** `fa3c28c7`, plus sets 142–145.
 > **Integration branch:** `experiment/verification-pipeline-v3`; child
-> branch `verification-v3/set-145-measure-then-enable`. **Not** developed
+> branch `verification-v3/set-146-measure-then-enable`. **Not** developed
 > on `master`.
 > **Prerequisite:** sets 142–145 complete.
 

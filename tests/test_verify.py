@@ -245,7 +245,9 @@ class TestRoundOne:
             (repo / ".dabbler" / "runs" / set_dir.name
              / "deterministic-facts.jsonl").read_text(encoding="utf-8")
         )
-        assert recorded["changedLineCoverage"]["status"] == "unknown"
+        assert {"kind": "lint", "status": "unknown"}.items() <= next(
+            row for row in recorded["controls"] if row["kind"] == "lint"
+        ).items()
 
 
 class TestLoop:

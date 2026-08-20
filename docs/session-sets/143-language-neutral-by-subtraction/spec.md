@@ -242,8 +242,19 @@ stale rule costs a late discovery in `final-full` and cannot ship a defect.
 No step can skip its model check, because there is no skip. Changed-line
 coverage is gone from the code, the configuration and the dependencies.
 
-**The framework is smaller than it was at the start of the set** on all
-three counts — LOC, modules and tests — and session 3 publishes the numbers.
+**The framework is smaller than it was at the start of the set** on LOC and
+on tests, and session 3 publishes the numbers — LOC, module count and test
+count, before and after, plus the line count of every module the set touched.
+
+Module count is **measured and published, not required to fall**. This is an
+operator-authorized re-scope of an earlier criterion that demanded a fall on
+all three counts, taken in session 3 once the arithmetic was in view. The
+three assumptions this set removes are spread *inside* `affected.py`,
+`evidence.py` and `facts.py`, each of which still has work to do afterwards;
+none of them was a module that could go. Meeting a module-count target would
+therefore have meant deleting something unrelated to language neutrality,
+which is arithmetic theatre and the opposite of what the criterion was for.
+The number is published either way, so a reader can see it did not move.
 
 ## Test budget
 

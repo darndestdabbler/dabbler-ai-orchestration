@@ -8,17 +8,14 @@ deadline: all of them are settled before the first token is bought.
   a judgement about one.
 - **The declared controls.** Compile, typecheck, lint, analyzer — normalized
   into one closed vocabulary so a reader never has to know which tool spoke.
-- **Changed-line coverage.** Which lines the change touched, and which of
-  those the selected tests actually executed.
+- **The changed lines.** Which lines the change adds, per path. Context for
+  whoever reads the record; nothing is judged by it.
 
 The vocabulary is closed at four words and the missing one is the point: a
 control this repository does not declare reads ``not_applicable``, a control
 that could not be executed reads ``unknown``, and neither is ever ``pass``.
 An absent tool that reports success is worse than no tool at all, because the
-record then carries a green row nobody ran. Coverage answers a ratio rather
-than a verdict, so it reads ``measured`` where a control would read ``pass``
-— and still falls back to the same ``unknown`` when there is nothing to
-measure it from.
+record then carries a green row nobody ran.
 
 Facts are cheap and models are not, so a red *required* fact returns to the
 author here rather than riding into a verification round as something for a
@@ -63,13 +60,10 @@ STATUSES = (STATUS_PASS, STATUS_FAIL, STATUS_NOT_APPLICABLE, STATUS_UNKNOWN)
 # apart, and a name is a thing to get wrong; the kind is the identity.
 CONTROL_KINDS = ("compile", "typecheck", "lint", "analyzer")
 CONTROL_FIELDS = frozenset({"kind", "command", "required"})
-COVERAGE_FIELDS = frozenset({"report"})
 
 CONTROL_TIMEOUT_SECONDS = 600
 
 KIND_TESTS = "tests"
-
-COVERAGE_MEASURED = "measured"
 
 _BOOKKEEPING_BASENAMES = frozenset({
     "session-state.json", "activity-log.json", "change-log.md",
@@ -261,9 +255,8 @@ def parse_changed_lines(diff: str) -> dict:
     """``{path: (line number, ...)}`` for the lines the diff ADDS, numbered
     in the post-image.
 
-    Deletions are deliberately absent: a line that no longer exists cannot be
-    executed, and counting it as uncovered would make every deletion look like
-    a coverage regression."""
+    Deletions are deliberately absent: the added lines are the ones a reader
+    can go and look at in the tree as it now stands."""
     out: dict = {}
     path = None
     for line in diff.splitlines():
@@ -306,167 +299,6 @@ def changed_lines(repo_root, baseline_tree=None) -> Optional[dict]:
     if rc != 0:
         return None
     return parse_changed_lines(diff)
-
-
-# --- Executed lines ----------------------------------------------------------
-
-def _relative_to_repo(repo_root, path: str) -> str:
-    rel = _posix(path)
-    while rel.startswith("./"):
-        rel = rel[2:]
-    if not os.path.isabs(rel):
-        return rel.strip("/")
-    try:
-        return _posix(os.path.relpath(rel, str(repo_root))).strip("/")
-    except ValueError:
-        return rel.strip("/")
-
-
-def _int_lines(entry, key) -> frozenset:
-    raw = entry.get(key)
-    if not isinstance(raw, list):
-        return frozenset()
-    return frozenset(
-        n for n in raw if isinstance(n, int) and not isinstance(n, bool)
-    )
-
-
-@dataclass(frozen=True)
-class FileLines:
-    """What a coverage report knows about one file: the statement lines it
-    tracked at all, and the subset of those that ran."""
-    executed: frozenset
-    statements: frozenset
-
-
-def _parse_coverage_json(payload, repo_root) -> dict:
-    files = payload.get("files")
-    if not isinstance(files, dict):
-        return {}
-    out = {}
-    for path, entry in files.items():
-        if not isinstance(entry, dict) or not isinstance(
-            entry.get("executed_lines"), list
-        ):
-            continue
-        executed = _int_lines(entry, "executed_lines")
-        # A line coverage never tracked is not an uncovered line: comments,
-        # blank lines, and excluded regions are not executable, and counting
-        # them would make a reformatted docstring read as a coverage
-        # regression.
-        statements = (
-            executed
-            | _int_lines(entry, "missing_lines")
-            | _int_lines(entry, "excluded_lines")
-        )
-        out[_relative_to_repo(repo_root, str(path))] = FileLines(
-            executed, statements
-        )
-    return out
-
-
-def load_executed_lines(repo_root, report_path) -> Optional[dict]:
-    """``{path: FileLines}`` from a coverage report, or ``None`` when there
-    is no readable report.
-
-    coverage.py's JSON export, parsed with the standard library. Reading a
-    report the test run produced keeps this module out of the business of
-    running tests: the selector already decides which tests run, and one
-    implementation of that rule is enough."""
-    if not report_path:
-        return None
-    path = Path(report_path)
-    if not path.is_absolute():
-        path = Path(repo_root) / path
-    try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, UnicodeError, json.JSONDecodeError):
-        return None
-    if not isinstance(payload, dict):
-        return None
-    return _parse_coverage_json(payload, repo_root)
-
-
-@dataclass(frozen=True)
-class CoverageFact:
-    status: str
-    changed_lines: int = 0
-    measured_lines: int = 0
-    covered_lines: int = 0
-    uncovered: tuple = ()  # ((path, (line, ...)), ...)
-    detail: str = ""
-
-    def to_dict(self) -> dict:
-        out = {
-            "status": self.status,
-            "changedLines": self.changed_lines,
-            "measuredLines": self.measured_lines,
-            "coveredLines": self.covered_lines,
-        }
-        if self.uncovered:
-            out["uncovered"] = [
-                {"path": path, "lines": list(lines)}
-                for path, lines in self.uncovered
-            ]
-        if self.detail:
-            out["detail"] = self.detail
-        return out
-
-
-def measure_changed_line_coverage(changed, executed) -> CoverageFact:
-    """How much of what the change added the selected tests executed.
-
-    Two narrowings, and both are the difference between a fact and a
-    grievance. The measurable files are the ones the report names — a
-    changed markdown file is outside the question, not uncovered. The
-    measurable lines within them are the ones coverage tracked as
-    statements, so a changed comment cannot read as a coverage gap."""
-    if changed is None:
-        return CoverageFact(
-            STATUS_UNKNOWN,
-            detail="the change set could not be determined",
-        )
-    total = sum(len(lines) for lines in changed.values())
-    if not total:
-        return CoverageFact(
-            STATUS_NOT_APPLICABLE,
-            detail="the change adds no line to execute",
-        )
-    if executed is None:
-        return CoverageFact(
-            STATUS_UNKNOWN, changed_lines=total,
-            detail=(
-                "no coverage report was available for the selected test run; "
-                "declare testing.coverage.report to make this measurable"
-            ),
-        )
-    if not executed:
-        # A report that names no file measures nothing. Reporting "0 of 0
-        # covered" here would be the same lie as a green row for a tool that
-        # never ran.
-        return CoverageFact(
-            STATUS_UNKNOWN, changed_lines=total,
-            detail="the coverage report names no file",
-        )
-    covered = 0
-    measured = 0
-    uncovered = []
-    for path, lines in sorted(changed.items()):
-        known = executed.get(path)
-        if known is None:
-            continue
-        statements = [n for n in lines if n in known.statements]
-        if not statements:
-            continue
-        measured += len(statements)
-        covered += sum(1 for n in statements if n in known.executed)
-        missed = tuple(n for n in statements if n not in known.executed)
-        if missed:
-            uncovered.append((path, missed))
-    return CoverageFact(
-        COVERAGE_MEASURED, changed_lines=total, measured_lines=measured,
-        covered_lines=covered, uncovered=tuple(uncovered),
-    )
 
 
 # --- The declared controls ---------------------------------------------------
@@ -554,28 +386,6 @@ def load_controls_checked(config) -> ControlLoadResult:
     return ControlLoadResult(tuple(controls), tuple(errors))
 
 
-def load_coverage_report_path(config):
-    """``(report path or None, errors)``."""
-    if not isinstance(config, dict):
-        return None, ()
-    raw = (config.get("testing") or {}).get("coverage")
-    if raw is None:
-        return None, ()
-    if not isinstance(raw, dict):
-        return None, ("testing.coverage must be a mapping",)
-    errors = []
-    unknown = sorted(set(raw) - COVERAGE_FIELDS)
-    if unknown:
-        errors.append(f"testing.coverage has unknown key(s) {unknown}")
-    report = raw.get("report")
-    if report is not None and (
-        not isinstance(report, str) or not report.strip()
-    ):
-        errors.append("testing.coverage.report must be a non-empty string")
-        report = None
-    return (report.strip() if isinstance(report, str) else None), tuple(errors)
-
-
 def run_control(repo_root, spec: ControlSpec) -> ControlFact:
     """One control, normalized. A tool that exits non-zero FAILED; a tool
     that could not be launched at all is UNKNOWN, never a quiet pass."""
@@ -648,7 +458,7 @@ def collect_control_facts(repo_root, config) -> tuple:
 @dataclass(frozen=True)
 class FactRecord:
     controls: tuple = ()
-    coverage: CoverageFact = CoverageFact(STATUS_UNKNOWN)
+    changed: Optional[dict] = None  # {path: (line, ...)}, None when unknown
     session_number: Optional[int] = None
     round_number: Optional[int] = None
     recorded_at: str = ""
@@ -662,7 +472,10 @@ class FactRecord:
         out = {
             "recordedAt": self.recorded_at,
             "controls": [fact.to_dict() for fact in self.controls],
-            "changedLineCoverage": self.coverage.to_dict(),
+            "changedLines": (
+                None if self.changed is None
+                else {path: len(lines) for path, lines in self.changed.items()}
+            ),
         }
         if self.session_number is not None:
             out["sessionNumber"] = self.session_number
@@ -705,27 +518,24 @@ def collect_facts(
 ) -> FactRecord:
     """Every deterministic fact about the tree as it now stands, in one
     record: the declared controls, the pre-verification test command the
-    selector sanctioned, and changed-line coverage.
+    selector sanctioned, and the lines the change adds.
 
     The test row is a record, not a second gate. The refusal that keeps an
     unproved change out of a round lives in ``affected.preverify_gate`` and
-    stays there; repeating it here would be a guard guarding a guard."""
+    stays there; repeating it here would be a guard guarding a guard. The
+    changed lines are context of the same kind: nothing is judged by them."""
     from .affected import preverify_baseline
 
     controls, errors = collect_control_facts(repo_root, config)
     controls = controls + _tests_facts(gate)
-    report, coverage_errors = load_coverage_report_path(config)
-    coverage = measure_changed_line_coverage(
-        changed_lines(
+    return FactRecord(
+        controls=controls,
+        changed=changed_lines(
             repo_root, preverify_baseline(repo_root, session_set_dir)
         ),
-        load_executed_lines(repo_root, report),
-    )
-    return FactRecord(
-        controls=controls, coverage=coverage,
         session_number=session_number, round_number=round_number,
         recorded_at=datetime.datetime.now().astimezone().isoformat(),
-        errors=tuple(errors) + tuple(coverage_errors),
+        errors=tuple(errors),
     )
 
 
@@ -793,13 +603,14 @@ def main(argv=None) -> int:
         return 0
     for fact in record.controls:
         print(f"  {fact.kind:<10} {fact.status:<15} {fact.command}")
-    coverage = record.coverage
-    print(
-        f"  changed lines: {coverage.covered_lines}/{coverage.measured_lines} "
-        f"executed, of {coverage.changed_lines} changed ({coverage.status})"
-    )
-    for path, lines in coverage.uncovered:
-        print(f"    uncovered {path}: {', '.join(str(n) for n in lines[:20])}")
+    if record.changed is None:
+        print("  changed lines: the change set could not be determined")
+    else:
+        total = sum(len(lines) for lines in record.changed.values())
+        print(
+            f"  changed lines: {total} added across "
+            f"{len(record.changed)} file(s)"
+        )
     for error in record.errors:
         print(f"  DECLARATION ERROR {error}", file=sys.stderr)
     return 0

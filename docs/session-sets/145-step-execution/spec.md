@@ -226,10 +226,9 @@ A step executes against its approved envelope, and a write outside that
 envelope is refused rather than warned about. Deterministic evidence runs
 before any model spend, and a red result returns to the author.
 
-**A step skips its model check only when all three conditions hold** — all
-evidence deterministic, all green, and every changed line covered. A step
-with one uncovered changed line gets the model check no matter what its
-evidence contract declared, and the record says the coverage forced it.
+**Every step gets its model check**, because there is no skip to grant and
+therefore nothing to police. An evidence contract that is all-deterministic
+and all-green buys a cheaper review, not an absent one.
 
 The residual check reads one step's diff and its authorized paths, not the
 session bundle. Fix is bounded at two attempts; disprove requires a
@@ -249,6 +248,6 @@ failure produces a bisect range rather than an accusation.
 Sets 142–144 leave the count at **483**; this set adds **19** (7, 7, 5),
 reaching 502 of
 the 605 envelope. Session 2 is the largest allocation in the sequence
-because the coverage gate is the rule the whole cost saving rests on, and
-its failure modes — all-deterministic-and-green but uncovered,
-covered-but-not-green, judgment-item-present — each need their own test.
+because the step check is what every step's review rests on, and its
+distinct outcomes — fix, disprove, escalate, and the two-attempt bound on
+fix — each need their own test.

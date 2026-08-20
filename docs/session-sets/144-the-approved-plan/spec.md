@@ -90,8 +90,9 @@ declares none is refused at approval.**
   module, sensitive path, dependency change.
 
 Evidence is the point. A step whose evidence is all `deterministic` is a
-step no model will need to read in set 145 — which makes the plan review
-the only thing standing between a weak criterion and an unreviewed change.
+step whose reviewer in set 145 can lean on results the framework executed
+rather than on the author's word — which makes the plan review the only
+thing standing between a weak criterion and a review with nothing behind it.
 That is why session 2 spends its whole budget on judging proofs.
 
 ## What the plan contains, and how much of it

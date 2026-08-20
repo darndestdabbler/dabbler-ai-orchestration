@@ -219,6 +219,142 @@
       "dateTime": "2026-08-20T05:08:31.057945-04:00",
       "description": "VERIFIED round 3 (gpt-5.5/openai); round-1 premium-routing finding disputed and withdrawn. Full suite 524 passed, recorded final-full.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-20T05:13:03.226020-04:00",
+      "description": "Register.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 2,
+      "stepKey": "implement-amendments",
+      "dateTime": "2026-08-20T05:13:03.226020-04:00",
+      "description": "Implement amendments: a new file outside the envelope, a new dependency, or a changed evidence criterion is a plan amendment. **Only the changed part** goes back through session 2's checks \u2014 re-approving an unchanged step is ceremony, and this design is trying to spend less of it.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 3,
+      "stepKey": "make-the-outside-the-plan-test",
+      "dateTime": "2026-08-20T05:13:03.226020-04:00",
+      "description": "Make the outside-the-plan test mechanical: the framework compares the working tree against the approved envelope and decides. There is no judgment call for a supervisor to exploit, and no model is asked whether it stayed inside its own plan.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 4,
+      "stepKey": "measure-the-completeness-question-this-design",
+      "dateTime": "2026-08-20T05:13:03.226020-04:00",
+      "description": "Measure the completeness question this design cannot answer by construction: **pre-registration stops the proof from moving, but it does not prove the plan was complete.** Replay the activity logs and verification rounds of sets 136\u2013141 and record, for each, whether the session's real file set would have needed an amendment, and whether each verification finding would have been caught by a declared proof. Publish the counts.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 5,
+      "stepKey": "act-on-what-the-replay-says",
+      "dateTime": "2026-08-20T05:13:03.226020-04:00",
+      "description": "Act on what the replay says. A high amendment rate means the plan is paperwork rather than a constraint, and that is a finding for the operator \u2014 not something to absorb by loosening the envelope check.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 6,
+      "stepKey": "affected-tests-recorded-as-the-preverify",
+      "dateTime": "2026-08-20T05:13:03.226020-04:00",
+      "description": "Affected tests, recorded as the `preverify-targeted` evidence.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 7,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-20T05:13:03.226020-04:00",
+      "description": "Cross-provider verification; then the full suite once, against the final verified tree.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 8,
+      "stepKey": "close-out-and-the-end-of",
+      "dateTime": "2026-08-20T05:13:03.226020-04:00",
+      "description": "Close-out, and the end-of-set `change-log.md`.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-20T05:13:03.230561-04:00",
+      "description": "Registered session 3 (copilot).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-20T05:30:41.090850-04:00",
+      "description": "Register.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 2,
+      "stepKey": "implement-amendments",
+      "dateTime": "2026-08-20T05:30:41.559522-04:00",
+      "description": "Amendments carry the change: added_files widens the amended step's envelope, evidence_contract replaces its proof, and effective_plan folds them over an untouched core. review_amendment re-checks only the amended step and appends only on approval.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 3,
+      "stepKey": "make-the-outside-the-plan-test",
+      "dateTime": "2026-08-20T05:30:42.039964-04:00",
+      "description": "compare_to_envelope diffs the working tree against the declared envelope; lifecycle-written files are dropped first and a dependency manifest outside the envelope is named as such. No model is asked.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 4,
+      "stepKey": "measure-the-completeness-question-this-design",
+      "dateTime": "2026-08-20T05:30:42.563376-04:00",
+      "description": "scripts/plan_replay.py replays 16 closed sessions of 136-141; counts published to replay-136-141.md.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 5,
+      "stepKey": "act-on-what-the-replay-says",
+      "dateTime": "2026-08-20T05:30:43.071202-04:00",
+      "description": "Finding published: the corpus cannot bound the amendment rate (14 of 15), so the rate must be measured live in 145. One correction taken: change-log.md is lifecycle-written; spec.md deliberately is not.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 6,
+      "stepKey": "affected-tests-recorded-as-the-preverify",
+      "dateTime": "2026-08-20T05:48:18.035668-04:00",
+      "description": "Selector ran twice: the session delta, then the fix delta after the lifecycle-file consolidation. Both recorded as preverify-targeted (digests a952cb1409fe, b3be631e0b9e).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 7,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-20T05:48:18.702959-04:00",
+      "description": "VERIFIED by gpt-5.5 (openai) over copilot-cli. Round 1 verified the session work; round 2 reviewed the fix delta that consolidated the lifecycle-written file list into ledger.py.",
+      "status": "complete"
     }
   ]
 }

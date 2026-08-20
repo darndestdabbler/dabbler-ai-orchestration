@@ -18,6 +18,11 @@ derived risk flags say a mistake here is expensive.
 Every round lands in ``plan-review.jsonl`` under the run directory,
 schema-validated and append-only, bound to the exact plan content it
 judged.
+
+An amendment to an approved plan runs the same machinery, scoped: the
+free checks, the prompt and the verdicts cover the changed step and
+nothing else. Re-approving a step the amendment did not touch would buy
+an answer the record already holds.
 """
 
 from __future__ import annotations
@@ -229,11 +234,16 @@ def _schema_findings(plan: dict) -> list:
 
 
 def free_checks(plan: dict, spec_text: str, session_number: int,
-                workspace_root=None) -> list:
+                workspace_root=None, only_steps=None) -> list:
     """Every check that costs nothing, run before any model.
 
     A non-empty result settles the round on its own: there is no reason to
     pay a model to read a plan that a free check already refused.
+
+    *only_steps* scopes the result to an amendment's changed steps.
+    Findings that name no step -- a plan document that is malformed as a
+    whole -- always survive the scope, because a plan nobody can read is
+    not one step's problem.
     """
     findings = list(_schema_findings(plan))
 
@@ -297,7 +307,10 @@ def free_checks(plan: dict, spec_text: str, session_number: int,
                 step_id=step.get("step_id"),
             ))
 
-    return findings
+    if only_steps is None:
+        return findings
+    scope = set(only_steps)
+    return [f for f in findings if f.step_id is None or f.step_id in scope]
 
 
 # --- The fixed checklist -------------------------------------------------
@@ -329,16 +342,36 @@ bigger model. Judge the proof, not the prose.\
 """
 
 
-def build_review_prompt(plan: dict, goals: list) -> str:
+def build_review_prompt(plan: dict, goals: list, only_steps=None) -> str:
     """The reviewer's whole input: fixed checklist, fixed response form,
     and the plan. The checklist is fixed text on purpose -- a reviewer
     inventing its own criteria each round is the free-form critique this
-    design replaced."""
+    design replaced.
+
+    *only_steps* narrows the prompt to an amendment's changed steps. The
+    unchanged ones are not shown, because a reviewer shown a step it is
+    not being asked about is a reviewer that may object to it -- and
+    re-approving what was already approved is the ceremony this design is
+    spending less of."""
+    scope = None if only_steps is None else set(only_steps)
+    steps = [
+        s for s in (plan.get("steps") or [])
+        if scope is None or s.get("step_id") in scope
+    ]
     lines = [
         "You are reviewing a pre-registered plan for one coding session.",
         "The plan is not code. It declares, per step, what will be done, "
         "which files it may touch, and what evidence will prove it worked.",
         "",
+    ]
+    if scope is not None:
+        lines += [
+            "This is an amendment to a plan that was already approved. "
+            "Only the amended step(s) are shown, and only they are yours "
+            "to judge.",
+            "",
+        ]
+    lines += [
         "Your assignment is the evidence. Work this checklist and nothing "
         "else:",
         "",
@@ -352,7 +385,7 @@ def build_review_prompt(plan: dict, goals: list) -> str:
         lines.append(f"- {goal.key}: {goal.text}")
     lines.append("")
     lines.append("--- The plan under review ---")
-    for step in plan.get("steps") or []:
+    for step in steps:
         lines.append("")
         lines.append(f"STEP: {step.get('step_id')}")
         lines.append(f"  intent: {step.get('intent')}")
@@ -520,21 +553,32 @@ def revision_answers_objections(plan: dict, prior_digests: dict) -> bool:
     return False
 
 
-def escalation_triggers(plan: dict, prior_rounds) -> list:
+def escalation_triggers(plan: dict, prior_rounds, only_steps=None) -> list:
     """Which triggers, if any, route this round to the premium model.
 
     Both are recorded when both fire: a precedence rule would hide one of
     them from the record, and the record is the point.
+
+    Rejections are counted since the most recent approval, not since the
+    session began. An approved plan that took two rounds to get there has
+    settled its strikes; carrying them forward would send every later
+    amendment to the premium model for a disagreement that is over.
     """
+    scope = None if only_steps is None else set(only_steps)
     triggers = []
     for step in plan.get("steps") or []:
+        if scope is not None and step.get("step_id") not in scope:
+            continue
         if HIGH_RISK_FLAGS.intersection(step.get("risk_flags") or []):
             triggers.append(TRIGGER_HIGH_RISK)
             break
-    rejections = sum(
-        1 for r in prior_rounds
-        if r.get("model_called") and r.get("outcome") != OUTCOME_APPROVED
-    )
+    rejections = 0
+    for row in prior_rounds:
+        if row.get("outcome") == OUTCOME_APPROVED:
+            rejections = 0
+            continue
+        if row.get("model_called"):
+            rejections += 1
     if rejections >= ESCALATE_AFTER_REJECTIONS:
         triggers.append(TRIGGER_REPEAT_OBJECTION)
     return triggers
@@ -612,6 +656,7 @@ def _default_dispatch(prompt: str, *, tier: int, session_set, session_number,
 def review_round(
     run_dir, plan: dict, spec_text: str, session_number: int, *,
     workspace_root=None, session_set=None, dispatch=None, transport=None,
+    only_steps=None,
 ) -> dict:
     """Review the plan once and record the round.
 
@@ -620,10 +665,15 @@ def review_round(
     anti-grind bounce, which is also free. Only what survives both is worth
     a model, and which model is decided by the derived risk flags and by
     how many times this plan has already been rejected.
+
+    *only_steps* reviews an amendment: the checks, the prompt and the
+    verdicts cover the changed steps and nothing else, and the row records
+    which steps that was.
     """
     prior = read_rounds(run_dir)
     round_number = len(prior) + 1
     core_hash = compute_plan_hash(plan)
+    scope = None if only_steps is None else list(only_steps)
 
     base = {
         "schema_version": SCHEMA_VERSION,
@@ -636,8 +686,12 @@ def review_round(
         "objected_field_digests": {},
         "reviewer": None,
     }
+    if scope is not None:
+        base["reviewed_steps"] = scope
 
-    findings = free_checks(plan, spec_text, session_number, workspace_root)
+    findings = free_checks(
+        plan, spec_text, session_number, workspace_root, only_steps=scope
+    )
     if findings:
         return _append_round(run_dir, dict(
             base,
@@ -656,10 +710,10 @@ def review_round(
             objected_field_digests=prior_digests,
         ))
 
-    triggers = escalation_triggers(plan, prior)
+    triggers = escalation_triggers(plan, prior, only_steps=scope)
     tier = PREMIUM_TIER if triggers else CHEAP_TIER
     goals = session_goals(spec_text, session_number)
-    prompt = build_review_prompt(plan, goals)
+    prompt = build_review_prompt(plan, goals, only_steps=scope)
     caller = dispatch or _default_dispatch
     result = caller(
         prompt, tier=tier, session_set=session_set,
@@ -667,7 +721,8 @@ def review_round(
     )
 
     step_ids = [
-        s.get("step_id") for s in (plan.get("steps") or []) if s.get("step_id")
+        s.get("step_id") for s in (plan.get("steps") or [])
+        if s.get("step_id") and (scope is None or s.get("step_id") in scope)
     ]
     verdicts = parse_review_response(
         getattr(result, "content", "") or "", step_ids
@@ -695,3 +750,66 @@ def review_round(
             "cost_usd": getattr(result, "cost_usd", None),
         },
     ))
+
+
+# --- Amendments ----------------------------------------------------------
+
+def review_amendment(
+    run_dir, spec_text: str, session_number: int, *, step_id: str,
+    reason: str, added_files=None, evidence_contract=None,
+    workspace_root=None, session_set=None, dispatch=None, transport=None,
+) -> tuple:
+    """Put one proposed amendment through the same checks the plan passed,
+    scoped to the step it changes, and append it only if they approve.
+
+    Returns ``(round_record, plan_or_None)``; the plan is ``None`` when the
+    round did not approve, and nothing was appended -- a rejected amendment
+    leaves the approved plan exactly as it was.
+
+    Only the changed step is re-checked. Re-approving the steps an
+    amendment does not touch would cost a model call per unchanged step to
+    re-derive an answer already on the record.
+    """
+    from .approved_plan import PlanImmutableError, effective_plan, read_plan
+
+    if not added_files and not evidence_contract:
+        raise ValueError(
+            "an amendment must carry a change: added_files, an "
+            "evidence_contract, or both"
+        )
+    plan = read_plan(run_dir)
+    if not plan.get("approved"):
+        raise PlanImmutableError(
+            f"{run_dir}: cannot amend a plan that has not been approved"
+        )
+    if not any(s.get("step_id") == step_id for s in plan.get("steps") or []):
+        raise ValueError(
+            f"{run_dir}: step_id {step_id!r} is not declared in this plan"
+        )
+
+    proposed = dict(plan)
+    proposed["amendments"] = list(plan.get("amendments") or []) + [{
+        "recorded_at": _now_iso(),
+        "step_id": step_id,
+        "reason": reason,
+        **({"added_files": list(added_files)} if added_files else {}),
+        **({"evidence_contract": list(evidence_contract)}
+           if evidence_contract else {}),
+    }]
+    candidate = effective_plan(proposed, workspace_root)
+
+    record = review_round(
+        run_dir, candidate, spec_text, session_number,
+        workspace_root=workspace_root, session_set=session_set,
+        dispatch=dispatch, transport=transport, only_steps=[step_id],
+    )
+    if record.get("outcome") != OUTCOME_APPROVED:
+        return record, None
+
+    from .approved_plan import append_amendment
+
+    return record, append_amendment(
+        run_dir, step_id=step_id, reason=reason, added_files=added_files,
+        evidence_contract=evidence_contract,
+    )
+

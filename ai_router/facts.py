@@ -36,7 +36,7 @@ from pathlib import Path
 from typing import Optional
 
 from .evidence import repo_root_for, run_git, snapshot_worktree_tree
-from .ledger import RUNS_DIRNAME
+from .ledger import LIFECYCLE_WRITTEN_SET_FILES, RUNS_DIRNAME
 
 DEFAULT_EVIDENCE_CHAR_CAP = 600 * 1024
 _UNTRACKED_INLINE_CAP = 64 * 1024
@@ -65,9 +65,7 @@ CONTROL_TIMEOUT_SECONDS = 600
 
 KIND_TESTS = "tests"
 
-_BOOKKEEPING_BASENAMES = frozenset({
-    "session-state.json", "activity-log.json", "change-log.md",
-})
+_BOOKKEEPING_BASENAMES = frozenset(LIFECYCLE_WRITTEN_SET_FILES)
 
 
 class FactsError(RuntimeError):

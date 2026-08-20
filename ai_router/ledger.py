@@ -38,6 +38,18 @@ _schema_cache: dict = {}
 MACHINE_DIRNAME = ".dabbler"
 RUNS_DIRNAME = f"{MACHINE_DIRNAME}/runs"
 
+# The set-dir files the lifecycle writes about a session rather than as
+# part of one: the router writes the state and the activity log, and the
+# close writes the change log. Declared once, because every module that
+# has to tell the record from the work asks the same question -- what a
+# close commits, what an evidence diff drops, what a covered-surface
+# change ignores, and what a plan's file envelope may never declare.
+# ``spec.md`` is deliberately absent: a session editing its own spec
+# mid-flight is drift, not ceremony.
+LIFECYCLE_WRITTEN_SET_FILES = (
+    "session-state.json", "activity-log.json", "change-log.md",
+)
+
 
 class LedgerError(RuntimeError):
     """The ledger is unreadable or fails validation. Fail closed: the

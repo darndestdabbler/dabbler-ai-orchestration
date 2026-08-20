@@ -4,12 +4,15 @@ import pytest
 import yaml
 
 from ai_router.approved_plan import (
+    REASON_NEW_DEPENDENCY,
     PlanImmutableError,
     PlanIntegrityError,
     append_amendment,
     approve_plan,
+    compare_to_envelope,
     compute_plan_hash,
     derive_risk_flags,
+    effective_plan,
     new_plan,
     read_plan,
     write_plan,
@@ -155,6 +158,77 @@ class TestAmendments:
         path.write_text(json.dumps(raw), encoding="utf-8")
         with pytest.raises(PlanIntegrityError):
             read_plan(tmp_path)
+
+    def test_effective_plan_folds_the_amendment_and_rederives_risk(
+        self, tmp_path
+    ):
+        # The amendment carries the change; the core stays exactly as it
+        # was approved, and the widened envelope earns the flag its new
+        # path deserves rather than keeping the one it was approved with.
+        write_plan(tmp_path, _plan())
+        approved = approve_plan(tmp_path)
+        assert approved["steps"][0]["risk_flags"] == ["public-interface"]
+
+        amended = append_amendment(
+            tmp_path, step_id="register", reason="the config decides this",
+            added_files=["router-config.yaml"],
+            evidence_contract=[
+                {"description": "the config round-trips", "kind": "judgment"}
+            ],
+        )
+        assert amended["steps"][0]["file_envelope"] == ["ai_router/session.py"]
+
+        folded = effective_plan(amended)
+        step = folded["steps"][0]
+        assert step["file_envelope"] == [
+            "ai_router/session.py", "router-config.yaml"
+        ]
+        assert step["evidence_contract"] == [
+            {"description": "the config round-trips", "kind": "judgment"}
+        ]
+        assert step["risk_flags"] == ["public-interface", "sensitive-path"]
+        assert amended["amendments"][0]["changed_fields"] == [
+            "file_envelope", "evidence_contract"
+        ]
+
+
+class TestEnvelopeComparison:
+    def _approved(self, run_dir, envelope):
+        write_plan(run_dir, _plan(steps=[_step(file_envelope=envelope)]))
+        return approve_plan(run_dir)
+
+    def test_change_outside_the_envelope_needs_an_amendment(
+        self, sandbox_repo
+    ):
+        repo, set_dir = sandbox_repo
+        plan = self._approved(repo / ".dabbler" / "s1", ["ai_router/"])
+        (repo / "ai_router").mkdir()
+        (repo / "ai_router" / "session.py").write_text("x", encoding="utf-8")
+        (repo / "pyproject.toml").write_text("[project]", encoding="utf-8")
+
+        result = compare_to_envelope(repo, plan, set_dir)
+        assert result.inside == ("ai_router/session.py",)
+        assert [(p.path, p.reason) for p in result.outside] == [
+            ("pyproject.toml", REASON_NEW_DEPENDENCY)
+        ]
+        assert result.needs_amendment is True
+
+    def test_lifecycle_written_files_are_never_outside_the_plan(
+        self, sandbox_repo
+    ):
+        # Close-out writes the change log and the router writes the state
+        # and the activity log. No step envelope can declare them -- the
+        # steps that write them never enter a plan -- so counting them
+        # would refuse every session for obeying the lifecycle.
+        repo, set_dir = sandbox_repo
+        plan = self._approved(repo / ".dabbler" / "s1", ["ai_router/"])
+        for name in ("session-state.json", "activity-log.json",
+                     "change-log.md"):
+            (set_dir / name).write_text("{}", encoding="utf-8")
+
+        result = compare_to_envelope(repo, plan, set_dir)
+        assert result.outside == ()
+        assert result.needs_amendment is False
 
 
 class TestRiskFlags:

@@ -82,6 +82,12 @@
         "enum": ["high-risk-flag", "repeat-objection"]
       }
     },
+    "reviewed_steps": {
+      "type": "array",
+      "description": "The steps this round judged, when it judged only some of them -- an amendment re-checks the step it changes and nothing else. Absent means the round covered the whole plan.",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1 }
+    },
     "reviewer": {
       "type": ["object", "null"],
       "additionalProperties": false,

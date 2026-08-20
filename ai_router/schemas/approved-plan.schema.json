@@ -89,7 +89,7 @@
     },
     "amendments": {
       "type": "array",
-      "description": "Append-only. The only legal change to an approved plan.",
+      "description": "Append-only. The only legal change to an approved plan. An amendment carries the change itself, not a note about it: 'added_files' widens the amended step's envelope and 'evidence_contract' replaces its proof, and the plan a reader acts on is the core folded with its amendments in order (approved_plan.effective_plan). The core is never rewritten, so plan_hash never moves.",
       "items": {
         "type": "object",
         "additionalProperties": false,
@@ -101,6 +101,29 @@
           "changed_fields": {
             "type": "array",
             "items": { "type": "string", "minLength": 1 }
+          },
+          "added_files": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "type": "string", "minLength": 1 },
+            "description": "Paths this amendment adds to the amended step's file envelope."
+          },
+          "evidence_contract": {
+            "type": "array",
+            "minItems": 1,
+            "description": "The amended step's replacement proof. Present only when this amendment changes an evidence criterion.",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["description", "kind"],
+              "properties": {
+                "description": { "type": "string", "minLength": 1 },
+                "kind": {
+                  "type": "string",
+                  "enum": ["deterministic", "judgment"]
+                }
+              }
+            }
           }
         }
       }

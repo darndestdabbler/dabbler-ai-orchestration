@@ -15,6 +15,11 @@ here, mechanically, from the file envelope and (for the
 integration-module flag) the repository's own module manifest
 (``docs/modules.yaml``, read through ``ai_router.modules``) -- a step
 does not get to say its own work is low-risk.
+
+Whether the work stayed inside its plan is decided the same way:
+``compare_to_envelope`` diffs the working tree against the declared
+envelope. A path outside it is an amendment, and an amendment carries
+the change it makes rather than a note about it.
 """
 
 from __future__ import annotations
@@ -25,13 +30,14 @@ import os
 import re
 import tempfile
 import time
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
 import jsonschema
 
 from .evidence import hash_bytes
-from .ledger import session_run_dir
+from .ledger import LIFECYCLE_WRITTEN_SET_FILES, session_run_dir
 
 _SCHEMA_PATH = Path(__file__).parent / "schemas" / "approved-plan.schema.json"
 _schema_cache: Optional[dict] = None
@@ -293,13 +299,22 @@ def approve_plan(run_dir) -> dict:
 
 
 def append_amendment(
-    run_dir, *, step_id: str, reason: str, changed_fields=None
+    run_dir, *, step_id: str, reason: str, changed_fields=None,
+    added_files=None, evidence_contract=None,
 ) -> dict:
     """Append one amendment row. Legal only against an approved plan and
     only for a ``step_id`` the plan actually declares; never touches a
     core field, so the plan's ``plan_hash`` never moves -- but the write
     ledger advances, which is what lets ``read_plan`` tell a true append
-    apart from a rewritten history."""
+    apart from a rewritten history.
+
+    The amendment carries the change, not a note about it: *added_files*
+    widens the step's envelope and *evidence_contract* replaces its proof,
+    both readable through :func:`effective_plan`. ``changed_fields`` is
+    derived from what was actually carried and never taken on the caller's
+    word -- an amendment that says it changed the evidence and carries
+    none would otherwise read as a proof that moved.
+    """
     plan = read_plan(run_dir)
     if not plan.get("approved"):
         raise PlanImmutableError(
@@ -314,12 +329,189 @@ def append_amendment(
         "step_id": step_id,
         "reason": reason,
     }
-    if changed_fields:
-        amendment["changed_fields"] = list(changed_fields)
+    carried = []
+    if added_files:
+        amendment["added_files"] = [_normalize_path(p) for p in added_files]
+        carried.append("file_envelope")
+    if evidence_contract:
+        amendment["evidence_contract"] = json.loads(
+            json.dumps(list(evidence_contract))
+        )
+        carried.append("evidence_contract")
+    fields = list(carried)
+    for name in changed_fields or []:
+        if name not in fields:
+            fields.append(name)
+    if fields:
+        amendment["changed_fields"] = fields
     plan.setdefault("amendments", []).append(amendment)
     _validate_schema(plan)
     _write(run_dir, plan)
     return plan
+
+
+def effective_plan(plan: dict, workspace_root=None) -> dict:
+    """The plan as its amendments leave it: the immutable core, folded
+    with each amendment in the order it was appended.
+
+    A pure function, never written back. Writing the fold would rewrite
+    the core the ``plan_hash`` is bound to, which is the one thing an
+    approved plan does not permit -- so the fold is computed on every
+    read instead, and the artifact on disk stays the thing that was
+    approved. Risk flags are re-derived from the widened envelope: an
+    amendment that reaches a sensitive path raises the flag for it, or a
+    supervisor could amend its way out of the review its own risk earns.
+    """
+    folded = json.loads(json.dumps(plan))
+    by_id = {
+        s.get("step_id"): s for s in (folded.get("steps") or [])
+        if s.get("step_id")
+    }
+    touched = set()
+    for amendment in folded.get("amendments") or []:
+        step = by_id.get(amendment.get("step_id"))
+        if step is None:
+            continue
+        for path in amendment.get("added_files") or []:
+            if path not in (step.get("file_envelope") or []):
+                step.setdefault("file_envelope", []).append(path)
+            touched.add(step["step_id"])
+        contract = amendment.get("evidence_contract")
+        if contract:
+            step["evidence_contract"] = json.loads(json.dumps(contract))
+            touched.add(step["step_id"])
+    for step_id in touched:
+        step = by_id[step_id]
+        step["risk_flags"] = derive_risk_flags(
+            step.get("file_envelope") or [], workspace_root
+        )
+    return folded
+
+
+def amended_step_ids(plan: dict) -> list:
+    """The steps this plan's amendments changed, in first-amended order --
+    the only steps an amendment round has any reason to re-check."""
+    out = []
+    for amendment in plan.get("amendments") or []:
+        step_id = amendment.get("step_id")
+        if step_id and step_id not in out:
+            out.append(step_id)
+    return out
+
+
+# --- The envelope, and what falls outside it -----------------------------
+
+def lifecycle_written_paths(session_set_dir, repo_root=None) -> list:
+    """Repo-relative paths the lifecycle writes for this session set.
+
+    A step envelope can never declare these: the lifecycle steps that
+    write them -- the router's own registration and logging, and the
+    close -- are not plan steps and never enter a plan.
+    """
+    set_dir = Path(session_set_dir)
+    if repo_root is not None:
+        try:
+            set_dir = set_dir.resolve().relative_to(Path(repo_root).resolve())
+        except ValueError:
+            pass
+    prefix = _normalize_path(str(set_dir)).rstrip("/")
+    return [f"{prefix}/{name}" for name in LIFECYCLE_WRITTEN_SET_FILES]
+
+
+def envelope_paths(plan: dict) -> list:
+    """Every path the plan's steps may touch, amendments included."""
+    paths = []
+    for step in effective_plan(plan).get("steps") or []:
+        for path in step.get("file_envelope") or []:
+            normalized = _normalize_path(path)
+            if normalized not in paths:
+                paths.append(normalized)
+    return paths
+
+
+def path_in_envelope(path: str, envelope) -> bool:
+    """Whether *path* is covered by *envelope*, by exact match or by a
+    declared directory containing it. Nothing wider: a declared file
+    covers itself, and a declared directory covers what is under it."""
+    normalized = _normalize_path(path)
+    for declared in envelope:
+        declared = _normalize_path(declared).rstrip("/")
+        if not declared:
+            continue
+        if normalized == declared or normalized.startswith(declared + "/"):
+            return True
+    return False
+
+
+@dataclass(frozen=True)
+class OutsidePath:
+    path: str
+    reason: str
+
+
+@dataclass(frozen=True)
+class EnvelopeComparison:
+    """What the working tree changed, against what the plan declared."""
+
+    inside: tuple = ()
+    outside: tuple = ()
+    measured: bool = True
+    unmeasured_reason: str = ""
+
+    @property
+    def needs_amendment(self) -> bool:
+        """An unmeasurable change set is never "inside the plan". Git
+        failing to answer is the one case where saying nothing is wrong
+        would let a change the plan never declared through unremarked."""
+        return bool(self.outside) or not self.measured
+
+
+REASON_OUTSIDE_ENVELOPE = "outside-envelope"
+REASON_NEW_DEPENDENCY = "new-dependency"
+
+
+def compare_to_envelope(repo_root, plan: dict, session_set_dir,
+                        baseline_tree=None):
+    """Compare the working tree against the plan's approved envelope.
+
+    Mechanical from end to end: git says what changed, the envelope says
+    what was declared, and set difference decides. No model is asked
+    whether a supervisor stayed inside its own plan, because a question
+    nobody is asked cannot be answered convincingly and wrongly.
+
+    The files the lifecycle writes for *session_set_dir* are dropped
+    first. A step envelope cannot declare them -- the lifecycle steps that
+    write them never enter a plan -- so counting them would refuse every
+    session for doing exactly what the lifecycle told it to.
+    """
+    from .affected import working_tree_changes
+
+    changed = working_tree_changes(repo_root, baseline_tree)
+    if changed is None:
+        return EnvelopeComparison(
+            measured=False,
+            unmeasured_reason=(
+                "git could not report what this working tree changed"
+            ),
+        )
+    envelope = envelope_paths(plan)
+    ceremony = set(lifecycle_written_paths(session_set_dir, repo_root))
+    inside, outside = [], []
+    for path in sorted(changed):
+        normalized = _normalize_path(path)
+        if normalized in ceremony:
+            continue
+        if path_in_envelope(normalized, envelope):
+            inside.append(normalized)
+            continue
+        outside.append(OutsidePath(
+            path=normalized,
+            reason=(
+                REASON_NEW_DEPENDENCY if _is_dependency_path(normalized)
+                else REASON_OUTSIDE_ENVELOPE
+            ),
+        ))
+    return EnvelopeComparison(inside=tuple(inside), outside=tuple(outside))
 
 
 # --- Risk flags ----------------------------------------------------------

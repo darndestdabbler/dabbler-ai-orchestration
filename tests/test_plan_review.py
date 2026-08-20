@@ -6,7 +6,13 @@ import json
 import pytest
 
 from ai_router import plan_review
-from ai_router.approved_plan import new_plan, write_plan
+from ai_router.approved_plan import (
+    approve_plan,
+    effective_plan,
+    new_plan,
+    read_plan,
+    write_plan,
+)
 
 SPEC = """\
 ### Session 1 of 1: Build the thing
@@ -311,3 +317,79 @@ class TestRounds:
         )
         with pytest.raises(plan_review.PlanReviewError):
             plan_review.read_rounds(tmp_path)
+
+
+class TestAmendments:
+    def _approved(self, tmp_path):
+        _written(tmp_path, _clean_plan())
+        return approve_plan(tmp_path)
+
+    def test_only_the_amended_step_is_re_checked(self, tmp_path):
+        self._approved(tmp_path)
+        prompts = []
+
+        def dispatch(prompt, *, tier, session_set, session_number, transport):
+            prompts.append(prompt)
+            return _Result(_approve_all("add-widget"))
+
+        row, plan = plan_review.review_amendment(
+            tmp_path, SPEC, 1, step_id="add-widget",
+            reason="the widget needs its own config",
+            added_files=["ai_router/widget_config.py"],
+            workspace_root=tmp_path, dispatch=dispatch,
+        )
+        assert row["outcome"] == plan_review.OUTCOME_APPROVED
+        assert row["reviewed_steps"] == ["add-widget"]
+        assert [v["step_id"] for v in row["step_verdicts"]] == ["add-widget"]
+        # The unchanged step is not in the prompt: re-approving what was
+        # already approved is the ceremony this design spends less of.
+        assert "add-widget" in prompts[0]
+        assert "STEP: rename-knob" not in prompts[0]
+        assert plan["amendments"][0]["added_files"] == [
+            "ai_router/widget_config.py"
+        ]
+        assert effective_plan(plan)["steps"][0]["file_envelope"] == [
+            "ai_router/widget.py", "ai_router/widget_config.py"
+        ]
+
+    def test_a_rejected_amendment_leaves_the_plan_alone(self, tmp_path):
+        approved = self._approved(tmp_path)
+        objection = (
+            "STEP: add-widget\nVERDICT: amend\nFIELDS: evidence_contract\n"
+            "WHY: nothing here would fail if the step were done wrong."
+        )
+        row, plan = plan_review.review_amendment(
+            tmp_path, SPEC, 1, step_id="add-widget", reason="widen it",
+            added_files=["ai_router/widget_config.py"],
+            workspace_root=tmp_path, dispatch=_recorder(objection, []),
+        )
+        assert row["outcome"] == plan_review.OUTCOME_AMEND
+        assert plan is None
+        on_disk = read_plan(tmp_path)
+        assert on_disk["amendments"] == []
+        assert on_disk["plan_hash"] == approved["plan_hash"]
+
+    def test_an_amendment_that_reaches_a_sensitive_path_escalates(
+        self, tmp_path
+    ):
+        # Risk is re-derived from the widened envelope, so a supervisor
+        # cannot amend its way past the review its own risk earns.
+        self._approved(tmp_path)
+        seen = []
+        row, _ = plan_review.review_amendment(
+            tmp_path, SPEC, 1, step_id="add-widget",
+            reason="the widget reads the router config",
+            added_files=["router-config.yaml"],
+            workspace_root=tmp_path,
+            dispatch=_recorder(_approve_all("add-widget"), seen),
+        )
+        assert seen == [plan_review.PREMIUM_TIER]
+        assert row["escalation_triggers"] == ["high-risk-flag"]
+
+    def test_an_amendment_must_carry_a_change(self, tmp_path):
+        self._approved(tmp_path)
+        with pytest.raises(ValueError, match="must carry a change"):
+            plan_review.review_amendment(
+                tmp_path, SPEC, 1, step_id="add-widget", reason="just because",
+            )
+

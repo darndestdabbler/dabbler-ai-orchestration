@@ -31,7 +31,7 @@ from .evidence import (
     run_git,
     snapshot_worktree_tree,
 )
-from .ledger import LedgerError, read_rounds
+from .ledger import LIFECYCLE_WRITTEN_SET_FILES, LedgerError, read_rounds
 from .progress import read_session_state
 from .verdict import SESSION_VERDICTS
 
@@ -46,9 +46,7 @@ _IGNORE_BASENAME_PATTERNS = (
 # lock is deliberately absent: it is still held during the close commit
 # and deleted on release, so committing it leaves every close behind a
 # tracked-deletion dirty tree.
-SET_BOOKKEEPING_COMMIT_BASENAMES = (
-    "session-state.json", "activity-log.json", "change-log.md",
-)
+SET_BOOKKEEPING_COMMIT_BASENAMES = LIFECYCLE_WRITTEN_SET_FILES
 
 # What may legitimately be dirty in the set dir at close time: the files
 # the close will commit, plus the lock the close itself is holding.

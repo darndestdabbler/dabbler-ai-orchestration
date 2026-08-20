@@ -27,7 +27,7 @@ from pathlib import Path
 from typing import Optional
 
 from .evidence import repo_root_for, run_git
-from .ledger import RUNS_DIRNAME
+from .ledger import LIFECYCLE_WRITTEN_SET_FILES, RUNS_DIRNAME
 
 OUTCOME_PASSED = "passed"
 OUTCOME_FAILED = "failed"
@@ -82,10 +82,9 @@ def run_of_record_recipe(session_set_dir, suite: str, command: str) -> str:
 
 # Set-dir files the sanctioned writers own; they change during a session
 # and must not count as "the covered surfaces changed".
-SET_BOOKKEEPING_BASENAMES = frozenset({
-    "session-state.json", "activity-log.json", "change-log.md",
-    ".lifecycle.lock",
-})
+SET_BOOKKEEPING_BASENAMES = frozenset(LIFECYCLE_WRITTEN_SET_FILES) | {
+    ".lifecycle.lock"
+}
 
 SUITE_FIELDS = frozenset({"name", "command", "covers", "expensive"})
 

@@ -23,6 +23,11 @@ Bootstrap also writes the ``.dabbler/`` rule into the project's
 every round lands there *after* the tree snapshot it describes — so a
 tracked ledger presents itself to the close gate as work done after
 verification, and no number of re-verifications can clear it.
+
+The last piece of setup is the ``pre-commit`` guard that refuses a manual
+commit while a plan step is open. It belongs here rather than at step
+open: the guard has to exist in the clone before the first step does, and
+a guard installed by the thing it guards is installed too late.
 """
 
 from __future__ import annotations
@@ -398,6 +403,67 @@ def ensure_gitignore(project_dir) -> bool:
     return True
 
 
+_HOOK_MARKER = "# dabbler-ai-router: step-execution commit guard"
+_PRE_COMMIT_HOOK = """\
+#!/bin/sh
+{marker}
+# The framework commits a step, and only once the step's evidence is
+# satisfied. A commit landed mid-step leaves the step with no diff of its
+# own to be judged by, so this refuses rather than advises.
+#
+# Only exit {blocking} -- the guard saying "a step is open" -- blocks the commit.
+# A missing interpreter, an uninstalled package or an unreadable ledger
+# exit differently and are let through: none of them is the guard's
+# verdict, and a repository nobody can commit to is a worse failure than
+# an unguarded one. The binding check is `verify step close`, which
+# refuses outright when HEAD has moved off the commit the step opened on.
+"{python}" -m ai_router.verify step guard-commit
+if [ $? -eq {blocking} ]; then
+  exit 1
+fi
+exit 0
+"""
+
+
+def ensure_commit_guard(project_dir) -> Optional[Path]:
+    """Install the pre-commit guard that refuses a manual commit while a
+    step is open; return the hook path when it was written.
+
+    An existing hook this function did not write is never clobbered -- a
+    project's own pre-commit checks are not ours to delete, and a guard
+    that silently ate them would be worse than no guard. The interpreter
+    is baked in rather than resolved from PATH, because a hook that ran
+    against a different environment is answering about a different
+    repository.
+    """
+    from .verify import EXIT_BLOCKING
+
+    hooks = Path(project_dir) / ".git" / "hooks"
+    if not hooks.parent.is_dir():
+        return None
+    path = hooks / "pre-commit"
+    try:
+        existing = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeError):
+        existing = ""
+    if existing and _HOOK_MARKER not in existing:
+        return None
+    content = _PRE_COMMIT_HOOK.format(
+        marker=_HOOK_MARKER, python=Path(sys.executable).as_posix(),
+        blocking=EXIT_BLOCKING,
+    )
+    if existing == content:
+        return None
+    try:
+        hooks.mkdir(parents=True, exist_ok=True)
+        with open(path, "w", encoding="utf-8", newline="\n") as f:
+            f.write(content)
+        os.chmod(path, 0o755)
+    except OSError:
+        return None
+    return path
+
+
 def detect_copilot_seat(binary: str = "copilot") -> Optional[str]:
     """The live Copilot CLI version string, or None when no seat resolves.
     Detection is a fact about the machine, so nobody should be asked."""
@@ -666,6 +732,9 @@ def main(argv=None) -> int:
         print(f"bootstrap: wrote managed section in {path}")
     if ensure_gitignore(project):
         print(f"bootstrap: added {_IGNORE_RULE} to {project / '.gitignore'}")
+    hook = ensure_commit_guard(project)
+    if hook is not None:
+        print(f"bootstrap: installed the step-execution commit guard at {hook}")
     if not args.no_transport_detect:
         value, reason = resolve_bootstrap_transport(args.transport)
         if value is None:

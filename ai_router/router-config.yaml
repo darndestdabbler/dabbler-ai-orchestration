@@ -574,13 +574,16 @@ testing:
         select:
           - tests/test_affected.py
           - tests/test_verify.py
+          - tests/test_step_execution.py
       - when: ai_router/approved_plan.py
         select:
           - tests/test_approved_plan.py
           - tests/test_session.py
+          - tests/test_step_execution.py
       - when: ai_router/bootstrap.py
         select:
           - tests/test_bootstrap.py
+          - tests/test_step_execution.py
       - when: ai_router/config.py
         select:
           - tests/test_config.py
@@ -599,6 +602,7 @@ testing:
         select:
           - tests/test_facts.py
           - tests/test_verify.py
+          - tests/test_step_execution.py
       - when: ai_router/gates.py
         select:
           - tests/test_gates.py
@@ -617,6 +621,7 @@ testing:
           - tests/test_gates.py
           - tests/test_session.py
           - tests/test_verify.py
+          - tests/test_step_execution.py
       - when: ai_router/metrics.py
         select:
           - tests/test_metrics.py
@@ -628,6 +633,7 @@ testing:
       - when: ai_router/plan_review.py
         select:
           - tests/test_plan_review.py
+          - tests/test_step_execution.py
       - when: ai_router/pricing.py
         select:
           - tests/test_pricing.py
@@ -686,6 +692,7 @@ testing:
         select:
           - tests/test_verify.py
           - tests/test_critique_contracts.py
+          - tests/test_step_execution.py
       - when: ai_router/writers.py
         select:
           - tests/test_session.py
@@ -721,6 +728,7 @@ testing:
           - tests/test_critique_contracts.py
           - tests/test_approved_plan.py
           - tests/test_plan_review.py
+          - tests/test_step_execution.py
       - when: ai_router/prompt-templates/
         select:
           - tests/test_verify.py

@@ -550,7 +550,7 @@ def append_facts(repo_root, set_slug: str, record: FactRecord) -> Path:
     return path
 
 
-def red_facts_refusal(record: FactRecord) -> str:
+def red_facts_refusal(record: FactRecord, prefix: str = "verify") -> str:
     """The message that returns red required facts to their author, or ``""``
     when nothing is red. Deterministic controls are the cheapest reader this
     work will ever get; spending a verification round to be told the build is
@@ -565,7 +565,7 @@ def red_facts_refusal(record: FactRecord) -> str:
         for fact in red
     )
     return (
-        "verify: refused -- "
+        f"{prefix}: refused -- "
         f"{len(red)} required deterministic control(s) are not green:\n"
         f"{rows}\n"
         "These are facts, not opinions, and they cost nothing to obtain -- "

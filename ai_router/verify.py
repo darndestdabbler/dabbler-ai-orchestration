@@ -55,6 +55,16 @@ off by default: it derives the ``change-id`` from the reviewed tree,
 records the author's claims as the canonical ``review-claims.json``, and
 opens the review run. It decides nothing — no round, no verdict and no
 gate reads what it writes.
+
+``verify step`` executes the session's approved plan one step at a time,
+at a granularity below the round. A step is opened against a declared
+file envelope and anchored to the commit it opened on; closing it is
+refused when the work reached outside that envelope — an amendment
+requirement, not a warning — and refused again when a declared control or
+the step's own targeted tests come back red. Both are free, both run
+before any model is asked anything, and ``verify step guard-commit`` is
+the pre-commit hook that keeps the author from committing a step the
+framework has not yet closed.
 """
 
 from __future__ import annotations
@@ -1590,6 +1600,572 @@ def run_waive(set_dir, *, max_rounds: Optional[int] = None) -> int:
     return EXIT_OK
 
 
+# --- Step execution ----------------------------------------------------------
+#
+# A step is in flight or it is not, exactly one at a time, and
+# step-execution.jsonl says which. A step answers for its own work and no
+# one else's: its change set starts at the snapshot the previous step
+# closed on, or at the commit the session opened on when it is the first.
+# A closed step's work stays in the working tree until the session commits,
+# so anchoring every step to that commit would charge each one for its
+# predecessors -- and dropping those paths by name instead would let a
+# later step edit them again, outside its own envelope, unremarked.
+#
+# The order is the economy. Git decides whether the work stayed inside the
+# declared envelope, and a path outside it is refused as an amendment
+# requirement rather than reported as a warning -- an envelope nothing
+# enforces is a comment. Then the declared controls and the step's own
+# targeted tests run, free, and a red one returns to the author. Only what
+# survives both is worth a model.
+
+
+class StepRefusal(VerifyError):
+    """A step command refused, carrying the exit code the CLI returns."""
+
+    def __init__(self, message: str, code: int = EXIT_STATE):
+        super().__init__(message)
+        self.code = code
+
+
+def _step_command(verb: str, set_path, suffix: str = "") -> str:
+    return (
+        f"python -m ai_router.verify step {verb} --session-set-dir "
+        f"{set_path}{suffix}"
+    )
+
+
+def _head_commit(repo_root) -> Optional[str]:
+    rc, out, _ = run_git(repo_root, "rev-parse", "HEAD")
+    out = (out or "").strip()
+    return out if rc == 0 and out else None
+
+
+def _step_session(set_path):
+    from .progress import read_session_state
+
+    repo_root = repo_root_for(set_path)
+    if repo_root is None:
+        raise StepRefusal(f"not inside a git repository: {set_path}")
+    current = (read_session_state(set_path) or {}).get("currentSession")
+    if current is None:
+        raise StepRefusal(
+            f"no session is in flight under {set_path}; register the session "
+            "first:\n"
+            f"  python -m ai_router.session start --session-set-dir {set_path}"
+            " --engine <engine> --provider <provider>"
+        )
+    return repo_root, current
+
+
+def _approved_plan_for(repo_root, set_path, session_number: int) -> dict:
+    from .approved_plan import PlanIntegrityError, plan_path, read_plan
+
+    slug = set_path.name
+    if not plan_path(repo_root, slug, session_number).exists():
+        raise StepRefusal(
+            f"{slug} session {session_number} has no plan. A step executes "
+            "against a plan pre-registered and approved before the code was "
+            "seen; there is nothing to execute without one."
+        )
+    try:
+        plan = read_plan(ledger.session_run_dir(repo_root, slug, session_number))
+    except (PlanIntegrityError, ValueError, OSError) as exc:
+        raise StepRefusal(str(exc)) from exc
+    if not plan.get("approved"):
+        raise StepRefusal(
+            f"the plan for {slug} session {session_number} is not approved. "
+            "An unapproved plan is still being written, and an envelope that "
+            "can still move measures nothing."
+        )
+    return plan
+
+
+def _baseline_tree_of(repo_root, commit: str) -> str:
+    rc, tree, _ = run_git(repo_root, "rev-parse", f"{commit}^{{tree}}")
+    tree = (tree or "").strip()
+    if rc != 0 or not tree:
+        raise StepRefusal(
+            f"git could not resolve the tree of {commit[:12]}, the commit "
+            "this step opened against; the step's own change set cannot be "
+            "measured.",
+            EXIT_CALL_FAILED,
+        )
+    return tree
+
+
+def _envelope_refusal(set_path, step_id: str, comparison, note: str = "") -> str:
+    if not comparison.measured:
+        return (
+            f"step {step_id!r} cannot be closed -- {comparison.unmeasured_reason}"
+            ". An unmeasurable change set is never \"inside the plan\"."
+        )
+    rows = "\n".join(
+        f"  {item.path}  ({item.reason})" for item in comparison.outside
+    )
+    return (
+        f"step {step_id!r} wrote outside its declared envelope:\n{rows}\n"
+        + (f"{note}\n" if note else "")
+        + "This is an amendment requirement, not a warning. The envelope was "
+        "declared before the code was seen, and widening it after the fact "
+        "without a record is how a plan stops meaning anything. Either move "
+        "the change back inside the envelope, or amend the plan -- the "
+        "amendment carries the widening and is re-reviewed against the risk "
+        "the wider envelope earns:\n"
+        f"  {_step_command('amend', set_path)} --add-file <path> --reason "
+        "\"<why the envelope was wrong>\""
+    )
+
+
+def _step_deterministic_facts(repo_root, config, changed_paths) -> tuple:
+    """The declared controls plus the step's own targeted tests, run here
+    rather than recorded by their author.
+
+    Pre-verification asks the author to run and record; a step does not,
+    because the framework is what closes it and a fact it collected itself
+    needs no evidence protocol to be trusted.
+
+    Every declaration is read before anything runs. A misdeclared suite or
+    selection rule narrows what the pass executes without saying so, and a
+    green row from a pass that silently skipped the step's tests is worse
+    than no row -- so the errors come back with nothing run."""
+    from .affected import (
+        load_selection_config,
+        select_tests,
+        targeted_command,
+    )
+    from .facts import (
+        KIND_TESTS,
+        STATUS_NOT_APPLICABLE,
+        ControlFact,
+        ControlSpec,
+        collect_control_facts,
+        load_controls_checked,
+        run_control,
+    )
+    from .test_evidence import load_suites_checked
+
+    selection = load_selection_config(config)
+    suites = load_suites_checked(config)
+    errors = (
+        tuple(load_controls_checked(config).errors)
+        + tuple(selection.errors)
+        + tuple(suites.errors)
+    )
+    if errors:
+        return (), errors
+
+    controls, _ = collect_control_facts(repo_root, config)
+    result = select_tests(repo_root, changed_paths, selection.config)
+    for suite in suites.suites:
+        command = targeted_command(suite.command, result)
+        if not command:
+            controls += (ControlFact(
+                KIND_TESTS, STATUS_NOT_APPLICABLE, "", False,
+                f"{suite.name}: this step's paths map to no test",
+            ),)
+            continue
+        controls += (run_control(
+            repo_root, ControlSpec(KIND_TESTS, command, required=True)
+        ),)
+    return controls, ()
+
+
+def _declaration_refusal(errors) -> str:
+    rows = "\n".join(f"  {error}" for error in errors)
+    return (
+        "the deterministic pass cannot be trusted to have run this step's "
+        f"evidence -- its declarations do not parse:\n{rows}\n"
+        "A dropped suite and no suite at all look identical once the pass "
+        "has finished, so a step does not close on a declaration nobody "
+        "could read. Fix the declaration in router-config.yaml and close "
+        "the step again."
+    )
+
+
+def run_step_open(set_dir, *, step_id: str) -> int:
+    """Put one plan step in flight, anchored to the commit it opens on."""
+    from .approved_plan import effective_plan, find_step
+
+    set_path = Path(set_dir)
+    try:
+        repo_root, current = _step_session(set_path)
+        slug = set_path.name
+        plan = _approved_plan_for(repo_root, set_path, current)
+
+        in_flight = ledger.open_step(repo_root, slug, current)
+        if in_flight is not None:
+            raise StepRefusal(
+                f"step {in_flight['step_id']!r} is already in flight. Two "
+                "open steps share one working tree, and neither one's diff "
+                "is then its own. Close it first:\n"
+                f"  {_step_command('close', set_path)}",
+                EXIT_USAGE,
+            )
+        step = find_step(plan, step_id)
+        if step is None:
+            declared = ", ".join(
+                s["step_id"] for s in effective_plan(plan)["steps"]
+            )
+            raise StepRefusal(
+                f"step {step_id!r} is not declared in the approved plan for "
+                f"session {current}. The plan declares: {declared}.",
+                EXIT_USAGE,
+            )
+        if step_id in ledger.closed_step_ids(repo_root, slug, current):
+            raise StepRefusal(
+                f"step {step_id!r} is already closed. A step executes once: "
+                "re-opening one would put a second change against an "
+                "envelope that was reviewed for the first.",
+                EXIT_USAGE,
+            )
+        base_commit = _head_commit(repo_root)
+        if base_commit is None:
+            raise StepRefusal(
+                "git could not resolve HEAD, so the step has nothing to "
+                "anchor its change set to.",
+                EXIT_CALL_FAILED,
+            )
+        ledger.append_step_event(repo_root, slug, current, {
+            "schema_version": ledger.STEP_SCHEMA_VERSION,
+            "event": ledger.STEP_EVENT_OPENED,
+            "recorded_at": datetime.datetime.now().astimezone().isoformat(),
+            "set_slug": slug,
+            "session_number": current,
+            "step_id": step_id,
+            "base_commit": base_commit,
+        })
+    except (StepRefusal, ledger.LedgerError) as exc:
+        code = getattr(exc, "code", EXIT_STATE)
+        print(f"verify step open: {exc}", file=sys.stderr)
+        return code
+
+    envelope = "\n".join(f"  {p}" for p in step["file_envelope"])
+    contract = "\n".join(
+        f"  [{item['kind']}] {item['description']}"
+        for item in step["evidence_contract"]
+    )
+    print(
+        f"step open: {step_id} is in flight, anchored to "
+        f"{base_commit[:12]}.\n"
+        f"{step['intent']}\n"
+        f"Envelope -- nothing outside these paths:\n{envelope}\n"
+        f"Evidence contract:\n{contract}\n"
+        f"When the work is done:\n  {_step_command('close', set_path)}"
+    )
+    return EXIT_OK
+
+
+def run_step_close(set_dir) -> int:
+    """Close the step in flight: the envelope first, then the deterministic
+    evidence, and neither costs a model call."""
+    from .approved_plan import compare_to_envelope
+    from .config import load_config
+    from .evidence import snapshot_worktree_tree
+    from .facts import FactRecord, red_facts_refusal
+
+    set_path = Path(set_dir)
+    try:
+        repo_root, current = _step_session(set_path)
+        slug = set_path.name
+        step_row = ledger.open_step(repo_root, slug, current)
+        if step_row is None:
+            raise StepRefusal(
+                f"no step is in flight for {slug} session {current}. Open "
+                "one:\n"
+                f"  {_step_command('open', set_path, ' --step <step_id>')}",
+                EXIT_USAGE,
+            )
+        step_id = step_row["step_id"]
+        base_commit = step_row["base_commit"]
+        plan = _approved_plan_for(repo_root, set_path, current)
+
+        head = _head_commit(repo_root)
+        if head != base_commit:
+            raise StepRefusal(
+                f"HEAD moved from {base_commit[:12]} to "
+                f"{(head or '(unknown)')[:12]} while step {step_id!r} was "
+                "open. The step's envelope comparison and its deterministic "
+                "evidence are both measured against the commit it opened on, "
+                "so a commit landed mid-step leaves them describing someone "
+                "else's change. Put the work back in the working tree "
+                f"(git reset --soft {base_commit[:12]}) and close the step "
+                "again. The framework commits a step, and only once its "
+                "evidence is satisfied.",
+                EXIT_BLOCKING,
+            )
+
+        baseline_tree = ledger.last_closed_tree(
+            repo_root, slug, current
+        ) or _baseline_tree_of(repo_root, base_commit)
+        comparison = compare_to_envelope(
+            repo_root, plan, set_path, baseline_tree, step_id=step_id
+        )
+        if comparison.needs_amendment:
+            raise StepRefusal(
+                _envelope_refusal(set_path, step_id, comparison), EXIT_BLOCKING
+            )
+
+        config = load_config()
+        controls, errors = _step_deterministic_facts(
+            repo_root, config, comparison.inside
+        )
+        if errors:
+            raise StepRefusal(_declaration_refusal(errors), EXIT_BLOCKING)
+        refusal = red_facts_refusal(
+            FactRecord(controls=controls), "verify step close"
+        )
+        if refusal:
+            print(refusal, file=sys.stderr)
+            return EXIT_BLOCKING
+
+        # The controls and tests just ran against this working tree, and a
+        # compile, an analyzer or a test run that drops an artifact writes
+        # to it like anything else. Measure again before the snapshot
+        # becomes the next step's baseline: a path checked only before the
+        # commands ran would let their output into the record unremarked,
+        # and the next step would inherit it as already-accounted-for.
+        comparison = compare_to_envelope(
+            repo_root, plan, set_path, baseline_tree, step_id=step_id
+        )
+        if comparison.needs_amendment:
+            raise StepRefusal(
+                _envelope_refusal(
+                    set_path, step_id, comparison,
+                    note=(
+                        "These appeared while the step's own deterministic "
+                        "commands ran, so the write is theirs rather than "
+                        "yours -- declare the artifact, or stop the command "
+                        "writing it into the repository."
+                    ),
+                ),
+                EXIT_BLOCKING,
+            )
+
+        closed_tree = snapshot_worktree_tree(repo_root)
+        if closed_tree is None:
+            raise StepRefusal(
+                "git could not snapshot the working tree, so this step "
+                "cannot record where it ended and the next step would have "
+                "no baseline to be measured from.",
+                EXIT_CALL_FAILED,
+            )
+        ledger.append_step_event(repo_root, slug, current, {
+            "schema_version": ledger.STEP_SCHEMA_VERSION,
+            "event": ledger.STEP_EVENT_CLOSED,
+            "recorded_at": datetime.datetime.now().astimezone().isoformat(),
+            "set_slug": slug,
+            "session_number": current,
+            "step_id": step_id,
+            "base_commit": base_commit,
+            "closed_tree": closed_tree,
+            "envelope": {
+                "inside": list(comparison.inside),
+                "outside": [item.path for item in comparison.outside],
+            },
+            "deterministic": [fact.to_dict() for fact in controls],
+        })
+    except (StepRefusal, ledger.LedgerError) as exc:
+        code = getattr(exc, "code", EXIT_STATE)
+        print(f"verify step close: {exc}", file=sys.stderr)
+        return code
+
+    rows = "\n".join(
+        f"  {fact.kind:<10} {fact.status:<15} {fact.command}"
+        for fact in controls
+    )
+    print(
+        f"step close: {step_id} closed. {len(comparison.inside)} path(s) "
+        f"changed, all inside the declared envelope.\n{rows}"
+    )
+    return EXIT_OK
+
+
+def run_step_status(set_dir) -> int:
+    """What is in flight, what is done, and what is left."""
+    from .approved_plan import effective_plan
+
+    set_path = Path(set_dir)
+    try:
+        repo_root, current = _step_session(set_path)
+        slug = set_path.name
+        plan = _approved_plan_for(repo_root, set_path, current)
+        in_flight = ledger.open_step(repo_root, slug, current)
+        done = ledger.closed_step_ids(repo_root, slug, current)
+    except (StepRefusal, ledger.LedgerError) as exc:
+        print(f"verify step status: {exc}", file=sys.stderr)
+        return getattr(exc, "code", EXIT_STATE)
+
+    for step in effective_plan(plan)["steps"]:
+        step_id = step["step_id"]
+        if in_flight is not None and in_flight["step_id"] == step_id:
+            mark = "OPEN "
+        elif step_id in done:
+            mark = "done "
+        else:
+            mark = "     "
+        print(f"  {mark} {step_id}  {step['intent']}")
+    if in_flight is None:
+        print(f"No step is in flight. "
+              f"{_step_command('open', set_path, ' --step <step_id>')}")
+    else:
+        print(f"Step {in_flight['step_id']!r} is in flight, anchored to "
+              f"{in_flight['base_commit'][:12]}. "
+              f"{_step_command('close', set_path)}")
+    return EXIT_OK
+
+
+def _spec_text(set_path) -> str:
+    """The whole spec, not an excerpt: the plan reviewer derives a
+    session's goals by parsing every session heading, so a slice of one
+    session reads as a spec with no sessions in it."""
+    try:
+        return (Path(set_path) / "spec.md").read_text(encoding="utf-8")
+    except (OSError, UnicodeError) as exc:
+        raise StepRefusal(
+            f"{set_path}/spec.md could not be read, so the amendment has "
+            f"nothing to be reviewed against: {exc}"
+        ) from exc
+
+
+def run_step_amend(set_dir, *, reason: str, added_files=None) -> int:
+    """Widen the open step's envelope through the plan reviewer.
+
+    The amendment carries the widening rather than a note about it, and it
+    is re-reviewed against the risk the wider envelope derives -- so an
+    author cannot amend past the review its own work earns."""
+    from . import plan_review
+    from .approved_plan import PlanImmutableError
+
+    set_path = Path(set_dir)
+    try:
+        repo_root, current = _step_session(set_path)
+        slug = set_path.name
+        step_row = ledger.open_step(repo_root, slug, current)
+        if step_row is None:
+            raise StepRefusal(
+                f"no step is in flight for {slug} session {current}; an "
+                "amendment amends the step that needs it, not the plan at "
+                "large.",
+                EXIT_USAGE,
+            )
+        _approved_plan_for(repo_root, set_path, current)
+        run_dir = ledger.session_run_dir(repo_root, slug, current)
+        try:
+            record, plan = plan_review.review_amendment(
+                run_dir, _spec_text(set_path), current,
+                step_id=step_row["step_id"], reason=reason,
+                added_files=list(added_files or []),
+                workspace_root=repo_root, session_set=slug,
+            )
+        except (PlanImmutableError, ValueError,
+                plan_review.PlanReviewError) as exc:
+            raise StepRefusal(str(exc), EXIT_USAGE) from exc
+        if plan is None:
+            raise StepRefusal(
+                f"the amendment to {step_row['step_id']!r} was not approved "
+                f"({record['outcome']}). The approved plan is unchanged.",
+                EXIT_BLOCKING,
+            )
+    except (StepRefusal, ledger.LedgerError) as exc:
+        print(f"verify step amend: {exc}", file=sys.stderr)
+        return getattr(exc, "code", EXIT_STATE)
+
+    print(
+        f"step amend: {step_row['step_id']} amended; the envelope now "
+        f"covers {', '.join(added_files or [])}.\n"
+        f"  {_step_command('close', set_path)}"
+    )
+    return EXIT_OK
+
+
+def run_step_guard_commit(cwd=".") -> int:
+    """The pre-commit guard: refuse a manual commit while a step is open.
+
+    The framework commits a step, after its evidence is satisfied. A commit
+    made while a step is open leaves the step with no diff of its own to be
+    judged by, which is why this is a refusal and not advice."""
+    repo_root = repo_root_for(cwd)
+    if repo_root is None:
+        return EXIT_OK
+    try:
+        open_rows = ledger.open_steps_in_repo(repo_root)
+    except ledger.LedgerError as exc:
+        print(f"verify step guard-commit: {exc}", file=sys.stderr)
+        return EXIT_STATE
+    if not open_rows:
+        return EXIT_OK
+    rows = "\n".join(
+        f"  {row['step_id']} (set {row['set_slug']}, session "
+        f"{row['session_number']})" for row in open_rows
+    )
+    set_dir = f"docs/session-sets/{open_rows[0]['set_slug']}"
+    print(
+        "commit refused -- a step is open:\n"
+        f"{rows}\n"
+        "The framework commits a step, and it does so once the step's "
+        "evidence is satisfied. Close the step and let it:\n"
+        f"  {_step_command('close', set_dir)}",
+        file=sys.stderr,
+    )
+    return EXIT_BLOCKING
+
+
+def _step_main(argv) -> int:
+    parser = argparse.ArgumentParser(
+        prog="python -m ai_router.verify step",
+        description="Execute one approved-plan step: open it, close it "
+                    "against its own envelope and deterministic evidence, "
+                    "or ask what is in flight.",
+    )
+    sub = parser.add_subparsers(dest="verb", required=True)
+    for verb, help_text in (
+        ("open", "put one plan step in flight"),
+        ("close", "close the step in flight"),
+        ("status", "what is in flight, done, and left"),
+        ("amend", "widen the open step's envelope, through review"),
+    ):
+        child = sub.add_parser(verb, help=help_text)
+        child.add_argument("--session-set-dir", required=True,
+                           help="directory, slug, or bare set number")
+        if verb == "open":
+            child.add_argument("--step", required=True,
+                               help="a step_id the approved plan declares")
+        if verb == "amend":
+            child.add_argument("--add-file", action="append", default=[],
+                               dest="add_file",
+                               help="a path to add to the step's envelope "
+                                    "(repeatable)")
+            child.add_argument("--reason", required=True,
+                               help="why the declared envelope was wrong")
+    sub.add_parser("guard-commit",
+                   help="pre-commit hook entry point; takes no arguments")
+    args = parser.parse_args(argv)
+
+    if args.verb == "guard-commit":
+        return run_step_guard_commit()
+    try:
+        set_dir = resolve_session_set_dir(args.session_set_dir)
+    except ValueError as exc:
+        print(f"verify step {args.verb}: {exc}", file=sys.stderr)
+        return EXIT_USAGE
+    if args.verb == "open":
+        return run_step_open(set_dir, step_id=args.step)
+    if args.verb == "close":
+        return run_step_close(set_dir)
+    if args.verb == "amend":
+        if not args.add_file:
+            print(
+                "verify step amend: refused -- an amendment must carry the "
+                "change it makes. Name the path(s) with --add-file.",
+                file=sys.stderr,
+            )
+            return EXIT_USAGE
+        return run_step_amend(
+            set_dir, reason=args.reason, added_files=args.add_file
+        )
+    return run_step_status(set_dir)
+
+
 # --- Task-level auto-verify (route()'s deferred seam) ------------------------
 
 def auto_verify(route_result, content: str, task_type: str, config) -> Optional[dict]:
@@ -1763,6 +2339,8 @@ def main(argv=None) -> int:
         return _waive_main(argv[1:])
     if argv[:1] == ["prepare"]:
         return _prepare_main(argv[1:])
+    if argv[:1] == ["step"]:
+        return _step_main(argv[1:])
 
     parser = argparse.ArgumentParser(prog="python -m ai_router.verify")
     parser.add_argument("--session-set-dir", required=True,

@@ -1,6 +1,7 @@
 """The machine-only run ledger: ``.dabbler/runs/<set>/s<N>/rounds.jsonl``
-and, beside it, ``disputes.jsonl`` (one row per disputed finding) and the
-``critique/<change-id>/`` subtree of critique artifacts.
+and, beside it, ``step-execution.jsonl`` (one row per step opened and one
+per step closed), ``disputes.jsonl`` (one row per disputed finding) and
+the ``critique/<change-id>/`` subtree of critique artifacts.
 
 One row per completed verification round, appended only by the CLI
 (``ai_router.verify``). The close gate reads it. There is no stamp and no
@@ -179,6 +180,114 @@ def save_raw_output(
 def next_round_number(repo_root, set_slug: str, session_number: int) -> int:
     rounds = read_rounds(repo_root, set_slug, session_number)
     return (rounds[-1]["round"] + 1) if rounds else 1
+
+
+# --- step-execution.jsonl ----------------------------------------------------
+
+STEP_EXECUTION_FILENAME = "step-execution.jsonl"
+
+STEP_EVENT_OPENED = "opened"
+STEP_EVENT_CLOSED = "closed"
+STEP_SCHEMA_VERSION = 1
+
+
+def step_execution_path(repo_root, set_slug: str, session_number: int) -> Path:
+    return (
+        session_run_dir(repo_root, set_slug, session_number)
+        / STEP_EXECUTION_FILENAME
+    )
+
+
+def validate_step_event(record: dict) -> dict:
+    return _validate(record, "step-execution.schema.json", "step execution")
+
+
+def read_step_events(
+    repo_root, set_slug: str, session_number: int
+) -> list[dict]:
+    return _read_jsonl(
+        step_execution_path(repo_root, set_slug, session_number),
+        validate_step_event,
+    )
+
+
+def append_step_event(
+    repo_root, set_slug: str, session_number: int, record: dict
+) -> dict:
+    """Append one validated step row. Append-only like every other row
+    here: a step's history is what happened, not what it should have."""
+    validate_step_event(record)
+    path = step_execution_path(repo_root, set_slug, session_number)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "a", encoding="utf-8") as f:
+        f.write(json.dumps(record) + "\n")
+    return record
+
+
+def _open_step_in(events: list) -> Optional[dict]:
+    """The last opened row with no closed row after it. One at a time is a
+    property of this fold, not a count anybody maintains."""
+    current = None
+    for event in events:
+        if event["event"] == STEP_EVENT_OPENED:
+            current = event
+        elif event["event"] == STEP_EVENT_CLOSED:
+            current = None
+    return current
+
+
+def open_step(repo_root, set_slug: str, session_number: int):
+    """The step this session has in flight, or ``None``."""
+    return _open_step_in(read_step_events(repo_root, set_slug, session_number))
+
+
+def closed_step_ids(repo_root, set_slug: str, session_number: int) -> list:
+    """The steps this session has already executed, in the order they
+    closed. A step is executed once; re-opening one would put a second
+    commit and a second review against the same declared envelope."""
+    return [
+        event["step_id"]
+        for event in read_step_events(repo_root, set_slug, session_number)
+        if event["event"] == STEP_EVENT_CLOSED
+    ]
+
+
+def last_closed_tree(repo_root, set_slug: str, session_number: int):
+    """The worktree snapshot the session's most recent step closed on, or
+    ``None`` before the first close.
+
+    This is where the next step's change set starts. A closed step's work
+    stays in the working tree until the session commits, so measuring the
+    next step against the commit it opened on would charge it for its
+    predecessor's files. Measuring against the snapshot instead charges it
+    for exactly what changed since -- including a second edit to a file an
+    earlier step created, which is the open step's work and nobody
+    else's."""
+    trees = [
+        event.get("closed_tree")
+        for event in read_step_events(repo_root, set_slug, session_number)
+        if event["event"] == STEP_EVENT_CLOSED
+    ]
+    return trees[-1] if trees else None
+
+
+def open_steps_in_repo(repo_root) -> list[dict]:
+    """Every step open anywhere in this repository.
+
+    The question a commit guard asks. It is answered from the execution
+    record alone because a hook gets no arguments and must not have to
+    resolve which session is active to know whether a step is in flight:
+    each row names its own set and session.
+    """
+    runs = Path(repo_root) / RUNS_DIRNAME
+    if not runs.is_dir():
+        return []
+    open_rows = []
+    for path in sorted(runs.glob(f"*/s*/{STEP_EXECUTION_FILENAME}")):
+        row = _open_step_in(_read_jsonl(path, validate_step_event))
+        if row is not None:
+            open_rows.append(row)
+    return open_rows
 
 
 # --- disputes.jsonl ----------------------------------------------------------

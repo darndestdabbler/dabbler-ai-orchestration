@@ -1,0 +1,193 @@
+{
+  "sessionSetName": "145-step-execution",
+  "createdDate": "2026-08-20T05:58:49.103324-04:00",
+  "totalSessions": 3,
+  "entries": [
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-20T05:58:49.103644-04:00",
+      "description": "Register.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "open-and-close-a-step-against",
+      "dateTime": "2026-08-20T05:58:49.103644-04:00",
+      "description": "Open and close a step against the approved plan: a step is in flight or it is not, exactly one at a time, and the record says which. Only the session's own steps are in the plan \u2014 set 144 keeps register, verification, the run of record, and close-out out of it \u2014 so there is no ceremony step to open an envelope for, review, or commit an empty diff against.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "enforce-the-file-envelope-mechanically",
+      "dateTime": "2026-08-20T05:58:49.103644-04:00",
+      "description": "Enforce the file envelope mechanically. A write outside the step's declared paths is refused at the boundary and surfaces as an amendment requirement, not a warning. The framework compares the tree against the envelope; no model is asked whether it stayed inside its own plan.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "run-the-step-s-deterministic-evidence",
+      "dateTime": "2026-08-20T05:58:49.103644-04:00",
+      "description": "Run the step's deterministic evidence first and free \u2014 compile, typecheck, lint, analyzers, and the step's own targeted tests from set 142. A red deterministic result returns to the author before any model spend.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "refuse-a-manual-commit-while-a",
+      "dateTime": "2026-08-20T05:58:49.103644-04:00",
+      "description": "Refuse a manual commit while a step is open, with a message naming the step and the command that closes it.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 6,
+      "stepKey": "affected-tests-as-preverify",
+      "dateTime": "2026-08-20T05:58:49.103644-04:00",
+      "description": "Affected tests as preverify.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 7,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-20T05:58:49.103644-04:00",
+      "description": "Cross-provider verification.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 8,
+      "stepKey": "full-test-suite-recorded-as-the",
+      "dateTime": "2026-08-20T05:58:49.103644-04:00",
+      "description": "Full test suite, recorded as the `final-full` run of record.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 9,
+      "stepKey": "close-out",
+      "dateTime": "2026-08-20T05:58:49.103644-04:00",
+      "description": "Close-out.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 10,
+      "stepKey": "technical-educational-documentation",
+      "dateTime": "2026-08-20T05:58:49.103644-04:00",
+      "description": "Technical/educational documentation.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-20T05:58:49.107060-04:00",
+      "description": "Registered session 1 (copilot).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-20T06:21:45.204791-04:00",
+      "description": "Register.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "open-and-close-a-step-against",
+      "dateTime": "2026-08-20T06:21:45.831905-04:00",
+      "description": "Open and close a step against the approved plan: a step is in flight or it is not, exactly one at a time, and the record says which. Only the session's own steps are in the plan \u2014 set 144 keeps register, verification, the run of record, and close-out out of it \u2014 so there is no ceremony step to open an envelope for, review, or commit an empty diff against.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "enforce-the-file-envelope-mechanically",
+      "dateTime": "2026-08-20T06:21:46.476048-04:00",
+      "description": "Enforce the file envelope mechanically. A write outside the step's declared paths is refused at the boundary and surfaces as an amendment requirement, not a warning. The framework compares the tree against the envelope; no model is asked whether it stayed inside its own plan.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "run-the-step-s-deterministic-evidence",
+      "dateTime": "2026-08-20T06:21:52.899418-04:00",
+      "description": "Run the step's deterministic evidence first and free \u2014 compile, typecheck, lint, analyzers, and the step's own targeted tests from set 142. A red deterministic result returns to the author before any model spend.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "refuse-a-manual-commit-while-a",
+      "dateTime": "2026-08-20T06:21:53.545771-04:00",
+      "description": "Refuse a manual commit while a step is open, with a message naming the step and the command that closes it.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 10,
+      "stepKey": "technical-educational-documentation",
+      "dateTime": "2026-08-20T06:21:54.192126-04:00",
+      "description": "Technical/educational documentation.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 6,
+      "stepKey": "affected-tests-as-preverify",
+      "dateTime": "2026-08-20T06:21:54.829756-04:00",
+      "description": "Affected tests as preverify.",
+      "status": "in-progress"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 6,
+      "stepKey": "affected-tests-as-preverify",
+      "dateTime": "2026-08-20T07:30:40.953265-04:00",
+      "description": "Affected tests as preverify.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 7,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-20T07:31:03.622868-04:00",
+      "description": "Cross-provider verification.",
+      "status": "in-progress"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 7,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-20T08:33:46.266954-04:00",
+      "description": "Cross-provider verification.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 8,
+      "stepKey": "full-test-suite-recorded-as-the",
+      "dateTime": "2026-08-20T08:40:45.059363-04:00",
+      "description": "Full test suite, recorded as the `final-full` run of record.",
+      "status": "complete"
+    }
+  ]
+}

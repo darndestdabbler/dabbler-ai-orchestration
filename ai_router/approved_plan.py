@@ -418,15 +418,29 @@ def lifecycle_written_paths(session_set_dir, repo_root=None) -> list:
     return [f"{prefix}/{name}" for name in LIFECYCLE_WRITTEN_SET_FILES]
 
 
-def envelope_paths(plan: dict) -> list:
-    """Every path the plan's steps may touch, amendments included."""
+def envelope_paths(plan: dict, step_id=None) -> list:
+    """Every path the plan's steps may touch, amendments included -- or
+    only the ones *step_id* declares, which is the envelope a single step
+    in flight is measured against. A step does not inherit the reach of
+    the steps beside it: that would make a seven-step plan one envelope
+    with seven names."""
     paths = []
     for step in effective_plan(plan).get("steps") or []:
+        if step_id is not None and step.get("step_id") != step_id:
+            continue
         for path in step.get("file_envelope") or []:
             normalized = _normalize_path(path)
             if normalized not in paths:
                 paths.append(normalized)
     return paths
+
+
+def find_step(plan: dict, step_id: str):
+    """The step *step_id* names, as its amendments leave it, or ``None``."""
+    for step in effective_plan(plan).get("steps") or []:
+        if step.get("step_id") == step_id:
+            return step
+    return None
 
 
 def path_in_envelope(path: str, envelope) -> bool:
@@ -471,8 +485,9 @@ REASON_NEW_DEPENDENCY = "new-dependency"
 
 
 def compare_to_envelope(repo_root, plan: dict, session_set_dir,
-                        baseline_tree=None):
-    """Compare the working tree against the plan's approved envelope.
+                        baseline_tree=None, *, step_id=None):
+    """Compare the working tree against the plan's approved envelope, or
+    against the envelope of the single step *step_id* declares.
 
     Mechanical from end to end: git says what changed, the envelope says
     what was declared, and set difference decides. No model is asked
@@ -494,7 +509,7 @@ def compare_to_envelope(repo_root, plan: dict, session_set_dir,
                 "git could not report what this working tree changed"
             ),
         )
-    envelope = envelope_paths(plan)
+    envelope = envelope_paths(plan, step_id)
     ceremony = set(lifecycle_written_paths(session_set_dir, repo_root))
     inside, outside = [], []
     for path in sorted(changed):

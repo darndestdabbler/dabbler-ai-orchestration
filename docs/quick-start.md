@@ -102,8 +102,60 @@ instead of the spec's; `--session-number` addresses a session other than
 the one in flight (with none in flight it defaults to the last closed
 one, which is where a close-out step belongs).
 
-## 4. Verify (mandatory, before commit)
+### Executing an approved plan, one step at a time
 
+When the session's work is pre-registered as an approved plan
+(`.dabbler/runs/<set>/s<N>/approved-plan.json`), the steps are executed
+through the framework rather than freehand. One step is in flight at a
+time:
+
+```
+python -m ai_router.verify step open   --session-set-dir docs/session-sets/<set> --step <step_id>
+python -m ai_router.verify step status --session-set-dir docs/session-sets/<set>
+python -m ai_router.verify step close  --session-set-dir docs/session-sets/<set>
+```
+
+`open` anchors the step to the current `HEAD` and prints the paths it may
+touch. `close` then asks two questions, both free and both before any
+model is paid anything:
+
+1. **Did the work stay inside the declared envelope?** Git says what
+   changed, the plan says what was declared, and set difference decides —
+   no model is asked whether you stayed inside your own plan. A path
+   outside is **refused**, as an amendment requirement rather than a
+   warning. Either move the change back, or carry the widening on the
+   record, where it is re-reviewed against the risk the wider envelope
+   earns:
+
+   ```
+   python -m ai_router.verify step amend --session-set-dir docs/session-sets/<set> \
+       --add-file <path> --reason "<why the declared envelope was wrong>"
+   ```
+
+2. **Is the deterministic evidence green?** The declared controls
+   (`testing.controls`: compile, typecheck, lint, analyzer) and the tests
+   the step's own changed paths select. A red required result comes back
+   to you here, because an exit code has already settled what a verifier
+   would be paid to notice.
+
+**You do not commit while a step is open.** `python -m
+ai_router.bootstrap` installs a `pre-commit` hook that refuses a manual
+commit while a step is open and names the command that closes it. The
+binding check is not the hook — `--no-verify` bypasses any hook — but
+`step close` itself, which refuses when `HEAD` has moved off the commit
+the step opened on.
+
+A closed step's work therefore stays in the working tree, and the next
+step opens on the same commit and sees it. That is expected: each close
+records a snapshot of the tree, and the next step's change set is
+measured from that snapshot rather than from the commit — so a plan's
+steps close in sequence with no commit between them, and touching an
+earlier step's file again is still your open step's work, refused unless
+your own envelope declares it. The session's work is committed once the
+last step is closed, and pushing stays a session-boundary act: once, at
+close.
+
+## 4. Verify (mandatory, before commit)
 ```
 python -m ai_router.verify --session-set-dir docs/session-sets/<set>
 ```

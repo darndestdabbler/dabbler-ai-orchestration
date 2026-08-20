@@ -200,6 +200,33 @@ Row fields (all required):
 | `evidence_paths` | array, min 1 | repo-relative cites, optionally `path:START-END`; prose-only disputes are refused at the CLI |
 | `recorded_at` | string | timestamp |
 
+## Step execution ledger — `.dabbler/runs/<set>/s<N>/step-execution.jsonl`
+
+Two rows per step of the session's approved plan — one `opened`, one
+`closed` — written **only** by `ai_router.verify step`; schema-validated
+on read (`ai_router/schemas/step-execution.schema.json`). This file is
+what says whether a step is in flight: the last `opened` row with no
+`closed` row after it is the open step, and there is never more than one.
+A row that fails validation is a refusal, not a skip — a framework that
+cannot tell what is open cannot tell whether work escaped a plan.
+
+| Field | Type | Meaning |
+|---|---|---|
+| `schema_version` | `1` | frozen; any other value is refused, not interpreted |
+| `event` | `opened` \| `closed` | there is no third word |
+| `recorded_at` | string | timestamp |
+| `set_slug`, `session_number` | string, integer ≥ 1 | the row names its own session, so a hook with no arguments can still answer "is a step open?" |
+| `step_id` | slug | a `step_id` the session's `approved-plan.json` declares |
+| `base_commit` | 40-hex | HEAD when the step opened; both required |
+| `envelope` | object | `closed` only: `inside` and `outside` repo-relative paths |
+| `deterministic` | array | `closed` only: one row per control and per targeted test run — `kind`, `status` (`pass`/`fail`/`not_applicable`/`unknown`), `required`, `command`, `detail` |
+
+Everything a step is judged by is anchored to `base_commit`: the envelope
+comparison and the deterministic pass both diff the working tree against
+that commit's tree. `verify step close` therefore refuses outright when
+HEAD has moved — a commit landed mid-step, and both measurements would
+otherwise be describing someone else's change.
+
 ## Metrics ledger — `router-metrics.jsonl`
 
 Append-only JSONL, one object per routed or verification call, additive

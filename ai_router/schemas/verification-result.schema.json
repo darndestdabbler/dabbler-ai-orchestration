@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "verification-result.schema.json",
+  "title": "VerificationResult (round-<n>-attempt-<k>-result.json)",
+  "type": "object",
+  "required": [
+    "schema_version", "request_id", "attempt", "tree_digest",
+    "effective_provider", "requested_model", "served_model_id", "transport",
+    "verdict", "blocking_findings", "minor_findings", "doc_capped_findings",
+    "usage", "raw_output_ref", "raw_output_digest", "error_class"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "const": 1 },
+    "request_id": { "type": "string", "minLength": 1 },
+    "attempt": { "type": "integer", "minimum": 1 },
+    "tree_digest": { "type": "string", "minLength": 1 },
+    "effective_provider": { "type": ["string", "null"] },
+    "requested_model": { "type": ["string", "null"] },
+    "served_model_id": { "type": ["string", "null"] },
+    "transport": { "type": ["string", "null"] },
+    "verdict": { "enum": ["VERIFIED", "ISSUES_FOUND", null] },
+    "blocking_findings": { "$ref": "#/$defs/findings" },
+    "minor_findings": { "$ref": "#/$defs/findings" },
+    "doc_capped_findings": { "$ref": "#/$defs/findings" },
+    "usage": {
+      "type": "object",
+      "required": ["input_tokens", "output_tokens", "model_usd", "priced"],
+      "additionalProperties": false,
+      "properties": {
+        "input_tokens": { "type": "integer", "minimum": 0 },
+        "output_tokens": { "type": "integer", "minimum": 0 },
+        "model_usd": { "type": ["number", "null"], "minimum": 0 },
+        "priced": { "type": "boolean" }
+      }
+    },
+    "raw_output_ref": { "type": ["string", "null"] },
+    "raw_output_digest": { "type": ["string", "null"] },
+    "error_class": { "type": ["string", "null"] },
+    "round": { "type": "integer", "minimum": 1 },
+    "dispatch_id": { "type": "string", "minLength": 1 }
+  },
+  "allOf": [
+    {
+      "comment": "A verdict and an error are mutually exclusive: an attempt that failed produced no opinion, and an attempt that produced one did not fail.",
+      "if": { "properties": { "verdict": { "type": "string" } }, "required": ["verdict"] },
+      "then": { "properties": { "error_class": { "type": "null" } } }
+    },
+    {
+      "if": { "properties": { "error_class": { "type": "string" } }, "required": ["error_class"] },
+      "then": { "properties": { "verdict": { "type": "null" } } }
+    }
+  ],
+  "$defs": {
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["description", "category", "severity"],
+        "properties": {
+          "description": { "type": "string" },
+          "category": { "type": "string" },
+          "severity": { "type": "string" },
+          "failureScenario": { "type": "string" },
+          "evidencePaths": { "type": "array", "items": { "type": "string" } },
+          "raw": { "type": "string" }
+        }
+      }
+    }
+  }
+}

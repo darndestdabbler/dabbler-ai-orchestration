@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "session-organization.schema.json",
+  "title": "Normalized set/session intent parsed from docs/session-sets/*/spec.md",
+  "type": "object",
+  "required": ["schema_version", "sets", "diagnostics"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "const": 1 },
+    "sets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["slug", "position", "title", "objective", "sessions"],
+        "additionalProperties": false,
+        "properties": {
+          "slug": {
+            "type": "string",
+            "pattern": "^[0-9]{3}-[a-z0-9]+(-[a-z0-9]+)*$"
+          },
+          "position": { "type": "integer", "minimum": 1 },
+          "title": { "type": "string", "minLength": 1 },
+          "objective": { "type": "string" },
+          "spec_path": { "type": "string", "minLength": 1 },
+          "sessions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["number", "title", "policy"],
+              "additionalProperties": false,
+              "properties": {
+                "number": { "type": "integer", "minimum": 1 },
+                "title": { "type": "string", "minLength": 1 },
+                "policy": { "enum": ["fast", "verified", null] },
+                "notes": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "diagnostics": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["set_slug", "detail"],
+        "additionalProperties": false,
+        "properties": {
+          "set_slug": { "type": "string" },
+          "detail": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  }
+}

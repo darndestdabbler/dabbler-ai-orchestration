@@ -259,3 +259,181 @@ def _hermetic(monkeypatch):
     yield
     runtime_mode.reset_for_tests()
     route.reset_for_tests()
+
+
+# --- Run-core sandbox --------------------------------------------------------
+
+RUN_SPEC_MD = """# Default
+
+## Objective
+
+Initial and general project work.
+
+## Sessions
+
+### Session 1: First work session
+
+Describe and complete one bounded change.
+
+### Session 2: Review the parser
+
+Policy: verified
+
+Implement and test the bounded parser path.
+"""
+
+
+@pytest.fixture
+def run_repo(tmp_path, monkeypatch):
+    """A committed git repository with one authored set spec, cwd'd into.
+
+    The run core resolves its control root, repository id, and config from
+    the working directory, so every run-core test needs a real repository
+    rather than a temp directory that merely looks like one.
+    """
+    repo = tmp_path / "work"
+    set_dir = repo / "docs" / "session-sets" / "001-default"
+    set_dir.mkdir(parents=True)
+    (set_dir / "spec.md").write_text(RUN_SPEC_MD, encoding="utf-8")
+    (repo / ".gitignore").write_text(
+        ".dabbler/\n"
+        "docs/session-sets/*/session-state.json\n"
+        "docs/session-sets/*/activity-log.json\n"
+        "docs/session-sets/*/change-log.md\n",
+        encoding="utf-8",
+    )
+    (repo / "app.py").write_text("VALUE = 1\n", encoding="utf-8")
+    _git(repo, "init", "-q", "-b", "main")
+    _git(repo, "config", "user.email", "test@example.invalid")
+    _git(repo, "config", "user.name", "Test")
+    _git(repo, "config", "commit.gpgsign", "false")
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-q", "-m", "seed")
+    monkeypatch.chdir(repo)
+    return repo
+
+
+@pytest.fixture
+def run_config(run_repo, monkeypatch):
+    """A schema-valid config for the scratch repository, with one declared
+    suite and one control the run core can actually execute."""
+    import sys
+
+    import yaml
+
+    interpreter = sys.executable.replace("\\", "/")
+    config = make_config(
+        testing={
+            "suites": [{
+                "name": "unit",
+                "argv": [interpreter, "checkrunner.py"],
+                "covers": ["app.py", "tests/", "conftest.py"],
+            }],
+            "controls": [{
+                "name": "lint",
+                "kind": "lint",
+                "argv": [interpreter, "-c", "import sys; sys.exit(0)"],
+                "covers": ["app.py"],
+                "required": True,
+            }],
+            "selection": {
+                "test_roots": ["tests"],
+                "test_glob": "test_*.py",
+                "repo_wide": ["conftest.py"],
+                "smoke": ["tests/test_smoke.py"],
+                "rules": [{"when": "app.py", "select": ["tests/test_app.py"]}],
+            },
+        },
+        run_policy={"default": "fast", "verification_rounds": 2},
+    )
+    (run_repo / "checkrunner.py").write_text(
+        "import pathlib, sys\n"
+        "sys.exit(1 if pathlib.Path('FAIL').exists() else 0)\n",
+        encoding="utf-8",
+    )
+    tests_dir = run_repo / "tests"
+    tests_dir.mkdir(exist_ok=True)
+    for name in ("test_app.py", "test_smoke.py"):
+        (tests_dir / name).write_text("def test_ok():\n    pass\n", encoding="utf-8")
+    _git(run_repo, "add", "-A")
+    _git(run_repo, "commit", "-q", "-m", "declare checks")
+
+    # Outside the repository: a config file inside it would be untracked
+    # content and every run would refuse on a dirty worktree.
+    path = run_repo.parent / "router-config.yaml"
+    path.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
+    monkeypatch.setenv("AI_ROUTER_CONFIG", str(path))
+    return config
+
+
+def cli(*argv) -> tuple:
+    """``(exit_code, payload)`` for one run-core command."""
+    import contextlib
+    import io
+    import json as _json
+
+    from ai_router.runcli import main
+
+    buffer = io.StringIO()
+    with contextlib.redirect_stdout(buffer):
+        code = main([*argv, "--json"] if "--json" not in argv else list(argv))
+    text = buffer.getvalue().strip()
+    return code, (_json.loads(text) if text else {})
+
+
+@pytest.fixture
+def no_model_calls(monkeypatch):
+    """Fail the test on any dispatch through either transport.
+
+    Asserted at the transport rather than at ``route`` so a call that
+    reached the wire by another path still fails the test.
+    """
+    from ai_router.transports.api import DirectApiTransport
+    from ai_router.transports.copilot import CopilotCliTransport
+
+    def _forbidden(self, **kwargs):
+        raise AssertionError("a framework model call was dispatched")
+
+    monkeypatch.setattr(DirectApiTransport, "dispatch", _forbidden)
+    monkeypatch.setattr(CopilotCliTransport, "dispatch", _forbidden)
+
+
+class StubTransport:
+    """A scripted verifier. Records every dispatch so a test can assert how
+    many reviews a policy actually bought."""
+
+    def __init__(self, responses, served_model_id=None):
+        self.responses = list(responses)
+        self.calls = []
+        # None echoes back the id that was asked for, which is what an honest
+        # provider does; a fixed value is how a test stages a lie about it.
+        self.served_model_id = served_model_id
+
+    def dispatch(self, *, model_id, system_prompt, user_message,
+                 max_tokens=None, generation_params=None):
+        from ai_router.transports.base import APIResult
+
+        self.calls.append({"model_id": model_id, "user_message": user_message})
+        content = self.responses.pop(0) if self.responses else "VERIFIED\n"
+        return APIResult(
+            content=content, input_tokens=100, output_tokens=200,
+            stop_reason="end_turn",
+            served_model_id=self.served_model_id or model_id,
+        )
+
+
+def reconfigure(run_repo, config, **overrides):
+    """Rewrite the scratch repository's config with *overrides* merged over
+    the top-level blocks."""
+    import yaml
+
+    merged = dict(config)
+    for key, value in overrides.items():
+        if isinstance(value, dict) and isinstance(merged.get(key), dict):
+            merged[key] = {**merged[key], **value}
+        else:
+            merged[key] = value
+    (run_repo.parent / "router-config.yaml").write_text(
+        yaml.safe_dump(merged, sort_keys=False), encoding="utf-8"
+    )
+    return merged

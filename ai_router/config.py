@@ -202,6 +202,7 @@ def load_config(path: str | None = None) -> dict:
             )
 
     _validate_copilot_block(config)
+    _apply_run_core_defaults(config)
     _resolve_critique_block(config)
     _load_prompt_templates(config, config_path.parent)
 
@@ -253,6 +254,51 @@ def _apply_local_overrides(config: dict, overrides_path: Path) -> dict:
         )
     _reject_unknown_overlay_keys(overrides, _load_schema(), overrides_path)
     return _deep_merge(config, overrides)
+
+
+RUN_CORE_DEFAULTS = {
+    "run_policy": {
+        "default": "fast",
+        "verification_rounds": 3,
+        "diff_limit_lines": 1500,
+        "check_timeout_seconds": 1800,
+        "budgets": {
+            "model_usd": 10.0,
+            "model_dispatches": 3,
+            "elapsed_minutes": 120,
+        },
+        "sensitive_paths": [],
+    },
+    "git": {
+        "push_on_finish": False,
+        "worktree_per_run": False,
+        "remote": "origin",
+    },
+    "explorer": {"stale_after_minutes": 5},
+    "worktree": {"root": None, "init": []},
+}
+
+
+def _apply_run_core_defaults(config: dict) -> None:
+    """Fill the §5.3 run-core blocks so every reader sees the same shape.
+
+    An existing repository needs no new configuration for ``fast``: an
+    absent block is the documented default, not an unconfigured feature.
+    The schema has already refused unknown keys and out-of-range limits, so
+    the only rule left here is the one a range check cannot express — a null
+    dollar ceiling disables the dollar ceiling and nothing else.
+    """
+    for block, defaults in RUN_CORE_DEFAULTS.items():
+        merged = _deep_merge(copy.deepcopy(defaults), config.get(block) or {})
+        config[block] = merged
+
+    budgets = config["run_policy"]["budgets"]
+    if budgets.get("model_dispatches") is None:
+        raise ValueError(
+            "run_policy.budgets.model_dispatches has no 'unlimited' value: "
+            "a dispatch ceiling is what bounds framework model calls when "
+            "seat pricing makes the dollar ceiling unmeasurable."
+        )
 
 
 def _validate_copilot_block(config: dict) -> None:

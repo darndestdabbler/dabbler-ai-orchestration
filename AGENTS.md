@@ -47,15 +47,24 @@ increment. One envelope replaces both, measured against the post-141 baseline
 and acting as a **ceiling for the whole sequence**, not a per-set budget to
 spend down:
 
-| Dimension | Baseline (`fa3c28c7`) | Ceiling | After 142 |
-| --- | ---: | ---: | ---: |
-| Python source | 12,650 LOC | **16,800** | 14,473 |
-| Python modules | 25 | **33** | 27 |
-| Python tests | 455 | **605** | 477 |
-| TypeScript tests | 161 | **215** (unchanged) | 161 |
+| Dimension | Baseline (`fa3c28c7`) | Ceiling | After 145 s1 | Headroom |
+| --- | ---: | ---: | ---: | ---: |
+| Python source | 12,650 LOC | **16,800** | 16,327 | **473** |
+| Python modules | 25 | **33** | 29 | 4 |
+| Python tests | 455 | **605** | 547 | **58** |
+| TypeScript tests | 161 | **215** (unchanged) | 161 | 54 |
 
-Set 143 is expected to move these *down*: it removes the framework's
-language-specific machinery rather than adding a layer beside it.
+Measured over `ai_router/**/*.py` by raw line count; the suite figure is
+`pytest --collect-only`. **Set 147 is cancelled**, so the sequence in flight
+is 142–146 and set 146 closes it. The operator's relaxation window still
+reads 142–147, because 147 is restorable; a restore reopens the budget
+question rather than inheriting this table.
+
+The headroom column is the point. Session 1 of set 145 alone spent 771 LOC
+and 16 tests, so what remains does not cover the sequence at the rate it has
+been running. The `verify.py` extraction relocates lines and creates no
+headroom. Sets 145 and 146 must be planned against these numbers, not
+against the entering counts their specs were written with.
 
 Two rules survive the relaxation unchanged, because they are what the ceilings
 were protecting:
@@ -65,7 +74,9 @@ were protecting:
 - **A module earns its existence by making another module smaller.** New
   modules are permitted; new modules that only add are not. `verify.py` is the
   named target: this sequence must leave it **under 1,200 lines**, by moving
-  code out rather than by adding beside it.
+  code out rather than by adding beside it. It stands at **2,367** — it grew
+  by 578 during set 145 session 1, so the extraction now has to move roughly
+  1,170 lines, double what it was scoped for.
 
 When the sequence ends — merged or killed — rules 1 and 4 resume with their
 original numbers.

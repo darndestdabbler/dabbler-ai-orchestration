@@ -248,9 +248,14 @@ failure produces a bisect range rather than an accusation.
 
 ## Test budget
 
-Sets 142–144 leave the count at **494**; this set adds **19** (7, 7, 5),
-reaching 513 of
-the 605 envelope. Session 2 is the largest allocation in the sequence
+Sets 142–144 leave the count at **531**; session 1 spent **16** against a
+forecast of 7, putting the suite at **547** of the 605 envelope. Sessions 2
+and 3 forecast 7 and 5. Session 2 is the largest remaining allocation
 because the step check is what every step's review rests on, and its
 distinct outcomes — fix, disprove, escalate, and the two-attempt bound on
 fix — each need their own test.
+
+**Read the forecast as a floor.** Across 142–144 the estimates ran roughly
+a third of actual spend, and session 1 of this set repeated it. Fifty-eight
+slots remain against the 605 ceiling; they are the margin for being wrong,
+not budget to spend down.

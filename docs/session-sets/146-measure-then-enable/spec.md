@@ -8,13 +8,13 @@
 > It also closes the loop that keeps the framework from growing: a defect
 > caught late becomes a test or a lint rule, and only becomes prose when it
 > provably cannot be code.
-> **Session Set:** `docs/session-sets/145-measure-then-enable/`
+> **Session Set:** `docs/session-sets/146-measure-then-enable/`
 > **Created:** 2026-08-19
 > **Revised:** 2026-08-19 — rewritten for the plan-first, step-wise design.
 > **Workflow:** Full
 > **Baseline commit:** `fa3c28c7`, plus sets 142–145.
 > **Integration branch:** `experiment/verification-pipeline-v3`; child
-> branch `verification-v3/set-145-measure-then-enable`. **Not** developed
+> branch `verification-v3/set-146-measure-then-enable`. **Not** developed
 > on `master`.
 > **Prerequisite:** sets 142–145 complete.
 
@@ -81,9 +81,8 @@ abstract baseline. For each corpus case, run both and report:
 ## What this set does NOT do (do not reopen)
 
 - **No waiver of session-level cross-provider verification.** It stays
-  mandatory with no skip, under every enablement outcome. The step-level
-  skip is a different granularity, has its own coverage gate, and is not a
-  precedent for relaxing the session mandate.
+  mandatory with no skip, under every enablement outcome. No step-level
+  exemption exists to argue from: every step gets its model check.
 - **No calibration, no auto-routing.** Weights and thresholds stay frozen
   through this set. There is no cost-driven routing.
 - **No new checklist line admitted to demonstrate the mechanism.** An empty
@@ -188,9 +187,9 @@ TypeScript tests.
 ## Acceptance criterion for the set
 
 Both designs ran over the same corpus, and the comparison reports cost per
-case in tokens and credits, recall with denominators and confidence
-intervals, ceremony share, amendment rate, and the completeness gap. Where
-a denominator is too small, the report says so.
+case in tokens and credits, recall with denominators, ceremony share,
+amendment rate, and the completeness gap. Where a denominator is too small,
+the report says so.
 
 The new path is enabled **only** if it is measurably cheaper at no worse
 recall, and stays honestly off otherwise with the failing measure named.
@@ -211,7 +210,13 @@ being quietly restated.
 
 ## Test budget
 
-Sets 142–145 leave the count at **513**; this set adds **10** (4, 4, 2),
-reaching **523 of 605**. Eighty-two slots remain unspent against the
-envelope, which is the margin for being wrong — not budget to find a use
-for.
+Set 145 is still in flight, so the entering count is not yet fixed: the
+suite stands at **547** of 605 after set 145 session 1, with sessions 2 and
+3 still to spend. This set forecasts **10** (4, 4, 2).
+
+Whatever remains is the margin for being wrong, not budget to find a use
+for. With set 147 cancelled this set now closes the sequence, so its
+envelope report in session 3 is the final one. Estimates across 142–145
+have run roughly a third of actual spend; if that holds, the ceiling binds
+during this set, and the report says by how much rather than the ceiling
+being quietly restated.

@@ -28,7 +28,7 @@ from typing import Optional
 import jsonschema
 import yaml
 
-from .evidence import repo_root_for
+from .journal import repo_root_for
 from .pricing import validate_model_rates
 from .transports.copilot import validate_transport_timeouts
 

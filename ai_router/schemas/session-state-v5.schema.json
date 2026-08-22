@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "session-state-v5.schema.json",
+  "title": "session-state.json (v5 generated set projection)",
+  "description": "The v5 set document: wholly derived from the tracked spec.md plus the run journal, written by atomic replace, ignored by git, and regenerable at any time. v4 files are frozen historical records validated by session-state.schema.json and are never rewritten by this producer.",
+  "type": "object",
+  "required": [
+    "schemaVersion", "sessionSetName", "title", "objective", "status",
+    "projectionRevision", "organizationDigest", "sessions"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": { "const": 5 },
+    "sessionSetName": {
+      "type": "string",
+      "pattern": "^[0-9]{3}-[a-z0-9]+(-[a-z0-9]+)*$"
+    },
+    "title": { "type": "string" },
+    "objective": { "type": "string" },
+    "status": {
+      "enum": ["not-started", "in-progress", "complete", "cancelled"]
+    },
+    "projectionRevision": { "type": "integer", "minimum": 0 },
+    "organizationDigest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "sessions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "number", "title", "policy", "status", "runIds", "currentRunId",
+          "needsAttention", "startedAt", "completedAt", "verification",
+          "cost", "commit"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "number": { "type": "integer", "minimum": 1 },
+          "title": { "type": "string" },
+          "policy": { "enum": ["fast", "verified"] },
+          "status": {
+            "enum": ["not-started", "in-progress", "complete", "cancelled"]
+          },
+          "runIds": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "currentRunId": { "type": ["string", "null"] },
+          "needsAttention": { "type": "boolean" },
+          "startedAt": { "type": ["string", "null"] },
+          "completedAt": { "type": ["string", "null"] },
+          "verification": {
+            "type": ["object", "null"],
+            "required": [
+              "rounds", "last_verdict", "verifier_provider", "transport"
+            ],
+            "properties": {
+              "rounds": { "type": "integer", "minimum": 0 },
+              "last_verdict": {
+                "enum": ["VERIFIED", "ISSUES_FOUND", "WAIVED", null]
+              },
+              "verifier_provider": { "type": ["string", "null"] },
+              "transport": { "type": ["string", "null"] }
+            }
+          },
+          "cost": {
+            "type": ["object", "null"],
+            "required": ["model_usd", "unpriced_calls"],
+            "properties": {
+              "model_usd": { "type": "number", "minimum": 0 },
+              "unpriced_calls": { "type": "integer", "minimum": 0 }
+            }
+          },
+          "commit": { "type": ["string", "null"] }
+        }
+      }
+    }
+  }
+}

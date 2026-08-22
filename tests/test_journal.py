@@ -185,3 +185,61 @@ def test_events_are_written_as_one_object_per_line(run_repo):
     lines = journal.journal_path(root).read_text(encoding="utf-8").splitlines()
     assert len(lines) == 2
     assert all(json.loads(line)["schema_version"] == 1 for line in lines)
+
+
+def test_a_lock_being_born_is_not_reclaimed(run_repo):
+    """The window between creating the lock file and writing its record is
+    the one a contender must not treat as abandonment — reclaiming it is how
+    two writers come to believe they both hold the mutex."""
+    root = journal.control_root()
+    path = journal.machine_dir(root) / journal.LOCK_FILENAME
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(b"")
+
+    assert journal._lock_is_stale(path) is False
+    with pytest.raises(journal.LockContentionError):
+        with journal.journal_lock(root, wait_seconds=0.05):
+            pass
+
+
+def test_a_holder_never_deletes_a_lock_it_no_longer_owns(run_repo):
+    """A holder reclaimed out from under itself must leave its successor's
+    lock alone, so the mutex still admits one owner at a time."""
+    root = journal.control_root()
+    first = journal.journal_lock(root)
+    first.__enter__()
+    path = first.path
+    path.unlink()  # a contender reclaimed it
+    second = journal.journal_lock(root)
+    second.__enter__()
+
+    first.__exit__()
+    assert path.is_file(), "the first holder deleted the second's lock"
+    second.__exit__()
+    assert not path.exists()
+
+
+def test_organization_events_name_no_run(run_repo):
+    root = journal.control_root()
+    event = journal.append(
+        root, event_type="organization.cancelled", run_id=None, attempt=1,
+        actor=journal.actor(journal.ACTOR_OPERATOR, "operator"),
+        summary="cancelled a session",
+        payload={
+            "target": "session", "set_slug": "001-default",
+            "session_number": 1, "reason": "deferred",
+        },
+    )
+    assert event["run_id"] is None
+    assert journal.read_events(root)[0]["run_id"] is None
+
+
+def test_every_other_event_must_name_a_run(run_repo):
+    root = journal.control_root()
+    with pytest.raises(JournalCorrupt, match="run_id"):
+        journal.append(
+            root, event_type="run.checkpoint", run_id=None, attempt=1,
+            actor=journal.actor(journal.ACTOR_AGENT, "agent"),
+            summary="orphan",
+            payload={"note": "x", "ack_guidance_through": None},
+        )

@@ -175,36 +175,101 @@ def test_an_orphaned_dispatch_is_recorded_as_a_failed_attempt(
     assert second["round"] == 1 and second["verdict"] == "VERIFIED"
 
 
-def test_a_commit_before_run_finished_is_adopted_not_repeated(
+def _drop_last_event(root):
+    """Lose the final journal line, as a kill between the commit and the
+    ``run.finished`` that records it would."""
+    path = journal.journal_path(root)
+    lines = path.read_bytes().splitlines(keepends=True)
+    path.write_bytes(b"".join(lines[:-1]))
+    runproject.write_projection(root)
+
+
+def _count_commits(repo):
+    return subprocess.run(
+        ["git", "-C", str(repo), "rev-list", "--count", "HEAD"],
+        capture_output=True, text=True,
+    ).stdout.strip()
+
+
+def test_a_proven_commit_before_run_finished_is_adopted_not_repeated(
     run_repo, run_config
 ):
     started = _register()
     _edit(run_repo)
+    code, finished = cli("finish", "--run", started["run_id"])
+    assert code == 0, finished
     root = journal.control_root()
-    view = runcore.load_run(root, started["run_id"])
+
+    # The commit landed and its checks are on the record for that exact
+    # tree; only the closing event was lost.
+    _drop_last_event(root)
+    before = _count_commits(run_repo)
+
+    code, resumed = cli("resume", "--run", started["run_id"])
+    assert code == 0, resumed
+    assert resumed["state"] == "completed"
+    assert resumed["commit"] == finished["commit"]
+    assert _count_commits(run_repo) == before
+    assert len(_events(root, "run.finished")) == 1
+
+
+def test_an_unproven_commit_is_not_adopted_as_a_completion(
+    run_repo, run_config
+):
+    """A trailer is text anyone can type. Recovery closes a run on a commit
+    only when the evidence a completion requires is on the record for that
+    exact tree; otherwise the run parks and names what is missing."""
+    started = _register()
+    _edit(run_repo)
+    root = journal.control_root()
     subprocess.run(
         ["git", "-C", str(run_repo), "add", "-A"], capture_output=True,
     )
     subprocess.run(
         ["git", "-C", str(run_repo), "commit", "-q", "-m",
-         f"First work session\n\nDabbler-Run: {view.run_id}\n"],
+         f"First work session\n\nDabbler-Run: {started['run_id']}\n"],
         capture_output=True,
     )
-    before = subprocess.run(
-        ["git", "-C", str(run_repo), "rev-list", "--count", "HEAD"],
-        capture_output=True, text=True,
-    ).stdout.strip()
 
     code, resumed = cli("resume", "--run", started["run_id"])
     assert code == 0, resumed
-    assert resumed["state"] == "completed"
+    assert resumed["state"] == "waiting"
+    assert not _events(root, "run.finished")
 
-    after = subprocess.run(
-        ["git", "-C", str(run_repo), "rev-list", "--count", "HEAD"],
-        capture_output=True, text=True,
-    ).stdout.strip()
-    assert after == before
-    assert len(_events(root, "run.finished")) == 1
+    question = _events(root, "run.waiting")[-1]["payload"]["question"]
+    assert "not backed by the evidence" in question
+    assert "no final-full result for check 'unit'" in question
+
+
+def test_a_verified_run_is_not_adopted_without_its_verdict(
+    run_repo, run_config, monkeypatch, provider_keys
+):
+    stub = StubTransport([])
+    from ai_router.transports.api import DirectApiTransport
+
+    monkeypatch.setattr(
+        DirectApiTransport, "dispatch", lambda self, **kw: stub.dispatch(**kw)
+    )
+    started = _register(REGISTER_VERIFIED)
+    _edit(run_repo)
+    root = journal.control_root()
+    subprocess.run(
+        ["git", "-C", str(run_repo), "add", "-A"], capture_output=True,
+    )
+    subprocess.run(
+        ["git", "-C", str(run_repo), "commit", "-q", "-m",
+         f"Review the parser\n\nDabbler-Run: {started['run_id']}\n"],
+        capture_output=True,
+    )
+
+    code, resumed = cli("resume", "--run", started["run_id"])
+    assert code == 0, resumed
+    assert resumed["state"] == "waiting"
+    assert not _events(root, "run.finished")
+    assert stub.calls == []
+
+    question = _events(root, "run.waiting")[-1]["payload"]["question"]
+    assert "no accepted verification is bound to the committed tree" in question
 
 
 def test_a_probe_failure_names_the_discrepancy(run_repo, run_config):

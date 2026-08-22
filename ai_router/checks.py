@@ -15,24 +15,17 @@ result, and that is recorded rather than rounded off.
 
 from __future__ import annotations
 
+import fnmatch
 import os
 import shlex
 import subprocess
+import tempfile
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
-from .affected import (
-    RISK_SELECTION_UNKNOWN,
-    SelectionResult,
-    load_selection_config,
-    select_tests,
-    targeted_command,
-)
-from .evidence import changed_paths_between, snapshot_worktree_tree
-from .journal import write_heartbeat
-from .test_evidence import matching_prefixes
+from .journal import MACHINE_DIRNAME, run_git, write_heartbeat
 
 STAGE_TARGETED = "targeted"
 STAGE_FINAL_FULL = "final-full"
@@ -59,6 +52,375 @@ FULL_ALLOWED_ALL_AFFECTED = "all-tests-affected"
 FULL_ALLOWED_OPERATOR = "operator-override"
 
 HEARTBEAT_INTERVAL_SECONDS = 15.0
+
+
+# --- The repository's own declarations (moved here from affected.py) ---------
+#
+# Selection is deterministic: the same changed paths against the same tree
+# always yield the same tests, in the same order, with the same reasons. What
+# maps to what is declared by the repository in its own configuration, in
+# whatever language it is written — an inferred mapping needs a parser per
+# ecosystem and buys an optimization on an optimization. A changed path that
+# maps to no test is never widened into a full-suite run: it records
+# ``selection_unknown``, pulls in the configured smoke tests, and raises a
+# risk. Running everything is the expensive way to hide an incomplete mapping.
+
+REASON_CHANGED_TEST = "changed-test"
+REASON_CONFIGURED_RULE = "configured-rule"
+REASON_SMOKE = "selection-unknown-smoke"
+
+# Strongest first. A test selected by several routes is recorded once, under
+# the most specific reason that reached it.
+REASON_PRECEDENCE = (
+    REASON_CHANGED_TEST, REASON_CONFIGURED_RULE, REASON_SMOKE,
+)
+
+RISK_SELECTION_UNKNOWN = "selection_unknown"
+
+SELECTION_FIELDS = frozenset({
+    "test_roots", "test_glob", "smoke", "repo_wide", "rules",
+})
+RULE_FIELDS = frozenset({"when", "select"})
+
+
+def _posix(path) -> str:
+    return str(path).replace("\\", "/").strip("/")
+
+
+def _normalise_rel(path: str) -> str:
+    rel = _posix(str(path)).strip()
+    # A "./" PREFIX loop, never lstrip("./"): lstrip strips a character
+    # set and would eat the leading dot of ".github/".
+    while rel.startswith("./"):
+        rel = rel[2:]
+    rel = rel.strip("/")
+    # "." is the whole-repo prefix; it must match everything, not nothing.
+    return "" if rel == "." else rel
+
+
+def matching_prefixes(rel: str, prefixes) -> tuple:
+    """Which declared prefixes cover *rel*, anchored at path boundaries —
+    ``a/tests_helper.py`` does not match prefix ``a/tests/``. A prefix that
+    normalises to '' (a whole-repo suite) matches everything."""
+    rel_n = _normalise_rel(rel)
+    hits = []
+    for prefix in prefixes:
+        p_n = _normalise_rel(prefix)
+        if p_n == "" or rel_n == p_n or rel_n.startswith(p_n + "/"):
+            hits.append(prefix)
+    return tuple(hits)
+
+
+@dataclass(frozen=True)
+class SelectedTest:
+    path: str
+    reason: str
+    selected_by: str
+
+
+@dataclass(frozen=True)
+class SelectionRisk:
+    kind: str
+    path: str
+    detail: str
+
+
+@dataclass(frozen=True)
+class SelectionConfig:
+    # Where this repository's tests live and what it calls them. Both are
+    # declared: guessing either one is guessing an ecosystem's convention.
+    test_roots: tuple = ()
+    test_glob: str = ""
+    smoke: tuple = ()
+    repo_wide: tuple = ()
+    rules: tuple = ()  # ((when_prefix, (test_path, ...)), ...)
+
+
+@dataclass(frozen=True)
+class SelectionConfigResult:
+    config: SelectionConfig = field(default_factory=SelectionConfig)
+    errors: tuple = ()
+
+    @property
+    def ok(self) -> bool:
+        return not self.errors
+
+
+@dataclass(frozen=True)
+class SelectionResult:
+    selected: tuple = ()
+    risks: tuple = ()
+    all_tests_affected: bool = False
+    all_affected_reason: str = ""
+
+    @property
+    def test_paths(self) -> tuple:
+        return tuple(sorted({s.path for s in self.selected}))
+
+    @property
+    def unknown_paths(self) -> tuple:
+        return tuple(
+            r.path for r in self.risks if r.kind == RISK_SELECTION_UNKNOWN
+        )
+
+    def to_dict(self) -> dict:
+        return {
+            "selected": [
+                {"path": s.path, "reason": s.reason,
+                 "selectedBy": s.selected_by}
+                for s in self.selected
+            ],
+            "risks": [
+                {"kind": r.kind, "path": r.path, "detail": r.detail}
+                for r in self.risks
+            ],
+            "allTestsAffected": self.all_tests_affected,
+            "allAffectedReason": self.all_affected_reason,
+        }
+
+
+def load_selection_config(config) -> SelectionConfigResult:
+    """The declared selection rules plus every declaration error. A silently
+    dropped rule and no rule at all must never look the same: a typo that
+    removes a mapping turns real coverage into ``selection_unknown``."""
+    if not isinstance(config, dict):
+        return SelectionConfigResult()
+    raw = (config.get("testing") or {}).get("selection")
+    if raw is None:
+        return SelectionConfigResult()
+    if not isinstance(raw, dict):
+        return SelectionConfigResult(
+            errors=("testing.selection must be a mapping",)
+        )
+    errors = []
+    unknown = sorted(set(raw) - SELECTION_FIELDS)
+    if unknown:
+        errors.append(f"testing.selection has unknown key(s) {unknown}")
+
+    def _str_list(value, label):
+        if value is None:
+            return ()
+        if not isinstance(value, list) or not all(
+            isinstance(v, str) for v in value
+        ):
+            errors.append(f"{label} must be a list of strings")
+            return ()
+        return tuple(v.strip() for v in value if v.strip())
+
+    test_roots = _str_list(
+        raw.get("test_roots"), "testing.selection.test_roots"
+    )
+    test_glob = raw.get("test_glob", "")
+    if not isinstance(test_glob, str):
+        errors.append("testing.selection.test_glob must be a string")
+        test_glob = ""
+
+    smoke = _str_list(raw.get("smoke"), "testing.selection.smoke")
+    repo_wide = _str_list(raw.get("repo_wide"), "testing.selection.repo_wide")
+
+    rules = []
+    raw_rules = raw.get("rules")
+    if raw_rules is not None and not isinstance(raw_rules, list):
+        errors.append("testing.selection.rules must be a list")
+        raw_rules = None
+    for index, entry in enumerate(raw_rules or []):
+        label = f"testing.selection.rules[{index}]"
+        if not isinstance(entry, dict):
+            errors.append(f"{label} must be a mapping")
+            continue
+        extra = sorted(set(entry) - RULE_FIELDS)
+        if extra:
+            errors.append(f"{label} has unknown key(s) {extra}")
+        when = entry.get("when")
+        if not isinstance(when, str) or not when.strip():
+            errors.append(f"{label}.when must be a non-empty path prefix")
+            continue
+        select = entry.get("select")
+        # An explicit empty list is the declaration "this path affects no
+        # test", which is different from "unmapped" and must stay expressible.
+        if select is None or not isinstance(select, list) or not all(
+            isinstance(v, str) for v in select
+        ):
+            errors.append(f"{label}.select must be a list of test paths")
+            continue
+        rules.append((
+            when.strip(), tuple(v.strip() for v in select if v.strip())
+        ))
+
+    return SelectionConfigResult(
+        SelectionConfig(
+            test_roots=test_roots, test_glob=test_glob.strip(), smoke=smoke,
+            repo_wide=repo_wide, rules=tuple(rules),
+        ),
+        tuple(errors),
+    )
+
+
+def is_test_file(repo_root, rel: str, selection: SelectionConfig) -> bool:
+    """Whether *rel* is one of this repository's tests.
+
+    Three conditions, all declared or observed rather than assumed: the path
+    sits under a declared test root, its filename matches the declared
+    test-file glob, and the file is present in the tree. Presence is what
+    keeps a deleted test out of the command -- naming it would fail the very
+    run it was meant to prove.
+
+    Matching is case-sensitive on every platform. Selection is evidence, and
+    evidence that depends on which filesystem produced it proves nothing.
+    """
+    if not selection.test_glob:
+        return False
+    if not matching_prefixes(rel, selection.test_roots):
+        return False
+    if not fnmatch.fnmatchcase(rel.rsplit("/", 1)[-1], selection.test_glob):
+        return False
+    return (Path(repo_root) / rel).is_file()
+
+
+def select_tests(repo_root, changed_paths, selection: SelectionConfig):
+    """The tests *changed_paths* make necessary, each with the reason that
+    selected it, plus the risks the selection raised.
+
+    Reasons are assigned by precedence, so a test reachable by several routes
+    is recorded once under the most specific one. Nothing here widens to the
+    full suite except an explicitly declared repository-wide path."""
+    changed = [_posix(p) for p in changed_paths if str(p).strip()]
+
+    repo_wide_hits = [
+        rel for rel in changed if matching_prefixes(rel, selection.repo_wide)
+    ] if selection.repo_wide else []
+    if repo_wide_hits:
+        return SelectionResult(
+            selected=(), risks=(), all_tests_affected=True,
+            all_affected_reason=(
+                "declared repository-wide path(s) changed: "
+                + ", ".join(sorted(set(repo_wide_hits)))
+            ),
+        )
+
+    # Best reason wins: {test path: (precedence index, reason, selected_by)}
+    best: dict = {}
+
+    def _offer(test_path: str, reason: str, selected_by: str) -> None:
+        test_path = _posix(test_path)
+        rank = REASON_PRECEDENCE.index(reason)
+        current = best.get(test_path)
+        if current is None or rank < current[0]:
+            best[test_path] = (rank, reason, selected_by)
+
+    unknown = []
+    for rel in changed:
+        matched = False
+
+        if is_test_file(repo_root, rel, selection):
+            _offer(rel, REASON_CHANGED_TEST, rel)
+            matched = True
+        # Everything else under a test root -- a shared helper, a fixture, a
+        # package marker -- maps to nothing on its own. It must fall through
+        # to the rules and, failing those, to selection_unknown: treating it
+        # as mapped would return clean targeted evidence for a change that
+        # can break any test using it.
+
+        for when, targets in selection.rules:
+            if matching_prefixes(rel, (when,)):
+                # An empty target list is a declaration that this path
+                # affects no test -- mapped, deliberately selecting nothing.
+                matched = True
+                for target in targets:
+                    _offer(target, REASON_CONFIGURED_RULE, rel)
+
+        if not matched:
+            unknown.append(rel)
+
+    risks = []
+    for rel in sorted(set(unknown)):
+        risks.append(SelectionRisk(
+            RISK_SELECTION_UNKNOWN, rel,
+            "no test maps to this path; the configured smoke tests ran "
+            "instead and verification must judge the exposure. Add a "
+            "testing.selection rule rather than widening the run.",
+        ))
+    if unknown:
+        for smoke in selection.smoke:
+            _offer(smoke, REASON_SMOKE, "selection_unknown")
+
+    selected = tuple(sorted(
+        (
+            SelectedTest(path, reason, selected_by)
+            for path, (_, reason, selected_by) in best.items()
+        ),
+        key=lambda s: (REASON_PRECEDENCE.index(s.reason), s.path),
+    ))
+    return SelectionResult(
+        selected=selected, risks=tuple(risks), all_tests_affected=False,
+        all_affected_reason="",
+    )
+
+
+def targeted_command(base: str, result: SelectionResult) -> str:
+    """The command this change set sanctions, or ``""`` when it sanctions
+    none. The bare suite command is correct only where the selector proved
+    every test affected; a change mapped to no test has nothing to run, and
+    naming the suite there would be this module recommending the one run it
+    exists to refuse."""
+    base = str(base or "").strip()
+    if result.all_tests_affected:
+        return base
+    if not result.test_paths:
+        return ""
+    return " ".join((base, *result.test_paths))
+
+
+RECORD_PLACEHOLDER = "<the command you ran>"
+
+
+def snapshot_worktree_tree(repo_root) -> Optional[str]:
+    """A tree object capturing tracked AND untracked non-ignored files,
+    via a throwaway index — the real index and worktree are untouched.
+    Both ends of a fix-delta diff must be snapshots like this one: a
+    tree-vs-worktree diff reports an untracked file as deleted.
+
+    The machine-side ``.dabbler/`` directory is dropped unconditionally,
+    so the ledger cannot appear in a snapshot even in a repo that never
+    got the ignore rule (or that committed the ledger before it did)."""
+    fd, tmp_index = tempfile.mkstemp(prefix="dabbler-verify-index-")
+    os.close(fd)
+    os.unlink(tmp_index)  # let git create it
+    env = dict(os.environ, GIT_INDEX_FILE=tmp_index)
+    try:
+        rc, _, _ = run_git(repo_root, "read-tree", "HEAD", env=env)
+        if rc != 0:
+            rc, _, _ = run_git(repo_root, "read-tree", "--empty", env=env)
+            if rc != 0:
+                return None
+        rc, _, _ = run_git(repo_root, "add", "-A", env=env)
+        if rc != 0:
+            return None
+        # After the add, so it also clears entries inherited from HEAD.
+        # rc is ignored: --ignore-unmatch makes "nothing to drop" normal.
+        run_git(
+            repo_root, "rm", "--cached", "-r", "-f", "--ignore-unmatch",
+            "-q", "--", MACHINE_DIRNAME, env=env,
+        )
+        rc, out, _ = run_git(repo_root, "write-tree", env=env)
+        return out if rc == 0 and out else None
+    finally:
+        try:
+            os.unlink(tmp_index)
+        except OSError:
+            pass
+
+
+def changed_paths_between(repo_root, tree_a: str, tree_b: str) -> Optional[list]:
+    """Repo-relative paths differing between two trees, or ``None`` on git
+    failure (callers fail closed)."""
+    rc, out, _ = run_git(
+        repo_root, "diff", "--name-only", "-z", "--no-ext-diff",
+        tree_a, tree_b,
+    )
+    if rc != 0:
+        return None
+    return [p for p in out.split("\0") if p]
 
 
 class CheckConfigError(ValueError):

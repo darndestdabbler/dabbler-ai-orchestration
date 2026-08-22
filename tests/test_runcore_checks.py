@@ -161,7 +161,11 @@ def test_a_change_no_declared_check_covers_escalates(run_repo, run_config):
     code, payload = cli("check", "--run", started["run_id"])
     assert code == 0
     assert payload["policy"] == "verified"
-    assert _escalations(journal.control_root()) == ["no-declared-check"]
+    # Both declarations are genuinely missing for this path, and each is
+    # fixed in a different place, so both fire — in §5.3's order.
+    assert _escalations(journal.control_root()) == [
+        "no-declared-check", "selection-unknown",
+    ]
 
 
 def test_a_sensitive_path_escalates_once(run_repo, run_config):
@@ -261,3 +265,22 @@ def test_a_glob_in_covers_is_refused(run_repo, run_config):
     ]}}
     with pytest.raises(CheckConfigError, match="glob"):
         load_checks(config)
+
+
+def test_an_unmapped_path_escalates_a_fast_run(run_repo, run_config):
+    """§5.2.1: unknown selection escalates `fast`. It is its own trigger —
+    a suite covers the path, so `no-declared-check` is not the condition."""
+    reconfigure(run_repo, run_config, testing={
+        **run_config["testing"],
+        "suites": [{
+            **run_config["testing"]["suites"][0],
+            "covers": ["app.py", "tests/", "conftest.py", "helper.py"],
+        }],
+    })
+    started = _register()
+    (run_repo / "helper.py").write_text("X = 1\n", encoding="utf-8")
+
+    code, payload = cli("check", "--run", started["run_id"])
+    assert code == 0, payload
+    assert payload["policy"] == "verified"
+    assert _escalations(journal.control_root()) == ["selection-unknown"]

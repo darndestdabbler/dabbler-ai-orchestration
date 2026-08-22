@@ -22,8 +22,9 @@ from pathlib import Path
 import jsonschema
 
 from . import checks, journal, runcore
+from .checks import snapshot_worktree_tree
 from .config import load_config
-from .evidence import run_git, snapshot_worktree_tree
+from .journal import run_git
 from .journal import ACTOR_FRAMEWORK
 from .runcore import Refusal
 from .verdict import (
@@ -648,4 +649,68 @@ def _pause_if_exhausted(root, view, config, round_number):
         "round": round_number, "tree_digest": None, "verdict": None,
         "error_class": None, "blocking": [], "minor": [],
         "doc_capped": [], "state": view.state, "paused": reason,
+    }
+
+
+# --- Task-level auto-verify (route()'s deferred seam) ------------------------
+#
+# Not the session loop above: this is the one-shot review ``route()`` may add
+# to an ordinary routed call when ``verification.auto_verify_task_types``
+# names its task type. It lives here because this is the module that
+# dispatches a cross-provider review, and because leaving it in verify.py
+# would keep a retained module importing one the cutover deletes.
+
+def build_verification_prompt(
+    template: str, original_task: str, task_type: str, original_response: str
+) -> str:
+    template = template or (
+        "Verify the following work adversarially. Start your response "
+        "with VERIFIED or ISSUES FOUND.\n\n### Original Task\n"
+        "{original_task}\n\n### Task Type\n{task_type}\n\n"
+        "### Response Under Review\n{original_response}\n"
+    )
+    return (
+        template.replace("{original_task}", original_task or "(not provided)")
+        .replace("{task_type}", task_type)
+        .replace("{original_response}", original_response)
+    )
+
+
+def auto_verify(route_result, content: str, task_type: str, config):
+    """Verify a routed response with a different-provider verifier; returns
+    ``{verdict, blocking, issue_count, verifier_model, verifier_provider}``
+    or ``None`` when no verifier survives. Best-effort by contract: the
+    routed call already succeeded and was paid for."""
+    from .metrics import record_call
+    from .route import RouterError, route
+
+    prompt = build_verification_prompt(
+        config.get("_verification_template", ""),
+        content, task_type, route_result.content,
+    )
+    try:
+        result = route(
+            prompt, task_type="verification",
+            exclude_providers=[route_result.provider],
+        )
+    except RouterError:
+        return None
+    verdict, issues = parse_verification_response(result.content)
+    classification = classify_blocking(verdict, issues)
+    record_call(
+        config, call_type="verify", task_type=task_type,
+        model=result.model_name, provider=result.provider,
+        tier=result.tier, complexity_score=None, generation_params={},
+        input_tokens=result.input_tokens, output_tokens=result.output_tokens,
+        cost_usd=result.cost_usd, elapsed_seconds=result.elapsed_seconds,
+        escalated=result.escalated, stop_reason="", transport=result.transport,
+        verifier_of=route_result.model_name, verdict=verdict,
+        issue_count=len(issues),
+    )
+    return {
+        "verdict": verdict,
+        "blocking": classification.blocking,
+        "issue_count": len(issues),
+        "verifier_model": result.model_name,
+        "verifier_provider": result.provider,
     }

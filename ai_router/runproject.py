@@ -22,7 +22,7 @@ from typing import Optional
 import jsonschema
 
 from . import journal, runcore
-from .evidence import run_git
+from .journal import run_git
 
 SCHEMA_VERSION = 1
 SET_DOC_SCHEMA_VERSION = 5
@@ -58,12 +58,23 @@ def _schema(name: str) -> dict:
     return _schema_cache[name]
 
 
+_validator_cache: dict = {}
+
+
+def _validator(name: str):
+    """Compiled once per process. ``jsonschema.validate`` recompiles its
+    schema on every call, which is invisible until it lands on a path that
+    runs after every journal append."""
+    if name not in _validator_cache:
+        _validator_cache[name] = jsonschema.Draft202012Validator(_schema(name))
+    return _validator_cache[name]
+
+
 def _validate(document: dict, name: str, noun: str) -> dict:
-    try:
-        jsonschema.validate(document, _schema(name))
-    except jsonschema.ValidationError as exc:
-        location = "/".join(str(p) for p in exc.absolute_path) or "(root)"
-        raise ValueError(f"{noun} invalid at {location}: {exc.message}") from exc
+    error = next(iter(_validator(name).iter_errors(document)), None)
+    if error is not None:
+        location = "/".join(str(p) for p in error.absolute_path) or "(root)"
+        raise ValueError(f"{noun} invalid at {location}: {error.message}")
     return document
 
 
@@ -150,31 +161,44 @@ def parse_spec(text: str, slug: str, position: int, spec_path: str):
     }, diagnostics
 
 
-def load_organization(root) -> dict:
-    """Every tracked set spec, normalized and validated.
+def read_organization(root) -> tuple:
+    """``(organization, digest)`` from one pass over the spec files.
 
-    A directory whose name is not ``NNN-slug`` is not a session set and is
-    skipped in silence; a set whose spec is unreadable or unparseable is
-    reported and still projected with whatever it did declare.
+    The digest and the parsed content come from the *same bytes*. Reading
+    the specs twice — once to parse, once to hash — lets an edit that lands
+    between the two passes publish old content under the new digest, which
+    is precisely the "this view is current" claim the digest exists to make.
+    So the bytes are read once and both answers are derived from them.
     """
-    sets, diagnostics = [], []
+    sets, diagnostics, hashed = [], [], hashlib.sha256()
     base = session_sets_dir(root)
-    for entry in sorted(p for p in base.glob("*") if p.is_dir()):
+    for entry in sorted(
+        (p for p in base.glob("*") if p.is_dir() and _SET_DIRNAME.match(p.name)),
+        key=lambda p: p.name,
+    ):
         match = _SET_DIRNAME.match(entry.name)
-        if not match:
-            continue
         spec = entry / "spec.md"
         rel = f"{SESSION_SETS_DIRNAME}/{entry.name}/spec.md"
-        if not spec.is_file():
+        try:
+            raw = spec.read_bytes()
+        except OSError as exc:
+            raw = b""
             diagnostics.append({
-                "set_slug": entry.name, "detail": f"{rel} is missing",
+                "set_slug": entry.name,
+                "detail": f"{rel} is missing or unreadable: {exc}",
             })
+        hashed.update(entry.name.encode("utf-8"))
+        hashed.update(b"\0")
+        hashed.update(str(len(raw)).encode("ascii"))
+        hashed.update(b"\0")
+        hashed.update(raw)
+        if not raw:
             continue
         try:
-            text = spec.read_text(encoding="utf-8")
-        except (OSError, UnicodeDecodeError) as exc:
+            text = raw.decode("utf-8")
+        except UnicodeDecodeError as exc:
             diagnostics.append({
-                "set_slug": entry.name, "detail": f"{rel} is unreadable: {exc}",
+                "set_slug": entry.name, "detail": f"{rel} is not UTF-8: {exc}",
             })
             continue
         parsed, problems = parse_spec(
@@ -186,11 +210,16 @@ def load_organization(root) -> dict:
         )
 
     sets.sort(key=lambda s: (s["position"], s["slug"]))
-    return _validate(
+    organization = _validate(
         {"schema_version": SCHEMA_VERSION, "sets": sets,
          "diagnostics": diagnostics},
         "session-organization", "session organization",
     )
+    return organization, "sha256:" + hashed.hexdigest()
+
+
+def load_organization(root) -> dict:
+    return read_organization(root)[0]
 
 
 def organization_digest(root) -> str:
@@ -200,20 +229,7 @@ def organization_digest(root) -> str:
     digest, which is the whole mechanism by which the Explorer notices
     authored changes.
     """
-    digest = hashlib.sha256()
-    base = session_sets_dir(root)
-    for entry in sorted(
-        (p for p in base.glob("*") if p.is_dir() and _SET_DIRNAME.match(p.name)),
-        key=lambda p: p.name,
-    ):
-        spec = entry / "spec.md"
-        raw = spec.read_bytes() if spec.is_file() else b""
-        digest.update(entry.name.encode("utf-8"))
-        digest.update(b"\0")
-        digest.update(str(len(raw)).encode("ascii"))
-        digest.update(b"\0")
-        digest.update(raw)
-    return "sha256:" + digest.hexdigest()
+    return read_organization(root)[1]
 
 
 # --- Task rows (§6.1) -------------------------------------------------------
@@ -404,13 +420,22 @@ def _session_state(runs, cancellation) -> tuple:
     return STATE_IN_PROGRESS, None, True
 
 
-def build_projection(root) -> dict:
-    events = journal.read_events(root)
-    organization = load_organization(root)
+def build_projection(root, events=None) -> dict:
+    """The whole projection, folded from the journal and the spec bytes.
+
+    *events* lets a caller that has already read the journal under the lock
+    hand them over rather than paying for a second read and re-validation
+    of the same file.
+    """
+    if events is None:
+        events = journal.read_events(root)
+    organization, digest = read_organization(root)
     views = runcore.fold_all(events)
     per_run_events: dict = {}
     created_sequence: dict = {}
     for event in events:
+        if event["event_type"] in runcore.ORGANIZATION_EVENTS:
+            continue  # about a set or a session, and naming no run
         per_run_events.setdefault(event["run_id"], []).append(event)
         if event["event_type"] == "run.created":
             created_sequence[event["run_id"]] = event["sequence"]
@@ -462,7 +487,7 @@ def build_projection(root) -> dict:
     projection = {
         "schema_version": SCHEMA_VERSION,
         "projection_revision": events[-1]["sequence"] if events else 0,
-        "organization_digest": organization_digest(root),
+        "organization_digest": digest,
         "generated_at": events[-1]["occurred_at"] if events else None,
         "diagnostics": organization["diagnostics"],
         "session_sets": session_sets,
@@ -485,20 +510,36 @@ def _set_state(sessions, any_activity, cancellation) -> str:
     return STATE_IN_PROGRESS
 
 
-def write_projection(root) -> dict:
-    projection = build_projection(root)
+def write_projection(root, events=None) -> dict:
+    projection = build_projection(root, events)
     journal.atomic_write_json(journal.projection_path(root), projection)
     write_documents(root, projection)
     return projection
 
 
 def read_projection(root) -> Optional[dict]:
+    """The stored projection, or ``None`` if it is absent, unparseable, or
+    does not satisfy its own schema.
+
+    §3.4 requires readers to validate before rendering, and this is the one
+    document a reader is most tempted to trust on sight: it is written by
+    this package, so it "must" be well formed. A truncated or
+    hand-meddled-with file would otherwise be served to the Explorer as
+    current state. An invalid one is simply not a projection, and the
+    caller rebuilds.
+    """
     try:
         raw = journal.projection_path(root).read_text(encoding="utf-8")
     except OSError:
         return None
     try:
-        return json.loads(raw)
+        stored = json.loads(raw)
+    except ValueError:
+        return None
+    if not isinstance(stored, dict) or stored.get("schema_version") != SCHEMA_VERSION:
+        return None
+    try:
+        return _validate(stored, "run-projection", "stored run projection")
     except ValueError:
         return None
 
@@ -507,26 +548,37 @@ def current_projection(root, *, rebuild: bool = False) -> dict:
     """The projection, rebuilt whenever it does not match the journal tail
     or the exact spec bytes. A stale view is never returned as current."""
     stored = None if rebuild else read_projection(root)
-    if (
-        stored is not None
-        and stored.get("schema_version") == SCHEMA_VERSION
-        and stored.get("projection_revision") == journal.tail_sequence(root)
-        and stored.get("organization_digest") == organization_digest(root)
-    ):
-        return stored
+    if stored is not None:
+        _, digest = read_organization(root)
+        if (
+            stored["projection_revision"] == journal.tail_sequence(root)
+            and stored["organization_digest"] == digest
+        ):
+            return stored
     return write_projection(root)
 
 
 # --- The four documents (§6.2) ----------------------------------------------
 
+_v4_cache: dict = {}
+
+
 def _is_v4_set(root, slug: str) -> bool:
     """A tracked ``session-state.json`` marks a historical v4 set. Those
-    files are inputs to the hierarchy and are never rewritten here."""
-    rc, _, _ = run_git(
-        root, "ls-files", "--error-unmatch",
-        f"{SESSION_SETS_DIRNAME}/{slug}/session-state.json",
-    )
-    return rc == 0
+    files are inputs to the hierarchy and are never rewritten here.
+
+    Cached per process: whether a path is tracked cannot change without a
+    commit, and this otherwise costs one git subprocess per set on every
+    projection write.
+    """
+    key = (str(root), slug)
+    if key not in _v4_cache:
+        rc, _, _ = run_git(
+            root, "ls-files", "--error-unmatch",
+            f"{SESSION_SETS_DIRNAME}/{slug}/session-state.json",
+        )
+        _v4_cache[key] = rc == 0
+    return _v4_cache[key]
 
 
 def write_documents(root, projection: dict) -> list:
@@ -582,7 +634,7 @@ def _session_state_document(declared, runs, projection) -> dict:
             "cost": latest["cost"] if latest else None,
             "commit": latest["commit"] if latest else None,
         })
-    return {
+    return _validate({
         "schemaVersion": SET_DOC_SCHEMA_VERSION,
         "sessionSetName": declared["slug"],
         "title": declared["title"],
@@ -591,7 +643,7 @@ def _session_state_document(declared, runs, projection) -> dict:
         "projectionRevision": projection["projection_revision"],
         "organizationDigest": projection["organization_digest"],
         "sessions": sessions,
-    }
+    }, "session-state-v5", "v5 set state")
 
 
 def _activity_log_document(declared, runs, projection) -> dict:

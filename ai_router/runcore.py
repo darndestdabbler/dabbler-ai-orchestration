@@ -23,9 +23,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
-from .evidence import run_git
-from .journal import journal_path, read_events
-from .test_evidence import matching_prefixes
+from .checks import matching_prefixes
+from .journal import journal_path, read_events, run_git
 
 POLICY_FAST = "fast"
 POLICY_VERIFIED = "verified"
@@ -48,24 +47,27 @@ TERMINAL_STATES = frozenset({STATE_COMPLETED, STATE_FAILED, STATE_CANCELLED})
 TRIGGER_OPERATOR = "operator-request"
 TRIGGER_SENSITIVE_PATH = "sensitive-path"
 TRIGGER_NO_DECLARED_CHECK = "no-declared-check"
+# A path no declared check covers and a path no selection rule maps are
+# different declarations, and conflating them would let one hide the
+# other. §5.2.1 requires unknown selection to escalate a fast run; this
+# is the token it escalates under.
+TRIGGER_SELECTION_UNKNOWN = "selection-unknown"
 TRIGGER_REPEATED_CHECK_FAILURE = "repeated-check-failure"
 TRIGGER_AGENT_UNCERTAIN = "agent-uncertain"
 TRIGGER_DIFF_LIMIT = "diff-limit"
 
 TRIGGER_ORDER = (
     TRIGGER_OPERATOR, TRIGGER_SENSITIVE_PATH, TRIGGER_NO_DECLARED_CHECK,
-    TRIGGER_REPEATED_CHECK_FAILURE, TRIGGER_AGENT_UNCERTAIN,
-    TRIGGER_DIFF_LIMIT,
+    TRIGGER_SELECTION_UNKNOWN, TRIGGER_REPEATED_CHECK_FAILURE,
+    TRIGGER_AGENT_UNCERTAIN, TRIGGER_DIFF_LIMIT,
 )
 
 RUN_TRAILER = "Dabbler-Run"
 
-# Organizational events are about a set or a session, not about a run, but
-# the §3.2 envelope requires a run id on every event. They carry this
-# reserved one — r0000 is never allocated, so it can never collide — and the
-# fold skips them: cancelling a session is not a move in any run's state
-# machine, and folding one into a terminal run would read as reopening it.
-ORGANIZATION_RUN_ID = "r0000-organization"
+# Organizational events are about a set or a session, not about a run, so
+# they name no run at all. The fold skips them: cancelling a session is not
+# a move in any run's state machine, and folding one into a terminal run
+# would read as reopening it.
 ORGANIZATION_EVENTS = ("organization.cancelled", "organization.restored")
 
 _RUN_ID = re.compile(r"^r(\d{4})-[a-z0-9]+(?:-[a-z0-9]+)*$")
@@ -104,9 +106,14 @@ def allocate_run_id(root, ask: str) -> str:
     cancelled run's number is never handed out again and a run id read
     anywhere in the record identifies exactly one attempt forever.
     """
+    return allocate_run_id_from(read_events(root, validate=False), ask)
+
+
+def allocate_run_id_from(events, ask: str) -> str:
+    """The same allocation against a journal the caller already holds."""
     highest = 0
-    for event in read_events(root, validate=False):
-        match = _RUN_ID.match(event.get("run_id", ""))
+    for event in events:
+        match = _RUN_ID.match(event.get("run_id") or "")
         if match:
             highest = max(highest, int(match.group(1)))
     return f"r{highest + 1:04d}-{slugify(ask)}"
@@ -455,24 +462,65 @@ def require_single_live_run(views: dict, worktree: str) -> None:
 
 
 def find_run_commit(worktree, run_id: str, base_commit: str):
-    """The commit this run already made, if the process died between the
-    commit and its ``run.finished``.
+    """``(sha, tree)`` for the commit this run already made, or ``None``.
 
-    Identified by the run trailer on a descendant of the recorded base, so
-    recovery can close the run instead of committing its work a second time.
+    The trailer identifies the commit; it does not vouch for it. A trailer
+    is text anyone can type, and a descendant carrying one proves only that
+    something claimed this run's name. Recovery must still hold the tree
+    against the recorded evidence before closing the run on it — see
+    :func:`adoption_problems`.
     """
     rc, out, _ = run_git(
-        worktree, "log", "--format=%H%x1f%B%x1e", f"{base_commit}..HEAD",
+        worktree, "log", "--format=%H%x1f%T%x1f%B%x1e", f"{base_commit}..HEAD",
     )
     if rc != 0:
         return None
     for entry in out.split("\x1e"):
         if not entry.strip():
             continue
-        sha, _, body = entry.strip().partition("\x1f")
+        parts = entry.strip().split("\x1f", 2)
+        if len(parts) != 3:
+            continue
+        sha, tree, body = parts
         if f"{RUN_TRAILER}: {run_id}" in body:
-            return sha.strip()
+            return sha.strip(), tree.strip()
     return None
+
+
+def adoption_problems(view: RunView, tree_digest: str, required_checks) -> list:
+    """Why this run may not be closed on *tree_digest*, or an empty list.
+
+    The commit-before-journal window is the one place a run can reach
+    ``completed`` without the handler that normally proves it, so the proof
+    is re-derived here from the journal instead of assumed. Every required
+    check must have a green ``final-full`` record bound to this exact tree,
+    and a ``verified`` run must additionally carry an accepted verdict bound
+    to it. Anything less and the run is not adopted: an unproven commit
+    stays an unproven commit, and the operator is told why.
+    """
+    problems = []
+    for check_id in required_checks:
+        record = view.latest_check(check_id, "final-full", tree_digest)
+        if record is None:
+            problems.append(
+                f"no final-full result for check {check_id!r} on the "
+                "committed tree"
+            )
+        elif record["outcome"] != "passed" or record["tree_mutated"]:
+            problems.append(
+                f"check {check_id!r} did not pass on the committed tree"
+            )
+    if view.policy == POLICY_VERIFIED:
+        if view.accepted_tree_digest != tree_digest:
+            problems.append(
+                "no accepted verification is bound to the committed tree"
+            )
+        elif view.last_verdict != "VERIFIED" and view.blocking_findings:
+            problems.append(
+                f"the latest verdict is {view.last_verdict!r} with "
+                f"{view.blocking_findings} blocking finding(s)"
+            )
+    return problems
 
 
 # --- Escalation (§5.3) ------------------------------------------------------
@@ -484,6 +532,7 @@ def pending_triggers(
     changed_paths=(),
     diff_lines: Optional[int] = None,
     covered_paths=None,
+    selection_unknown: bool = False,
     operator_request: bool = False,
 ) -> list:
     """Triggers that fire now and have not fired before, in §5.3 order.
@@ -505,6 +554,8 @@ def pending_triggers(
         fired.append(TRIGGER_SENSITIVE_PATH)
     if covered_paths is not None and changed_paths and not covered_paths:
         fired.append(TRIGGER_NO_DECLARED_CHECK)
+    if selection_unknown:
+        fired.append(TRIGGER_SELECTION_UNKNOWN)
     if any(count >= 2 for count in view.check_failures.values()):
         fired.append(TRIGGER_REPEATED_CHECK_FAILURE)
     if view.uncertain:
@@ -587,7 +638,8 @@ def recovery_probe(root, view: RunView) -> dict:
     if present and view.base_commit:
         matches = head == view.base_commit
         if not matches:
-            orphan = find_run_commit(worktree, view.run_id, view.base_commit)
+            found = find_run_commit(worktree, view.run_id, view.base_commit)
+            orphan = found[0] if found else None
             if orphan is None:
                 findings.append(
                     f"HEAD is {head}, not the recorded base {view.base_commit}, "

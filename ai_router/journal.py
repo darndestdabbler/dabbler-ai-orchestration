@@ -16,10 +16,12 @@ closed on it rather than presenting a partial history as the truth.
 
 from __future__ import annotations
 
+import contextlib
 import datetime
 import hashlib
 import json
 import os
+import subprocess
 import time
 import uuid
 from pathlib import Path
@@ -27,10 +29,14 @@ from typing import Optional
 
 import jsonschema
 
-from .evidence import run_git
-from .ledger import MACHINE_DIRNAME, RUNS_DIRNAME
-
 SCHEMA_VERSION = 1
+
+# Every machine record is anchored to a git object — the repository's
+# identity, a run's base commit, a candidate tree — so the one place that
+# shells out to git lives here, at the bottom of the run core. Nothing above
+# this module runs a git command by any other route.
+MACHINE_DIRNAME = ".dabbler"
+RUNS_DIRNAME = f"{MACHINE_DIRNAME}/runs"
 
 JOURNAL_FILENAME = "journal.jsonl"
 LOCK_FILENAME = "journal.lock"
@@ -41,6 +47,10 @@ HEARTBEAT_FILENAME = "heartbeat.json"
 # which is milliseconds. A holder older than this died without releasing.
 STALE_LOCK_TTL_SECONDS = 600
 LOCK_WAIT_SECONDS = 30.0
+# How long an unreadable lock is presumed to be one still being written.
+# The gap between creating the file and writing the record is microseconds;
+# anything older than this is genuinely abandoned.
+LOCK_BIRTH_GRACE_SECONDS = 10.0
 
 _SCHEMA_PATH = Path(__file__).parent / "schemas" / "run-event.schema.json"
 
@@ -60,6 +70,28 @@ class JournalCorrupt(JournalError):
 
 class LockContentionError(JournalError):
     pass
+
+
+# --- Git plumbing -----------------------------------------------------------
+
+def run_git(repo_root, *args, env=None) -> tuple:
+    """``(rc, stdout, stderr)``; a missing git binary is ``rc=127``."""
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(repo_root), *args],
+            capture_output=True, text=True, encoding="utf-8",
+            errors="replace", env=env,
+        )
+    except FileNotFoundError:
+        return 127, "", "git not available on PATH"
+    # stdout drops only the newline framing: porcelain status columns are
+    # positional, and the first line may legitimately begin with a space.
+    return result.returncode, result.stdout.strip("\n"), result.stderr.strip()
+
+
+def repo_root_for(path) -> Optional[str]:
+    rc, out, _ = run_git(Path(path), "rev-parse", "--show-toplevel")
+    return out if rc == 0 and out else None
 
 
 # --- Control root -----------------------------------------------------------
@@ -92,6 +124,9 @@ def control_root(start=None) -> str:
     return str(Path(roots[0]).resolve())
 
 
+_repository_id_cache: dict = {}
+
+
 def repository_id(root) -> str:
     """``sha256:<hex>`` over the repository's root commit.
 
@@ -99,7 +134,14 @@ def repository_id(root) -> str:
     worktree, which is what makes one journal legitimately shared. A
     repository with no commits has no such identity and is refused rather
     than given a placeholder that would change under it later.
+
+    Cached per root for the life of the process: it cannot change while the
+    process runs, and it sits on the append path, where shelling out to git
+    once per event is the difference between an append and a fork.
     """
+    key = str(root)
+    if key in _repository_id_cache:
+        return _repository_id_cache[key]
     rc, out, _ = run_git(root, "rev-list", "--max-parents=0", "--all")
     commits = sorted(line.strip() for line in out.splitlines() if line.strip())
     if rc != 0 or not commits:
@@ -107,7 +149,11 @@ def repository_id(root) -> str:
             f"{root} has no commits, so it has no stable repository id. "
             "Make the initial commit before registering a run."
         )
-    return "sha256:" + hashlib.sha256(commits[0].encode("utf-8")).hexdigest()
+    identity = "sha256:" + hashlib.sha256(
+        commits[0].encode("utf-8")
+    ).hexdigest()
+    _repository_id_cache[key] = identity
+    return identity
 
 
 def worktree_id(path) -> str:
@@ -173,12 +219,34 @@ def _pid_running(pid: int) -> bool:
     return True
 
 
-def _lock_is_stale(path: Path) -> bool:
+def _read_lock(path: Path):
     try:
-        record = json.loads(path.read_text(encoding="utf-8"))
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+
+
+def _lock_is_stale(path: Path) -> bool:
+    """Whether the lock at *path* may be reclaimed.
+
+    An unreadable lock is the delicate case. It is almost always a lock
+    being born — the holder created the file and has not yet written its
+    record — and reclaiming that one is how two writers end up believing
+    they both hold it. So an unreadable lock is stale only once it is older
+    than :data:`LOCK_BIRTH_GRACE_SECONDS`, which is orders of magnitude
+    longer than the microseconds between create and write.
+    """
+    record = _read_lock(path)
+    if record is None:
+        try:
+            age = time.time() - path.stat().st_mtime
+        except OSError:
+            return False  # it vanished; the next create decides
+        return age >= LOCK_BIRTH_GRACE_SECONDS
+    try:
         acquired = datetime.datetime.fromisoformat(record["acquired_at"])
         pid = int(record["pid"])
-    except (OSError, ValueError, KeyError, TypeError):
+    except (KeyError, TypeError, ValueError):
         return True
     age = (datetime.datetime.now(acquired.tzinfo) - acquired).total_seconds()
     if age >= STALE_LOCK_TTL_SECONDS:
@@ -187,53 +255,80 @@ def _lock_is_stale(path: Path) -> bool:
 
 
 class journal_lock:
-    """Atomic ``O_CREAT|O_EXCL`` create with one stale reclaim, waiting up to
+    """Atomic ``O_CREAT|O_EXCL`` create with stale reclaim, waiting up to
     :data:`LOCK_WAIT_SECONDS` for a live holder. Appends are frequent and
     short, so contention is normal and waiting is right; a holder that died
-    mid-append is reclaimed rather than blocking the repository forever."""
+    mid-append is reclaimed rather than blocking the repository forever.
+
+    Every holder writes a token nobody else can produce, and releases the
+    lock only while that token is still the one on disk. Reclaiming a lock
+    is therefore safe even if the reclaim was wrong: the process whose lock
+    was taken away cannot delete its successor's, so the mutex still holds
+    one owner at a time rather than silently admitting two.
+    """
 
     def __init__(self, root, wait_seconds: float = LOCK_WAIT_SECONDS):
         self.path = machine_dir(root) / LOCK_FILENAME
         self.wait_seconds = wait_seconds
+        self.token = None
 
     def __enter__(self):
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        record = json.dumps(
-            {"pid": os.getpid(), "acquired_at": now_iso()}, indent=2
-        ) + "\n"
+        token = f"{os.getpid()}:{uuid.uuid4()}"
+        record = json.dumps({
+            "pid": os.getpid(), "token": token, "acquired_at": now_iso(),
+        }, indent=2) + "\n"
         deadline = time.monotonic() + self.wait_seconds
-        reclaimed = False
         while True:
             try:
                 fd = os.open(self.path, os.O_CREAT | os.O_EXCL | os.O_RDWR)
-                with os.fdopen(fd, "w", encoding="utf-8") as handle:
-                    handle.write(record)
-                return self
             except FileExistsError:
-                if not reclaimed and _lock_is_stale(self.path):
-                    reclaimed = True
-                    try:
-                        self.path.unlink()
-                    except OSError:
-                        pass
+                if _lock_is_stale(self.path):
+                    self._release(_read_lock(self.path))
+                    if time.monotonic() >= deadline:
+                        raise LockContentionError(
+                            f"{self.path} could not be reclaimed"
+                        )
                     continue
                 if time.monotonic() >= deadline:
                     raise LockContentionError(
                         f"another writer holds {self.path}"
                     )
                 time.sleep(0.02)
+                continue
+            with os.fdopen(fd, "w", encoding="utf-8") as handle:
+                handle.write(record)
+                handle.flush()
+                os.fsync(handle.fileno())
+            self.token = token
+            return self
 
-    def __exit__(self, *exc):
+    def _release(self, expected) -> None:
+        """Unlink only while the lock on disk is still the one *expected*
+        describes. A holder that was reclaimed out from under itself leaves
+        the new holder's lock alone."""
+        current = _read_lock(self.path)
+        if current is not None and expected is not None:
+            if current.get("token") != expected.get("token"):
+                return
         try:
             self.path.unlink()
         except OSError:
             pass
+
+    def __exit__(self, *exc):
+        if self.token is not None:
+            self._release({"token": self.token})
+            self.token = None
         return False
 
 
 # --- Schema -----------------------------------------------------------------
 
 _schema_cache: dict = {}
+_validator_cache: dict = {}
+
+_ENVELOPE = "__envelope__"
 
 
 def event_schema() -> dict:
@@ -242,6 +337,36 @@ def event_schema() -> dict:
             _SCHEMA_PATH.read_text(encoding="utf-8")
         )
     return _schema_cache["event"]
+
+
+def _validators() -> dict:
+    """One compiled validator for the envelope and one per event type.
+
+    Equivalent to the schema file's closed ``oneOf`` — every branch is keyed
+    by a distinct ``event_type`` const, so dispatching on that field first
+    picks exactly the branch ``oneOf`` would have — but it evaluates one
+    branch instead of nineteen, and compiles the schema once for the process
+    instead of once per event. The journal is validated on every read, so
+    this is the difference between a projection rebuild costing seconds and
+    costing minutes.
+    """
+    if _validator_cache:
+        return _validator_cache
+    schema = event_schema()
+    envelope = json.loads(json.dumps({
+        key: value for key, value in schema.items() if key != "oneOf"
+    }))
+    envelope["properties"]["payload"] = {"type": "object"}
+    envelope.pop("$defs", None)
+    envelope["$defs"] = schema["$defs"]
+    _validator_cache[_ENVELOPE] = jsonschema.Draft202012Validator(envelope)
+    for variant in schema["oneOf"]:
+        const = variant["properties"]["event_type"]["const"]
+        ref = variant["properties"]["payload"]["$ref"].rsplit("/", 1)[-1]
+        sub = dict(schema["$defs"][ref])
+        sub["$defs"] = schema["$defs"]
+        _validator_cache[const] = jsonschema.Draft202012Validator(sub)
+    return _validator_cache
 
 
 def validate_event(event: dict, source: str = "<memory>") -> dict:
@@ -254,40 +379,26 @@ def validate_event(event: dict, source: str = "<memory>") -> dict:
             f"router understands {SCHEMA_VERSION}. Upgrade the router rather "
             "than reading it as the current shape."
         )
-    schema = event_schema()
-    try:
-        jsonschema.validate(event, schema)
-    except jsonschema.ValidationError as exc:
-        detail = _payload_detail(event, exc)
-        raise JournalCorrupt(
-            f"{source}: run event {event.get('event_type')!r} failed schema "
-            f"validation: {detail}"
-        ) from exc
-    return event
-
-
-def _payload_detail(event: dict, exc) -> str:
-    """``oneOf`` reports only that nothing matched. Re-validate the payload
-    against the one variant the event_type names, so the message points at
-    the field that is actually wrong."""
-    schema = event_schema()
-    for variant in schema.get("oneOf", []):
-        const = (
-            variant.get("properties", {}).get("event_type", {}).get("const")
+    validators = _validators()
+    error = next(iter(validators[_ENVELOPE].iter_errors(event)), None)
+    if error is None:
+        payload_validator = validators.get(event["event_type"])
+        error = next(
+            iter(payload_validator.iter_errors(event.get("payload"))), None
         )
-        if const != event.get("event_type"):
-            continue
-        ref = variant["properties"]["payload"]["$ref"].rsplit("/", 1)[-1]
-        sub = dict(schema["$defs"][ref])
-        sub["$defs"] = schema["$defs"]
-        try:
-            jsonschema.validate(event.get("payload"), sub)
-        except jsonschema.ValidationError as inner:
-            location = "/".join(str(p) for p in inner.absolute_path) or "(payload)"
-            return f"payload/{location}: {inner.message}"
-        break
-    location = "/".join(str(p) for p in exc.absolute_path) or "(root)"
-    return f"{location}: {exc.message}"
+        if error is not None:
+            location = "/".join(str(p) for p in error.absolute_path)
+            raise JournalCorrupt(
+                f"{source}: run event {event['event_type']!r} failed schema "
+                f"validation: payload/{location or '(payload)'}: "
+                f"{error.message}"
+            )
+        return event
+    location = "/".join(str(p) for p in error.absolute_path) or "(root)"
+    raise JournalCorrupt(
+        f"{source}: run event {event.get('event_type')!r} failed schema "
+        f"validation: {location}: {error.message}"
+    )
 
 
 # --- Reading ----------------------------------------------------------------
@@ -405,71 +516,82 @@ def _repair_and_append(path: Path, line: bytes, repair) -> None:
         os.fsync(handle.fileno())
 
 
-def append(
-    root,
-    *,
-    event_type: str,
-    run_id: str,
-    attempt: int,
-    actor: dict,
-    summary: str,
-    payload: dict,
-    artifact_refs=(),
-    locked: bool = False,
-) -> dict:
-    """Stamp, validate, and durably append one event; return it.
+class _Batch:
+    """One or more appends over a single read of the journal.
 
-    *locked* declares the caller already holds :class:`journal_lock` — the
-    multi-event operations (create+start, guidance+resume) append under one
-    lock so a reader can never observe half of them.
+    The journal is read, repaired, and sequence-checked once when the batch
+    opens; every append after that extends the in-memory record and the file
+    together. ``events`` is therefore the complete, current journal without
+    a second read — which matters because the projection is rewritten after
+    every append and would otherwise re-read and re-validate the whole file
+    each time.
     """
-    if locked:
-        return _append_locked(
-            root, event_type, run_id, attempt, actor, summary, payload,
-            artifact_refs,
-        )
-    with journal_lock(root):
-        return _append_locked(
-            root, event_type, run_id, attempt, actor, summary, payload,
-            artifact_refs,
-        )
+
+    def __init__(self, root):
+        self.root = root
+        self.path = journal_path(root)
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            raw = self.path.read_bytes()
+        except FileNotFoundError:
+            raw = b""
+        self.events, self._repair = _split_records(raw, str(self.path))
+        _check_sequences(self.events, str(self.path))
+        for record in self.events:
+            validate_event(record, str(self.path))
+        self.appended: list = []
+
+    def append(self, *, event_type: str, run_id: str, attempt: int,
+               actor: dict, summary: str, payload: dict,
+               artifact_refs=()) -> dict:
+        event = {
+            "schema_version": SCHEMA_VERSION,
+            "sequence": len(self.events) + 1,
+            "event_id": str(uuid.uuid4()),
+            "event_type": event_type,
+            "occurred_at": now_iso(),
+            "repository_id": repository_id(self.root),
+            "worktree_id": worktree_id(Path.cwd()),
+            "run_id": run_id,
+            "attempt": int(attempt),
+            "actor": dict(actor),
+            "summary": summary[:200],
+            "artifact_refs": list(artifact_refs),
+            "payload": payload,
+        }
+        validate_event(event, str(self.path))
+        line = (
+            json.dumps(event, ensure_ascii=False, sort_keys=True,
+                       separators=(",", ":"))
+            + "\n"
+        ).encode("utf-8")
+        _repair_and_append(self.path, line, self._repair)
+        self._repair = None
+        _fsync_dir(self.path.parent)
+        self.events.append(event)
+        self.appended.append(event)
+        return event
 
 
-def _append_locked(root, event_type, run_id, attempt, actor, summary,
-                   payload, artifact_refs) -> dict:
-    path = journal_path(root)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    try:
-        raw = path.read_bytes()
-    except FileNotFoundError:
-        raw = b""
-    records, repair = _split_records(raw, str(path))
-    _check_sequences(records, str(path))
+@contextlib.contextmanager
+def batch(root, *, lock: bool = True):
+    """A :class:`_Batch` under the journal lock.
 
-    event = {
-        "schema_version": SCHEMA_VERSION,
-        "sequence": len(records) + 1,
-        "event_id": str(uuid.uuid4()),
-        "event_type": event_type,
-        "occurred_at": now_iso(),
-        "repository_id": repository_id(root),
-        "worktree_id": worktree_id(Path.cwd()),
-        "run_id": run_id,
-        "attempt": int(attempt),
-        "actor": dict(actor),
-        "summary": summary[:200],
-        "artifact_refs": list(artifact_refs),
-        "payload": payload,
-    }
-    validate_event(event, str(path))
-    line = (
-        json.dumps(event, ensure_ascii=False, sort_keys=True,
-                   separators=(",", ":"))
-        + "\n"
-    ).encode("utf-8")
-    _repair_and_append(path, line, repair)
-    _fsync_dir(path.parent)
-    return event
+    ``lock=False`` is for a caller that already holds it — the compound
+    operations that must read their preconditions and append their events
+    without another writer in between.
+    """
+    if lock:
+        with journal_lock(root):
+            yield _Batch(root)
+    else:
+        yield _Batch(root)
+
+
+def append(root, **spec) -> dict:
+    """Stamp, validate, and durably append one event; return it."""
+    with batch(root) as writer:
+        return writer.append(**spec)
 
 
 def actor(kind: str, id_: str, provider=None) -> dict:

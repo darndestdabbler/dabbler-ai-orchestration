@@ -106,6 +106,14 @@ rotation or compaction in this version (§14 non-goals).
 
 Rules:
 
+- `run_id` is required on every event except `organization.cancelled` and
+   `organization.restored`, which are about a set or a session and may name
+   no run at all; on those two it is `null`. The run fold skips them —
+   cancelling a session is not a move in any run's state machine.
+- `attempt` is the run's ordinal among the runs linked to the same session:
+   the first run of a session is attempt 1, and a retry after a failed
+   attempt is attempt 2. It is fixed when `run.created` is written and
+   carried unchanged on every later event of that run.
 - `sequence` is repository-local, strictly monotonic, and gap-free. A gap in
    the stored journal is corruption and fails closed; an Explorer that merely
    misses a watcher notification recovers from the intact file/projection
@@ -153,6 +161,9 @@ duck-typed dictionaries. The slice adds:
 - `schemas/run-projection.schema.json`: §6.1, including derived task rows;
 - `schemas/session-organization.schema.json`: normalized set/session intent
    parsed from §6.4 specs;
+- `schemas/session-state-v5.schema.json`: the generated v5 set document
+   (§6.2). v4's `session-state.schema.json` is frozen and still validates the
+   historical files this projector never rewrites;
 - `schemas/verification-request.schema.json`: §9.1;
 - `schemas/verification-result.schema.json`: §9.2.
 
@@ -183,6 +194,7 @@ stateDiagram-v2
     remediating --> verifying: verification.dispatched (next round)
     remediating --> waiting: round cap reached (reason=operator)
     running --> completed: run.finished (fast, checks green)
+      waiting --> completed: run.finished (operator WAIVED, checks green)
     running --> failed: run.finished (outcome=failed)
       waiting --> failed: run.finished (outcome=failed)
       verifying --> failed: run.finished (outcome=failed)
@@ -378,7 +390,10 @@ blocks verification until the operator resolves/overrides it. Selection reuses
 the existing language-neutral `testing.selection` contract; no AST/import graph
 is introduced.
 
-Cost: `verified` makes **at most one** framework model call before any
+Cost: a `dispatch_id` is `"<request_id>:<attempt>"` — the identity of one
+transport attempt, derivable from the persisted `VerificationResult`, so a
+seat measurement arriving later can address the dispatch it is correcting.
+`verified` makes **at most one** framework model call before any
 finding exists, plus one per remediation round. Every dispatch appends
 `run.cost_updated` (`null` for seat calls — unpriced, not free). A later seat
 measurement may append another update for the same `dispatch_id`; projection
@@ -392,11 +407,15 @@ appear once below.
 
 Triggers: operator request (`--policy verified` or mid-run
 `escalate`), touched path matches `sensitive_paths`, no declared check
-covers any changed path, the same check fails twice, agent-declared
-uncertainty (`checkpoint --uncertain`), or diff exceeds `diff_limit_lines`.
+covers any changed path, a changed path no `testing.selection` rule maps,
+the same check fails twice, agent-declared uncertainty
+(`checkpoint --uncertain`), or diff exceeds `diff_limit_lines`.
 Their event tokens, in that order, are `operator-request`, `sensitive-path`,
-`no-declared-check`, `repeated-check-failure`, `agent-uncertain`, and
-`diff-limit`. Each token fires at most once per run; later observations remain
+`no-declared-check`, `selection-unknown`, `repeated-check-failure`,
+`agent-uncertain`, and `diff-limit`. `no-declared-check` and
+`selection-unknown` are distinct declarations and neither implies the other:
+a suite's `covers` can name a path that no selection rule maps, and the two
+gaps are fixed in different places. Each token fires at most once per run; later observations remain
 visible in check/checkpoint facts but do not duplicate the escalation event.
 Each firing appends `escalation.triggered`. Budget ceilings are not escalation
 triggers: reaching one in *either* policy appends `run.waiting` for the operator
@@ -640,7 +659,7 @@ fields are never removed or retyped without one.
 
 | Command | Input | Output (JSON, key fields) |
 | --- | --- | --- |
-| `run --register (--set <slug> --session <N> \| --run <prepared-id>) --engine E --provider P --model M` | starts one declared session or its prepared run; the session's title supplies the ask and its policy/default supplies policy; model is required | `{"run_id", "set_slug", "session_number", "policy", "state", "worktree", "base_commit", "identity_provenance"}` |
+| `run --register (--set <slug> --session <N> \| --run <prepared-id>) --engine E --provider P --model M [--policy fast\|verified]` | starts one declared session or its prepared run; the session's title supplies the ask; policy is `--policy` (the §5.3 operator-request trigger), else the session's declared policy, else `run_policy.default`; model is required | `{"run_id", "set_slug", "session_number", "policy", "state", "worktree", "base_commit", "identity_provenance"}` |
 | `checkpoint --run <id> --note "<text>" [--uncertain] [--ack-guidance-through <sequence>]` | acknowledgement cannot exceed the latest guidance sequence | `{"sequence", "pending_guidance"}` |
 | `guidance --run <id> --text "<text>" [--answer <waiting-sequence> --resume] --attest-operator` | records durable guidance on a running/waiting run; answering the exact current operator wait first passes the §5.5 recovery probe, then appends guidance and `run.resumed` under one journal lock; stale/wrong wait sequences refuse | `{"sequence", "state", "answered_sequence"}` |
 | `escalate --run <id>` | | `{"policy": "verified", "trigger": "operator-request"}` |
@@ -1018,14 +1037,18 @@ unavailable, the extension copies the same prompt and opens chat.
 
 ### 11.2 Worktree initialization contract
 
-`worktree create --ask "<text>" [--policy ...]` allocates `run.created`, then
-creates and initializes its worktree before any coding agent starts.
+`worktree create --set <slug> --session <N> [--policy ...]` allocates
+`run.created`, then creates and initializes its worktree before any coding
+agent starts. The session's title supplies the ask, exactly as for an
+in-place run: `run.created` requires `set_slug` and `session_number`, so a
+run is always named by the session it belongs to and never by free text.
 The main worktree may be dirty: the prepared branch starts from its committed
 `HEAD`, and tracked/untracked WIP in the main worktree is neither copied nor
 committed. The clean-start rule applies when an in-place run registers and when
 the prepared run registers inside its own worktree.
 `git.worktree_per_run` defaults **false**, so the default remains in-place work.
-In the CLI slice, setting it true makes an in-place `run --register --ask`
+In the CLI slice, setting it true makes an in-place
+`run --register --set <slug> --session <N>`
 refuse `worktree-preparation-required`; a future host adapter may automate the
 prepare/open/register sequence. `worktree.root` defaults to a sibling of the main worktree,
 `../.<repository-name>-dabbler-worktrees`; it must not be nested under any

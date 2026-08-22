@@ -299,7 +299,11 @@ def run_repo(tmp_path, monkeypatch):
         ".dabbler/\n"
         "docs/session-sets/*/session-state.json\n"
         "docs/session-sets/*/activity-log.json\n"
-        "docs/session-sets/*/change-log.md\n",
+        "docs/session-sets/*/change-log.md\n"
+        # A test's failure sentinel. Ignored so it is not itself an unmapped
+        # change in the candidate tree, which would confound the selection
+        # and escalation assertions it exists to set up.
+        "FAIL\n",
         encoding="utf-8",
     )
     (repo / "app.py").write_text("VALUE = 1\n", encoding="utf-8")

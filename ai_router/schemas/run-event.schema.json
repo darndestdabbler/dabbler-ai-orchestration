@@ -67,7 +67,10 @@
       "minLength": 1
     },
     "run_id": {
-      "type": "string",
+      "type": [
+        "string",
+        "null"
+      ],
       "pattern": "^r[0-9]{4}-[a-z0-9]+(-[a-z0-9]+)*$"
     },
     "attempt": {
@@ -1201,6 +1204,7 @@
             "operator-request",
             "sensitive-path",
             "no-declared-check",
+            "selection-unknown",
             "repeated-check-failure",
             "agent-uncertain",
             "diff-limit"
@@ -1217,5 +1221,28 @@
         }
       }
     }
-  }
+  },
+  "allOf": [
+    {
+      "$comment": "An organizational event is about a set or a session and may name no run; every other event names exactly one.",
+      "if": {
+        "properties": {
+          "event_type": {
+            "enum": [
+              "organization.cancelled",
+              "organization.restored"
+            ]
+          }
+        }
+      },
+      "then": {},
+      "else": {
+        "properties": {
+          "run_id": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  ]
 }

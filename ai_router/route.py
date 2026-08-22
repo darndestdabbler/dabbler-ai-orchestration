@@ -599,7 +599,7 @@ def route(
         and task_type in (verification_cfg.get("auto_verify_task_types") or [])
         and task_type not in ("verification", "session-verification")
     ):
-        from .verify import auto_verify
+        from .verifyjob import auto_verify
 
         outcome = auto_verify(route_result, content, task_type, config)
         if outcome is not None:

@@ -25,7 +25,8 @@ from .config import (
     load_config,
     resolve_transport,
 )
-from .evidence import repo_root_for, run_git, snapshot_worktree_tree
+from .checks import snapshot_worktree_tree
+from .journal import repo_root_for, run_git
 from .identity import (
     IdentityResolutionError,
     resolve_orchestrator_identity,
@@ -60,12 +61,15 @@ def _emit(root, events) -> tuple:
     the lock is released; if that write fails the events are already durable
     and the caller is told the view is behind rather than told nothing.
     """
-    appended = []
-    with journal.journal_lock(root):
+    with journal.batch(root) as writer:
         for spec in events:
-            appended.append(journal.append(root, locked=True, **spec))
+            writer.append(**spec)
+        appended = writer.appended
         try:
-            projection = runproject.write_projection(root)
+            # The batch already holds the whole journal, read and validated
+            # once under this lock; handing it on spares the projection a
+            # second full read of the same file after every append.
+            projection = runproject.write_projection(root, writer.events)
         except Exception as exc:  # the append is durable; the view is not
             raise OperationalError(
                 "projection-stale",
@@ -243,23 +247,24 @@ def cmd_run(args) -> dict:
     _require_generated_views_ignored(root, args.set)
     runcore.require_clean_start(worktree)
 
-    with journal.journal_lock(root):
-        events = journal.read_events(root)
-        views = runcore.fold_all(events)
+    with journal.batch(root) as writer:
+        views = runcore.fold_all(writer.events)
         runcore.require_single_live_run(views, journal.worktree_id(worktree))
-        _require_session_open(events, views, args.set, args.session)
+        _require_session_open(writer.events, views, args.set, args.session)
         attempt = 1 + sum(
             1 for v in views.values()
             if v.set_slug == args.set and v.session_number == args.session
         )
         ask = session["title"]
         policy = args.policy or session["policy"] or config["run_policy"]["default"]
-        run_id = runcore.allocate_run_id(root, ask)
+        run_id = runcore.allocate_run_id_from(writer.events, ask)
         base = runcore.head_commit(worktree)
-        journal.append(
-            root, locked=True, event_type="run.created", run_id=run_id,
-            attempt=attempt,
-            actor=journal.actor(ACTOR_AGENT, args.engine, identity.effective_provider),
+        actor = journal.actor(
+            ACTOR_AGENT, args.engine, identity.effective_provider
+        )
+        writer.append(
+            event_type="run.created", run_id=run_id, attempt=attempt,
+            actor=actor,
             summary=f"{args.set} session {args.session}: {ask}",
             payload={
                 "policy": policy, "ask": ask, "base_commit": base,
@@ -268,16 +273,18 @@ def cmd_run(args) -> dict:
                 "set_slug": args.set, "session_number": args.session,
             },
         )
-        journal.append(
-            root, locked=True, event_type="run.started", run_id=run_id,
-            attempt=attempt,
-            actor=journal.actor(ACTOR_AGENT, args.engine, identity.effective_provider),
+        writer.append(
+            event_type="run.started", run_id=run_id, attempt=attempt,
+            actor=actor,
             summary=f"registered {args.engine} on {identity.effective_provider}",
             payload=started_payload,
         )
-        runproject.write_projection(root)
+        runproject.write_projection(root, writer.events)
+        view = runcore.fold(
+            [e for e in writer.events if e["run_id"] == run_id]
+        )
 
-    return _run_output(_view(root, run_id), worktree, identity)
+    return _run_output(view, worktree, identity)
 
 
 def _require_session_open(events, views, set_slug, session_number) -> None:
@@ -520,6 +527,9 @@ def _fire_triggers(root, config, view, planned) -> None:
         view, config=config, changed_paths=planned.changed_paths,
         diff_lines=diff_lines,
         covered_paths=planned.covered_paths,
+        selection_unknown=bool(
+            checks.selection_unknown_paths(planned.selection)
+        ),
     )
     if pending:
         _emit(root, [_escalation_event(view, t) for t in pending])
@@ -651,7 +661,18 @@ def cmd_finish(args) -> dict:
     view = _view(root, view.run_id)
     existing = runcore.find_run_commit(worktree, view.run_id, view.base_commit)
     if existing:
-        commit = existing
+        # A commit from the crash window. It is adopted only when it holds
+        # the very tree these checks just passed on; anything else is a
+        # commit this run did not make on this work.
+        commit, existing_tree = existing
+        if existing_tree != tree_digest:
+            raise Refusal(
+                "tree-moved",
+                f"a commit for this run already exists at {commit[:12]} but "
+                f"its tree is {existing_tree}, not the accepted "
+                f"{tree_digest}. Nothing is committed twice and nothing is "
+                "committed on a tree the checks did not measure.",
+            )
     else:
         commit = _commit(worktree, view, tree_digest)
     pushed = False
@@ -763,13 +784,17 @@ def _documents(root, set_slug: str) -> list:
 
 # --- resume -----------------------------------------------------------------
 
-def heal(root, view) -> runcore.RunView:
-    """Close the crash windows §5.5 names, idempotently.
+def heal(root, view) -> tuple:
+    """``(view, parked)`` after closing the crash windows §5.5 names.
 
     An orphaned dispatch becomes an immutable failed attempt so the round is
     no longer open; a commit that landed before its ``run.finished`` is
-    adopted rather than made twice. Both are re-runnable: a second resume
-    finds nothing left to heal.
+    adopted, but only against the evidence that commit would have needed.
+    Both are re-runnable: a second resume finds nothing left to heal.
+
+    *parked* says recovery itself put the run in front of the operator. The
+    caller must not then resume it — that would hand back a run whose
+    discrepancy is still standing.
     """
     from .journal import heartbeat_owner_alive, read_heartbeat
     from .verifyjob import interrupted_result
@@ -788,29 +813,62 @@ def heal(root, view) -> runcore.RunView:
             view = _view(root, view.run_id)
 
     if view.state in (runcore.STATE_RUNNING, runcore.STATE_REMEDIATING):
-        worktree = Path(view.worktree_id)
-        if worktree.is_dir() and view.base_commit:
-            commit = runcore.find_run_commit(
-                worktree, view.run_id, view.base_commit
-            )
-            if commit:
-                rc, tree, _ = run_git(
-                    worktree, "rev-parse", f"{commit}^{{tree}}"
-                )
-                _emit(root, [{
-                    "event_type": "run.finished", "run_id": view.run_id,
-                    "attempt": view.attempt,
-                    "actor": journal.actor(ACTOR_FRAMEWORK, "resume"),
-                    "summary": f"adopted commit {commit[:12]}",
-                    "payload": {
-                        "outcome": "completed", "commit": commit,
-                        "tree_digest": tree.strip() if rc == 0 else None,
-                        "verdict": view.last_verdict,
-                        "checks_green": True,
-                    },
-                }])
-                view = _view(root, view.run_id)
-    return view
+        before = view.state
+        view = _adopt_orphan_commit(root, view)
+        if view.state == runcore.STATE_WAITING and before != view.state:
+            return view, True
+    return view, False
+
+
+def _adopt_orphan_commit(root, view) -> runcore.RunView:
+    """Close a run on a commit it already made — but only on the evidence
+    that would have been required to make it.
+
+    Recovery is the one path that reaches ``completed`` without going
+    through ``finish``, so it re-derives ``finish``'s proof rather than
+    inheriting its conclusion. An unproven commit parks the run for the
+    operator instead of being recorded as a green completion.
+    """
+    worktree = Path(view.worktree_id) if view.worktree_id else None
+    if not (worktree and worktree.is_dir() and view.base_commit):
+        return view
+    found = runcore.find_run_commit(worktree, view.run_id, view.base_commit)
+    if not found:
+        return view
+    commit, tree = found
+
+    try:
+        planned = checks.plan(
+            worktree, load_config(), stage=checks.STAGE_FINAL_FULL,
+            tree_digest=tree, base_commit=view.base_commit,
+        )
+        required = [c.name for c, _ in planned.checks if c.required]
+    except checks.CheckConfigError as exc:
+        return _park(root, view, {"findings": [
+            f"a commit for this run exists at {commit[:12]} but its checks "
+            f"cannot be re-derived: {exc}"
+        ]})
+
+    problems = runcore.adoption_problems(view, tree, required)
+    if problems:
+        return _park(root, view, {"findings": [
+            f"a commit for this run exists at {commit[:12]} but it is not "
+            "backed by the evidence a completion requires: "
+            + "; ".join(problems)
+            + ". Reset or amend it, or record the run as failed."
+        ]})
+
+    _emit(root, [{
+        "event_type": "run.finished", "run_id": view.run_id,
+        "attempt": view.attempt,
+        "actor": journal.actor(ACTOR_FRAMEWORK, "resume"),
+        "summary": f"adopted commit {commit[:12]}",
+        "payload": {
+            "outcome": "completed", "commit": commit, "tree_digest": tree,
+            "verdict": view.last_verdict, "checks_green": True,
+        },
+    }])
+    return _view(root, view.run_id)
 
 
 def cmd_resume(args) -> dict:
@@ -818,7 +876,9 @@ def cmd_resume(args) -> dict:
     config = load_config()
     view = _view(root, args.run)
     _require_nonterminal(view)
-    view = heal(root, view)
+    view, parked = heal(root, view)
+    if parked:
+        return _resume_output(view, runcore.recovery_probe(root, view), config)
     if view.terminal:
         return {
             "state": view.state, "probe": runcore.recovery_probe(root, view),
@@ -1062,7 +1122,7 @@ def cmd_organize_cancel(args, restore: bool = False) -> dict:
         "event_type": (
             "organization.restored" if restore else "organization.cancelled"
         ),
-        "run_id": runcore.ORGANIZATION_RUN_ID,
+        "run_id": None,
         "attempt": 1,
         "actor": journal.actor(ACTOR_OPERATOR, "operator"),
         "summary": f"{'restored' if restore else 'cancelled'} {target}",
@@ -1176,16 +1236,15 @@ def cmd_worktree_create(args) -> dict:
     if base is None:
         raise Refusal("no-base-commit", f"{root} has no HEAD to branch from")
 
-    with journal.journal_lock(root):
-        events = journal.read_events(root)
-        views = runcore.fold_all(events)
-        _require_session_open(events, views, args.set, args.session)
+    with journal.batch(root) as writer:
+        views = runcore.fold_all(writer.events)
+        _require_session_open(writer.events, views, args.set, args.session)
         attempt = 1 + sum(
             1 for v in views.values()
             if v.set_slug == args.set and v.session_number == args.session
         )
         ask = session["title"]
-        run_id = runcore.allocate_run_id(root, ask)
+        run_id = runcore.allocate_run_id_from(writer.events, ask)
         branch = f"dabbler/run/{run_id}"
         if run_git(root, "rev-parse", "--verify", "--quiet", branch)[0] == 0:
             raise Refusal(
@@ -1194,9 +1253,8 @@ def cmd_worktree_create(args) -> dict:
                 "is a leftover from a removed worktree.",
             )
         target = runcore.worktree_root(root, config) / run_id
-        journal.append(
-            root, locked=True, event_type="run.created", run_id=run_id,
-            attempt=attempt,
+        writer.append(
+            event_type="run.created", run_id=run_id, attempt=attempt,
             actor=journal.actor(ACTOR_FRAMEWORK, "worktree"),
             summary=f"prepared {args.set} session {args.session}",
             payload={
@@ -1208,7 +1266,7 @@ def cmd_worktree_create(args) -> dict:
                 "prepared": True,
             },
         )
-        runproject.write_projection(root)
+        runproject.write_projection(root, writer.events)
 
     target.parent.mkdir(parents=True, exist_ok=True)
     rc, _, err = run_git(

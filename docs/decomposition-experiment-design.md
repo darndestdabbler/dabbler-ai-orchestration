@@ -83,6 +83,31 @@ a close fit for this experiment's first component:
    is mechanical rather than clever, which makes it a reasonable Claude Code
    task inside Phase 1's zero-API budget.
 
+**Correction to consequence 2 — the reference parser is not available.** The
+scorer does not store reference dumps; per `RUNBOOK.md` §5 it *generates* them
+by running the full parser, which `report.json` records as
+`D:\Projects\hl7-pipe-parser` on the Windows machine. No repository of that
+name exists on GitHub, so it is unreachable from this laptop.
+
+`darndestdabbler/ct-dph-hl7` was checked as a substitute and rejected: it
+carries a **diverged** copy of `gov.ct.dph.model251` — 13 files differ, `SN` is
+absent, `syndromic/Adt` is extra, and `oru_r01/ElrMessage` — the exact type
+`CandidateParser.parse` returns — is missing entirely. Scoring against it would
+measure a different model.
+
+**What this blocks, precisely:** deserializer accuracy, and with it the claimed
+comparability to `hl7-study-results.md`. That benefit is contingent on the
+parser, not delivered by the corpus alone.
+
+**What it does not block:** everything the experiment is actually testing.
+Accuracy is a guard metric in §6, not one of §7's pass criteria — those are
+spend, escaped defects, and context read. Components 2–4 are authored for this
+experiment, so their reference behaviour is ours to define and needs no external
+parser.
+
+**Operator action:** push `hl7-pipe-parser` when back at the work computer, or
+confirm accuracy is deferred to Phase 2. Do not substitute `ct-dph-hl7`.
+
 Do not modify the study's artifacts in place. Copy them into the new experiment
 area so the published results stay recomputable.
 

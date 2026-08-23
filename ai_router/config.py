@@ -39,7 +39,11 @@ LOCAL_OVERRIDES_FILENAME = "local-overrides.yaml"
 
 TRANSPORT_API = "api"
 TRANSPORT_COPILOT_CLI = "copilot-cli"
-VALID_TRANSPORTS = (TRANSPORT_API, TRANSPORT_COPILOT_CLI)
+# Scripted responses from disk: no network, no credentials, no spend. It
+# answers from a directory the operator names, so it cannot be reached by
+# default or by accident.
+TRANSPORT_OFFLINE = "offline"
+VALID_TRANSPORTS = (TRANSPORT_API, TRANSPORT_COPILOT_CLI, TRANSPORT_OFFLINE)
 
 TRANSPORT_ENV_VAR = "DABBLER_TRANSPORT"
 

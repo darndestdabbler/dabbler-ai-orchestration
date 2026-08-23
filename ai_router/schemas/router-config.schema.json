@@ -266,7 +266,8 @@
         "profile": {
           "enum": [
             "api",
-            "copilot-cli"
+            "copilot-cli",
+            "offline"
           ]
         }
       }
@@ -274,6 +275,16 @@
     "transports": {
       "type": "object",
       "properties": {
+        "offline": {
+          "type": "object",
+          "properties": {
+            "responses_dir": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Directory of scripted verifier responses, consumed in lexical order. Overridden by DABBLER_OFFLINE_RESPONSES."
+            }
+          }
+        },
         "copilot-cli": {
           "type": "object",
           "properties": {

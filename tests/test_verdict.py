@@ -39,6 +39,9 @@ class TestVerdictParsing:
         verdict, issues = parse_verification_response(ISSUE_BLOCK)
         assert verdict == VERDICT_ISSUES_FOUND
         assert len(issues) == 2
+        assert issues[0]["description"] == (
+            "the close gate reads the wrong field"  # no leading `**`
+        )
         assert issues[0]["severity"] == "major"
         assert issues[0]["category"] == "Correctness"
         assert issues[0]["failureScenario"].startswith("every close")
@@ -58,12 +61,66 @@ class TestVerdictParsing:
         assert len(issues) == 1
         assert "Something is off" in issues[0]["description"]
 
-    def test_nits_never_bleed_into_issues(self):
+    def test_nits_are_recorded_as_minor(self):
         verdict, issues = parse_verification_response(
             "VERIFIED\n\n#### NITS\n- **Issue 1:** not really an issue\n"
         )
         assert verdict == VERDICT_VERIFIED
-        assert issues == []
+        assert len(issues) == 1
+        assert issues[0]["severity"] == "minor"
+        assert issues[0]["section"] == "nits"
+        assert not is_blocking_issue(issues[0])
+
+    def test_nits_prose_bullets_are_recorded(self):
+        """Verifiers rarely use ``Issue N:`` form under NITS."""
+        verdict, issues = parse_verification_response(
+            "VERIFIED\n\n### NITS\n"
+            "- the retry loop looks suspicious to me\n"
+            "- naming here is inconsistent\n"
+        )
+        assert verdict == VERDICT_VERIFIED
+        assert [i["description"] for i in issues] == [
+            "the retry loop looks suspicious to me",
+            "naming here is inconsistent",
+        ]
+
+    def test_unstructured_nits_section_is_recorded_whole(self):
+        _, issues = parse_verification_response(
+            "VERIFIED\n\nNITS\nI have a vague worry about the cache.\n"
+        )
+        assert len(issues) == 1
+        assert "vague worry" in issues[0]["description"]
+
+    def test_nits_section_does_not_launder_a_blocking_severity(self):
+        _, issues = parse_verification_response(
+            "VERIFIED\n\n## NITS\n- **Issue 1:** the fold drops events\n"
+            "  - **Severity:** Major\n"
+        )
+        assert issues[0]["severity"] == "major"
+        assert is_blocking_issue(issues[0])
+
+    def test_verified_response_keeps_its_minor_findings(self):
+        _, issues = parse_verification_response(
+            "VERIFIED\n\n- **Issue 1:** small thing\n"
+            "  - **Severity:** Minor\n"
+        )
+        assert len(issues) == 1  # recorded, though it does not block
+
+    def test_speculative_finding_survives_into_the_record(self):
+        """The HL7 study case: the verifier found the real defect, filed it
+        under NITS, and called it speculative. It must reach the record."""
+        verdict, issues = parse_verification_response(
+            "VERIFIED\n\nThe implementation looks correct.\n\n"
+            "#### NITS\n"
+            "- Segment counting may mis-handle a trailing empty field. "
+            "This is speculative rather than blocking.\n"
+        )
+        classification = classify_blocking(verdict, issues)
+        assert not classification.blocking
+        assert len(classification.nit_issues) == 1
+        assert "trailing empty field" in (
+            classification.nit_issues[0]["description"]
+        )
 
     def test_verified_with_major_block_surfaces_contradiction(self):
         text = (

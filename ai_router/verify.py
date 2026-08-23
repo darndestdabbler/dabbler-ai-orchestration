@@ -528,6 +528,9 @@ def run_round(
         if issue.get("evidencePaths"):
             finding["evidencePaths"] = list(issue["evidencePaths"])[:20]
         finding["blocking"] = issue in classification.blocking_issues
+        finding["section"] = (
+            "nits" if issue.get("section") == "nits" else "body"
+        )
 
     completion_tree = snapshot_worktree_tree(repo_root)
     if completion_tree is None:

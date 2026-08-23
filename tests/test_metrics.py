@@ -70,9 +70,16 @@ class TestRecordCall:
         _record(config)
         assert load_metrics(config) == []
 
-    def test_write_failure_never_raises(self, base_config, monkeypatch):
+    def test_write_failure_never_raises(
+        self, tmp_path, base_config, monkeypatch
+    ):
+        # A path under a regular file is unwritable on every platform. A
+        # bare `Z:\...` is only unwritable on Windows — POSIX accepts it as
+        # a filename, so the test passed vacuously and left the file behind.
+        blocker = tmp_path / "not-a-directory"
+        blocker.write_text("", encoding="utf-8")
         monkeypatch.setenv(
-            "AI_ROUTER_METRICS_PATH", "Z:\\no\\such\\dir\\metrics.jsonl"
+            "AI_ROUTER_METRICS_PATH", str(blocker / "metrics.jsonl")
         )
         _record(base_config)  # must not raise
 

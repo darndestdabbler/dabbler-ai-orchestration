@@ -2,8 +2,11 @@
 
 The parser is structural, never prose-scanning: a verdict token at the head
 of the response, ``Issue N:`` blocks with per-field tolerant parses, and a
-``NITS`` section that is cut before issues are read. Every ambiguity fails
-closed — an unrecognizable verdict is ISSUES_FOUND, an ISSUES_FOUND body
+``NITS`` section parsed on the same terms. Nothing a verifier wrote is ever
+discarded: a NITS finding is recorded as ``minor`` and tagged
+``section: nits``, and a NITS finding that declares a blocking severity keeps
+it — the section is a formatting convention, not a severity. Every ambiguity
+fails closed — an unrecognizable verdict is ISSUES_FOUND, an ISSUES_FOUND body
 with no parseable block becomes one unknown-severity issue, and an
 unrecognized severity blocks. Severity may not be laundered by misspelling.
 
@@ -51,11 +54,20 @@ _NITS_SECTION = re.compile(
 
 # Line-anchored, horizontal whitespace only, trailing ':' or '.' required —
 # keeps mid-prose "the issue template" from opening a block.
-_ISSUE_MARKER = r"^[ \t]*[-*>#]*[ \t]*\*{0,2}Issue\b[ \t]*\d*\*{0,2}[ \t]*[:.][ \t]*"
+# The trailing `\*{0,2}` closes `**Issue 1:**` — bold that wraps the colon
+# rather than sitting inside it, which would otherwise open every recorded
+# description with a stray `**`.
+_ISSUE_MARKER = (
+    r"^[ \t]*[-*>#]*[ \t]*\*{0,2}Issue\b[ \t]*\d*\*{0,2}[ \t]*[:.]"
+    r"[ \t]*\*{0,2}[ \t]*"
+)
 _ISSUE_BLOCKS = re.compile(
     _ISSUE_MARKER + r"(.*?)(?=" + _ISSUE_MARKER + r"|\Z)",
     re.IGNORECASE | re.MULTILINE | re.DOTALL,
 )
+
+# NITS bodies are usually a bullet or numbered list, not ``Issue N:`` blocks.
+_BULLET_LINE = re.compile(r"^[ \t]*(?:[-*+\u2022]|\d+[.)])[ \t]+(.*)$")
 
 _CATEGORY = re.compile(r"Category[\s*:.\-_]*([^\n*]+)", re.IGNORECASE)
 _SEVERITY = re.compile(
@@ -82,12 +94,10 @@ def parse_verification_response(response: str) -> tuple[str, list[dict]]:
     head = _MARKDOWN_NOISE.sub("", head)
 
     if head.startswith("VERIFIED"):
-        issues = _parse_issue_blocks(_strip_nits_section(text))
-        return VERDICT_VERIFIED, [i for i in issues if is_blocking_issue(i)]
+        return VERDICT_VERIFIED, _parse_all_findings(text)
 
     body = _ISSUES_HEADER.sub("", text.strip(), count=1)
-    body = _strip_nits_section(body)
-    issues = _parse_issue_blocks(body)
+    issues = _parse_all_findings(body)
     if not issues:
         stripped = body.strip()
         issues = [{
@@ -98,9 +108,59 @@ def parse_verification_response(response: str) -> tuple[str, list[dict]]:
     return VERDICT_ISSUES_FOUND, issues
 
 
-def _strip_nits_section(text: str) -> str:
+def _split_nits_section(text: str) -> tuple[str, str]:
+    """``(body, nits)``. The NITS heading itself belongs to neither half."""
     match = _NITS_SECTION.search(text)
-    return text[: match.start()] if match else text
+    if not match:
+        return text, ""
+    return text[: match.start()], text[match.end():]
+
+
+def _parse_all_findings(text: str) -> list[dict]:
+    """Every finding the response carries, from both sections.
+
+    Recording a finding and blocking on one are separate decisions — this
+    function only records. ``classify_blocking`` partitions afterwards.
+    """
+    body, nits = _split_nits_section(text)
+    findings = _parse_issue_blocks(body)
+    for issue in _parse_nits_findings(nits):
+        findings.append(issue)
+    return findings
+
+
+def _parse_nits_findings(nits: str) -> list[dict]:
+    """NITS findings, tagged and defaulted to ``minor``.
+
+    Verifiers rarely use ``Issue N:`` form under NITS, so structured blocks
+    are tried first and a bullet/numbered list second; a section that is
+    neither is recorded whole rather than dropped. An explicit blocking
+    severity survives — filing a major finding under NITS does not launder
+    it.
+    """
+    if not nits.strip():
+        return []
+    issues = _parse_issue_blocks(nits)
+    if not issues:
+        issues = [
+            {"description": line, "raw": line}
+            for line in _bullet_lines(nits)
+        ]
+    if not issues:
+        issues = [{"description": nits.strip()[:500], "raw": nits.strip()}]
+    for issue in issues:
+        issue["section"] = "nits"
+        issue.setdefault("severity", "minor")
+    return issues
+
+
+def _bullet_lines(text: str) -> list[str]:
+    lines = []
+    for raw in text.splitlines():
+        match = _BULLET_LINE.match(raw)
+        if match and match.group(1).strip():
+            lines.append(match.group(1).strip())
+    return lines
 
 
 def _parse_issue_blocks(text: str) -> list[dict]:

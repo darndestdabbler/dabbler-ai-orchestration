@@ -27,12 +27,18 @@ from .config import (
     load_config,
     resolve_generation_params,
     resolve_transport,
+    TRANSPORT_OFFLINE,
 )
 from .metrics import record_call
 from .pricing import calculate_cost
 from .runtime_mode import is_no_router_mode
 from .selection import estimate_complexity, next_escalation_model, pick_model
 from .transports.api import DirectApiTransport
+from .transports.offline import (
+    PROVIDER as OFFLINE_PROVIDER,
+    OfflineTransport,
+    resolve_responses_dir,
+)
 from .transports.copilot import (
     REFRESH_COMMAND,
     CopilotCliTransport,
@@ -348,6 +354,9 @@ def any_candidate_survives(exclude_providers=None, transport=None) -> bool:
     exclude = sorted(
         {str(p).strip().lower() for p in (exclude_providers or []) if p}
     )
+    if transport_name == TRANSPORT_OFFLINE:
+        # The scripted queue always has a candidate; it is the script.
+        return True
     if transport_name == TRANSPORT_COPILOT_CLI:
         _transport_obj, catalog = _get_copilot(config)
         return bool(resolve_role_candidates(
@@ -402,7 +411,40 @@ def route(
         hint=complexity_hint, config=config["complexity"],
     )
 
-    if transport_name == TRANSPORT_COPILOT_CLI:
+    if transport_name == TRANSPORT_OFFLINE:
+        transport_obj = OfflineTransport(resolve_responses_dir(config))
+        # One candidate, no ladder: escalating between scripted responses
+        # would consume the queue to hide a script the operator wrote on
+        # purpose.
+        ladder = [_Candidate(
+            alias=OFFLINE_PROVIDER, model_id=OFFLINE_PROVIDER,
+            provider=OFFLINE_PROVIDER, tier=0,
+        )]
+
+        def _next_candidate(index: int, escalation_count: int):
+            return None
+
+        def _dispatch(candidate: _Candidate, system_prompt, user_message,
+                      gen_params):
+            return transport_obj.dispatch(
+                model_id=candidate.model_id,
+                system_prompt=system_prompt,
+                user_message=user_message,
+            )
+
+        def _model_cfg(candidate: _Candidate) -> dict:
+            return {}
+
+        def _gen_params(candidate: _Candidate) -> dict:
+            return {}
+
+        def _rate_limit(candidate: _Candidate) -> None:
+            pass
+
+        def _price(candidate, result):
+            return None  # nothing was spent; nothing is priced
+
+    elif transport_name == TRANSPORT_COPILOT_CLI:
         transport_obj, catalog = _get_copilot(config)
         role_candidates = resolve_role_candidates(
             config, catalog, "generator", exclude_providers=exclude

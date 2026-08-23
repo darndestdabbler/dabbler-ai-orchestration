@@ -63,7 +63,8 @@
           "severity": { "type": "string" },
           "failureScenario": { "type": "string" },
           "evidencePaths": { "type": "array", "items": { "type": "string" } },
-          "raw": { "type": "string" }
+          "raw": { "type": "string" },
+          "section": { "type": "string", "enum": ["body", "nits"] }
         }
       }
     }

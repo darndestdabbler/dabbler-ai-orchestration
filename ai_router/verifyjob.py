@@ -336,6 +336,7 @@ def _finding(issue: dict) -> dict:
     for key in ("failureScenario", "evidencePaths", "raw"):
         if issue.get(key):
             record[key] = issue[key]
+    record["section"] = "nits" if issue.get("section") == "nits" else "body"
     return record
 
 

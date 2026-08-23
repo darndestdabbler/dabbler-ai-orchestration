@@ -109,19 +109,43 @@ and a mechanical test. Results relevant here:
 parsing was small, bounded, and mechanically testable. Domains with UI,
 complex workflows, or the shape of this framework itself will do worse.
 
-**But the corollary is the point of this proposal.** Those success conditions
-— small scope, clear boundary, unambiguous done-ness — are not luck. They are
-properties you can manufacture, and decomposition is the manufacturing
-process. The study did not only measure whether verification works; it
-described the conditions under which AI work is cheap. Verification catches
-what went wrong. Decomposition keeps the unit small enough that less goes
-wrong. The second is worth more.
+**What the study does not do is support this proposal's thesis.** It ran on
+one component throughout and never varied solution decomposition, so it is
+evidence neither for nor against it. Two of its findings are easy to
+misread in this direction and should not be:
 
-This conflicts with the current blueprint, which excludes plan machinery from
-`fast`/`verified` (§5.4, §14) and lists `plan_review.py` for deletion (§13).
-The evidence for investing before implementation is stronger than the
-evidence for anything the run core does after it. **Resolve toward the
-study.**
+- *"Decomposition alone did not pay. Arm 5 never beat arm 2 on accuracy and
+  cost more."* The study's arms are delegation configurations — arm 5 is
+  "author writes a plan, a top-tier engine implements it." That is **work**
+  decomposition, the thing §3 distinguishes from solution decomposition. It
+  says nothing about component boundaries.
+- *"Plan review halved implementer cost in all four cells."* True, and
+  incomplete: **total** spend rose in three of four cells, because the author
+  pays for the review cycle. The study's own summary is that plan review buys
+  reliability and a cheaper implementer, not a cheaper total when the author
+  is a premium model.
+
+**So the following is a hypothesis, not a result.** The conditions under which
+the study's work was cheap — small scope, clear boundary, unambiguous
+done-ness — look manufacturable rather than lucky, and decomposition is the
+plausible manufacturing process. Verification catches what went wrong;
+decomposition would keep the unit small enough that less goes wrong. That
+reasoning is why this proposal exists, and it is untested. It needs a
+multi-component experiment across the two required stacks before it justifies
+restructuring anything.
+
+Three claims are separable and should be tested separately rather than
+adopted together: (1) component decomposition improves later work,
+(2) reviewing detailed instructions improves delegated implementation — the
+one thing the study does support — and (3) a component Explorer improves the
+developer's workflow.
+
+Claim (2) conflicts with the current blueprint, which excludes plan machinery
+from `fast`/`verified` (§5.4, §14) and lists `plan_review.py` for deletion
+(§13). It is the claim the study actually supports, and it supports a narrow
+form of it — an optional review-and-revise step on detailed instructions
+before delegated implementation, not a mandatory approved project plan.
+**Resolve toward the study, at that width.**
 
 ### 4.2 The severity-inflation incident (v1)
 
@@ -349,15 +373,29 @@ cannot decide in two minutes, the brief failed.
 
 Committed at `b47e69a4`. 691 tests pass.
 
-- **Finding erasure fixed, on two paths.** The NITS section was cut before
-  any issue was read, and the `VERIFIED` branch filtered out everything
-  non-blocking before returning. Recording and blocking are now separate
-  decisions: both sections parse, NITS findings default to `minor` and carry
-  `section: "nits"`, and an explicit blocking severity inside NITS survives —
-  the section is a formatting convention, not a severity. NITS bodies are
-  usually bullets rather than `Issue N:` blocks, so bullets parse too and an
-  unstructured section is recorded whole. A regression test reproduces the
-  study's arm-2 case.
+- **Finding erasure fixed, on four paths.** Two were found by the first pass:
+  the NITS section was cut before any issue was read, and the `VERIFIED`
+  branch filtered out everything non-blocking before returning. Two more were
+  found by review of that pass, and both were real — the first pass fixed one
+  laundering route while leaving two open and described the problem as
+  solved:
+  - A NITS **bullet** declaring `Severity: Major` was still recorded as
+    minor, because only `Issue N:` blocks were scanned for declared fields —
+    and NITS bodies are usually bullets. All recording paths now share one
+    field parser, so a declared severity is honoured wherever it is written.
+  - A `VERIFIED` response whose concern was a plain bullet with no `Issue N:`
+    block parsed to **nothing at all**: `ISSUES_FOUND` had a catch-all for
+    unparseable text and `VERIFIED` had none. Bullets under a VERIFIED head
+    are now recorded, defaulting to `minor` so a summary bullet costs a row
+    and never blocks.
+
+  Recording and blocking are separate decisions throughout. A regression test
+  reproduces the study's arm-2 case, and one covers each path above.
+  **Remaining limit, stated rather than papered over:** prose carrying no
+  bullet and no `Issue N:` block under a VERIFIED head is still not recovered
+  as a structured finding. The complete response is preserved by
+  `raw_output_ref`. The durable fix is a schema-validated verifier result
+  rather than better prose parsing — see §9.
 - **Issue-marker fix.** Every recorded description was prefixed with a stray
   `**` from `**Issue 1:**`. It landed directly in the human-facing record.
 - **An offline transport.** Scripted responses from a directory: no network,
@@ -386,6 +424,10 @@ Committed at `b47e69a4`. 691 tests pass.
    decomposition phase rather than a review step?
 5. **Does the deferral queue live in the machine record or beside it?** It is
    durable and human-read, which pulls in different directions.
+6. **Should the verifier return a structured result instead of prose?** Every
+   erasure defect found so far is a prose-parsing defect, and each fix has
+   been shape-specific. A schema-validated result would end the class rather
+   than the instance.
 
 ## 10. Non-goals
 

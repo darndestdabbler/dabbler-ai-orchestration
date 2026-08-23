@@ -39,6 +39,12 @@ treat this branch as the trunk for day-to-day work.
 8. **LOC budgets are targets ±30%, not gates.** If a module wants to be 2× its
    budget, stop and reconsider the design instead of writing a justification.
 
+> **Superseded, 2026-08-23.** The operator has set aside the ground rules and
+> the envelope below for the duration of the rebuild — see
+> `docs/operator-decisions.md`, which is the governing record. The text is kept
+> because the constraints are restored once the replacement works. Read it as
+> what returns, not as what is in force.
+
 ## The envelope sets 142–147 run under
 
 The operator has relaxed ground rules 1 and 4 for sets 142–147, on the grounds

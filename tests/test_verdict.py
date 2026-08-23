@@ -99,6 +99,42 @@ class TestVerdictParsing:
         assert issues[0]["severity"] == "major"
         assert is_blocking_issue(issues[0])
 
+    def test_nits_bullet_declaring_a_severity_is_not_laundered(self):
+        """The severity has to be read wherever it is written. NITS bodies
+        are usually bullets, so honouring it only inside an ``Issue N:``
+        block leaves the common shape as a laundering route."""
+        _, issues = parse_verification_response(
+            "VERIFIED\n\n## NITS\n"
+            "- Severity: Major - adoption skips the check evidence\n"
+        )
+        assert issues[0]["severity"] == "major"
+        assert is_blocking_issue(issues[0])
+
+    def test_verified_bullet_outside_any_issue_block_is_recorded(self):
+        """VERIFIED had no catch-all, so a concern written as a plain bullet
+        parsed to nothing and left no record."""
+        _, issues = parse_verification_response(
+            "VERIFIED\n\nThe implementation looks correct.\n"
+            "- The lock can be deleted by a displaced holder.\n"
+        )
+        assert len(issues) == 1
+        assert "displaced holder" in issues[0]["description"]
+        assert issues[0]["section"] == "body"
+        assert not is_blocking_issue(issues[0])
+
+    def test_verified_bullet_declaring_a_severity_blocks(self):
+        _, issues = parse_verification_response(
+            "VERIFIED\n\n- Severity: Major - the fold drops events\n"
+        )
+        assert issues[0]["severity"] == "major"
+        assert is_blocking_issue(issues[0])
+
+    def test_clean_verified_records_no_finding(self):
+        _, issues = parse_verification_response(
+            "VERIFIED\n\nAll checks pass and the diff matches the spec.\n"
+        )
+        assert issues == []
+
     def test_verified_response_keeps_its_minor_findings(self):
         _, issues = parse_verification_response(
             "VERIFIED\n\n- **Issue 1:** small thing\n"

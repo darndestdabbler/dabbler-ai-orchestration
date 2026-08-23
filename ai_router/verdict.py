@@ -94,7 +94,7 @@ def parse_verification_response(response: str) -> tuple[str, list[dict]]:
     head = _MARKDOWN_NOISE.sub("", head)
 
     if head.startswith("VERIFIED"):
-        return VERDICT_VERIFIED, _parse_all_findings(text)
+        return VERDICT_VERIFIED, _parse_all_findings(text, salvage_body=True)
 
     body = _ISSUES_HEADER.sub("", text.strip(), count=1)
     issues = _parse_all_findings(body)
@@ -116,17 +116,47 @@ def _split_nits_section(text: str) -> tuple[str, str]:
     return text[: match.start()], text[match.end():]
 
 
-def _parse_all_findings(text: str) -> list[dict]:
+def _parse_all_findings(text: str, salvage_body: bool = False) -> list[dict]:
     """Every finding the response carries, from both sections.
 
     Recording a finding and blocking on one are separate decisions — this
     function only records. ``classify_blocking`` partitions afterwards.
+
+    ``salvage_body`` is set on the VERIFIED branch, where an unstructured
+    body would otherwise parse to nothing at all: the ISSUES_FOUND branch
+    has a catch-all for unparseable text and VERIFIED had none, so a
+    verifier that described a defect in prose and still wrote VERIFIED left
+    no record of it.
     """
     body, nits = _split_nits_section(text)
     findings = _parse_issue_blocks(body)
+    for issue in findings:
+        issue["section"] = "body"
+    if not findings and salvage_body:
+        findings = _salvage_body_bullets(body)
     for issue in _parse_nits_findings(nits):
         findings.append(issue)
     return findings
+
+
+def _salvage_body_bullets(body: str) -> list[dict]:
+    """Bullets in a VERIFIED response that carries no ``Issue N:`` block.
+
+    A verifier that spells a concern out in a bullet and still writes
+    VERIFIED has written a finding. Defaulted to ``minor`` unless the bullet
+    declares a severity, so a summary bullet costs one row in the record and
+    never blocks, while a real concern survives to be read.
+
+    Prose carrying no bullet at all is still not recovered as a finding; the
+    complete response is preserved by ``raw_output_ref``.
+    """
+    issues = []
+    for line in _bullet_lines(body):
+        issue = _issue_from_text(line, line)
+        issue["section"] = "body"
+        issue.setdefault("severity", "minor")
+        issues.append(issue)
+    return issues
 
 
 def _parse_nits_findings(nits: str) -> list[dict]:
@@ -142,12 +172,9 @@ def _parse_nits_findings(nits: str) -> list[dict]:
         return []
     issues = _parse_issue_blocks(nits)
     if not issues:
-        issues = [
-            {"description": line, "raw": line}
-            for line in _bullet_lines(nits)
-        ]
+        issues = [_issue_from_text(line, line) for line in _bullet_lines(nits)]
     if not issues:
-        issues = [{"description": nits.strip()[:500], "raw": nits.strip()}]
+        issues = [_issue_from_text(nits.strip(), nits.strip()[:500])]
     for issue in issues:
         issue["section"] = "nits"
         issue.setdefault("severity", "minor")
@@ -163,6 +190,32 @@ def _bullet_lines(text: str) -> list[str]:
     return lines
 
 
+def _issue_from_text(block: str, description: str) -> dict:
+    """One finding from a span of text, carrying whatever fields it declares.
+
+    Every path that records a finding goes through here. A declared severity
+    is read wherever the finding is written — an ``Issue N:`` block, a NITS
+    bullet, a bullet under a VERIFIED head — because a severity that is only
+    honoured in one shape is a laundering route into the other shapes.
+    """
+    issue: dict = {"description": description, "raw": block}
+    cat = _CATEGORY.search(block)
+    if cat:
+        issue["category"] = cat.group(1).strip()
+    sev = _SEVERITY.search(block)
+    if sev:
+        issue["severity"] = sev.group(1).strip().lower()
+    scenario = _FAILURE_SCENARIO.search(block)
+    if scenario:
+        issue["failureScenario"] = scenario.group(1).strip()
+    paths = _EVIDENCE_PATHS.search(block)
+    if paths:
+        parsed = _parse_evidence_paths(paths.group(1))
+        if parsed:
+            issue["evidencePaths"] = parsed
+    return issue
+
+
 def _parse_issue_blocks(text: str) -> list[dict]:
     issues = []
     for match in _ISSUE_BLOCKS.finditer(text):
@@ -170,22 +223,7 @@ def _parse_issue_blocks(text: str) -> list[dict]:
         description = block.splitlines()[0].strip() if block else ""
         if not description:
             continue
-        issue: dict = {"description": description, "raw": block}
-        cat = _CATEGORY.search(block)
-        if cat:
-            issue["category"] = cat.group(1).strip()
-        sev = _SEVERITY.search(block)
-        if sev:
-            issue["severity"] = sev.group(1).strip().lower()
-        scenario = _FAILURE_SCENARIO.search(block)
-        if scenario:
-            issue["failureScenario"] = scenario.group(1).strip()
-        paths = _EVIDENCE_PATHS.search(block)
-        if paths:
-            parsed = _parse_evidence_paths(paths.group(1))
-            if parsed:
-                issue["evidencePaths"] = parsed
-        issues.append(issue)
+        issues.append(_issue_from_text(block, description))
     return issues
 
 

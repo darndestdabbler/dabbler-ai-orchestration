@@ -54,6 +54,40 @@ This is the design's whole point. T1 pays; T2–T5 collect.
 
 ## 3. The fixture
 
+### 3.0 Most of component 1 already exists — reuse it
+
+`dabbler-ai-orchestration-eval` already holds the HL7 study's fixture, and it is
+a close fit for this experiment's first component:
+
+- `study-artifacts/hl7/handover/` — a Maven project on **Java 21**, matching the
+  operator's Corretto 21 exactly.
+- `.../model251/` — the `ElrMessage` object model: 43 classes, ~3,000 lines of
+  datatypes, segments, and the ORU^R01 structure. Already includes `Error.java`.
+- `.../corpus/` — 30 ELR messages from published state and national
+  implementation guides, plus synthetic ones.
+- `.../scorer/` — reference dumps and the pooled-accuracy scorer the study
+  reported against.
+- `candidate/CandidateParser.java` — a one-method interface handed to the
+  implementer *instead of* source. The study already ran this experiment's
+  core idea on one component and it worked.
+
+**Three consequences for the design:**
+
+1. **Phase 1 gets much cheaper.** The object model, corpus, and scorer are the
+   expensive parts of a fixture and they are built.
+2. **The accuracy numbers become directly comparable.** Same corpus, same
+   scorer, same metric as `hl7-study-results.md` — so this experiment inherits a
+   measured single-component baseline instead of starting from nothing. That is
+   worth more than the labour saved.
+3. **The .NET side needs the object model ported.** ~3,000 lines of data classes
+   is mechanical rather than clever, which makes it a reasonable Claude Code
+   task inside Phase 1's zero-API budget.
+
+Do not modify the study's artifacts in place. Copy them into the new experiment
+area so the published results stay recomputable.
+
+### 3.1 The pipeline
+
 An electronic lab reporting pipeline — the operator's domain, mechanically
 checkable, and adjacent to the HL7 study so its single-component costs give a
 sanity baseline.
@@ -62,7 +96,7 @@ sanity baseline.
 
 | # | Component | Owns | Why it is in the first pass |
 | --- | --- | --- | --- |
-| 1 | `hl7-deserializer` | HL7 v2 → object model | The richest boundary: a whole object model crosses it |
+| 1 | `hl7-deserializer` | HL7 v2 → object model | The richest boundary: a whole object model crosses it. **Largely exists** — §3.0 |
 | 2 | `hl7-validator` | Rules over the object model → structurally valid HL7 error/ACK | The output is a **wire contract** — exact text is correctness |
 | 3 | `elr-deidentifier` | De-identify the object model for CDC submission | **Behavior-heavy, signature-stable.** Carries T4 |
 | 4 | `elr-pipeline` | Composes 1–3 | The integration component; a component whose dependencies are components |
@@ -174,11 +208,15 @@ Do not average away a regression.
 existing subscription. The API budget is spent only where a *different provider*
 is structurally required.
 
-1. Clone the eval repo; add an experiment area beside the HL7 study.
-2. Build the four-component fixture in both stacks, with reference outputs and
-   the message corpus. This is the bulk of the work and it costs no API money.
+1. **Done** — the eval repo is cloned. Add an experiment area beside the HL7
+   study, copying rather than modifying its artifacts.
+2. Build what does not exist, reusing §3.0 for what does: the validator, the
+   de-identifier, and the pipeline against the existing object model; then the
+   .NET port of the model, corpus, and scorer. No API money.
 3. Define the contract artifact format (§4) concretely for both stacks: the
    exact extraction commands, normalization rules, and baseline file layout.
+   `CandidateParser` is the shape to generalize from — it is the typed half of
+   §4 already, and what it lacks is the executable-behavior half.
 4. Author T1–T5 as scripted, replayable task definitions, so the funded run
    executes rather than improvises.
 5. Build the measurement harness — per-seat spend, context read, rounds,
@@ -211,13 +249,21 @@ is structurally required.
   finding is that *executable contracts* pay — which is a narrower and more
   useful claim than "decomposition pays."
 - **Small n.** Two stacks, one run per cell. Report cells, not averages.
+- **Reused fixture.** Component 1's corpus and scorer come from a study these
+  model families have already been run against. Sessions carry no memory between
+  runs, so this is not contamination, but the deserializer is the one component
+  whose difficulty is already known — treat its numbers as calibration rather
+  than as a finding.
 - **This is not a UI experiment.** Nothing here supports or refutes claim 3.
 
 ## 11. Prerequisites
 
-1. **GitHub credentials on this machine.** `dabbler-ai-orchestration-eval` is
-   private and cannot currently be cloned here — `gh auth login`.
-2. **Java and .NET toolchains.** Neither is installed on this laptop. Both are
-   available from Ubuntu's repositories.
-3. **The API keys**, which are in place.
-4. **IPv6 disabled on this network**, or package installs will hang.
+1. ~~GitHub credentials~~ — **done**; the eval repo is cloned to
+   `~/dabbler-ai-orchestration-eval`.
+2. ~~API keys~~ — **done**, all three present.
+3. **Toolchains.** Amazon Corretto 21 (Amazon's apt repository; not in Ubuntu's)
+   and Maven, for japicmp/Revapi. **.NET 10 SDK is in Ubuntu's own repositories**
+   as `dotnet-sdk-10.0`, so no Microsoft feed is needed. The .NET public API
+   analyzer is a NuGet package and needs no system install.
+4. **IPv6 disabled on this network**, or fetching from `apt.corretto.aws` will
+   hang exactly as `pip` did.

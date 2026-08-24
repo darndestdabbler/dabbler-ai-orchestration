@@ -1,7 +1,7 @@
 {
   "name": "dabbler-ai-orchestration",
   "displayName": "Dabbler AI Orchestration",
-  "description": "Organize AI-led development like work: modules, session sets and step-by-step session plans in a native tree — plus routed verification before every close, normally cross-provider, recorded as evidence you can check.",
+  "description": "Organize AI-led development like work: modules, session sets and step-by-step session plans in a native tree \u2014 plus routed verification before every close, normally cross-provider, recorded as evidence you can check.",
   "version": "1.0.4",
   "publisher": "DarndestDabbler",
   "private": true,
@@ -50,6 +50,11 @@
     },
     "views": {
       "dabblerSessionSetsContainer": [
+        {
+          "id": "dabblerSolutionTree",
+          "name": "Solution Explorer",
+          "contextualTitle": "Solution Explorer"
+        },
         {
           "id": "dabblerWorkExplorerTree",
           "name": "AI Work Explorer",

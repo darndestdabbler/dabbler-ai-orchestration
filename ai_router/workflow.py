@@ -24,6 +24,7 @@ EXIT_OK = 0
 EXIT_REFUSED = 1
 
 LOG_RELPATH = Path(".dabbler") / "solution" / "events.jsonl"
+PROJECTION_RELPATH = Path(".dabbler") / "solution" / "projection.json"
 
 EVENTS = ("entered", "reviewed", "approved", "returned", "contract-changed")
 SCOPES = ("solution", "component")
@@ -35,6 +36,23 @@ class WorkflowError(Exception):
 
 def log_path(root) -> Path:
     return Path(root) / LOG_RELPATH
+
+
+def projection_path(root) -> Path:
+    return Path(root) / PROJECTION_RELPATH
+
+
+def write_projection(root) -> Path:
+    """Publish the projection the extension renders.
+
+    TypeScript renders; Python decides. The extension never folds the event log
+    itself, because two implementations of one rule disagree eventually and the
+    disagreement shows up as a wrong status nobody can explain.
+    """
+    p = projection_path(root)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(json.dumps(project(root), indent=2) + "\n", encoding="utf-8")
+    return p
 
 
 def _now() -> str:
@@ -245,6 +263,12 @@ def _main(argv=None) -> int:
                           "needsApproval": bool(args.needs_approval)})
             print(f"{_target(args)} contract → {args.version}")
             print(f"  affected: {', '.join(affects) if affects else 'nobody'}")
+        try:
+            write_projection(root)
+        except (WorkflowError, ManifestError):
+            # The event is recorded either way; a manifest problem must not
+            # swallow it. `status` will surface the manifest error plainly.
+            pass
     except (WorkflowError, ManifestError) as exc:
         print(f"refused: {exc}", file=sys.stderr)
         return EXIT_REFUSED

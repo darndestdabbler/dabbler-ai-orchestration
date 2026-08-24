@@ -124,3 +124,20 @@ class TestCli:
                "--workspace-root", str(root)])
         _main(["status", "--workspace-root", str(root)])
         assert "needs you" in capsys.readouterr().out
+
+
+class TestProjectionFile:
+    def test_a_mutating_command_publishes_the_projection(self, root):
+        _main(["enter", "mocks", "--component", "csv-parser",
+               "--workspace-root", str(root)])
+        p = root / ".dabbler" / "solution" / "projection.json"
+        assert p.is_file()
+        doc = json.loads(p.read_text())
+        parser = next(c for c in doc["components"] if c["name"] == "csv-parser")
+        assert parser["stepTitle"] == "Build stand-ins"
+
+    def test_the_event_survives_a_manifest_that_cannot_be_projected(self, tmp_path):
+        """The record is the point. A broken manifest must not eat an event."""
+        code = _main(["enter", "plan", "--workspace-root", str(tmp_path)])
+        assert code == 0
+        assert len(read(tmp_path)) == 1

@@ -10,6 +10,7 @@ import { registerBootstrapProjectCommand } from "./commands/bootstrapProject";
 import { registerInstallAiRouterCommand } from "./commands/installAiRouter";
 import { registerWorkExplorerTreeCommands } from "./commands/workExplorerTreeCommands";
 import { discoverRoots, listSessionSetDirNames } from "./utils/fileSystem";
+import { SolutionTreeProvider } from "./providers/SolutionTreeProvider";
 import { WorkExplorerTreeProvider } from "./providers/WorkExplorerTreeProvider";
 
 const SESSION_SETS_REL = path.join("docs", "session-sets");
@@ -23,6 +24,17 @@ export function activate(context: vscode.ExtensionContext): void {
 
   // createTreeView rather than registerTreeDataProvider because the
   // former returns the TreeView handle that .message and reveal() live on.
+  const solutionProvider = new SolutionTreeProvider(
+    vscode.workspace.workspaceFolders?.[0]?.uri.fsPath,
+  );
+  context.subscriptions.push(
+    solutionProvider,
+    vscode.window.createTreeView(SolutionTreeProvider.viewType, {
+      treeDataProvider: solutionProvider,
+      showCollapseAll: true,
+    }),
+  );
+
   const treeProvider = new WorkExplorerTreeProvider(context.extensionUri);
   context.subscriptions.push({ dispose: () => treeProvider.dispose() });
   const treeView = vscode.window.createTreeView(WorkExplorerTreeProvider.viewType, {

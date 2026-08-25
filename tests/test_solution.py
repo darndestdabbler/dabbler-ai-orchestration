@@ -105,3 +105,18 @@ class TestProjection:
         assert contract_doc_path("components/x/contract.md") == \
             "components/x/contract.md"
         assert contract_doc_path(None) is None
+
+
+class TestCheckOutput:
+    def test_check_does_not_present_the_declared_step_as_progress(self, capsys):
+        """The two commands printed look-alike step lines that disagreed."""
+        import yaml
+        from ai_router.solution import _main
+        import tempfile, pathlib as pl
+        d = pl.Path(tempfile.mkdtemp())
+        (d / "solution.yaml").write_text(yaml.safe_dump(BASE))
+        _main(["check", "--workspace-root", str(d)])
+        out = capsys.readouterr().out
+        assert "declared starting step" in out
+        assert "workflow status" in out
+        assert "of 6" not in out

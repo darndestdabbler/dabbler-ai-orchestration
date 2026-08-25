@@ -330,13 +330,20 @@ def _main(argv=None) -> int:
         print(json.dumps(as_dict(solution), indent=2))
         return EXIT_OK
 
+    # This command reads the manifest and nothing else. It printed the
+    # declared step in the same shape `workflow status` prints live progress,
+    # so the two disagreed on screen with nothing to say which was which --
+    # a reader spent twelve steps trying to work out who was lying.
     print(f"{solution.title} ({solution.name})")
-    print(f"  step {STEPS.index(solution.step) + 1} of {len(STEPS)} "
-          f"- {STEP_TITLES[solution.step]}")
+    print("  the manifest is valid")
     print(f"  {len(solution.components)} components, no cycles")
     for c in solution.components:
         used = ", ".join(c.used_by) if c.used_by else "nothing yet"
         print(f"    {c.name:<22} {c.kind:<12} used by: {used}")
+    print(f"  declared starting step: {STEP_TITLES[solution.step]}. This is "
+          "where the manifest says work begins,")
+    print("  not where it has got to. For that, run "
+          "`python -m ai_router.workflow status`.")
     return EXIT_OK
 
 

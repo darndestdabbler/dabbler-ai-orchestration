@@ -7,8 +7,36 @@ The problem is deliberately trivial: read a CSV of people into objects. If you
 find yourself thinking about CSV edge cases, something has gone wrong with this
 document — the point is to watch the process, not the problem.
 
-**Everything here actually ran.** The event log under `.dabbler/solution/` was
-written by the tool, not by hand, and every review reply is on disk verbatim.
+**Everything here already ran.** You are not building anything. You are looking
+at a finished project and checking that you can tell what happened and where
+your staff would look. Reading this end to end takes about fifteen minutes.
+
+---
+
+## Before you start: get the commands working
+
+Every command in this document needs the project's Python environment. Set it
+up once, in the terminal you are going to use:
+
+```bash
+cd /home/dennis-mitchell/dabbler-ai-orchestration
+source .venv/bin/activate
+cd examples/csv-walkthrough
+```
+
+Check it worked:
+
+```bash
+python -m ai_router.workflow status --workspace-root .
+```
+
+You should see three components, each at 6/6. If instead you see
+`python: command not found` or `No module named ai_router`, the environment is
+not active — go back and run the `source` line again. Nothing else in this
+document will work until that command does.
+
+**Stay in `examples/csv-walkthrough` for everything below.** Every command
+assumes you are there.
 
 ---
 
@@ -170,30 +198,109 @@ and this is the evidence for it.
 
 ## Where your team looks to see progress
 
-Open the **Solution Explorer** in the VS Code extension. Components at the top;
-each carries its version, its step out of six, its owner, and how many times it
-has been sent back. The **Used by** row is the one nobody can work out for
-themselves — it is who breaks if a contract changes.
+**At a terminal**, this is the command, and it is the one that answers "where
+has this got to":
 
-The tree reads `.dabbler/solution/projection.json`, which the tool republishes
-on every command. It never folds the event log itself.
+```bash
+python -m ai_router.workflow status --workspace-root .
+```
 
-## Running it yourself
+```
+Read a people CSV into objects — step 6/6: Replace the stand-ins for real
+  csv-model            6/6 Replace the stand-ins for real
+  csv-parser           6/6 Replace the stand-ins for real      (1 sent back)
+  csv-app              6/6 Replace the stand-ins for real
+```
+
+**In the editor**, the same information is a tree: the Solution Explorer in the
+VS Code extension under `tools/`. Components at the top, each with its version,
+its step out of six, its owner, and its send-back count. The **Used by** row is
+the one nobody can work out for themselves — it is who breaks if a contract
+changes.
+
+> **The extension is not installed for you.** It lives in
+> `tools/dabbler-ai-orchestration` and has to be built and loaded into VS Code
+> before you can see any of this. If you only want to check the walkthrough,
+> the `status` command above tells you the same thing and needs no setup.
+
+The tree reads `.dabbler/solution/projection.json`, which the tool rewrites on
+every command. It never works the state out for itself.
+
+---
+
+## Three things that look wrong and are not
+
+You will notice these if you poke around. Each one confused a reader before
+you, so they are written down rather than left to be discovered.
+
+**1. `solution check` does not tell you where the project has got to.**
 
 ```bash
 python -m ai_router.solution check --workspace-root .
-python -m ai_router.workflow status --workspace-root .
+```
+
+This validates the manifest — are the components declared properly, do the
+dependencies point at things that exist, is there a cycle. It also prints the
+*declared starting step*, which is "Plan and design" and always will be. That
+is where the manifest says work begins, not where it is now.
+
+**`workflow status` is the only thing that answers "where has this got to".**
+One command checks the map, the other reports the journey.
+
+**2. Every component says `approved: false`, and that is correct.**
+
+If you open `.dabbler/solution/projection.json` you will see `approved: false`
+on all three components. Nothing is missing.
+
+Approval happens at two moments only — the end of step 1 and the end of step 2
+— and both are approvals of **the solution as a whole**, not of any individual
+component. Those two approvals are in the event log. No component is ever
+approved on its own, so `false` here is the permanent and expected value.
+
+Steps 3 through 6 have no approval gate at all. Work moves when the reviewers
+clear it.
+
+**3. The reviewers say `offline` and `simulated`, on purpose.**
+
+Steps 2 through 6 were reviewed by a script rather than by real vendors, to
+keep the cost down. Every one of those rounds is stamped `simulated` in the
+log and prints a warning when it runs, precisely so it can never be mistaken
+for real cross-vendor evidence.
+
+Step 1 was real — six rounds against Gemini and GPT, and the disagreement at
+the end is genuine.
+
+---
+
+## Run the finished thing
+
+```bash
 python components/csv_app/src/real_run.py fixtures/leading-blank.csv
 ```
 
-## Two honest caveats
+```
+2 record(s) read, 1 row(s) rejected
+  line 4: 'two hundred' is not an age from 0 to 150
+```
 
-**Steps 2 through 6 were reviewed by a script, not by vendors.** Step 1 was
-real — six rounds against Gemini and GPT, and the disagreement at the end is
-genuine. The rest were served from `scripted-reviews/` to keep the cost down.
-Every scripted round is marked as such in the log and prints a warning when it
-runs; none of them is cross-vendor evidence and none of them can be mistaken
-for it.
+Try `fixtures/clean.csv` (nothing rejected) and `fixtures/wrong-header.csv`
+(the file is refused outright) to see the other two outcomes.
 
-**`.dabbler/` is per-repository and git-ignored.** Your team cannot see each
-other's progress yet. Status is local until a shared event source exists.
+## One honest caveat
+
+**`.dabbler/` is per-repository and git-ignored.** Everything the status
+command and the Explorer show lives only on the machine that did the work. Your
+team cannot see each other's progress yet, and a fresh clone of this repository
+starts with no history at all. That needs a shared event source before anyone
+relies on it.
+
+---
+
+## When you are done
+
+You should be able to answer these. If you cannot, the document failed and I
+want to know which one:
+
+1. What does a developer actually do at step 1, and who decides when it ends?
+2. What happens when someone finds a contract wrong while building?
+3. Where would you look, tomorrow morning, to see what your team got done?

@@ -18,7 +18,7 @@ import argparse
 import json
 import sys
 from dataclasses import dataclass, field
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Optional
 
 import yaml
@@ -49,6 +49,70 @@ STEP_TITLES = {
     "integration": "Build the whole thing on stand-ins",
     "build": "Replace the stand-ins for real",
 }
+
+#: What a step owes, in the words a reviewer is given. Declared here so the
+#: review prompt and the tree cannot describe the same step differently.
+STEP_DELIVERABLES = {
+    "plan": (
+        "A statement of the objective a reader can act on: what the solution "
+        "is for, who uses it, what it must do, and what is deliberately out "
+        "of scope. Vagueness that would let two people build different "
+        "things is the defect to look for."
+    ),
+    "decompose": (
+        "More than one candidate decomposition, each in plain language, with "
+        "one recommended and the reasoning given. Components should hide "
+        "decisions likely to change rather than mirror processing steps. A "
+        "single candidate presented as the only option is a defect."
+    ),
+    "contracts": (
+        "A contract per component carrying what a signature cannot: what must "
+        "be true going in, what is guaranteed coming out, what is kept on "
+        "purpose, side effects, how it fails, and what callers must not "
+        "depend on. A promise nothing can prove is the defect to look for."
+    ),
+    "mocks": (
+        "A stand-in per component that satisfies its contract and nothing "
+        "more. A mock that is right by accident, or that promises behaviour "
+        "the contract does not, is the defect to look for."
+    ),
+    "integration": (
+        "The whole solution running on stand-ins alone, end to end. What it "
+        "proves is that the contracts compose. A gap the integration papers "
+        "over is a contract that is wrong."
+    ),
+    "build": (
+        "A real component replacing its stand-in and passing the same "
+        "contract checks the stand-in passed. A real component held to a "
+        "weaker bar than its mock is the defect to look for."
+    ),
+}
+
+#: The two steps a developer signs off. Derived from the step, never set per
+#: call: an approval gate a caller can switch off is one a caller switches off.
+#: Step 3 is deliberately absent — the developer sees the contracts and may
+#: object, but the objection does not hold the work.
+APPROVAL_STEPS = ("plan", "decompose")
+
+#: The generated, readable form of a contract sits beside its source. Derived,
+#: never declared, for the reason ``used_by`` is derived: two paths kept by
+#: hand disagree eventually and the disagreement is silent.
+CONTRACT_DOC_SUFFIX = ".md"
+
+
+def contract_doc_path(contract: Optional[str]) -> Optional[str]:
+    """``components/x/contract.yaml`` -> ``components/x/contract.md``.
+
+    ``None`` when no contract is declared, and unchanged when the declared
+    path is already the generated form.
+    """
+    if not contract:
+        return None
+    p = PurePosixPath(contract)
+    if p.suffix == CONTRACT_DOC_SUFFIX:
+        return contract
+    return str(p.with_suffix(CONTRACT_DOC_SUFFIX))
+
 
 KNOWN_SOLUTION_KEYS = ("name", "title", "step")
 KNOWN_COMPONENT_KEYS = (
@@ -237,6 +301,7 @@ def as_dict(solution: Solution) -> dict:
             {
                 "name": c.name, "kind": c.kind, "title": c.title,
                 "source": c.source, "contract": c.contract,
+                "contractDoc": contract_doc_path(c.contract),
                 "artifact": c.artifact, "version": c.version,
                 "step": c.step, "stepTitle": STEP_TITLES[c.step],
                 "stepNumber": STEPS.index(c.step) + 1,

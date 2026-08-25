@@ -13,3 +13,6 @@ node_modules/
 out/
 *.vsix
 test-results/
+
+# Offline-transport queue position, not content.
+**/scripted-reviews/**/.cursor

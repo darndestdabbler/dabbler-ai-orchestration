@@ -3,8 +3,25 @@ import json
 
 import pytest
 
-from ai_router.workflow import (WorkflowError, append, fold, project, read,
-                                _main)
+from ai_router import stepreview
+from ai_router.stepreview import ReviewerOutcome, StepReview
+from ai_router.workflow import (WorkflowError, append, current_step, fold,
+                                project, read, _main)
+
+
+def _fake_review(target, step, artifact_paths, **kw):
+    """Stands in for the vendors. What is under test here is what the driver
+    records, not what a model says."""
+    return StepReview(
+        target=target, step=step, artifacts=list(artifact_paths),
+        reviewers=[
+            ReviewerOutcome(provider="anthropic", model="a", verdict="VERIFIED"),
+            ReviewerOutcome(
+                provider="openai", model="o", verdict="ISSUES_FOUND",
+                findings=[{"severity": "Major", "description": "boundary"}],
+                blocking=True, blocking_reason="1 blocking finding(s)"),
+        ],
+    ), ["raw one", "raw two"]
 
 MANIFEST = """
 solution:
@@ -86,6 +103,38 @@ class TestFold:
         assert state["a"]["approved"] is False
 
 
+class TestTheApprovalGateOutranksTheBlock:
+    """Five real review rounds on one plan document produced four Major
+    findings every time, each round's findings genuinely new. A gate the
+    reviewers can hold shut forever is not a gate."""
+
+    def test_a_blocked_approval_step_still_reaches_the_developer(self):
+        state = fold([
+            {"event": "entered", "target": "a", "step": "plan"},
+            {"event": "reviewed", "target": "a", "step": "plan",
+             "verdict": "blocked", "needsApproval": True},
+        ])
+        assert state["a"]["waitingOn"] == "developer"
+
+    def test_a_blocked_step_with_no_gate_goes_back_to_the_author(self):
+        state = fold([
+            {"event": "entered", "target": "a", "step": "mocks"},
+            {"event": "reviewed", "target": "a", "step": "mocks",
+             "verdict": "blocked", "needsApproval": False},
+        ])
+        assert state["a"]["waitingOn"] == "author"
+
+    def test_approving_over_open_findings_records_that_it_did(self, root, capsys):
+        append(root, {"event": "entered", "target": "csv-model", "step": "plan"})
+        append(root, {"event": "reviewed", "target": "csv-model", "step": "plan",
+                      "verdict": "blocked", "needsApproval": True,
+                      "findings": [{"severity": "major"}, {"severity": "major"}]})
+        _main(["approve", "--component", "csv-model",
+               "--workspace-root", str(root)])
+        assert read(root)[-1]["overFindings"] == 2
+        assert "stay on the record" in capsys.readouterr().out
+
+
 class TestProjection:
     def test_it_joins_the_manifest_to_live_state(self, root):
         append(root, {"event": "entered", "target": "csv-parser", "step": "mocks"})
@@ -105,11 +154,39 @@ class TestProjection:
 
 
 class TestCli:
-    def test_a_single_reviewer_is_refused(self, root, capsys):
-        code = _main(["reviewed", "--verdict", "clear", "--reviewers", "sol",
-                      "--workspace-root", str(root)])
-        assert code == 1
-        assert "different providers" in capsys.readouterr().err
+    def test_review_records_what_the_reviewers_actually_said(
+            self, root, monkeypatch, capsys):
+        """The verdict comes back from the readers. There is no longer a way
+        to hand one in on the command line."""
+        append(root, {"event": "entered", "target": "csv-model",
+                      "step": "contracts"})
+        monkeypatch.setattr(stepreview, "review", _fake_review)
+        art = root / "contract.yaml"
+        art.write_text("calls: []\n")
+        code = _main(["review", "--artifact", str(art),
+                      "--component", "csv-model", "--workspace-root", str(root)])
+        assert code == 0
+        event = read(root)[-1]
+        assert event["event"] == "reviewed"
+        assert event["step"] == "contracts"
+        assert event["verdict"] == "blocked"
+        assert [r["provider"] for r in event["reviewers"]] == ["anthropic", "openai"]
+
+    def test_each_reply_is_filed_verbatim(self, root, monkeypatch):
+        """A summary is not a record: a finding that exists only as someone's
+        paraphrase cannot be re-read."""
+        append(root, {"event": "entered", "target": "csv-model", "step": "plan"})
+        monkeypatch.setattr(stepreview, "review", _fake_review)
+        art = root / "plan.md"
+        art.write_text("# plan\n")
+        _main(["review", "--artifact", str(art), "--component", "csv-model",
+               "--workspace-root", str(root)])
+        filed = sorted((root / ".dabbler" / "solution" / "reviews").iterdir())
+        assert [f.read_text() for f in filed] == ["raw one", "raw two"]
+
+    def test_reviewing_work_that_has_not_begun_is_refused(self, root):
+        with pytest.raises(WorkflowError, match="has not entered a step"):
+            current_step(root, "csv-model")
 
     def test_send_back_names_the_affected_components(self, root, capsys):
         _main(["send-back", "--to", "contracts", "--reason", "boundary wrong",
@@ -119,9 +196,8 @@ class TestCli:
         assert "csv-parser, csv-app" in out
 
     def test_status_reports_who_is_waited_on(self, root, capsys):
-        _main(["reviewed", "--verdict", "clear", "--reviewers", "sol,gemini",
-               "--needs-approval", "--component", "csv-model",
-               "--workspace-root", str(root)])
+        append(root, {"event": "reviewed", "target": "csv-model",
+                      "step": "plan", "verdict": "clear", "needsApproval": True})
         _main(["status", "--workspace-root", str(root)])
         assert "needs you" in capsys.readouterr().out
 

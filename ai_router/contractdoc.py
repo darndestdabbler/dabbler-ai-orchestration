@@ -70,6 +70,23 @@ def _cell(items) -> str:
     return "<br>".join(f"{s}" for s in items)
 
 
+def _proof(clauses, tests) -> str:
+    """What proves this row, named. Never a bare tick.
+
+    An unconditional checkmark is the failure this module exists to prevent:
+    it asserts coverage that nothing supplies, and a contract people trust is
+    worse than one they check. A clause with no test says so, in the column
+    where a reader is already looking.
+    """
+    if not clauses:
+        return "*nothing to prove*"
+    if not tests:
+        return "**not proved**"
+    if isinstance(tests, str):
+        tests = [tests]
+    return "<br>".join(f"`{t}`" for t in tests)
+
+
 def diagram(contract: dict, solution=None) -> str:
     """Where this component sits. Generated, so it cannot drift."""
     name = contract["component"]
@@ -122,11 +139,12 @@ def render(contract: dict, solution=None) -> str:
             out += ["```", op["signature"], "```", ""]
         if op.get("summary"):
             out += [op["summary"], ""]
-        out.append("| | | Tested |")
-        out.append("| --- | --- | :---: |")
+        tests = op.get("tests") or {}
+        out.append("| | | Proved by |")
+        out.append("| --- | --- | --- |")
         for key, label, why in SECTIONS:
             out.append(f"| **{label}**<br><sub>{why}</sub> "
-                       f"| {_cell(op.get(key))} | ✓ |")
+                       f"| {_cell(op.get(key))} | {_proof(op.get(key), tests.get(key))} |")
         out.append("")
         np = op.get(NOT_PROMISED)
         out += [

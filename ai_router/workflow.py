@@ -17,7 +17,9 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-from ai_router.solution import STEPS, STEP_TITLES, ManifestError
+from ai_router.solution import (
+    APPROVAL_STEPS, STEPS, STEP_TITLES, ManifestError,
+)
 from ai_router import solution as solmod
 
 EXIT_OK = 0
@@ -25,6 +27,7 @@ EXIT_REFUSED = 1
 
 LOG_RELPATH = Path(".dabbler") / "solution" / "events.jsonl"
 PROJECTION_RELPATH = Path(".dabbler") / "solution" / "projection.json"
+REVIEWS_RELDIR = Path(".dabbler") / "solution" / "reviews"
 
 EVENTS = ("entered", "reviewed", "approved", "returned", "contract-changed")
 SCOPES = ("solution", "component")
@@ -40,6 +43,10 @@ def log_path(root) -> Path:
 
 def projection_path(root) -> Path:
     return Path(root) / PROJECTION_RELPATH
+
+
+def reviews_dir(root) -> Path:
+    return Path(root) / REVIEWS_RELDIR
 
 
 def write_projection(root) -> Path:
@@ -96,6 +103,7 @@ def fold(events: list) -> dict:
         s = state.setdefault(key, {
             "step": STEPS[0], "reviewed": False, "approved": False,
             "returns": 0, "history": [], "waitingOn": None,
+            "findings": [], "reviewers": [],
         })
         kind = e["event"]
         s["history"].append(e)
@@ -104,12 +112,24 @@ def fold(events: list) -> dict:
             s["reviewed"] = False
             s["approved"] = False
             s["waitingOn"] = None
+            s["findings"] = []
+            s["reviewers"] = []
         elif kind == "reviewed":
             s["reviewed"] = True
-            if e.get("verdict") == "blocked":
-                s["waitingOn"] = "author"
-            elif e.get("needsApproval"):
+            s["findings"] = e.get("findings", [])
+            s["reviewers"] = e.get("reviewers", [])
+            # The gate outranks the block. A step the developer signs off
+            # reaches the developer even when the reviewers are still
+            # objecting -- that is the whole reason the gate exists. Left the
+            # other way round, a reviewer that keeps finding new Major issues
+            # holds the work forever and the human who could settle it is
+            # never asked.
+            if e.get("needsApproval"):
                 s["waitingOn"] = "developer"
+            elif e.get("verdict") == "blocked":
+                s["waitingOn"] = "author"
+            else:
+                s["waitingOn"] = None
         elif kind == "approved":
             s["approved"] = True
             s["waitingOn"] = None
@@ -119,6 +139,8 @@ def fold(events: list) -> dict:
             s["approved"] = False
             s["returns"] += 1
             s["waitingOn"] = "author"
+            s["findings"] = []
+            s["reviewers"] = []
         elif kind == "contract-changed":
             s["waitingOn"] = "developer" if e.get("needsApproval") else None
     return state
@@ -136,6 +158,8 @@ def project(root) -> dict:
     sol_state = state.get("solution", {})
     doc["solution"]["waitingOn"] = sol_state.get("waitingOn")
     doc["solution"]["returns"] = sol_state.get("returns", 0)
+    doc["solution"]["reviewers"] = sol_state.get("reviewers", [])
+    doc["solution"]["findings"] = sol_state.get("findings", [])
     if sol_state.get("step"):
         doc["solution"]["step"] = sol_state["step"]
         doc["solution"]["stepTitle"] = STEP_TITLES[sol_state["step"]]
@@ -151,12 +175,92 @@ def project(root) -> dict:
         c["returns"] = cs.get("returns", 0)
         c["reviewed"] = cs.get("reviewed", False)
         c["approved"] = cs.get("approved", False)
+        c["reviewers"] = cs.get("reviewers", [])
+        c["findings"] = cs.get("findings", [])
 
     waiting = [c["name"] for c in doc["components"] if c["waitingOn"] == "developer"]
     if doc["solution"]["waitingOn"] == "developer":
         waiting.insert(0, doc["solution"]["name"])
     doc["needsYou"] = waiting
     return doc
+
+
+
+def current_step(root, target: str) -> str:
+    """Where the target is now, per the log. A review is of the step the work
+    is actually in, never of a step named on the command line — a caller who
+    can name the step can review the wrong one and file it as the right one."""
+    state = fold(read(root)).get(target)
+    if not state:
+        raise WorkflowError(
+            f"'{target}' has not entered a step yet. Run "
+            f"`workflow enter <step>` first — reviewing work that has not "
+            f"begun records a verdict about nothing."
+        )
+    return state["step"]
+
+
+def file_review(root, target: str, step: str, raws: list) -> list:
+    """Write each reviewer's reply verbatim. A summary is not a record, and a
+    finding that only exists as someone's paraphrase cannot be re-read."""
+    out_dir = reviews_dir(root)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    stamp = _now().replace(":", "").replace("-", "")
+    written = []
+    for i, raw in enumerate(raws, 1):
+        path = out_dir / f"{target}-{step}-{stamp}-r{i}.md"
+        path.write_text(raw, encoding="utf-8")
+        written.append(str(path))
+    return written
+
+
+def _run_review(args, root) -> int:
+    from ai_router import stepreview
+
+    target = _target(args)
+    step = current_step(root, target)
+    outcome, raws = stepreview.review(
+        target=target, step=step, artifact_paths=args.artifact,
+        author_provider=args.author_provider, transport=args.transport,
+        prefer_models=args.prefer_model,
+    )
+    filed = file_review(root, target, step, raws)
+
+    append(root, {
+        "event": "reviewed", "target": target, "step": step,
+        "verdict": outcome.verdict,
+        "reviewers": [r.as_dict() for r in outcome.reviewers],
+        "findings": outcome.findings,
+        "artifacts": outcome.artifacts,
+        "records": filed,
+        "simulated": outcome.simulated,
+        "needsApproval": step in APPROVAL_STEPS,
+    })
+    try:
+        write_projection(root)
+    except (WorkflowError, ManifestError):
+        pass
+
+    if outcome.simulated:
+        print("  SCRIPTED REVIEW — served from a response file, not a vendor. "
+              "This round is not cross-vendor evidence.")
+    for r in outcome.reviewers:
+        mark = "blocks" if r.blocking else "clear"
+        print(f"  {r.model}/{r.provider}: {r.verdict} ({mark})")
+    print(f"{target} — {STEP_TITLES[step]}: {outcome.verdict}")
+    kept = len(outcome.findings)
+    if kept:
+        print(f"  {kept} finding(s) recorded, every severity kept")
+    for path in filed:
+        print(f"  filed {path}")
+    if step in APPROVAL_STEPS:
+        if outcome.blocked:
+            print("  waiting on you: approve over these, or send it back")
+        else:
+            print("  waiting on you to approve")
+    elif outcome.blocked:
+        print("  back with the author")
+    return EXIT_OK
 
 
 def _target_args(ap):
@@ -176,11 +280,17 @@ def _main(argv=None) -> int:
     e.add_argument("step", choices=STEPS)
     _target_args(e)
 
-    r = sub.add_parser("reviewed", help="record a cross-provider review outcome")
-    r.add_argument("--verdict", required=True, choices=("clear", "blocked"))
-    r.add_argument("--reviewers", required=True,
-                   help="comma-separated, and they must be different providers")
-    r.add_argument("--needs-approval", action="store_true")
+    r = sub.add_parser(
+        "review",
+        help="send this step's output to two vendors and record what they said")
+    r.add_argument("--artifact", action="append", default=[], required=True,
+                   help="a file this step produced; repeatable")
+    r.add_argument("--author-provider",
+                   help="the provider that wrote the work, excluded from review")
+    r.add_argument("--transport")
+    r.add_argument("--prefer-model", action="append", default=[],
+                   help="ask for a specific model; repeatable, first is "
+                        "reviewer one")
     _target_args(r)
 
     a = sub.add_parser("approve", help="record the developer's approval")
@@ -232,21 +342,20 @@ def _main(argv=None) -> int:
                           "component" if args.component else "solution",
                           "target": _target(args), "step": args.step})
             print(f"{_target(args)} → {STEP_TITLES[args.step]}")
-        elif args.cmd == "reviewed":
-            reviewers = [x.strip() for x in args.reviewers.split(",") if x.strip()]
-            if len(reviewers) < 2:
-                print("refused: cross-review needs two reviewers, and they must "
-                      "come from different providers. One model checking its own "
-                      "family's work agrees with itself too often.", file=sys.stderr)
-                return EXIT_REFUSED
-            append(root, {"event": "reviewed", "target": _target(args),
-                          "reviewers": reviewers, "verdict": args.verdict,
-                          "needsApproval": bool(args.needs_approval)})
-            print(f"{_target(args)} reviewed by {', '.join(reviewers)}: {args.verdict}")
+        elif args.cmd == "review":
+            return _run_review(args, root)
         elif args.cmd == "approve":
+            open_findings = fold(read(root)).get(_target(args), {}).get(
+                "findings", [])
             append(root, {"event": "approved", "target": _target(args),
-                          "by": "developer"})
+                          "by": "developer",
+                          # Kept, not erased: an approval that overrode live
+                          # objections must be legible later as having done so.
+                          "overFindings": len(open_findings)})
             print(f"{_target(args)} approved")
+            if open_findings:
+                print(f"  over {len(open_findings)} open finding(s), which stay "
+                      f"on the record")
         elif args.cmd == "send-back":
             affects = [x.strip() for x in args.affects.split(",") if x.strip()]
             append(root, {"event": "returned", "target": _target(args),

@@ -1,7 +1,8 @@
 """The solution manifest: what it accepts, and what it refuses by name."""
 import pytest
 
-from ai_router.solution import ManifestError, STEPS, as_dict, parse
+from ai_router.solution import (ManifestError, STEPS, as_dict,
+                                contract_doc_path, parse)
 
 BASE = {
     "solution": {"name": "csv-demo", "title": "CSV walkthrough", "step": "contracts"},
@@ -96,3 +97,11 @@ class TestProjection:
         model = next(c for c in d["components"] if c["name"] == "csv-model")
         assert model["dependsOn"] == []
         assert model["usedBy"] == ["csv-app", "csv-parser"]
+
+    def test_the_readable_contract_path_is_derived_not_declared(self):
+        """Two paths kept by hand disagree eventually, and silently."""
+        assert contract_doc_path("components/x/contract.yaml") == \
+            "components/x/contract.md"
+        assert contract_doc_path("components/x/contract.md") == \
+            "components/x/contract.md"
+        assert contract_doc_path(None) is None

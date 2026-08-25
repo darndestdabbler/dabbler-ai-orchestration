@@ -2,6 +2,7 @@ import * as assert from "assert";
 import {
   Projection,
   childrenOf,
+  contractTarget,
   descriptorFor,
   orderedComponents,
   rootNodes,
@@ -141,5 +142,23 @@ suite("solutionTreeModel: rows", () => {
     const ids = nodes.map((n) => descriptorFor(n, p).id);
     assert.strictEqual(new Set(ids).size, ids.length);
     ids.forEach((id) => assert.ok(id.length > 0));
+  });
+});
+
+suite("the contract row's target", () => {
+  test("the readable rendering wins over the source it came from", () => {
+    const c = projection().components[0];
+    assert.strictEqual(
+      contractTarget({ ...c, contractDoc: "c/model.md" }),
+      "c/model.md",
+    );
+  });
+
+  test("the source is opened when nothing has been rendered yet", () => {
+    const c = projection().components[0];
+    assert.strictEqual(
+      contractTarget({ ...c, contractDoc: null }),
+      "c/model.yaml",
+    );
   });
 });

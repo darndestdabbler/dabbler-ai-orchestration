@@ -81,3 +81,25 @@ class TestRefusals:
         p.write_text("component: x\noperations:\n  - signature: foo()\n")
         with pytest.raises(ContractError, match="name"):
             load(p)
+
+
+class TestProof:
+    """The column said every clause was tested, on every contract, always.
+    A contract people trust is worse than one they check."""
+
+    def test_a_clause_with_no_test_says_so(self):
+        md = render({"component": "x", "operations": [
+            {"name": "f", "preconditions": ["a is positive"]}]})
+        assert "**not proved**" in md
+
+    def test_a_clause_names_the_test_that_proves_it(self):
+        md = render({"component": "x", "operations": [
+            {"name": "f", "preconditions": ["a is positive"],
+             "tests": {"preconditions": ["test_rejects_negative_a"]}}]})
+        assert "`test_rejects_negative_a`" in md
+        assert "**not proved**" not in md
+
+    def test_an_empty_section_has_nothing_to_prove(self):
+        md = render({"component": "x", "operations": [{"name": "f"}]})
+        assert "*nothing to prove*" in md
+        assert "**not proved**" not in md

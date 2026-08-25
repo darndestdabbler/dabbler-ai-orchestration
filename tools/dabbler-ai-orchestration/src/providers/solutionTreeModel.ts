@@ -27,6 +27,7 @@ export interface ProjectionComponent {
   stepNumber: number;
   owner?: string | null;
   contract?: string | null;
+  contractDoc?: string | null;
   dependsOn: string[];
   usedBy: string[];
   waitingOn?: string | null;
@@ -37,6 +38,19 @@ export interface Projection {
   solution: ProjectionSolution;
   components: ProjectionComponent[];
   needsYou: string[];
+}
+
+/**
+ * Which file the Contract row opens. The readable rendering when there is
+ * one, the source otherwise. A consumer reading a contract wants the tables,
+ * not the YAML that generates them; Python derives both paths, so this only
+ * picks between them.
+ */
+export function contractTarget(
+  c: ProjectionComponent | undefined,
+): string | undefined {
+  if (!c) return undefined;
+  return c.contractDoc || c.contract || undefined;
 }
 
 export type IconSpec = { id: string; tone?: "attention" | "done" | "muted" };
@@ -158,7 +172,7 @@ export function descriptorFor(
     }
     case "contract": {
       const c = find(p, node.name);
-      const has = Boolean(c?.contract);
+      const has = Boolean(contractTarget(c));
       return {
         id: `contract:${node.name}`,
         label: "Contract",

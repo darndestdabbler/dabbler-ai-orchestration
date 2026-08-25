@@ -163,6 +163,14 @@ def main():
 
         r = route(content=convo, task_type="general",
                   prefer_model=os.environ.get("UAT_MODEL", "gpt-5-6-luna"), max_tier=3)
+        want = os.environ.get("UAT_MODEL", "gpt-5-6-luna")
+        if r.model_name != want:
+            # The router escalates on a short reply. A study whose subject was
+            # silently swapped for a stronger model measures nothing, so this
+            # stops rather than quietly producing a clean result.
+            raise SystemExit(
+                f"aborting: asked for {want}, {r.model_name} answered turn "
+                f"{turn}. The escalation ladder replaced the model under test.")
         reply = r.content.strip()
         log, conf, action = parse(reply)
         print(f"\n===== TURN {turn} ({r.model_name}) =====")

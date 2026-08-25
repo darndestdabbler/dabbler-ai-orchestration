@@ -151,3 +151,38 @@ persisted, and a read-only `2>/dev/null` was rejected as a write.
 **That is the standing risk with this method: a harness that lies produces
 findings that look exactly like real ones.** Every failure has to be reproduced
 by hand before it is believed.
+
+---
+
+## Sixth run: three models, three vendors
+
+**The instructions are now checked against the three least capable models
+available, from three different vendors**, on the redacted document. All three
+get through.
+
+| Model | Vendor | Turns | Confused | Verdict |
+| --- | --- | ---: | ---: | --- |
+| GPT-5.6 Luna | OpenAI | 11 | 0 | passes |
+| Gemini Flash | Google | 7 | 1 | passes |
+| Haiku 4.5 | Anthropic | 11 | 3 | passes |
+
+**Haiku needed pinning before it could be used at all.** It is tier 1, so the
+router's escalation ladder answered the first probe with Opus instead — a study
+whose subject is silently swapped for a stronger model measures nothing.
+`uat_follow.py` now aborts when the model that answered is not the model asked
+for.
+
+**One of Haiku's three confusions was invented.** It reported that the
+`csv-parser` contract shows *not proved* against its line-accounting clause and
+asked how that squares with the component being at 6/6. No contract in this
+solution contains the string *not proved* — every clause names a test. The
+finding was checked and discarded.
+
+**That is the second way this method produces findings that are not real.** The
+first was a harness that lied; this is a model that confabulates. Neither is
+rare enough to ignore, and both look exactly like genuine findings until
+reproduced by hand. **Reproduce before believing, every time.**
+
+Haiku's other two confusions are fair: the document does not explain how a
+contract clause's proof state relates to a component's step number, and it goes
+quiet about what the projection carries beyond what the tree shows.

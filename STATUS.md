@@ -1,3 +1,90 @@
+# STATUS — the framework runs, and the instructions are tested against three models
+
+**Branch: `design/solution-decomposition`.** Not `experiment/verification-pipeline-v3`,
+which the section below describes and which is no longer where work happens.
+Nothing is merged to `master`.
+
+## Where things are
+
+**The six-step framework is built and has been run end to end on a real
+solution.** `solution.py` declares what a solution is, `contractdoc.py` renders
+contracts as tables with generated diagrams, `workflow.py` folds state from an
+append-only log, and `stepreview.py` sends a step's output to two vendors that
+did not write it. The VS Code Solution Explorer reads a projection the driver
+publishes.
+
+**The walkthrough is at `examples/csv-walkthrough/` and every command in it has
+been run from a bare shell.** Step 1 was reviewed by real vendors over six
+rounds; steps 2–6 were served from `scripted-reviews/` and every such round is
+stamped `simulated` so it can never be read as cross-vendor evidence.
+
+**Suite: 759 Python, 179 TypeScript, lint clean.**
+
+## What running it actually exposed
+
+**Five defects in the new code, none of which reading it would have found:**
+
+1. **The review prompt asked for a shape `verdict.py` cannot parse.** Two real
+   reviews came back as unparseable blobs, three findings collapsed into one row
+   with no severity. A round-trip test now pins prompt and parser together.
+2. **A blocked step could never reach the developer.** `needsApproval` was
+   `step in APPROVAL_STEPS and not blocked`, so the human gate was shut exactly
+   when it was needed. **Five real cross-vendor rounds on one plan produced four
+   Major findings every time, each round's genuinely new and correct** — a prose
+   document has no bottom, so "no Major findings" is not a state anyone reaches.
+   The gate now outranks the block, and an approval over live objections records
+   how many it overrode.
+3. **`route()` ignores `exclude_providers` on the offline path**, so a scripted
+   run would have recorded two reviewers that were one queue. Checked in
+   `stepreview` too, and scripted rounds are marked.
+4. **`contractdoc` asserted coverage it never had** — a hardcoded tick in a
+   "Tested" column on every clause, referencing no test.
+5. **`solution check` printed the manifest's declared step in the same shape
+   `workflow status` prints live progress**, so one screen said step 1 and the
+   other step 6 with nothing to say which was which.
+
+**There is still no round cap on `workflow review`.** An unattended run keeps
+calling vendors. The approval gate means work can move; it does not make the
+reviewers stop.
+
+## The instruction-testing method
+
+**Walkthroughs and UATs are now checked by driving deliberately weak models
+through them as if they were the reader.** `scripts/uat_follow.py` is the
+harness; `scripts/skimcheck.py` redacts a document to what a skimmer sees and
+audits paragraphs for a point sentence. The writing rules are in
+`docs/skim-resilient-writing.md`.
+
+**The first run never finished** — confused on 22 of 28 turns, because none of
+the documented commands ran as printed. **The current document passes all three
+of Luna, Gemini Flash and Haiku, from three vendors, under skim redaction.**
+
+**The method produces false findings in two distinct ways, and both look real.**
+A harness bug gets scored against the document (four of those so far), and a
+weak model confabulates (Haiku invented a contract clause that does not exist).
+**Reproduce every finding by hand before acting on it.**
+
+## What the walkthrough proved about the framework
+
+**A contract change is the interesting case and it fired on a real defect
+rather than a staged one.** Building the parser proved the line-accounting
+invariant wrong; `csv-parser` returned to step 3 naming `csv-app` as affected,
+`csv-model` stayed at 6/6, and the contract went 1.0.0 → 1.1.0. **`app.run` is
+byte-identical between step 5 on mocks and step 6 on the real parser**, which is
+the claim the six steps exist to make.
+
+## Next
+
+1. **The operator walks through it himself.** Everything else waits on that.
+2. **`.dabbler/` is git-ignored**, so a team cannot see each other's progress and
+   a fresh clone starts with no history. This needs a shared event source before
+   anyone relies on it.
+3. **A round cap on `workflow review`.**
+4. **The Solution Explorer has not been rendered in a real VS Code.** A drawing
+   of the intended tree exists; nothing has been screenshotted from the product.
+
+---
+
 # STATUS — after set 144 (the plan is pre-registered, hashed, and cannot answer the completeness question)
 
 - **Set 144 is complete on `experiment/verification-pipeline-v3`.** All three

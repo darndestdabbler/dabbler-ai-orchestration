@@ -278,6 +278,23 @@ models:
     output_cost_per_1m: 1.2
     confirmed_on: '2026-08-04'
 
+  haiku:
+    provider: anthropic
+    model_id: claude-haiku-4-5-20251001
+    tier: 1
+    is_enabled: true
+    # Enabled so a follow-through study can prefer it by name, kept out of the
+    # verifier pool for the same reason as Luna: a cheap model must never win a
+    # cheapest-survivor tiebreak for a round that adjudicates.
+    is_enabled_as_verifier: false
+    max_context_tokens: 200000
+    max_output_tokens: 8000
+    system_prompt_file: prompt-templates/system-prompts.md
+    notes: "Anthropic's small model. Used as a stand-in for a reader who will not puzzle things out."
+    input_cost_per_1m: 1.0
+    output_cost_per_1m: 5.0
+    confirmed_on: '2026-08-25'
+
   gpt-5-4-mini:
     provider: openai
     model_id: gpt-5.4-mini

@@ -69,3 +69,45 @@ as such.
 
 **12.** I completed the walkthrough checks and verified the status, contract, finished outputs, and manifest behavior.
     - `DONE The walkthrough passes: staff plan and obtain human approval at step 1, choose and approve the decomposition at step 2, formalize contracts at st`
+
+---
+
+## Third and fourth runs: simulating a skimmer
+
+**The full-text runs could not see the document's biggest defect, because a
+model that reads every word is not the reader this is written for.** So the
+README was redacted down to what a skimming reader takes in — headings, code,
+tables and bold spans, everything else blanked — and Luna was told it had been
+redacted and to work from what it could see.
+
+| Condition | Turns | Confused | Verdict |
+| --- | ---: | ---: | --- |
+| Full text, first attempt | 28 | 22 | never finished |
+| Full text, after fixes | 12 | 1 | passed |
+| Skimmed, prose-heavy README | 15 | 3 | failed — steps 4–6 undocumented |
+| Skimmed, rewritten one-bold-point README | 10 | 4 | failed — cannot tell what to do at any step |
+
+**The rewrite made the failure sharper rather than making it go away, which is
+the right direction.** A vague complaint about missing sections became a
+specific one about the whole document.
+
+**The defect it found: every bold point in the six step sections is past-tense
+narration of what happened here once.**
+
+```
+Step 1  Every finding was real and every one was fixed
+Step 2  Three candidate decompositions were put up, not one
+Step 3  A reviewer caught a real conflict between two contracts.
+Step 4  A mock satisfies its contract and promises nothing more.
+Step 6  Building the parser proved the contract wrong.
+```
+
+Not one says what a reader would *do*. The document's stated success criterion
+is that the operator finishes "knowing what his staff would do at each step",
+and it does not deliver that — **it is a story about a project rather than an
+instruction for running one.** That is still to be fixed.
+
+**The cheapest form of this check needs no model at all:** extract the bold
+sentences and read them as a column. If they do not instruct, the document does
+not instruct. `scripts/skimcheck.py` does the redaction and the paragraph audit;
+`scripts/uat_follow.py` drives the model. See `docs/skim-resilient-writing.md`.

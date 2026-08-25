@@ -1,5 +1,11 @@
 # What to build next: the framework, then the CSV walkthrough
 
+> **Superseded, 2026-08-25.** This document assumes the reader is building.
+> **The operator's staff supervise AI engines and do not write the code**, which
+> changes where their attention goes and therefore what the framework is for.
+> Read `docs/framework-reconception.md` instead. This is kept because the pilot's
+> coverage requirements below are still what a walkthrough has to demonstrate.
+
 **Set by the operator, 2026-08-24.** Two sessions. The first builds the
 framework; the second builds the pilot on top of it.
 

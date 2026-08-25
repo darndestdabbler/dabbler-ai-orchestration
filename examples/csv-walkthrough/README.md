@@ -12,6 +12,13 @@ the point is to watch the process, not the problem.
 > point.** If you read only the bold, the headings and the commands, you should
 > still be able to do everything here.
 
+> **Do not hand this to staff yet.** It walks a reader through a *developer's*
+> day — running commands at a terminal, opening contracts, reading mocks. Your
+> staff supervise AI engines and do not write the code, so their walkthrough is
+> two decisions, a handoff and an inbox. That rebuild has not happened.
+> **What is below is still true**, and the framework underneath it works; the
+> shape is wrong for the audience. See `docs/framework-reconception.md`.
+
 ---
 
 ## Before you start

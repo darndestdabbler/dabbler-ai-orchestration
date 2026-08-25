@@ -15,9 +15,14 @@ and still carries the LOC and module ceilings; `docs/operator-decisions.md`
 governs and has set those aside for the rebuild. **A reviewer reading only
 `AGENTS.md` has already reported this work as violating rules that were lifted.**
 
-**The next thing that happens is the operator walking through
-`examples/csv-walkthrough/` himself.** He said today or tomorrow morning.
-Everything below is context for whatever he finds.
+**Staff supervise AI engines; they do not write the code.** This governs
+everything and it arrived late — most of what was built on 2026-08-25 assumed
+the opposite. `docs/framework-reconception.md` is the current design and
+`docs/reviews/sol-on-reconception.md` is GPT-5.6 Sol's review of it.
+
+**The CSV walkthrough teaches a developer's day and is marked not to be handed
+to staff.** The framework underneath it works; the shape is wrong for the
+audience, and the rebuild is two decisions, a handoff and an inbox.
 
 ## What is built
 

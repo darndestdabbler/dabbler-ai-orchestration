@@ -75,7 +75,18 @@ the claim the six steps exist to make.
 
 ## Next
 
-1. **The operator walks through it himself.** Everything else waits on that.
+**The framework has been reconceived around supervisors** —
+`docs/framework-reconception.md`, reviewed by GPT-5.6 Sol at
+`docs/reviews/sol-on-reconception.md`. Staff supervise AI engines and do not
+write code, so components are a durable graph, work packages are bounded and
+own sessions, contract formalization sits inside the decomposition gate, and
+cross-provider review runs per work package rather than per session.
+
+**The CSV walkthrough is the wrong shape for that audience** and is marked so at
+the top. It teaches a developer's day. The rebuild is two decisions, a handoff
+and an inbox.
+
+1. **The operator walks through it himself**, knowing the shape is wrong.
 2. **`.dabbler/` is git-ignored**, so a team cannot see each other's progress and
    a fresh clone starts with no history. This needs a shared event source before
    anyone relies on it.

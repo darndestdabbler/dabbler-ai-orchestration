@@ -57,22 +57,37 @@ up yet -- exactly as you would be if you had just sat down. If the document
 tells you to set something up, run those commands like any other; they will
 persist for the rest of the session.
 
+If the document has been REDACTED -- blocks of ▒ where words should be -- that
+is deliberate and not a mistake in the file. Those are words a skimming reader
+passed over. Work from what you can see, exactly as someone who skimmed would,
+and do not ask for the unredacted text. If what is visible is not enough to do
+the job, say so: that is the finding.
+
 Start by reading README.md.
 """
 
 ALLOWED = re.compile(
-    r"^\s*(cat|ls|head|tail|find|wc|grep|sed -n|tree|file|less|more|python3?|"
-    r"\.?/?[\w./-]*python[\w.]*|git status|git log|pwd|echo)\b")
+    r"^\s*(cd|source|\.|cat|ls|head|tail|find|wc|grep|sed -n|tree|file|less|"
+    r"more|python3?|\.?/?[\w./-]*python[\w.]*|git status|git log|pwd|echo)\b")
 BANNED = re.compile(r"(rm\s|(?<![12])>|\|\s*sh\b|curl|wget|pip |npm i|sudo|chmod|mv\s|cp\s)")
 
 
 ACTIVATED = {"yes": False}
+# A real terminal remembers where it is. Without this, a document that says
+# "cd somewhere" then "run this" reads as broken through no fault of its own --
+# which is what happened to one model, and it was the harness lying.
+STATE = {"cwd": None}
 
 
 def run_command(cmd):
+    # `source` cannot persist out of a subprocess, so activation is recorded
+    # as a flag and the PATH it would have set is applied below. The rest of
+    # the command still runs, so the `cd` beside it moves the shell for real.
     if "activate" in cmd:
         ACTIVATED["yes"] = True
-        return "(no output)"
+        cmd = re.sub(r"(source|\.)\s+\S*activate\S*", "true", cmd)
+        if re.fullmatch(r"[\s;&]*true[\s;&]*", cmd):
+            return "(no output)"       # Activation on its own has nothing to run.
     if re.search(r"ai_router\.workflow\s+(enter|review|approve|send-back|contract-changed)", cmd):
         return ("REFUSED: this harness is read-only and that command would "
                 "write to the project's event log. The walkthrough is already "
@@ -88,10 +103,20 @@ def run_command(cmd):
         # What `source .venv/bin/activate` actually buys you.
         env["PATH"] = f"{REPO}/.venv/bin:/usr/bin:/bin"
         env["VIRTUAL_ENV"] = f"{REPO}/.venv"
+    if STATE["cwd"] is None:
+        STATE["cwd"] = str(WALKTHROUGH)
+    marker = "__UAT_CWD__"
+    wrapped = f"{cmd}\nrc=$?; echo {marker}$(pwd); exit $rc"
     try:
-        p = subprocess.run(cmd, shell=True, cwd=WALKTHROUGH, capture_output=True,
-                           text=True, timeout=90, env=env)
-        out = (p.stdout or "") + (("\n[stderr]\n" + p.stderr) if p.stderr else "")
+        p = subprocess.run(wrapped, shell=True, cwd=STATE["cwd"],
+                           capture_output=True, text=True, timeout=90, env=env)
+        stdout = p.stdout or ""
+        for line in stdout.splitlines():
+            if line.startswith(marker):
+                STATE["cwd"] = line[len(marker):].strip() or STATE["cwd"]
+        stdout = "\n".join(l for l in stdout.splitlines()
+                            if not l.startswith(marker))
+        out = stdout + (("\n[stderr]\n" + p.stderr) if p.stderr else "")
         out = out or "(no output)"
         if len(out) > MAX_OUTPUT_CHARS:
             out = out[:MAX_OUTPUT_CHARS] + f"\n... [truncated, {len(out)} chars total]"
@@ -101,7 +126,8 @@ def run_command(cmd):
 
 
 def read_file(rel):
-    p = (WALKTHROUGH / rel.strip()).resolve()
+    base = Path(STATE["cwd"] or WALKTHROUGH)
+    p = (base / rel.strip()).resolve()
     if not str(p).startswith(str(WALKTHROUGH.resolve())):
         return "REFUSED: path is outside the walkthrough directory."
     if not p.is_file():

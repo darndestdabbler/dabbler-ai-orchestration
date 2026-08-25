@@ -30,9 +30,13 @@ Check it worked:
 python -m ai_router.workflow status --workspace-root .
 ```
 
-**You should see three components, each at 6/6.** If you get
-`python: command not found` or `No module named ai_router`, the environment is
-not active — run the `source` line again. Nothing below works until this does.
+**You should see three components, each at 6/6, one of them marked
+`(1 sent back)`.** That marker is not a problem — it is step 6's feedback loop,
+and it is explained there.
+
+**If you get `python: command not found` or `No module named ai_router`, the
+environment is not active** — run the `source` line again. Nothing below works
+until this does.
 
 **Stay in `examples/csv-walkthrough` for every command in this document.**
 
@@ -52,8 +56,13 @@ not active — run the `source` line again. Nothing below works until this does.
 
 ## Step 1 — Plan and design
 
-**A plan was written, two AI reviewers from different vendors read it, and it
-came back blocked five times running.**
+**What your staff does: a developer works with AI until the objective is
+genuinely clear, then two AI reviewers from different vendors attack the plan.**
+
+**Who ends it: you do.** The reviewers do not stop on their own, so the step
+finishes when you approve the plan — not when the reviews come back clean.
+
+*What happened here.* The plan went round six times against Gemini and GPT:
 
 | Round | Findings | Majors | Result |
 | ---: | ---: | ---: | --- |
@@ -64,59 +73,69 @@ came back blocked five times running.**
 | 5 | 8 | 4 | blocked |
 | 6 | 4 | 4 | one vendor cleared it, one did not |
 
-**Every finding was real and every one was fixed** — case-sensitive headers,
-byte order marks, what counts as a blank line, what happens when a file has no
-header. The reviewers just found four more each time.
+*Every finding was real and every one was fixed* — case-sensitive headers, byte
+order marks, what counts as a blank line, what a file with no header does. The
+reviewers found four more each time.
 
-**A prose plan has no bottom, so "no Major findings" is not a finish line
-anyone reaches.** That is why step 1 ends with a person rather than a clean
-review.
-
-**The developer approved it over four open findings, and the override is
-recorded with its count.** Nothing was erased to make the step pass.
-
-> **You are the tie-breaker on steps 1 and 2, and you will need to be.** The
-> reviewers do not stop on their own.
+**Expect this, and plan for it: a prose document has no bottom, so "no Major
+findings" is not a finish line anyone reaches.** The developer approved over
+four open findings, and the record says so — the override is counted, and the
+findings are kept rather than erased.
 
 ## Step 2 — Decompose into components
 
-**Three candidate decompositions were put up, not one**, and the recommended
-one is argued from a table: take the three changes the plan says are likely,
-and see which split keeps each change inside a single component.
+**What your staff does: AI proposes more than one way to split the work, in
+plain language, and recommends one with its reasoning.**
 
-**Only the recommended split does, which makes the argument checkable rather
-than a matter of taste.** The developer approved, over two open nits.
+**Who ends it: you do**, the same way as step 1.
+
+**Judge the recommendation by where change lands, not by how tidy it looks.**
+Take the changes the plan says are likely, and check which split keeps each one
+inside a single component.
+
+*What happened here.* Three candidates were put up — one component, a split by
+processing step, and a split by what changes. Only the third keeps two of the
+three likely changes inside one component, which is what made the argument
+checkable rather than a matter of taste.
 
 ## Step 3 — Formalize the contracts
 
-**Contracts are rendered as tables with a generated dependency diagram** — open
-[`components/csv_model/contract.md`](components/csv_model/contract.md) and look
-at the right-hand column, where every clause names the test that proves it or
-says **not proved**.
+**What your staff does: a developer writes a contract per component, AI
+reviews them, and you read them.**
 
-**There is no approval gate here: you see the contracts and may object, but the
-work does not wait for you.**
+**This step has no approval gate: you may object, but the work does not wait
+for you.**
 
-**A reviewer caught a real conflict between two contracts.** `csv-app` promised
-to print the parser's rejection wording verbatim, while `csv-parser` explicitly
-refused to promise that wording — so rewording a message the parser team were
-told was safe would have broken the app team's tests.
+**Read the right-hand column of a contract first** — open
+[`components/csv_model/contract.md`](components/csv_model/contract.md), where
+every clause names the test that proves it or says **not proved**.
 
-**It was fixed at the right end: the app gave up a promise it could not keep.**
+*What happened here.* A reviewer caught two contracts contradicting each other.
+`csv-app` promised to print the parser's rejection wording verbatim, while
+`csv-parser` explicitly refused to promise that wording — so rewording a message
+the parser team were told was safe would have broken the app team's tests. It
+was fixed at the weaker end: the app gave up a promise it could not keep.
 
 ## Step 4 — Build the mocks
 
-**A mock satisfies its contract and promises nothing more.** `mock_parser`
-cannot parse at all — it returns a fixed answer per fixture name and raises on
-anything it was not scripted for.
+**What your staff does: a developer builds a stand-in for each component that
+satisfies its contract and promises nothing more.**
 
-**That is deliberate: a mock that really parsed would let the next step pass
-because two implementations happened to agree**, which proves nothing about
-whether the contracts fit together.
+**Keep the stand-ins stupid on purpose.** A mock that does real work lets the
+next step pass because two implementations happened to agree, which proves
+nothing about whether the contracts fit together.
+
+*What happened here.* `mock_parser` cannot parse at all. It returns a fixed
+answer per fixture name and raises on anything it was not scripted for.
 
 ## Step 5 — Build the integration against the mocks
 
-**The whole solution runs end to end on stand-ins alone:**
+**What your staff does: a developer wires the whole solution together and
+runs it end to end on stand-ins alone, before any real component exists.**
+
+**What this proves is that the promises compose** — nothing real is behind it.
+
+*What happened here.* Four cases pass on mocks alone:
 
 ```
 ok   clean.csv: exit 0
@@ -127,24 +146,24 @@ ok   not-utf8.csv: exit 2
 4/4 cases pass on mocks alone
 ```
 
-**Nothing real is behind this, so what it proves is that the promises
-compose.**
-
 ## Step 6 — Build the real components
 
-**`csv-model` and `csv-parser` were built at the same time by different
-people**, and the Explorer shows both at 6/6 with their owners.
+**What your staff does: developers build the real components in parallel, one
+each, replacing the stand-ins one at a time.**
 
-### The feedback loop firing
+**Expect a contract to turn out wrong here, and treat it as normal.** Building
+the real thing is what proves a contract; when it does, the work goes back to
+step 3 and everyone affected is named.
 
-**Building the parser proved the contract wrong.** The contract said blank
-lines *after the header* are skipped and counted, and declared this invariant:
+*What happened here.* `csv-model` and `csv-parser` were built at the same time
+by different people. Building the parser proved the contract wrong: it said
+blank lines *after the header* are skipped and counted, and declared
 
 > records + rejections + blank lines + 1 header == total lines
 
-**A file that begins with a blank line breaks it**, and the implementation only
-agreed by accident because it happened to count leading blanks too. Two people
-reading that contract build two different parsers.
+*which a file beginning with a blank line breaks. The implementation only
+agreed by accident, and two people reading that contract build two different
+parsers.*
 
 So the work went backwards:
 
@@ -155,20 +174,23 @@ ours only agrees by accident.
   affected: csv-app
 ```
 
+**Three things to notice about what a send-back does, because this is where
+most processes get it wrong:**
+
 1. **`csv-parser` dropped from 6/6 to 3/6** and carries a send-back count.
 2. **`csv-model` stayed at 6/6** — a return is scoped to what it affects, not a
-   reset of the project.
+   reset of the whole project.
 3. **`csv-app` was named as affected before its team was hit**, and the
    consumer decides whether it cares, not the producer.
 
-**The contract was fixed, the version went 1.0.0 → 1.1.0, and the change was
-recorded against its consumers.**
+**A contract change carries its version and names its consumers**: this one
+went 1.0.0 → 1.1.0 and was recorded against `csv-app`.
 
 ### The finished state
 
-**No code in `app.run` changed between step 5 on mocks and step 6 on the real
-parser** — swapping the real component in was a change of argument. That is the
-claim the six steps make, and this is the evidence.
+**Swapping a real component in should be a change of argument, and here it
+was:** no code in `app.run` differs between step 5 on mocks and step 6 on the
+real parser. That is the claim the six steps make, and this is the evidence.
 
 ---
 

@@ -19,39 +19,47 @@ import re
 import sys
 from pathlib import Path
 
-BOLD = re.compile(r"\*\*(?:(?!\*\*).)+\*\*")
+# A bold span may wrap across lines but never across a blank line.
+BOLD = re.compile(r"\*\*(?:(?!\*\*)[^\n]|\n(?!\s*\n))+?\*\*")
 BLOCK = "▒"
 
 
-def blank(text):
-    """Everything that is not bold, gone. Layout survives so the page still
-    looks like a page; the words do not."""
-    out, last = [], 0
-    for m in BOLD.finditer(text):
-        out.append(re.sub(r"\S", BLOCK, text[last:m.start()]))
-        out.append(m.group(0))
-        last = m.end()
-    out.append(re.sub(r"\S", BLOCK, text[last:]))
-    return "".join(out)
-
-
 def skim(md):
-    out, in_fence = [], False
-    for raw in md.split("\n"):
-        st = raw.strip()
-        if st.startswith("```"):
-            in_fence = not in_fence
-            out.append(raw)
-        elif in_fence or not st:
-            out.append(raw)
-        elif st.startswith("#") or st.startswith("---") or st.startswith("|"):
-            out.append(raw)                      # Headings and tables are scanned.
+    """Blank every character the eye never lands on.
+
+    Whole-document, by offset, deliberately. An earlier version walked line by
+    line and so could not see a bold span that wrapped -- it blanked the one
+    sentence each paragraph existed to deliver, while the audit, which joins a
+    paragraph before looking, reported the document as fine. The two halves
+    disagreed and the audit was believed.
+    """
+    protect = []
+
+    for m in re.finditer(r"^```.*?^```", md, re.S | re.M):
+        protect.append((m.start(), m.end()))
+    for m in re.finditer(r"^[ \t]*(#{1,6} .*|\|.*|-{3,}|\d+[.)] |[-*+] )$",
+                         md, re.M):
+        protect.append((m.start(), m.end()))
+    for m in re.finditer(r"^[ \t]*(#{1,6} .*|\|.*|-{3,})$", md, re.M):
+        protect.append((m.start(), m.end()))
+    # List markers keep their shape so the reader still sees a list.
+    for m in re.finditer(r"^[ \t]*(\d+[.)]|[-*+])[ \t]", md, re.M):
+        protect.append((m.start(), m.end()))
+    for m in BOLD.finditer(md):
+        protect.append((m.start(), m.end()))
+
+    keep = bytearray(len(md))
+    for a, b in protect:
+        for i in range(a, b):
+            keep[i] = 1
+
+    out = []
+    for i, ch in enumerate(md):
+        if keep[i] or ch.isspace():
+            out.append(ch)
         else:
-            indent = len(raw) - len(raw.lstrip())
-            m = re.match(r"^([-*+]|\d+[.)])\s", st)
-            marker = m.group(0) if m else ""
-            out.append(" " * indent + marker + blank(st[len(marker):]))
-    return "\n".join(out)
+            out.append(BLOCK)
+    return "".join(out)
 
 
 def audit(md):
@@ -65,7 +73,10 @@ def audit(md):
             continue
         if in_fence:
             continue
-        if not st or st.startswith("#") or st.startswith("|") or st.startswith("---"):
+        # A blockquote is displayed material -- a quoted invariant, a pulled-out
+        # warning -- not a paragraph of prose owing a point sentence.
+        if (not st or st.startswith("#") or st.startswith("|")
+                or st.startswith("---") or st.startswith(">")):
             if cur:
                 paras.append(cur)
                 cur = []
@@ -81,7 +92,11 @@ def audit(md):
         # A single short line ending in a colon is a label for the block
         # below, not a paragraph making a point. It needs no bold.
         lead_in = len(p) == 1 and text.strip().endswith(":") and len(text) < 90
-        if n == 0 and not lead_in:
+        # A paragraph opening in italics is marked by its author as
+        # illustration -- evidence for a point made elsewhere. It is meant to
+        # go unread by a skimmer, which is exactly the claim "no bold" makes.
+        illustration = text.strip().startswith("*") and not text.strip().startswith("**")
+        if n == 0 and not lead_in and not illustration:
             bare.append((p[0][0], text.strip()[:70]))
         elif n > 2:
             many.append((p[0][0], n, text.strip()[:60]))

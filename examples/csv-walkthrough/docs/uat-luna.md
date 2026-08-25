@@ -111,3 +111,43 @@ instruction for running one.** That is still to be fixed.
 sentences and read them as a column. If they do not instruct, the document does
 not instruct. `scripts/skimcheck.py` does the redaction and the paragraph audit;
 `scripts/uat_follow.py` drives the model. See `docs/skim-resilient-writing.md`.
+
+---
+
+## Fifth run: rewritten to instruct, checked by two models
+
+**The step sections were rewritten so each one leads with what a reader does,
+and the story of this particular run was demoted below it in italics.** Every
+step now opens with a bolded *What your staff does*, and says who ends the step.
+
+**Both models were then run against the redacted document, from two different
+vendors.**
+
+| Model | Turns | Confused | Verdict |
+| --- | ---: | ---: | --- |
+| GPT-5.6 Luna | 11 | 0 | **passes** |
+| Gemini Flash | 7 | 1 | **passes** |
+
+**Luna's earlier failure was correct and my tooling was wrong.** It reported
+that the redacted document did not say what staff must do, while the paragraph
+audit said every paragraph had a point sentence. The audit joins a paragraph
+before looking; the redactor matched bold line by line — so a bold span that
+wrapped across a line break was blanked by one half of the tool and counted by
+the other. The bolds that mattered most were exactly the long ones that wrapped.
+**The redactor now works on the whole document by character offset, and the two
+halves cannot disagree again.**
+
+**Gemini Flash's one confusion is a real defect and was fixed:** the setup
+section promised "three components, each at 6/6", while the actual output also
+shows `(1 sent back)`, unexplained until step 6. A verification step whose
+expected output does not match the real output teaches a reader to distrust the
+document at the first command.
+
+**Three harness bugs were also found, all of which had been scored against the
+document rather than against the tool:** `cd` and `source` were missing from the
+allow-list, each command ran in a fresh shell so a working directory never
+persisted, and a read-only `2>/dev/null` was rejected as a write.
+
+**That is the standing risk with this method: a harness that lies produces
+findings that look exactly like real ones.** Every failure has to be reproduced
+by hand before it is believed.

@@ -7,11 +7,14 @@ live in the rebuild work plan; `STATUS.md` carries the inter-session handoff.
 
 ## Working branch
 
-Work happens on `experiment/verification-pipeline-v3`, not `master`. The
-branch explores a cheaper approach to verification after an earlier rewrite
-ran into trouble. Branch from it, commit to it, and push it; leave `master`
-alone. If the approach proves out it merges back to `master` — until then,
-treat this branch as the trunk for day-to-day work.
+**Work happens on `master`.** Set 148 builds the session framework there,
+per the standing trunk-based directive. Commit to it and push it.
+
+`experiment/verification-pipeline-v3` and `design/solution-decomposition`
+are both merged into `master` and are finished. The experiment branch
+carried the cheaper verification approach; the design branch carried the
+framework specification. Neither is the place to commit now — taking either
+one as the trunk strands work where nothing else can see it.
 
 ## Ground rules
 

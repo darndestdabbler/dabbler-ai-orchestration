@@ -1,5 +1,7 @@
 """The scripted transport: the framework's model calls without a vendor."""
 
+from pathlib import Path
+
 import pytest
 
 from ai_router.config import TRANSPORT_OFFLINE, VALID_TRANSPORTS, resolve_transport
@@ -90,7 +92,9 @@ class TestSelection:
         resolved = resolve_responses_dir(
             {"transports": {"offline": {"responses_dir": "/scripts"}}}
         )
-        assert str(resolved) == "/scripts"
+        # Compared as a path, not as its rendered string: the separator is a
+        # property of the platform, not of the resolution being tested.
+        assert resolved == Path("/scripts")
 
     def test_unconfigured_offline_refuses_rather_than_defaulting(
         self, monkeypatch

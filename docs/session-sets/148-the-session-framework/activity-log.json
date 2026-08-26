@@ -1,0 +1,69 @@
+{
+  "sessionSetName": "148-the-session-framework",
+  "createdDate": "2026-08-26T16:17:37.728042-04:00",
+  "totalSessions": 17,
+  "entries": [
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-26T16:17:37.728227-04:00",
+      "description": "Register.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "run-cross-provider-verification-over-docs",
+      "dateTime": "2026-08-26T16:17:37.728227-04:00",
+      "description": "Run cross-provider verification over `docs/session-framework-spec.md` and `docs/session-framework-plan.md` as the session's work product. **This is the dogfood step that matters most** \u2014 a framework that verifies designs must survive its own design being verified.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "remediate-blocking-findings-that-identify-a",
+      "dateTime": "2026-08-26T16:17:37.728227-04:00",
+      "description": "Remediate blocking findings that identify a genuine contradiction, omission, or unbuildable instruction. **Stop when only Minor findings remain** \u2014 prose review has no bottom.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "record-every-design-decision-the-round",
+      "dateTime": "2026-08-26T16:17:37.728227-04:00",
+      "description": "Record every design decision the round produced in the decisions log for this set, by hand for now: the framework that writes it does not exist until session 5.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "present-the-unresolved-findings-if-any",
+      "dateTime": "2026-08-26T16:17:37.728227-04:00",
+      "description": "Present the unresolved findings, if any, to the operator for approval over \u2014 the one place the specification permits it.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 6,
+      "stepKey": "close-out",
+      "dateTime": "2026-08-26T16:17:37.728227-04:00",
+      "description": "Close-out.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-26T16:17:37.731748-04:00",
+      "description": "Registered session 1 (copilot).",
+      "status": "complete"
+    }
+  ]
+}

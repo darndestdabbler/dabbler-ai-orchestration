@@ -200,3 +200,242 @@ will be compared against.
 delta-only read. A session that disputes rather than remediates still pays
 for a round — the saving is in not corrupting the code, not in seat spend.*
 
+---
+
+## Session 2 — Verify this breakdown against that design
+
+### D10 · 2026-08-26 · AI (orchestrator) · Every plan item appears exactly once
+
+Checked the plan's item list against the set's seventeen sessions.
+
+| Plan item | Session | |
+| --- | ---: | --- |
+| A1 credential allowlist | 3 | ✓ |
+| A2 record authority | 4 | ✓ |
+| A4 the two files | 5 | ✓ |
+| A5 agency, read half | 6 | ✓ split |
+| A5 agency, write half | 7 | ✓ split |
+| A6 selection by role | 8 | ✓ |
+| A7 model discovery | 9 | ✓ |
+| B1 code review loop | 10 | ✓ |
+| B2 verifier authors tests | 11 | ✓ |
+| B3 full suite, bounded fix loop | 12 | ✓ |
+| C packaging | 13 | ✓ |
+| A3 collapse session sets | 14 | ✓ moved |
+| D1 sessions view | 15 | ✓ |
+| D2 project setup | 16 | ✓ |
+| D3 unresolved-session view | 17 | ✓ |
+
+Nothing is claimed twice and nothing is dropped. A5 is the only item split
+across two sessions, and the split is along the read/write boundary the
+specification already draws — the three read operations are one enforcement
+problem and the single write is another.
+
+Sessions 1 and 2 build no plan item by design; they are the set's own
+verification of the design and the breakdown.
+
+### D11 · 2026-08-26 · AI (orchestrator) · §3.a is unbuilt, and session 13 depends on it — the one real gap
+
+**`releasable` appears in the three design documents and nowhere in the
+code.** Grepped the whole repository: `docs/session-framework-spec.md:93`,
+`:100`, `:110`, `docs/session-framework-plan.md:233`, and this set's
+`spec.md:353`. No module, no schema, no state file.
+
+Session 13 step 3 reads: *"Releasability is read from the task list
+declared at step (a). A session that did not declare itself releasable
+cannot publish."* **No session builds step (a).**
+
+That is precisely the failure mode session 2 exists to catch — a session
+depending on something no session creates. Left alone, session 13 would
+arrive to find its gate has nothing to read, and the likely improvisation
+is the one §3.a exists to prevent: a model deciding when to publish.
+
+**Assigned to session 5**, which already writes `project-work-plan.md` and
+the numbered session list derived from it. The declaration belongs beside
+the session list, is written by the sanctioned writer like everything else
+in that file, and exists eight sessions before the gate that reads it.
+
+*Recorded as an amendment to the breakdown, not to the specification. The
+spec was right; the session list had a hole.*
+
+### D12 · 2026-08-26 · AI (orchestrator) · Session 8 does not depend on session 9, though it reads as if it might
+
+Plan A6 has the direct-API path resolve the `verifier` role "against the
+model record", and A7 — a session later — is what builds enumeration into
+that record. Read quickly, that is a forward dependency.
+
+It is not one. The record session 8 resolves against already exists: the
+`models` block in `router-config.yaml` carries thirteen entries today, and
+the seat has `copilot-catalog.lock`. Session 9 changes how that record is
+*maintained* (enumerated and dated rather than hand-kept); it does not
+create the thing session 8 reads.
+
+**Checked rather than assumed**, because the plan's own "A6 and A7 move
+together or not at all" is about the pricing sort key, not about ordering:
+A6 must replace rates as the candidate sort key in the same change that
+deletes pricing. That constraint is within session 8.
+
+### D13 · 2026-08-26 · AI (orchestrator) · The session 14 reordering is sound
+
+The set spec moves A3 from third to fourteenth. Confirmed both halves of
+the claim the set spec makes for it:
+
+- **No session between 3 and 13 depends on session sets being collapsed.**
+  Every one of them works inside `ai_router` internals — `checks.py`,
+  `workflow.py`, `verdict.py`, `writers.py`, the agency surface, role
+  resolution, discovery, the three loops, packaging. None reads or renders
+  the set level.
+- **Sessions 15 through 17 do depend on it.** All three are extension
+  surfaces that render or read the session tree, which is the structure
+  session 14 changes.
+
+**The reordering is not merely safe, it is required.** A3 removes the
+machinery sessions 4 through 17 register, verify and close under; run at
+session 3 it would strand the rest of the set. Session 14's own step 3
+carries the real risk — migrating this set's state forward — and the set
+spec already states the test: if sessions 15 through 17 cannot register,
+verify and close under what session 14 builds, session 14 is not done.
+
+### D14 · 2026-08-26 · AI (orchestrator) · Two spec sections need no session, and one was checked too narrowly
+
+Checked for specification sections that no session builds:
+
+- **§1.a "not selectable in the extension"** is **already true**. No
+  reference to `transport` exists in any of the extension's fifty
+  TypeScript files; the surfaces the changelog describes are gone.
+- **§1.b removal of the old staff-facing file set** is covered jointly by
+  session 5 (the two files replace it) and session 14 (the set level and
+  its state files). Not a gap, but it is nobody's headline.
+- **§10** names absences and builds nothing by definition.
+
+**Corrected after round 1, finding 1.** This entry originally concluded
+that §1.a was satisfied outright. It checked one of the section's three
+surfaces. §1.a names the extension, the staff documentation, **and the
+shipped configuration**, and `router-config.yaml` ships
+`transport.profile: api` — so the default was wrong on the one surface
+staff actually receive, and no session changed it. Assigned to session 8
+step 7.
+
+*The error is worth keeping visible: "already satisfied" is the most
+expensive kind of wrong answer in a completeness review, because it closes
+the question. A partial check that reports as a whole one is how a gap
+survives its own audit.*
+
+### D15 · 2026-08-26 · Verifier (gpt-5.5/openai) · Round 1 found three unassigned deliverables
+
+All three were real, all three were Completeness, and none was a
+disagreement about design — they were places the breakdown claimed
+coverage it did not have.
+
+| Finding | Assigned to |
+| --- | --- |
+| §1.a seat default in the shipped configuration | session 8 step 7 |
+| Pricing's rate tables, `confirmed_on`, schema keys and dollar reporting | session 8 step 6 |
+| The waiver can close an ordinary code session | session 3 step 2 |
+
+Verified each against the code before accepting it: the packaged config
+does carry `transport.profile: api`; twelve of thirteen model records carry
+`confirmed_on` alongside per-token rate fields the schema still admits; and
+`run_waive` checks adjudication exhaustion and a TTY but never the session's
+kind.
+
+**The third is the one that mattered most.** This set's own operating rule
+is that no session may reduce its own verification, and sessions 3 through
+17 are supposed to have no escape hatch at all. The hatch existed, unguarded
+against exactly the sessions the specification excludes, and it took a
+different vendor reading §9 against the code to notice.
+
+### D16 · 2026-08-26 · Verifier (gpt-5.5/openai) · Round 2: the right fix in the wrong session is still a gap
+
+Round 2 accepted the transport and pricing assignments and rejected the
+third: the waiver guard had been assigned to **session 4**, and session 3
+runs first.
+
+Session 3 is an ordinary code session. Until the guard exists, session 3's
+own verification can be stamped `WAIVED` by exactly the path §9 excludes —
+and session 3 is the session most likely to need it, being the first real
+code session and the one whose seat cost is being measured.
+
+**Moved to session 3, step 2**, before the credential-allowlist work.
+`verify waive` runs from the working tree, so a guard built in step 2 is in
+force by the time step 7 could reach the waive path. Session 3 becomes the
+first session the guard protects instead of the last one it misses.
+
+*A completeness review that stops at "is it assigned?" misses this entirely.
+The question is "is it assigned early enough to cover the first session that
+could use the hole", and ordering is the answer to it. This is the same
+class of reasoning the session 14 reordering rests on, applied in the other
+direction.*
+
+### D17 · 2026-08-26 · Verifier (gpt-5.5/openai) · Round 3: there were two waiver paths, and the fix named one
+
+Round 3 — the round cap — returned one Major finding, and it was right for
+the third time on the same subject.
+
+The guard was written against `ai_router.verify waive`. The run-core exposes
+a second, independent path: `dabbler finish --waive "<reason>"
+--attest-operator`, whose `_resolve_verified_verdict` returns `WAIVED` on
+attestation alone. Confirmed in code — `runcli.py` exposes the flag, the
+resolver contains no planning or session-kind check, and
+`tests/test_runcore_verified.py` asserts the path works for a fixture
+session that is ordinary implementation work.
+
+**Step 2 now binds every public waiver path**, and says so as a rule rather
+than as a list: the guard belongs where a verdict becomes non-blocking, so a
+third entry point cannot reopen the hole by not knowing about the other two.
+
+*Three rounds, three genuine findings, each one a strictly smaller miss than
+the last: unassigned → assigned too late → assigned to one of two paths.
+That is convergence, not the prose-grinding the round cap exists to stop —
+each round found something the previous one had actually got wrong, and none
+re-litigated a settled decision.*
+
+**This remediation is itself unverified.** Round 3 was the cap, so the fix
+above has not been through a round. That is the state session 2 hands to the
+operator, and the specification's answer for a planning session at the cap
+is the approval gate — not a fourth round taken unilaterally.
+
+### D18 · 2026-08-26 · AI (orchestrator) · The framework has no exit for "the verifier was right, I fixed it, and I am out of rounds"
+
+Round 4 was attempted and **refused before any vendor call**: *"round 4
+exceeds the cap (3). The loop SUSPENDS at the bound."* The cap works.
+
+The refusal names two sanctioned exits, and **neither one fits**:
+
+- **Dispute** requires rebutting the finding. The finding was correct.
+  Disputing it would be a false statement on the record, in a set whose
+  entire claim is that the record is honest.
+- **Adjudicate** routes recorded disputes to a third provider. There are no
+  disputes to route, and a third provider is reachable, so adjudication is
+  neither unavailable nor applicable.
+
+`verify waive` sits behind those two: it requires the machine path
+exhausted — an adjudication that upheld a blocking finding, or adjudication
+genuinely unavailable. Neither holds. **So the code-level override the
+specification reserves for planning sessions is not reachable in the one
+situation a planning session is most likely to reach it.**
+
+**The gap is between §9 and the machinery, not inside either.** §9 says the
+operator may approve over unresolved findings in sessions 1 and 2, and the
+set spec repeats it. The implementation offers that door only to a session
+that *contested* a finding and lost. A session that agreed with every
+finding, fixed every one, and simply ran out of rounds has no door at all —
+its good behaviour is what disqualifies it.
+
+**Design input, and it belongs to session 10**, which builds the code review
+loop and its cap. The loop needs a third terminal state beside "clean" and
+"contested at the cap": *remediated at the cap, unverified*. It is not a
+waiver — nothing is being accepted over — it is an honest label for work
+whose last fix was never reviewed, and the unresolved-session view of
+session 17 is where it should surface.
+
+*Left to the operator rather than resolved here. The available workarounds —
+raising `max_rounds` mid-session, or filing a dispute nobody believes — both
+edit the conditions of a review from inside the review, which is the one
+thing this set exists to make impossible.*
+
+
+
+
+
+

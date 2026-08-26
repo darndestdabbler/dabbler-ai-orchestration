@@ -17,20 +17,20 @@
 > envelope, and the `AGENTS.md` ground rules remain set aside per
 > `docs/operator-decisions.md`.
 
-> **Blocking precondition. Set 148 cannot start until two other sets are
-> settled.** Set 145 `step-execution` is still `in-progress`, and two
-> in-progress sets is a drift error. Set 146 `measure-then-enable` has
-> never been started, so the lowest-numbered-`not-started` rule selects it
-> ahead of this set. **Both dispositions are the operator's**, and neither
-> file may be hand-edited to resolve it.
+> **Blocking precondition — settled 2026-08-26, before session 1.** Set 145
+> `step-execution` was `in-progress` and set 146 `measure-then-enable` had
+> never been started, so the lowest-numbered-`not-started` rule selected 146
+> ahead of this set. Both dispositions already existed in machine-written
+> form in commit `0cc98b33` and were carried onto the working branch **by
+> merge, not by editing a state file**. Zero sets are now `in-progress`.
 
-> **Open decision — the branch. The operator settles this before session 1.**
-> The design documents currently sit on `design/solution-decomposition`.
-> The standing directive is trunk-based work on `master`; `AGENTS.md` names
-> `experiment/verification-pipeline-v3`, which is a different experiment.
-> **Recommendation: merge the design documents to `master` and run this set
-> on `master`**, per the standing directive. Nothing in the session list
-> depends on which is chosen, but every session inherits the answer.
+> **The branch — settled 2026-08-26 by the operator: this set runs on
+> `master`**, per the standing trunk-based directive. `master` was a strict
+> ancestor of both `design/solution-decomposition` and
+> `experiment/verification-pipeline-v3`, so it fast-forwarded to the design
+> tip and then merged the experiment tip; no published history was
+> rewritten. `AGENTS.md` now names `master` as the working branch.
+
 
 ---
 
@@ -156,21 +156,46 @@ Est. 0 tests.
 ### Session 3 of 17: The credential allowlist (plan A1)
 
 1. Register.
-2. Build the child environment in `checks.py::_spawn` from an allowlist of
+2. **Restrict the operator waiver to planning sessions, first — on every
+   public path, not one of them.** A waiver writes a non-blocking `WAIVED`
+   row and stamps the session's verification. Today two public paths do
+   this and **neither checks which kind of session it is closing**:
+   `ai_router.verify waive`, and the run-core's
+   `dabbler finish --waive ... --attest-operator`, whose
+   `_resolve_verified_verdict` returns `WAIVED` on attestation alone. Both
+   check that the machine path is exhausted and that a human is present;
+   neither checks the session. Spec §9 puts the override in the planning
+   sessions and nowhere else: "Code sessions do not need the escape hatch,
+   because a failed code session is cheap." Refuse both on an ordinary code
+   session, and **treat any future waiver path as bound by the same rule** —
+   the guard belongs at the point a verdict becomes non-blocking, so a third
+   entry point cannot reopen the hole by not knowing about it.
+   **This is step 2 of the first code session on purpose** — it is in the
+   working tree before this session's own verification can reach a waive
+   path, so session 3 is the first session the guard protects rather than
+   the last one it misses.
+3. Build the child environment in `checks.py::_spawn` from an allowlist of
    what the toolchain requires, in **both** branches. Redirect `TEMP` and
    `TMP`. Exclude vendor keys, feed PATs, git tokens, proxy credentials,
    and `_JAVA_OPTIONS`-style option variables.
-3. Add a Windows sentinel test that plants a secret in the parent
+4. Add a Windows sentinel test that plants a secret in the parent
    environment and asserts a spawned check process cannot see it.
-4. **Measure this session's seat cost and record it in the set's decisions
+5. **Measure this session's seat cost and record it in the set's decisions
    log.** This is the unit that says whether seventeen sessions fit.
-5. Affected tests as preverify.
-6. Cross-provider verification.
-7. Full test suite, recorded as the `final-full` run of record.
-8. Close-out.
+6. Affected tests as preverify.
+7. Cross-provider verification.
+8. Full test suite, recorded as the `final-full` run of record.
+9. Close-out.
 
-**Creates:** the allowlisted child environment and its sentinel test.
-Est. 4 Python tests.
+**Creates:** the allowlisted child environment, its sentinel test, and the
+guard that makes "sessions 3 onward may not be approved over" true in code
+rather than in prose. Est. 7 Python tests.
+
+> **Step 2 added by session 2, after round 2.** It was first assigned to
+> session 4, which is one session too late: session 3 is itself an ordinary
+> code session, and until the guard exists its verification can be stamped
+> `WAIVED` by the very path the specification excludes.
+
 
 ### Session 4 of 17: Record authority (plan A2)
 
@@ -192,6 +217,7 @@ Est. 4 Python tests.
 **Creates:** one transition validator, two closed holes. Est. 8 Python
 tests.
 
+
 ### Session 5 of 17: The two files, framework-written (plan A4)
 
 1. Register.
@@ -199,16 +225,27 @@ tests.
    `writers.py`, in a fixed shape. The model supplies content; it never
    chooses structure, filename, or organization.
 3. Every decision — human or AI — appends at the moment it occurs.
-4. **Backfill this set's own decisions log through the new writer**, from
+4. **The task list of spec §3.a, beside the numbered session list.** Each
+   session declares what it will do and **whether it produces a releasable
+   artifact**, written by the same sanctioned writer. The declaration is
+   made before any code exists, because otherwise a model decides when to
+   publish a package.
+5. **Backfill this set's own decisions log through the new writer**, from
    the hand-kept records of sessions 1 through 4. The first user of the
    feature is this set.
-5. Affected tests as preverify.
-6. Cross-provider verification.
-7. Full test suite, recorded as the `final-full` run of record.
-8. Close-out.
+6. Affected tests as preverify.
+7. Cross-provider verification.
+8. Full test suite, recorded as the `final-full` run of record.
+9. Close-out.
 
-**Creates:** the two sanctioned files and their writers. Est. 6 Python
-tests.
+**Creates:** the two sanctioned files, their writers, and the releasable
+declaration session 13 reads. Est. 8 Python tests.
+
+> **Added by session 2.** Step 4 was missing from the breakdown: `releasable`
+> appeared in the specification and in session 13's gate, but no session
+> built it. Session 13 cannot read a declaration nothing writes. It lands
+> here because this is the session that already writes the session list.
+
 
 ### Session 6 of 17: The verifier's read surface (plan A5, first half)
 
@@ -257,16 +294,36 @@ Est. 8 Python tests.
    as a selection filter.
 5. Delete `pick_model`, `next_escalation_model`, `estimate_complexity`,
    `pricing.py`'s cost arithmetic, and the load-time rate check.
-6. **This is one change, not two.** Rates are the current sort key for
+6. **Delete the shipped pricing surfaces too, not just the arithmetic.**
+   The per-token rate fields and `confirmed_on` on the model records in
+   `router-config.yaml`, the schema keys that admit them, and any
+   dollar-denominated reporting left in `metrics.py` and `route.py`. Spec
+   §7 says the framework does not record dollar cost, rate tables, or rate
+   confirmation dates — deleting the arithmetic while the rates still ship
+   leaves pricing a configured product surface with nothing reading it.
+7. **Make the seat the default in the shipped configuration.**
+   `transport.profile` ships as `api` today, which contradicts §1.a on the
+   one surface staff actually receive. Flip it to `copilot-cli` and follow
+   the same change through the staff-facing documentation. The precedence
+   order is unchanged — flag, then env, then profile — so the direct-API
+   path stays reachable and merely stops being the default.
+8. **This is one change, not two.** Rates are the current sort key for
    candidate ordering, so pricing cannot be removed until the declared
    preference order replaces it.
-7. Affected tests as preverify.
-8. Cross-provider verification.
-9. Full test suite, recorded as the `final-full` run of record.
-10. Close-out.
+9. Affected tests as preverify.
+10. Cross-provider verification.
+11. Full test suite, recorded as the `final-full` run of record.
+12. Close-out.
 
-**Creates:** one selection mechanism; a net deletion. Est. 10 Python tests,
-with more deleted than added.
+**Creates:** one selection mechanism, and the end of pricing as a shipped
+surface; a net deletion. Est. 12 Python tests, with more deleted than added.
+
+> **Steps 6 and 7 added by session 2.** The breakdown named `pricing.py`'s
+> arithmetic but not the rates and confirmation dates in the packaged config
+> and schema, and no session anywhere made the seat the shipped default.
+> Both land here because both are edits to `router-config.yaml`, which this
+> session already rewrites — one config change, one review.
+
 
 ### Session 9 of 17: Model discovery (plan A7)
 
@@ -349,8 +406,9 @@ tests.
 2. `pack`, then `push` to the Azure DevOps feed with the operator's PAT,
    resolved through `secret_resolver` and **never placed in a child
    environment** — session 3 is what makes that real rather than intended.
-3. Releasability is read from the task list declared at step (a). A session
-   that did not declare itself releasable cannot publish.
+3. Releasability is read from the task list declared at step (a), which
+   **session 5 step 4 writes**. A session that did not declare itself
+   releasable cannot publish.
 4. Affected tests as preverify.
 5. Cross-provider verification.
 6. Full test suite, recorded as the `final-full` run of record.

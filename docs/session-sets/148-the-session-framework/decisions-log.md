@@ -1099,3 +1099,98 @@ answer is fewer and larger sessions, never fewer rounds.
 *One round of verification found three Major defects, one of which — the
 session-4 misattribution — was in the record this session exists to make
 trustworthy, and no amount of re-reading the diff would have surfaced it.*
+
+## Session 6 — The verifier's read surface (plan A5, first half)
+
+### D49 · 2026-08-27 · Orchestrator · Read scope and budget are declared and recorded, not refused
+
+The Copilot CLI executes the verifier's tools inside its own process, so the
+framework cannot refuse a read the way session 7 will refuse a write. The
+write path can be enforced because the framework applies the write; the read
+path cannot, because the model calls `view` and the CLI answers it.
+
+So scope and budget are declared to the verifier in the prompt and then
+measured against what the round actually did. Every list, search and read is
+recovered from the CLI's own JSONL event stream and recorded on the round,
+with `in_scope` on each operation and `out_of_scope` / `over_budget` counts on
+the record. A verifier that read outside the session's changed files and their
+declared dependencies, or past its read budget, produces a round that says so
+in the machine-written ledger.
+
+The alternative -- claiming enforcement the transport cannot deliver -- would
+put a false statement on a record whose entire claim is that it is honest.
+Recording is what is actually available, and per spec section 4 it is also the
+limit that matters: the log makes a verifier's selective looking checkable
+afterward, which a refusal would not.
+
+### D50 · 2026-08-27 · Orchestrator · Read fidelity is decided by line-number comparison, proved against the live CLI
+
+The transform §4.a warns about was reproduced against the live CLI rather than
+assumed. A file containing
+
+        "Authorization": f"Bearer {api_key}",
+
+was read through the `view` tool and returned to the model as
+
+    6.         "Authorization": f"******",
+
+which is the session 1 incident exactly: correct interpolation displayed as a
+hardcoded placeholder, with the agency log able to show only that the right
+file was read.
+
+Two facts from the same probe decide the implementation.
+
+The `view` tool returns content as `N. <text>`, where N is the file's own
+1-based line number. Fidelity is therefore an exact mechanical comparison
+rather than a heuristic: parse the shown line numbers, read the same lines off
+disk, and compare. A read whose shown line differs from the disk line at the
+same number is `transformed`; one where every shown line matches is
+`verbatim`. Partial reads and truncation stay honest under this rule because
+only the lines actually shown are compared.
+
+The same probe, run with a malformed `--available-tools` value, produced a
+worse failure worth guarding: with the read tools disabled the model emitted
+`<function_calls><invoke name="view">` as ordinary message text and then
+answered from invention -- it reported a marker string the file does not
+contain. A round with a granted read surface and zero recorded tool calls is
+that shape, so the record carries the operation count and the surface it was
+granted, and the two can be compared.
+
+### D51 · 2026-08-27 · Verifier (gpt-5.5/openai) · Scope missed sibling-module imports; the import names are half the declaration
+
+Round 1 raised a Major against the scope computation and it was correct.
+`declared_dependencies` resolved only the module part before `import`, so
+`from . import ledger` and `from ai_router import ledger` -- the form
+`verify.py` itself uses -- resolved to the package `__init__.py` and never to
+the sibling module. A verifier briefed with that scope would have had a real
+dependency missing from it, and its legitimate read of that dependency
+recorded as out of scope.
+
+The import clause declares two things, and only one was being read: the
+module path before `import`, and the names after it. Both are now resolved,
+with the names tried as submodules of the stem.
+
+The finding is a fair test of the feature under construction, because the
+round that raised it was itself briefed by the scope it was complaining
+about. The round's own agency record showed 9 reads outside scope out of 34,
+which is the same defect measured from the other side.
+
+### D52 · 2026-08-27 · Verifier (gpt-5.5/openai) · An unconfined search is not a scoped one; in_scope now means confined to the grant
+
+Round 2 raised a Major that the first fix created. Marking a pattern-only
+`grep` or `glob` as in-scope let a repository-wide search leave the round with
+`out_of_scope == 0`, so the ledger would attest to a scoped review that had
+not happened -- the precise failure the log exists to prevent.
+
+`in_scope` now means "this operation was confined to the grant", which is a
+claim the framework can actually make. A read names a path and is placed
+against the scope. A search or a listing is confined only when it also names
+paths; a pattern on its own reaches the whole tree and is recorded as
+unconfined, with the reason on the operation. The briefing tells the verifier
+how to confine a search, so complying is available rather than merely
+demanded.
+
+The earlier reasoning -- that a repository-wide grep is a legitimate way to
+find where something is used -- is still true and is not an argument for
+recording it as confined. It is recorded, not refused; what changed is that
+the record stopped overstating it.

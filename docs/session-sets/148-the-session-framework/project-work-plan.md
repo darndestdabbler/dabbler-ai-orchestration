@@ -41,7 +41,7 @@ it.
 | 3 | The credential allowlist (plan A1) | — | not declared |
 | 4 | Record authority (plan A2) | — | not declared |
 | 5 | The two files, framework-written (plan A4) | no | 2026-08-27 |
-| 6 | The verifier's read surface (plan A5, first half) | — | not declared |
+| 6 | The verifier's read surface (plan A5, first half) | no | 2026-08-27 |
 | 7 | The test-write path (plan A5, second half) | — | not declared |
 | 8 | Selection by role, and the death of the tier ladder (plan A6) | — | not declared |
 | 9 | Model discovery (plan A7) | — | not declared |
@@ -69,3 +69,24 @@ because session 13 gates packaging on a declaration nothing wrote.
 
 Backfill this set's own decisions log through the new writer, from the
 hand-kept records of sessions 1 through 4.
+
+### Session 6 — The verifier's read surface (plan A5, first half)
+
+**Releasable: no.**
+
+Build the read half of the verifier's agency surface on the Copilot path: list
+files by pattern, search file contents by pattern, and read a file's contents.
+
+Scope the surface to the session's changed files and their declared
+dependencies, never the whole repository. Budget a fixed number of reads per
+round. Log every list, search and read into the round record.
+
+Enforce read fidelity per spec section 4.a: either the verifier reads the bytes
+on disk, or the round records that a transform was applied. The secret-scrubbing
+layer rewrites credential-shaped text, so a scrubbed read must be marked as
+transformed rather than presented as the file. Do not weaken the scrubber.
+
+Stamp a direct-API round as `agency: none`, so a round that could not look is
+never reported as equivalent to one that could.
+
+This session builds framework internals and publishes no package.

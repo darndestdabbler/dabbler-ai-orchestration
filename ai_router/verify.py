@@ -81,7 +81,7 @@ import sys
 from pathlib import Path
 from typing import Optional
 
-from . import ledger
+from . import agency, ledger
 from .evidence import (
     changed_paths_between,
     repo_root_for,
@@ -269,7 +269,7 @@ def _prior_findings_block(rounds: list, disputes=None, repo_root=None) -> str:
 
 def _build_task_block(
     set_dir, session_number: int, round_number: int, prior_rounds: list,
-    disputes=None, repo_root=None,
+    disputes=None, repo_root=None, grant=None,
 ) -> str:
     parts = []
     prior = _prior_findings_block(prior_rounds, disputes, repo_root)
@@ -281,6 +281,9 @@ def _build_task_block(
         "session's plan, verbatim from spec.md:\n\n"
         + _spec_excerpt(set_dir, session_number)
     )
+    briefing = agency.briefing(grant) if grant is not None else ""
+    if briefing:
+        parts.append(briefing)
     return "\n\n".join(parts)
 
 
@@ -510,8 +513,11 @@ def run_round(
 
     A round never opens on unproved work: the affected tests come first, and
     a full-suite run is not a substitute for them."""
-    from .affected import preverify_gate, preverify_recipe, remediation_recipe
-    from .config import load_config
+    from .affected import (
+        preverify_gate, preverify_recipe, remediation_recipe,
+        working_tree_changes,
+    )
+    from .config import load_config, resolve_transport
     from .route import NoCandidateError, RouterError
     from .session import append_change_log_block, record_session_verification
     from .progress import read_session_state
@@ -624,11 +630,22 @@ def run_round(
         return EXIT_USAGE
 
     disputes = ledger.read_disputes(repo_root, slug, current)
+    scope = agency.session_scope(
+        repo_root, set_path,
+        working_tree_changes(
+            repo_root, None if round_number == 1
+            else prior_rounds[-1]["completion_tree"]
+        ) or (),
+    )
+    read_budget = settings.get("read_budget") or agency.DEFAULT_READ_BUDGET
+    grant = agency.grant_for_transport(
+        resolve_transport(config, transport), scope, read_budget,
+    )
     prompt_body = build_verification_prompt(
         config.get("_verification_template", ""),
         _build_task_block(
             set_path, current, round_number, prior_rounds, disputes,
-            repo_root,
+            repo_root, grant,
         ),
         "session-verification",
         evidence,
@@ -702,6 +719,15 @@ def run_round(
               "recorded.", file=sys.stderr)
         return EXIT_CALL_FAILED
 
+    # The grant was predicted from the resolved preference; the record is
+    # built from the transport the round actually ran on, because a round
+    # that fell back to the API path could not look however it was briefed.
+    agency_record = agency.record_for_round(
+        repo_root,
+        agency.grant_for_transport(result.transport, scope, read_budget),
+        result.metadata,
+    )
+
     row = {
         "round": round_number,
         "phase": "full" if round_number == 1 else "fix-delta",
@@ -715,6 +741,7 @@ def run_round(
         "completion_tree": completion_tree,
         "recorded_at": datetime.datetime.now().astimezone().isoformat(),
         "transport": result.transport,
+        "agency": agency_record.as_row(),
     }
     if round_number >= 2:
         row["previous_tree"] = prior_rounds[-1]["completion_tree"]
@@ -726,6 +753,7 @@ def run_round(
             f"{len(classification.blocking_issues)} blocking finding(s) "
             f"(verifier {result.model_name}/{result.provider}). Raw output: "
             f"{raw_path}\n"
+            f"{agency.summary_line(agency_record)}\n"
             + remediation_recipe(set_path, gate.suite)
         )
         return EXIT_BLOCKING
@@ -756,6 +784,7 @@ def run_round(
         f"- Orchestrator provider (excluded): "
         f"{orchestrator.effective_provider}\n"
         f"- Routed verification cost: {cost_text}\n"
+        f"- Verifier's read surface: {agency.summary_line(agency_record)}\n"
         f"- Raw round output: `.dabbler/runs/{slug}/s{current}/`\n",
     )
     print(

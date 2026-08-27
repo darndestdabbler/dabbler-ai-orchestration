@@ -730,6 +730,11 @@ testing:
           - tests/test_verify.py
           - tests/test_critique_contracts.py
           - tests/test_step_execution.py
+          - tests/test_agency.py
+      - when: ai_router/agency.py
+        select:
+          - tests/test_agency.py
+          - tests/test_verify.py
       - when: ai_router/verifyjob.py
         select:
           - tests/test_runcore_verified.py
@@ -764,6 +769,7 @@ testing:
           - tests/test_bootstrap.py
           - tests/test_identity.py
           - tests/test_route.py
+          - tests/test_agency.py
       - when: ai_router/router-config.yaml
         select:
           - tests/test_config.py

@@ -49,6 +49,48 @@
     "previous_tree": { "type": "string", "minLength": 7 },
     "recorded_at": { "type": "string", "minLength": 1 },
     "transport": { "type": "string" },
+    "agency": {
+      "description": "The verifier's read surface for this round: what it was granted, and what it did with it. mode 'none' is a round that could not look at the tree at all (the direct-API path sends no tools) and is never equivalent to one that could. in_scope means the operation was confined to the grant: a read names a path and is placed against the scope, while a search or listing is confined only when it also names a path — a pattern on its own reaches the whole tree and is recorded as unconfined. Each read carries a fidelity: 'verbatim' means the shown lines matched the bytes on disk, 'transformed' means they did not (the credential scrubber rewrites text before a model sees it, and a finding resting on a transformed read is weighable rather than trustable), 'unverified' means the comparison could not be made.",
+      "type": "object",
+      "required": ["mode"],
+      "properties": {
+        "mode": { "type": "string", "enum": ["tools", "none"] },
+        "operations_granted": {
+          "type": "array",
+          "items": { "type": "string", "enum": ["list", "search", "read"] }
+        },
+        "read_budget": { "type": "integer", "minimum": 0 },
+        "scope": { "type": "array", "items": { "type": "string" } },
+        "scope_size": { "type": "integer", "minimum": 0 },
+        "reads": { "type": "integer", "minimum": 0 },
+        "listings": { "type": "integer", "minimum": 0 },
+        "searches": { "type": "integer", "minimum": 0 },
+        "out_of_scope": { "type": "integer", "minimum": 0 },
+        "over_budget": { "type": "integer", "minimum": 0 },
+        "transformed_reads": { "type": "integer", "minimum": 0 },
+        "reason": { "type": "string" },
+        "operations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["kind", "target", "in_scope"],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": ["list", "search", "read"]
+              },
+              "target": { "type": "string" },
+              "in_scope": { "type": "boolean" },
+              "fidelity": {
+                "type": "string",
+                "enum": ["verbatim", "transformed", "unverified"]
+              },
+              "detail": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
     "type": {
       "type": "string",
       "enum": ["adjudication", "waive", "remediated_at_cap"]

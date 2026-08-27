@@ -1166,6 +1166,214 @@
       "dateTime": "2026-08-27T04:13:18.523605-04:00",
       "description": "Close-out.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 6,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-27T04:21:25.873476-04:00",
+      "description": "Register.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 6,
+      "stepNumber": 2,
+      "stepKey": "three-operations-for-the-verifier-on",
+      "dateTime": "2026-08-27T04:21:25.873476-04:00",
+      "description": "Three operations for the verifier on the Copilot path: list files with a pattern, search file contents with a pattern, read a file's contents.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 6,
+      "stepNumber": 3,
+      "stepKey": "scope",
+      "dateTime": "2026-08-27T04:21:25.873476-04:00",
+      "description": "**Scope**: the session's changed files and their declared dependencies, never the whole repository. **Budget**: a fixed number of reads per round. **Log**: every list, search and read recorded into the round.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 6,
+      "stepNumber": 4,
+      "stepKey": "read-fidelity-per-spec-4",
+      "dateTime": "2026-08-27T04:21:25.873476-04:00",
+      "description": "**Read fidelity, per spec \u00a74.a.** Either the verifier reads the bytes on disk, or the round records that a transform was applied. The secret-scrubbing layer rewrites credential-shaped text, and session 1 took a confident Major finding against correct code because of it \u2014 the agency log showed the right file being read and said nothing about what was shown. Mark the transform; do not weaken the scrubber.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 6,
+      "stepNumber": 5,
+      "stepKey": "a-direct-api-round-stamps-agency",
+      "dateTime": "2026-08-27T04:21:25.873476-04:00",
+      "description": "A direct-API round stamps `agency: none` and is never reported as equivalent to a round that could look.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 6,
+      "stepNumber": 6,
+      "stepKey": "affected-tests-as-preverify",
+      "dateTime": "2026-08-27T04:21:25.873476-04:00",
+      "description": "Affected tests as preverify.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 6,
+      "stepNumber": 7,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-27T04:21:25.873476-04:00",
+      "description": "Cross-provider verification.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 6,
+      "stepNumber": 8,
+      "stepKey": "full-test-suite-recorded-as-the",
+      "dateTime": "2026-08-27T04:21:25.873476-04:00",
+      "description": "Full test suite, recorded as the `final-full` run of record.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 6,
+      "stepNumber": 9,
+      "stepKey": "close-out",
+      "dateTime": "2026-08-27T04:21:25.873476-04:00",
+      "description": "Close-out.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 6,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-27T04:21:25.882460-04:00",
+      "description": "Registered session 6 (copilot).",
+      "status": "complete"
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 6,
+      "dateTime": "2026-08-27T04:21:48.929870-04:00",
+      "task": "Build the read half of the verifier's agency surface on the Copilot path: list\nfiles by pattern, search file contents by pattern, and read a file's contents.\n\nScope the surface to the session's changed files and their declared\ndependencies, never the whole repository. Budget a fixed number of reads per\nround. Log every list, search and read into the round record.\n\nEnforce read fidelity per spec section 4.a: either the verifier reads the bytes\non disk, or the round records that a transform was applied. The secret-scrubbing\nlayer rewrites credential-shaped text, so a scrubbed read must be marked as\ntransformed rather than presented as the file. Do not weaken the scrubber.\n\nStamp a direct-API round as `agency: none`, so a round that could not look is\nnever reported as equivalent to one that could.\n\nThis session builds framework internals and publishes no package.",
+      "releasable": false
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D49",
+      "ordinal": 49,
+      "sessionNumber": 6,
+      "decidedOn": "2026-08-27",
+      "recordedAt": "2026-08-27T05:40:38.984237-04:00",
+      "decider": "orchestrator",
+      "headline": "Read scope and budget are declared and recorded, not refused",
+      "body": "The Copilot CLI executes the verifier's tools inside its own process, so the\nframework cannot refuse a read the way session 7 will refuse a write. The\nwrite path can be enforced because the framework applies the write; the read\npath cannot, because the model calls `view` and the CLI answers it.\n\nSo scope and budget are declared to the verifier in the prompt and then\nmeasured against what the round actually did. Every list, search and read is\nrecovered from the CLI's own JSONL event stream and recorded on the round,\nwith `in_scope` on each operation and `out_of_scope` / `over_budget` counts on\nthe record. A verifier that read outside the session's changed files and their\ndeclared dependencies, or past its read budget, produces a round that says so\nin the machine-written ledger.\n\nThe alternative -- claiming enforcement the transport cannot deliver -- would\nput a false statement on a record whose entire claim is that it is honest.\nRecording is what is actually available, and per spec section 4 it is also the\nlimit that matters: the log makes a verifier's selective looking checkable\nafterward, which a refusal would not."
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D50",
+      "ordinal": 50,
+      "sessionNumber": 6,
+      "decidedOn": "2026-08-27",
+      "recordedAt": "2026-08-27T05:43:10.600816-04:00",
+      "decider": "orchestrator",
+      "headline": "Read fidelity is decided by line-number comparison, proved against the live CLI",
+      "body": "The transform \u00a74.a warns about was reproduced against the live CLI rather than\nassumed. A file containing\n\n        \"Authorization\": f\"Bearer {api_key}\",\n\nwas read through the `view` tool and returned to the model as\n\n    6.         \"Authorization\": f\"******\",\n\nwhich is the session 1 incident exactly: correct interpolation displayed as a\nhardcoded placeholder, with the agency log able to show only that the right\nfile was read.\n\nTwo facts from the same probe decide the implementation.\n\nThe `view` tool returns content as `N. <text>`, where N is the file's own\n1-based line number. Fidelity is therefore an exact mechanical comparison\nrather than a heuristic: parse the shown line numbers, read the same lines off\ndisk, and compare. A read whose shown line differs from the disk line at the\nsame number is `transformed`; one where every shown line matches is\n`verbatim`. Partial reads and truncation stay honest under this rule because\nonly the lines actually shown are compared.\n\nThe same probe, run with a malformed `--available-tools` value, produced a\nworse failure worth guarding: with the read tools disabled the model emitted\n`<function_calls><invoke name=\"view\">` as ordinary message text and then\nanswered from invention -- it reported a marker string the file does not\ncontain. A round with a granted read surface and zero recorded tool calls is\nthat shape, so the record carries the operation count and the surface it was\ngranted, and the two can be compared."
+    },
+    {
+      "sessionNumber": 6,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-27T05:54:36.282574-04:00",
+      "description": "Registered, and declared the task list as not releasable.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 6,
+      "stepNumber": 2,
+      "stepKey": "three-operations-for-the-verifier-on",
+      "dateTime": "2026-08-27T05:54:36.730026-04:00",
+      "description": "The three operations reach the verifier as the CLI's glob, grep and view. The transport now reports every tool the CLI executed in metadata['tool_calls'], paired from its own start and completion events.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 6,
+      "stepNumber": 3,
+      "stepKey": "scope",
+      "dateTime": "2026-08-27T05:54:37.211013-04:00",
+      "description": "Scope is the session's changed files, the modules they import, and the set directory. Budget defaults to 40 reads per round. Every list, search and read lands on the round row with its scope verdict.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 6,
+      "stepNumber": 4,
+      "stepKey": "read-fidelity-per-spec-4",
+      "dateTime": "2026-08-27T05:54:37.656334-04:00",
+      "description": "view returns N. <text> with the file's own line numbers, so each shown line is compared against the disk line it numbers itself as: verbatim, transformed, or unverified. Reproduced the session 1 scrub against the live CLI before building it.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 6,
+      "stepNumber": 5,
+      "stepKey": "a-direct-api-round-stamps-agency",
+      "dateTime": "2026-08-27T05:54:38.113787-04:00",
+      "description": "grant_for_transport gives the seat path tools and every other path mode none, with the reason recorded on the row.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 6,
+      "stepNumber": 6,
+      "stepKey": "affected-tests-as-preverify",
+      "dateTime": "2026-08-27T05:54:38.552610-04:00",
+      "description": "341 selected tests passed and were recorded as preverify-targeted.",
+      "status": "complete"
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D51",
+      "ordinal": 51,
+      "sessionNumber": 6,
+      "decidedOn": "2026-08-27",
+      "recordedAt": "2026-08-27T06:02:25.053752-04:00",
+      "decider": "verifier",
+      "headline": "Scope missed sibling-module imports; the import names are half the declaration",
+      "body": "Round 1 raised a Major against the scope computation and it was correct.\n`declared_dependencies` resolved only the module part before `import`, so\n`from . import ledger` and `from ai_router import ledger` -- the form\n`verify.py` itself uses -- resolved to the package `__init__.py` and never to\nthe sibling module. A verifier briefed with that scope would have had a real\ndependency missing from it, and its legitimate read of that dependency\nrecorded as out of scope.\n\nThe import clause declares two things, and only one was being read: the\nmodule path before `import`, and the names after it. Both are now resolved,\nwith the names tried as submodules of the stem.\n\nThe finding is a fair test of the feature under construction, because the\nround that raised it was itself briefed by the scope it was complaining\nabout. The round's own agency record showed 9 reads outside scope out of 34,\nwhich is the same defect measured from the other side.",
+      "model": "gpt-5.5",
+      "provider": "openai"
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D52",
+      "ordinal": 52,
+      "sessionNumber": 6,
+      "decidedOn": "2026-08-27",
+      "recordedAt": "2026-08-27T06:13:39.801515-04:00",
+      "decider": "verifier",
+      "headline": "An unconfined search is not a scoped one; in_scope now means confined to the grant",
+      "body": "Round 2 raised a Major that the first fix created. Marking a pattern-only\n`grep` or `glob` as in-scope let a repository-wide search leave the round with\n`out_of_scope == 0`, so the ledger would attest to a scoped review that had\nnot happened -- the precise failure the log exists to prevent.\n\n`in_scope` now means \"this operation was confined to the grant\", which is a\nclaim the framework can actually make. A read names a path and is placed\nagainst the scope. A search or a listing is confined only when it also names\npaths; a pattern on its own reaches the whole tree and is recorded as\nunconfined, with the reason on the operation. The briefing tells the verifier\nhow to confine a search, so complying is available rather than merely\ndemanded.\n\nThe earlier reasoning -- that a repository-wide grep is a legitimate way to\nfind where something is used -- is still true and is not an argument for\nrecording it as confined. It is recorded, not refused; what changed is that\nthe record stopped overstating it.",
+      "model": "gpt-5.5",
+      "provider": "openai"
+    },
+    {
+      "sessionNumber": 6,
+      "stepNumber": 7,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-27T06:17:01.843434-04:00",
+      "description": "VERIFIED after 3 rounds by gpt-5.5/openai over copilot-cli. Round 1 found the scope missed sibling-module imports; round 2 found that an unconfined pattern search was being recorded as in-scope. Both were real and both were fixed.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 6,
+      "stepNumber": 8,
+      "stepKey": "full-test-suite-recorded-as-the",
+      "dateTime": "2026-08-27T06:25:47.039257-04:00",
+      "description": "799 tests passed against the verified tree and were recorded as the final-full run of record.",
+      "status": "complete"
     }
   ]
 }

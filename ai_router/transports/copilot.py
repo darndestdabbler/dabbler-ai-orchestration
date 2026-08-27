@@ -33,6 +33,11 @@ orchestrator's own instructions — text the API path never sends, that
 inflates the payload, and that tells the verifier it is running the session
 it was asked to judge.
 
+Every tool the CLI executes is reported back in ``metadata['tool_calls']``,
+paired from the CLI's own start and completion events. The CLI runs the
+tools, so this is the only account of what a routed model looked at that the
+model did not write itself, and ``ai_router.agency`` is what weighs it.
+
 Large prompts travel as a PULL, not as argv. The CLI's only non-interactive
 prompt input is ``-p <text>``, so the whole composed prompt would otherwise
 be one argv element — and Windows ``CreateProcessW`` caps the entire rendered
@@ -541,6 +546,62 @@ def _last_event(events: Sequence[dict], event_type: str) -> Optional[dict]:
     return None
 
 
+_TOOL_START = "tool.execution_start"
+_TOOL_COMPLETE = "tool.execution_complete"
+
+
+def _tool_calls(events: Sequence[dict]) -> list[dict]:
+    """The tool operations the CLI actually executed, in order, paired from
+    its own start and completion events.
+
+    The CLI is the executor, so this is the only account of what a routed
+    model looked at that the model did not write itself. It is reported
+    whatever the tools were, because the grant is policy rather than
+    physics and a call outside the read-only allowlist is the first thing a
+    reader of the round needs to see.
+
+    ``result.content`` is kept and ``detailedContent`` dropped: the former
+    is what the model was shown, which is the only copy any fidelity claim
+    can be made against.
+    """
+    calls: dict = {}
+    order: list = []
+    for event in events:
+        event_type = event.get("type")
+        if event_type not in (_TOOL_START, _TOOL_COMPLETE):
+            continue
+        data = event.get("data")
+        if not isinstance(data, dict):
+            continue
+        call_id = data.get("toolCallId")
+        if not isinstance(call_id, str) or not call_id:
+            continue
+        if event_type == _TOOL_START:
+            if call_id not in calls:
+                order.append(call_id)
+            tool = data.get("toolName")
+            calls[call_id] = {
+                "tool": tool if isinstance(tool, str) else "",
+                "arguments": data.get("arguments"),
+                "success": None,
+                "result": None,
+            }
+            continue
+        entry = calls.get(call_id)
+        if entry is None:
+            continue
+        entry["success"] = data.get("success")
+        result = data.get("result")
+        if isinstance(result, dict):
+            content = result.get("content")
+            entry["result"] = {
+                "content": content if isinstance(content, str) else ""
+            }
+        elif isinstance(result, str):
+            entry["result"] = {"content": result}
+    return [calls[call_id] for call_id in order]
+
+
 class CopilotCliTransport:
     """Dispatches one call through the Copilot CLI's headless mode.
 
@@ -915,6 +976,7 @@ class CopilotCliTransport:
             "exit_code": exit_code,
             "session_id": session_id,
             "premium_requests": usage.get("premiumRequests"),
+            "tool_calls": _tool_calls(events),
         }
         metadata.update(
             _handoff_metadata_fields(handoff, ack_outcome=ack_outcome)

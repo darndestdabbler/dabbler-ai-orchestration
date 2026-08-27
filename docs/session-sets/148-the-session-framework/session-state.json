@@ -90,9 +90,9 @@
     {
       "number": 5,
       "title": "The two files, framework-written (plan A4)",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-27T03:23:02.276817-04:00",
-      "completedAt": null,
+      "completedAt": "2026-08-27T04:13:09.842012-04:00",
       "orchestrator": {
         "engine": "copilot",
         "provider": "anthropic",

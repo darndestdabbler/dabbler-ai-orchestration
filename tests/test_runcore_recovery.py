@@ -12,11 +12,11 @@ from ai_router import journal, runcore, runproject
 from tests.conftest import StubTransport, cli, reconfigure
 
 REGISTER = (
-    "run", "--register", "--set", "001-default", "--session", "1",
+    "run", "--register", "--session", "1",
     "--engine", "claude-code", "--provider", "anthropic", "--model", "sonnet",
 )
 REGISTER_VERIFIED = (
-    "run", "--register", "--set", "001-default", "--session", "2",
+    "run", "--register", "--session", "2",
     "--engine", "claude-code", "--provider", "anthropic", "--model", "sonnet",
 )
 
@@ -63,7 +63,7 @@ def test_a_created_run_accepts_exactly_one_later_registration(
 ):
     root = journal.control_root()
     code, prepared = cli(
-        "worktree", "create", "--set", "001-default", "--session", "1"
+        "worktree", "create", "--session", "1"
     )
     assert code == 0, prepared
     assert prepared["state"] == "ready"
@@ -360,35 +360,22 @@ def test_answering_the_current_wait_resumes_exactly_that_sequence(
 
 # --- Organization -----------------------------------------------------------
 
-def test_a_new_set_is_declared_and_committed_on_its_own(run_repo, run_config):
-    code, payload = cli(
-        "organize", "set", "create", "--title", "API objectives",
-        "--objective", "Ship the public surface",
-    )
-    assert code == 0, payload
-    assert payload["set_slug"] == "002-api-objectives"
-
-    subject = subprocess.run(
-        ["git", "-C", str(run_repo), "log", "-1", "--format=%s"],
-        capture_output=True, text=True,
-    ).stdout.strip()
-    assert subject == "Declare session set 002-api-objectives"
-
-    code, status = cli("status")
-    slugs = [s["slug"] for s in status["session_sets"]]
-    assert slugs == ["001-default", "002-api-objectives"]
-
-
 def test_a_session_is_appended_with_its_declared_policy(run_repo, run_config):
     code, payload = cli(
-        "organize", "session", "add", "--set", "001-default",
+        "organize", "session", "add",
         "--title", "Harden the loader", "--policy", "verified",
     )
     assert code == 0, payload
     assert payload["session_number"] == 3
 
+    subject = subprocess.run(
+        ["git", "-C", str(run_repo), "log", "-1", "--format=%s"],
+        capture_output=True, text=True,
+    ).stdout.strip()
+    assert subject == "Declare session 3"
+
     code, status = cli("status")
-    session = status["session_sets"][0]["sessions"][2]
+    session = status["sessions"][2]
     assert session["title"] == "Harden the loader"
     assert session["policy"] == "verified"
 
@@ -398,7 +385,7 @@ def test_cancelling_a_session_with_a_live_run_is_refused(
 ):
     _register()
     code, payload = cli(
-        "organize", "cancel", "--set", "001-default", "--session", "1",
+        "organize", "cancel", "--session", "1",
         "--reason", "deferred", "--attest-operator",
     )
     assert code == 2
@@ -409,7 +396,7 @@ def test_a_cancelled_session_cannot_start_and_restore_reopens_it(
     run_repo, run_config
 ):
     code, payload = cli(
-        "organize", "cancel", "--set", "001-default", "--session", "1",
+        "organize", "cancel", "--session", "1",
         "--reason", "deferred", "--attest-operator",
     )
     assert code == 0 and payload["state"] == "cancelled"
@@ -418,20 +405,20 @@ def test_a_cancelled_session_cannot_start_and_restore_reopens_it(
     assert code == 2 and refused["refused"] == "session-cancelled"
 
     code, restored = cli(
-        "organize", "restore", "--set", "001-default", "--session", "1",
+        "organize", "restore", "--session", "1",
         "--reason", "back on", "--attest-operator",
     )
     assert code == 0 and restored["state"] == "not-started"
     assert cli(*REGISTER)[0] == 0
 
 
-def test_a_spec_edit_alone_moves_the_organization_digest(
+def test_a_plan_edit_alone_moves_the_organization_digest(
     run_repo, run_config
 ):
     code, before = cli("status")
-    spec = run_repo / "docs" / "session-sets" / "001-default" / "spec.md"
-    spec.write_text(
-        spec.read_text(encoding="utf-8") + "\n### Session 3: Extra\n",
+    plan = run_repo / "docs" / "sessions" / "session-plan.md"
+    plan.write_text(
+        plan.read_text(encoding="utf-8") + "\n### Session 3: Extra\n",
         encoding="utf-8",
     )
 
@@ -439,15 +426,15 @@ def test_a_spec_edit_alone_moves_the_organization_digest(
     assert code == 0
     assert after["organization_digest"] != before["organization_digest"]
     assert after["projection_revision"] == before["projection_revision"]
-    assert len(after["session_sets"][0]["sessions"]) == 3
+    assert len(after["sessions"]) == 3
 
 
-def test_an_invalid_spec_diagnoses_without_hiding_its_runs(
+def test_an_invalid_plan_diagnoses_without_hiding_its_runs(
     run_repo, run_config
 ):
     started = _register()
-    spec = run_repo / "docs" / "session-sets" / "001-default" / "spec.md"
-    spec.write_text(
+    plan = run_repo / "docs" / "sessions" / "session-plan.md"
+    plan.write_text(
         "## Sessions\n\n### Session 1: A\n\n### Session 1: A again\n",
         encoding="utf-8",
     )
@@ -455,7 +442,7 @@ def test_an_invalid_spec_diagnoses_without_hiding_its_runs(
     code, status = cli("status")
     assert code == 0
     details = " ".join(d["detail"] for d in status["diagnostics"])
-    assert "more than once" in details and "no '# <title>'" in details
+    assert "more than once" in details
     assert [r["run_id"] for r in status["runs"]] == [started["run_id"]]
 
 
@@ -468,7 +455,7 @@ def test_preparation_from_a_dirty_main_worktree_copies_no_wip(
     _edit(run_repo, "VALUE = 999\n")
 
     code, prepared = cli(
-        "worktree", "create", "--set", "001-default", "--session", "1"
+        "worktree", "create", "--session", "1"
     )
     assert code == 0, prepared
     from pathlib import Path
@@ -489,7 +476,7 @@ def test_worktree_per_run_refuses_an_in_place_registration(
 
 def test_removing_a_prepared_run_cancels_it_first(run_repo, run_config):
     code, prepared = cli(
-        "worktree", "create", "--set", "001-default", "--session", "1"
+        "worktree", "create", "--session", "1"
     )
     assert code == 0
     code, removed = cli("worktree", "remove", "--run", prepared["run_id"])
@@ -509,7 +496,7 @@ def test_a_failed_init_task_names_itself_and_retries(run_repo, run_config):
         "argv": [sys.executable, "-c", "import sys; sys.exit(3)"],
     }]})
     code, prepared = cli(
-        "worktree", "create", "--set", "001-default", "--session", "1"
+        "worktree", "create", "--session", "1"
     )
     assert code == 0, prepared
     assert prepared["state"] == "failed"

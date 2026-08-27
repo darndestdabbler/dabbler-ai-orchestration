@@ -145,7 +145,7 @@ class TestTreeSnapshots:
 
 class TestOutOfBandWrites:
     def _set_dir(self, git_repo):
-        sessions_dir = git_repo / "docs" / "session-sets" / "010-x"
+        sessions_dir = git_repo / "docs" / "sessions"
         sessions_dir.mkdir(parents=True)
         return sessions_dir
 
@@ -194,7 +194,7 @@ class TestSurfaceDigests:
         assert surface_digest(git_repo, ("",)) != first
 
     def test_record_run_strict_at_the_boundary(self, git_repo):
-        sessions_dir = git_repo / "docs" / "session-sets" / "010-x"
+        sessions_dir = git_repo / "docs" / "sessions"
         sessions_dir.mkdir(parents=True)
         suite = SuiteSpec(name="s", command="c", covers=("",),
                           expensive=True)
@@ -298,7 +298,7 @@ def test_the_run_of_record_recipe_names_what_stands_before_a_close():
     stopped at "verified" is how a close gets attempted two steps early."""
     from ai_router.test_evidence import run_of_record_recipe
 
-    text = run_of_record_recipe("docs/session-sets/s", "python",
+    text = run_of_record_recipe("docs/sessions", "python",
                                 "python -m pytest")
     assert "python -m pytest" in text
     assert f"--stage {STAGE_FINAL_FULL}" in text

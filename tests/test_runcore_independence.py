@@ -95,7 +95,7 @@ def _seed_long_journal(root, repo, total: int) -> None:
             summary="long", payload={
                 "policy": "fast", "ask": "long", "base_commit": None,
                 "worktree_id": journal.worktree_id(repo), "branch": "main",
-                "set_slug": "001-default", "session_number": 1,
+                "session_number": 1,
             },
         )
         writer.append(

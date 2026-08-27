@@ -10,7 +10,7 @@ from ai_router.config import RUN_CORE_DEFAULTS, load_config
 from tests.conftest import StubTransport, cli, make_config, reconfigure
 
 REGISTER_VERIFIED = (
-    "run", "--register", "--set", "001-default", "--session", "2",
+    "run", "--register", "--session", "2",
     "--engine", "claude-code", "--provider", "anthropic", "--model", "sonnet",
 )
 
@@ -97,14 +97,11 @@ def test_a_malformed_projection_is_refused(run_repo, run_config):
 
 
 def test_a_malformed_organization_document_is_refused():
-    with pytest.raises(ValueError, match="slug"):
+    with pytest.raises(ValueError, match="number"):
         runproject._validate(
             {
                 "schema_version": 1, "diagnostics": [],
-                "sets": [{
-                    "slug": "Default", "position": 1, "title": "t",
-                    "objective": "", "sessions": [],
-                }],
+                "sessions": [{"number": 0, "title": "t", "policy": "fast"}],
             },
             "session-organization", "session organization",
         )
@@ -182,7 +179,7 @@ def test_a_ceiling_pauses_a_fast_run_too(run_repo, run_config):
         "budgets": {"elapsed_minutes": 0.0001},
     })
     code, started = cli(
-        "run", "--register", "--set", "001-default", "--session", "1",
+        "run", "--register", "--session", "1",
         "--engine", "claude-code", "--provider", "anthropic",
         "--model", "sonnet",
     )

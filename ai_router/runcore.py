@@ -131,7 +131,6 @@ class RunView:
     policy: str = POLICY_FAST
     attempt: int = 1
     ask: str = ""
-    set_slug: str = ""
     session_number: int = 0
     base_commit: Optional[str] = None
     branch: Optional[str] = None
@@ -246,7 +245,6 @@ def apply_event(view: RunView, event: dict) -> RunView:
         view.base_commit = payload["base_commit"]
         view.branch = payload["branch"]
         view.worktree_id = payload["worktree_id"]
-        view.set_slug = payload["set_slug"]
         view.session_number = payload["session_number"]
         view.prepared = bool(payload.get("prepared"))
         view.attempt = event["attempt"]

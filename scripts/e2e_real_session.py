@@ -95,9 +95,11 @@ def main() -> int:
     with tempfile.TemporaryDirectory(prefix="dabbler-real-e2e-") as tmp:
         tmp_path = Path(tmp)
         repo = tmp_path / "repo"
-        set_dir = repo / "docs" / "session-sets" / "001-scratch"
+        set_dir = repo / "docs" / "sessions"
         set_dir.mkdir(parents=True)
-        (set_dir / "spec.md").write_text(SPEC, encoding="utf-8")
+        (set_dir / "session-plan.md").write_text(
+            SPEC, encoding="utf-8"
+        )
         (repo / ".gitignore").write_text(".dabbler/\n", encoding="utf-8")
         _git(repo, "init", "-q", "-b", "main")
         _git(repo, "config", "user.email", "e2e@example.invalid")
@@ -147,9 +149,12 @@ def main() -> int:
         expect(close(set_dir) == 0, "close succeeds")
 
         state = json.loads(
-            (set_dir / "session-state.json").read_text(encoding="utf-8")
+            (set_dir / "sessions.json").read_text(encoding="utf-8")
         )
-        expect(state["status"] == "complete", "set flipped to complete")
+        expect(
+            state["sessions"][0]["status"] == "complete",
+            "session 1 flipped to complete",
+        )
         expect(
             state["sessions"][0]["verificationVerdict"] == "VERIFIED",
             "verdict stamped from the ledger",

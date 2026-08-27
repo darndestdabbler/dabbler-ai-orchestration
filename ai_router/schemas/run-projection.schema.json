@@ -5,7 +5,7 @@
   "type": "object",
   "required": [
     "schema_version", "projection_revision", "organization_digest",
-    "generated_at", "session_sets", "runs"
+    "generated_at", "sessions", "runs"
   ],
   "additionalProperties": false,
   "properties": {
@@ -20,54 +20,32 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["set_slug", "detail"],
+        "required": ["detail"],
         "additionalProperties": false,
         "properties": {
-          "set_slug": { "type": "string" },
           "detail": { "type": "string" }
         }
       }
     },
-    "session_sets": {
+    "sessions": {
       "type": "array",
       "items": {
         "type": "object",
-        "required": [
-          "slug", "title", "objective", "state", "position", "sessions"
-        ],
+        "required": ["number", "title", "policy", "state", "run_ids"],
         "additionalProperties": false,
         "properties": {
-          "slug": { "type": "string", "minLength": 1 },
+          "number": { "type": "integer", "minimum": 1 },
           "title": { "type": "string" },
-          "objective": { "type": "string" },
+          "policy": { "enum": ["fast", "verified"] },
           "state": {
             "enum": ["not-started", "in-progress", "complete", "cancelled"]
           },
-          "position": { "type": "integer", "minimum": 1 },
-          "sessions": {
+          "run_ids": {
             "type": "array",
-            "items": {
-              "type": "object",
-              "required": ["number", "title", "policy", "state", "run_ids"],
-              "additionalProperties": false,
-              "properties": {
-                "number": { "type": "integer", "minimum": 1 },
-                "title": { "type": "string" },
-                "policy": { "enum": ["fast", "verified"] },
-                "state": {
-                  "enum": [
-                    "not-started", "in-progress", "complete", "cancelled"
-                  ]
-                },
-                "run_ids": {
-                  "type": "array",
-                  "items": { "type": "string", "minLength": 1 }
-                },
-                "current_run_id": { "type": ["string", "null"] },
-                "needs_attention": { "type": "boolean" }
-              }
-            }
-          }
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "current_run_id": { "type": ["string", "null"] },
+          "needs_attention": { "type": "boolean" }
         }
       }
     },
@@ -80,7 +58,7 @@
     "run": {
       "type": "object",
       "required": [
-        "run_id", "policy", "state", "waiting_reason", "ask", "set_slug",
+        "run_id", "policy", "state", "waiting_reason", "ask",
         "session_number", "engine", "provider", "branch", "started_at",
         "last_activity_at", "pending_guidance", "attempt", "tasks", "checks",
         "verification", "cost", "commit", "outcome"
@@ -98,7 +76,6 @@
         "waiting_reason": { "enum": ["operator", "dependency", null] },
         "waiting_sequence": { "type": ["integer", "null"] },
         "ask": { "type": "string" },
-        "set_slug": { "type": "string" },
         "session_number": { "type": "integer", "minimum": 1 },
         "engine": { "type": ["string", "null"] },
         "provider": { "type": ["string", "null"] },

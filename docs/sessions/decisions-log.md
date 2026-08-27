@@ -2028,3 +2028,121 @@ signal, not a threshold to get under.
 pre-verification run was the full 10-minute suite. Three of those ran. A
 session scoped so that conftest is untouched pays targeted-test prices
 instead.
+
+### D93 · 2026-08-27 · Orchestrator (claude-opus-5/anthropic) · The run core's set addressing is collapsed, out of band and unverified
+
+Round 1's finding 1 is fixed. The run core (`runcli`, `runproject`,
+`runcore`) no longer addresses `--set` and no longer reads
+`docs/session-sets/`, so the shipped `dabbler` CLI drives a collapsed
+repository. `dabbler status` in this repository now reads its own
+seventeen sessions from `docs/sessions/session-plan.md` instead of
+reporting no sets.
+
+**This was done outside a session, at the operator's direction**, and the
+record says so rather than presenting it as lifecycle work. No session was
+registered for it, no verifier saw it, and session 14 stays `in-progress`
+with no verdict. What follows describes a change in the working tree; it
+is not a claim that anything was verified.
+
+**What changed.**
+
+- `runproject.read_organization` parses the one authored
+  `docs/sessions/session-plan.md`. No slugs, no positions, no per-set title
+  or objective; the digest is the exact plan bytes, so a plan edit that
+  appends no event still moves it.
+- The projection's `session_sets` is a flat `sessions`, and `_set_state` —
+  a roll-up with nothing left to roll up — is gone.
+- **`runproject.write_documents` is deleted, not ported**, with
+  `_session_state_document`, `_activity_log_document`,
+  `_change_log_document` and `_is_v4_set`. It was a second writer of
+  `session-state.json`, `activity-log.json` and `change-log.md`, which the
+  lifecycle writers own. `session-state-v5.schema.json` went with it, and
+  `finish` no longer reports a `documents` list it does not write.
+- `runcli` loses the `organize set` noun. `organize session add`,
+  `organize cancel/restore`, `run --register` and `worktree create` take
+  `--session` and no `--set`. `_require_generated_views_ignored` is gone
+  with the views it guarded.
+- `set_slug` leaves `run-event`, `run-projection`, `session-organization`
+  and `RunView`. `organization.cancelled`/`.restored` carry
+  `session_number` and `reason`; the `target` discriminator had one legal
+  value left.
+- `bootstrap.DECOMPOSITION_PROMPT` no longer instructs a model to scaffold
+  `docs/session-sets/<NNN-slug>/spec.md` — a live path that would have
+  rebuilt the set level in any repository bootstrapped after the collapse.
+
+**Evidence.** 870 Python tests green before, 868 after: two tests were
+deleted because their subjects were,
+`test_the_four_documents_are_generated` with the generator and
+`test_a_new_set_is_declared_and_committed_on_its_own` with the `organize
+set` noun. No test was added, which is the right shape for a collapse. 179
+TypeScript tests green and `tsc --noEmit` clean, both unchanged by this
+work. A scratch repository with no set level was driven end to end through
+`status`, `organize session add`, `organize cancel`, a refused
+registration of the cancelled session, `organize restore` and `run
+--register`; nothing but the authored plan appeared under
+`docs/sessions/`. Net -450 lines.
+
+**What is deliberately not done.** D88's question is still the operator's:
+whether the run core's projection replaces the lifecycle's records or is
+retired. This change answers only the narrow half the collapse forced —
+the run core stopped writing the lifecycle's filenames — and leaves the two
+systems with separate state. `dabbler status` reads the run journal, which
+has no runs in this repository because every session here was driven by
+`ai_router.session`; it reports the sessions as `not-started` and is not
+wrong to, because no *run* has ever been registered.
+
+The Work Explorer still shows nothing in this repository. That is session
+15's work and was already on the record at D90.
+
+### D94 · 2026-08-27 · Operator · This machine has no seat, so verification runs on the direct-API transport
+
+D89 recorded verification as blocked because the seat was logged out and
+no provider key was set. That was true of the machine it was written on.
+**It is not true of this one, and the difference is a machine fact, not a
+project fact.**
+
+This machine has **no Copilot seat at all**. The GitHub account signed in
+here is the operator's personal account, used for pushing extension code;
+the Copilot entitlement lives on the other machine under a GitHub
+Enterprise business account. The other machine's confusion — Copilot
+reaching for the personal account rather than the business one — is the
+same fact seen from the other side. Re-logging in here cannot help,
+because there is nothing here to log in to.
+
+**What this machine has instead:** all three of
+`DABBLER_ANTHROPIC_API_KEY`, `DABBLER_OPENAI_API_KEY` and
+`DABBLER_GEMINI_API_KEY` are set, so the direct-API path has a
+cross-provider verifier available for an Anthropic orchestrator.
+
+**Recorded as `transport.profile: api` in a project-local
+`local-overrides.yaml`**, which is exactly what the bundled config's own
+comment names for this case, and which is gitignored — so the other
+machine keeps its seat and the published default stays `copilot-cli`. An
+env var was rejected as the mechanism: it reaches only processes started
+after it was written, and this fact needs to outlive a shell.
+
+**One thing the operator should expect to see.** `discovery status`
+reports the API enumeration record as absent, and `discovery enumerate`
+refuses while session 14 is in flight — correctly, per spec §5.d. That is
+a warning and not a block: selection treats an absent record as unknown,
+never as unsupported, and draws its candidates from the registry. Do not
+resolve the warning by enumerating mid-session; the refusal is the rule
+working.
+
+### D95 · 2026-08-27 · Operator · Session rows carry a three-digit padded label, and nothing else does
+
+Session rows are labelled `001`, `002`, ... `014` — three digits, zero
+padded. Staff read set numbers in that shape for 147 sets and the operator
+asked for it back after the collapse removed the directory that carried it.
+
+**Presentation only, and the boundary is the point.** The plan's
+`### Session N:` headings, `sessions.json`'s `number`, the
+`.dabbler/runs/s<N>/` ledger and every CLI `--session` argument keep the
+plain integer. Padding an identifier that four subsystems already agree on
+would buy a familiar label at the price of a migration, and the label is
+what was actually asked for.
+
+Added to session 15's spec as step 5, alongside the icon requirements
+already there: the four status glyphs resolve by name through `ICON_FILES`
+and reach `TreeItem.iconPath` as a `{ light, dark }` pair, and the
+`fill:currentColor` "simplification" stays rejected.

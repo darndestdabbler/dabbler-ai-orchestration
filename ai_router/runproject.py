@@ -1,14 +1,19 @@
-"""Projections: the run projection and the four per-set documents.
+"""The run projection.
 
-Everything here is derived and disposable. The journal plus the tracked
-``spec.md`` files are the only inputs, so any process can rebuild every byte
-of this and get the same answer — which is what makes it safe for the
-Explorer to read a file instead of interrogating the journal on every frame.
+Everything here is derived and disposable. The journal plus the one tracked
+``docs/sessions/session-plan.md`` are the only inputs, so any process can
+rebuild every byte of this and get the same answer — which is what makes it
+safe for the Explorer to read a file instead of interrogating the journal on
+every frame.
 
 Two authorities are joined and neither is edited: authored intent comes from
-``spec.md`` (what work was declared) and execution truth comes from the
-journal (what actually happened). A spec that cannot be parsed produces a
+the session plan (what work was declared) and execution truth comes from the
+journal (what actually happened). A plan that cannot be parsed produces a
 diagnostic and still never hides a run the journal recorded.
+
+**Nothing here writes a staff-facing record.** The lifecycle writers own
+``sessions.json``, ``activity-log.json`` and ``change-log.md``; a second
+generator of those names is the drift the set collapse exists to end.
 """
 
 from __future__ import annotations
@@ -22,12 +27,12 @@ from typing import Optional
 import jsonschema
 
 from . import journal, runcore
-from .journal import run_git
 
 SCHEMA_VERSION = 1
-SET_DOC_SCHEMA_VERSION = 5
 
-SESSION_SETS_DIRNAME = "docs/session-sets"
+SESSIONS_DIRNAME = "docs/sessions"
+SESSION_PLAN_FILENAME = "session-plan.md"
+SESSION_PLAN_REL = f"{SESSIONS_DIRNAME}/{SESSION_PLAN_FILENAME}"
 
 STATE_NOT_STARTED = "not-started"
 STATE_IN_PROGRESS = "in-progress"
@@ -41,7 +46,6 @@ TASK_COMPLETE = "complete"
 TASK_FAILED = "failed"
 
 _SCHEMA_DIR = Path(__file__).parent / "schemas"
-_SET_DIRNAME = re.compile(r"^(\d{3})-([a-z0-9]+(?:-[a-z0-9]+)*)$")
 _SESSION_HEADING = re.compile(
     r"^###\s+Session\s+(\d+)(?:\s+of\s+\d+)?\s*[:.\-]\s*(.+?)\s*$"
 )
@@ -80,38 +84,27 @@ def _validate(document: dict, name: str, noun: str) -> dict:
 
 # --- Authored intent (§6.4) -------------------------------------------------
 
-def session_sets_dir(root) -> Path:
-    return Path(root) / SESSION_SETS_DIRNAME
+def sessions_dir(root) -> Path:
+    return Path(root) / SESSIONS_DIRNAME
 
 
-def parse_spec(text: str, slug: str, position: int, spec_path: str):
-    """``(set, diagnostics)`` for one authored ``spec.md``.
+def session_plan_path(root) -> Path:
+    return sessions_dir(root) / SESSION_PLAN_FILENAME
 
-    Minimal by design: a title, an objective, and ordered
-    ``### Session N: Title`` sections with an optional ``Policy:`` line.
-    Anything else beneath a session is a visible note, never a gate.
+
+def parse_plan(text: str):
+    """``(sessions, diagnostics)`` for the one authored ``session-plan.md``.
+
+    Minimal by design: ordered ``### Session N: Title`` sections with an
+    optional ``Policy:`` line. ``### Session N of M: Title`` is accepted
+    because that is how the plans staff write actually read. Anything else
+    beneath a session is a visible note, never a gate.
     """
     diagnostics = []
-    lines = text.splitlines()
-
-    title = ""
-    objective_lines: list = []
     sessions: list = []
-    section = None
     current = None
 
-    for line in lines:
-        stripped = line.strip()
-        if stripped.startswith("# ") and not stripped.startswith("##"):
-            title = stripped[2:].strip()
-            section = None
-            continue
-        if stripped.startswith("## "):
-            heading = stripped[3:].strip().lower()
-            section = "objective" if heading.startswith("objective") else (
-                "sessions" if heading.startswith("session") else None
-            )
-            continue
+    for line in text.splitlines():
         heading = _SESSION_HEADING.match(line)
         if heading:
             current = {
@@ -122,17 +115,14 @@ def parse_spec(text: str, slug: str, position: int, spec_path: str):
             }
             sessions.append(current)
             continue
-        if current is not None:
-            policy = _POLICY_LINE.match(stripped)
-            if policy:
-                current["policy"] = policy.group(1).lower()
-                continue
-            current["notes"].append(line)
-        elif section == "objective":
-            objective_lines.append(line)
+        if current is None:
+            continue
+        policy = _POLICY_LINE.match(line.strip())
+        if policy:
+            current["policy"] = policy.group(1).lower()
+            continue
+        current["notes"].append(line)
 
-    if not title:
-        diagnostics.append("no '# <title>' heading")
     seen = set()
     ordered = []
     for entry in sessions:
@@ -151,68 +141,55 @@ def parse_spec(text: str, slug: str, position: int, spec_path: str):
         })
     ordered.sort(key=lambda s: s["number"])
 
-    return {
-        "slug": slug,
-        "position": position,
-        "title": title or slug,
-        "objective": "\n".join(objective_lines).strip(),
-        "spec_path": spec_path,
-        "sessions": ordered,
-    }, diagnostics
+    if not ordered:
+        diagnostics.append(
+            "no '### Session <N>: <title>' section; the plan declares no work"
+        )
+
+    return ordered, diagnostics
 
 
 def read_organization(root) -> tuple:
-    """``(organization, digest)`` from one pass over the spec files.
+    """``(organization, digest)`` from one read of the session plan.
 
     The digest and the parsed content come from the *same bytes*. Reading
-    the specs twice — once to parse, once to hash — lets an edit that lands
+    the plan twice — once to parse, once to hash — lets an edit that lands
     between the two passes publish old content under the new digest, which
     is precisely the "this view is current" claim the digest exists to make.
     So the bytes are read once and both answers are derived from them.
     """
-    sets, diagnostics, hashed = [], [], hashlib.sha256()
-    base = session_sets_dir(root)
-    for entry in sorted(
-        (p for p in base.glob("*") if p.is_dir() and _SET_DIRNAME.match(p.name)),
-        key=lambda p: p.name,
-    ):
-        match = _SET_DIRNAME.match(entry.name)
-        spec = entry / "spec.md"
-        rel = f"{SESSION_SETS_DIRNAME}/{entry.name}/spec.md"
-        try:
-            raw = spec.read_bytes()
-        except OSError as exc:
-            raw = b""
-            diagnostics.append({
-                "set_slug": entry.name,
-                "detail": f"{rel} is missing or unreadable: {exc}",
-            })
-        hashed.update(entry.name.encode("utf-8"))
-        hashed.update(b"\0")
-        hashed.update(str(len(raw)).encode("ascii"))
-        hashed.update(b"\0")
-        hashed.update(raw)
-        if not raw:
-            continue
+    diagnostics = []
+    try:
+        raw = session_plan_path(root).read_bytes()
+    except OSError as exc:
+        raw = b""
+        diagnostics.append(
+            {"detail": f"{SESSION_PLAN_REL} is missing or unreadable: {exc}"}
+        )
+
+    hashed = hashlib.sha256()
+    hashed.update(str(len(raw)).encode("ascii"))
+    hashed.update(raw)
+
+    sessions = []
+    if raw:
         try:
             text = raw.decode("utf-8")
         except UnicodeDecodeError as exc:
-            diagnostics.append({
-                "set_slug": entry.name, "detail": f"{rel} is not UTF-8: {exc}",
-            })
-            continue
-        parsed, problems = parse_spec(
-            text, entry.name, int(match.group(1)), rel
-        )
-        sets.append(parsed)
-        diagnostics.extend(
-            {"set_slug": entry.name, "detail": p} for p in problems
-        )
+            diagnostics.append(
+                {"detail": f"{SESSION_PLAN_REL} is not UTF-8: {exc}"}
+            )
+        else:
+            sessions, problems = parse_plan(text)
+            diagnostics.extend({"detail": p} for p in problems)
 
-    sets.sort(key=lambda s: (s["position"], s["slug"]))
     organization = _validate(
-        {"schema_version": SCHEMA_VERSION, "sets": sets,
-         "diagnostics": diagnostics},
+        {
+            "schema_version": SCHEMA_VERSION,
+            "plan_path": SESSION_PLAN_REL,
+            "sessions": sessions,
+            "diagnostics": diagnostics,
+        },
         "session-organization", "session organization",
     )
     return organization, "sha256:" + hashed.hexdigest()
@@ -223,9 +200,9 @@ def load_organization(root) -> dict:
 
 
 def organization_digest(root) -> str:
-    """SHA-256 of the ordered set slugs and the exact ``spec.md`` bytes.
+    """SHA-256 of the exact ``session-plan.md`` bytes.
 
-    Byte-exact so a spec edit that appends no journal event still moves the
+    Byte-exact so a plan edit that appends no journal event still moves the
     digest, which is the whole mechanism by which the Explorer notices
     authored changes.
     """
@@ -328,7 +305,6 @@ def _run_row(view: runcore.RunView, events) -> dict:
         "waiting_reason": view.waiting_reason,
         "waiting_sequence": view.waiting_sequence,
         "ask": view.ask,
-        "set_slug": view.set_slug,
         "session_number": view.session_number,
         "engine": view.engine,
         "provider": view.provider,
@@ -376,21 +352,15 @@ def _run_row(view: runcore.RunView, events) -> dict:
 
 
 def organization_states(events) -> dict:
-    """``{(set_slug, session_number|None): (sequence, state)}`` — the latest
-    cancel/restore per target, with the sequence that decided it."""
+    """``{session_number: (sequence, state)}`` — the latest cancel/restore
+    per session, with the sequence that decided it."""
     latest: dict = {}
     for event in events:
         if event["event_type"] not in (
             "organization.cancelled", "organization.restored"
         ):
             continue
-        payload = event["payload"]
-        key = (
-            payload["set_slug"],
-            payload.get("session_number")
-            if payload["target"] == "session" else None,
-        )
-        latest[key] = (
+        latest[event["payload"]["session_number"]] = (
             event["sequence"],
             STATE_CANCELLED
             if event["event_type"] == "organization.cancelled"
@@ -443,45 +413,27 @@ def build_projection(root, events=None) -> dict:
     cancellations = organization_states(events)
     by_session: dict = {}
     for run_id, view in views.items():
-        by_session.setdefault(
-            (view.set_slug, view.session_number), []
-        ).append({
+        by_session.setdefault(view.session_number, []).append({
             "view": view, "created_sequence": created_sequence[run_id],
         })
     for entries in by_session.values():
         entries.sort(key=lambda e: e["created_sequence"])
 
-    session_sets = []
-    for declared in organization["sets"]:
-        sessions = []
-        any_activity = False
-        for session in declared["sessions"]:
-            key = (declared["slug"], session["number"])
-            runs = by_session.get(key, [])
-            state, current, attention = _session_state(
-                runs, cancellations.get(key)
-            )
-            if runs:
-                any_activity = True
-            sessions.append({
-                "number": session["number"],
-                "title": session["title"],
-                "policy": session["policy"] or "fast",
-                "state": state,
-                "run_ids": [r["view"].run_id for r in runs],
-                "current_run_id": current,
-                "needs_attention": attention,
-            })
-        session_sets.append({
-            "slug": declared["slug"],
+    sessions = []
+    for declared in organization["sessions"]:
+        number = declared["number"]
+        runs = by_session.get(number, [])
+        state, current, attention = _session_state(
+            runs, cancellations.get(number)
+        )
+        sessions.append({
+            "number": number,
             "title": declared["title"],
-            "objective": declared["objective"],
-            "state": _set_state(
-                sessions, any_activity,
-                cancellations.get((declared["slug"], None)),
-            ),
-            "position": declared["position"],
-            "sessions": sessions,
+            "policy": declared["policy"] or "fast",
+            "state": state,
+            "run_ids": [r["view"].run_id for r in runs],
+            "current_run_id": current,
+            "needs_attention": attention,
         })
 
     projection = {
@@ -490,7 +442,7 @@ def build_projection(root, events=None) -> dict:
         "organization_digest": digest,
         "generated_at": events[-1]["occurred_at"] if events else None,
         "diagnostics": organization["diagnostics"],
-        "session_sets": session_sets,
+        "sessions": sessions,
         "runs": [
             _run_row(views[run_id], per_run_events[run_id])
             for run_id in sorted(views)
@@ -499,21 +451,9 @@ def build_projection(root, events=None) -> dict:
     return _validate(projection, "run-projection", "run projection")
 
 
-def _set_state(sessions, any_activity, cancellation) -> str:
-    if cancellation is not None and cancellation[1] == STATE_CANCELLED:
-        return STATE_CANCELLED
-    if not any_activity:
-        return STATE_NOT_STARTED
-    live = [s for s in sessions if s["state"] != STATE_CANCELLED]
-    if live and all(s["state"] == STATE_COMPLETE for s in live):
-        return STATE_COMPLETE
-    return STATE_IN_PROGRESS
-
-
 def write_projection(root, events=None) -> dict:
     projection = build_projection(root, events)
     journal.atomic_write_json(journal.projection_path(root), projection)
-    write_documents(root, projection)
     return projection
 
 
@@ -546,7 +486,7 @@ def read_projection(root) -> Optional[dict]:
 
 def current_projection(root, *, rebuild: bool = False) -> dict:
     """The projection, rebuilt whenever it does not match the journal tail
-    or the exact spec bytes. A stale view is never returned as current."""
+    or the exact plan bytes. A stale view is never returned as current."""
     stored = None if rebuild else read_projection(root)
     if stored is not None:
         _, digest = read_organization(root)
@@ -556,156 +496,3 @@ def current_projection(root, *, rebuild: bool = False) -> dict:
         ):
             return stored
     return write_projection(root)
-
-
-# --- The four documents (§6.2) ----------------------------------------------
-
-_v4_cache: dict = {}
-
-
-def _is_v4_set(root, slug: str) -> bool:
-    """A tracked ``session-state.json`` marks a historical v4 set. Those
-    files are inputs to the hierarchy and are never rewritten here.
-
-    Cached per process: whether a path is tracked cannot change without a
-    commit, and this otherwise costs one git subprocess per set on every
-    projection write.
-    """
-    key = (str(root), slug)
-    if key not in _v4_cache:
-        rc, _, _ = run_git(
-            root, "ls-files", "--error-unmatch",
-            f"{SESSION_SETS_DIRNAME}/{slug}/session-state.json",
-        )
-        _v4_cache[key] = rc == 0
-    return _v4_cache[key]
-
-
-def write_documents(root, projection: dict) -> list:
-    written = []
-    runs = {r["run_id"]: r for r in projection["runs"]}
-    for declared in projection["session_sets"]:
-        slug = declared["slug"]
-        if _is_v4_set(root, slug):
-            continue
-        directory = session_sets_dir(root) / slug
-        if not directory.is_dir():
-            continue
-        journal.atomic_write_json(
-            directory / "session-state.json",
-            _session_state_document(declared, runs, projection),
-        )
-        journal.atomic_write_json(
-            directory / "activity-log.json",
-            _activity_log_document(declared, runs, projection),
-        )
-        written.extend([
-            f"{SESSION_SETS_DIRNAME}/{slug}/session-state.json",
-            f"{SESSION_SETS_DIRNAME}/{slug}/activity-log.json",
-        ])
-        changelog = _change_log_document(declared, runs)
-        if changelog is not None:
-            journal.atomic_write_text(
-                directory / "change-log.md", changelog
-            )
-            written.append(f"{SESSION_SETS_DIRNAME}/{slug}/change-log.md")
-    return written
-
-
-def _session_state_document(declared, runs, projection) -> dict:
-    sessions = []
-    for session in declared["sessions"]:
-        linked = [runs[r] for r in session["run_ids"] if r in runs]
-        latest = linked[-1] if linked else None
-        sessions.append({
-            "number": session["number"],
-            "title": session["title"],
-            "policy": session["policy"],
-            "status": session["state"],
-            "runIds": session["run_ids"],
-            "currentRunId": session["current_run_id"],
-            "needsAttention": session["needs_attention"],
-            "startedAt": linked[0]["started_at"] if linked else None,
-            "completedAt": (
-                latest["last_activity_at"]
-                if latest and latest["outcome"] == "completed" else None
-            ),
-            "verification": latest["verification"] if latest else None,
-            "cost": latest["cost"] if latest else None,
-            "commit": latest["commit"] if latest else None,
-        })
-    return _validate({
-        "schemaVersion": SET_DOC_SCHEMA_VERSION,
-        "sessionSetName": declared["slug"],
-        "title": declared["title"],
-        "objective": declared["objective"],
-        "status": declared["state"],
-        "projectionRevision": projection["projection_revision"],
-        "organizationDigest": projection["organization_digest"],
-        "sessions": sessions,
-    }, "session-state-v5", "v5 set state")
-
-
-def _activity_log_document(declared, runs, projection) -> dict:
-    entries = []
-    for session in declared["sessions"]:
-        for run_id in session["run_ids"]:
-            run = runs.get(run_id)
-            if run is None:
-                continue
-            entries.append({
-                "sessionNumber": session["number"],
-                "runId": run_id,
-                "attempt": run["attempt"],
-                "policy": run["policy"],
-                "state": run["state"],
-                "firstStartedAt": run["started_at"],
-                "lastActivityAt": run["last_activity_at"],
-                "tasks": run["tasks"],
-                "checks": run["checks"],
-                "escalations": run["escalations"],
-            })
-    return {
-        "schemaVersion": SET_DOC_SCHEMA_VERSION,
-        "sessionSetName": declared["slug"],
-        "projectionRevision": projection["projection_revision"],
-        "entries": entries,
-    }
-
-
-def _change_log_document(declared, runs) -> Optional[str]:
-    blocks = []
-    for session in declared["sessions"]:
-        for run_id in session["run_ids"]:
-            run = runs.get(run_id)
-            if run is None or run["outcome"] != "completed":
-                continue
-            cost = run["cost"]
-            spend = (
-                f"${cost['model_usd']:.2f}" if cost["model_usd"] else "$0.00"
-            )
-            if cost["unpriced_calls"]:
-                spend += f" + {cost['unpriced_calls']} unpriced"
-            blocks.append(
-                f"## Session {session['number']}: {session['title']}\n\n"
-                f"- Run: `{run_id}` (attempt {run['attempt']}, "
-                f"policy {run['policy']})\n"
-                f"- Ask: {run['ask']}\n"
-                f"- Checks: " + (
-                    ", ".join(
-                        f"{c['check_id']} {c['outcome']} ({c['stage']})"
-                        for c in run["checks"]
-                    ) or "none declared"
-                ) + "\n"
-                f"- Verification: {run['verification']['rounds']} round(s), "
-                f"verdict {run['verdict'] or 'n/a'}\n"
-                f"- Cost: {spend}\n"
-                f"- Commit: `{run['commit']}`\n"
-            )
-    if not blocks:
-        return None
-    return (
-        f"# {declared['title']} — change log\n\n"
-        "Generated from the run journal. Do not hand-edit.\n\n"
-        + "\n".join(blocks)
-    )

@@ -515,12 +515,21 @@ Python tests.
    evidence is in `media/status-icon-theming.md`, and a Playwright test
    reads the computed style in a real Extension Development Host rather
    than trusting documentation.
-5. Affected tests as preverify.
-6. Cross-provider verification.
-7. Full test suite, recorded as the `final-full` run of record.
-8. Close-out.
+5. **A session row is labelled with a three-digit zero-padded number** —
+   `001`, `002`, ... `014` — because that is the shape staff read set
+   numbers in and the operator asked for it back after the collapse. This
+   is **presentation only**: the plan's `### Session N:` headings,
+   `sessions.json`'s `number`, the `.dabbler/runs/s<N>/` ledger and every
+   CLI `--session` argument keep the plain integer. One formatter owns the
+   padding so the tree, the CLI's human output and any status line cannot
+   disagree about how a session is named.
+6. Affected tests as preverify.
+7. Cross-provider verification.
+8. Full test suite, recorded as the `final-full` run of record.
+9. Close-out.
 
-**Creates:** the collapsed tree, with the icons untouched. Est. 8 TS tests.
+**Creates:** the collapsed tree, padded row labels, and the icons
+untouched. Est. 8 TS tests.
 
 ### Session 16 of 17: Project setup as two sessions (plan D2)
 

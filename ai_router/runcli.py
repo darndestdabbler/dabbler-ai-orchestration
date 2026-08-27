@@ -38,11 +38,6 @@ EXIT_OK = 0
 EXIT_ERROR = 1
 EXIT_REFUSED = 2
 
-GENERATED_VIEWS = (
-    "session-state.json", "activity-log.json", "change-log.md",
-)
-
-
 class OperationalError(RuntimeError):
     def __init__(self, token: str, detail: str, **extra):
         super().__init__(f"{token}: {detail}")
@@ -115,55 +110,19 @@ def _require_attestation(args) -> None:
 
 # --- run --register ---------------------------------------------------------
 
-def _resolve_session(root, set_slug: str, session_number: int):
+def _resolve_session(root, session_number: int):
     organization = runproject.load_organization(root)
-    declared = next(
-        (s for s in organization["sets"] if s["slug"] == set_slug), None
-    )
-    if declared is None:
-        raise Refusal(
-            "unknown-session",
-            f"no session set {set_slug!r} under "
-            f"{runproject.SESSION_SETS_DIRNAME}/",
-        )
     session = next(
-        (s for s in declared["sessions"] if s["number"] == session_number),
+        (s for s in organization["sessions"] if s["number"] == session_number),
         None,
     )
     if session is None:
         raise Refusal(
             "unknown-session",
-            f"set {set_slug!r} declares no session {session_number}",
+            f"{runproject.SESSION_PLAN_REL} declares no session "
+            f"{session_number}",
         )
-    return declared, session
-
-
-def _require_generated_views_ignored(root, set_slug: str) -> None:
-    """The three §6.2 views are machine-written into the working tree, so a
-    repository that tracks them would sweep them into every run's commit.
-    Refuse before the run starts rather than after it has evidence."""
-    paths = [
-        f"{runproject.SESSION_SETS_DIRNAME}/{set_slug}/{name}"
-        for name in GENERATED_VIEWS
-    ]
-    rc, out, _ = run_git(root, "check-ignore", *paths)
-    ignored = set(out.splitlines()) if rc in (0, 1) else set()
-    missing = [p for p in paths if p not in ignored]
-    tracked = [
-        p for p in missing
-        if run_git(root, "ls-files", "--error-unmatch", p)[0] == 0
-    ]
-    if tracked:
-        # A tracked file here is a historical v4 set; those are never
-        # rewritten, so they cannot dirty anything.
-        return
-    if missing:
-        raise Refusal(
-            "generated-views-not-ignored",
-            "the generated set views are neither ignored nor tracked: "
-            f"{missing}. Add them to .gitignore so the projection cannot "
-            "dirty the candidate tree.",
-        )
+    return session
 
 
 def cmd_run(args) -> dict:
@@ -234,26 +193,24 @@ def cmd_run(args) -> dict:
         raise Refusal(
             "worktree-preparation-required",
             "git.worktree_per_run is true, so a run works in its own "
-            "prepared worktree. Run 'worktree create --set ... --session ...' "
-            "first.",
+            "prepared worktree. Run 'worktree create --session N' first.",
         )
-    if args.set is None or args.session is None:
+    if args.session is None:
         raise Refusal(
             "session-required",
-            "name the declared session with --set and --session, or a "
-            "prepared run with --run.",
+            "name the declared session with --session, or a prepared run "
+            "with --run.",
         )
-    declared, session = _resolve_session(root, args.set, args.session)
-    _require_generated_views_ignored(root, args.set)
+    session = _resolve_session(root, args.session)
     runcore.require_clean_start(worktree)
 
     with journal.batch(root) as writer:
         views = runcore.fold_all(writer.events)
         runcore.require_single_live_run(views, journal.worktree_id(worktree))
-        _require_session_open(writer.events, views, args.set, args.session)
+        _require_session_open(writer.events, views, args.session)
         attempt = 1 + sum(
             1 for v in views.values()
-            if v.set_slug == args.set and v.session_number == args.session
+            if v.session_number == args.session
         )
         ask = session["title"]
         policy = args.policy or session["policy"] or config["run_policy"]["default"]
@@ -265,12 +222,12 @@ def cmd_run(args) -> dict:
         writer.append(
             event_type="run.created", run_id=run_id, attempt=attempt,
             actor=actor,
-            summary=f"{args.set} session {args.session}: {ask}",
+            summary=f"session {args.session}: {ask}",
             payload={
                 "policy": policy, "ask": ask, "base_commit": base,
                 "worktree_id": journal.worktree_id(worktree),
                 "branch": runcore.current_branch(worktree),
-                "set_slug": args.set, "session_number": args.session,
+                "session_number": args.session,
             },
         )
         writer.append(
@@ -287,21 +244,19 @@ def cmd_run(args) -> dict:
     return _run_output(view, worktree, identity)
 
 
-def _require_session_open(events, views, set_slug, session_number) -> None:
-    cancellations = runproject.organization_states(events)
-    for key in ((set_slug, session_number), (set_slug, None)):
-        entry = cancellations.get(key)
-        if entry and entry[1] == runproject.STATE_CANCELLED:
-            raise Refusal(
-                "session-cancelled",
-                f"{set_slug} session {session_number} is cancelled; restore "
-                "it before starting a run.",
-            )
+def _require_session_open(events, views, session_number) -> None:
+    entry = runproject.organization_states(events).get(session_number)
+    if entry and entry[1] == runproject.STATE_CANCELLED:
+        raise Refusal(
+            "session-cancelled",
+            f"session {session_number} is cancelled; restore it before "
+            "starting a run.",
+        )
 
 
 def _run_output(view, worktree, identity) -> dict:
     return {
-        "run_id": view.run_id, "set_slug": view.set_slug,
+        "run_id": view.run_id,
         "session_number": view.session_number, "policy": view.policy,
         "state": view.state, "worktree": journal.worktree_id(worktree),
         "base_commit": view.base_commit,
@@ -616,7 +571,7 @@ def cmd_finish(args) -> dict:
         }])
         return {
             "outcome": args.outcome, "commit": None, "verdict": None,
-            "checks": [], "documents": _documents(root, view.set_slug),
+            "checks": [],
         }
 
     worktree = Path(view.worktree_id)
@@ -697,7 +652,6 @@ def cmd_finish(args) -> dict:
             for r in results
         ],
         "reused": reused, "pushed": pushed,
-        "documents": _documents(root, view.set_slug),
     }
 
 
@@ -795,13 +749,6 @@ def _push(worktree, config, view) -> bool:
             "re-run finish to retry the push.",
         )
     return True
-
-
-def _documents(root, set_slug: str) -> list:
-    return [
-        f"{runproject.SESSION_SETS_DIRNAME}/{set_slug}/{name}"
-        for name in ("spec.md", *GENERATED_VIEWS)
-    ]
 
 
 # --- resume -----------------------------------------------------------------
@@ -1046,15 +993,6 @@ def cmd_status(args) -> dict:
 
 # --- organize ---------------------------------------------------------------
 
-def _next_set_number(root) -> int:
-    highest = 0
-    for entry in runproject.session_sets_dir(root).glob("*"):
-        match = runproject._SET_DIRNAME.match(entry.name)
-        if entry.is_dir() and match:
-            highest = max(highest, int(match.group(1)))
-    return highest + 1
-
-
 def _commit_spec(root, paths, message) -> str:
     run_git(root, "add", "--", *paths)
     rc, _, err = run_git(root, "commit", "--no-verify", "-q", "-m", message)
@@ -1063,78 +1001,46 @@ def _commit_spec(root, paths, message) -> str:
     return runcore.head_commit(root)
 
 
-def cmd_organize_set_create(args) -> dict:
-    root = _control_root()
-    if not runcore.worktree_is_clean(root):
-        raise Refusal(
-            "dirty-worktree",
-            "creating a set commits a spec on its own; commit or stash "
-            "unrelated changes first.",
-        )
-    number = _next_set_number(root)
-    slug = f"{number:03d}-{runcore.slugify(args.title)}"
-    directory = runproject.session_sets_dir(root) / slug
-    directory.mkdir(parents=True, exist_ok=True)
-    first = args.first_session or "First work session"
-    (directory / "spec.md").write_text(
-        f"# {args.title}\n\n## Objective\n\n{args.objective}\n\n"
-        f"## Sessions\n\n### Session 1: {first}\n\n"
-        "Describe and complete one bounded change.\n",
-        encoding="utf-8",
-    )
-    rel = f"{runproject.SESSION_SETS_DIRNAME}/{slug}/spec.md"
-    commit = _commit_spec(root, [rel], f"Declare session set {slug}")
-    runproject.write_projection(root)
-    return {"set_slug": slug, "session_number": 1, "commit": commit}
-
-
 def cmd_organize_session_add(args) -> dict:
     root = _control_root()
     if not runcore.worktree_is_clean(root):
         raise Refusal(
             "dirty-worktree",
-            "adding a session commits a spec on its own; commit or stash "
+            "adding a session commits the plan on its own; commit or stash "
             "unrelated changes first.",
         )
-    declared, _ = _resolve_session_set(root, args.set)
-    number = max((s["number"] for s in declared["sessions"]), default=0) + 1
-    spec = runproject.session_sets_dir(root) / args.set / "spec.md"
-    body = spec.read_text(encoding="utf-8").rstrip("\n")
+    organization = runproject.load_organization(root)
+    number = max(
+        (s["number"] for s in organization["sessions"]), default=0
+    ) + 1
+    plan = runproject.session_plan_path(root)
+    plan.parent.mkdir(parents=True, exist_ok=True)
+    body = (
+        plan.read_text(encoding="utf-8").rstrip("\n")
+        if plan.is_file() else "# Session plan\n\n## Sessions"
+    )
     policy = f"\nPolicy: {args.policy}\n" if args.policy else ""
-    spec.write_text(
+    plan.write_text(
         f"{body}\n\n### Session {number}: {args.title}\n{policy}\n"
         "Describe and complete one bounded change.\n",
         encoding="utf-8",
     )
-    rel = f"{runproject.SESSION_SETS_DIRNAME}/{args.set}/spec.md"
     commit = _commit_spec(
-        root, [rel], f"Declare {args.set} session {number}"
+        root, [runproject.SESSION_PLAN_REL], f"Declare session {number}"
     )
     runproject.write_projection(root)
-    return {"set_slug": args.set, "session_number": number, "commit": commit}
-
-
-def _resolve_session_set(root, slug):
-    organization = runproject.load_organization(root)
-    declared = next(
-        (s for s in organization["sets"] if s["slug"] == slug), None
-    )
-    if declared is None:
-        raise Refusal("unknown-session", f"no session set {slug!r}")
-    return declared, organization
+    return {"session_number": number, "commit": commit}
 
 
 def cmd_organize_cancel(args, restore: bool = False) -> dict:
     root = _control_root()
     _require_attestation(args)
-    _resolve_session_set(root, args.set)
-    target = "session" if args.session is not None else "set"
+    _resolve_session(root, args.session)
     if not restore:
         views = runcore.fold_all(journal.read_events(root))
         live = [
             v for v in views.values()
-            if not v.terminal and v.set_slug == args.set
-            and (args.session is None or v.session_number == args.session)
+            if not v.terminal and v.session_number == args.session
         ]
         if live:
             raise Refusal(
@@ -1149,25 +1055,17 @@ def cmd_organize_cancel(args, restore: bool = False) -> dict:
         "run_id": None,
         "attempt": 1,
         "actor": journal.actor(ACTOR_OPERATOR, "operator"),
-        "summary": f"{'restored' if restore else 'cancelled'} {target}",
+        "summary": f"{'restored' if restore else 'cancelled'} session",
         "payload": {
-            "target": target, "set_slug": args.set,
             "session_number": args.session, "reason": args.reason,
         },
     }])
     projection = runproject.current_projection(root)
-    declared = next(
-        s for s in projection["session_sets"] if s["slug"] == args.set
+    state = next(
+        s["state"] for s in projection["sessions"]
+        if s["number"] == args.session
     )
-    state = declared["state"]
-    if args.session is not None:
-        state = next(
-            s["state"] for s in declared["sessions"]
-            if s["number"] == args.session
-        )
-    return {
-        "set_slug": args.set, "session_number": args.session, "state": state,
-    }
+    return {"session_number": args.session, "state": state}
 
 
 # --- doctor / configure -----------------------------------------------------
@@ -1254,18 +1152,17 @@ def cmd_worktree_create(args) -> dict:
     committed ``HEAD`` and no work-in-progress is copied or committed."""
     root = _control_root()
     config = load_config()
-    declared, session = _resolve_session(root, args.set, args.session)
-    _require_generated_views_ignored(root, args.set)
+    session = _resolve_session(root, args.session)
     base = runcore.head_commit(root)
     if base is None:
         raise Refusal("no-base-commit", f"{root} has no HEAD to branch from")
 
     with journal.batch(root) as writer:
         views = runcore.fold_all(writer.events)
-        _require_session_open(writer.events, views, args.set, args.session)
+        _require_session_open(writer.events, views, args.session)
         attempt = 1 + sum(
             1 for v in views.values()
-            if v.set_slug == args.set and v.session_number == args.session
+            if v.session_number == args.session
         )
         ask = session["title"]
         run_id = runcore.allocate_run_id_from(writer.events, ask)
@@ -1280,13 +1177,13 @@ def cmd_worktree_create(args) -> dict:
         writer.append(
             event_type="run.created", run_id=run_id, attempt=attempt,
             actor=journal.actor(ACTOR_FRAMEWORK, "worktree"),
-            summary=f"prepared {args.set} session {args.session}",
+            summary=f"prepared session {args.session}",
             payload={
                 "policy": args.policy or session["policy"]
                 or config["run_policy"]["default"],
                 "ask": ask, "base_commit": base,
                 "worktree_id": journal.worktree_id(target), "branch": branch,
-                "set_slug": args.set, "session_number": args.session,
+                "session_number": args.session,
                 "prepared": True,
             },
         )
@@ -1444,7 +1341,6 @@ def build_parser() -> argparse.ArgumentParser:
 
     run = sub.add_parser("run")
     run.add_argument("--register", action="store_true", required=True)
-    run.add_argument("--set")
     run.add_argument("--session", type=int)
     run.add_argument("--run")
     run.add_argument("--engine", required=True)
@@ -1519,26 +1415,16 @@ def build_parser() -> argparse.ArgumentParser:
 
     organize = sub.add_parser("organize")
     organize_sub = organize.add_subparsers(dest="noun", required=True)
-    org_set = organize_sub.add_parser("set")
-    org_set_sub = org_set.add_subparsers(dest="action", required=True)
-    set_create = org_set_sub.add_parser("create")
-    set_create.add_argument("--title", required=True)
-    set_create.add_argument("--objective", required=True)
-    set_create.add_argument("--first-session")
-    set_create.set_defaults(handler=cmd_organize_set_create)
-
     org_session = organize_sub.add_parser("session")
     org_session_sub = org_session.add_subparsers(dest="action", required=True)
     session_add = org_session_sub.add_parser("add")
-    session_add.add_argument("--set", required=True)
     session_add.add_argument("--title", required=True)
     session_add.add_argument("--policy", choices=runcore.POLICIES)
     session_add.set_defaults(handler=cmd_organize_session_add)
 
     for name, restore in (("cancel", False), ("restore", True)):
         action = organize_sub.add_parser(name)
-        action.add_argument("--set", required=True)
-        action.add_argument("--session", type=int)
+        action.add_argument("--session", type=int, required=True)
         action.add_argument("--reason", required=True)
         action.add_argument("--attest-operator", action="store_true")
         action.set_defaults(
@@ -1553,7 +1439,6 @@ def _add_worktree_parser(sub) -> None:
     worktree = sub.add_parser("worktree")
     worktree_sub = worktree.add_subparsers(dest="action", required=True)
     create = worktree_sub.add_parser("create")
-    create.add_argument("--set", required=True)
     create.add_argument("--session", type=int, required=True)
     create.add_argument("--policy", choices=runcore.POLICIES)
     create.set_defaults(handler=cmd_worktree_create)

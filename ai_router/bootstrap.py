@@ -225,7 +225,7 @@ You are **Gemini CLI**. The managed body above arrived through the
 _IMPORT_LINE = "@AGENTS.md"
 
 PLAN_PROMPT = """\
-You are preparing a project plan for the Dabbler session-set workflow.
+You are preparing a project plan for the Dabbler session workflow.
 
 Create — or import — `docs/planning/project-plan.md`, the stable artifact
 the decomposition session reads from.
@@ -233,8 +233,8 @@ the decomposition session reads from.
 - **Create:** draft the plan directly: overview, goals and success
   criteria, high-level phases or feature areas, and each phase's key
   deliverables. Keep it concise — the decomposition session turns each
-  phase into session sets, so scope each phase to a handful of focused AI
-  sessions.
+  phase into numbered sessions, so scope each phase to a handful of
+  focused AI sessions.
 - **Import:** if a plan already exists outside this repo (a doc, a ticket,
   notes), bring its content into that path in this same shape, preserving
   intent while conforming to the structure above.
@@ -243,37 +243,40 @@ A later revision is just another plan session that amends the same file.
 """
 
 DECOMPOSITION_PROMPT = """\
-You are a session-set architect for an AI-led development workflow (the
-Dabbler session-set workflow).
+You are a session architect for an AI-led development workflow (the
+Dabbler session workflow).
 
 Read `docs/planning/project-plan.md` in this workspace (it is deliberately
-not inlined here) and decompose it into a sequence of session sets. Each
-session set is a focused, independently deployable unit of work that one
-AI coding session can complete.
+not inlined here) and decompose it into a sequence of numbered sessions.
+Each session is a focused unit of work that one AI coding session can
+complete.
 
-For EACH session set, scaffold `docs/session-sets/<NNN-slug>/spec.md`.
+Append the sessions to `docs/sessions/session-plan.md`, under its
+`## Sessions` heading. There is no level above a session: no sets, no
+slugs, no directories.
 
 Hard requirements (do not deviate):
-- **Slug:** `NNN-kebab-title` — three-digit, zero-padded, monotonically
-  increasing prefix continuing after the highest existing set number,
-  then a kebab-case title (e.g. `003-user-auth` when the scaffolded
-  bootstrap sets 001/002 exist). Never a bare, un-prefixed slug; never
-  two sets sharing a prefix.
-- **spec.md layout:** one `# <Title>` heading; a `## Sessions` section;
-  one `### Session K of N: <title>` heading per session; each session's
-  steps as a top-level ordered list. Step 1 registers the session; the
-  last steps run the affected tests, cross-provider verification, the
-  complete suite once against the verified tree, and close-out; the
-  middle steps are the work. Never write a step that says "run the
-  tests" without saying which run it means.
-- Do NOT hand-author `session-state.json`: each set's own first
-  `session start` bootstraps it from the spec — state files are the
-  runtime writers' job, never authored by hand.
+- **Numbering:** continue from the highest session number the plan already
+  declares. Numbers are never reused and never renumbered, including for
+  cancelled sessions.
+- **Layout:** one `### Session <N>: <title>` heading per session, and its
+  steps as a top-level ordered list. Step 1 registers the session; the last
+  steps run the affected tests, cross-provider verification, the complete
+  suite once against the verified tree, and close-out; the middle steps are
+  the work. Never write a step that says "run the tests" without saying
+  which run it means.
+- A session may declare `Policy: fast` or `Policy: verified` on its own
+  line; omitting it uses the repository default.
+- Do NOT hand-author `sessions.json`: the first `session start` bootstraps
+  it from this plan — state files are the runtime writers' job, never
+  authored by hand.
 
 Authoring guidance:
-- Order sets so earlier ones unblock later ones.
-- Keep scope tight: prefer 2-4 sessions per set, at most ~3 work steps
-  per session.
+- Order sessions so earlier ones unblock later ones.
+- Keep scope tight: at most ~3 work steps per session. A session whose
+  evidence bundle a verifier cannot read is too large, and the evidence cap
+  is the measure of that — treat it as a planning signal, not a threshold
+  to get under.
 """
 
 

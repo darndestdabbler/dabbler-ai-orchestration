@@ -229,11 +229,7 @@ def _hermetic(monkeypatch):
 
 # --- Run-core sandbox --------------------------------------------------------
 
-RUN_SPEC_MD = """# Default
-
-## Objective
-
-Initial and general project work.
+RUN_PLAN_MD = """# Default
 
 ## Sessions
 
@@ -251,21 +247,20 @@ Implement and test the bounded parser path.
 
 @pytest.fixture
 def run_repo(tmp_path, monkeypatch):
-    """A committed git repository with one authored set spec, cwd'd into.
+    """A committed git repository with one authored session plan, cwd'd into.
 
     The run core resolves its control root, repository id, and config from
     the working directory, so every run-core test needs a real repository
     rather than a temp directory that merely looks like one.
     """
     repo = tmp_path / "work"
-    sessions_dir = repo / "docs" / "session-sets" / "001-default"
+    sessions_dir = repo / "docs" / "sessions"
     sessions_dir.mkdir(parents=True)
-    (sessions_dir / "spec.md").write_text(RUN_SPEC_MD, encoding="utf-8")
+    (sessions_dir / "session-plan.md").write_text(
+        RUN_PLAN_MD, encoding="utf-8"
+    )
     (repo / ".gitignore").write_text(
         ".dabbler/\n"
-        "docs/session-sets/*/session-state.json\n"
-        "docs/session-sets/*/activity-log.json\n"
-        "docs/session-sets/*/change-log.md\n"
         # A test's failure sentinel. Ignored so it is not itself an unmapped
         # change in the candidate tree, which would confound the selection
         # and escalation assertions it exists to set up.

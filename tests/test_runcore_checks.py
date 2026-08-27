@@ -11,7 +11,7 @@ from ai_router.checks import CheckConfigError, load_checks
 from tests.conftest import cli, reconfigure
 
 REGISTER = (
-    "run", "--register", "--set", "001-default", "--session", "1",
+    "run", "--register", "--session", "1",
     "--engine", "claude-code", "--provider", "anthropic", "--model", "sonnet",
 )
 

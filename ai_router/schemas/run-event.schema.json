@@ -403,7 +403,6 @@
         "base_commit",
         "worktree_id",
         "branch",
-        "set_slug",
         "session_number"
       ],
       "additionalProperties": false,
@@ -430,10 +429,6 @@
             "string",
             "null"
           ]
-        },
-        "set_slug": {
-          "type": "string",
-          "minLength": 1
         },
         "session_number": {
           "type": "integer",
@@ -1019,50 +1014,18 @@
     "organizationChange": {
       "type": "object",
       "required": [
-        "target",
-        "set_slug",
+        "session_number",
         "reason"
       ],
       "additionalProperties": false,
       "properties": {
-        "target": {
-          "enum": [
-            "set",
-            "session"
-          ]
-        },
-        "set_slug": {
-          "type": "string",
-          "minLength": 1
-        },
         "session_number": {
-          "type": [
-            "integer",
-            "null"
-          ],
+          "type": "integer",
           "minimum": 1
         },
         "reason": {
           "type": "string",
           "minLength": 1
-        }
-      },
-      "if": {
-        "properties": {
-          "target": {
-            "const": "session"
-          }
-        }
-      },
-      "then": {
-        "required": [
-          "session_number"
-        ],
-        "properties": {
-          "session_number": {
-            "type": "integer",
-            "minimum": 1
-          }
         }
       }
     },

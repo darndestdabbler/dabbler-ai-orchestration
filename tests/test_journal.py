@@ -225,10 +225,7 @@ def test_organization_events_name_no_run(run_repo):
         root, event_type="organization.cancelled", run_id=None, attempt=1,
         actor=journal.actor(journal.ACTOR_OPERATOR, "operator"),
         summary="cancelled a session",
-        payload={
-            "target": "session", "set_slug": "001-default",
-            "session_number": 1, "reason": "deferred",
-        },
+        payload={"session_number": 1, "reason": "deferred"},
     )
     assert event["run_id"] is None
     assert journal.read_events(root)[0]["run_id"] is None

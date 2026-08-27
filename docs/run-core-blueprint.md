@@ -17,10 +17,10 @@ implementation is reported back as a blueprint defect, not filled ad hoc.
 
 ## 1. Product definition
 
-One execution pipeline, two policies, and one lightweight organizational
-hierarchy. A **session set** groups work around an objective. A **session** is
-one ordered, bounded work unit inside that set. A **run** is one execution
-attempt for a session, usually one agent conversation. The framework's job per
+One execution pipeline, two policies, and one flat organizational level.
+A **session** is one ordered, bounded work unit, numbered directly in a
+repository. A **run** is one execution attempt for a session, usually one
+agent conversation. The framework's job per
 run: remember the work, run the declared checks, optionally obtain one
 independent cross-provider review and loop findings back, record cost, and
 leave git in a known state.
@@ -31,16 +31,15 @@ leave git in a known state.
 | `verified` | Meaningful production changes, or any trigger in §5.3 | One cross-provider review before any finding; remediation loop after findings; round cap. |
 
 Both policies share one state machine (§4), one journal (§3), one projection
-(§6), and one CLI (§7). Sets and sessions add navigation and durable intent,
-not execution gates: no required set size, no required number of sessions, no
-plan approval, and no set-level verification. A one-line fix can be one session
-in the Default set; a long project can declare many sets and sessions in
-advance. The hierarchy scales without charging project ceremony to every run.
+(§6), and one CLI (§7). Sessions add navigation and durable intent, not
+execution gates: no required number of sessions, no plan approval, and no
+level above a session that carries a lifecycle state. A one-line fix can be
+one session; a long project can declare many sessions in advance.
 
 ## 2. Layout and naming
 
 - **Control root:** resolve the main worktree from `git worktree list --porcelain`;
-   its repository root owns `.dabbler/` and resolves `docs/session-sets/` for every linked
+   its repository root owns `.dabbler/` and resolves `docs/sessions/` for every linked
    worktree. All commands resolve this root before reading or writing, so linked
    worktrees do not create independent journals or counters. If Git cannot
    identify one main worktree, `run` refuses rather than guessing.
@@ -54,16 +53,14 @@ advance. The hierarchy scales without charging project ceremony to every run.
    - `.dabbler/runs/<run-id>/heartbeat.json` — per-run liveness marker (§8.3).
   - `.dabbler/runs/<run-id>/` — per-run artifacts: verification attempts,
     check output digests, evidence bundles.
-- **Human-facing documents (generated ignored local views, regenerable at any time):**
-   - `docs/session-sets/<NNN-slug>/session-state.json`, `activity-log.json`, and
-      `change-log.md` (§6.2).
-- **Human-authored planning:** `docs/planning/project-plan.md` describes the
-   project; each tracked `docs/session-sets/<NNN-slug>/spec.md` describes one
-   objective and its ordered sessions (§6.4). Specs store intent, never runtime
-   status or evidence.
-- New v5 projects ignore the three generated filenames under
-   `docs/session-sets/*/`; `spec.md` remains tracked. Existing tracked v4 files
-   remain untouched historical artifacts despite matching those ignore rules.
+- **Human-facing records:** `docs/sessions/sessions.json`,
+   `activity-log.json` and `change-log.md` are written by the **lifecycle**
+   writers and are tracked. The run core does not generate them; a second
+   writer of one record is the drift the set collapse removed.
+- **Human-authored planning:** `docs/sessions/project-work-plan.md` describes
+   the project; the tracked `docs/sessions/session-plan.md` declares the
+   ordered sessions (§6.4). The plan stores intent, never runtime status or
+   evidence.
 - **Run id:** `r<NNNN>-<slug>`; `NNNN` is a zero-padded repository-local
    counter allocated under the journal lock as `max(existing NNNN) + 1` (the
    first event of a run fixes it); `slug` is kebab-case from the operator's ask,
@@ -130,7 +127,7 @@ Rules:
 
 | `event_type` | Emitted by | Payload (required fields) |
 | --- | --- | --- |
-| `run.created` | `run`/`worktree create` | `policy`, `ask` (operator's request text), `base_commit`, `worktree_id`, `branch` (current branch for in-place runs; `dabbler/run/<run-id>` for prepared worktrees), `set_slug`, `session_number` |
+| `run.created` | `run`/`worktree create` | `policy`, `ask` (operator's request text), `base_commit`, `worktree_id`, `branch` (current branch for in-place runs; `dabbler/run/<run-id>` for prepared worktrees), `session_number` |
 | `run.started` | `run --register`/future host adapter | `mode`: `wrapped` \| `registered`, `engine`, `provider`, `model`, `identity_provenance` |
 | `run.checkpoint` | agent via CLI/hook | `note` (≤ 500 chars), `ack_guidance_through` (sequence or `null`) |
 | `run.waiting` | framework | `reason`: `operator` \| `dependency`, `question` (operator) or `depends_on_run` (dependency) |
@@ -143,7 +140,7 @@ Rules:
 | `remediation.started` | `verify` | `round`, `finding_count` |
 | `run.cost_updated` | framework | `dispatch_id`, `cost_usd` (number or `null`), `pricing_status`: `priced` \| `unpriced`, token/credit usage when known, `source` |
 | `run.finished` | `finish` / prepared-worktree removal | `outcome`: `completed` \| `failed` \| `cancelled`, `commit` and `tree_digest` (nullable before work/commit), `verdict` (`VERIFIED`/`ISSUES_FOUND`/`WAIVED`/`null`), `waiver_reason` (required only for `WAIVED`), `checks_green`: bool |
-| `organization.cancelled` / `organization.restored` | operator via CLI/Explorer | `target`: `set` \| `session`, `set_slug`, `session_number` (required for session), `reason` |
+| `organization.cancelled` / `organization.restored` | operator via CLI/Explorer | `session_number`, `reason` |
 | `worktree.created` / `worktree.ready` / `worktree.failed` | `worktree` | §11 |
 | `escalation.triggered` | framework | `trigger` (one of §5.3), `from_policy`, `to_policy` |
 
@@ -161,7 +158,6 @@ duck-typed dictionaries. The slice adds:
 - `schemas/run-projection.schema.json`: §6.1, including derived task rows;
 - `schemas/session-organization.schema.json`: normalized set/session intent
    parsed from §6.4 specs;
-- `schemas/session-state-v5.schema.json`: the generated v5 set document
    (§6.2). v4's `session-state.schema.json` is frozen and still validates the
    historical files this projector never rewrites;
 - `schemas/verification-request.schema.json`: §9.1;
@@ -499,7 +495,7 @@ success until the journal event is durable and the projection/document writes
 succeed. If projection fails after the durable append, the command returns
 `projection-stale` with the committed sequence; it never rolls back the event or
 pretends the view is current. `status` compares the journal tail and exact
-session-set spec digest to the projection and rebuilds automatically on any
+session-plan digest to the projection and rebuilds automatically on any
 mismatch; `--rebuild` forces the same operation for troubleshooting. Shape:
 
 ```json
@@ -508,19 +504,10 @@ mismatch; `--rebuild` forces the same operation for troubleshooting. Shape:
   "projection_revision": 1842,
    "organization_digest": "sha256:...",
    "generated_at": "<occurred_at of projection_revision event>",
-   "session_sets": [
-      {
-         "slug": "001-default",
-         "title": "Default",
-         "objective": "Initial and general project work",
-         "state": "in-progress",
-         "position": 1,
-         "sessions": [
-            {"number": 1, "title": "Plan the project", "policy": "fast", "state": "complete", "run_ids": ["r0001-plan-project"]},
-            {"number": 2, "title": "Parse the HL7 message", "policy": "verified", "state": "in-progress", "run_ids": ["r0002-hl7-segment-parser"]},
-            {"number": 3, "title": "Validate optional segments", "policy": "fast", "state": "not-started", "run_ids": []}
-         ]
-      }
+   "sessions": [
+      {"number": 1, "title": "Plan the project", "policy": "fast", "state": "complete", "run_ids": ["r0001-plan-project"]},
+      {"number": 2, "title": "Parse the HL7 message", "policy": "verified", "state": "in-progress", "run_ids": ["r0002-hl7-segment-parser"]},
+      {"number": 3, "title": "Validate optional segments", "policy": "fast", "state": "not-started", "run_ids": []}
    ],
   "runs": [
     {
@@ -529,7 +516,6 @@ mismatch; `--rebuild` forces the same operation for troubleshooting. Shape:
       "state": "verifying",
       "waiting_reason": null,
       "ask": "...",
-      "set_slug": "001-default",
       "session_number": 2,
       "engine": "claude-code",
       "provider": "anthropic",
@@ -573,30 +559,28 @@ the current phase. Every row carries `started_at`, `last_activity_at`, and
 `in-progress` | `waiting` | `complete` | `failed`; it never feeds run policy. A short `fast` run therefore has one or two useful rows, while a long
 verified run visibly advances without requiring authored task bookkeeping.
 
-### 6.2 The four preserved documents
+### 6.2 The staff-facing records belong to the lifecycle
 
-Each `docs/session-sets/<NNN-slug>/` keeps the familiar four filenames.
-`spec.md` is tracked authored intent and is never overwritten by projection.
-For new v5 sets, the other three are ignored machine-written local views stamped
-with the journal revision. They regenerate by atomic replace after relevant
-events or spec changes and therefore cannot dirty or alter the candidate tree.
-On another clone, `status`/extension activation regenerates them from tracked
-specs plus the local journal. Existing tracked v4 files are historical inputs
-and are never rewritten by the v5 projector.
+**The run core generates no staff-facing document.** `docs/sessions/`
+holds `sessions.json`, `activity-log.json`, `change-log.md` and
+`decisions-log.md`, and the lifecycle writers own all four. Session 14
+deleted the run core's parallel generator of those names: two writers of one
+record is the drift the collapse exists to end, and the ledger the Explorer
+reads is `.dabbler/run-projection.json` (§6.1), which is machine-side,
+ignored, and regenerable.
 
-| File | Projection rule |
-| --- | --- |
-| `spec.md` | Authored set title/objective plus ordered `### Session N: Title` sections. A session may state `Policy: fast` or `Policy: verified`; omitted policy uses repository default. Session number is stable after any run links to it. |
-| `session-state.json` | Schema v5 set projection: set status, revision/digest, and ordered sessions with status, linked run ids, current run, start/completion timestamps, verification summary, and cost. It is wholly derived from spec + journal. |
-| `activity-log.json` | Set-level display history and derived phase/task rows for each linked run attempt. It retains first start time and latest activity time. |
-| `change-log.md` | Created after the first completed session and regenerated after later completion/accounting events: one concise block per session attempt with changes, checks, verification, cost, and commit. |
+| File | Owner | Rule |
+| --- | --- | --- |
+| `docs/sessions/session-plan.md` | authored | Ordered `### Session N: Title` sections. A session may state `Policy: fast` or `Policy: verified`; omitted policy uses the repository default. Session numbers are stable and never reused. |
+| `docs/sessions/sessions.json` | lifecycle | Schema v5. Per-session status, verdict, orchestrator identity and verification summary. The run core reads it for nothing and writes it never. |
+| `.dabbler/run-projection.json` | run core | The projection of §6.1: sessions joined to their runs, rebuilt whenever the journal tail or the plan digest moves. |
 
 ### 6.3 Organizational status and compatibility
 
-Python parses every tracked set spec and joins it to journal runs. Session
+Python parses the tracked session plan and joins it to journal runs. Session
 status uses the familiar vocabulary:
 
-- `not-started`: declared in spec, no linked run and no cancellation;
+- `not-started`: declared in the plan, no linked run and no cancellation;
 - `in-progress`: latest run is nonterminal, or latest attempt failed and awaits
   retry/operator disposition;
 - `complete`: latest run completed;
@@ -659,21 +643,20 @@ fields are never removed or retyped without one.
 
 | Command | Input | Output (JSON, key fields) |
 | --- | --- | --- |
-| `run --register (--set <slug> --session <N> \| --run <prepared-id>) --engine E --provider P --model M [--policy fast\|verified]` | starts one declared session or its prepared run; the session's title supplies the ask; policy is `--policy` (the §5.3 operator-request trigger), else the session's declared policy, else `run_policy.default`; model is required | `{"run_id", "set_slug", "session_number", "policy", "state", "worktree", "base_commit", "identity_provenance"}` |
+| `run --register (--session <N> \| --run <prepared-id>) --engine E --provider P --model M [--policy fast\|verified]` | starts one declared session or its prepared run; the session's title supplies the ask; policy is `--policy` (the §5.3 operator-request trigger), else the session's declared policy, else `run_policy.default`; model is required | `{"run_id", "session_number", "policy", "state", "worktree", "base_commit", "identity_provenance"}` |
 | `checkpoint --run <id> --note "<text>" [--uncertain] [--ack-guidance-through <sequence>]` | acknowledgement cannot exceed the latest guidance sequence | `{"sequence", "pending_guidance"}` |
 | `guidance --run <id> --text "<text>" [--answer <waiting-sequence> --resume] --attest-operator` | records durable guidance on a running/waiting run; answering the exact current operator wait first passes the §5.5 recovery probe, then appends guidance and `run.resumed` under one journal lock; stale/wrong wait sequences refuse | `{"sequence", "state", "answered_sequence"}` |
 | `escalate --run <id>` | | `{"policy": "verified", "trigger": "operator-request"}` |
 | `check --run <id> [--stage targeted\|final-full] [--allow-full "<reason>" --attest-operator]` | defaults to `targeted`; `final-full` refuses before accepted verification for `verified` runs; override applies only to targeted-stage full-suite selection | `{"tree_digest", "stage", "fresh", "selection", "checks": [...]}` |
 | `verify --run <id>` | preconditions: state `running`/`remediating`; invokes `check` handler before dispatch | `{"round", "tree_digest", "verdict", "blocking": [...], "minor": [...], "state"}` |
-| `finish --run <id> [--outcome completed\|failed\|cancelled] [--waive "<reason>" --attest-operator]` | default outcome derived; waiver requires green checks and a non-empty reason; explicit `failed`/`cancelled` is legal from any nonterminal state, including `created`, and creates no commit | `{"outcome", "commit", "verdict", "checks": [...], "documents": ["docs/session-sets/<set>/..."]}` |
+| `finish --run <id> [--outcome completed\|failed\|cancelled] [--waive "<reason>" --attest-operator]` | default outcome derived; waiver requires green checks and a non-empty reason; explicit `failed`/`cancelled` is legal from any nonterminal state, including `created`, and creates no commit | `{"outcome", "commit", "verdict", "checks": [...]}` |
 | `resume --run <id> [--extend-rounds <N> [--model-usd-budget <total>] [--elapsed-minutes-budget <total>] --attest-operator]` | runs §5.5 probe; extension is accepted only from round-cap/budget waiting and raises the logical dispatch ceiling by `N` | `{"state", "probe": {...}, "round_limit", "dispatch_limit", "model_usd_budget", "elapsed_minutes_budget"}` |
 | `status [--run <id>] [--after <sequence>] [--rebuild] --json` | | always includes `control_root`, `projection_revision`, and `organization_digest`; with `--after`, events must begin at `after + 1` and remain contiguous. A requested future revision is refusal `future-revision`; a stored sequence gap is operational error `journal-corrupt`. Without `--after`: the full projection (§6.1). |
 | `doctor [--transport api\|copilot-cli] --json` | no mutation or model call | `{"ready", "python", "router", "transport": {"env_present", "env_value", "effective", "source", "status", "diagnostics"}, "provider_keys_present": [...]}` |
 | `configure transport --profile api\|copilot-cli --user --json` | persists `DABBLER_TRANSPORT` at user scope through the existing bootstrap helper; never reads or writes provider secrets | `{"env_name": "DABBLER_TRANSPORT", "value", "persisted_scope", "restart_may_be_required"}` |
-| `organize set create --title "<text>" --objective "<text>" [--first-session "<text>"]` | requires clean worktree; creates the next numbered tracked set spec and commits only that spec | `{"set_slug", "session_number", "commit"}` |
-| `organize session add --set <slug> --title "<text>" [--policy fast\|verified]` | requires clean worktree; appends the next session number to spec and commits only that spec | `{"set_slug", "session_number", "commit"}` |
-| `organize cancel\|restore --set <slug> [--session <N>] --reason "<text>" --attest-operator` | refuses cancel of a session with a live run; records organizational status only | `{"set_slug", "session_number", "state"}` |
-| `worktree create --set <slug> --session <N>` (§11) | allocates a run in `created` before Git mutation; main-worktree WIP is permitted because the session is already committed | `{"run_id", "worktree_id", "state": "ready\|failed", "tasks": [...]}` |
+| `organize session add --title "<text>" [--policy fast\|verified]` | requires clean worktree; appends the next session number to the session plan and commits only that file | `{"session_number", "commit"}` |
+| `organize cancel\|restore --session <N> --reason "<text>" --attest-operator` | refuses cancel of a session with a live run; records organizational status only | `{"session_number", "state"}` |
+| `worktree create --session <N>` (§11) | allocates a run in `created` before Git mutation; main-worktree WIP is permitted because the session is already committed | `{"run_id", "worktree_id", "state": "ready\|failed", "tasks": [...]}` |
 | `worktree init --run <id>` / `worktree remove --run <id>` (§11) | retry initialization / remove only a terminal or never-started prepared worktree; removal of nonterminal `created` appends `run.finished(cancelled)` first | `{"run_id", "worktree_id", "state", "tasks": [...]}` |
 
 `verify` is the only command that makes a model call. `finish` is the only
@@ -719,7 +702,7 @@ unrelated changes into the planning commit.
 1. Resolve the absolute shared `control_root` through `status`, then watch
    `.dabbler/run-projection.json`, `.dabbler/journal.jsonl`, and
    `.dabbler/runs/*/heartbeat.json` there (plus the legacy set watchers,
-   unchanged), plus `docs/session-sets/*/spec.md`. A spec event invokes
+   unchanged), plus `docs/sessions/session-plan.md`. A plan event invokes
    `status --rebuild`; TypeScript never parses Markdown organization. Watcher
    bursts are debounced for at most 250 ms and then request one full/current
    Python projection. When the control root is outside the open VS Code workspace,
@@ -922,21 +905,20 @@ Pending guidance remains visible until acknowledged by sequence.
    `testing.suites`, deterministic controls, model registry/pricing.
    New section added: `run_policy` (§5.3), `git`, `explorer`.
 5. `router-metrics.jsonl` and seat-cost measurement.
-6. Every existing `docs/session-sets/` directory remains visible in the
-   familiar hierarchy. Completed/cancelled v4 sets are historical read-only
-   records; active sets finish or are cancelled under v4 before cutover. There
-   is no v4-to-v5 live-set migration path in the slice.
+6. Historical session-set records live in git history. `session migrate`
+   carries a legacy set forward into `docs/sessions/`; nothing reads a
+   `docs/session-sets/` directory any more.
 7. Ground rules 2, 3, 5, 6, 7 of `AGENTS.md`, verbatim. The machine owns
    the journal; no code path accepts a hand-written verdict or event.
 
 **Intentional breaks (the point of the rebuild):**
 
-1. Session sets and sessions remain the live organizational surface, but their
-   old process ceremony is removed. Starting a session registers a run;
-   finishing the run updates the session. There is no mandatory three-session
-   set, plan approval, per-step model check, affected-test evidence ceremony,
-   set-level verification, five-gate close, or bookkeeping commit/push. The
-   `fast` execution path is session → run → checks → commit.
+1. Sessions are the live organizational surface and the set level above them
+   is gone (session 14). Starting a session registers a run; finishing the
+   run updates the session. There is no plan approval, per-step model check,
+   affected-test evidence ceremony, five-gate close, or bookkeeping
+   commit/push. The `fast` execution path is session → run → checks →
+   commit.
 2. `targeted` / `final-full` staging is retained in a smaller form because it
    prevents expensive speculative suites. `verified` runs accept only targeted
    evidence before review and run relevant complete suites after final clean
@@ -1040,10 +1022,10 @@ unavailable, the extension copies the same prompt and opens chat.
 
 ### 11.2 Worktree initialization contract
 
-`worktree create --set <slug> --session <N> [--policy ...]` allocates
+`worktree create --session <N> [--policy ...]` allocates
 `run.created`, then creates and initializes its worktree before any coding
 agent starts. The session's title supplies the ask, exactly as for an
-in-place run: `run.created` requires `set_slug` and `session_number`, so a
+in-place run: `run.created` requires `session_number`, so a
 run is always named by the session it belongs to and never by free text.
 The main worktree may be dirty: the prepared branch starts from its committed
 `HEAD`, and tracked/untracked WIP in the main worktree is neither copied nor
@@ -1051,7 +1033,7 @@ committed. The clean-start rule applies when an in-place run registers and when
 the prepared run registers inside its own worktree.
 `git.worktree_per_run` defaults **false**, so the default remains in-place work.
 In the CLI slice, setting it true makes an in-place
-`run --register --set <slug> --session <N>`
+`run --register --session <N>`
 refuse `worktree-preparation-required`; a future host adapter may automate the
 prepare/open/register sequence. `worktree.root` defaults to a sibling of the main worktree,
 `../.<repository-name>-dabbler-worktrees`; it must not be nested under any
@@ -1127,7 +1109,7 @@ automated except the two marked *operator*.
 **Correctness and recovery:**
 
 1. `fast` end-to-end on a scratch repo: run → edit → `finish` → checks
-   green → commit with trailer → four documents generated → journal
+   green → commit with trailer → journal
    replays to a byte-identical projection (`status --rebuild`).
 2. Framework model calls in `fast`: exactly 0 (asserted by a transport
    stub that fails the test on any dispatch).
@@ -1228,7 +1210,7 @@ means stop and reconsider):
 | --- | --- | --- |
 | `ai_router/journal.py` | Envelope, append+lock+fsync, sequence, read-after, truncation tolerance | 250 |
 | `ai_router/runcore.py` | Run identity, state fold, transitions, preconditions, escalation triggers, resume probe | 350 |
-| `ai_router/runproject.py` | `run-projection.json` + the four documents (§6) | 300 |
+| `ai_router/runproject.py` | `run-projection.json` (§6) | 300 |
 | `ai_router/checks.py` | Declared-check execution against the diff, `check.completed` facts | 200 |
 | `ai_router/verifyjob.py` | Request/Result contracts, evidence manifest, dispatch via `transports`, rounds, remediation loop | 400 |
 | `ai_router/runcli.py` | The §7 verbs, JSON I/O, exit codes | 250 |
@@ -1266,7 +1248,7 @@ pass §12):
 Before deleting any row, use import/reference checks to prove no retained module
 or extension command imports it. In particular, `config.py` currently imports
 `repo_root_for` from `evidence.py`; that helper moves before deletion.
-Historical v4 session sets remain renderable through retained `progress.py`.
+Historical v4 session sets are read from git history, not from the tree.
 New and adopted v5 sets use lightweight run and organizational cancel/restore
 commands; old verify/close actions are removed.
 

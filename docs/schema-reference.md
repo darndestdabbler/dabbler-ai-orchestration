@@ -214,7 +214,7 @@ cannot tell what is open cannot tell whether work escaped a plan.
 | `schema_version` | `1` | frozen; any other value is refused, not interpreted |
 | `event` | `opened` \| `closed` | there is no third word |
 | `recorded_at` | string | timestamp |
-| `set_slug`, `session_number` | string, integer ≥ 1 | the row names its own session, so a hook with no arguments can still answer "is a step open?" |
+| `session_number` | integer ≥ 1 | the row names its own session, so a hook with no arguments can still answer "is a step open?" |
 | `step_id` | slug | a `step_id` the session's `approved-plan.json` declares |
 | `base_commit` | 40-hex | HEAD when the step opened; both required |
 | `envelope` | object | `closed` only: `inside` and `outside` repo-relative paths |

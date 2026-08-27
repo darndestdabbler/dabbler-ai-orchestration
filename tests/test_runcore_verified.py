@@ -9,7 +9,7 @@ from ai_router import journal
 from tests.conftest import StubTransport, cli, reconfigure
 
 REGISTER = (
-    "run", "--register", "--set", "001-default", "--session", "2",
+    "run", "--register", "--session", "2",
     "--engine", "claude-code", "--provider", "anthropic", "--model", "sonnet",
 )
 
@@ -336,7 +336,7 @@ def test_there_is_no_way_to_supply_a_verdict(run_repo, run_config):
 
 def test_verify_refuses_on_a_fast_run(run_repo, run_config):
     code, started = cli(
-        "run", "--register", "--set", "001-default", "--session", "1",
+        "run", "--register", "--session", "1",
         "--engine", "claude-code", "--provider", "anthropic",
         "--model", "sonnet",
     )

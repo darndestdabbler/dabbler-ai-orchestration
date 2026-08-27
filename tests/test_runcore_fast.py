@@ -9,7 +9,7 @@ from ai_router import journal, runproject
 from tests.conftest import cli
 
 REGISTER = (
-    "run", "--register", "--set", "001-default", "--session", "1",
+    "run", "--register", "--session", "1",
     "--engine", "claude-code", "--provider", "anthropic", "--model", "sonnet",
 )
 
@@ -55,19 +55,6 @@ def test_fast_makes_zero_framework_model_calls(
     assert code == 0 and finished["outcome"] == "completed"
 
 
-def test_the_four_documents_are_generated(run_repo, run_config):
-    started = _register()
-    _edit(run_repo)
-    cli("finish", "--run", started["run_id"])
-
-    sessions_dir = run_repo / "docs" / "session-sets" / "001-default"
-    state = json.loads((sessions_dir / "session-state.json").read_text(encoding="utf-8"))
-    assert state["schemaVersion"] == 5
-    assert state["sessions"][0]["status"] == "complete"
-    assert (sessions_dir / "activity-log.json").is_file()
-    assert started["run_id"] in (sessions_dir / "change-log.md").read_text(encoding="utf-8")
-
-
 def test_the_journal_replays_to_a_byte_identical_projection(run_repo, run_config):
     started = _register()
     _edit(run_repo)
@@ -91,7 +78,7 @@ def test_registration_refuses_a_dirty_worktree(run_repo, run_config):
 def test_a_second_live_run_in_one_worktree_is_refused(run_repo, run_config):
     _register()
     code, payload = cli(
-        "run", "--register", "--set", "001-default", "--session", "2",
+        "run", "--register", "--session", "2",
         "--engine", "claude-code", "--provider", "anthropic",
         "--model", "sonnet",
     )
@@ -135,7 +122,7 @@ def test_an_asserted_provider_that_the_model_contradicts_is_refused(
     run_repo, run_config
 ):
     code, payload = cli(
-        "run", "--register", "--set", "001-default", "--session", "1",
+        "run", "--register", "--session", "1",
         "--engine", "claude-code", "--provider", "openai", "--model", "sonnet",
     )
     assert code == 2
@@ -150,7 +137,7 @@ def test_wrapped_mode_is_not_enabled_in_this_slice(run_repo, run_config):
 
 def test_an_unknown_session_is_refused(run_repo, run_config):
     code, payload = cli(
-        "run", "--register", "--set", "001-default", "--session", "9",
+        "run", "--register", "--session", "9",
         "--engine", "claude-code", "--provider", "anthropic",
         "--model", "sonnet",
     )

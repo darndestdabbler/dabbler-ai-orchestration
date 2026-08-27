@@ -293,7 +293,7 @@ class TestNextCommandMessages:
     def test_the_preverify_recipe_names_the_run_and_the_record(self):
         from ai_router.affected import preverify_recipe
 
-        text = preverify_recipe("docs/session-sets/s", "python",
+        text = preverify_recipe("docs/sessions", "python",
                                 "python -m pytest tests/test_thing.py")
         assert "python -m pytest tests/test_thing.py" in text
         assert "--stage preverify-targeted" in text
@@ -305,7 +305,7 @@ class TestNextCommandMessages:
         round was opened on no longer answers for them."""
         from ai_router.affected import remediation_recipe
 
-        text = remediation_recipe("docs/session-sets/s", "python")
+        text = remediation_recipe("docs/sessions", "python")
         assert "ai_router.affected" in text
         assert "--stage preverify-targeted" in text
         assert "ai_router.verify" in text

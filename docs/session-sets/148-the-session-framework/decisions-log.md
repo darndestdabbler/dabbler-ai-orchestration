@@ -591,3 +591,146 @@ discovered at session 7.*
 
 
 
+
+
+---
+
+## Session 3 — The credential allowlist (plan A1)
+
+### D25 · 2026-08-26 · Orchestrator (claude-opus-5/anthropic) · The machine reads which cap-terminal state a session reached; it is never told
+
+Spec §3.c.i names three terminal states but not how a machine tells the
+second from the third. "Every blocking finding was fixed" is a claim, and a
+claim typed by the author is the waiver under a different name.
+
+**Chosen: the tree answers it.** At the cap `ai_router.verify` decides from
+the record alone, in this order:
+
+1. a blocking finding carrying a recorded dispute goes to `adjudicate` — a
+   dispute says the finding is *wrong*, not that it was fixed, and consensus
+   precedes termination;
+2. otherwise a working tree that has moved past the reviewed round's
+   `completion_tree` carries the repair — **remediated at the cap**;
+3. otherwise it has not — **unresolved**, and nothing lands.
+
+A moved tree is weak evidence of a repair on its own, so the same targeted
+preverify gate a round has to clear also gates this landing. That is the one
+thing unreviewed work still proves: the fix ran the tests it makes
+necessary. Nobody is asked anything on any branch.
+
+*The alternative was a per-finding "I fixed this" claim. It reads stronger
+and is not: it is prose the machine cannot check, attached to the exact
+decision the waiver used to make.*
+
+> **Step 2 of this decision was overturned by round 1 — see D30.** A moved
+> tree was too weak by exactly the margin this entry hedged on. Steps 1 and
+> 3, and the preverify requirement, stand.
+
+### D26 · 2026-08-26 · Orchestrator (claude-opus-5/anthropic) · The child environment is an allowlist and nothing else
+
+Plan A1 asks for an allowlist *and* names five classes to exclude. Building
+both would be two mechanisms deciding one question, and the denylist would
+be the one that fails — it can only exclude names someone thought of.
+
+**Chosen: an exact-name allowlist, and the exclusions are facts about what
+is not on it.** Vendor keys, feed PATs, git tokens, proxy credentials and
+`_JAVA_OPTIONS`-style option variables never reach a check because they were
+never added, not because a filter caught them leaving. `TEMP`, `TMP` and
+`TMPDIR` are the one thing set rather than passed: each check gets a scratch
+directory of its own, so it neither reads what the parent left there nor
+leaves anything for the next check.
+
+*Cost: a toolchain needing a name nobody listed fails visibly rather than
+silently inheriting a key. That is the right direction to fail.*
+
+### D27 · 2026-08-26 · Orchestrator (claude-opus-5/anthropic) · A reached round cap is no longer extensible, and `--extend-rounds` survives only for budgets
+
+`resume --extend-rounds` raised the round limit from a round-cap pause. The
+cap no longer pauses, so that entry no longer exists: the flag is reachable
+only from a budget pause, where money and minutes are genuinely the
+operator's to extend.
+
+**Kept rather than deleted**, because raising a budget is not typing a
+verdict. Its refusal message now says which ceiling it answers for.
+
+### D28 · 2026-08-26 · Orchestrator (claude-opus-5/anthropic) · WAIVED is retired from every writer and kept in every reader
+
+`.dabbler/runs/138-.../s1/rounds.jsonl` carries a real `waive` row. Dropping
+WAIVED from the record schemas would make the machine's own history
+unreadable — a `LedgerError` on every read of it — which is a worse failure
+than the token surviving.
+
+**Chosen: the split the writer/reader asymmetry already uses.**
+`SESSION_VERDICTS` drops WAIVED, so `validate_session_verdict` refuses it and
+no path can persist another. The schemas and the extension's reader keep it,
+and `REMEDIATED_AT_CAP` joins both.
+
+### D29 · 2026-08-26 · Orchestrator (claude-opus-5/anthropic) · Seat cost, measured: one code session is roughly $22 in AI credits before verification
+
+**The measurement.** `python -m ai_router.seat_cost <conversation-id>`
+against this session's own conversation, taken after the work and the
+targeted run and before cross-provider verification: **2,247.6 credits
+(~$22.48) over 184 events**, reported as a floor — the caller's own closing
+turns are not in the store yet. Verification rounds are billed to the seat
+too and are not in that figure; the ledger records them as
+`unpriced (seat transport)`, which is a metrics gap, not a free call.
+
+**What it says about seventeen sessions.** At this rate the set costs
+**$380–$600 in AI credits** depending on rounds per session, and session 3
+is a large session rather than a typical one — it removed the framework's
+only escape hatch, which is the reason its test estimate went 4 → 14 during
+session 2's review. Sessions 4 and 5 are the honest typical unit and should
+be measured the same way before any re-plan is decided on this number alone.
+
+**No re-plan is proposed yet.** One sample, taken from the least typical
+session in the sequence, is not grounds to restructure sixteen others. The
+decision this entry exists to enable is: if sessions 4 and 5 also land near
+$20, the answer is fewer and larger sessions — never fewer rounds.
+
+### D30 · 2026-08-26 · Verifier (gpt-5.5/openai) · Round 1: any changed tree was the waiver wearing a machine's name
+
+D25 granted REMEDIATED_AT_CAP when the tree had moved past the reviewed
+round. The verifier named the gap in one sentence: **that is not "every
+blocking finding fixed", it is "something changed"** — an incomplete or
+unrelated edit that still passes the targeted checks would land work over a
+finding that never stopped standing. The finding was correct, and it lands
+on the exact hedge D25 wrote down and then did not act on.
+
+**Chosen: the bar is per finding, and it is what the finding itself cited.**
+`verdict.unremediated_findings(findings, changed_paths)` is the single
+implementation, called from all three cap paths (`ai_router.verify`,
+`verifyjob`, `runcli`'s `finish`): a blocking finding is shown remediated
+only when the fix delta touches a path that finding's own `evidencePaths`
+named. Any finding it cannot show that way leaves the session unresolved,
+and the refusal prints which finding and which path it wanted.
+
+**A finding citing no evidence path can never reach this state.** There is
+no site to check, so there is nothing to prove, and unresolved is the honest
+answer rather than a harsh one.
+
+*This is still not proof the repair is correct — nothing at a cap can be,
+which is why the work lands labelled unreviewed. It is proof the repair was
+aimed at the finding, which is the strongest claim available without a
+reviewer, and the one the retired waiver never had to make at all.*
+
+### D31 · 2026-08-26 · Orchestrator (claude-opus-5/anthropic) · Round 2 is disputed: "prove the repair" is a review, and the cap is where no reviewer exists
+
+Round 2 accepted that the bar is now per finding and asked for one stronger
+still: evidence that separates a complete fix from an incomplete edit at the
+same cited site. **That separation is a judgment about the repair, and a
+judgment about the repair is a review** — the one thing the round cap has
+already spent. Spec §3.c.i defines this state as the case where "the cap
+left the fix unreviewed", so the criterion does not raise the bar; it
+deletes the state, and with it the exit the spec says a session that agrees
+with every finding must have.
+
+**Disputed rather than remediated**, with the spec's own text as evidence
+(`docs/session-framework-spec.md:150-169` and `:455-463`), recorded through
+`verify dispute` so the next round judges it UPHOLD-or-WITHDRAW. The grounds
+are in `.dabbler/runs/148-the-session-framework/s3/disputes.jsonl`,
+verbatim and machine-written.
+
+*Round 1's finding was right and cost a real redesign. Round 2's is the same
+sentence aimed one step past what a machine can answer, which is what "prose
+review has no bottom" looks like when the subject is code. The dispute
+channel exists so that costs one round rather than the session.*

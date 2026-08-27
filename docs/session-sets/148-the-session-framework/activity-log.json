@@ -126,6 +126,151 @@
       "dateTime": "2026-08-26T16:55:25.044929-04:00",
       "description": "Registered session 2 (copilot).",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-26T20:55:03.777598-04:00",
+      "description": "Register.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 2,
+      "stepKey": "replace-the-operator-override-with-an",
+      "dateTime": "2026-08-26T20:55:03.777598-04:00",
+      "description": "**Replace the operator override with an honest terminal state \u2014 one change, because neither half is safe alone.** - **Remove every public waiver path, for every kind of session.** Two exist today and neither checks anything about the session it closes: `ai_router.verify waive`, and the run-core's `dabbler finish --waive ... --attest-operator`, whose `_resolve_verified_verdict` returns `WAIVED` on attestation alone. Retire `WAIVED` from the persisted verdict vocabulary with them. Spec \u00a79 admits **no** override, including for planning sessions \u2014 there is no verdict a person can type. - **Add the `remediated at the cap` terminal state of spec \u00a73.c.i** in its place: every blocking finding from the last round fixed, the cap reached before the fix could be reviewed, the work landing labelled unreviewed. **Not a waiver** \u2014 nothing is accepted over, and what is unproved is the repair rather than the complaint. - **Wire both cap-terminal states into the paths that exist today, not into session 10's loop.** Sessions 4 through 9 run on the current machinery, so all three of these must terminate a capped session without `WAIVED` and without a person: `ai_router.verify`, which refuses an over-cap round outright; `verifyjob`, which pauses at the cap and offers `resume`, `finish --waive`, or `finish --outcome failed`; and `gates.py::check_verification_clean`, which refuses to close while the latest round is blocking. **Removing the override without providing the replacement would strand sessions 4 through 9**, which is why this is not two steps and not two sessions: a session that agrees with every finding and fixes them all would otherwise have no exit at all. **Session 10 may only integrate already-usable states into its new loop** \u2014 it inherits a working terminal path rather than creating one, because six sessions need it first. **This is step 2 of the first code session on purpose** \u2014 it is in the working tree before this session's own verification can reach a cap, so session 3 is the first session it protects rather than the last one it misses.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 3,
+      "stepKey": "build-the-child-environment-in-checks",
+      "dateTime": "2026-08-26T20:55:03.777598-04:00",
+      "description": "Build the child environment in `checks.py::_spawn` from an allowlist of what the toolchain requires, in **both** branches. Redirect `TEMP` and `TMP`. Exclude vendor keys, feed PATs, git tokens, proxy credentials, and `_JAVA_OPTIONS`-style option variables.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 4,
+      "stepKey": "add-a-windows-sentinel-test-that",
+      "dateTime": "2026-08-26T20:55:03.777598-04:00",
+      "description": "Add a Windows sentinel test that plants a secret in the parent environment and asserts a spawned check process cannot see it.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 5,
+      "stepKey": "measure-this-session-s-seat-cost",
+      "dateTime": "2026-08-26T20:55:03.777598-04:00",
+      "description": "**Measure this session's seat cost and record it in the set's decisions log.** This is the unit that says whether seventeen sessions fit.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 6,
+      "stepKey": "affected-tests-as-preverify",
+      "dateTime": "2026-08-26T20:55:03.777598-04:00",
+      "description": "Affected tests as preverify.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 7,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-26T20:55:03.777598-04:00",
+      "description": "Cross-provider verification.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 8,
+      "stepKey": "full-test-suite-recorded-as-the",
+      "dateTime": "2026-08-26T20:55:03.777598-04:00",
+      "description": "Full test suite, recorded as the `final-full` run of record.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 9,
+      "stepKey": "close-out",
+      "dateTime": "2026-08-26T20:55:03.777598-04:00",
+      "description": "Close-out.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-26T20:55:03.781233-04:00",
+      "description": "Registered session 3 (copilot).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-26T21:43:58.073391-04:00",
+      "description": "Register.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 2,
+      "stepKey": "replace-the-operator-override-with-an",
+      "dateTime": "2026-08-26T21:43:58.512749-04:00",
+      "description": "**Replace the operator override with an honest terminal state \u2014 one change, because neither half is safe alone.** - **Remove every public waiver path, for every kind of session.** Two exist today and neither checks anything about the session it closes: `ai_router.verify waive`, and the run-core's `dabbler finish --waive ... --attest-operator`, whose `_resolve_verified_verdict` returns `WAIVED` on attestation alone. Retire `WAIVED` from the persisted verdict vocabulary with them. Spec \u00a79 admits **no** override, including for planning sessions \u2014 there is no verdict a person can type. - **Add the `remediated at the cap` terminal state of spec \u00a73.c.i** in its place: every blocking finding from the last round fixed, the cap reached before the fix could be reviewed, the work landing labelled unreviewed. **Not a waiver** \u2014 nothing is accepted over, and what is unproved is the repair rather than the complaint. - **Wire both cap-terminal states into the paths that exist today, not into session 10's loop.** Sessions 4 through 9 run on the current machinery, so all three of these must terminate a capped session without `WAIVED` and without a person: `ai_router.verify`, which refuses an over-cap round outright; `verifyjob`, which pauses at the cap and offers `resume`, `finish --waive`, or `finish --outcome failed`; and `gates.py::check_verification_clean`, which refuses to close while the latest round is blocking. **Removing the override without providing the replacement would strand sessions 4 through 9**, which is why this is not two steps and not two sessions: a session that agrees with every finding and fixes them all would otherwise have no exit at all. **Session 10 may only integrate already-usable states into its new loop** \u2014 it inherits a working terminal path rather than creating one, because six sessions need it first. **This is step 2 of the first code session on purpose** \u2014 it is in the working tree before this session's own verification can reach a cap, so session 3 is the first session it protects rather than the last one it misses.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 3,
+      "stepKey": "build-the-child-environment-in-checks",
+      "dateTime": "2026-08-26T21:43:58.904729-04:00",
+      "description": "Build the child environment in `checks.py::_spawn` from an allowlist of what the toolchain requires, in **both** branches. Redirect `TEMP` and `TMP`. Exclude vendor keys, feed PATs, git tokens, proxy credentials, and `_JAVA_OPTIONS`-style option variables.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 4,
+      "stepKey": "add-a-windows-sentinel-test-that",
+      "dateTime": "2026-08-26T21:43:59.303691-04:00",
+      "description": "Add a Windows sentinel test that plants a secret in the parent environment and asserts a spawned check process cannot see it.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 5,
+      "stepKey": "measure-this-session-s-seat-cost",
+      "dateTime": "2026-08-26T21:43:59.691069-04:00",
+      "description": "**Measure this session's seat cost and record it in the set's decisions log.** This is the unit that says whether seventeen sessions fit.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 6,
+      "stepKey": "affected-tests-as-preverify",
+      "dateTime": "2026-08-26T21:44:00.118714-04:00",
+      "description": "Affected tests as preverify.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 7,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-26T21:44:00.538026-04:00",
+      "description": "Cross-provider verification.",
+      "status": "in-progress"
     }
   ]
 }

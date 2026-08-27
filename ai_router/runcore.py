@@ -166,6 +166,7 @@ class RunView:
     accepted_tree_digest: Optional[str] = None
     reviewed_tree_digest: Optional[str] = None
     blocking_findings: int = 0
+    last_blocking_findings: list = field(default_factory=list)
     minor_findings: int = 0
     round_limit: Optional[int] = None
     dispatch_limit: Optional[int] = None
@@ -315,6 +316,9 @@ def apply_event(view: RunView, event: dict) -> RunView:
         view.verifier_transport = payload.get("transport")
         blocking = payload.get("blocking_findings") or []
         view.blocking_findings = len(blocking)
+        # The findings themselves, not just their count: "remediated at the
+        # cap" is decided per finding, against what each one cited.
+        view.last_blocking_findings = list(blocking)
         view.minor_findings = len(payload.get("minor_findings") or [])
         if payload.get("verdict") is not None:
             view.last_verdict = payload["verdict"]

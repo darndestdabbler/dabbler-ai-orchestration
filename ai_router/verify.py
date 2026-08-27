@@ -40,15 +40,18 @@ outcome lands as one terminal ``type: "adjudication"`` ledger row the
 existing close gate reads unchanged. One adjudication per session, ever;
 no verification round may open after it.
 
-``verify waive`` is the operator's last exit, permitted only when the
-machine path is exhausted: an adjudication upheld a blocking finding, or
-adjudication is unavailable (its preconditions hold and no eligible
-provider survives the exclusion superset). It is interactive-only — the
-attestation is typed at a prompt and a non-TTY stdin is refused, which
-is the mechanical distinction between an operator attestation and a
-confabulated one. WAIVED means the operator accepts UNVERIFIED work; it
-never means "verified another way". Every refusal in this loop names
-its sanctioned next command — no message describes a dead end.
+``verify waive`` is gone, and with it every path by which a person could
+type a verdict. A capped session ends in one of two machine-decided
+terminal states instead. **Remediated at the cap**: every blocking
+finding of the last round was fixed, the cap left the fix unreviewed, and
+the work lands labelled unreviewed — granted only when the tree has moved
+since the reviewed round and the fix has passed its own targeted tests.
+**Unresolved**: blocking findings are still outstanding, and nothing lands
+but the record. The first is not a waiver and must never be recorded as
+one — a waiver accepted work over a finding that still stood, while here
+nothing stands and what is unproved is the repair rather than the
+complaint. Every refusal in this loop names its sanctioned next command —
+no message describes a dead end.
 
 ``verify prepare`` is the critique pipeline's entry point, additive and
 off by default: it derives the ``change-id`` from the reviewed tree,
@@ -79,7 +82,12 @@ from pathlib import Path
 from typing import Optional
 
 from . import ledger
-from .evidence import repo_root_for, run_git, snapshot_worktree_tree
+from .evidence import (
+    changed_paths_between,
+    repo_root_for,
+    run_git,
+    snapshot_worktree_tree,
+)
 from .facts import (
     EvidenceEmptyError,
     EvidenceTooLargeError,
@@ -100,11 +108,12 @@ from .session import extract_spec_excerpt, resolve_session_set_dir
 from .verifyjob import auto_verify as auto_verify  # re-export
 from .verifyjob import build_verification_prompt
 from .verdict import (
+    VERDICT_REMEDIATED_AT_CAP,
     VERDICT_VERIFIED,
-    VERDICT_WAIVED,
     classify_blocking,
     normalize_severity,
     parse_verification_response,
+    unremediated_findings,
 )
 
 EXIT_OK = 0
@@ -310,6 +319,171 @@ def _dispatch_verification(
 
 # --- The loop entry point ----------------------------------------------------
 
+def _terminate_at_cap(
+    repo_root, set_path, config, current: int, prior_rounds: list, cap: int
+) -> int:
+    """The cap is reached, so no further round opens. Which of the two
+    cap-terminal states this is is decided from the record, never asked of
+    anyone.
+
+    A contested finding still goes to adjudication first: consensus
+    precedes termination, and a dispute says the finding is wrong rather
+    than fixed. Otherwise the tree answers it — a tree that moved since the
+    reviewed round carries the repair, and one that did not carries
+    nothing. The repair must also have passed its own targeted tests,
+    which is the same bar a round would have had to clear.
+    """
+    from .affected import preverify_gate, preverify_recipe
+    from .session import append_change_log_block, record_session_verification
+
+    latest = prior_rounds[-1]
+    if not latest.get("blocking"):
+        print(
+            f"verify: refused -- round {latest['round']} left no blocking "
+            f"finding and the cap ({cap}) is reached; there is nothing "
+            "left to verify. Close the session:\n"
+            f"  python -m ai_router.session close --session-set-dir "
+            f"{set_path}",
+            file=sys.stderr,
+        )
+        return EXIT_USAGE
+
+    disputes = ledger.read_disputes(repo_root, set_path.name, current)
+    if len(_undisputed_blocking_indices(latest, disputes)) < len(
+        _blocking_findings(latest)
+    ):
+        print(
+            f"verify: refused -- the cap ({cap}) is reached and round "
+            f"{latest['round']} carries disputed blocking finding(s). A "
+            "dispute says a finding is wrong, not that it was fixed, so it "
+            "is judged rather than terminated. Route the disputes to a "
+            "third provider:\n"
+            f"  python -m ai_router.verify adjudicate --session-set-dir "
+            f"{set_path}",
+            file=sys.stderr,
+        )
+        return EXIT_USAGE
+
+    unreviewed = _blocking_findings(latest)
+    completion_tree = snapshot_worktree_tree(repo_root)
+    if completion_tree is None:
+        print(
+            "verify: could not snapshot the working tree; nothing recorded "
+            "(failing closed).", file=sys.stderr,
+        )
+        return EXIT_CALL_FAILED
+
+    fix_paths = changed_paths_between(
+        repo_root, latest["completion_tree"], completion_tree
+    )
+    if fix_paths is None:
+        print(
+            "verify: could not diff the working tree against round "
+            f"{latest['round']}; nothing recorded (failing closed).",
+            file=sys.stderr,
+        )
+        return EXIT_CALL_FAILED
+    unshown = unremediated_findings(unreviewed, fix_paths)
+    if unshown or not unreviewed:
+        listing = "".join(
+            f"  - [{f.get('severity')}] "
+            f"{str(f.get('description', ''))[:160]}\n"
+            f"    cited: "
+            + (", ".join(f.get("evidencePaths") or []) or "(no path cited)")
+            + "\n"
+            for f in (unshown or unreviewed)
+        )
+        print(
+            f"verify: UNRESOLVED -- the cap ({cap}) is reached and "
+            f"{len(unshown) or len(unreviewed)} blocking finding(s) from "
+            f"round {latest['round']} cannot be shown remediated:\n"
+            f"{listing}"
+            "REMEDIATED AT THE CAP lands work no verifier reviewed, so it "
+            "is granted only when the fix delta touches a path each "
+            "finding itself cited. A changed tree is not that: it says "
+            "something moved, not that this finding was answered. Nothing "
+            "lands but the record; the close stays BLOCKED and these "
+            "findings are read at the next planning session.",
+            file=sys.stderr,
+        )
+        return EXIT_BLOCKING
+
+    gate = preverify_gate(repo_root, set_path, config)
+    if not gate.ok:
+        remedy = preverify_recipe(
+            set_path, gate.suite, gate.command
+        ) if gate.command else (
+            "There is no targeted command to offer you: declare the "
+            "missing mapping under testing.selection so the selector can "
+            "answer for these paths."
+        )
+        print(
+            "verify: refused -- the fix has no valid targeted selection "
+            f"evidence for this tree: {gate.reason}.\n"
+            "REMEDIATED AT THE CAP lands work no verifier reviewed, so the "
+            "one thing it does prove is that the repair passed the tests "
+            "it makes necessary. Run them first:\n"
+            f"{remedy}", file=sys.stderr,
+        )
+        return EXIT_BLOCKING
+
+    row = {
+        "round": latest["round"] + 1,
+        "type": ledger.ROW_REMEDIATED_AT_CAP,
+        "verdict": VERDICT_REMEDIATED_AT_CAP,
+        "blocking": False,
+        "findings": [],
+        "remediated": {
+            "reviewed_round": latest["round"],
+            "findings": unreviewed,
+            "fix_paths": sorted(fix_paths),
+        },
+        "completion_tree": completion_tree,
+        "previous_tree": latest["completion_tree"],
+        "recorded_at": datetime.datetime.now().astimezone().isoformat(),
+    }
+    ledger.append_round(repo_root, set_path.name, current, row)
+    record_session_verification(
+        set_path, current, VERDICT_REMEDIATED_AT_CAP,
+        summary={
+            "rounds": latest["round"],
+            "verifierModel": latest.get("verifier_model"),
+            "verifierProvider": latest.get("verifier_provider"),
+            "transport": latest.get("transport"),
+            "costUsd": None,
+            "unreviewedFindings": len(unreviewed),
+        },
+    )
+    finding_lines = "".join(
+        f"- Fixed, unreviewed: [{f.get('severity')}] "
+        f"{str(f.get('description', ''))[:200]}\n"
+        for f in unreviewed
+    )
+    append_change_log_block(
+        set_path,
+        f"## Session {current} verification — REMEDIATED AT THE CAP after "
+        f"{cap} round(s)\n\n"
+        f"- Every blocking finding of round {latest['round']} was fixed; "
+        "the cap left the fix unreviewed.\n"
+        f"{finding_lines}"
+        "- This work lands UNREVIEWED. It is not a waiver: nothing was "
+        "accepted over a standing finding — what is unproved is the "
+        "repair.\n",
+    )
+    print(
+        f"verify: REMEDIATED AT THE CAP -- the {len(unreviewed)} blocking "
+        f"finding(s) of round {latest['round']} were fixed and the cap "
+        f"({cap}) left the fix unreviewed. The work lands labelled "
+        "UNREVIEWED; no verifier saw the repair.\n"
+        + _run_of_record_lines(set_path, config)
+    )
+    return EXIT_OK
+
+
+def _blocking_findings(row: dict) -> list:
+    return [f for f in row.get("findings") or [] if f.get("blocking", True)]
+
+
 def _run_of_record_lines(set_path, config) -> str:
     """The close is two steps away from a verified tree, and this names them.
     A malformed or suite-less config says nothing rather than guessing a
@@ -377,11 +551,15 @@ def run_round(
             file=sys.stderr,
         )
         return EXIT_USAGE
-    if any(r.get("type") == "waive" for r in prior_rounds):
+    if any(r.get("type") in ledger.TERMINAL_ROW_TYPES for r in prior_rounds):
+        terminal = next(
+            r for r in prior_rounds if r.get("type") in ledger.TERMINAL_ROW_TYPES
+        )
         print(
-            f"verify: refused -- session {current} is WAIVED by operator "
-            "attestation; the waive row is terminal and no further "
-            "verification rounds may open after it. Close the session:\n"
+            f"verify: refused -- session {current} already carries its "
+            f"terminal {terminal['type']!r} row "
+            f"({terminal.get('verdict')}); no further verification round "
+            "may open after it. Close the session:\n"
             f"  python -m ai_router.session close --session-set-dir "
             f"{set_path}",
             file=sys.stderr,
@@ -389,23 +567,9 @@ def run_round(
         return EXIT_USAGE
     round_number = (prior_rounds[-1]["round"] + 1) if prior_rounds else 1
     if round_number > cap:
-        last = prior_rounds[-1]["round"]
-        print(
-            f"verify: refused -- round {round_number} exceeds the cap "
-            f"({cap}). The loop SUSPENDS at the bound; it does not keep "
-            "opening rounds. If no Critical/Major finding is left, close. "
-            "A contested blocking finding has its sanctioned exits, in "
-            "order:\n"
-            "  1. rebut it on the record:\n"
-            f"     python -m ai_router.verify dispute --session-set-dir "
-            f"{set_path} --round {last} --finding <F> --grounds \"...\" "
-            "--evidence <path>\n"
-            "  2. route the recorded disputes to a third provider:\n"
-            f"     python -m ai_router.verify adjudicate --session-set-dir "
-            f"{set_path}",
-            file=sys.stderr,
+        return _terminate_at_cap(
+            repo_root, set_path, config, current, prior_rounds, cap
         )
-        return EXIT_USAGE
 
     try:
         if round_number == 1:
@@ -1151,10 +1315,14 @@ def run_adjudication(
             "adjudication per session, ever.", file=sys.stderr,
         )
         return EXIT_STATE
-    if any(r.get("type") == "waive" for r in rounds):
+    if any(r.get("type") in ledger.TERMINAL_ROW_TYPES for r in rounds):
+        terminal = next(
+            r for r in rounds if r.get("type") in ledger.TERMINAL_ROW_TYPES
+        )
         print(
-            f"verify adjudicate: refused -- session {current} is WAIVED "
-            "by operator attestation; there is nothing left to "
+            f"verify adjudicate: refused -- session {current} already "
+            f"carries its terminal {terminal['type']!r} row "
+            f"({terminal.get('verdict')}); there is nothing left to "
             "adjudicate. Close the session:\n"
             f"  python -m ai_router.session close --session-set-dir "
             f"{set_path}",
@@ -1236,16 +1404,14 @@ def run_adjudication(
             "verify adjudicate: VERIFICATION UNAVAILABLE -- no eligible "
             "adjudicator exists outside the excluded providers "
             f"({', '.join(excluded)}). Reason: {exc}\n"
-            "No verdict was written; the close stays BLOCKED. This state "
-            "is resolvable only by the operator (never the engine).\n"
-            "Operator exits: enable a model from a provider outside the "
-            "exclusions and re-run:\n"
+            "No verdict was written; the close stays BLOCKED and the "
+            "session is UNRESOLVED — its disputed findings stand unjudged "
+            "and nothing lands but the record.\n"
+            "The one exit is a third provider: enable a model from outside "
+            "the exclusions and re-run:\n"
             f"  python -m ai_router.verify adjudicate --session-set-dir "
             f"{set_path}\n"
-            "or, if no third provider can exist, attest an operator "
-            "waiver at an interactive prompt:\n"
-            f"  python -m ai_router.verify waive --session-set-dir "
-            f"{set_path}",
+            "There is no verdict a person can type in its place.",
             file=sys.stderr,
         )
         return EXIT_UNAVAILABLE
@@ -1313,14 +1479,13 @@ def run_adjudication(
         print(
             f"verify adjudicate: {verdict} — the adjudicator "
             f"({result.model_name}/{result.provider}) upheld {upheld} of "
-            f"{len(outcomes)} disputed finding(s); the close stays "
-            f"BLOCKED. Raw output: {raw_path}\n{outcome_lines}\n"
-            "Exits: remediate the upheld finding(s) — no further "
-            "verification round may open this session, so remediation "
-            "lands in a follow-up session — or accept the work UNVERIFIED "
-            "with an operator attestation at an interactive prompt:\n"
-            f"  python -m ai_router.verify waive --session-set-dir "
-            f"{set_path}"
+            f"{len(outcomes)} disputed finding(s); the session is "
+            f"UNRESOLVED and the close stays BLOCKED. Raw output: "
+            f"{raw_path}\n{outcome_lines}\n"
+            "Nothing lands but the record. The upheld finding(s) stand, "
+            "and no further verification round may open this session, so "
+            "remediation is a follow-up session's work — read this record "
+            "at the next planning session."
         )
         return EXIT_BLOCKING
 
@@ -1356,238 +1521,6 @@ def run_adjudication(
         f"({result.model_name}/{result.provider}) overruled every "
         f"disputed finding; session {current} is clear to close.\n"
         f"{outcome_lines}"
-    )
-    return EXIT_OK
-
-
-# --- The operator waiver -----------------------------------------------------
-
-def run_waive(set_dir, *, max_rounds: Optional[int] = None) -> int:
-    """Record the operator's attested acceptance of UNVERIFIED work.
-
-    Permitted only when the machine path is exhausted: an adjudication row
-    upheld at least one blocking finding, or adjudication is unavailable
-    (its preconditions hold and no eligible provider survives the
-    exclusion superset — checked with the same selection seam ``route()``
-    uses). Interactive-only: the attestation is typed at a prompt, and a
-    non-TTY stdin is refused — an engine in a non-interactive shell cannot
-    invoke it. WAIVED means the session closes UNVERIFIED; it never means
-    "verified another way"."""
-    from .config import load_config
-    from .progress import read_session_state
-    from .session import append_change_log_block, record_session_verification
-    from .verdict import OUTCOME_OVERRULED
-
-    set_path = Path(set_dir)
-    repo_root = repo_root_for(set_path)
-    if repo_root is None:
-        print(f"verify waive: not inside a git repository: {set_path}",
-              file=sys.stderr)
-        return EXIT_STATE
-    state = read_session_state(set_path)
-    current = (state or {}).get("currentSession")
-    if current is None:
-        print(
-            f"verify waive: no session is in flight under {set_path}.",
-            file=sys.stderr,
-        )
-        return EXIT_STATE
-
-    slug = set_path.name
-    rounds = ledger.read_rounds(repo_root, slug, current)
-    if any(r.get("type") == "waive" for r in rounds):
-        print(
-            f"verify waive: refused -- session {current} already carries "
-            "its waive row. One waiver per session, ever. Close the "
-            "session:\n"
-            f"  python -m ai_router.session close --session-set-dir "
-            f"{set_path}",
-            file=sys.stderr,
-        )
-        return EXIT_STATE
-
-    adjudication = next(
-        (r for r in rounds if r.get("type") == "adjudication"), None
-    )
-    if adjudication is not None:
-        if not adjudication.get("blocking"):
-            print(
-                "verify waive: refused -- the adjudication overruled "
-                "every disputed finding; there is nothing to waive. The "
-                "session is clear to close:\n"
-                f"  python -m ai_router.session close --session-set-dir "
-                f"{set_path}",
-                file=sys.stderr,
-            )
-            return EXIT_STATE
-        judged_round = [r for r in rounds if not r.get("type")][-1]
-        findings = judged_round.get("findings") or []
-        waived_findings = [
-            findings[o["finding_index"]]
-            for o in adjudication.get("outcomes") or []
-            if o["outcome"] != OUTCOME_OVERRULED
-            and 0 <= o["finding_index"] < len(findings)
-        ]
-        exhausted_via = "upheld-adjudication"
-    else:
-        # No adjudication row: waivable only if adjudication is itself
-        # unavailable — every adjudicate precondition holds and no
-        # eligible provider survives. Anything less has a machine exit,
-        # and the refusal names it.
-        try:
-            orchestrator = resolve_session_orchestrator_identity(
-                set_path, current
-            )
-        except IdentityResolutionError as exc:
-            print(f"verify waive: {exc}", file=sys.stderr)
-            return EXIT_STATE
-        config = load_config()
-        settings = (config.get("verification") or {}).get("settings") or {}
-        cap = max_rounds or settings.get("max_rounds", DEFAULT_MAX_ROUNDS)
-        latest = rounds[-1] if rounds else None
-        if latest is None or latest["round"] < cap:
-            reached = latest["round"] if latest else 0
-            print(
-                "verify waive: refused -- the machine path is not "
-                f"exhausted: the round cap ({cap}) is not reached "
-                f"(recorded rounds: {reached}). Run the loop:\n"
-                f"  python -m ai_router.verify --session-set-dir "
-                f"{set_path}",
-                file=sys.stderr,
-            )
-            return EXIT_STATE
-        if not latest.get("blocking"):
-            print(
-                "verify waive: refused -- the latest round "
-                f"({latest['round']}) is not blocking; there is nothing "
-                "to waive. Close the session:\n"
-                f"  python -m ai_router.session close --session-set-dir "
-                f"{set_path}",
-                file=sys.stderr,
-            )
-            return EXIT_STATE
-        disputes = ledger.read_disputes(repo_root, slug, current)
-        undisputed = _undisputed_blocking_indices(latest, disputes)
-        if undisputed:
-            listing = ", ".join(str(i) for i in undisputed)
-            print(
-                "verify waive: refused -- the machine path is not "
-                f"exhausted: blocking finding(s) {listing} of round "
-                f"{latest['round']} carry no recorded dispute. Record one "
-                "per finding first:\n"
-                f"  python -m ai_router.verify dispute --session-set-dir "
-                f"{set_path} --round {latest['round']} --finding <F> "
-                "--grounds \"...\" --evidence <path>",
-                file=sys.stderr,
-            )
-            return EXIT_STATE
-        from .route import RouterError, any_candidate_survives
-
-        excluded = _adjudication_exclusions(orchestrator, rounds)
-        try:
-            adjudicable = any_candidate_survives(excluded)
-        except RouterError:
-            # An undispatchable transport cannot adjudicate either.
-            adjudicable = False
-        if adjudicable:
-            print(
-                "verify waive: refused -- the machine path is not "
-                "exhausted: an eligible adjudicator exists outside the "
-                f"excluded providers ({', '.join(excluded)}). Consensus "
-                "precedes the operator; route the disputes first:\n"
-                f"  python -m ai_router.verify adjudicate "
-                f"--session-set-dir {set_path}",
-                file=sys.stderr,
-            )
-            return EXIT_STATE
-        waived_findings = [
-            f for f in latest.get("findings") or []
-            if f.get("blocking", True)
-        ]
-        exhausted_via = "adjudication-unavailable"
-
-    if not sys.stdin.isatty():
-        print(
-            "verify waive: refused -- stdin is not a TTY. A waiver is an "
-            "operator attestation typed at an interactive prompt; a "
-            "non-interactive shell (an engine) cannot invoke it. Re-run "
-            "this exact command in an interactive terminal.",
-            file=sys.stderr,
-        )
-        return EXIT_USAGE
-
-    print(
-        f"verify waive: session {current} of {slug} — the following "
-        f"blocking finding(s) will be waived ({exhausted_via}):"
-    )
-    for finding in waived_findings:
-        print(
-            f"  - [{finding.get('severity')}] "
-            f"{str(finding.get('description', ''))[:200]}"
-        )
-    print(
-        "WAIVED means the session closes UNVERIFIED — the operator "
-        "accepts the risk on the record. It never means \"verified "
-        "another way\"."
-    )
-    try:
-        attestation = input(
-            "Attestation (why this is accepted unverified): "
-        ).strip()
-    except EOFError:
-        attestation = ""
-    if not attestation:
-        print(
-            "verify waive: refused -- an empty attestation attests "
-            "nothing; nothing was written.", file=sys.stderr,
-        )
-        return EXIT_USAGE
-
-    completion_tree = snapshot_worktree_tree(repo_root)
-    if completion_tree is None:
-        print(
-            "verify waive: could not snapshot the working tree; nothing "
-            "recorded.", file=sys.stderr,
-        )
-        return EXIT_CALL_FAILED
-
-    row = {
-        "round": rounds[-1]["round"] + 1,
-        "type": "waive",
-        "verdict": VERDICT_WAIVED,
-        "blocking": False,
-        "findings": [],
-        "attestation": attestation,
-        "waived": {
-            "exhausted_via": exhausted_via,
-            "findings": waived_findings,
-        },
-        "completion_tree": completion_tree,
-        "previous_tree": rounds[-1]["completion_tree"],
-        "recorded_at": datetime.datetime.now().astimezone().isoformat(),
-    }
-    ledger.append_round(repo_root, slug, current, row)
-    record_session_verification(set_path, current, VERDICT_WAIVED)
-    waived_lines = "".join(
-        f"- Waived: [{f.get('severity')}] "
-        f"{str(f.get('description', ''))[:200]}\n"
-        for f in waived_findings
-    )
-    append_change_log_block(
-        set_path,
-        f"## Session {current} verification — WAIVED (operator "
-        "attestation)\n\n"
-        f"- Machine path exhausted via: {exhausted_via}\n"
-        f"{waived_lines}"
-        f"- Attestation, verbatim: {attestation}\n"
-        "- WAIVED means the operator accepted UNVERIFIED work; it is not "
-        "a verification.\n",
-    )
-    print(
-        f"verify waive: WAIVED recorded for session {current}. The "
-        "session closes UNVERIFIED, carrying the attestation in the "
-        "record:\n"
-        f"  python -m ai_router.session close --session-set-dir {set_path}"
     )
     return EXIT_OK
 
@@ -2221,28 +2154,6 @@ def _adjudicate_main(argv) -> int:
     )
 
 
-def _waive_main(argv) -> int:
-    parser = argparse.ArgumentParser(
-        prog="python -m ai_router.verify waive",
-        description="Operator-attested WAIVED outcome; interactive-only, "
-                    "permitted only when the machine path is exhausted. "
-                    "WAIVED means the session closes UNVERIFIED.",
-    )
-    parser.add_argument("--session-set-dir", required=True,
-                        help="directory, slug, or bare set number")
-    parser.add_argument("--max-rounds", type=int,
-                        help="override the configured round cap the "
-                             "adjudication-unavailable check measures "
-                             "against")
-    args = parser.parse_args(argv)
-    try:
-        set_dir = resolve_session_set_dir(args.session_set_dir)
-    except ValueError as exc:
-        print(f"verify waive: {exc}", file=sys.stderr)
-        return EXIT_USAGE
-    return run_waive(set_dir, max_rounds=args.max_rounds)
-
-
 def _prepare_main(argv) -> int:
     # There is no --change-id flag, and this is the message that says so:
     # argparse's "unrecognized arguments" would read like an oversight.
@@ -2286,7 +2197,18 @@ def main(argv=None) -> int:
     if argv[:1] == ["adjudicate"]:
         return _adjudicate_main(argv[1:])
     if argv[:1] == ["waive"]:
-        return _waive_main(argv[1:])
+        print(
+            "verify waive: refused -- there is no waiver. A waiver "
+            "accepted work over a finding that still stood, and no verdict "
+            "a person types exists here any more. A capped session ends in "
+            "one of two states the loop decides for itself: REMEDIATED AT "
+            "THE CAP when every blocking finding was fixed and the cap "
+            "left the fix unreviewed, or UNRESOLVED when findings still "
+            "stand. Re-run the loop and it will record whichever it is:\n"
+            "  python -m ai_router.verify --session-set-dir <dir>",
+            file=sys.stderr,
+        )
+        return EXIT_USAGE
     if argv[:1] == ["prepare"]:
         return _prepare_main(argv[1:])
     if argv[:1] == ["step"]:

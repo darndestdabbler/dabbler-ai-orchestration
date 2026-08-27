@@ -704,20 +704,83 @@ def _terminate_tree(process) -> None:
             process.kill()
 
 
-def _spawn(check: Check, command: str, cwd: Path):
+# The child environment is built, never inherited. A check command is
+# repository-declared and runs on the router's own machine, so inheriting
+# the environment hands every vendor key, feed PAT and git token to code
+# the framework did not write and cannot audit. The names below are what a
+# toolchain needs to find its interpreter, its SDK and a scratch
+# directory.
+#
+# Nothing on this list carries a credential, and that is the property
+# being kept: vendor keys (DABBLER_*_API_KEY and the raw ANTHROPIC_,
+# OPENAI_, GEMINI_ forms), feed PATs (NUGET_*, NPM_TOKEN,
+# VSS_NUGET_EXTERNAL_FEED_ENDPOINTS), git tokens (GH_TOKEN, GITHUB_TOKEN,
+# GIT_ASKPASS) and proxy credentials (HTTP_PROXY / HTTPS_PROXY, whose URLs
+# routinely carry user:password) never reach a child because they were
+# never added — not because a filter caught them on the way out.
+#
+# Option-injection variables are absent on the same terms: _JAVA_OPTIONS,
+# JAVA_TOOL_OPTIONS, JDK_JAVA_OPTIONS, NODE_OPTIONS, PYTHONPATH and
+# PYTHONSTARTUP all change what a runtime executes without changing the
+# command the record says ran.
+#
+# TEMP, TMP and TMPDIR are deliberately absent: they are always set to a
+# per-check scratch directory rather than passed through, so a check
+# cannot read what the parent left in its temp directory or leave
+# something there for the next one.
+CHILD_ENV_ALLOWLIST = frozenset({
+    # Where to find programs, and how to talk to the user's console.
+    "PATH", "PATHEXT", "COMSPEC", "SHELL", "TERM",
+    "LANG", "LC_ALL", "LC_CTYPE", "TZ",
+    # Identity and home, which build tools use to locate their caches.
+    "HOME", "USERPROFILE", "HOMEDRIVE", "HOMEPATH",
+    "USER", "USERNAME", "LOGNAME",
+    # Windows platform roots.
+    "SYSTEMROOT", "WINDIR", "SYSTEMDRIVE", "PUBLIC", "ALLUSERSPROFILE",
+    "PROGRAMFILES", "PROGRAMFILES(X86)", "PROGRAMW6432", "PROGRAMDATA",
+    "COMMONPROGRAMFILES", "COMMONPROGRAMFILES(X86)",
+    "APPDATA", "LOCALAPPDATA",
+    "NUMBER_OF_PROCESSORS", "PROCESSOR_ARCHITECTURE", "OS",
+    # Toolchain roots. Every one of these names a directory.
+    "VIRTUAL_ENV", "JAVA_HOME",
+    "DOTNET_ROOT", "DOTNET_ROOT(X86)",
+    "DOTNET_CLI_TELEMETRY_OPTOUT", "DOTNET_NOLOGO",
+    "GOROOT", "GOPATH", "GOCACHE", "GOMODCACHE",
+    "CARGO_HOME", "RUSTUP_HOME",
+    # A build that behaves differently under automation should know it is.
+    "CI",
+})
+
+
+def child_env(scratch) -> dict:
+    """The environment a check process gets: the allowlist, plus a scratch
+    directory of its own for TEMP/TMP/TMPDIR."""
+    env = {
+        name: os.environ[name]
+        for name in CHILD_ENV_ALLOWLIST
+        if name in os.environ
+    }
+    scratch = str(scratch)
+    env["TEMP"] = scratch
+    env["TMP"] = scratch
+    env["TMPDIR"] = scratch
+    return env
+
+
+def _spawn(check: Check, command: str, cwd: Path, env: dict):
     if check.command:
         # A declared shell string is trusted repository configuration and
         # keeps working byte-for-byte; nothing here infers shell mode.
         return subprocess.Popen(
             command, shell=True, stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT, text=True, encoding="utf-8",
-            errors="replace", cwd=str(cwd),
+            errors="replace", cwd=str(cwd), env=env,
             **({} if os.name == "nt" else {"start_new_session": True}),
         )
     argv = shlex.split(command) if command != " ".join(check.argv) else list(check.argv)
     return subprocess.Popen(
         argv, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
-        encoding="utf-8", errors="replace", cwd=str(cwd),
+        encoding="utf-8", errors="replace", cwd=str(cwd), env=env,
         **({} if os.name == "nt" else {"start_new_session": True}),
     )
 
@@ -743,28 +806,35 @@ def execute(
     cwd = Path(root) / check.cwd if check.cwd else Path(root)
     started = time.monotonic()
     timed_out = False
-    process = _spawn(check, command, cwd)
-    chunks: list = []
-    deadline = started + timeout_seconds
-    try:
-        while True:
-            try:
-                chunks.append(process.communicate(timeout=HEARTBEAT_INTERVAL_SECONDS)[0])
-                break
-            except subprocess.TimeoutExpired:
-                if run_id:
-                    write_heartbeat(root, run_id, f"check/{check.name}")
-                if time.monotonic() >= deadline:
-                    timed_out = True
-                    _terminate_tree(process)
-                    try:
-                        chunks.append(process.communicate(timeout=30)[0])
-                    except subprocess.TimeoutExpired:
-                        pass
+    with tempfile.TemporaryDirectory(
+        prefix="dabbler-check-", ignore_cleanup_errors=True
+    ) as scratch:
+        process = _spawn(check, command, cwd, child_env(scratch))
+        chunks: list = []
+        deadline = started + timeout_seconds
+        try:
+            while True:
+                try:
+                    chunks.append(
+                        process.communicate(
+                            timeout=HEARTBEAT_INTERVAL_SECONDS
+                        )[0]
+                    )
                     break
-    finally:
-        if process.poll() is None:
-            _terminate_tree(process)
+                except subprocess.TimeoutExpired:
+                    if run_id:
+                        write_heartbeat(root, run_id, f"check/{check.name}")
+                    if time.monotonic() >= deadline:
+                        timed_out = True
+                        _terminate_tree(process)
+                        try:
+                            chunks.append(process.communicate(timeout=30)[0])
+                        except subprocess.TimeoutExpired:
+                            pass
+                        break
+        finally:
+            if process.poll() is None:
+                _terminate_tree(process)
 
     duration = time.monotonic() - started
     exit_code = None if timed_out else process.returncode

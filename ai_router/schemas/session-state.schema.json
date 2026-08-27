@@ -74,7 +74,7 @@
         },
         "verificationVerdict": {
           "type": ["string", "null"],
-          "description": "Canonical tokens are VERIFIED / ISSUES_FOUND (plus WAIVED for external verification); operators have shipped extension tokens (e.g. ISSUES_FOUND_RESOLVED_IN_FLIGHT) that readers PREFIX-MATCH, so this is typed string, not an enum. Set 086: the sanctioned writer (session_state.validate_verification_verdict) fails closed against an EXACT allowlist of canonical + shipped-extension tokens, so a confabulated non-verdict (manual-override-development) or an invented prefix look-alike (VERIFIED_NOT_REALLY) can never persist here. Readers stay lenient; the writer is strict."
+          "description": "Canonical tokens are VERIFIED / ISSUES_FOUND / REMEDIATED_AT_CAP (plus the retired WAIVED, still read from historical records and refused by every writer); operators have shipped extension tokens (e.g. ISSUES_FOUND_RESOLVED_IN_FLIGHT) that readers PREFIX-MATCH, so this is typed string, not an enum. The sanctioned writer (verdict.validate_session_verdict) fails closed against an EXACT allowlist, so a confabulated non-verdict (manual-override-development), an invented prefix look-alike (VERIFIED_NOT_REALLY), or a retired token can never persist here. Readers stay lenient; the writer is strict."
         }
       },
       "required": ["number", "title", "status"]

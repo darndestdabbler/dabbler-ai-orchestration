@@ -175,7 +175,7 @@ python -m ai_router.verify --session-set-dir docs/session-sets/<set>
   (`verification.settings.max_rounds`, default 3; `--max-rounds`
   overrides).
 
-### If a blocking finding is contested: dispute → adjudicate → waive
+### If a blocking finding is contested: dispute → adjudicate
 
 A finding you believe is wrong is not remediated by grinding rounds.
 The ladder, in order — every refusal along the way prints the next
@@ -197,25 +197,29 @@ rung's exact command:
    orchestrated nor verified any round. It judges each dispute
    (UPHOLD or OVERRULE, with reasons; it may not raise new findings)
    and writes one terminal ledger row. All overruled → the session is
-   clear to close; any upheld → still blocked. One adjudication per
-   session, ever; no verification round may open after it.
+   clear to close; any upheld → the session is unresolved. One
+   adjudication per session, ever; no verification round may open
+   after it.
 
    ```
    python -m ai_router.verify adjudicate --session-set-dir <set>
    ```
 
-3. **Waive** — the operator's last exit, permitted only when the
-   machine path is exhausted: the adjudication upheld a blocking
-   finding, or adjudication is unavailable (no eligible third
-   provider exists). Interactive-only — the attestation is typed at a
-   prompt and the command refuses when stdin is not a TTY, so an
-   engine cannot invoke it. WAIVED means the session closes
-   **unverified** with the operator's attestation on the record; it
-   never means "verified another way".
+There is no third rung, and no waiver: no verdict a person can type
+exists anywhere in the loop. An undisputed session that reaches the cap
+ends in one of two states the loop decides for itself — re-run the same
+`verify` command and it records whichever the tree says it is:
 
-   ```
-   python -m ai_router.verify waive --session-set-dir <set>
-   ```
+- **Remediated at the cap** — every blocking finding of the last round
+  was fixed (the tree has moved past the round that raised them) and the
+  fix passed its own targeted tests, but the cap left it unreviewed. The
+  work lands, labelled unreviewed, and the close gate says so.
+- **Unresolved** — the tree has not moved, so nothing was remediated.
+  Nothing lands but the record, and the close stays blocked.
+
+Remediated-at-the-cap is not a waiver. A waiver accepted work over a
+finding that still stood; here nothing stands, and what is unproved is
+the repair rather than the complaint.
 
 Then record the test run of record and commit/push the verified work:
 

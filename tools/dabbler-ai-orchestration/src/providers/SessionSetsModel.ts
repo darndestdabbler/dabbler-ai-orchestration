@@ -82,12 +82,18 @@ export function blockedTooltip(set: SessionSet): string {
   return `Blocked by prerequisites: ${parts.join(", ")} — all must complete first.`;
 }
 
-/** A verdict that must not render as a pass: unrecognized, or a failure token. */
+/** A verdict that must not render as a pass: unrecognized, or a failure token.
+ * REMEDIATED_AT_CAP is unclean on purpose — the work landed, but no verifier
+ * reviewed the repair, and a row that reads as a pass would hide that. */
 export function verdictIsUnclean(verdict: string | null | undefined): boolean {
   if (typeof verdict !== "string" || verdict.trim() === "") return false;
   if (!isRecognizedVerdictToken(verdict)) return true;
   const normalized = verdict.trim().toUpperCase();
-  return normalized.startsWith("ISSUES_FOUND") || normalized.startsWith("WAIVED");
+  return (
+    normalized.startsWith("ISSUES_FOUND") ||
+    normalized.startsWith("WAIVED") ||
+    normalized.startsWith("REMEDIATED_AT_CAP")
+  );
 }
 
 export function kindBadge(set: SessionSet): string {

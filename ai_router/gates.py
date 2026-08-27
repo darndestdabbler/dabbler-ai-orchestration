@@ -31,7 +31,12 @@ from .evidence import (
     run_git,
     snapshot_worktree_tree,
 )
-from .ledger import LIFECYCLE_WRITTEN_SET_FILES, LedgerError, read_rounds
+from .ledger import (
+    LIFECYCLE_WRITTEN_SET_FILES,
+    ROW_REMEDIATED_AT_CAP,
+    LedgerError,
+    read_rounds,
+)
 from .progress import read_session_state
 from .verdict import SESSION_VERDICTS
 
@@ -80,7 +85,12 @@ def _current_session(set_dir):
 def check_verification_clean(set_dir) -> tuple:
     """The run ledger says the latest round is non-blocking, the worktree
     has not changed since that round (outside the set's own bookkeeping),
-    and session-state.json was written only by the sanctioned writers."""
+    and session-state.json was written only by the sanctioned writers.
+
+    A blocking latest round is the *unresolved* terminal state: nothing
+    lands but the record. A ``remediated_at_cap`` row is the other cap
+    terminal — it is non-blocking, so it passes here, and the gate says so
+    out loud rather than letting unreviewed work read as verified."""
     set_path = Path(set_dir)
     root = repo_root_for(set_path)
     if root is None:
@@ -119,6 +129,9 @@ def check_verification_clean(set_dir) -> tuple:
             f"round {latest['round']} ended with blocking findings "
             f"({latest.get('verdict')}); remediate and re-run: "
             + _verify_command(set_path)
+            + " — at the round cap that same command records the terminal "
+            "state instead of opening a round, and an unresolved session "
+            "lands nothing but its record"
         )
 
     current_tree = snapshot_worktree_tree(root)
@@ -151,6 +164,16 @@ def check_verification_clean(set_dir) -> tuple:
             f"the working tree changed after verification round "
             f"{latest['round']}: {preview}{suffix}. Re-run: "
             + _verify_command(set_path)
+        )
+    if latest.get("type") == ROW_REMEDIATED_AT_CAP:
+        remediated = latest.get("remediated") or {}
+        count = len(remediated.get("findings") or [])
+        return True, (
+            f"remediated at the cap: {count} blocking finding(s) from "
+            f"round {remediated.get('reviewed_round')} each had their "
+            "cited site changed, and the cap left the fix unreviewed. THIS "
+            "WORK LANDS UNREVIEWED — no verifier saw the repair. It is not "
+            "a waiver: nothing was accepted over a standing finding"
         )
     return True, ""
 

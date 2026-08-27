@@ -58,7 +58,7 @@
             "properties": {
               "rounds": { "type": "integer", "minimum": 0 },
               "last_verdict": {
-                "enum": ["VERIFIED", "ISSUES_FOUND", "WAIVED", null]
+                "enum": ["VERIFIED", "ISSUES_FOUND", "WAIVED", "REMEDIATED_AT_CAP", null]
               },
               "verifier_provider": { "type": ["string", "null"] },
               "transport": { "type": ["string", "null"] }

@@ -237,24 +237,33 @@ which is why the round cap and the Minor-only stop exist; a person adds no
 bound those two do not already supply and costs a blocked engine.
 
 **Two of the three terminal states end a session at the cap, and they are
-not the same thing:**
+not the same thing. Session 3 built both, so the loop reaches them by
+itself — re-run `python -m ai_router.verify` at the cap and it records
+whichever one the tree says it is:**
 
-- **Unresolved** — blocking findings are still outstanding. Nothing lands.
+- **Unresolved** — blocking findings are still outstanding and the tree
+  has not moved since the round that raised them. Nothing lands.
 - **Remediated at the cap** — every blocking finding from the last round was
   fixed, and the cap left the fix unreviewed. The work lands, labelled
-  unreviewed.
+  unreviewed. The fix must have passed its own targeted tests first: that
+  is the one thing an unreviewed landing still proves.
 
 **Remediated-at-the-cap is not a waiver and must never be recorded as one.**
 A waiver accepts work over a finding that still stands; here nothing stands,
 and what is unproved is the repair rather than the complaint.
 
+**There is no `verify waive`, and asking for one is not a route to
+anything.** The command refuses and names the two terminal states instead.
+
 **A failed code session is cheap** — the code did not land, and the next
 session tries again with better instructions.
 
 **Do not dispute a finding you believe is correct.** Dispute is for a
-finding that is wrong, and it must be evidence-backed. Filing one to reach
-the adjudication path, and through it the waiver, puts a false statement on
-the record of a set whose entire claim is that the record is honest.
+finding that is wrong, and it must be evidence-backed. A dispute also
+diverts the cap to adjudication rather than to a terminal state, so filing
+one against a finding you intend to fix costs the session its exit and
+puts a false statement on the record of a set whose entire claim is that
+the record is honest.
 
 
 ---

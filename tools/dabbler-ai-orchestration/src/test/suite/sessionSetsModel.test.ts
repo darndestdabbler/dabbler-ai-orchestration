@@ -82,6 +82,8 @@ suite("SessionSetsModel: verdict hygiene", () => {
   test("recognized failure tokens are unclean", () => {
     assert.ok(verdictIsUnclean("ISSUES_FOUND: 2 major"));
     assert.ok(verdictIsUnclean("WAIVED"));
+    // Work landed, but no verifier reviewed the repair.
+    assert.ok(verdictIsUnclean("REMEDIATED_AT_CAP"));
   });
 
   test("a confabulated token is unclean, never a pass", () => {

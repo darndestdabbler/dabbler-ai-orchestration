@@ -22,13 +22,20 @@ from dataclasses import dataclass, field
 
 VERDICT_VERIFIED = "VERIFIED"
 VERDICT_ISSUES_FOUND = "ISSUES_FOUND"
-VERDICT_WAIVED = "WAIVED"
+VERDICT_REMEDIATED_AT_CAP = "REMEDIATED_AT_CAP"
 
 # The closed allowlist for any verdict a writer persists (session-state's
-# verificationVerdict, the rounds ledger). WAIVED is operator-attested
-# external verification only — the loop itself never produces it.
+# verificationVerdict, the rounds ledger). Every token here is produced by
+# the loop; there is no verdict a person can type.
+#
+# REMEDIATED_AT_CAP is not a waiver and must never be read as one. A waiver
+# accepted work over a finding that still stood; this is the opposite —
+# every blocking finding was fixed and the cap left the repair unreviewed.
+# WAIVED is retired from this allowlist, so no writer can emit it again;
+# the record schemas still READ it, because historical rows carry it and a
+# retired token must not make the machine's own record unreadable.
 SESSION_VERDICTS = frozenset(
-    {VERDICT_VERIFIED, VERDICT_ISSUES_FOUND, VERDICT_WAIVED}
+    {VERDICT_VERIFIED, VERDICT_ISSUES_FOUND, VERDICT_REMEDIATED_AT_CAP}
 )
 
 SEVERITIES = ("critical", "major", "minor")
@@ -331,6 +338,40 @@ def is_blocking_issue(issue: dict) -> bool:
         return False
     return str(issue.get("severity", "")).strip().lower() not in (
         "minor",
+    )
+
+
+def unremediated_findings(findings: list, changed_paths) -> list:
+    """The findings a fix delta cannot be shown to have answered.
+
+    This is the whole bar on "remediated at the cap", and it is deliberately
+    per-finding: a changed tree says only that *something* moved, and
+    landing unreviewed work on that would be the retired waiver wearing a
+    machine's name. A finding is shown remediated when the delta touches a
+    path the finding itself cited — the one claim a machine can check
+    without a reviewer.
+
+    A finding citing no evidence path can never be shown remediated, and
+    that is correct rather than harsh: there is no site to check, so there
+    is nothing to prove, and the honest outcome is unresolved.
+    """
+    touched = {str(p).replace("\\", "/").strip("/") for p in changed_paths}
+    unshown = []
+    for issue in findings or []:
+        cited = [
+            normalize_evidence_path(p).strip("/")
+            for p in issue.get("evidencePaths") or []
+        ]
+        if not any(_delta_touches(path, touched) for path in cited if path):
+            unshown.append(issue)
+    return unshown
+
+
+def _delta_touches(cited: str, touched: set) -> bool:
+    """A cited file, or a cited directory holding a changed file."""
+    prefix = cited + "/"
+    return any(
+        path == cited or path.startswith(prefix) for path in touched
     )
 
 

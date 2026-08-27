@@ -979,14 +979,16 @@
             "VERIFIED",
             "ISSUES_FOUND",
             "WAIVED",
+            "REMEDIATED_AT_CAP",
             null
           ]
         },
-        "waiver_reason": {
+        "unreviewed_findings": {
           "type": [
-            "string",
+            "integer",
             "null"
-          ]
+          ],
+          "minimum": 0
         },
         "checks_green": {
           "type": "boolean"
@@ -998,18 +1000,18 @@
       "if": {
         "properties": {
           "verdict": {
-            "const": "WAIVED"
+            "const": "REMEDIATED_AT_CAP"
           }
         }
       },
       "then": {
         "required": [
-          "waiver_reason"
+          "unreviewed_findings"
         ],
         "properties": {
-          "waiver_reason": {
-            "type": "string",
-            "minLength": 1
+          "unreviewed_findings": {
+            "type": "integer",
+            "minimum": 1
           }
         }
       }

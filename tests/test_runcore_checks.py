@@ -2,6 +2,8 @@
 triggers that read a change's shape."""
 
 
+import json
+
 import pytest
 
 from ai_router import journal
@@ -284,3 +286,52 @@ def test_an_unmapped_path_escalates_a_fast_run(run_repo, run_config):
     assert code == 0, payload
     assert payload["policy"] == "verified"
     assert _escalations(journal.control_root()) == ["selection-unknown"]
+
+
+@pytest.mark.parametrize("shell", [False, True])
+def test_a_planted_secret_never_reaches_a_check_process(
+    run_repo, run_config, monkeypatch, tmp_path, shell
+):
+    """The sentinel: a check command is repository configuration running on
+    the operator's machine, and it must not be handed the operator's keys.
+    Both spawn branches build the environment; neither inherits one."""
+    import sys
+
+    from ai_router.checks import Check, STAGE_TARGETED, execute
+    from ai_router.evidence import snapshot_worktree_tree
+
+    monkeypatch.setenv("DABBLER_ANTHROPIC_API_KEY", "sk-planted-sentinel")
+    monkeypatch.setenv("GITHUB_TOKEN", "ghp-planted-sentinel")
+    monkeypatch.setenv("HTTPS_PROXY", "http://user:pw@proxy.invalid:8080")
+    monkeypatch.setenv("_JAVA_OPTIONS", "-javaagent:/tmp/evil.jar")
+    monkeypatch.setenv("TEMP", str(tmp_path / "parent-temp"))
+
+    argv = [
+        sys.executable, "-c",
+        "import json,os,sys; sys.stdout.write(json.dumps(dict(os.environ)))",
+    ]
+    check = Check(
+        name="env-probe",
+        command=" ".join(f'"{a}"' for a in argv) if shell else "",
+        argv=() if shell else tuple(argv),
+    )
+    run = execute(
+        run_repo, check, check.display_command(), stage=STAGE_TARGETED,
+        tree_digest=snapshot_worktree_tree(run_repo), timeout_seconds=60,
+    )
+    assert run.exit_code == 0, run.output
+    child = json.loads(run.output)
+    assert "sk-planted-sentinel" not in json.dumps(child)
+    for name in (
+        "DABBLER_ANTHROPIC_API_KEY", "GITHUB_TOKEN", "HTTPS_PROXY",
+        "_JAVA_OPTIONS",
+    ):
+        assert name not in child
+    # TEMP is redirected to a scratch directory of the check's own, not
+    # passed through, so a check reads neither the parent's temp contents
+    # nor leaves anything there for the next one.
+    assert child["TEMP"] != str(tmp_path / "parent-temp")
+    assert "dabbler-check-" in child["TEMP"]
+    assert child["TMP"] == child["TEMP"]
+    # It is an allowlist, not a scrub: the toolchain still finds itself.
+    assert child["PATH"]

@@ -21,6 +21,10 @@
 export const RECOGNIZED_VERDICT_PREFIXES = [
   "VERIFIED",
   "ISSUES_FOUND",
+  "REMEDIATED_AT_CAP",
+  // Retired: no writer emits WAIVED any more, and the Python writer
+  // refuses it. Historical records carry it, and a reader that stopped
+  // recognizing it would render the past as a confabulation.
   "WAIVED",
 ] as const;
 

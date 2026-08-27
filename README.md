@@ -30,12 +30,13 @@ Components:
    provider than the orchestrator. Rounds append to a machine-only
    ledger under `.dabbler/runs/`. A contested blocking finding has a
    sanctioned exit ladder instead of an impasse: `verify dispute`
-   records an evidence-backed rebuttal the next round must engage,
-   `verify adjudicate` routes recorded disputes to a third provider
-   that neither orchestrated nor verified, and `verify waive` —
-   interactive-only, operator-attested — closes the session as WAIVED
-   (accepted **unverified**, on the record) once the machine path is
-   exhausted.
+   records an evidence-backed rebuttal the next round must engage, and
+   `verify adjudicate` routes recorded disputes to a third provider that
+   neither orchestrated nor verified. At the round cap the loop ends
+   itself: **remediated at the cap** when every blocking finding was
+   fixed and the cap left the fix unreviewed (the work lands, labelled
+   unreviewed), **unresolved** when findings still stand (nothing lands
+   but the record). There is no waiver and no verdict a person can type.
 4. `python -m ai_router.session close` runs five gates — verification
    clean, working tree clean, pushed to remote, test run fresh, verdict
    vocabulary — then flips the state. The verification gate reads the

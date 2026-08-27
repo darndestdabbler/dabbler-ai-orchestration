@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "rounds.jsonl row (one verification round)",
-  "description": "One row per completed verification round in .dabbler/runs/<set>/s<N>/rounds.jsonl. Written only by the CLI (ai_router.verify); the close gate reads it. A row that fails this schema on read is a refusal, never a skip. Two terminal row types exist beside plain rounds: 'adjudication' (a third provider judged the recorded disputes) and 'waive' (the operator attested acceptance of UNVERIFIED work at an interactive prompt — WAIVED is not a verification).",
+  "description": "One row per completed verification round in .dabbler/runs/<set>/s<N>/rounds.jsonl. Written only by the CLI (ai_router.verify); the close gate reads it. A row that fails this schema on read is a refusal, never a skip. Two terminal row types may be written beside plain rounds: 'adjudication' (a third provider judged the recorded disputes) and 'remediated_at_cap' (every blocking finding of the last round was fixed and the cap left the fix unreviewed — the work lands labelled unreviewed, which is not a waiver: nothing was accepted over a standing finding). The retired 'waive' type stays readable because historical ledgers carry it; no writer emits it, and WAIVED is no longer in the writer's verdict vocabulary.",
   "type": "object",
   "required": [
     "round",
@@ -16,7 +16,7 @@
     "phase": { "type": "string", "enum": ["full", "fix-delta"] },
     "verdict": {
       "type": "string",
-      "enum": ["VERIFIED", "ISSUES_FOUND", "WAIVED"]
+      "enum": ["VERIFIED", "ISSUES_FOUND", "WAIVED", "REMEDIATED_AT_CAP"]
     },
     "blocking": { "type": "boolean" },
     "verifier_model": { "type": "string", "minLength": 1 },
@@ -49,7 +49,10 @@
     "previous_tree": { "type": "string", "minLength": 7 },
     "recorded_at": { "type": "string", "minLength": 1 },
     "transport": { "type": "string" },
-    "type": { "type": "string", "enum": ["adjudication", "waive"] },
+    "type": {
+      "type": "string",
+      "enum": ["adjudication", "waive", "remediated_at_cap"]
+    },
     "excluded_providers": {
       "type": "array",
       "items": { "type": "string", "minLength": 1 },
@@ -69,6 +72,21 @@
       }
     },
     "attestation": { "type": "string", "minLength": 1 },
+    "remediated": {
+      "type": "object",
+      "required": ["reviewed_round", "findings"],
+      "properties": {
+        "reviewed_round": { "type": "integer", "minimum": 1 },
+        "findings": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["description", "severity"]
+          }
+        }
+      }
+    },
     "waived": {
       "type": "object",
       "required": ["exhausted_via", "findings"],
@@ -111,7 +129,29 @@
           "verdict": { "const": "WAIVED" },
           "blocking": { "const": false }
         }
+      }
+    },
+    {
+      "if": {
+        "properties": { "type": { "const": "remediated_at_cap" } },
+        "required": ["type"]
       },
+      "then": {
+        "required": ["remediated", "previous_tree"],
+        "properties": {
+          "verdict": { "const": "REMEDIATED_AT_CAP" },
+          "blocking": { "const": false }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": { "enum": ["waive", "remediated_at_cap"] }
+        },
+        "required": ["type"]
+      },
+      "then": true,
       "else": {
         "required": ["verifier_model", "verifier_provider"],
         "properties": {

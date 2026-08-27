@@ -18,25 +18,13 @@ from ai_router.verify import (
 from .conftest import record_preverify
 
 
-def _interactive(monkeypatch, text):
-    """A TTY stdin and a scripted attestation — the operator at the
-    prompt."""
-    import sys
-
-    class Tty:
-        @staticmethod
-        def isatty():
-            return True
-
-    monkeypatch.setattr(sys, "stdin", Tty())
-    monkeypatch.setattr("builtins.input", lambda prompt="": text)
-
 BLOCKING_RESPONSE = """ISSUES FOUND
 
 - **Issue 1:** the widget divides by zero on empty input
   - **Category:** Correctness
   - **Severity:** Major
   - **Failure scenario:** any empty batch crashes the run
+  - **Evidence paths:** widget.py
 """
 
 CLEAN_RESPONSE = (
@@ -269,17 +257,23 @@ class TestLoop:
         assert rounds[1]["previous_tree"] == rounds[0]["completion_tree"]
         assert rounds[1]["phase"] == "fix-delta"
 
-    def test_round_cap_suspends(self, flight, capsys):
+    def test_round_cap_terminates_unresolved_when_nothing_was_fixed(
+        self, flight, capsys
+    ):
         repo, set_dir, install = flight
         install([make_result(BLOCKING_RESPONSE)])
         assert run_round(set_dir, max_rounds=1) == EXIT_BLOCKING
-        assert run_round(set_dir, max_rounds=1) == EXIT_USAGE
-        # The bound refuses BEFORE any metered call: only one round exists.
+        # The cap ends the loop before any metered call, and an unmoved
+        # tree remediated nothing: unresolved, nothing lands.
+        assert run_round(set_dir, max_rounds=1) == EXIT_BLOCKING
         assert len(ledger.read_rounds(repo, set_dir.name, 1)) == 1
-        # The refusal names its exits, verbatim commands.
         err = capsys.readouterr().err
-        assert "ai_router.verify dispute" in err
-        assert "ai_router.verify adjudicate" in err
+        assert "UNRESOLVED" in err
+        assert "cannot be shown remediated" in err
+        from ai_router.gates import check_verification_clean
+
+        ok, _ = check_verification_clean(set_dir)
+        assert not ok
 
 
 class TestDispute:
@@ -564,7 +558,7 @@ class TestAdjudicate:
         assert call["exclude_providers"] == ["anthropic", "openai"]
         assert call["task_type"] == "session-verification"
 
-    def test_no_eligible_adjudicator_is_operator_only(self, flight, capsys):
+    def test_no_eligible_adjudicator_is_unresolved(self, flight, capsys):
         repo, set_dir, _ = self._capped_and_disputed(
             flight,
             [make_result(BLOCKING_RESPONSE),
@@ -573,7 +567,9 @@ class TestAdjudicate:
         assert self._adjudicate(set_dir) == EXIT_UNAVAILABLE
         err = capsys.readouterr().err
         assert "VERIFICATION UNAVAILABLE" in err
-        assert "ai_router.verify waive" in err   # the refusal names its exit
+        assert "UNRESOLVED" in err
+        # No exit a person can type is offered, because none exists.
+        assert "waive" not in err
         assert len(ledger.read_rounds(repo, set_dir.name, 1)) == 1
 
     def test_overrule_writes_verified_row_and_gate_passes(self, flight):
@@ -609,7 +605,7 @@ class TestAdjudicate:
         ok, _remediation = check_verification_clean(set_dir)
         assert ok
 
-    def test_upheld_adjudication_still_blocked(self, flight, capsys):
+    def test_upheld_adjudication_is_unresolved(self, flight, capsys):
         repo, set_dir, _ = self._capped_and_disputed(
             flight,
             [
@@ -619,8 +615,9 @@ class TestAdjudicate:
             ],
         )
         assert self._adjudicate(set_dir) == EXIT_BLOCKING
-        # The blocked outcome names remediate-or-waive, verbatim command.
-        assert "ai_router.verify waive" in capsys.readouterr().out
+        out = capsys.readouterr().out
+        assert "UNRESOLVED" in out
+        assert "Nothing lands but the record" in out
         row = ledger.read_rounds(repo, set_dir.name, 1)[-1]
         assert row["verdict"] == "ISSUES_FOUND"
         assert row["blocking"] is True
@@ -686,24 +683,80 @@ class TestAdjudicate:
         assert "UPHOLD" in prompt and "OVERRULE" in prompt
 
 
-class TestWaive:
-    def _waive(self, set_dir, *extra):
-        from ai_router.verify import main
+class TestCapTerminalStates:
+    """The two ways a capped session ends, neither of which is a waiver
+    and neither of which waits for a person."""
 
-        return main(["waive", "--session-set-dir", str(set_dir), *extra])
-
-    def _upheld(self, flight):
-        """Round 1 blocking at a cap of 1, disputed, adjudicated UPHELD —
-        the machine path exhausted via an upheld adjudication."""
-        from ai_router.verify import main
-
+    def _capped(self, flight):
+        """Round 1 blocking at a cap of 1 — the loop is at its bound."""
         repo, set_dir, install = flight
-        install([
-            make_result(BLOCKING_RESPONSE),
-            make_result(ADJ_UPHOLD, model_name="gemini-pro",
-                        provider="google"),
-        ])
+        install([make_result(BLOCKING_RESPONSE)])
         assert run_round(set_dir, max_rounds=1) == EXIT_BLOCKING
+        return repo, set_dir
+
+    def _fix(self, repo):
+        (repo / "widget.py").write_text(
+            "def f(xs): return 1 / len(xs) if xs else 0\n", encoding="utf-8"
+        )
+
+    def test_a_fixed_tree_at_the_cap_lands_labelled_unreviewed(
+        self, flight, capsys
+    ):
+        repo, set_dir = self._capped(flight)
+        self._fix(repo)
+        assert run_round(set_dir, max_rounds=1) == EXIT_OK
+        assert "REMEDIATED AT THE CAP" in capsys.readouterr().out
+        rounds = ledger.read_rounds(repo, set_dir.name, 1)
+        row = rounds[-1]
+        assert row["type"] == "remediated_at_cap"
+        assert row["verdict"] == "REMEDIATED_AT_CAP"
+        assert row["blocking"] is False
+        assert row["remediated"]["reviewed_round"] == 1
+        assert "divides by zero" in (
+            row["remediated"]["findings"][0]["description"]
+        )
+        assert row["remediated"]["fix_paths"] == ["widget.py"]
+        assert row["previous_tree"] == rounds[0]["completion_tree"]
+        # No verifier is named, because none saw this tree.
+        assert "verifier_model" not in row
+        from ai_router.progress import read_session_state
+
+        state = read_session_state(set_dir)
+        assert state["sessions"][0]["verificationVerdict"] == (
+            "REMEDIATED_AT_CAP"
+        )
+        text = (set_dir / "change-log.md").read_text(encoding="utf-8")
+        assert "REMEDIATED AT THE CAP" in text and "UNREVIEWED" in text
+        # The close gate passes it and says out loud what it is passing.
+        from ai_router.gates import check_verification_clean
+
+        ok, note = check_verification_clean(set_dir)
+        assert ok
+        assert "UNREVIEWED" in note
+        # Terminal: no further round may open.
+        assert run_round(set_dir, max_rounds=99) == EXIT_USAGE
+        assert len(ledger.read_rounds(repo, set_dir.name, 1)) == 2
+
+    def test_a_change_away_from_the_finding_does_not_remediate_it(
+        self, flight, capsys
+    ):
+        repo, set_dir = self._capped(flight)
+        # The finding cites widget.py; this touches something else. A
+        # changed tree is not a repair, and treating it as one would be
+        # the retired waiver under a machine's name.
+        (repo / "docs" / "notes.md").write_text("unrelated\n", encoding="utf-8")
+        assert run_round(set_dir, max_rounds=1) == EXIT_BLOCKING
+        err = capsys.readouterr().err
+        assert "cannot be shown remediated" in err
+        assert "widget.py" in err            # the refusal names what it wanted
+        assert len(ledger.read_rounds(repo, set_dir.name, 1)) == 1
+
+    def test_a_disputed_finding_is_adjudicated_not_terminated(
+        self, flight, capsys
+    ):
+        from ai_router.verify import main
+
+        repo, set_dir = self._capped(flight)
         (repo / "docs" / "scope.md").write_text(
             "scope: deliberately not covered\n", encoding="utf-8"
         )
@@ -712,128 +765,37 @@ class TestWaive:
             "--round", "1", "--finding", "0",
             "--grounds", "out of scope", "--evidence", "docs/scope.md",
         ]) == EXIT_OK
-        assert main([
-            "adjudicate", "--session-set-dir", str(set_dir),
-            "--max-rounds", "1",
-        ]) == EXIT_BLOCKING
-        return repo, set_dir
+        self._fix(repo)
+        # A dispute says the finding is wrong, not that it was fixed, so a
+        # moved tree does not terminate the session over its own dispute.
+        assert run_round(set_dir, max_rounds=1) == EXIT_USAGE
+        assert "ai_router.verify adjudicate" in capsys.readouterr().err
+        assert len(ledger.read_rounds(repo, set_dir.name, 1)) == 1
 
-    def test_noninteractive_stdin_refused(self, flight, capsys):
-        # pytest's stdin is not a TTY — exactly the engine's situation.
-        repo, set_dir = self._upheld(flight)
-        assert self._waive(set_dir) == EXIT_USAGE
-        assert "not a TTY" in capsys.readouterr().err
-        assert len(ledger.read_rounds(repo, set_dir.name, 1)) == 2
-
-    def test_machine_path_not_exhausted_refusals_name_exits(
+    def test_the_fix_must_have_run_its_own_tests(
         self, flight, capsys, monkeypatch
     ):
         import importlib
-        from ai_router.verify import main
 
-        repo, set_dir, install = flight
-        install([make_result(BLOCKING_RESPONSE)])
-        assert run_round(set_dir) == EXIT_BLOCKING
-        # Below the cap: the exit is the loop itself.
-        assert self._waive(set_dir, "--max-rounds", "3") == EXIT_STATE
-        err = capsys.readouterr().err
-        assert "round cap (3) is not reached" in err
-        assert "ai_router.verify --session-set-dir" in err
-        # Cap reached, finding undisputed: the exit is dispute.
-        assert self._waive(set_dir, "--max-rounds", "1") == EXIT_STATE
-        err = capsys.readouterr().err
-        assert "no recorded dispute" in err
-        assert "ai_router.verify dispute" in err
-        # Disputed, but an eligible adjudicator exists: the exit is
-        # adjudicate — consensus precedes the operator.
-        (repo / "docs" / "scope.md").write_text("scope\n", encoding="utf-8")
-        assert main([
-            "dispute", "--session-set-dir", str(set_dir),
-            "--round", "1", "--finding", "0",
-            "--grounds", "out of scope", "--evidence", "docs/scope.md",
-        ]) == EXIT_OK
+        from ai_router.affected import PreverifyGate
+
+        repo, set_dir = self._capped(flight)
+        self._fix(repo)
         monkeypatch.setattr(
-            importlib.import_module("ai_router.route"),
-            "any_candidate_survives", lambda excluded: True,
+            importlib.import_module("ai_router.affected"), "preverify_gate",
+            lambda *a, **k: PreverifyGate(False, "the fix was never run"),
         )
-        assert self._waive(set_dir, "--max-rounds", "1") == EXIT_STATE
-        assert "ai_router.verify adjudicate" in capsys.readouterr().err
-        # No refusal wrote anything; the TTY gate was never even reached.
+        assert run_round(set_dir, max_rounds=1) == EXIT_BLOCKING
+        assert "the fix was never run" in capsys.readouterr().err
         assert len(ledger.read_rounds(repo, set_dir.name, 1)) == 1
 
-    def test_waive_after_upheld_adjudication_is_terminal_waived_row(
-        self, flight, monkeypatch
-    ):
-        repo, set_dir = self._upheld(flight)
-        _interactive(monkeypatch, "operator accepts the scope risk")
-        assert self._waive(set_dir) == EXIT_OK
-        rounds = ledger.read_rounds(repo, set_dir.name, 1)
-        row = rounds[-1]
-        assert row["type"] == "waive"
-        assert row["verdict"] == "WAIVED"
-        assert row["blocking"] is False
-        assert row["attestation"] == "operator accepts the scope risk"
-        assert row["waived"]["exhausted_via"] == "upheld-adjudication"
-        assert "divides by zero" in row["waived"]["findings"][0]["description"]
-        assert row["previous_tree"] == rounds[-2]["completion_tree"]
-        from ai_router.progress import read_session_state
-
-        state = read_session_state(set_dir)
-        assert state["sessions"][0]["verificationVerdict"] == "WAIVED"
-        # The existing gate reads the row with NO gate change.
-        from ai_router.gates import check_verification_clean
-
-        ok, _remediation = check_verification_clean(set_dir)
-        assert ok
-        # Terminal: no further round and no second waiver.
-        assert run_round(set_dir, max_rounds=99) == EXIT_USAGE
-        assert self._waive(set_dir) == EXIT_STATE
-        assert len(ledger.read_rounds(repo, set_dir.name, 1)) == 3
-
-    def test_waive_when_adjudication_unavailable(self, flight, monkeypatch):
-        import importlib
+    def test_there_is_no_waiver_command(self, capsys):
         from ai_router.verify import main
 
-        repo, set_dir, install = flight
-        install([make_result(BLOCKING_RESPONSE)])
-        assert run_round(set_dir, max_rounds=1) == EXIT_BLOCKING
-        (repo / "docs" / "scope.md").write_text("scope\n", encoding="utf-8")
-        assert main([
-            "dispute", "--session-set-dir", str(set_dir),
-            "--round", "1", "--finding", "0",
-            "--grounds", "out of scope", "--evidence", "docs/scope.md",
-        ]) == EXIT_OK
-        seen = {}
-
-        def fake_survives(excluded):
-            seen["excluded"] = list(excluded)
-            return False
-
-        monkeypatch.setattr(
-            importlib.import_module("ai_router.route"),
-            "any_candidate_survives", fake_survives,
-        )
-        _interactive(monkeypatch, "no third provider exists here")
-        assert self._waive(set_dir, "--max-rounds", "1") == EXIT_OK
-        # The availability check ran against the adjudication superset.
-        assert seen["excluded"] == ["anthropic", "openai"]
-        row = ledger.read_rounds(repo, set_dir.name, 1)[-1]
-        assert row["waived"]["exhausted_via"] == "adjudication-unavailable"
-        assert row["attestation"] == "no third provider exists here"
-        assert row["waived"]["findings"][0]["severity"] == "major"
-
-    def test_empty_attestation_refused_nothing_written(
-        self, flight, monkeypatch, capsys
-    ):
-        repo, set_dir = self._upheld(flight)
-        _interactive(monkeypatch, "   ")
-        assert self._waive(set_dir) == EXIT_USAGE
-        assert "empty attestation" in capsys.readouterr().err
-        assert len(ledger.read_rounds(repo, set_dir.name, 1)) == 2
-        from ai_router.progress import read_session_state
-
-        state = read_session_state(set_dir)
-        assert state["sessions"][0]["verificationVerdict"] is None
+        assert main(["waive", "--session-set-dir", "anything"]) == EXIT_USAGE
+        err = capsys.readouterr().err
+        assert "there is no waiver" in err
+        assert "REMEDIATED AT THE CAP" in err and "UNRESOLVED" in err
 
 
 class TestIncidentReplay:
@@ -913,9 +875,7 @@ class TestIncidentReplay:
         assert record["status"] == "complete"
         assert record["verificationVerdict"] == "VERIFIED"
 
-    def test_upheld_replay_blocks_close_until_waived(
-        self, flight, monkeypatch
-    ):
+    def test_upheld_replay_leaves_the_session_unresolved(self, flight):
         from ai_router.session import close
         from ai_router.verify import main
 
@@ -928,23 +888,17 @@ class TestIncidentReplay:
             ["adjudicate", "--session-set-dir", str(set_dir)]
         ) == EXIT_BLOCKING
         self._commit_and_push(repo)
-        assert close(set_dir) == 1       # refused until waive is attested
-        _interactive(monkeypatch, "scope decision documented; risk owned")
-        assert self._waive_via_main(set_dir) == EXIT_OK
-        assert close(set_dir) == 0
+        # Unresolved is terminal and has no exit: nothing lands, and no
+        # second command can change that. The record is the whole outcome.
+        assert close(set_dir) == 1
+        assert close(set_dir) == 1
+        assert main(["waive", "--session-set-dir", str(set_dir)]) == EXIT_USAGE
+        assert len(ledger.read_rounds(repo, set_dir.name, 1)) == 4
         from ai_router.progress import read_session_state
 
         record = read_session_state(set_dir)["sessions"][0]
-        assert record["status"] == "complete"
-        assert record["verificationVerdict"] == "WAIVED"
-        text = (set_dir / "change-log.md").read_text(encoding="utf-8")
-        assert "WAIVED" in text
-        assert "scope decision documented; risk owned" in text
-
-    def _waive_via_main(self, set_dir):
-        from ai_router.verify import main
-
-        return main(["waive", "--session-set-dir", str(set_dir)])
+        assert record["status"] == "in-progress"
+        assert record["verificationVerdict"] is None
 
 
 class TestVerifierSelectionFailures:

@@ -236,33 +236,70 @@ def test_a_served_model_from_an_excluded_provider_yields_no_verdict(
     assert "served-provider" in payload["error_class"]
 
 
-def test_the_round_cap_hands_the_run_to_the_operator(
+def test_the_round_cap_lands_a_fixed_tree_labelled_unreviewed(
     run_repo, run_config, verifier
 ):
-    verifier.responses = [ISSUES, ISSUES, ISSUES]
+    verifier.responses = [ISSUES, ISSUES]
     started = _register()
     for value in ("VALUE = 2\n", "VALUE = 3\n"):
         _edit(run_repo, value)
         cli("verify", "--run", started["run_id"])
+    # The fix that the cap will leave unreviewed.
     _edit(run_repo, "VALUE = 4\n")
 
     code, payload = cli("verify", "--run", started["run_id"])
     assert code == 0, payload
-    assert payload["state"] == "waiting"
-    assert "round cap" in payload["paused"]
-    assert len(verifier.calls) == 2
+    assert payload["terminal"] == "remediated_at_cap"
+    assert len(verifier.calls) == 2      # the cap opened no third round
+
+    code, finished = cli("finish", "--run", started["run_id"])
+    assert code == 0, finished
+    assert finished["verdict"] == "REMEDIATED_AT_CAP"
+    event = _events(journal.control_root(), "run.finished")[-1]["payload"]
+    assert event["unreviewed_findings"] == 1
+
+
+def test_the_round_cap_fails_the_run_when_nothing_was_fixed(
+    run_repo, run_config, verifier
+):
+    verifier.responses = [ISSUES, ISSUES]
+    started = _register()
+    for value in ("VALUE = 2\n", "VALUE = 3\n"):
+        _edit(run_repo, value)
+        cli("verify", "--run", started["run_id"])
+
+    # Same tree the last round reviewed: nothing was remediated, so the
+    # run ends unresolved on its own — no person is asked anything.
+    code, payload = cli("verify", "--run", started["run_id"])
+    assert code == 0, payload
+    assert payload["terminal"] == "unresolved"
+    assert payload["state"] == "failed"
+    event = _events(journal.control_root(), "run.finished")[-1]["payload"]
+    assert event["outcome"] == "failed"
+    assert event["verdict"] is None
 
 
 def test_extending_rounds_also_raises_the_dispatch_ceiling(
     run_repo, run_config, verifier
 ):
-    verifier.responses = [ISSUES, ISSUES, "VERIFIED\n\nok\n"]
+    # One dispatch, two permitted rounds: the budget ceiling is reached
+    # first, and a budget is the operator's to extend where a round cap is
+    # not.
+    reconfigure(
+        run_repo, run_config,
+        run_policy={
+            **run_config["run_policy"],
+            "budgets": {"model_dispatches": 1},
+        },
+    )
+    verifier.responses = [ISSUES, "VERIFIED\n\nok\n"]
     started = _register()
-    for value in ("VALUE = 2\n", "VALUE = 3\n"):
-        _edit(run_repo, value)
-        cli("verify", "--run", started["run_id"])
-    _edit(run_repo, "VALUE = 4\n")
+    _edit(run_repo, "VALUE = 2\n")
     cli("verify", "--run", started["run_id"])
+    _edit(run_repo, "VALUE = 3\n")
+    code, paused = cli("verify", "--run", started["run_id"])
+    assert code == 0 and paused["state"] == "waiting"
+    assert "model_dispatches" in paused["paused"]
 
     code, resumed = cli(
         "resume", "--run", started["run_id"], "--extend-rounds", "2",
@@ -270,36 +307,21 @@ def test_extending_rounds_also_raises_the_dispatch_ceiling(
     )
     assert code == 0, resumed
     assert resumed["round_limit"] == 4
-    assert resumed["dispatch_limit"] == 5
+    assert resumed["dispatch_limit"] == 3
     assert resumed["state"] == "running"
 
-    code, third = cli("verify", "--run", started["run_id"])
-    assert code == 0 and third["round"] == 3
+    code, second = cli("verify", "--run", started["run_id"])
+    assert code == 0 and second["round"] == 2
 
 
-def test_a_waiver_is_operator_attested_and_recorded(
-    run_repo, run_config, verifier
-):
-    verifier.responses = [ISSUES]
-    started = _register()
-    _edit(run_repo)
-    cli("verify", "--run", started["run_id"])
+def test_there_is_no_waiver_to_finish_with(run_repo, run_config):
+    from ai_router.runcli import build_parser
 
-    code, refused = cli(
-        "finish", "--run", started["run_id"], "--waive", "shipping anyway"
-    )
-    assert code == 2 and refused["refused"] == "attestation-required"
-
-    code, finished = cli(
-        "finish", "--run", started["run_id"], "--waive", "shipping anyway",
-        "--attest-operator",
-    )
-    assert code == 0, finished
-    assert finished["verdict"] == "WAIVED"
-
-    root = journal.control_root()
-    payload = _events(root, "run.finished")[-1]["payload"]
-    assert payload["waiver_reason"] == "shipping anyway"
+    parser = build_parser()
+    with pytest.raises(SystemExit):
+        parser.parse_args([
+            "finish", "--run", "r0001-x", "--waive", "shipping anyway",
+        ])
 
 
 def test_there_is_no_way_to_supply_a_verdict(run_repo, run_config):

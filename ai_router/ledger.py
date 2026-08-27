@@ -51,6 +51,19 @@ LIFECYCLE_WRITTEN_SET_FILES = (
     "session-state.json", "activity-log.json", "change-log.md",
 )
 
+# Row types that end a session: no verification round may open after one,
+# and a session carries at most one. ``adjudication`` is a third
+# provider's judgment of the recorded disputes; ``remediated_at_cap`` is
+# the cap terminal where every blocking finding was fixed and the cap left
+# the fix unreviewed. ``waive`` is retired — no writer emits it — but
+# historical ledgers carry it, so readers still recognize it as terminal.
+ROW_ADJUDICATION = "adjudication"
+ROW_REMEDIATED_AT_CAP = "remediated_at_cap"
+ROW_WAIVE = "waive"
+TERMINAL_ROW_TYPES = frozenset(
+    {ROW_ADJUDICATION, ROW_REMEDIATED_AT_CAP, ROW_WAIVE}
+)
+
 
 class LedgerError(RuntimeError):
     """The ledger is unreadable or fails validation. Fail closed: the

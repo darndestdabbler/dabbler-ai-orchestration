@@ -342,31 +342,6 @@ def _get_copilot(config: dict):
     return _state["copilot_transport"], _state["copilot_catalog"]
 
 
-def any_candidate_survives(exclude_providers=None, transport=None) -> bool:
-    """Selection-only preflight: True when at least one enabled candidate
-    outside *exclude_providers* could be dispatched on the resolved
-    transport. No call is made and nothing is metered — this runs the same
-    selection seams :func:`route` uses, so the answer can never disagree
-    with a real dispatch. ``verify waive`` uses it to machine-check
-    "adjudication is unavailable" before permitting an operator waiver."""
-    config = _get_config()
-    transport_name = resolve_transport(config, transport)
-    exclude = sorted(
-        {str(p).strip().lower() for p in (exclude_providers or []) if p}
-    )
-    if transport_name == TRANSPORT_OFFLINE:
-        # The scripted queue always has a candidate; it is the script.
-        return True
-    if transport_name == TRANSPORT_COPILOT_CLI:
-        _transport_obj, catalog = _get_copilot(config)
-        return bool(resolve_role_candidates(
-            config, catalog, "generator", exclude_providers=exclude
-        ))
-    from .selection import surviving_candidates
-
-    return bool(surviving_candidates(config, exclude_providers=exclude))
-
-
 # --- The one dispatch body --------------------------------------------------
 
 @dataclass(frozen=True)

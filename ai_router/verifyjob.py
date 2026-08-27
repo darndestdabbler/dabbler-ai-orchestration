@@ -22,7 +22,7 @@ from pathlib import Path
 import jsonschema
 
 from . import checks, journal, runcore
-from .checks import snapshot_worktree_tree
+from .checks import changed_paths_between, snapshot_worktree_tree
 from .config import load_config
 from .journal import run_git
 from .journal import ACTOR_FRAMEWORK
@@ -463,7 +463,7 @@ def cmd_verify(args) -> dict:
 
     events = journal.read_events(root, run_id=view.run_id)
     round_number, attempt = round_and_attempt(events)
-    paused = _pause_if_exhausted(root, view, config, round_number)
+    paused = _pause_if_exhausted(root, view, config, round_number, tree_digest)
     if paused is not None:
         return paused
 
@@ -618,17 +618,24 @@ def _require_targeted_evidence(view, tree_digest) -> None:
             )
 
 
-def _pause_if_exhausted(root, view, config, round_number):
-    """A ceiling pauses the run for the operator. It never opens another
-    autonomous layer, in either policy."""
+def _pause_if_exhausted(root, view, config, round_number, tree_digest):
+    """A ceiling ends the round loop. It never opens another autonomous
+    layer, in either policy.
+
+    The round cap ends the run itself, and which of the two cap-terminal
+    states it reached is read from the record rather than asked of anyone:
+    a tree that has moved past the reviewed one carries the repair, so the
+    work lands unreviewed at ``finish``; a tree that has not moved
+    remediated nothing, and the run is recorded failed on the spot. A
+    budget ceiling is a different thing — money and minutes are the
+    operator's to extend — so it still waits, but there is no waiver to
+    offer it."""
     from .runcli import _emit, _view
 
     limit = runcore.round_limit_for(view, config)
-    reason = None
     if round_number > limit:
-        reason = f"the verification round cap of {limit} is reached"
-    else:
-        reason = runcore.budget_exhaustion(view, config)
+        return _terminate_at_cap(root, view, config, limit, tree_digest)
+    reason = runcore.budget_exhaustion(view, config)
     if reason is None:
         return None
     _emit(root, [{
@@ -639,9 +646,9 @@ def _pause_if_exhausted(root, view, config, round_number):
         "payload": {
             "reason": "operator",
             "question": (
-                f"{reason}. Extend with 'resume --extend-rounds <N> "
-                "--attest-operator', waive with 'finish --waive \"<reason>\" "
-                "--attest-operator', or record 'finish --outcome failed'."
+                f"{reason}. Extend with 'resume --model-usd-budget <N>' or "
+                "'resume --elapsed-minutes-budget <N>' (with "
+                "--attest-operator), or record 'finish --outcome failed'."
             ),
         },
     }])
@@ -650,6 +657,68 @@ def _pause_if_exhausted(root, view, config, round_number):
         "round": round_number, "tree_digest": None, "verdict": None,
         "error_class": None, "blocking": [], "minor": [],
         "doc_capped": [], "state": view.state, "paused": reason,
+    }
+
+
+def _terminate_at_cap(root, view, config, limit, tree_digest):
+    """The round cap, ended without a person and without a waiver.
+
+    Which terminal state it is is decided per finding, not per tree: a
+    changed tree says something moved, and landing unreviewed work on that
+    alone would be the retired waiver under a machine's name."""
+    from .runcli import _emit, _view
+    from .verdict import unremediated_findings
+
+    if not view.blocking_findings:
+        terminal = "clear"
+        summary = (
+            f"the verification round cap of {limit} is reached and no "
+            "blocking finding is outstanding; finish the run"
+        )
+        unshown = []
+    else:
+        fix_paths = (
+            changed_paths_between(
+                Path(view.worktree_id), view.reviewed_tree_digest, tree_digest
+            )
+            if view.reviewed_tree_digest not in (None, tree_digest) else []
+        )
+        unshown = (
+            view.last_blocking_findings if fix_paths is None or not fix_paths
+            else unremediated_findings(view.last_blocking_findings, fix_paths)
+        )
+        terminal = "remediated_at_cap" if not unshown else "unresolved"
+
+    if terminal == "remediated_at_cap":
+        summary = (
+            f"remediated at the cap: the {view.blocking_findings} blocking "
+            f"finding(s) of round {view.rounds} each had their cited site "
+            f"changed, and the cap of {limit} left the fix unreviewed. "
+            "'finish' lands this work labelled UNREVIEWED; it is not a "
+            "waiver, because nothing was accepted over a standing finding"
+        )
+    elif terminal == "unresolved":
+        summary = (
+            f"unresolved: the cap of {limit} is reached and {len(unshown)} "
+            "blocking finding(s) cannot be shown remediated — the fix "
+            "delta touches no path they cited. Nothing lands but the record"
+        )
+        _emit(root, [{
+            "event_type": "run.finished", "run_id": view.run_id,
+            "attempt": view.attempt,
+            "actor": journal.actor(ACTOR_FRAMEWORK, "verifyjob"),
+            "summary": "run failed: unresolved at the round cap",
+            "payload": {
+                "outcome": "failed", "commit": None, "tree_digest": None,
+                "verdict": None, "checks_green": False,
+            },
+        }])
+    view = _view(root, view.run_id)
+    return {
+        "round": view.rounds, "tree_digest": tree_digest, "verdict": None,
+        "error_class": None, "blocking": [], "minor": [],
+        "doc_capped": [], "state": view.state, "terminal": terminal,
+        "paused": summary,
     }
 
 

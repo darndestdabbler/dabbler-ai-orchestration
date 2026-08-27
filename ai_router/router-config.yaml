@@ -601,6 +601,11 @@ testing:
         select:
           - tests/test_bootstrap.py
           - tests/test_step_execution.py
+      - when: ai_router/checks.py
+        select:
+          - tests/test_runcore_checks.py
+          - tests/test_runcore_verified.py
+          - tests/test_runcore_fast.py
       - when: ai_router/config.py
         select:
           - tests/test_config.py
@@ -668,6 +673,21 @@ testing:
           - tests/test_route.py
           - tests/test_escalation.py
           - tests/test_verify.py
+      - when: ai_router/runcli.py
+        select:
+          - tests/test_runcore_fast.py
+          - tests/test_runcore_verified.py
+          - tests/test_runcore_checks.py
+          - tests/test_runcore_recovery.py
+          - tests/test_runcore_contracts.py
+          - tests/test_runcore_independence.py
+      - when: ai_router/runcore.py
+        select:
+          - tests/test_runcore_contracts.py
+          - tests/test_runcore_fast.py
+          - tests/test_runcore_verified.py
+          - tests/test_runcore_recovery.py
+          - tests/test_runcore_independence.py
       - when: ai_router/runtime_mode.py
         select:
           - tests/test_route.py
@@ -710,6 +730,11 @@ testing:
           - tests/test_verify.py
           - tests/test_critique_contracts.py
           - tests/test_step_execution.py
+      - when: ai_router/verifyjob.py
+        select:
+          - tests/test_runcore_verified.py
+          - tests/test_runcore_contracts.py
+          - tests/test_verify.py
       - when: ai_router/writers.py
         select:
           - tests/test_session.py
@@ -746,6 +771,10 @@ testing:
           - tests/test_approved_plan.py
           - tests/test_plan_review.py
           - tests/test_step_execution.py
+          - tests/test_ledger.py
+          - tests/test_verify.py
+          - tests/test_gates.py
+          - tests/test_runcore_contracts.py
       - when: ai_router/prompt-templates/
         select:
           - tests/test_verify.py

@@ -25,7 +25,7 @@ from .config import (
     load_config,
     resolve_transport,
 )
-from .checks import snapshot_worktree_tree
+from .checks import changed_paths_between, snapshot_worktree_tree
 from .journal import repo_root_for, run_git
 from .identity import (
     IdentityResolutionError,
@@ -632,13 +632,7 @@ def cmd_finish(args) -> dict:
 
     verdict = None
     if view.policy == runcore.POLICY_VERIFIED:
-        verdict = _resolve_verified_verdict(view, tree_digest, args)
-    elif args.waive:
-        raise Refusal(
-            "waiver-not-applicable",
-            "a waiver replaces a cross-provider verdict; a 'fast' run has "
-            "none to replace.",
-        )
+        verdict = _resolve_verified_verdict(view, tree_digest, config)
 
     _, results, reused, final_tree = run_checks(
         root, config, view, stage=checks.STAGE_FINAL_FULL,
@@ -687,7 +681,11 @@ def cmd_finish(args) -> dict:
         "payload": {
             "outcome": "completed", "commit": commit,
             "tree_digest": tree_digest, "verdict": verdict,
-            "waiver_reason": args.waive or None, "checks_green": True,
+            "unreviewed_findings": (
+                view.blocking_findings
+                if verdict == "REMEDIATED_AT_CAP" else None
+            ),
+            "checks_green": True,
             "pushed": pushed,
         },
     }])
@@ -703,32 +701,56 @@ def cmd_finish(args) -> dict:
     }
 
 
-def _resolve_verified_verdict(view, tree_digest, args):
+def _resolve_verified_verdict(view, tree_digest, config):
+    """The verdict a completed 'verified' run carries — always one the loop
+    produced. There is no waiver: at the round cap a run whose blocking
+    findings were each shown remediated carries REMEDIATED_AT_CAP, and its
+    work lands labelled unreviewed rather than accepted over anything."""
     from .verdict import (
-        VERDICT_ISSUES_FOUND, VERDICT_VERIFIED, VERDICT_WAIVED,
-        validate_session_verdict,
+        VERDICT_ISSUES_FOUND, VERDICT_REMEDIATED_AT_CAP, VERDICT_VERIFIED,
+        unremediated_findings, validate_session_verdict,
     )
 
-    if args.waive:
-        if not args.attest_operator:
-            raise Refusal(
-                "attestation-required",
-                "a waiver is the operator's, and is journaled as one; add "
-                "--attest-operator.",
-            )
-        return validate_session_verdict(VERDICT_WAIVED)
+    if view.accepted_tree_digest == tree_digest:
+        if view.last_verdict == VERDICT_VERIFIED:
+            return validate_session_verdict(VERDICT_VERIFIED)
+        if (
+            view.last_verdict == VERDICT_ISSUES_FOUND
+            and view.blocking_findings == 0
+        ):
+            # The severity-gated stop: minor or doc-only findings are
+            # recorded and do not hold the run open.
+            return validate_session_verdict(VERDICT_ISSUES_FOUND)
+    if (
+        view.blocking_findings
+        and view.rounds >= runcore.round_limit_for(view, config)
+        and view.reviewed_tree_digest not in (None, tree_digest)
+    ):
+        fix_paths = changed_paths_between(
+            Path(view.worktree_id), view.reviewed_tree_digest, tree_digest
+        )
+        unshown = (
+            view.last_blocking_findings if fix_paths is None
+            else unremediated_findings(view.last_blocking_findings, fix_paths)
+        )
+        if not unshown:
+            # Remediated at the cap: every blocking finding's cited site
+            # was changed, and the cap left the repair unreviewed. Not a
+            # waiver — nothing stands.
+            return validate_session_verdict(VERDICT_REMEDIATED_AT_CAP)
+        raise Refusal(
+            "verification-required",
+            f"the round cap is reached and {len(unshown)} blocking "
+            "finding(s) cannot be shown remediated: the fix delta touches "
+            "no path they cited. Unreviewed work lands only where each "
+            "finding's own site was changed; this run is unresolved.",
+        )
     if view.accepted_tree_digest != tree_digest:
         raise Refusal(
             "verification-required",
             "no accepted verification is bound to this tree. Run 'verify' "
             "against the current tree before finishing.",
         )
-    if view.last_verdict == VERDICT_VERIFIED:
-        return validate_session_verdict(VERDICT_VERIFIED)
-    if view.last_verdict == VERDICT_ISSUES_FOUND and view.blocking_findings == 0:
-        # The severity-gated stop: minor or doc-only findings are recorded
-        # and do not hold the run open.
-        return validate_session_verdict(VERDICT_ISSUES_FOUND)
     raise Refusal(
         "verification-required",
         f"the latest verdict is {view.last_verdict!r} with "
@@ -898,7 +920,9 @@ def cmd_resume(args) -> dict:
             raise Refusal(
                 "not-waiting",
                 f"{view.run_id} is {view.state}; rounds are extended from a "
-                "round-cap or budget pause.",
+                "budget pause. A reached verification round cap is not "
+                "extensible — it ends the run in one of its two terminal "
+                "states rather than waiting to be raised.",
             )
         limit = runcore.round_limit_for(view, config)
         payload["round_limit"] = limit + args.extend_rounds
@@ -1466,8 +1490,6 @@ def build_parser() -> argparse.ArgumentParser:
     finish.add_argument("--run", required=True)
     finish.add_argument("--outcome",
                         choices=("completed", "failed", "cancelled"))
-    finish.add_argument("--waive")
-    finish.add_argument("--attest-operator", action="store_true")
     finish.set_defaults(handler=cmd_finish)
 
     resume = sub.add_parser("resume")

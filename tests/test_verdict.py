@@ -221,13 +221,16 @@ class TestSeverityAndBlocking:
 
 
 class TestSessionVerdictVocabulary:
-    @pytest.mark.parametrize("token", ["VERIFIED", "ISSUES_FOUND", "WAIVED"])
+    @pytest.mark.parametrize(
+        "token", ["VERIFIED", "ISSUES_FOUND", "REMEDIATED_AT_CAP"]
+    )
     def test_canonical_tokens_pass(self, token):
         assert validate_session_verdict(token) == token
 
     @pytest.mark.parametrize("token", [
         "manual-override-development",  # the 2026-07-08 incident token
         "VERIFIED_NOT_REALLY",          # prefix look-alike
+        "WAIVED",                       # retired: no writer emits it again
         "", None, "verified ",
     ])
     def test_invented_tokens_refused(self, token):

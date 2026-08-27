@@ -64,6 +64,68 @@
       "dateTime": "2026-08-26T16:17:37.731748-04:00",
       "description": "Registered session 1 (copilot).",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-26T16:55:25.042173-04:00",
+      "description": "Register.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 2,
+      "stepKey": "check-this-session-list-against-the",
+      "dateTime": "2026-08-26T16:55:25.042173-04:00",
+      "description": "Check this session list against the verified specification and plan: every plan item appears exactly once, nothing in the spec is unbuilt by the end, and no session depends on something a later session creates.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 3,
+      "stepKey": "confirm-the-session-14-reordering-is",
+      "dateTime": "2026-08-26T16:55:25.042173-04:00",
+      "description": "**Confirm the session 14 reordering is sound** \u2014 that no session between 3 and 13 depends on session sets being collapsed, and that sessions 15 through 17 do.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 4,
+      "stepKey": "cross-provider-verification-of-this-spec",
+      "dateTime": "2026-08-26T16:55:25.042173-04:00",
+      "description": "Cross-provider verification of this spec file.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 5,
+      "stepKey": "remediate",
+      "dateTime": "2026-08-26T16:55:25.042173-04:00",
+      "description": "Remediate; stop on Minor-only; operator approves over what remains.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 6,
+      "stepKey": "close-out",
+      "dateTime": "2026-08-26T16:55:25.042173-04:00",
+      "description": "Close-out.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-26T16:55:25.044929-04:00",
+      "description": "Registered session 2 (copilot).",
+      "status": "complete"
     }
   ]
 }

@@ -1,0 +1,3 @@
+VERIFIED
+
+I checked the two previously unresolved defects through the actual code paths that carry them. In `ai_router/agency.py`, `ai_router/testphase.py`, and `ai_router/route.py`, non-`copilot-cli` transports now retain and brief the one allowed write, and `author()` no longer rejects `api`/`offline` up front before `_confine()` can accept a valid `test-write`; `tests/test_testphase.py` covers the no-tools API path. In `ai_router/workflow.py` and `ai_router/checks.py`, the at-cap tests-loop decision now records and compares `postTreeDigest`, and `tests/test_workflow.py` covers the dirty-worktree case that previously produced the wrong terminal label.

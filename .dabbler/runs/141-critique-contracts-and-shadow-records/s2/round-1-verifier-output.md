@@ -1,0 +1,9 @@
+**ISSUES FOUND**
+
+- **Issue 1:** `verify prepare` can mutate the review run before claims are fully validated, and one malformed claims-file shape is silently treated as “no claims.”
+  - **Category:** Correctness
+  - **Severity:** Major
+  - **Evidence paths:** `ai_router/verify.py:737`, `ai_router/verify.py:749`, `ai_router/ledger.py:476`, `ai_router/schemas/review-claims.schema.json:21`
+  - **Failure scenario:** An author supplies a new `claims.json` by hand with a schema error, such as `{"claims":[{"claim_id":"c1"}]}`, or a single-claim object instead of the documented `{"claims":[...]}` wrapper. That is probable for a new hand-authored JSON input. The first case writes `review-run.json` before failing claims validation; the second is accepted as an empty claim set. A retry then records attempt 2 against polluted machine state instead of a clean attempt 1.
+  - **Acceptance criterion:** `JUDGMENT - A reviewer must see that verify prepare rejects malformed or schema-invalid claims before any review-run write/append, and such a refusal leaves no new review-run.json and no new attempt.`
+  - **Details:** **Violation:** the spec requires `verify prepare` to “validate author-supplied claims” and says a failed record is “refused and quarantined, never partially written and never best-effort skipped.” **Impact:** core machine-ledger integrity is broken on the primary claims ingestion path: invalid claims can leave an opened attempt behind, or malformed claims can be silently dropped as zero claims. **Evidence:** `load_author_claims` only checks that the extracted value is a list and uses `payload.get("claims", [])`, so a dict without `claims` becomes empty; `run_prepare` calls `ledger.write_review_run` before `ledger.write_review_claims`; the schema requires each claim to include `claim_id` and `statement`, so schema-level errors are caught only after the run is already written.

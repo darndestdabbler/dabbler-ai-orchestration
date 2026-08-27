@@ -1,0 +1,1 @@
+VERIFIED — The prior finding is resolved. `ai_router/router-config.yaml` now selects `tests/test_critique_contracts.py` for both `ai_router/evidence.py` and `ai_router/ledger.py`, and the selector applies those declared rules via exact/path-boundary prefix matching.

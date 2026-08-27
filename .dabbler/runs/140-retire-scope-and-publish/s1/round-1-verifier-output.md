@@ -1,0 +1,1 @@
+**VERIFIED** — I checked the removal contract against the Python import/CLI/schema surfaces, prompt templates, docs schema reference, and VS Code command list. The cancelled scope/pull surface is gone from the active code paths, while the explicitly retained monolithic verification path, `parse_set_config`, manifest extension, and routing truncation refusal remain.

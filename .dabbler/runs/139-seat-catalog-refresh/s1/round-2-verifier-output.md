@@ -1,0 +1,3 @@
+VERIFIED — the prior finding is resolved. `transports.copilot-cli` now has declared schema properties, so `_reject_unknown_overlay_keys()` recurses into that block and rejects typoed overlay keys like `timeotus`/`lockfil` instead of treating the block as opaque.
+
+I checked `ai_router/config.py`, `ai_router/schemas/router-config.schema.json`, and `tests/test_config.py`; valid Copilot overrides still merge over the bundled base, while intentionally open blocks like `metrics` remain open.

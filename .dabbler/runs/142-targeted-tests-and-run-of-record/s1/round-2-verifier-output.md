@@ -1,0 +1,1 @@
+VERIFIED — I re-checked the Round 1 failure path in `ai_router/affected.py` and `tests/test_affected.py`. Non-collected files under `tests/` now fall through to `selection_unknown` unless a rule maps them, and the added regression test covers `tests/helpers.py` selecting smoke with unknown-path risk rather than returning clean empty evidence.

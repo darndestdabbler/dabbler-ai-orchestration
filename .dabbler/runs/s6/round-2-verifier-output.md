@@ -1,0 +1,9 @@
+ISSUES FOUND
+
+- **Issue 1:** Pattern-only `grep`/`glob` calls are always recorded as in-scope, so repository-wide searches/listings can bypass the promised scope.
+  - **Category:** Correctness
+  - **Severity:** Major
+  - **Evidence paths:** `ai_router/agency.py:217-240`, `ai_router/agency.py:321-343`, `ai_router/agency.py:415-420`, `tests/test_agency.py:244-252`
+  - **Failure scenario:** A verifier commonly calls `grep` with only a pattern to find a symbol or TODO; the existing round-record test itself models that with `{"pattern": "def f"}`. Because the CLI tools default such searches/listings to the working tree unless confined by `paths`, the verifier has effectively searched outside the scoped changed files/dependencies while the agency record reports the operation as in-scope.
+  - **Acceptance criterion:** `JUDGMENT - A pattern-only list/search operation must not be recorded as in-scope unless the implementation can prove the operation was confined to the granted scope; path-confined list/search operations must be evaluated against that path.`
+  - **Details:** **Violation:** the briefing promises “Scope — this session's changed files and what they import, not the repository” and “every list, search and read is recorded on the round, in scope or out of it.” **Impact:** this materially weakens the verifier read-surface deliverable because a reviewer can perform repository-wide content/file discovery and still leave `out_of_scope == 0`, making the ledger falsely attest to scoped review. **Evidence:** `_tool_target` classifies `pattern`/`query` as “not a path,” and `record_for_round` then sets `rel, scoped = target, True` for all such calls, while the tests only assert counts for a pattern-only `grep` and do not catch the scope failure.

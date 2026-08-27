@@ -1,0 +1,9 @@
+**ISSUES FOUND**
+
+**Issue 1:** Backslash traversal can bypass the test-root write boundary on POSIX.
+- **Category:** Correctness
+- **Severity:** Major
+- **Evidence paths:** `ai_router/agency.py:189`, `ai_router/agency.py:704`, `ai_router/agency.py:714`, `ai_router/agency.py:757`, `ai_router/affected.py:232`, `ai_router/test_evidence.py:182`
+- **Failure scenario:** On a POSIX checkout, a granted write proposal like `path=tests\..\ai_router\test_escape.py` is normalized into `tests/../ai_router/test_escape.py` after `Path.resolve()` has already run. The selector then accepts it as under `tests/` with a `test_*.py` basename, but `_write_file` joins that string as a real path and writes under `ai_router/`, outside the declared test root. POSIX runners are ordinary, and the whole boundary exists because model-authored paths are not trusted.
+- **Acceptance criterion:** `JUDGMENT - A reviewer must see that write-path normalization collapses separator-converted "."/".." segments before `names_a_test` runs, and that `tests\..\ai_router\test_escape.py` is refused without creating or modifying a file outside the test root.`
+- **Details:** **Violation:** “Writes are confined to the declared test root. A write outside it is refused by the framework.” **Impact:** the framework’s enforcement can fail open and let the verifier create/modify product files despite no write tool being granted. **Evidence:** `_relative_to` resolves the raw `Path` before `_posix` converts backslashes; `names_a_test` only checks the resulting string prefix/basename; `_write_file` later interprets the now-forward-slash `..` path as filesystem traversal. The correct behavior is to normalize path separators and collapse traversal before the test-root predicate and before writing.

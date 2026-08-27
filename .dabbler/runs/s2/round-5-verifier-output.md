@@ -1,0 +1,11 @@
+**ISSUES FOUND**
+
+- **Issue 1:** The waiver removal is still scheduled before a usable cap-terminal path exists for sessions 4–9.
+  - **Category:** Completeness
+  - **Severity:** Major
+  - **Evidence paths:** `docs/session-sets/148-the-session-framework/spec.md:145-155, docs/session-sets/148-the-session-framework/spec.md:386-395, docs/session-framework-spec.md:460-463, ai_router/verifyjob.py:621-644, ai_router/verify.py:391-408, ai_router/gates.py:117-123`
+  - **Failure scenario:** Session 4–9 reaches the verification cap after waiver removal. Because Session 3 only says to add the replacement state while Session 10 “wires it into the loop,” the current pre-Session-10 verification paths still either pause/refuse at the cap or keep close blocked on the latest blocking round. This is probable because every intervening session must run cross-provider verification, and this very session already hit the cap.
+  - **Acceptance criterion:** `JUDGMENT - Session 3 must explicitly assign all code changes needed in the current ai_router.verify and dabbler verify/finish close paths for capped sessions before Session 10 to terminate as unresolved or remediated-at-the-cap without WAIVED or operator approval; Session 10 may only integrate/refactor already-usable states into the new loop.`
+  - **Details:** **Violation:** the session task requires “no session depends on something a later session creates,” and the framework spec says “No running session ever waits for anyone.” **Impact:** without this fix, a reasonable reviewer should block the sequence because removing WAIVED can strand the next six sessions before the later loop work exists. **Evidence:** the set spec says Session 3 adds the state but Session 10 wires it into the loop, while current `verifyjob` still pauses at cap and offers `resume`, `finish --waive`, or `finish --outcome failed`; legacy `ai_router.verify` refuses over-cap rounds; and the close gate rejects a latest blocking round.
+
+The prior transport-default, pricing-surface, and all-waiver-path findings are otherwise covered by the current Session 8 and Session 3 assignments; I am not re-raising them separately.

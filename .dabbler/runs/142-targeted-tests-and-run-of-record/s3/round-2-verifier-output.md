@@ -1,0 +1,11 @@
+**ISSUES FOUND**
+
+The selected-test command fact issue appears fixed, but the changed-line coverage path is still blocked on the normal workflow.
+
+- **Issue 1:** The new coverage command creates an unignored `.coverage` file, so recording the printed preverify command becomes a `policy_violation`.
+  - **Category:** Correctness
+  - **Severity:** Major
+  - **Evidence paths:** `ai_router/router-config.yaml:524`, `.gitignore:1`, `ai_router/evidence.py:83`, `ai_router/affected.py:348`, `ai_router/test_evidence.py:613`
+  - **Failure scenario:** On an ordinary Python change, `ai_router.affected` prints the targeted command from `router-config.yaml`; the user runs it; pytest-cov writes `.coverage` in the repo root by default; because `.gitignore` does not ignore it, the recorder recomputes changed paths and sees `.coverage` as an unknown changed path, adds the smoke test, and rejects the originally printed command for not naming that smoke test. This is probable on the main path because pytest-cov’s default data file is `.coverage`, and the reviewed status already shows `?? .coverage`.
+  - **Acceptance criterion:** `JUDGMENT - A normal preverify-targeted flow using the declared python suite command must not leave an unignored coverage data file that changes the selector result before ai_router.test_evidence record judges the command; the coverage data file is either written under an ignored machine path or ignored explicitly, and the printed command records without becoming a policy_violation because of coverage artifacts.`
+  - **Details:** **Violation:** The spec requires “Changed-line coverage is computed and recorded,” and AGENTS says to “Run the printed command, then record it.” **Impact:** A normal user following that path cannot get valid `preverify-targeted` evidence, so verification does not dispatch and changed-line coverage facts are not recorded. **Evidence:** the suite command enables pytest-cov without relocating the data file, `.gitignore` omits `.coverage`, snapshots intentionally include untracked non-ignored files, and the recorder reselects tests from the current working tree before classifying the command. The correct fix is to prevent pytest-cov’s `.coverage` artifact from entering the changed-path universe.

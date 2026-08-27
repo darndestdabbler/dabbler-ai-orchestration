@@ -1,0 +1,3 @@
+VERIFIED — I checked the fix-delta surfaces in `AGENTS.md`, `ai_router/bootstrap.py`, `ai_router/affected.py`, and the scoped baseline path used by `preverify_gate` / `test_evidence`.
+
+The prior Round 4 issue is resolved: generated instructions now name `python -m ai_router.affected --session-set-dir <dir>`, and remediation selection is scoped to the last verification round rather than the full session diff. No blocking defects found within the current delta.

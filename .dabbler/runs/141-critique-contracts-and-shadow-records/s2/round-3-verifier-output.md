@@ -1,0 +1,1 @@
+VERIFIED — I checked `ai_router/verify.py`, `ai_router/ledger.py`, the review-claims schema, and the added tests. The prior finding is resolved: malformed canonical claims are now screened through the same quarantine-on-validation-failure path before `review-run.json` is written, so no attempt is opened while the rejected record is preserved.

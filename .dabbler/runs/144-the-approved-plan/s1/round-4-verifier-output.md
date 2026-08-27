@@ -1,0 +1,1 @@
+Dispute 1: OVERRULE — The orchestrator added logic to explicitly detect unclosed `(slug` markers using `_SLUG_OPEN_RE` and correctly raises `MalformedSlugError` when a trailing closing parenthesis is missing, satisfying the criteria and addressing the specific failure scenario detailed in the finding. Regression tests were appropriately added.

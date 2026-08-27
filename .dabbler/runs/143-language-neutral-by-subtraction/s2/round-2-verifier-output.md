@@ -1,0 +1,9 @@
+ISSUES FOUND
+
+- **Issue 1:** The prior pass-on-forbidden-literal defect persists; the fix only changes the fixture to stop exercising it.
+  - **Category:** Correctness
+  - **Severity:** Major
+  - **Evidence paths:** `ai_router/evidence.py:716`, `ai_router/evidence.py:742`, `tests/fixtures/critique-roundtrip/checks.json:7`, `tests/test_critique_contracts.py:159`
+  - **Failure scenario:** A worker records `result: "pass"` for the registered `no-shell-out` check while declaring `matches: 2` for `os.system`. That is probable because worker-model outputs can self-contradict, and this framework exists to re-derive evidence rather than trust them. The current code re-runs the search, sees the same count, and appends the pass anyway.
+  - **Acceptance criterion:** `JUDGMENT - record_worker_result must refuse or prevent appending a pass for a registered absence check when the framework-measured search satisfies that check's fail branch instead of its pass branch.`
+  - **Details:** **Violation:** the check says `os.system` existence maps to `fail`, while `count == 0` maps to `pass` (`checks.json`). The prior finding specifically required not recording a pass when the framework search finds two forbidden literals. **Impact:** the ledger can still record a clean/pass outcome for code the framework itself measured as violating the check, which would materially mislead the merge decision. **Evidence:** `verify_worker_result` only verifies quotes and re-executed absence counts, then returns `verified = dict(row)` without evaluating the registered check’s condition/branch; `record_worker_result` only confirms the check exists and appends the verified row. The changed test now records `result: "fail"` for the `matches: 2` case, but it does not close the product hole.

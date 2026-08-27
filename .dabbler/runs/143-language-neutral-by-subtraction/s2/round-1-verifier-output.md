@@ -1,0 +1,9 @@
+ISSUES FOUND
+
+- **Issue 1:** The updated critique round-trip now records a passing result for a literal absence check even though the framework-measured search finds two forbidden literals.
+  - **Category:** Correctness
+  - **Severity:** Major
+  - **Evidence paths:** `tests/fixtures/critique-roundtrip/checks.json:7-19`, `tests/fixtures/critique-roundtrip/widget.py:3-16`, `tests/test_critique_contracts.py:159-185`, `ai_router/evidence.py:716-739`
+  - **Failure scenario:** A typical worker-model check asks whether literal text is absent, the framework re-runs the declared search and finds matches, but `record_worker_result` still records `result: "pass"` because it only compares the worker’s count to the measured count. The seeded fixture now exercises exactly that path, so this is probable on the main replacement path, not an edge case.
+  - **Acceptance criterion:** `JUDGMENT - The seeded critique round trip no longer records or accepts a pass for no-shell-out when the framework-measured os.system literal search has matches: 2; the result must align with the check branch, or the construct-sensitive check must be routed to deterministic analysis instead.`
+  - **Details:** **Violation:** the new check says failure when `{ "exists": "os.system" }` and pass only when `count.of == "os.system"` is `0`, but the test records `result: "pass"` with `matches: 2`. **Impact:** the targeted evidence now codifies a false pass for the language-neutral literal vocabulary, undermining the evidence contract a reviewer would rely on before merge. **Evidence:** `widget.py` intentionally contains `os.system` twice, `checks.json` defines that as the failing branch, and `test_critique_contracts.py` asserts the pass is accepted while `evidence.py` re-runs only the count and never rejects the contradictory pass.

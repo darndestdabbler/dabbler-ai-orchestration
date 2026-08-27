@@ -1,0 +1,11 @@
+ISSUES FOUND
+
+- **Issue 1:** `step close` can launder files written by deterministic commands into the next step’s baseline without any envelope check.
+  - **Category:** Correctness
+  - **Severity:** Major
+  - **Evidence paths:** `ai_router/verify.py:1899-1928`, `ai_router/approved_plan.py:504-529`, `ai_router/evidence.py:82-111`, `ai_router/ledger.py:255-271`
+  - **Failure scenario:** A normal repo declares a required deterministic command or targeted test that writes an unignored artifact such as `coverage.xml`, `build-report.json`, or generated metadata outside the step envelope. The pre-test envelope comparison passes, the command exits 0, `closed_tree` snapshots the new artifact, and the next step uses that snapshot as its baseline, so the outside write is never refused. This is probable because compile/lint/analyzer/test commands commonly create repo-local outputs.
+  - **Acceptance criterion:** `JUDGMENT - Does run_step_close re-check the envelope after deterministic controls/tests and refuse without appending a closed event when those commands create or modify any non-ceremony path outside the open step's envelope?`
+  - **Details:** **Violation:** the session spec requires “A write outside the step's declared paths is refused at the boundary.” **Impact:** this defeats the core envelope-enforcement objective and would change a merge decision because a step can close with out-of-envelope files absorbed into `closed_tree`. **Evidence:** `run_step_close` compares the envelope before deterministic execution, then runs controls/tests, then snapshots and records `closed_tree`; `last_closed_tree` makes that snapshot the next step’s baseline. The correct behavior is to validate the post-deterministic tree before recording it as closed.
+
+The prior declaration-error and settled-path findings are not re-raised; the current code blocks malformed deterministic declarations and measures the next step from the previous accepted snapshot rather than blindly ignoring settled paths.

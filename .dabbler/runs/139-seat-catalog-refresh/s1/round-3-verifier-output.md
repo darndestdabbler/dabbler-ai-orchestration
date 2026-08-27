@@ -1,0 +1,1 @@
+VERIFIED — I checked the current fix delta and re-validated the prior `transports.copilot-cli` override finding. The schema now declares that block deeply enough for `_reject_unknown_overlay_keys()` to reject typoed keys like `timeotus`, while valid Copilot overrides still merge and `local-overrides.yaml` remains gitignored and unpackaged.

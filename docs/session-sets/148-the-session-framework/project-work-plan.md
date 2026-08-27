@@ -45,7 +45,7 @@ it.
 | 7 | The test-write path (plan A5, second half) | no | 2026-08-27 |
 | 8 | Selection by role, and the death of the tier ladder (plan A6) | no | 2026-08-27 |
 | 9 | Model discovery (plan A7) | yes | 2026-08-27 |
-| 10 | The code review loop (plan B1) | — | not declared |
+| 10 | The code review loop (plan B1) | no | 2026-08-27 |
 | 11 | The verifier authors tests, the framework runs them (plan B2) | — | not declared |
 | 12 | The full suite and its bounded fix loop (plan B3) | — | not declared |
 | 13 | Packaging to the feed (plan C) | — | not declared |
@@ -185,3 +185,41 @@ because a probe costs premium requests; enumeration bills no tokens.
 **Releasable:** yes. This is framework code with no operator-specific data
 in it; the record it writes is seat/key-set local and is regenerated, not
 shipped.
+
+### Session 10 — The code review loop (plan B1)
+
+**Releasable: no.**
+
+Bound the code review loop (plan B1).
+
+`workflow review` has no round cap today, so an unattended run keeps calling
+two vendors for as long as it is invoked. This session gives that loop the
+same bound the session verifier already has, and the same three terminal
+states — reusing what session 3 built rather than inventing a fourth.
+
+1. Count review rounds per target per step, folded from the event log, and
+   reset the count when work enters a step or is sent back to one.
+2. Refuse to open a round past the configured cap (`verification.settings.
+   max_rounds`, 3). One implementation of the rule, in one place: no second
+   cap constant.
+3. Stop early when only Minor findings remain — `classify_blocking` already
+   decides that, so the loop reads its answer instead of re-deriving it.
+4. Reach exactly one of the three terminal states of spec §3.c.i, derived
+   from the folded log rather than written by a caller: verified;
+   unresolved; remediated at the cap. The remediation test is the one
+   `verdict.unremediated_findings` already applies — a blocking finding is
+   shown remediated when the artifact it cited changed since the round that
+   raised it, which means the `reviewed` event must record what each
+   artifact's content was at review time.
+5. No terminal state waits for a person and none can be typed by one: the
+   state is computed, no event asserts it, and the developer approval on the
+   solution driver's two approval steps neither produces one nor holds one
+   back.
+6. Surface the round count and the terminal state in `workflow status` and
+   in the projection the extension renders — Python decides, TypeScript
+   renders.
+
+Not in scope: the session verifier's loop (already capped since session 3),
+the tests loop (B2, session 11), the full-suite fix loop (B3, session 12),
+and the solution driver's developer approval steps, which belong to the
+decomposition product rather than to this framework's session lifecycle.

@@ -48,6 +48,9 @@ VALID_TRANSPORTS = (TRANSPORT_API, TRANSPORT_COPILOT_CLI, TRANSPORT_OFFLINE)
 
 TRANSPORT_ENV_VAR = "DABBLER_TRANSPORT"
 
+#: The backstop every review loop shares when the config names no bound.
+DEFAULT_VERIFICATION_ROUNDS = 3
+
 CRITIQUE_PIPELINE_DEFAULT = "off"
 CRITIQUE_PIPELINE_SHADOW = "shadow"
 CRITIQUE_PIPELINE_ENFORCE = "enforce"
@@ -81,7 +84,7 @@ def _resolve_config_path(path: str | None = None) -> Path:
 
 
 def _resolve_config_sources(
-    path: str | None = None,
+    path: str | None = None, project_dir: str | None = None,
 ) -> tuple[Path, Optional[Path]]:
     """``(base config, project-local overlay or None)``.
 
@@ -89,11 +92,16 @@ def _resolve_config_sources(
     the whole answer and takes no overlay: a caller that named a file means
     that file. The overlay layers only over the bundled default, which is
     the one config nobody on this machine chose.
+
+    ``project_dir`` names the project whose overlay applies. A caller that
+    was handed a workspace passes it, because the overlay belongs to the
+    workspace under discussion rather than to whatever directory the
+    process happens to be sitting in.
     """
     base = _resolve_config_path(path)
     if path is not None or os.environ.get("AI_ROUTER_CONFIG"):
         return base, None
-    return base, local_overrides_path()
+    return base, local_overrides_path(project_dir)
 
 
 # Resolved once per working directory: the overlay's location is a property
@@ -101,20 +109,20 @@ def _resolve_config_sources(
 _project_root_cache: dict[str, Optional[str]] = {}
 
 
-def project_root() -> Optional[str]:
-    """The git toplevel of the working directory, or ``None`` outside a
-    repository. The router already discovers the project this way for
-    evidence and gates; a second notion of "the project" would be a second
-    thing to disagree."""
-    cwd = str(Path.cwd().resolve())
-    if cwd not in _project_root_cache:
-        _project_root_cache[cwd] = repo_root_for(cwd)
-    return _project_root_cache[cwd]
+def project_root(project_dir: str | None = None) -> Optional[str]:
+    """The git toplevel of ``project_dir``, or of the working directory when
+    none is named, or ``None`` outside a repository. The router already
+    discovers the project this way for evidence and gates; a second notion
+    of "the project" would be a second thing to disagree."""
+    start = str(Path(project_dir or Path.cwd()).resolve())
+    if start not in _project_root_cache:
+        _project_root_cache[start] = repo_root_for(start)
+    return _project_root_cache[start]
 
 
-def local_overrides_path() -> Optional[Path]:
+def local_overrides_path(project_dir: str | None = None) -> Optional[Path]:
     """The project-local overlay, when the project has one."""
-    root = project_root()
+    root = project_root(project_dir)
     if root is None:
         return None
     candidate = Path(root) / LOCAL_OVERRIDES_FILENAME
@@ -158,8 +166,8 @@ def _reject_unknown_overlay_keys(
             )
 
 
-def load_config(path: str | None = None) -> dict:
-    config_path, overrides_path = _resolve_config_sources(path)
+def load_config(path: str | None = None, project_dir: str | None = None) -> dict:
+    config_path, overrides_path = _resolve_config_sources(path, project_dir)
     if not config_path.exists():
         raise FileNotFoundError(
             f"Router config not found: {config_path}. Create it from the "
@@ -312,6 +320,27 @@ def _validate_copilot_block(config: dict) -> None:
             f"transports.copilot-cli is missing required key(s): {missing}"
         )
     validate_transport_timeouts(block.get("timeouts"))
+
+
+def verification_round_cap(config: dict) -> int:
+    """How many review rounds any loop may open before it must terminate.
+
+    One resolver for every loop that calls a vendor per round, because a cap
+    read through two code paths is a cap two loops eventually disagree
+    about. The closed severity vocabulary is the primary control and this is
+    the backstop: an unattended loop that never converges still stops
+    calling vendors.
+
+    A missing, unparseable or non-positive setting falls back to the default
+    rather than to no cap — a bound that a malformed config can switch off
+    is not a bound.
+    """
+    settings = (config.get("verification") or {}).get("settings") or {}
+    try:
+        cap = int(settings.get("max_rounds", DEFAULT_VERIFICATION_ROUNDS))
+    except (TypeError, ValueError):
+        return DEFAULT_VERIFICATION_ROUNDS
+    return cap if cap >= 1 else DEFAULT_VERIFICATION_ROUNDS
 
 
 def resolve_transport(config: dict, cli_flag: str | None = None) -> str:

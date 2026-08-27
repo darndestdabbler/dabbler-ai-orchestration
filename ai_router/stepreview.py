@@ -24,6 +24,7 @@ select what gets written down.
 
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
@@ -74,6 +75,11 @@ class StepReview:
     step: str
     reviewers: list
     artifacts: list
+    #: What each artifact contained when it was sent, keyed by path. A later
+    #: round decides whether a finding was answered by comparing against
+    #: this, so it must be the digest of the text that actually went to the
+    #: reviewers rather than of whatever the file says afterwards.
+    artifact_digests: dict = field(default_factory=dict)
 
     @property
     def blocked(self) -> bool:
@@ -92,12 +98,26 @@ class StepReview:
         return any(r.simulated for r in self.reviewers)
 
     @property
+    def live(self) -> bool:
+        """True if any reader was a vendor rather than a script.
+
+        This is what the round cap counts. A round that reached no vendor
+        spent nothing and bounding it would bound the wrong thing; a round
+        that reached one did spend, whatever the other reader was.
+        """
+        return any(not r.simulated for r in self.reviewers)
+
+    @property
     def findings(self) -> list:
         out = []
         for r in self.reviewers:
             for f in r.findings:
                 out.append({**f, "reviewer": f"{r.model}/{r.provider}"})
         return out
+
+
+def digest_text(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
 def read_artifacts(paths) -> list:
@@ -173,12 +193,18 @@ def build_prompt(target: str, step: str, artifacts: list) -> str:
         "  - **Severity:** Critical / Major",
         "  - **Failure scenario:** the concrete scenario in which this bites "
         "a real user, and why it is probable rather than merely possible",
-        "  - **Location:** where in the work above it is",
+        "  - **Evidence paths:** the artifact path(s) above this finding is "
+        "about, exactly as they are headed",
         "```",
         "",
         "Number them upward: `Issue 1:`, `Issue 2:`, and so on. Minor "
         "findings go under a `NITS` heading as ordinary bullets, and keep "
         "their `Severity:` label there.",
+        "",
+        "**Cite an evidence path on every blocking finding.** A later round "
+        "decides whether a finding was answered by checking whether what it "
+        "cited changed; a finding that cites nothing names no site to check "
+        "and can never be shown to have been fixed.",
     ]
     return "\n".join(body)
 
@@ -254,4 +280,5 @@ def review(
     return StepReview(
         target=target, step=step, reviewers=outcomes,
         artifacts=[p for p, _ in artifacts],
+        artifact_digests={p: digest_text(text) for p, text in artifacts},
     ), raws

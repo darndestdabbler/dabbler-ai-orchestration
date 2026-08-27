@@ -5,12 +5,37 @@ import yaml
 
 from ai_router.config import (
     CRITIQUE_ENFORCE_SET,
+    DEFAULT_VERIFICATION_ROUNDS,
     load_config,
     resolve_generation_params,
     resolve_transport,
+    verification_round_cap,
     _split_sections,
 )
 from tests.conftest import make_config
+
+
+class TestTheVerificationRoundCap:
+    """One resolver for every loop that opens rounds. Two loops reading the
+    same setting through two code paths disagree about it eventually."""
+
+    def test_the_configured_bound_is_used(self):
+        assert verification_round_cap(
+            {"verification": {"settings": {"max_rounds": 5}}}
+        ) == 5
+
+    @pytest.mark.parametrize("settings", [
+        {"max_rounds": 0}, {"max_rounds": -1}, {"max_rounds": "soon"},
+        {}, None,
+    ])
+    def test_a_bound_a_malformed_config_could_switch_off_falls_back(
+            self, settings):
+        """A cap an unparseable, absent or non-positive setting turns into
+        no cap at all is not a cap: the loop it was bounding would go back
+        to calling vendors until something else stopped it."""
+        assert verification_round_cap(
+            {"verification": {"settings": settings}}
+        ) == DEFAULT_VERIFICATION_ROUNDS
 
 
 def _write_config(tmp_path, config):

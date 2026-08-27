@@ -1429,3 +1429,107 @@ Round 1, Major. The default resolved to ai_router/api-models.lock and pyproject 
 ### D64 · 2026-08-27 · Verifier (gpt-5.4/openai) · The sanctioned writer must be able to create the record the first time
 
 Round 2, Major, and a defect the round-1 remediation introduced. Moving the default to .dabbler/api-models.lock put the record in a directory that does not exist on a fresh checkout, while write_document was a bare write_text -- so the documented first run of enumerate would have raised FileNotFoundError and produced no record at all. Fixed in the writer rather than at the call site: it is the only sanctioned way to produce either record, so a missing parent directory there means the record cannot be made by any permitted route. The seat catalog's parent has always existed, so nothing changes for it.
+
+## Session 10 — The code review loop (plan B1)
+
+### D65 · 2026-08-27 · Orchestrator · The step review loop is bounded by the same cap the session verifier uses, read through one resolver
+
+`workflow review` could be invoked forever. Each invocation called two
+vendors, so the only thing bounding an unattended run was whatever stopped
+invoking it. The session verifier has had a cap since session 3; this loop
+had none, and the plan named it as a live hole rather than a hypothetical
+one.
+
+The bound is the same one, read through the same resolver. A step gets
+`verification.settings.max_rounds` rounds, and `config.verification_round_cap`
+is now the single place that answers what that number is — `verify.py` had
+been reading the setting inline, so there were two readers of one rule and
+the second one was about to be written here. A malformed, absent or
+non-positive setting falls back to the shipped default rather than to no
+bound, because a cap a bad config can switch off is not a cap.
+
+Two decisions inside the bound are worth naming.
+
+**Only rounds that reached a vendor count.** The cap exists to stop the loop
+spending, so a round served entirely from the offline transport is not
+counted against it — and a round with one scripted reader and one live one
+is, because it spent. A round that says neither is counted, failing closed.
+
+**The bound binds the writer, not the reader.** `validate_transition` does
+not refuse a `reviewed` event for being over the cap. An operator who lowers
+the cap would otherwise make yesterday's log unreadable, which is the same
+failure the retired `WAIVED` token was kept readable to avoid: a record the
+machine cannot read back is worse than a record with an over-long loop in it.
+The refusal lives at the one place that opens rounds.
+
+### D66 · 2026-08-27 · Orchestrator · The loop's terminal state is computed from the record, never written, so no fourth state and none typed by a person
+
+The three terminal states already existed — session 3 built them and wired
+them into the paths that existed then. This session had to make the step
+review loop reach one of them, and the instruction was explicit that
+inventing a fourth would mean session 3 was incomplete.
+
+Nothing new was invented. `review_terminal` returns one of
+`verdict.SESSION_VERDICTS` and passes its answer back through
+`validate_session_verdict` on the way out, so a fourth state would have to
+be added to the closed vocabulary before this module could return it. The
+remediation test is `verdict.unremediated_findings`, unchanged: a blocking
+finding is shown remediated when the site it cited has changed since the
+round that raised it.
+
+**The state is computed, never written.** No event asserts a terminal state.
+It is derived from the folded log plus the artifacts on disk, which is what
+makes "none can be typed by a person" true in code rather than in a rule
+nobody enforces. It also means the loop always reaches one: a step that
+agreed with every finding and fixed them all lands on remediated-at-the-cap
+instead of hanging, which is the dead end session 2 hit and the reason these
+steps were added to the spec at all.
+
+Two things follow from deriving rather than recording.
+
+**The comparison needs a baseline, so a round now records what it read.**
+`artifactDigests` on the `reviewed` event is the digest of the text that
+actually went to the reviewers, not of whatever the file says later. Without
+it there is no honest "has this changed since".
+
+**A finding that cites nothing can never be shown fixed**, so the step review
+prompt now asks for `Evidence paths:` where it used to ask for `Location:`.
+The old field was prose and the parser could not read it, which would have
+made remediated-at-the-cap unreachable on this path — a terminal state that
+can never occur is not a terminal state, it is dead code with a name.
+
+A blocked round that named no parseable finding lands unresolved, not
+remediated. There is nothing to have fixed, and letting an unreadable round
+be the cheapest exit is exactly the laundering route the fail-closed rules
+elsewhere exist to shut.
+
+### D67 · 2026-08-27 · Verifier (gpt-5.4/openai) · Round 1: the bound could be reset by re-entering the same step, and was read from the process directory rather than the workspace
+
+Round 1 raised two Major findings against the bounded review loop, and both
+were real. Neither was disputed; both were fixed.
+
+**The cap could be reset without moving the work.** `validate_transition`
+accepts entering the step the work is already in — `to_index == current_index`
+falls through both of its guards — and the fold zeroed the round count on
+every `entered` event. So an author at the cap could run
+`workflow enter <current step>` and buy another full set of vendor rounds on
+the same step. That is not a corner: it is the obvious command to reach for
+after editing an artifact, and it defeated the whole point of the bound. The
+fold now resets the loop only when the step actually changes. Transition
+legality is untouched, because a same-step enter is still a legal event that
+records something; it simply no longer moves anything.
+
+**The cap was read from the wrong repository.** `review_cap()` called
+`load_config()` with no root, and `load_config` discovers the project-local
+overlay from `Path.cwd()`. `--workspace-root` and `project(root)` are
+first-class entrypoints, so an operator or the extension invoking either from
+elsewhere would enforce and display the bundled default instead of the
+workspace's configured cap. `load_config` now takes an optional `project_dir`
+that names the project whose overlay applies, and `review_cap` passes the
+workspace it was handed. Every other caller keeps the working-directory
+default, so nothing else changes behaviour.
+
+The round's nit was taken as well: `workflow status` now shows the round
+count while the loop is still open, not only once it has closed. The count is
+what says how much room is left, which is worth more before the loop ends
+than after.

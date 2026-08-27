@@ -123,8 +123,6 @@ EXIT_BLOCKING = 4
 EXIT_CALL_FAILED = 6
 EXIT_UNAVAILABLE = 7
 
-DEFAULT_MAX_ROUNDS = 3
-
 
 class VerifyError(RuntimeError):
     pass
@@ -518,7 +516,9 @@ def run_round(
         load_selection_config, preverify_gate, preverify_recipe,
         remediation_recipe, working_tree_changes,
     )
-    from .config import load_config, resolve_transport
+    from .config import (
+        load_config, resolve_transport, verification_round_cap,
+    )
     from .route import NoCandidateError, RouterError
     from .session import append_change_log_block, record_session_verification
     from .progress import read_session_state
@@ -545,8 +545,7 @@ def run_round(
         return EXIT_STATE
 
     config = load_config()
-    settings = (config.get("verification") or {}).get("settings") or {}
-    cap = max_rounds or settings.get("max_rounds", DEFAULT_MAX_ROUNDS)
+    cap = max_rounds or verification_round_cap(config)
 
     slug = set_path.name
     prior_rounds = ledger.read_rounds(repo_root, slug, current)
@@ -638,7 +637,12 @@ def run_round(
             else prior_rounds[-1]["completion_tree"]
         ) or (),
     )
-    read_budget = settings.get("read_budget") or agency.DEFAULT_READ_BUDGET
+    verification_settings = (
+        (config.get("verification") or {}).get("settings") or {}
+    )
+    read_budget = (
+        verification_settings.get("read_budget") or agency.DEFAULT_READ_BUDGET
+    )
     selection = load_selection_config(config).config
 
     def _grant(for_transport: str):
@@ -1305,7 +1309,7 @@ def run_adjudication(
     judgment. Machine-checked preconditions, each refusal naming the unmet
     one; the outcome is one terminal ledger row the existing
     ``verification_clean`` gate already knows how to read."""
-    from .config import load_config
+    from .config import load_config, verification_round_cap
     from .route import NoCandidateError, RouterError
     from .session import append_change_log_block, record_session_verification
     from .progress import read_session_state
@@ -1339,8 +1343,7 @@ def run_adjudication(
         return EXIT_STATE
 
     config = load_config()
-    settings = (config.get("verification") or {}).get("settings") or {}
-    cap = max_rounds or settings.get("max_rounds", DEFAULT_MAX_ROUNDS)
+    cap = max_rounds or verification_round_cap(config)
 
     slug = set_path.name
     rounds = ledger.read_rounds(repo_root, slug, current)

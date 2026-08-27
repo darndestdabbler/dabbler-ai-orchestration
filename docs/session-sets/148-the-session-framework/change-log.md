@@ -76,3 +76,10 @@
 - Orchestrator provider (excluded): anthropic
 - Verifier's read surface: agency: 14 read(s), 0 search(es), 0 listing(s); 1 read(s) were transformed; 1 not confined to scope
 - Raw round output: `.dabbler/runs/148-the-session-framework/s9/`
+
+## Session 10 verification — VERIFIED after 3 round(s)
+
+- Verifier: gpt-5.4 (openai) over copilot-cli
+- Orchestrator provider (excluded): anthropic
+- Verifier's read surface: agency: 27 read(s), 0 search(es), 1 listing(s); 1 read(s) were transformed; 4 not confined to scope
+- Raw round output: `.dabbler/runs/148-the-session-framework/s10/`

@@ -1997,6 +1997,217 @@
       "dateTime": "2026-08-27T10:24:43.747761-04:00",
       "description": "790 passed in 668s against the final verified tree.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 10,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-27T10:32:16.900440-04:00",
+      "description": "Register.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 10,
+      "stepNumber": 2,
+      "stepKey": "verify-fix-cap-3-stopping-early",
+      "dateTime": "2026-08-27T10:32:16.900440-04:00",
+      "description": "`verify \u2192 fix`, cap 3, stopping early when only Minor findings remain. At the cap the session ends with its round history intact \u2014 nothing commits, nobody is asked.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 10,
+      "stepNumber": 3,
+      "stepKey": "the-three-terminal-states-of-spec",
+      "dateTime": "2026-08-27T10:32:16.900440-04:00",
+      "description": "**The three terminal states of spec \u00a73.c.i, and no fourth.** Verified; unresolved, when the cap is reached with blocking findings outstanding; and **remediated at the cap**, when every blocking finding from the last round was fixed and the cap left the fix unreviewed. **Session 3 built these and wired them into the paths that existed then; this session integrates them into the new loop and adds nothing new.** If this session finds itself inventing a terminal state, session 3 was incomplete and the fix belongs there, not here.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 10,
+      "stepNumber": 4,
+      "stepKey": "no-terminal-state-waits-for-a",
+      "dateTime": "2026-08-27T10:32:16.900440-04:00",
+      "description": "**No terminal state waits for a person, and none can be typed by one.** The waiver paths are already gone by session 3. What remains is that the loop must always reach one of the three \u2014 a session that agreed with every finding and fixed them all must land, not hang.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 10,
+      "stepNumber": 5,
+      "stepKey": "the-cap-also-closes-a-live",
+      "dateTime": "2026-08-27T10:32:16.900440-04:00",
+      "description": "**The cap also closes a live hole:** `workflow review` has no round cap today, so an unattended run keeps calling vendors.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 10,
+      "stepNumber": 6,
+      "stepKey": "affected-tests-as-preverify",
+      "dateTime": "2026-08-27T10:32:16.900440-04:00",
+      "description": "Affected tests as preverify.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 10,
+      "stepNumber": 7,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-27T10:32:16.900440-04:00",
+      "description": "Cross-provider verification.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 10,
+      "stepNumber": 8,
+      "stepKey": "full-test-suite-recorded-as-the",
+      "dateTime": "2026-08-27T10:32:16.900440-04:00",
+      "description": "Full test suite, recorded as the `final-full` run of record.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 10,
+      "stepNumber": 9,
+      "stepKey": "close-out",
+      "dateTime": "2026-08-27T10:32:16.900440-04:00",
+      "description": "Close-out.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 10,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-27T10:32:16.909281-04:00",
+      "description": "Registered session 10 (copilot).",
+      "status": "complete"
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 10,
+      "dateTime": "2026-08-27T10:33:50.747127-04:00",
+      "task": "Bound the code review loop (plan B1).\n\n`workflow review` has no round cap today, so an unattended run keeps calling\ntwo vendors for as long as it is invoked. This session gives that loop the\nsame bound the session verifier already has, and the same three terminal\nstates \u2014 reusing what session 3 built rather than inventing a fourth.\n\n1. Count review rounds per target per step, folded from the event log, and\n   reset the count when work enters a step or is sent back to one.\n2. Refuse to open a round past the configured cap (`verification.settings.\n   max_rounds`, 3). One implementation of the rule, in one place: no second\n   cap constant.\n3. Stop early when only Minor findings remain \u2014 `classify_blocking` already\n   decides that, so the loop reads its answer instead of re-deriving it.\n4. Reach exactly one of the three terminal states of spec \u00a73.c.i, derived\n   from the folded log rather than written by a caller: verified;\n   unresolved; remediated at the cap. The remediation test is the one\n   `verdict.unremediated_findings` already applies \u2014 a blocking finding is\n   shown remediated when the artifact it cited changed since the round that\n   raised it, which means the `reviewed` event must record what each\n   artifact's content was at review time.\n5. No terminal state waits for a person and none can be typed by one: the\n   state is computed, no event asserts it, and the developer approval on the\n   solution driver's two approval steps neither produces one nor holds one\n   back.\n6. Surface the round count and the terminal state in `workflow status` and\n   in the projection the extension renders \u2014 Python decides, TypeScript\n   renders.\n\nNot in scope: the session verifier's loop (already capped since session 3),\nthe tests loop (B2, session 11), the full-suite fix loop (B3, session 12),\nand the solution driver's developer approval steps, which belong to the\ndecomposition product rather than to this framework's session lifecycle.",
+      "releasable": false
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D65",
+      "ordinal": 65,
+      "sessionNumber": 10,
+      "decidedOn": "2026-08-27",
+      "recordedAt": "2026-08-27T10:55:12.355842-04:00",
+      "decider": "orchestrator",
+      "headline": "The step review loop is bounded by the same cap the session verifier uses, read through one resolver",
+      "body": "`workflow review` could be invoked forever. Each invocation called two\nvendors, so the only thing bounding an unattended run was whatever stopped\ninvoking it. The session verifier has had a cap since session 3; this loop\nhad none, and the plan named it as a live hole rather than a hypothetical\none.\n\nThe bound is the same one, read through the same resolver. A step gets\n`verification.settings.max_rounds` rounds, and `config.verification_round_cap`\nis now the single place that answers what that number is \u2014 `verify.py` had\nbeen reading the setting inline, so there were two readers of one rule and\nthe second one was about to be written here. A malformed, absent or\nnon-positive setting falls back to the shipped default rather than to no\nbound, because a cap a bad config can switch off is not a cap.\n\nTwo decisions inside the bound are worth naming.\n\n**Only rounds that reached a vendor count.** The cap exists to stop the loop\nspending, so a round served entirely from the offline transport is not\ncounted against it \u2014 and a round with one scripted reader and one live one\nis, because it spent. A round that says neither is counted, failing closed.\n\n**The bound binds the writer, not the reader.** `validate_transition` does\nnot refuse a `reviewed` event for being over the cap. An operator who lowers\nthe cap would otherwise make yesterday's log unreadable, which is the same\nfailure the retired `WAIVED` token was kept readable to avoid: a record the\nmachine cannot read back is worse than a record with an over-long loop in it.\nThe refusal lives at the one place that opens rounds."
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D66",
+      "ordinal": 66,
+      "sessionNumber": 10,
+      "decidedOn": "2026-08-27",
+      "recordedAt": "2026-08-27T10:55:19.243357-04:00",
+      "decider": "orchestrator",
+      "headline": "The loop's terminal state is computed from the record, never written, so no fourth state and none typed by a person",
+      "body": "The three terminal states already existed \u2014 session 3 built them and wired\nthem into the paths that existed then. This session had to make the step\nreview loop reach one of them, and the instruction was explicit that\ninventing a fourth would mean session 3 was incomplete.\n\nNothing new was invented. `review_terminal` returns one of\n`verdict.SESSION_VERDICTS` and passes its answer back through\n`validate_session_verdict` on the way out, so a fourth state would have to\nbe added to the closed vocabulary before this module could return it. The\nremediation test is `verdict.unremediated_findings`, unchanged: a blocking\nfinding is shown remediated when the site it cited has changed since the\nround that raised it.\n\n**The state is computed, never written.** No event asserts a terminal state.\nIt is derived from the folded log plus the artifacts on disk, which is what\nmakes \"none can be typed by a person\" true in code rather than in a rule\nnobody enforces. It also means the loop always reaches one: a step that\nagreed with every finding and fixed them all lands on remediated-at-the-cap\ninstead of hanging, which is the dead end session 2 hit and the reason these\nsteps were added to the spec at all.\n\nTwo things follow from deriving rather than recording.\n\n**The comparison needs a baseline, so a round now records what it read.**\n`artifactDigests` on the `reviewed` event is the digest of the text that\nactually went to the reviewers, not of whatever the file says later. Without\nit there is no honest \"has this changed since\".\n\n**A finding that cites nothing can never be shown fixed**, so the step review\nprompt now asks for `Evidence paths:` where it used to ask for `Location:`.\nThe old field was prose and the parser could not read it, which would have\nmade remediated-at-the-cap unreachable on this path \u2014 a terminal state that\ncan never occur is not a terminal state, it is dead code with a name.\n\nA blocked round that named no parseable finding lands unresolved, not\nremediated. There is nothing to have fixed, and letting an unreadable round\nbe the cheapest exit is exactly the laundering route the fail-closed rules\nelsewhere exist to shut."
+    },
+    {
+      "sessionNumber": 10,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-27T11:01:25.286928-04:00",
+      "description": "Registered as copilot/claude-opus-5, and declared the task list not-releasable before any edit.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 10,
+      "stepNumber": 2,
+      "stepKey": "verify-fix-cap-3-stopping-early",
+      "dateTime": "2026-08-27T11:01:26.108359-04:00",
+      "description": "workflow review is capped at verification.settings.max_rounds and stops early the moment a round leaves no blocking finding. Rounds served entirely from a script are not counted, because the bound exists to stop the loop spending on vendors.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 10,
+      "stepNumber": 3,
+      "stepKey": "the-three-terminal-states-of-spec",
+      "dateTime": "2026-08-27T11:01:26.904200-04:00",
+      "description": "review_terminal returns one of verdict.SESSION_VERDICTS and passes it back through validate_session_verdict, so a fourth state would have to be added to the closed vocabulary first. The remediation test is verdict.unremediated_findings, unchanged from session 3.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 10,
+      "stepNumber": 4,
+      "stepKey": "no-terminal-state-waits-for-a",
+      "dateTime": "2026-08-27T11:01:27.615276-04:00",
+      "description": "The terminal state is computed from the folded log and the artifacts on disk. No event asserts one, so none can be typed, and a step that agreed with every finding and fixed them all lands rather than hangs.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 10,
+      "stepNumber": 5,
+      "stepKey": "the-cap-also-closes-a-live",
+      "dateTime": "2026-08-27T11:01:28.360428-04:00",
+      "description": "The live hole is closed: an unattended workflow review run can no longer keep calling two vendors.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 10,
+      "stepNumber": 6,
+      "stepKey": "affected-tests-as-preverify",
+      "dateTime": "2026-08-27T11:01:29.113293-04:00",
+      "description": "192 selected tests passed and were recorded as preverify-targeted. A missing selector rule for stepreview.py was declared rather than worked around.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 10,
+      "stepNumber": 7,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-27T11:01:29.892196-04:00",
+      "description": "Cross-provider verification.",
+      "status": "in-progress"
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D67",
+      "ordinal": 67,
+      "sessionNumber": 10,
+      "decidedOn": "2026-08-27",
+      "recordedAt": "2026-08-27T11:09:50.404756-04:00",
+      "decider": "verifier",
+      "headline": "Round 1: the bound could be reset by re-entering the same step, and was read from the process directory rather than the workspace",
+      "body": "Round 1 raised two Major findings against the bounded review loop, and both\nwere real. Neither was disputed; both were fixed.\n\n**The cap could be reset without moving the work.** `validate_transition`\naccepts entering the step the work is already in \u2014 `to_index == current_index`\nfalls through both of its guards \u2014 and the fold zeroed the round count on\nevery `entered` event. So an author at the cap could run\n`workflow enter <current step>` and buy another full set of vendor rounds on\nthe same step. That is not a corner: it is the obvious command to reach for\nafter editing an artifact, and it defeated the whole point of the bound. The\nfold now resets the loop only when the step actually changes. Transition\nlegality is untouched, because a same-step enter is still a legal event that\nrecords something; it simply no longer moves anything.\n\n**The cap was read from the wrong repository.** `review_cap()` called\n`load_config()` with no root, and `load_config` discovers the project-local\noverlay from `Path.cwd()`. `--workspace-root` and `project(root)` are\nfirst-class entrypoints, so an operator or the extension invoking either from\nelsewhere would enforce and display the bundled default instead of the\nworkspace's configured cap. `load_config` now takes an optional `project_dir`\nthat names the project whose overlay applies, and `review_cap` passes the\nworkspace it was handed. Every other caller keeps the working-directory\ndefault, so nothing else changes behaviour.\n\nThe round's nit was taken as well: `workflow status` now shows the round\ncount while the loop is still open, not only once it has closed. The count is\nwhat says how much room is left, which is worth more before the loop ends\nthan after.",
+      "model": "gpt-5.4",
+      "provider": "openai"
+    },
+    {
+      "sessionNumber": 10,
+      "stepNumber": 7,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-27T11:36:19.318660-04:00",
+      "description": "VERIFIED at round 3 by gpt-5.4/openai over copilot-cli. Rounds 1 and 2 each raised a real Major finding against the bound and both were fixed rather than disputed.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 10,
+      "stepNumber": 8,
+      "stepKey": "full-test-suite-recorded-as-the",
+      "dateTime": "2026-08-27T11:36:19.772868-04:00",
+      "description": "808 tests passed against the verified tree and were recorded as the final-full run of record.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 10,
+      "stepNumber": 9,
+      "stepKey": "close-out",
+      "dateTime": "2026-08-27T11:36:20.268788-04:00",
+      "description": "Close-out.",
+      "status": "in-progress"
     }
   ]
 }

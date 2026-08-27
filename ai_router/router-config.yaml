@@ -489,6 +489,7 @@ testing:
           - tests/test_critique_contracts.py
           - tests/test_route.py
           - tests/test_verify.py
+          - tests/test_workflow.py
       - when: ai_router/discovery.py
         select:
           - tests/test_discovery.py
@@ -600,6 +601,10 @@ testing:
           - tests/test_critique_contracts.py
           - tests/test_gates.py
           - tests/test_verify.py
+      - when: ai_router/stepreview.py
+        select:
+          - tests/test_stepreview.py
+          - tests/test_workflow.py
       - when: ai_router/test_evidence.py
         select:
           - tests/test_evidence_protocol.py
@@ -612,6 +617,7 @@ testing:
           - tests/test_gates.py
           - tests/test_session.py
           - tests/test_verify.py
+          - tests/test_workflow.py
       - when: ai_router/verify.py
         select:
           - tests/test_verify.py

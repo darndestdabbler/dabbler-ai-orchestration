@@ -1,13 +1,19 @@
 """The step driver: folding state, and treating a return as ordinary."""
 import json
+import subprocess
 
 import pytest
+import yaml
 
 from ai_router import stepreview
+from ai_router import verdict as verdictmod
+from ai_router.config import DEFAULT_VERIFICATION_ROUNDS
 from ai_router.solution import STEPS
-from ai_router.stepreview import ReviewerOutcome, StepReview
-from ai_router.workflow import (WorkflowError, append, current_step, fold,
-                                project, read, validate_transition, _main)
+from ai_router.stepreview import ReviewerOutcome, StepReview, digest_text
+from ai_router.workflow import (EXIT_REFUSED, WorkflowError, append,
+                                current_step, fold, project, read,
+                                review_cap, review_terminal,
+                                validate_transition, _main)
 
 
 def entries_through(target, step):
@@ -20,6 +26,13 @@ def entries_through(target, step):
 def walk_to(root, target, step):
     for event in entries_through(target, step):
         append(root, event)
+
+
+def reviewed(target, step, verdict="blocked", findings=None, digests=None,
+             live=True, **extra):
+    return {"event": "reviewed", "target": target, "step": step,
+            "verdict": verdict, "findings": findings or [],
+            "artifactDigests": digests or {}, "live": live, **extra}
 
 
 def _fake_review(target, step, artifact_paths, **kw):
@@ -290,6 +303,144 @@ class TestCli:
                       "step": "plan", "verdict": "clear", "needsApproval": True})
         _main(["status", "--workspace-root", str(root)])
         assert "needs you" in capsys.readouterr().out
+
+
+class TestTheReviewLoopIsBounded:
+    """`workflow review` had no bound, so an unattended run kept calling two
+    vendors for as long as anything invoked it. The loop now stops by itself
+    and lands on one of the three terminal states, and no part of that waits
+    for a person or can be typed by one."""
+
+    def test_only_a_round_that_reached_a_vendor_is_counted(self):
+        """The bound exists to stop the loop spending on vendors, so a round
+        served from a script spent nothing to bound."""
+        state = fold([
+            {"event": "entered", "target": "a", "step": "plan"},
+            reviewed("a", "plan", live=False),
+            reviewed("a", "plan"),
+        ])
+        assert state["a"]["reviewRounds"] == 1
+
+    def test_moving_the_work_opens_a_new_loop(self):
+        """Rounds spent on what a step produced are not spent against the
+        step the work is sent back to."""
+        state = fold(entries_through("a", "decompose") + [
+            reviewed("a", "decompose"),
+            {"event": "returned", "target": "a", "toStep": "plan",
+             "reason": "boundary wrong"},
+        ])
+        assert state["a"]["reviewRounds"] == 0
+        assert state["a"]["lastLiveReview"] is None
+
+    def test_re_entering_the_same_step_changes_nothing(self):
+        """`enter <the step it is already in>` moves nothing, so it is inert.
+        Zeroing the count there would buy another full set of vendor rounds
+        on work that has not changed step; clearing the review instead left
+        the step refused by `approve` for having no live review and refused
+        by `review` for having closed its loop — twice refused, for opposite
+        reasons."""
+        events = [
+            {"event": "entered", "target": "a", "step": "plan"},
+            reviewed("a", "plan", verdict="clear", needsApproval=True),
+        ]
+        before = fold(events)["a"]
+        after = fold(events + [
+            {"event": "entered", "target": "a", "step": "plan"},
+        ])["a"]
+        assert after["reviewRounds"] == before["reviewRounds"] == 1
+        assert after["reviewed"] is before["reviewed"] is True
+        assert after["waitingOn"] == before["waitingOn"] == "developer"
+
+    def test_the_bound_comes_from_the_workspace_not_the_process_directory(
+            self, root, monkeypatch, tmp_path):
+        """`--workspace-root` and `project(root)` are first-class entry
+        points. Reading the overlay from wherever the process happens to sit
+        would enforce one repository's cap against another's."""
+        subprocess.run(["git", "init", "-q"], cwd=str(root),
+                       capture_output=True)
+        (root / "local-overrides.yaml").write_text(
+            yaml.safe_dump({"verification": {"settings": {"max_rounds": 1}}}),
+            encoding="utf-8",
+        )
+        elsewhere = tmp_path / "elsewhere"
+        elsewhere.mkdir()
+        monkeypatch.chdir(elsewhere)
+        assert review_cap(root) == 1
+
+    def test_the_cap_refuses_a_further_round_and_names_the_way_out(
+            self, root, monkeypatch, capsys):
+        walk_to(root, "csv-model", "contracts")
+        monkeypatch.setattr(stepreview, "review", _fake_review)
+        art = root / "contract.yaml"
+        art.write_text("calls: []\n")
+        argv = ["review", "--artifact", str(art), "--component", "csv-model",
+                "--workspace-root", str(root)]
+        for _ in range(review_cap(root)):
+            assert _main(argv) == 0
+        assert _main(argv) == EXIT_REFUSED
+        err = capsys.readouterr().err
+        assert "send-back" in err
+        assert "Nobody is asked" in err
+
+    def test_a_round_with_no_blocking_finding_closes_the_loop_as_verified(
+            self, root):
+        """The early stop. Minor findings are recorded and open no further
+        round — prose review has no bottom, which is what the severity
+        vocabulary is for."""
+        state = fold([
+            {"event": "entered", "target": "a", "step": "plan"},
+            reviewed("a", "plan", verdict="clear",
+                     findings=[{"severity": "minor", "description": "casing"}]),
+        ])
+        assert review_terminal(root, state["a"], 3) == verdictmod.VERDICT_VERIFIED
+
+    def test_a_fix_at_the_cited_site_is_remediated_at_the_cap(self, root):
+        """Not a waiver: nothing was accepted over a finding that still
+        stood, and what is unproved is the repair rather than the
+        complaint."""
+        (root / "plan.md").write_text("# rewritten after the finding\n")
+        state = fold([
+            {"event": "entered", "target": "a", "step": "plan"},
+            reviewed("a", "plan",
+                     findings=[{"severity": "major", "description": "boundary",
+                                "evidencePaths": ["plan.md"]}],
+                     digests={"plan.md": digest_text("# as the round read it\n")}),
+        ])
+        assert review_terminal(root, state["a"], 1) == (
+            verdictmod.VERDICT_REMEDIATED_AT_CAP)
+
+    def test_an_untouched_cited_site_is_unresolved(self, root):
+        text = "# exactly as the round read it\n"
+        (root / "plan.md").write_text(text)
+        state = fold([
+            {"event": "entered", "target": "a", "step": "plan"},
+            reviewed("a", "plan",
+                     findings=[{"severity": "major", "description": "boundary",
+                                "evidencePaths": ["plan.md"]}],
+                     digests={"plan.md": digest_text(text)}),
+        ])
+        assert review_terminal(root, state["a"], 1) == (
+            verdictmod.VERDICT_ISSUES_FOUND)
+
+    def test_a_blocked_round_naming_no_finding_cannot_be_remediated(self, root):
+        """Fail closed. Nothing to have fixed is not the same as nothing left
+        to fix, and an unreadable round must not be the cheapest way out."""
+        state = fold([
+            {"event": "entered", "target": "a", "step": "plan"},
+            reviewed("a", "plan", findings=[]),
+        ])
+        assert review_terminal(root, state["a"], 1) == (
+            verdictmod.VERDICT_ISSUES_FOUND)
+
+    def test_the_projection_carries_the_loop_position(self, root):
+        """Python decides whether the loop has finished; the extension is
+        handed the answer rather than the events."""
+        append(root, {"event": "entered", "target": "csv-model", "step": "plan"})
+        append(root, reviewed("csv-model", "plan"))
+        model = next(c for c in project(root)["components"]
+                     if c["name"] == "csv-model")
+        assert model["reviewRounds"] == 1
+        assert model["reviewCap"] == review_cap(root)
 
 
 class TestProjectionFile:

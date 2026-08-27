@@ -176,3 +176,31 @@ class TestWhatSurvives:
         _, raws, _ = _review(
             monkeypatch, [("anthropic", CLEAN), ("openai", ISSUES)], artifact)
         assert raws == [CLEAN, ISSUES]
+
+    def test_the_round_records_what_each_artifact_contained(
+            self, monkeypatch, artifact):
+        """A later round decides whether a finding was answered by checking
+        whether what it cited has changed since. That comparison is against
+        the text the reviewers were actually sent, not against whatever the
+        file says by the time anyone looks."""
+        outcome, _, _ = _review(
+            monkeypatch, [("anthropic", CLEAN), ("openai", ISSUES)], artifact)
+        assert outcome.artifact_digests == {
+            str(artifact): stepreview.digest_text(artifact.read_text())
+        }
+
+    def test_the_prompt_asks_for_the_citation_the_loop_checks(self, artifact):
+        """A finding that cites nothing names no site to check, so it can
+        never be shown fixed and its session can only end unresolved. The
+        prompt has to ask for the field, in the shape the parser reads."""
+        prompt = build_prompt("csv-demo", "plan",
+                              [(str(artifact), artifact.read_text())])
+        assert "Evidence paths:" in prompt
+        _, findings = verdictmod.parse_verification_response(
+            "ISSUES FOUND\n\n- **Issue 1:** the boundary is wrong\n"
+            "  - **Severity:** Major\n"
+            f"  - **Evidence paths:** {artifact}\n"
+        )
+        assert findings[0]["evidencePaths"] == [
+            str(artifact).replace("\\", "/")
+        ]

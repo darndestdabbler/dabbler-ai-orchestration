@@ -12,6 +12,26 @@ forward motion is one people work around the moment reality disagrees with it.
 whether a move is legal and both the writer and the reader call it, so an
 impossible move cannot be written and one that arrived by some other route
 cannot be read back as history.
+
+**The review loop is bounded and ends by itself.** A step gets at most
+``verification.settings.max_rounds`` review rounds, resolved against the
+workspace under discussion rather than the process's working directory. It
+stops early the moment no blocking finding remains, and it then reaches
+exactly one of the three terminal states of the session framework's code
+review loop — verified, unresolved, or remediated at the cap. The terminal
+state is computed from the log and the artifacts on disk; no event asserts it
+and no caller can type one. Only rounds that reached a vendor are counted,
+because the bound exists to stop an unattended loop spending on vendors.
+
+**Only a step change opens a new loop.** Sending work back or carrying it
+forward resets the round count. Re-entering the step the work is already in
+is inert — it moves nothing, so it changes nothing, and treating it as a move
+would be the cheapest way to spend past the cap.
+
+**The bound binds the writer, not the reader.** ``validate_transition`` does
+not refuse a round for being over the cap: an operator who lowers the cap
+would otherwise make yesterday's log unreadable, and a record the machine
+cannot read back is the failure this log exists to prevent.
 """
 
 from __future__ import annotations
@@ -21,7 +41,12 @@ import json
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Optional
 
+from ai_router import verdict as verdictmod
+from ai_router.config import (
+    DEFAULT_VERIFICATION_ROUNDS, load_config, verification_round_cap,
+)
 from ai_router.solution import (
     APPROVAL_STEPS, STEPS, STEP_TITLES, ManifestError,
 )
@@ -36,6 +61,15 @@ REVIEWS_RELDIR = Path(".dabbler") / "solution" / "reviews"
 
 EVENTS = ("entered", "reviewed", "approved", "returned", "contract-changed")
 SCOPES = ("solution", "component")
+
+#: How each terminal state of the review loop reads. The keys are the closed
+#: verdict vocabulary and nothing else: a fourth state would have to be added
+#: to :data:`ai_router.verdict.SESSION_VERDICTS` first, which is the point.
+TERMINAL_HEADLINES = {
+    verdictmod.VERDICT_VERIFIED: "verified",
+    verdictmod.VERDICT_ISSUES_FOUND: "unresolved at the cap",
+    verdictmod.VERDICT_REMEDIATED_AT_CAP: "remediated at the cap",
+}
 
 
 class WorkflowError(Exception):
@@ -206,17 +240,31 @@ def fold(events: list) -> dict:
         s = state.setdefault(key, {
             "step": STEPS[0], "reviewed": False, "approved": False,
             "returns": 0, "history": [], "waitingOn": None,
-            "findings": [], "reviewers": [],
+            "findings": [], "reviewers": [], "reviewRounds": 0,
+            "lastLiveReview": None,
         })
         kind = e["event"]
         s["history"].append(e)
         if kind == "entered":
+            if e["step"] == s["step"]:
+                # Re-entering the step the work is already in moves nothing,
+                # so it changes nothing. Clearing the review here while the
+                # round that produced it still stood left the step unable to
+                # be approved (no live review) and unable to be reviewed
+                # again (the loop had closed) -- refused twice, for opposite
+                # reasons. The event stays in the history; it just is not a
+                # move.
+                continue
             s["step"] = e["step"]
             s["reviewed"] = False
             s["approved"] = False
             s["waitingOn"] = None
             s["findings"] = []
             s["reviewers"] = []
+            # A step change opens a new loop: the rounds spent on what the
+            # last step produced are not spent against this one.
+            s["reviewRounds"] = 0
+            s["lastLiveReview"] = None
         elif kind == "reviewed":
             # A scripted review is a rehearsal, not a reading. It is recorded
             # in full and it satisfies nothing a live review satisfies -- the
@@ -225,6 +273,9 @@ def fold(events: list) -> dict:
             s["reviewed"] = not e.get("simulated", False)
             s["findings"] = e.get("findings", [])
             s["reviewers"] = e.get("reviewers", [])
+            if reached_a_vendor(e):
+                s["reviewRounds"] += 1
+                s["lastLiveReview"] = e
             # The gate outranks the block. A step the developer signs off
             # reaches the developer even when the reviewers are still
             # objecting -- that is the whole reason the gate exists. Left the
@@ -248,9 +299,29 @@ def fold(events: list) -> dict:
             s["waitingOn"] = "author"
             s["findings"] = []
             s["reviewers"] = []
+            s["reviewRounds"] = 0
+            s["lastLiveReview"] = None
         elif kind == "contract-changed":
             s["waitingOn"] = "developer" if e.get("needsApproval") else None
     return state
+
+
+def _project_review_loop(node: dict, root, state: dict, cap: int) -> None:
+    """Publish the loop's position, decided here.
+
+    TypeScript renders; Python decides. The extension is handed the round
+    count, the bound and the terminal token rather than the events, because
+    a second implementation of "has this loop finished" disagrees with the
+    first eventually, and the disagreement shows up as a status nobody can
+    explain.
+    """
+    terminal = review_terminal(root, state, cap)
+    node["reviewRounds"] = state.get("reviewRounds", 0)
+    node["reviewCap"] = cap
+    node["reviewTerminal"] = terminal
+    node["reviewTerminalLabel"] = (
+        TERMINAL_HEADLINES[terminal] if terminal else None
+    )
 
 
 def project(root) -> dict:
@@ -261,12 +332,14 @@ def project(root) -> dict:
         raise WorkflowError(str(e)) from e
 
     state = fold(read(root))
+    cap = review_cap(root)
     doc = solmod.as_dict(solution)
     sol_state = state.get("solution", {})
     doc["solution"]["waitingOn"] = sol_state.get("waitingOn")
     doc["solution"]["returns"] = sol_state.get("returns", 0)
     doc["solution"]["reviewers"] = sol_state.get("reviewers", [])
     doc["solution"]["findings"] = sol_state.get("findings", [])
+    _project_review_loop(doc["solution"], root, sol_state, cap)
     if sol_state.get("step"):
         doc["solution"]["step"] = sol_state["step"]
         doc["solution"]["stepTitle"] = STEP_TITLES[sol_state["step"]]
@@ -284,6 +357,7 @@ def project(root) -> dict:
         c["approved"] = cs.get("approved", False)
         c["reviewers"] = cs.get("reviewers", [])
         c["findings"] = cs.get("findings", [])
+        _project_review_loop(c, root, cs, cap)
 
     waiting = [c["name"] for c in doc["components"] if c["waitingOn"] == "developer"]
     if doc["solution"]["waitingOn"] == "developer":
@@ -293,10 +367,13 @@ def project(root) -> dict:
 
 
 
-def current_step(root, target: str) -> str:
-    """Where the target is now, per the log. A review is of the step the work
-    is actually in, never of a step named on the command line — a caller who
-    can name the step can review the wrong one and file it as the right one."""
+def require_state(root, target: str) -> dict:
+    """The folded state of a target that has begun, or a refusal.
+
+    Reviewing work that has not entered a step records a verdict about
+    nothing, so every caller that needs the target's position comes through
+    here and gets the same refusal.
+    """
     state = fold(read(root)).get(target)
     if not state:
         raise WorkflowError(
@@ -304,7 +381,153 @@ def current_step(root, target: str) -> str:
             f"`workflow enter <step>` first — reviewing work that has not "
             f"begun records a verdict about nothing."
         )
-    return state["step"]
+    return state
+
+
+def current_step(root, target: str) -> str:
+    """Where the target is now, per the log. A review is of the step the work
+    is actually in, never of a step named on the command line — a caller who
+    can name the step can review the wrong one and file it as the right one."""
+    return require_state(root, target)["step"]
+
+
+# --- The bounded review loop -------------------------------------------------
+
+def reached_a_vendor(event: dict) -> bool:
+    """Whether a ``reviewed`` event cost anything to produce.
+
+    The cap exists to stop an unattended loop calling vendors, so a round
+    served entirely from a script is not counted against it — and a round
+    with one scripted reader and one live one is, because it spent. An event
+    that says neither is counted: a bound a malformed record can decline is
+    not a bound.
+    """
+    if "live" in event:
+        return bool(event["live"])
+    reviewers = event.get("reviewers")
+    if reviewers:
+        return any(not r.get("simulated") for r in reviewers)
+    return not event.get("simulated", False)
+
+
+def review_cap(root) -> int:
+    """The bound configured for ``root``, resolved through the one resolver
+    every loop uses.
+
+    The workspace is passed rather than assumed. ``--workspace-root`` and
+    ``project(root)`` are first-class entrypoints, so reading the overlay
+    from whatever directory the process happens to be sitting in would let a
+    repository's configured cap be enforced against a different repository's
+    number — and displayed as that number too.
+
+    A config that cannot be loaded falls back to the shipped default rather
+    than to no bound, because the projection is a view and a config problem
+    must not make it unreadable.
+    """
+    try:
+        return verification_round_cap(load_config(project_dir=str(root)))
+    except Exception:
+        return DEFAULT_VERIFICATION_ROUNDS
+
+
+def blocking_findings(event: dict) -> list:
+    """The findings of a round that block, decided by
+    :mod:`ai_router.verdict`. There is one implementation of "does this
+    finding block" and this module is not it."""
+    return [
+        f for f in event.get("findings") or []
+        if verdictmod.is_blocking_issue(f)
+    ]
+
+
+def changed_artifacts(root, digests: dict) -> list:
+    """The reviewed artifacts whose content is no longer what the round read.
+
+    An artifact that has gone counts as changed, on the same terms a diff
+    would report a deletion: the thing the round looked at is not there any
+    more. What that proves is decided per finding by
+    :func:`ai_router.verdict.unremediated_findings`, not here.
+    """
+    from ai_router.stepreview import digest_text
+
+    changed = []
+    for path, recorded in (digests or {}).items():
+        p = Path(path)
+        if not p.is_absolute():
+            p = Path(root) / path
+        try:
+            current = digest_text(p.read_text(encoding="utf-8", errors="replace"))
+        except OSError:
+            changed.append(path)
+            continue
+        if current != recorded:
+            changed.append(path)
+    return changed
+
+
+def review_terminal(root, state: dict, cap: int) -> Optional[str]:
+    """Which terminal state this target's current step has reached, or
+    ``None`` while its loop is still open.
+
+    Derived from the folded log and the artifacts on disk. Nothing writes it,
+    no event asserts it, and the answer goes back through the closed verdict
+    vocabulary on the way out — so there is no terminal state a caller can
+    type and no fourth one this module can invent.
+
+    The three, and how each is decided:
+
+    - **Verified** — the last live round left no blocking finding. Minor-only
+      lands here, which is the early stop: prose review has no bottom and
+      grinding rounds against wording is what the severity vocabulary exists
+      to prevent.
+    - **Remediated at the cap** — the cap is reached, and every blocking
+      finding of the last round cited an artifact that has changed since that
+      round read it. The work stands, labelled unreviewed. It is not a
+      waiver: nothing was accepted over a finding that still stood, and what
+      is unproved is the repair rather than the complaint.
+    - **Unresolved** — the cap is reached and at least one blocking finding
+      cannot be shown answered. A round that blocked without naming a single
+      parseable finding lands here too, because there is nothing to have
+      fixed and a clean-looking exit off an unreadable round is the laundering
+      route the fail-closed rule exists to shut.
+    """
+    last = (state or {}).get("lastLiveReview")
+    if not last:
+        return None
+    if last.get("verdict") != "blocked":
+        return verdictmod.validate_session_verdict(verdictmod.VERDICT_VERIFIED)
+    if (state.get("reviewRounds") or 0) < cap:
+        return None
+    blocking = blocking_findings(last)
+    changed = changed_artifacts(root, last.get("artifactDigests") or {})
+    token = (
+        verdictmod.VERDICT_ISSUES_FOUND
+        if not blocking or verdictmod.unremediated_findings(blocking, changed)
+        else verdictmod.VERDICT_REMEDIATED_AT_CAP
+    )
+    return verdictmod.validate_session_verdict(token)
+
+
+def _terminal_refusal(target: str, step: str, state: dict,
+                      terminal: str, cap: int) -> str:
+    rounds = state.get("reviewRounds") or 0
+    detail = ""
+    if terminal == verdictmod.VERDICT_ISSUES_FOUND:
+        unshown = blocking_findings(state.get("lastLiveReview") or {})
+        detail = "".join(
+            f"\n  - [{f.get('severity')}] {str(f.get('description', ''))[:160]}"
+            for f in unshown
+        )
+    return (
+        f"{target} — {STEP_TITLES[step]}: {TERMINAL_HEADLINES[terminal]} "
+        f"after {rounds} round(s), cap {cap}. This step's review loop is "
+        f"closed and no further round opens on it.{detail}\n"
+        "Nobody is asked whether it should continue — that is the bound "
+        "doing its job, not a decision waiting on someone. Move the work "
+        "instead: `workflow send-back --to <step> --reason ...` returns it "
+        "to the author, `workflow enter <next step>` carries it forward. "
+        "Either one opens a new loop with its rounds back at zero."
+    )
 
 
 def file_review(root, target: str, step: str, raws: list) -> list:
@@ -325,7 +548,15 @@ def _run_review(args, root) -> int:
     from ai_router import stepreview
 
     target = _target(args)
-    step = current_step(root, target)
+    state = require_state(root, target)
+    step = state["step"]
+    cap = review_cap(root)
+    terminal = review_terminal(root, state, cap)
+    if terminal is not None:
+        raise WorkflowError(
+            _terminal_refusal(target, step, state, terminal, cap)
+        )
+
     outcome, raws = stepreview.review(
         target=target, step=step, artifact_paths=args.artifact,
         author_provider=args.author_provider, transport=args.transport,
@@ -338,8 +569,15 @@ def _run_review(args, root) -> int:
         "reviewers": [r.as_dict() for r in outcome.reviewers],
         "findings": outcome.findings,
         "artifacts": outcome.artifacts,
+        # What each artifact contained when this round read it. The next
+        # terminal decision compares against these rather than asking
+        # anyone whether a finding was addressed.
+        "artifactDigests": dict(outcome.artifact_digests),
         "records": filed,
         "simulated": outcome.simulated,
+        # Whether this round reached a vendor, and so whether it counts
+        # against the cap. Recorded rather than inferred later.
+        "live": outcome.live,
         "needsApproval": step in APPROVAL_STEPS,
     })
     try:
@@ -359,6 +597,16 @@ def _run_review(args, root) -> int:
         print(f"  {kept} finding(s) recorded, every severity kept")
     for path in filed:
         print(f"  filed {path}")
+
+    after = fold(read(root)).get(target) or {}
+    reached = review_terminal(root, after, cap)
+    spent = after.get("reviewRounds") or 0
+    if reached is not None:
+        print(f"  loop closed: {TERMINAL_HEADLINES[reached]} "
+              f"({spent}/{cap} rounds)")
+    elif outcome.live:
+        print(f"  round {spent} of {cap}")
+
     if step in APPROVAL_STEPS:
         if outcome.blocked:
             print("  waiting on you: approve over these, or send it back")
@@ -367,6 +615,20 @@ def _run_review(args, root) -> int:
     elif outcome.blocked:
         print("  back with the author")
     return EXIT_OK
+
+
+def _loop_label(node: dict) -> str:
+    """Where the review loop stands, whether or not it has opened or closed.
+
+    Shown unconditionally. A count is most useful before the loop ends —
+    it is what says how much room is left — so hiding it until the first
+    round or until the loop closes withholds it exactly when it is worth
+    reading.
+    """
+    position = f"{node['reviewRounds']}/{node['reviewCap']} rounds"
+    if node["reviewTerminal"]:
+        return f"{node['reviewTerminalLabel']}, {position}"
+    return f"open, {position}"
 
 
 def _target_args(ap):
@@ -427,12 +689,14 @@ def _main(argv=None) -> int:
             head = doc["solution"]
             print(f"{head['title']} — step {head['stepNumber']}/{head['stepCount']}: "
                   f"{head['stepTitle']}")
+            print(f"  review {_loop_label(head)}")
             for comp in doc["components"]:
                 flag = ""
                 if comp["waitingOn"] == "developer":
                     flag = "  ← needs you"
                 elif comp["waitingOn"] == "author":
                     flag = "  ← back with the author"
+                flag += f"  [review {_loop_label(comp)}]"
                 loops = f"  ({comp['returns']} sent back)" if comp["returns"] else ""
                 print(f"  {comp['name']:<20} {comp['stepNumber']}/6 "
                       f"{comp['stepTitle']:<34}{loops}{flag}")

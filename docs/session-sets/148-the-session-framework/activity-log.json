@@ -271,6 +271,30 @@
       "dateTime": "2026-08-26T21:44:00.538026-04:00",
       "description": "Cross-provider verification.",
       "status": "in-progress"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 7,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-26T22:31:20.948570-04:00",
+      "description": "Cross-provider verification.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 8,
+      "stepKey": "full-test-suite-recorded-as-the",
+      "dateTime": "2026-08-26T22:31:21.381296-04:00",
+      "description": "Full test suite, recorded as the `final-full` run of record.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 9,
+      "stepKey": "close-out",
+      "dateTime": "2026-08-26T22:31:21.825968-04:00",
+      "description": "Close-out.",
+      "status": "in-progress"
     }
   ]
 }

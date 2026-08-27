@@ -132,9 +132,9 @@
     {
       "number": 7,
       "title": "The test-write path (plan A5, second half)",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-27T06:34:06.691336-04:00",
-      "completedAt": null,
+      "completedAt": "2026-08-27T07:12:41.685321-04:00",
       "orchestrator": {
         "engine": "copilot",
         "provider": "anthropic",

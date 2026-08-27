@@ -56,7 +56,7 @@ VALID_RESULT = {
     "schema_version": 1, "request_id": "id", "attempt": 1, "tree_digest": "t",
     "effective_provider": "openai", "requested_model": "o-gpt",
     "served_model_id": "o-gpt", "transport": "api", "verdict": "VERIFIED",
-    "blocking_findings": [], "minor_findings": [], "doc_capped_findings": [],
+    "blocking_findings": [], "minor_findings": [],
     "usage": {
         "input_tokens": 1, "output_tokens": 2, "model_usd": None,
         "priced": False,

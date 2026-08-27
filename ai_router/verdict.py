@@ -41,11 +41,6 @@ SESSION_VERDICTS = frozenset(
 SEVERITIES = ("critical", "major", "minor")
 BLOCKING_SEVERITIES = frozenset({"critical", "major"})
 
-# Documentation prose whose findings never block on their own. Markdown
-# under prompt-templates/ is behavior-bearing and stays in scope.
-_DOC_EXTENSIONS = (".md", ".markdown", ".rst", ".txt")
-_DOC_EXEMPT_SEGMENT = "prompt-templates/"
-
 
 # --- Parsing ----------------------------------------------------------------
 
@@ -314,28 +309,17 @@ def normalize_severity(raw) -> str:
     return token if token in SEVERITIES else "major"
 
 
-def is_doc_only_issue(issue: dict) -> bool:
-    """True when the finding cites at least one evidence path and every
-    cited path is documentation prose. Prose-only findings are recorded,
-    never blocking — prompt-templates markdown is exempt (behavior-bearing).
-    """
-    paths = issue.get("evidencePaths") or []
-    if not paths:
-        return False
-    for path in paths:
-        lowered = str(path).lower()
-        if _DOC_EXEMPT_SEGMENT in lowered:
-            return False
-        if not lowered.endswith(_DOC_EXTENSIONS):
-            return False
-    return True
-
-
 def is_blocking_issue(issue: dict) -> bool:
-    """Blocking unless the severity is exactly ``minor`` or the finding is
-    doc-only. Missing or unrecognized severity blocks (anti-laundering)."""
-    if is_doc_only_issue(issue):
-        return False
+    """Blocking unless the severity is exactly ``minor``. Missing or
+    unrecognized severity blocks (anti-laundering).
+
+    Severity is the only input, because it is the only one the verifier
+    cannot quietly choose for itself. Findings citing only documentation
+    prose used to be capped non-blocking here, which handed a verifier a
+    self-exemption: the same author picks the severity *and* the evidence
+    paths, so a finding it did not want to hold up the work needed only a
+    ``.md`` citation to stop counting.
+    """
     return str(issue.get("severity", "")).strip().lower() not in (
         "minor",
     )
@@ -381,18 +365,15 @@ class BlockingClassification:
     reason: str
     blocking_issues: list = field(default_factory=list)
     nit_issues: list = field(default_factory=list)
-    doc_capped_issues: list = field(default_factory=list)
 
 
 def classify_blocking(verdict: str, issues: list) -> BlockingClassification:
     """Severity-derived, not token-derived: any blocking finding blocks even
     under a VERIFIED token; a findings-free non-VERIFIED verdict blocks
     conservatively."""
-    blocking_issues, nits, doc_capped = [], [], []
+    blocking_issues, nits = [], []
     for issue in issues or []:
-        if is_doc_only_issue(issue):
-            doc_capped.append(issue)
-        elif is_blocking_issue(issue):
+        if is_blocking_issue(issue):
             blocking_issues.append(issue)
         else:
             nits.append(issue)
@@ -401,13 +382,11 @@ def classify_blocking(verdict: str, issues: list) -> BlockingClassification:
         return BlockingClassification(
             True,
             f"{len(blocking_issues)} blocking finding(s)",
-            blocking_issues, nits, doc_capped,
+            blocking_issues, nits,
         )
     if issues:
         return BlockingClassification(
-            False,
-            "findings present but all minor or doc-only",
-            [], nits, doc_capped,
+            False, "findings present but all minor", [], nits,
         )
     if verdict == VERDICT_VERIFIED:
         return BlockingClassification(False, "verified, no findings")

@@ -734,3 +734,104 @@ verbatim and machine-written.
 sentence aimed one step past what a machine can answer, which is what "prose
 review has no bottom" looks like when the subject is code. The dispute
 channel exists so that costs one round rather than the session.*
+
+### D32 · 2026-08-27 · Orchestrator (claude-opus-5/anthropic) · Session 4: a target's first event declares where work begins, and is not judged as a move
+
+`validate_transition` enforces "forward entry is sequential", but a target
+with no history has nothing to move from. Judging its first `entered` event
+against `STEPS[0]` would have made the manifest's `step:` field unusable:
+`solution.yaml` may legitimately declare a component that begins at
+`contracts`, and the csv walkthrough ships three components declared at
+`build`. Folding is over the event log alone — it does not read the
+manifest, and it must not — so the rule is: **the first event for a target
+is an origin, and sequencing applies from there.**
+
+*The origin is still in the log and still auditable. What it cannot be is a
+route around the rule, because a target has exactly one first event.*
+
+### D33 · 2026-08-27 · Orchestrator (claude-opus-5/anthropic) · Session 4: `fold` refuses an illegal move rather than repairing it
+
+The plan asked for one validator used by `append` and `fold` both. `append`
+refusing is obvious; `fold` refusing is the point. A reader that skips or
+"corrects" a move it cannot explain turns a hand-edited `events.jsonl` into
+history, which is the one thing this framework claims cannot happen.
+`fold` therefore raises `WorkflowError` and `workflow status` prints
+`refused:` with the offending target and step.
+
+*Cost: four existing tests placed targets at late steps by folding a single
+`entered` event. Three needed no change under D32; the rest were rewritten
+to walk the steps or to enter first and send back.*
+
+### D34 · 2026-08-27 · Orchestrator (claude-opus-5/anthropic) · Session 4: the doc-only cap is deleted, not narrowed
+
+`is_doc_only_issue` capped a finding non-blocking when every evidence path
+it cited was prose. **The same author picks the severity and the evidence
+paths**, so a verifier that did not want its own Major finding to hold up
+the work needed only a `.md` citation. Narrowing the extension list or the
+`prompt-templates/` exemption would leave the mechanism intact and move the
+argument to which paths count. Blocking is now severity alone.
+
+**`doc_capped_findings` is retired from the writer and kept in the result
+schema as readable**, the same treatment `WAIVED` got in session 3: a
+retired field must not make the machine's own historical record unreadable.
+It leaves `required`, so nothing new emits it.
+
+### D35 · 2026-08-27 · Orchestrator (claude-opus-5/anthropic) · Session 4: one missing selection rule added, three left alone
+
+`ai_router.affected` raised `selection_unknown` for `ai_router/workflow.py`
+— the module this session changed — so a `testing.selection` rule was added
+mapping it to `tests/test_workflow.py`, which is the loud state doing its
+job. **`solution.py`, `stepreview.py` and `contractdoc.py` have the same
+gap and were left alone**: they arrived on the merged design branch without
+rules and this session did not touch them. A session that fixes every
+adjacent gap it notices stops being reviewable.
+
+*Filed for whichever session next touches those three.*
+
+### D36 · 2026-08-27 · Verifier (gpt-5.5/openai) · Round 1: D32's origin exception was the skip it was meant to prevent
+
+D32 exempted a target's first `entered` event from the sequence rule, on the
+grounds that a target with no history has nothing to move from. **The
+verifier pointed out that every target begins with no history**, so the
+exempt branch is not an edge case — it is the normal first-entry path, and
+`workflow enter build` on a clean workspace persisted an arrival at step six
+with no record of getting there. Spec §3 says a step cannot be skipped, in
+those words.
+
+**Chosen: a first `entered` event must name the first step.** The manifest's
+`step:` field says where a target is *shown* before it has a log; it does
+not open one partway through, and `project()` already falls back to it when
+no log exists. Nothing needs the exemption.
+
+*The manifest problem D32 was solving was not real. `solution check`
+already prints that the declared step is "where the manifest says work
+begins, not where it has got to" — so the two were never in conflict, and
+D32 traded a stated rule for a conflict that did not exist.*
+
+**Verified by the criterion the finding supplied:**
+`python -m ai_router.workflow enter build --component csv-model
+--workspace-root examples/csv-walkthrough` exits 1 and writes nothing.
+
+### D37 · 2026-08-27 · Orchestrator (claude-opus-5/anthropic) · Session 4 seat cost: ~$8, about a third of session 3, and it is the typical unit D29 asked for
+
+**The measurement.** `python -m ai_router.seat_cost` against this session's
+own conversation, after two verification rounds and before the run of
+record: **799.1 credits (~$7.99) over 84 events**, reported as a floor for
+the reason D29 gave — the caller's closing turns are not in the store yet,
+and the seat-transport verification rounds are billed but priced
+`unpriced`.
+
+**What it says against D29.** Session 3 cost ~$22.48 over 184 events and
+D29 named it the least typical session in the sequence. Session 4 landed at
+**36% of that** with one round fewer, which supports D29's reading rather
+than undercutting it: **$8–$12 is the ordinary code session** and $22 is
+what removing the framework's escape hatch cost.
+
+**Re-plan trigger, restated with two samples.** At $8–$12, thirteen
+remaining sessions is **$104–$156**, not the $380–$600 D29 projected from
+one sample. **No re-plan is proposed.** The trigger stays what D29 set: if
+sessions land near $20 again, the answer is fewer and larger sessions,
+never fewer rounds.
+
+*One round of verification found one Major defect that reading the code did
+not — D36. That is the round the cost is buying.*

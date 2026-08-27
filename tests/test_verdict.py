@@ -5,7 +5,6 @@ from ai_router.verdict import (
     VERDICT_VERIFIED,
     classify_blocking,
     is_blocking_issue,
-    is_doc_only_issue,
     normalize_severity,
     parse_verification_response,
     validate_session_verdict,
@@ -186,20 +185,13 @@ class TestSeverityAndBlocking:
         assert normalize_severity(None) == "major"
         assert normalize_severity(" minor ") == "minor"
 
-    def test_doc_only_issue_never_blocks(self):
+    def test_a_major_finding_citing_only_prose_still_blocks(self):
+        """The verifier picks the severity and the evidence paths both, so a
+        cap keyed on the paths let it exempt its own finding."""
         issue = {
-            "description": "readme typo", "severity": "major",
+            "description": "readme contradicts the gate", "severity": "major",
             "evidencePaths": ["README.md", "docs/notes.txt"],
         }
-        assert is_doc_only_issue(issue)
-        assert not is_blocking_issue(issue)
-
-    def test_prompt_templates_markdown_stays_in_scope(self):
-        issue = {
-            "description": "template bug", "severity": "major",
-            "evidencePaths": ["ai_router/prompt-templates/verification.md"],
-        }
-        assert not is_doc_only_issue(issue)
         assert is_blocking_issue(issue)
 
     def test_classify_blocking_verdict_without_findings(self):
@@ -215,9 +207,8 @@ class TestSeverityAndBlocking:
              "evidencePaths": ["README.md"]},
         ])
         assert result.blocking
-        assert len(result.blocking_issues) == 1
+        assert len(result.blocking_issues) == 2
         assert len(result.nit_issues) == 1
-        assert len(result.doc_capped_issues) == 1
 
 
 class TestSessionVerdictVocabulary:

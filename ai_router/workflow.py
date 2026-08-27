@@ -7,6 +7,11 @@ this get here" is always answerable and no field can be quietly corrected.
 return work to an earlier one, and ``returned`` events are first-class: they
 carry the reason and name the components affected. A process that models only
 forward motion is one people work around the moment reality disagrees with it.
+
+**The log is judged, not merely recorded.** One ``validate_transition`` decides
+whether a move is legal and both the writer and the reader call it, so an
+impossible move cannot be written and one that arrived by some other route
+cannot be read back as history.
 """
 
 from __future__ import annotations
@@ -66,10 +71,107 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
+def _step_index(step, where: str) -> int:
+    if step not in STEPS:
+        raise WorkflowError(
+            f"{where}: '{step}' is not one of {', '.join(STEPS)}")
+    return STEPS.index(step)
+
+
+def validate_transition(state, event: dict) -> None:
+    """The one judge of whether a move is legal — on the write side and the
+    read side both.
+
+    ``append`` calls it so an impossible move is never written, and ``fold``
+    calls it so an impossible move that reached the file by some other route
+    cannot be read back as history. A log the writer guards and the reader
+    trusts is a log that can be edited by hand.
+
+    ``state`` is the folded state of this event's target, or ``None`` when
+    the target has no history yet. A target with no history has not entered
+    anything, so its first ``entered`` event is held to the first step: a
+    log that may open at any step is a target recorded at the end with no
+    history of getting there.
+    """
+    kind = event.get("event")
+    if kind not in EVENTS:
+        raise WorkflowError(f"unknown event '{kind}'")
+
+    target = event.get("target") or "solution"
+    current = (state or {}).get("step", STEPS[0])
+    current_index = _step_index(current, f"{target}: current step")
+
+    if kind == "entered":
+        to = event.get("step")
+        to_index = _step_index(to, f"{target}: entered")
+        if state is None:
+            if to_index != 0:
+                raise WorkflowError(
+                    f"{target}: cannot begin at {STEP_TITLES[to]} — work "
+                    f"begins at {STEP_TITLES[STEPS[0]]} ('{STEPS[0]}') and "
+                    f"reaches {STEP_TITLES[to]} one step at a time. The "
+                    f"manifest's `step:` says where a target is shown before "
+                    f"it has a log; it does not open one partway through."
+                )
+            return
+        if to_index < current_index:
+            raise WorkflowError(
+                f"{target}: cannot enter {STEP_TITLES[to]} from "
+                f"{STEP_TITLES[current]} — entering only moves forward. Going "
+                f"back is `send-back --to {to} --reason ...`, which records "
+                f"why it went back and what else it affects."
+            )
+        if to_index > current_index + 1:
+            nxt = STEPS[current_index + 1]
+            raise WorkflowError(
+                f"{target}: cannot enter {STEP_TITLES[to]} from "
+                f"{STEP_TITLES[current]} — steps are entered in order and the "
+                f"next one is {STEP_TITLES[nxt]} ('{nxt}'). A skipped step is "
+                f"work nobody did and nobody reviewed."
+            )
+        return
+
+    if kind == "returned":
+        to = event.get("toStep")
+        to_index = _step_index(to, f"{target}: returned")
+        if to_index >= current_index:
+            raise WorkflowError(
+                f"{target}: cannot return to {STEP_TITLES[to]} from "
+                f"{STEP_TITLES[current]} — a return moves work backwards, and "
+                f"forward is `enter`."
+            )
+        return
+
+    if kind == "approved":
+        if current not in APPROVAL_STEPS:
+            raise WorkflowError(
+                f"{target}: {STEP_TITLES[current]} is not a step a developer "
+                f"signs off. The approval steps are "
+                f"{', '.join(STEP_TITLES[s] for s in APPROVAL_STEPS)}."
+            )
+        if not (state or {}).get("reviewed"):
+            raise WorkflowError(
+                f"{target}: nothing live has been reviewed at "
+                f"{STEP_TITLES[current]}, so there is no reading to approve "
+                f"over. A scripted review does not count as one."
+            )
+        return
+
+    step = event.get("step")
+    if step is not None:
+        _step_index(step, f"{target}: {kind}")
+        if step != current:
+            raise WorkflowError(
+                f"{target}: a '{kind}' event names {STEP_TITLES[step]} but the "
+                f"work is at {STEP_TITLES[current]}. An event about a step the "
+                f"work is not in is an event about other work."
+            )
+
+
 def append(root, event: dict) -> dict:
     """Machine-written only. Never edited, never corrected in place."""
-    if event.get("event") not in EVENTS:
-        raise WorkflowError(f"unknown event '{event.get('event')}'")
+    target = event.get("target") or "solution"
+    validate_transition(fold(read(root)).get(target), event)
     p = log_path(root)
     p.parent.mkdir(parents=True, exist_ok=True)
     event = dict(event)
@@ -100,6 +202,7 @@ def fold(events: list) -> dict:
     state = {}
     for e in events:
         key = e.get("target") or "solution"
+        validate_transition(state.get(key), e)
         s = state.setdefault(key, {
             "step": STEPS[0], "reviewed": False, "approved": False,
             "returns": 0, "history": [], "waitingOn": None,
@@ -115,7 +218,11 @@ def fold(events: list) -> dict:
             s["findings"] = []
             s["reviewers"] = []
         elif kind == "reviewed":
-            s["reviewed"] = True
+            # A scripted review is a rehearsal, not a reading. It is recorded
+            # in full and it satisfies nothing a live review satisfies -- the
+            # flag was written here and never read, so a response served from
+            # a file cleared the same gate two vendors clear.
+            s["reviewed"] = not e.get("simulated", False)
             s["findings"] = e.get("findings", [])
             s["reviewers"] = e.get("reviewers", [])
             # The gate outranks the block. A step the developer signs off

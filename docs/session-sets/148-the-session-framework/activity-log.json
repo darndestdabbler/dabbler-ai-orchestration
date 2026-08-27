@@ -295,6 +295,86 @@
       "dateTime": "2026-08-26T22:31:21.825968-04:00",
       "description": "Close-out.",
       "status": "in-progress"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-27T02:40:06.300367-04:00",
+      "description": "Register.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 2,
+      "stepKey": "one-validatetransition-used-by-both-workflow",
+      "dateTime": "2026-08-27T02:40:06.300367-04:00",
+      "description": "One `validate_transition()` used by both `workflow.append()` and `workflow.fold()`: forward entry is sequential, returns may only move backward, an approval requires a live review and a current approval step, and an event's step must match current state.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 3,
+      "stepKey": "a-simulated-review-no-longer-sets",
+      "dateTime": "2026-08-27T02:40:06.300367-04:00",
+      "description": "**A `simulated` review no longer sets `reviewed`.** `fold` records the flag today and never reads it.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 4,
+      "stepKey": "remove-the-verifier-s-self-exemption",
+      "dateTime": "2026-08-27T02:40:06.300367-04:00",
+      "description": "Remove the verifier's self-exemption in `verdict.py::is_doc_only_issue`, so a verifier cannot make its own finding non-blocking by choosing which evidence paths to cite.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 5,
+      "stepKey": "affected-tests-as-preverify",
+      "dateTime": "2026-08-27T02:40:06.300367-04:00",
+      "description": "Affected tests as preverify.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 6,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-27T02:40:06.300367-04:00",
+      "description": "Cross-provider verification.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 7,
+      "stepKey": "full-test-suite-recorded-as-the",
+      "dateTime": "2026-08-27T02:40:06.300367-04:00",
+      "description": "Full test suite, recorded as the `final-full` run of record.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 8,
+      "stepKey": "close-out",
+      "dateTime": "2026-08-27T02:40:06.300367-04:00",
+      "description": "Close-out.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-27T02:40:06.304401-04:00",
+      "description": "Registered session 4 (copilot).",
+      "status": "complete"
     }
   ]
 }

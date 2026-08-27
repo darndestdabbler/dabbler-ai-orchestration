@@ -352,7 +352,6 @@ def build_result(request, *, attempt, route_result, error_class,
             "served_model_id": getattr(route_result, "served_model_id", None),
             "transport": getattr(route_result, "transport", None),
             "verdict": None, "blocking_findings": [], "minor_findings": [],
-            "doc_capped_findings": [],
             "usage": {
                 "input_tokens": getattr(route_result, "input_tokens", 0) or 0,
                 "output_tokens": getattr(route_result, "output_tokens", 0) or 0,
@@ -382,9 +381,6 @@ def build_result(request, *, attempt, route_result, error_class,
             _finding(i) for i in classification.blocking_issues
         ],
         "minor_findings": [_finding(i) for i in classification.nit_issues],
-        "doc_capped_findings": [
-            _finding(i) for i in classification.doc_capped_issues
-        ],
         "usage": {
             "input_tokens": route_result.input_tokens or 0,
             "output_tokens": route_result.output_tokens or 0,
@@ -416,7 +412,6 @@ def interrupted_result(root, view) -> dict:
         "effective_provider": None, "requested_model": None,
         "served_model_id": None, "transport": None, "verdict": None,
         "blocking_findings": [], "minor_findings": [],
-        "doc_capped_findings": [],
         "usage": {
             "input_tokens": 0, "output_tokens": 0, "model_usd": None,
             "priced": False,
@@ -567,7 +562,6 @@ def cmd_verify(args) -> dict:
         "verdict": result["verdict"], "error_class": result["error_class"],
         "blocking": result["blocking_findings"],
         "minor": result["minor_findings"],
-        "doc_capped": result["doc_capped_findings"],
         "state": view.state,
     }
 
@@ -656,7 +650,7 @@ def _pause_if_exhausted(root, view, config, round_number, tree_digest):
     return {
         "round": round_number, "tree_digest": None, "verdict": None,
         "error_class": None, "blocking": [], "minor": [],
-        "doc_capped": [], "state": view.state, "paused": reason,
+        "state": view.state, "paused": reason,
     }
 
 
@@ -717,7 +711,7 @@ def _terminate_at_cap(root, view, config, limit, tree_digest):
     return {
         "round": view.rounds, "tree_digest": tree_digest, "verdict": None,
         "error_class": None, "blocking": [], "minor": [],
-        "doc_capped": [], "state": view.state, "terminal": terminal,
+        "state": view.state, "terminal": terminal,
         "paused": summary,
     }
 

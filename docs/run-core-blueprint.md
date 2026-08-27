@@ -883,7 +883,6 @@ Pending guidance remains visible until acknowledged by sequence.
   "verdict": "VERIFIED|ISSUES_FOUND",
   "blocking_findings": [{"description": "...", "category": "...", "severity": "major", "evidencePaths": ["..."]}],
   "minor_findings": [],
-  "doc_capped_findings": [],
   "usage": {"input_tokens": 0, "output_tokens": 1114, "model_usd": null, "priced": false},
   "raw_output_ref": "round-1-response.txt",
   "raw_output_digest": "sha256:...",
@@ -902,8 +901,12 @@ Pending guidance remains visible until acknowledged by sequence.
 - `verdict` here is only ever `VERIFIED` or `ISSUES_FOUND`. `WAIVED` exists
   solely as an operator-attested `run.finished` verdict and never appears
   in a `VerificationResult`.
-- The severity vocabulary, blocking classification, doc-only capping, and
-  fail-closed parsing are `verdict.py`, reused, not reimplemented.
+- The severity vocabulary, blocking classification, and fail-closed parsing
+  are `verdict.py`, reused, not reimplemented. **A finding blocks on its
+  severity alone.** There is no doc-only cap: the verifier chooses both the
+  severity and the evidence paths, so a cap keyed on the paths is a
+  self-exemption. `doc_capped_findings` is retired from the writer and stays
+  readable only so historical rows still validate.
 
 ## 10. Compatibility requirements and intentional breaks
 

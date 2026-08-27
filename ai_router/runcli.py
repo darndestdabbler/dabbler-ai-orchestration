@@ -718,8 +718,8 @@ def _resolve_verified_verdict(view, tree_digest, config):
             view.last_verdict == VERDICT_ISSUES_FOUND
             and view.blocking_findings == 0
         ):
-            # The severity-gated stop: minor or doc-only findings are
-            # recorded and do not hold the run open.
+            # The severity-gated stop: minor findings are recorded and do
+            # not hold the run open.
             return validate_session_verdict(VERDICT_ISSUES_FOUND)
     if (
         view.blocking_findings

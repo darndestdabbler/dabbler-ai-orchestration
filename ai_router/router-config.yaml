@@ -735,6 +735,9 @@ testing:
           - tests/test_runcore_verified.py
           - tests/test_runcore_contracts.py
           - tests/test_verify.py
+      - when: ai_router/workflow.py
+        select:
+          - tests/test_workflow.py
       - when: ai_router/writers.py
         select:
           - tests/test_session.py

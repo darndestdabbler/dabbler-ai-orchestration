@@ -69,9 +69,9 @@
     {
       "number": 4,
       "title": "Record authority (plan A2)",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-27T02:40:06.188648-04:00",
-      "completedAt": null,
+      "completedAt": "2026-08-27T03:20:53.551146-04:00",
       "orchestrator": {
         "engine": "copilot",
         "provider": "anthropic",

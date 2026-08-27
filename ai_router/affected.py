@@ -229,14 +229,13 @@ def _posix(path) -> str:
     return str(path).replace("\\", "/").strip("/")
 
 
-def is_test_file(repo_root, rel: str, selection: SelectionConfig) -> bool:
-    """Whether *rel* is one of this repository's tests.
+def names_a_test(rel: str, selection: SelectionConfig) -> bool:
+    """Whether *rel* is a path this repository would call a test: under a
+    declared test root, with a filename matching the declared test glob.
 
-    Three conditions, all declared or observed rather than assumed: the path
-    sits under a declared test root, its filename matches the declared
-    test-file glob, and the file is present in the tree. Presence is what
-    keeps a deleted test out of the command -- naming it would fail the very
-    run it was meant to prove.
+    Presence is deliberately not asked. This is the question a write has to
+    answer -- a test file being created does not exist yet -- and it is the
+    same declaration selection reads, so the test root is defined once.
 
     Matching is case-sensitive on every platform. Selection is evidence, and
     evidence that depends on which filesystem produced it proves nothing.
@@ -245,7 +244,16 @@ def is_test_file(repo_root, rel: str, selection: SelectionConfig) -> bool:
         return False
     if not matching_prefixes(rel, selection.test_roots):
         return False
-    if not fnmatch.fnmatchcase(rel.rsplit("/", 1)[-1], selection.test_glob):
+    return fnmatch.fnmatchcase(rel.rsplit("/", 1)[-1], selection.test_glob)
+
+
+def is_test_file(repo_root, rel: str, selection: SelectionConfig) -> bool:
+    """Whether *rel* is one of this repository's tests and is there.
+
+    Presence is what keeps a deleted test out of the command -- naming it
+    would fail the very run it was meant to prove.
+    """
+    if not names_a_test(rel, selection):
         return False
     return (Path(repo_root) / rel).is_file()
 

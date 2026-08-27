@@ -42,7 +42,7 @@ it.
 | 4 | Record authority (plan A2) | — | not declared |
 | 5 | The two files, framework-written (plan A4) | no | 2026-08-27 |
 | 6 | The verifier's read surface (plan A5, first half) | no | 2026-08-27 |
-| 7 | The test-write path (plan A5, second half) | — | not declared |
+| 7 | The test-write path (plan A5, second half) | no | 2026-08-27 |
 | 8 | Selection by role, and the death of the tier ladder (plan A6) | — | not declared |
 | 9 | Model discovery (plan A7) | — | not declared |
 | 10 | The code review loop (plan B1) | — | not declared |
@@ -90,3 +90,9 @@ Stamp a direct-API round as `agency: none`, so a round that could not look is
 never reported as equivalent to one that could.
 
 This session builds framework internals and publishes no package.
+
+### Session 7 — The test-write path (plan A5, second half)
+
+**Releasable: no.**
+
+Build the fourth operation of the verifier's agency surface: create or modify a test file. The verifier proposes a test-file write in its response; the framework applies it. The model never touches the filesystem, and it holds no write tool on either transport. Writes are confined to the test root this repository declares under testing.selection -- a proposal naming a path outside it, or a path that is not a test filename, or a round that granted no write at all, is refused by the framework rather than discouraged by the prompt. Every proposal lands on the round's agency record with its outcome and, when refused, the reason. The write grant is off in a code-review round; the tests loop of spec section 3.c.ii turns it on.

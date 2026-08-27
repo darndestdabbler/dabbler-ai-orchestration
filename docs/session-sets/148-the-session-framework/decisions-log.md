@@ -1194,3 +1194,120 @@ The earlier reasoning -- that a repository-wide grep is a legitimate way to
 find where something is used -- is still true and is not an argument for
 recording it as confined. It is recorded, not refused; what changed is that
 the record stopped overstating it.
+
+## Session 7 — The test-write path (plan A5, second half)
+
+### D53 · 2026-08-27 · Orchestrator · The verifier has no write tool; it emits the file and the framework opens it, which is what makes the boundary a boundary
+
+The read surface could only be measured. The Copilot CLI executes `view`,
+`grep` and `glob` inside its own process, so the framework watches those
+happen and records what they did. The write is the opposite shape, and the
+spec is explicit about why: "the framework applies the write -- the model
+does not touch the filesystem."
+
+So the verifier holds no write tool on either transport, and gets none. The
+CLI's tool universe stays `view,grep,glob`; the API path still sends no
+tools at all. The verifier asks for a file by emitting it in its answer:
+
+    ```test-write path=tests/test_widget.py
+    <the complete contents of the file>
+    ```
+
+and `apply_test_writes` is the only thing that opens a file. That inversion
+is what turns the confinement rule into a boundary instead of a request. A
+prompt saying "only write tests" is advice a model may decline; a framework
+that reads the path, compares it against the declaration, and never calls
+`open` is not declinable.
+
+Three consequences follow from the block being the whole channel, and each
+one is a refusal rather than a repair:
+
+The block carries the whole file, never a patch. A patch would require the
+framework to decide what a fragment means against a file the model has only
+seen through a scrubbing layer -- and set 148 session 1 already paid for
+trusting what that layer displayed.
+
+An empty block is refused. Against a file that already exists it is a
+deletion wearing a write's name, and nothing in the surface grants a delete.
+
+A block that never closes, or that names no path, is recorded as refused
+rather than dropped. A proposal that vanishes silently is indistinguishable
+on the record from one that was never made, which is the same failure the
+agency log exists to prevent one level up.
+
+Confinement reads `testing.selection.test_roots` and `test_glob` -- the same
+declaration test selection already uses, through a `names_a_test` predicate
+split out of `is_test_file` so the root is defined once. The predicate
+deliberately does not ask whether the file exists: a test being created does
+not, and a second definition of "where the tests live" is how the two
+answers start to differ.
+
+### D54 · 2026-08-27 · Orchestrator · A review round grants no write, and refuses proposals out loud rather than ignoring them
+
+Session 7 builds operation (d) and grants it to nobody yet. Every round the
+framework runs today is a code review round under spec 3.c.i, and
+`verify.py` builds its grant with `allow_write=False`.
+
+The reason is not caution about half-built code. It is that 3.c.ii is a
+different round with a different job -- "the verifier authors the tests, the
+framework runs them" -- and a surface offered in every round is a surface
+used in every round. A reviewer that quietly edits the tree it is reviewing
+has stopped being a reviewer, and the tests it added during a review would
+join the session's own diff, which the author then has to make pass. Session
+11 builds that phase and turns the grant on there.
+
+What is live now is the enforcement, and that is the half that matters
+today. Proposals are parsed and decided on **every** round, including the
+ones that grant no write. A verifier that emits a `test-write` block in a
+review round gets it refused, with the reason on the round:
+
+    "this round granted no write operation; tests are authored in the tests
+    phase, not in a review round"
+
+The alternative -- ignoring blocks until session 11 wires the phase -- would
+leave a boundary that nobody can see being enforced, which the record cannot
+distinguish from a boundary that is not there. It would also hide the
+signal: a verifier repeatedly proposing writes in review rounds is telling
+the operator that the review prompt reads like a request for tests.
+
+The refusal count reaches the operator on the same line as the read surface,
+so a round that tried to write is visible without opening the ledger.
+
+### D55 · 2026-08-27 · Verifier (gpt-5.5/openai) · Round 1: the check read a string and the write read a path, so the boundary failed open on POSIX
+
+Round 1 raised a Major against the write boundary and it was correct. The
+confinement check read the proposal as a string and `open` read it as a
+path, and the two disagree on POSIX.
+
+`_relative_to` called `Path.resolve()` before `_posix` converted separators.
+On Windows that is harmless, because a backslash is already a separator and
+`resolve()` collapses the traversal. On POSIX, `tests\..\ai_router\x.py` is
+a **single filename** -- there is nothing for `resolve()` to collapse -- so
+the string arrived at `names_a_test` as `tests/../ai_router/x.py` only after
+conversion. It then passed both tests: prefix `tests/`, basename
+`test_*.py`. `_write_file` joined that same string as a real path, and the
+`..` was traversal again. A granted write would have landed in `ai_router/`.
+
+Two things were wrong, and only fixing the second would have left the class
+open:
+
+Separators are now normalised **before** anything else, so a backslash is a
+separator on every platform. That makes the traversal collapse on POSIX at
+the same point it already collapsed on Windows.
+
+And the path is resolved exactly once, with the resolved absolute path
+carried through to `open`. `_confine` returns it; nothing downstream
+re-derives a path from the string. The original defect was not really the
+backslash -- it was that the decision and the write each performed their own
+interpretation of a model-supplied string, and any divergence between two
+such interpretations fails open. One interpretation cannot diverge from
+itself.
+
+The refusal now records the collapsed path rather than the proposed
+spelling, which is the assertion the test pins: what the record names is
+what the filesystem would have acted on.
+
+This is the second time in set 148 that the framework under construction
+was caught by the verifier it was building a surface for, and the finding
+is a fair one: a boundary is exactly the kind of code whose defects are
+invisible from the side that wrote it.

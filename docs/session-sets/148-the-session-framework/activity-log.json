@@ -1382,6 +1382,175 @@
       "dateTime": "2026-08-27T06:26:31.268038-04:00",
       "description": "Committed and pushed once, then closed through the five gates.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 7,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-27T06:34:06.796075-04:00",
+      "description": "Register.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 7,
+      "stepNumber": 2,
+      "stepKey": "the-fourth-operation",
+      "dateTime": "2026-08-27T06:34:06.796075-04:00",
+      "description": "The fourth operation: create or modify a test file. **The framework applies the write; the model never touches the filesystem.**",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 7,
+      "stepNumber": 3,
+      "stepKey": "writes-are-confined-to-the-declared",
+      "dateTime": "2026-08-27T06:34:06.796075-04:00",
+      "description": "Writes are confined to the declared test root. A write outside it is refused by the framework, not discouraged by a prompt.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 7,
+      "stepNumber": 4,
+      "stepKey": "affected-tests-as-preverify",
+      "dateTime": "2026-08-27T06:34:06.796075-04:00",
+      "description": "Affected tests as preverify.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 7,
+      "stepNumber": 5,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-27T06:34:06.796075-04:00",
+      "description": "Cross-provider verification.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 7,
+      "stepNumber": 6,
+      "stepKey": "full-test-suite-recorded-as-the",
+      "dateTime": "2026-08-27T06:34:06.796075-04:00",
+      "description": "Full test suite, recorded as the `final-full` run of record.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 7,
+      "stepNumber": 7,
+      "stepKey": "close-out",
+      "dateTime": "2026-08-27T06:34:06.796075-04:00",
+      "description": "Close-out.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 7,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-27T06:34:06.804439-04:00",
+      "description": "Registered session 7 (copilot).",
+      "status": "complete"
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 7,
+      "dateTime": "2026-08-27T06:36:06.996277-04:00",
+      "task": "Build the fourth operation of the verifier's agency surface: create or modify a test file. The verifier proposes a test-file write in its response; the framework applies it. The model never touches the filesystem, and it holds no write tool on either transport. Writes are confined to the test root this repository declares under testing.selection -- a proposal naming a path outside it, or a path that is not a test filename, or a round that granted no write at all, is refused by the framework rather than discouraged by the prompt. Every proposal lands on the round's agency record with its outcome and, when refused, the reason. The write grant is off in a code-review round; the tests loop of spec section 3.c.ii turns it on.",
+      "releasable": false
+    },
+    {
+      "sessionNumber": 7,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-27T06:36:21.724282-04:00",
+      "description": "Session 7 registered as copilot/claude-opus-5, task list declared not-releasable.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 7,
+      "stepNumber": 2,
+      "stepKey": "the-fourth-operation",
+      "dateTime": "2026-08-27T06:36:22.191045-04:00",
+      "description": "The fourth operation: create or modify a test file. **The framework applies the write; the model never touches the filesystem.**",
+      "status": "in-progress"
+    },
+    {
+      "sessionNumber": 7,
+      "stepNumber": 2,
+      "stepKey": "the-fourth-operation",
+      "dateTime": "2026-08-27T06:44:44.121895-04:00",
+      "description": "Operation (d) built in ai_router/agency.py: the verifier emits a test-write block in its answer and apply_test_writes performs the write. No tool carries it on either transport, so the framework is the only thing that opens a file.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 7,
+      "stepNumber": 3,
+      "stepKey": "writes-are-confined-to-the-declared",
+      "dateTime": "2026-08-27T06:44:44.578150-04:00",
+      "description": "Confinement reads testing.selection.test_roots and test_glob -- the same declaration test selection uses -- through a presence-free names_a_test predicate. A path outside it, a traversal out of the repository, an empty body, a malformed block, or a round that granted no write is refused before any byte is written, and every refusal lands on the round's agency record.",
+      "status": "complete"
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D53",
+      "ordinal": 53,
+      "sessionNumber": 7,
+      "decidedOn": "2026-08-27",
+      "recordedAt": "2026-08-27T06:50:28.808393-04:00",
+      "decider": "orchestrator",
+      "headline": "The verifier has no write tool; it emits the file and the framework opens it, which is what makes the boundary a boundary",
+      "body": "The read surface could only be measured. The Copilot CLI executes `view`,\n`grep` and `glob` inside its own process, so the framework watches those\nhappen and records what they did. The write is the opposite shape, and the\nspec is explicit about why: \"the framework applies the write -- the model\ndoes not touch the filesystem.\"\n\nSo the verifier holds no write tool on either transport, and gets none. The\nCLI's tool universe stays `view,grep,glob`; the API path still sends no\ntools at all. The verifier asks for a file by emitting it in its answer:\n\n    ```test-write path=tests/test_widget.py\n    <the complete contents of the file>\n    ```\n\nand `apply_test_writes` is the only thing that opens a file. That inversion\nis what turns the confinement rule into a boundary instead of a request. A\nprompt saying \"only write tests\" is advice a model may decline; a framework\nthat reads the path, compares it against the declaration, and never calls\n`open` is not declinable.\n\nThree consequences follow from the block being the whole channel, and each\none is a refusal rather than a repair:\n\nThe block carries the whole file, never a patch. A patch would require the\nframework to decide what a fragment means against a file the model has only\nseen through a scrubbing layer -- and set 148 session 1 already paid for\ntrusting what that layer displayed.\n\nAn empty block is refused. Against a file that already exists it is a\ndeletion wearing a write's name, and nothing in the surface grants a delete.\n\nA block that never closes, or that names no path, is recorded as refused\nrather than dropped. A proposal that vanishes silently is indistinguishable\non the record from one that was never made, which is the same failure the\nagency log exists to prevent one level up.\n\nConfinement reads `testing.selection.test_roots` and `test_glob` -- the same\ndeclaration test selection already uses, through a `names_a_test` predicate\nsplit out of `is_test_file` so the root is defined once. The predicate\ndeliberately does not ask whether the file exists: a test being created does\nnot, and a second definition of \"where the tests live\" is how the two\nanswers start to differ."
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D54",
+      "ordinal": 54,
+      "sessionNumber": 7,
+      "decidedOn": "2026-08-27",
+      "recordedAt": "2026-08-27T06:50:29.277600-04:00",
+      "decider": "orchestrator",
+      "headline": "A review round grants no write, and refuses proposals out loud rather than ignoring them",
+      "body": "Session 7 builds operation (d) and grants it to nobody yet. Every round the\nframework runs today is a code review round under spec 3.c.i, and\n`verify.py` builds its grant with `allow_write=False`.\n\nThe reason is not caution about half-built code. It is that 3.c.ii is a\ndifferent round with a different job -- \"the verifier authors the tests, the\nframework runs them\" -- and a surface offered in every round is a surface\nused in every round. A reviewer that quietly edits the tree it is reviewing\nhas stopped being a reviewer, and the tests it added during a review would\njoin the session's own diff, which the author then has to make pass. Session\n11 builds that phase and turns the grant on there.\n\nWhat is live now is the enforcement, and that is the half that matters\ntoday. Proposals are parsed and decided on **every** round, including the\nones that grant no write. A verifier that emits a `test-write` block in a\nreview round gets it refused, with the reason on the round:\n\n    \"this round granted no write operation; tests are authored in the tests\n    phase, not in a review round\"\n\nThe alternative -- ignoring blocks until session 11 wires the phase -- would\nleave a boundary that nobody can see being enforced, which the record cannot\ndistinguish from a boundary that is not there. It would also hide the\nsignal: a verifier repeatedly proposing writes in review rounds is telling\nthe operator that the review prompt reads like a request for tests.\n\nThe refusal count reaches the operator on the same line as the read surface,\nso a round that tried to write is visible without opening the ledger."
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D55",
+      "ordinal": 55,
+      "sessionNumber": 7,
+      "decidedOn": "2026-08-27",
+      "recordedAt": "2026-08-27T07:00:35.488171-04:00",
+      "decider": "verifier",
+      "headline": "Round 1: the check read a string and the write read a path, so the boundary failed open on POSIX",
+      "body": "Round 1 raised a Major against the write boundary and it was correct. The\nconfinement check read the proposal as a string and `open` read it as a\npath, and the two disagree on POSIX.\n\n`_relative_to` called `Path.resolve()` before `_posix` converted separators.\nOn Windows that is harmless, because a backslash is already a separator and\n`resolve()` collapses the traversal. On POSIX, `tests\\..\\ai_router\\x.py` is\na **single filename** -- there is nothing for `resolve()` to collapse -- so\nthe string arrived at `names_a_test` as `tests/../ai_router/x.py` only after\nconversion. It then passed both tests: prefix `tests/`, basename\n`test_*.py`. `_write_file` joined that same string as a real path, and the\n`..` was traversal again. A granted write would have landed in `ai_router/`.\n\nTwo things were wrong, and only fixing the second would have left the class\nopen:\n\nSeparators are now normalised **before** anything else, so a backslash is a\nseparator on every platform. That makes the traversal collapse on POSIX at\nthe same point it already collapsed on Windows.\n\nAnd the path is resolved exactly once, with the resolved absolute path\ncarried through to `open`. `_confine` returns it; nothing downstream\nre-derives a path from the string. The original defect was not really the\nbackslash -- it was that the decision and the write each performed their own\ninterpretation of a model-supplied string, and any divergence between two\nsuch interpretations fails open. One interpretation cannot diverge from\nitself.\n\nThe refusal now records the collapsed path rather than the proposed\nspelling, which is the assertion the test pins: what the record names is\nwhat the filesystem would have acted on.\n\nThis is the second time in set 148 that the framework under construction\nwas caught by the verifier it was building a surface for, and the finding\nis a fair one: a boundary is exactly the kind of code whose defects are\ninvisible from the side that wrote it.",
+      "model": "gpt-5.5",
+      "provider": "openai"
+    },
+    {
+      "sessionNumber": 7,
+      "stepNumber": 4,
+      "stepKey": "affected-tests-as-preverify",
+      "dateTime": "2026-08-27T07:02:19.068844-04:00",
+      "description": "Two targeted runs recorded: the session's 15 selected files (364 tests), then the fix delta of tests/test_agency.py and tests/test_verify.py (70 tests).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 7,
+      "stepNumber": 5,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-27T07:02:19.557663-04:00",
+      "description": "VERIFIED in 2 rounds by gpt-5.5/openai over copilot-cli. Round 1 raised a correct Major: the confinement check read the proposal as a string and open read it as a path, so a backslash traversal failed open on POSIX.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 7,
+      "stepNumber": 6,
+      "stepKey": "full-test-suite-recorded-as-the",
+      "dateTime": "2026-08-27T07:11:58.420355-04:00",
+      "description": "808 passed in 9m25s against the verified tree.",
+      "status": "complete"
     }
   ]
 }

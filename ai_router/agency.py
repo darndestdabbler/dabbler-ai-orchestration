@@ -1,14 +1,21 @@
-"""The verifier's read surface: what it may look at, how much of it, and
-what it was actually shown.
+"""The verifier's tool surface: what it may look at, how much of it, what it
+was actually shown, and the one thing it may change.
 
-Three operations reach the verifier on the seat path -- list files by
-pattern, search file contents by pattern, read a file -- and they arrive as
-the Copilot CLI's own ``glob``, ``grep`` and ``view`` tools. The CLI executes
-them inside its own process, so this module cannot refuse a read the way the
-test-write path refuses a write. What it can do is declare the limits to the
-verifier and then measure the round against them, which is also the limit
-that matters: a verifier that reaches a blocking finding by not looking at
-the counterevidence is caught by the log, never by a refusal.
+Four operations reach the verifier -- list files by pattern, search file
+contents by pattern, read a file, and create or modify a test file. The
+first three arrive on the seat path as the Copilot CLI's own ``glob``,
+``grep`` and ``view`` tools. The CLI executes them inside its own process,
+so this module cannot refuse a read; what it can do is declare the limits to
+the verifier and then measure the round against them, which is also the
+limit that matters: a verifier that reaches a blocking finding by not
+looking at the counterevidence is caught by the log, never by a refusal.
+
+The fourth is different in kind, and the difference is the point. The
+verifier holds no write tool on either transport -- it emits the file it
+wants in its answer, and the framework writes the bytes. So a write can be
+refused outright, and is: a path outside the test root this repository
+declares never reaches the filesystem. Enforcement lives here rather than in
+the prompt, because a prompt is a request and this is a boundary.
 
 Fidelity is the part that is not bookkeeping. Scope, budget and a log record
 which file was opened and never what came back from it, and those differ
@@ -33,6 +40,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
+from .affected import SelectionConfig, names_a_test
+
 #: The round could look at the tree through tools.
 MODE_TOOLS = "tools"
 #: The round could not. The direct-API path sends no tools at all, and a
@@ -44,12 +53,16 @@ MODE_NONE = "none"
 OP_LIST = "list"
 OP_SEARCH = "search"
 OP_READ = "read"
+#: The only write, and the only operation no tool performs: the verifier
+#: asks for it in its answer and the framework acts, which is what makes a
+#: refusal possible at all.
+OP_WRITE = "write"
 
-#: The CLI tool that performs each granted operation. This mapping is the
-#: whole grant: a tool absent from it is not part of the read surface.
+#: The CLI tool that performs each granted read operation. This mapping is
+#: the whole read grant: a tool absent from it is not part of the surface.
 TOOL_OPERATIONS: dict = {"glob": OP_LIST, "grep": OP_SEARCH, "view": OP_READ}
 
-GRANTED_OPERATIONS: tuple = (OP_LIST, OP_SEARCH, OP_READ)
+READ_OPERATIONS: tuple = (OP_LIST, OP_SEARCH, OP_READ)
 
 #: Read operations allowed per round. A ceiling, not an allowance to spend:
 #: a review that needs more than this many files is reviewing more than one
@@ -64,6 +77,17 @@ FIDELITY_TRANSFORMED = "transformed"
 #: or the tool returned nothing line-numbered to compare. Neither a clean
 #: bill nor an accusation, and distinct from both on purpose.
 FIDELITY_UNVERIFIED = "unverified"
+
+#: The framework wrote the bytes.
+WRITE_ACCEPTED = "accepted"
+#: It did not, and the reason is on the row. A refused write is recorded
+#: rather than dropped: a boundary nobody can see being enforced is
+#: indistinguishable from one that is not there.
+WRITE_REFUSED = "refused"
+
+#: Whether the accepted write brought a file into existence or replaced one.
+ACTION_CREATED = "created"
+ACTION_MODIFIED = "modified"
 
 #: Ledger rows are read by humans and by the unresolved-session view; an
 #: unbounded scope list or operation log helps neither.
@@ -156,28 +180,45 @@ def session_scope(repo_root, set_dir, changed_paths) -> tuple:
     changed = {_posix(p) for p in (changed_paths or ()) if str(p).strip()}
     scope = set(changed)
     scope |= declared_dependencies(repo_root, changed)
-    set_rel = _relative_to(repo_root, set_dir)
+    set_rel = _relative_posix(repo_root, set_dir)
     if set_rel:
         scope.add(set_rel)
     return tuple(sorted(scope))
 
 
-def _relative_to(repo_root, path) -> Optional[str]:
-    """The repository-relative posix form of *path*.
+def _relative_to(repo_root, path) -> Optional[Path]:
+    """The absolute path *path* names inside the repository, or ``None``.
 
     An absolute path is placed against the repository; a relative one is
     already repository-relative, because the CLI runs with the repository
     as its working directory. Resolving a relative tool argument against
     this process's own directory instead would silently invent a path.
+
+    Separators are normalised before anything else, so that a backslash is
+    a separator on every platform. It already is on Windows; on POSIX,
+    ``tests\\..\\pkg\\x.py`` is a single filename here and a traversal to
+    the caller of ``open``, and a boundary that decides on one reading
+    while the filesystem acts on the other fails open.
     """
     try:
         root = Path(repo_root).resolve()
-        candidate = Path(path)
+        candidate = Path(str(path).replace("\\", "/"))
         if not candidate.is_absolute():
             candidate = root / candidate
-        return _posix(candidate.resolve().relative_to(root))
+        resolved = candidate.resolve()
+        resolved.relative_to(root)
+        return resolved
     except (OSError, ValueError):
         return None
+
+
+def _relative_posix(repo_root, path) -> Optional[str]:
+    """The repository-relative posix form of *path*, traversal collapsed."""
+    resolved = _relative_to(repo_root, path)
+    if resolved is None:
+        return None
+    return _posix(resolved.relative_to(Path(repo_root).resolve()))
+
 
 
 def in_scope(scope, rel: str) -> bool:
@@ -198,19 +239,45 @@ class AgencyGrant:
     mode: str
     scope: tuple = ()
     read_budget: int = DEFAULT_READ_BUDGET
+    #: Where this repository says its tests live and what it calls them.
+    #: Supplied by the caller from the same declaration test selection
+    #: reads, so the test root is defined in one place.
+    test_roots: tuple = ()
+    test_glob: str = ""
+    #: Whether this round may author tests at all. A code review round may
+    #: not: the tests phase is a different round with a different job, and
+    #: a surface offered everywhere is a surface used everywhere.
+    allow_write: bool = False
 
     @property
     def operations(self) -> tuple:
-        return GRANTED_OPERATIONS if self.mode == MODE_TOOLS else ()
+        if self.mode != MODE_TOOLS:
+            return ()
+        return READ_OPERATIONS + ((OP_WRITE,) if self.allow_write else ())
+
+    @property
+    def test_selection(self) -> SelectionConfig:
+        return SelectionConfig(
+            test_roots=self.test_roots, test_glob=self.test_glob
+        )
 
 
 def grant_for_transport(
-    transport: str, scope=(), read_budget: int = DEFAULT_READ_BUDGET
+    transport: str, scope=(), read_budget: int = DEFAULT_READ_BUDGET,
+    test_roots=(), test_glob: str = "", allow_write: bool = False,
 ) -> AgencyGrant:
     """Only the seat path is agentic. Naming the transport here keeps the
-    two paths from being recorded as the same kind of review."""
+    two paths from being recorded as the same kind of review.
+
+    The write rides on the same grant even though no tool carries it: a
+    round that could not look is not a round that may author tests, and
+    tying the two together means one answer to "what could this round do".
+    """
     if transport == "copilot-cli":
-        return AgencyGrant(MODE_TOOLS, tuple(scope), read_budget)
+        return AgencyGrant(
+            MODE_TOOLS, tuple(scope), read_budget,
+            tuple(test_roots), test_glob, allow_write,
+        )
     return AgencyGrant(MODE_NONE, (), 0)
 
 
@@ -221,11 +288,14 @@ def briefing(grant: AgencyGrant) -> str:
     if grant.mode != MODE_TOOLS:
         return ""
     listed = "\n".join(f"- {path}" for path in grant.scope[:_MAX_RECORDED_SCOPE])
-    return (
+    write_note = (
+        " and no way to change anything" if not grant.allow_write else ""
+    )
+    parts = [
         "## Your read surface\n\n"
         "You may **list files** (`glob`), **search file contents** (`grep`) "
-        "and **read a file** (`view`). You have no other operations, and no "
-        "way to change anything.\n\n"
+        f"and **read a file** (`view`). You have no other tools{write_note}."
+        "\n\n"
         f"**Scope** — this session's changed files and what they import, "
         f"not the repository:\n\n{listed}\n\n"
         f"**Budget** — at most {grant.read_budget} reads this round.\n\n"
@@ -234,14 +304,49 @@ def briefing(grant: AgencyGrant) -> str:
         "naming the scope paths you want it to cover; a pattern on its own "
         "reaches the whole tree and is recorded as unconfined. Reading "
         "nothing is recorded too: a finding asserted about a file you did "
-        "not open is a finding without evidence.\n\n"
+        "not open is a finding without evidence.",
         "**What you are shown may not be what is on disk.** Credential-"
         "shaped text is rewritten before it reaches you, so a correct "
         "`f\"Bearer {api_key}\"` can arrive as `f\"******\"`. The framework "
         "compares what you were shown against the bytes on disk and marks "
         "the difference. Do not raise a hardcoded-secret finding from a "
-        "read alone."
+        "read alone.",
+    ]
+    if grant.allow_write:
+        parts.append(_write_briefing(grant))
+    return "\n\n".join(parts)
+
+
+def _write_briefing(grant: AgencyGrant) -> str:
+    roots = ", ".join(f"`{root}/`" for root in grant.test_roots) or "(none)"
+    return (
+        "## Your one write\n\n"
+        "You may **create or modify a test file**, and you do it by asking "
+        "rather than by acting: emit the whole file inside a block of "
+        "exactly this form, and the framework writes the bytes.\n\n"
+        "````text\n"
+        "```test-write path=" + _example_test_path(grant) + "\n"
+        "<the complete contents of the file>\n"
+        "```\n"
+        "````\n\n"
+        "The block carries the **whole file**, never a patch or a fragment: "
+        "what it contains is what the file will contain. Emit one block per "
+        "file.\n\n"
+        f"**Writes are confined to this repository's declared test root** "
+        f"({roots}), to filenames matching `{grant.test_glob}`. A path "
+        "outside that is refused by the framework before anything is "
+        "written, and the refusal is recorded on the round — this is a "
+        "boundary, not a request. You have no other write and no filesystem "
+        "access of any kind."
     )
+
+
+def _example_test_path(grant: AgencyGrant) -> str:
+    """A path from this repository's own declaration, so the example the
+    verifier is shown is one the framework would actually accept."""
+    root = grant.test_roots[0].strip("/") if grant.test_roots else "tests"
+    name = (grant.test_glob or "test_*.py").replace("*", "example", 1)
+    return f"{root}/{name}"
 
 
 # --- What the round actually did ---------------------------------------------
@@ -265,10 +370,38 @@ class AgencyOperation:
 
 
 @dataclass(frozen=True)
+class TestWrite:
+    """One proposed write and what the framework did about it."""
+    path: str
+    outcome: str
+    action: Optional[str] = None
+    bytes_written: int = 0
+    reason: Optional[str] = None
+
+    @property
+    def accepted(self) -> bool:
+        return self.outcome == WRITE_ACCEPTED
+
+    def as_row(self) -> dict:
+        row = {"path": self.path, "outcome": self.outcome}
+        if self.action:
+            row["action"] = self.action
+        if self.accepted:
+            row["bytes"] = self.bytes_written
+        if self.reason:
+            row["reason"] = self.reason
+        return row
+
+
+@dataclass(frozen=True)
 class AgencyRecord:
     mode: str
     grant: AgencyGrant
     operations: tuple = ()
+    #: Writes are kept apart from operations on purpose: an operation is
+    #: something the model did and the transport reported, a write is
+    #: something the model asked for and the framework decided.
+    writes: tuple = ()
 
     @property
     def reads(self) -> int:
@@ -288,6 +421,14 @@ class AgencyRecord:
             1 for op in self.operations
             if op.fidelity == FIDELITY_TRANSFORMED
         )
+
+    @property
+    def writes_applied(self) -> int:
+        return sum(1 for write in self.writes if write.accepted)
+
+    @property
+    def writes_refused(self) -> int:
+        return sum(1 for write in self.writes if not write.accepted)
 
     def as_row(self) -> dict:
         row = {
@@ -310,6 +451,12 @@ class AgencyRecord:
                 op.as_row() for op in
                 self.operations[:_MAX_RECORDED_OPERATIONS]
             ],
+            # Every write is recorded, applied or refused and never
+            # truncated: a boundary is only worth having if the record
+            # shows each time it held.
+            "writes": [write.as_row() for write in self.writes],
+            "writes_applied": self.writes_applied,
+            "writes_refused": self.writes_refused,
         }
         if self.mode == MODE_NONE:
             row["reason"] = (
@@ -390,15 +537,22 @@ def _tool_calls(metadata) -> list:
     return list(calls) if isinstance(calls, list) else []
 
 
-def record_for_round(repo_root, grant: AgencyGrant, metadata) -> AgencyRecord:
+def record_for_round(
+    repo_root, grant: AgencyGrant, metadata, writes=()
+) -> AgencyRecord:
     """The round's agency record, built from what the transport reported.
 
     A granted surface with no recorded call is left visible rather than
     smoothed over: it is the shape a round takes when the tool grant did not
     reach the model and the model answered from invention instead.
+
+    *writes* are the framework's own decisions from
+    :func:`apply_test_writes`, which is why they are passed in rather than
+    recovered from metadata: no transport reports them, because no transport
+    performed them.
     """
     if grant.mode != MODE_TOOLS:
-        return AgencyRecord(MODE_NONE, grant, ())
+        return AgencyRecord(MODE_NONE, grant, (), tuple(writes))
 
     operations = []
     for call in _tool_calls(metadata):
@@ -417,7 +571,7 @@ def record_for_round(repo_root, grant: AgencyGrant, metadata) -> AgencyRecord:
         target, names_path = _tool_target(arguments)
         detail = None
         if names_path:
-            rel = _relative_to(repo_root, target) or _posix(target)
+            rel = _relative_posix(repo_root, target) or _posix(target)
             scoped = in_scope(grant.scope, rel)
         else:
             # A pattern with no path was not confined to anything. Calling
@@ -437,25 +591,212 @@ def record_for_round(repo_root, grant: AgencyGrant, metadata) -> AgencyRecord:
                 fidelity=fidelity, detail=detail,
             )
         )
-    return AgencyRecord(MODE_TOOLS, grant, tuple(operations))
+    return AgencyRecord(MODE_TOOLS, grant, tuple(operations), tuple(writes))
 
 
 def summary_line(record: AgencyRecord) -> str:
-    """One line for the operator, so a transformed or unlooking round is
-    visible without opening the ledger."""
+    """One line for the operator, so a transformed, unlooking or refused
+    round is visible without opening the ledger."""
     if record.mode != MODE_TOOLS:
-        return "agency: none — this round's verifier could not look at the tree"
-    parts = [
-        f"agency: {record.reads} read(s), "
-        f"{sum(1 for op in record.operations if op.kind == OP_SEARCH)} search(es), "
-        f"{sum(1 for op in record.operations if op.kind == OP_LIST)} listing(s)"
-    ]
-    if not record.operations:
-        parts.append("the verifier looked at nothing it was granted")
-    if record.transformed_reads:
-        parts.append(f"{record.transformed_reads} read(s) were transformed")
-    if record.out_of_scope:
-        parts.append(f"{record.out_of_scope} not confined to scope")
-    if record.over_budget:
-        parts.append(f"{record.over_budget} past the read budget")
+        parts = [
+            "agency: none — this round's verifier could not look at the tree"
+        ]
+    else:
+        parts = [
+            f"agency: {record.reads} read(s), "
+            f"{sum(1 for op in record.operations if op.kind == OP_SEARCH)}"
+            " search(es), "
+            f"{sum(1 for op in record.operations if op.kind == OP_LIST)}"
+            " listing(s)"
+        ]
+        if not record.operations:
+            parts.append("the verifier looked at nothing it was granted")
+        if record.transformed_reads:
+            parts.append(
+                f"{record.transformed_reads} read(s) were transformed"
+            )
+        if record.out_of_scope:
+            parts.append(f"{record.out_of_scope} not confined to scope")
+        if record.over_budget:
+            parts.append(f"{record.over_budget} past the read budget")
+    if record.writes_applied:
+        parts.append(f"{record.writes_applied} test write(s) applied")
+    if record.writes_refused:
+        parts.append(f"{record.writes_refused} write(s) refused")
     return "; ".join(parts)
+
+
+# --- The write ---------------------------------------------------------------
+#
+# The verifier authors tests because it did not write the code, and the
+# framework performs the write because "the file says this" must be an
+# observation rather than a claim. Both halves of that follow from the model
+# having no filesystem: it emits a block, and everything after the block is
+# the framework's.
+
+#: A proposal opens with a fenced block labelled ``test-write`` and carrying
+#: a path. The fence may be longer than three backticks, so a test file that
+#: itself contains a fence is still expressible -- the block closes only on a
+#: fence at least as long as the one that opened it.
+_FENCE = re.compile(r"^(?P<ticks>`{3,})[ \t]*(?P<info>.*?)[ \t]*$")
+_WRITE_INFO = re.compile(r"^test-write\b[ \t]*(?P<rest>.*)$")
+_WRITE_PATH = re.compile(r"^path[ \t]*=[ \t]*(?P<path>[^\s]+)[ \t]*$")
+
+
+@dataclass(frozen=True)
+class _Proposal:
+    path: str
+    content: str
+    malformed: Optional[str] = None
+
+
+def _parse_proposals(text) -> list:
+    """The test-write blocks in *text*, in the order they appear.
+
+    Ordinary fenced blocks are skipped whole, so a review that quotes the
+    format inside a code sample does not accidentally propose a write.
+    A block that opens and never closes, or that names no path, is returned
+    as malformed rather than dropped: a proposal that vanishes silently
+    looks exactly like one that was never made.
+    """
+    if not isinstance(text, str) or "test-write" not in text:
+        return []
+    lines = text.replace("\r\n", "\n").split("\n")
+    proposals = []
+    index = 0
+    while index < len(lines):
+        opening = _FENCE.match(lines[index])
+        if not opening:
+            index += 1
+            continue
+        ticks, info = opening.group("ticks"), opening.group("info")
+        label = _WRITE_INFO.match(info)
+        body, closed, index = _consume_block(lines, index + 1, ticks)
+        if not label:
+            continue
+        path_match = _WRITE_PATH.match(label.group("rest").strip())
+        if not path_match:
+            proposals.append(_Proposal(
+                "", "", "the block named no path=<file> to write"
+            ))
+        elif not closed:
+            proposals.append(_Proposal(
+                path_match.group("path"), "",
+                "the block was never closed, so its contents are incomplete",
+            ))
+        else:
+            proposals.append(
+                _Proposal(path_match.group("path"), "\n".join(body))
+            )
+    return proposals
+
+
+def _consume_block(lines, start: int, ticks: str) -> tuple:
+    """``(body_lines, closed, index_after)`` for the block opened by
+    *ticks*, which closes on a bare fence at least as long."""
+    body = []
+    index = start
+    while index < len(lines):
+        closing = _FENCE.match(lines[index])
+        if (closing and not closing.group("info")
+                and len(closing.group("ticks")) >= len(ticks)):
+            return body, True, index + 1
+        body.append(lines[index])
+        index += 1
+    return body, False, index
+
+
+def _confine(repo_root, grant: AgencyGrant, raw_path: str) -> tuple:
+    """``(rel, target, reason)`` -- *reason* is ``None`` when the write may
+    proceed, and *target* is then the absolute path to open.
+
+    The path is resolved exactly once, here, and the resolved form is what
+    gets written. Deciding about one spelling of a path and then handing
+    another to ``open`` is how a boundary fails open, so nothing downstream
+    re-interprets the string.
+
+    Every branch refuses before anything is written, and the order runs from
+    the widest boundary inward, so the reason recorded is the outermost one
+    the path crossed.
+    """
+    if OP_WRITE not in grant.operations:
+        return _posix(raw_path), None, (
+            "this round granted no write operation; tests are authored in "
+            "the tests phase, not in a review round"
+        )
+    target = _relative_to(repo_root, raw_path)
+    if target is None:
+        return _posix(raw_path), None, (
+            "the path resolves outside the repository"
+        )
+    rel = _posix(target.relative_to(Path(repo_root).resolve()))
+    if not grant.test_roots or not grant.test_glob:
+        return rel, None, (
+            "this repository declares no test root, so no path can be "
+            "confirmed to be a test"
+        )
+    if not names_a_test(rel, grant.test_selection):
+        roots = ", ".join(grant.test_roots)
+        return rel, None, (
+            f"outside the declared test root: a write must be under "
+            f"{roots} and named {grant.test_glob}"
+        )
+    if target.is_dir():
+        return rel, None, "the path is a directory"
+    return rel, target, None
+
+
+def apply_test_writes(repo_root, grant: AgencyGrant, text) -> tuple:
+    """Perform the test writes *text* proposes, and report every decision.
+
+    This is the whole of operation (d). The verifier never touches the
+    filesystem: it describes a file, and this function is the only thing
+    that opens one. A proposal outside the declared test root is refused
+    here, before any bytes are written -- which is the difference between a
+    boundary and an instruction.
+    """
+    writes = []
+    for proposal in _parse_proposals(text):
+        if proposal.malformed:
+            writes.append(TestWrite(
+                path=_posix(proposal.path), outcome=WRITE_REFUSED,
+                reason=proposal.malformed,
+            ))
+            continue
+        rel, target, reason = _confine(repo_root, grant, proposal.path)
+        if reason is None and not proposal.content.strip():
+            # An empty body against an existing test silently empties it,
+            # which is a deletion wearing a write's name.
+            reason = "the block carried no content"
+        if reason:
+            writes.append(TestWrite(
+                path=rel, outcome=WRITE_REFUSED, reason=reason
+            ))
+            continue
+        writes.append(_write_file(rel, target, proposal.content))
+    return tuple(writes)
+
+
+def _write_file(rel: str, target: Path, content: str) -> TestWrite:
+    existed = target.is_file()
+    body = content if content.endswith("\n") else content + "\n"
+    data = body.encode("utf-8")
+    try:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        # Newlines are written as authored on every platform: a test file
+        # whose line endings depend on which machine ran the verifier is a
+        # diff nobody asked for.
+        with open(target, "w", encoding="utf-8", newline="") as handle:
+            handle.write(body)
+    except OSError as exc:
+        return TestWrite(
+            path=rel, outcome=WRITE_REFUSED,
+            reason=f"the write failed: {exc}",
+        )
+    return TestWrite(
+        path=rel, outcome=WRITE_ACCEPTED,
+        action=ACTION_MODIFIED if existed else ACTION_CREATED,
+        bytes_written=len(data),
+    )
+
+

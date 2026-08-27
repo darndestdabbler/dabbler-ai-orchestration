@@ -514,8 +514,8 @@ def run_round(
     A round never opens on unproved work: the affected tests come first, and
     a full-suite run is not a substitute for them."""
     from .affected import (
-        preverify_gate, preverify_recipe, remediation_recipe,
-        working_tree_changes,
+        load_selection_config, preverify_gate, preverify_recipe,
+        remediation_recipe, working_tree_changes,
     )
     from .config import load_config, resolve_transport
     from .route import NoCandidateError, RouterError
@@ -638,9 +638,20 @@ def run_round(
         ) or (),
     )
     read_budget = settings.get("read_budget") or agency.DEFAULT_READ_BUDGET
-    grant = agency.grant_for_transport(
-        resolve_transport(config, transport), scope, read_budget,
-    )
+    selection = load_selection_config(config).config
+
+    def _grant(for_transport: str):
+        # A code review round grants no write. The tests phase of spec
+        # 3.c.ii is where the verifier authors tests, and a surface offered
+        # in every round is a surface used in every round -- a review that
+        # quietly edits the tree it is reviewing is not a review.
+        return agency.grant_for_transport(
+            for_transport, scope, read_budget,
+            selection.test_roots, selection.test_glob, allow_write=False,
+        )
+
+    grant = _grant(resolve_transport(config, transport))
+
     prompt_body = build_verification_prompt(
         config.get("_verification_template", ""),
         _build_task_block(
@@ -722,10 +733,14 @@ def run_round(
     # The grant was predicted from the resolved preference; the record is
     # built from the transport the round actually ran on, because a round
     # that fell back to the API path could not look however it was briefed.
+    #
+    # Proposals are read on every round, including the ones that grant no
+    # write: a boundary that silently ignores what it turns away leaves no
+    # evidence it was ever crossed.
+    actual_grant = _grant(result.transport)
+    writes = agency.apply_test_writes(repo_root, actual_grant, result.content)
     agency_record = agency.record_for_round(
-        repo_root,
-        agency.grant_for_transport(result.transport, scope, read_budget),
-        result.metadata,
+        repo_root, actual_grant, result.metadata, writes,
     )
 
     row = {

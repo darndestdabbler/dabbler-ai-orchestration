@@ -26,8 +26,12 @@ A routed call cannot mutate the workspace on either transport. The API path
 sends no tools; here the agentic CLI gets a read-only tool allowlist
 (``--available-tools view,grep,glob``) — ``--allow-all-tools`` stays because
 it governs auto-approval, and once the tool universe is read-only, "allow
-all" allows only read-only tools. ``--no-custom-instructions`` is part of the
-same parity: the CLI otherwise loads the workspace's ``AGENTS.md`` /
+all" allows only read-only tools. The one write the verifier is granted is
+not an exception to this: it is performed by the framework after the call
+returns, from a block in the answer, precisely so that a path outside the
+declared test root can be refused rather than merely discouraged. See
+``ai_router.agency``. ``--no-custom-instructions`` is part of the same
+parity: the CLI otherwise loads the workspace's ``AGENTS.md`` /
 ``CLAUDE.md`` into the system prompt, which would hand a routed verifier the
 orchestrator's own instructions — text the API path never sends, that
 inflates the payload, and that tells the verifier it is running the session

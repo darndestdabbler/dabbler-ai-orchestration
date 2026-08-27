@@ -1,4 +1,5 @@
-"""The verifier's read surface: scope, budget, the log, and read fidelity."""
+"""The verifier's tool surface: scope, budget, the log, read fidelity, and
+the one write the framework performs on its behalf."""
 
 import json
 
@@ -30,6 +31,21 @@ def call(tool, arguments, result=None) -> dict:
 
 def grant(scope=("app.py",), budget=agency.DEFAULT_READ_BUDGET):
     return agency.grant_for_transport("copilot-cli", scope, budget)
+
+
+def write_grant(allow_write=True):
+    """The seat grant with this repository's own test declaration on it."""
+    return agency.grant_for_transport(
+        "copilot-cli", ("app.py",), agency.DEFAULT_READ_BUDGET,
+        ("tests",), "test_*.py", allow_write,
+    )
+
+
+def proposal(path, content, ticks=3) -> str:
+    """What the verifier emits to ask for a test file. It has no write tool
+    on either transport, so the block is the whole of its half."""
+    fence = "`" * ticks
+    return f"{fence}test-write path={path}\n{content}\n{fence}\n"
 
 
 class TestScope:
@@ -276,3 +292,202 @@ class TestRoundRecord:
         # The scope the verifier was told about is the session's change.
         assert "widget.py" in recorded["scope"]
         assert "widget.py" in fake_route.prompt
+
+
+class TestTheWrite:
+    """Operation (d): the verifier proposes a test file and the framework
+    writes it. No tool performs this on either transport, which is what
+    makes a refusal possible rather than merely requested."""
+
+    def test_the_framework_writes_the_file_the_verifier_proposes(
+        self, tmp_path
+    ):
+        writes = agency.apply_test_writes(
+            tmp_path, write_grant(),
+            "Here is the case the diff misses.\n\n" + proposal(
+                "tests/test_widget.py", "def test_empty():\n    assert True"
+            ),
+        )
+
+        assert [w.outcome for w in writes] == [agency.WRITE_ACCEPTED]
+        assert writes[0].action == agency.ACTION_CREATED
+        written = (tmp_path / "tests" / "test_widget.py").read_text(
+            encoding="utf-8"
+        )
+        assert written == "def test_empty():\n    assert True\n"
+        assert writes[0].bytes_written == len(written.encode("utf-8"))
+
+    def test_an_existing_test_is_replaced_and_recorded_as_modified(
+        self, tmp_path
+    ):
+        (tmp_path / "tests").mkdir()
+        target = tmp_path / "tests" / "test_widget.py"
+        target.write_text("def test_old():\n    assert False\n",
+                          encoding="utf-8")
+
+        writes = agency.apply_test_writes(
+            tmp_path, write_grant(),
+            proposal("tests/test_widget.py",
+                     "def test_new():\n    assert True"),
+        )
+
+        assert writes[0].action == agency.ACTION_MODIFIED
+        assert target.read_text(encoding="utf-8") == (
+            "def test_new():\n    assert True\n"
+        )
+
+    def test_a_write_outside_the_declared_test_root_is_refused(
+        self, tmp_path
+    ):
+        """Refused by the framework before any byte is written, on the
+        repository's own declaration of where tests live -- not discouraged
+        by a sentence in the prompt."""
+        (tmp_path / "ai_router").mkdir()
+        (tmp_path / "ai_router" / "verify.py").write_text(
+            "REAL = 1\n", encoding="utf-8"
+        )
+        text = "".join(proposal(path, "TOUCHED = 1") for path in (
+            "ai_router/verify.py",           # not under a test root
+            "tests/conftest.py",             # under it, not a test name
+            "tests/../ai_router/verify.py",  # traversal back out
+            # The same traversal spelled with backslashes. On POSIX this is
+            # one filename until `open` sees it, so a check that reads it as
+            # a string and a write that reads it as a path disagree.
+            "tests\\..\\ai_router\\test_escape.py",
+            "../outside/test_escape.py",     # out of the repository
+        ))
+
+        writes = agency.apply_test_writes(tmp_path, write_grant(), text)
+
+        assert [w.outcome for w in writes] == [agency.WRITE_REFUSED] * 5
+        assert all(w.reason for w in writes)
+        # The path recorded is the one the filesystem would have acted on,
+        # so the decision and the write can never be about different files.
+        assert writes[3].path == "ai_router/test_escape.py"
+        assert (tmp_path / "ai_router" / "verify.py").read_text(
+            encoding="utf-8"
+        ) == "REAL = 1\n"
+        assert not (tmp_path / "ai_router" / "test_escape.py").exists()
+        assert not (tmp_path / "tests").exists()
+        assert not (tmp_path.parent / "outside").exists()
+
+    def test_a_round_that_granted_no_write_refuses_the_proposal(
+        self, tmp_path
+    ):
+        """The tests phase authors tests; a review round does not. A surface
+        offered in every round is a surface used in every round."""
+        writes = agency.apply_test_writes(
+            tmp_path, write_grant(allow_write=False),
+            proposal("tests/test_widget.py", "def test_x():\n    assert True"),
+        )
+
+        assert writes[0].outcome == agency.WRITE_REFUSED
+        assert "granted no write" in writes[0].reason
+        assert not (tmp_path / "tests").exists()
+
+    def test_an_empty_block_is_refused_rather_than_emptying_the_file(
+        self, tmp_path
+    ):
+        """A write carrying nothing is a deletion wearing a write's name."""
+        (tmp_path / "tests").mkdir()
+        target = tmp_path / "tests" / "test_widget.py"
+        target.write_text("def test_x():\n    assert True\n", encoding="utf-8")
+
+        writes = agency.apply_test_writes(
+            tmp_path, write_grant(), proposal("tests/test_widget.py", ""),
+        )
+
+        assert writes[0].outcome == agency.WRITE_REFUSED
+        assert target.read_text(encoding="utf-8") == (
+            "def test_x():\n    assert True\n"
+        )
+
+    def test_a_malformed_proposal_is_recorded_rather_than_dropped(
+        self, tmp_path
+    ):
+        """A proposal that vanishes silently looks exactly like one that was
+        never made, and the round would show nothing either way."""
+        no_path = "```test-write\ndef test_x():\n    assert True\n```\n"
+        unterminated = (
+            "```test-write path=tests/test_widget.py\n"
+            "def test_x():\n    assert True\n"
+        )
+
+        writes = agency.apply_test_writes(
+            tmp_path, write_grant(), no_path + "\n" + unterminated,
+        )
+
+        assert [w.outcome for w in writes] == [agency.WRITE_REFUSED] * 2
+        assert "named no path" in writes[0].reason
+        assert "never closed" in writes[1].reason
+        assert not (tmp_path / "tests").exists()
+
+    def test_a_quoted_example_proposes_nothing_and_a_longer_fence_nests(
+        self, tmp_path
+    ):
+        """A review that shows the format is not a review that used it, and
+        a test file may itself contain a fence."""
+        quoted = (
+            "Use this form:\n\n````text\n"
+            "```test-write path=tests/test_quoted.py\nbody\n```\n````\n"
+        )
+        nested = proposal(
+            "tests/test_nested.py", "DOC = '''\n```\n'''", ticks=4
+        )
+
+        writes = agency.apply_test_writes(
+            tmp_path, write_grant(), quoted + nested,
+        )
+
+        assert [w.path for w in writes] == ["tests/test_nested.py"]
+        assert not (tmp_path / "tests" / "test_quoted.py").exists()
+        assert "\n```\n" in (tmp_path / "tests" / "test_nested.py").read_text(
+            encoding="utf-8"
+        )
+
+    def test_the_briefing_offers_the_write_only_when_it_is_granted(self):
+        offered = agency.briefing(write_grant())
+        assert "test-write path=tests/test_example.py" in offered
+        assert "test_*.py" in offered
+
+        withheld = agency.briefing(write_grant(allow_write=False))
+        assert "test-write" not in withheld
+        assert "no way to change anything" in withheld
+
+    def test_the_round_records_every_write_decision(
+        self, sandbox_repo, monkeypatch
+    ):
+        import importlib
+
+        repo, set_dir = sandbox_repo
+        register_session_start(set_dir, 1, engine="claude-code",
+                               provider="anthropic")
+        (repo / "widget.py").write_text("def f(xs): return 1/len(xs)\n",
+                                        encoding="utf-8")
+        record_preverify(repo, set_dir)
+
+        def fake_route(content, **kwargs):
+            return make_result(
+                CLEAN_RESPONSE + "\n\n" + proposal(
+                    "tests/test_widget.py",
+                    "def test_empty():\n    assert True",
+                ),
+                transport="copilot-cli", metadata={"tool_calls": []},
+            )
+
+        monkeypatch.setattr(
+            importlib.import_module("ai_router.route"), "route", fake_route
+        )
+        assert run_round(set_dir) == EXIT_OK
+
+        recorded = ledger.read_rounds(repo, set_dir.name, 1)[0]["agency"]
+        assert recorded["writes_applied"] == 0
+        assert recorded["writes_refused"] == 1
+        assert recorded["writes"][0]["path"] == "tests/test_widget.py"
+        assert recorded["writes"][0]["outcome"] == agency.WRITE_REFUSED
+        assert not (repo / "tests" / "test_widget.py").exists()
+        # And the operator sees it without opening the ledger.
+        assert "1 write(s) refused" in (
+            set_dir / "change-log.md"
+        ).read_text(encoding="utf-8")
+

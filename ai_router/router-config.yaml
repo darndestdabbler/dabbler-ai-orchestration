@@ -592,6 +592,7 @@ testing:
           - tests/test_affected.py
           - tests/test_verify.py
           - tests/test_step_execution.py
+          - tests/test_agency.py
       - when: ai_router/approved_plan.py
         select:
           - tests/test_approved_plan.py
@@ -781,6 +782,7 @@ testing:
           - tests/test_plan_review.py
           - tests/test_step_execution.py
           - tests/test_ledger.py
+          - tests/test_agency.py
           - tests/test_verify.py
           - tests/test_gates.py
           - tests/test_runcore_contracts.py

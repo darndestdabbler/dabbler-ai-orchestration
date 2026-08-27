@@ -1533,3 +1533,31 @@ The round's nit was taken as well: `workflow status` now shows the round
 count while the loop is still open, not only once it has closed. The count is
 what says how much room is left, which is worth more before the loop ends
 than after.
+
+## Session 11 — The verifier authors tests, the framework runs them (plan B2)
+
+### D68 · 2026-08-27 · Orchestrator · The tests loop lands on the three existing terminal states, decided against a tree id rather than an opinion
+
+Spec 3.c.ii says the tests loop ends 'on the same terms as c.i', and c.i has three terminal states in a closed vocabulary. No fourth state was invented: run_terminal returns a token from verdict.SESSION_VERDICTS and passes it back through validate_session_verdict on the way out.
+
+What differs is the evidence. The review loop decides remediation by comparing the digest of each cited artifact against what the round was sent. A test round cites nothing -- it exits 0 or it does not -- so the comparison is the tree id the run measured against the tree now. At the cap, a tree that has moved since the failing run is a repair the bound left unrun (remediated at the cap); a tree that has not moved is unresolved. A run that could not name the tree it measured is unresolved too, because an exit code that cannot be tied to a tree is not evidence about one.
+
+This keeps the trap c.i's third state exists for shut on this side as well: a session that agreed with every failure and fixed them all has an exit, instead of hanging at the cap waiting for a person who is not coming.
+
+### D69 · 2026-08-27 · Orchestrator · The verifier's write is granted in the tests round only, and the framework never asks it how the tests went
+
+Session 7 built operation (d) and left the grant off everywhere, because a reviewer that quietly edits the tree it is reviewing has stopped being a reviewer. This session turns it on in exactly one place: testphase.author builds its grant with allow_write=True, and verify.py's review rounds still build theirs with allow_write=False. Both paths read the same test-root declaration under testing.selection, so the boundary is defined once.
+
+The other half of the split is what the prompt does not ask for. The authoring prompt asks for files and says, in the same breath, that the verifier will not run them and must not say whether they pass. A verifier that both writes tests and reports on them is scoring its own work, and the result stops being a field the loop can branch on. What the loop reads is checks.execute's exit code, judged against the tree the run measured -- an observation, not a claim.
+
+A written path no declared suite covers is refused rather than run by some command invented here: a test whose runner nobody declared is a test whose green means nothing.
+
+### D70 · 2026-08-27 · Verifier (gpt-5.4/openai) · The verifier's one write is decoupled from the read tools, because no tool performs it
+
+Round 1 raised a Major finding: the tests phase worked only on copilot-cli. grant_for_transport collapsed every other transport to AgencyGrant(MODE_NONE, (), 0), so briefing() described no write block and _confine() refused every proposal for lacking OP_WRITE. A no-seat install -- the configuration this package ships as its default, per config.py's own statement that the bundled file must stay correct for a fresh install with API keys and no seat -- could not author tests at all, and the tests phase is required of every session.
+
+The finding was upheld rather than disputed, on the merits. Spec 4.b withholds agency from the direct-API path for a stated reason: the tool surface would need a tool-use loop written three times against three vendors' function-calling protocols. Operation (d) costs none of that. It is a fenced block in an ordinary answer, and the framework -- not the model -- opens the file. So the reason 4.b gives does not reach it, and the set spec's exclusion ('the seat has the tool surface, the API path records agency: none') still holds after the change: the API path still sends no tools and still records mode none.
+
+Session 7 had tied the two together on the grounds that a round which could not look is not a round that may author tests. In this phase that premise does not hold -- the artifacts under test are in the prompt. A tool-less authoring round is briefed that it can see only what it was sent, and the record says mode: none, so a reader can tell the two kinds of round apart.
+
+Also fixed, from the same round's nit: remediated-at-the-cap is decided against the tree the run left behind rather than the tree it was measuring. A suite that dirties the worktree is already failed evidence and must not be able to call its own side effect a repair.

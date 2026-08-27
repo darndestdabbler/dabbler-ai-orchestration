@@ -23,10 +23,19 @@ state is computed from the log and the artifacts on disk; no event asserts it
 and no caller can type one. Only rounds that reached a vendor are counted,
 because the bound exists to stop an unattended loop spending on vendors.
 
+**The tests loop is the same shape and a different meter.** The verifier
+authors the tests and the framework runs them, so a test round is judged by
+an exit code rather than by an opinion, and its bound is
+``verification.settings.max_test_rounds``. It lands on the same three
+terminal states, computed the same way: green is verified, and at the cap a
+tree that has moved since the failing run is a repair the cap left unrun.
+
 **Only a step change opens a new loop.** Sending work back or carrying it
 forward resets the round count. Re-entering the step the work is already in
 is inert — it moves nothing, so it changes nothing, and treating it as a move
-would be the cheapest way to spend past the cap.
+would be the cheapest way to spend past the cap. Authoring more tests does
+not reset it either: re-authoring at the cap would be the same evasion
+wearing a different name.
 
 **The bound binds the writer, not the reader.** ``validate_transition`` does
 not refuse a round for being over the cap: an operator who lowers the cap
@@ -45,7 +54,8 @@ from typing import Optional
 
 from ai_router import verdict as verdictmod
 from ai_router.config import (
-    DEFAULT_VERIFICATION_ROUNDS, load_config, verification_round_cap,
+    DEFAULT_TEST_ROUNDS, DEFAULT_VERIFICATION_ROUNDS, load_config,
+    run_round_cap, verification_round_cap,
 )
 from ai_router.solution import (
     APPROVAL_STEPS, STEPS, STEP_TITLES, ManifestError,
@@ -59,7 +69,10 @@ LOG_RELPATH = Path(".dabbler") / "solution" / "events.jsonl"
 PROJECTION_RELPATH = Path(".dabbler") / "solution" / "projection.json"
 REVIEWS_RELDIR = Path(".dabbler") / "solution" / "reviews"
 
-EVENTS = ("entered", "reviewed", "approved", "returned", "contract-changed")
+EVENTS = (
+    "entered", "reviewed", "approved", "returned", "contract-changed",
+    "tests-authored", "tested",
+)
 SCOPES = ("solution", "component")
 
 #: How each terminal state of the review loop reads. The keys are the closed
@@ -70,6 +83,10 @@ TERMINAL_HEADLINES = {
     verdictmod.VERDICT_ISSUES_FOUND: "unresolved at the cap",
     verdictmod.VERDICT_REMEDIATED_AT_CAP: "remediated at the cap",
 }
+
+#: How much of a red run's output the loop echoes. Enough to name what
+#: failed; the whole run is in the record either way.
+TEST_OUTPUT_TAIL_LINES = 40
 
 
 class WorkflowError(Exception):
@@ -201,6 +218,16 @@ def validate_transition(state, event: dict) -> None:
                 f"work is not in is an event about other work."
             )
 
+    if kind == "tested" and not (state or {}).get("testsAuthored"):
+        raise WorkflowError(
+            f"{target}: no test has been authored at {STEP_TITLES[current]}, "
+            f"so there is nothing here the verifier wrote. The tests phase "
+            f"runs tests the author did not write — a run of the author's "
+            f"own tests recorded as this phase would prove the one thing the "
+            f"split exists to stop it proving. Run `workflow author-tests` "
+            f"first."
+        )
+
 
 def append(root, event: dict) -> dict:
     """Machine-written only. Never edited, never corrected in place."""
@@ -241,7 +268,8 @@ def fold(events: list) -> dict:
             "step": STEPS[0], "reviewed": False, "approved": False,
             "returns": 0, "history": [], "waitingOn": None,
             "findings": [], "reviewers": [], "reviewRounds": 0,
-            "lastLiveReview": None,
+            "lastLiveReview": None, "reviewWaitingOn": None,
+            "testsAuthored": [], "testRounds": 0, "lastTestRun": None,
         })
         kind = e["event"]
         s["history"].append(e)
@@ -265,6 +293,8 @@ def fold(events: list) -> dict:
             # last step produced are not spent against this one.
             s["reviewRounds"] = 0
             s["lastLiveReview"] = None
+            s["reviewWaitingOn"] = None
+            _open_test_loop(s)
         elif kind == "reviewed":
             # A scripted review is a rehearsal, not a reading. It is recorded
             # in full and it satisfies nothing a live review satisfies -- the
@@ -288,9 +318,14 @@ def fold(events: list) -> dict:
                 s["waitingOn"] = "author"
             else:
                 s["waitingOn"] = None
+            # Kept so a green test round can hand the work back to whoever
+            # the review left it with, instead of clearing a gate the tests
+            # know nothing about.
+            s["reviewWaitingOn"] = s["waitingOn"]
         elif kind == "approved":
             s["approved"] = True
             s["waitingOn"] = None
+            s["reviewWaitingOn"] = None
         elif kind == "returned":
             s["step"] = e["toStep"]
             s["reviewed"] = False
@@ -301,9 +336,40 @@ def fold(events: list) -> dict:
             s["reviewers"] = []
             s["reviewRounds"] = 0
             s["lastLiveReview"] = None
+            s["reviewWaitingOn"] = "author"
+            _open_test_loop(s)
+        elif kind == "tests-authored":
+            # Accumulated, never replaced: a second hand-off adds files, and
+            # a file the first round wrote still has to pass.
+            s["testsAuthored"] = sorted(set(s["testsAuthored"]).union(
+                e.get("written") or []
+            ))
+        elif kind == "tested":
+            s["testRounds"] += 1
+            s["lastTestRun"] = e
+            # A red run leaves the work with the author. A green one is not
+            # an answer about who is waited on: the review's own answer, gate
+            # or block, still stands, and clearing it here would make an
+            # approval a developer owes disappear because a suite passed.
+            s["waitingOn"] = (
+                s["reviewWaitingOn"] if e.get("green") else "author"
+            )
         elif kind == "contract-changed":
             s["waitingOn"] = "developer" if e.get("needsApproval") else None
     return state
+
+
+def _open_test_loop(s: dict) -> None:
+    """Start this target's tests phase over.
+
+    Called wherever the work moves, and nowhere else. Tests authored against
+    what the last step produced answer for that step, so carrying them
+    forward would run yesterday's proof against today's code and read the
+    result as this step's.
+    """
+    s["testsAuthored"] = []
+    s["testRounds"] = 0
+    s["lastTestRun"] = None
 
 
 def _project_review_loop(node: dict, root, state: dict, cap: int) -> None:
@@ -324,6 +390,19 @@ def _project_review_loop(node: dict, root, state: dict, cap: int) -> None:
     )
 
 
+def _project_test_loop(node: dict, root, state: dict, cap: int) -> None:
+    """The tests phase's position, on the same terms and for the same
+    reason."""
+    terminal = run_terminal(root, state, cap)
+    node["testsAuthored"] = list(state.get("testsAuthored") or [])
+    node["testRounds"] = state.get("testRounds", 0)
+    node["testCap"] = cap
+    node["testTerminal"] = terminal
+    node["testTerminalLabel"] = (
+        TERMINAL_HEADLINES[terminal] if terminal else None
+    )
+
+
 def project(root) -> dict:
     """What the Explorer reads: the manifest, joined to live state."""
     try:
@@ -333,6 +412,7 @@ def project(root) -> dict:
 
     state = fold(read(root))
     cap = review_cap(root)
+    tcap = run_cap(root)
     doc = solmod.as_dict(solution)
     sol_state = state.get("solution", {})
     doc["solution"]["waitingOn"] = sol_state.get("waitingOn")
@@ -340,6 +420,7 @@ def project(root) -> dict:
     doc["solution"]["reviewers"] = sol_state.get("reviewers", [])
     doc["solution"]["findings"] = sol_state.get("findings", [])
     _project_review_loop(doc["solution"], root, sol_state, cap)
+    _project_test_loop(doc["solution"], root, sol_state, tcap)
     if sol_state.get("step"):
         doc["solution"]["step"] = sol_state["step"]
         doc["solution"]["stepTitle"] = STEP_TITLES[sol_state["step"]]
@@ -358,6 +439,7 @@ def project(root) -> dict:
         c["reviewers"] = cs.get("reviewers", [])
         c["findings"] = cs.get("findings", [])
         _project_review_loop(c, root, cs, cap)
+        _project_test_loop(c, root, cs, tcap)
 
     waiting = [c["name"] for c in doc["components"] if c["waitingOn"] == "developer"]
     if doc["solution"]["waitingOn"] == "developer":
@@ -428,6 +510,21 @@ def review_cap(root) -> int:
         return verification_round_cap(load_config(project_dir=str(root)))
     except Exception:
         return DEFAULT_VERIFICATION_ROUNDS
+
+
+def run_cap(root) -> int:
+    """How many times the tests phase may run before its loop terminates,
+    resolved on the same terms as :func:`review_cap` and from the same
+    workspace.
+
+    Named for what it counts rather than for the phase: a ``test_``-prefixed
+    module attribute is collected by pytest wherever it is imported, and a
+    bound that reports itself as a failing test is worse than a clumsy name.
+    """
+    try:
+        return run_round_cap(load_config(project_dir=str(root)))
+    except Exception:
+        return DEFAULT_TEST_ROUNDS
 
 
 def blocking_findings(event: dict) -> list:
@@ -530,15 +627,83 @@ def _terminal_refusal(target: str, step: str, state: dict,
     )
 
 
-def file_review(root, target: str, step: str, raws: list) -> list:
-    """Write each reviewer's reply verbatim. A summary is not a record, and a
-    finding that only exists as someone's paraphrase cannot be re-read."""
+# --- The bounded tests loop --------------------------------------------------
+
+def run_terminal(root, state: dict, cap: int) -> Optional[str]:
+    """Which terminal state this target's tests phase has reached, or
+    ``None`` while its loop is still open.
+
+    The same three states as the review loop and the same closed vocabulary,
+    decided against an exit code instead of an opinion:
+
+    - **Verified** — the last run was green. Green is green: there is no
+      severity to weigh and no early stop to make, because a passing suite
+      is already the cheapest possible ending.
+    - **Remediated at the cap** — the cap is reached on a red run, and the
+      tree has moved since that run finished. Something was repaired and the
+      bound left the repair unrun. It is not a waiver: no failure was
+      accepted, and what is unproved is the fix.
+    - **Unresolved** — the cap is reached, and the tree is the one the run
+      left behind. Nothing has been done about it, and a run that could not
+      name the tree it left lands here too: a state that cannot be compared
+      is not evidence of a repair.
+
+    The comparison is against the tree **after** the run rather than the one
+    it was measuring, so a suite that dirties the worktree cannot label its
+    own side effect a repair. Such a run is already failed evidence; it must
+    not also be the cheapest way out of an unresolved loop.
+    """
+    last = (state or {}).get("lastTestRun")
+    if not last:
+        return None
+    if last.get("green"):
+        return verdictmod.validate_session_verdict(verdictmod.VERDICT_VERIFIED)
+    if (state.get("testRounds") or 0) < cap:
+        return None
+    from ai_router.checks import snapshot_worktree_tree
+
+    left = last.get("postTreeDigest")
+    current = snapshot_worktree_tree(root)
+    token = (
+        verdictmod.VERDICT_REMEDIATED_AT_CAP
+        if left and current and current != left
+        else verdictmod.VERDICT_ISSUES_FOUND
+    )
+    return verdictmod.validate_session_verdict(token)
+
+
+def _run_terminal_refusal(target: str, step: str, state: dict,
+                          terminal: str, cap: int) -> str:
+    rounds = state.get("testRounds") or 0
+    last = state.get("lastTestRun") or {}
+    detail = ""
+    if terminal == verdictmod.VERDICT_ISSUES_FOUND:
+        detail = (
+            f"\n  last run: exit {last.get('exitCode')} on "
+            f"{last.get('command')}"
+        )
+    return (
+        f"{target} — {STEP_TITLES[step]}: tests {TERMINAL_HEADLINES[terminal]} "
+        f"after {rounds} round(s), cap {cap}. This step's tests loop is closed "
+        f"and no further run or authoring opens on it.{detail}\n"
+        "Authoring more tests does not reopen it — that would be spending "
+        "past the bound by another name. Move the work instead: "
+        "`workflow send-back --to <step> --reason ...` returns it to the "
+        "author, `workflow enter <next step>` carries it forward."
+    )
+
+
+def file_review(root, target: str, step: str, raws: list, kind: str = "") -> list:
+    """Write each model's reply verbatim. A summary is not a record, and a
+    finding — or a test file — that only exists as someone's paraphrase
+    cannot be re-read."""
     out_dir = reviews_dir(root)
     out_dir.mkdir(parents=True, exist_ok=True)
     stamp = _now().replace(":", "").replace("-", "")
+    stem = f"{target}-{step}" + (f"-{kind}" if kind else "")
     written = []
     for i, raw in enumerate(raws, 1):
-        path = out_dir / f"{target}-{step}-{stamp}-r{i}.md"
+        path = out_dir / f"{stem}-{stamp}-r{i}.md"
         path.write_text(raw, encoding="utf-8")
         written.append(str(path))
     return written
@@ -617,18 +782,147 @@ def _run_review(args, root) -> int:
     return EXIT_OK
 
 
-def _loop_label(node: dict) -> str:
-    """Where the review loop stands, whether or not it has opened or closed.
+def _loop_label(node: dict, prefix: str = "review") -> str:
+    """Where a loop stands, whether or not it has opened or closed.
 
     Shown unconditionally. A count is most useful before the loop ends —
     it is what says how much room is left — so hiding it until the first
     round or until the loop closes withholds it exactly when it is worth
     reading.
     """
-    position = f"{node['reviewRounds']}/{node['reviewCap']} rounds"
-    if node["reviewTerminal"]:
-        return f"{node['reviewTerminalLabel']}, {position}"
+    position = f"{node[prefix + 'Rounds']}/{node[prefix + 'Cap']} rounds"
+    if node[prefix + "Terminal"]:
+        return f"{node[prefix + 'TerminalLabel']}, {position}"
     return f"open, {position}"
+
+
+def _tests_position(root, target: str, cap: int) -> None:
+    after = fold(read(root)).get(target) or {}
+    reached = run_terminal(root, after, cap)
+    spent = after.get("testRounds") or 0
+    if reached is not None:
+        print(f"  loop closed: tests {TERMINAL_HEADLINES[reached]} "
+              f"({spent}/{cap} rounds)")
+    else:
+        print(f"  round {spent} of {cap}")
+
+
+def _refuse_if_tests_loop_closed(root, target: str, state: dict,
+                                 cap: int) -> None:
+    terminal = run_terminal(root, state, cap)
+    if terminal is not None:
+        raise WorkflowError(_run_terminal_refusal(
+            target, state["step"], state, terminal, cap
+        ))
+
+
+def _run_author_tests(args, root) -> int:
+    """The hand-off. The verifier is asked for files and nothing else, and
+    the framework is what opens one."""
+    from ai_router import testphase
+
+    target = _target(args)
+    state = require_state(root, target)
+    step = state["step"]
+    cap = run_cap(root)
+    _refuse_if_tests_loop_closed(root, target, state, cap)
+
+    try:
+        authoring, raw = testphase.author(
+            root, target, step, args.artifact,
+            load_config(project_dir=str(root)),
+            author_provider=args.author_provider, transport=args.transport,
+        )
+    except testphase.PhaseError as exc:
+        raise WorkflowError(str(exc)) from exc
+
+    filed = file_review(root, target, step, [raw], kind="tests")
+    append(root, {
+        "event": "tests-authored", "target": target, "step": step,
+        "written": list(authoring.written),
+        "author": authoring.as_dict(),
+        "records": filed,
+        "simulated": authoring.simulated,
+    })
+    try:
+        write_projection(root)
+    except (WorkflowError, ManifestError):
+        pass
+
+    if authoring.simulated:
+        print("  SCRIPTED AUTHORING — served from a response file, not a "
+              "vendor. These tests were not written by another vendor.")
+    print(f"{target} — {STEP_TITLES[step]}: tests authored by "
+          f"{authoring.model}/{authoring.provider}")
+    for write in authoring.writes:
+        if write.accepted:
+            print(f"  {write.action} {write.path} ({write.bytes_written} bytes)")
+        else:
+            print(f"  refused {write.path}: {write.reason}")
+    for path in filed:
+        print(f"  filed {path}")
+    if not authoring.written:
+        print("  nothing was written, so there is nothing to run. The record "
+              "carries every refusal above.")
+    return EXIT_OK
+
+
+def _run_tests(args, root) -> int:
+    """The framework's half: run what the verifier wrote and record what the
+    exit code said. No opinion is solicited and none is recorded."""
+    from ai_router import testphase
+
+    target = _target(args)
+    state = require_state(root, target)
+    step = state["step"]
+    cap = run_cap(root)
+    _refuse_if_tests_loop_closed(root, target, state, cap)
+    # The same judge the log is read back through. A run with nothing
+    # authored is refused here rather than after it has already happened.
+    validate_transition(state, {"event": "tested", "target": target,
+                                "step": step})
+
+    authored = list(state.get("testsAuthored") or [])
+    try:
+        run = testphase.run_authored(
+            root, load_config(project_dir=str(root)), authored
+        )
+    except testphase.PhaseError as exc:
+        raise WorkflowError(str(exc)) from exc
+
+    append(root, {
+        "event": "tested", "target": target, "step": step,
+        "green": run.green, "exitCode": run.exit_code,
+        "outcome": run.outcome, "command": run.command,
+        "suite": run.check.name, "tests": authored,
+        # The tree the run measured, and the one it left behind. Whether a
+        # later fix is unrun is decided against the second: a suite that
+        # dirtied the worktree must not be able to call its own side effect
+        # a repair.
+        "treeDigest": run.tree_digest,
+        "postTreeDigest": run.post_tree_digest,
+        "treeMutated": run.tree_mutated,
+        "timedOut": run.timed_out,
+        "durationSeconds": run.duration_seconds,
+    })
+    try:
+        write_projection(root)
+    except (WorkflowError, ManifestError):
+        pass
+
+    print(f"{target} — {STEP_TITLES[step]}: {run.command}")
+    print(f"  exit {run.exit_code} in {run.duration_seconds}s "
+          f"({'green' if run.green else 'red'})")
+    if run.tree_mutated:
+        print("  the run changed the tree it was measuring, so it did not "
+              "measure the tree anyone is about to commit")
+    if not run.green:
+        tail = [line for line in (run.output or "").splitlines() if line.strip()]
+        for line in tail[-TEST_OUTPUT_TAIL_LINES:]:
+            print(f"  | {line}")
+        print("  back with the author")
+    _tests_position(root, target, cap)
+    return EXIT_OK
 
 
 def _target_args(ap):
@@ -661,6 +955,22 @@ def _main(argv=None) -> int:
     a = sub.add_parser("approve", help="record the developer's approval")
     _target_args(a)
 
+    at = sub.add_parser(
+        "author-tests",
+        help="ask a verifier for this step's tests and write the ones the "
+             "boundary allows")
+    at.add_argument("--artifact", action="append", default=[], required=True,
+                    help="a file this step produced; repeatable")
+    at.add_argument("--author-provider",
+                    help="the provider that wrote the work, excluded from "
+                         "authoring its tests")
+    at.add_argument("--transport")
+    _target_args(at)
+
+    t = sub.add_parser(
+        "test", help="run the authored tests and record the exit code")
+    _target_args(t)
+
     b = sub.add_parser("send-back", help="return work to an earlier step")
     b.add_argument("--to", required=True, choices=STEPS, dest="to_step")
     b.add_argument("--reason", required=True)
@@ -690,6 +1000,7 @@ def _main(argv=None) -> int:
             print(f"{head['title']} — step {head['stepNumber']}/{head['stepCount']}: "
                   f"{head['stepTitle']}")
             print(f"  review {_loop_label(head)}")
+            print(f"  tests  {_loop_label(head, 'test')}")
             for comp in doc["components"]:
                 flag = ""
                 if comp["waitingOn"] == "developer":
@@ -697,6 +1008,7 @@ def _main(argv=None) -> int:
                 elif comp["waitingOn"] == "author":
                     flag = "  ← back with the author"
                 flag += f"  [review {_loop_label(comp)}]"
+                flag += f"  [tests {_loop_label(comp, 'test')}]"
                 loops = f"  ({comp['returns']} sent back)" if comp["returns"] else ""
                 print(f"  {comp['name']:<20} {comp['stepNumber']}/6 "
                       f"{comp['stepTitle']:<34}{loops}{flag}")
@@ -711,6 +1023,10 @@ def _main(argv=None) -> int:
             print(f"{_target(args)} → {STEP_TITLES[args.step]}")
         elif args.cmd == "review":
             return _run_review(args, root)
+        elif args.cmd == "author-tests":
+            return _run_author_tests(args, root)
+        elif args.cmd == "test":
+            return _run_tests(args, root)
         elif args.cmd == "approve":
             open_findings = fold(read(root)).get(_target(args), {}).get(
                 "findings", [])

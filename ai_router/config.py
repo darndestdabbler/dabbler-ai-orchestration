@@ -51,6 +51,12 @@ TRANSPORT_ENV_VAR = "DABBLER_TRANSPORT"
 #: The backstop every review loop shares when the config names no bound.
 DEFAULT_VERIFICATION_ROUNDS = 3
 
+#: The backstop for the test loop. Higher than the review bound because the
+#: rounds are different things: a review round buys a vendor's opinion, a
+#: test round runs a suite the framework already has. What both bounds stop
+#: is an unattended loop that never converges.
+DEFAULT_TEST_ROUNDS = 7
+
 CRITIQUE_PIPELINE_DEFAULT = "off"
 CRITIQUE_PIPELINE_SHADOW = "shadow"
 CRITIQUE_PIPELINE_ENFORCE = "enforce"
@@ -322,6 +328,21 @@ def _validate_copilot_block(config: dict) -> None:
     validate_transport_timeouts(block.get("timeouts"))
 
 
+def _round_cap(config: dict, key: str, default: int) -> int:
+    """A loop bound from ``verification.settings``, or the shipped default.
+
+    A missing, unparseable or non-positive setting falls back to the default
+    rather than to no cap — a bound that a malformed config can switch off
+    is not a bound.
+    """
+    settings = (config.get("verification") or {}).get("settings") or {}
+    try:
+        cap = int(settings.get(key, default))
+    except (TypeError, ValueError):
+        return default
+    return cap if cap >= 1 else default
+
+
 def verification_round_cap(config: dict) -> int:
     """How many review rounds any loop may open before it must terminate.
 
@@ -330,17 +351,25 @@ def verification_round_cap(config: dict) -> int:
     about. The closed severity vocabulary is the primary control and this is
     the backstop: an unattended loop that never converges still stops
     calling vendors.
-
-    A missing, unparseable or non-positive setting falls back to the default
-    rather than to no cap — a bound that a malformed config can switch off
-    is not a bound.
     """
-    settings = (config.get("verification") or {}).get("settings") or {}
-    try:
-        cap = int(settings.get("max_rounds", DEFAULT_VERIFICATION_ROUNDS))
-    except (TypeError, ValueError):
-        return DEFAULT_VERIFICATION_ROUNDS
-    return cap if cap >= 1 else DEFAULT_VERIFICATION_ROUNDS
+    return _round_cap(config, "max_rounds", DEFAULT_VERIFICATION_ROUNDS)
+
+
+def run_round_cap(config: dict) -> int:
+    """How many times the framework runs the authored tests before the loop
+    must terminate.
+
+    Separate from the review bound because the two loops meter different
+    things — a review round buys a vendor's opinion and a test round runs a
+    suite — and one number serving both would tune each against the other's
+    cost.
+
+    Named for the runs it counts rather than for the phase: a
+    ``test_``-prefixed module attribute is collected by pytest wherever it is
+    imported, and a bound that reports itself as a failing test is worse than
+    a clumsy name.
+    """
+    return _round_cap(config, "max_test_rounds", DEFAULT_TEST_ROUNDS)
 
 
 def resolve_transport(config: dict, cli_flag: str | None = None) -> str:

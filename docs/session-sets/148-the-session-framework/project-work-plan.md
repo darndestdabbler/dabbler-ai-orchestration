@@ -46,7 +46,7 @@ it.
 | 8 | Selection by role, and the death of the tier ladder (plan A6) | no | 2026-08-27 |
 | 9 | Model discovery (plan A7) | yes | 2026-08-27 |
 | 10 | The code review loop (plan B1) | no | 2026-08-27 |
-| 11 | The verifier authors tests, the framework runs them (plan B2) | — | not declared |
+| 11 | The verifier authors tests, the framework runs them (plan B2) | no | 2026-08-27 |
 | 12 | The full suite and its bounded fix loop (plan B3) | — | not declared |
 | 13 | Packaging to the feed (plan C) | — | not declared |
 | 14 | Collapse session sets (plan A3) | — | not declared |
@@ -223,3 +223,9 @@ Not in scope: the session verifier's loop (already capped since session 3),
 the tests loop (B2, session 11), the full-suite fix loop (B3, session 12),
 and the solution driver's developer approval steps, which belong to the
 decomposition product rather than to this framework's session lifecycle.
+
+### Session 11 — The verifier authors tests, the framework runs them (plan B2)
+
+**Releasable: no.**
+
+Build the tests phase of spec 3.c.ii: the verifier authors test files through the session 7 write path with the write grant on, the framework runs them through checks.execute and reports the exit code, and a bounded test-fix loop (cap 7) carries its round count into the terminal outcome.

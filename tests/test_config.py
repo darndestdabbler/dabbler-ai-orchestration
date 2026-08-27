@@ -9,6 +9,7 @@ from ai_router.config import (
     load_config,
     resolve_generation_params,
     resolve_transport,
+    run_round_cap,
     verification_round_cap,
     _split_sections,
 )
@@ -36,6 +37,14 @@ class TestTheVerificationRoundCap:
         assert verification_round_cap(
             {"verification": {"settings": settings}}
         ) == DEFAULT_VERIFICATION_ROUNDS
+
+    def test_the_tests_phase_is_metered_separately(self):
+        """One number serving both loops would tune each against the other's
+        cost: a review round buys a vendor's opinion, a test round runs a
+        suite the framework already has."""
+        settings = {"max_rounds": 2, "max_test_rounds": 9}
+        config = {"verification": {"settings": settings}}
+        assert (verification_round_cap(config), run_round_cap(config)) == (2, 9)
 
 
 def _write_config(tmp_path, config):

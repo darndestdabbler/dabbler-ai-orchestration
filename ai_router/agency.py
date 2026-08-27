@@ -173,6 +173,10 @@ def session_scope(repo_root, set_dir, changed_paths) -> tuple:
     the modules they declare they depend on, and the session set's own
     directory -- which carries the spec the work is judged against.
 
+    ``set_dir`` is optional: a round outside a session set has no spec
+    directory to add, and naming one that does not exist would put a path
+    in the scope that no reader could open.
+
     Never the whole repository. A scope that resolved to everything would
     make the out-of-scope count structurally unreachable and the limit a
     decoration.
@@ -180,7 +184,7 @@ def session_scope(repo_root, set_dir, changed_paths) -> tuple:
     changed = {_posix(p) for p in (changed_paths or ()) if str(p).strip()}
     scope = set(changed)
     scope |= declared_dependencies(repo_root, changed)
-    set_rel = _relative_posix(repo_root, set_dir)
+    set_rel = _relative_posix(repo_root, set_dir) if set_dir else None
     if set_rel:
         scope.add(set_rel)
     return tuple(sorted(scope))
@@ -251,9 +255,12 @@ class AgencyGrant:
 
     @property
     def operations(self) -> tuple:
-        if self.mode != MODE_TOOLS:
-            return ()
-        return READ_OPERATIONS + ((OP_WRITE,) if self.allow_write else ())
+        """What this round could do. Reads need a transport that carries the
+        tools; the write does not, because no tool performs it — the model
+        describes a file and the framework opens one, which works over any
+        transport that returns text."""
+        reads = READ_OPERATIONS if self.mode == MODE_TOOLS else ()
+        return reads + ((OP_WRITE,) if self.allow_write else ())
 
     @property
     def test_selection(self) -> SelectionConfig:
@@ -269,24 +276,50 @@ def grant_for_transport(
     """Only the seat path is agentic. Naming the transport here keeps the
     two paths from being recorded as the same kind of review.
 
-    The write rides on the same grant even though no tool carries it: a
-    round that could not look is not a round that may author tests, and
-    tying the two together means one answer to "what could this round do".
+    **The write does not depend on the transport, and the reads do.** The
+    tool surface is the seat's, because giving it to the direct-API path
+    means a tool-use loop written three times against three vendors'
+    function-calling protocols. The write costs none of that: it is a fenced
+    block in an ordinary answer. Confining it to the seat as well would put
+    the tests phase — which the lifecycle requires of every session — out of
+    reach of the configuration this package ships as its default, and the
+    round that authored without tools already says so in ``mode``.
     """
     if transport == "copilot-cli":
         return AgencyGrant(
             MODE_TOOLS, tuple(scope), read_budget,
             tuple(test_roots), test_glob, allow_write,
         )
-    return AgencyGrant(MODE_NONE, (), 0)
+    return AgencyGrant(
+        MODE_NONE, (), 0, tuple(test_roots), test_glob, allow_write,
+    )
 
 
 def briefing(grant: AgencyGrant) -> str:
-    """What the verifier is told about its own surface. Empty on the
-    direct-API path: describing tools that were not sent invites a model to
-    report reads it never made."""
-    if grant.mode != MODE_TOOLS:
-        return ""
+    """What the verifier is told about its own surface.
+
+    Nothing is described that was not granted: describing tools that were
+    not sent invites a model to report reads it never made, and describing a
+    write that will be refused invites a proposal that costs a call to turn
+    away.
+    """
+    parts = []
+    if grant.mode == MODE_TOOLS:
+        parts.extend(_read_briefing(grant))
+    elif grant.allow_write:
+        parts.append(
+            "## What you can look at\n\n"
+            "**Only what is in this message.** You have no tools on this "
+            "transport — no way to list, search or open a file. Work from "
+            "the text you were given, and say so plainly where it is not "
+            "enough rather than describing a file you did not see."
+        )
+    if grant.allow_write:
+        parts.append(_write_briefing(grant))
+    return "\n\n".join(parts)
+
+
+def _read_briefing(grant: AgencyGrant) -> list:
     listed = "\n".join(f"- {path}" for path in grant.scope[:_MAX_RECORDED_SCOPE])
     write_note = (
         " and no way to change anything" if not grant.allow_write else ""
@@ -312,9 +345,7 @@ def briefing(grant: AgencyGrant) -> str:
         "the difference. Do not raise a hardcoded-secret finding from a "
         "read alone.",
     ]
-    if grant.allow_write:
-        parts.append(_write_briefing(grant))
-    return "\n\n".join(parts)
+    return parts
 
 
 def _write_briefing(grant: AgencyGrant) -> str:

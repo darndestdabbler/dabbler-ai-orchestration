@@ -5,15 +5,16 @@ import subprocess
 import pytest
 import yaml
 
-from ai_router import stepreview
+from ai_router import stepreview, testphase
 from ai_router import verdict as verdictmod
+from ai_router.checks import Check, CheckRun, snapshot_worktree_tree
 from ai_router.config import DEFAULT_VERIFICATION_ROUNDS
 from ai_router.solution import STEPS
 from ai_router.stepreview import ReviewerOutcome, StepReview, digest_text
 from ai_router.workflow import (EXIT_REFUSED, WorkflowError, append,
                                 current_step, fold, project, read,
-                                review_cap, review_terminal,
-                                validate_transition, _main)
+                                review_cap, review_terminal, run_cap,
+                                run_terminal, validate_transition, _main)
 
 
 def entries_through(target, step):
@@ -49,6 +50,29 @@ def _fake_review(target, step, artifact_paths, **kw):
         ],
     ), ["raw one", "raw two"]
 
+
+def authored(target, step, written=("tests/test_value.py",)):
+    return {"event": "tests-authored", "target": target, "step": step,
+            "written": list(written)}
+
+
+def ran(target, step, green=False, tree=None, **extra):
+    return {"event": "tested", "target": target, "step": step, "green": green,
+            "exitCode": 0 if green else 3, "treeDigest": tree,
+            "postTreeDigest": tree, **extra}
+
+
+def _fake_run(root, config, test_paths, **kw):
+    """Stands in for the suite. What is under test here is what the driver
+    records, not what pytest says."""
+    return CheckRun(
+        check=Check(name="unit", argv=("runner",)), stage="targeted",
+        command="runner " + " ".join(test_paths), tree_digest="t1",
+        post_tree_digest="t1", tree_mutated=False, exit_code=3,
+        duration_seconds=0.2, timed_out=False, outcome="failed",
+        selection={}, output="E   assert 1 == 2",
+    )
+
 MANIFEST = """
 solution:
   name: csv-demo
@@ -67,6 +91,15 @@ components:
 def root(tmp_path):
     (tmp_path / "solution.yaml").write_text(MANIFEST)
     return tmp_path
+
+
+@pytest.fixture
+def git_root(root):
+    """The workspace as a real repository. Whether a failing run has been
+    answered is decided by comparing tree ids, so the tests loop's terminal
+    states need a tree to compare."""
+    subprocess.run(["git", "init", "-q"], cwd=str(root), capture_output=True)
+    return root
 
 
 class TestLog:
@@ -441,6 +474,106 @@ class TestTheReviewLoopIsBounded:
                      if c["name"] == "csv-model")
         assert model["reviewRounds"] == 1
         assert model["reviewCap"] == review_cap(root)
+
+
+class TestTheTestsLoopIsBounded:
+    """Spec 3.c.ii: the verifier authors the tests, the framework runs them,
+    and what the loop reads is an exit code rather than an opinion. The bound
+    and the three terminal states are the review loop's, on the same terms."""
+
+    def test_a_run_with_nothing_authored_is_refused_by_the_record(self, root):
+        """A run of the author's own tests filed as this phase would prove
+        the one thing the split exists to stop it proving."""
+        append(root, {"event": "entered", "target": "a", "step": "plan"})
+        with pytest.raises(WorkflowError, match="no test has been authored"):
+            append(root, ran("a", "plan"))
+
+    def test_a_green_run_closes_the_loop_as_verified(self, root):
+        """There is no early stop to make: a passing suite is already the
+        cheapest ending there is."""
+        state = fold([
+            {"event": "entered", "target": "a", "step": "plan"},
+            authored("a", "plan"),
+            ran("a", "plan", green=True),
+        ])
+        assert run_terminal(root, state["a"], 7) == verdictmod.VERDICT_VERIFIED
+
+    def test_at_the_cap_an_unmoved_tree_is_unresolved(self, git_root):
+        """Nothing was done about the failure, so nothing is proved by
+        stopping."""
+        state = fold([
+            {"event": "entered", "target": "a", "step": "plan"},
+            authored("a", "plan"),
+            ran("a", "plan", tree=snapshot_worktree_tree(git_root)),
+        ])
+        assert run_terminal(git_root, state["a"], 1) == (
+            verdictmod.VERDICT_ISSUES_FOUND)
+
+    def test_at_the_cap_a_moved_tree_is_remediated_at_the_cap(self, git_root):
+        """Not a waiver: no failure was accepted, and what is unproved is the
+        repair rather than the complaint."""
+        measured = snapshot_worktree_tree(git_root)
+        state = fold([
+            {"event": "entered", "target": "a", "step": "plan"},
+            authored("a", "plan"),
+            ran("a", "plan", tree=measured),
+        ])
+        (git_root / "fix.py").write_text("VALUE = 2\n")
+        assert run_terminal(git_root, state["a"], 1) == (
+            verdictmod.VERDICT_REMEDIATED_AT_CAP)
+
+    def test_a_run_that_dirtied_the_tree_cannot_call_that_a_repair(
+            self, git_root):
+        """The comparison is against the tree the run left, not the one it
+        was measuring. A suite with a side effect is already failed evidence
+        and must not also be the cheapest way out of an unresolved loop."""
+        state = fold([
+            {"event": "entered", "target": "a", "step": "plan"},
+            authored("a", "plan"),
+            ran("a", "plan", tree="the-tree-it-measured", treeMutated=True,
+                postTreeDigest=snapshot_worktree_tree(git_root)),
+        ])
+        assert run_terminal(git_root, state["a"], 1) == (
+            verdictmod.VERDICT_ISSUES_FOUND)
+
+    def test_moving_the_work_opens_a_new_tests_loop(self):
+        """Tests authored against what a step produced answer for that step.
+        Carried forward, they would run yesterday's proof against today's
+        code and the result would be read as this step's."""
+        state = fold(entries_through("a", "decompose") + [
+            authored("a", "decompose"),
+            {"event": "returned", "target": "a", "toStep": "plan",
+             "reason": "boundary wrong"},
+        ])
+        assert state["a"]["testsAuthored"] == []
+        assert state["a"]["testRounds"] == 0
+
+    def test_the_cli_records_the_exit_code_rather_than_a_claim(
+            self, root, monkeypatch, capsys):
+        """The framework's half of the split. Nothing here asks anyone how it
+        went."""
+        append(root, {"event": "entered", "target": "csv-model", "step": "plan"})
+        append(root, authored("csv-model", "plan"))
+        monkeypatch.setattr(testphase, "run_authored", _fake_run)
+        code = _main(["test", "--component", "csv-model",
+                      "--workspace-root", str(root)])
+        assert code == 0
+        event = read(root)[-1]
+        assert event["event"] == "tested"
+        assert (event["exitCode"], event["green"]) == (3, False)
+        assert "back with the author" in capsys.readouterr().out
+
+    def test_the_projection_carries_the_tests_loop_position(self, root):
+        """Python decides whether the loop has finished; the extension is
+        handed the answer rather than the events."""
+        append(root, {"event": "entered", "target": "csv-model", "step": "plan"})
+        append(root, authored("csv-model", "plan"))
+        append(root, ran("csv-model", "plan", green=True))
+        model = next(c for c in project(root)["components"]
+                     if c["name"] == "csv-model")
+        assert model["testRounds"] == 1
+        assert model["testCap"] == run_cap(root)
+        assert model["testTerminal"] == verdictmod.VERDICT_VERIFIED
 
 
 class TestProjectionFile:

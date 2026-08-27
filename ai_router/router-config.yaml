@@ -386,6 +386,11 @@ verification:
     # The session-verification loop suspends at this bound. The closed
     # severity vocabulary is the primary control; the cap is the backstop.
     max_rounds: 3
+    # The tests phase runs the authored tests at most this many times before
+    # its loop terminates. Separate from max_rounds because a test round
+    # runs a suite the framework already has, where a review round buys a
+    # vendor's opinion.
+    max_test_rounds: 7
     on_disagreement: merge     # merge | flag | re-route
     on_disagreement_by_task_type:
       code-review: merge
@@ -483,6 +488,7 @@ testing:
           - tests/test_runcore_checks.py
           - tests/test_runcore_verified.py
           - tests/test_runcore_fast.py
+          - tests/test_testphase.py
       - when: ai_router/config.py
         select:
           - tests/test_config.py
@@ -611,6 +617,10 @@ testing:
           - tests/test_affected.py
           - tests/test_gates.py
           - tests/test_verify.py
+      - when: ai_router/testphase.py
+        select:
+          - tests/test_testphase.py
+          - tests/test_workflow.py
       - when: ai_router/verdict.py
         select:
           - tests/test_verdict.py
@@ -628,6 +638,7 @@ testing:
         select:
           - tests/test_agency.py
           - tests/test_verify.py
+          - tests/test_testphase.py
       - when: ai_router/verifyjob.py
         select:
           - tests/test_runcore_verified.py

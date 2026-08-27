@@ -233,9 +233,9 @@
     {
       "number": 12,
       "title": "The full suite and its bounded fix loop (plan B3)",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-27T12:56:47.921031-04:00",
-      "completedAt": null,
+      "completedAt": "2026-08-27T14:09:07.053408-04:00",
       "orchestrator": {
         "engine": "copilot",
         "provider": "anthropic",

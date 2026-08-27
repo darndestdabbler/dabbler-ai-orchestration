@@ -153,9 +153,9 @@
     {
       "number": 8,
       "title": "Selection by role, and the death of the tier ladder (plan A6)",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-27T07:18:03.608364-04:00",
-      "completedAt": null,
+      "completedAt": "2026-08-27T09:03:04.641955-04:00",
       "orchestrator": {
         "engine": "copilot",
         "provider": "anthropic",

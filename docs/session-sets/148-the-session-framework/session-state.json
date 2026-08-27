@@ -213,9 +213,9 @@
     {
       "number": 11,
       "title": "The verifier authors tests, the framework runs them (plan B2)",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-27T11:43:11.762067-04:00",
-      "completedAt": null,
+      "completedAt": "2026-08-27T12:49:08.521309-04:00",
       "orchestrator": {
         "engine": "copilot",
         "provider": "anthropic",

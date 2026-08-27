@@ -27,7 +27,7 @@ from pathlib import Path
 from typing import Optional
 
 from .evidence import repo_root_for, run_git
-from .ledger import LIFECYCLE_WRITTEN_SET_FILES, RUNS_DIRNAME
+from .ledger import LIFECYCLE_WRITTEN_FILES, RUNS_DIRNAME
 
 OUTCOME_PASSED = "passed"
 OUTCOME_FAILED = "failed"
@@ -65,24 +65,24 @@ ACCEPTED_POLICIES = (
 TEST_RUNS_FILENAME = "test-runs.jsonl"
 
 
-def run_of_record_recipe(session_set_dir, suite: str, command: str) -> str:
+def run_of_record_recipe(sessions_dir, suite: str, command: str) -> str:
     """What stands between a verified tree and a close. A verified session is
     not a closeable one: the complete suite has not yet run against the tree
     that was verified, and nothing has been pushed."""
     return (
         "The run of record and the push remain:\n"
         f"  {command}\n"
-        f"  python -m ai_router.test_evidence record --session-set-dir "
-        f"{session_set_dir} --suite {suite} --stage {STAGE_FINAL_FULL} "
+        f"  python -m ai_router.test_evidence record --sessions-dir "
+        f"{sessions_dir} --suite {suite} --stage {STAGE_FINAL_FULL} "
         "--outcome passed --duration-seconds <elapsed>\n"
         "  git commit, then git push -- once, here\n"
-        f"  python -m ai_router.session close --session-set-dir "
-        f"{session_set_dir}"
+        f"  python -m ai_router.session close --sessions-dir "
+        f"{sessions_dir}"
     )
 
 # Set-dir files the sanctioned writers own; they change during a session
 # and must not count as "the covered surfaces changed".
-SET_BOOKKEEPING_BASENAMES = frozenset(LIFECYCLE_WRITTEN_SET_FILES) | {
+SESSION_BOOKKEEPING_BASENAMES = frozenset(LIFECYCLE_WRITTEN_FILES) | {
     ".lifecycle.lock"
 }
 
@@ -244,31 +244,31 @@ def _git_z(repo_root, *args) -> Optional[list]:
     return [p for p in out.split("\0") if p]
 
 
-def _set_rel(repo_root, session_set_dir) -> Optional[str]:
-    if session_set_dir is None:
+def _sessions_rel(repo_root, sessions_dir) -> Optional[str]:
+    if sessions_dir is None:
         return None
     try:
-        rel = os.path.relpath(str(session_set_dir), str(repo_root))
+        rel = os.path.relpath(str(sessions_dir), str(repo_root))
     except ValueError:
         return None
     rel = _normalise_rel(rel)
     return None if rel.startswith("..") else rel
 
 
-def is_active_set_bookkeeping(rel: str, set_rel: Optional[str]) -> bool:
-    """Only the active set, and only basenames the sanctioned writers own.
-    spec.md is deliberately not here: editing the active set's own spec
-    still stales its run."""
-    if not set_rel:
+def is_session_bookkeeping(rel: str, sessions_rel: Optional[str]) -> bool:
+    """Only the sessions root, and only basenames the sanctioned writers
+    own. The session plan is deliberately not here: editing the plan the
+    session is running against still stales its run."""
+    if not sessions_rel:
         return False
     rel_n = _normalise_rel(rel)
-    if not rel_n.startswith(set_rel + "/"):
+    if not rel_n.startswith(sessions_rel + "/"):
         return False
-    return rel_n.rsplit("/", 1)[-1] in SET_BOOKKEEPING_BASENAMES
+    return rel_n.rsplit("/", 1)[-1] in SESSION_BOOKKEEPING_BASENAMES
 
 
 def surface_digest(
-    repo_root, covers, *, session_set_dir=None
+    repo_root, covers, *, sessions_dir=None
 ) -> Optional[str]:
     """SHA-256 over the sorted (path, content-hash) pairs of every tracked
     or untracked non-ignored file under the covered prefixes. ``None`` when
@@ -279,12 +279,12 @@ def surface_digest(
     )
     if tracked is None or untracked is None:
         return None
-    set_rel = _set_rel(repo_root, session_set_dir)
+    sessions_rel = _sessions_rel(repo_root, sessions_dir)
     lines = []
     for rel in sorted(set(tracked) | set(untracked)):
         if not matching_prefixes(rel, covers):
             continue
-        if is_active_set_bookkeeping(rel, set_rel):
+        if is_session_bookkeeping(rel, sessions_rel):
             continue
         try:
             digest = hashlib.sha256(
@@ -297,24 +297,24 @@ def surface_digest(
     return hashlib.sha256(joined.encode("utf-8")).hexdigest()
 
 
-def tree_digest(repo_root, *, session_set_dir=None) -> Optional[str]:
+def tree_digest(repo_root, *, sessions_dir=None) -> Optional[str]:
     """The digest of the whole tree a run was taken against. A ``final-full``
     record binds to this, so a suite that ran and was then followed by an edit
     anywhere -- including outside the suite's own ``covers`` -- is no longer
     proof about the tree being closed."""
-    return surface_digest(repo_root, ("",), session_set_dir=session_set_dir)
+    return surface_digest(repo_root, ("",), sessions_dir=sessions_dir)
 
 
 # --- Records ----------------------------------------------------------------
 
-def _runs_path(repo_root, set_slug: str) -> Path:
-    return Path(repo_root) / RUNS_DIRNAME / str(set_slug) / TEST_RUNS_FILENAME
+def _runs_path(repo_root) -> Path:
+    return Path(repo_root) / RUNS_DIRNAME / TEST_RUNS_FILENAME
 
 
-def read_records(repo_root, set_slug: str) -> list:
+def read_records(repo_root) -> list:
     """Lenient by design: one bad line must not blind the gate to the good
     ones. Missing file is an empty history."""
-    path = _runs_path(repo_root, set_slug)
+    path = _runs_path(repo_root)
     records = []
     try:
         text = path.read_text(encoding="utf-8")
@@ -373,7 +373,7 @@ def read_records(repo_root, set_slug: str) -> list:
 
 
 def record_run(
-    session_set_dir, suite: SuiteSpec, outcome: str, *, stage: str,
+    sessions_dir, suite: SuiteSpec, outcome: str, *, stage: str,
     duration_seconds, command=None, policy: str = "",
     policy_reason: str = "", selected_tests=(), session_number=None,
     detail: str = "", repo_root=None,
@@ -421,19 +421,19 @@ def record_run(
             f"duration_seconds must be a positive finite number, got "
             f"{duration_seconds!r}"
         )
-    root = repo_root or repo_root_for(session_set_dir)
+    root = repo_root or repo_root_for(sessions_dir)
     if root is None:
         raise RuntimeError(
-            f"no git repository found above {session_set_dir}"
+            f"no git repository found above {sessions_dir}"
         )
     digest = surface_digest(
-        root, suite.covers, session_set_dir=session_set_dir
+        root, suite.covers, sessions_dir=sessions_dir
     )
     if digest is None:
         raise RuntimeError("could not digest the covered surfaces")
     whole_tree = ""
     if stage == STAGE_FINAL_FULL:
-        whole_tree = tree_digest(root, session_set_dir=session_set_dir) or ""
+        whole_tree = tree_digest(root, sessions_dir=sessions_dir) or ""
         if not whole_tree:
             raise RuntimeError("could not digest the tree")
     record = TestRunRecord(
@@ -448,7 +448,7 @@ def record_run(
         session_number=session_number, detail=detail,
         duration_seconds=float(duration_seconds),
     )
-    path = _runs_path(root, Path(session_set_dir).name)
+    path = _runs_path(root)
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "a", encoding="utf-8") as f:
         f.write(json.dumps(record.to_dict(), ensure_ascii=False) + "\n")
@@ -457,7 +457,7 @@ def record_run(
 
 # --- Judging freshness ------------------------------------------------------
 
-def affected_suites(files_changed, suites, *, set_rel=None) -> dict:
+def affected_suites(files_changed, suites, *, sessions_rel=None) -> dict:
     """``{suite_name: changed_inputs}`` for suites whose covers intersect
     the change set, with active-set bookkeeping dropped from the changes."""
     out: dict = {}
@@ -465,7 +465,7 @@ def affected_suites(files_changed, suites, *, set_rel=None) -> dict:
         hits = tuple(
             rel for rel in files_changed
             if matching_prefixes(rel, suite.covers)
-            and not is_active_set_bookkeeping(rel, set_rel)
+            and not is_session_bookkeeping(rel, sessions_rel)
         )
         if hits:
             out[suite.name] = hits
@@ -473,7 +473,7 @@ def affected_suites(files_changed, suites, *, set_rel=None) -> dict:
 
 
 def evaluate_freshness(
-    session_set_dir, files_changed, suites, *, repo_root=None
+    sessions_dir, files_changed, suites, *, repo_root=None
 ) -> list:
     """Every expensive suite must have a green record whose digest still
     matches the covered surfaces. A surface untouched since the last green
@@ -481,14 +481,13 @@ def evaluate_freshness(
     needs no separate change list; pass *files_changed* to narrow required
     suites to the intersection when a change set is known. No timestamps
     are compared anywhere."""
-    root = repo_root or repo_root_for(session_set_dir)
-    set_slug = Path(session_set_dir).name
-    set_rel = _set_rel(root, session_set_dir) if root else None
+    root = repo_root or repo_root_for(sessions_dir)
+    sessions_rel = _sessions_rel(root, sessions_dir) if root else None
     affected = (
         None if files_changed is None
-        else affected_suites(files_changed, suites, set_rel=set_rel)
+        else affected_suites(files_changed, suites, sessions_rel=sessions_rel)
     )
-    records = read_records(root, set_slug) if root else []
+    records = read_records(root) if root else []
     verdicts = []
     for suite in suites:
         if not suite.expensive:
@@ -508,7 +507,7 @@ def evaluate_freshness(
             ))
             continue
         current = surface_digest(
-            root, suite.covers, session_set_dir=session_set_dir
+            root, suite.covers, sessions_dir=sessions_dir
         )
         if current is None:
             verdicts.append(FreshnessVerdict(
@@ -541,14 +540,14 @@ def evaluate_freshness(
                 suite.name, True, False,
                 f"{preamble}; run `{suite.command}` after your last code "
                 f"change, then `python -m ai_router.test_evidence record "
-                f"--session-set-dir <dir> --suite {suite.name} "
+                f"--sessions-dir <dir> --suite {suite.name} "
                 f"--stage {STAGE_FINAL_FULL} --outcome passed "
                 f"--duration-seconds <elapsed>`",
                 changed,
             ))
             continue
         latest = mine[-1]
-        current_tree = tree_digest(root, session_set_dir=session_set_dir)
+        current_tree = tree_digest(root, sessions_dir=sessions_dir)
         if latest.surface_digest != current:
             verdicts.append(FreshnessVerdict(
                 suite.name, True, False,
@@ -611,11 +610,11 @@ def _judge_preverify_command(config, suite: SuiteSpec, args):
             file=sys.stderr,
         )
         return 2
-    root = repo_root_for(args.session_set_dir)
+    root = repo_root_for(args.sessions_dir)
     if root is None:
         print(
             f"test_evidence: no git repository found above "
-            f"{args.session_set_dir}", file=sys.stderr,
+            f"{args.sessions_dir}", file=sys.stderr,
         )
         return 2
     loaded = load_selection_config(config)
@@ -626,7 +625,7 @@ def _judge_preverify_command(config, suite: SuiteSpec, args):
         )
         return 2
     changed = working_tree_changes(
-        root, preverify_baseline(root, args.session_set_dir)
+        root, preverify_baseline(root, args.sessions_dir)
     )
     if changed is None:
         print(
@@ -652,7 +651,9 @@ def main(argv=None) -> int:
     parser = argparse.ArgumentParser(prog="python -m ai_router.test_evidence")
     sub = parser.add_subparsers(dest="command", required=True)
     rec = sub.add_parser("record", help="record a completed test run")
-    rec.add_argument("--session-set-dir", required=True)
+    rec.add_argument("--sessions-dir",
+                        help="the repository's sessions root; derived from "
+                             "the working directory when omitted")
     rec.add_argument("--suite", required=True)
     rec.add_argument(
         "--stage", required=True, choices=list(STAGES),
@@ -686,6 +687,14 @@ def main(argv=None) -> int:
     rec.add_argument("--session-number", type=int)
     rec.add_argument("--detail", default="")
     args = parser.parse_args(argv)
+
+    from .evidence import SessionsRootNotFoundError, resolve_sessions_dir
+
+    try:
+        args.sessions_dir = resolve_sessions_dir(args.sessions_dir)
+    except SessionsRootNotFoundError as exc:
+        print(f"test_evidence: {exc}", file=sys.stderr)
+        return 2
 
     config = load_config()
     loaded = load_suites_checked(config)
@@ -722,7 +731,7 @@ def main(argv=None) -> int:
         return 2
     try:
         record = record_run(
-            args.session_set_dir, suite, args.outcome,
+            args.sessions_dir, suite, args.outcome,
             stage=args.stage,
             duration_seconds=args.duration_seconds,
             command=args.command, policy=policy,
@@ -739,7 +748,7 @@ def main(argv=None) -> int:
         from .affected import preverify_recipe
 
         remedy = (
-            preverify_recipe(args.session_set_dir, suite.name, sanctioned)
+            preverify_recipe(args.sessions_dir, suite.name, sanctioned)
             if sanctioned
             else "Nothing needed to run here; record nothing and go "
                  "straight to verification."
@@ -756,14 +765,14 @@ def main(argv=None) -> int:
     if record.outcome == OUTCOME_PASSED:
         if record.stage == STAGE_PREVERIFY_TARGETED:
             print(
-                f"Next: python -m ai_router.verify --session-set-dir "
-                f"{args.session_set_dir}"
+                f"Next: python -m ai_router.verify --sessions-dir "
+                f"{args.sessions_dir}"
             )
         elif record.stage == STAGE_FINAL_FULL:
             print(
                 "Next: git commit, then git push -- once -- then\n"
-                f"  python -m ai_router.session close --session-set-dir "
-                f"{args.session_set_dir}"
+                f"  python -m ai_router.session close --sessions-dir "
+                f"{args.sessions_dir}"
             )
     return 0
 

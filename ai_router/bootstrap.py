@@ -43,6 +43,7 @@ from .config import (
     TRANSPORT_ENV_VAR,
     VALID_TRANSPORTS,
 )
+from .evidence import SESSION_PLAN_FILENAME, SESSIONS_DIRNAME
 
 MANAGED_START = "<!-- dabbler:managed:start -->"
 MANAGED_END = "<!-- dabbler:managed:end -->"
@@ -59,23 +60,25 @@ _SHARED_BODY = """\
 ## Your role
 
 You are the **orchestrator** for `{repo_name}`, running AI-led work one
-session at a time under the Dabbler session-set workflow. You do the
-mechanics (file edits, shell, git) and follow the per-session plan in the
-active set's `spec.md`.
+session at a time under the Dabbler session workflow. You do the mechanics
+(file edits, shell, git) and follow the per-session plan in
+`docs/sessions/session-plan.md`.
 
 ## The session lifecycle
 
-1. **Resolve the active session set.** The active set is the single
-   directory `docs/session-sets/<NNN-slug>/` whose `session-state.json`
-   has `status: "in-progress"`. There must be at most one. If none is
-   in-progress, the next set to start is the `not-started` set with the
-   lowest `NNN-` prefix; `complete` and `cancelled` sets are skipped.
-   Never infer state from file presence; read the `status` field. Two
-   in-progress sets is a drift error — stop and surface it.
+Sessions are numbered directly in this repository, under one sessions root
+(`docs/sessions/`), so no command takes a handle to one.
+
+1. **Resolve the session to run.** The session in flight is the single
+   entry in `docs/sessions/sessions.json` whose `status` is
+   `"in-progress"`; there is at most one. If none is in flight, the next
+   is the lowest-numbered `not-started` one; `complete` and `cancelled`
+   are skipped. Never infer state from file presence; read the `status`
+   field. Two in flight is a drift error — stop and surface it.
 
 2. **Register the session (state first, work second).**
 
-       python -m ai_router.session start --session-set-dir docs/session-sets/<slug> \\
+       python -m ai_router.session start \\
            --engine <claude-code|codex|gemini|copilot> --provider <anthropic|openai|google>
 
    Copilot seats must also pass `--model` (the seat label is not trusted;
@@ -84,7 +87,7 @@ active set's `spec.md`.
 
    **Then declare the task list, before you edit anything.**
 
-       python -m ai_router.session declare --session-set-dir <dir> \\
+       python -m ai_router.session declare \\
            --task-file <path> --releasable|--not-releasable
 
    The declaration says what this session will do and whether it produces a
@@ -94,22 +97,21 @@ active set's `spec.md`.
    hindsight what may be published. Step 8 reads it and fails closed: an
    undeclared session cannot publish.
 
-3. **Do the work.** Follow the active spec's step list for the current
+3. **Do the work.** Follow the session plan's step list for the current
    session. Log progress and make the edits. Do NOT commit yet —
    verification reviews the working tree, and an already-committed tree
    presents an empty diff.
 
 4. **Run the tests this change makes necessary — only those.**
 
-       python -m ai_router.affected --session-set-dir <dir>
+       python -m ai_router.affected
 
    prints the selected tests, the reason each was selected, and the exact
-   command to run. Pass `--session-set-dir`: once a verification round
-   exists, selection is measured against that round's snapshot, so a
-   remediation runs what the fix touched instead of re-running what the
-   session touched. Run the printed command, then record it:
+   command to run. Once a verification round exists, selection is measured
+   against that round's snapshot, so a remediation runs what the fix
+   touched rather than what the session touched. Run it, then record it:
 
-       python -m ai_router.test_evidence record --session-set-dir <dir> \\
+       python -m ai_router.test_evidence record \\
            --suite <name> --stage preverify-targeted \\
            --command "<the command you ran>" --outcome passed \\
            --duration-seconds <elapsed>
@@ -123,7 +125,7 @@ active set's `spec.md`.
 
 5. **Run cross-provider verification (mandatory — there is no skip).**
 
-       python -m ai_router.verify --session-set-dir docs/session-sets/<slug>
+       python -m ai_router.verify
 
    The verifier is a different provider than you, on either transport.
    Round outcomes land in `.dabbler/runs/` (machine-written; never edit).
@@ -136,7 +138,7 @@ active set's `spec.md`.
    declares under `testing.suites` in `router-config.yaml` — the same one
    `--suite <name>` names here:
 
-       python -m ai_router.test_evidence record --session-set-dir <dir> \\
+       python -m ai_router.test_evidence record \\
            --suite <name> --stage final-full --outcome passed \\
            --duration-seconds <elapsed>
 
@@ -151,7 +153,7 @@ active set's `spec.md`.
 
 8. **Package — only if step 2 declared this session releasable.**
 
-       python -m ai_router.packaging --session-set-dir docs/session-sets/<slug>
+       python -m ai_router.packaging
 
    Packs, then pushes to the declared feed. It refuses an undeclared or
    not-releasable session, refuses a repository that declares no
@@ -162,7 +164,7 @@ active set's `spec.md`.
 
 9. **Close via the gate.**
 
-       python -m ai_router.session close --session-set-dir docs/session-sets/<slug>
+       python -m ai_router.session close
 
    Five gates run (verification clean, tree clean, pushed, tests fresh,
    verdict vocabulary); use `--dry-run` any time to preview the rows.
@@ -170,7 +172,8 @@ active set's `spec.md`.
 
 ## Hard rules
 
-- State files (`session-state.json`) and everything under `.dabbler/runs/`
+- State files (`docs/sessions/sessions.json`) and everything under
+  `.dabbler/runs/`
   are written by the router only — never by hand, never "fixed up".
 - Verification verdicts come from the verifier. A verdict token you did
   not receive from `ai_router.verify` does not exist.
@@ -274,119 +277,75 @@ Authoring guidance:
 """
 
 
-_PLAN_SET_DIRNAME = "001-default-plan"
-_DECOMPOSITION_SET_DIRNAME = "002-default-decomposition"
+_BOOTSTRAP_PLAN = """\
+# Session plan
 
-_PLAN_SPEC = """\
-# Project plan
-
-> **Purpose:** Create — or import — `docs/planning/project-plan.md`, the
-> stable artifact the decomposition set reads from. The plan is the
-> deliverable: it runs through the normal pipeline — cross-provider
-> verification reviews it — like any other session-set output.
-> **Session Set:** `docs/session-sets/001-default-plan/`
+> **Purpose:** the numbered sessions this repository runs, in order. The
+> first two set the project up; everything after them is the work.
 > **Workflow:** Full
-> **Prerequisite:** none.
-
----
-
-## Session Set Configuration
-
-```yaml
-module: default
-totalSessions: 1
-```
 
 ---
 
 ## Sessions
 
-### Session 1 of 1: Author or import the project plan
+### Session 1: Author or import the project plan
 
 1. Register.
-2. Create — or import — `docs/planning/project-plan.md`: overview, goals
+2. Create \u2014 or import \u2014 `docs/planning/project-plan.md`: overview, goals
    and success criteria, high-level phases or feature areas, and each
-   phase's key deliverables. Keep it concise — the decomposition set
-   turns each phase into session sets, so scope each phase to a handful
-   of focused AI sessions. If a plan already exists outside this repo (a
-   doc, a ticket, notes), bring its content into that path in this same
-   shape, preserving intent.
-3. Cross-provider verification.
-4. Close-out.
+   phase's key deliverables. Keep it concise \u2014 session 2 turns each phase
+   into numbered sessions, so scope each phase to a handful of focused AI
+   sessions. If a plan already exists outside this repo (a doc, a ticket,
+   notes), bring its content into that path in this same shape, preserving
+   intent.
+3. Affected tests as preverify.
+4. Cross-provider verification.
+5. Full test suite, recorded as the run of record.
+6. Close-out.
 
 **Creates:** `docs/planning/project-plan.md`. A later revision is just
 another plan session that amends the same file.
-"""
 
-_DECOMPOSITION_SPEC = """\
-# Session-set decomposition
-
-> **Purpose:** Decompose `docs/planning/project-plan.md` into the work
-> session sets — each a focused, independently deployable unit of work.
-> **Session Set:** `docs/session-sets/002-default-decomposition/`
-> **Workflow:** Full
-> **Prerequisite:** `001-default-plan` closed (the plan is its input).
-
----
-
-## Session Set Configuration
-
-```yaml
-module: default
-totalSessions: 1
-```
-
----
-
-## Sessions
-
-### Session 1 of 1: Decompose the plan into session sets
+### Session 2: Break the plan into numbered sessions
 
 1. Register.
-2. Read `docs/planning/project-plan.md` and decompose it into a sequence
-   of session sets, scaffolding `docs/session-sets/<NNN-slug>/spec.md`
-   for each. Hard requirements: the slug is `NNN-kebab-title` — a
-   three-digit, zero-padded, monotonically increasing prefix continuing
-   after the highest existing set number (003 onward here), then a
-   kebab-case title; never two sets sharing a prefix. Each spec.md has
-   one `# <Title>` heading, a `## Sessions` section, one
-   `### Session K of N: <title>` heading per session, and each session's
-   steps as a top-level ordered list — step 1 registers the session, the
-   last steps run cross-provider verification and close-out, the middle
-   steps are the work. Order sets so earlier ones unblock later ones;
-   prefer 2-4 sessions per set and at most ~3 work steps per session.
-   Do NOT hand-author `session-state.json` — each set's own first
-   `session start` bootstraps it from the spec.
-3. Cross-provider verification.
-4. Close-out.
+2. Read `docs/planning/project-plan.md` and break it into numbered
+   sessions appended to this file. Each session is a focused unit of work
+   one AI coding session can complete: one
+   `### Session <N>: <title>` heading, and its steps as a top-level
+   ordered list. Step 1 registers the session; the last steps run the
+   affected tests, cross-provider verification, the complete suite once
+   against the verified tree, and close-out; the middle steps are the
+   work. Never write a step that says "run the tests" without saying which
+   run it means. Order sessions so earlier ones unblock later ones, and
+   keep at most ~3 work steps per session.
+3. Affected tests as preverify.
+4. Cross-provider verification.
+5. Full test suite, recorded as the run of record.
+6. Close-out.
 
-**Creates:** one `docs/session-sets/<NNN-slug>/spec.md` per work set.
+**Creates:** the numbered session list the rest of this repository runs.
+
+> Do NOT hand-author `sessions.json`. The first `session start`
+> bootstraps it from this plan \u2014 state files are the writers' job.
 """
 
-_BOOTSTRAP_SETS = (
-    (_PLAN_SET_DIRNAME, _PLAN_SPEC),
-    (_DECOMPOSITION_SET_DIRNAME, _DECOMPOSITION_SPEC),
-)
 
+def scaffold_bootstrap_sessions(project_dir) -> list:
+    """Scaffold the two setup sessions into a repository that has no
+    session plan at all; return the written path.
 
-def scaffold_bootstrap_sets(project_dir) -> list:
-    """Scaffold the two bootstrap sets into a project with NO session
-    sets at all; return the written spec paths. Any existing set — work
-    set or bootstrap set, any state — means the project has its own
-    numbering and history, so nothing is written and nothing is ever
-    overwritten."""
-    root = Path(project_dir) / "docs" / "session-sets"
-    if root.is_dir() and any(p.is_dir() for p in root.iterdir()):
+    A repository that already has a plan has its own numbering and its own
+    history, so nothing is written and nothing is ever overwritten.
+    """
+    root = Path(project_dir) / "docs" / SESSIONS_DIRNAME
+    plan = root / SESSION_PLAN_FILENAME
+    if plan.exists():
         return []
-    written = []
-    for dirname, content in _BOOTSTRAP_SETS:
-        set_dir = root / dirname
-        set_dir.mkdir(parents=True, exist_ok=True)
-        spec = set_dir / "spec.md"
-        with open(spec, "w", encoding="utf-8", newline="") as f:
-            f.write(content)
-        written.append(spec)
-    return written
+    root.mkdir(parents=True, exist_ok=True)
+    with open(plan, "w", encoding="utf-8", newline="") as f:
+        f.write(_BOOTSTRAP_PLAN)
+    return [plan]
 
 
 def ensure_gitignore(project_dir) -> bool:
@@ -786,19 +745,19 @@ def main(argv=None) -> int:
                     f"yourself: {_manual_persist_hint(value)}",
                     file=sys.stderr,
                 )
-    scaffolded = scaffold_bootstrap_sets(project)
+    scaffolded = scaffold_bootstrap_sessions(project)
     for path in scaffolded:
         print(f"bootstrap: scaffolded {path}")
     if scaffolded:
         print(
             "bootstrap: next, tell your AI agent to \"start the next "
-            "session\" — 001-default-plan authors the project plan, then "
-            "002-default-decomposition turns it into work sets."
+            "session\" — session 1 authors the project plan, then session 2 "
+            "breaks it into numbered sessions."
         )
     else:
         print(
-            "bootstrap: session sets already exist; set scaffolding "
-            "skipped (instruction files refreshed only)."
+            "bootstrap: a session plan already exists; scaffolding skipped "
+            "(instruction files refreshed only)."
         )
     return 0
 

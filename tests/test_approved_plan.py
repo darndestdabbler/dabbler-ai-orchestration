@@ -34,7 +34,7 @@ def _step(step_id="register", **overrides):
 
 
 def _plan(steps=None, **overrides):
-    plan = new_plan("144-the-approved-plan", 1, "the-artifact", steps or [_step()])
+    plan = new_plan(1, "the-artifact", steps or [_step()])
     plan.update(overrides)
     return plan
 
@@ -200,13 +200,13 @@ class TestEnvelopeComparison:
     def test_change_outside_the_envelope_needs_an_amendment(
         self, sandbox_repo
     ):
-        repo, set_dir = sandbox_repo
+        repo, sessions_dir = sandbox_repo
         plan = self._approved(repo / ".dabbler" / "s1", ["ai_router/"])
         (repo / "ai_router").mkdir()
         (repo / "ai_router" / "session.py").write_text("x", encoding="utf-8")
         (repo / "pyproject.toml").write_text("[project]", encoding="utf-8")
 
-        result = compare_to_envelope(repo, plan, set_dir)
+        result = compare_to_envelope(repo, plan, sessions_dir)
         assert result.inside == ("ai_router/session.py",)
         assert [(p.path, p.reason) for p in result.outside] == [
             ("pyproject.toml", REASON_NEW_DEPENDENCY)
@@ -220,13 +220,13 @@ class TestEnvelopeComparison:
         # and the activity log. No step envelope can declare them -- the
         # steps that write them never enter a plan -- so counting them
         # would refuse every session for obeying the lifecycle.
-        repo, set_dir = sandbox_repo
+        repo, sessions_dir = sandbox_repo
         plan = self._approved(repo / ".dabbler" / "s1", ["ai_router/"])
-        for name in ("session-state.json", "activity-log.json",
+        for name in ("sessions.json", "activity-log.json",
                      "change-log.md"):
-            (set_dir / name).write_text("{}", encoding="utf-8")
+            (sessions_dir / name).write_text("{}", encoding="utf-8")
 
-        result = compare_to_envelope(repo, plan, set_dir)
+        result = compare_to_envelope(repo, plan, sessions_dir)
         assert result.outside == ()
         assert result.needs_amendment is False
 

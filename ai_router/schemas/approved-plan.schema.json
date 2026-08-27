@@ -1,11 +1,11 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "approved-plan.json (the pre-registered, hashed step-by-step plan for one session)",
-  "description": "The machine-owned plan for one session's own work, under .dabbler/runs/<set>/s<N>/approved-plan.json. Written only through ai_router.approved_plan: validated against this schema, then atomic replace. Before approval the plan may be rewritten in full; after approval (approved: true) it is immutable except by an appended amendment -- plan_hash is computed over every field except 'amendments', so an appended amendment never changes it and any other edit is detected the next time the plan is read. The plan holds only the session's own steps, never the fixed lifecycle ceremony (register, affected tests, verification, run of record, close-out) that surrounds every session.",
+  "description": "The machine-owned plan for one session's own work, under .dabbler/runs/s<N>/approved-plan.json. Written only through ai_router.approved_plan: validated against this schema, then atomic replace. Before approval the plan may be rewritten in full; after approval (approved: true) it is immutable except by an appended amendment -- plan_hash is computed over every field except 'amendments', so an appended amendment never changes it and any other edit is detected the next time the plan is read. The plan holds only the session's own steps, never the fixed lifecycle ceremony (register, affected tests, verification, run of record, close-out) that surrounds every session.",
   "type": "object",
   "additionalProperties": false,
   "required": [
-    "schema_version", "session_set", "session_number", "session_slug",
+    "schema_version", "session_number", "session_slug",
     "steps", "approved", "amendments"
   ],
   "properties": {
@@ -13,12 +13,11 @@
       "const": 1,
       "description": "Frozen at v1. A reader that finds any other value refuses the record rather than interpreting it."
     },
-    "session_set": { "type": "string", "minLength": 1 },
     "session_number": { "type": "integer", "minimum": 1 },
     "session_slug": {
       "type": "string",
       "pattern": "^[a-z0-9-]+$",
-      "description": "The session's authored slug -- the same short, hand-picked label a session set already carries in its own directory name, one level down."
+      "description": "The session's authored slug -- the short, hand-picked label the session heading declares beside its number."
     },
     "steps": {
       "type": "array",

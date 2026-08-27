@@ -75,14 +75,14 @@ suite("routerCli: missing-router detection", () => {
 });
 
 suite("CLI argv contracts", () => {
-  test("cancel/restore target ai_router.session subcommands", () => {
-    assert.deepStrictEqual(cancelArgs("D:\\ws\\docs\\session-sets\\001-a", "done"), [
+  test("cancel/restore name a session number, not a directory", () => {
+    assert.deepStrictEqual(cancelArgs(3, "done"), [
       "cancel",
-      "D:\\ws\\docs\\session-sets\\001-a",
+      "3",
       "--reason",
       "done",
     ]);
-    assert.deepStrictEqual(restoreArgs("D:\\x", ""), ["restore", "D:\\x", "--reason", ""]);
+    assert.deepStrictEqual(restoreArgs(3, ""), ["restore", "3", "--reason", ""]);
   });
 
   test("modules create passes the root positionally and omits empty options", () => {
@@ -155,7 +155,7 @@ suite("CLI argv contracts", () => {
   });
 
   test("describeLifecycleFailure states the nothing-was-written guarantee on refusal", () => {
-    const message = describeLifecycleFailure("Cancelling", "001-a", {
+    const message = describeLifecycleFailure("Cancelling", "Third things", {
       outcome: "refused",
       ok: false,
       exitCode: 3,

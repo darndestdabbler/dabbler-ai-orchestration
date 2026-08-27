@@ -3,7 +3,7 @@ import subprocess
 
 import pytest
 
-SPEC_MD = """# Demo set
+SESSION_PLAN_MD = """# Demo repository
 
 ## Sessions
 
@@ -33,12 +33,14 @@ def _git(cwd, *args):
 
 @pytest.fixture
 def sandbox_repo(tmp_path):
-    """A real git repo with one committed session set and a bare upstream:
-    the sandbox every gate and loop test runs in."""
+    """A real git repo with one committed session plan and a bare
+    upstream: the sandbox every gate and loop test runs in."""
     repo = tmp_path / "repo"
-    set_dir = repo / "docs" / "session-sets" / "010-demo"
-    set_dir.mkdir(parents=True)
-    (set_dir / "spec.md").write_text(SPEC_MD, encoding="utf-8")
+    sessions_dir = repo / "docs" / "sessions"
+    sessions_dir.mkdir(parents=True)
+    (sessions_dir / "session-plan.md").write_text(
+        SESSION_PLAN_MD, encoding="utf-8"
+    )
     (repo / ".gitignore").write_text(".dabbler/\n", encoding="utf-8")
     _git(repo, "init", "-q", "-b", "main")
     _git(repo, "config", "user.email", "test@example.invalid")
@@ -52,10 +54,10 @@ def sandbox_repo(tmp_path):
     )
     _git(repo, "remote", "add", "origin", str(remote))
     _git(repo, "push", "-q", "-u", "origin", "main")
-    return repo, set_dir
+    return repo, sessions_dir
 
 
-def record_preverify(repo, set_dir):
+def record_preverify(repo, sessions_dir):
     """The sanctioned pre-verification evidence for whatever this tree
     currently changes: the selector's own command, run and recorded. A round
     cannot open without it, so every loop test needs the real thing rather
@@ -83,7 +85,7 @@ def record_preverify(repo, set_dir):
     command = targeted_command(suite.command, result)
     verdict = classify_preverify_command(command, result)
     return record_run(
-        set_dir, suite, "passed", stage=STAGE_PREVERIFY_TARGETED,
+        sessions_dir, suite, "passed", stage=STAGE_PREVERIFY_TARGETED,
         duration_seconds=1.0, command=command, policy=verdict.policy,
         policy_reason=verdict.reason,
         selected_tests=tuple((s.path, s.reason) for s in result.selected),
@@ -256,9 +258,9 @@ def run_repo(tmp_path, monkeypatch):
     rather than a temp directory that merely looks like one.
     """
     repo = tmp_path / "work"
-    set_dir = repo / "docs" / "session-sets" / "001-default"
-    set_dir.mkdir(parents=True)
-    (set_dir / "spec.md").write_text(RUN_SPEC_MD, encoding="utf-8")
+    sessions_dir = repo / "docs" / "session-sets" / "001-default"
+    sessions_dir.mkdir(parents=True)
+    (sessions_dir / "spec.md").write_text(RUN_SPEC_MD, encoding="utf-8")
     (repo / ".gitignore").write_text(
         ".dabbler/\n"
         "docs/session-sets/*/session-state.json\n"

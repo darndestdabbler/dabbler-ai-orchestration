@@ -1,13 +1,14 @@
-"""The canonical session-state reader and the Work Explorer projection.
+"""The canonical session reader and the Work Explorer projection.
 
 One reader for every consumer: gates, the CLI, and the VS Code extension
-(which shells to ``python -m ai_router.progress --json <set-dir>`` and
-renders the JSON — it re-implements nothing). Readers tolerate v2/v3 files
-on disk via :func:`normalize_to_v4_shape`; writers only ever emit v4.
+(which shells to ``python -m ai_router.progress --json`` and renders the
+JSON — it re-implements nothing). The live path reads v5 only;
+:func:`normalize_legacy_state` exists for the migration, which is the last
+reader a v4 file ever gets.
 
 Three vocabularies, deliberately distinct:
-- set/session lifecycle: ``not-started`` / ``in-progress`` / ``complete``
-  (+ ``cancelled`` at set level only);
+- session lifecycle: ``not-started`` / ``in-progress`` / ``complete`` /
+  ``cancelled``;
 - step status (the activity-log record, rendered verbatim): ``pending`` /
   ``in-progress`` / ``complete`` / ``blocked`` plus tolerated drift;
 - the icon key the extension maps to its four SVG assets: ``complete`` /
@@ -25,15 +26,23 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
+from .evidence import (
+    ACTIVITY_LOG_FILENAME,
+    STATE_FILENAME,
+)
+
 SCHEMA_VERSION_V4 = 4
+SCHEMA_VERSION = 5
 
 STATUS_NOT_STARTED = "not-started"
 STATUS_IN_PROGRESS = "in-progress"
 STATUS_COMPLETE = "complete"
 STATUS_CANCELLED = "cancelled"
 
-SESSION_STATUSES = (STATUS_NOT_STARTED, STATUS_IN_PROGRESS, STATUS_COMPLETE)
-TOP_LEVEL_STATUSES = SESSION_STATUSES + (STATUS_CANCELLED,)
+SESSION_STATUSES = (STATUS_NOT_STARTED, STATUS_IN_PROGRESS,
+                    STATUS_COMPLETE, STATUS_CANCELLED)
+# A session that is cancelled or complete is closed; the rest are open.
+CLOSED_STATUSES = (STATUS_COMPLETE, STATUS_CANCELLED)
 
 # The complete alias map. None stays None; unknown values pass through for
 # the validators to reject — canonicalization never invents a status.
@@ -61,11 +70,11 @@ _SESSION_HEADING_RE = re.compile(
 _GENERIC_TITLE_RE = re.compile(r"^Session\s+(?P<number>\d+)$")
 
 
-def extract_session_titles_from_spec(spec_md_path) -> list:
+def extract_session_titles_from_plan(plan_path) -> list:
     """``[(number, title), ...]`` sorted; empty on a missing or unreadable
     spec — titles are a nicety, never a gate."""
     try:
-        text = Path(spec_md_path).read_text(encoding="utf-8")
+        text = Path(plan_path).read_text(encoding="utf-8")
     except (OSError, UnicodeError):
         return []
     pairs = [
@@ -142,7 +151,7 @@ def synthesize_v3_from_v2(state: dict, spec_md_path) -> dict:
     total = state.get("totalSessions")
     total = total if _strict_positive_int(total) else 0
 
-    spec_titles = dict(extract_session_titles_from_spec(spec_md_path))
+    spec_titles = dict(extract_session_titles_from_plan(spec_md_path))
     count = max([total] + [n for n in spec_titles] + completed, default=0)
 
     top_status = canonicalize_status(state.get("status"))
@@ -172,11 +181,14 @@ _PER_SESSION_METADATA = ("startedAt", "completedAt", "orchestrator",
                          "verificationVerdict")
 
 
-def normalize_to_v4_shape(
+def normalize_legacy_state(
     state: dict, spec_md_path, spec_titles: Optional[dict] = None
 ) -> dict:
-    """The one read shim: any historical shape in, the v4 read view out.
-    Older files are normalized on read, never rewritten."""
+    """The migration's reader: any pre-v5 shape in, the v4 read view out.
+
+    Nothing on the live path calls this. It exists so a repository still
+    holding set-scoped state can be carried forward exactly once, which is
+    the only moment a v4 file is read."""
     sessions_present = state.get("sessions") is not None
     if not sessions_present:
         state = synthesize_v3_from_v2(state, spec_md_path)
@@ -201,7 +213,7 @@ def normalize_to_v4_shape(
     if needs_title_heal(sessions_v4):
         titles = (
             spec_titles if spec_titles is not None
-            else dict(extract_session_titles_from_spec(spec_md_path))
+            else dict(extract_session_titles_from_plan(spec_md_path))
         )
         if titles:
             heal_generic_titles(sessions_v4, titles)
@@ -309,10 +321,9 @@ def normalize_to_v4_shape(
 
 # --- Reading state files ----------------------------------------------------
 
-def read_raw_session_state(set_dir) -> Optional[dict]:
-    """The raw on-disk dict, or ``None`` when no usable state exists.
-    ``PermissionError`` propagates — a locked file is not an absent one,
-    and treating it as absent invites writers to clobber real state."""
+def read_raw_legacy_state(set_dir) -> Optional[dict]:
+    """The migration's reader for a set-scoped ``session-state.json``.
+    Nothing else reads this file: after the migration it does not exist."""
     path = Path(set_dir) / "session-state.json"
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
@@ -323,14 +334,71 @@ def read_raw_session_state(set_dir) -> Optional[dict]:
     return raw if isinstance(raw, dict) else None
 
 
-def read_session_state(set_dir) -> Optional[dict]:
-    raw = read_raw_session_state(set_dir)
+def read_raw_session_state(sessions_dir) -> Optional[dict]:
+    """The raw on-disk dict, or ``None`` when no usable state exists.
+    ``PermissionError`` propagates — a locked file is not an absent one,
+    and treating it as absent invites writers to clobber real state."""
+    path = Path(sessions_dir) / STATE_FILENAME
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return None
+    except (json.JSONDecodeError, UnicodeError):
+        return None
+    return raw if isinstance(raw, dict) else None
+
+
+def read_session_state(sessions_dir) -> Optional[dict]:
+    """The v5 record with the derived fields every caller asks for. The
+    derived keys are computed, never stored: a stored ``currentSession``
+    is a second place for the answer to be wrong."""
+    raw = read_raw_session_state(sessions_dir)
     if raw is None:
         return None
-    try:
-        return normalize_to_v4_shape(raw, Path(set_dir) / "spec.md")
-    except (TypeError, ValueError):
-        return raw
+    return derived_view(raw)
+
+
+def derived_view(state: dict) -> dict:
+    """The record plus the answers that follow from it."""
+    sessions = [s for s in state.get("sessions") or [] if isinstance(s, dict)]
+    for entry in sessions:
+        entry["status"] = canonicalize_status(entry.get("status"))
+        for key in _PER_SESSION_METADATA:
+            entry.setdefault(key, None)
+    current = next(
+        (s.get("number") for s in sessions
+         if s.get("status") == STATUS_IN_PROGRESS), None
+    )
+    completed = [
+        s["number"] for s in sessions
+        if s.get("status") == STATUS_COMPLETE and isinstance(s.get("number"), int)
+    ]
+    last_completed = next(
+        (s for s in reversed(sessions)
+         if s.get("status") == STATUS_COMPLETE), None
+    )
+    in_flight = next(
+        (s for s in sessions if s.get("status") == STATUS_IN_PROGRESS), None
+    )
+    source = in_flight if in_flight is not None else last_completed
+    out = dict(state)
+    out.update({
+        "schemaVersion": state.get("schemaVersion"),
+        "sessions": sessions,
+        "currentSession": current,
+        "totalSessions": len(sessions),
+        "completedSessions": completed,
+        "orchestrator": (source or {}).get("orchestrator"),
+        "startedAt": (source or {}).get("startedAt"),
+        "completedAt": (last_completed or {}).get("completedAt"),
+        "verificationVerdict": (
+            (last_completed or {}).get("verificationVerdict")
+        ),
+        "lifecycleState": (
+            "work_in_progress" if current is not None else "closed"
+        ),
+    })
+    return out
 
 
 # --- Progress view and invariants -------------------------------------------
@@ -374,13 +442,7 @@ def _parse_sessions(raw) -> list:
     return records
 
 
-def validate_invariants(sessions, *, top_status, lifecycle_state=None) -> None:
-    if lifecycle_state == "closed" and top_status not in (
-        STATUS_COMPLETE, STATUS_CANCELLED,
-    ):
-        raise SessionStateInvariantError(
-            8, f"lifecycleState 'closed' with top status {top_status!r}"
-        )
+def validate_invariants(sessions, *, lifecycle_state=None) -> None:
     if not sessions:
         raise SessionStateInvariantError(1, "sessions[] is empty")
     numbers = []
@@ -404,48 +466,27 @@ def validate_invariants(sessions, *, top_status, lifecycle_state=None) -> None:
             3, f"more than one in-progress session: "
                f"{[s.number for s in in_progress]}"
         )
+    if lifecycle_state == "closed" and in_progress:
+        raise SessionStateInvariantError(
+            8, f"lifecycleState 'closed' with session {in_progress[0].number} "
+               "in flight"
+        )
+    # Work is done in order: a closed session never sits behind an open one.
+    # Cancelled counts as closed — it is a session that will not run, not one
+    # still waiting its turn.
     seen_open = False
     for s in sessions:
-        if s.status != STATUS_COMPLETE:
+        if s.status not in CLOSED_STATUSES:
             seen_open = True
-        elif seen_open:
+        elif seen_open and s.status == STATUS_COMPLETE:
             raise SessionStateInvariantError(
                 4, f"complete session {s.number} follows an open one"
-            )
-    if top_status is None:
-        return
-    if top_status not in TOP_LEVEL_STATUSES:
-        raise SessionStateInvariantError(
-            2, f"unknown top-level status {top_status!r}"
-        )
-    if top_status == STATUS_NOT_STARTED:
-        if any(s.status != STATUS_NOT_STARTED for s in sessions):
-            raise SessionStateInvariantError(
-                5, "top status not-started but a session has begun"
-            )
-    elif top_status == STATUS_IN_PROGRESS:
-        completed = [s for s in sessions if s.status == STATUS_COMPLETE]
-        not_started = [s for s in sessions if s.status == STATUS_NOT_STARTED]
-        between = bool(completed) and bool(not_started) and not in_progress
-        if not in_progress and not between:
-            raise SessionStateInvariantError(
-                6, "top status in-progress needs one in-progress session "
-                   "or a between-sessions state"
-            )
-    elif top_status == STATUS_COMPLETE:
-        if any(s.status != STATUS_COMPLETE for s in sessions):
-            raise SessionStateInvariantError(
-                7, "top status complete but a session is not complete"
             )
 
 
 def get_progress(state: dict) -> ProgressView:
     sessions = _parse_sessions(state.get("sessions"))
-    validate_invariants(
-        sessions,
-        top_status=canonicalize_status(state.get("status")),
-        lifecycle_state=state.get("lifecycleState"),
-    )
+    validate_invariants(sessions, lifecycle_state=state.get("lifecycleState"))
     completed = tuple(
         s.number for s in sessions if s.status == STATUS_COMPLETE
     )
@@ -465,10 +506,6 @@ def get_progress(state: dict) -> ProgressView:
             current is None and len(completed) >= 1 and nxt is not None
         ),
     )
-
-
-def read_progress(state: dict, spec_md_path) -> ProgressView:
-    return get_progress(normalize_to_v4_shape(state, spec_md_path))
 
 
 # --- Step rows from activity-log.json ---------------------------------------
@@ -511,8 +548,8 @@ def step_icon_key(status) -> str:
     return _ICON_KEYS.get(_py_str(status).lower(), "not-started")
 
 
-def read_activity_log(set_dir) -> Optional[dict]:
-    path = Path(set_dir) / "activity-log.json"
+def read_activity_log(sessions_dir) -> Optional[dict]:
+    path = Path(sessions_dir) / ACTIVITY_LOG_FILENAME
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError, UnicodeError):
@@ -546,13 +583,13 @@ def _collapse_by_step_key(entries: list) -> list:
     return [latest[k] for k in order]
 
 
-def build_step_rows(set_dir, session_number: int) -> list:
+def build_step_rows(sessions_dir, session_number: int) -> list:
     """Plan rows own position, logged steps own content: a logged step
     claims a planned row by exact stepKey, or failing that by stepNumber —
     keys are derived slugs an engine paraphrases, numbers are the stable
     address; unclaimed logged steps append; unclaimed planned rows stay
     as pending rows with the spec's words. Nothing is dropped either way."""
-    log = read_activity_log(set_dir)
+    log = read_activity_log(sessions_dir)
     if log is None:
         return []
     mine = [
@@ -595,52 +632,26 @@ def build_step_rows(set_dir, session_number: int) -> list:
 
 # --- The projection ---------------------------------------------------------
 
-def build_projection(set_dir) -> dict:
-    """Everything the Work Explorer renders for one set, in one pass.
-    Computed fresh on every call — a cache would need a freshness protocol,
-    and the v1 one (digests + stale states) cost more than recomputing."""
-    set_path = Path(set_dir)
-    slug = set_path.name
-    raw = read_raw_session_state(set_path)
+def build_projection(sessions_dir) -> dict:
+    """Everything the Work Explorer renders for this repository, in one
+    pass. Computed fresh on every call — a cache would need a freshness
+    protocol, and the v1 one (digests + stale states) cost more than
+    recomputing."""
+    sessions_path = Path(sessions_dir)
+    raw = read_raw_session_state(sessions_path)
 
     invariant_violation = None
     if raw is None:
-        # Spec-only folder: infer from file presence; consult the legacy
-        # CANCELLED.md marker only when no usable state file exists.
-        if (set_path / "CANCELLED.md").exists():
-            status = STATUS_CANCELLED
-        elif (set_path / "change-log.md").exists():
-            status = STATUS_COMPLETE
-        elif (set_path / "activity-log.json").exists():
-            status = STATUS_IN_PROGRESS
-        else:
-            status = STATUS_NOT_STARTED
-        state = {"sessionSetName": slug, "status": status, "sessions": []}
-        normalized = dict(
-            state, schemaVersion=None, currentSession=None,
-            totalSessions=None, completedSessions=[], orchestrator=None,
-            startedAt=None, completedAt=None, verificationVerdict=None,
-            lifecycleState=None,
-        )
+        view = derived_view({"schemaVersion": None, "sessions": []})
     else:
-        normalized = normalize_to_v4_shape(raw, set_path / "spec.md")
+        view = derived_view(raw)
         try:
-            get_progress(normalized)
+            get_progress(view)
         except SessionStateInvariantError as exc:
             invariant_violation = str(exc)
-            # A stale mid-set "complete" must not briefly render Complete.
-            if normalized.get("status") == STATUS_COMPLETE:
-                normalized["status"] = STATUS_IN_PROGRESS
 
-    # Named for the payload it reaches, not for the loop that follows: a
-    # step row's status is a different vocabulary, and a name shared with
-    # one would put a step's word where the set's word belongs.
-    set_status = normalized.get("status")
-    icon_key = (
-        set_status if set_status in TOP_LEVEL_STATUSES else STATUS_NOT_STARTED
-    )
     sessions_out = []
-    for entry in normalized.get("sessions") or []:
+    for entry in view.get("sessions") or []:
         number = entry.get("number")
         session_status = entry.get("status")
         in_flight = session_status == STATUS_IN_PROGRESS
@@ -659,7 +670,7 @@ def build_projection(set_dir) -> dict:
             "steps": [],
         }
         if in_flight and isinstance(number, int):
-            rows = build_step_rows(set_path, number)
+            rows = build_step_rows(sessions_path, number)
             # Only the record marks a step. A row is never active because it
             # is the first one not yet logged: that inference put the marker
             # five rows behind a session whose verification had already
@@ -689,22 +700,16 @@ def build_projection(set_dir) -> dict:
                 })
         sessions_out.append(session_out)
 
-    completed = normalized.get("completedSessions") or []
     return {
         "schemaVersion": 1,
         "generatedAt": datetime.datetime.now().astimezone().isoformat(),
-        "set": {
-            "slug": slug,
-            "status": set_status,
-            "iconKey": icon_key,
+        "repository": {
             "schemaVersionOnDisk": (raw or {}).get("schemaVersion"),
-            "totalSessions": normalized.get("totalSessions"),
-            "sessionsCompleted": len(completed),
-            "currentSession": normalized.get("currentSession"),
-            "verificationVerdict": normalized.get("verificationVerdict"),
-            "forceClosed": bool(normalized.get("forceClosed")),
-            "preCancelStatus": normalized.get("preCancelStatus"),
-            "orchestrator": normalized.get("orchestrator"),
+            "totalSessions": view.get("totalSessions"),
+            "sessionsCompleted": len(view.get("completedSessions") or []),
+            "currentSession": view.get("currentSession"),
+            "forceClosed": bool(view.get("forceClosed")),
+            "orchestrator": view.get("orchestrator"),
             "invariantViolation": invariant_violation,
         },
         "sessions": sessions_out,
@@ -712,21 +717,29 @@ def build_projection(set_dir) -> dict:
 
 
 def main(argv=None) -> int:
+    from .evidence import SessionsRootNotFoundError, resolve_sessions_dir
+
     parser = argparse.ArgumentParser(
         prog="python -m ai_router.progress",
-        description="Emit the Work Explorer projection for a session set.",
+        description="Emit the Work Explorer projection for this repository.",
     )
-    parser.add_argument("set_dir", help="session-set directory")
+    parser.add_argument("--sessions-dir",
+                        help="the repository's sessions root; derived from "
+                             "the working directory when omitted")
     parser.add_argument(
         "--json", action="store_true",
         help="emit the projection JSON (the only output mode)",
     )
     args = parser.parse_args(argv)
-    set_path = Path(args.set_dir)
-    if not set_path.is_dir():
-        print(f"progress: not a directory: {set_path}", file=sys.stderr)
+    try:
+        sessions_path = Path(resolve_sessions_dir(args.sessions_dir))
+    except SessionsRootNotFoundError as exc:
+        print(f"progress: {exc}", file=sys.stderr)
         return 2
-    print(json.dumps(build_projection(set_path), indent=2))
+    if not sessions_path.is_dir():
+        print(f"progress: not a directory: {sessions_path}", file=sys.stderr)
+        return 2
+    print(json.dumps(build_projection(sessions_path), indent=2))
     return 0
 
 

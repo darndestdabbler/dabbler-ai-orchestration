@@ -29,31 +29,32 @@ from typing import Optional
 
 import jsonschema
 
-from .evidence import record_state_write
+from .evidence import (
+    ACTIVITY_LOG_FILENAME,
+    SESSION_PLAN_FILENAME,
+    STATE_FILENAME,
+    record_state_write,
+)
 from .progress import (
     SessionStateInvariantError,
+    STATUS_CANCELLED,
     STATUS_COMPLETE,
     STATUS_IN_PROGRESS,
     STATUS_NOT_STARTED,
-    TOP_LEVEL_STATUSES,
     canonicalize_status,
-    extract_session_titles_from_spec,
+    derived_view,
+    extract_session_titles_from_plan,
     get_progress,
     heal_title,
-    normalize_to_v4_shape,
     read_raw_session_state,
 )
 from .verdict import validate_session_verdict
 
-SCHEMA_VERSION = 4
-_STATE_SCHEMA_PATH = Path(__file__).parent / "schemas" / "session-state.schema.json"
+SCHEMA_VERSION = 5
+_STATE_SCHEMA_PATH = Path(__file__).parent / "schemas" / "sessions.schema.json"
 _state_schema_cache: dict | None = None
 
 STEP_STATUSES = ("pending", "in-progress", "complete", "blocked")
-
-CANCELLED_FILENAME = "CANCELLED.md"
-RESTORED_FILENAME = "RESTORED.md"
-_CANCEL_HISTORY_HEADER = "# Cancellation history"
 
 # The two files of the specification. The names are constants because the
 # model that supplies their content never chooses where it lands.
@@ -143,7 +144,7 @@ def build_orchestrator_block(
     return block
 
 
-def _validate_and_write_state(set_dir, state: dict) -> None:
+def _validate_and_write_state(sessions_dir, state: dict) -> None:
     try:
         jsonschema.validate(state, _state_schema())
     except jsonschema.ValidationError as exc:
@@ -154,8 +155,8 @@ def _validate_and_write_state(set_dir, state: dict) -> None:
         ) from exc
     if "sessions" in state:
         get_progress(state)  # invariants, fail loud before I/O
-    _atomic_write_json(Path(set_dir) / "session-state.json", state)
-    record_state_write(set_dir)
+    _atomic_write_json(Path(sessions_dir) / STATE_FILENAME, state)
+    record_state_write(sessions_dir)
 
 
 def _build_sessions_array(
@@ -169,10 +170,17 @@ def _build_sessions_array(
     for n in range(1, total + 1):
         prior = prior_by_number.get(n, {})
         title = heal_title(prior.get("title"), n, spec_titles) or f"Session {n}"
+        prior_status = canonicalize_status(prior.get("status"))
         if n == in_progress_number:
             status = STATUS_IN_PROGRESS
         elif n in completed:
             status = STATUS_COMPLETE
+        elif prior_status == STATUS_CANCELLED:
+            # A cancellation is a decision about that session, not a gap in
+            # the numbering. Rebuilding it as not-started would silently
+            # return abandoned work to the queue and drop the reason it was
+            # abandoned.
+            status = STATUS_CANCELLED
         else:
             status = STATUS_NOT_STARTED
         record = {"number": n, "title": title, "status": status}
@@ -183,6 +191,10 @@ def _build_sessions_array(
                     "verificationVerdict", "verification"):
             if prior.get(key) is not None:
                 record[key] = prior[key]
+        if status == STATUS_CANCELLED:
+            for key in ("preCancelStatus", "cancelledReason", "cancelledAt"):
+                if prior.get(key) is not None:
+                    record[key] = prior[key]
         record.setdefault("startedAt", None)
         record.setdefault("completedAt", None)
         record.setdefault("orchestrator", None)
@@ -191,6 +203,17 @@ def _build_sessions_array(
             record["type"] = prior["type"]
         sessions.append(record)
     return sessions
+
+
+def _cancelled_numbers(state: Optional[dict]) -> set:
+    if not state:
+        return set()
+    return {
+        s.get("number") for s in state.get("sessions") or []
+        if isinstance(s, dict)
+        and canonicalize_status(s.get("status")) == STATUS_CANCELLED
+        and isinstance(s.get("number"), int)
+    }
 
 
 def _completed_numbers(state: Optional[dict]) -> set:
@@ -204,17 +227,15 @@ def _completed_numbers(state: Optional[dict]) -> set:
 
 
 def register_session_start(
-    set_dir, session_number: int, *, engine: str, provider=None,
+    sessions_dir, session_number: int, *, engine: str, provider=None,
     model=None, effort=None, total_sessions: Optional[int] = None,
 ) -> dict:
     """The one writer for a session start. Re-opening a closed session is
     refused HERE, not only at the CLI — a direct API caller must hit the
     same wall."""
-    set_path = Path(set_dir)
-    raw = read_raw_session_state(set_path)
-    normalized = (
-        normalize_to_v4_shape(raw, set_path / "spec.md") if raw else None
-    )
+    sessions_path = Path(sessions_dir)
+    raw = read_raw_session_state(sessions_path)
+    normalized = derived_view(raw) if raw else None
     completed = _completed_numbers(normalized)
     if session_number in completed:
         raise SessionStateInvariantError(
@@ -226,7 +247,7 @@ def register_session_start(
         )
 
     spec_titles = dict(
-        extract_session_titles_from_spec(set_path / "spec.md")
+        extract_session_titles_from_plan(sessions_path / SESSION_PLAN_FILENAME)
     )
     total = total_sessions or 0
     if not total and normalized:
@@ -253,30 +274,24 @@ def register_session_start(
             # leftover summary beside a null verdict would be a lie.
             record.pop("verification", None)
 
-    state = {
-        "schemaVersion": SCHEMA_VERSION,
-        "sessionSetName": set_path.name,
-        "status": STATUS_IN_PROGRESS,
-        "sessions": sessions,
-    }
-    for passthrough in ("forceClosed", "preCancelStatus"):
-        if raw and passthrough in raw:
-            state[passthrough] = raw[passthrough]
-    _validate_and_write_state(set_path, state)
+    state = {"schemaVersion": SCHEMA_VERSION, "sessions": sessions}
+    if raw and "forceClosed" in raw:
+        state["forceClosed"] = raw["forceClosed"]
+    _validate_and_write_state(sessions_path, state)
     return state
 
 
 def record_session_verification(
-    set_dir, session_number: int, verdict: str, summary: Optional[dict] = None
+    sessions_dir, session_number: int, verdict: str, summary: Optional[dict] = None
 ) -> None:
     """Stamp the final verdict (closed vocabulary, exact allowlist) and an
     additive verification summary onto the session record."""
     verdict = validate_session_verdict(str(verdict).strip().upper())
-    set_path = Path(set_dir)
-    raw = read_raw_session_state(set_path)
+    sessions_path = Path(sessions_dir)
+    raw = read_raw_session_state(sessions_path)
     if not raw or not isinstance(raw.get("sessions"), list):
         raise SessionStateInvariantError(
-            1, f"no writable v4 session-state under {set_dir}"
+            1, f"no writable v4 session-state under {sessions_dir}"
         )
     hit = False
     for record in raw["sessions"]:
@@ -287,46 +302,43 @@ def record_session_verification(
             hit = True
     if not hit:
         raise SessionStateInvariantError(
-            2, f"session {session_number} not present in {set_dir}"
+            2, f"session {session_number} not present in {sessions_dir}"
         )
-    _validate_and_write_state(set_path, raw)
+    _validate_and_write_state(sessions_path, raw)
 
 
 def flip_state_to_closed(
-    set_dir, *, verdict=None, forced: bool = False
+    sessions_dir, *, verdict=None, forced: bool = False
 ) -> dict:
-    """Close the in-flight session: complete it, stamp the verdict, and
-    flip the set to complete when it was the last session (or when forced,
-    which promotes every session — a forensic marker, not a shortcut)."""
+    """Close the in-flight session: complete it and stamp the verdict.
+    ``forced`` promotes every open session — a forensic marker, not a
+    shortcut."""
     if verdict is not None:
         verdict = validate_session_verdict(str(verdict).strip().upper())
-    set_path = Path(set_dir)
-    raw = read_raw_session_state(set_path)
-    normalized = (
-        normalize_to_v4_shape(raw, set_path / "spec.md") if raw else None
-    )
+    sessions_path = Path(sessions_dir)
+    raw = read_raw_session_state(sessions_path)
+    normalized = derived_view(raw) if raw else None
     if not normalized:
         raise SessionStateInvariantError(
-            1, f"no readable session-state under {set_dir}"
+            1, f"no readable session record under {sessions_dir}"
         )
     current = normalized.get("currentSession")
     if current is None:
         raise SessionStateInvariantError(
-            3, f"no session is in flight under {set_dir}"
+            3, f"no session is in flight under {sessions_dir}"
         )
-    completed = _completed_numbers(normalized) | {current}
-    sessions = normalized.get("sessions") or []
-    total = len(sessions)
     now = _now_iso()
     new_sessions = []
-    for record in sessions:
+    for record in normalized.get("sessions") or []:
         record = dict(record)
         if record.get("number") == current:
             record["status"] = STATUS_COMPLETE
             record["completedAt"] = now
             if verdict is not None:
                 record["verificationVerdict"] = verdict
-        elif forced and record.get("status") != STATUS_COMPLETE:
+        elif forced and record.get("status") not in (
+            STATUS_COMPLETE, STATUS_CANCELLED,
+        ):
             record["status"] = STATUS_COMPLETE
             if record.get("completedAt") is None:
                 record["completedAt"] = now
@@ -335,49 +347,27 @@ def flip_state_to_closed(
             record.setdefault(key, None)
         new_sessions.append(record)
 
-    all_done = forced or len(completed) == total
-    state = {
-        "schemaVersion": SCHEMA_VERSION,
-        "sessionSetName": set_path.name,
-        "status": STATUS_COMPLETE if all_done else STATUS_IN_PROGRESS,
-        "sessions": new_sessions,
-    }
+    state = {"schemaVersion": SCHEMA_VERSION, "sessions": new_sessions}
     if forced:
         state["forceClosed"] = True
     elif raw and "forceClosed" in raw:
         state["forceClosed"] = raw["forceClosed"]
-    if raw and "preCancelStatus" in raw:
-        state["preCancelStatus"] = raw["preCancelStatus"]
-    _validate_and_write_state(set_path, state)
+    _validate_and_write_state(sessions_path, state)
     return state
 
 
-def _v4_on_disk_state(set_path: Path, raw: dict) -> dict:
-    """Project any historical on-disk shape to the canonical v4 write
-    shape: ledger normalized, derived top-level keys dropped, the plan-less
-    carve-out and passthrough keys preserved."""
-    normalized = normalize_to_v4_shape(raw, set_path / "spec.md")
+def _on_disk_state(sessions_path: Path, raw: dict) -> dict:
+    """The canonical v5 write shape: the ledger as recorded, derived keys
+    dropped, passthroughs preserved."""
     state = {
         "schemaVersion": SCHEMA_VERSION,
-        "sessionSetName": normalized.get("sessionSetName") or set_path.name,
-        "status": canonicalize_status(normalized.get("status")),
+        "sessions": [
+            dict(s) for s in raw.get("sessions") or [] if isinstance(s, dict)
+        ],
     }
-    normalized_sessions = normalized.get("sessions")
-    if isinstance(raw.get("sessions"), list) or normalized_sessions:
-        state["sessions"] = normalized_sessions or []
-    else:
-        for key in ("startedAt", "orchestrator"):  # plan-less carve-out
-            if raw.get(key) is not None:
-                state[key] = raw[key]
     for key in ("forceClosed", "nextOrchestrator"):
         if key in raw:
             state[key] = raw[key]
-    if "preCancelStatus" in raw:
-        pre = canonicalize_status(raw["preCancelStatus"])
-        # A drifted value is dropped, not written: restore then falls back
-        # to ledger derivation instead of trusting a token nothing owns.
-        if pre is None or pre in TOP_LEVEL_STATUSES:
-            state["preCancelStatus"] = pre
     return state
 
 
@@ -396,8 +386,8 @@ def plan_step_key(text: str, ordinal: int) -> str:
     return key or f"step-{ordinal}"
 
 
-def _read_or_create_activity_log(set_dir, total_sessions=None) -> dict:
-    path = Path(set_dir) / "activity-log.json"
+def _read_or_create_activity_log(sessions_dir, total_sessions=None) -> dict:
+    path = Path(sessions_dir) / ACTIVITY_LOG_FILENAME
     try:
         log = json.loads(path.read_text(encoding="utf-8"))
         if isinstance(log, dict):
@@ -405,18 +395,17 @@ def _read_or_create_activity_log(set_dir, total_sessions=None) -> dict:
     except (OSError, json.JSONDecodeError, UnicodeError):
         pass
     return {
-        "sessionSetName": Path(set_dir).name,
         "createdDate": _now_iso(),
         "totalSessions": total_sessions or 0,
         "entries": [],
     }
 
 
-def _write_activity_log(set_dir, log: dict) -> None:
-    _atomic_write_json(Path(set_dir) / "activity-log.json", log)
+def _write_activity_log(sessions_dir, log: dict) -> None:
+    _atomic_write_json(Path(sessions_dir) / ACTIVITY_LOG_FILENAME, log)
 
 
-def seed_session_plan(set_dir, session_number: int, total_sessions=None) -> int:
+def seed_session_plan(sessions_dir, session_number: int, total_sessions=None) -> int:
     """Seed spec steps as plan rows — once per session, never re-applied.
     A spec edited mid-flight shows new work only when it is logged."""
     # The spec parser lives with the lifecycle flows; imported lazily so
@@ -425,7 +414,7 @@ def seed_session_plan(set_dir, session_number: int, total_sessions=None) -> int:
         DuplicateSlugError, parse_session_plans, split_slug_marker,
     )
 
-    spec_path = Path(set_dir) / "spec.md"
+    spec_path = Path(sessions_dir) / SESSION_PLAN_FILENAME
     try:
         spec_text = spec_path.read_text(encoding="utf-8")
     except (OSError, UnicodeError):
@@ -437,7 +426,7 @@ def seed_session_plan(set_dir, session_number: int, total_sessions=None) -> int:
     )
     if plan is None or not plan["steps"]:
         return 0
-    log = _read_or_create_activity_log(set_dir, total_sessions)
+    log = _read_or_create_activity_log(sessions_dir, total_sessions)
     entries = log.setdefault("entries", [])
     if any(
         isinstance(e, dict) and e.get("sessionNumber") == session_number
@@ -459,7 +448,7 @@ def seed_session_plan(set_dir, session_number: int, total_sessions=None) -> int:
         if slug is not None:
             if slug in seen_authored:
                 raise DuplicateSlugError(
-                    f"{set_dir}: step slug {slug!r} is declared more than "
+                    f"{sessions_dir}: step slug {slug!r} is declared more than "
                     f"once in session {session_number}"
                 )
             seen_authored.add(slug)
@@ -482,12 +471,12 @@ def seed_session_plan(set_dir, session_number: int, total_sessions=None) -> int:
             "status": "pending",
             "kind": "plan-step",
         })
-    _write_activity_log(set_dir, log)
+    _write_activity_log(sessions_dir, log)
     return len(plan["steps"])
 
 
 def log_step(
-    set_dir, session_number: int, step_key: str, description: str,
+    sessions_dir, session_number: int, step_key: str, description: str,
     status: str, step_number=None,
 ) -> None:
     """Closed step vocabulary at the writer; drifted synonyms are read-
@@ -496,7 +485,7 @@ def log_step(
         raise ValueError(
             f"step status must be one of {STEP_STATUSES}, got {status!r}"
         )
-    log = _read_or_create_activity_log(set_dir)
+    log = _read_or_create_activity_log(sessions_dir)
     log.setdefault("entries", []).append({
         "sessionNumber": session_number,
         "stepNumber": step_number,
@@ -505,13 +494,13 @@ def log_step(
         "description": description,
         "status": status,
     })
-    _write_activity_log(set_dir, log)
+    _write_activity_log(sessions_dir, log)
 
 
 # --- change-log.md -----------------------------------------------------------
 
-def append_change_log_block(set_dir, text: str) -> None:
-    path = Path(set_dir) / "change-log.md"
+def append_change_log_block(sessions_dir, text: str) -> None:
+    path = Path(sessions_dir) / "change-log.md"
     existing = ""
     try:
         existing = path.read_text(encoding="utf-8")
@@ -556,10 +545,10 @@ def _entries_of_kind(log: dict, kind: str) -> list:
     ]
 
 
-def _session_records(set_dir) -> dict:
+def _session_records(sessions_dir) -> dict:
     """number -> {title, status} from the state file, or {} when there is
     none yet. The state owns titles; the log never restates them."""
-    raw = read_raw_session_state(Path(set_dir))
+    raw = read_raw_session_state(Path(sessions_dir))
     if not isinstance(raw, dict):
         return {}
     records = {}
@@ -573,7 +562,7 @@ def _session_records(set_dir) -> dict:
 
 
 def append_decision(
-    set_dir, *, session_number: int, decider: str, headline: str, body: str,
+    sessions_dir, *, session_number: int, decider: str, headline: str, body: str,
     model=None, provider=None, decided_on=None, backfill_reason=None,
 ) -> dict:
     """Append one decision and re-render the log.
@@ -616,7 +605,7 @@ def append_decision(
             ) from exc
         reason = _require_text(backfill_reason, "backfill_reason")
 
-    log = _read_or_create_activity_log(set_dir)
+    log = _read_or_create_activity_log(sessions_dir)
     ordinal = len(_entries_of_kind(log, KIND_DECISION)) + 1
     entry = {
         "kind": KIND_DECISION,
@@ -635,13 +624,13 @@ def append_decision(
     if reason is not None:
         entry["backfillReason"] = reason
     log.setdefault("entries", []).append(entry)
-    _write_activity_log(set_dir, log)
-    render_decisions_log(set_dir)
+    _write_activity_log(sessions_dir, log)
+    render_decisions_log(sessions_dir)
     return entry
 
 
 def declare_session_task(
-    set_dir, *, session_number: int, task: str, releasable: bool,
+    sessions_dir, *, session_number: int, task: str, releasable: bool,
 ) -> dict:
     """Declare what a session will do, and whether it may publish.
 
@@ -658,14 +647,14 @@ def declare_session_task(
             "releasable must be True or False -- an undeclared session is "
             "not releasable, and no third value means anything here"
         )
-    log = _read_or_create_activity_log(set_dir)
+    log = _read_or_create_activity_log(sessions_dir)
     if any(e.get("sessionNumber") == number
            for e in _entries_of_kind(log, KIND_TASK_DECLARATION)):
         raise SanctionedWriteError(
             f"session {number} has already declared its task list; a "
             "declaration is made once, before the work"
         )
-    record = _session_records(set_dir).get(number)
+    record = _session_records(sessions_dir).get(number)
     if record and record["status"] == STATUS_COMPLETE:
         raise SanctionedWriteError(
             f"session {number} is complete; its task list can no longer be "
@@ -677,7 +666,7 @@ def declare_session_task(
     # that read what it wrote.
     from .gates import material_worktree_changes, preview_paths
 
-    changed, error = material_worktree_changes(set_dir)
+    changed, error = material_worktree_changes(sessions_dir)
     if error:
         raise SanctionedWriteError(
             f"cannot tell whether session {number}'s work has begun: {error}"
@@ -698,43 +687,43 @@ def declare_session_task(
         "releasable": releasable,
     }
     log.setdefault("entries", []).append(entry)
-    _write_activity_log(set_dir, log)
-    render_project_work_plan(set_dir)
+    _write_activity_log(sessions_dir, log)
+    render_project_work_plan(sessions_dir)
     return entry
 
 
-def record_project_plan(set_dir, body: str) -> dict:
+def record_project_plan(sessions_dir, body: str) -> dict:
     """Record the plan prose the session list hangs off. Appended, not
     overwritten -- the newest is rendered and the earlier ones stay in the
     log, so a plan that changed can be seen to have changed."""
     body_text = _require_text(body, "body")
-    log = _read_or_create_activity_log(set_dir)
+    log = _read_or_create_activity_log(sessions_dir)
     entry = {
         "kind": KIND_PROJECT_PLAN,
         "dateTime": _now_iso(),
         "body": body_text,
     }
     log.setdefault("entries", []).append(entry)
-    _write_activity_log(set_dir, log)
-    render_project_work_plan(set_dir)
+    _write_activity_log(sessions_dir, log)
+    render_project_work_plan(sessions_dir)
     return entry
 
 
-def read_task_declaration(set_dir, session_number: int):
+def read_task_declaration(sessions_dir, session_number: int):
     """The session's declaration, or None. None is the answer for a
     session that never declared, and callers must read it as "not
     releasable" rather than as "unknown"."""
-    log = _read_or_create_activity_log(set_dir)
+    log = _read_or_create_activity_log(sessions_dir)
     for entry in _entries_of_kind(log, KIND_TASK_DECLARATION):
         if entry.get("sessionNumber") == session_number:
             return entry
     return None
 
 
-def session_is_releasable(set_dir, session_number: int) -> bool:
+def session_is_releasable(sessions_dir, session_number: int) -> bool:
     """Fails closed. Packaging asks this question, and the absence of a
     declaration is a refusal, never a default yes."""
-    declaration = read_task_declaration(set_dir, session_number)
+    declaration = read_task_declaration(sessions_dir, session_number)
     return bool(declaration and declaration.get("releasable") is True)
 
 
@@ -758,7 +747,7 @@ _PROJECTION_NOTE = (
 )
 
 
-def render_decisions_log(set_dir) -> str:
+def render_decisions_log(sessions_dir) -> str:
     """Fold the decision rows into `decisions-log.md`, strictly in the
     order they were appended.
 
@@ -767,15 +756,15 @@ def render_decisions_log(set_dir) -> str:
     again further down. Grouping would have read better and would have
     put D38 above D10; the file's whole claim is "in order".
     """
-    set_path = Path(set_dir)
-    log = _read_or_create_activity_log(set_path)
+    sessions_path = Path(sessions_dir)
+    log = _read_or_create_activity_log(sessions_path)
     decisions = sorted(
         _entries_of_kind(log, KIND_DECISION),
         key=lambda e: e.get("ordinal") or 0,
     )
-    records = _session_records(set_path)
+    records = _session_records(sessions_path)
     lines = [
-        f"# Decisions log — {set_path.name}",
+        f"# Decisions log — {sessions_path.name}",
         "",
         "Every decision, human or AI, in order, with who made it and what "
         "it was.",
@@ -811,27 +800,27 @@ def render_decisions_log(set_dir) -> str:
                 f"— {entry['backfillReason']}*",
             ]
     text = "\n".join(lines).rstrip("\n") + "\n"
-    _write_text_lf(set_path / DECISIONS_LOG_FILENAME, text)
+    _write_text_lf(sessions_path / DECISIONS_LOG_FILENAME, text)
     return text
 
 
-def render_project_work_plan(set_dir) -> str:
+def render_project_work_plan(sessions_dir) -> str:
     """Fold the plan prose and the task declarations into
     `project-work-plan.md`: the plan, then every numbered session beside
     what it declared and whether it may publish."""
-    set_path = Path(set_dir)
-    log = _read_or_create_activity_log(set_path)
+    sessions_path = Path(sessions_dir)
+    log = _read_or_create_activity_log(sessions_path)
     plans = _entries_of_kind(log, KIND_PROJECT_PLAN)
     declarations = {
         e.get("sessionNumber"): e
         for e in _entries_of_kind(log, KIND_TASK_DECLARATION)
     }
-    records = _session_records(set_path)
+    records = _session_records(sessions_path)
     numbers = sorted(
         n for n in set(records) | set(declarations) if isinstance(n, int)
     )
     lines = [
-        f"# Project work plan — {set_path.name}",
+        f"# Project work plan — {sessions_path.name}",
         "",
         _PROJECTION_NOTE,
         "",
@@ -874,24 +863,8 @@ def render_project_work_plan(set_dir) -> str:
             str(declared.get("task", "")).strip(),
         ]
     text = "\n".join(lines).rstrip("\n") + "\n"
-    _write_text_lf(set_path / WORK_PLAN_FILENAME, text)
+    _write_text_lf(sessions_path / WORK_PLAN_FILENAME, text)
     return text
-
-
-# --- cancel/restore audit markers --------------------------------------------
-
-def _prepend_history_entry(existing, verb: str, reason: str,
-                           when: str) -> str:
-    """New entry above prior ones, one accumulated history per marker file.
-    Malformed prior content (manual edits) is preserved verbatim below a
-    fresh header — filename presence is the signal that must survive."""
-    entry = f"{verb} on {when}\n{reason}\n\n"
-    if existing is None:
-        return f"{_CANCEL_HISTORY_HEADER}\n\n{entry}"
-    if existing.startswith(_CANCEL_HISTORY_HEADER):
-        tail = existing[len(_CANCEL_HISTORY_HEADER):].lstrip("\n")
-        return f"{_CANCEL_HISTORY_HEADER}\n\n{entry}{tail}"
-    return f"{_CANCEL_HISTORY_HEADER}\n\n{entry}{existing}"
 
 
 def _write_text_lf(path: Path, content: str) -> None:

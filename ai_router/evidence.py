@@ -79,6 +79,50 @@ def repo_root_for(path) -> Optional[str]:
     return out if rc == 0 and out else None
 
 
+# --- The repository's sessions root -----------------------------------------
+#
+# A repository has sessions, not sets of sessions. There is exactly one
+# sessions root per repository, so no command takes a handle to one: it is
+# derived, and the only override exists because a caller may run from
+# outside the tree.
+
+SESSIONS_DIRNAME = "sessions"
+_SESSIONS_PARENT = "docs"
+
+# The files that live at the sessions root. Their names are constants
+# because nothing chooses where a record lands.
+STATE_FILENAME = "sessions.json"
+ACTIVITY_LOG_FILENAME = "activity-log.json"
+SESSION_PLAN_FILENAME = "session-plan.md"
+
+
+def sessions_dir_for(repo_root) -> Path:
+    return Path(repo_root) / _SESSIONS_PARENT / SESSIONS_DIRNAME
+
+
+class SessionsRootNotFoundError(ValueError):
+    pass
+
+
+def resolve_sessions_dir(explicit=None, start=None) -> str:
+    """The sessions root for the repository *start* lives in.
+
+    An explicit path wins so a caller outside the tree can still address a
+    repository; otherwise the root is derived from the working directory.
+    Nothing here selects *which* sessions to act on — that is the session
+    number's job.
+    """
+    if explicit:
+        return str(explicit)
+    root = repo_root_for(Path(start or os.getcwd()))
+    if root is None:
+        raise SessionsRootNotFoundError(
+            f"not inside a git repository: {start or os.getcwd()}. "
+            "Run from the repository, or pass --sessions-dir."
+        )
+    return str(sessions_dir_for(root))
+
+
 def snapshot_worktree_tree(repo_root) -> Optional[str]:
     """A tree object capturing tracked AND untracked non-ignored files,
     via a throwaway index — the real index and worktree are untouched.
@@ -327,29 +371,29 @@ def authoritative_tier(proposed_tier, transcript) -> str:
 _STATE_WRITES_FILENAME = "state-writes.jsonl"
 
 
-def _state_writes_path(repo_root, set_slug: str) -> Path:
-    return Path(repo_root) / RUNS_DIRNAME / str(set_slug) / _STATE_WRITES_FILENAME
+def _state_writes_path(repo_root) -> Path:
+    return Path(repo_root) / RUNS_DIRNAME / _STATE_WRITES_FILENAME
 
 
-def state_file_hash(set_dir) -> Optional[str]:
-    path = Path(set_dir) / "session-state.json"
+def state_file_hash(sessions_dir) -> Optional[str]:
+    path = Path(sessions_dir) / STATE_FILENAME
     try:
         return hash_output(path.read_text(encoding="utf-8"))
     except OSError:
         return None
 
 
-def record_state_write(set_dir, repo_root=None) -> None:
-    """Called by the sanctioned writers after every session-state.json
-    write. Best-effort: outside a git repo (unit tests, scratch dirs) the
-    record is simply not kept."""
-    root = repo_root or repo_root_for(set_dir)
+def record_state_write(sessions_dir, repo_root=None) -> None:
+    """Called by the sanctioned writers after every sessions.json write.
+    Best-effort: outside a git repo (unit tests, scratch dirs) the record
+    is simply not kept."""
+    root = repo_root or repo_root_for(sessions_dir)
     if root is None:
         return
-    digest = state_file_hash(set_dir)
+    digest = state_file_hash(sessions_dir)
     if digest is None:
         return
-    path = _state_writes_path(root, Path(set_dir).name)
+    path = _state_writes_path(root)
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
         with open(path, "a", encoding="utf-8") as f:
@@ -359,19 +403,19 @@ def record_state_write(set_dir, repo_root=None) -> None:
 
 
 def detect_out_of_band_write(
-    set_dir, repo_root=None, *, require_record: bool = False
+    sessions_dir, repo_root=None, *, require_record: bool = False
 ) -> Optional[str]:
-    """``None`` when the current session-state.json content matches some
+    """``None`` when the current sessions.json content matches some
     sanctioned write; otherwise a reason string. With *require_record*
     (the close gate's mode) an absent or empty record is itself a finding —
     absence is the signature a fully-simulated session leaves."""
-    root = repo_root or repo_root_for(set_dir)
+    root = repo_root or repo_root_for(sessions_dir)
     if root is None:
         return "not inside a git repository" if require_record else None
-    current = state_file_hash(set_dir)
+    current = state_file_hash(sessions_dir)
     if current is None:
-        return "session-state.json is unreadable"
-    path = _state_writes_path(root, Path(set_dir).name)
+        return f"{STATE_FILENAME} is unreadable"
+    path = _state_writes_path(root)
     recorded = set()
     try:
         with open(path, encoding="utf-8") as f:
@@ -384,7 +428,7 @@ def detect_out_of_band_write(
                     recorded.add(row["hash"])
     except FileNotFoundError:
         return (
-            "no sanctioned-writer record exists for session-state.json "
+            f"no sanctioned-writer record exists for {STATE_FILENAME} "
             "(state-writes ledger absent)" if require_record else None
         )
     except OSError as exc:
@@ -395,7 +439,7 @@ def detect_out_of_band_write(
         )
     if current not in recorded:
         return (
-            "session-state.json content matches no sanctioned write — it "
+            f"{STATE_FILENAME} content matches no sanctioned write — it "
             "was edited out of band"
         )
     return None
@@ -740,7 +784,7 @@ def verify_worker_result(
 
 
 def record_worker_result(
-    repo_root, set_slug: str, session_number: int, reviewed_tree: str, row
+    repo_root, session_number: int, reviewed_tree: str, row
 ) -> dict:
     """The one way a worker result reaches the record: verified here
     against the reviewed tree and against the check it answers, then
@@ -752,7 +796,7 @@ def record_worker_result(
     when a worker names a check nobody wrote.
     """
     change_id = row["change_id"]
-    checks = ledger.read_checks(repo_root, set_slug, session_number, change_id)
+    checks = ledger.read_checks(repo_root, session_number, change_id)
     check = next(
         (c for c in checks if c.get("check_id") == row.get("check_id")), None
     )
@@ -767,8 +811,8 @@ def record_worker_result(
     verified = verify_worker_result(
         repo_root, reviewed_tree, row,
         prior_results=ledger.read_worker_results(
-            repo_root, set_slug, session_number, change_id
+            repo_root, session_number, change_id
         ),
     )
-    ledger.append_worker_result(repo_root, set_slug, session_number, verified)
+    ledger.append_worker_result(repo_root, session_number, verified)
     return verified

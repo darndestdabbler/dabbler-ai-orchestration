@@ -46,10 +46,10 @@ RUNS_DIRNAME = f"{MACHINE_DIRNAME}/runs"
 # that has to tell the record from the work asks the same question -- what
 # a close commits, what an evidence diff drops, what a covered-surface
 # change ignores, and what a plan's file envelope may never declare.
-# ``spec.md`` is deliberately absent: a session editing its own spec
-# mid-flight is drift, not ceremony.
-LIFECYCLE_WRITTEN_SET_FILES = (
-    "session-state.json", "activity-log.json", "change-log.md",
+# The session plan is deliberately absent: a session editing the plan it
+# is running against mid-flight is drift, not ceremony.
+LIFECYCLE_WRITTEN_FILES = (
+    "sessions.json", "activity-log.json", "change-log.md",
     "decisions-log.md", "project-work-plan.md",
 )
 
@@ -80,21 +80,18 @@ def _schema(name: str) -> dict:
     return _schema_cache[name]
 
 
-def session_run_dir(repo_root, set_slug: str, session_number: int) -> Path:
-    return (
-        Path(repo_root) / RUNS_DIRNAME / str(set_slug)
-        / f"s{int(session_number)}"
-    )
+def session_run_dir(repo_root, session_number: int) -> Path:
+    return Path(repo_root) / RUNS_DIRNAME / f"s{int(session_number)}"
 
 
-def rounds_path(repo_root, set_slug: str, session_number: int) -> Path:
-    return session_run_dir(repo_root, set_slug, session_number) / "rounds.jsonl"
+def rounds_path(repo_root, session_number: int) -> Path:
+    return session_run_dir(repo_root, session_number) / "rounds.jsonl"
 
 
 def raw_output_path(
-    repo_root, set_slug: str, session_number: int, round_number: int
+    repo_root, session_number: int, round_number: int
 ) -> Path:
-    return session_run_dir(repo_root, set_slug, session_number) / (
+    return session_run_dir(repo_root, session_number) / (
         f"round-{int(round_number)}-verifier-output.md"
     )
 
@@ -142,36 +139,36 @@ def _read_jsonl(path: Path, validate) -> list[dict]:
     return records
 
 
-def read_rounds(repo_root, set_slug: str, session_number: int) -> list[dict]:
+def read_rounds(repo_root, session_number: int) -> list[dict]:
     """Every recorded round, ascending. Any unparseable or schema-invalid
     line raises :class:`LedgerError` — the ledger is machine-written, so a
     bad line is evidence of tampering or corruption, not noise to skip."""
     rounds = _read_jsonl(
-        rounds_path(repo_root, set_slug, session_number), validate_round
+        rounds_path(repo_root, session_number), validate_round
     )
     rounds.sort(key=lambda r: r["round"])
     return rounds
 
 
-def latest_round(repo_root, set_slug: str, session_number: int):
-    rounds = read_rounds(repo_root, set_slug, session_number)
+def latest_round(repo_root, session_number: int):
+    rounds = read_rounds(repo_root, session_number)
     return rounds[-1] if rounds else None
 
 
 def append_round(
-    repo_root, set_slug: str, session_number: int, record: dict
+    repo_root, session_number: int, record: dict
 ) -> dict:
     """Append one validated round row. Refuses a duplicate round number —
     rounds are immutable history, never rewritten."""
     validate_round(record)
-    existing = read_rounds(repo_root, set_slug, session_number)
+    existing = read_rounds(repo_root, session_number)
     if any(r["round"] == record["round"] for r in existing):
         raise LedgerError(
             f"round {record['round']} is already recorded for "
-            f"{set_slug} s{session_number}; rounds are append-only and "
+            f"session {session_number}; rounds are append-only and "
             "never overwritten"
         )
-    path = rounds_path(repo_root, set_slug, session_number)
+    path = rounds_path(repo_root, session_number)
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "a", encoding="utf-8") as f:
         f.write(json.dumps(record) + "\n")
@@ -179,21 +176,21 @@ def append_round(
 
 
 def save_raw_output(
-    repo_root, set_slug: str, session_number: int, round_number: int,
+    repo_root, session_number: int, round_number: int,
     content: str,
 ) -> Path:
     """Save the verifier's raw response before any parsing or display.
     ``newline=""`` keeps on-disk bytes identical to the response — no CRLF
     translation on Windows."""
-    path = raw_output_path(repo_root, set_slug, session_number, round_number)
+    path = raw_output_path(repo_root, session_number, round_number)
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w", encoding="utf-8", newline="") as f:
         f.write(content)
     return path
 
 
-def next_round_number(repo_root, set_slug: str, session_number: int) -> int:
-    rounds = read_rounds(repo_root, set_slug, session_number)
+def next_round_number(repo_root, session_number: int) -> int:
+    rounds = read_rounds(repo_root, session_number)
     return (rounds[-1]["round"] + 1) if rounds else 1
 
 
@@ -206,9 +203,9 @@ STEP_EVENT_CLOSED = "closed"
 STEP_SCHEMA_VERSION = 1
 
 
-def step_execution_path(repo_root, set_slug: str, session_number: int) -> Path:
+def step_execution_path(repo_root, session_number: int) -> Path:
     return (
-        session_run_dir(repo_root, set_slug, session_number)
+        session_run_dir(repo_root, session_number)
         / STEP_EXECUTION_FILENAME
     )
 
@@ -218,21 +215,21 @@ def validate_step_event(record: dict) -> dict:
 
 
 def read_step_events(
-    repo_root, set_slug: str, session_number: int
+    repo_root, session_number: int
 ) -> list[dict]:
     return _read_jsonl(
-        step_execution_path(repo_root, set_slug, session_number),
+        step_execution_path(repo_root, session_number),
         validate_step_event,
     )
 
 
 def append_step_event(
-    repo_root, set_slug: str, session_number: int, record: dict
+    repo_root, session_number: int, record: dict
 ) -> dict:
     """Append one validated step row. Append-only like every other row
     here: a step's history is what happened, not what it should have."""
     validate_step_event(record)
-    path = step_execution_path(repo_root, set_slug, session_number)
+    path = step_execution_path(repo_root, session_number)
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "a", encoding="utf-8") as f:
         f.write(json.dumps(record) + "\n")
@@ -251,23 +248,23 @@ def _open_step_in(events: list) -> Optional[dict]:
     return current
 
 
-def open_step(repo_root, set_slug: str, session_number: int):
+def open_step(repo_root, session_number: int):
     """The step this session has in flight, or ``None``."""
-    return _open_step_in(read_step_events(repo_root, set_slug, session_number))
+    return _open_step_in(read_step_events(repo_root, session_number))
 
 
-def closed_step_ids(repo_root, set_slug: str, session_number: int) -> list:
+def closed_step_ids(repo_root, session_number: int) -> list:
     """The steps this session has already executed, in the order they
     closed. A step is executed once; re-opening one would put a second
     commit and a second review against the same declared envelope."""
     return [
         event["step_id"]
-        for event in read_step_events(repo_root, set_slug, session_number)
+        for event in read_step_events(repo_root, session_number)
         if event["event"] == STEP_EVENT_CLOSED
     ]
 
 
-def last_closed_tree(repo_root, set_slug: str, session_number: int):
+def last_closed_tree(repo_root, session_number: int):
     """The worktree snapshot the session's most recent step closed on, or
     ``None`` before the first close.
 
@@ -280,7 +277,7 @@ def last_closed_tree(repo_root, set_slug: str, session_number: int):
     else's."""
     trees = [
         event.get("closed_tree")
-        for event in read_step_events(repo_root, set_slug, session_number)
+        for event in read_step_events(repo_root, session_number)
         if event["event"] == STEP_EVENT_CLOSED
     ]
     return trees[-1] if trees else None
@@ -292,13 +289,13 @@ def open_steps_in_repo(repo_root) -> list[dict]:
     The question a commit guard asks. It is answered from the execution
     record alone because a hook gets no arguments and must not have to
     resolve which session is active to know whether a step is in flight:
-    each row names its own set and session.
+    each row names its own session.
     """
     runs = Path(repo_root) / RUNS_DIRNAME
     if not runs.is_dir():
         return []
     open_rows = []
-    for path in sorted(runs.glob(f"*/s*/{STEP_EXECUTION_FILENAME}")):
+    for path in sorted(runs.glob(f"s*/{STEP_EXECUTION_FILENAME}")):
         row = _open_step_in(_read_jsonl(path, validate_step_event))
         if row is not None:
             open_rows.append(row)
@@ -307,27 +304,27 @@ def open_steps_in_repo(repo_root) -> list[dict]:
 
 # --- disputes.jsonl ----------------------------------------------------------
 
-def disputes_path(repo_root, set_slug: str, session_number: int) -> Path:
+def disputes_path(repo_root, session_number: int) -> Path:
     return (
-        session_run_dir(repo_root, set_slug, session_number)
+        session_run_dir(repo_root, session_number)
         / "disputes.jsonl"
     )
 
 
-def read_disputes(repo_root, set_slug: str, session_number: int) -> list[dict]:
+def read_disputes(repo_root, session_number: int) -> list[dict]:
     return _read_jsonl(
-        disputes_path(repo_root, set_slug, session_number), validate_dispute
+        disputes_path(repo_root, session_number), validate_dispute
     )
 
 
 def append_dispute(
-    repo_root, set_slug: str, session_number: int, record: dict
+    repo_root, session_number: int, record: dict
 ) -> dict:
     """Append one validated dispute row. One dispute per finding, ever —
     a dispute is immutable, and re-arguing a judged point is the loop this
     channel exists to end."""
     validate_dispute(record)
-    existing = read_disputes(repo_root, set_slug, session_number)
+    existing = read_disputes(repo_root, session_number)
     if any(
         d["round"] == record["round"]
         and d["finding_index"] == record["finding_index"]
@@ -335,10 +332,10 @@ def append_dispute(
     ):
         raise LedgerError(
             f"finding {record['finding_index']} of round {record['round']} "
-            f"is already disputed for {set_slug} s{session_number}; disputes "
+            f"is already disputed for session {session_number}; disputes "
             "are immutable and a finding is disputed at most once"
         )
-    path = disputes_path(repo_root, set_slug, session_number)
+    path = disputes_path(repo_root, session_number)
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "a", encoding="utf-8") as f:
         f.write(json.dumps(record) + "\n")
@@ -350,19 +347,19 @@ def append_dispute(
 PACKAGE_DIRNAME = "package"
 
 
-def packaging_path(repo_root, set_slug: str, session_number: int) -> Path:
+def packaging_path(repo_root, session_number: int) -> Path:
     return (
-        session_run_dir(repo_root, set_slug, session_number)
+        session_run_dir(repo_root, session_number)
         / "packaging.jsonl"
     )
 
 
-def package_output_dir(repo_root, set_slug: str, session_number: int) -> Path:
+def package_output_dir(repo_root, session_number: int) -> Path:
     """Where ``pack`` writes. Inside the run directory rather than the
     repository, so the artifact set is by construction what this run built
     and the tree that was verified stays the tree that was verified."""
     return (
-        session_run_dir(repo_root, set_slug, session_number) / PACKAGE_DIRNAME
+        session_run_dir(repo_root, session_number) / PACKAGE_DIRNAME
     )
 
 
@@ -370,14 +367,14 @@ def validate_packaging(record: dict) -> dict:
     return _validate(record, "packaging.schema.json", "packaging")
 
 
-def read_packaging(repo_root, set_slug: str, session_number: int) -> list[dict]:
+def read_packaging(repo_root, session_number: int) -> list[dict]:
     return _read_jsonl(
-        packaging_path(repo_root, set_slug, session_number), validate_packaging
+        packaging_path(repo_root, session_number), validate_packaging
     )
 
 
 def append_packaging(
-    repo_root, set_slug: str, session_number: int, record: dict
+    repo_root, session_number: int, record: dict
 ) -> dict:
     """Append one validated packaging row.
 
@@ -386,7 +383,7 @@ def append_packaging(
     the first two never happened.
     """
     validate_packaging(record)
-    path = packaging_path(repo_root, set_slug, session_number)
+    path = packaging_path(repo_root, session_number)
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "a", encoding="utf-8") as f:
         f.write(json.dumps(record) + "\n")
@@ -435,27 +432,27 @@ def _require_change_id(change_id) -> str:
     return change_id
 
 
-def critique_root(repo_root, set_slug: str, session_number: int) -> Path:
+def critique_root(repo_root, session_number: int) -> Path:
     return (
-        session_run_dir(repo_root, set_slug, session_number)
+        session_run_dir(repo_root, session_number)
         / CRITIQUE_DIRNAME
     )
 
 
 def critique_dir(
-    repo_root, set_slug: str, session_number: int, change_id: str
+    repo_root, session_number: int, change_id: str
 ) -> Path:
     return (
-        critique_root(repo_root, set_slug, session_number)
+        critique_root(repo_root, session_number)
         / _require_change_id(change_id)
     )
 
 
 def critique_path(
-    repo_root, set_slug: str, session_number: int, change_id: str,
+    repo_root, session_number: int, change_id: str,
     filename: str,
 ) -> Path:
-    return critique_dir(repo_root, set_slug, session_number, change_id) / filename
+    return critique_dir(repo_root, session_number, change_id) / filename
 
 
 def validate_review_run(record: dict) -> dict:
@@ -478,20 +475,20 @@ def validate_disposition(record: dict) -> dict:
     return _validate(record, "dispositions.schema.json", "disposition")
 
 
-def quarantine_dir(repo_root, set_slug: str, session_number: int) -> Path:
+def quarantine_dir(repo_root, session_number: int) -> Path:
     """Beside the per-change subtree, never inside it: the frozen layout
     lists seven files and a rejected payload is none of them."""
     return (
-        critique_root(repo_root, set_slug, session_number)
+        critique_root(repo_root, session_number)
         / QUARANTINE_DIRNAME
     )
 
 
 def _quarantine(
-    repo_root, set_slug: str, session_number: int, noun: str, record,
+    repo_root, session_number: int, noun: str, record,
     reason: str,
 ) -> Optional[Path]:
-    directory = quarantine_dir(repo_root, set_slug, session_number)
+    directory = quarantine_dir(repo_root, session_number)
     stamp = (
         datetime.datetime.now(datetime.timezone.utc)
         .strftime("%Y%m%dT%H%M%S%fZ")
@@ -510,7 +507,7 @@ def _quarantine(
 
 
 def _validated_or_quarantined(
-    repo_root, set_slug: str, session_number: int, record, validate, noun: str,
+    repo_root, session_number: int, record, validate, noun: str,
 ):
     """Validate before anything is written. On failure the record is
     refused *and* preserved: a rejected payload that is silently dropped
@@ -520,7 +517,7 @@ def _validated_or_quarantined(
         return validate(record)
     except LedgerError as exc:
         path = _quarantine(
-            repo_root, set_slug, session_number, noun, record, str(exc)
+            repo_root, session_number, noun, record, str(exc)
         )
         where = f" A copy is quarantined at {path}." if path else ""
         raise LedgerError(
@@ -565,26 +562,26 @@ def _read_json(path: Path, validate, noun: str):
 # --- review-run.json ---------------------------------------------------------
 
 def review_run_path(
-    repo_root, set_slug: str, session_number: int, change_id: str
+    repo_root, session_number: int, change_id: str
 ) -> Path:
     return critique_path(
-        repo_root, set_slug, session_number, change_id, REVIEW_RUN_FILENAME
+        repo_root, session_number, change_id, REVIEW_RUN_FILENAME
     )
 
 
 def read_review_run(
-    repo_root, set_slug: str, session_number: int, change_id: str
+    repo_root, session_number: int, change_id: str
 ) -> Optional[dict]:
     return _read_json(
-        review_run_path(repo_root, set_slug, session_number, change_id),
+        review_run_path(repo_root, session_number, change_id),
         validate_review_run, "review run",
     )
 
 
-def read_review_runs(repo_root, set_slug: str, session_number: int) -> list:
+def read_review_runs(repo_root, session_number: int) -> list:
     """Every review run recorded for the session, oldest first. A directory
     that holds no readable review run is not a review run."""
-    root = critique_root(repo_root, set_slug, session_number)
+    root = critique_root(repo_root, session_number)
     if not root.is_dir():
         return []
     runs = []
@@ -601,19 +598,19 @@ def read_review_runs(repo_root, set_slug: str, session_number: int) -> list:
 
 
 def write_review_run(
-    repo_root, set_slug: str, session_number: int, record: dict
+    repo_root, session_number: int, record: dict
 ) -> Path:
     """Atomic-replace the run record. Attempts are append-only: a write
     that shortens or rewrites an earlier attempt is refused, because a
     remediation's whole point is that the prior attempt's evidence stays
     exactly as it was recorded."""
     _validated_or_quarantined(
-        repo_root, set_slug, session_number, record, validate_review_run,
+        repo_root, session_number, record, validate_review_run,
         "review run",
     )
     change_id = _require_change_id(record["change_id"])
-    path = review_run_path(repo_root, set_slug, session_number, change_id)
-    existing = read_review_run(repo_root, set_slug, session_number, change_id)
+    path = review_run_path(repo_root, session_number, change_id)
+    existing = read_review_run(repo_root, session_number, change_id)
     if existing is not None:
         prior = existing["attempts"]
         proposed = record["attempts"]
@@ -630,63 +627,63 @@ def write_review_run(
 # --- review-claims.json ------------------------------------------------------
 
 def review_claims_path(
-    repo_root, set_slug: str, session_number: int, change_id: str
+    repo_root, session_number: int, change_id: str
 ) -> Path:
     return critique_path(
-        repo_root, set_slug, session_number, change_id, REVIEW_CLAIMS_FILENAME
+        repo_root, session_number, change_id, REVIEW_CLAIMS_FILENAME
     )
 
 
 def review_claims_twin_path(
-    repo_root, set_slug: str, session_number: int, change_id: str
+    repo_root, session_number: int, change_id: str
 ) -> Path:
     """The human-readable rendering. Decorative by construction: no reader
     in this package opens it, and deleting it changes no behavior."""
     return critique_path(
-        repo_root, set_slug, session_number, change_id,
+        repo_root, session_number, change_id,
         REVIEW_CLAIMS_TWIN_FILENAME,
     )
 
 
 def read_review_claims(
-    repo_root, set_slug: str, session_number: int, change_id: str
+    repo_root, session_number: int, change_id: str
 ) -> Optional[dict]:
     return _read_json(
-        review_claims_path(repo_root, set_slug, session_number, change_id),
+        review_claims_path(repo_root, session_number, change_id),
         validate_review_claims, "review claims",
     )
 
 
 def write_review_claims(
-    repo_root, set_slug: str, session_number: int, record: dict
+    repo_root, session_number: int, record: dict
 ) -> Path:
-    screen_review_claims(repo_root, set_slug, session_number, record)
+    screen_review_claims(repo_root, session_number, record)
     return _atomic_write_json(
         review_claims_path(
-            repo_root, set_slug, session_number, record["change_id"]
+            repo_root, session_number, record["change_id"]
         ),
         record,
     )
 
 
 def screen_review_claims(
-    repo_root, set_slug: str, session_number: int, record: dict
+    repo_root, session_number: int, record: dict
 ) -> dict:
     """The writer's own check, without the write. A caller that must not
     move machine state until author input is known-good gets the identical
     refusal and the identical quarantine copy — pre-checking through a
     plain validator instead would drop the rejected payload on the floor."""
     return _validated_or_quarantined(
-        repo_root, set_slug, session_number, record, validate_review_claims,
+        repo_root, session_number, record, validate_review_claims,
         "review claims",
     )
 
 
 def write_review_claims_twin(
-    repo_root, set_slug: str, session_number: int, change_id: str, text: str
+    repo_root, session_number: int, change_id: str, text: str
 ) -> Path:
     path = review_claims_twin_path(
-        repo_root, set_slug, session_number, change_id
+        repo_root, session_number, change_id
     )
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text, encoding="utf-8")
@@ -696,15 +693,15 @@ def write_review_claims_twin(
 # --- checks.json -------------------------------------------------------------
 
 def checks_path(
-    repo_root, set_slug: str, session_number: int, change_id: str
+    repo_root, session_number: int, change_id: str
 ) -> Path:
     return critique_path(
-        repo_root, set_slug, session_number, change_id, CHECKS_FILENAME
+        repo_root, session_number, change_id, CHECKS_FILENAME
     )
 
 
 def read_checks(
-    repo_root, set_slug: str, session_number: int, change_id: str
+    repo_root, session_number: int, change_id: str
 ) -> list:
     def _validate_all(records):
         if not isinstance(records, list):
@@ -714,23 +711,23 @@ def read_checks(
         return records
 
     records = _read_json(
-        checks_path(repo_root, set_slug, session_number, change_id),
+        checks_path(repo_root, session_number, change_id),
         _validate_all, "checks",
     )
     return records or []
 
 
 def write_checks(
-    repo_root, set_slug: str, session_number: int, change_id: str,
+    repo_root, session_number: int, change_id: str,
     records: list,
 ) -> Path:
     for record in records:
         _validated_or_quarantined(
-            repo_root, set_slug, session_number, record, validate_check,
+            repo_root, session_number, record, validate_check,
             "check",
         )
     return _atomic_write_json(
-        checks_path(repo_root, set_slug, session_number, change_id),
+        checks_path(repo_root, session_number, change_id),
         list(records),
     )
 
@@ -738,40 +735,40 @@ def write_checks(
 # --- worker-results.jsonl and dispositions.jsonl -----------------------------
 
 def worker_results_path(
-    repo_root, set_slug: str, session_number: int, change_id: str
+    repo_root, session_number: int, change_id: str
 ) -> Path:
     return critique_path(
-        repo_root, set_slug, session_number, change_id,
+        repo_root, session_number, change_id,
         WORKER_RESULTS_FILENAME,
     )
 
 
 def dispositions_path(
-    repo_root, set_slug: str, session_number: int, change_id: str
+    repo_root, session_number: int, change_id: str
 ) -> Path:
     return critique_path(
-        repo_root, set_slug, session_number, change_id, DISPOSITIONS_FILENAME
+        repo_root, session_number, change_id, DISPOSITIONS_FILENAME
     )
 
 
 def audits_path(
-    repo_root, set_slug: str, session_number: int, change_id: str
+    repo_root, session_number: int, change_id: str
 ) -> Path:
     return critique_path(
-        repo_root, set_slug, session_number, change_id, AUDITS_FILENAME
+        repo_root, session_number, change_id, AUDITS_FILENAME
     )
 
 
 def _append_validated(
-    repo_root, set_slug: str, session_number: int, record: dict, validate,
+    repo_root, session_number: int, record: dict, validate,
     noun: str, path_for, precheck=None,
 ) -> dict:
     _validated_or_quarantined(
-        repo_root, set_slug, session_number, record, validate, noun
+        repo_root, session_number, record, validate, noun
     )
     if precheck is not None:
         precheck(record)
-    path = path_for(repo_root, set_slug, session_number, record["change_id"])
+    path = path_for(repo_root, session_number, record["change_id"])
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "a", encoding="utf-8") as f:
         f.write(json.dumps(record) + "\n")
@@ -779,16 +776,16 @@ def _append_validated(
 
 
 def read_worker_results(
-    repo_root, set_slug: str, session_number: int, change_id: str
+    repo_root, session_number: int, change_id: str
 ) -> list:
     return _read_jsonl(
-        worker_results_path(repo_root, set_slug, session_number, change_id),
+        worker_results_path(repo_root, session_number, change_id),
         validate_worker_result,
     )
 
 
 def append_worker_result(
-    repo_root, set_slug: str, session_number: int, record: dict
+    repo_root, session_number: int, record: dict
 ) -> dict:
     """One result per check per attempt. A second row for a check already
     decided in this attempt is not an append, it is a supersession — and a
@@ -797,7 +794,7 @@ def append_worker_result(
 
     def _one_result_per_attempt(row: dict) -> None:
         for prior in read_worker_results(
-            repo_root, set_slug, session_number, row["change_id"]
+            repo_root, session_number, row["change_id"]
         ):
             if (prior["check_id"], prior["attempt"]) == (
                 row["check_id"], row["attempt"]
@@ -810,25 +807,25 @@ def append_worker_result(
                 )
 
     return _append_validated(
-        repo_root, set_slug, session_number, record, validate_worker_result,
+        repo_root, session_number, record, validate_worker_result,
         "worker result", worker_results_path,
         precheck=_one_result_per_attempt,
     )
 
 
 def read_dispositions(
-    repo_root, set_slug: str, session_number: int, change_id: str
+    repo_root, session_number: int, change_id: str
 ) -> list:
     return _read_jsonl(
-        dispositions_path(repo_root, set_slug, session_number, change_id),
+        dispositions_path(repo_root, session_number, change_id),
         validate_disposition,
     )
 
 
 def append_disposition(
-    repo_root, set_slug: str, session_number: int, record: dict
+    repo_root, session_number: int, record: dict
 ) -> dict:
     return _append_validated(
-        repo_root, set_slug, session_number, record, validate_disposition,
+        repo_root, session_number, record, validate_disposition,
         "disposition", dispositions_path,
     )

@@ -101,7 +101,12 @@ from .facts import (
     red_facts_refusal,
 )
 from .identity import IdentityResolutionError, resolve_session_orchestrator_identity
-from .session import extract_spec_excerpt, resolve_session_set_dir
+from .evidence import (
+    SESSION_PLAN_FILENAME,
+    SessionsRootNotFoundError,
+    resolve_sessions_dir,
+)
+from .session import extract_spec_excerpt
 # Both moved to verifyjob, which owns cross-provider dispatch, so that
 # route.py — retained past the cutover — stops importing this module,
 # which is not. Imported back here only while this module still exists.
@@ -128,11 +133,13 @@ class VerifyError(RuntimeError):
     pass
 
 
-def _spec_excerpt(set_dir, session_number: int) -> str:
+def _spec_excerpt(sessions_dir, session_number: int) -> str:
     try:
-        text = (Path(set_dir) / "spec.md").read_text(encoding="utf-8")
+        text = (Path(sessions_dir) / SESSION_PLAN_FILENAME).read_text(
+        encoding="utf-8"
+    )
     except (OSError, UnicodeError):
-        return "(spec.md unavailable)"
+        return "(session plan unavailable)"
     return extract_spec_excerpt(text, session_number)
 
 
@@ -266,7 +273,7 @@ def _prior_findings_block(rounds: list, disputes=None, repo_root=None) -> str:
 
 
 def _build_task_block(
-    set_dir, session_number: int, round_number: int, prior_rounds: list,
+    sessions_dir, session_number: int, round_number: int, prior_rounds: list,
     disputes=None, repo_root=None, grant=None,
 ) -> str:
     parts = []
@@ -276,8 +283,8 @@ def _build_task_block(
     parts.append(
         f"Session {session_number} of the active session set (verification "
         f"round {round_number}). This is a **pre-close** review. The "
-        "session's plan, verbatim from spec.md:\n\n"
-        + _spec_excerpt(set_dir, session_number)
+        "session's plan, verbatim:\n\n"
+        + _spec_excerpt(sessions_dir, session_number)
     )
     briefing = agency.briefing(grant) if grant is not None else ""
     if briefing:
@@ -288,7 +295,7 @@ def _build_task_block(
 # --- Dispatch with one cross-provider retry ---------------------------------
 
 def _dispatch_verification(
-    prompt: str, *, exclude_providers: list, session_set, session_number,
+    prompt: str, *, exclude_providers: list, session_number,
     transport=None,
 ):
     """Two attempts, one exclusion accumulator: a fallback can never
@@ -305,7 +312,6 @@ def _dispatch_verification(
                 prompt,
                 task_type="session-verification",
                 role=ROLE_VERIFIER,
-                session_set=str(session_set),
                 session_number=session_number,
                 exclude_providers=excluded,
                 transport=transport,
@@ -323,7 +329,7 @@ def _dispatch_verification(
 # --- The loop entry point ----------------------------------------------------
 
 def _terminate_at_cap(
-    repo_root, set_path, config, current: int, prior_rounds: list, cap: int
+    repo_root, sessions_path, config, current: int, prior_rounds: list, cap: int
 ) -> int:
     """The cap is reached, so no further round opens. Which of the two
     cap-terminal states this is is decided from the record, never asked of
@@ -345,13 +351,13 @@ def _terminate_at_cap(
             f"verify: refused -- round {latest['round']} left no blocking "
             f"finding and the cap ({cap}) is reached; there is nothing "
             "left to verify. Close the session:\n"
-            f"  python -m ai_router.session close --session-set-dir "
-            f"{set_path}",
+            f"  python -m ai_router.session close --sessions-dir "
+            f"{sessions_path}",
             file=sys.stderr,
         )
         return EXIT_USAGE
 
-    disputes = ledger.read_disputes(repo_root, set_path.name, current)
+    disputes = ledger.read_disputes(repo_root, current)
     if len(_undisputed_blocking_indices(latest, disputes)) < len(
         _blocking_findings(latest)
     ):
@@ -361,8 +367,8 @@ def _terminate_at_cap(
             "dispute says a finding is wrong, not that it was fixed, so it "
             "is judged rather than terminated. Route the disputes to a "
             "third provider:\n"
-            f"  python -m ai_router.verify adjudicate --session-set-dir "
-            f"{set_path}",
+            f"  python -m ai_router.verify adjudicate --sessions-dir "
+            f"{sessions_path}",
             file=sys.stderr,
         )
         return EXIT_USAGE
@@ -411,10 +417,10 @@ def _terminate_at_cap(
         )
         return EXIT_BLOCKING
 
-    gate = preverify_gate(repo_root, set_path, config)
+    gate = preverify_gate(repo_root, sessions_path, config)
     if not gate.ok:
         remedy = preverify_recipe(
-            set_path, gate.suite, gate.command
+            sessions_path, gate.suite, gate.command
         ) if gate.command else (
             "There is no targeted command to offer you: declare the "
             "missing mapping under testing.selection so the selector can "
@@ -445,9 +451,9 @@ def _terminate_at_cap(
         "previous_tree": latest["completion_tree"],
         "recorded_at": datetime.datetime.now().astimezone().isoformat(),
     }
-    ledger.append_round(repo_root, set_path.name, current, row)
+    ledger.append_round(repo_root, current, row)
     record_session_verification(
-        set_path, current, VERDICT_REMEDIATED_AT_CAP,
+        sessions_path, current, VERDICT_REMEDIATED_AT_CAP,
         summary={
             "rounds": latest["round"],
             "verifierModel": latest.get("verifier_model"),
@@ -462,7 +468,7 @@ def _terminate_at_cap(
         for f in unreviewed
     )
     append_change_log_block(
-        set_path,
+        sessions_path,
         f"## Session {current} verification — REMEDIATED AT THE CAP after "
         f"{cap} round(s)\n\n"
         f"- Every blocking finding of round {latest['round']} was fixed; "
@@ -477,7 +483,7 @@ def _terminate_at_cap(
         f"finding(s) of round {latest['round']} were fixed and the cap "
         f"({cap}) left the fix unreviewed. The work lands labelled "
         "UNREVIEWED; no verifier saw the repair.\n"
-        + _run_of_record_lines(set_path, config)
+        + _run_of_record_lines(sessions_path, config)
     )
     return EXIT_OK
 
@@ -486,7 +492,7 @@ def _blocking_findings(row: dict) -> list:
     return [f for f in row.get("findings") or [] if f.get("blocking", True)]
 
 
-def _run_of_record_lines(set_path, config) -> str:
+def _run_of_record_lines(sessions_path, config) -> str:
     """The close is two steps away from a verified tree, and this names them.
     A malformed or suite-less config says nothing rather than guessing a
     command: a wrong command here is what the message exists to prevent."""
@@ -499,11 +505,11 @@ def _run_of_record_lines(set_path, config) -> str:
             "The run of record and the push remain before "
             "`python -m ai_router.session close`."
         )
-    return run_of_record_recipe(set_path, suite.name, suite.command)
+    return run_of_record_recipe(sessions_path, suite.name, suite.command)
 
 
 def run_round(
-    set_dir, *, max_rounds: Optional[int] = None, transport: Optional[str] = None,
+    sessions_dir, *, max_rounds: Optional[int] = None, transport: Optional[str] = None,
 ) -> int:
     """One verification round: assemble evidence, dispatch cross-provider,
     record the outcome. Returns a CLI exit code; re-invoking after
@@ -523,32 +529,30 @@ def run_round(
     from .session import append_change_log_block, record_session_verification
     from .progress import read_session_state
 
-    set_path = Path(set_dir)
-    repo_root = repo_root_for(set_path)
+    sessions_path = Path(sessions_dir)
+    repo_root = repo_root_for(sessions_path)
     if repo_root is None:
-        print(f"verify: not inside a git repository: {set_path}",
+        print(f"verify: not inside a git repository: {sessions_path}",
               file=sys.stderr)
         return EXIT_STATE
-    state = read_session_state(set_path)
+    state = read_session_state(sessions_path)
     current = (state or {}).get("currentSession")
     if current is None:
         print(
-            f"verify: no session is in flight under {set_path}; run "
+            f"verify: no session is in flight under {sessions_path}; run "
             "start_session first.", file=sys.stderr,
         )
         return EXIT_STATE
 
     try:
-        orchestrator = resolve_session_orchestrator_identity(set_path, current)
+        orchestrator = resolve_session_orchestrator_identity(sessions_path, current)
     except IdentityResolutionError as exc:
         print(f"verify: {exc}", file=sys.stderr)
         return EXIT_STATE
 
     config = load_config()
     cap = max_rounds or verification_round_cap(config)
-
-    slug = set_path.name
-    prior_rounds = ledger.read_rounds(repo_root, slug, current)
+    prior_rounds = ledger.read_rounds(repo_root, current)
     if any(r.get("type") == "adjudication" for r in prior_rounds):
         print(
             f"verify: refused -- session {current} already carries its "
@@ -566,24 +570,24 @@ def run_round(
             f"terminal {terminal['type']!r} row "
             f"({terminal.get('verdict')}); no further verification round "
             "may open after it. Close the session:\n"
-            f"  python -m ai_router.session close --session-set-dir "
-            f"{set_path}",
+            f"  python -m ai_router.session close --sessions-dir "
+            f"{sessions_path}",
             file=sys.stderr,
         )
         return EXIT_USAGE
     round_number = (prior_rounds[-1]["round"] + 1) if prior_rounds else 1
     if round_number > cap:
         return _terminate_at_cap(
-            repo_root, set_path, config, current, prior_rounds, cap
+            repo_root, sessions_path, config, current, prior_rounds, cap
         )
 
     try:
         if round_number == 1:
-            evidence = assemble_evidence(repo_root, set_path, current)
+            evidence = assemble_evidence(repo_root, sessions_path, current)
         else:
             baseline = prior_rounds[-1]["completion_tree"]
             evidence = assemble_fix_delta_evidence(
-                repo_root, set_path, current, baseline
+                repo_root, sessions_path, current, baseline
             )
     except (EvidenceEmptyError, EvidenceTooLargeError, FactsError,
             VerifyError) as exc:
@@ -593,10 +597,10 @@ def run_round(
     # After the bundle exists and before any model sees it: there is
     # something to review, so the tests that review costs nothing must have
     # run first.
-    gate = preverify_gate(repo_root, set_path, config)
+    gate = preverify_gate(repo_root, sessions_path, config)
     if not gate.ok:
         remedy = preverify_recipe(
-            set_path, gate.suite, gate.command
+            sessions_path, gate.suite, gate.command
         ) if gate.command else (
             "There is no targeted command to offer you: declare the missing "
             "mapping under testing.selection so the selector can answer for "
@@ -620,18 +624,18 @@ def run_round(
     # fix, and a verification round spent rediscovering it buys nothing the
     # exit code already said.
     facts = collect_facts(
-        repo_root, set_path, config, gate=gate, round_number=round_number,
+        repo_root, sessions_path, config, gate=gate, round_number=round_number,
         session_number=current,
     )
-    append_facts(repo_root, slug, facts)
+    append_facts(repo_root, facts)
     refusal = red_facts_refusal(facts)
     if refusal:
         print(refusal, file=sys.stderr)
         return EXIT_USAGE
 
-    disputes = ledger.read_disputes(repo_root, slug, current)
+    disputes = ledger.read_disputes(repo_root, current)
     scope = agency.session_scope(
-        repo_root, set_path,
+        repo_root, sessions_path,
         working_tree_changes(
             repo_root, None if round_number == 1
             else prior_rounds[-1]["completion_tree"]
@@ -660,7 +664,7 @@ def run_round(
     prompt_body = build_verification_prompt(
         config.get("_verification_template", ""),
         _build_task_block(
-            set_path, current, round_number, prior_rounds, disputes,
+            sessions_path, current, round_number, prior_rounds, disputes,
             repo_root, grant,
         ),
         "session-verification",
@@ -671,7 +675,7 @@ def run_round(
     try:
         result = _dispatch_verification(
             prompt_body, exclude_providers=exclude,
-            session_set=slug, session_number=current,
+            session_number=current,
             transport=transport,
         )
     except NoCandidateError as exc:
@@ -684,7 +688,7 @@ def run_round(
             "Operator exit: enable a model from another provider in "
             "router-config.yaml (or set its API key env var), then "
             "re-run:\n"
-            f"  python -m ai_router.verify --session-set-dir {set_path}",
+            f"  python -m ai_router.verify --sessions-dir {sessions_path}",
             file=sys.stderr,
         )
         return EXIT_UNAVAILABLE
@@ -705,7 +709,7 @@ def run_round(
 
     # Raw output first, before any parsing or display.
     raw_path = ledger.save_raw_output(
-        repo_root, slug, current, round_number, result.content
+        repo_root, current, round_number, result.content
     )
 
     verdict, issues = parse_verification_response(result.content)
@@ -764,7 +768,7 @@ def run_round(
     }
     if round_number >= 2:
         row["previous_tree"] = prior_rounds[-1]["completion_tree"]
-    ledger.append_round(repo_root, slug, current, row)
+    ledger.append_round(repo_root, current, row)
 
     if classification.blocking:
         print(
@@ -773,13 +777,13 @@ def run_round(
             f"(verifier {result.model_name}/{result.provider}). Raw output: "
             f"{raw_path}\n"
             f"{agency.summary_line(agency_record)}\n"
-            + remediation_recipe(set_path, gate.suite)
+            + remediation_recipe(sessions_path, gate.suite)
         )
         return EXIT_BLOCKING
 
     # Loop finished: stamp the session record and the change-log summary.
     record_session_verification(
-        set_path, current, verdict,
+        sessions_path, current, verdict,
         summary={
             "rounds": round_number,
             "verifierModel": result.model_name,
@@ -788,7 +792,7 @@ def run_round(
         },
     )
     append_change_log_block(
-        set_path,
+        sessions_path,
         f"## Session {current} verification — {verdict} after "
         f"{round_number} round(s)\n\n"
         f"- Verifier: {result.model_name} ({result.provider}) over "
@@ -796,13 +800,13 @@ def run_round(
         f"- Orchestrator provider (excluded): "
         f"{orchestrator.effective_provider}\n"
         f"- Verifier's read surface: {agency.summary_line(agency_record)}\n"
-        f"- Raw round output: `.dabbler/runs/{slug}/s{current}/`\n",
+        f"- Raw round output: `.dabbler/runs/s{current}/`\n",
     )
     print(
         f"verify: round {round_number} — {verdict} "
         f"(verifier {result.model_name}/{result.provider}); "
         f"session {current} is verified.\n"
-        + _run_of_record_lines(set_path, config)
+        + _run_of_record_lines(sessions_path, config)
     )
     return EXIT_OK
 
@@ -910,7 +914,7 @@ def render_claims_markdown(record: dict) -> str:
     return "\n".join(lines).rstrip() + "\n"
 
 
-def run_prepare(set_dir, *, claims_path=None) -> int:
+def run_prepare(sessions_dir, *, claims_path=None) -> int:
     """Open (or extend) the review run for the current working tree and
     record the author's claims under the machine-owned run directory.
 
@@ -924,17 +928,17 @@ def run_prepare(set_dir, *, claims_path=None) -> int:
     )
     from .progress import read_session_state
 
-    set_path = Path(set_dir)
-    repo_root = repo_root_for(set_path)
+    sessions_path = Path(sessions_dir)
+    repo_root = repo_root_for(sessions_path)
     if repo_root is None:
-        print(f"verify prepare: not inside a git repository: {set_path}",
+        print(f"verify prepare: not inside a git repository: {sessions_path}",
               file=sys.stderr)
         return EXIT_STATE
-    state = read_session_state(set_path)
+    state = read_session_state(sessions_path)
     current = (state or {}).get("currentSession")
     if current is None:
         print(
-            f"verify prepare: no session is in flight under {set_path}; run "
+            f"verify prepare: no session is in flight under {sessions_path}; run "
             "start_session first.", file=sys.stderr,
         )
         return EXIT_STATE
@@ -966,11 +970,9 @@ def run_prepare(set_dir, *, claims_path=None) -> int:
               "recorded.", file=sys.stderr)
         return EXIT_CALL_FAILED
     baseline_tree = _head_tree(repo_root)
-
-    slug = set_path.name
     now = datetime.datetime.now().astimezone().isoformat()
     try:
-        existing = ledger.read_review_runs(repo_root, slug, current)
+        existing = ledger.read_review_runs(repo_root, current)
         if existing:
             run = existing[-1]
             change_id = run["change_id"]
@@ -990,7 +992,7 @@ def run_prepare(set_dir, *, claims_path=None) -> int:
                 # not that the author has withdrawn them. Only an explicit
                 # --claims replaces what is on the record.
                 prior = ledger.read_review_claims(
-                    repo_root, slug, current, change_id
+                    repo_root, current, change_id
                 )
                 claims = (prior or {}).get("claims", claims)
         else:
@@ -999,7 +1001,6 @@ def run_prepare(set_dir, *, claims_path=None) -> int:
             run = {
                 "schema_version": 1,
                 "change_id": change_id,
-                "set_slug": slug,
                 "session_number": current,
                 "opened_at": now,
                 "attempts": [{
@@ -1030,7 +1031,7 @@ def run_prepare(set_dir, *, claims_path=None) -> int:
     # a refusal must leave no opened attempt behind for the retry to
     # stumble over, and must still preserve what it rejected.
     try:
-        ledger.screen_review_claims(repo_root, slug, current, claims_record)
+        ledger.screen_review_claims(repo_root, current, claims_record)
     except ledger.LedgerError as exc:
         print(
             f"verify prepare: {exc} No attempt was opened. Correct the "
@@ -1040,13 +1041,13 @@ def run_prepare(set_dir, *, claims_path=None) -> int:
         return EXIT_USAGE
 
     try:
-        run_path = ledger.write_review_run(repo_root, slug, current, run)
-        ledger.write_review_claims(repo_root, slug, current, claims_record)
+        run_path = ledger.write_review_run(repo_root, current, run)
+        ledger.write_review_claims(repo_root, current, claims_record)
     except ledger.LedgerError as exc:
         print(f"verify prepare: {exc}", file=sys.stderr)
         return EXIT_STATE
     ledger.write_review_claims_twin(
-        repo_root, slug, current, change_id,
+        repo_root, current, change_id,
         render_claims_markdown(claims_record),
     )
 
@@ -1080,7 +1081,7 @@ def _resolve_repo_relative(root: Path, token: str) -> tuple:
 
 
 def record_dispute(
-    set_dir, *, round_number: int, finding_index: int, grounds: str,
+    sessions_dir, *, round_number: int, finding_index: int, grounds: str,
     evidence: list,
 ) -> int:
     """Record the orchestrator's rebuttal of one recorded finding. The
@@ -1089,19 +1090,19 @@ def record_dispute(
     WITHDRAW — instead of re-raising it unanswered."""
     from .progress import read_session_state
 
-    set_path = Path(set_dir)
-    repo_root = repo_root_for(set_path)
+    sessions_path = Path(sessions_dir)
+    repo_root = repo_root_for(sessions_path)
     if repo_root is None:
         print(
-            f"verify dispute: not inside a git repository: {set_path}",
+            f"verify dispute: not inside a git repository: {sessions_path}",
             file=sys.stderr,
         )
         return EXIT_STATE
-    state = read_session_state(set_path)
+    state = read_session_state(sessions_path)
     current = (state or {}).get("currentSession")
     if current is None:
         print(
-            f"verify dispute: no session is in flight under {set_path}; a "
+            f"verify dispute: no session is in flight under {sessions_path}; a "
             "dispute belongs to the session whose round it contests.",
             file=sys.stderr,
         )
@@ -1159,9 +1160,7 @@ def record_dispute(
                 )
                 return EXIT_USAGE
         cited.append(rel + suffix)
-
-    slug = set_path.name
-    rounds = ledger.read_rounds(repo_root, slug, current)
+    rounds = ledger.read_rounds(repo_root, current)
     target = next((r for r in rounds if r["round"] == round_number), None)
     if target is None:
         recorded = [r["round"] for r in rounds]
@@ -1197,7 +1196,7 @@ def record_dispute(
         "recorded_at": datetime.datetime.now().astimezone().isoformat(),
     }
     try:
-        ledger.append_dispute(repo_root, slug, current, row)
+        ledger.append_dispute(repo_root, current, row)
     except ledger.LedgerError as exc:
         print(f"verify dispute: {exc}", file=sys.stderr)
         return EXIT_STATE
@@ -1236,7 +1235,7 @@ def _undisputed_blocking_indices(latest: dict, disputes: list) -> list:
 
 
 def _adjudication_prompt(
-    set_path, session_number: int, disputed: list, fix_delta: str,
+    sessions_path, session_number: int, disputed: list, fix_delta: str,
     repo_root,
 ) -> str:
     """The adjudicator judges each dispute — UPHOLD or OVERRULE — and may
@@ -1302,7 +1301,7 @@ def _adjudication_prompt(
 
 
 def run_adjudication(
-    set_dir, *, max_rounds: Optional[int] = None,
+    sessions_dir, *, max_rounds: Optional[int] = None,
     transport: Optional[str] = None,
 ) -> int:
     """Route the session's recorded disputes to a third provider for
@@ -1319,34 +1318,32 @@ def run_adjudication(
         parse_adjudication_response,
     )
 
-    set_path = Path(set_dir)
-    repo_root = repo_root_for(set_path)
+    sessions_path = Path(sessions_dir)
+    repo_root = repo_root_for(sessions_path)
     if repo_root is None:
         print(
-            f"verify adjudicate: not inside a git repository: {set_path}",
+            f"verify adjudicate: not inside a git repository: {sessions_path}",
             file=sys.stderr,
         )
         return EXIT_STATE
-    state = read_session_state(set_path)
+    state = read_session_state(sessions_path)
     current = (state or {}).get("currentSession")
     if current is None:
         print(
-            f"verify adjudicate: no session is in flight under {set_path}.",
+            f"verify adjudicate: no session is in flight under {sessions_path}.",
             file=sys.stderr,
         )
         return EXIT_STATE
 
     try:
-        orchestrator = resolve_session_orchestrator_identity(set_path, current)
+        orchestrator = resolve_session_orchestrator_identity(sessions_path, current)
     except IdentityResolutionError as exc:
         print(f"verify adjudicate: {exc}", file=sys.stderr)
         return EXIT_STATE
 
     config = load_config()
     cap = max_rounds or verification_round_cap(config)
-
-    slug = set_path.name
-    rounds = ledger.read_rounds(repo_root, slug, current)
+    rounds = ledger.read_rounds(repo_root, current)
     if any(r.get("type") == "adjudication" for r in rounds):
         print(
             "verify adjudicate: refused -- unmet precondition: session "
@@ -1363,8 +1360,8 @@ def run_adjudication(
             f"carries its terminal {terminal['type']!r} row "
             f"({terminal.get('verdict')}); there is nothing left to "
             "adjudicate. Close the session:\n"
-            f"  python -m ai_router.session close --session-set-dir "
-            f"{set_path}",
+            f"  python -m ai_router.session close --sessions-dir "
+            f"{sessions_path}",
             file=sys.stderr,
         )
         return EXIT_STATE
@@ -1386,7 +1383,7 @@ def run_adjudication(
         )
         return EXIT_STATE
 
-    disputes = ledger.read_disputes(repo_root, slug, current)
+    disputes = ledger.read_disputes(repo_root, current)
     by_key = {(d["round"], d["finding_index"]): d for d in disputes}
     findings = latest.get("findings") or []
     blocking_indices = [
@@ -1400,8 +1397,8 @@ def run_adjudication(
             f"finding(s) {listing} of round {latest['round']} carry no "
             "recorded dispute. Adjudication judges disputes; record one "
             "per finding first:\n"
-            f"  python -m ai_router.verify dispute --session-set-dir "
-            f"{set_path} --round {latest['round']} --finding <F> "
+            f"  python -m ai_router.verify dispute --sessions-dir "
+            f"{sessions_path} --round {latest['round']} --finding <F> "
             "--grounds \"...\" --evidence <path>", file=sys.stderr,
         )
         return EXIT_STATE
@@ -1427,7 +1424,7 @@ def run_adjudication(
         for i in blocking_indices
     ]
     prompt = _adjudication_prompt(
-        set_path, current, disputed, fix_delta, repo_root
+        sessions_path, current, disputed, fix_delta, repo_root
     )
     check_evidence_cap(prompt)
 
@@ -1435,7 +1432,7 @@ def run_adjudication(
     try:
         result = _dispatch_verification(
             prompt, exclude_providers=excluded,
-            session_set=slug, session_number=current,
+            session_number=current,
             transport=transport,
         )
     except NoCandidateError as exc:
@@ -1448,8 +1445,8 @@ def run_adjudication(
             "and nothing lands but the record.\n"
             "The one exit is a third provider: enable a model from outside "
             "the exclusions and re-run:\n"
-            f"  python -m ai_router.verify adjudicate --session-set-dir "
-            f"{set_path}\n"
+            f"  python -m ai_router.verify adjudicate --sessions-dir "
+            f"{sessions_path}\n"
             "There is no verdict a person can type in its place.",
             file=sys.stderr,
         )
@@ -1471,7 +1468,7 @@ def run_adjudication(
 
     round_number = latest["round"] + 1
     raw_path = ledger.save_raw_output(
-        repo_root, slug, current, round_number, result.content
+        repo_root, current, round_number, result.content
     )
 
     judged = parse_adjudication_response(result.content, len(disputed))
@@ -1504,7 +1501,7 @@ def run_adjudication(
         "recorded_at": datetime.datetime.now().astimezone().isoformat(),
         "transport": result.transport,
     }
-    ledger.append_round(repo_root, slug, current, row)
+    ledger.append_round(repo_root, current, row)
 
     outcome_lines = "\n".join(
         f"- Dispute on round {latest['round']} finding "
@@ -1528,7 +1525,7 @@ def run_adjudication(
         return EXIT_BLOCKING
 
     record_session_verification(
-        set_path, current, verdict,
+        sessions_path, current, verdict,
         summary={
             "rounds": round_number,
             "verifierModel": result.model_name,
@@ -1537,14 +1534,14 @@ def run_adjudication(
         },
     )
     append_change_log_block(
-        set_path,
+        sessions_path,
         f"## Session {current} adjudication — {verdict} (every disputed "
         f"finding OVERRULED)\n\n"
         f"- Adjudicator: {result.model_name} ({result.provider}) over "
         f"{result.transport}\n"
         f"- Excluded providers: {', '.join(excluded)}\n"
         f"{outcome_lines}\n"
-        f"- Raw round output: `.dabbler/runs/{slug}/s{current}/`\n",
+        f"- Raw round output: `.dabbler/runs/s{current}/`\n",
     )
     print(
         f"verify adjudicate: {verdict} — the adjudicator "
@@ -1582,10 +1579,10 @@ class StepRefusal(VerifyError):
         self.code = code
 
 
-def _step_command(verb: str, set_path, suffix: str = "") -> str:
+def _step_command(verb: str, sessions_path, suffix: str = "") -> str:
     return (
-        f"python -m ai_router.verify step {verb} --session-set-dir "
-        f"{set_path}{suffix}"
+        f"python -m ai_router.verify step {verb} --sessions-dir "
+        f"{sessions_path}{suffix}"
     )
 
 
@@ -1595,40 +1592,38 @@ def _head_commit(repo_root) -> Optional[str]:
     return out if rc == 0 and out else None
 
 
-def _step_session(set_path):
+def _step_session(sessions_path):
     from .progress import read_session_state
 
-    repo_root = repo_root_for(set_path)
+    repo_root = repo_root_for(sessions_path)
     if repo_root is None:
-        raise StepRefusal(f"not inside a git repository: {set_path}")
-    current = (read_session_state(set_path) or {}).get("currentSession")
+        raise StepRefusal(f"not inside a git repository: {sessions_path}")
+    current = (read_session_state(sessions_path) or {}).get("currentSession")
     if current is None:
         raise StepRefusal(
-            f"no session is in flight under {set_path}; register the session "
+            f"no session is in flight under {sessions_path}; register the session "
             "first:\n"
-            f"  python -m ai_router.session start --session-set-dir {set_path}"
+            f"  python -m ai_router.session start --sessions-dir {sessions_path}"
             " --engine <engine> --provider <provider>"
         )
     return repo_root, current
 
 
-def _approved_plan_for(repo_root, set_path, session_number: int) -> dict:
+def _approved_plan_for(repo_root, sessions_path, session_number: int) -> dict:
     from .approved_plan import PlanIntegrityError, plan_path, read_plan
-
-    slug = set_path.name
-    if not plan_path(repo_root, slug, session_number).exists():
+    if not plan_path(repo_root, session_number).exists():
         raise StepRefusal(
-            f"{slug} session {session_number} has no plan. A step executes "
+            f"session {session_number} has no plan. A step executes "
             "against a plan pre-registered and approved before the code was "
             "seen; there is nothing to execute without one."
         )
     try:
-        plan = read_plan(ledger.session_run_dir(repo_root, slug, session_number))
+        plan = read_plan(ledger.session_run_dir(repo_root, session_number))
     except (PlanIntegrityError, ValueError, OSError) as exc:
         raise StepRefusal(str(exc)) from exc
     if not plan.get("approved"):
         raise StepRefusal(
-            f"the plan for {slug} session {session_number} is not approved. "
+            f"the plan for session {session_number} is not approved. "
             "An unapproved plan is still being written, and an envelope that "
             "can still move measures nothing."
         )
@@ -1648,7 +1643,7 @@ def _baseline_tree_of(repo_root, commit: str) -> str:
     return tree
 
 
-def _envelope_refusal(set_path, step_id: str, comparison, note: str = "") -> str:
+def _envelope_refusal(sessions_path, step_id: str, comparison, note: str = "") -> str:
     if not comparison.measured:
         return (
             f"step {step_id!r} cannot be closed -- {comparison.unmeasured_reason}"
@@ -1666,7 +1661,7 @@ def _envelope_refusal(set_path, step_id: str, comparison, note: str = "") -> str
         "the change back inside the envelope, or amend the plan -- the "
         "amendment carries the widening and is re-reviewed against the risk "
         "the wider envelope earns:\n"
-        f"  {_step_command('amend', set_path)} --add-file <path> --reason "
+        f"  {_step_command('amend', sessions_path)} --add-file <path> --reason "
         "\"<why the envelope was wrong>\""
     )
 
@@ -1737,23 +1732,22 @@ def _declaration_refusal(errors) -> str:
     )
 
 
-def run_step_open(set_dir, *, step_id: str) -> int:
+def run_step_open(sessions_dir, *, step_id: str) -> int:
     """Put one plan step in flight, anchored to the commit it opens on."""
     from .approved_plan import effective_plan, find_step
 
-    set_path = Path(set_dir)
+    sessions_path = Path(sessions_dir)
     try:
-        repo_root, current = _step_session(set_path)
-        slug = set_path.name
-        plan = _approved_plan_for(repo_root, set_path, current)
+        repo_root, current = _step_session(sessions_path)
+        plan = _approved_plan_for(repo_root, sessions_path, current)
 
-        in_flight = ledger.open_step(repo_root, slug, current)
+        in_flight = ledger.open_step(repo_root, current)
         if in_flight is not None:
             raise StepRefusal(
                 f"step {in_flight['step_id']!r} is already in flight. Two "
                 "open steps share one working tree, and neither one's diff "
                 "is then its own. Close it first:\n"
-                f"  {_step_command('close', set_path)}",
+                f"  {_step_command('close', sessions_path)}",
                 EXIT_USAGE,
             )
         step = find_step(plan, step_id)
@@ -1766,7 +1760,7 @@ def run_step_open(set_dir, *, step_id: str) -> int:
                 f"session {current}. The plan declares: {declared}.",
                 EXIT_USAGE,
             )
-        if step_id in ledger.closed_step_ids(repo_root, slug, current):
+        if step_id in ledger.closed_step_ids(repo_root, current):
             raise StepRefusal(
                 f"step {step_id!r} is already closed. A step executes once: "
                 "re-opening one would put a second change against an "
@@ -1780,11 +1774,10 @@ def run_step_open(set_dir, *, step_id: str) -> int:
                 "anchor its change set to.",
                 EXIT_CALL_FAILED,
             )
-        ledger.append_step_event(repo_root, slug, current, {
+        ledger.append_step_event(repo_root, current, {
             "schema_version": ledger.STEP_SCHEMA_VERSION,
             "event": ledger.STEP_EVENT_OPENED,
             "recorded_at": datetime.datetime.now().astimezone().isoformat(),
-            "set_slug": slug,
             "session_number": current,
             "step_id": step_id,
             "base_commit": base_commit,
@@ -1805,12 +1798,12 @@ def run_step_open(set_dir, *, step_id: str) -> int:
         f"{step['intent']}\n"
         f"Envelope -- nothing outside these paths:\n{envelope}\n"
         f"Evidence contract:\n{contract}\n"
-        f"When the work is done:\n  {_step_command('close', set_path)}"
+        f"When the work is done:\n  {_step_command('close', sessions_path)}"
     )
     return EXIT_OK
 
 
-def run_step_close(set_dir) -> int:
+def run_step_close(sessions_dir) -> int:
     """Close the step in flight: the envelope first, then the deterministic
     evidence, and neither costs a model call."""
     from .approved_plan import compare_to_envelope
@@ -1818,21 +1811,20 @@ def run_step_close(set_dir) -> int:
     from .evidence import snapshot_worktree_tree
     from .facts import FactRecord, red_facts_refusal
 
-    set_path = Path(set_dir)
+    sessions_path = Path(sessions_dir)
     try:
-        repo_root, current = _step_session(set_path)
-        slug = set_path.name
-        step_row = ledger.open_step(repo_root, slug, current)
+        repo_root, current = _step_session(sessions_path)
+        step_row = ledger.open_step(repo_root, current)
         if step_row is None:
             raise StepRefusal(
-                f"no step is in flight for {slug} session {current}. Open "
+                f"no step is in flight for session {current}. Open "
                 "one:\n"
-                f"  {_step_command('open', set_path, ' --step <step_id>')}",
+                f"  {_step_command('open', sessions_path, ' --step <step_id>')}",
                 EXIT_USAGE,
             )
         step_id = step_row["step_id"]
         base_commit = step_row["base_commit"]
-        plan = _approved_plan_for(repo_root, set_path, current)
+        plan = _approved_plan_for(repo_root, sessions_path, current)
 
         head = _head_commit(repo_root)
         if head != base_commit:
@@ -1850,14 +1842,14 @@ def run_step_close(set_dir) -> int:
             )
 
         baseline_tree = ledger.last_closed_tree(
-            repo_root, slug, current
+            repo_root, current
         ) or _baseline_tree_of(repo_root, base_commit)
         comparison = compare_to_envelope(
-            repo_root, plan, set_path, baseline_tree, step_id=step_id
+            repo_root, plan, sessions_path, baseline_tree, step_id=step_id
         )
         if comparison.needs_amendment:
             raise StepRefusal(
-                _envelope_refusal(set_path, step_id, comparison), EXIT_BLOCKING
+                _envelope_refusal(sessions_path, step_id, comparison), EXIT_BLOCKING
             )
 
         config = load_config()
@@ -1880,12 +1872,12 @@ def run_step_close(set_dir) -> int:
         # commands ran would let their output into the record unremarked,
         # and the next step would inherit it as already-accounted-for.
         comparison = compare_to_envelope(
-            repo_root, plan, set_path, baseline_tree, step_id=step_id
+            repo_root, plan, sessions_path, baseline_tree, step_id=step_id
         )
         if comparison.needs_amendment:
             raise StepRefusal(
                 _envelope_refusal(
-                    set_path, step_id, comparison,
+                    sessions_path, step_id, comparison,
                     note=(
                         "These appeared while the step's own deterministic "
                         "commands ran, so the write is theirs rather than "
@@ -1904,11 +1896,10 @@ def run_step_close(set_dir) -> int:
                 "no baseline to be measured from.",
                 EXIT_CALL_FAILED,
             )
-        ledger.append_step_event(repo_root, slug, current, {
+        ledger.append_step_event(repo_root, current, {
             "schema_version": ledger.STEP_SCHEMA_VERSION,
             "event": ledger.STEP_EVENT_CLOSED,
             "recorded_at": datetime.datetime.now().astimezone().isoformat(),
-            "set_slug": slug,
             "session_number": current,
             "step_id": step_id,
             "base_commit": base_commit,
@@ -1935,17 +1926,16 @@ def run_step_close(set_dir) -> int:
     return EXIT_OK
 
 
-def run_step_status(set_dir) -> int:
+def run_step_status(sessions_dir) -> int:
     """What is in flight, what is done, and what is left."""
     from .approved_plan import effective_plan
 
-    set_path = Path(set_dir)
+    sessions_path = Path(sessions_dir)
     try:
-        repo_root, current = _step_session(set_path)
-        slug = set_path.name
-        plan = _approved_plan_for(repo_root, set_path, current)
-        in_flight = ledger.open_step(repo_root, slug, current)
-        done = ledger.closed_step_ids(repo_root, slug, current)
+        repo_root, current = _step_session(sessions_path)
+        plan = _approved_plan_for(repo_root, sessions_path, current)
+        in_flight = ledger.open_step(repo_root, current)
+        done = ledger.closed_step_ids(repo_root, current)
     except (StepRefusal, ledger.LedgerError) as exc:
         print(f"verify step status: {exc}", file=sys.stderr)
         return getattr(exc, "code", EXIT_STATE)
@@ -1961,28 +1951,31 @@ def run_step_status(set_dir) -> int:
         print(f"  {mark} {step_id}  {step['intent']}")
     if in_flight is None:
         print(f"No step is in flight. "
-              f"{_step_command('open', set_path, ' --step <step_id>')}")
+              f"{_step_command('open', sessions_path, ' --step <step_id>')}")
     else:
         print(f"Step {in_flight['step_id']!r} is in flight, anchored to "
               f"{in_flight['base_commit'][:12]}. "
-              f"{_step_command('close', set_path)}")
+              f"{_step_command('close', sessions_path)}")
     return EXIT_OK
 
 
-def _spec_text(set_path) -> str:
+def _spec_text(sessions_path) -> str:
     """The whole spec, not an excerpt: the plan reviewer derives a
     session's goals by parsing every session heading, so a slice of one
     session reads as a spec with no sessions in it."""
     try:
-        return (Path(set_path) / "spec.md").read_text(encoding="utf-8")
+        return (Path(sessions_path) / SESSION_PLAN_FILENAME).read_text(
+        encoding="utf-8"
+    )
     except (OSError, UnicodeError) as exc:
         raise StepRefusal(
-            f"{set_path}/spec.md could not be read, so the amendment has "
+            f"{sessions_path}/{SESSION_PLAN_FILENAME} could not be read, so the "
+            f"amendment has "
             f"nothing to be reviewed against: {exc}"
         ) from exc
 
 
-def run_step_amend(set_dir, *, reason: str, added_files=None) -> int:
+def run_step_amend(sessions_dir, *, reason: str, added_files=None) -> int:
     """Widen the open step's envelope through the plan reviewer.
 
     The amendment carries the widening rather than a note about it, and it
@@ -1991,26 +1984,25 @@ def run_step_amend(set_dir, *, reason: str, added_files=None) -> int:
     from . import plan_review
     from .approved_plan import PlanImmutableError
 
-    set_path = Path(set_dir)
+    sessions_path = Path(sessions_dir)
     try:
-        repo_root, current = _step_session(set_path)
-        slug = set_path.name
-        step_row = ledger.open_step(repo_root, slug, current)
+        repo_root, current = _step_session(sessions_path)
+        step_row = ledger.open_step(repo_root, current)
         if step_row is None:
             raise StepRefusal(
-                f"no step is in flight for {slug} session {current}; an "
+                f"no step is in flight for session {current}; an "
                 "amendment amends the step that needs it, not the plan at "
                 "large.",
                 EXIT_USAGE,
             )
-        _approved_plan_for(repo_root, set_path, current)
-        run_dir = ledger.session_run_dir(repo_root, slug, current)
+        _approved_plan_for(repo_root, sessions_path, current)
+        run_dir = ledger.session_run_dir(repo_root, current)
         try:
             record, plan = plan_review.review_amendment(
-                run_dir, _spec_text(set_path), current,
+                run_dir, _spec_text(sessions_path), current,
                 step_id=step_row["step_id"], reason=reason,
                 added_files=list(added_files or []),
-                workspace_root=repo_root, session_set=slug,
+                workspace_root=repo_root,
             )
         except (PlanImmutableError, ValueError,
                 plan_review.PlanReviewError) as exc:
@@ -2028,7 +2020,7 @@ def run_step_amend(set_dir, *, reason: str, added_files=None) -> int:
     print(
         f"step amend: {step_row['step_id']} amended; the envelope now "
         f"covers {', '.join(added_files or [])}.\n"
-        f"  {_step_command('close', set_path)}"
+        f"  {_step_command('close', sessions_path)}"
     )
     return EXIT_OK
 
@@ -2050,16 +2042,15 @@ def run_step_guard_commit(cwd=".") -> int:
     if not open_rows:
         return EXIT_OK
     rows = "\n".join(
-        f"  {row['step_id']} (set {row['set_slug']}, session "
-        f"{row['session_number']})" for row in open_rows
+        f"  {row['step_id']} (session {row['session_number']})"
+        for row in open_rows
     )
-    set_dir = f"docs/session-sets/{open_rows[0]['set_slug']}"
     print(
         "commit refused -- a step is open:\n"
         f"{rows}\n"
         "The framework commits a step, and it does so once the step's "
         "evidence is satisfied. Close the step and let it:\n"
-        f"  {_step_command('close', set_dir)}",
+        "  python -m ai_router.verify step close",
         file=sys.stderr,
     )
     return EXIT_BLOCKING
@@ -2080,8 +2071,9 @@ def _step_main(argv) -> int:
         ("amend", "widen the open step's envelope, through review"),
     ):
         child = sub.add_parser(verb, help=help_text)
-        child.add_argument("--session-set-dir", required=True,
-                           help="directory, slug, or bare set number")
+        child.add_argument("--sessions-dir",
+                           help="the repository's sessions root; derived "
+                                "from the working directory when omitted")
         if verb == "open":
             child.add_argument("--step", required=True,
                                help="a step_id the approved plan declares")
@@ -2099,14 +2091,14 @@ def _step_main(argv) -> int:
     if args.verb == "guard-commit":
         return run_step_guard_commit()
     try:
-        set_dir = resolve_session_set_dir(args.session_set_dir)
+        sessions_dir = resolve_sessions_dir(args.sessions_dir)
     except ValueError as exc:
         print(f"verify step {args.verb}: {exc}", file=sys.stderr)
         return EXIT_USAGE
     if args.verb == "open":
-        return run_step_open(set_dir, step_id=args.step)
+        return run_step_open(sessions_dir, step_id=args.step)
     if args.verb == "close":
-        return run_step_close(set_dir)
+        return run_step_close(sessions_dir)
     if args.verb == "amend":
         if not args.add_file:
             print(
@@ -2116,9 +2108,9 @@ def _step_main(argv) -> int:
             )
             return EXIT_USAGE
         return run_step_amend(
-            set_dir, reason=args.reason, added_files=args.add_file
+            sessions_dir, reason=args.reason, added_files=args.add_file
         )
-    return run_step_status(set_dir)
+    return run_step_status(sessions_dir)
 
 
 def _dispute_main(argv) -> int:
@@ -2128,8 +2120,9 @@ def _dispute_main(argv) -> int:
                     "repo; the next round presents it for "
                     "UPHOLD-or-WITHDRAW.",
     )
-    parser.add_argument("--session-set-dir", required=True,
-                        help="directory, slug, or bare set number")
+    parser.add_argument("--sessions-dir",
+                        help="the repository's sessions root; derived "
+                             "from the working directory when omitted")
     parser.add_argument("--round", type=int, required=True,
                         help="the recorded round the finding belongs to")
     parser.add_argument("--finding", type=int, required=True,
@@ -2144,12 +2137,12 @@ def _dispute_main(argv) -> int:
                              "is required)")
     args = parser.parse_args(argv)
     try:
-        set_dir = resolve_session_set_dir(args.session_set_dir)
+        sessions_dir = resolve_sessions_dir(args.sessions_dir)
     except ValueError as exc:
         print(f"verify dispute: {exc}", file=sys.stderr)
         return EXIT_USAGE
     return record_dispute(
-        set_dir, round_number=args.round, finding_index=args.finding,
+        sessions_dir, round_number=args.round, finding_index=args.finding,
         grounds=args.grounds, evidence=args.evidence,
     )
 
@@ -2163,8 +2156,9 @@ def _adjudicate_main(argv) -> int:
                     "provider for judgment — UPHOLD or OVERRULE, one "
                     "adjudication per session, ever.",
     )
-    parser.add_argument("--session-set-dir", required=True,
-                        help="directory, slug, or bare set number")
+    parser.add_argument("--sessions-dir",
+                        help="the repository's sessions root; derived "
+                             "from the working directory when omitted")
     parser.add_argument("--max-rounds", type=int,
                         help="override the configured round cap the "
                              "precondition checks against")
@@ -2175,12 +2169,12 @@ def _adjudicate_main(argv) -> int:
     )
     args = parser.parse_args(argv)
     try:
-        set_dir = resolve_session_set_dir(args.session_set_dir)
+        sessions_dir = resolve_sessions_dir(args.sessions_dir)
     except ValueError as exc:
         print(f"verify adjudicate: {exc}", file=sys.stderr)
         return EXIT_USAGE
     return run_adjudication(
-        set_dir, max_rounds=args.max_rounds, transport=args.transport,
+        sessions_dir, max_rounds=args.max_rounds, transport=args.transport,
     )
 
 
@@ -2202,8 +2196,9 @@ def _prepare_main(argv) -> int:
                     "record the author's claims. Writes only when "
                     "critique.pipeline is 'shadow'; decides nothing.",
     )
-    parser.add_argument("--session-set-dir", required=True,
-                        help="directory, slug, or bare set number")
+    parser.add_argument("--sessions-dir",
+                        help="the repository's sessions root; derived "
+                             "from the working directory when omitted")
     parser.add_argument(
         "--claims",
         help="JSON file holding the author's claims (a list, or an object "
@@ -2211,11 +2206,11 @@ def _prepare_main(argv) -> int:
     )
     args = parser.parse_args(argv)
     try:
-        set_dir = resolve_session_set_dir(args.session_set_dir)
+        sessions_dir = resolve_sessions_dir(args.sessions_dir)
     except ValueError as exc:
         print(f"verify prepare: {exc}", file=sys.stderr)
         return EXIT_USAGE
-    return run_prepare(set_dir, claims_path=args.claims)
+    return run_prepare(sessions_dir, claims_path=args.claims)
 
 
 def main(argv=None) -> int:
@@ -2235,7 +2230,7 @@ def main(argv=None) -> int:
             "THE CAP when every blocking finding was fixed and the cap "
             "left the fix unreviewed, or UNRESOLVED when findings still "
             "stand. Re-run the loop and it will record whichever it is:\n"
-            "  python -m ai_router.verify --session-set-dir <dir>",
+            "  python -m ai_router.verify --sessions-dir <dir>",
             file=sys.stderr,
         )
         return EXIT_USAGE
@@ -2245,8 +2240,9 @@ def main(argv=None) -> int:
         return _step_main(argv[1:])
 
     parser = argparse.ArgumentParser(prog="python -m ai_router.verify")
-    parser.add_argument("--session-set-dir", required=True,
-                        help="directory, slug, or bare set number")
+    parser.add_argument("--sessions-dir",
+                        help="the repository's sessions root; derived "
+                             "from the working directory when omitted")
     parser.add_argument("--max-rounds", type=int)
     parser.add_argument(
         "--transport", choices=list(VALID_TRANSPORTS),
@@ -2256,12 +2252,12 @@ def main(argv=None) -> int:
     )
     args = parser.parse_args(argv)
     try:
-        set_dir = resolve_session_set_dir(args.session_set_dir)
+        sessions_dir = resolve_sessions_dir(args.sessions_dir)
     except ValueError as exc:
         print(f"verify: {exc}", file=sys.stderr)
         return EXIT_USAGE
     return run_round(
-        set_dir, max_rounds=args.max_rounds, transport=args.transport,
+        sessions_dir, max_rounds=args.max_rounds, transport=args.transport,
     )
 
 

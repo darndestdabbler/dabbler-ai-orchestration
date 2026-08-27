@@ -1,27 +1,12 @@
-// Set 122 Session 2: the cancel / restore launchers.
+// The cancel / restore launchers.
 //
-// Why these exist at all
-// ----------------------
+// Cancelling is the router's write, never this extension's: the state file
+// has one set of sanctioned writers and a second implementation here would
+// drift from them. The readers stay in TypeScript because the tree renders
+// synchronously and must not spawn a process per row.
 //
-// `src/utils/cancelLifecycle.ts` used to CANCEL and RESTORE session sets in
-// TypeScript, which meant it opened `session-state.json` and wrote it —
-// `writeSessionState`, the line the Set 122 spec names as "the concrete
-// violation that justified this whole set". Only the router's sanctioned
-// writers may touch that file.
-//
-// `ai_router/session_lifecycle.py` already carried a complete port of the
-// same behaviour (same filenames, same history header, same v4 on-disk
-// shape); it simply had no entry point. Session 2 added one and deleted the
-// TypeScript writer, so there is now exactly one implementation. The
-// readers (`isCancelled`, `readCancellationState`, `wasRestored`) stay in
-// TypeScript: the tree renders synchronously and must not spawn a process
-// per row.
-//
-// Operator decision, 2026-08-13 (`decisions.jsonl`): the alternative —
-// severing only the module-delete path and leaving the standalone
-// Cancel/Restore commands on the TypeScript writer — was considered and
-// rejected, because it leaves a second writer shipping and the two
-// implementations drifting.
+// What is cancelled is a session. A repository has sessions, not sets of
+// them, so these take a session number rather than a directory.
 
 import {
   RouterCliResult,
@@ -40,20 +25,19 @@ export const SESSION_LIFECYCLE_CLI = "ai_router.session";
  * writes the blank reason line so the timestamp pattern in the history file
  * stays intact.
  */
-export function cancelArgs(sessionSetDir: string, reason: string): string[] {
-  return ["cancel", sessionSetDir, "--reason", reason];
+export function cancelArgs(sessionNumber: number, reason: string): string[] {
+  return ["cancel", String(sessionNumber), "--reason", reason];
 }
 
-export function restoreArgs(sessionSetDir: string, reason: string): string[] {
-  return ["restore", sessionSetDir, "--reason", reason];
+export function restoreArgs(sessionNumber: number, reason: string): string[] {
+  return ["restore", String(sessionNumber), "--reason", reason];
 }
 
 /**
- * The spawn cwd is the REPO ROOT, not the session-set directory, while the
- * target is passed as an explicit `--session-set-dir`. Two reasons: the
- * interpreter is resolved from the workspace root (that is where `.venv`
- * lives), and a target derived from an explicit argument cannot drift when
- * a caller's cwd changes.
+ * The spawn cwd is the REPO ROOT. The interpreter is resolved from the
+ * workspace root (that is where `.venv` lives), and the router derives the
+ * one sessions root from the repository it is standing in — there is no
+ * directory to name.
  */
 function run(
   repoRoot: string,
@@ -67,30 +51,30 @@ function run(
   );
 }
 
-export function runCancelSessionSet(
+export function runCancelSession(
   repoRoot: string,
-  sessionSetDir: string,
+  sessionNumber: number,
   reason: string,
   deps?: RunRouterCliDeps,
 ): Promise<RouterCliResult> {
   return run(
     repoRoot,
-    cancelArgs(sessionSetDir, reason),
-    "Cancelling a session set",
+    cancelArgs(sessionNumber, reason),
+    "Cancelling a session",
     deps,
   );
 }
 
-export function runRestoreSessionSet(
+export function runRestoreSession(
   repoRoot: string,
-  sessionSetDir: string,
+  sessionNumber: number,
   reason: string,
   deps?: RunRouterCliDeps,
 ): Promise<RouterCliResult> {
   return run(
     repoRoot,
-    restoreArgs(sessionSetDir, reason),
-    "Restoring a session set",
+    restoreArgs(sessionNumber, reason),
+    "Restoring a session",
     deps,
   );
 }
@@ -99,21 +83,21 @@ export function runRestoreSessionSet(
  * The failure sentence.
  *
  * `refused` is stated as "nothing was written" because that is the CLI's
- * guarantee for exit 3 — restoring a set that was never cancelled reaches
- * this path, and telling the operator to reconcile from git for a call that
- * wrote nothing would be actively misleading.
+ * guarantee for exit 3 — restoring a session that was never cancelled
+ * reaches this path, and telling the operator to reconcile from git for a
+ * call that wrote nothing would be actively misleading.
  */
 export function describeLifecycleFailure(
   verb: string,
-  setName: string,
+  label: string,
   result: RouterCliResult,
 ): string {
   const detail = result.message.trim() || `exit ${result.exitCode}`;
   if (result.outcome === "refused") {
-    return `${verb} "${setName}" refused — ${detail} Nothing was written.`;
+    return `${verb} "${label}" refused — ${detail} Nothing was written.`;
   }
   if (result.outcome === "unavailable") {
     return detail;
   }
-  return `Failed to ${verb.toLowerCase()} "${setName}": ${detail} Re-run the command to finish.`;
+  return `Failed to ${verb.toLowerCase()} "${label}": ${detail} Re-run the command to finish.`;
 }

@@ -1,14 +1,21 @@
 import * as vscode from "vscode";
 import {
   describeLifecycleFailure,
-  runCancelSessionSet,
-  runRestoreSessionSet,
+  runCancelSession,
+  runRestoreSession,
 } from "../utils/sessionLifecycleCli";
 import { RunRouterCliDeps } from "../utils/routerCli";
-import { SessionSet } from "../types";
 
-interface SetItem extends vscode.TreeItem {
-  set: SessionSet;
+/** What a row must carry for these flows: where to spawn, and which
+ * session. A repository has sessions, not sets of them. */
+export interface CancellableSession {
+  root: string;
+  number: number;
+  name: string;
+}
+
+interface SessionItem extends vscode.TreeItem {
+  session: CancellableSession;
 }
 
 interface RegisterDeps {
@@ -44,86 +51,87 @@ function defaultUi(): CancelLifecycleUi {
 }
 
 /**
- * Set 122 S2: both flows now go through `python -m
- * ai_router.session_lifecycle` rather than a TypeScript writer of
- * `session-state.json`. The flow shape is unchanged — affirmative confirm,
- * optional reason, report, refresh — so the only difference an operator
- * sees is that the command being run is echoed to the "Dabbler Commands"
- * output channel.
- *
- * `set.root` is the spawn cwd (that is where `.venv` is resolved from) and
- * `set.dir` is the explicit target.
+ * Both flows go through `python -m ai_router.session` rather than a
+ * TypeScript writer of the state file. `session.root` is the spawn cwd
+ * (that is where `.venv` is resolved from); the router derives the one
+ * sessions root from the repository it is standing in.
  *
  * Returns true when the tree should refresh.
  */
-export async function runCancelSessionSetFlow(
-  set: SessionSet,
+export async function runCancelSessionFlow(
+  session: CancellableSession,
   ui: CancelLifecycleUi = defaultUi(),
   cliDeps?: RunRouterCliDeps,
 ): Promise<boolean> {
-  // Two-step prompt: a confirmation dialog with explicit "Cancel Session
-  // Set" / "Keep" buttons so the (destructive-ish) action requires an
+  // Two-step prompt: a confirmation dialog with explicit "Cancel Session"
+  // / "Keep" buttons so the (destructive-ish) action requires an
   // affirmative click. Dismissing the dialog returns undefined and aborts.
   // The button label is the full phrase rather than "Cancel" — VS Code's
   // Esc/cancel semantics already mean "abort a modal", so a button labeled
   // "Cancel" reads as "abort this dialog" rather than "perform the action".
   const choice = await ui.confirm(
-    `Cancel session set "${set.name}"?`,
-    "This writes a CANCELLED.md audit file in the session-set folder. The set can be restored later.",
-    "Cancel Session Set",
+    `Cancel session ${session.number} "${session.name}"?`,
+    "The reason is recorded on the session, which can be restored later.",
+    "Cancel Session",
     "Keep",
   );
-  if (choice !== "Cancel Session Set") return false;
+  if (choice !== "Cancel Session") return false;
 
   // The reason prompt returns undefined when dismissed with Esc; an empty
-  // reason is valid (the operator may type one into the file later). Both
-  // are treated the same — write a blank reason line — which matches the
-  // CLI's own contract.
+  // reason is valid. Both are treated the same, which matches the CLI's
+  // own contract.
   const reason = await ui.promptReason(
-    `Reason for cancelling "${set.name}" (optional)`,
-    "e.g. scope rolled into another set",
+    `Reason for cancelling "${session.name}" (optional)`,
+    "e.g. scope rolled into another session",
   );
 
-  const result = await runCancelSessionSet(set.root, set.dir, reason ?? "", cliDeps);
+  const result = await runCancelSession(
+    session.root,
+    session.number,
+    reason ?? "",
+    cliDeps,
+  );
   if (!result.ok) {
-    ui.showErrorMessage(describeLifecycleFailure("Cancelling", set.name, result));
+    ui.showErrorMessage(
+      describeLifecycleFailure("Cancelling", session.name, result),
+    );
     return false;
   }
-  ui.showInformationMessage(
-    `Cancelled "${set.name}". CANCELLED.md written to the session-set folder.`,
-  );
+  ui.showInformationMessage(`Cancelled session ${session.number}.`);
   return true;
 }
 
-export async function runRestoreSessionSetFlow(
-  set: SessionSet,
+export async function runRestoreSessionFlow(
+  session: CancellableSession,
   ui: CancelLifecycleUi = defaultUi(),
   cliDeps?: RunRouterCliDeps,
 ): Promise<boolean> {
   const choice = await ui.confirm(
-    `Restore session set "${set.name}"?`,
-    "This renames CANCELLED.md to RESTORED.md (history preserved) and returns the set to its prior status.",
+    `Restore session ${session.number} "${session.name}"?`,
+    "This returns the session to the status it held before it was cancelled.",
     "Restore",
     "Keep Cancelled",
   );
   if (choice !== "Restore") return false;
 
-  // Restore reasons are optional and rarely useful in practice, but the
-  // input box is offered for symmetry with cancel so the audit file's
-  // prepend shape stays consistent.
   const reason = await ui.promptReason(
-    `Reason for restoring "${set.name}" (optional)`,
+    `Reason for restoring "${session.name}" (optional)`,
     "e.g. scope is back in plan",
   );
 
-  const result = await runRestoreSessionSet(set.root, set.dir, reason ?? "", cliDeps);
+  const result = await runRestoreSession(
+    session.root,
+    session.number,
+    reason ?? "",
+    cliDeps,
+  );
   if (!result.ok) {
-    ui.showErrorMessage(describeLifecycleFailure("Restoring", set.name, result));
+    ui.showErrorMessage(
+      describeLifecycleFailure("Restoring", session.name, result),
+    );
     return false;
   }
-  ui.showInformationMessage(
-    `Restored "${set.name}". RESTORED.md kept as audit trail.`,
-  );
+  ui.showInformationMessage(`Restored session ${session.number}.`);
   return true;
 }
 
@@ -134,18 +142,18 @@ export function registerCancelLifecycleCommands(
   context.subscriptions.push(
     vscode.commands.registerCommand(
       "dabblerSessionSets.cancel",
-      async (item: SetItem) => {
-        const set = item?.set;
-        if (!set) return;
-        if (await runCancelSessionSetFlow(set)) deps.refreshView();
+      async (item: SessionItem) => {
+        const session = item?.session;
+        if (!session) return;
+        if (await runCancelSessionFlow(session)) deps.refreshView();
       },
     ),
     vscode.commands.registerCommand(
       "dabblerSessionSets.restore",
-      async (item: SetItem) => {
-        const set = item?.set;
-        if (!set) return;
-        if (await runRestoreSessionSetFlow(set)) deps.refreshView();
+      async (item: SessionItem) => {
+        const session = item?.session;
+        if (!session) return;
+        if (await runRestoreSessionFlow(session)) deps.refreshView();
       },
     ),
   );

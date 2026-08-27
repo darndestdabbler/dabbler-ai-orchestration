@@ -233,13 +233,13 @@ class TestTheGate:
         """"Nothing is affected" and "nobody knows what is affected" look
         identical from the selected-test list and must never be treated
         alike: the second is the state the whole stage exists to surface."""
-        repo, set_dir = sandbox_repo
+        repo, sessions_dir = sandbox_repo
         (repo / "docs" / "notes.md").write_text("x\n", encoding="utf-8")
-        assert preverify_gate(repo, set_dir, self.CONFIG).ok
+        assert preverify_gate(repo, sessions_dir, self.CONFIG).ok
 
         (repo / "scripts").mkdir()
         (repo / "scripts" / "deploy.rb").write_text("x\n", encoding="utf-8")
-        gate = preverify_gate(repo, set_dir, self.CONFIG)
+        gate = preverify_gate(repo, sessions_dir, self.CONFIG)
         assert not gate.ok
         assert "scripts/deploy.rb" in gate.reason
         # No command is offered, because none would measure anything.
@@ -249,7 +249,7 @@ class TestTheGate:
         # for one file say nothing about the file nothing chose tests for.
         (repo / "src").mkdir()
         (repo / "src" / "app.py").write_text("x = 1\n", encoding="utf-8")
-        mixed = preverify_gate(repo, set_dir, self.CONFIG)
+        mixed = preverify_gate(repo, sessions_dir, self.CONFIG)
         assert not mixed.ok
         assert "scripts/deploy.rb" in mixed.reason
 
@@ -264,15 +264,15 @@ class TestTheGate:
         from ai_router.evidence import snapshot_worktree_tree
         from ai_router.session import register_session_start
 
-        repo, set_dir = sandbox_repo
-        register_session_start(set_dir, 1, engine="claude-code",
+        repo, sessions_dir = sandbox_repo
+        register_session_start(sessions_dir, 1, engine="claude-code",
                                provider="anthropic")
         (repo / "pyproject.toml").write_text("[p]\n", encoding="utf-8")
-        assert preverify_gate(repo, set_dir, self.CONFIG).command == (
+        assert preverify_gate(repo, sessions_dir, self.CONFIG).command == (
             "python -m pytest"
         )
 
-        ledger.append_round(repo, set_dir.name, 1, {
+        ledger.append_round(repo, 1, {
             "round": 1, "verdict": "ISSUES_FOUND", "blocking": True,
             "findings": [], "recorded_at": "2026-08-19T18:00:00-04:00",
             "verifier_model": "m", "verifier_provider": "openai",
@@ -281,7 +281,7 @@ class TestTheGate:
         (repo / "src").mkdir()
         (repo / "src" / "app.py").write_text("x = 1\n", encoding="utf-8")
 
-        gate = preverify_gate(repo, set_dir, self.CONFIG)
+        gate = preverify_gate(repo, sessions_dir, self.CONFIG)
         assert gate.command == "python -m pytest tests/test_thing.py"
 
 

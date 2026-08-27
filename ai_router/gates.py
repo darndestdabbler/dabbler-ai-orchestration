@@ -32,7 +32,7 @@ from .evidence import (
     snapshot_worktree_tree,
 )
 from .ledger import (
-    LIFECYCLE_WRITTEN_SET_FILES,
+    LIFECYCLE_WRITTEN_FILES,
     ROW_REMEDIATED_AT_CAP,
     LedgerError,
     read_rounds,
@@ -51,7 +51,7 @@ _IGNORE_BASENAME_PATTERNS = (
 # lock is deliberately absent: it is still held during the close commit
 # and deleted on release, so committing it leaves every close behind a
 # tracked-deletion dirty tree.
-SET_BOOKKEEPING_COMMIT_BASENAMES = LIFECYCLE_WRITTEN_SET_FILES
+SET_BOOKKEEPING_COMMIT_BASENAMES = LIFECYCLE_WRITTEN_FILES
 
 # What may legitimately be dirty in the set dir at close time: the files
 # the close will commit, plus the lock the close itself is holding.
@@ -69,12 +69,12 @@ class GateResult:
     remediation: str = ""
 
 
-def _verify_command(set_dir) -> str:
-    return f"python -m ai_router.verify --session-set-dir {set_dir}"
+def _verify_command(sessions_dir) -> str:
+    return f"python -m ai_router.verify --sessions-dir {sessions_dir}"
 
 
-def _current_session(set_dir):
-    state = read_session_state(set_dir)
+def _current_session(sessions_dir):
+    state = read_session_state(sessions_dir)
     if not state:
         return None
     return state.get("currentSession")
@@ -82,7 +82,7 @@ def _current_session(set_dir):
 
 # --- The five predicates -----------------------------------------------------
 
-def check_verification_clean(set_dir) -> tuple:
+def check_verification_clean(sessions_dir) -> tuple:
     """The run ledger says the latest round is non-blocking, the worktree
     has not changed since that round (outside the set's own bookkeeping),
     and session-state.json was written only by the sanctioned writers.
@@ -91,27 +91,27 @@ def check_verification_clean(set_dir) -> tuple:
     lands but the record. A ``remediated_at_cap`` row is the other cap
     terminal — it is non-blocking, so it passes here, and the gate says so
     out loud rather than letting unreviewed work read as verified."""
-    set_path = Path(set_dir)
-    root = repo_root_for(set_path)
+    sessions_path = Path(sessions_dir)
+    root = repo_root_for(sessions_path)
     if root is None:
-        return False, f"not inside a git repository: {set_path}"
+        return False, f"not inside a git repository: {sessions_path}"
 
     # The integrity axis runs first and short-circuits: a hand-edited
     # state file must surface as itself, not as whatever downstream
     # confusion it causes.
-    oob = detect_out_of_band_write(set_path, root, require_record=True)
+    oob = detect_out_of_band_write(sessions_path, root, require_record=True)
     if oob:
         return False, (
             f"session-state integrity: {oob}. State files are written by "
             "the router, never by hand."
         )
 
-    current = _current_session(set_path)
+    current = _current_session(sessions_path)
     if current is None:
-        return False, f"no session is in flight under {set_path}"
+        return False, f"no session is in flight under {sessions_path}"
 
     try:
-        rounds = read_rounds(root, set_path.name, current)
+        rounds = read_rounds(root, current)
     except LedgerError as exc:
         return False, (
             f"the run ledger is unreadable or invalid ({exc}); failing "
@@ -121,14 +121,14 @@ def check_verification_clean(set_dir) -> tuple:
         return False, (
             "no verification round is recorded for session "
             f"{current}. Cross-provider verification is mandatory; run: "
-            + _verify_command(set_path)
+            + _verify_command(sessions_path)
         )
     latest = rounds[-1]
     if latest.get("blocking"):
         return False, (
             f"round {latest['round']} ended with blocking findings "
             f"({latest.get('verdict')}); remediate and re-run: "
-            + _verify_command(set_path)
+            + _verify_command(sessions_path)
             + " — at the round cap that same command records the terminal "
             "state instead of opening a round, and an unresolved session "
             "lands nothing but its record"
@@ -146,9 +146,9 @@ def check_verification_clean(set_dir) -> tuple:
             "(failing closed)"
         )
     try:
-        set_rel = os.path.relpath(str(set_path), root).replace("\\", "/")
+        set_rel = os.path.relpath(str(sessions_path), root).replace("\\", "/")
     except ValueError:
-        set_rel = str(set_path)
+        set_rel = str(sessions_path)
     material = [
         p for p in changed
         if not (
@@ -163,7 +163,7 @@ def check_verification_clean(set_dir) -> tuple:
         return False, (
             f"the working tree changed after verification round "
             f"{latest['round']}: {preview}{suffix}. Re-run: "
-            + _verify_command(set_path)
+            + _verify_command(sessions_path)
         )
     if latest.get("type") == ROW_REMEDIATED_AT_CAP:
         remediated = latest.get("remediated") or {}
@@ -178,7 +178,7 @@ def check_verification_clean(set_dir) -> tuple:
     return True, ""
 
 
-def material_worktree_changes(set_dir) -> tuple:
+def material_worktree_changes(sessions_dir) -> tuple:
     """``(paths, error)``: the working-tree changes that are the session's
     work rather than the record of it.
 
@@ -187,19 +187,19 @@ def material_worktree_changes(set_dir) -> tuple:
     uncommitted work, and the task declaration, which refuses to be made
     after work exists.
     """
-    set_path = Path(set_dir)
-    root = repo_root_for(set_path)
+    sessions_path = Path(sessions_dir)
+    root = repo_root_for(sessions_path)
     if root is None:
-        return [], f"not inside a git repository: {set_path}"
+        return [], f"not inside a git repository: {sessions_path}"
     # -uall expands collapsed untracked directories to per-file entries;
     # a single umbrella row would defeat the ignore filter.
     rc, out, err = run_git(root, "status", "--porcelain", "-uall")
     if rc != 0:
         return [], f"git status failed: {err or 'unknown error'}"
     try:
-        set_rel = os.path.relpath(str(set_path), root).replace("\\", "/")
+        set_rel = os.path.relpath(str(sessions_path), root).replace("\\", "/")
     except ValueError:
-        set_rel = str(set_path)
+        set_rel = str(sessions_path)
     blocking = []
     for line in out.splitlines():
         if len(line) < 4:
@@ -230,8 +230,8 @@ def preview_paths(paths) -> str:
     return preview + (f" (+{len(paths) - 5} more)" if len(paths) > 5 else "")
 
 
-def check_working_tree_clean(set_dir) -> tuple:
-    blocking, error = material_worktree_changes(set_dir)
+def check_working_tree_clean(sessions_dir) -> tuple:
+    blocking, error = material_worktree_changes(sessions_dir)
     if error:
         return False, error
     if not blocking:
@@ -256,10 +256,10 @@ def _has_remote(repo_root) -> bool:
     return bool(out.strip())
 
 
-def check_pushed_to_remote(set_dir) -> tuple:
-    root = repo_root_for(Path(set_dir))
+def check_pushed_to_remote(sessions_dir) -> tuple:
+    root = repo_root_for(Path(sessions_dir))
     if root is None:
-        return False, f"not inside a git repository: {set_dir}"
+        return False, f"not inside a git repository: {sessions_dir}"
     rc, head_ref, _ = run_git(root, "symbolic-ref", "--short", "HEAD")
     if rc != 0:
         return False, "HEAD is detached; check out a branch before close-out"
@@ -299,8 +299,8 @@ def check_pushed_to_remote(set_dir) -> tuple:
     )
 
 
-def _governing_config(set_dir):
-    """The configuration that actually governs *set_dir*'s repository.
+def _governing_config(sessions_dir):
+    """The configuration that actually governs *sessions_dir*'s repository.
 
     The ambient config describes the repository the router was invoked in.
     A session set living in a different repository never made those
@@ -309,7 +309,7 @@ def _governing_config(set_dir):
     a repository silently gated by another's testing policy."""
     from .config import load_config, project_root
 
-    set_root = repo_root_for(Path(set_dir))
+    set_root = repo_root_for(Path(sessions_dir))
     ambient = project_root()
     if set_root is None or ambient is None:
         return None
@@ -321,11 +321,11 @@ def _governing_config(set_dir):
         return None
 
 
-def check_test_run_fresh(set_dir, config=None) -> tuple:
+def check_test_run_fresh(sessions_dir, config=None) -> tuple:
     from .test_evidence import evaluate_freshness, load_suites_checked
 
     if config is None:
-        config = _governing_config(set_dir)
+        config = _governing_config(sessions_dir)
     loaded = load_suites_checked(config)
     if loaded.errors:
         # "No expensive suites declared" and "every declared suite was a
@@ -337,29 +337,29 @@ def check_test_run_fresh(set_dir, config=None) -> tuple:
         )
     if not any(s.expensive for s in loaded.suites):
         return True, ""
-    verdicts = evaluate_freshness(set_dir, None, list(loaded.suites))
+    verdicts = evaluate_freshness(sessions_dir, None, list(loaded.suites))
     failures = [v for v in verdicts if v.required and not v.passed]
     if not failures:
         return True, ""
     return False, "; ".join(f"{v.suite}: {v.reason}" for v in failures)
 
 
-def check_verdict_vocabulary(set_dir) -> tuple:
+def check_verdict_vocabulary(sessions_dir) -> tuple:
     """Every persisted verdict token is exactly in the closed allowlist.
     Absence of rounds is verification_clean's finding, not this gate's —
     double-reporting one root cause is worse than silence."""
-    set_path = Path(set_dir)
-    root = repo_root_for(set_path)
-    current = _current_session(set_path)
+    sessions_path = Path(sessions_dir)
+    root = repo_root_for(sessions_path)
+    current = _current_session(sessions_path)
     tokens = []
     if root is not None and current is not None:
         try:
-            rounds = read_rounds(root, set_path.name, current)
+            rounds = read_rounds(root, current)
         except LedgerError:
             rounds = []
         if rounds:
             tokens.append(("run ledger", rounds[-1].get("verdict")))
-    state = read_session_state(set_path)
+    state = read_session_state(sessions_path)
     if state:
         for record in state.get("sessions") or []:
             if record.get("number") == current and record.get(
@@ -391,7 +391,7 @@ GATE_CHECKS = (
 )
 
 
-def run_gates(set_dir, *, forced: bool = False, config=None) -> list:
+def run_gates(sessions_dir, *, forced: bool = False, config=None) -> list:
     """All five gate rows (or only the evidence gates under ``forced`` —
     force bypasses bookkeeping, never evidence). A predicate that raises
     becomes a failed row carrying the exception text."""
@@ -404,9 +404,9 @@ def run_gates(set_dir, *, forced: bool = False, config=None) -> list:
             continue
         try:
             if name == "test_run_fresh":
-                passed, remediation = predicate(set_dir, config)
+                passed, remediation = predicate(sessions_dir, config)
             else:
-                passed, remediation = predicate(set_dir)
+                passed, remediation = predicate(sessions_dir)
         except Exception as exc:  # a buggy gate must not wedge every close
             passed, remediation = False, (
                 f"gate crashed ({type(exc).__name__}: {exc}); failing closed"

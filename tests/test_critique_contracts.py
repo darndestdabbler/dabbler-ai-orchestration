@@ -33,7 +33,6 @@ MINIMAL = {
     "review-run.schema.json": {
         "schema_version": 1,
         "change_id": "abcdef1",
-        "set_slug": "141-critique-contracts-and-shadow-records",
         "session_number": 1,
         "opened_at": "2026-08-19T00:00:00Z",
         "attempts": [{
@@ -119,37 +118,36 @@ def seeded(sandbox_repo, monkeypatch):
     """The seeded change, prepared: a review run open on the working tree,
     the author's claims recorded, and the check IR written beside them.
 
-    Yields ``(repo, set_dir, change_id, reviewed_tree)``. The tree is the
+    Yields ``(repo, sessions_dir, change_id, reviewed_tree)``. The tree is the
     one ``prepare`` snapshotted, which is the only tree any evidence in
     these tests is checked against.
     """
     import ai_router.config as config_module
     from ai_router.verify import EXIT_OK, run_prepare
 
-    repo, set_dir = sandbox_repo
+    repo, sessions_dir = sandbox_repo
     register_session_start(
-        set_dir, 1, engine="claude-code", provider="anthropic"
+        sessions_dir, 1, engine="claude-code", provider="anthropic"
     )
     (repo / "widget.py").write_bytes((FIXTURE / "widget.py").read_bytes())
     monkeypatch.setattr(
         config_module, "load_config",
         lambda *a, **k: {"critique": {"pipeline": "shadow"}},
     )
-    assert run_prepare(set_dir, claims_path=FIXTURE / "claims.json") == EXIT_OK
+    assert run_prepare(sessions_dir, claims_path=FIXTURE / "claims.json") == EXIT_OK
 
-    run = ledger.read_review_runs(repo, set_dir.name, 1)[0]
+    run = ledger.read_review_runs(repo, 1)[0]
     ledger.write_checks(
-        repo, set_dir.name, 1, run["change_id"],
+        repo, 1, run["change_id"],
         json.loads((FIXTURE / "checks.json").read_text(encoding="utf-8")),
     )
-    return repo, set_dir, run["change_id"], run["attempts"][-1][
+    return repo, sessions_dir, run["change_id"], run["attempts"][-1][
         "completion_tree"
     ]
 
 
 def test_evidence_is_re_derived_from_the_reviewed_tree(seeded):
-    repo, set_dir, change_id, tree = seeded
-    slug = set_dir.name
+    repo, sessions_dir, change_id, tree = seeded
     blob = evidence.read_tree_blob(repo, tree, "widget.py")
 
     def span(needle):
@@ -157,7 +155,7 @@ def test_evidence_is_re_derived_from_the_reviewed_tree(seeded):
         return {"kind": "byte", "start": start, "end": start + len(needle)}
 
     mention = b"os.system(cmd)"
-    recorded = evidence.record_worker_result(repo, slug, 1, tree, {
+    recorded = evidence.record_worker_result(repo, 1, tree, {
         "schema_version": 1,
         "change_id": change_id,
         "check_id": "no-shell-out",
@@ -187,9 +185,9 @@ def test_evidence_is_re_derived_from_the_reviewed_tree(seeded):
     search = recorded["absence_searches"][0]
     assert search["matches"] == 2
     assert search["tool_version"].startswith("python-re/")
-    assert ledger.read_worker_results(repo, slug, 1, change_id) == [recorded]
+    assert ledger.read_worker_results(repo, 1, change_id) == [recorded]
     assert ledger.read_checks(
-        repo, slug, 1, change_id)[0]["check_id"] == "no-shell-out"
+        repo, 1, change_id)[0]["check_id"] == "no-shell-out"
 
     # A worker that reports a count the re-run does not produce is refused,
     # not quietly corrected.
@@ -247,8 +245,7 @@ def test_a_quote_is_verified_from_any_file_the_tree_contains(sandbox_repo):
 
 
 def test_a_blocked_check_cannot_be_retried_into_a_pass(seeded):
-    repo, set_dir, change_id, tree = seeded
-    slug = set_dir.name
+    repo, sessions_dir, change_id, tree = seeded
     base = {
         "schema_version": 1,
         "change_id": change_id,
@@ -260,7 +257,7 @@ def test_a_blocked_check_cannot_be_retried_into_a_pass(seeded):
         "tool_version": "whatever the worker says it used", "matches": 2,
     }]
 
-    evidence.record_worker_result(repo, slug, 1, tree, {
+    evidence.record_worker_result(repo, 1, tree, {
         **base, "attempt": 1, "result": "blocked",
         "blocked_reason": "authorized-pulls-insufficient",
     })
@@ -274,7 +271,7 @@ def test_a_blocked_check_cannot_be_retried_into_a_pass(seeded):
     # Within the attempt the recorded result is not superseded at all,
     # whatever the second row says.
     with pytest.raises(ledger.LedgerError, match="append-only"):
-        evidence.record_worker_result(repo, slug, 1, tree, {
+        evidence.record_worker_result(repo, 1, tree, {
             **base, "attempt": 1, "result": "fail", "severity": "minor",
             "defect_class": "maintainability-test",
         })
@@ -288,10 +285,10 @@ def test_a_blocked_check_cannot_be_retried_into_a_pass(seeded):
          "absence_searches": searched},
     ):
         with pytest.raises(evidence.EvidenceError) as refusal:
-            evidence.record_worker_result(repo, slug, 1, tree, later)
+            evidence.record_worker_result(repo, 1, tree, later)
         assert refusal.value.code == "blocked-not-dischargeable"
     assert [row["result"] for row in ledger.read_worker_results(
-        repo, slug, 1, change_id)] == ["blocked"]
+        repo, 1, change_id)] == ["blocked"]
 
     # The exit is the ladder, and rung two is a narrower check — which
     # has to be written down and bounded before it can be answered. Its
@@ -329,14 +326,14 @@ def test_a_blocked_check_cannot_be_retried_into_a_pass(seeded):
         }],
     }
     with pytest.raises(evidence.EvidenceError) as unregistered:
-        evidence.record_worker_result(repo, slug, 1, tree, answer)
+        evidence.record_worker_result(repo, 1, tree, answer)
     assert unregistered.value.code == "check-not-registered"
 
     ledger.write_checks(
-        repo, slug, 1, change_id,
-        ledger.read_checks(repo, slug, 1, change_id) + [narrower],
+        repo, 1, change_id,
+        ledger.read_checks(repo, 1, change_id) + [narrower],
     )
-    evidence.record_worker_result(repo, slug, 1, tree, answer)
+    evidence.record_worker_result(repo, 1, tree, answer)
     assert [row["result"] for row in ledger.read_worker_results(
-        repo, slug, 1, change_id)] == ["blocked", "pass"]
+        repo, 1, change_id)] == ["blocked", "pass"]
 

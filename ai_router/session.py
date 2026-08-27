@@ -21,12 +21,19 @@ import datetime
 import json
 import os
 import re
+import shutil
 import sys
 import time
 from pathlib import Path
 from typing import Optional
 
-from .evidence import repo_root_for, run_git
+from .evidence import (
+    SessionsRootNotFoundError,
+    repo_root_for,
+    resolve_sessions_dir,
+    run_git,
+)
+from .ledger import RUNS_DIRNAME
 from .progress import (
     SessionStateInvariantError,
     STATUS_CANCELLED,
@@ -34,26 +41,26 @@ from .progress import (
     STATUS_IN_PROGRESS,
     STATUS_NOT_STARTED,
     canonicalize_status,
+    derived_view,
     is_logged_step,
-    normalize_to_v4_shape,
+    normalize_legacy_state,
     read_activity_log,
+    read_raw_legacy_state,
     read_raw_session_state,
 )
 # Re-exported so the public surface stays importable from ai_router.session
 # — callers address the lifecycle module; where a helper lives is an
 # implementation detail.
 from .writers import (  # noqa: F401
-    CANCELLED_FILENAME,
     DECIDERS,
-    RESTORED_FILENAME,
     SCHEMA_VERSION,
     STEP_STATUSES,
     SanctionedWriteError,
+    _cancelled_numbers,
     _completed_numbers,
     _now_iso,
     _now_iso_seconds,
-    _prepend_history_entry,
-    _v4_on_disk_state,
+    _on_disk_state,
     _validate_and_write_state,
     _write_text_lf,
     append_change_log_block,
@@ -76,66 +83,6 @@ EXIT_GATE_FAILED = 1
 EXIT_USAGE = 2
 EXIT_BOUNDARY = 3
 EXIT_LOCK_CONTENTION = 5
-
-
-# --- Set resolution (bare numbers -> directories) ---------------------------
-
-SESSION_SETS_DIRNAME = "session-sets"
-_PREFIX_RE = re.compile(r"^(\d+)-")
-
-
-class SetNotFoundError(ValueError):
-    pass
-
-
-class SetCollisionError(ValueError):
-    pass
-
-
-def default_scan_root() -> str:
-    return os.path.join(os.getcwd(), "docs", SESSION_SETS_DIRNAME)
-
-
-def resolve_session_set_dir(value: str, scan_root: Optional[str] = None) -> str:
-    """An all-digits value is a set-number handle resolved against the scan
-    root (zero-padding normalized by int()); anything else passes through
-    verbatim. No fuzzy matching — a nearest-match nudge toward the wrong
-    set is worse than an error."""
-    if not str(value).isdigit():
-        return str(value)
-    number = int(value)
-    root = scan_root or default_scan_root()
-    matches = []
-    try:
-        names = sorted(os.listdir(root))
-    except OSError:
-        names = []
-    for name in names:
-        if name.startswith("_"):
-            continue
-        if not os.path.isdir(os.path.join(root, name)):
-            continue
-        m = _PREFIX_RE.match(name)
-        if m and int(m.group(1)) == number:
-            matches.append(name)
-    if not matches:
-        available = sorted({
-            int(m.group(1))
-            for name in names
-            if (m := _PREFIX_RE.match(name))
-        })
-        raise SetNotFoundError(
-            f"no session set with number {number} under {root}. "
-            f"Available numbers: "
-            f"{', '.join(str(n) for n in available) or '(none)'}."
-        )
-    if len(matches) > 1:
-        raise SetCollisionError(
-            f"number {number} is ambiguous under {root}: it matches "
-            f"{matches}. Two session sets must not share a numeric prefix; "
-            "rename one before addressing by number."
-        )
-    return os.path.join(root, matches[0])
 
 
 # --- The lifecycle lock ------------------------------------------------------
@@ -192,10 +139,10 @@ def _lock_is_stale(path: Path) -> bool:
     return not _pid_running(pid)
 
 
-def acquire_lock(set_dir, worker_id: Optional[str] = None) -> Path:
+def acquire_lock(sessions_dir, worker_id: Optional[str] = None) -> Path:
     """Atomic O_CREAT|O_EXCL create; one stale-reclaim retry. Raises
     :class:`LockContentionError` on a live holder."""
-    path = Path(set_dir) / LOCK_FILENAME
+    path = Path(sessions_dir) / LOCK_FILENAME
     record = json.dumps({
         "pid": os.getpid(),
         "worker_id": worker_id or f"lifecycle/{os.getpid()}",
@@ -221,12 +168,12 @@ def acquire_lock(set_dir, worker_id: Optional[str] = None) -> Path:
 
 
 def acquire_lock_with_timeout(
-    set_dir, worker_id=None, timeout_seconds: float = 30.0
+    sessions_dir, worker_id=None, timeout_seconds: float = 30.0
 ) -> Path:
     deadline = time.monotonic() + timeout_seconds
     while True:
         try:
-            return acquire_lock(set_dir, worker_id)
+            return acquire_lock(sessions_dir, worker_id)
         except LockContentionError:
             if time.monotonic() >= deadline:
                 raise
@@ -269,7 +216,7 @@ class DuplicateSlugError(ValueError):
     """Two sessions or two steps within one session declared the same
     authored slug -- refused rather than silently disambiguated, since a
     silently renamed slug breaks the one-identity promise across
-    spec.md, activity-log.json and the plan's step_id."""
+    the session plan, activity-log.json and the plan's step_id."""
 
 
 def split_slug_marker(text: str) -> tuple:
@@ -371,7 +318,7 @@ def parse_step_texts(segment: str) -> list:
 
 
 def parse_session_plans(spec_text: str) -> list:
-    """``[{"number", "title", "slug", "steps"}, ...]`` from spec.md.
+    """``[{"number", "title", "slug", "steps"}, ...]`` from the plan.
     ``slug`` is the session's authored ``(slug: xxx)`` marker, or ``None``
     when the heading declares none. Two sessions declaring the same slug
     is refused here, at parse time, rather than left for a later reader
@@ -401,7 +348,7 @@ def parse_session_plans(spec_text: str) -> list:
 
 
 def extract_spec_excerpt(spec_text: str, session_number: int) -> str:
-    """The one session's slice of spec.md, falling back to the whole spec
+    """The one session's slice of the plan, falling back to the whole
     when no heading matches."""
     matches = list(_SESSION_HEAD_RE.finditer(spec_text))
     for i, m in enumerate(matches):
@@ -464,12 +411,12 @@ def _discovery_warnings() -> list:
 
 
 def start(
-    set_dir, *, engine: str, provider=None, model=None, effort=None,
+    sessions_dir, *, engine: str, provider=None, model=None, effort=None,
     session_number: Optional[int] = None, total_sessions=None,
 ) -> int:
-    set_path = Path(set_dir)
-    if not set_path.is_dir():
-        print(f"start: not a directory: {set_path}", file=sys.stderr)
+    sessions_path = Path(sessions_dir)
+    if not sessions_path.is_dir():
+        print(f"start: not a directory: {sessions_path}", file=sys.stderr)
         return EXIT_USAGE
 
     from .identity import IdentityResolutionError, resolve_orchestrator_identity
@@ -483,23 +430,33 @@ def start(
 
     try:
         lock = acquire_lock_with_timeout(
-            set_path, worker_id=f"start_session/{os.getpid()}"
+            sessions_path, worker_id=f"start_session/{os.getpid()}"
         )
     except LockContentionError as exc:
         print(f"start: refused -- lifecycle lock contention: {exc}",
               file=sys.stderr)
         return EXIT_LOCK_CONTENTION
     try:
-        raw = read_raw_session_state(set_path)
+        raw = read_raw_session_state(sessions_path)
         normalized = (
-            normalize_to_v4_shape(raw, set_path / "spec.md") if raw else None
+            derived_view(raw) if raw else None
         )
         completed = sorted(_completed_numbers(normalized))
+        cancelled = _cancelled_numbers(normalized)
         current = (normalized or {}).get("currentSession")
+
+        # A cancelled session is settled work, not a hole in the sequence:
+        # the next session steps over it, and "next" is the first one still
+        # available to run rather than one past the highest closed number.
+        def _next_available(after: int) -> int:
+            candidate = after
+            while candidate in cancelled:
+                candidate += 1
+            return candidate
 
         requested = session_number
         if requested is None:
-            requested = current if current is not None else (
+            requested = current if current is not None else _next_available(
                 (max(completed) + 1) if completed else 1
             )
 
@@ -518,8 +475,18 @@ def start(
                 "re-opened.", file=sys.stderr,
             )
             return EXIT_BOUNDARY
+        if requested in cancelled:
+            print(
+                f"start: refused -- session {requested} is cancelled. "
+                "Starting it would erase the cancellation and the reason "
+                f"for it; restore it first: python -m ai_router.session "
+                f"restore {requested}", file=sys.stderr,
+            )
+            return EXIT_BOUNDARY
         if current is None:
-            expected = (max(completed) + 1) if completed else 1
+            expected = _next_available(
+                (max(completed) + 1) if completed else 1
+            )
             if requested != expected:
                 print(
                     f"start: refused -- session {requested} is not the next "
@@ -530,15 +497,15 @@ def start(
                 return EXIT_BOUNDARY
 
         state = register_session_start(
-            set_path, requested, engine=engine, provider=provider,
+            sessions_path, requested, engine=engine, provider=provider,
             model=model, effort=effort, total_sessions=total_sessions,
         )
         seeded = seed_session_plan(
-            set_path, requested,
+            sessions_path, requested,
             total_sessions=len(state.get("sessions") or []),
         )
 
-        log = read_activity_log(set_path) or {}
+        log = read_activity_log(sessions_path) or {}
         mine = [
             e for e in log.get("entries", [])
             if isinstance(e, dict) and e.get("sessionNumber") == requested
@@ -552,13 +519,13 @@ def start(
         )
         if reg is not None and "register" not in logged_keys:
             log_step(
-                set_path, requested, "register",
+                sessions_path, requested, "register",
                 f"Registered session {requested} ({engine}).", "complete",
                 step_number=reg.get("stepNumber"),
             )
 
         print(
-            f"start: session {requested} of {set_path.name} registered "
+            f"start: session {requested} of {sessions_path.name} registered "
             f"({engine}); {seeded} plan step(s) seeded."
         )
         for line in _discovery_warnings():
@@ -573,7 +540,7 @@ def start(
             )
             for r in plan_rows:
                 print(f"  {r.get('stepNumber')}. {r.get('stepKey')}")
-        if read_task_declaration(set_path, requested) is None:
+        if read_task_declaration(sessions_path, requested) is None:
             # Step (a) of the lifecycle. Said here because the declaration
             # has to precede the work to mean anything -- a session that
             # declares itself releasable after building is a model deciding
@@ -581,13 +548,13 @@ def start(
             print(
                 f"This session has not declared its task list. Before the "
                 f"edits:\n  python -m ai_router.session declare "
-                f"--session-set-dir {set_path} \\\n"
+                f"--sessions-dir {sessions_path} \\\n"
                 "      --task \"<what this session will do>\" "
                 "--releasable|--not-releasable"
             )
         print(
             "Next, once the edits are made:\n"
-            f"  python -m ai_router.affected --session-set-dir {set_path}\n"
+            f"  python -m ai_router.affected --sessions-dir {sessions_path}\n"
             "It prints the tests this change makes necessary and the exact "
             "command to run. The complete suite is not accepted before "
             "verification -- it is the run of record, and it comes after the "
@@ -626,15 +593,15 @@ def _resolve_plan_row(step: str, plan_rows: list):
     return None
 
 
-def log(set_dir, *, step: str, status: str, note=None,
+def log(sessions_dir, *, step: str, status: str, note=None,
         session_number: Optional[int] = None) -> int:
     """Record one plan step's status. The step must resolve against the
     rows ``start`` seeded: an unresolvable key refuses rather than
     appending an orphan row nobody planned, and the closed status
     vocabulary is enforced here as well as at the writer."""
-    set_path = Path(set_dir)
-    if not set_path.is_dir():
-        print(f"log: not a directory: {set_path}", file=sys.stderr)
+    sessions_path = Path(sessions_dir)
+    if not sessions_path.is_dir():
+        print(f"log: not a directory: {sessions_path}", file=sys.stderr)
         return EXIT_USAGE
     if status not in STEP_STATUSES:
         print(
@@ -645,16 +612,16 @@ def log(set_dir, *, step: str, status: str, note=None,
 
     try:
         lock = acquire_lock_with_timeout(
-            set_path, worker_id=f"log_step/{os.getpid()}"
+            sessions_path, worker_id=f"log_step/{os.getpid()}"
         )
     except LockContentionError as exc:
         print(f"log: refused -- lifecycle lock contention: {exc}",
               file=sys.stderr)
         return EXIT_LOCK_CONTENTION
     try:
-        raw = read_raw_session_state(set_path)
+        raw = read_raw_session_state(sessions_path)
         normalized = (
-            normalize_to_v4_shape(raw, set_path / "spec.md") if raw else None
+            derived_view(raw) if raw else None
         )
         target = session_number
         if target is None:
@@ -669,18 +636,18 @@ def log(set_dir, *, step: str, status: str, note=None,
         if target is None:
             print(
                 f"log: refused -- no session has been started under "
-                f"{set_path}. Run `session start` first.", file=sys.stderr,
+                f"{sessions_path}. Run `session start` first.", file=sys.stderr,
             )
             return EXIT_BOUNDARY
 
-        activity = read_activity_log(set_path) or {}
+        activity = read_activity_log(sessions_path) or {}
         entries = [
             e for e in activity.get("entries", []) if isinstance(e, dict)
         ]
         plan_rows = _plan_rows_for(entries, target)
         if not plan_rows:
             print(
-                f"log: refused -- session {target} of {set_path.name} has no "
+                f"log: refused -- session {target} of {sessions_path.name} has no "
                 "seeded plan rows to log against. Run `session start` "
                 "first.", file=sys.stderr,
             )
@@ -714,7 +681,7 @@ def log(set_dir, *, step: str, status: str, note=None,
             )
             return EXIT_OK
 
-        log_step(set_path, target, key, description, status,
+        log_step(sessions_path, target, key, description, status,
                  step_number=row.get("stepNumber"))
         print(
             f"log: session {target} step {row.get('stepNumber')} "
@@ -727,14 +694,14 @@ def log(set_dir, *, step: str, status: str, note=None,
 
 # --- the two files ----------------------------------------------------------
 
-def _resolve_target_session(set_path, session_number):
+def _resolve_target_session(sessions_path, session_number):
     """The session a decision or declaration belongs to: the one in
     flight, else the last closed one, else refuse."""
     if session_number is not None:
         return session_number
-    raw = read_raw_session_state(set_path)
+    raw = read_raw_session_state(sessions_path)
     normalized = (
-        normalize_to_v4_shape(raw, set_path / "spec.md") if raw else None
+        derived_view(raw) if raw else None
     )
     current = (normalized or {}).get("currentSession")
     if current is not None:
@@ -755,19 +722,19 @@ def _read_body(text, path):
     return Path(path).read_text(encoding="utf-8")
 
 
-def decision(set_dir, *, decider: str, headline: str, body=None,
+def decision(sessions_dir, *, decider: str, headline: str, body=None,
              body_file=None, model=None, provider=None, decided_on=None,
              backfill_reason=None, session_number=None) -> int:
     """Append one decision to the log, at the moment it occurs."""
-    set_path = Path(set_dir)
-    if not set_path.is_dir():
-        print(f"decision: not a directory: {set_path}", file=sys.stderr)
+    sessions_path = Path(sessions_dir)
+    if not sessions_path.is_dir():
+        print(f"decision: not a directory: {sessions_path}", file=sys.stderr)
         return EXIT_USAGE
-    target = _resolve_target_session(set_path, session_number)
+    target = _resolve_target_session(sessions_path, session_number)
     if target is None:
         print(
             f"decision: refused -- no session has been started under "
-            f"{set_path}. Run `session start` first.", file=sys.stderr,
+            f"{sessions_path}. Run `session start` first.", file=sys.stderr,
         )
         return EXIT_BOUNDARY
     try:
@@ -780,7 +747,7 @@ def decision(set_dir, *, decider: str, headline: str, body=None,
         return EXIT_USAGE
     try:
         lock = acquire_lock_with_timeout(
-            set_path, worker_id=f"decision/{os.getpid()}"
+            sessions_path, worker_id=f"decision/{os.getpid()}"
         )
     except LockContentionError as exc:
         print(f"decision: refused -- lifecycle lock contention: {exc}",
@@ -788,7 +755,7 @@ def decision(set_dir, *, decider: str, headline: str, body=None,
         return EXIT_LOCK_CONTENTION
     try:
         entry = append_decision(
-            set_path, session_number=target, decider=decider,
+            sessions_path, session_number=target, decider=decider,
             headline=headline, body=text, model=model, provider=provider,
             decided_on=decided_on, backfill_reason=backfill_reason,
         )
@@ -804,18 +771,18 @@ def decision(set_dir, *, decider: str, headline: str, body=None,
     return EXIT_OK
 
 
-def declare(set_dir, *, task=None, task_file=None, releasable=None,
+def declare(sessions_dir, *, task=None, task_file=None, releasable=None,
             session_number=None) -> int:
     """Declare the session's task list and whether it may publish."""
-    set_path = Path(set_dir)
-    if not set_path.is_dir():
-        print(f"declare: not a directory: {set_path}", file=sys.stderr)
+    sessions_path = Path(sessions_dir)
+    if not sessions_path.is_dir():
+        print(f"declare: not a directory: {sessions_path}", file=sys.stderr)
         return EXIT_USAGE
-    target = _resolve_target_session(set_path, session_number)
+    target = _resolve_target_session(sessions_path, session_number)
     if target is None:
         print(
             f"declare: refused -- no session has been started under "
-            f"{set_path}. Run `session start` first.", file=sys.stderr,
+            f"{sessions_path}. Run `session start` first.", file=sys.stderr,
         )
         return EXIT_BOUNDARY
     try:
@@ -828,7 +795,7 @@ def declare(set_dir, *, task=None, task_file=None, releasable=None,
         return EXIT_USAGE
     try:
         lock = acquire_lock_with_timeout(
-            set_path, worker_id=f"declare/{os.getpid()}"
+            sessions_path, worker_id=f"declare/{os.getpid()}"
         )
     except LockContentionError as exc:
         print(f"declare: refused -- lifecycle lock contention: {exc}",
@@ -836,7 +803,7 @@ def declare(set_dir, *, task=None, task_file=None, releasable=None,
         return EXIT_LOCK_CONTENTION
     try:
         declare_session_task(
-            set_path, session_number=target, task=text,
+            sessions_path, session_number=target, task=text,
             releasable=releasable,
         )
     except SanctionedWriteError as exc:
@@ -851,11 +818,11 @@ def declare(set_dir, *, task=None, task_file=None, releasable=None,
     return EXIT_OK
 
 
-def plan(set_dir, *, body=None, body_file=None) -> int:
+def plan(sessions_dir, *, body=None, body_file=None) -> int:
     """Record the plan prose the numbered session list hangs off."""
-    set_path = Path(set_dir)
-    if not set_path.is_dir():
-        print(f"plan: not a directory: {set_path}", file=sys.stderr)
+    sessions_path = Path(sessions_dir)
+    if not sessions_path.is_dir():
+        print(f"plan: not a directory: {sessions_path}", file=sys.stderr)
         return EXIT_USAGE
     try:
         text = _read_body(body, body_file)
@@ -867,20 +834,20 @@ def plan(set_dir, *, body=None, body_file=None) -> int:
         return EXIT_USAGE
     try:
         lock = acquire_lock_with_timeout(
-            set_path, worker_id=f"plan/{os.getpid()}"
+            sessions_path, worker_id=f"plan/{os.getpid()}"
         )
     except LockContentionError as exc:
         print(f"plan: refused -- lifecycle lock contention: {exc}",
               file=sys.stderr)
         return EXIT_LOCK_CONTENTION
     try:
-        record_project_plan(set_path, text)
+        record_project_plan(sessions_path, text)
     except SanctionedWriteError as exc:
         print(f"plan: refused -- {exc}", file=sys.stderr)
         return EXIT_USAGE
     finally:
         release_lock(lock)
-    print(f"plan: recorded; {set_path.name}/project-work-plan.md rewritten.")
+    print(f"plan: recorded; {sessions_path.name}/project-work-plan.md rewritten.")
     return EXIT_OK
 
 
@@ -890,23 +857,23 @@ def _local_only(repo_root) -> bool:
     return os.path.isfile(os.path.join(repo_root, ".dabbler", "local-only"))
 
 
-def close(set_dir, *, dry_run: bool = False, forced: bool = False) -> int:
+def close(sessions_dir, *, dry_run: bool = False, forced: bool = False) -> int:
     from .gates import SET_BOOKKEEPING_COMMIT_BASENAMES, run_gates
     from .ledger import latest_round
 
-    set_path = Path(set_dir)
-    if not set_path.is_dir():
-        print(f"close: not a directory: {set_path}", file=sys.stderr)
+    sessions_path = Path(sessions_dir)
+    if not sessions_path.is_dir():
+        print(f"close: not a directory: {sessions_path}", file=sys.stderr)
         return EXIT_USAGE
     try:
-        lock = acquire_lock(set_path, worker_id=f"close_session/{os.getpid()}")
+        lock = acquire_lock(sessions_path, worker_id=f"close_session/{os.getpid()}")
     except LockContentionError as exc:
         print(f"close: refused -- {exc}", file=sys.stderr)
         return EXIT_BOUNDARY
     try:
-        raw = read_raw_session_state(set_path)
+        raw = read_raw_session_state(sessions_path)
         normalized = (
-            normalize_to_v4_shape(raw, set_path / "spec.md") if raw else None
+            derived_view(raw) if raw else None
         )
         current = (normalized or {}).get("currentSession")
         if current is None:
@@ -916,11 +883,11 @@ def close(set_dir, *, dry_run: bool = False, forced: bool = False) -> int:
                 return EXIT_OK
             print(
                 f"close: refused -- no session is in flight under "
-                f"{set_path} (status={status!r}).", file=sys.stderr,
+                f"{sessions_path} (status={status!r}).", file=sys.stderr,
             )
             return EXIT_BOUNDARY
 
-        results = run_gates(set_path, forced=forced)
+        results = run_gates(sessions_path, forced=forced)
         width = max(len(r.name) for r in results)
         for r in results:
             mark = "PASS" if r.passed else "FAIL"
@@ -942,28 +909,28 @@ def close(set_dir, *, dry_run: bool = False, forced: bool = False) -> int:
             )
             return EXIT_GATE_FAILED
 
-        repo_root = repo_root_for(set_path)
+        repo_root = repo_root_for(sessions_path)
         verdict = None
         if repo_root:
-            row = latest_round(repo_root, set_path.name, current)
+            row = latest_round(repo_root, current)
             if row:
                 verdict = row.get("verdict")
 
-        flip_state_to_closed(set_path, verdict=verdict, forced=forced)
-        print(f"close: session {current} of {set_path.name} closed"
+        flip_state_to_closed(sessions_path, verdict=verdict, forced=forced)
+        print(f"close: session {current} of {sessions_path.name} closed"
               + (f" ({verdict})" if verdict else "") + ".")
 
         if repo_root:
             bookkeeping = [
-                str(set_path / name)
+                str(sessions_path / name)
                 for name in SET_BOOKKEEPING_COMMIT_BASENAMES
-                if (set_path / name).is_file()
+                if (sessions_path / name).is_file()
             ]
             if bookkeeping:
                 run_git(repo_root, "add", "--", *bookkeeping)
             rc, _, err = run_git(
                 repo_root, "commit", "-m",
-                f"Close session {current} of {set_path.name}",
+                f"Close session {current} of {sessions_path.name}",
             )
             if rc != 0 and "nothing to commit" not in err.lower():
                 print(f"close: state flipped but commit failed: {err}",
@@ -983,167 +950,244 @@ def close(set_dir, *, dry_run: bool = False, forced: bool = False) -> int:
         release_lock(lock)
 
 
+# --- migrate (a set-scoped repository, carried forward exactly once) ---------
+
+_MIGRATED_FILES = (
+    ("activity-log.json", "activity-log.json"),
+    ("change-log.md", "change-log.md"),
+    ("decisions-log.md", "decisions-log.md"),
+    ("project-work-plan.md", "project-work-plan.md"),
+    ("spec.md", "session-plan.md"),
+)
+
+
+def _v5_sessions_from_legacy(normalized: dict) -> list:
+    """The legacy ledger as v5 session records.
+
+    A cancelled set becomes cancelled sessions. That is the only honest
+    reading: the set said this work would not run, and after the collapse
+    there is nowhere but the session to say so.
+    """
+    set_cancelled = (
+        canonicalize_status(normalized.get("status")) == STATUS_CANCELLED
+    )
+    sessions = []
+    for entry in normalized.get("sessions") or []:
+        record = {
+            "number": entry.get("number"),
+            "title": entry.get("title") or f"Session {entry.get('number')}",
+            "status": canonicalize_status(entry.get("status")),
+        }
+        for key in ("startedAt", "completedAt", "orchestrator",
+                    "verificationVerdict", "verification", "type"):
+            if entry.get(key) is not None:
+                record[key] = entry[key]
+        record.setdefault("startedAt", None)
+        record.setdefault("completedAt", None)
+        record.setdefault("orchestrator", None)
+        record.setdefault("verificationVerdict", None)
+        if set_cancelled and record["status"] != STATUS_COMPLETE:
+            record["preCancelStatus"] = record["status"]
+            record["status"] = STATUS_CANCELLED
+        sessions.append(record)
+    return sessions
+
+
+def migrate(legacy_set_dir, sessions_dir, *, dry_run: bool = False) -> int:
+    """Carry one set-scoped directory forward into the repository's
+    sessions root.
+
+    Run once, and refused once the root carries a record: a second
+    migration would fold a second set's numbering over the first, and two
+    sets' session 3 are not the same session. Everything it writes it
+    writes through the sanctioned writer, so the state-writes ledger
+    covers the migrated file exactly as it covers a registration.
+    """
+    legacy = Path(legacy_set_dir)
+    sessions_path = Path(sessions_dir)
+    if not legacy.is_dir():
+        print(f"migrate: not a directory: {legacy}", file=sys.stderr)
+        return EXIT_USAGE
+    raw = read_raw_legacy_state(legacy)
+    if raw is None:
+        print(f"migrate: no session-state.json under {legacy}",
+              file=sys.stderr)
+        return EXIT_USAGE
+    if read_raw_session_state(sessions_path) is not None:
+        print(
+            f"migrate: refused -- {sessions_path} already carries a session "
+            "record. A repository is migrated once; a second set folded "
+            "over the first would renumber work that is already closed.",
+            file=sys.stderr,
+        )
+        return EXIT_BOUNDARY
+
+    normalized = normalize_legacy_state(raw, legacy / "spec.md")
+    sessions = _v5_sessions_from_legacy(normalized)
+    if not sessions:
+        print(f"migrate: {legacy} declares no sessions", file=sys.stderr)
+        return EXIT_USAGE
+    state = {"schemaVersion": SCHEMA_VERSION, "sessions": sessions}
+    if "forceClosed" in raw:
+        state["forceClosed"] = raw["forceClosed"]
+
+    repo_root = repo_root_for(sessions_path.parent) or repo_root_for(legacy)
+    runs_from = (
+        Path(repo_root) / RUNS_DIRNAME / legacy.name if repo_root else None
+    )
+    moves = [
+        (legacy / src, sessions_path / dst)
+        for src, dst in _MIGRATED_FILES if (legacy / src).is_file()
+    ]
+
+    if dry_run:
+        print(json.dumps({
+            "sessions": len(sessions),
+            "files": [str(dst.relative_to(sessions_path)) for _, dst in moves],
+            "runs": str(runs_from) if runs_from and runs_from.is_dir() else None,
+        }, indent=2))
+        return EXIT_OK
+
+    sessions_path.mkdir(parents=True, exist_ok=True)
+    for src, dst in moves:
+        shutil.copy2(src, dst)
+    # The ledger moves with the sessions it describes: rounds recorded
+    # under the old address are the same rounds, and leaving them behind
+    # would make every migrated session look unverified.
+    if runs_from is not None and runs_from.is_dir():
+        runs_to = Path(repo_root) / RUNS_DIRNAME
+        for entry in runs_from.iterdir():
+            target = runs_to / entry.name
+            if target.exists():
+                continue
+            shutil.move(str(entry), str(target))
+        try:
+            runs_from.rmdir()
+        except OSError:
+            pass
+    try:
+        _validate_and_write_state(sessions_path, state)
+    except SessionStateInvariantError as exc:
+        print(f"migrate: refused -- {exc}", file=sys.stderr)
+        return EXIT_GATE_FAILED
+    print(json.dumps({
+        "sessions": len(sessions),
+        "sessionsDir": str(sessions_path),
+    }))
+    return EXIT_OK
+
+
 # --- cancel / restore --------------------------------------------------------
 
 _RESTORABLE_STATUSES = (STATUS_NOT_STARTED, STATUS_IN_PROGRESS,
                         STATUS_COMPLETE)
 
 
-def _infer_status_from_files(set_path: Path) -> str:
-    """File-presence inference for sets with no usable state file — the
-    same rules build_projection applies on read."""
-    if (set_path / "change-log.md").is_file():
-        return STATUS_COMPLETE
-    if (set_path / "activity-log.json").is_file():
-        return STATUS_IN_PROGRESS
-    return STATUS_NOT_STARTED
+def _session_record(state: dict, number: int):
+    for record in state.get("sessions") or []:
+        if isinstance(record, dict) and record.get("number") == number:
+            return record
+    return None
 
 
-def _derive_pre_cancel_status(normalized: dict) -> str:
-    """Ledger-derived fallback when preCancelStatus is absent: any complete
-    sessions -> in-progress if incomplete sessions remain else complete;
-    none complete -> not-started."""
-    statuses = [
-        s.get("status") for s in (normalized or {}).get("sessions") or []
-        if isinstance(s, dict)
-    ]
-    complete = [s for s in statuses if s == STATUS_COMPLETE]
-    if not complete:
-        return STATUS_NOT_STARTED
-    if len(complete) < len(statuses):
-        return STATUS_IN_PROGRESS
-    return STATUS_COMPLETE
-
-
-def cancel(set_dir, *, reason: str, force: bool = False) -> int:
-    set_path = Path(set_dir)
-    if not set_path.is_dir():
-        print(f"cancel: not a directory: {set_path}", file=sys.stderr)
+def cancel(sessions_dir, session_number: int, *, reason: str,
+           force: bool = False) -> int:
+    """Cancel one session. A repository has no set to cancel, so what is
+    cancelled is the piece of work, and the reason rides on the session
+    record rather than in a marker file beside it."""
+    sessions_path = Path(sessions_dir)
+    if not sessions_path.is_dir():
+        print(f"cancel: not a directory: {sessions_path}", file=sys.stderr)
         return EXIT_USAGE
     try:
-        lock = acquire_lock(set_path, worker_id=f"cancel/{os.getpid()}")
+        lock = acquire_lock(sessions_path, worker_id=f"cancel/{os.getpid()}")
     except LockContentionError as exc:
         print(f"cancel: refused -- {exc}", file=sys.stderr)
         return EXIT_BOUNDARY
     try:
-        raw = read_raw_session_state(set_path)
-        normalized = (
-            normalize_to_v4_shape(raw, set_path / "spec.md") if raw else None
-        )
-        current = (normalized or {}).get("currentSession")
-        if current is not None and not force:
+        raw = read_raw_session_state(sessions_path)
+        if raw is None:
+            print(f"cancel: no session record under {sessions_path}",
+                  file=sys.stderr)
+            return EXIT_USAGE
+        state = _on_disk_state(sessions_path, raw)
+        record = _session_record(state, session_number)
+        if record is None:
+            print(f"cancel: no session {session_number} on record",
+                  file=sys.stderr)
+            return EXIT_USAGE
+        prior = canonicalize_status(record.get("status"))
+        if prior == STATUS_CANCELLED:
+            print(f"cancel: session {session_number} is already cancelled",
+                  file=sys.stderr)
+            return EXIT_BOUNDARY
+        if prior == STATUS_IN_PROGRESS and not force:
             print(
-                f"cancel: refused -- session {current} of {set_path.name} "
-                "is in flight. Close it first, or pass --force.",
+                f"cancel: refused -- session {session_number} is in flight. "
+                "Close it first, or pass --force.",
                 file=sys.stderr,
             )
             return EXIT_BOUNDARY
-
-        if raw is not None:
-            state = _v4_on_disk_state(set_path, raw)
-            prior = state.get("status")
-            # A re-cancel keeps the original preCancelStatus: overwriting
-            # it with "cancelled" would lose the status a restore returns to.
-            if prior in _RESTORABLE_STATUSES:
-                state["preCancelStatus"] = prior
-            state["status"] = STATUS_CANCELLED
-        else:
-            state = {
-                "schemaVersion": SCHEMA_VERSION,
-                "sessionSetName": set_path.name,
-                "status": STATUS_CANCELLED,
-                "preCancelStatus": _infer_status_from_files(set_path),
-            }
+        if prior in _RESTORABLE_STATUSES:
+            record["preCancelStatus"] = prior
+        record["status"] = STATUS_CANCELLED
+        record["cancelledReason"] = reason
+        record["cancelledAt"] = _now_iso_seconds()
         try:
-            _validate_and_write_state(set_path, state)
+            _validate_and_write_state(sessions_path, state)
         except SessionStateInvariantError as exc:
             print(f"cancel: refused -- {exc}", file=sys.stderr)
             return EXIT_GATE_FAILED
-
-        # Marker file second: the state file is authoritative for v2
-        # readers; the marker is the audit trail legacy readers and humans
-        # consult. History accumulates in one file, so an earlier restore's
-        # RESTORED.md is renamed back before the new entry is prepended.
-        cancelled_path = set_path / CANCELLED_FILENAME
-        restored_path = set_path / RESTORED_FILENAME
-        if restored_path.is_file() and not cancelled_path.is_file():
-            os.replace(restored_path, cancelled_path)
-        existing = None
-        if cancelled_path.is_file():
-            existing = cancelled_path.read_text(encoding="utf-8")
-        _write_text_lf(cancelled_path, _prepend_history_entry(
-            existing, "Cancelled", reason, _now_iso_seconds()
-        ))
         print(json.dumps({
-            "status": STATUS_CANCELLED,
-            "sessionSetName": state["sessionSetName"],
+            "session": session_number, "status": STATUS_CANCELLED,
         }))
         return EXIT_OK
     finally:
         release_lock(lock)
 
 
-def restore(set_dir, *, reason: str = "") -> int:
-    set_path = Path(set_dir)
-    if not set_path.is_dir():
-        print(f"restore: not a directory: {set_path}", file=sys.stderr)
+def restore(sessions_dir, session_number: int, *, reason: str = "") -> int:
+    sessions_path = Path(sessions_dir)
+    if not sessions_path.is_dir():
+        print(f"restore: not a directory: {sessions_path}", file=sys.stderr)
         return EXIT_USAGE
     try:
-        lock = acquire_lock(set_path, worker_id=f"restore/{os.getpid()}")
+        lock = acquire_lock(sessions_path, worker_id=f"restore/{os.getpid()}")
     except LockContentionError as exc:
         print(f"restore: refused -- {exc}", file=sys.stderr)
         return EXIT_BOUNDARY
     try:
-        raw = read_raw_session_state(set_path)
-        cancelled_path = set_path / CANCELLED_FILENAME
-        is_cancelled = (
-            canonicalize_status(raw.get("status")) == STATUS_CANCELLED
-            if raw is not None else cancelled_path.is_file()
-        )
-        if not is_cancelled:
+        raw = read_raw_session_state(sessions_path)
+        if raw is None:
+            print(f"restore: no session record under {sessions_path}",
+                  file=sys.stderr)
+            return EXIT_USAGE
+        state = _on_disk_state(sessions_path, raw)
+        record = _session_record(state, session_number)
+        if record is None:
+            print(f"restore: no session {session_number} on record",
+                  file=sys.stderr)
+            return EXIT_USAGE
+        if canonicalize_status(record.get("status")) != STATUS_CANCELLED:
             print(
-                f"restore: refused -- {set_path.name} is not cancelled; "
-                "there is nothing to restore.", file=sys.stderr,
+                f"restore: refused -- session {session_number} is not "
+                "cancelled; there is nothing to restore.", file=sys.stderr,
             )
             return EXIT_BOUNDARY
-
-        # Marker rename first (history preserved under RESTORED.md), state
-        # write second, CANCELLED.md removal last — a crash mid-way leaves
-        # the set still looking cancelled, and restore is re-runnable.
-        marker_history = None
-        if cancelled_path.is_file():
-            marker_history = cancelled_path.read_text(encoding="utf-8")
-            _write_text_lf(set_path / RESTORED_FILENAME,
-                           _prepend_history_entry(
-                               marker_history, "Restored", reason,
-                               _now_iso_seconds(),
-                           ))
-
-        if raw is not None:
-            state = _v4_on_disk_state(set_path, raw)
-            prior = state.pop("preCancelStatus", None)
-            if prior not in _RESTORABLE_STATUSES:
-                prior = _derive_pre_cancel_status(
-                    normalize_to_v4_shape(raw, set_path / "spec.md")
-                )
-            state["status"] = prior
-            try:
-                _validate_and_write_state(set_path, state)
-            except SessionStateInvariantError as exc:
-                print(f"restore: refused -- {exc}", file=sys.stderr)
-                return EXIT_GATE_FAILED
-            restored_status = prior
-        else:
-            restored_status = _infer_status_from_files(set_path)
-
+        prior = record.pop("preCancelStatus", None)
+        if prior not in _RESTORABLE_STATUSES:
+            prior = STATUS_NOT_STARTED
+        record["status"] = prior
+        record.pop("cancelledReason", None)
+        record.pop("cancelledAt", None)
+        if reason:
+            record["restoredReason"] = reason
         try:
-            cancelled_path.unlink()
-        except OSError:
-            pass
-        print(json.dumps({
-            "status": restored_status,
-            "sessionSetName": set_path.name,
-        }))
+            _validate_and_write_state(sessions_path, state)
+        except SessionStateInvariantError as exc:
+            print(f"restore: refused -- {exc}", file=sys.stderr)
+            return EXIT_GATE_FAILED
+        print(json.dumps({"session": session_number, "status": prior}))
         return EXIT_OK
     finally:
         release_lock(lock)
@@ -1155,9 +1199,15 @@ def main(argv=None) -> int:
     parser = argparse.ArgumentParser(prog="python -m ai_router.session")
     sub = parser.add_subparsers(dest="command", required=True)
 
-    p_start = sub.add_parser("start", help="register a session start")
-    p_start.add_argument("--session-set-dir", required=True,
-                         help="directory, slug, or bare set number")
+    def with_root(p):
+        # Not a selector. A repository has one sessions root, so this only
+        # exists for a caller standing outside the tree.
+        p.add_argument("--sessions-dir",
+                       help="the repository's sessions root; derived from "
+                            "the working directory when omitted")
+        return p
+
+    p_start = with_root(sub.add_parser("start", help="register a session start"))
     p_start.add_argument("--engine", required=True)
     p_start.add_argument("--provider")
     p_start.add_argument("--model")
@@ -1165,24 +1215,22 @@ def main(argv=None) -> int:
     p_start.add_argument("--session-number", type=int)
     p_start.add_argument("--total-sessions", type=int)
 
-    p_log = sub.add_parser(
+    p_log = with_root(sub.add_parser(
         "log", help="record a plan step's status in activity-log.json"
-    )
-    p_log.add_argument("--session-set-dir", required=True)
+    ))
     p_log.add_argument("--step", required=True,
                        help="the plan row's stepKey, or its stepNumber")
     p_log.add_argument("--status", required=True, choices=list(STEP_STATUSES))
     p_log.add_argument("--note",
-                       help="description to record instead of the spec's "
+                       help="description to record instead of the plan's "
                             "wording for the step")
     p_log.add_argument("--session-number", type=int,
                        help="defaults to the in-flight session, or the last "
                             "closed one when none is in flight")
 
-    p_decision = sub.add_parser(
+    p_decision = with_root(sub.add_parser(
         "decision", help="append a decision to decisions-log.md"
-    )
-    p_decision.add_argument("--session-set-dir", required=True)
+    ))
     p_decision.add_argument("--decider", required=True, choices=list(DECIDERS),
                             help="who made it")
     p_decision.add_argument("--headline", required=True,
@@ -1199,10 +1247,9 @@ def main(argv=None) -> int:
                                  "live append; required with --decided-on")
     p_decision.add_argument("--session-number", type=int)
 
-    p_declare = sub.add_parser(
+    p_declare = with_root(sub.add_parser(
         "declare", help="declare the session's task list and releasability"
-    )
-    p_declare.add_argument("--session-set-dir", required=True)
+    ))
     task_src = p_declare.add_mutually_exclusive_group(required=True)
     task_src.add_argument("--task", help="what this session will do")
     task_src.add_argument("--task-file", help="the same, from a file")
@@ -1213,65 +1260,75 @@ def main(argv=None) -> int:
                      action="store_false", help="it may not")
     p_declare.add_argument("--session-number", type=int)
 
-    p_plan = sub.add_parser(
+    p_plan = with_root(sub.add_parser(
         "plan", help="record the plan prose in project-work-plan.md"
-    )
-    p_plan.add_argument("--session-set-dir", required=True)
+    ))
     plan_src = p_plan.add_mutually_exclusive_group(required=True)
     plan_src.add_argument("--body", help="the plan, inline")
     plan_src.add_argument("--body-file", help="the plan, from a file")
 
-    p_close = sub.add_parser("close", help="run gates and close the session")
-    p_close.add_argument("--session-set-dir", required=True)
+    p_close = with_root(sub.add_parser(
+        "close", help="run gates and close the session"
+    ))
     p_close.add_argument("--dry-run", action="store_true",
                          help="run the gates read-only and print the rows")
     p_close.add_argument("--force", action="store_true",
                          help="bypass bookkeeping gates, never evidence; "
                               "stamps forceClosed")
 
-    p_cancel = sub.add_parser("cancel", help="cancel a session set")
-    p_cancel.add_argument("set_dir",
-                          help="directory, slug, or bare set number")
+    p_cancel = with_root(sub.add_parser("cancel", help="cancel one session"))
+    p_cancel.add_argument("session_number", type=int)
     p_cancel.add_argument("--reason", required=True,
-                          help="recorded in CANCELLED.md")
+                          help="recorded on the session")
     p_cancel.add_argument("--force", action="store_true",
-                          help="cancel even with a session in flight")
+                          help="cancel even while the session is in flight")
 
-    p_restore = sub.add_parser(
-        "restore", help="restore a cancelled session set"
-    )
-    p_restore.add_argument("set_dir",
-                           help="directory, slug, or bare set number")
+    p_restore = with_root(sub.add_parser(
+        "restore", help="restore a cancelled session"
+    ))
+    p_restore.add_argument("session_number", type=int)
     p_restore.add_argument("--reason", default="",
-                           help="recorded in RESTORED.md")
+                           help="recorded on the session")
+
+    p_migrate = with_root(sub.add_parser(
+        "migrate", help="fold a legacy session-set directory into the "
+                        "repository's sessions root"
+    ))
+    p_migrate.add_argument("legacy_set_dir",
+                           help="the docs/session-sets/<NNN-slug> directory "
+                                "to carry forward")
+    p_migrate.add_argument("--dry-run", action="store_true",
+                           help="report what would move and write nothing")
 
     args = parser.parse_args(argv)
-    target = getattr(args, "session_set_dir", None) or args.set_dir
     try:
-        set_dir = resolve_session_set_dir(target)
-    except (SetNotFoundError, SetCollisionError) as exc:
+        sessions_dir = resolve_sessions_dir(args.sessions_dir)
+    except SessionsRootNotFoundError as exc:
         print(f"session: {exc}", file=sys.stderr)
         return EXIT_USAGE
 
+    if args.command == "migrate":
+        return migrate(args.legacy_set_dir, sessions_dir, dry_run=args.dry_run)
     if args.command == "start":
         return start(
-            set_dir, engine=args.engine, provider=args.provider,
+            sessions_dir, engine=args.engine, provider=args.provider,
             model=args.model, effort=args.effort,
             session_number=args.session_number,
             total_sessions=args.total_sessions,
         )
     if args.command == "cancel":
-        return cancel(set_dir, reason=args.reason, force=args.force)
+        return cancel(sessions_dir, args.session_number, reason=args.reason,
+                      force=args.force)
     if args.command == "restore":
-        return restore(set_dir, reason=args.reason)
+        return restore(sessions_dir, args.session_number, reason=args.reason)
     if args.command == "log":
         return log(
-            set_dir, step=args.step, status=args.status, note=args.note,
+            sessions_dir, step=args.step, status=args.status, note=args.note,
             session_number=args.session_number,
         )
     if args.command == "decision":
         return decision(
-            set_dir, decider=args.decider, headline=args.headline,
+            sessions_dir, decider=args.decider, headline=args.headline,
             body=args.body, body_file=args.body_file, model=args.model,
             provider=args.provider, decided_on=args.decided_on,
             backfill_reason=args.backfill_reason,
@@ -1279,12 +1336,12 @@ def main(argv=None) -> int:
         )
     if args.command == "declare":
         return declare(
-            set_dir, task=args.task, task_file=args.task_file,
+            sessions_dir, task=args.task, task_file=args.task_file,
             releasable=args.releasable, session_number=args.session_number,
         )
     if args.command == "plan":
-        return plan(set_dir, body=args.body, body_file=args.body_file)
-    return close(set_dir, dry_run=args.dry_run, forced=args.force)
+        return plan(sessions_dir, body=args.body, body_file=args.body_file)
+    return close(sessions_dir, dry_run=args.dry_run, forced=args.force)
 
 
 if __name__ == "__main__":

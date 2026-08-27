@@ -96,17 +96,17 @@ def push_log(tmp_path):
 def publishable(sandbox_repo, monkeypatch):
     """A session that may publish: declared releasable before the work, then
     verified, committed, pushed and left with a clean tree."""
-    repo, set_dir = sandbox_repo
-    register_session_start(set_dir, 1, engine="claude-code",
+    repo, sessions_dir = sandbox_repo
+    register_session_start(sessions_dir, 1, engine="claude-code",
                            provider="anthropic")
     declare_session_task(
-        set_dir, session_number=1, task="ship the widget", releasable=True,
+        sessions_dir, session_number=1, task="ship the widget", releasable=True,
     )
     (repo / "widget.py").write_text("WIDGET = 1\n", encoding="utf-8")
     _git(repo, "add", "-A")
     _git(repo, "commit", "-q", "-m", "work")
     _git(repo, "push", "-q")
-    ledger.append_round(repo, set_dir.name, 1, {
+    ledger.append_round(repo, 1, {
         "round": 1,
         "verdict": "VERIFIED",
         "blocking": False,
@@ -117,7 +117,7 @@ def publishable(sandbox_repo, monkeypatch):
         "recorded_at": datetime.datetime.now().astimezone().isoformat(),
     })
     monkeypatch.setenv(SECRET_ENV, SECRET_VALUE)
-    return repo, set_dir
+    return repo, sessions_dir
 
 
 def pushes(push_log):
@@ -180,15 +180,15 @@ class TestWhoMayPublish:
         """Two shapes of the same answer: a session that declared `no`, and
         one that never declared at all. `session_is_releasable` fails closed,
         so the absent declaration is a refusal rather than an unknown."""
-        repo, set_dir = sandbox_repo
-        register_session_start(set_dir, 1, engine="claude-code",
+        repo, sessions_dir = sandbox_repo
+        register_session_start(sessions_dir, 1, engine="claude-code",
                                provider="anthropic")
         if declaration is not None:
             declare_session_task(
-                set_dir, session_number=1, task="refactor only",
+                sessions_dir, session_number=1, task="refactor only",
                 releasable=declaration,
             )
-        run = package(set_dir, config=packaging_config(push_log))
+        run = package(sessions_dir, config=packaging_config(push_log))
         assert run.outcome == OUTCOME_REFUSED
         assert run.releasable is False
         assert "releasable" in run.refusal
@@ -196,8 +196,8 @@ class TestWhoMayPublish:
 
     def test_a_releasable_session_in_a_repository_with_no_feed_is_refused(
             self, publishable):
-        repo, set_dir = publishable
-        run = package(set_dir, config=make_config())
+        repo, sessions_dir = publishable
+        run = package(sessions_dir, config=make_config())
         assert run.outcome == OUTCOME_REFUSED
         assert "publishes nothing" in run.refusal
 
@@ -206,35 +206,35 @@ class TestWhoMayPublish:
         """§3.f runs after (e). 'After' means the evidence exists, so work
         left unpushed refuses the publication rather than shipping a tree the
         remote has never seen."""
-        repo, set_dir = publishable
+        repo, sessions_dir = publishable
         (repo / "widget.py").write_text("WIDGET = 2\n", encoding="utf-8")
         _git(repo, "add", "-A")
         _git(repo, "commit", "-q", "-m", "more work")
-        run = package(set_dir, config=packaging_config(push_log))
+        run = package(sessions_dir, config=packaging_config(push_log))
         assert run.outcome == OUTCOME_REFUSED
         assert "pushed_to_remote" in run.refusal
         assert not push_log.exists()
 
     def test_a_missing_credential_refuses_before_anything_is_built(
             self, publishable, push_log, monkeypatch):
-        repo, set_dir = publishable
+        repo, sessions_dir = publishable
         monkeypatch.delenv(SECRET_ENV, raising=False)
-        run = package(set_dir, config=packaging_config(push_log))
+        run = package(sessions_dir, config=packaging_config(push_log))
         assert run.outcome == OUTCOME_REFUSED
         assert SECRET_ENV in run.refusal
-        assert not ledger.package_output_dir(repo, set_dir.name, 1).exists()
+        assert not ledger.package_output_dir(repo, 1).exists()
 
 
 class TestThePublication:
     def test_pack_then_push_once_per_artifact(self, publishable, push_log):
-        repo, set_dir = publishable
-        run = package(set_dir, config=packaging_config(
+        repo, sessions_dir = publishable
+        run = package(sessions_dir, config=packaging_config(
             push_log, artifacts=("a-1.0.nupkg", "b-1.0.nupkg"),
         ))
         assert run.outcome == OUTCOME_PUBLISHED, run.refusal
         assert run.artifacts == ("a-1.0.nupkg", "b-1.0.nupkg")
         assert [row["argv"][0] for row in pushes(push_log)] == [
-            str(ledger.package_output_dir(repo, set_dir.name, 1) / name)
+            str(ledger.package_output_dir(repo, 1) / name)
             for name in run.artifacts
         ]
         assert [s.step for s in run.steps] == ["pack", "push", "push"]
@@ -244,26 +244,26 @@ class TestThePublication:
             self, publishable, push_log):
         """The tree that was verified stays the tree that was verified, and
         the artifacts land where the record can name them."""
-        repo, set_dir = publishable
-        package(set_dir, config=packaging_config(push_log))
-        output = ledger.package_output_dir(repo, set_dir.name, 1)
+        repo, sessions_dir = publishable
+        package(sessions_dir, config=packaging_config(push_log))
+        output = ledger.package_output_dir(repo, 1)
         assert (output / "thing-1.0.nupkg").is_file()
         assert _git(repo, "status", "--porcelain").stdout.strip() == ""
 
     def test_a_stale_artifact_from_a_previous_run_is_not_published(
             self, publishable, push_log):
-        repo, set_dir = publishable
-        output = ledger.package_output_dir(repo, set_dir.name, 1)
+        repo, sessions_dir = publishable
+        output = ledger.package_output_dir(repo, 1)
         output.mkdir(parents=True, exist_ok=True)
         (output / "last-week-9.9.nupkg").write_text("old", encoding="utf-8")
-        run = package(set_dir, config=packaging_config(push_log))
+        run = package(sessions_dir, config=packaging_config(push_log))
         assert run.artifacts == ("thing-1.0.nupkg",)
         assert not (output / "last-week-9.9.nupkg").exists()
 
     def test_a_pack_that_produced_nothing_is_refused_not_reported_published(
             self, publishable, push_log):
-        repo, set_dir = publishable
-        run = package(set_dir, config=packaging_config(push_log, artifacts=()))
+        repo, sessions_dir = publishable
+        run = package(sessions_dir, config=packaging_config(push_log, artifacts=()))
         assert run.outcome == OUTCOME_REFUSED
         assert "nothing to push" in run.refusal
         assert not push_log.exists()
@@ -274,13 +274,13 @@ class TestThePublication:
         from a tree nobody verified. The exit code says it worked; the tree
         says the result is not about the code that was reviewed, and the tree
         wins -- the same rule a check that mutates its own subject gets."""
-        repo, set_dir = publishable
+        repo, sessions_dir = publishable
         config = packaging_config(push_log)
         config["packaging"]["pack"]["argv"] = [
             sys.executable, "-c", DIRTY_PACK_SRC, "{output}",
             str(repo / "obj.log"),
         ]
-        run = package(set_dir, config=config)
+        run = package(sessions_dir, config=config)
         assert run.outcome == OUTCOME_FAILED
         assert run.tree_mutated is True
         assert run.post_tree_digest != run.tree_digest
@@ -292,8 +292,8 @@ class TestThePublication:
         published is worse than a failure that stopped where it stopped.
         CI is on the child-environment allowlist, so the stub exits on it."""
         monkeypatch.setenv("CI", "1")
-        repo, set_dir = publishable
-        run = package(set_dir, config=packaging_config(
+        repo, sessions_dir = publishable
+        run = package(sessions_dir, config=packaging_config(
             push_log, artifacts=("a-1.0.nupkg", "b-1.0.nupkg"),
         ))
         assert run.outcome == OUTCOME_FAILED
@@ -308,8 +308,8 @@ class TestTheCredential:
         environment is the allowlist, so neither the credential nor the
         operator's other secrets are inherited."""
         monkeypatch.setenv("DABBLER_ANTHROPIC_API_KEY", "sk-should-not-travel")
-        repo, set_dir = publishable
-        run = package(set_dir, config=packaging_config(push_log))
+        repo, sessions_dir = publishable
+        run = package(sessions_dir, config=packaging_config(push_log))
         assert run.outcome == OUTCOME_PUBLISHED, run.refusal
         row = pushes(push_log)[0]
         assert row["argv"][2] == SECRET_VALUE
@@ -321,8 +321,8 @@ class TestTheCredential:
         """A credential that reaches a log has leaked whether or not it
         reached an environment, so the recorded command still says
         `{secret}` and the tool's own echo of it is scrubbed."""
-        repo, set_dir = publishable
-        run = package(set_dir, config=packaging_config(push_log))
+        repo, sessions_dir = publishable
+        run = package(sessions_dir, config=packaging_config(push_log))
         push_step = run.steps[-1]
         assert "{secret}" in push_step.command
         assert "pushing with token {secret}" in push_step.output
@@ -334,12 +334,12 @@ class TestTheRecord:
             self, publishable, push_log, monkeypatch):
         """A record holding only the successes cannot be read as a history
         of what was released, so a refusal files beside a publication."""
-        repo, set_dir = publishable
+        repo, sessions_dir = publishable
         monkeypatch.delenv(SECRET_ENV, raising=False)
-        record(set_dir, package(set_dir, config=packaging_config(push_log)))
+        record(sessions_dir, package(sessions_dir, config=packaging_config(push_log)))
         monkeypatch.setenv(SECRET_ENV, SECRET_VALUE)
-        record(set_dir, package(set_dir, config=packaging_config(push_log)))
-        rows = ledger.read_packaging(repo, set_dir.name, 1)
+        record(sessions_dir, package(sessions_dir, config=packaging_config(push_log)))
+        rows = ledger.read_packaging(repo, 1)
         assert [r["outcome"] for r in rows] == [
             OUTCOME_REFUSED, OUTCOME_PUBLISHED,
         ]
@@ -348,11 +348,11 @@ class TestTheRecord:
 
     def test_a_dry_run_shows_the_gates_and_runs_nothing(
             self, publishable, push_log):
-        repo, set_dir = publishable
+        repo, sessions_dir = publishable
         run = package(
-            set_dir, config=packaging_config(push_log), dry_run=True,
+            sessions_dir, config=packaging_config(push_log), dry_run=True,
         )
         assert run.ready is True
         assert [g["passed"] for g in run.gates] == [True] * 5
         assert not push_log.exists()
-        assert not ledger.packaging_path(repo, set_dir.name, 1).exists()
+        assert not ledger.packaging_path(repo, 1).exists()

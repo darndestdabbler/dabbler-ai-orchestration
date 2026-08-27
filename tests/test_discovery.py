@@ -366,20 +366,20 @@ class TestSessionStart:
 
 class TestRefreshNeverHappensInsideASession:
     def test_a_session_in_flight_is_read_from_the_state_file(self, tmp_path):
-        set_dir = tmp_path / "148-a-set"
-        set_dir.mkdir()
-        (set_dir / "session-state.json").write_text(json.dumps({
-            "schemaVersion": 4,
+        (tmp_path / "sessions.json").write_text(json.dumps({
+            "schemaVersion": 5,
             "sessions": [
                 {"number": 1, "status": "complete"},
                 {"number": 2, "status": "in-progress"},
             ],
         }), encoding="utf-8")
-        (tmp_path / "149-idle").mkdir()
-        (tmp_path / "149-idle" / "session-state.json").write_text(
-            json.dumps({"schemaVersion": 4, "sessions": [
-                {"number": 1, "status": "not-started"}
-            ]}), encoding="utf-8",
-        )
 
-        assert sessions_in_flight(tmp_path) == ["148-a-set session 2"]
+        assert sessions_in_flight(tmp_path) == ["session 2"]
+
+    def test_an_idle_repository_reports_nothing_in_flight(self, tmp_path):
+        (tmp_path / "sessions.json").write_text(json.dumps({
+            "schemaVersion": 5,
+            "sessions": [{"number": 1, "status": "not-started"}],
+        }), encoding="utf-8")
+
+        assert sessions_in_flight(tmp_path) == []

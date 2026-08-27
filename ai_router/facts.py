@@ -35,8 +35,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
-from .evidence import repo_root_for, run_git, snapshot_worktree_tree
-from .ledger import LIFECYCLE_WRITTEN_SET_FILES, RUNS_DIRNAME
+from .evidence import (
+    repo_root_for,
+    resolve_sessions_dir,
+    run_git,
+    snapshot_worktree_tree,
+)
+from .ledger import LIFECYCLE_WRITTEN_FILES, RUNS_DIRNAME
 
 DEFAULT_EVIDENCE_CHAR_CAP = 600 * 1024
 _UNTRACKED_INLINE_CAP = 64 * 1024
@@ -65,7 +70,7 @@ CONTROL_TIMEOUT_SECONDS = 600
 
 KIND_TESTS = "tests"
 
-_BOOKKEEPING_BASENAMES = frozenset(LIFECYCLE_WRITTEN_SET_FILES)
+_BOOKKEEPING_BASENAMES = frozenset(LIFECYCLE_WRITTEN_FILES)
 
 
 class FactsError(RuntimeError):
@@ -94,13 +99,33 @@ def evidence_char_cap() -> int:
 
 def build_diff_pathspecs(excludes=DEFAULT_DIFF_EXCLUDES) -> list:
     """Depth-agnostic exclusions: the anchored form missed nested
-    ``tools/x/dist``."""
+    ``tools/x/dist``.
+
+    The lifecycle's own files are excluded too. They are the record of the
+    session, not its work, and a session that rewrites or relocates them
+    would otherwise spend the reviewer's whole evidence budget showing the
+    reviewer its own bookkeeping. Their paths are still listed, so the
+    exclusion is visible rather than silent.
+    """
     pathspecs = ["."]
     for pattern in excludes:
         pathspecs.append(f":(exclude,glob)**/{pattern}")
         if "*" not in pattern:
             pathspecs.append(f":(exclude,glob)**/{pattern}/**")
+    for basename in LIFECYCLE_WRITTEN_FILES:
+        pathspecs.append(f":(exclude,glob)**/{basename}")
     return pathspecs
+
+
+def _tracked_bookkeeping(repo_root) -> list:
+    """The lifecycle files this change touches, by path only."""
+    rc, out, _ = run_git(
+        repo_root, "diff", "--name-only", "-z", "HEAD", "--",
+        *(f"**/{name}" for name in LIFECYCLE_WRITTEN_FILES),
+    )
+    if rc != 0:
+        return []
+    return [p for p in out.split("\0") if p]
 
 
 def _untracked_contents(repo_root, pathspecs) -> tuple:
@@ -171,7 +196,7 @@ def _render_evidence(
     return "\n".join(parts)
 
 
-def assemble_evidence(repo_root, set_dir, session_number: int) -> str:
+def assemble_evidence(repo_root, sessions_dir, session_number: int) -> str:
     """Round 1: full working-tree evidence vs HEAD."""
     pathspecs = build_diff_pathspecs()
     rc, status, err = run_git(repo_root, "status", "--short")
@@ -183,6 +208,7 @@ def assemble_evidence(repo_root, set_dir, session_number: int) -> str:
     if rc != 0:
         raise FactsError(f"git diff failed: {err}")
     inlined, omitted, bookkeeping = _untracked_contents(repo_root, pathspecs)
+    bookkeeping = bookkeeping + _tracked_bookkeeping(repo_root)
     if not diff.strip() and not inlined:
         raise EvidenceEmptyError(
             "the evidence bundle is empty (no diff vs HEAD, no untracked "
@@ -201,7 +227,7 @@ def assemble_evidence(repo_root, set_dir, session_number: int) -> str:
 
 
 def assemble_fix_delta_evidence(
-    repo_root, set_dir, session_number: int, baseline_tree: str
+    repo_root, sessions_dir, session_number: int, baseline_tree: str
 ) -> str:
     """Rounds ≥2: tree-to-tree fix delta only. The untracked collector is
     deliberately absent — the tree diff already carries new files as added
@@ -511,7 +537,7 @@ def _tests_facts(gate) -> tuple:
 
 
 def collect_facts(
-    repo_root, session_set_dir, config, *, gate=None, round_number=None,
+    repo_root, sessions_dir, config, *, gate=None, round_number=None,
     session_number=None,
 ) -> FactRecord:
     """Every deterministic fact about the tree as it now stands, in one
@@ -529,7 +555,7 @@ def collect_facts(
     return FactRecord(
         controls=controls,
         changed=changed_lines(
-            repo_root, preverify_baseline(repo_root, session_set_dir)
+            repo_root, preverify_baseline(repo_root, sessions_dir)
         ),
         session_number=session_number, round_number=round_number,
         recorded_at=datetime.datetime.now().astimezone().isoformat(),
@@ -537,13 +563,13 @@ def collect_facts(
     )
 
 
-def facts_path(repo_root, set_slug: str) -> Path:
-    return Path(repo_root) / RUNS_DIRNAME / str(set_slug) / FACTS_FILENAME
+def facts_path(repo_root) -> Path:
+    return Path(repo_root) / RUNS_DIRNAME / FACTS_FILENAME
 
 
-def append_facts(repo_root, set_slug: str, record: FactRecord) -> Path:
+def append_facts(repo_root, record: FactRecord) -> Path:
     """Machine-owned, append-only, one line per collection."""
-    path = facts_path(repo_root, set_slug)
+    path = facts_path(repo_root)
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a", encoding="utf-8") as handle:
         handle.write(json.dumps(record.to_dict(), sort_keys=True) + "\n")
@@ -587,7 +613,9 @@ def main(argv=None) -> int:
         prog="python -m ai_router.facts",
         description="what the machine knows about this change already",
     )
-    parser.add_argument("--session-set-dir", required=True)
+    parser.add_argument("--sessions-dir",
+                        help="the repository's sessions root; derived from "
+                             "the working directory when omitted")
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args(argv)
 
@@ -595,7 +623,10 @@ def main(argv=None) -> int:
     if repo_root is None:
         print("facts: no git repository here", file=sys.stderr)
         return 2
-    record = collect_facts(repo_root, args.session_set_dir, load_config())
+    record = collect_facts(
+        repo_root, resolve_sessions_dir(args.sessions_dir, repo_root),
+        load_config(),
+    )
     if args.json:
         print(json.dumps(record.to_dict(), indent=2, sort_keys=True))
         return 0

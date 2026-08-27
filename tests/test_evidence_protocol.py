@@ -138,41 +138,41 @@ class TestTreeSnapshots:
         This repo has no .gitignore at all — the exclusion cannot depend
         on one."""
         before = snapshot_worktree_tree(git_repo)
-        runs = git_repo / ".dabbler" / "runs" / "010-demo" / "s1"
+        runs = git_repo / ".dabbler" / "runs" / "s1"
         runs.mkdir(parents=True)
         (runs / "rounds.jsonl").write_text('{"round": 1}\n', encoding="utf-8")
         assert snapshot_worktree_tree(git_repo) == before
 
 class TestOutOfBandWrites:
     def _set_dir(self, git_repo):
-        set_dir = git_repo / "docs" / "session-sets" / "010-x"
-        set_dir.mkdir(parents=True)
-        return set_dir
+        sessions_dir = git_repo / "docs" / "session-sets" / "010-x"
+        sessions_dir.mkdir(parents=True)
+        return sessions_dir
 
     def test_sanctioned_write_matches(self, git_repo):
-        set_dir = self._set_dir(git_repo)
-        (set_dir / "session-state.json").write_text("{}", encoding="utf-8")
-        record_state_write(set_dir, git_repo)
+        sessions_dir = self._set_dir(git_repo)
+        (sessions_dir / "sessions.json").write_text("{}", encoding="utf-8")
+        record_state_write(sessions_dir, git_repo)
         assert detect_out_of_band_write(
-            set_dir, git_repo, require_record=True
+            sessions_dir, git_repo, require_record=True
         ) is None
 
     def test_hand_edit_detected(self, git_repo):
-        set_dir = self._set_dir(git_repo)
-        (set_dir / "session-state.json").write_text("{}", encoding="utf-8")
-        record_state_write(set_dir, git_repo)
-        (set_dir / "session-state.json").write_text(
+        sessions_dir = self._set_dir(git_repo)
+        (sessions_dir / "sessions.json").write_text("{}", encoding="utf-8")
+        record_state_write(sessions_dir, git_repo)
+        (sessions_dir / "sessions.json").write_text(
             '{"status": "complete"}', encoding="utf-8"
         )
-        reason = detect_out_of_band_write(set_dir, git_repo)
+        reason = detect_out_of_band_write(sessions_dir, git_repo)
         assert reason and "out of band" in reason
 
     def test_absent_record_only_blocks_when_required(self, git_repo):
-        set_dir = self._set_dir(git_repo)
-        (set_dir / "session-state.json").write_text("{}", encoding="utf-8")
-        assert detect_out_of_band_write(set_dir, git_repo) is None
+        sessions_dir = self._set_dir(git_repo)
+        (sessions_dir / "sessions.json").write_text("{}", encoding="utf-8")
+        assert detect_out_of_band_write(sessions_dir, git_repo) is None
         reason = detect_out_of_band_write(
-            set_dir, git_repo, require_record=True
+            sessions_dir, git_repo, require_record=True
         )
         assert reason and "absent" in reason
 
@@ -194,20 +194,20 @@ class TestSurfaceDigests:
         assert surface_digest(git_repo, ("",)) != first
 
     def test_record_run_strict_at_the_boundary(self, git_repo):
-        set_dir = git_repo / "docs" / "session-sets" / "010-x"
-        set_dir.mkdir(parents=True)
+        sessions_dir = git_repo / "docs" / "session-sets" / "010-x"
+        sessions_dir.mkdir(parents=True)
         suite = SuiteSpec(name="s", command="c", covers=("",),
                           expensive=True)
         with pytest.raises(ValueError):
-            record_run(set_dir, suite, "green", stage="final-full",
+            record_run(sessions_dir, suite, "green", stage="final-full",
                        duration_seconds=1)
         with pytest.raises(ValueError):
-            record_run(set_dir, suite, "passed", stage="final-full",
+            record_run(sessions_dir, suite, "passed", stage="final-full",
                        duration_seconds=0)
         with pytest.raises(ValueError):
-            record_run(set_dir, suite, "passed", stage="smoke",
+            record_run(sessions_dir, suite, "passed", stage="smoke",
                        duration_seconds=1)
-        record = record_run(set_dir, suite, "failed", stage="final-full",
+        record = record_run(sessions_dir, suite, "failed", stage="final-full",
                             duration_seconds=2.5)
         assert record.outcome == "failed"  # honesty beats silence
 
@@ -226,24 +226,24 @@ class TestRunStages:
     SUITE = SuiteSpec(name="pytest", command="pytest", covers=("",),
                       expensive=True)
 
-    def _verdict(self, repo, set_dir):
+    def _verdict(self, repo, sessions_dir):
         return evaluate_freshness(
-            set_dir, None, [self.SUITE], repo_root=repo
+            sessions_dir, None, [self.SUITE], repo_root=repo
         )[0]
 
     def test_a_targeted_run_never_satisfies_the_close(self, sandbox_repo):
-        repo, set_dir = sandbox_repo
-        record_run(set_dir, self.SUITE, "passed",
+        repo, sessions_dir = sandbox_repo
+        record_run(sessions_dir, self.SUITE, "passed",
                    stage=STAGE_PREVERIFY_TARGETED, duration_seconds=1.0,
                    command="pytest tests/test_widget.py",
                    policy=POLICY_TARGETED, repo_root=repo)
-        verdict = self._verdict(repo, set_dir)
+        verdict = self._verdict(repo, sessions_dir)
         assert not verdict.passed
         assert STAGE_PREVERIFY_TARGETED in verdict.reason
 
-        record_run(set_dir, self.SUITE, "passed", stage=STAGE_FINAL_FULL,
+        record_run(sessions_dir, self.SUITE, "passed", stage=STAGE_FINAL_FULL,
                    duration_seconds=1.0, repo_root=repo)
-        assert self._verdict(repo, set_dir).passed
+        assert self._verdict(repo, sessions_dir).passed
 
     def test_a_targeted_record_must_name_its_command_and_policy(
         self, sandbox_repo
@@ -251,28 +251,28 @@ class TestRunStages:
         """The command is the evidence, so it cannot be optional; and the
         vocabulary that judges it cannot leak onto the run of record, which
         is the whole suite by definition."""
-        repo, set_dir = sandbox_repo
+        repo, sessions_dir = sandbox_repo
         with pytest.raises(ValueError):
-            record_run(set_dir, self.SUITE, "passed",
+            record_run(sessions_dir, self.SUITE, "passed",
                        stage=STAGE_PREVERIFY_TARGETED, duration_seconds=1.0,
                        policy=POLICY_TARGETED, repo_root=repo)
         with pytest.raises(ValueError):
-            record_run(set_dir, self.SUITE, "passed",
+            record_run(sessions_dir, self.SUITE, "passed",
                        stage=STAGE_PREVERIFY_TARGETED, duration_seconds=1.0,
                        command="pytest tests/test_widget.py", repo_root=repo)
         with pytest.raises(ValueError):
-            record_run(set_dir, self.SUITE, "passed",
+            record_run(sessions_dir, self.SUITE, "passed",
                        stage=STAGE_FINAL_FULL, duration_seconds=1.0,
                        policy=POLICY_TARGETED, repo_root=repo)
 
         record_run(
-            set_dir, self.SUITE, "passed", stage=STAGE_PREVERIFY_TARGETED,
+            sessions_dir, self.SUITE, "passed", stage=STAGE_PREVERIFY_TARGETED,
             duration_seconds=1.0, command="pytest tests/test_widget.py",
             policy=POLICY_TARGETED, policy_reason="names all 1 selected",
             selected_tests=(("tests/test_widget.py", "module-ownership"),),
             repo_root=repo,
         )
-        stored = read_records(repo, set_dir.name)[-1]
+        stored = read_records(repo)[-1]
         assert stored.command == "pytest tests/test_widget.py"
         assert stored.policy == POLICY_TARGETED
         assert stored.selected_tests == (
@@ -282,13 +282,13 @@ class TestRunStages:
     def test_a_final_full_run_binds_to_the_tree_it_ran_against(
         self, sandbox_repo
     ):
-        repo, set_dir = sandbox_repo
-        record_run(set_dir, self.SUITE, "passed", stage=STAGE_FINAL_FULL,
+        repo, sessions_dir = sandbox_repo
+        record_run(sessions_dir, self.SUITE, "passed", stage=STAGE_FINAL_FULL,
                    duration_seconds=1.0, repo_root=repo)
-        assert self._verdict(repo, set_dir).passed
+        assert self._verdict(repo, sessions_dir).passed
 
         (repo / "widget.py").write_text("W = 1\n", encoding="utf-8")
-        verdict = self._verdict(repo, set_dir)
+        verdict = self._verdict(repo, sessions_dir)
         assert not verdict.passed
 
 

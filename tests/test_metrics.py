@@ -41,17 +41,6 @@ class TestRecordCall:
         assert row["billed_usage_unavailable"] is True
         assert row["transport_session_id"] == "conv-9"
 
-    def test_session_set_normalized_to_slug(self, tmp_path, base_config):
-        config = _config_at(tmp_path, base_config)
-        for shape in (
-            "042-my-set",
-            "docs/session-sets/042-my-set",
-            "D:\\repo\\docs\\session-sets\\042-my-set",
-        ):
-            _record(config, session_set=shape)
-        rows = load_metrics(config)
-        assert {r["session_set"] for r in rows} == {"042-my-set"}
-
     def test_mismatch_is_tri_state(self, tmp_path, base_config):
         config = _config_at(tmp_path, base_config)
         _record(config, requested_model_id="a", served_model_id="b")
@@ -104,11 +93,11 @@ class TestReport:
     ):
         config = _config_at(tmp_path, base_config)
         _record(config)
-        _record(config, session_set="042-x")
+        _record(config, session_number=42)
         print_metrics_report(config)
         out = capsys.readouterr().out
         assert "Total input tokens:   200" in out
-        assert "042-x" in out
+        assert "session 42" in out
         assert "$" not in out
 
     def test_seat_rows_point_at_the_conversation_id_that_prices_them(

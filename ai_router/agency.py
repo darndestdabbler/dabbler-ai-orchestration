@@ -174,12 +174,12 @@ def declared_dependencies(repo_root, rel_paths) -> set:
     return found
 
 
-def session_scope(repo_root, set_dir, changed_paths) -> tuple:
+def session_scope(repo_root, sessions_dir, changed_paths) -> tuple:
     """What this round's verifier is scoped to: the session's changed files,
     the modules they declare they depend on, and the session set's own
     directory -- which carries the spec the work is judged against.
 
-    ``set_dir`` is optional: a round outside a session set has no spec
+    ``sessions_dir`` is optional: a round outside a session set has no spec
     directory to add, and naming one that does not exist would put a path
     in the scope that no reader could open.
 
@@ -190,7 +190,7 @@ def session_scope(repo_root, set_dir, changed_paths) -> tuple:
     changed = {_posix(p) for p in (changed_paths or ()) if str(p).strip()}
     scope = set(changed)
     scope |= declared_dependencies(repo_root, changed)
-    set_rel = relative_posix(repo_root, set_dir) if set_dir else None
+    set_rel = relative_posix(repo_root, sessions_dir) if sessions_dir else None
     if set_rel:
         scope.add(set_rel)
     return tuple(sorted(scope))

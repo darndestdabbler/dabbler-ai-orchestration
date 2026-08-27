@@ -10,7 +10,7 @@ from ai_router.progress import (
     get_progress,
     heal_title,
     is_generic_title,
-    normalize_to_v4_shape,
+    normalize_legacy_state,
     read_session_state,
     step_icon_key,
     step_state,
@@ -49,9 +49,9 @@ class TestCanonicalize:
         assert canonicalize_status("Complete") == "Complete"
 
 
-class TestNormalizeToV4:
+class TestLegacyReader:
     def test_v3_metadata_promotes_onto_sessions(self, tmp_path):
-        out = normalize_to_v4_shape(v3_state(), tmp_path / "spec.md")
+        out = normalize_legacy_state(v3_state(), tmp_path / "spec.md")
         last = out["sessions"][-1]
         assert last["completedAt"] == "2026-05-01T09:00:00-04:00"
         assert last["verificationVerdict"] == "VERIFIED"
@@ -60,7 +60,7 @@ class TestNormalizeToV4:
 
     def test_v4_input_is_not_promoted(self, tmp_path):
         state = v3_state(schemaVersion=4)
-        out = normalize_to_v4_shape(state, tmp_path / "spec.md")
+        out = normalize_legacy_state(state, tmp_path / "spec.md")
         assert out["sessions"][-1]["verificationVerdict"] is None
 
     def test_v2_shape_synthesizes_sessions(self, tmp_path):
@@ -69,7 +69,7 @@ class TestNormalizeToV4:
             "status": "in-progress", "currentSession": 2,
             "totalSessions": 3, "completedSessions": [1],
         }
-        out = normalize_to_v4_shape(state, tmp_path / "spec.md")
+        out = normalize_legacy_state(state, tmp_path / "spec.md")
         statuses = [s["status"] for s in out["sessions"]]
         assert statuses == ["complete", "in-progress", "not-started"]
 
@@ -79,7 +79,7 @@ class TestNormalizeToV4:
             "status": "in-progress", "currentSession": True,
             "totalSessions": 2, "completedSessions": [1.0],
         }
-        out = normalize_to_v4_shape(state, tmp_path / "spec.md")
+        out = normalize_legacy_state(state, tmp_path / "spec.md")
         # bool current and float completed are not ints: nothing escalates.
         assert all(s["status"] == "not-started" for s in out["sessions"])
 
@@ -92,7 +92,7 @@ class TestNormalizeToV4:
             ],
             completedSessions=[1], currentSession=2, completedAt=None,
         )
-        out = normalize_to_v4_shape(state, tmp_path / "spec.md")
+        out = normalize_legacy_state(state, tmp_path / "spec.md")
         assert out["currentSession"] == 2
         assert out["completedSessions"] == [1]
         assert out["completedAt"] is None  # mid-set: no set completion time
@@ -120,7 +120,7 @@ class TestTitleHeal:
             sessions=[{"number": 1, "title": "Session 1",
                        "status": "complete"}],
         )
-        out = normalize_to_v4_shape(state, tmp_path / "spec.md")
+        out = normalize_legacy_state(state, tmp_path / "spec.md")
         assert out["sessions"][0]["title"] == "The real name"
 
 
@@ -128,7 +128,6 @@ class TestInvariants:
     def test_duplicate_numbers_rejected(self):
         with pytest.raises(SessionStateInvariantError):
             get_progress({
-                "status": "complete",
                 "sessions": [
                     {"number": 1, "title": "a", "status": "complete"},
                     {"number": 1, "title": "b", "status": "complete"},
@@ -138,7 +137,6 @@ class TestInvariants:
     def test_two_in_progress_rejected(self):
         with pytest.raises(SessionStateInvariantError):
             get_progress({
-                "status": "in-progress",
                 "sessions": [
                     {"number": 1, "title": "a", "status": "in-progress"},
                     {"number": 2, "title": "b", "status": "in-progress"},
@@ -148,7 +146,6 @@ class TestInvariants:
     def test_complete_after_open_rejected(self):
         with pytest.raises(SessionStateInvariantError):
             get_progress({
-                "status": "in-progress",
                 "sessions": [
                     {"number": 1, "title": "a", "status": "not-started"},
                     {"number": 2, "title": "b", "status": "complete"},
@@ -157,7 +154,6 @@ class TestInvariants:
 
     def test_between_sessions_is_legal(self):
         view = get_progress({
-            "status": "in-progress",
             "sessions": [
                 {"number": 1, "title": "a", "status": "complete"},
                 {"number": 2, "title": "b", "status": "not-started"},
@@ -179,63 +175,59 @@ class TestStepVocabulary:
         assert step_state(0) == "unknown"
 
 
-class TestProjectionOverCorpus:
-    def _projection(self, slug):
-        return build_projection(CORPUS / slug)
-
-    def test_v4_complete_set(self):
-        p = self._projection("074-dabbler-provider-env-vars")
-        assert p["set"]["status"] == "complete"
-        assert p["set"]["schemaVersionOnDisk"] == 4
+class TestProjection:
+    def test_the_projection_reports_the_repository_not_a_set(self, tmp_path):
+        (tmp_path / "sessions.json").write_text(json.dumps({
+            "schemaVersion": 5,
+            "sessions": [
+                {"number": 1, "title": "One", "status": "complete",
+                 "verificationVerdict": "VERIFIED"},
+                {"number": 2, "title": "Two", "status": "not-started"},
+            ],
+        }), encoding="utf-8")
+        p = build_projection(tmp_path)
+        assert "set" not in p
+        assert p["repository"]["schemaVersionOnDisk"] == 5
+        assert p["repository"]["totalSessions"] == 2
+        assert p["repository"]["sessionsCompleted"] == 1
+        assert p["repository"]["currentSession"] is None
         assert p["sessions"][0]["verificationVerdict"] == "VERIFIED"
 
-    def test_v3_set_normalizes_on_read(self):
-        p = self._projection("028-drift-hotfix-harness-hardening")
-        assert p["set"]["schemaVersionOnDisk"] == 3
-        assert p["set"]["status"] == "complete"
-        assert p["set"]["totalSessions"] == 3
-
-    def test_cancelled_set(self):
-        p = self._projection("040-codex-launch-adapter")
-        assert p["set"]["status"] == "cancelled"
-        assert p["set"]["iconKey"] == "cancelled"
-
-    def test_in_progress_set_with_round_artifacts(self):
-        p = self._projection("113-narrated-video-walkthroughs")
-        assert p["set"]["status"] == "in-progress"
-        # Between sessions: 1-7 complete, 8 not started.
-        assert p["set"]["currentSession"] is None
-        assert p["set"]["sessionsCompleted"] == 7
-
-    def test_title_heal_case(self):
-        p = self._projection("059-extension-activation-and-scaffold-fix")
-        titles = [s["title"] for s in p["sessions"]]
-        assert titles[0] != "Session 1"
-        assert "activation" in titles[0].lower()
-
-    def test_spec_only_folder_infers_not_started(self, tmp_path):
-        (tmp_path / "spec.md").write_text("# X\n", encoding="utf-8")
+    def test_a_cancelled_session_keeps_its_own_icon(self, tmp_path):
+        (tmp_path / "sessions.json").write_text(json.dumps({
+            "schemaVersion": 5,
+            "sessions": [
+                {"number": 1, "title": "One", "status": "complete"},
+                {"number": 2, "title": "Two", "status": "cancelled"},
+            ],
+        }), encoding="utf-8")
         p = build_projection(tmp_path)
-        assert p["set"]["status"] == "not-started"
+        assert p["sessions"][1]["iconKey"] == "cancelled"
 
-    def test_read_session_state_permission_error_propagates(self, tmp_path):
+    def test_an_empty_root_projects_no_sessions(self, tmp_path):
+        p = build_projection(tmp_path)
+        assert p["sessions"] == []
+        assert p["repository"]["totalSessions"] == 0
+
+    def test_read_session_state_returns_none_without_a_usable_file(
+        self, tmp_path
+    ):
         # Only FileNotFound/decode errors mean "no usable state".
         assert read_session_state(tmp_path) is None
-        (tmp_path / "session-state.json").write_text("{not json",
-                                                     encoding="utf-8")
+        (tmp_path / "sessions.json").write_text("{not json",
+                                                encoding="utf-8")
         assert read_session_state(tmp_path) is None
 
 
 class TestProjectionSteps:
     def test_steps_render_for_in_flight_session(self, tmp_path):
-        (tmp_path / "session-state.json").write_text(json.dumps({
-            "schemaVersion": 4, "sessionSetName": tmp_path.name,
-            "status": "in-progress",
+        (tmp_path / "sessions.json").write_text(json.dumps({
+            "schemaVersion": 5,
             "sessions": [{"number": 1, "title": "One",
                           "status": "in-progress"}],
         }), encoding="utf-8")
         (tmp_path / "activity-log.json").write_text(json.dumps({
-            "sessionSetName": tmp_path.name, "entries": [
+            "entries": [
                 {"sessionNumber": 1, "stepNumber": 1, "stepKey": "register",
                  "dateTime": "t", "description": "Register.",
                  "status": "pending", "kind": "plan-step"},
@@ -261,20 +253,19 @@ class TestProjectionSteps:
         assert steps[1]["status"] == "pending"  # the record is never edited
         assert steps[1]["startedAt"] is None
 
-    def test_set_status_is_not_overwritten_by_a_step_row(self, tmp_path):
-        # The set's status and a step row's status are different
+    def test_a_step_row_never_overwrites_the_session_status(self, tmp_path):
+        # A session's status and a step row's status are different
         # vocabularies. An in-flight session whose last row is "pending"
-        # must still project the set as in-progress: "pending" is not a
-        # set status, so a consumer narrowing the payload rejects the
-        # whole projection and falls back to guessing from file presence.
-        (tmp_path / "session-state.json").write_text(json.dumps({
-            "schemaVersion": 4, "sessionSetName": tmp_path.name,
-            "status": "in-progress",
+        # must still project as in-progress: "pending" is not a session
+        # status, so a consumer narrowing the payload would reject the
+        # whole projection and fall back to guessing.
+        (tmp_path / "sessions.json").write_text(json.dumps({
+            "schemaVersion": 5,
             "sessions": [{"number": 1, "title": "One",
                           "status": "in-progress"}],
         }), encoding="utf-8")
         (tmp_path / "activity-log.json").write_text(json.dumps({
-            "sessionSetName": tmp_path.name, "entries": [
+            "entries": [
                 {"sessionNumber": 1, "stepNumber": 1, "stepKey": "work",
                  "dateTime": "t", "description": "Do the work.",
                  "status": "pending", "kind": "plan-step"},
@@ -282,21 +273,20 @@ class TestProjectionSteps:
         }), encoding="utf-8")
         p = build_projection(tmp_path)
         assert p["sessions"][0]["steps"][-1]["status"] == "pending"
-        assert p["set"]["status"] == "in-progress"
-        assert p["set"]["iconKey"] == "in-progress"
+        assert p["sessions"][0]["status"] == "in-progress"
+        assert p["sessions"][0]["iconKey"] == "in-progress"
 
     def test_logged_start_survives_later_status_entries(self, tmp_path):
         # A step logged in-progress and later complete keeps the
         # in-progress entry's time as its start — the latest entry owns
         # the status, the first owns the start.
-        (tmp_path / "session-state.json").write_text(json.dumps({
-            "schemaVersion": 4, "sessionSetName": tmp_path.name,
-            "status": "in-progress",
+        (tmp_path / "sessions.json").write_text(json.dumps({
+            "schemaVersion": 5,
             "sessions": [{"number": 1, "title": "One",
                           "status": "in-progress"}],
         }), encoding="utf-8")
         (tmp_path / "activity-log.json").write_text(json.dumps({
-            "sessionSetName": tmp_path.name, "entries": [
+            "entries": [
                 {"sessionNumber": 1, "stepNumber": 1, "stepKey": "work",
                  "dateTime": "t0", "description": "Do the work.",
                  "status": "pending", "kind": "plan-step"},
@@ -315,14 +305,13 @@ class TestProjectionSteps:
         assert step["startedAt"] == "t1"
 
     def test_paraphrased_key_claims_planned_row_by_number(self, tmp_path):
-        (tmp_path / "session-state.json").write_text(json.dumps({
-            "schemaVersion": 4, "sessionSetName": tmp_path.name,
-            "status": "in-progress",
+        (tmp_path / "sessions.json").write_text(json.dumps({
+            "schemaVersion": 5,
             "sessions": [{"number": 1, "title": "One",
                           "status": "in-progress"}],
         }), encoding="utf-8")
         (tmp_path / "activity-log.json").write_text(json.dumps({
-            "sessionSetName": tmp_path.name, "entries": [
+            "entries": [
                 {"sessionNumber": 1, "stepNumber": 1, "stepKey": "register",
                  "dateTime": "t", "description": "Register.",
                  "status": "pending", "kind": "plan-step"},

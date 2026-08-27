@@ -1,13 +1,12 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "review-run.json (one review run for a change-id)",
-  "description": "The open record of a critique review under .dabbler/runs/<set>/s<N>/critique/<change-id>/review-run.json. Written only by router commands, validated before an atomic replace. change_id is derived from the reviewed tree/diff digest and is never supplied by a caller or chosen by a model. A remediation appends a linked attempt; it never rewrites a prior attempt's evidence, so attempts are append-only and earlier entries are immutable.",
+  "description": "The open record of a critique review under .dabbler/runs/s<N>/critique/<change-id>/review-run.json. Written only by router commands, validated before an atomic replace. change_id is derived from the reviewed tree/diff digest and is never supplied by a caller or chosen by a model. A remediation appends a linked attempt; it never rewrites a prior attempt's evidence, so attempts are append-only and earlier entries are immutable.",
   "type": "object",
   "additionalProperties": false,
   "required": [
     "schema_version",
     "change_id",
-    "set_slug",
     "session_number",
     "attempts",
     "opened_at"
@@ -22,7 +21,6 @@
       "minLength": 7,
       "description": "Digest of the reviewed tree/diff. Structurally unchoosable by a model."
     },
-    "set_slug": { "type": "string", "minLength": 1 },
     "session_number": { "type": "integer", "minimum": 1 },
     "opened_at": { "type": "string", "minLength": 1 },
     "attempts": {

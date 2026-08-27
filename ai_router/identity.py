@@ -191,7 +191,7 @@ def resolve_orchestrator_identity(
 
 
 def resolve_session_orchestrator_identity(
-    set_dir, session_number: Optional[int] = None, *,
+    sessions_dir, session_number: Optional[int] = None, *,
     models_registry: Optional[dict] = None,
 ) -> OrchestratorIdentity:
     """The one session-level path: read state, normalize, pick the session
@@ -200,10 +200,10 @@ def resolve_session_orchestrator_identity(
     :class:`IdentityResolutionError`."""
     from .progress import read_session_state
 
-    state = read_session_state(set_dir)
+    state = read_session_state(sessions_dir)
     if state is None:
         raise IdentityResolutionError(
-            f"no readable session-state.json under {set_dir}"
+            f"no readable session-state.json under {sessions_dir}"
         )
     sessions = state.get("sessions") or []
 
@@ -226,7 +226,7 @@ def resolve_session_orchestrator_identity(
     ) or state.get("orchestrator")
     if not block:
         raise IdentityResolutionError(
-            f"no session under {set_dir} carries an orchestrator block "
+            f"no session under {sessions_dir} carries an orchestrator block "
             f"(session_number={session_number!r}); re-run start_session "
             "with --model, then retry."
         )

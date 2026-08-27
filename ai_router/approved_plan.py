@@ -37,7 +37,7 @@ from typing import Optional
 import jsonschema
 
 from .evidence import hash_bytes
-from .ledger import LIFECYCLE_WRITTEN_SET_FILES, session_run_dir
+from .ledger import LIFECYCLE_WRITTEN_FILES, session_run_dir
 
 _SCHEMA_PATH = Path(__file__).parent / "schemas" / "approved-plan.schema.json"
 _schema_cache: Optional[dict] = None
@@ -88,8 +88,8 @@ def _normalize_path(path: str) -> str:
     return str(path).replace("\\", "/").lstrip("/")
 
 
-def plan_path(repo_root, set_slug: str, session_number: int) -> Path:
-    return session_run_dir(repo_root, set_slug, session_number) / PLAN_FILENAME
+def plan_path(repo_root, session_number: int) -> Path:
+    return session_run_dir(repo_root, session_number) / PLAN_FILENAME
 
 
 def _validate_schema(plan: dict) -> None:
@@ -115,7 +115,7 @@ def _validate_schema(plan: dict) -> None:
 # --- Hashing and immutability -------------------------------------------
 
 _CORE_FIELDS = (
-    "schema_version", "session_set", "session_number", "session_slug",
+    "schema_version", "session_number", "session_slug",
     "steps", "approved",
 )
 _WRITES_LEDGER_FILENAME = "approved-plan-writes.jsonl"
@@ -211,7 +211,7 @@ def _write(run_dir, plan: dict) -> None:
 
 
 def new_plan(
-    session_set: str, session_number: int, session_slug: str, steps: list
+    session_number: int, session_slug: str, steps: list
 ) -> dict:
     """A fresh, unapproved plan -- valid to write repeatedly until
     ``approve_plan`` is called on it. Each step's ``risk_flags`` may be
@@ -219,7 +219,6 @@ def new_plan(
     supervisor does not declare its own risk."""
     return {
         "schema_version": SCHEMA_VERSION,
-        "session_set": session_set,
         "session_number": session_number,
         "session_slug": session_slug,
         "steps": steps,
@@ -401,21 +400,21 @@ def amended_step_ids(plan: dict) -> list:
 
 # --- The envelope, and what falls outside it -----------------------------
 
-def lifecycle_written_paths(session_set_dir, repo_root=None) -> list:
+def lifecycle_written_paths(sessions_dir, repo_root=None) -> list:
     """Repo-relative paths the lifecycle writes for this session set.
 
     A step envelope can never declare these: the lifecycle steps that
     write them -- the router's own registration and logging, and the
     close -- are not plan steps and never enter a plan.
     """
-    set_dir = Path(session_set_dir)
+    sessions_dir = Path(sessions_dir)
     if repo_root is not None:
         try:
-            set_dir = set_dir.resolve().relative_to(Path(repo_root).resolve())
+            sessions_dir = sessions_dir.resolve().relative_to(Path(repo_root).resolve())
         except ValueError:
             pass
-    prefix = _normalize_path(str(set_dir)).rstrip("/")
-    return [f"{prefix}/{name}" for name in LIFECYCLE_WRITTEN_SET_FILES]
+    prefix = _normalize_path(str(sessions_dir)).rstrip("/")
+    return [f"{prefix}/{name}" for name in LIFECYCLE_WRITTEN_FILES]
 
 
 def envelope_paths(plan: dict, step_id=None) -> list:
@@ -484,7 +483,7 @@ REASON_OUTSIDE_ENVELOPE = "outside-envelope"
 REASON_NEW_DEPENDENCY = "new-dependency"
 
 
-def compare_to_envelope(repo_root, plan: dict, session_set_dir,
+def compare_to_envelope(repo_root, plan: dict, sessions_dir,
                         baseline_tree=None, *, step_id=None):
     """Compare the working tree against the plan's approved envelope, or
     against the envelope of the single step *step_id* declares.
@@ -494,7 +493,7 @@ def compare_to_envelope(repo_root, plan: dict, session_set_dir,
     whether a supervisor stayed inside its own plan, because a question
     nobody is asked cannot be answered convincingly and wrongly.
 
-    The files the lifecycle writes for *session_set_dir* are dropped
+    The files the lifecycle writes for *sessions_dir* are dropped
     first. A step envelope cannot declare them -- the lifecycle steps that
     write them never enter a plan -- so counting them would refuse every
     session for doing exactly what the lifecycle told it to.
@@ -510,7 +509,7 @@ def compare_to_envelope(repo_root, plan: dict, session_set_dir,
             ),
         )
     envelope = envelope_paths(plan, step_id)
-    ceremony = set(lifecycle_written_paths(session_set_dir, repo_root))
+    ceremony = set(lifecycle_written_paths(sessions_dir, repo_root))
     inside, outside = [], []
     for path in sorted(changed):
         normalized = _normalize_path(path)

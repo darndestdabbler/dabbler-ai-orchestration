@@ -121,7 +121,7 @@ class TestApiTransport:
     ):
         config_on_disk()
         _mock_api(monkeypatch, lambda req: _google_response("the answer"))
-        result = route("say hi", task_type="formatting", session_set="042-demo")
+        result = route("say hi", task_type="formatting", session_number=3)
 
         assert result.content == "the answer"
         assert result.model_name == "flash"  # roles.generator.prefer[0]
@@ -131,7 +131,7 @@ class TestApiTransport:
 
         rows = load_metrics({"_config_path": str(tmp_path / "router-config.yaml")})
         assert len(rows) == 1
-        assert rows[0]["session_set"] == "042-demo"
+        assert rows[0]["session_number"] == 3
         assert rows[0]["transport"] == "api"
         assert rows[0]["billed_usage_unavailable"] is None
         assert rows[0]["requested_model_id"] == "g-flash"
@@ -211,7 +211,7 @@ class TestCopilotTransport:
         config_on_disk()
         _install_fake_copilot(COPILOT_OK)
 
-        result = route("do a thing", session_set="042-demo")
+        result = route("do a thing", session_number=3)
         assert result.content == "seat answer"
         assert result.transport == "copilot-cli"
         assert result.transport_session_id == "conv-42"

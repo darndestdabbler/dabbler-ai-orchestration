@@ -939,36 +939,34 @@ def format_drift(drift: Drift) -> str:
 
 # --- Refresh never happens inside a session ---------------------------------
 
-def sessions_in_flight(scan_root=None) -> list:
-    """Session sets carrying a session that has started and not closed.
+def sessions_in_flight(sessions_dir=None) -> list:
+    """The sessions that have started and not closed.
 
-    Read from the machine-written state and from nothing else -- the presence
+    Read from the machine-written state and from nothing else — the presence
     of a lock file or a run directory is not the record.
     """
-    from .session import default_scan_root
+    from .evidence import STATE_FILENAME, resolve_sessions_dir
 
-    root = Path(scan_root or default_scan_root())
-    in_flight = []
-    if not root.is_dir():
-        return in_flight
-    for set_dir in sorted(p for p in root.iterdir() if p.is_dir()):
-        state_path = set_dir / "session-state.json"
-        if not state_path.is_file():
-            continue
-        try:
-            state = json.loads(state_path.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            continue
-        sessions = state.get("sessions")
-        numbers = [
-            s.get("number") for s in sessions
-            if isinstance(s, dict) and s.get("status") == "in-progress"
-        ] if isinstance(sessions, list) else []
-        if state.get("currentSession") is not None:
-            numbers.append(state["currentSession"])
-        for number in sorted({n for n in numbers if n is not None}):
-            in_flight.append(f"{set_dir.name} session {number}")
-    return in_flight
+    try:
+        root = Path(sessions_dir or resolve_sessions_dir())
+    except ValueError:
+        return []
+    state_path = root / STATE_FILENAME
+    if not state_path.is_file():
+        return []
+    try:
+        state = json.loads(state_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+    sessions = state.get("sessions")
+    numbers = [
+        s.get("number") for s in sessions
+        if isinstance(s, dict) and s.get("status") == "in-progress"
+    ] if isinstance(sessions, list) else []
+    return [
+        f"session {number}"
+        for number in sorted({n for n in numbers if n is not None})
+    ]
 
 
 # --- CLI --------------------------------------------------------------------

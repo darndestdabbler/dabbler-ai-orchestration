@@ -49,7 +49,9 @@ def proposal(path, content, ticks=3) -> str:
 
 
 class TestScope:
-    def test_scope_is_the_change_its_imports_and_the_set_dir(self, tmp_path):
+    def test_scope_is_the_change_its_imports_and_the_sessions_root(
+        self, tmp_path
+    ):
         repo = tmp_path / "repo"
         (repo / "pkg").mkdir(parents=True)
         (repo / "pkg" / "__init__.py").write_text("", encoding="utf-8")
@@ -60,17 +62,17 @@ class TestScope:
             "from pkg.helper import X\nfrom . import sibling\n",
             encoding="utf-8",
         )
-        set_dir = repo / "docs" / "sets" / "010-demo"
-        set_dir.mkdir(parents=True)
+        sessions_dir = repo / "docs" / "sessions"
+        sessions_dir.mkdir(parents=True)
 
-        scope = agency.session_scope(repo, set_dir, ["pkg/changed.py"])
+        scope = agency.session_scope(repo, sessions_dir, ["pkg/changed.py"])
 
         assert "pkg/changed.py" in scope
         assert "pkg/helper.py" in scope          # declared by its import
         # `from . import sibling` names a module, not the package: the part
         # before `import` is empty and the dependency is only in the names.
         assert "pkg/sibling.py" in scope
-        assert "docs/sets/010-demo" in scope     # the spec it is judged against
+        assert "docs/sessions" in scope   # the plan it is judged against
         # Not the repository: a file nothing changed and nothing imports.
         assert "pkg/other.py" not in scope
 
@@ -259,12 +261,12 @@ class TestRoundRecord:
     ):
         import importlib
 
-        repo, set_dir = sandbox_repo
-        register_session_start(set_dir, 1, engine="claude-code",
+        repo, sessions_dir = sandbox_repo
+        register_session_start(sessions_dir, 1, engine="claude-code",
                                provider="anthropic")
         (repo / "widget.py").write_text("def f(xs): return 1/len(xs)\n",
                                         encoding="utf-8")
-        record_preverify(repo, set_dir)
+        record_preverify(repo, sessions_dir)
 
         def fake_route(content, **kwargs):
             fake_route.prompt = content
@@ -280,9 +282,9 @@ class TestRoundRecord:
         monkeypatch.setattr(
             importlib.import_module("ai_router.route"), "route", fake_route
         )
-        assert run_round(set_dir) == EXIT_OK
+        assert run_round(sessions_dir) == EXIT_OK
 
-        recorded = ledger.read_rounds(repo, set_dir.name, 1)[0]["agency"]
+        recorded = ledger.read_rounds(repo, 1)[0]["agency"]
         assert recorded["mode"] == agency.MODE_TOOLS
         assert recorded["reads"] == 1
         assert recorded["searches"] == 1
@@ -459,12 +461,12 @@ class TestTheWrite:
     ):
         import importlib
 
-        repo, set_dir = sandbox_repo
-        register_session_start(set_dir, 1, engine="claude-code",
+        repo, sessions_dir = sandbox_repo
+        register_session_start(sessions_dir, 1, engine="claude-code",
                                provider="anthropic")
         (repo / "widget.py").write_text("def f(xs): return 1/len(xs)\n",
                                         encoding="utf-8")
-        record_preverify(repo, set_dir)
+        record_preverify(repo, sessions_dir)
 
         def fake_route(content, **kwargs):
             return make_result(
@@ -478,9 +480,9 @@ class TestTheWrite:
         monkeypatch.setattr(
             importlib.import_module("ai_router.route"), "route", fake_route
         )
-        assert run_round(set_dir) == EXIT_OK
+        assert run_round(sessions_dir) == EXIT_OK
 
-        recorded = ledger.read_rounds(repo, set_dir.name, 1)[0]["agency"]
+        recorded = ledger.read_rounds(repo, 1)[0]["agency"]
         assert recorded["writes_applied"] == 0
         assert recorded["writes_refused"] == 1
         assert recorded["writes"][0]["path"] == "tests/test_widget.py"
@@ -488,6 +490,6 @@ class TestTheWrite:
         assert not (repo / "tests" / "test_widget.py").exists()
         # And the operator sees it without opening the ledger.
         assert "1 write(s) refused" in (
-            set_dir / "change-log.md"
+            sessions_dir / "change-log.md"
         ).read_text(encoding="utf-8")
 

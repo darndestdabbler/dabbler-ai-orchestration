@@ -1,8 +1,9 @@
 import * as assert from "assert";
 import {
+  CancellableSession,
   CancelLifecycleUi,
-  runCancelSessionSetFlow,
-  runRestoreSessionSetFlow,
+  runCancelSessionFlow,
+  runRestoreSessionFlow,
 } from "../../commands/cancelLifecycleCommands";
 import { NewModuleUi, runNewModuleFlow } from "../../commands/newModule";
 import {
@@ -60,18 +61,28 @@ function cancelUi(overrides: Partial<CancelLifecycleUi> = {}): {
   return { ui, errors, infos };
 }
 
+const CANCELLABLE: CancellableSession = {
+  root: "D:\\ws",
+  number: 3,
+  name: "Third things",
+};
+
 suite("cancel/restore flows", () => {
-  test("cancel runs the CLI and reports the audit file on success", async () => {
+  test("cancel runs the CLI and names the session on success", async () => {
     const { ui, infos, errors } = cancelUi();
-    const refreshed = await runCancelSessionSetFlow(makeSet(), ui, fakeCliDeps(0));
+    const refreshed = await runCancelSessionFlow(
+      CANCELLABLE,
+      ui,
+      fakeCliDeps(0),
+    );
     assert.strictEqual(refreshed, true);
     assert.strictEqual(errors.length, 0);
-    assert.ok(infos[0].includes("CANCELLED.md"));
+    assert.ok(infos[0].includes("session 3"));
   });
 
   test("dismissing the confirm aborts without running anything", async () => {
     const { ui } = cancelUi({ confirm: async () => undefined });
-    const refreshed = await runCancelSessionSetFlow(makeSet(), ui, {
+    const refreshed = await runCancelSessionFlow(CANCELLABLE, ui, {
       spawn: (() => {
         throw new Error("must not spawn");
       }) as never,
@@ -81,8 +92,8 @@ suite("cancel/restore flows", () => {
 
   test("a CLI refusal surfaces as an error and does not refresh", async () => {
     const { ui, errors } = cancelUi();
-    const refreshed = await runCancelSessionSetFlow(
-      makeSet(),
+    const refreshed = await runCancelSessionFlow(
+      CANCELLABLE,
       ui,
       fakeCliDeps(3, "a session is in flight"),
     );
@@ -90,15 +101,15 @@ suite("cancel/restore flows", () => {
     assert.ok(errors[0].includes("refused"));
   });
 
-  test("restore reports the preserved history file", async () => {
+  test("restore names the session it returned", async () => {
     const { ui, infos } = cancelUi({ confirm: async () => "Restore" });
-    const refreshed = await runRestoreSessionSetFlow(
-      makeSet({ state: "cancelled" }),
+    const refreshed = await runRestoreSessionFlow(
+      CANCELLABLE,
       ui,
       fakeCliDeps(0),
     );
     assert.strictEqual(refreshed, true);
-    assert.ok(infos[0].includes("RESTORED.md"));
+    assert.ok(infos[0].includes("session 3"));
   });
 });
 

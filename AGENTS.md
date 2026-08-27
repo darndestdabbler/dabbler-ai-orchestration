@@ -110,23 +110,25 @@ original numbers.
 ## Your role
 
 You are the **orchestrator** for `dabbler-ai-orchestration`, running AI-led work one
-session at a time under the Dabbler session-set workflow. You do the
-mechanics (file edits, shell, git) and follow the per-session plan in the
-active set's `spec.md`.
+session at a time under the Dabbler session workflow. You do the mechanics
+(file edits, shell, git) and follow the per-session plan in
+`docs/sessions/session-plan.md`.
 
 ## The session lifecycle
 
-1. **Resolve the active session set.** The active set is the single
-   directory `docs/session-sets/<NNN-slug>/` whose `session-state.json`
-   has `status: "in-progress"`. There must be at most one. If none is
-   in-progress, the next set to start is the `not-started` set with the
-   lowest `NNN-` prefix; `complete` and `cancelled` sets are skipped.
-   Never infer state from file presence; read the `status` field. Two
-   in-progress sets is a drift error — stop and surface it.
+Sessions are numbered directly in this repository, under one sessions root
+(`docs/sessions/`), so no command takes a handle to one.
+
+1. **Resolve the session to run.** The session in flight is the single
+   entry in `docs/sessions/sessions.json` whose `status` is
+   `"in-progress"`; there is at most one. If none is in flight, the next
+   is the lowest-numbered `not-started` one; `complete` and `cancelled`
+   are skipped. Never infer state from file presence; read the `status`
+   field. Two in flight is a drift error — stop and surface it.
 
 2. **Register the session (state first, work second).**
 
-       python -m ai_router.session start --session-set-dir docs/session-sets/<slug> \
+       python -m ai_router.session start \
            --engine <claude-code|codex|gemini|copilot> --provider <anthropic|openai|google>
 
    Copilot seats must also pass `--model` (the seat label is not trusted;
@@ -135,7 +137,7 @@ active set's `spec.md`.
 
    **Then declare the task list, before you edit anything.**
 
-       python -m ai_router.session declare --session-set-dir <dir> \
+       python -m ai_router.session declare \
            --task-file <path> --releasable|--not-releasable
 
    The declaration says what this session will do and whether it produces a
@@ -145,22 +147,21 @@ active set's `spec.md`.
    hindsight what may be published. Step 8 reads it and fails closed: an
    undeclared session cannot publish.
 
-3. **Do the work.** Follow the active spec's step list for the current
+3. **Do the work.** Follow the session plan's step list for the current
    session. Log progress and make the edits. Do NOT commit yet —
    verification reviews the working tree, and an already-committed tree
    presents an empty diff.
 
 4. **Run the tests this change makes necessary — only those.**
 
-       python -m ai_router.affected --session-set-dir <dir>
+       python -m ai_router.affected
 
    prints the selected tests, the reason each was selected, and the exact
-   command to run. Pass `--session-set-dir`: once a verification round
-   exists, selection is measured against that round's snapshot, so a
-   remediation runs what the fix touched instead of re-running what the
-   session touched. Run the printed command, then record it:
+   command to run. Once a verification round exists, selection is measured
+   against that round's snapshot, so a remediation runs what the fix
+   touched rather than what the session touched. Run it, then record it:
 
-       python -m ai_router.test_evidence record --session-set-dir <dir> \
+       python -m ai_router.test_evidence record \
            --suite <name> --stage preverify-targeted \
            --command "<the command you ran>" --outcome passed \
            --duration-seconds <elapsed>
@@ -174,7 +175,7 @@ active set's `spec.md`.
 
 5. **Run cross-provider verification (mandatory — there is no skip).**
 
-       python -m ai_router.verify --session-set-dir docs/session-sets/<slug>
+       python -m ai_router.verify
 
    The verifier is a different provider than you, on either transport.
    Round outcomes land in `.dabbler/runs/` (machine-written; never edit).
@@ -187,7 +188,7 @@ active set's `spec.md`.
    declares under `testing.suites` in `router-config.yaml` — the same one
    `--suite <name>` names here:
 
-       python -m ai_router.test_evidence record --session-set-dir <dir> \
+       python -m ai_router.test_evidence record \
            --suite <name> --stage final-full --outcome passed \
            --duration-seconds <elapsed>
 
@@ -202,7 +203,7 @@ active set's `spec.md`.
 
 8. **Package — only if step 2 declared this session releasable.**
 
-       python -m ai_router.packaging --session-set-dir docs/session-sets/<slug>
+       python -m ai_router.packaging
 
    Packs, then pushes to the declared feed. It refuses an undeclared or
    not-releasable session, refuses a repository that declares no
@@ -213,7 +214,7 @@ active set's `spec.md`.
 
 9. **Close via the gate.**
 
-       python -m ai_router.session close --session-set-dir docs/session-sets/<slug>
+       python -m ai_router.session close
 
    Five gates run (verification clean, tree clean, pushed, tests fresh,
    verdict vocabulary); use `--dry-run` any time to preview the rows.
@@ -221,7 +222,8 @@ active set's `spec.md`.
 
 ## Hard rules
 
-- State files (`session-state.json`) and everything under `.dabbler/runs/`
+- State files (`docs/sessions/sessions.json`) and everything under
+  `.dabbler/runs/`
   are written by the router only — never by hand, never "fixed up".
 - Verification verdicts come from the verifier. A verdict token you did
   not receive from `ai_router.verify` does not exist.

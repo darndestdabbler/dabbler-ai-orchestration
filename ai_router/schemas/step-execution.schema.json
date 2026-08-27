@@ -1,12 +1,11 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "step-execution.jsonl (one row per step opened and one per step closed)",
-  "description": "The machine-owned execution record for one session's approved-plan steps, under .dabbler/runs/<set>/s<N>/step-execution.jsonl. Appended only by ai_router.verify. A step is in flight or it is not, and this file is what says which: the last 'opened' row with no 'closed' row after it is the open step, and there is never more than one. A row that fails validation on read is a refusal, not a skip -- an unreadable execution record means the framework cannot tell what is open, and guessing is how work escapes a plan.",
+  "description": "The machine-owned execution record for one session's approved-plan steps, under .dabbler/runs/s<N>/step-execution.jsonl. Appended only by ai_router.verify. A step is in flight or it is not, and this file is what says which: the last 'opened' row with no 'closed' row after it is the open step, and there is never more than one. A row that fails validation on read is a refusal, not a skip -- an unreadable execution record means the framework cannot tell what is open, and guessing is how work escapes a plan.",
   "type": "object",
   "additionalProperties": false,
   "required": [
-    "schema_version", "event", "recorded_at", "set_slug", "session_number",
-    "step_id"
+    "schema_version", "event", "recorded_at", "session_number", "step_id"
   ],
   "properties": {
     "schema_version": {
@@ -18,7 +17,6 @@
       "description": "Two words, and no third: a step that was neither opened nor closed did not happen."
     },
     "recorded_at": { "type": "string", "minLength": 1 },
-    "set_slug": { "type": "string", "minLength": 1 },
     "session_number": { "type": "integer", "minimum": 1 },
     "step_id": {
       "type": "string",

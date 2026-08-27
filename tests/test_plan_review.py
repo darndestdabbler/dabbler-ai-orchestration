@@ -42,7 +42,7 @@ def _step(step_id, envelope, kinds=("deterministic",), intent="Do it."):
 
 
 def _plan(steps):
-    return new_plan("144-x", 1, "build-the-thing", steps)
+    return new_plan(1, "build-the-thing", steps)
 
 
 def _clean_plan():
@@ -69,7 +69,7 @@ class _Result:
 
 
 def _recorder(content, roles_seen):
-    def dispatch(prompt, *, role, session_set, session_number, transport):
+    def dispatch(prompt, *, role, session_number, transport):
         roles_seen.append(role)
         return _Result(content)
     return dispatch
@@ -328,7 +328,7 @@ class TestAmendments:
         self._approved(tmp_path)
         prompts = []
 
-        def dispatch(prompt, *, role, session_set, session_number, transport):
+        def dispatch(prompt, *, role, session_number, transport):
             prompts.append(prompt)
             return _Result(_approve_all("add-widget"))
 

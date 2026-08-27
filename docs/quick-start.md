@@ -45,16 +45,14 @@ and says so rather than landing nowhere. An existing preference is never
 overridden. Force it either way with `--transport api|copilot-cli`, or
 leave it untouched with `--no-transport-detect`.
 
-Into a project with no session sets yet, it also scaffolds the two
-bootstrap sets — `001-default-plan` and `002-default-decomposition` —
-as ordinary spec-only sets. Tell your AI agent to **"start the next
-session"**: the plan set authors (or imports)
+Into a project with no session plan yet, it also scaffolds the two setup
+sessions into `docs/sessions/session-plan.md`. Tell your AI agent to
+**"start the next session"**: session 1 authors (or imports)
 `docs/planning/project-plan.md` through the normal tracked pipeline
-(register → work → cross-provider verification → close), and the
-decomposition set then turns the plan into work sets
-(`docs/session-sets/<NNN-slug>/spec.md`, numbered from 003). Do not
-hand-author `session-state.json` — the first session start creates it
-from the spec.
+(register → work → cross-provider verification → close), and session 2
+breaks that plan into the numbered sessions the rest of the repository
+runs. Do not hand-author `sessions.json` — the first session start creates
+it from the plan.
 
 Prefer the untracked route? The same prompts are available loose:
 
@@ -66,14 +64,15 @@ python -m ai_router.bootstrap --print-decomposition-prompt
 ## 2. Start a session
 
 ```
-python -m ai_router.session start --session-set-dir docs/session-sets/<set> --engine <engine>
+python -m ai_router.session start --engine <engine>
 ```
 
-`--session-set-dir` accepts a directory, a slug, or a bare set number.
+No command names a sessions root: there is one per repository and it is
+derived from the working directory.
 `--engine` is required (e.g. `claude-code`, `codex`, `copilot`,
 `gemini`); `--provider`, `--model`, and `--effort` record the seat
 identity (Copilot seats must pass `--model` — the seat label is not
-trusted). The start registers the session in `session-state.json` and
+trusted). The start registers the session in `sessions.json` and
 seeds the spec's step list into `activity-log.json` once. It is
 idempotent — safe to re-run after a context reset. It refuses to start
 a session that is already in flight, re-open a completed one, or skip
@@ -89,7 +88,7 @@ empty diff.
 Log each step against the rows the start seeded:
 
 ```
-python -m ai_router.session log --session-set-dir docs/session-sets/<set> \
+python -m ai_router.session log \
     --step <stepKey|stepNumber> --status <pending|in-progress|complete|blocked>
 ```
 
@@ -110,9 +109,9 @@ through the framework rather than freehand. One step is in flight at a
 time:
 
 ```
-python -m ai_router.verify step open   --session-set-dir docs/session-sets/<set> --step <step_id>
-python -m ai_router.verify step status --session-set-dir docs/session-sets/<set>
-python -m ai_router.verify step close  --session-set-dir docs/session-sets/<set>
+python -m ai_router.verify step open   --step <step_id>
+python -m ai_router.verify step status
+python -m ai_router.verify step close 
 ```
 
 `open` anchors the step to the current `HEAD` and prints the paths it may
@@ -128,7 +127,7 @@ model is paid anything:
    earns:
 
    ```
-   python -m ai_router.verify step amend --session-set-dir docs/session-sets/<set> \
+   python -m ai_router.verify step amend \
        --add-file <path> --reason "<why the declared envelope was wrong>"
    ```
 
@@ -157,7 +156,7 @@ close.
 
 ## 4. Verify (mandatory, before commit)
 ```
-python -m ai_router.verify --session-set-dir docs/session-sets/<set>
+python -m ai_router.verify
 ```
 
 - **Round 1** sends the full evidence: spec excerpt, `git status`, the
@@ -188,7 +187,7 @@ rung's exact command:
    verifier must UPHOLD it with reasons or WITHDRAW it.
 
    ```
-   python -m ai_router.verify dispute --session-set-dir <set> \
+   python -m ai_router.verify dispute \
        --round <R> --finding <F> --grounds "..." --evidence <path>
    ```
 
@@ -202,7 +201,7 @@ rung's exact command:
    after it.
 
    ```
-   python -m ai_router.verify adjudicate --session-set-dir <set>
+   python -m ai_router.verify adjudicate
    ```
 
 There is no third rung, and no waiver: no verdict a person can type
@@ -224,14 +223,14 @@ the repair rather than the complaint.
 Then record the test run of record and commit/push the verified work:
 
 ```
-python -m ai_router.test_evidence record --session-set-dir docs/session-sets/<set> \
+python -m ai_router.test_evidence record \
     --suite <name> --outcome passed --duration-seconds <elapsed>
 ```
 
 ## 5. Close
 
 ```
-python -m ai_router.session close --session-set-dir docs/session-sets/<set>
+python -m ai_router.session close
 ```
 
 Five gates run: verification clean (reads the round ledger),
@@ -240,7 +239,7 @@ vocabulary. All pass → the session (and, on the last session, the set)
 flips state, and the close commits and pushes its bookkeeping.
 
 ```
-python -m ai_router.session close --session-set-dir <set> --dry-run
+python -m ai_router.session close --dry-run
 ```
 
 previews the gate rows read-only at any time. `--force` bypasses
@@ -349,7 +348,7 @@ invocation that resolves it.
 
 Install the extension VSIX
 (`code --install-extension dabbler-ai-orchestration-1.0.0.vsix`). The
-AI Work Explorer view lists every set under `docs/session-sets/` with
+AI Work Explorer view lists every session under `docs/sessions/` with
 its sessions and, for the in-flight session, its step rows. The tree
 is a pure renderer of
 

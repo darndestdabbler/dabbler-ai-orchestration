@@ -60,12 +60,12 @@ def test_the_four_documents_are_generated(run_repo, run_config):
     _edit(run_repo)
     cli("finish", "--run", started["run_id"])
 
-    set_dir = run_repo / "docs" / "session-sets" / "001-default"
-    state = json.loads((set_dir / "session-state.json").read_text(encoding="utf-8"))
+    sessions_dir = run_repo / "docs" / "session-sets" / "001-default"
+    state = json.loads((sessions_dir / "session-state.json").read_text(encoding="utf-8"))
     assert state["schemaVersion"] == 5
     assert state["sessions"][0]["status"] == "complete"
-    assert (set_dir / "activity-log.json").is_file()
-    assert started["run_id"] in (set_dir / "change-log.md").read_text(encoding="utf-8")
+    assert (sessions_dir / "activity-log.json").is_file()
+    assert started["run_id"] in (sessions_dir / "change-log.md").read_text(encoding="utf-8")
 
 
 def test_the_journal_replays_to_a_byte_identical_projection(run_repo, run_config):

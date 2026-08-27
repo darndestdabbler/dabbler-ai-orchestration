@@ -638,7 +638,7 @@ def _append_round(run_dir, record: dict) -> dict:
     return record
 
 
-def _default_dispatch(prompt: str, *, role: str, session_set, session_number,
+def _default_dispatch(prompt: str, *, role: str, session_number,
                       transport):
     from .route import route
 
@@ -646,7 +646,6 @@ def _default_dispatch(prompt: str, *, role: str, session_set, session_number,
         prompt,
         task_type="plan-review",
         role=role,
-        session_set=session_set,
         session_number=session_number,
         transport=transport,
     )
@@ -654,7 +653,7 @@ def _default_dispatch(prompt: str, *, role: str, session_set, session_number,
 
 def review_round(
     run_dir, plan: dict, spec_text: str, session_number: int, *,
-    workspace_root=None, session_set=None, dispatch=None, transport=None,
+    workspace_root=None, dispatch=None, transport=None,
     only_steps=None,
 ) -> dict:
     """Review the plan once and record the round.
@@ -715,7 +714,7 @@ def review_round(
     prompt = build_review_prompt(plan, goals, only_steps=scope)
     caller = dispatch or _default_dispatch
     result = caller(
-        prompt, role=role, session_set=session_set,
+        prompt, role=role,
         session_number=session_number, transport=transport,
     )
 
@@ -755,7 +754,7 @@ def review_round(
 def review_amendment(
     run_dir, spec_text: str, session_number: int, *, step_id: str,
     reason: str, added_files=None, evidence_contract=None,
-    workspace_root=None, session_set=None, dispatch=None, transport=None,
+    workspace_root=None, dispatch=None, transport=None,
 ) -> tuple:
     """Put one proposed amendment through the same checks the plan passed,
     scoped to the step it changes, and append it only if they approve.
@@ -798,7 +797,7 @@ def review_amendment(
 
     record = review_round(
         run_dir, candidate, spec_text, session_number,
-        workspace_root=workspace_root, session_set=session_set,
+        workspace_root=workspace_root,
         dispatch=dispatch, transport=transport, only_steps=[step_id],
     )
     if record.get("outcome") != OUTCOME_APPROVED:

@@ -44,16 +44,6 @@ def _metrics_enabled(config: dict) -> bool:
     return bool((config.get("metrics", {}) or {}).get("enabled", True))
 
 
-def _session_set_name(session_set) -> Optional[str]:
-    """Normalize a session-set identifier (slug, relative path, or absolute
-    path) to the bare folder name, so per-set aggregation has one key and
-    machine paths never leak into the log."""
-    if not session_set:
-        return None
-    name = str(session_set).replace("\\", "/").rstrip("/").rsplit("/", 1)[-1]
-    return name or None
-
-
 def record_call(
     config: dict,
     *,
@@ -67,7 +57,6 @@ def record_call(
     elapsed_seconds: float,
     escalated: bool,
     stop_reason: str,
-    session_set: Optional[str] = None,
     session_number: Optional[int] = None,
     requested_model_id: Optional[str] = None,
     served_model_id: Optional[str] = None,
@@ -103,7 +92,6 @@ def record_call(
 
     record = {
         "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
-        "session_set": _session_set_name(session_set),
         "session_number": session_number,
         "call_type": call_type,
         "task_type": task_type,
@@ -244,16 +232,17 @@ def print_metrics_report(config: dict) -> None:
     for t, rows in sorted(by_task.items(), key=lambda kv: -_tokens(kv[1])):
         print(f"  {t:<24} {len(rows):>6} {_tokens(rows):>12,}")
 
-    sets: dict[str, list] = {}
+    sessions: dict[int, list] = {}
     for r in records:
-        ss = _session_set_name(r.get("session_set"))
-        if ss:
-            sets.setdefault(ss, []).append(r)
-    if sets:
-        print("\n--- By session set ---")
-        print(f"  {'session_set':<40} {'calls':>6} {'tokens':>12}")
-        for ss, rows in sorted(sets.items()):
-            print(f"  {ss:<40} {len(rows):>6} {_tokens(rows):>12,}")
+        number = r.get("session_number")
+        if isinstance(number, int):
+            sessions.setdefault(number, []).append(r)
+    if sessions:
+        print("\n--- By session ---")
+        print(f"  {'session':<40} {'calls':>6} {'tokens':>12}")
+        for number, rows in sorted(sessions.items()):
+            label = f"session {number}"
+            print(f"  {label:<40} {len(rows):>6} {_tokens(rows):>12,}")
 
     print("=" * 68 + "\n")
 

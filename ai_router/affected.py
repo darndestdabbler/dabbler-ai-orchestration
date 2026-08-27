@@ -342,7 +342,7 @@ def select_tests(repo_root, changed_paths, selection: SelectionConfig):
 
 # --- The pre-verification policy ---------------------------------------------
 
-def preverify_baseline(repo_root, session_set_dir):
+def preverify_baseline(repo_root, sessions_dir):
     """The tree a pre-verification run is judged against.
 
     Before the first round that is ``HEAD``: all of the session's work is
@@ -354,12 +354,12 @@ def preverify_baseline(repo_root, session_set_dir):
     from . import ledger
     from .progress import read_session_state
 
-    state = read_session_state(Path(session_set_dir))
+    state = read_session_state(Path(sessions_dir))
     current = (state or {}).get("currentSession")
     if current is None:
         return None
     rounds = ledger.read_rounds(
-        repo_root, Path(session_set_dir).name, current
+        repo_root, current
     )
     for row in reversed(rounds):
         if row.get("completion_tree"):
@@ -448,41 +448,41 @@ def targeted_command(base: str, result: SelectionResult) -> str:
 RECORD_PLACEHOLDER = "<the command you ran>"
 
 
-def record_command(session_set_dir, suite: str, command: str = "") -> str:
+def record_command(sessions_dir, suite: str, command: str = "") -> str:
     """The one rendering of the record line. Every message that asks for
     pre-verification evidence prints this, so a caller cannot invent a
     variant that names a flag the CLI does not take."""
     return (
-        f"python -m ai_router.test_evidence record --session-set-dir "
-        f"{session_set_dir} --suite {suite or '<name>'} "
+        f"python -m ai_router.test_evidence record --sessions-dir "
+        f"{sessions_dir} --suite {suite or '<name>'} "
         f"--stage preverify-targeted "
         f"--command \"{command or RECORD_PLACEHOLDER}\" --outcome passed "
         "--duration-seconds <elapsed>"
     )
 
 
-def preverify_recipe(session_set_dir, suite: str, command: str) -> str:
+def preverify_recipe(sessions_dir, suite: str, command: str) -> str:
     """Run the selected tests, then record that run. Both lines or neither:
     a message that named the run without the record would leave the caller
     one refusal short of where it thought it was."""
     return (
         "Run the affected tests, then record that command:\n"
         f"  {command}\n"
-        f"  {record_command(session_set_dir, suite, command)}"
+        f"  {record_command(sessions_dir, suite, command)}"
     )
 
 
-def remediation_recipe(session_set_dir, suite: str = "") -> str:
+def remediation_recipe(sessions_dir, suite: str = "") -> str:
     """What a fix must do before another round opens. The selector answers
     again rather than being quoted from the last round: a fix moves the
     surfaces, so the tests it now affects are not the tests the session
     affected."""
     return (
         "Prove the fix before the next round:\n"
-        f"  python -m ai_router.affected --session-set-dir {session_set_dir}\n"
+        f"  python -m ai_router.affected --sessions-dir {sessions_dir}\n"
         "  <run the command it prints>\n"
-        f"  {record_command(session_set_dir, suite)}\n"
-        f"  python -m ai_router.verify --session-set-dir {session_set_dir}"
+        f"  {record_command(sessions_dir, suite)}\n"
+        f"  python -m ai_router.verify --sessions-dir {sessions_dir}"
     )
 
 
@@ -552,7 +552,7 @@ def classify_preverify_command(
     )
 
 
-def preverify_gate(repo_root, session_set_dir, config) -> PreverifyGate:
+def preverify_gate(repo_root, sessions_dir, config) -> PreverifyGate:
     """Whether valid targeted selection evidence exists for the tree as it
     now stands.
 
@@ -577,7 +577,7 @@ def preverify_gate(repo_root, session_set_dir, config) -> PreverifyGate:
             "testing.selection is malformed: " + "; ".join(selection.errors),
         )
     changed = working_tree_changes(
-        repo_root, preverify_baseline(repo_root, session_set_dir)
+        repo_root, preverify_baseline(repo_root, sessions_dir)
     )
     if changed is None:
         return PreverifyGate(
@@ -606,11 +606,11 @@ def preverify_gate(repo_root, session_set_dir, config) -> PreverifyGate:
         # for. Demanding a record here is what would put the full suite in
         # front of verification on the most ordinary change there is.
         return PreverifyGate(True)
-    records = read_records(repo_root, Path(session_set_dir).name)
+    records = read_records(repo_root)
     accepted = []
     for suite in expensive:
         current = surface_digest(
-            repo_root, suite.covers, session_set_dir=session_set_dir,
+            repo_root, suite.covers, sessions_dir=sessions_dir,
         )
         if current is None:
             return PreverifyGate(
@@ -669,7 +669,7 @@ def main(argv=None) -> int:
     import sys
 
     from .config import load_config
-    from .evidence import repo_root_for
+    from .evidence import repo_root_for, resolve_sessions_dir
 
     parser = argparse.ArgumentParser(
         prog="python -m ai_router.affected",
@@ -677,12 +677,9 @@ def main(argv=None) -> int:
     )
     parser.add_argument("--json", action="store_true")
     parser.add_argument(
-        "--session-set-dir",
-        help=(
-            "scope the selection the way verification will: once a round "
-            "exists, a remediation is measured against that round's "
-            "snapshot rather than HEAD"
-        ),
+        "--sessions-dir",
+        help="the repository's sessions root; derived from the working "
+             "directory when omitted",
     )
     args = parser.parse_args(argv)
 
@@ -699,9 +696,11 @@ def main(argv=None) -> int:
             file=sys.stderr,
         )
         return 2
-    baseline = (
-        preverify_baseline(repo_root, args.session_set_dir)
-        if args.session_set_dir else None
+    # Selection is scoped the way verification will scope it: once a round
+    # exists, a remediation is measured against that round's snapshot
+    # rather than HEAD.
+    baseline = preverify_baseline(
+        repo_root, resolve_sessions_dir(args.sessions_dir, repo_root)
     )
     changed = working_tree_changes(repo_root, baseline)
     if changed is None:
@@ -716,11 +715,7 @@ def main(argv=None) -> int:
     # Which baseline produced this, always: a selection measured against
     # HEAD and one measured against the last round look identical as a list
     # of files, and only one of them is what verification will require.
-    print(
-        f"scope: {'the last round' if baseline else 'HEAD'}"
-        + ("" if args.session_set_dir else
-           " (pass --session-set-dir to scope a remediation to its fix)")
-    )
+    print(f"scope: {'the last round' if baseline else 'HEAD'}")
     # The runner is whatever the repository declared, never this module's
     # guess: a printed command an orchestrator cannot paste teaches it to
     # improvise one.

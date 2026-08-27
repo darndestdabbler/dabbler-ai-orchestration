@@ -19,7 +19,7 @@ Components:
 ## How a session runs
 
 1. `python -m ai_router.session start` registers the session in
-   `session-state.json` and seeds the spec's step plan into
+   `sessions.json` and seeds the plan's step list into
    `activity-log.json`, once.
 2. The orchestrating AI (Claude Code, Codex, Copilot, Gemini — any engine
    that reads `AGENTS.md` or the `CLAUDE.md`/`GEMINI.md` that import it)
@@ -60,13 +60,13 @@ code --install-extension dabbler-ai-orchestration-1.0.0.vsix
 
 ## The per-set artifacts
 
-Each session set lives at `docs/session-sets/<NNN-slug>/` in the
+The repository's sessions live under `docs/sessions/` in the
 consumer project and carries exactly four artifacts:
 
 | Artifact | Written by | Purpose |
 |---|---|---|
 | `spec.md` | decomposition session (human-reviewed) | the plan: sessions and their steps |
-| `session-state.json` | `ai_router` only | lifecycle state, schema v4 (v3 read-tolerated) |
+| `sessions.json` | `ai_router` only | the numbered session ledger, schema v5 |
 | `activity-log.json` | `ai_router` only | per-step progress log |
 | `change-log.md` | `ai_router` (appends) | human-readable summary blocks per session |
 
@@ -210,7 +210,7 @@ print(result.model_name, result.input_tokens, result.output_tokens)
 ```
 
 `python -m ai_router.metrics` prints the token report (per model, per task
-type, per session set). Seat rows name the conversation id that prices
+type, per session). Seat rows name the conversation id that prices
 them; no row is presented as a dollar figure.
 
 ## Layout

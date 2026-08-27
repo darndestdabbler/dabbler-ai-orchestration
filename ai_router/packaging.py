@@ -406,14 +406,14 @@ def run_step(
 
 # --- The output directory ----------------------------------------------------
 
-def prepare_output_dir(repo_root, set_slug: str, session_number: int) -> Path:
+def prepare_output_dir(repo_root, session_number: int) -> Path:
     """An empty directory of this run's own, replacing whatever was there.
 
     Replacing rather than reusing is the whole guarantee: everything found
     in it afterwards was built by the command that just ran, so no stale
     artifact can be swept into a push.
     """
-    target = package_output_dir(repo_root, set_slug, session_number)
+    target = package_output_dir(repo_root, session_number)
     if target.exists():
         shutil.rmtree(target)
     target.mkdir(parents=True, exist_ok=True)
@@ -432,14 +432,14 @@ def artifacts_in(output_dir) -> tuple:
 
 # --- The run -----------------------------------------------------------------
 
-def _current_session(set_dir) -> Optional[int]:
-    state = read_session_state(set_dir)
+def _current_session(sessions_dir) -> Optional[int]:
+    state = read_session_state(sessions_dir)
     if not state:
         return None
     return state.get("currentSession")
 
 
-def _gate_rows(set_dir) -> tuple:
+def _gate_rows(sessions_dir) -> tuple:
     """The close gates, asked exactly as the close asks them.
 
     No config is passed, because the close passes none: the gates resolve
@@ -453,7 +453,7 @@ def _gate_rows(set_dir) -> tuple:
             "passed": result.passed,
             "remediation": result.remediation,
         }
-        for result in run_gates(set_dir)
+        for result in run_gates(sessions_dir)
     )
 
 
@@ -465,7 +465,7 @@ def _refusal(session_number, releasable, reason, gates=()) -> PackagingRun:
     )
 
 
-def package(set_dir, *, config=None, dry_run: bool = False) -> PackagingRun:
+def package(sessions_dir, *, config=None, dry_run: bool = False) -> PackagingRun:
     """Run step (f) for the session in flight, or refuse and say why.
 
     The refusals are ordered by what they cost to discover. Releasability is
@@ -473,13 +473,13 @@ def package(set_dir, *, config=None, dry_run: bool = False) -> PackagingRun:
     credential resolves before ``pack`` runs, so a missing PAT is not
     discovered after a build has been paid for.
     """
-    set_path = Path(set_dir)
-    root = repo_root_for(set_path)
+    sessions_path = Path(sessions_dir)
+    root = repo_root_for(sessions_path)
     if root is None:
-        raise PackagingError(f"not inside a git repository: {set_path}")
-    session_number = _current_session(set_path)
+        raise PackagingError(f"not inside a git repository: {sessions_path}")
+    session_number = _current_session(sessions_path)
     if session_number is None:
-        raise PackagingError(f"no session is in flight under {set_path}")
+        raise PackagingError(f"no session is in flight under {sessions_path}")
 
     if config is None:
         from .config import load_config
@@ -489,7 +489,7 @@ def package(set_dir, *, config=None, dry_run: bool = False) -> PackagingRun:
         # credential's name live.
         config = load_config(project_dir=str(root))
 
-    releasable = session_is_releasable(set_path, session_number)
+    releasable = session_is_releasable(sessions_path, session_number)
     if not releasable:
         return _refusal(
             session_number, False,
@@ -508,7 +508,7 @@ def package(set_dir, *, config=None, dry_run: bool = False) -> PackagingRun:
             "build to infer for an ecosystem nobody named.",
         )
 
-    gates = _gate_rows(set_path)
+    gates = _gate_rows(sessions_path)
     failed = [g for g in gates if not g["passed"]]
     if failed:
         return _refusal(
@@ -542,15 +542,15 @@ def package(set_dir, *, config=None, dry_run: bool = False) -> PackagingRun:
         )
 
     return _execute(
-        root, set_path, session_number, declaration, secret_value, gates,
+        root, sessions_path, session_number, declaration, secret_value, gates,
     )
 
 
 def _execute(
-    root, set_path, session_number, declaration, secret_value, gates,
+    root, sessions_path, session_number, declaration, secret_value, gates,
 ) -> PackagingRun:
     tree_digest = snapshot_worktree_tree(root)
-    output_dir = prepare_output_dir(root, set_path.name, session_number)
+    output_dir = prepare_output_dir(root, session_number)
     push = declaration.push
     steps: list = []
 
@@ -629,7 +629,7 @@ def _execute(
     return _outcome(OUTCOME_PUBLISHED, artifacts=artifacts)
 
 
-def record(set_dir, run: PackagingRun) -> dict:
+def record(sessions_dir, run: PackagingRun) -> dict:
     """File the attempt. Machine-written, append-only, schema-validated."""
     if run.ready:
         raise PackagingError(
@@ -637,12 +637,12 @@ def record(set_dir, run: PackagingRun) -> dict:
             "and a ledger carrying rehearsals cannot be read as a history of "
             "what was released."
         )
-    set_path = Path(set_dir)
-    root = repo_root_for(set_path)
+    sessions_path = Path(sessions_dir)
+    root = repo_root_for(sessions_path)
     if root is None:
-        raise PackagingError(f"not inside a git repository: {set_path}")
+        raise PackagingError(f"not inside a git repository: {sessions_path}")
     return append_packaging(
-        root, set_path.name, run.session_number, run.as_record()
+        root, run.session_number, run.as_record()
     )
 
 
@@ -684,7 +684,9 @@ def main(argv=None) -> int:
             "(e) exists."
         ),
     )
-    parser.add_argument("--session-set-dir", required=True)
+    parser.add_argument("--sessions-dir",
+                        help="the repository's sessions root; derived from "
+                             "the working directory when omitted")
     parser.add_argument(
         "--dry-run", action="store_true",
         help="show the gates and stop; nothing runs and nothing is recorded",
@@ -696,34 +698,34 @@ def main(argv=None) -> int:
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args(argv)
 
-    from .session import resolve_session_set_dir
+    from .evidence import resolve_sessions_dir
 
-    set_dir = resolve_session_set_dir(args.session_set_dir)
+    sessions_dir = resolve_sessions_dir(args.sessions_dir)
 
     if args.show_record:
-        set_path = Path(set_dir)
-        root = repo_root_for(set_path)
-        number = _current_session(set_path)
+        sessions_path = Path(sessions_dir)
+        root = repo_root_for(sessions_path)
+        number = _current_session(sessions_path)
         if root is None or number is None:
             print("no session is in flight", file=sys.stderr)
             return 1
-        rows = read_packaging(root, set_path.name, number)
+        rows = read_packaging(root, number)
         print(json.dumps(rows, indent=2) if args.json else (
             "\n".join(
                 f"{r['recorded_at']}  {r['outcome']}  "
                 f"{r.get('refusal') or r.get('feed', '')}" for r in rows
-            ) or f"no packaging attempt recorded; see {packaging_path(root, set_path.name, number)}"
+            ) or f"no packaging attempt recorded; see {packaging_path(root, number)}"
         ))
         return 0
 
     try:
-        run = package(set_dir, dry_run=args.dry_run)
+        run = package(sessions_dir, dry_run=args.dry_run)
     except (PackagingError, PackagingConfigError) as exc:
         print(f"packaging: {exc}", file=sys.stderr)
         return 1
 
     if not args.dry_run:
-        record(set_dir, run)
+        record(sessions_dir, run)
 
     print(json.dumps(run.as_record(), indent=2) if args.json else _render(run))
     return 0 if (run.published or run.ready) else 1

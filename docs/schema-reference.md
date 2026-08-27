@@ -1,6 +1,6 @@
 # Schema reference
 
-The four per-set artifacts live in `docs/session-sets/<NNN-slug>/` in
+The session artifacts live in `docs/sessions/` in
 the consumer project. Two ledgers live outside the set directory: the
 verification round ledger under `.dabbler/runs/` (gitignored) and the
 router metrics ledger `router-metrics.jsonl`. Two more files are
@@ -19,7 +19,7 @@ one `### Session K of N: <title>` heading per session; each session's
 steps as a top-level ordered list. Session start seeds those steps into
 `activity-log.json`.
 
-## session-state.json (schema v4)
+## sessions.json (schema v5)
 
 Machine-written by `ai_router` only. JSON Schema:
 `ai_router/schemas/session-state.schema.json`. Readers tolerate v3
@@ -98,7 +98,7 @@ Machine-written step log. Shape:
   `session start` prints the seeded keys and numbers so the logger
   never has to re-derive the slug.
 - Progress entries are written by `python -m ai_router.session log
-  --session-set-dir <dir> --step <stepKey|stepNumber> --status <s>`,
+  --step <stepKey|stepNumber> --status <s>`,
   the only sanctioned writer. The step must resolve against a seeded
   `plan-step` row: an unresolvable `--step` is **refused**, listing the
   valid addresses, rather than appending an orphan row nobody planned.

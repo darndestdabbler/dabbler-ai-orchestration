@@ -1,10 +1,10 @@
 # Building the session framework — instructions for each session
 
 **Read this before your first command.** It is the operating manual for
-`docs/session-sets/148-the-session-framework/`, written for an AI engine
-running one session at a time on a GitHub Copilot seat. **The session set
-spec says what to build; this file says how to run a session**, and the
-close gate will refuse work that got the register step wrong.
+the sessions in `docs/sessions/`, written for an AI engine running one
+session at a time on a GitHub Copilot seat. **`session-plan.md` says what
+to build; this file says how to run a session**, and the close gate will
+refuse work that got the register step wrong.
 
 **The one rule behind all the others: the machine owns the record.** State
 files and everything under `.dabbler/runs/` are written by the router only.
@@ -15,28 +15,27 @@ hand-edited record here would falsify the thing being built.
 
 ---
 
-## Precondition: settled 2026-08-26
+## Precondition: session 14 collapsed the set level
 
-**Sets 145 and 146 are both `cancelled`, and no set is `in-progress`
-besides 148.** Set 145 `step-execution` was in-progress and set 146
-`measure-then-enable` had never been started, which would have selected 146
-ahead of this set under the lowest-numbered-`not-started` rule.
+**Sessions are numbered directly in this repository.** There is one
+sessions root, `docs/sessions/`, holding `session-plan.md` (what to build),
+`sessions.json` (the machine-written ledger), the activity log and the two
+staff-facing files. `docs/session-sets/` is gone; its records are in git
+history, and set 148's ledger was carried forward by
+`session migrate` rather than retyped.
 
-Both dispositions already existed in machine-written form on another branch
-and were carried over **by merge, never by editing a state file**.
-
-**Confirm it still holds before the register step** by reading the `status`
-field in each set's `session-state.json`. Two in-progress sets is a drift
-error: stop and surface it, do not work around it, and do not edit a file to
-make it go away.
+**No command takes a handle to a sessions root.** `--sessions-dir` exists
+only for a caller standing outside the tree; from inside the repository it
+is derived, and there is nothing to select.
 
 ---
 
 ## Before you start: three things to establish
 
 1. **Which session is next.** Read the `status` field in
-   `docs/session-sets/148-the-session-framework/session-state.json`. Never
-   infer state from which files exist.
+   `docs/sessions/sessions.json`. Never infer state from which files
+   exist. Two sessions in flight is a drift error: stop and surface it, do
+   not work around it, and do not edit a file to make it go away.
 2. **Which branch. Settled: `master`.** The design documents were authored
    on `design/solution-decomposition` and both it and
    `experiment/verification-pipeline-v3` are merged in and finished. Commit
@@ -76,7 +75,6 @@ still register, still verify, and still close through the gate.
 
 ```powershell
 .venv/Scripts/python -m ai_router.session start `
-    --session-set-dir docs/session-sets/148-the-session-framework `
     --engine copilot --provider <anthropic|openai|google> --model <exact-model-id>
 ```
 
@@ -92,7 +90,6 @@ The command is idempotent. Re-run it safely after a context reset.
 
 ```powershell
 .venv/Scripts/python -m ai_router.session declare `
-    --session-set-dir docs/session-sets/148-the-session-framework `
     --task-file <path> --releasable|--not-releasable
 ```
 
@@ -116,20 +113,18 @@ diff** and the round reviews nothing.
 ### 3. Run the tests this change makes necessary — only those
 
 ```powershell
-.venv/Scripts/python -m ai_router.affected `
-    --session-set-dir docs/session-sets/148-the-session-framework
+.venv/Scripts/python -m ai_router.affected
 ```
 
 It prints the selected tests, why each was selected, and the exact command
-to run. **Pass `--session-set-dir`**: once a verification round exists,
-selection is measured against that round's snapshot, so a remediation runs
-what the fix touched instead of re-running what the session touched.
+to run. Once a verification round exists, selection is measured against
+that round's snapshot, so a remediation runs what the fix touched instead
+of re-running what the session touched.
 
 Run the printed command, then record it:
 
 ```powershell
 .venv/Scripts/python -m ai_router.test_evidence record `
-    --session-set-dir docs/session-sets/148-the-session-framework `
     --suite <name> --stage preverify-targeted `
     --command "<the command you actually ran>" --outcome passed `
     --duration-seconds <elapsed>
@@ -145,8 +140,7 @@ so, and the bare suite command is then correct), or
 ### 4. Cross-provider verification — mandatory, no skip
 
 ```powershell
-.venv/Scripts/python -m ai_router.verify `
-    --session-set-dir docs/session-sets/148-the-session-framework
+.venv/Scripts/python -m ai_router.verify
 ```
 
 **Run this in the background.** Discovery rounds take nine to ten minutes
@@ -175,7 +169,6 @@ adjudication per session, ever.
 
 ```powershell
 .venv/Scripts/python -m ai_router.test_evidence record `
-    --session-set-dir docs/session-sets/148-the-session-framework `
     --suite <name> --stage final-full --outcome passed `
     --duration-seconds <elapsed>
 ```
@@ -197,8 +190,7 @@ of work that is not finished.
 ### 7. Close through the gate
 
 ```powershell
-.venv/Scripts/python -m ai_router.session close `
-    --session-set-dir docs/session-sets/148-the-session-framework
+.venv/Scripts/python -m ai_router.session close
 ```
 
 Five gates run: verification clean, tree clean, pushed, tests fresh,
@@ -215,7 +207,6 @@ than a habit:
 
 ```powershell
 .venv/Scripts/python -m ai_router.session decision `
-    --session-set-dir docs/session-sets/148-the-session-framework `
     --decider <operator|orchestrator|verifier|framework> `
     --headline "<what was decided, in one line>" `
     --body-file <path>   # or --body "<why>"; '-' reads stdin
@@ -308,8 +299,8 @@ the record is honest.
 
 ## The one ordering change to know about
 
-**The plan puts "collapse session sets" at A3; this set runs it at session
+**The plan puts "collapse session sets" at A3; this set ran it at session
 14.** A3 removes the machinery this sequence runs on, so collapsing it
-early would strand every session after it. Session 14 must migrate this
-set's own state forward — if sessions 15 through 17 cannot register, verify
-and close under what session 14 builds, **session 14 is not done.**
+early would have stranded every session after it. Session 14 migrated the
+set's own state forward, which is the only proof that mattered: sessions 15
+through 17 register, verify and close under what it built.

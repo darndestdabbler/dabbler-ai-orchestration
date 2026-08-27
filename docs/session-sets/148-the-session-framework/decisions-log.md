@@ -1403,3 +1403,29 @@ through OpenAI. It now pins `transport="api"`.
 
 Both were found by reading the shipped configuration against the code, which
 is the read a different vendor is in a position to make.
+
+## Session 9 — Model discovery (plan A7)
+
+### D59 · 2026-08-27 · Orchestrator · The record format is extracted so both discovery paths write one shape
+
+Spec 5.b says the probe and the enumeration write the same record. That is only true if one piece of code renders both, so the restricted-TOML renderer, the writer stamp, the content digest and the hand-edit verdict moved out of transports/copilot.py into ai_router/lockfile.py. The seat catalog still round-trips byte for byte and keeps its recorded digest, which is the check that the move changed nothing. Two renderers would have let the two records drift apart in how a value is written and in whether a hand edit is detectable -- and the second record would have been the one nobody noticed was unguarded.
+
+### D60 · 2026-08-27 · Orchestrator · A vendor that answers is authoritative about which of its models exist; a vendor that fails keeps everything it had
+
+Two failure modes look alike and must not be treated alike. A field a vendor stops reporting degrades to unknown: it is written by omission, a fresh unknown never overwrites a known value, and nothing filters a candidate on metadata. A model a vendor stops listing is genuinely gone from the API path -- unlike the seat, which cannot enumerate at all -- so a successful enumeration replaces that provider's model list and the departure surfaces in the drift diff as a role naming a model no record carries. A failed enumeration does neither: the endpoint timing out is not the vendor withdrawing its catalog, so the prior entries stand and the failure is recorded beside them. Deleting them would have turned a network blip into a drift report claiming every role names a model that does not exist.
+
+### D61 · 2026-08-27 · Orchestrator · The seat catalog is aged on its own clock, and the staleness check can never fail a registration
+
+One check reads both records, because there is one question -- does the framework currently know what exists -- and answering it in two places is how the two answers come to disagree. The thresholds differ because the mechanisms do: enumeration is free, so 24 hours; a probe costs premium requests, so 720. A 24-hour warning on the seat would fire every day for a refresh nobody should run daily, and a warning that is always on is a warning that is always ignored. The check is surfaced by session start, where it warns and names the invocation, and any failure reading it leaves the session unblocked and silent -- a maintenance signal capable of causing an outage is a maintenance signal that gets suppressed. Enumeration itself is refused while a session is in flight, read from the machine-written state and from nothing else.
+
+### D62 · 2026-08-27 · Verifier (gpt-5.4/openai) · One vendor's success must not date the whole record
+
+Round 1, Major. meta.enumerated_at advanced whenever any provider answered, and status and session start read only that stamp, so an expired key on one of three vendors left the maintenance signal green while that vendor's entries aged indefinitely. Partial provider failure is an expected operational path against three endpoints this project does not control, not an edge case. Fixed: the API record is now aged against the oldest per-vendor stamp among enabled, enumerable providers, and every vendor that is missing from the record or whose last attempt failed is named in the row. The record-level date survives only where no enumerable provider is configured and there is no per-vendor evidence to be conservative about.
+
+### D63 · 2026-08-27 · Verifier (gpt-5.4/openai) · A key-set-local record written inside the package is a record a build will ship
+
+Round 1, Major. The default resolved to ai_router/api-models.lock and pyproject listed that filename as package data, so enumerating in a working tree and then building from it would have published one machine's view of what its credentials expose to every consumer. The session had declared the record local and not shipped; the implementation did not enforce it. Fixed by making it structurally impossible rather than discouraged: the default is now .dabbler/api-models.lock, a relative record path resolves against the project root instead of the config's directory, and the filename is out of package data. .dabbler/ is already gitignored, so the record is neither committed nor packaged. The seat catalog still ships, because it belongs to the distribution rather than to a key set.
+
+### D64 · 2026-08-27 · Verifier (gpt-5.4/openai) · The sanctioned writer must be able to create the record the first time
+
+Round 2, Major, and a defect the round-1 remediation introduced. Moving the default to .dabbler/api-models.lock put the record in a directory that does not exist on a fresh checkout, while write_document was a bare write_text -- so the documented first run of enumerate would have raised FileNotFoundError and produced no record at all. Fixed in the writer rather than at the call site: it is the only sanctioned way to produce either record, so a missing parent directory there means the record cannot be made by any permitted route. The seat catalog's parent has always existed, so nothing changes for it.

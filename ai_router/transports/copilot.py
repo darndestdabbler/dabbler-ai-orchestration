@@ -71,6 +71,18 @@ from pathlib import Path
 from typing import Callable, Optional, Protocol, Sequence
 
 from .base import APIResult
+from ..lockfile import (
+    PROVENANCE_HAND_EDITED,
+    PROVENANCE_MACHINE_WRITTEN,
+    PROVENANCE_UNSTAMPED,
+    digest_text,
+    provenance as record_provenance,
+    render_document,
+    set_or_drop as _set_or_drop,
+    utc_now as _utc_now,
+    write_document,
+    writer_id,
+)
 
 # --- Error-class taxonomy. Nothing is retryable today; the set stays empty
 # (not absent) so a future promotion is a one-line, deliberate change.
@@ -1337,72 +1349,10 @@ def validate_catalog(
 
 # --- Seat catalog writer ----------------------------------------------------
 #
-# The restricted TOML subset the reader accepts, and the only shape written:
-# one flat ``[meta]`` table then repeated flat ``[[models]]`` tables, holding
-# scalars and flat arrays of strings. Nothing nested, so the writer needs no
-# TOML library and the file stays legible to the operator who must never have
-# to edit it.
-
-_TOML_STRING_ESCAPES = {
-    "\\": "\\\\", '"': '\\"', "\n": "\\n", "\r": "\\r", "\t": "\\t",
-}
-
-
-def _render_string(value: str) -> str:
-    out = []
-    for char in value:
-        escaped = _TOML_STRING_ESCAPES.get(char)
-        if escaped is not None:
-            out.append(escaped)
-        elif ord(char) < 0x20 or ord(char) == 0x7F:
-            raise ValueError(
-                f"catalog value contains an unrenderable control character "
-                f"{char!r}"
-            )
-        else:
-            out.append(char)
-    return '"' + "".join(out) + '"'
-
-
-def _render_value(key: str, value) -> str:
-    # bool first: it is an int subclass, and `true` must not render as `1`.
-    if isinstance(value, bool):
-        return "true" if value else "false"
-    if isinstance(value, int):
-        return str(value)
-    if isinstance(value, float):
-        # repr is the shortest text that reads back as the same float, so a
-        # sample survives a rewrite unchanged and the content digest holds.
-        if not math.isfinite(value):
-            raise ValueError(
-                f"catalog key {key!r} holds a non-finite number, which is not "
-                "a measurement of anything"
-            )
-        return repr(value)
-    if isinstance(value, str):
-        return _render_string(value)
-    if isinstance(value, (list, tuple)):
-        if not all(isinstance(item, str) for item in value):
-            raise ValueError(
-                f"catalog key {key!r} holds an array the lockfile cannot "
-                "represent: arrays are flat arrays of strings"
-            )
-        body = "".join(f"    {_render_string(item)},\n" for item in value)
-        return "[\n" + body + "]"
-    raise ValueError(
-        f"catalog key {key!r} holds a value the lockfile cannot represent: "
-        f"{value!r} ({type(value).__name__}). Coerce it where it arrived "
-        "from — a value the writer cannot render must never reach the writer."
-    )
-
-
-def _set_or_drop(mapping: dict, key: str, value) -> None:
-    """An absent key and a null key are the same fact, and TOML has only the
-    first: unknown is written by omission, never by a placeholder."""
-    if value is None:
-        mapping.pop(key, None)
-    else:
-        mapping[key] = value
+# The record format itself lives in ``ai_router.lockfile``, because the
+# direct-API enumeration writes the same shape and a second renderer would let
+# the two records disagree about how a value is written or how a hand edit is
+# detected.
 
 
 def _meta_mapping(meta: CatalogMeta) -> dict:
@@ -1454,14 +1404,6 @@ def _entry_mapping(entry: ModelEntry) -> dict:
     return out
 
 
-def _render_table(header: str, mapping: dict) -> str:
-    lines = [header]
-    lines.extend(
-        f"{key} = {_render_value(key, value)}" for key, value in mapping.items()
-    )
-    return "\n".join(lines)
-
-
 def dumps_catalog(catalog: Catalog) -> str:
     """Render *catalog* back to the lockfile text the reader accepts.
 
@@ -1469,12 +1411,11 @@ def dumps_catalog(catalog: Catalog) -> str:
     equal catalog, and a catalog nothing has touched renders back to the
     bytes it was read from.
     """
-    tables = [_render_table("[meta]", _meta_mapping(catalog.meta))]
+    tables = [("[meta]", _meta_mapping(catalog.meta))]
     tables.extend(
-        _render_table("[[models]]", _entry_mapping(entry))
-        for entry in catalog.models
+        ("[[models]]", _entry_mapping(entry)) for entry in catalog.models
     )
-    return "\n\n".join(tables) + "\n"
+    return render_document(tables)
 
 
 def write_catalog(path, catalog: Catalog, *, written_at=None) -> Catalog:
@@ -1482,40 +1423,16 @@ def write_catalog(path, catalog: Catalog, *, written_at=None) -> Catalog:
     with no writer leaves hand-editing as the sole remedy for staleness.
     Returns the stamped catalog that was written."""
     stamped = stamp_catalog(catalog, written_at=written_at)
-    Path(path).write_text(
-        dumps_catalog(stamped), encoding="utf-8", newline="\n"
-    )
+    write_document(path, dumps_catalog(stamped))
     return stamped
 
 
 # --- Writer stamp and hand-edit detection -----------------------------------
 #
 # The rule this repo already holds for ``.dabbler/runs/`` — machine-written,
-# never hand-repaired — is checkable here instead of aspirational. The writer
-# records what wrote the file, when, and a digest of what it wrote; a later
-# reader recomputes the digest and reports a mismatch as hand-edited
-# provenance. Detection, not enforcement: an operator may still edit the file,
-# but the record will say they did, and the value it carries is empirical or
-# it is nothing.
-#
-# The digest covers the catalog's rendered content, not the file's mtime. The
-# lockfile is committed, and every checkout rewrites mtime, so a timestamp
-# comparison would report a clean clone as hand-edited — a guard that fires on
-# the innocent case teaches people to ignore it.
-
-PROVENANCE_MACHINE_WRITTEN = "machine-written"
-PROVENANCE_HAND_EDITED = "hand-edited"
-PROVENANCE_UNSTAMPED = "unstamped"
-
-
-def _utc_now() -> str:
-    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-
-
-def _writer_id() -> str:
-    from .. import __version__
-
-    return f"ai_router.transports.copilot {__version__}"
+# never hand-repaired — is checkable here instead of aspirational. The verdict
+# itself is ``ai_router.lockfile.provenance``; what belongs to this module is
+# only which fields of the seat catalog the digest covers.
 
 
 def catalog_digest(catalog: Catalog) -> str:
@@ -1528,16 +1445,14 @@ def catalog_digest(catalog: Catalog) -> str:
     unstamped = Catalog(
         meta=replace(catalog.meta, content_digest=None), models=catalog.models
     )
-    return "sha256:" + hashlib.sha256(
-        dumps_catalog(unstamped).encode("utf-8")
-    ).hexdigest()
+    return digest_text(dumps_catalog(unstamped))
 
 
 def stamp_catalog(catalog: Catalog, *, written_at=None) -> Catalog:
     """The catalog with a fresh writer stamp over its current contents."""
     meta = replace(
         catalog.meta,
-        written_by=_writer_id(),
+        written_by=writer_id("ai_router.transports.copilot"),
         written_at=written_at or _utc_now(),
         content_digest=None,
     )
@@ -1549,18 +1464,14 @@ def stamp_catalog(catalog: Catalog, *, written_at=None) -> Catalog:
 
 
 def catalog_provenance(catalog: Catalog) -> str:
-    """How this file came to hold what it holds.
-
-    A stamp stripped of its digest reads as hand-edited, not as unstamped:
-    removing the line that would convict is itself the edit. A file carrying
-    no stamp at all is merely older than the writer.
-    """
+    """How this file came to hold what it holds."""
     meta = catalog.meta
-    if not (meta.content_digest or meta.written_by or meta.written_at):
-        return PROVENANCE_UNSTAMPED
-    if meta.content_digest and meta.content_digest == catalog_digest(catalog):
-        return PROVENANCE_MACHINE_WRITTEN
-    return PROVENANCE_HAND_EDITED
+    return record_provenance(
+        stored_digest=meta.content_digest,
+        recomputed_digest=catalog_digest(catalog),
+        written_by=meta.written_by,
+        written_at=meta.written_at,
+    )
 
 
 # --- Seat catalog discovery -------------------------------------------------

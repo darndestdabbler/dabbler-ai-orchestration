@@ -44,7 +44,7 @@ it.
 | 6 | The verifier's read surface (plan A5, first half) | no | 2026-08-27 |
 | 7 | The test-write path (plan A5, second half) | no | 2026-08-27 |
 | 8 | Selection by role, and the death of the tier ladder (plan A6) | no | 2026-08-27 |
-| 9 | Model discovery (plan A7) | — | not declared |
+| 9 | Model discovery (plan A7) | yes | 2026-08-27 |
 | 10 | The code review loop (plan B1) | — | not declared |
 | 11 | The verifier authors tests, the framework runs them (plan B2) | — | not declared |
 | 12 | The full suite and its bounded fix loop (plan B3) | — | not declared |
@@ -129,3 +129,59 @@ pricing cannot be removed until the declared preference order replaces it.
    `final-full` run of record; close through the gate.
 
 Net deletion. Est. 12 Python tests, with more deleted than added.
+
+### Session 9 — Model discovery (plan A7)
+
+**Releasable: yes.**
+
+# Session 9 of 148 — Model discovery (plan A7)
+
+Build the direct-API half of §5.b/§5.c: enumeration, one staleness check over
+both records, and the drift diff. The seat keeps its probe-based refresh
+because a probe costs premium requests; enumeration bills no tokens.
+
+1. **Extract the lockfile primitives.** Move the restricted-TOML renderer,
+   the writer stamp, the content digest and the provenance verdict out of
+   `transports/copilot.py` into `ai_router/lockfile.py`. One implementation,
+   so the API record cannot drift from the seat catalog in how it is written
+   or how a hand edit is detected. `copilot.py` gets smaller; the seat
+   lockfile must round-trip byte for byte and keep its recorded digest.
+
+2. **Enumerate each vendor's models endpoint** (`ai_router/discovery.py`):
+   Anthropic `GET /v1/models`, OpenAI `GET /v1/models`, Google
+   `GET /v1beta/models`, each paginated to exhaustion and each carrying the
+   key in a header, never a query string. A metadata request bills no
+   tokens, which is why the default cadence is 24 hours.
+
+3. **Write the record through the sanctioned writer, dated.**
+   `ai_router/api-models.lock` — `[meta]` plus `[[models]]`, the same shape
+   the seat catalog uses, stamped and digested. One record per key set.
+
+4. **A field a vendor stops reporting degrades to unknown, never to
+   unsupported.** An absent field is written by omission; a merge never lets
+   a fresh unknown overwrite a known value; a provider whose enumeration
+   failed keeps its prior entries and records the failure beside them.
+   Capability metadata never filters a candidate.
+
+5. **One staleness check reading both records.** Age of the API record
+   against `discovery.max_age_hours` (24) and of the seat catalog against
+   `discovery.seat_max_age_hours`; both warn, both name the exact invocation
+   that resolves them, neither blocks. Surfaced by `session start`.
+
+6. **Refresh never happens inside a session.** `discovery enumerate` refuses
+   while any session set has a session in flight — a session that changes
+   its own verifier pool has edited the conditions of its own review.
+
+7. **The drift diff (§5.c).** Models in a record and named in no role;
+   models named in a role and absent from both records; the age of each
+   record against its threshold. Reported, never closed silently.
+
+8. Config and schema: a `discovery` block naming the record and the two
+   thresholds.
+
+9. Affected tests as preverify, cross-provider verification, the full suite
+   as the run of record, close-out.
+
+**Releasable:** yes. This is framework code with no operator-specific data
+in it; the record it writes is seat/key-set local and is regenerated, not
+shipped.

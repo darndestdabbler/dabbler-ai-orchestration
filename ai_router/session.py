@@ -442,6 +442,27 @@ def parse_set_config(spec_text: str) -> dict:
 
 # --- start ------------------------------------------------------------------
 
+def _discovery_warnings() -> list:
+    """Stale-record warnings for the session about to start.
+
+    Registration is the last moment before the work that a refresh may
+    legitimately happen, and the first moment at which it may not: discovery
+    runs between sessions, so the signal belongs here and the refresh does
+    not. It warns and names the invocation; it never blocks, and it never
+    refreshes. A staleness check that could fail a registration would be a
+    maintenance signal capable of causing an outage, which is how maintenance
+    signals get suppressed -- so any failure reading it leaves the session
+    unblocked and silent.
+    """
+    try:
+        from .config import load_config
+        from .discovery import freshness_warnings
+
+        return freshness_warnings(load_config())
+    except Exception:
+        return []
+
+
 def start(
     set_dir, *, engine: str, provider=None, model=None, effort=None,
     session_number: Optional[int] = None, total_sessions=None,
@@ -540,6 +561,8 @@ def start(
             f"start: session {requested} of {set_path.name} registered "
             f"({engine}); {seeded} plan step(s) seeded."
         )
+        for line in _discovery_warnings():
+            print(line)
         if plan_rows:
             # The engine cannot guess these derived slugs; a step logged
             # under any other key (and no stepNumber) lands as a NEW row

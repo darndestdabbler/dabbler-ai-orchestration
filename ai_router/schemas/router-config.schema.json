@@ -342,6 +342,28 @@
         }
       }
     },
+    "discovery": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "key_set_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "record": {
+          "type": "string",
+          "minLength": 1
+        },
+        "max_age_hours": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "seat_max_age_hours": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    },
     "worktree": {
       "type": "object",
       "additionalProperties": false,

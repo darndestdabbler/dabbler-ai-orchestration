@@ -106,6 +106,44 @@ list that has gone stale costs a slightly older model and never costs a
 candidate. Roles are declared once under `roles:` in `router-config.yaml`
 and applied identically on both transports.
 
+### Model discovery
+
+A role says what a verifier may be; a discovery record says what currently
+exists. There are two records because there are two mechanisms:
+
+- **Direct API — enumeration.** `python -m ai_router.discovery enumerate`
+  reads each vendor's models endpoint and writes `.dabbler/api-models.lock`.
+  A models endpoint is a metadata request and **bills no tokens on any of the
+  three vendors**, so the default 24-hour cadence is a freshness preference
+  rather than a budget control. The record is derived from whichever key set
+  is present, so it lives outside the package and is neither committed nor
+  shipped — unlike the seat catalog, which belongs to the distribution.
+- **Copilot seat — empirical probe.** The CLI has no list-models command, so
+  its catalog is a maintained candidate universe confirmed by
+  `python -m ai_router.transports.copilot refresh`. That does cost premium
+  requests, which is why its staleness threshold is far longer.
+
+`python -m ai_router.discovery status` reports both records' ages — **the API
+record is aged against its stalest enabled vendor**, so one vendor answering
+never dates the whole file while another's key is expired.
+`python -m ai_router.discovery drift` reports the gap between the records and
+the roles — models in a record that no role ranks, and models a role ranks
+that no record carries. **The gap is reported, never closed silently:**
+ranking one model above another is a judgment metadata cannot make, so a
+model may propose an ordering, enumeration or a probe confirms it, and the
+writer records it. Nothing is enabled by a name.
+
+**What a vendor stops reporting becomes unknown, never unsupported.** Vendors
+report unequally, and a hard capability filter would disqualify every model
+from the quietest vendor and end cross-vendor verification by accident.
+Capability metadata ranks; it never filters.
+
+**Enumeration refuses to run while a session is in flight**, and a stale
+record only ever warns — `session start` prints the warning and names the
+invocation. A session that changed its own verifier pool mid-run would have
+edited the conditions of its own review, and a maintenance signal that can
+cause an outage is a maintenance signal that gets suppressed.
+
 ### Transport preference
 
 Resolved in this precedence (first set wins):

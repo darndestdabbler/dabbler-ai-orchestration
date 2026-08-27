@@ -101,6 +101,24 @@ transports:
       first_byte_seconds: 30
       total_seconds: 1200
 
+# Model discovery. The direct-API path enumerates each vendor's models
+# endpoint; the seat cannot enumerate — the CLI has no list-models command —
+# so its catalog stays probe-confirmed. Enumeration is a metadata request and
+# bills no tokens, which is why max_age_hours is a freshness preference and
+# not a budget control. seat_max_age_hours is far longer because a probe does
+# cost premium requests, and a warning that fires every day is a warning that
+# gets suppressed. Neither threshold ever blocks anything.
+#
+# record resolves against the project root, not this file's directory, and
+# lives under the gitignored .dabbler/ tree: it is derived from whichever key
+# set is present, so it is neither committed nor packaged. The seat catalog
+# ships because it belongs to the distribution; this one belongs to a machine.
+discovery:
+  key_set_id: default
+  record: .dabbler/api-models.lock
+  max_age_hours: 24
+  seat_max_age_hours: 720
+
 # --- Model Registry ---
 # is_enabled: in the routed pool at all (identity-only entries set false —
 #   they exist so orchestrator identity can resolve).
@@ -471,6 +489,10 @@ testing:
           - tests/test_critique_contracts.py
           - tests/test_route.py
           - tests/test_verify.py
+      - when: ai_router/discovery.py
+        select:
+          - tests/test_discovery.py
+          - tests/test_session.py
       - when: ai_router/evidence.py
         select:
           - tests/test_evidence_protocol.py
@@ -503,6 +525,12 @@ testing:
           - tests/test_session.py
           - tests/test_verify.py
           - tests/test_step_execution.py
+      - when: ai_router/lockfile.py
+        # Both discovery records render and stamp through this module, so a
+        # change here can break either one.
+        select:
+          - tests/test_discovery.py
+          - tests/test_transport_copilot.py
       - when: ai_router/metrics.py
         select:
           - tests/test_metrics.py

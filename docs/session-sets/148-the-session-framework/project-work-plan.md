@@ -1,0 +1,71 @@
+# Project work plan — 148-the-session-framework
+
+**Written by `ai_router.writers` as a fold of `activity-log.json`.**
+Hand edits are overwritten by the next append. The record is the log;
+this page is one view of it.
+
+---
+
+## The plan
+
+Build the session framework specified in `docs/session-framework-spec.md`,
+in the order set by `docs/session-framework-plan.md`, as seventeen numbered
+sessions — each one developed, tested, cross-provider verified and closed
+under the existing router machinery.
+
+**Milestone A — a session runs end to end** (sessions 3–9): the credential
+allowlist, record authority, these two files, the verifier's limited agency
+surface, selection by role, and model discovery.
+
+**Milestone B — the loops** (sessions 10–12): the code review loop, the
+verifier authoring tests the framework runs, and the full suite with its
+bounded fix loop.
+
+**Milestone C — packaging** (session 13): pack and push to the feed, gated
+on the releasability each session declares below.
+
+**Milestone D — the extension** (sessions 14–17): collapse session sets,
+then the sessions view, project setup, and the unresolved-session view.
+
+The ordering change to know about: the plan puts "collapse session sets" at
+A3; this set runs it at session 14, because A3 removes the machinery this
+sequence runs on and collapsing it early would strand every session after
+it.
+
+## Sessions
+
+| # | Session | Releasable | Declared |
+| ---: | --- | --- | --- |
+| 1 | Verify the design before anything is built | — | not declared |
+| 2 | Verify this breakdown against that design | — | not declared |
+| 3 | The credential allowlist (plan A1) | — | not declared |
+| 4 | Record authority (plan A2) | — | not declared |
+| 5 | The two files, framework-written (plan A4) | no | 2026-08-27 |
+| 6 | The verifier's read surface (plan A5, first half) | — | not declared |
+| 7 | The test-write path (plan A5, second half) | — | not declared |
+| 8 | Selection by role, and the death of the tier ladder (plan A6) | — | not declared |
+| 9 | Model discovery (plan A7) | — | not declared |
+| 10 | The code review loop (plan B1) | — | not declared |
+| 11 | The verifier authors tests, the framework runs them (plan B2) | — | not declared |
+| 12 | The full suite and its bounded fix loop (plan B3) | — | not declared |
+| 13 | Packaging to the feed (plan C) | — | not declared |
+| 14 | Collapse session sets (plan A3) | — | not declared |
+| 15 | The sessions view (plan D1) | — | not declared |
+| 16 | Project setup as two sessions (plan D2) | — | not declared |
+| 17 | The unresolved-session view (plan D3) | — | not declared |
+
+### Session 5 — The two files, framework-written (plan A4)
+
+**Releasable: no.**
+
+Make `project-work-plan.md` and `decisions-log.md` framework-written (plan
+A4): sanctioned writers in `writers.py`, a fixed shape, and a `session`
+CLI seam so a model supplies content and never structure, filename,
+ordering, identity or time.
+
+Build the §3.a task list beside the numbered session list — each session
+declaring what it will do and whether it produces a releasable artifact —
+because session 13 gates packaging on a declaration nothing wrote.
+
+Backfill this set's own decisions log through the new writer, from the
+hand-kept records of sessions 1 through 4.

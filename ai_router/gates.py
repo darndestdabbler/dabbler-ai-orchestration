@@ -178,16 +178,24 @@ def check_verification_clean(set_dir) -> tuple:
     return True, ""
 
 
-def check_working_tree_clean(set_dir) -> tuple:
+def material_worktree_changes(set_dir) -> tuple:
+    """``(paths, error)``: the working-tree changes that are the session's
+    work rather than the record of it.
+
+    Editor noise, the run ledger and the set's own lifecycle bookkeeping
+    are not work. Two callers ask this: the close, which refuses to land
+    uncommitted work, and the task declaration, which refuses to be made
+    after work exists.
+    """
     set_path = Path(set_dir)
     root = repo_root_for(set_path)
     if root is None:
-        return False, f"not inside a git repository: {set_path}"
+        return [], f"not inside a git repository: {set_path}"
     # -uall expands collapsed untracked directories to per-file entries;
     # a single umbrella row would defeat the ignore filter.
     rc, out, err = run_git(root, "status", "--porcelain", "-uall")
     if rc != 0:
-        return False, f"git status failed: {err or 'unknown error'}"
+        return [], f"git status failed: {err or 'unknown error'}"
     try:
         set_rel = os.path.relpath(str(set_path), root).replace("\\", "/")
     except ValueError:
@@ -214,12 +222,22 @@ def check_working_tree_clean(set_dir) -> tuple:
         if is_machine_state_path(path):
             continue  # the run ledger is the record, not the work
         blocking.append(path)
+    return blocking, ""
+
+
+def preview_paths(paths) -> str:
+    preview = ", ".join(paths[:5])
+    return preview + (f" (+{len(paths) - 5} more)" if len(paths) > 5 else "")
+
+
+def check_working_tree_clean(set_dir) -> tuple:
+    blocking, error = material_worktree_changes(set_dir)
+    if error:
+        return False, error
     if not blocking:
         return True, ""
-    preview = ", ".join(blocking[:5])
-    suffix = f" (+{len(blocking) - 5} more)" if len(blocking) > 5 else ""
     return False, (
-        f"working tree has uncommitted changes: {preview}{suffix}"
+        f"working tree has uncommitted changes: {preview_paths(blocking)}"
     )
 
 

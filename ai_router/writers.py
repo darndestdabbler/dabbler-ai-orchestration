@@ -1,12 +1,19 @@
 """The sanctioned writers for the per-set artifacts.
 
 Every byte written to ``session-state.json``, ``activity-log.json``,
-``change-log.md`` and the cancel/restore audit markers goes through this
-module. The writers validate against the schema, enforce the closed
-verdict and step vocabularies, and record a content hash so an
-out-of-band edit is detectable. Lifecycle FLOW logic (boundary triad,
-locking, gates, CLI) lives in ``session.py``; this module owns the write
-discipline and nothing else.
+``change-log.md``, ``decisions-log.md``, ``project-work-plan.md`` and the
+cancel/restore audit markers goes through this module. The writers
+validate against the schema, enforce the closed verdict and step
+vocabularies, and record a content hash so an out-of-band edit is
+detectable. Lifecycle FLOW logic (boundary triad, locking, gates, CLI)
+lives in ``session.py``; this module owns the write discipline and
+nothing else.
+
+The two prose files are projections, not records. ``activity-log.json``
+holds the decision and declaration rows; the markdown is folded from it on
+every append and may be deleted and rebuilt at any time. That is what
+lets a model supply content while the framework keeps structure,
+filename, ordering and identity out of its reach.
 """
 
 from __future__ import annotations
@@ -47,6 +54,27 @@ STEP_STATUSES = ("pending", "in-progress", "complete", "blocked")
 CANCELLED_FILENAME = "CANCELLED.md"
 RESTORED_FILENAME = "RESTORED.md"
 _CANCEL_HISTORY_HEADER = "# Cancellation history"
+
+# The two files of the specification. The names are constants because the
+# model that supplies their content never chooses where it lands.
+DECISIONS_LOG_FILENAME = "decisions-log.md"
+WORK_PLAN_FILENAME = "project-work-plan.md"
+
+# Activity-log row kinds. ``plan-step`` predates these three and is written
+# by ``seed_session_plan``/``log_step``.
+KIND_DECISION = "decision"
+KIND_TASK_DECLARATION = "task-declaration"
+KIND_PROJECT_PLAN = "project-plan"
+
+# Who decided. Closed, because "who made it" is only answerable against a
+# fixed set of roles -- a free-text author lets a model attribute its own
+# decision to a human.
+DECIDER_OPERATOR = "operator"
+DECIDER_ORCHESTRATOR = "orchestrator"
+DECIDER_VERIFIER = "verifier"
+DECIDER_FRAMEWORK = "framework"
+DECIDERS = (DECIDER_OPERATOR, DECIDER_ORCHESTRATOR, DECIDER_VERIFIER,
+            DECIDER_FRAMEWORK)
 
 
 def _state_schema() -> dict:
@@ -494,6 +522,360 @@ def append_change_log_block(set_dir, text: str) -> None:
             f.write(existing.rstrip("\n") + "\n\n" + text.rstrip("\n") + "\n")
         else:
             f.write(text.rstrip("\n") + "\n")
+
+
+# --- the two files: decisions-log.md and project-work-plan.md ----------------
+
+class SanctionedWriteError(ValueError):
+    """A caller reached for something the framework owns.
+
+    Identity, ordering, timestamps, filenames and layout are not content.
+    Refusing here rather than at the CLI means a direct API caller -- an
+    engine importing the module -- hits the same wall an operator does.
+    """
+
+
+def _require_text(value, field: str) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise SanctionedWriteError(f"{field} must be non-empty text")
+    return value.strip()
+
+
+def _require_session_number(value) -> int:
+    if not isinstance(value, int) or isinstance(value, bool) or value < 1:
+        raise SanctionedWriteError(
+            f"sessionNumber must be a positive integer, got {value!r}"
+        )
+    return value
+
+
+def _entries_of_kind(log: dict, kind: str) -> list:
+    return [
+        e for e in log.get("entries") or []
+        if isinstance(e, dict) and e.get("kind") == kind
+    ]
+
+
+def _session_records(set_dir) -> dict:
+    """number -> {title, status} from the state file, or {} when there is
+    none yet. The state owns titles; the log never restates them."""
+    raw = read_raw_session_state(Path(set_dir))
+    if not isinstance(raw, dict):
+        return {}
+    records = {}
+    for entry in raw.get("sessions") or []:
+        if isinstance(entry, dict) and isinstance(entry.get("number"), int):
+            records[entry["number"]] = {
+                "title": entry.get("title") or f"Session {entry['number']}",
+                "status": canonicalize_status(entry.get("status")),
+            }
+    return records
+
+
+def append_decision(
+    set_dir, *, session_number: int, decider: str, headline: str, body: str,
+    model=None, provider=None, decided_on=None, backfill_reason=None,
+) -> dict:
+    """Append one decision and re-render the log.
+
+    The caller supplies what was decided and why. The writer supplies the
+    identifier, the position in the sequence and the time -- so a decision
+    cannot be renumbered, backdated, or slipped in between two others.
+
+    A historical entry is possible and is never silent: *decided_on* and
+    *backfill_reason* are required together, and the rendered entry says
+    it was transcribed. Without that pair a backdated decision would be
+    indistinguishable from one recorded as it happened, which is the only
+    claim this file makes.
+    """
+    number = _require_session_number(session_number)
+    if decider not in DECIDERS:
+        raise SanctionedWriteError(
+            f"decider must be one of {DECIDERS}, got {decider!r}"
+        )
+    headline_text = _require_text(headline, "headline")
+    body_text = _require_text(body, "body")
+    if (decided_on is None) != (backfill_reason is None):
+        raise SanctionedWriteError(
+            "decided_on and backfill_reason are supplied together or not at "
+            "all: a decision dated by its author without saying it is a "
+            "transcription reads exactly like one recorded as it happened."
+        )
+    recorded_at = _now_iso()
+    if decided_on is None:
+        decided = recorded_at[:10]
+        reason = None
+    else:
+        decided = _require_text(decided_on, "decided_on")
+        try:
+            datetime.date.fromisoformat(decided)
+        except ValueError as exc:
+            raise SanctionedWriteError(
+                f"decided_on must be an ISO date (YYYY-MM-DD), got "
+                f"{decided_on!r}"
+            ) from exc
+        reason = _require_text(backfill_reason, "backfill_reason")
+
+    log = _read_or_create_activity_log(set_dir)
+    ordinal = len(_entries_of_kind(log, KIND_DECISION)) + 1
+    entry = {
+        "kind": KIND_DECISION,
+        "decisionId": f"D{ordinal}",
+        "ordinal": ordinal,
+        "sessionNumber": number,
+        "decidedOn": decided,
+        "recordedAt": recorded_at,
+        "decider": decider,
+        "headline": headline_text,
+        "body": body_text,
+    }
+    for key, value in (("model", model), ("provider", provider)):
+        if isinstance(value, str) and value.strip():
+            entry[key] = value.strip()
+    if reason is not None:
+        entry["backfillReason"] = reason
+    log.setdefault("entries", []).append(entry)
+    _write_activity_log(set_dir, log)
+    render_decisions_log(set_dir)
+    return entry
+
+
+def declare_session_task(
+    set_dir, *, session_number: int, task: str, releasable: bool,
+) -> dict:
+    """Declare what a session will do, and whether it may publish.
+
+    Spec §3.a puts this before development, and the framework enforces the
+    order rather than asking for it: the declaration is refused once the
+    working tree carries the session's work, refused a second time, and
+    refused after the session closes. A declaration made after the code
+    exists is a model deciding in hindsight what may be published.
+    """
+    number = _require_session_number(session_number)
+    task_text = _require_text(task, "task")
+    if not isinstance(releasable, bool):
+        raise SanctionedWriteError(
+            "releasable must be True or False -- an undeclared session is "
+            "not releasable, and no third value means anything here"
+        )
+    log = _read_or_create_activity_log(set_dir)
+    if any(e.get("sessionNumber") == number
+           for e in _entries_of_kind(log, KIND_TASK_DECLARATION)):
+        raise SanctionedWriteError(
+            f"session {number} has already declared its task list; a "
+            "declaration is made once, before the work"
+        )
+    record = _session_records(set_dir).get(number)
+    if record and record["status"] == STATUS_COMPLETE:
+        raise SanctionedWriteError(
+            f"session {number} is complete; its task list can no longer be "
+            "declared, because the declaration is what the work is measured "
+            "against"
+        )
+    # Imported here: ``gates`` reads the ledger and the state, and a
+    # top-level edge would make the write discipline depend on the gates
+    # that read what it wrote.
+    from .gates import material_worktree_changes, preview_paths
+
+    changed, error = material_worktree_changes(set_dir)
+    if error:
+        raise SanctionedWriteError(
+            f"cannot tell whether session {number}'s work has begun: {error}"
+        )
+    if changed:
+        raise SanctionedWriteError(
+            f"session {number} cannot declare its task list now: the working "
+            f"tree already carries {len(changed)} change(s) "
+            f"({preview_paths(changed)}). The declaration comes before the "
+            "work -- one made after it is a model deciding in hindsight what "
+            "may be published. Commit or revert, then declare."
+        )
+    entry = {
+        "kind": KIND_TASK_DECLARATION,
+        "sessionNumber": number,
+        "dateTime": _now_iso(),
+        "task": task_text,
+        "releasable": releasable,
+    }
+    log.setdefault("entries", []).append(entry)
+    _write_activity_log(set_dir, log)
+    render_project_work_plan(set_dir)
+    return entry
+
+
+def record_project_plan(set_dir, body: str) -> dict:
+    """Record the plan prose the session list hangs off. Appended, not
+    overwritten -- the newest is rendered and the earlier ones stay in the
+    log, so a plan that changed can be seen to have changed."""
+    body_text = _require_text(body, "body")
+    log = _read_or_create_activity_log(set_dir)
+    entry = {
+        "kind": KIND_PROJECT_PLAN,
+        "dateTime": _now_iso(),
+        "body": body_text,
+    }
+    log.setdefault("entries", []).append(entry)
+    _write_activity_log(set_dir, log)
+    render_project_work_plan(set_dir)
+    return entry
+
+
+def read_task_declaration(set_dir, session_number: int):
+    """The session's declaration, or None. None is the answer for a
+    session that never declared, and callers must read it as "not
+    releasable" rather than as "unknown"."""
+    log = _read_or_create_activity_log(set_dir)
+    for entry in _entries_of_kind(log, KIND_TASK_DECLARATION):
+        if entry.get("sessionNumber") == session_number:
+            return entry
+    return None
+
+
+def session_is_releasable(set_dir, session_number: int) -> bool:
+    """Fails closed. Packaging asks this question, and the absence of a
+    declaration is a refusal, never a default yes."""
+    declaration = read_task_declaration(set_dir, session_number)
+    return bool(declaration and declaration.get("releasable") is True)
+
+
+def _decider_label(entry: dict) -> str:
+    label = str(entry.get("decider", "")).capitalize() or "Unknown"
+    model = entry.get("model")
+    provider = entry.get("provider")
+    if model and provider:
+        return f"{label} ({model}/{provider})"
+    if model:
+        return f"{label} ({model})"
+    if provider:
+        return f"{label} ({provider})"
+    return label
+
+
+_PROJECTION_NOTE = (
+    "**Written by `ai_router.writers` as a fold of `activity-log.json`.**\n"
+    "Hand edits are overwritten by the next append. The record is the log;\n"
+    "this page is one view of it."
+)
+
+
+def render_decisions_log(set_dir) -> str:
+    """Fold the decision rows into `decisions-log.md`, strictly in the
+    order they were appended.
+
+    Session headings are emitted where the session changes rather than
+    used to group, so a session that receives a later decision appears
+    again further down. Grouping would have read better and would have
+    put D38 above D10; the file's whole claim is "in order".
+    """
+    set_path = Path(set_dir)
+    log = _read_or_create_activity_log(set_path)
+    decisions = sorted(
+        _entries_of_kind(log, KIND_DECISION),
+        key=lambda e: e.get("ordinal") or 0,
+    )
+    records = _session_records(set_path)
+    lines = [
+        f"# Decisions log — {set_path.name}",
+        "",
+        "Every decision, human or AI, in order, with who made it and what "
+        "it was.",
+        "",
+        _PROJECTION_NOTE,
+        "",
+        "---",
+    ]
+    if not decisions:
+        lines += ["", "_No decisions recorded yet._"]
+    current = None
+    seen = set()
+    for entry in decisions:
+        number = entry.get("sessionNumber") or 0
+        if number != current:
+            title = (records.get(number) or {}).get("title") \
+                or f"Session {number}"
+            suffix = " (continued)" if number in seen else ""
+            lines += ["", f"## Session {number} — {title}{suffix}"]
+            seen.add(number)
+            current = number
+        lines += [
+            "",
+            f"### {entry.get('decisionId')} · {entry.get('decidedOn')} · "
+            f"{_decider_label(entry)} · {entry.get('headline')}",
+            "",
+            str(entry.get("body", "")).strip(),
+        ]
+        if entry.get("backfillReason"):
+            lines += [
+                "",
+                f"*Backfilled on {str(entry.get('recordedAt', ''))[:10]} "
+                f"— {entry['backfillReason']}*",
+            ]
+    text = "\n".join(lines).rstrip("\n") + "\n"
+    _write_text_lf(set_path / DECISIONS_LOG_FILENAME, text)
+    return text
+
+
+def render_project_work_plan(set_dir) -> str:
+    """Fold the plan prose and the task declarations into
+    `project-work-plan.md`: the plan, then every numbered session beside
+    what it declared and whether it may publish."""
+    set_path = Path(set_dir)
+    log = _read_or_create_activity_log(set_path)
+    plans = _entries_of_kind(log, KIND_PROJECT_PLAN)
+    declarations = {
+        e.get("sessionNumber"): e
+        for e in _entries_of_kind(log, KIND_TASK_DECLARATION)
+    }
+    records = _session_records(set_path)
+    numbers = sorted(
+        n for n in set(records) | set(declarations) if isinstance(n, int)
+    )
+    lines = [
+        f"# Project work plan — {set_path.name}",
+        "",
+        _PROJECTION_NOTE,
+        "",
+        "---",
+        "",
+        "## The plan",
+        "",
+        plans[-1]["body"].strip() if plans else "_No plan recorded yet._",
+        "",
+        "## Sessions",
+        "",
+        "| # | Session | Releasable | Declared |",
+        "| ---: | --- | --- | --- |",
+    ]
+    if not numbers:
+        lines.append("| — | _no sessions yet_ | — | — |")
+    for number in numbers:
+        title = (records.get(number) or {}).get("title") or f"Session {number}"
+        declared = declarations.get(number)
+        releasable = "—" if declared is None else (
+            "yes" if declared.get("releasable") else "no"
+        )
+        when = "not declared" if declared is None else str(
+            declared.get("dateTime", "")
+        )[:10]
+        lines.append(f"| {number} | {title} | {releasable} | {when} |")
+    for number in numbers:
+        declared = declarations.get(number)
+        if declared is None:
+            continue
+        title = (records.get(number) or {}).get("title") or f"Session {number}"
+        lines += [
+            "",
+            f"### Session {number} — {title}",
+            "",
+            "**Releasable: "
+            + ("yes" if declared.get("releasable") else "no")
+            + ".**",
+            "",
+            str(declared.get("task", "")).strip(),
+        ]
+    text = "\n".join(lines).rstrip("\n") + "\n"
+    _write_text_lf(set_path / WORK_PLAN_FILENAME, text)
+    return text
 
 
 # --- cancel/restore audit markers --------------------------------------------

@@ -88,6 +88,25 @@ around.
 
 The command is idempotent. Re-run it safely after a context reset.
 
+**Then declare the task list, before you edit anything.**
+
+```powershell
+.venv/Scripts/python -m ai_router.session declare `
+    --session-set-dir docs/session-sets/148-the-session-framework `
+    --task-file <path> --releasable|--not-releasable
+```
+
+`start` prints this command when the session has not declared. The
+declaration is **refused once the working tree carries the session's work**,
+refused a second time, and refused after the session closes — because a
+session that declares itself releasable after building is a model deciding
+in hindsight what may be published, and session 13 will not package a
+session that did not declare itself releasable beforehand.
+
+**So declare before you edit.** If you have already started, commit or
+revert first; the framework will not take the declaration over a dirty
+tree.
+
 ### 2. Do the work — and do not commit yet
 
 Follow the numbered steps for your session in the set spec. **Verification
@@ -191,8 +210,27 @@ The close flips the state, then commits and pushes its own bookkeeping.
 ## What "full dogfood" obliges you to do
 
 **Every session records its decisions as it makes them, not afterward.**
-That is the behaviour session 5 automates; until then, keep the set's
-decisions log by hand and session 5 backfills it through the real writer.
+Since session 5 the framework owns both files, so this is a command rather
+than a habit:
+
+```powershell
+.venv/Scripts/python -m ai_router.session decision `
+    --session-set-dir docs/session-sets/148-the-session-framework `
+    --decider <operator|orchestrator|verifier|framework> `
+    --headline "<what was decided, in one line>" `
+    --body-file <path>   # or --body "<why>"; '-' reads stdin
+```
+
+**Never hand-edit `decisions-log.md` or `project-work-plan.md`.** They are
+folded out of `activity-log.json` on every append, so an edit survives
+exactly until the next one. The identifier, the position in the sequence
+and the date are the writer's; you supply what was decided and why. A
+historical entry needs `--decided-on` **and** `--backfill-reason` together,
+and renders saying it was transcribed.
+
+**Record the verifier's decisions too**, with `--decider verifier --model
+<id> --provider <vendor>`. A round that found something real is a decision
+the record should carry.
 
 **Every session records its seat cost from session 3 onward.** Session 3 is
 the first ordinary code session and its cost is the unit that says whether

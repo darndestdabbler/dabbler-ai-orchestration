@@ -2,10 +2,9 @@
 
 Every decision, human or AI, in order, with who made it and what it was.
 
-**Kept by hand until session 5.** The writer that owns this file does not
-exist yet; session 5 builds it and backfills these entries through it. The
-shape here anticipates that writer — date, who, decision, why — so the
-backfill is a transcription rather than a re-interpretation.
+**Written by `ai_router.writers` as a fold of `activity-log.json`.**
+Hand edits are overwritten by the next append. The record is the log;
+this page is one view of it.
 
 ---
 
@@ -24,6 +23,8 @@ recommendation.
 `master` was a strict ancestor of both branches, so it fast-forwarded to
 the design tip and then merged the experiment tip. Nothing was rebased and
 no published history was rewritten.
+
+*Backfilled on 2026-08-27 — transcribed from the hand-kept log, attributed there to "Operator"*
 
 ### D2 · 2026-08-26 · Operator · Sets 145 and 146 were already cancelled, on another branch
 
@@ -44,7 +45,9 @@ sets are `in-progress` and 148 is the lowest-numbered startable set.
 record. The precondition was satisfiable two ways, and only one of them
 left the record honest.*
 
-### D3 · 2026-08-26 · AI (orchestrator), operator-approved · The design documents are held out of the committed tree until session 1 commits them
+*Backfilled on 2026-08-27 — transcribed from the hand-kept log, attributed there to "Operator"*
+
+### D3 · 2026-08-26 · Orchestrator · The design documents are held out of the committed tree until session 1 commits them
 
 Round 1 evidence is `git diff HEAD` plus untracked file contents, and
 `facts.py::assemble_evidence` raises `EvidenceEmptyError` when both are
@@ -71,7 +74,9 @@ lifecycle lock — so `check_working_tree_clean` counts it as an uncommitted
 change and session 1 could never have closed. The verifier caught a real
 contradiction between a decision recorded here and a gate in running code.
 
-### D4 · 2026-08-26 · AI (orchestrator) · `AGENTS.md` now names `master` as the working branch
+*Backfilled on 2026-08-27 — transcribed from the hand-kept log, attributed there to "AI (orchestrator), operator-approved"*
+
+### D4 · 2026-08-26 · Orchestrator · `AGENTS.md` now names `master` as the working branch
 
 D1 made the existing "Working branch" section wrong, and it is the section
 every engine reads first. Left stale it would have sent session 2 to
@@ -79,6 +84,8 @@ every engine reads first. Left stale it would have sent session 2 to
 
 Edited in the unmanaged region above the `dabbler:managed` fence; the
 managed body is untouched and still belongs to `ai_router.bootstrap`.
+
+*Backfilled on 2026-08-27 — transcribed from the hand-kept log, attributed there to "AI (orchestrator)"*
 
 ### D5 · 2026-08-26 · Framework · No preverify record is required for this session
 
@@ -90,7 +97,9 @@ Consistent with the set spec's "Est. 0 tests — this session writes no
 code." Recorded rather than assumed, because a session that skips a
 lifecycle step must be able to show why the step was satisfied.
 
-### D6 · 2026-08-26 · AI (orchestrator) · A redacted read can manufacture a confident false finding — and did, in round 1
+*Backfilled on 2026-08-27 — transcribed from the hand-kept log, attributed there to "Framework"*
+
+### D6 · 2026-08-26 · Orchestrator · A redacted read can manufacture a confident false finding — and did, in round 1
 
 Round 1's second finding said `_call_openai` sends `Authorization: ******`
 without using the resolved key, so every OpenAI direct-API call would fail
@@ -120,7 +129,9 @@ be weighed — an unmarked one is indistinguishable from evidence.
 not "a verifier that cannot look", but a verifier that looked and was shown
 something else.*
 
-### D7 · 2026-08-26 · AI (orchestrator) · Session 2 must edit before it verifies
+*Backfilled on 2026-08-27 — transcribed from the hand-kept log, attributed there to "AI (orchestrator)"*
+
+### D7 · 2026-08-26 · Orchestrator · Session 2 must edit before it verifies
 
 D3 commits all four documents in session 1, so session 2 opens against a
 clean tree and would hit the same `EvidenceEmptyError`.
@@ -132,6 +143,7 @@ and appending to this log. **It must make those edits before running
 existing document has to write the judgment down before the judgment can be
 reviewed.
 
+*Backfilled on 2026-08-27 — transcribed from the hand-kept log, attributed there to "AI (orchestrator)"*
 
 ### D8 · 2026-08-26 · Verifier (gpt-5.5/openai) · Round 2 withdrew the disputed finding and accepted the D3 correction
 
@@ -153,7 +165,9 @@ orchestrator had written into its own plan, and a false positive that
 exposed a defect in the verifier's read surface. Neither would have been
 found by the author alone.*
 
-### D9 · 2026-08-26 · AI (orchestrator) · The run of record exposed a test that cannot pass on Windows
+*Backfilled on 2026-08-27 — transcribed from the hand-kept log, attributed there to "Verifier (gpt-5.5/openai)"*
+
+### D9 · 2026-08-26 · Orchestrator · The run of record exposed a test that cannot pass on Windows
 
 The first `final-full` run came back **1 failed, 758 passed**:
 `tests/test_offline_transport.py::TestSelection::test_config_supplies_the_directory`
@@ -178,33 +192,11 @@ That rule is why this was found at all: a session permitted to record
 this is a repair to an existing test, not a new one, and the Python test
 count is unchanged.*
 
----
-
-## Seat cost
-
-The set spec makes session 3 the unit of measurement, because it is the
-first ordinary code session. Session 1 is prose review and is recorded here
-for contrast rather than as the planning number.
-
-| Session | Rounds | Verifier | Transport | Findings | Cost |
-| --- | ---: | --- | --- | ---: | --- |
-| 1 | 2 | `gpt-5.5` / openai | `copilot-cli` | 2 Major → 1 remediated, 1 withdrawn | `costUsd: null` |
-
-**`costUsd: null` on a seat call is a metrics gap, not a free call.** Both
-rounds recorded null cost and null token counts, which is the seat's known
-reporting behaviour (spec §7: seat spend is not attributable per session and
-is not estimated). Two rounds of prose review is the observation session 3
-will be compared against.
-
-*Round 1 cost two blocking findings' worth of review; round 2 cost a
-delta-only read. A session that disputes rather than remediates still pays
-for a round — the saving is in not corrupting the code, not in seat spend.*
-
----
+*Backfilled on 2026-08-27 — transcribed from the hand-kept log, attributed there to "AI (orchestrator)"*
 
 ## Session 2 — Verify this breakdown against that design
 
-### D10 · 2026-08-26 · AI (orchestrator) · Every plan item appears exactly once
+### D10 · 2026-08-26 · Orchestrator · Every plan item appears exactly once
 
 Checked the plan's item list against the set's seventeen sessions.
 
@@ -234,7 +226,9 @@ problem and the single write is another.
 Sessions 1 and 2 build no plan item by design; they are the set's own
 verification of the design and the breakdown.
 
-### D11 · 2026-08-26 · AI (orchestrator) · §3.a is unbuilt, and session 13 depends on it — the one real gap
+*Backfilled on 2026-08-27 — transcribed from the hand-kept log, attributed there to "AI (orchestrator)"*
+
+### D11 · 2026-08-26 · Orchestrator · §3.a is unbuilt, and session 13 depends on it — the one real gap
 
 **`releasable` appears in the three design documents and nowhere in the
 code.** Grepped the whole repository: `docs/session-framework-spec.md:93`,
@@ -258,7 +252,9 @@ in that file, and exists eight sessions before the gate that reads it.
 *Recorded as an amendment to the breakdown, not to the specification. The
 spec was right; the session list had a hole.*
 
-### D12 · 2026-08-26 · AI (orchestrator) · Session 8 does not depend on session 9, though it reads as if it might
+*Backfilled on 2026-08-27 — transcribed from the hand-kept log, attributed there to "AI (orchestrator)"*
+
+### D12 · 2026-08-26 · Orchestrator · Session 8 does not depend on session 9, though it reads as if it might
 
 Plan A6 has the direct-API path resolve the `verifier` role "against the
 model record", and A7 — a session later — is what builds enumeration into
@@ -275,7 +271,9 @@ together or not at all" is about the pricing sort key, not about ordering:
 A6 must replace rates as the candidate sort key in the same change that
 deletes pricing. That constraint is within session 8.
 
-### D13 · 2026-08-26 · AI (orchestrator) · The session 14 reordering is sound
+*Backfilled on 2026-08-27 — transcribed from the hand-kept log, attributed there to "AI (orchestrator)"*
+
+### D13 · 2026-08-26 · Orchestrator · The session 14 reordering is sound
 
 The set spec moves A3 from third to fourteenth. Confirmed both halves of
 the claim the set spec makes for it:
@@ -296,7 +294,9 @@ carries the real risk — migrating this set's state forward — and the set
 spec already states the test: if sessions 15 through 17 cannot register,
 verify and close under what session 14 builds, session 14 is not done.
 
-### D14 · 2026-08-26 · AI (orchestrator) · Two spec sections need no session, and one was checked too narrowly
+*Backfilled on 2026-08-27 — transcribed from the hand-kept log, attributed there to "AI (orchestrator)"*
+
+### D14 · 2026-08-26 · Orchestrator · Two spec sections need no session, and one was checked too narrowly
 
 Checked for specification sections that no session builds:
 
@@ -320,6 +320,8 @@ step 7.
 expensive kind of wrong answer in a completeness review, because it closes
 the question. A partial check that reports as a whole one is how a gap
 survives its own audit.*
+
+*Backfilled on 2026-08-27 — transcribed from the hand-kept log, attributed there to "AI (orchestrator)"*
 
 ### D15 · 2026-08-26 · Verifier (gpt-5.5/openai) · Round 1 found three unassigned deliverables
 
@@ -345,6 +347,8 @@ is that no session may reduce its own verification, and sessions 3 through
 against exactly the sessions the specification excludes, and it took a
 different vendor reading §9 against the code to notice.
 
+*Backfilled on 2026-08-27 — transcribed from the hand-kept log, attributed there to "Verifier (gpt-5.5/openai)"*
+
 ### D16 · 2026-08-26 · Verifier (gpt-5.5/openai) · Round 2: the right fix in the wrong session is still a gap
 
 Round 2 accepted the transport and pricing assignments and rejected the
@@ -366,6 +370,8 @@ The question is "is it assigned early enough to cover the first session that
 could use the hole", and ordering is the answer to it. This is the same
 class of reasoning the session 14 reordering rests on, applied in the other
 direction.*
+
+*Backfilled on 2026-08-27 — transcribed from the hand-kept log, attributed there to "Verifier (gpt-5.5/openai)"*
 
 ### D17 · 2026-08-26 · Verifier (gpt-5.5/openai) · Round 3: there were two waiver paths, and the fix named one
 
@@ -395,7 +401,9 @@ above has not been through a round. That is the state session 2 hands to the
 operator, and the specification's answer for a planning session at the cap
 is the approval gate — not a fourth round taken unilaterally.
 
-### D18 · 2026-08-26 · AI (orchestrator) · The framework has no exit for "the verifier was right, I fixed it, and I am out of rounds"
+*Backfilled on 2026-08-27 — transcribed from the hand-kept log, attributed there to "Verifier (gpt-5.5/openai)"*
+
+### D18 · 2026-08-26 · Orchestrator · The framework has no exit for "the verifier was right, I fixed it, and I am out of rounds"
 
 Round 4 was attempted and **refused before any vendor call**: *"round 4
 exceeds the cap (3). The loop SUSPENDS at the bound."* The cap works.
@@ -434,6 +442,8 @@ raising `max_rounds` mid-session, or filing a dispute nobody believes — both
 edit the conditions of a review from inside the review, which is the one
 thing this set exists to make impossible.*
 
+*Backfilled on 2026-08-27 — transcribed from the hand-kept log, attributed there to "AI (orchestrator)"*
+
 ### D19 · 2026-08-26 · Operator · There are no human approval gates anywhere
 
 **Directive: "I don't really want human blockers."**
@@ -460,7 +470,9 @@ sessions are built against it. That is the trade the directive makes, and it
 is only safe because §3.c.i's terminal states keep an unreviewed remediation
 labelled as one instead of laundering it into "verified".*
 
-### D20 · 2026-08-26 · Operator + AI · The three terminal states, which is what makes D19 safe
+*Backfilled on 2026-08-27 — transcribed from the hand-kept log, attributed there to "Operator"*
+
+### D20 · 2026-08-26 · Operator · The three terminal states, which is what makes D19 safe
 
 Removing the approval gate without giving the loop somewhere to land would
 have turned every session that hit D18's dead end into a permanent hang.
@@ -488,7 +500,9 @@ surfaced by session 17, which must show which state a session reached
 because unresolved and remediated-at-the-cap read very differently at
 planning time.
 
-### D21 · 2026-08-26 · AI (orchestrator) · Read fidelity is now session 6's problem, in the spec rather than only in this log
+*Backfilled on 2026-08-27 — transcribed from the hand-kept log, attributed there to "Operator + AI"*
+
+### D21 · 2026-08-26 · Orchestrator · Read fidelity is now session 6's problem, in the spec rather than only in this log
 
 D6 recorded the redaction discovery as design input. It is now **spec
 §4.a** — a new subsection stating that the read surface owes one guarantee:
@@ -506,6 +520,8 @@ Session 6 step 4 now carries it, with session 1's incident named as the
 evidence: an unmarked transformed read produced a confident Major finding
 against correct code, and the agency log recorded only that the right file
 was read.
+
+*Backfilled on 2026-08-27 — transcribed from the hand-kept log, attributed there to "AI (orchestrator)"*
 
 ### D22 · 2026-08-26 · Operator · The cap is raised for session 2, on the record
 
@@ -529,6 +545,8 @@ answer is fewer and larger sessions, never fewer rounds.
 session 2 close honestly without touching the bound at all. Until that
 exists, this is the only exit that does not put a false statement on the
 record.*
+
+*Backfilled on 2026-08-27 — transcribed from the hand-kept log, attributed there to "Operator"*
 
 ### D23 · 2026-08-26 · Verifier (gpt-5.5/openai) · Round 4: removing the gate left session 3 building the gate
 
@@ -557,6 +575,8 @@ into the loop rather than inventing it.
 narrow, then backwards. The step is small; the constraint around it is not,
 and each round found a different way the constraint had been missed.*
 
+*Backfilled on 2026-08-27 — transcribed from the hand-kept log, attributed there to "Verifier (gpt-5.5/openai)"*
+
 ### D24 · 2026-08-26 · Verifier (gpt-5.5/openai) · Round 5: "adds the state" is not the same as "the state works"
 
 Round 5 sharpened round 4's ordering point into the one that mattered.
@@ -582,18 +602,7 @@ is the honest cost of the first code session also being the session that
 removes the framework's only escape hatch, and it is better known now than
 discovered at session 7.*
 
-
-
-
-
-
-
-
-
-
-
-
----
+*Backfilled on 2026-08-27 — transcribed from the hand-kept log, attributed there to "Verifier (gpt-5.5/openai)"*
 
 ## Session 3 — The credential allowlist (plan A1)
 
@@ -626,6 +635,8 @@ decision the waiver used to make.*
 > tree was too weak by exactly the margin this entry hedged on. Steps 1 and
 > 3, and the preverify requirement, stand.
 
+*Backfilled on 2026-08-27 — transcribed from the hand-kept log, attributed there to "Orchestrator (claude-opus-5/anthropic)"*
+
 ### D26 · 2026-08-26 · Orchestrator (claude-opus-5/anthropic) · The child environment is an allowlist and nothing else
 
 Plan A1 asks for an allowlist *and* names five classes to exclude. Building
@@ -643,6 +654,8 @@ leaves anything for the next check.
 *Cost: a toolchain needing a name nobody listed fails visibly rather than
 silently inheriting a key. That is the right direction to fail.*
 
+*Backfilled on 2026-08-27 — transcribed from the hand-kept log, attributed there to "Orchestrator (claude-opus-5/anthropic)"*
+
 ### D27 · 2026-08-26 · Orchestrator (claude-opus-5/anthropic) · A reached round cap is no longer extensible, and `--extend-rounds` survives only for budgets
 
 `resume --extend-rounds` raised the round limit from a round-cap pause. The
@@ -652,6 +665,8 @@ operator's to extend.
 
 **Kept rather than deleted**, because raising a budget is not typing a
 verdict. Its refusal message now says which ceiling it answers for.
+
+*Backfilled on 2026-08-27 — transcribed from the hand-kept log, attributed there to "Orchestrator (claude-opus-5/anthropic)"*
 
 ### D28 · 2026-08-26 · Orchestrator (claude-opus-5/anthropic) · WAIVED is retired from every writer and kept in every reader
 
@@ -664,6 +679,8 @@ than the token surviving.
 `SESSION_VERDICTS` drops WAIVED, so `validate_session_verdict` refuses it and
 no path can persist another. The schemas and the extension's reader keep it,
 and `REMEDIATED_AT_CAP` joins both.
+
+*Backfilled on 2026-08-27 — transcribed from the hand-kept log, attributed there to "Orchestrator (claude-opus-5/anthropic)"*
 
 ### D29 · 2026-08-26 · Orchestrator (claude-opus-5/anthropic) · Seat cost, measured: one code session is roughly $22 in AI credits before verification
 
@@ -686,6 +703,8 @@ be measured the same way before any re-plan is decided on this number alone.
 session in the sequence, is not grounds to restructure sixteen others. The
 decision this entry exists to enable is: if sessions 4 and 5 also land near
 $20, the answer is fewer and larger sessions — never fewer rounds.
+
+*Backfilled on 2026-08-27 — transcribed from the hand-kept log, attributed there to "Orchestrator (claude-opus-5/anthropic)"*
 
 ### D30 · 2026-08-26 · Verifier (gpt-5.5/openai) · Round 1: any changed tree was the waiver wearing a machine's name
 
@@ -713,6 +732,8 @@ which is why the work lands labelled unreviewed. It is proof the repair was
 aimed at the finding, which is the strongest claim available without a
 reviewer, and the one the retired waiver never had to make at all.*
 
+*Backfilled on 2026-08-27 — transcribed from the hand-kept log, attributed there to "Verifier (gpt-5.5/openai)"*
+
 ### D31 · 2026-08-26 · Orchestrator (claude-opus-5/anthropic) · Round 2 is disputed: "prove the repair" is a review, and the cap is where no reviewer exists
 
 Round 2 accepted that the bar is now per finding and asked for one stronger
@@ -735,6 +756,10 @@ sentence aimed one step past what a machine can answer, which is what "prose
 review has no bottom" looks like when the subject is code. The dispute
 channel exists so that costs one round rather than the session.*
 
+*Backfilled on 2026-08-27 — transcribed from the hand-kept log, attributed there to "Orchestrator (claude-opus-5/anthropic)"*
+
+## Session 4 — Record authority (plan A2)
+
 ### D32 · 2026-08-27 · Orchestrator (claude-opus-5/anthropic) · Session 4: a target's first event declares where work begins, and is not judged as a move
 
 `validate_transition` enforces "forward entry is sequential", but a target
@@ -749,6 +774,8 @@ is an origin, and sequencing applies from there.**
 *The origin is still in the log and still auditable. What it cannot be is a
 route around the rule, because a target has exactly one first event.*
 
+*Backfilled on 2026-08-27 — transcribed from the hand-kept log, attributed there to "Orchestrator (claude-opus-5/anthropic)"; filed there under the session 3 heading, which the log never closed, and corrected to session 4 against the entry's own text*
+
 ### D33 · 2026-08-27 · Orchestrator (claude-opus-5/anthropic) · Session 4: `fold` refuses an illegal move rather than repairing it
 
 The plan asked for one validator used by `append` and `fold` both. `append`
@@ -761,6 +788,8 @@ history, which is the one thing this framework claims cannot happen.
 *Cost: four existing tests placed targets at late steps by folding a single
 `entered` event. Three needed no change under D32; the rest were rewritten
 to walk the steps or to enter first and send back.*
+
+*Backfilled on 2026-08-27 — transcribed from the hand-kept log, attributed there to "Orchestrator (claude-opus-5/anthropic)"; filed there under the session 3 heading, which the log never closed, and corrected to session 4 against the entry's own text*
 
 ### D34 · 2026-08-27 · Orchestrator (claude-opus-5/anthropic) · Session 4: the doc-only cap is deleted, not narrowed
 
@@ -776,6 +805,8 @@ schema as readable**, the same treatment `WAIVED` got in session 3: a
 retired field must not make the machine's own historical record unreadable.
 It leaves `required`, so nothing new emits it.
 
+*Backfilled on 2026-08-27 — transcribed from the hand-kept log, attributed there to "Orchestrator (claude-opus-5/anthropic)"; filed there under the session 3 heading, which the log never closed, and corrected to session 4 against the entry's own text*
+
 ### D35 · 2026-08-27 · Orchestrator (claude-opus-5/anthropic) · Session 4: one missing selection rule added, three left alone
 
 `ai_router.affected` raised `selection_unknown` for `ai_router/workflow.py`
@@ -787,6 +818,8 @@ rules and this session did not touch them. A session that fixes every
 adjacent gap it notices stops being reviewable.
 
 *Filed for whichever session next touches those three.*
+
+*Backfilled on 2026-08-27 — transcribed from the hand-kept log, attributed there to "Orchestrator (claude-opus-5/anthropic)"; filed there under the session 3 heading, which the log never closed, and corrected to session 4 against the entry's own text*
 
 ### D36 · 2026-08-27 · Verifier (gpt-5.5/openai) · Round 1: D32's origin exception was the skip it was meant to prevent
 
@@ -812,6 +845,8 @@ D32 traded a stated rule for a conflict that did not exist.*
 `python -m ai_router.workflow enter build --component csv-model
 --workspace-root examples/csv-walkthrough` exits 1 and writes nothing.
 
+*Backfilled on 2026-08-27 — transcribed from the hand-kept log, attributed there to "Verifier (gpt-5.5/openai)"; filed there under the session 3 heading, which the log never closed, and corrected to session 4 against the entry's own text*
+
 ### D37 · 2026-08-27 · Orchestrator (claude-opus-5/anthropic) · Session 4 seat cost: ~$8, about a third of session 3, and it is the typical unit D29 asked for
 
 **The measurement.** `python -m ai_router.seat_cost` against this session's
@@ -835,3 +870,232 @@ never fewer rounds.
 
 *One round of verification found one Major defect that reading the code did
 not — D36. That is the round the cost is buying.*
+
+*Backfilled on 2026-08-27 — transcribed from the hand-kept log, attributed there to "Orchestrator (claude-opus-5/anthropic)"; filed there under the session 3 heading, which the log never closed, and corrected to session 4 against the entry's own text*
+
+## Session 1 — Verify the design before anything is built (continued)
+
+### D38 · 2026-08-26 · Orchestrator (claude-opus-5/anthropic) · Session 1 seat cost: two rounds of prose review, and `costUsd: null` is a metrics gap rather than a free call
+
+The set spec makes session 3 the unit of measurement, because it is the
+first ordinary code session. Session 1 is prose review and is recorded here
+for contrast rather than as the planning number.
+
+| Session | Rounds | Verifier | Transport | Findings | Cost |
+| --- | ---: | --- | --- | ---: | --- |
+| 1 | 2 | `gpt-5.5` / openai | `copilot-cli` | 2 Major → 1 remediated, 1 withdrawn | `costUsd: null` |
+
+**`costUsd: null` on a seat call is a metrics gap, not a free call.** Both
+rounds recorded null cost and null token counts, which is the seat's known
+reporting behaviour (spec §7: seat spend is not attributable per session and
+is not estimated). Two rounds of prose review is the observation session 3
+will be compared against.
+
+*Round 1 cost two blocking findings' worth of review; round 2 cost a
+delta-only read. A session that disputes rather than remediates still pays
+for a round — the saving is in not corrupting the code, not in seat spend.*
+
+*Backfilled on 2026-08-27 — transcribed from the hand-kept log's standalone "Seat cost" section, which the writer has no shape for; appended last so no earlier identifier moved*
+
+## Session 5 — The two files, framework-written (plan A4)
+
+### D39 · 2026-08-27 · Orchestrator (claude-opus-5/anthropic) · The two files are projections; `activity-log.json` is the record
+
+The specification names two files and says the framework writes both. It
+does not say the files are the record, and making them one would mean
+parsing markdown back to find the next identifier — a record whose
+authority depends on its own formatting.
+
+**So the decision rows live in `activity-log.json`**, which is already
+machine-written, already carries a `kind` per row, and is already the set
+file the close commits. `decisions-log.md` and `project-work-plan.md` are
+folded out of it on every append and may be deleted and rebuilt.
+
+This is the same shape `journal.py` states for the run journal: one
+append-only record, every other view a fold. It is also what makes the
+"the model never chooses structure" claim enforceable rather than
+aspirational — there is no structure in the file for a model to reach.
+
+*A hand edit to either file survives exactly until the next append. That
+is tested, not asserted.*
+
+### D40 · 2026-08-27 · Orchestrator (claude-opus-5/anthropic) · The decider vocabulary is closed, and a backdated entry must say it is a transcription
+
+"Who made it" is only answerable against a fixed set of roles: `operator`,
+`orchestrator`, `verifier`, `framework`. A free-text author field lets a
+model attribute its own decision to a human, which is the one
+misattribution this file exists to prevent.
+
+**Time is the same problem.** `decided_on` and `backfill_reason` are
+supplied together or not at all. Without that pairing a backdated decision
+is indistinguishable from one recorded as it happened, and "every decision
+appends at the moment it occurs" becomes a claim nothing can check.
+
+A backfilled entry renders its own mark, so the contrast is visible on the
+page: an entry with no backfill line was written live.
+
+### D41 · 2026-08-27 · Orchestrator (claude-opus-5/anthropic) · A task declaration is write-once, and refused once the session is complete
+
+Spec §3.a: the declaration is made before any code exists, "because
+otherwise a model decides when to publish a package". Two machine-checkable
+bounds carry that:
+
+- **Write-once.** A second declaration for the same session is refused, not
+  merged. Re-declaring is how hindsight gets in.
+- **Refused after close.** A complete session can no longer declare,
+  because the declaration is what its work was measured against.
+
+`session_is_releasable` **fails closed**: an undeclared session is not
+releasable, and the absence of a declaration is a refusal rather than an
+unknown. Session 13 reads this and gates packaging on it.
+
+*`start` now prints the declare command when the in-flight session has not
+declared. A print is not a gate — the gate that matters is session 13's,
+and putting one in `start` would have blocked four already-closed
+sessions and every other set in the repository.*
+
+### D42 · 2026-08-27 · Orchestrator (claude-opus-5/anthropic) · The backfill preserved every identifier, so the seat-cost table became D38 rather than D10
+
+Thirty-seven entries were transcribed from the hand-kept log as it stands
+at `HEAD`, so a partially rendered file on disk could not become the
+source. Each one kept its identifier, its date and its body verbatim, and
+each carries its original attribution string in its backfill line — so
+`AI (orchestrator), operator-approved` and `Operator + AI`, which the
+closed vocabulary has no slot for, are preserved as written rather than
+paraphrased into it.
+
+**The hand-kept log also had a `## Seat cost` section, which is not a
+decision heading and which the writer has no shape for.** Inserting it in
+date order would have renumbered D10 through D37, and those identifiers
+are cited by other entries, by `STATUS.md`, and by this set's spec.
+
+**So it was appended last, as D38.** It reads out of sequence inside
+session 1 and that is the honest rendering: it was recorded last, and no
+earlier identifier moved.
+
+*The whole transcription is 89 insertions against 32 deletions. Every
+deleted line is the superseded preamble, a re-attributed heading, a
+separator, or blank. No body content was lost.*
+
+### D43 · 2026-08-27 · Orchestrator (claude-opus-5/anthropic) · The two files join `LIFECYCLE_WRITTEN_SET_FILES`, because a decision may be made after the last commit
+
+`ledger.LIFECYCLE_WRITTEN_SET_FILES` is the one declaration of what a close
+commits, what an evidence diff drops, what a covered-surface change
+ignores, and what a plan envelope may never declare. It already held the
+state file, the activity log and the change log.
+
+**Both new files belong in it for the same reason `change-log.md` does.**
+"Every decision appends at the moment it occurs" means decisions land
+during verification and during the close — after the work is committed.
+Left out of the list, each such append would dirty the tree, fail
+`working_tree_clean`, and teach the next session to batch its decisions
+until the end, which is the one behaviour the feature exists to stop.
+
+*They are folds of `activity-log.json`, which is already in the list. A
+projection of bookkeeping is bookkeeping.*
+
+### D44 · 2026-08-27 · Verifier (gpt-5.5/openai) · Round 1: the order the spec promised was printed, not enforced — and the first dogfood record was wrong
+
+Three Major findings, all correct, all against work this session had just
+called done.
+
+1. **A printed reminder is not enforcement.** Spec §3 says the framework
+   enforces the order of the lifecycle and that it is "a property of the
+   state machine, not an instruction in a prompt". `declare` only refused a
+   second declaration and a closed session, so an author who missed the
+   reminder could build first and declare `--releasable` afterwards — the
+   precise hindsight §3.a exists to stop.
+2. **The first dogfood record was wrong about session 4.** D32-D37 were
+   filed under session 3, because the hand-kept log never opened a
+   `## Session 4` heading and the transcription copied the file's
+   structure faithfully.
+3. **The render was not in order.** Grouping by session put D38 above D10,
+   in a file whose stated contents are "every decision, in order".
+
+*Finding 2 is the one worth keeping in view: a faithful transcription of a
+structurally wrong source produces a structurally wrong record. The
+hand-kept log could carry the error because a reader supplies the missing
+heading; a queryable record cannot.*
+
+### D45 · 2026-08-27 · Orchestrator (claude-opus-5/anthropic) · The declaration is refused once the working tree carries the work — which supersedes D41 and indicts this session's own declaration
+
+**D41 argued for a printed reminder** on the grounds that a gate in `start`
+would have blocked four already-closed sessions and every other set in the
+repository. That was an argument against gating the wrong command. The
+verifier asked for the gate on `declare`, where it costs nothing already
+closed.
+
+`declare_session_task` now refuses when the working tree carries material
+changes. "Material" is `gates.material_worktree_changes`, extracted from
+`check_working_tree_clean` so both callers ask one question: editor noise,
+the run ledger and the set's own bookkeeping are not work. `start` writes
+the state and the activity log before anything is declared, so counting
+those would have made declaration impossible.
+
+**Session 5''s own declaration was made after its code existed, and the new
+gate would have refused it.** It stands as recorded rather than being
+reissued: the writer is write-once by design, and reaching into the record
+to re-stage a cleaner history is the one thing this framework forbids. The
+first user of a feature cannot have used it before it existed — the same
+shape as the backfilled entries above.
+
+*Every session from 6 onward declares on a clean tree or does not declare.*
+
+### D46 · 2026-08-27 · Orchestrator (claude-opus-5/anthropic) · The log renders in append order; grouping by session is what put D38 above D10
+
+The renderer grouped decisions under one heading per session, which read
+well and was wrong: the file's stated contents are "every decision, human
+or AI, **in order**", and D38 — session 1''s seat cost, appended last —
+landed between D9 and D10.
+
+**Entries now emit strictly in ordinal order**, with a session heading
+written wherever the session changes rather than used to gather. A session
+that receives a later decision therefore appears again, marked
+`(continued)`.
+
+*D42 recorded that D38 "reads out of sequence inside session 1" and called
+that honest. It was not: the identifier was honest and the position was
+not. The fix keeps the identifier and moves the entry.*
+
+### D47 · 2026-08-27 · Orchestrator (claude-opus-5/anthropic) · D32-D37 are session 4's, and the correction is in the transcription rather than beside it
+
+The hand-kept log ran out of headings at `## Session 3`, so six session-4
+entries sat under it. Their own text says "Session 4"; the structured
+record said 3.
+
+**The whole backfill was regenerated from the source at `HEAD`** rather
+than patched in place — none of it was committed, so it was a draft rather
+than a record. Every identifier D1-D43 kept its position: the 37
+transcribed entries, then the seat-cost D38, then this session''s five live
+decisions re-appended in their original order.
+
+**The correction states itself.** D32-D37 carry it in their backfill line —
+"filed there under the session 3 heading, which the log never closed, and
+corrected to session 4 against the entry''s own text" — so the record shows
+both what the source said and what was written.
+
+*The rebuild script asserts the heading each entry was found under before
+it corrects any of them. A source that had been reorganized in the
+meantime stops the rebuild instead of silently re-attributing 43 entries.*
+
+### D48 · 2026-08-27 · Orchestrator (claude-opus-5/anthropic) · Session 5 seat cost: ~$10.61, inside the $8-$12 band D37 named
+
+**The measurement.** `python -m ai_router.seat_cost` against this session''s
+own conversation, after two verification rounds and before the run of
+record: **1,060.7 credits (~$10.61) over 113 events**, reported as a floor
+for the reason D29 gave — the caller''s closing turns are not in the store
+yet, and the seat-transport rounds are billed but priced `unpriced`.
+
+**Three samples now.** Session 3 was ~$22.48 over 184 events, session 4
+~$7.99 over 84, session 5 ~$10.61 over 113. **D37''s $8-$12 band holds**,
+and cost tracks event count rather than the size of the change: this
+session wrote more code than session 4 and cost proportionally more turns,
+not disproportionately more.
+
+**Re-plan trigger, unchanged.** At $8-$12, twelve remaining sessions is
+**$96-$144**. No re-plan is proposed. If sessions land near $20 again the
+answer is fewer and larger sessions, never fewer rounds.
+
+*One round of verification found three Major defects, one of which — the
+session-4 misattribution — was in the record this session exists to make
+trustworthy, and no amount of re-reading the diff would have surfaced it.*

@@ -44,9 +44,11 @@ from .progress import (
 # implementation detail.
 from .writers import (  # noqa: F401
     CANCELLED_FILENAME,
+    DECIDERS,
     RESTORED_FILENAME,
     SCHEMA_VERSION,
     STEP_STATUSES,
+    SanctionedWriteError,
     _completed_numbers,
     _now_iso,
     _now_iso_seconds,
@@ -55,13 +57,18 @@ from .writers import (  # noqa: F401
     _validate_and_write_state,
     _write_text_lf,
     append_change_log_block,
+    append_decision,
     build_orchestrator_block,
+    declare_session_task,
     flip_state_to_closed,
     log_step,
     plan_step_key,
+    read_task_declaration,
+    record_project_plan,
     record_session_verification,
     register_session_start,
     seed_session_plan,
+    session_is_releasable,
 )
 
 EXIT_OK = 0
@@ -543,6 +550,18 @@ def start(
             )
             for r in plan_rows:
                 print(f"  {r.get('stepNumber')}. {r.get('stepKey')}")
+        if read_task_declaration(set_path, requested) is None:
+            # Step (a) of the lifecycle. Said here because the declaration
+            # has to precede the work to mean anything -- a session that
+            # declares itself releasable after building is a model deciding
+            # in hindsight what may be published.
+            print(
+                f"This session has not declared its task list. Before the "
+                f"edits:\n  python -m ai_router.session declare "
+                f"--session-set-dir {set_path} \\\n"
+                "      --task \"<what this session will do>\" "
+                "--releasable|--not-releasable"
+            )
         print(
             "Next, once the edits are made:\n"
             f"  python -m ai_router.affected --session-set-dir {set_path}\n"
@@ -681,6 +700,165 @@ def log(set_dir, *, step: str, status: str, note=None,
         return EXIT_OK
     finally:
         release_lock(lock)
+
+
+# --- the two files ----------------------------------------------------------
+
+def _resolve_target_session(set_path, session_number):
+    """The session a decision or declaration belongs to: the one in
+    flight, else the last closed one, else refuse."""
+    if session_number is not None:
+        return session_number
+    raw = read_raw_session_state(set_path)
+    normalized = (
+        normalize_to_v4_shape(raw, set_path / "spec.md") if raw else None
+    )
+    current = (normalized or {}).get("currentSession")
+    if current is not None:
+        return current
+    completed = sorted(_completed_numbers(normalized))
+    return max(completed) if completed else None
+
+
+def _read_body(text, path):
+    """Prose arrives inline or from a file (``-`` is stdin), because a
+    decision that fits on a command line is usually not one."""
+    if text is not None:
+        return text
+    if path is None:
+        raise SanctionedWriteError("supply the text inline or from a file")
+    if path == "-":
+        return sys.stdin.read()
+    return Path(path).read_text(encoding="utf-8")
+
+
+def decision(set_dir, *, decider: str, headline: str, body=None,
+             body_file=None, model=None, provider=None, decided_on=None,
+             backfill_reason=None, session_number=None) -> int:
+    """Append one decision to the log, at the moment it occurs."""
+    set_path = Path(set_dir)
+    if not set_path.is_dir():
+        print(f"decision: not a directory: {set_path}", file=sys.stderr)
+        return EXIT_USAGE
+    target = _resolve_target_session(set_path, session_number)
+    if target is None:
+        print(
+            f"decision: refused -- no session has been started under "
+            f"{set_path}. Run `session start` first.", file=sys.stderr,
+        )
+        return EXIT_BOUNDARY
+    try:
+        text = _read_body(body, body_file)
+    except (OSError, UnicodeError) as exc:
+        print(f"decision: cannot read body -- {exc}", file=sys.stderr)
+        return EXIT_USAGE
+    except SanctionedWriteError as exc:
+        print(f"decision: refused -- {exc}", file=sys.stderr)
+        return EXIT_USAGE
+    try:
+        lock = acquire_lock_with_timeout(
+            set_path, worker_id=f"decision/{os.getpid()}"
+        )
+    except LockContentionError as exc:
+        print(f"decision: refused -- lifecycle lock contention: {exc}",
+              file=sys.stderr)
+        return EXIT_LOCK_CONTENTION
+    try:
+        entry = append_decision(
+            set_path, session_number=target, decider=decider,
+            headline=headline, body=text, model=model, provider=provider,
+            decided_on=decided_on, backfill_reason=backfill_reason,
+        )
+    except SanctionedWriteError as exc:
+        print(f"decision: refused -- {exc}", file=sys.stderr)
+        return EXIT_USAGE
+    finally:
+        release_lock(lock)
+    print(
+        f"decision: {entry['decisionId']} recorded for session {target} "
+        f"({entry['decider']})."
+    )
+    return EXIT_OK
+
+
+def declare(set_dir, *, task=None, task_file=None, releasable=None,
+            session_number=None) -> int:
+    """Declare the session's task list and whether it may publish."""
+    set_path = Path(set_dir)
+    if not set_path.is_dir():
+        print(f"declare: not a directory: {set_path}", file=sys.stderr)
+        return EXIT_USAGE
+    target = _resolve_target_session(set_path, session_number)
+    if target is None:
+        print(
+            f"declare: refused -- no session has been started under "
+            f"{set_path}. Run `session start` first.", file=sys.stderr,
+        )
+        return EXIT_BOUNDARY
+    try:
+        text = _read_body(task, task_file)
+    except (OSError, UnicodeError) as exc:
+        print(f"declare: cannot read task -- {exc}", file=sys.stderr)
+        return EXIT_USAGE
+    except SanctionedWriteError as exc:
+        print(f"declare: refused -- {exc}", file=sys.stderr)
+        return EXIT_USAGE
+    try:
+        lock = acquire_lock_with_timeout(
+            set_path, worker_id=f"declare/{os.getpid()}"
+        )
+    except LockContentionError as exc:
+        print(f"declare: refused -- lifecycle lock contention: {exc}",
+              file=sys.stderr)
+        return EXIT_LOCK_CONTENTION
+    try:
+        declare_session_task(
+            set_path, session_number=target, task=text,
+            releasable=releasable,
+        )
+    except SanctionedWriteError as exc:
+        print(f"declare: refused -- {exc}", file=sys.stderr)
+        return EXIT_USAGE
+    finally:
+        release_lock(lock)
+    print(
+        f"declare: session {target} declared; releasable="
+        f"{'yes' if releasable else 'no'}."
+    )
+    return EXIT_OK
+
+
+def plan(set_dir, *, body=None, body_file=None) -> int:
+    """Record the plan prose the numbered session list hangs off."""
+    set_path = Path(set_dir)
+    if not set_path.is_dir():
+        print(f"plan: not a directory: {set_path}", file=sys.stderr)
+        return EXIT_USAGE
+    try:
+        text = _read_body(body, body_file)
+    except (OSError, UnicodeError) as exc:
+        print(f"plan: cannot read body -- {exc}", file=sys.stderr)
+        return EXIT_USAGE
+    except SanctionedWriteError as exc:
+        print(f"plan: refused -- {exc}", file=sys.stderr)
+        return EXIT_USAGE
+    try:
+        lock = acquire_lock_with_timeout(
+            set_path, worker_id=f"plan/{os.getpid()}"
+        )
+    except LockContentionError as exc:
+        print(f"plan: refused -- lifecycle lock contention: {exc}",
+              file=sys.stderr)
+        return EXIT_LOCK_CONTENTION
+    try:
+        record_project_plan(set_path, text)
+    except SanctionedWriteError as exc:
+        print(f"plan: refused -- {exc}", file=sys.stderr)
+        return EXIT_USAGE
+    finally:
+        release_lock(lock)
+    print(f"plan: recorded; {set_path.name}/project-work-plan.md rewritten.")
+    return EXIT_OK
 
 
 # --- close ------------------------------------------------------------------
@@ -978,6 +1156,48 @@ def main(argv=None) -> int:
                        help="defaults to the in-flight session, or the last "
                             "closed one when none is in flight")
 
+    p_decision = sub.add_parser(
+        "decision", help="append a decision to decisions-log.md"
+    )
+    p_decision.add_argument("--session-set-dir", required=True)
+    p_decision.add_argument("--decider", required=True, choices=list(DECIDERS),
+                            help="who made it")
+    p_decision.add_argument("--headline", required=True,
+                            help="what was decided, in one line")
+    body_src = p_decision.add_mutually_exclusive_group(required=True)
+    body_src.add_argument("--body", help="why, inline")
+    body_src.add_argument("--body-file", help="why, from a file ('-'=stdin)")
+    p_decision.add_argument("--model", help="the deciding model, if any")
+    p_decision.add_argument("--provider", help="its vendor, if any")
+    p_decision.add_argument("--decided-on",
+                            help="ISO date; only with --backfill-reason")
+    p_decision.add_argument("--backfill-reason",
+                            help="why this is a transcription rather than a "
+                                 "live append; required with --decided-on")
+    p_decision.add_argument("--session-number", type=int)
+
+    p_declare = sub.add_parser(
+        "declare", help="declare the session's task list and releasability"
+    )
+    p_declare.add_argument("--session-set-dir", required=True)
+    task_src = p_declare.add_mutually_exclusive_group(required=True)
+    task_src.add_argument("--task", help="what this session will do")
+    task_src.add_argument("--task-file", help="the same, from a file")
+    rel = p_declare.add_mutually_exclusive_group(required=True)
+    rel.add_argument("--releasable", dest="releasable", action="store_true",
+                     help="this session may publish a package")
+    rel.add_argument("--not-releasable", dest="releasable",
+                     action="store_false", help="it may not")
+    p_declare.add_argument("--session-number", type=int)
+
+    p_plan = sub.add_parser(
+        "plan", help="record the plan prose in project-work-plan.md"
+    )
+    p_plan.add_argument("--session-set-dir", required=True)
+    plan_src = p_plan.add_mutually_exclusive_group(required=True)
+    plan_src.add_argument("--body", help="the plan, inline")
+    plan_src.add_argument("--body-file", help="the plan, from a file")
+
     p_close = sub.add_parser("close", help="run gates and close the session")
     p_close.add_argument("--session-set-dir", required=True)
     p_close.add_argument("--dry-run", action="store_true",
@@ -1026,6 +1246,21 @@ def main(argv=None) -> int:
             set_dir, step=args.step, status=args.status, note=args.note,
             session_number=args.session_number,
         )
+    if args.command == "decision":
+        return decision(
+            set_dir, decider=args.decider, headline=args.headline,
+            body=args.body, body_file=args.body_file, model=args.model,
+            provider=args.provider, decided_on=args.decided_on,
+            backfill_reason=args.backfill_reason,
+            session_number=args.session_number,
+        )
+    if args.command == "declare":
+        return declare(
+            set_dir, task=args.task, task_file=args.task_file,
+            releasable=args.releasable, session_number=args.session_number,
+        )
+    if args.command == "plan":
+        return plan(set_dir, body=args.body, body_file=args.body_file)
     return close(set_dir, dry_run=args.dry_run, forced=args.force)
 
 

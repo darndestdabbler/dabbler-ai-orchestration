@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import shutil
 from pathlib import Path
 
@@ -9,24 +10,31 @@ from ai_router.progress import SessionStateInvariantError
 from ai_router.session import (
     EXIT_BOUNDARY,
     EXIT_OK,
+    EXIT_USAGE,
     DuplicateSlugError,
     LockContentionError,
     MalformedSlugError,
+    SanctionedWriteError,
     SetCollisionError,
     SetNotFoundError,
     acquire_lock,
     append_change_log_block,
+    append_decision,
+    declare_session_task,
     extract_spec_excerpt,
     flip_state_to_closed,
     log_step,
     main,
     parse_session_plans,
     plan_step_key,
+    read_task_declaration,
+    record_project_plan,
     record_session_verification,
     register_session_start,
     release_lock,
     resolve_session_set_dir,
     seed_session_plan,
+    session_is_releasable,
     split_slug_marker,
     start,
 )
@@ -522,3 +530,210 @@ class TestLogCLI:
                if e["stepKey"] == "close-out"][0]
         assert row["sessionNumber"] == 1
         assert row["description"] == "Closed and pushed."
+
+
+class TestDecisionsLog:
+    """`decisions-log.md` is a fold of the activity log: the model brings
+    content, the framework brings identity, order and time."""
+
+    def _read(self, set_dir):
+        return (set_dir / "decisions-log.md").read_text(encoding="utf-8")
+
+    def test_the_writer_numbers_and_dates_every_entry(self, set_dir):
+        start(set_dir, engine="claude-code", provider="anthropic")
+        first = append_decision(
+            set_dir, session_number=1, decider="operator",
+            headline="Ship it", body="Because the gate is green.",
+        )
+        second = append_decision(
+            set_dir, session_number=1, decider="orchestrator",
+            headline="Extract the parser", body="It had two callers.",
+            model="claude-opus-5", provider="anthropic",
+        )
+        assert [first["decisionId"], second["decisionId"]] == ["D1", "D2"]
+        assert first["decidedOn"] == first["recordedAt"][:10]
+        body = self._read(set_dir)
+        assert body.index("D1 ") < body.index("D2 ")
+        assert "· Operator · Ship it" in body
+        assert "Orchestrator (claude-opus-5/anthropic)" in body
+
+    def test_a_decider_outside_the_closed_set_is_refused(self, set_dir):
+        start(set_dir, engine="claude-code", provider="anthropic")
+        with pytest.raises(SanctionedWriteError, match="decider must be"):
+            append_decision(set_dir, session_number=1, decider="the team",
+                            headline="x", body="y")
+
+    def test_a_backdated_entry_needs_a_reason_and_says_it_was_backfilled(
+        self, set_dir
+    ):
+        start(set_dir, engine="claude-code", provider="anthropic")
+        with pytest.raises(SanctionedWriteError, match="transcription"):
+            append_decision(set_dir, session_number=1, decider="operator",
+                            headline="x", body="y", decided_on="2026-08-26")
+        entry = append_decision(
+            set_dir, session_number=1, decider="operator",
+            headline="Set 148 runs on master", body="The standing directive.",
+            decided_on="2026-08-26",
+            backfill_reason="transcribed from the hand-kept log",
+        )
+        assert entry["decidedOn"] == "2026-08-26"
+        assert "*Backfilled on " in self._read(set_dir)
+
+    def test_a_malformed_date_is_refused(self, set_dir):
+        start(set_dir, engine="claude-code", provider="anthropic")
+        with pytest.raises(SanctionedWriteError, match="ISO date"):
+            append_decision(set_dir, session_number=1, decider="operator",
+                            headline="x", body="y", decided_on="26 Aug 2026",
+                            backfill_reason="transcribed")
+
+    def test_the_log_renders_in_append_order_not_grouped_by_session(
+        self, set_dir
+    ):
+        start(set_dir, engine="claude-code", provider="anthropic")
+        append_decision(set_dir, session_number=1, decider="framework",
+                        headline="No preverify record is required",
+                        body="Nothing was affected.")
+        append_decision(set_dir, session_number=2, decider="verifier",
+                        headline="Round 1 found a real gap",
+                        body="The gate was shut when it was needed.",
+                        model="gpt-5.5", provider="openai")
+        append_decision(set_dir, session_number=1, decider="operator",
+                        headline="A late word on session 1",
+                        body="Recorded after session 2 had moved on.")
+        body = self._read(set_dir)
+        ids = [int(n) for n in re.findall(r"^### D(\d+) ", body, re.M)]
+        assert ids == [1, 2, 3]  # order of record, never regrouped
+        assert "## Session 1 — First things" in body
+        assert "## Session 2 — Second things" in body
+        assert "## Session 1 — First things (continued)" in body
+
+    def test_a_hand_edit_is_overwritten_by_the_next_append(
+        self, set_dir
+    ):
+        start(set_dir, engine="claude-code", provider="anthropic")
+        append_decision(set_dir, session_number=1, decider="operator",
+                        headline="Keep it", body="It earns its place.")
+        rendered = self._read(set_dir)
+        (set_dir / "decisions-log.md").write_text("hand edit", encoding="utf-8")
+        append_decision(set_dir, session_number=1, decider="operator",
+                        headline="And this", body="Second one.")
+        after = self._read(set_dir)
+        assert "hand edit" not in after
+        assert rendered.rstrip("\n") in after
+
+
+class TestTaskDeclaration:
+    """The §3.a declaration: made once, before the work, and read by
+    packaging. It needs a real repository, because "before the work" is
+    answered by the working tree."""
+
+    def _declare(self, set_dir, task="Build the widget.", releasable=True,
+                 number=1):
+        return declare_session_task(set_dir, session_number=number,
+                                    task=task, releasable=releasable)
+
+    def test_a_session_declares_once(self, sandbox_repo):
+        _, set_dir = sandbox_repo
+        start(set_dir, engine="claude-code", provider="anthropic")
+        self._declare(set_dir)
+        with pytest.raises(SanctionedWriteError, match="already declared"):
+            self._declare(set_dir, task="Build it differently.",
+                          releasable=False)
+        assert read_task_declaration(set_dir, 1)["task"] == "Build the widget."
+
+    def test_a_complete_session_can_no_longer_declare(self, sandbox_repo):
+        _, set_dir = sandbox_repo
+        start(set_dir, engine="claude-code", provider="anthropic")
+        flip_state_to_closed(set_dir, verdict="VERIFIED")
+        with pytest.raises(SanctionedWriteError, match="is complete"):
+            self._declare(set_dir, task="Whatever it turned out to be.")
+
+    def test_a_declaration_is_refused_once_the_work_exists(self, sandbox_repo):
+        repo, set_dir = sandbox_repo
+        start(set_dir, engine="claude-code", provider="anthropic")
+        (repo / "widget.py").write_text("built\n", encoding="utf-8")
+        with pytest.raises(SanctionedWriteError, match="comes before the"):
+            self._declare(set_dir)
+        assert read_task_declaration(set_dir, 1) is None
+
+    def test_the_set_s_own_bookkeeping_is_not_the_work(self, sandbox_repo):
+        # `start` writes the state and the activity log before anything is
+        # declared; if those counted as work, no session could ever declare.
+        _, set_dir = sandbox_repo
+        start(set_dir, engine="claude-code", provider="anthropic")
+        assert self._declare(set_dir)["releasable"] is True
+
+    def test_releasability_fails_closed_when_undeclared(self, sandbox_repo):
+        _, set_dir = sandbox_repo
+        start(set_dir, engine="claude-code", provider="anthropic")
+        assert session_is_releasable(set_dir, 1) is False
+        assert read_task_declaration(set_dir, 1) is None
+        self._declare(set_dir, task="Ship it.")
+        assert session_is_releasable(set_dir, 1) is True
+        assert session_is_releasable(set_dir, 2) is False
+
+
+class TestWorkPlanRender:
+    def test_the_plan_lists_every_session_with_its_declaration(
+        self, sandbox_repo
+    ):
+        _, set_dir = sandbox_repo
+        start(set_dir, engine="claude-code", provider="anthropic")
+        record_project_plan(set_dir, "Two sessions, one widget.")
+        declare_session_task(set_dir, session_number=1,
+                             task="Build the widget.", releasable=False)
+        body = (set_dir / "project-work-plan.md").read_text(encoding="utf-8")
+        assert "Two sessions, one widget." in body
+        assert "| 1 | First things | no |" in body
+        assert "| 2 | Second things | — | not declared |" in body
+        assert "**Releasable: no.**" in body
+
+    def test_the_newest_plan_is_rendered_and_the_earlier_one_is_kept(
+        self, set_dir
+    ):
+        start(set_dir, engine="claude-code", provider="anthropic")
+        record_project_plan(set_dir, "First shape of the plan.")
+        record_project_plan(set_dir, "Second shape of the plan.")
+        body = (set_dir / "project-work-plan.md").read_text(encoding="utf-8")
+        assert "Second shape of the plan." in body
+        assert "First shape of the plan." not in body
+        log = json.loads(
+            (set_dir / "activity-log.json").read_text(encoding="utf-8")
+        )
+        plans = [e for e in log["entries"] if e.get("kind") == "project-plan"]
+        assert [p["body"] for p in plans] == [
+            "First shape of the plan.", "Second shape of the plan.",
+        ]
+
+
+class TestTwoFilesCLI:
+    def test_decision_and_declare_default_to_the_session_in_flight(
+        self, sandbox_repo
+    ):
+        _, set_dir = sandbox_repo
+        start(set_dir, engine="claude-code", provider="anthropic")
+        assert main([
+            "decision", "--session-set-dir", str(set_dir),
+            "--decider", "orchestrator", "--headline", "Use one validator",
+            "--body", "Two would drift.",
+        ]) == EXIT_OK
+        assert main([
+            "declare", "--session-set-dir", str(set_dir),
+            "--task", "Build the widget.", "--not-releasable",
+        ]) == EXIT_OK
+        assert read_task_declaration(set_dir, 1)["releasable"] is False
+        assert "Use one validator" in (
+            set_dir / "decisions-log.md"
+        ).read_text(encoding="utf-8")
+
+    def test_a_refused_write_exits_usage_and_leaves_no_file(
+        self, set_dir, capsys
+    ):
+        start(set_dir, engine="claude-code", provider="anthropic")
+        assert main([
+            "decision", "--session-set-dir", str(set_dir),
+            "--decider", "operator", "--headline", "x", "--body", "y",
+            "--decided-on", "2026-08-26",
+        ]) == EXIT_USAGE
+        assert "transcription" in capsys.readouterr().err
+        assert not (set_dir / "decisions-log.md").exists()

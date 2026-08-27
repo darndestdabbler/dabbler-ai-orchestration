@@ -408,6 +408,29 @@ metrics:
   enabled: true
   log_filename: router-metrics.jsonl
 
+# Step (f) of the session lifecycle: pack, then push to a feed. A session that
+# declared itself releasable at step (a) publishes through `packaging.pack`
+# and `packaging.push` — both argv, never shell strings, both spawned with the
+# child-environment allowlist, and `push` naming the credential rather than
+# holding it. The framework substitutes `{output}`, `{artifact}`, `{feed}` and
+# `{secret}` per argv element at spawn time.
+#
+# This repository declares none, and that is the declaration: it publishes to
+# no feed today. A block here would have to carry a feed URL nobody publishes
+# to, which is the shape of the mistake that put a machine-local record inside
+# package data — a plausible-looking default that a build would have shipped.
+# The real one belongs in `local-overrides.yaml`, which is gitignored and is
+# where a machine states machine facts:
+#
+#   packaging:
+#     pack:
+#       argv: ["dotnet", "pack", "-c", "Release", "-o", "{output}"]
+#     push:
+#       argv: ["dotnet", "nuget", "push", "{artifact}",
+#              "--source", "{feed}", "--api-key", "{secret}"]
+#       feed: https://pkgs.dev.azure.com/<org>/_packaging/<feed>/nuget/v3/index.json
+#       secret: DABBLER_FEED_PAT
+
 # Which tests a change makes necessary, and what proves the suite was green.
 #
 # Pre-verification runs the selected tests only. The full suite is recorded
@@ -535,6 +558,7 @@ testing:
           - tests/test_critique_contracts.py
           - tests/test_gates.py
           - tests/test_session.py
+          - tests/test_packaging.py
           - tests/test_verify.py
           - tests/test_step_execution.py
       - when: ai_router/lockfile.py
@@ -551,6 +575,9 @@ testing:
       - when: ai_router/modules.py
         select:
           - tests/test_modules.py
+      - when: ai_router/packaging.py
+        select:
+          - tests/test_packaging.py
       - when: ai_router/plan_review.py
         select:
           - tests/test_plan_review.py
@@ -685,6 +712,7 @@ testing:
         select:
           - tests/test_config.py
           - tests/test_route.py
+          - tests/test_packaging.py
       - when: ai_router/schemas/
         select:
           - tests/test_critique_contracts.py
@@ -696,6 +724,7 @@ testing:
           - tests/test_verify.py
           - tests/test_gates.py
           - tests/test_runcore_contracts.py
+          - tests/test_packaging.py
       - when: ai_router/prompt-templates/
         select:
           - tests/test_verify.py

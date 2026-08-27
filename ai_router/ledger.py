@@ -345,6 +345,54 @@ def append_dispute(
     return record
 
 
+# --- packaging.jsonl ---------------------------------------------------------
+
+PACKAGE_DIRNAME = "package"
+
+
+def packaging_path(repo_root, set_slug: str, session_number: int) -> Path:
+    return (
+        session_run_dir(repo_root, set_slug, session_number)
+        / "packaging.jsonl"
+    )
+
+
+def package_output_dir(repo_root, set_slug: str, session_number: int) -> Path:
+    """Where ``pack`` writes. Inside the run directory rather than the
+    repository, so the artifact set is by construction what this run built
+    and the tree that was verified stays the tree that was verified."""
+    return (
+        session_run_dir(repo_root, set_slug, session_number) / PACKAGE_DIRNAME
+    )
+
+
+def validate_packaging(record: dict) -> dict:
+    return _validate(record, "packaging.schema.json", "packaging")
+
+
+def read_packaging(repo_root, set_slug: str, session_number: int) -> list[dict]:
+    return _read_jsonl(
+        packaging_path(repo_root, set_slug, session_number), validate_packaging
+    )
+
+
+def append_packaging(
+    repo_root, set_slug: str, session_number: int, record: dict
+) -> dict:
+    """Append one validated packaging row.
+
+    Append-only, and refusals append too. A session may be refused, fixed
+    and published, and a record holding only the last of those reads as if
+    the first two never happened.
+    """
+    validate_packaging(record)
+    path = packaging_path(repo_root, set_slug, session_number)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "a", encoding="utf-8") as f:
+        f.write(json.dumps(record) + "\n")
+    return record
+
+
 # --- critique/<change-id>/ ---------------------------------------------------
 #
 # The frozen layout, one directory per reviewed change:

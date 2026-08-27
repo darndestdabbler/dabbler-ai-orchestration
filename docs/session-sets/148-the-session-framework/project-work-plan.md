@@ -48,7 +48,7 @@ it.
 | 10 | The code review loop (plan B1) | no | 2026-08-27 |
 | 11 | The verifier authors tests, the framework runs them (plan B2) | no | 2026-08-27 |
 | 12 | The full suite and its bounded fix loop (plan B3) | no | 2026-08-27 |
-| 13 | Packaging to the feed (plan C) | — | not declared |
+| 13 | Packaging to the feed (plan C) | no | 2026-08-27 |
 | 14 | Collapse session sets (plan A3) | — | not declared |
 | 15 | The sessions view (plan D1) | — | not declared |
 | 16 | Project setup as two sessions (plan D2) | — | not declared |
@@ -252,3 +252,42 @@ tests phase, so a suite that never goes green ends by itself.
 
 Not releasable: this session builds framework code and publishes no
 package.
+
+### Session 13 — Packaging to the feed (plan C)
+
+**Releasable: no.**
+
+Build lifecycle step (f) — packaging — as `ai_router/packaging.py`, a
+`packaging:` configuration block with its schema, a machine-written packaging
+record, and the CLI that runs it.
+
+1. **`pack`, then `push`.** The declaration names both. `pack` runs once;
+   `push` runs once per artifact it produced.
+2. **Releasability is read, never decided here.** It comes from the task list
+   declared at step (a) through `writers.session_is_releasable`, which fails
+   closed — a session that never declared cannot publish.
+3. **The order is proved by the evidence the close gates already read.** No
+   second opinion about whether verification, the run of record, the clean
+   tree and the push happened; packaging asks the same predicates, because a
+   gate guarding a gate is how two answers to one question get written.
+4. **The PAT is in no environment at all.** It resolves through
+   `secret_resolver` by declared name and is substituted into a single argv
+   element at spawn. Both processes are given `checks.child_env()`, so nothing
+   in the parent environment is inherited either. The recorded command keeps
+   the placeholder, and captured output is scrubbed of the value. A push
+   declaration that names no secret is refused at load: ambient credentials
+   would make the guarantee unprovable.
+5. **`pack` writes to a fresh per-run directory** under the session's run dir,
+   so the artifact set is by construction the product of this run and no stale
+   build can be published by accident. It also keeps `pack` from dirtying the
+   tree that was just verified.
+6. **The record is machine-written** to `.dabbler/runs/<set>/s<N>/packaging.json`
+   and schema-validated on read, like every other record under that root.
+7. **The shipped `router-config.yaml` declares no packaging block.** This
+   repository publishes to no feed, and a repository that declares none
+   publishes nothing. The schema carries the shape; the config carries the
+   reason it is absent, as `testing.controls` already does.
+
+**Not releasable.** This session builds the publish path; it does not publish.
+There is no feed declared for this repository, and declaring itself releasable
+to exercise its own new code would be the hindsight §3.a exists to prevent.

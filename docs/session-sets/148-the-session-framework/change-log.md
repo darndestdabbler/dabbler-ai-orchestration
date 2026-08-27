@@ -96,3 +96,10 @@
 - Every blocking finding of round 3 was fixed; the cap left the fix unreviewed.
 - Fixed, unreviewed: [major] The new traceback matcher still drops common absolute-path Python frames, so the broken implementation file can remain outside the envelope.
 - This work lands UNREVIEWED. It is not a waiver: nothing was accepted over a standing finding — what is unproved is the repair.
+
+## Session 13 verification — VERIFIED after 2 round(s)
+
+- Verifier: gpt-5.4 (openai) over copilot-cli
+- Orchestrator provider (excluded): anthropic
+- Verifier's read surface: agency: 23 read(s), 0 search(es), 0 listing(s); 1 read(s) were transformed; 4 not confined to scope
+- Raw round output: `.dabbler/runs/148-the-session-framework/s13/`

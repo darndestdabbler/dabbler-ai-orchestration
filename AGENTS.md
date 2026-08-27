@@ -133,6 +133,18 @@ active set's `spec.md`.
    identity resolves through the model registry). Idempotent — safe to
    re-run after a context reset.
 
+   **Then declare the task list, before you edit anything.**
+
+       python -m ai_router.session declare --session-set-dir <dir> \
+           --task-file <path> --releasable|--not-releasable
+
+   The declaration says what this session will do and whether it produces a
+   releasable artifact. It is refused once the tree carries the session's
+   work, refused a second time, and refused after the close — a session
+   that declares itself releasable after building is a model deciding in
+   hindsight what may be published. Step 8 reads it and fails closed: an
+   undeclared session cannot publish.
+
 3. **Do the work.** Follow the active spec's step list for the current
    session. Log progress and make the edits. Do NOT commit yet —
    verification reviews the working tree, and an already-committed tree
@@ -188,7 +200,18 @@ active set's `spec.md`.
    on push, so a mid-session push buys a full matrix run of work that is
    not finished.
 
-8. **Close via the gate.**
+8. **Package — only if step 2 declared this session releasable.**
+
+       python -m ai_router.packaging --session-set-dir docs/session-sets/<slug>
+
+   Packs, then pushes to the declared feed. It refuses an undeclared or
+   not-releasable session, refuses a repository that declares no
+   `packaging` block, and refuses until the same gates the close reads all
+   pass. The feed credential is named in configuration, never held there:
+   it resolves at spawn into one argv element and is placed in no
+   environment. `--dry-run` previews the gates and runs nothing.
+
+9. **Close via the gate.**
 
        python -m ai_router.session close --session-set-dir docs/session-sets/<slug>
 
@@ -203,7 +226,9 @@ active set's `spec.md`.
 - Verification verdicts come from the verifier. A verdict token you did
   not receive from `ai_router.verify` does not exist.
 - API keys live in env vars (`DABBLER_ANTHROPIC_API_KEY`,
-  `DABBLER_OPENAI_API_KEY`, `DABBLER_GEMINI_API_KEY`), never in files.
+  `DABBLER_OPENAI_API_KEY`, `DABBLER_GEMINI_API_KEY`), never in files. The
+  same rule covers a feed PAT: `packaging.push.secret` names it and never
+  holds it.
 - Run the router through the project venv:
   `.venv/Scripts/python -m ai_router.<module>` on Windows,
   `.venv/bin/python -m ai_router.<module>` on POSIX. "No module named

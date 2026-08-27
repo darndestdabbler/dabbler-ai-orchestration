@@ -226,6 +226,43 @@ that commit's tree. `verify step close` therefore refuses outright when
 HEAD has moved — a commit landed mid-step, and both measurements would
 otherwise be describing someone else's change.
 
+## Packaging ledger — `.dabbler/runs/<set>/s<N>/packaging.jsonl`
+
+One row per attempt at step (f), written **only** by
+`ai_router.packaging`; schema-validated on read
+(`ai_router/schemas/packaging.schema.json`). Append-only, and **refusals
+append beside publications**: "this session was not allowed to publish"
+is a fact about the session, and a ledger holding only the successes
+cannot be read as a history of what was released.
+
+| Field | Type | Meaning |
+|---|---|---|
+| `outcome` | `published` \| `refused` \| `failed` | `refused` means a gate said no and nothing ran; `failed` means a declared command ran and did not succeed |
+| `session_number` | integer ≥ 1 | the session that attempted it |
+| `releasable` | boolean | what step (a) declared, read from `activity-log.json`. False includes the session that never declared: `session_is_releasable` fails closed |
+| `refusal` | string | required when `outcome` is `refused` |
+| `feed` | string | the feed that was substituted into the command that ran, not a caption beside it |
+| `secret_name` | string | the **name** of the credential, never its value |
+| `tree_digest` | string \| null | the worktree tree the artifacts were built from |
+| `post_tree_digest`, `tree_mutated` | string \| null, boolean | present when a declared command changed the repository while it ran |
+| `artifacts` | array | what `pack` produced, relative to the run's own output directory |
+| `gates` | array | the five close gates as packaging found them: `name`, `passed`, `remediation` |
+| `steps` | array | `pack` once then `push` per artifact: `step`, `command`, `artifact`, `exit_code`, `duration_seconds`, `timed_out`, `output` |
+| `recorded_at` | string | timestamp |
+
+**No field here ever holds a credential.** `command` is recorded with the
+`{secret}` placeholder still in it, and `output` is scrubbed of the
+resolved value before it is written, so the value exists only in the argv
+of a process that has already exited. A dry run is never filed: a
+rehearsal of the gates is not an attempt.
+
+`pack` writes into `.dabbler/runs/<set>/s<N>/package/`, which is emptied
+first — so every artifact is one this run built. The worktree is compared
+against its own tree id after every command: a build that leaves
+intermediates in the repository fails the attempt whatever its exit code
+said, and nothing is pushed. The schema enforces the same thing from the
+other side — a row cannot be `published` and `tree_mutated` at once.
+
 ## Metrics ledger — `router-metrics.jsonl`
 
 Append-only JSONL, one object per routed or verification call, additive
@@ -281,6 +318,27 @@ missing `copilot` binary and must not be edited because it is what ships:
 transport:
   profile: api
 ```
+
+The second worked case is the feed. A packaged default cannot name one
+repository's Azure DevOps feed, so `packaging` is declared in the schema
+and absent from the shipped config; the overlay is where a machine states
+its own. `secret` names the credential's environment variable and never
+holds a value:
+
+```yaml
+packaging:
+  pack:
+    argv: ["dotnet", "pack", "-c", "Release", "-o", "{output}"]
+  push:
+    argv: ["dotnet", "nuget", "push", "{artifact}",
+           "--source", "{feed}", "--api-key", "{secret}"]
+    feed: https://pkgs.dev.azure.com/<org>/_packaging/<feed>/nuget/v3/index.json
+    secret: DABBLER_FEED_PAT
+```
+
+Both commands are `argv`, never shell strings, so nothing can re-split
+the element the credential lands in; both are spawned with the child
+environment allowlist, so the credential is inherited by nothing.
 
 ## Seat catalog lockfile — `copilot-catalog.lock`
 

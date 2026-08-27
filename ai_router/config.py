@@ -3,8 +3,10 @@ effective generation params.
 
 Structural validation runs through the JSON schema at
 ``schemas/router-config.schema.json``. Semantic rules a schema cannot express
-(cross-references, pricing periods) run here, all at load time so a bad
-config fails at startup rather than mid-call.
+(cross-references between blocks) run here, all at load time so a bad config
+fails at startup rather than mid-call. A role's preference order is
+deliberately not cross-referenced: it is ordering only, so a name that matches
+no model is a stale line rather than an error.
 
 The bundled ``router-config.yaml`` is package data and therefore the
 *published* default: it must stay correct for a fresh install that has
@@ -29,7 +31,6 @@ import jsonschema
 import yaml
 
 from .journal import repo_root_for
-from .pricing import validate_model_rates
 from .transports.copilot import validate_transport_timeouts
 
 _THIS_DIR = Path(__file__).parent
@@ -55,7 +56,9 @@ CRITIQUE_PIPELINE_ENFORCE = "enforce"
 CRITIQUE_ENFORCE_SET = "145-lite-enforcement-and-projection"
 
 # Keys required in transports.copilot-cli when that transport is selected.
-_COPILOT_CLI_REQUIRED_KEYS = frozenset({"lockfile", "roles"})
+# Roles are not among them: selection is by role on both transports, so the
+# declaration is top-level and a seat block does not own it.
+_COPILOT_CLI_REQUIRED_KEYS = frozenset({"lockfile"})
 
 _schema_cache: dict | None = None
 
@@ -188,22 +191,6 @@ def load_config(path: str | None = None) -> dict:
                 f"Model {model_name!r} references unknown provider "
                 f"{model_cfg['provider']!r}. Available: {sorted(provider_names)}"
             )
-        validate_model_rates(model_name, model_cfg)
-
-    for tier, model_name in config["routing"]["tier_assignments"].items():
-        if model_name not in config["models"]:
-            raise ValueError(
-                f"Tier {tier} references unknown model {model_name!r}. "
-                f"Available: {list(config['models'])}"
-            )
-    for task_type, model_name in (
-        config["routing"].get("task_type_overrides") or {}
-    ).items():
-        if model_name not in config["models"]:
-            raise ValueError(
-                f"task_type_overrides.{task_type} references unknown model "
-                f"{model_name!r}"
-            )
 
     _validate_copilot_block(config)
     _apply_run_core_defaults(config)
@@ -267,7 +254,12 @@ RUN_CORE_DEFAULTS = {
         "diff_limit_lines": 1500,
         "check_timeout_seconds": 1800,
         "budgets": {
-            "model_usd": 10.0,
+            # Null, not a figure: dollars are not computed on either
+            # transport, so a dollar ceiling could only ever compare against
+            # zero and would read as an assurance nothing enforces. The knob
+            # survives for a deployment that reintroduces pricing; the
+            # dispatch ceiling below is what actually bounds spend.
+            "model_usd": None,
             "model_dispatches": 3,
             "elapsed_minutes": 120,
         },
@@ -300,8 +292,8 @@ def _apply_run_core_defaults(config: dict) -> None:
     if budgets.get("model_dispatches") is None:
         raise ValueError(
             "run_policy.budgets.model_dispatches has no 'unlimited' value: "
-            "a dispatch ceiling is what bounds framework model calls when "
-            "seat pricing makes the dollar ceiling unmeasurable."
+            "a dispatch ceiling is what bounds framework model calls, "
+            "because no transport reports a dollar figure to cap."
         )
 
 

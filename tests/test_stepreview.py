@@ -30,9 +30,8 @@ NITS
 def _result(provider, content, model=None, simulated=False):
     return RouteResult(
         content=content, model_name=model or f"{provider}-model",
-        model_id="x", provider=provider, tier=1, input_tokens=1,
-        output_tokens=1, cost_usd=None, cost_status="unmeasured",
-        complexity_score=1, escalated=False, escalation_history=[],
+        model_id="x", provider=provider, input_tokens=1,
+        output_tokens=1, escalated=False, escalation_history=[],
         elapsed_seconds=0.1, transport="offline",
         metadata={"simulated": True} if simulated else {},
     )
@@ -52,11 +51,10 @@ class FakeRouter:
         self.simulated = simulated
         self.calls = []
 
-    def __call__(self, content, task_type, exclude_providers, transport,
-                 prefer_model):
+    def __call__(self, content, task_type, role, exclude_providers, transport):
         self.calls.append({
             "content": content, "exclude": list(exclude_providers or []),
-            "prefer_model": prefer_model,
+            "role": role,
         })
         provider, body = self.replies.pop(0)
         if self.honour_exclusion and provider in (exclude_providers or []):

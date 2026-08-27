@@ -3,15 +3,15 @@
 A framework for AI-led coding sessions. Work is organized into **session
 sets** — small, independently deployable units of work, each with a spec
 that plans its sessions step by step. A router dispatches model calls
-across providers with complexity-based selection, escalation, and cost
-accounting. Every session must pass **cross-provider verification**
-before it can close, and the verification record is machine-written:
-no code path accepts a hand-written verdict.
+across providers by **role**, with escalation and token accounting. Every
+session must pass **cross-provider verification** before it can close, and
+the verification record is machine-written: no code path accepts a
+hand-written verdict.
 
 Components:
 
 - **Python package `ai_router`** — routing, session lifecycle, gates,
-  verification, cost accounting. Everything that decides lives here.
+  verification, token accounting. Everything that decides lives here.
 - **VS Code extension "Dabbler AI Orchestration"** — the Work Explorer
   tree. A pure renderer: it shells to `python -m ai_router.progress
   --json` and draws the JSON. It re-implements no logic.
@@ -79,19 +79,32 @@ by field detail: [docs/schema-reference.md](docs/schema-reference.md).
 
 Both transports are first-class for every call type:
 
-- **Direct API** — Anthropic, OpenAI, and Google, over their HTTP APIs,
-  with per-call cost accounting from the pricing registry.
-- **GitHub Copilot CLI** — dispatches through a Copilot seat. Models
-  come from a probed catalog lockfile. Calls are real spend but cannot
-  be priced per call; metrics rows carry `cost_usd: null` with
-  `billed_usage_unavailable: true`, and seat spend is measured
-  afterwards by `python -m ai_router.seat_cost` from the CLI's local
-  usage store.
+- **GitHub Copilot CLI** — the shipped default. Dispatches through a
+  Copilot seat; models come from a probed catalog lockfile. Calls are real
+  spend and are not attributable per session, so metrics rows carry
+  `billed_usage_unavailable: true` and seat spend is measured afterwards
+  by `python -m ai_router.seat_cost` from the CLI's local usage store.
+- **Direct API** — Anthropic, OpenAI, and Google, over their HTTP APIs.
+  Supported and reachable, and no longer the default.
+
+**Dollars are not computed on either path.** Tokens are recorded per call,
+per model and per session; reconciliation happens out of band against the
+vendor's own console, joined by the API key a repository names as its own.
 
 Verification may cross transports: an orchestrator on the direct API
 can be verified through the Copilot CLI on another provider's model,
 and vice versa. The provider-independence rule (verifier provider ≠
-orchestrator provider) holds on both paths.
+orchestrator provider) holds on both paths, and is asserted at the call
+site rather than only filtered during selection.
+
+### Selection is by role
+
+A role declares the provider set it may draw from — a hard filter — and a
+preference order, which is **ordering only**. A model the preference order
+does not name still qualifies and simply sorts after the named ones, so a
+list that has gone stale costs a slightly older model and never costs a
+candidate. Roles are declared once under `roles:` in `router-config.yaml`
+and applied identically on both transports.
 
 ### Transport preference
 
@@ -116,14 +129,14 @@ at load**, not dropped, because an override the router silently ignores
 is the failure the file exists to prevent.
 
 This is how a machine disagrees with the published default. The packaged
-`router-config.yaml` keeps `transport: profile: api`, which is correct
-for a fresh install holding provider API keys; a seat-only machine says
-so once, in a file it does not publish:
+`router-config.yaml` ships `transport: profile: copilot-cli`, because the
+seat is the surface staff receive; a machine with provider API keys and no
+seat says so once, in a file it does not publish:
 
 ```yaml
-# local-overrides.yaml — this machine has a Copilot seat and no API keys
+# local-overrides.yaml — this machine has API keys and no Copilot seat
 transport:
-  profile: copilot-cli
+  profile: api
 ```
 
 Config is the only layer that is client-, model- and
@@ -155,12 +168,12 @@ on that transport). An empty-string value counts as absent.
 from ai_router import route
 
 result = route("Review this diff for correctness bugs", task_type="code-review")
-print(result.model_name, result.cost_usd)
+print(result.model_name, result.input_tokens, result.output_tokens)
 ```
 
-`python -m ai_router.metrics` prints the spend report (per model, per
-task type, per session set, Opus-equivalent savings). Unpriced seat
-calls are reported as unpriced, never as $0.00.
+`python -m ai_router.metrics` prints the token report (per model, per task
+type, per session set). Seat rows name the conversation id that prices
+them; no row is presented as a dollar figure.
 
 ## Layout
 

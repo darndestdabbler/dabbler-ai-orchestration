@@ -1,13 +1,11 @@
 # ============================================================
 # AI Router Configuration (v2)
 # ============================================================
-# All model info, pricing, thresholds, and behavior in one file.
+# All model info, roles, thresholds, and behavior in one file.
 # API keys are NEVER stored here — providers name an env var and
 # values resolve through ai_router.secret_resolver at call time.
-
-metadata:
-  pricing_reviewed: "2026-08-04"
-  review_frequency_days: 30
+# Dollars are not computed anywhere: tokens are recorded, and
+# reconciliation happens against the vendor's own console.
 
 providers:
   anthropic:
@@ -54,15 +52,41 @@ providers:
       backoff_base_seconds: 2
 
 # Transport for routine dispatch. Resolution precedence: --transport CLI
-# flag > DABBLER_TRANSPORT env var > this value > default "api". This file
-# is package data, so it carries the profile that works for a fresh install
-# with provider API keys; a Copilot seat sets DABBLER_TRANSPORT=copilot-cli.
+# flag > DABBLER_TRANSPORT env var > this value > default "api". The seat is
+# the default because it is the surface staff receive; the direct-API path
+# stays fully supported and merely stops being what you get by not choosing.
+# A machine without a seat says so in a project-local local-overrides.yaml.
 transport:
-  profile: api
+  profile: copilot-cli
+
+# Selection is by role, and one resolver applies it on both transports
+# (ai_router.selection). A role declares the provider set it may draw from —
+# a hard filter — and a preference order, which is ordering only: a model the
+# order does not name still qualifies and simply sorts after the named ones.
+# That is what keeps a stale list from costing a candidate. Names are model
+# ids as each transport puts them on the wire, so a name that exists on only
+# one path is inert on the other rather than an error.
+roles:
+  generator:
+    prefer: [claude-sonnet-4.6, gpt-5.5, gemini-3.1-pro-preview]
+    require_provider_in: [anthropic, openai, google]
+  verifier:
+    # A verifier's job is to be right about whether work ships, which is the
+    # wrong place to economise. Entries the registry marks
+    # is_enabled_as_verifier: false are refused on both transports, so this
+    # order never names one.
+    prefer: [gpt-5.6-sol, gpt-5.4, claude-sonnet-4.6]
+    require_provider_in: [anthropic, openai, google]
+  plan-review:
+    prefer: [gpt-5.4-mini, gemini-2.5-flash, claude-haiku-4.5]
+    require_provider_in: [anthropic, openai, google]
+  plan-review-escalated:
+    prefer: [claude-opus-5, gpt-5.5, gemini-3.1-pro-preview]
+    require_provider_in: [anthropic, openai, google]
 
 # The copilot-cli transport's own settings; inert unless that transport is
-# selected. Roles are late-bound aliases resolved against the seat-local
-# catalog lockfile (the lock is model-truth; this config is intent).
+# selected. The catalog lockfile is model-truth for this seat; the roles above
+# are intent.
 transports:
   copilot-cli:
     binary: copilot
@@ -76,45 +100,29 @@ transports:
       spawn_seconds: 10
       first_byte_seconds: 30
       total_seconds: 1200
-    roles:
-      generator:
-        prefer: [claude-sonnet-4.6, gpt-5.5, gemini-3.1-pro-preview]
-        require_provider_in: [anthropic, openai, google]
-      verifier:
-        prefer: [gpt-5.4, gemini-3.1-pro-preview, claude-sonnet-4.6]
-        require_provider_in: [anthropic, openai, google]
 
 # --- Model Registry ---
-# tier: 1=cheap/fast, 2=balanced, 3=powerful/expensive.
-# is_enabled: in the routed generator pool at all (identity-only entries
-#   set false — they exist so orchestrator identity can resolve).
-# is_enabled_as_verifier: trusted to verify other models' output.
-# Rates are declared ONE way per entry: flat scalars, or a `pricing:` list
-# of context-tiered / effective-dated rows (see ai_router/pricing.py).
-# confirmed_on records the day a human last checked the entry's rates
-# against the provider's published page; absence is the honest unchecked
-# state.
+# is_enabled: in the routed pool at all (identity-only entries set false —
+#   they exist so orchestrator identity can resolve).
+# is_enabled_as_verifier: trusted to review another model's output. It is a
+#   property of the record rather than of a role, because it says what a model
+#   may be asked to do and not which order the candidates are tried in.
 models:
   gemini-flash:
     provider: google
     model_id: gemini-2.5-flash
-    tier: 1
     is_enabled: true
     is_enabled_as_verifier: true
-    input_cost_per_1m: 0.30
-    output_cost_per_1m: 2.50
     max_context_tokens: 1048576
     max_output_tokens: 65536
     system_prompt_file: prompt-templates/system-prompts.md
     notes: "Best for simple analysis, formatting, boilerplate generation."
     generation_params:
       thinking_budget: 0
-    confirmed_on: '2026-08-04'
 
   gemini-pro:
     provider: google
     model_id: gemini-2.5-pro
-    tier: 2
     is_enabled: true
     is_enabled_as_verifier: true
     max_context_tokens: 1048576
@@ -123,18 +131,10 @@ models:
     notes: "Medium-complexity analysis, documentation, code review."
     generation_params:
       thinking_budget: -1
-    pricing:
-      - input_cost_per_1m: 1.25
-        output_cost_per_1m: 10.0
-        max_input_tokens: 200000
-      - input_cost_per_1m: 2.5
-        output_cost_per_1m: 15.0
-    confirmed_on: '2026-08-04'
 
   gemini-3-1-pro:
     provider: google
     model_id: gemini-3.1-pro-preview
-    tier: 2
     is_enabled: true
     # New model: generator + explicit-call only until calibrated.
     is_enabled_as_verifier: false
@@ -144,45 +144,27 @@ models:
     notes: "Frontier Google Pro (preview id; may change at GA)."
     generation_params:
       thinking_level: HIGH
-    pricing:
-      - input_cost_per_1m: 2.0
-        output_cost_per_1m: 12.0
-        max_input_tokens: 200000
-      - input_cost_per_1m: 4.0
-        output_cost_per_1m: 18.0
-    confirmed_on: '2026-08-04'
 
   sonnet:
     provider: anthropic
     model_id: claude-sonnet-5
-    tier: 2
     is_enabled: true
     is_enabled_as_verifier: true
     max_context_tokens: 200000
     max_output_tokens: 16000
     system_prompt_file: prompt-templates/system-prompts.md
-    notes: "Anthropic quality without Opus cost. Introductory rate lapses 2026-09-01; the dated pricing row keeps the cost record true with no edit."
+    notes: "Anthropic quality without Opus cost."
     generation_params:
       effort: medium
       thinking:
         enabled: false
         type: adaptive
-    pricing:
-      - input_cost_per_1m: 2.0
-        output_cost_per_1m: 10.0
-      - input_cost_per_1m: 3.0
-        output_cost_per_1m: 15.0
-        effective_from: '2026-09-01'
-    confirmed_on: '2026-08-04'
 
   opus:
     provider: anthropic
     model_id: claude-opus-5
-    tier: 3
     is_enabled: true
     is_enabled_as_verifier: true
-    input_cost_per_1m: 5.00
-    output_cost_per_1m: 25.00
     max_context_tokens: 200000
     max_output_tokens: 32000
     system_prompt_file: prompt-templates/system-prompts.md
@@ -192,43 +174,34 @@ models:
       thinking:
         enabled: true
         type: adaptive
-    confirmed_on: '2026-08-04'
 
   fable:
     provider: anthropic
     model_id: claude-fable-5
-    # Registered and priced, not routed: at 2x Opus on both axes, enabling
-    # it is an operator decision with a cost attached, not a default.
+    # Registered, not routed: enabling it is an operator decision, not a
+    # default.
     is_enabled: false
     is_enabled_as_verifier: false
     max_context_tokens: 200000
     max_output_tokens: 32000
     system_prompt_file: prompt-templates/system-prompts.md
-    notes: "Claude Fable 5. Present so a Fable-5 orchestrator can record its identity and its price is on file."
-    input_cost_per_1m: 10.0
-    output_cost_per_1m: 50.0
-    confirmed_on: '2026-08-04'
+    notes: "Claude Fable 5. Present so a Fable-5 orchestrator can record its identity."
 
   gpt-5-4:
     provider: openai
     model_id: gpt-5.4
-    tier: 3
     is_enabled: true
     is_enabled_as_verifier: true
-    input_cost_per_1m: 2.50
-    output_cost_per_1m: 15.00
     max_context_tokens: 272000
     max_output_tokens: 32000
     system_prompt_file: prompt-templates/system-prompts.md
     notes: "Frontier OpenAI model; cross-provider verifier for Anthropic/Google output."
     generation_params:
       reasoning_effort: high
-    confirmed_on: '2026-08-04'
 
   gpt-5-5:
     provider: openai
     model_id: gpt-5.5
-    tier: 3
     is_enabled: true
     is_enabled_as_verifier: true
     max_context_tokens: 272000
@@ -237,17 +210,11 @@ models:
     notes: "Frontier OpenAI model (GPT-5.5). Cross-provider verifier + consensus engine."
     generation_params:
       reasoning_effort: high
-    input_cost_per_1m: 5.0
-    output_cost_per_1m: 30.0
-    confirmed_on: '2026-08-04'
 
   gpt-5-6-sol:
     provider: openai
     model_id: gpt-5.6-sol
-    tier: 3
     is_enabled: true
-    # Pinned session-verification verifier: a verifier's job is to be right
-    # about whether work ships — the wrong place to economise.
     is_enabled_as_verifier: true
     max_context_tokens: 272000
     max_output_tokens: 32000
@@ -255,90 +222,57 @@ models:
     notes: "GPT-5.6 'Sol' — the most capable of the 5.6 variants."
     generation_params:
       reasoning_effort: high
-    input_cost_per_1m: 5.0
-    output_cost_per_1m: 30.0
-    confirmed_on: '2026-08-04'
 
   gpt-5-6-luna:
     provider: openai
     model_id: gpt-5.6-luna
-    tier: 3
     is_enabled: true
-    # Not a general verifier: enabled so a discovery fan-out can prefer it
-    # by name, kept out of the verifier pool so it can never win a
-    # cheapest-survivor tiebreak for an adjudicating round.
+    # Enabled so a discovery fan-out can prefer it by name, kept out of the
+    # verifier pool so it can never review work it is not strong enough to
+    # judge.
     is_enabled_as_verifier: false
     max_context_tokens: 272000
     max_output_tokens: 32000
     system_prompt_file: prompt-templates/system-prompts.md
-    notes: "GPT-5.6 'Luna' — one twenty-fifth of Sol's price; breadth-of-findings work only."
+    notes: "GPT-5.6 'Luna' — breadth-of-findings work only."
     generation_params:
       reasoning_effort: high
-    input_cost_per_1m: 0.2
-    output_cost_per_1m: 1.2
-    confirmed_on: '2026-08-04'
 
   haiku:
     provider: anthropic
     model_id: claude-haiku-4-5-20251001
-    tier: 1
     is_enabled: true
     # Enabled so a follow-through study can prefer it by name, kept out of the
-    # verifier pool for the same reason as Luna: a cheap model must never win a
-    # cheapest-survivor tiebreak for a round that adjudicates.
+    # verifier pool for the same reason as Luna.
     is_enabled_as_verifier: false
     max_context_tokens: 200000
     max_output_tokens: 8000
     system_prompt_file: prompt-templates/system-prompts.md
     notes: "Anthropic's small model. Used as a stand-in for a reader who will not puzzle things out."
-    input_cost_per_1m: 1.0
-    output_cost_per_1m: 5.0
-    confirmed_on: '2026-08-25'
 
   gpt-5-4-mini:
     provider: openai
     model_id: gpt-5.4-mini
-    tier: 2
     is_enabled: true
     is_enabled_as_verifier: true
-    input_cost_per_1m: 0.75
-    output_cost_per_1m: 4.50
     max_context_tokens: 400000
     max_output_tokens: 16000
     system_prompt_file: prompt-templates/system-prompts.md
     notes: "Small OpenAI model; cross-provider verifier for Gemini output."
     generation_params:
       reasoning_effort: medium
-    confirmed_on: '2026-08-04'
 
   # --- Identity-registry-only entries ---
   # Orchestrator models outside the routed pool that must still resolve in
   # the registry so identity resolution and the verifier exclusion can
   # derive their effective provider. is_enabled: false keeps them out of
-  # every selection path, and they deliberately carry no rates — a model's
-  # price lives in this file exactly once, on its routed entry.
+  # every selection path.
   gemini-3-pro:
     provider: google
     model_id: gemini-3-pro-preview
     is_enabled: false
     is_enabled_as_verifier: false
     notes: "Identity registry only: Gemini Code Assist orchestrator sessions."
-
-routing:
-  tier1_max_complexity: 30    # score <= 30 -> tier 1
-  tier2_max_complexity: 65    # 31-65 -> tier 2
-  default_tier: 2
-  tier_assignments:
-    1: gemini-flash
-    2: gemini-pro
-    3: opus
-  # Preferences, never exclusion overrides: a pin whose provider is
-  # excluded falls through to the cheapest surviving candidate.
-  task_type_overrides:
-    code-review: sonnet
-    architecture: opus
-    session-verification: gpt-5-6-sol
-    session-close-out: sonnet
 
 task_type_params:
   formatting:
@@ -405,74 +339,10 @@ task_type_params:
     gpt-5-4: {reasoning_effort: high}
     gpt-5-4-mini: {reasoning_effort: medium}
 
-# Deliberate non-goal: do not invest further engineering in tightening this
-# heuristic. The heuristic + escalation safety net is the intended stopping
-# point; if the score misjudges a task, escalation catches it and the
-# metrics log shows the pattern.
-complexity:
-  weights:
-    context_length: 0.30
-    keyword_signals: 0.35
-    task_type: 0.20
-    explicit_hint: 0.15
-  context_length_scores:
-    - {max_chars: 500, score: 10}
-    - {max_chars: 2000, score: 25}
-    - {max_chars: 5000, score: 45}
-    - {max_chars: 10000, score: 65}
-    - {max_chars: 999999, score: 85}
-  task_type_scores:
-    code-review: 40
-    documentation: 25
-    analysis: 55
-    test-generation: 35
-    planning: 70
-    formatting: 10
-    summarization: 20
-    architecture: 80
-    security-review: 75
-    refactoring: 65
-    session-verification: 70
-    session-close-out: 15
-    general: 50
-  high_complexity_keywords:
-    - architect
-    - security
-    - performance
-    - concurrency
-    - migration
-    - breaking change
-    - cross-cutting
-    - distributed
-    - race condition
-    - backward compatible
-    - critical
-    - complex
-    - authentication
-    - authorization
-    - permission
-    - injection
-    - XSS
-    - CSRF
-    - token
-    - encryption
-  low_complexity_keywords:
-    - rename
-    - typo
-    - format
-    - lint
-    - boilerplate
-    - simple
-    - straightforward
-    - placeholder
-    - stub
-    - comment
-    - log
-    - copy
-
 escalation:
   enabled: true
-  max_escalations: 2          # tier 1 -> 2 -> 3, then give up
+  # A retry walks down the role's ordered candidate list; this is how far.
+  max_escalations: 2
   triggers:
     empty_response: true
     max_tokens_hit: true
@@ -489,17 +359,6 @@ escalation:
 # are read by the verifier selection and prompt template resolution.
 verification:
   enabled: true
-  # Verifier selection is rule-based: different provider than the
-  # generator, is_enabled, is_enabled_as_verifier, same tier or one higher;
-  # cheapest worst-case output rate wins. preferred_pairings is an optional
-  # tiebreaker layer consulted only when the pairing survives the rules.
-  preferred_pairings:
-    sonnet: gemini-pro
-    gemini-flash: gpt-5-4-mini
-    gemini-pro: gpt-5-4-mini
-    opus: gpt-5-4
-    gpt-5-4-mini: sonnet
-    gpt-5-4: opus
   auto_verify_task_types:
     - code-review
     - security-review
@@ -520,7 +379,6 @@ verification:
       architecture: flag
       refactoring: flag
     tiebreaker_model: opus
-    max_cost_multiplier: 3.0
     prompt_template_file: prompt-templates/verification.md
 
 metrics:

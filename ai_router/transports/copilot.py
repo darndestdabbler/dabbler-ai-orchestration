@@ -1707,44 +1707,27 @@ def resolve_role_candidates(
     role: str,
     exclude_providers=None,
 ) -> list[tuple[str, str]]:
-    """Ordered ``(model_id, provider)`` candidates for a catalog role.
+    """Ordered ``(model_id, provider)`` candidates for *role* on this seat.
 
-    Walks ``transports.copilot-cli.roles.<role>.prefer`` in declared order;
-    an entry qualifies when it is confirmed on the catalog, its provider is
-    in ``require_provider_in`` (when set), and its provider is not excluded.
-    When an exclusion is active, the prefer list is a preference order, not
-    the candidate universe: remaining confirmed entries (in catalog order)
-    that survive follow the preferred ones, so an exclusion only fails when
-    the seat truly has no surviving candidate.
+    The seat's enumeration is the confirmed catalog — nothing infers
+    availability from a name, so an unconfirmed entry is not a candidate.
+    The role itself is applied by ``ai_router.selection``, which is the one
+    implementation both transports resolve a role through.
     """
-    exclude = {str(p).strip().lower() for p in (exclude_providers or []) if p}
-    roles_cfg = (
-        (config.get("transports") or {}).get("copilot-cli") or {}
-    ).get("roles") or {}
-    role_cfg = roles_cfg.get(role) or {}
-    prefer = role_cfg.get("prefer") or []
-    require_provider_in = set(role_cfg.get("require_provider_in") or [])
+    from ..selection import resolve_role
 
-    def _qualifies(entry: ModelEntry) -> bool:
-        if entry.enablement != ENABLEMENT_CONFIRMED:
-            return False
-        if not entry.provider or entry.provider not in KNOWN_PROVIDERS:
-            return False
-        if require_provider_in and entry.provider not in require_provider_in:
-            return False
-        return entry.provider not in exclude
-
-    by_id = {e.id: e for e in catalog.models}
-    candidates: list[tuple[str, str]] = []
-    for model_id in prefer:
-        entry = by_id.get(model_id)
-        if entry is not None and _qualifies(entry):
-            candidates.append((entry.id, entry.provider))
-    if exclude:
-        for entry in catalog.models:
-            if _qualifies(entry) and (entry.id, entry.provider) not in candidates:
-                candidates.append((entry.id, entry.provider))
-    return candidates
+    return resolve_role(
+        config,
+        role,
+        [
+            (entry.id, entry.provider)
+            for entry in catalog.models
+            if entry.enablement == ENABLEMENT_CONFIRMED
+            and entry.provider
+            and entry.provider in KNOWN_PROVIDERS
+        ],
+        exclude_providers=exclude_providers,
+    )
 
 
 # --- Seat catalog refresh ---------------------------------------------------

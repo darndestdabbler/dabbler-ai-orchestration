@@ -30,6 +30,7 @@ from typing import Optional
 
 from ai_router import verdict as verdictmod
 from ai_router.route import NoCandidateError, route
+from ai_router.selection import ROLE_VERIFIER
 from ai_router.solution import STEP_DELIVERABLES, STEP_TITLES
 
 #: How many readers a step needs before it may move on. Two, from different
@@ -182,14 +183,14 @@ def build_prompt(target: str, step: str, artifacts: list) -> str:
     return "\n".join(body)
 
 
-def _review_once(prompt: str, exclude: list, transport, prefer_model):
+def _review_once(prompt: str, exclude: list, transport):
     try:
         result = route(
             content=prompt,
             task_type="verification",
+            role=ROLE_VERIFIER,
             exclude_providers=exclude,
             transport=transport,
-            prefer_model=prefer_model,
         )
     except NoCandidateError as exc:
         raise StepReviewError(
@@ -216,7 +217,6 @@ def review(
     artifact_paths,
     author_provider: Optional[str] = None,
     transport: Optional[str] = None,
-    prefer_models: Optional[list] = None,
 ) -> tuple:
     """Run the step past two providers, neither of them the author's.
 
@@ -233,15 +233,11 @@ def review(
         )
 
     prompt = build_prompt(target, step, artifacts)
-    prefer = list(prefer_models or [])
     exclude = [author_provider] if author_provider else []
 
     outcomes, raws = [], []
-    for i in range(REVIEWERS_REQUIRED):
-        outcome, raw = _review_once(
-            prompt, list(exclude), transport,
-            prefer[i] if i < len(prefer) else None,
-        )
+    for _ in range(REVIEWERS_REQUIRED):
+        outcome, raw = _review_once(prompt, list(exclude), transport)
         if not outcome.simulated and outcome.provider in exclude:
             raise StepReviewError(
                 f"{outcome.provider} answered despite being excluded, so this "

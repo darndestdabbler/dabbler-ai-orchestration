@@ -60,8 +60,7 @@ def fake_route(responses):
     def _route(content, **kwargs):
         return RouteResult(
             content=queue.pop(0), model_name="gpt-5-4", model_id="gpt-5.4",
-            provider="openai", tier=3, input_tokens=1000, output_tokens=300,
-            cost_usd=0.04, cost_status="measured", complexity_score=70,
+            provider="openai", input_tokens=1000, output_tokens=300,
             escalated=False, escalation_history=[], elapsed_seconds=0.5,
             transport="api",
         )

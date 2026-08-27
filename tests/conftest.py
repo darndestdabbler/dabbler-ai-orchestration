@@ -122,41 +122,27 @@ _BASE_CONFIG = {
     },
     "models": {
         "flash": {
-            "provider": "google", "model_id": "g-flash", "tier": 1,
-            "input_cost_per_1m": 0.30, "output_cost_per_1m": 2.50,
+            "provider": "google", "model_id": "g-flash",
             "max_context_tokens": 1000000, "max_output_tokens": 65536,
         },
         "pro": {
-            "provider": "google", "model_id": "g-pro", "tier": 2,
+            "provider": "google", "model_id": "g-pro",
             "max_context_tokens": 1000000, "max_output_tokens": 65536,
-            "pricing": [
-                {"input_cost_per_1m": 1.25, "output_cost_per_1m": 10.0,
-                 "max_input_tokens": 200000},
-                {"input_cost_per_1m": 2.5, "output_cost_per_1m": 15.0},
-            ],
         },
         "sonnet": {
-            "provider": "anthropic", "model_id": "a-sonnet", "tier": 2,
+            "provider": "anthropic", "model_id": "a-sonnet",
             "max_context_tokens": 200000, "max_output_tokens": 16000,
-            "pricing": [
-                {"input_cost_per_1m": 2.0, "output_cost_per_1m": 10.0},
-                {"input_cost_per_1m": 3.0, "output_cost_per_1m": 15.0,
-                 "effective_from": "2026-09-01"},
-            ],
         },
         "opus": {
-            "provider": "anthropic", "model_id": "a-opus", "tier": 3,
-            "input_cost_per_1m": 5.0, "output_cost_per_1m": 25.0,
+            "provider": "anthropic", "model_id": "a-opus",
             "max_context_tokens": 200000, "max_output_tokens": 32000,
         },
         "gpt": {
-            "provider": "openai", "model_id": "o-gpt", "tier": 3,
-            "input_cost_per_1m": 2.5, "output_cost_per_1m": 15.0,
+            "provider": "openai", "model_id": "o-gpt",
             "max_context_tokens": 272000, "max_output_tokens": 32000,
         },
         "gpt-mini": {
-            "provider": "openai", "model_id": "o-mini", "tier": 2,
-            "input_cost_per_1m": 0.75, "output_cost_per_1m": 4.50,
+            "provider": "openai", "model_id": "o-mini",
             "max_context_tokens": 400000, "max_output_tokens": 16000,
             "is_enabled_as_verifier": False,
         },
@@ -165,31 +151,15 @@ _BASE_CONFIG = {
             "is_enabled": False, "is_enabled_as_verifier": False,
         },
     },
-    "routing": {
-        "tier1_max_complexity": 30,
-        "tier2_max_complexity": 65,
-        "default_tier": 2,
-        "tier_assignments": {1: "flash", 2: "pro", 3: "opus"},
-        "task_type_overrides": {"code-review": "sonnet"},
-    },
-    "complexity": {
-        "weights": {
-            "context_length": 0.30, "keyword_signals": 0.35,
-            "task_type": 0.20, "explicit_hint": 0.15,
+    "roles": {
+        "generator": {
+            "prefer": ["g-flash", "g-pro", "a-opus"],
+            "require_provider_in": ["anthropic", "openai", "google"],
         },
-        "context_length_scores": [
-            {"max_chars": 500, "score": 10},
-            {"max_chars": 2000, "score": 25},
-            {"max_chars": 5000, "score": 45},
-            {"max_chars": 10000, "score": 65},
-            {"max_chars": 999999, "score": 85},
-        ],
-        "task_type_scores": {
-            "code-review": 40, "architecture": 80, "formatting": 10,
-            "general": 50,
+        "verifier": {
+            "prefer": ["o-gpt", "a-sonnet"],
+            "require_provider_in": ["anthropic", "openai", "google"],
         },
-        "high_complexity_keywords": ["security", "concurrency"],
-        "low_complexity_keywords": ["typo", "rename"],
     },
     "escalation": {
         "enabled": True,
@@ -205,12 +175,6 @@ _BASE_CONFIG = {
     "transports": {
         "copilot-cli": {
             "lockfile": "copilot-catalog.lock",
-            "roles": {
-                "generator": {
-                    "prefer": ["claude-x", "gpt-x", "gemini-x"],
-                    "require_provider_in": ["anthropic", "openai", "google"],
-                },
-            },
         },
     },
     "metrics": {"enabled": True},

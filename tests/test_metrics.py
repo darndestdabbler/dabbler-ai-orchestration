@@ -1,9 +1,5 @@
-import json
-
 from ai_router.metrics import (
     load_metrics,
-    opus_equivalent_savings,
-    priced_and_unpriced,
     print_metrics_report,
     record_call,
 )
@@ -17,9 +13,8 @@ def _config_at(tmp_path, base_config):
 def _record(config, **overrides):
     kwargs = dict(
         call_type="route", task_type="general", model="pro",
-        provider="google", tier=2, complexity_score=50,
-        generation_params={}, input_tokens=100, output_tokens=200,
-        cost_usd=0.01, elapsed_seconds=1.5, escalated=False,
+        provider="google", generation_params={}, input_tokens=100,
+        output_tokens=200, elapsed_seconds=1.5, escalated=False,
         stop_reason="end_turn",
     )
     kwargs.update(overrides)
@@ -36,12 +31,13 @@ class TestRecordCall:
         assert rows[0]["model"] == "pro"
         assert rows[1]["provider"] == "anthropic"
 
-    def test_none_cost_stays_null_never_zero(self, tmp_path, base_config):
+    def test_records_tokens_and_no_dollar_figure(self, tmp_path, base_config):
         config = _config_at(tmp_path, base_config)
-        _record(config, cost_usd=None, billed_usage_unavailable=True,
+        _record(config, billed_usage_unavailable=True,
                 transport="copilot-cli", transport_session_id="conv-9")
         row = load_metrics(config)[0]
-        assert row["cost_usd"] is None
+        assert "cost_usd" not in row
+        assert (row["input_tokens"], row["output_tokens"]) == (100, 200)
         assert row["billed_usage_unavailable"] is True
         assert row["transport_session_id"] == "conv-9"
 
@@ -103,46 +99,29 @@ class TestRecordCall:
 
 
 class TestReport:
-    def test_priced_and_unpriced_split(self):
-        rows = [
-            {"cost_usd": 0.5},
-            {"cost_usd": None, "billed_usage_unavailable": True},
-            {"cost_usd": None},
-        ]
-        priced, unpriced = priced_and_unpriced(rows)
-        assert len(priced) == 1 and len(unpriced) == 2
-
-    def test_opus_equivalent_savings(self, base_config):
-        rows = [{"cost_usd": 1.0, "input_tokens": 1_000_000,
-                 "output_tokens": 100_000}]
-        # Baseline on `opus` (5/25): 5.0 + 2.5 = 7.5; savings 6.5.
-        savings = opus_equivalent_savings(rows, base_config)
-        assert round(savings, 6) == 6.5
-
-    def test_savings_none_when_nothing_priced(self, base_config):
-        rows = [{"cost_usd": None, "billed_usage_unavailable": True}]
-        assert opus_equivalent_savings(rows, base_config) is None
-
-    def test_report_never_prints_zero_for_unpriced(
+    def test_report_totals_tokens_and_names_no_dollars(
         self, tmp_path, base_config, capsys
     ):
         config = _config_at(tmp_path, base_config)
-        _record(config, cost_usd=None, billed_usage_unavailable=True,
-                transport="copilot-cli", model="seat-model")
+        _record(config)
+        _record(config, session_set="042-x")
         print_metrics_report(config)
         out = capsys.readouterr().out
-        assert "no call in this log was priced" in out
-        assert "NOT PRICED HERE" in out
-        assert "$0.0000" not in out
-
-    def test_report_totals_priced_calls(self, tmp_path, base_config, capsys):
-        config = _config_at(tmp_path, base_config)
-        _record(config, cost_usd=0.25)
-        _record(config, cost_usd=0.75, session_set="042-x")
-        print_metrics_report(config)
-        out = capsys.readouterr().out
-        assert "$1.0000 over 2 call(s)" in out
+        assert "Total input tokens:   200" in out
         assert "042-x" in out
+        assert "$" not in out
+
+    def test_seat_rows_point_at_the_conversation_id_that_prices_them(
+        self, tmp_path, base_config, capsys
+    ):
+        config = _config_at(tmp_path, base_config)
+        _record(config, billed_usage_unavailable=True,
+                transport="copilot-cli", transport_session_id="conv-9",
+                model="seat-model")
+        print_metrics_report(config)
+        out = capsys.readouterr().out
+        assert "billed_usage_unavailable" in out
+        assert "ai_router.seat_cost" in out
 
     def test_empty_log_reports_cleanly(self, tmp_path, base_config, capsys):
         config = _config_at(tmp_path, base_config)

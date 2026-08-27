@@ -49,7 +49,7 @@ Each `sessions[]` record (required: `number`, `title`, `status`):
 | `startedAt`, `completedAt` | string \| null | timestamps |
 | `orchestrator` | object \| null | see below |
 | `verificationVerdict` | string \| null | canonical `VERIFIED` / `ISSUES_FOUND` (plus `WAIVED`); the writer fails closed against an exact allowlist, readers prefix-match leniently |
-| `verification` | object | summary stamped when the loop finishes: `rounds`, `verifierModel`, `verifierProvider`, `transport`, `costUsd` (null when unpriced); carried across later registrations like the verdict |
+| `verification` | object | summary stamped when the loop finishes: `rounds`, `verifierModel`, `verifierProvider`, `transport`; carried across later registrations like the verdict |
 
 The `orchestrator` block (required: `engine`; omit-null — missing keys
 are valid, `null` values are not):
@@ -115,10 +115,9 @@ Machine-written step log. Shape:
 ## change-log.md
 
 Human-readable, append-only markdown. The verification loop appends one
-summary block per session (verdict, verifier provider, rounds, cost);
-the close appends its close-out block. Presence of this file is also
-the completeness signal for legacy spec-only folders with no state
-file.
+summary block per session (verdict, verifier provider, rounds); the close
+appends its close-out block. Presence of this file is also the
+completeness signal for legacy spec-only folders with no state file.
 
 ## Rounds ledger — `.dabbler/runs/<set>/s<N>/rounds.jsonl`
 
@@ -142,7 +141,7 @@ Row fields (required: `round`, `verdict`, `blocking`, `findings`,
 | `verifier_model`, `verifier_provider` | string | who verified (on an adjudication row: the adjudicator) |
 | `orchestrator_provider` | string | the excluded provider |
 | `findings` | array | each: `description`, `severity` (`critical`/`major`/`minor`, closed vocabulary), optional `category`, `failureScenario`, `evidencePaths`, `blocking` |
-| `cost_usd` | number \| null | null on seat transport, never 0.0 |
+| `cost_usd` | number \| null | **historical only** — dollars are not computed anywhere and no writer emits this key; older ledgers carry it |
 | `baseline_tree` | string \| null | tree-SHA before the session's work |
 | `completion_tree` | string | worktree tree-SHA at this round |
 | `previous_tree` | string | previous round's tree-SHA; **required for rounds ≥ 2** (the fix-delta base) |
@@ -242,20 +241,16 @@ Row fields (from `metrics.record_call`):
 | `timestamp` | UTC ISO |
 | `session_set`, `session_number` | set name normalized to bare folder name; nullable |
 | `call_type` | `route` or `verify` |
-| `task_type`, `model`, `provider`, `tier`, `complexity_score` | selection facts |
+| `task_type`, `model`, `provider` | selection facts |
 | `requested_model_id`, `served_model_id`, `served_model_mismatch` | mismatch is tri-state: true/false only when both ids are known, else null |
 | `effort`, `thinking_on` | per-provider reasoning params |
-| `input_tokens`, `output_tokens` | integers |
-| `cost_usd` | rounded to 6 places; **null = not priced here, never 0.0** |
+| `input_tokens`, `output_tokens` | integers. **Tokens are the record; dollars are not computed anywhere**, and reconciliation happens against the vendor's own console |
 | `elapsed_seconds`, `escalated`, `stop_reason` | call outcome |
-| `transport`, `billed_usage_unavailable`, `transport_session_id` | Copilot rows carry `cost_usd: null` + `billed_usage_unavailable: true`; the conversation id prices them later via `python -m ai_router.seat_cost` |
+| `transport`, `billed_usage_unavailable`, `transport_session_id` | Copilot rows carry `billed_usage_unavailable: true`; the conversation id is what `python -m ai_router.seat_cost` prices them by |
 | `verifier_of`, `verdict`, `issue_count` | verification calls only |
 
-`python -m ai_router.metrics` prints the report: totals, per-model /
-per-task / per-set spend, requested-vs-served mismatches, and
-Opus-equivalent savings (what the priced calls would have cost at the
-tier-3 rate, minus actual). Unpriced groups render `-`, mixed groups a
-`+` suffix — never $0.00.
+`python -m ai_router.metrics` prints the report: token totals, per-model /
+per-task / per-set volume, and requested-vs-served mismatches.
 
 ## Config overlay — `local-overrides.yaml`
 
@@ -278,13 +273,13 @@ It is a config *source*, not a precedence tier: it changes what
 still outrank it. The loaded config records it as
 `_local_overrides_path` (null when there is none).
 
-The worked case — a machine with a Copilot seat and no provider API
-keys, where the packaged default's `profile: api` would fail on a
-missing key and must not be edited because it is what ships:
+The worked case — a machine with provider API keys and no Copilot seat,
+where the packaged default's `profile: copilot-cli` would fail on a
+missing `copilot` binary and must not be edited because it is what ships:
 
 ```yaml
 transport:
-  profile: copilot-cli
+  profile: api
 ```
 
 ## Seat catalog lockfile — `copilot-catalog.lock`

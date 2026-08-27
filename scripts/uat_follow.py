@@ -161,8 +161,7 @@ def main():
             convo += f"--- TERMINAL OUTPUT ---\n{h['result']}\n\n"
         convo += f"--- NOW: your turn {turn}. Reply in the required format. ---\n"
 
-        r = route(content=convo, task_type="general",
-                  prefer_model=os.environ.get("UAT_MODEL", "gpt-5-6-luna"), max_tier=3)
+        r = route(content=convo, task_type="general")
         want = os.environ.get("UAT_MODEL", "gpt-5-6-luna")
         if r.model_name != want:
             # The router escalates on a short reply. A study whose subject was

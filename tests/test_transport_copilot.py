@@ -895,12 +895,12 @@ class TestRefreshRun:
 
 class TestRoleResolution:
     CONFIG = {
-        "transports": {"copilot-cli": {"roles": {
+        "roles": {
             "generator": {
                 "prefer": ["claude-x", "gpt-x"],
                 "require_provider_in": ["anthropic", "openai", "google"],
             },
-        }}},
+        },
     }
 
     def _catalog(self):
@@ -924,15 +924,15 @@ class TestRoleResolution:
         )
         assert all(mid != "blocked-x" for mid, _ in candidates)
 
-    def test_without_exclusion_prefer_is_the_universe(self):
-        # gemini-x is confirmed but not in prefer; with no exclusion the
-        # prefer list alone decides.
+    def test_an_unnamed_confirmed_entry_still_qualifies(self):
+        # gemini-x is confirmed and not in prefer: it sorts last rather than
+        # dropping out, and that holds with no exclusion in play.
         candidates = resolve_role_candidates(
             self.CONFIG, self._catalog(), "generator"
         )
-        assert ("gemini-x", "google") not in candidates
+        assert candidates[-1] == ("gemini-x", "google")
 
-    def test_exclusion_widens_to_full_confirmed_catalog(self):
+    def test_exclusion_leaves_the_rest_of_the_confirmed_catalog(self):
         candidates = resolve_role_candidates(
             self.CONFIG, self._catalog(), "generator",
             exclude_providers=["anthropic", "openai"],
@@ -948,12 +948,12 @@ class TestRoleResolution:
 
     def test_require_provider_in_filters(self):
         config = {
-            "transports": {"copilot-cli": {"roles": {
+            "roles": {
                 "generator": {
                     "prefer": ["claude-x", "gpt-x"],
                     "require_provider_in": ["openai"],
                 },
-            }}},
+            },
         }
         candidates = resolve_role_candidates(
             config, self._catalog(), "generator"

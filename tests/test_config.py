@@ -47,52 +47,30 @@ class TestLoadConfig:
         with pytest.raises(ValueError, match="schema validation"):
             load_config(_write_config(tmp_path, config))
 
-    def test_schema_rejects_typoed_pricing_row_key(self, tmp_path):
-        # A typo'd bound would silently widen a tier to unbounded.
-        config = make_config()
-        config["models"]["pro"]["pricing"][0]["max_input_token"] = 5
-        del config["models"]["pro"]["pricing"][0]["max_input_tokens"]
-        with pytest.raises(ValueError, match="schema validation"):
-            load_config(_write_config(tmp_path, config))
-
-    def test_schema_rejects_flat_and_pricing_together(self, tmp_path):
-        config = make_config()
-        config["models"]["pro"]["input_cost_per_1m"] = 1.0
-        config["models"]["pro"]["output_cost_per_1m"] = 2.0
-        with pytest.raises(ValueError, match="schema validation"):
-            load_config(_write_config(tmp_path, config))
-
-    def test_schema_rejects_half_declared_flat_rate(self, tmp_path):
-        config = make_config()
-        del config["models"]["flash"]["output_cost_per_1m"]
-        with pytest.raises(ValueError, match="schema validation"):
-            load_config(_write_config(tmp_path, config))
-
-    def test_routable_model_without_rates_rejected(self, tmp_path):
-        config = make_config()
-        config["models"]["norate"] = {
-            "provider": "openai", "model_id": "x", "tier": 2,
-            "max_output_tokens": 100,
-        }
-        with pytest.raises(ValueError, match="declares no rates"):
-            load_config(_write_config(tmp_path, config))
-
     def test_unknown_provider_reference_rejected(self, tmp_path):
         config = make_config()
         config["models"]["flash"]["provider"] = "mystery"
         with pytest.raises(ValueError, match="unknown provider"):
             load_config(_write_config(tmp_path, config))
 
-    def test_unknown_tier_assignment_rejected(self, tmp_path):
+    def test_schema_rejects_unknown_key_in_a_role(self, tmp_path):
+        # A typo'd role key would silently drop the declaration it meant.
         config = make_config()
-        config["routing"]["tier_assignments"][2] = "mystery"
-        with pytest.raises(ValueError, match="unknown model"):
+        config["roles"]["verifier"]["require_provider"] = ["openai"]
+        with pytest.raises(ValueError, match="schema validation"):
             load_config(_write_config(tmp_path, config))
 
-    def test_copilot_block_missing_roles_rejected(self, tmp_path):
+    def test_a_preference_naming_no_model_is_not_an_error(self, tmp_path):
+        # Ordering only: a stale name costs a slightly older model, never a
+        # candidate, so it must not refuse the load.
         config = make_config()
-        del config["transports"]["copilot-cli"]["roles"]
-        with pytest.raises(ValueError, match="roles"):
+        config["roles"]["verifier"]["prefer"] = ["retired-last-year"]
+        assert load_config(_write_config(tmp_path, config))["roles"]
+
+    def test_copilot_block_missing_lockfile_rejected(self, tmp_path):
+        config = make_config()
+        del config["transports"]["copilot-cli"]["lockfile"]
+        with pytest.raises(ValueError, match="lockfile"):
             load_config(_write_config(tmp_path, config))
 
     def test_copilot_bad_timeouts_rejected_at_load(self, tmp_path):
@@ -170,7 +148,7 @@ class TestLocalOverrides:
         )
         config = load_config()
         assert config["transports"]["copilot-cli"]["lockfile"] == "seat.lock"
-        assert config["transports"]["copilot-cli"]["roles"]  # base survived
+        assert config["roles"]["verifier"]  # base survived
 
     def test_merged_result_is_schema_validated(self, project):
         self._overlay(project, {"transport": {"profile": "carrier-pigeon"}})

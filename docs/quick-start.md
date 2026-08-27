@@ -1,12 +1,12 @@
 # Quick start
 
-Prerequisites: Python 3.11+, git, `pip install dabbler-ai-router`, and at
-least two provider API keys in env vars (`DABBLER_ANTHROPIC_API_KEY`,
-`DABBLER_OPENAI_API_KEY`, `DABBLER_GEMINI_API_KEY`) — verification needs
-a second provider. A GitHub Copilot seat with the Copilot CLI works as an
-alternative transport (`DABBLER_TRANSPORT=copilot-cli`, or
-`transport: profile: copilot-cli` in a project-root
-`local-overrides.yaml` — see below).
+Prerequisites: Python 3.11+, git, `pip install dabbler-ai-router`, and a
+GitHub Copilot seat with the Copilot CLI — the shipped default transport.
+Direct provider APIs remain fully supported: put at least two keys in env
+vars (`DABBLER_ANTHROPIC_API_KEY`, `DABBLER_OPENAI_API_KEY`,
+`DABBLER_GEMINI_API_KEY`) — verification needs a second provider — and
+select that path with `DABBLER_TRANSPORT=api`, or `transport: profile: api`
+in a project-root `local-overrides.yaml` (see below).
 
 ## 1. Bootstrap a project
 
@@ -261,14 +261,14 @@ even with a session in flight.
 ## This machine's config (`local-overrides.yaml`)
 
 The packaged `ai_router/router-config.yaml` is the published default and
-keeps `transport: profile: api`, which is right for a fresh install
-holding provider API keys. A machine that disagrees says so in a
-project-root `local-overrides.yaml`, deep-merged over the packaged file:
+ships `transport: profile: copilot-cli`, because the seat is the surface
+staff receive. A machine without a seat says so in a project-root
+`local-overrides.yaml`, deep-merged over the packaged file:
 
 ```yaml
-# local-overrides.yaml — a Copilot seat, no provider API keys
+# local-overrides.yaml — provider API keys, no Copilot seat
 transport:
-  profile: copilot-cli
+  profile: api
 ```
 
 - It is **never committed and never packaged**: `.gitignore` reserves

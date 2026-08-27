@@ -112,12 +112,11 @@ class TestNoRouter:
         # No config, no keys, no network — must still return a stub.
         result = route("anything")
         assert result.model_name == "no-router-mode"
-        assert result.cost_usd is None
-        assert result.cost_status == "unmeasured"
+        assert result.transport == "none"
 
 
 class TestApiTransport:
-    def test_end_to_end_with_cost_and_metrics(
+    def test_end_to_end_records_tokens_and_metrics(
         self, config_on_disk, monkeypatch, tmp_path
     ):
         config_on_disk()
@@ -125,12 +124,9 @@ class TestApiTransport:
         result = route("say hi", task_type="formatting", session_set="042-demo")
 
         assert result.content == "the answer"
-        assert result.model_name == "flash"  # short formatting prompt -> tier 1
+        assert result.model_name == "flash"  # roles.generator.prefer[0]
         assert result.transport == "api"
-        assert result.cost_status == "measured"
-        assert result.cost_usd == pytest.approx(
-            (10 / 1e6) * 0.30 + (100 / 1e6) * 2.50
-        )
+        assert (result.input_tokens, result.output_tokens) == (10, 100)
         assert result.served_model_id == "g-served"
 
         rows = load_metrics({"_config_path": str(tmp_path / "router-config.yaml")})
@@ -141,7 +137,7 @@ class TestApiTransport:
         assert rows[0]["requested_model_id"] == "g-flash"
         assert rows[0]["served_model_id"] == "g-served"
 
-    def test_escalation_climbs_tiers_and_records_history(
+    def test_escalation_walks_the_role_order_and_records_history(
         self, config_on_disk, monkeypatch, tmp_path
     ):
         config_on_disk()
@@ -193,9 +189,22 @@ class TestApiTransport:
         with pytest.raises(NoCandidateError):
             route("say hi")
 
+    def test_an_excluded_provider_is_refused_at_the_call_site(
+        self, config_on_disk, monkeypatch
+    ):
+        """Selection already filtered on the exclusion; this is the assertion
+        immediately before the wire, which a later preference path cannot
+        undo."""
+        config_on_disk()
+        monkeypatch.setattr(
+            route_mod, "registry_candidates", lambda *a, **k: ["flash"]
+        )
+        with pytest.raises(route_mod.ExcludedProviderError, match="google"):
+            route("say hi", exclude_providers=["google"])
+
 
 class TestCopilotTransport:
-    def test_end_to_end_cost_is_none_unmeasured(
+    def test_end_to_end_records_the_conversation_id(
         self, config_on_disk, tmp_path, monkeypatch
     ):
         monkeypatch.setenv("DABBLER_TRANSPORT", "copilot-cli")
@@ -205,14 +214,11 @@ class TestCopilotTransport:
         result = route("do a thing", session_set="042-demo")
         assert result.content == "seat answer"
         assert result.transport == "copilot-cli"
-        assert result.cost_usd is None
-        assert result.cost_status == "unmeasured"
         assert result.transport_session_id == "conv-42"
-        assert result.model_name == "claude-x"  # roles.generator.prefer[0]
-        assert result.tier == 0
+        # No prefer entry names a seat id, so the catalog order stands.
+        assert result.model_name == "claude-x"
 
         rows = load_metrics({"_config_path": str(tmp_path / "router-config.yaml")})
-        assert rows[0]["cost_usd"] is None
         assert rows[0]["billed_usage_unavailable"] is True
         assert rows[0]["transport"] == "copilot-cli"
         assert rows[0]["transport_session_id"] == "conv-42"

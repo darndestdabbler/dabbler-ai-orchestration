@@ -1,12 +1,14 @@
 """route(): one dispatch body over the Transport protocol.
 
-Both transports run the same loop — select, prompt, dispatch, escalate,
-cost, record — with three seams that differ per transport: how candidates
-are selected (registry tiers on the API path, seat-catalog roles on the
-Copilot path), how a call is dispatched, and how it is priced (resolved
-rates on the API path; ``cost_usd=None`` with ``cost_status="unmeasured"``
-on the Copilot path — the CLI reports no billing-authoritative usage, and
-an absent cost is never 0.0).
+Both transports run the same loop — resolve the role, prompt, dispatch,
+escalate, record — with two seams that differ per transport: which models the
+transport can enumerate (the model registry on the direct-API path, the
+confirmed seat catalog on the Copilot path), and how a call is dispatched.
+The role itself is applied by ``ai_router.selection`` for both, so the
+ordering rule has one implementation.
+
+Nothing here computes a dollar. Tokens are recorded; reconciliation happens
+out of band against the vendor's own console.
 
 Prompt rendering lives here rather than in its own module because
 ``route`` is its only caller and the size decision it makes — refuse an
@@ -30,9 +32,8 @@ from .config import (
     TRANSPORT_OFFLINE,
 )
 from .metrics import record_call
-from .pricing import calculate_cost
 from .runtime_mode import is_no_router_mode
-from .selection import estimate_complexity, next_escalation_model, pick_model
+from .selection import ROLE_GENERATOR, registry_candidates
 from .transports.api import DirectApiTransport
 from .transports.offline import (
     PROVIDER as OFFLINE_PROVIDER,
@@ -50,9 +51,6 @@ from .transports.copilot import (
     validate_catalog,
 )
 
-COST_STATUS_MEASURED = "measured"
-COST_STATUS_UNMEASURED = "unmeasured"
-
 
 class RouterError(RuntimeError):
     """Base class for routing failures. Fail-loud by design — never a
@@ -62,6 +60,16 @@ class RouterError(RuntimeError):
 class NoCandidateError(RouterError):
     """No enabled model survives the provider exclusion. The caller's
     fail-closed case, never a silent same-provider pick."""
+
+
+class ExcludedProviderError(RouterError):
+    """A candidate reached the call site with an excluded provider.
+
+    Selection already filters on the exclusion, and this asserts it again
+    immediately before the wire. Cross-provider verification is the
+    invariant the whole framework rests on: a filter can be bypassed by a
+    future preference path, and an assertion at the call site cannot.
+    """
 
 
 class DispatchError(RouterError):
@@ -145,12 +153,8 @@ class RouteResult:
     model_name: str            # registry alias (API) or catalog id (Copilot)
     model_id: str              # the id put on the wire
     provider: str
-    tier: int                  # 0 on the Copilot path (no tier ladder)
     input_tokens: int
     output_tokens: int
-    cost_usd: Optional[float]  # None when not priced here — never 0.0
-    cost_status: str           # "measured" | "unmeasured"
-    complexity_score: int
     escalated: bool
     escalation_history: list   # [(model, reason), ...]
     elapsed_seconds: float
@@ -175,8 +179,7 @@ def _build_no_router_stub() -> RouteResult:
     credential check, no network."""
     return RouteResult(
         content="", model_name=_NO_ROUTER_MODEL, model_id=_NO_ROUTER_MODEL,
-        provider=_NO_ROUTER_MODEL, tier=0, input_tokens=0, output_tokens=0,
-        cost_usd=None, cost_status=COST_STATUS_UNMEASURED, complexity_score=0,
+        provider=_NO_ROUTER_MODEL, input_tokens=0, output_tokens=0,
         escalated=False, escalation_history=[], elapsed_seconds=0.0,
         transport="none",
     )
@@ -349,28 +352,25 @@ class _Candidate:
     alias: str          # registry alias (API) or catalog id (Copilot)
     model_id: str
     provider: str
-    tier: int
 
 
 def route(
     content: str,
     task_type: str = "general",
     context: str = "",
-    complexity_hint: Optional[int] = None,
-    max_tier: int = 3,
+    role: str = ROLE_GENERATOR,
     session_set: Optional[str] = None,
     session_number: Optional[int] = None,
     exclude_providers: Optional[list] = None,
-    prefer_model: Optional[str] = None,
     transport: Optional[str] = None,
 ) -> RouteResult:
-    """Route a task to the best model and dispatch it.
+    """Route a task to this *role*'s first surviving candidate and dispatch it.
 
-    *exclude_providers* is a hard constraint no pin, preference, or
-    escalation can override; an exclusion that leaves no candidate raises
-    :class:`NoCandidateError` (fail closed, never a silent same-provider
-    pick). *transport* overrides the resolved transport preference for this
-    call.
+    *exclude_providers* is a hard constraint no preference can override; an
+    exclusion that leaves no candidate raises :class:`NoCandidateError` (fail
+    closed, never a silent same-provider pick), and it is asserted again at
+    the call site. *transport* overrides the resolved transport preference
+    for this call.
     """
     if is_no_router_mode():
         return _build_no_router_stub()
@@ -381,11 +381,6 @@ def route(
         {str(p).strip().lower() for p in (exclude_providers or []) if p}
     )
 
-    score = estimate_complexity(
-        text=f"{content}\n{context}", task_type=task_type,
-        hint=complexity_hint, config=config["complexity"],
-    )
-
     if transport_name == TRANSPORT_OFFLINE:
         transport_obj = OfflineTransport(resolve_responses_dir(config))
         # One candidate, no ladder: escalating between scripted responses
@@ -393,11 +388,9 @@ def route(
         # purpose.
         ladder = [_Candidate(
             alias=OFFLINE_PROVIDER, model_id=OFFLINE_PROVIDER,
-            provider=OFFLINE_PROVIDER, tier=0,
+            provider=OFFLINE_PROVIDER,
         )]
-
-        def _next_candidate(index: int, escalation_count: int):
-            return None
+        escalates = False
 
         def _dispatch(candidate: _Candidate, system_prompt, user_message,
                       gen_params):
@@ -416,30 +409,20 @@ def route(
         def _rate_limit(candidate: _Candidate) -> None:
             pass
 
-        def _price(candidate, result):
-            return None  # nothing was spent; nothing is priced
-
     elif transport_name == TRANSPORT_COPILOT_CLI:
         transport_obj, catalog = _get_copilot(config)
-        role_candidates = resolve_role_candidates(
-            config, catalog, "generator", exclude_providers=exclude
-        )
-        if not role_candidates:
+        ladder = [
+            _Candidate(alias=mid, model_id=mid, provider=prov)
+            for mid, prov in resolve_role_candidates(
+                config, catalog, role, exclude_providers=exclude
+            )
+        ]
+        if not ladder:
             raise NoCandidateError(
                 "copilot-cli: no confirmed catalog entry survives the "
-                f"provider exclusion {exclude!r} for the generator role"
+                f"provider exclusion {exclude!r} for the {role!r} role"
             )
-        ladder = [
-            _Candidate(alias=mid, model_id=mid, provider=prov, tier=0)
-            for mid, prov in role_candidates
-        ]
-
-        def _next_candidate(index: int, escalation_count: int):
-            if escalation_count >= config["escalation"]["max_escalations"]:
-                return None
-            return (
-                ladder[index + 1] if index + 1 < len(ladder) else None
-            )
+        escalates = True
 
         def _dispatch(candidate: _Candidate, system_prompt, user_message, gen_params):
             return transport_obj.dispatch(
@@ -456,43 +439,25 @@ def route(
 
         def _rate_limit(candidate: _Candidate) -> None:
             pass
-
-        def _price(candidate, result):
-            return None
     else:
-        alias = pick_model(
-            score, max_tier, task_type, config,
-            exclude_providers=exclude, prefer_model=prefer_model,
-        )
-        if alias is None:
+        ladder = [
+            _Candidate(
+                alias=alias,
+                model_id=config["models"][alias]["model_id"],
+                provider=config["models"][alias]["provider"],
+            )
+            for alias in registry_candidates(
+                config, role, exclude_providers=exclude
+            )
+        ]
+        if not ladder:
             raise NoCandidateError(
                 "no enabled model in router-config.yaml survives the "
-                f"provider exclusion {exclude!r} "
-                f"(task_type={task_type!r}, max_tier={max_tier}). Enable a "
-                "model from a surviving provider, or set its API key."
+                f"provider exclusion {exclude!r} for the {role!r} role "
+                f"(task_type={task_type!r}). Enable a model from a surviving "
+                "provider, or set its API key."
             )
-
-        def _to_candidate(model_alias: str) -> _Candidate:
-            entry = config["models"][model_alias]
-            return _Candidate(
-                alias=model_alias,
-                model_id=entry["model_id"],
-                provider=entry["provider"],
-                tier=entry["tier"],
-            )
-
-        ladder = [_to_candidate(alias)]
-
-        def _next_candidate(index: int, escalation_count: int):
-            nxt = next_escalation_model(
-                ladder[index].alias, config, escalation_count,
-                exclude_providers=exclude,
-            )
-            if nxt is None:
-                return None
-            candidate = _to_candidate(nxt)
-            ladder.append(candidate)
-            return candidate
+        escalates = True
 
         def _dispatch(candidate: _Candidate, system_prompt, user_message, gen_params):
             entry = config["models"][candidate.alias]
@@ -516,18 +481,23 @@ def route(
         def _rate_limit(candidate: _Candidate) -> None:
             _state["rate_limiters"][candidate.provider].wait()
 
-        def _price(candidate, result):
-            return calculate_cost(
-                result.input_tokens, result.output_tokens,
-                config["models"][candidate.alias],
-            )
-
     escalation_cfg = config["escalation"]
+    max_escalations = escalation_cfg["max_escalations"]
     escalation_history: list = []
     index = 0
     current = ladder[0]
 
     while True:
+        # The exclusion is asserted here and not only where candidates were
+        # filtered: this is the call site, and cross-provider review is the
+        # one invariant a later preference path must not be able to undo.
+        if current.provider in exclude:
+            raise ExcludedProviderError(
+                f"{current.alias!r} resolved to provider "
+                f"{current.provider!r}, which this call excludes "
+                f"({exclude!r}). Refusing to dispatch."
+            )
+
         system_prompt, user_message = build_prompt(
             content=content, context=context, task_type=task_type,
             model_cfg=_model_cfg(current), config=config,
@@ -547,19 +517,21 @@ def route(
                 model=current.alias,
             )
 
-        if escalation_cfg["enabled"] and should_escalate(result, escalation_cfg):
-            nxt = _next_candidate(index, len(escalation_history))
-            if nxt is not None:
-                escalation_history.append(
-                    (current.alias, classify_escalation_reason(result, escalation_cfg))
-                )
-                index += 1
-                current = nxt
-                continue
-            # Max escalations reached or nothing survives: use what we have.
+        if (
+            escalates
+            and escalation_cfg["enabled"]
+            and should_escalate(result, escalation_cfg)
+            and len(escalation_history) < max_escalations
+            and index + 1 < len(ladder)
+        ):
+            escalation_history.append(
+                (current.alias, classify_escalation_reason(result, escalation_cfg))
+            )
+            index += 1
+            current = ladder[index]
+            continue
         break
 
-    cost = _price(current, result)
     on_copilot = transport_name == TRANSPORT_COPILOT_CLI
     session_id = result.metadata.get("session_id") if on_copilot else None
 
@@ -569,12 +541,9 @@ def route(
         task_type=task_type,
         model=current.alias,
         provider=current.provider,
-        tier=current.tier,
-        complexity_score=score,
         generation_params=gen_params,
         input_tokens=result.input_tokens,
         output_tokens=result.output_tokens,
-        cost_usd=cost,
         elapsed_seconds=elapsed,
         escalated=bool(escalation_history),
         stop_reason=result.stop_reason,
@@ -592,14 +561,8 @@ def route(
         model_name=current.alias,
         model_id=current.model_id,
         provider=current.provider,
-        tier=current.tier,
         input_tokens=result.input_tokens,
         output_tokens=result.output_tokens,
-        cost_usd=cost,
-        cost_status=(
-            COST_STATUS_UNMEASURED if cost is None else COST_STATUS_MEASURED
-        ),
-        complexity_score=score,
         escalated=bool(escalation_history),
         escalation_history=escalation_history,
         elapsed_seconds=elapsed,

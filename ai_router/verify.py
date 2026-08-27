@@ -297,6 +297,7 @@ def _dispatch_verification(
     re-cross the caller's constraint. NoCandidateError propagates — that is
     the operator-only 'verification unavailable' state."""
     from .route import DispatchError, route
+    from .selection import ROLE_VERIFIER
 
     excluded = list(exclude_providers)
     last_exc = None
@@ -305,6 +306,7 @@ def _dispatch_verification(
             return route(
                 prompt,
                 task_type="session-verification",
+                role=ROLE_VERIFIER,
                 session_set=str(session_set),
                 session_number=session_number,
                 exclude_providers=excluded,
@@ -453,7 +455,6 @@ def _terminate_at_cap(
             "verifierModel": latest.get("verifier_model"),
             "verifierProvider": latest.get("verifier_provider"),
             "transport": latest.get("transport"),
-            "costUsd": None,
             "unreviewedFindings": len(unreviewed),
         },
     )
@@ -752,7 +753,6 @@ def run_round(
         "verifier_provider": result.provider,
         "orchestrator_provider": orchestrator.effective_provider,
         "findings": findings,
-        "cost_usd": result.cost_usd,
         "completion_tree": completion_tree,
         "recorded_at": datetime.datetime.now().astimezone().isoformat(),
         "transport": result.transport,
@@ -774,11 +774,6 @@ def run_round(
         return EXIT_BLOCKING
 
     # Loop finished: stamp the session record and the change-log summary.
-    rounds_all = prior_rounds + [row]
-    total_cost = sum(
-        r["cost_usd"] for r in rounds_all if r.get("cost_usd") is not None
-    )
-    priced = any(r.get("cost_usd") is not None for r in rounds_all)
     record_session_verification(
         set_path, current, verdict,
         summary={
@@ -786,10 +781,8 @@ def run_round(
             "verifierModel": result.model_name,
             "verifierProvider": result.provider,
             "transport": result.transport,
-            "costUsd": round(total_cost, 6) if priced else None,
         },
     )
-    cost_text = f"${total_cost:.4f}" if priced else "unpriced (seat transport)"
     append_change_log_block(
         set_path,
         f"## Session {current} verification — {verdict} after "
@@ -798,7 +791,6 @@ def run_round(
         f"{result.transport}\n"
         f"- Orchestrator provider (excluded): "
         f"{orchestrator.effective_provider}\n"
-        f"- Routed verification cost: {cost_text}\n"
         f"- Verifier's read surface: {agency.summary_line(agency_record)}\n"
         f"- Raw round output: `.dabbler/runs/{slug}/s{current}/`\n",
     )
@@ -1504,7 +1496,6 @@ def run_adjudication(
         "findings": [],
         "outcomes": outcomes,
         "excluded_providers": excluded,
-        "cost_usd": result.cost_usd,
         "completion_tree": current_tree,
         "previous_tree": latest["completion_tree"],
         "recorded_at": datetime.datetime.now().astimezone().isoformat(),
@@ -1533,11 +1524,6 @@ def run_adjudication(
         )
         return EXIT_BLOCKING
 
-    rounds_all = rounds + [row]
-    total_cost = sum(
-        r["cost_usd"] for r in rounds_all if r.get("cost_usd") is not None
-    )
-    priced = any(r.get("cost_usd") is not None for r in rounds_all)
     record_session_verification(
         set_path, current, verdict,
         summary={
@@ -1545,10 +1531,8 @@ def run_adjudication(
             "verifierModel": result.model_name,
             "verifierProvider": result.provider,
             "transport": result.transport,
-            "costUsd": round(total_cost, 6) if priced else None,
         },
     )
-    cost_text = f"${total_cost:.4f}" if priced else "unpriced (seat transport)"
     append_change_log_block(
         set_path,
         f"## Session {current} adjudication — {verdict} (every disputed "
@@ -1556,7 +1540,6 @@ def run_adjudication(
         f"- Adjudicator: {result.model_name} ({result.provider}) over "
         f"{result.transport}\n"
         f"- Excluded providers: {', '.join(excluded)}\n"
-        f"- Routed cost, all rounds: {cost_text}\n"
         f"{outcome_lines}\n"
         f"- Raw round output: `.dabbler/runs/{slug}/s{current}/`\n",
     )

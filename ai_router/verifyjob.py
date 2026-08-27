@@ -289,6 +289,7 @@ def dispatch(request: dict, prompt: str, view):
     one shape that would silently buy a same-provider review.
     """
     from .route import DispatchError, NoCandidateError, route
+    from .selection import ROLE_VERIFIER
 
     excluded = [p for p in request["excluded_providers"] if p]
     if view.provider not in excluded:
@@ -301,6 +302,7 @@ def dispatch(request: dict, prompt: str, view):
     try:
         return route(
             prompt, task_type="session-verification",
+            role=ROLE_VERIFIER,
             exclude_providers=excluded,
         ), None
     except NoCandidateError as exc:
@@ -355,8 +357,8 @@ def build_result(request, *, attempt, route_result, error_class,
             "usage": {
                 "input_tokens": getattr(route_result, "input_tokens", 0) or 0,
                 "output_tokens": getattr(route_result, "output_tokens", 0) or 0,
-                "model_usd": getattr(route_result, "cost_usd", None),
-                "priced": getattr(route_result, "cost_usd", None) is not None,
+                "model_usd": None,
+                "priced": False,
             },
             "raw_output_ref": raw_ref, "raw_output_digest": raw_digest,
             "error_class": error_class, "round": request["round"],
@@ -384,8 +386,10 @@ def build_result(request, *, attempt, route_result, error_class,
         "usage": {
             "input_tokens": route_result.input_tokens or 0,
             "output_tokens": route_result.output_tokens or 0,
-            "model_usd": route_result.cost_usd,
-            "priced": route_result.cost_usd is not None,
+            # Dollars are not computed anywhere in this framework; tokens are
+            # the record, and the vendor's console is the reconciliation.
+            "model_usd": None,
+            "priced": False,
         },
         "raw_output_ref": raw_ref, "raw_output_digest": raw_digest,
         "error_class": None, "round": request["round"],
@@ -530,11 +534,8 @@ def cmd_verify(args) -> dict:
             "summary": "verification dispatch cost",
             "payload": {
                 "dispatch_id": result["dispatch_id"],
-                "cost_usd": route_result.cost_usd,
-                "pricing_status": (
-                    "priced" if route_result.cost_usd is not None
-                    else "unpriced"
-                ),
+                "cost_usd": None,
+                "pricing_status": "unpriced",
                 "source": route_result.transport,
                 "usage": {
                     "input_tokens": route_result.input_tokens or 0,
@@ -747,6 +748,7 @@ def auto_verify(route_result, content: str, task_type: str, config):
     routed call already succeeded and was paid for."""
     from .metrics import record_call
     from .route import RouterError, route
+    from .selection import ROLE_VERIFIER
 
     prompt = build_verification_prompt(
         config.get("_verification_template", ""),
@@ -755,6 +757,7 @@ def auto_verify(route_result, content: str, task_type: str, config):
     try:
         result = route(
             prompt, task_type="verification",
+            role=ROLE_VERIFIER,
             exclude_providers=[route_result.provider],
         )
     except RouterError:
@@ -764,9 +767,9 @@ def auto_verify(route_result, content: str, task_type: str, config):
     record_call(
         config, call_type="verify", task_type=task_type,
         model=result.model_name, provider=result.provider,
-        tier=result.tier, complexity_score=None, generation_params={},
+        generation_params={},
         input_tokens=result.input_tokens, output_tokens=result.output_tokens,
-        cost_usd=result.cost_usd, elapsed_seconds=result.elapsed_seconds,
+        elapsed_seconds=result.elapsed_seconds,
         escalated=result.escalated, stop_reason="", transport=result.transport,
         verifier_of=route_result.model_name, verdict=verdict,
         issue_count=len(issues),

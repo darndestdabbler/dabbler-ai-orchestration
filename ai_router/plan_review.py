@@ -79,8 +79,11 @@ HIGH_RISK_FLAGS = frozenset({RISK_SENSITIVE_PATH, RISK_DEPENDENCY_CHANGE})
 # reader: it has now failed twice to get an answer it will accept.
 ESCALATE_AFTER_REJECTIONS = 2
 
-CHEAP_TIER = 1
-PREMIUM_TIER = 3
+# The two roles a plan review draws from. The escalated one is a stronger
+# reader, not a higher tier: which models fill either role is declared in
+# router-config.yaml, and this module only decides which of the two to ask.
+ROLE_PLAN_REVIEW = "plan-review"
+ROLE_PLAN_REVIEW_ESCALATED = "plan-review-escalated"
 
 
 class PlanReviewError(RuntimeError):
@@ -635,18 +638,14 @@ def _append_round(run_dir, record: dict) -> dict:
     return record
 
 
-def _default_dispatch(prompt: str, *, tier: int, session_set, session_number,
+def _default_dispatch(prompt: str, *, role: str, session_set, session_number,
                       transport):
-    from .config import load_config
     from .route import route
 
-    config = load_config()
-    assignments = (config.get("routing") or {}).get("tier_assignments") or {}
     return route(
         prompt,
         task_type="plan-review",
-        max_tier=tier,
-        prefer_model=assignments.get(tier),
+        role=role,
         session_set=session_set,
         session_number=session_number,
         transport=transport,
@@ -711,12 +710,12 @@ def review_round(
         ))
 
     triggers = escalation_triggers(plan, prior, only_steps=scope)
-    tier = PREMIUM_TIER if triggers else CHEAP_TIER
+    role = ROLE_PLAN_REVIEW_ESCALATED if triggers else ROLE_PLAN_REVIEW
     goals = session_goals(spec_text, session_number)
     prompt = build_review_prompt(plan, goals, only_steps=scope)
     caller = dispatch or _default_dispatch
     result = caller(
-        prompt, tier=tier, session_set=session_set,
+        prompt, role=role, session_set=session_set,
         session_number=session_number, transport=transport,
     )
 
@@ -745,9 +744,8 @@ def review_round(
         reviewer={
             "model": getattr(result, "model_name", "") or "",
             "provider": getattr(result, "provider", "") or "",
-            "tier": int(getattr(result, "tier", 0) or 0),
+            "role": role,
             "transport": getattr(result, "transport", "") or "",
-            "cost_usd": getattr(result, "cost_usd", None),
         },
     ))
 

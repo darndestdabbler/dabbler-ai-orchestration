@@ -61,19 +61,17 @@ def _written(tmp_path, plan):
 
 
 class _Result:
-    def __init__(self, content, tier=1, model="cheap-1", provider="openai"):
+    def __init__(self, content, model="cheap-1", provider="openai"):
         self.content = content
         self.model_name = model
         self.provider = provider
-        self.tier = tier
         self.transport = "api"
-        self.cost_usd = None
 
 
-def _recorder(content, tier_seen):
-    def dispatch(prompt, *, tier, session_set, session_number, transport):
-        tier_seen.append(tier)
-        return _Result(content, tier=tier)
+def _recorder(content, roles_seen):
+    def dispatch(prompt, *, role, session_set, session_number, transport):
+        roles_seen.append(role)
+        return _Result(content)
     return dispatch
 
 
@@ -267,7 +265,7 @@ class TestRounds:
                 seen,
             ),
         )
-        assert seen == [plan_review.PREMIUM_TIER]
+        assert seen == [plan_review.ROLE_PLAN_REVIEW_ESCALATED]
         assert row["escalation_triggers"] == ["high-risk-flag"]
 
     def test_two_rejected_revisions_escalate_and_record_the_trigger(
@@ -291,7 +289,7 @@ class TestRounds:
                 dispatch=_recorder(objection, seen),
             )
             assert row["escalation_triggers"] == []
-        assert seen == [plan_review.CHEAP_TIER, plan_review.CHEAP_TIER]
+        assert seen == [plan_review.ROLE_PLAN_REVIEW, plan_review.ROLE_PLAN_REVIEW]
 
         plan = _written(tmp_path, _plan([
             _step("add-widget",
@@ -307,8 +305,10 @@ class TestRounds:
             ),
         )
         assert third["escalation_triggers"] == ["repeat-objection"]
-        assert seen[-1] == plan_review.PREMIUM_TIER
-        assert third["reviewer"]["tier"] == plan_review.PREMIUM_TIER
+        assert seen[-1] == plan_review.ROLE_PLAN_REVIEW_ESCALATED
+        assert third["reviewer"]["role"] == (
+            plan_review.ROLE_PLAN_REVIEW_ESCALATED
+        )
 
     def test_a_malformed_recorded_row_is_refused_not_skipped(self, tmp_path):
         plan_review.review_path(tmp_path).write_text(
@@ -328,7 +328,7 @@ class TestAmendments:
         self._approved(tmp_path)
         prompts = []
 
-        def dispatch(prompt, *, tier, session_set, session_number, transport):
+        def dispatch(prompt, *, role, session_set, session_number, transport):
             prompts.append(prompt)
             return _Result(_approve_all("add-widget"))
 
@@ -383,7 +383,7 @@ class TestAmendments:
             workspace_root=tmp_path,
             dispatch=_recorder(_approve_all("add-widget"), seen),
         )
-        assert seen == [plan_review.PREMIUM_TIER]
+        assert seen == [plan_review.ROLE_PLAN_REVIEW_ESCALATED]
         assert row["escalation_triggers"] == ["high-risk-flag"]
 
     def test_an_amendment_must_carry_a_change(self, tmp_path):

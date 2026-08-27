@@ -1311,3 +1311,95 @@ This is the second time in set 148 that the framework under construction
 was caught by the verifier it was building a surface for, and the finding
 is a fair one: a boundary is exactly the kind of code whose defects are
 invisible from the side that wrote it.
+
+## Session 8 — Selection by role, and the death of the tier ladder (plan A6)
+
+### D56 · 2026-08-27 · Orchestrator · Dead configuration goes with the code that read it, and dollars stop being computed anywhere
+
+Step 5 deletes `pick_model`, `next_escalation_model` and `estimate_complexity`;
+step 6 deletes the shipped pricing surfaces on the argument that "deleting the
+arithmetic while the rates still ship leaves pricing a configured product
+surface with nothing reading it." That argument does not stop at pricing, and
+applying it consistently decided three things the step list does not name.
+
+**The tier ladder's configuration goes with its functions.** `routing.
+tier1_max_complexity`, `tier2_max_complexity`, `default_tier`,
+`tier_assignments`, `task_type_overrides` and the whole 60-line `complexity:`
+block have exactly two readers between them: `pick_model` and
+`estimate_complexity`. Leaving them shipped is the pricing defect with a
+different key. `tier:` on the model records goes for the same reason, and with
+it the `tier` and `complexity_score` columns on routed calls — a field whose
+only possible value is 0 is not a record, it is residue.
+
+**`cost_usd` leaves `RouteResult`, and the callers stop asking for it.**
+`calculate_cost` is deleted by step 5, so `route()` can no longer produce a
+dollar figure at all; keeping the attribute would mean shipping a field that
+is permanently `None` beside a `cost_status` that is permanently
+`"unmeasured"`. `verifyjob`, `verify`, `plan_review` and `runcore` therefore
+record `null` and `unpriced` rather than reading an attribute that no longer
+exists. The run-event and rounds schemas already admit both, so no record
+shape changes — what changes is that nothing computes a dollar.
+
+**`plan-review` names two roles instead of two tiers.** Its cheap/premium
+dispatch was the only caller of `tier_assignments` outside selection, so the
+ladder could not die while it lived. The escalation rule is untouched: the
+same triggers still route the same reviews to the stronger reader, and what
+changes is that the stronger reader is named by a role rather than derived
+from a cost band.
+
+What is *not* deleted: escalation itself. Spec §1.b removes it, but this
+session's step 5 enumerates three functions and escalation is not among them.
+It survives as a walk down the role's ordered candidate list — which is what
+the seat path already did — and removing it is a decision for the session that
+is told to make it.
+
+### D57 · 2026-08-27 · Orchestrator · The run policy's dollar ceiling ships as null, because it can no longer trip
+
+`run_policy.budgets.model_usd` shipped at `10.0`. With `calculate_cost`
+deleted, every dispatch records `unpriced`, so that ceiling compares ten
+dollars against a sum that is structurally zero and can never trip. A ceiling
+that cannot trip is worse than no ceiling: it reads as an assurance and
+enforces nothing.
+
+**The shipped default becomes `null`, which the loader already documents as
+"disables the dollar ceiling and nothing else."** `model_dispatches` is the
+ceiling that actually bounds framework model calls, and `config.py` already
+said so — what changes is that its reason is now every transport rather than
+just the seat.
+
+**The knob itself stays.** Removing `model_usd` outright would reach the
+run-event contract (`runCostUpdated`, the `budgets` payload), the
+`resume --model-usd-budget` flag, and `RunView` — that is the run pipeline's
+own surface, built by a different set, and rebuilding it is a second large
+change riding on this one. Session 8's step 6 scopes the dollar deletion to
+`metrics.py` and `route.py`, and this is the smallest edit that keeps the
+shipped configuration from stating something untrue.
+
+### D58 · 2026-08-27 · Verifier (gpt-5.4/openai) · Round 1: the verifier-trust flag bound on one transport only, and the API smoke test stopped touching the API
+
+Two Major Correctness findings, both real, both caused by this session rather
+than pre-existing.
+
+**The verifier-trust flag did not bind on the seat.** `is_enabled_as_verifier`
+was checked only while enumerating the model registry, so the Copilot path
+could select a model the registry explicitly marks as untrusted to review
+another model's work — and the shipped verifier preference named exactly such
+a model, `gemini-3.1-pro-preview`. Lifting roles to a shared resolver is what
+made the gap reachable: before this session the seat resolved every call
+through the `generator` role and the `verifier` role was inert config.
+
+The fix puts the rule in `resolve_role`, where both transports meet it, and
+matches by the identity module's normalized token because the registry and
+the seat catalog spell the same model differently
+(`claude-haiku-4-5-20251001` against `claude-haiku-4.5`). A model the registry
+carries no record of stays eligible: an absent record is unknown, never
+unsupported, and a hard filter on missing metadata would end cross-vendor
+verification the day a seat ships something new.
+
+**`smoke.py` stopped testing what it exists to test.** Its whole purpose is
+proving a provider API key works, and flipping the shipped transport to the
+seat meant a green `[ok] openai` proved only that the seat could answer
+through OpenAI. It now pins `transport="api"`.
+
+Both were found by reading the shipped configuration against the code, which
+is the read a different vendor is in a position to make.

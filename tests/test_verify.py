@@ -42,8 +42,7 @@ def _git(cwd, *args):
 def make_result(content, **overrides):
     defaults = dict(
         content=content, model_name="gpt-5-4", model_id="gpt-5.4",
-        provider="openai", tier=3, input_tokens=1000, output_tokens=200,
-        cost_usd=0.05, cost_status="measured", complexity_score=70,
+        provider="openai", input_tokens=1000, output_tokens=200,
         escalated=False, escalation_history=[], elapsed_seconds=1.0,
         transport="api", truncated=False,
     )

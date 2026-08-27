@@ -57,10 +57,14 @@ def classify_identity_provenance(engine) -> Optional[str]:
     )
 
 
-def _normalize_model_token(model: str) -> str:
+def normalize_model_token(model: str) -> str:
     """Dots to hyphens, lowercased. A trailing ``-YYYYMMDD`` is stripped
     only on ``claude-`` ids — an unscoped strip once let an invented dated
-    variant of another provider's id normalize onto a real entry."""
+    variant of another provider's id normalize onto a real entry.
+
+    Public because the registry and a seat catalog spell the same model
+    differently, and more than one caller has to decide whether two ids name
+    one model."""
     token = model.strip().lower().replace(".", "-")
     if token.startswith("claude-"):
         token = _DATE_SUFFIX.sub("", token)
@@ -86,7 +90,7 @@ def _catalog_provider(token: str) -> Optional[str]:
     except Exception:
         return None
     for entry in catalog.confirmed_models():
-        if _normalize_model_token(entry.id) == token:
+        if normalize_model_token(entry.id) == token:
             provider = str(entry.provider or "").strip().lower()
             return provider if provider in KNOWN_PROVIDERS else None
     return None
@@ -115,13 +119,13 @@ def resolve_model_provider(
             if provider:
                 return str(provider).strip().lower()
 
-    token = _normalize_model_token(model)
+    token = normalize_model_token(model)
     for alias, entry in registry.items():
         if not isinstance(entry, dict):
             continue
-        if _normalize_model_token(alias) == token or (
+        if normalize_model_token(alias) == token or (
             entry.get("model_id")
-            and _normalize_model_token(str(entry["model_id"])) == token
+            and normalize_model_token(str(entry["model_id"])) == token
         ):
             provider = entry.get("provider")
             if provider:

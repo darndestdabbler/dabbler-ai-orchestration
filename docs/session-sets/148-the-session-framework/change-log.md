@@ -62,3 +62,10 @@
 - Routed verification cost: unpriced (seat transport)
 - Verifier's read surface: agency: 12 read(s), 0 search(es), 0 listing(s); 2 read(s) were transformed; 1 not confined to scope
 - Raw round output: `.dabbler/runs/148-the-session-framework/s7/`
+
+## Session 8 verification — VERIFIED after 2 round(s)
+
+- Verifier: gpt-5.4 (openai) over copilot-cli
+- Orchestrator provider (excluded): anthropic
+- Verifier's read surface: agency: 28 read(s), 0 search(es), 0 listing(s); 10 not confined to scope
+- Raw round output: `.dabbler/runs/148-the-session-framework/s8/`

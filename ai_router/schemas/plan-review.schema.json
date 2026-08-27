@@ -95,9 +95,8 @@
       "properties": {
         "model": { "type": "string" },
         "provider": { "type": "string" },
-        "tier": { "type": "integer" },
-        "transport": { "type": "string" },
-        "cost_usd": { "type": ["number", "null"] }
+        "role": { "type": "string" },
+        "transport": { "type": "string" }
       }
     },
     "objected_field_digests": {

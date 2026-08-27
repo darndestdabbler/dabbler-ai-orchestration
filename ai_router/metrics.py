@@ -5,12 +5,13 @@ additive schema (new fields never break old lines), safe to stream with jq.
 Writing is best-effort and never raises: metrics must never break a routed
 call that already succeeded and was already paid for.
 
-``cost_usd`` is billing-authoritative only on rows where
-``billed_usage_unavailable`` is not true. Copilot-CLI rows carry
-``cost_usd: null`` beside that flag — the spend is real, it just cannot be
-priced here; it is recoverable through ``transport_session_id`` (the CLI
-conversation id) via ``ai_router.seat_cost``. The report never presents
-unpriced calls as ``$0.00``.
+**Tokens are recorded and dollars are not computed.** Reconciliation happens
+out of band, against the vendor's own console: a repository names its own API
+key per provider, so the join between these token counts and the vendor's
+dollars is the key itself. Seat spend is not attributable per session and is
+not estimated — ``billed_usage_unavailable`` marks the rows a seat transport
+produced, and ``transport_session_id`` (the CLI conversation id) is what
+``ai_router.seat_cost`` prices them by.
 """
 
 from __future__ import annotations
@@ -20,8 +21,6 @@ import json
 import os
 from pathlib import Path
 from typing import Optional
-
-from .pricing import calculate_cost
 
 _THIS_DIR = Path(__file__).parent
 
@@ -62,12 +61,9 @@ def record_call(
     task_type: str,
     model: str,                        # registry alias (or catalog id on copilot)
     provider: str,
-    tier: int,
-    complexity_score: Optional[int],
     generation_params: dict,
     input_tokens: int,
     output_tokens: int,
-    cost_usd: Optional[float],         # None = not priced here, never 0.0
     elapsed_seconds: float,
     escalated: bool,
     stop_reason: str,
@@ -123,13 +119,10 @@ def record_call(
             else None
         ),
         "provider": provider,
-        "tier": tier,
-        "complexity_score": complexity_score,
         "effort": effort,
         "thinking_on": thinking_on,
         "input_tokens": int(input_tokens),
         "output_tokens": int(output_tokens),
-        "cost_usd": round(float(cost_usd), 6) if cost_usd is not None else None,
         "elapsed_seconds": round(float(elapsed_seconds), 3),
         "escalated": bool(escalated),
         "stop_reason": stop_reason,
@@ -171,96 +164,46 @@ def load_metrics(config: dict) -> list[dict]:
     return records
 
 
-def priced_and_unpriced(records: list) -> tuple[list, list]:
-    """Split records into (billing-authoritative, not-priced-here). A row is
-    unpriced when it carries ``billed_usage_unavailable: true`` or a null
-    ``cost_usd`` — summing those in as zeros is how a report says $0.00 for
-    a session that really spent money."""
-    priced: list = []
-    unpriced: list = []
-    for record in records:
-        if record.get("billed_usage_unavailable") is True or record.get(
-            "cost_usd"
-        ) is None:
-            unpriced.append(record)
-        else:
-            priced.append(record)
-    return priced, unpriced
-
-
-def _priced_sum(records: list) -> float:
-    priced, _ = priced_and_unpriced(records)
-    return sum(r.get("cost_usd") or 0 for r in priced)
-
-
-def _cost_cell(records: list, width: int = 8) -> str:
-    """A cost cell that never presents unpriced calls as $0.0000: a group
-    with nothing priced renders ``-``; a mixed group gets a ``+`` suffix."""
-    priced, unpriced = priced_and_unpriced(records)
-    if not priced:
-        return f"{'-':>{width + 2}}"
-    total = sum(r.get("cost_usd") or 0 for r in priced)
-    return f"${total:>{width}.4f}" + ("+" if unpriced else " ")
-
-
-def opus_equivalent_savings(records: list, config: dict) -> Optional[float]:
-    """What the priced calls would have cost on the tier-3 assignment, minus
-    what they actually cost. ``None`` when nothing is priced or no tier-3
-    assignment exists."""
-    priced, _ = priced_and_unpriced(records)
-    if not priced:
-        return None
-    tier3_alias = (config.get("routing", {}).get("tier_assignments") or {}).get(3)
-    tier3_entry = (config.get("models") or {}).get(tier3_alias)
-    if not isinstance(tier3_entry, dict):
-        return None
-    baseline = sum(
-        calculate_cost(
-            r.get("input_tokens", 0) or 0, r.get("output_tokens", 0) or 0,
-            tier3_entry,
-        )
-        for r in priced
-    )
-    return baseline - sum(r.get("cost_usd") or 0 for r in priced)
+def _seat_rows(records: list) -> list:
+    """Rows a seat transport produced. Their spend is real and is not
+    attributable here — ``transport_session_id`` is what prices them."""
+    return [
+        r for r in records if r.get("billed_usage_unavailable") is True
+    ]
 
 
 def print_metrics_report(config: dict) -> None:
-    """Human-readable summary: totals, per-model / per-task / per-set spend,
-    served-model mismatches, and Opus-equivalent savings."""
+    """Human-readable summary: token totals, per-model / per-task / per-set
+    volume, and served-model mismatches."""
     records = load_metrics(config)
     if not records:
         print("(no metrics recorded yet -- router-metrics.jsonl is empty "
               "or missing)")
         return
 
+    def _tokens(rows: list) -> int:
+        return sum(
+            (r.get("input_tokens", 0) or 0) + (r.get("output_tokens", 0) or 0)
+            for r in rows
+        )
+
     print("\n" + "=" * 68)
     print(f"AI ROUTER -- METRICS REPORT  ({len(records)} calls logged)")
     print("=" * 68)
 
-    priced, unpriced = priced_and_unpriced(records)
-    total_cost = sum(r.get("cost_usd") or 0 for r in priced)
-    if priced:
-        print(f"Routed cost (Direct APIs, priced):  ${total_cost:.4f} "
-              f"over {len(priced)} call(s)")
-    else:
-        print("Routed cost (Direct APIs, priced):  none -- no call in this "
-              "log was priced")
-    if unpriced:
-        with_id = sum(1 for r in unpriced if r.get("transport_session_id"))
-        print(f"NOT PRICED HERE:                    {len(unpriced)} call(s) "
-              "on a seat transport (billed_usage_unavailable)")
-        print(f"                                    real spend in AI credits; "
-              f"{with_id} carry the conversation id that prices them "
-              "(python -m ai_router.seat_cost)")
     print(f"Total input tokens:   "
           f"{sum(r.get('input_tokens', 0) or 0 for r in records):,}")
     print(f"Total output tokens:  "
           f"{sum(r.get('output_tokens', 0) or 0 for r in records):,}")
 
-    savings = opus_equivalent_savings(records, config)
-    if savings is not None:
-        print(f"Opus-equivalent savings (priced calls at the tier-3 rate "
-              f"minus actual): ${savings:.4f}")
+    seat = _seat_rows(records)
+    if seat:
+        with_id = sum(1 for r in seat if r.get("transport_session_id"))
+        print(f"On a seat transport:                {len(seat)} call(s) "
+              "(billed_usage_unavailable)")
+        print(f"                                    real spend in AI credits; "
+              f"{with_id} carry the conversation id that prices them "
+              "(python -m ai_router.seat_cost)")
 
     mismatched = [r for r in records if r.get("served_model_mismatch")]
     if mismatched:
@@ -270,7 +213,7 @@ def print_metrics_report(config: dict) -> None:
             grouped[key] = grouped.get(key, 0) + 1
         print("\n--- Requested vs served model ---")
         print("  A dated-snapshot pin is routine; a change of model FAMILY "
-              "changes the price.")
+              "is a different model answering.")
         for key, count in sorted(grouped.items(), key=lambda kv: -kv[1]):
             print(f"      {count:>5}x  {key}")
 
@@ -284,22 +227,22 @@ def print_metrics_report(config: dict) -> None:
         slot["records"].append(r)
         if r.get("escalated"):
             slot["escalated"] += 1
-    print(f"  {'model':<24} {'provider':<11} {'calls':>6} {'cost':>10} {'esc%':>6}")
+    print(f"  {'model':<24} {'provider':<11} {'calls':>6} {'tokens':>12} {'esc%':>6}")
     for m, s in sorted(
-        by_model.items(), key=lambda kv: -_priced_sum(kv[1]["records"])
+        by_model.items(), key=lambda kv: -_tokens(kv[1]["records"])
     ):
         calls = len(s["records"])
         esc_pct = (100.0 * s["escalated"] / calls) if calls else 0
         print(f"  {m:<24} {s['provider']:<11} {calls:>6} "
-              f"{_cost_cell(s['records'])} {esc_pct:>5.1f}%")
+              f"{_tokens(s['records']):>12,} {esc_pct:>5.1f}%")
 
     print("\n--- By task type ---")
     by_task: dict[str, list] = {}
     for r in records:
         by_task.setdefault(r.get("task_type", "?"), []).append(r)
-    print(f"  {'task_type':<24} {'calls':>6} {'cost':>10}")
-    for t, rows in sorted(by_task.items(), key=lambda kv: -_priced_sum(kv[1])):
-        print(f"  {t:<24} {len(rows):>6} {_cost_cell(rows)}")
+    print(f"  {'task_type':<24} {'calls':>6} {'tokens':>12}")
+    for t, rows in sorted(by_task.items(), key=lambda kv: -_tokens(kv[1])):
+        print(f"  {t:<24} {len(rows):>6} {_tokens(rows):>12,}")
 
     sets: dict[str, list] = {}
     for r in records:
@@ -308,15 +251,10 @@ def print_metrics_report(config: dict) -> None:
             sets.setdefault(ss, []).append(r)
     if sets:
         print("\n--- By session set ---")
-        print(f"  {'session_set':<40} {'calls':>6} {'cost':>10}")
+        print(f"  {'session_set':<40} {'calls':>6} {'tokens':>12}")
         for ss, rows in sorted(sets.items()):
-            print(f"  {ss:<40} {len(rows):>6} {_cost_cell(rows)}")
+            print(f"  {ss:<40} {len(rows):>6} {_tokens(rows):>12,}")
 
-    if unpriced:
-        print("\n  '-' means no call in that row was priced here; a trailing "
-              "'+' means some were not.")
-        print("  Neither is zero spend. Seat cost is measured by conversation "
-              "id, not by this column.")
     print("=" * 68 + "\n")
 
 

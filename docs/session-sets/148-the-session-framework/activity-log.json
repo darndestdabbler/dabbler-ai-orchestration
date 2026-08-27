@@ -1559,6 +1559,220 @@
       "dateTime": "2026-08-27T07:12:38.931735-04:00",
       "description": "Five gates pass; committed as 79f2a9ad and pushed to master.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 8,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-27T07:18:03.713127-04:00",
+      "description": "Register.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 8,
+      "stepNumber": 2,
+      "stepKey": "lift-roles-out-of-the-copilot",
+      "dateTime": "2026-08-27T07:18:03.713127-04:00",
+      "description": "Lift roles out of the Copilot transport block; both paths resolve the `verifier` role through one resolver. The direct-API path resolves against the model record instead of walking tiers, keeping its existing reachability and exclusion filters.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 8,
+      "stepNumber": 3,
+      "stepKey": "the-preference-order-becomes-ordering-only",
+      "dateTime": "2026-08-27T07:18:03.713127-04:00",
+      "description": "**The preference order becomes ordering-only on both paths.** Today the seat falls through to the whole confirmed catalog only when an exclusion is active; make that unconditional.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 8,
+      "stepNumber": 4,
+      "stepKey": "assert-verifier",
+      "dateTime": "2026-08-27T07:18:03.713127-04:00",
+      "description": "**Assert `verifier.provider != author.provider` at dispatch**, not only as a selection filter.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 8,
+      "stepNumber": 5,
+      "stepKey": "delete-pickmodel-nextescalationmodel-estimatecom",
+      "dateTime": "2026-08-27T07:18:03.713127-04:00",
+      "description": "Delete `pick_model`, `next_escalation_model`, `estimate_complexity`, `pricing.py`'s cost arithmetic, and the load-time rate check.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 8,
+      "stepNumber": 6,
+      "stepKey": "delete-the-shipped-pricing-surfaces-too",
+      "dateTime": "2026-08-27T07:18:03.713127-04:00",
+      "description": "**Delete the shipped pricing surfaces too, not just the arithmetic.** The per-token rate fields and `confirmed_on` on the model records in `router-config.yaml`, the schema keys that admit them, and any dollar-denominated reporting left in `metrics.py` and `route.py`. Spec \u00a77 says the framework does not record dollar cost, rate tables, or rate confirmation dates \u2014 deleting the arithmetic while the rates still ship leaves pricing a configured product surface with nothing reading it.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 8,
+      "stepNumber": 7,
+      "stepKey": "make-the-seat-the-default-in",
+      "dateTime": "2026-08-27T07:18:03.713127-04:00",
+      "description": "**Make the seat the default in the shipped configuration.** `transport.profile` ships as `api` today, which contradicts \u00a71.a on the one surface staff actually receive. Flip it to `copilot-cli` and follow the same change through the staff-facing documentation. The precedence order is unchanged \u2014 flag, then env, then profile \u2014 so the direct-API path stays reachable and merely stops being the default.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 8,
+      "stepNumber": 8,
+      "stepKey": "this-is-one-change-not-two",
+      "dateTime": "2026-08-27T07:18:03.713127-04:00",
+      "description": "**This is one change, not two.** Rates are the current sort key for candidate ordering, so pricing cannot be removed until the declared preference order replaces it.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 8,
+      "stepNumber": 9,
+      "stepKey": "affected-tests-as-preverify",
+      "dateTime": "2026-08-27T07:18:03.713127-04:00",
+      "description": "Affected tests as preverify.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 8,
+      "stepNumber": 10,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-27T07:18:03.713127-04:00",
+      "description": "Cross-provider verification.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 8,
+      "stepNumber": 11,
+      "stepKey": "full-test-suite-recorded-as-the",
+      "dateTime": "2026-08-27T07:18:03.713127-04:00",
+      "description": "Full test suite, recorded as the `final-full` run of record.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 8,
+      "stepNumber": 12,
+      "stepKey": "close-out",
+      "dateTime": "2026-08-27T07:18:03.713127-04:00",
+      "description": "Close-out.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 8,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-27T07:18:03.720957-04:00",
+      "description": "Registered session 8 (copilot).",
+      "status": "complete"
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 8,
+      "dateTime": "2026-08-27T07:19:49.018633-04:00",
+      "task": "Selection by role, and the death of the tier ladder (plan A6).\n\nOne change, not two: rates are the current sort key for candidate ordering, so\npricing cannot be removed until the declared preference order replaces it.\n\n1. Lift `roles` out of `transports.copilot-cli` to a top-level `roles:` block and\n   give both transports one role resolver. The direct-API path resolves the\n   `verifier` role against the model record instead of walking tiers, keeping its\n   existing reachability (provider enabled, API key resolves) and exclusion\n   filters.\n2. Make the preference order ordering-only on both paths: a model absent from\n   `prefer` still qualifies and merely sorts after the named ones, unconditionally\n   rather than only when an exclusion is active.\n3. Assert `verifier.provider != author.provider` at dispatch, immediately before\n   the call, not only as a selection filter.\n4. Delete `pick_model`, `next_escalation_model`, `estimate_complexity`,\n   `pricing.py`'s cost arithmetic, and the load-time rate check.\n5. Delete the shipped pricing surfaces: per-token rate fields and `confirmed_on`\n   on the model records in `router-config.yaml`, the schema keys that admit them,\n   and dollar-denominated reporting in `metrics.py` and `route.py`.\n6. Ship the seat as the default transport: `transport.profile: copilot-cli`, and\n   follow the change through the staff-facing documentation. Precedence is\n   unchanged \u2014 flag, then env, then profile \u2014 so the direct-API path stays\n   reachable and merely stops being the default.\n7. Affected tests as preverify; cross-provider verification; full suite as the\n   `final-full` run of record; close through the gate.\n\nNet deletion. Est. 12 Python tests, with more deleted than added.",
+      "releasable": false
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D56",
+      "ordinal": 56,
+      "sessionNumber": 8,
+      "decidedOn": "2026-08-27",
+      "recordedAt": "2026-08-27T07:23:59.949452-04:00",
+      "decider": "orchestrator",
+      "headline": "Dead configuration goes with the code that read it, and dollars stop being computed anywhere",
+      "body": "Step 5 deletes `pick_model`, `next_escalation_model` and `estimate_complexity`;\nstep 6 deletes the shipped pricing surfaces on the argument that \"deleting the\narithmetic while the rates still ship leaves pricing a configured product\nsurface with nothing reading it.\" That argument does not stop at pricing, and\napplying it consistently decided three things the step list does not name.\n\n**The tier ladder's configuration goes with its functions.** `routing.\ntier1_max_complexity`, `tier2_max_complexity`, `default_tier`,\n`tier_assignments`, `task_type_overrides` and the whole 60-line `complexity:`\nblock have exactly two readers between them: `pick_model` and\n`estimate_complexity`. Leaving them shipped is the pricing defect with a\ndifferent key. `tier:` on the model records goes for the same reason, and with\nit the `tier` and `complexity_score` columns on routed calls \u2014 a field whose\nonly possible value is 0 is not a record, it is residue.\n\n**`cost_usd` leaves `RouteResult`, and the callers stop asking for it.**\n`calculate_cost` is deleted by step 5, so `route()` can no longer produce a\ndollar figure at all; keeping the attribute would mean shipping a field that\nis permanently `None` beside a `cost_status` that is permanently\n`\"unmeasured\"`. `verifyjob`, `verify`, `plan_review` and `runcore` therefore\nrecord `null` and `unpriced` rather than reading an attribute that no longer\nexists. The run-event and rounds schemas already admit both, so no record\nshape changes \u2014 what changes is that nothing computes a dollar.\n\n**`plan-review` names two roles instead of two tiers.** Its cheap/premium\ndispatch was the only caller of `tier_assignments` outside selection, so the\nladder could not die while it lived. The escalation rule is untouched: the\nsame triggers still route the same reviews to the stronger reader, and what\nchanges is that the stronger reader is named by a role rather than derived\nfrom a cost band.\n\nWhat is *not* deleted: escalation itself. Spec \u00a71.b removes it, but this\nsession's step 5 enumerates three functions and escalation is not among them.\nIt survives as a walk down the role's ordered candidate list \u2014 which is what\nthe seat path already did \u2014 and removing it is a decision for the session that\nis told to make it."
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D57",
+      "ordinal": 57,
+      "sessionNumber": 8,
+      "decidedOn": "2026-08-27",
+      "recordedAt": "2026-08-27T07:56:09.985047-04:00",
+      "decider": "orchestrator",
+      "headline": "The run policy's dollar ceiling ships as null, because it can no longer trip",
+      "body": "`run_policy.budgets.model_usd` shipped at `10.0`. With `calculate_cost`\ndeleted, every dispatch records `unpriced`, so that ceiling compares ten\ndollars against a sum that is structurally zero and can never trip. A ceiling\nthat cannot trip is worse than no ceiling: it reads as an assurance and\nenforces nothing.\n\n**The shipped default becomes `null`, which the loader already documents as\n\"disables the dollar ceiling and nothing else.\"** `model_dispatches` is the\nceiling that actually bounds framework model calls, and `config.py` already\nsaid so \u2014 what changes is that its reason is now every transport rather than\njust the seat.\n\n**The knob itself stays.** Removing `model_usd` outright would reach the\nrun-event contract (`runCostUpdated`, the `budgets` payload), the\n`resume --model-usd-budget` flag, and `RunView` \u2014 that is the run pipeline's\nown surface, built by a different set, and rebuilding it is a second large\nchange riding on this one. Session 8's step 6 scopes the dollar deletion to\n`metrics.py` and `route.py`, and this is the smallest edit that keeps the\nshipped configuration from stating something untrue."
+    },
+    {
+      "sessionNumber": 8,
+      "stepNumber": 2,
+      "stepKey": "lift-roles-out-of-the-copilot",
+      "dateTime": "2026-08-27T07:58:31.207394-04:00",
+      "description": "Roles moved from transports.copilot-cli to a top-level roles: block. ai_router.selection.resolve_role is the one rule both transports apply; the seat enumerates its confirmed catalog, the direct-API path enumerates the model registry (enabled, provider reachable, is_enabled_as_verifier for the verifier role) instead of walking tiers.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 8,
+      "stepNumber": 3,
+      "stepKey": "the-preference-order-becomes-ordering-only",
+      "dateTime": "2026-08-27T07:58:31.832503-04:00",
+      "description": "A candidate the preference order does not name still qualifies and sorts after the named ones, unconditionally rather than only under an exclusion. Names are model ids as each transport puts them on the wire, so a name that matches nothing is inert.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 8,
+      "stepNumber": 4,
+      "stepKey": "assert-verifier",
+      "dateTime": "2026-08-27T07:58:32.460043-04:00",
+      "description": "route() refuses at the call site with ExcludedProviderError when the resolved candidate provider is in the exclusion, escalation candidates included. Selection still filters; this is the assertion a later preference path cannot undo.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 8,
+      "stepNumber": 5,
+      "stepKey": "delete-pickmodel-nextescalationmodel-estimatecom",
+      "dateTime": "2026-08-27T07:58:33.130155-04:00",
+      "description": "pick_model, next_escalation_model and estimate_complexity deleted; pricing.py deleted whole (every function was rate arithmetic) with its load-time rate check. Escalation survives as a walk down the role's ordered candidate list, which is what the seat path already did.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 8,
+      "stepNumber": 6,
+      "stepKey": "delete-the-shipped-pricing-surfaces-too",
+      "dateTime": "2026-08-27T07:58:33.769653-04:00",
+      "description": "Rate fields, pricing: lists, confirmed_on, metadata.pricing_reviewed, preferred_pairings and max_cost_multiplier gone from router-config.yaml and the schema keys that admitted them. cost_usd/cost_status left RouteResult, record_call and the metrics report; verifyjob, verify, plan_review record unpriced. Dead with them: routing.*, the complexity: block, and tier: on the model records.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 8,
+      "stepNumber": 7,
+      "stepKey": "make-the-seat-the-default-in",
+      "dateTime": "2026-08-27T07:58:34.476697-04:00",
+      "description": "transport.profile ships as copilot-cli. Precedence unchanged (flag > env > profile), so the direct-API path stays reachable. README, quick-start and schema-reference follow, and their worked local-overrides example inverts to profile: api.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 8,
+      "stepNumber": 8,
+      "stepKey": "this-is-one-change-not-two",
+      "dateTime": "2026-08-27T07:58:35.167042-04:00",
+      "description": "Rates were the sort key; the declared preference order replaces them in the same change. Neither half is separable.",
+      "status": "complete"
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D58",
+      "ordinal": 58,
+      "sessionNumber": 8,
+      "decidedOn": "2026-08-27",
+      "recordedAt": "2026-08-27T08:27:35.205234-04:00",
+      "decider": "verifier",
+      "headline": "Round 1: the verifier-trust flag bound on one transport only, and the API smoke test stopped touching the API",
+      "body": "Two Major Correctness findings, both real, both caused by this session rather\nthan pre-existing.\n\n**The verifier-trust flag did not bind on the seat.** `is_enabled_as_verifier`\nwas checked only while enumerating the model registry, so the Copilot path\ncould select a model the registry explicitly marks as untrusted to review\nanother model's work \u2014 and the shipped verifier preference named exactly such\na model, `gemini-3.1-pro-preview`. Lifting roles to a shared resolver is what\nmade the gap reachable: before this session the seat resolved every call\nthrough the `generator` role and the `verifier` role was inert config.\n\nThe fix puts the rule in `resolve_role`, where both transports meet it, and\nmatches by the identity module's normalized token because the registry and\nthe seat catalog spell the same model differently\n(`claude-haiku-4-5-20251001` against `claude-haiku-4.5`). A model the registry\ncarries no record of stays eligible: an absent record is unknown, never\nunsupported, and a hard filter on missing metadata would end cross-vendor\nverification the day a seat ships something new.\n\n**`smoke.py` stopped testing what it exists to test.** Its whole purpose is\nproving a provider API key works, and flipping the shipped transport to the\nseat meant a green `[ok] openai` proved only that the seat could answer\nthrough OpenAI. It now pins `transport=\"api\"`.\n\nBoth were found by reading the shipped configuration against the code, which\nis the read a different vendor is in a position to make.",
+      "model": "gpt-5.4",
+      "provider": "openai"
     }
   ]
 }

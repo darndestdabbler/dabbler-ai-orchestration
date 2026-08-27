@@ -43,7 +43,7 @@ it.
 | 5 | The two files, framework-written (plan A4) | no | 2026-08-27 |
 | 6 | The verifier's read surface (plan A5, first half) | no | 2026-08-27 |
 | 7 | The test-write path (plan A5, second half) | no | 2026-08-27 |
-| 8 | Selection by role, and the death of the tier ladder (plan A6) | — | not declared |
+| 8 | Selection by role, and the death of the tier ladder (plan A6) | no | 2026-08-27 |
 | 9 | Model discovery (plan A7) | — | not declared |
 | 10 | The code review loop (plan B1) | — | not declared |
 | 11 | The verifier authors tests, the framework runs them (plan B2) | — | not declared |
@@ -96,3 +96,36 @@ This session builds framework internals and publishes no package.
 **Releasable: no.**
 
 Build the fourth operation of the verifier's agency surface: create or modify a test file. The verifier proposes a test-file write in its response; the framework applies it. The model never touches the filesystem, and it holds no write tool on either transport. Writes are confined to the test root this repository declares under testing.selection -- a proposal naming a path outside it, or a path that is not a test filename, or a round that granted no write at all, is refused by the framework rather than discouraged by the prompt. Every proposal lands on the round's agency record with its outcome and, when refused, the reason. The write grant is off in a code-review round; the tests loop of spec section 3.c.ii turns it on.
+
+### Session 8 — Selection by role, and the death of the tier ladder (plan A6)
+
+**Releasable: no.**
+
+Selection by role, and the death of the tier ladder (plan A6).
+
+One change, not two: rates are the current sort key for candidate ordering, so
+pricing cannot be removed until the declared preference order replaces it.
+
+1. Lift `roles` out of `transports.copilot-cli` to a top-level `roles:` block and
+   give both transports one role resolver. The direct-API path resolves the
+   `verifier` role against the model record instead of walking tiers, keeping its
+   existing reachability (provider enabled, API key resolves) and exclusion
+   filters.
+2. Make the preference order ordering-only on both paths: a model absent from
+   `prefer` still qualifies and merely sorts after the named ones, unconditionally
+   rather than only when an exclusion is active.
+3. Assert `verifier.provider != author.provider` at dispatch, immediately before
+   the call, not only as a selection filter.
+4. Delete `pick_model`, `next_escalation_model`, `estimate_complexity`,
+   `pricing.py`'s cost arithmetic, and the load-time rate check.
+5. Delete the shipped pricing surfaces: per-token rate fields and `confirmed_on`
+   on the model records in `router-config.yaml`, the schema keys that admit them,
+   and dollar-denominated reporting in `metrics.py` and `route.py`.
+6. Ship the seat as the default transport: `transport.profile: copilot-cli`, and
+   follow the change through the staff-facing documentation. Precedence is
+   unchanged — flag, then env, then profile — so the direct-API path stays
+   reachable and merely stops being the default.
+7. Affected tests as preverify; cross-provider verification; full suite as the
+   `final-full` run of record; close through the gate.
+
+Net deletion. Est. 12 Python tests, with more deleted than added.

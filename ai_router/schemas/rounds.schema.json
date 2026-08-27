@@ -43,7 +43,10 @@
         }
       }
     },
-    "cost_usd": { "type": ["number", "null"] },
+    "cost_usd": {
+      "type": ["number", "null"],
+      "description": "Historical only. Dollars are not computed anywhere in this framework -- tokens are the record and the vendor's console is the reconciliation -- so no writer emits this key; it stays readable because older ledgers carry it."
+    },
     "baseline_tree": { "type": ["string", "null"] },
     "completion_tree": { "type": "string", "minLength": 7 },
     "previous_tree": { "type": "string", "minLength": 7 },

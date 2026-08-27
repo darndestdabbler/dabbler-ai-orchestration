@@ -208,9 +208,7 @@ class _Reviewed:
         self.content = content
         self.model_name = "cheap"
         self.provider = "openai"
-        self.tier = 1
         self.transport = "api"
-        self.cost_usd = 0.0
 
 
 class TestDeterministicPass:

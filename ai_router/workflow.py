@@ -329,7 +329,6 @@ def _run_review(args, root) -> int:
     outcome, raws = stepreview.review(
         target=target, step=step, artifact_paths=args.artifact,
         author_provider=args.author_provider, transport=args.transport,
-        prefer_models=args.prefer_model,
     )
     filed = file_review(root, target, step, raws)
 
@@ -395,9 +394,6 @@ def _main(argv=None) -> int:
     r.add_argument("--author-provider",
                    help="the provider that wrote the work, excluded from review")
     r.add_argument("--transport")
-    r.add_argument("--prefer-model", action="append", default=[],
-                   help="ask for a specific model; repeatable, first is "
-                        "reviewer one")
     _target_args(r)
 
     a = sub.add_parser("approve", help="record the developer's approval")

@@ -743,7 +743,7 @@ def run_round(
     # write: a boundary that silently ignores what it turns away leaves no
     # evidence it was ever crossed.
     actual_grant = _grant(result.transport)
-    writes = agency.apply_test_writes(repo_root, actual_grant, result.content)
+    writes = agency.apply_writes(repo_root, actual_grant, result.content)
     agency_record = agency.record_for_round(
         repo_root, actual_grant, result.metadata, writes,
     )

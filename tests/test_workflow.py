@@ -5,7 +5,7 @@ import subprocess
 import pytest
 import yaml
 
-from ai_router import stepreview, testphase
+from ai_router import fixloop, stepreview, testphase
 from ai_router import verdict as verdictmod
 from ai_router.checks import Check, CheckRun, snapshot_worktree_tree
 from ai_router.config import DEFAULT_VERIFICATION_ROUNDS
@@ -14,7 +14,8 @@ from ai_router.stepreview import ReviewerOutcome, StepReview, digest_text
 from ai_router.workflow import (EXIT_REFUSED, WorkflowError, append,
                                 current_step, fold, project, read,
                                 review_cap, review_terminal, run_cap,
-                                run_terminal, validate_transition, _main)
+                                run_terminal, suite_terminal,
+                                validate_transition, _main)
 
 
 def entries_through(target, step):
@@ -72,6 +73,25 @@ def _fake_run(root, config, test_paths, **kw):
         duration_seconds=0.2, timed_out=False, outcome="failed",
         selection={}, output="E   assert 1 == 2",
     )
+
+
+def suite_ran(target, step, green=False, tree=None, **extra):
+    return {"event": "suite-run", "target": target, "step": step,
+            "green": green, "exitCode": 0 if green else 1,
+            "treeDigest": tree, "postTreeDigest": tree, **extra}
+
+
+def _fake_suite(root, config, authored_paths, **kw):
+    """The complete suite, standing in. The driver's job is to record what a
+    runner said, not to be one."""
+    return CheckRun(
+        check=Check(name="unit", argv=("runner",)), stage="final-full",
+        command="runner", tree_digest="t1", post_tree_digest="t1",
+        tree_mutated=False, exit_code=1, duration_seconds=0.4,
+        timed_out=False, outcome="failed", selection={},
+        output="FAILED tests/test_value.py::test_it - assert 1 == 2\n",
+    )
+
 
 MANIFEST = """
 solution:
@@ -574,6 +594,79 @@ class TestTheTestsLoopIsBounded:
         assert model["testRounds"] == 1
         assert model["testCap"] == run_cap(root)
         assert model["testTerminal"] == verdictmod.VERDICT_VERIFIED
+
+
+class TestTheSuiteLoopAndItsFixRound:
+    """Spec 3.d: the complete suite against the tree including the authored
+    tests, and a red run opening a fix loop whose scope the framework holds
+    rather than requests."""
+
+    def test_a_suite_run_before_anything_was_authored_is_refused(self, root):
+        """It would be the suite as it stood before the verifier read
+        anything, filed as the run that included what it wrote."""
+        append(root, {"event": "entered", "target": "a", "step": "plan"})
+        with pytest.raises(WorkflowError, match="no test has been authored"):
+            append(root, suite_ran("a", "plan"))
+
+    def test_a_fix_round_with_no_failing_run_behind_it_is_refused(self, root):
+        """Without a named failure the round is a model invited to revise
+        whatever it notices."""
+        append(root, {"event": "entered", "target": "a", "step": "plan"})
+        append(root, authored("a", "plan"))
+        append(root, suite_ran("a", "plan", green=True))
+        with pytest.raises(WorkflowError, match="no failing suite run"):
+            append(root, {"event": "fixed", "target": "a", "step": "plan"})
+
+    def test_the_suite_loop_ends_on_the_tests_loops_own_terms(self, git_root):
+        """Section 3.d ends "same cap and same ending as c.ii", so it is the
+        same decision on a different run."""
+        state = fold([
+            {"event": "entered", "target": "a", "step": "plan"},
+            authored("a", "plan"),
+            suite_ran("a", "plan", tree=snapshot_worktree_tree(git_root)),
+        ])
+        assert suite_terminal(git_root, state["a"], 1) == (
+            verdictmod.VERDICT_ISSUES_FOUND)
+
+    def test_moving_the_work_opens_a_new_suite_loop(self):
+        """The suite loop runs the tests the step authored, so it goes back to
+        zero wherever they do."""
+        state = fold(entries_through("a", "decompose") + [
+            authored("a", "decompose"),
+            suite_ran("a", "decompose"),
+            {"event": "fixed", "target": "a", "step": "decompose"},
+            {"event": "returned", "target": "a", "toStep": "plan",
+             "reason": "boundary wrong"},
+        ])
+        assert (state["a"]["suiteRounds"], state["a"]["fixRounds"]) == (0, 0)
+
+    def test_the_cli_records_which_tests_the_run_named(
+            self, root, monkeypatch, capsys):
+        """The fix round is scoped to these and nothing else, so what the run
+        named is on the record rather than re-derived later."""
+        append(root, {"event": "entered", "target": "csv-model", "step": "plan"})
+        append(root, authored("csv-model", "plan"))
+        monkeypatch.setattr(fixloop, "run_suite", _fake_suite)
+        code = _main(["suite", "--component", "csv-model",
+                      "--workspace-root", str(root)])
+        assert code == 0
+        event = read(root)[-1]
+        assert event["event"] == "suite-run"
+        assert [f["name"] for f in event["failures"]] == [
+            "tests/test_value.py::test_it"]
+
+    def test_the_projection_carries_the_suite_position_and_the_fix_count(
+            self, root):
+        """Two different questions: how close the loop came to its bound, and
+        how much repair the step needed to get there."""
+        append(root, {"event": "entered", "target": "csv-model", "step": "plan"})
+        append(root, authored("csv-model", "plan"))
+        append(root, suite_ran("csv-model", "plan"))
+        append(root, {"event": "fixed", "target": "csv-model", "step": "plan"})
+        model = next(c for c in project(root)["components"]
+                     if c["name"] == "csv-model")
+        assert (model["suiteRounds"], model["fixRounds"]) == (1, 1)
+        assert model["suiteCap"] == run_cap(root)
 
 
 class TestProjectionFile:

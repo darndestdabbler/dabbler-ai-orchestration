@@ -89,6 +89,12 @@ WRITE_REFUSED = "refused"
 ACTION_CREATED = "created"
 ACTION_MODIFIED = "modified"
 
+#: The fence label each kind of round writes under. Different jobs get
+#: different labels so a block lifted out of one round's transcript is not
+#: honoured by another whose boundary is a different shape.
+WRITE_LABEL_TEST = "test-write"
+WRITE_LABEL_FIX = "fix-write"
+
 #: Ledger rows are read by humans and by the unresolved-session view; an
 #: unbounded scope list or operation log helps neither.
 _MAX_RECORDED_SCOPE = 200
@@ -184,7 +190,7 @@ def session_scope(repo_root, set_dir, changed_paths) -> tuple:
     changed = {_posix(p) for p in (changed_paths or ()) if str(p).strip()}
     scope = set(changed)
     scope |= declared_dependencies(repo_root, changed)
-    set_rel = _relative_posix(repo_root, set_dir) if set_dir else None
+    set_rel = relative_posix(repo_root, set_dir) if set_dir else None
     if set_rel:
         scope.add(set_rel)
     return tuple(sorted(scope))
@@ -216,7 +222,7 @@ def _relative_to(repo_root, path) -> Optional[Path]:
         return None
 
 
-def _relative_posix(repo_root, path) -> Optional[str]:
+def relative_posix(repo_root, path) -> Optional[str]:
     """The repository-relative posix form of *path*, traversal collapsed."""
     resolved = _relative_to(repo_root, path)
     if resolved is None:
@@ -252,6 +258,15 @@ class AgencyGrant:
     #: not: the tests phase is a different round with a different job, and
     #: a surface offered everywhere is a surface used everywhere.
     allow_write: bool = False
+    #: The exact paths a fix round may write to. When set it replaces the
+    #: test-root rule outright rather than narrowing it: a fix repairs the
+    #: code that failed, and a round confined to an envelope is confined to
+    #: that envelope and nothing beside it.
+    write_envelope: tuple = ()
+    #: The fence label this round's writes carry. Two rounds with different
+    #: jobs get different labels, so a block copied out of one round's
+    #: transcript into another's is not silently honoured.
+    write_label: str = WRITE_LABEL_TEST
 
     @property
     def operations(self) -> tuple:
@@ -272,6 +287,7 @@ class AgencyGrant:
 def grant_for_transport(
     transport: str, scope=(), read_budget: int = DEFAULT_READ_BUDGET,
     test_roots=(), test_glob: str = "", allow_write: bool = False,
+    write_envelope=(), write_label: str = WRITE_LABEL_TEST,
 ) -> AgencyGrant:
     """Only the seat path is agentic. Naming the transport here keeps the
     two paths from being recorded as the same kind of review.
@@ -289,9 +305,11 @@ def grant_for_transport(
         return AgencyGrant(
             MODE_TOOLS, tuple(scope), read_budget,
             tuple(test_roots), test_glob, allow_write,
+            tuple(write_envelope), write_label,
         )
     return AgencyGrant(
         MODE_NONE, (), 0, tuple(test_roots), test_glob, allow_write,
+        tuple(write_envelope), write_label,
     )
 
 
@@ -329,8 +347,8 @@ def _read_briefing(grant: AgencyGrant) -> list:
         "You may **list files** (`glob`), **search file contents** (`grep`) "
         f"and **read a file** (`view`). You have no other tools{write_note}."
         "\n\n"
-        f"**Scope** — this session's changed files and what they import, "
-        f"not the repository:\n\n{listed}\n\n"
+        f"**Scope** — what this round is confined to, not the "
+        f"repository:\n\n{listed}\n\n"
         f"**Budget** — at most {grant.read_budget} reads this round.\n\n"
         "**Log** — every list, search and read is recorded on the round, "
         "confined to the scope or not. Confine a search or a listing by "
@@ -349,6 +367,8 @@ def _read_briefing(grant: AgencyGrant) -> list:
 
 
 def _write_briefing(grant: AgencyGrant) -> str:
+    if grant.write_envelope:
+        return _envelope_briefing(grant)
     roots = ", ".join(f"`{root}/`" for root in grant.test_roots) or "(none)"
     return (
         "## Your one write\n\n"
@@ -356,7 +376,7 @@ def _write_briefing(grant: AgencyGrant) -> str:
         "rather than by acting: emit the whole file inside a block of "
         "exactly this form, and the framework writes the bytes.\n\n"
         "````text\n"
-        "```test-write path=" + _example_test_path(grant) + "\n"
+        "```" + grant.write_label + " path=" + _example_test_path(grant) + "\n"
         "<the complete contents of the file>\n"
         "```\n"
         "````\n\n"
@@ -369,6 +389,37 @@ def _write_briefing(grant: AgencyGrant) -> str:
         "written, and the refusal is recorded on the round — this is a "
         "boundary, not a request. You have no other write and no filesystem "
         "access of any kind."
+    )
+
+
+def _envelope_briefing(grant: AgencyGrant) -> str:
+    """The write surface of a round confined to an envelope.
+
+    The paths are listed rather than described. A rule stated in prose is a
+    rule a model reasons about; a list is a list, and the framework is
+    holding the same one.
+    """
+    listed = "\n".join(
+        f"- `{path}`" for path in grant.write_envelope[:_MAX_RECORDED_SCOPE]
+    )
+    return (
+        "## Your one write\n\n"
+        "You may **modify a file inside the envelope below**, and you do it "
+        "by asking rather than by acting: emit the whole file inside a block "
+        "of exactly this form, and the framework writes the bytes.\n\n"
+        "````text\n"
+        "```" + grant.write_label + " path=" + grant.write_envelope[0] + "\n"
+        "<the complete contents of the file>\n"
+        "```\n"
+        "````\n\n"
+        "The block carries the **whole file**, never a patch or a fragment: "
+        "what it contains is what the file will contain. Emit one block per "
+        "file.\n\n"
+        f"**The envelope — these paths, exactly:**\n\n{listed}\n\n"
+        "Anything else is refused by the framework before a file is opened, "
+        "and the refusal is recorded on the round. This is a boundary, not a "
+        "request: you have no filesystem access of any kind, so there is no "
+        "route by which a path outside this list can change."
     )
 
 
@@ -578,7 +629,7 @@ def record_for_round(
     reach the model and the model answered from invention instead.
 
     *writes* are the framework's own decisions from
-    :func:`apply_test_writes`, which is why they are passed in rather than
+    :func:`apply_writes`, which is why they are passed in rather than
     recovered from metadata: no transport reports them, because no transport
     performed them.
     """
@@ -602,7 +653,7 @@ def record_for_round(
         target, names_path = _tool_target(arguments)
         detail = None
         if names_path:
-            rel = _relative_posix(repo_root, target) or _posix(target)
+            rel = relative_posix(repo_root, target) or _posix(target)
             scoped = in_scope(grant.scope, rel)
         else:
             # A pattern with no path was not confined to anything. Calling
@@ -665,12 +716,11 @@ def summary_line(record: AgencyRecord) -> str:
 # having no filesystem: it emits a block, and everything after the block is
 # the framework's.
 
-#: A proposal opens with a fenced block labelled ``test-write`` and carrying
-#: a path. The fence may be longer than three backticks, so a test file that
-#: itself contains a fence is still expressible -- the block closes only on a
-#: fence at least as long as the one that opened it.
+#: A proposal opens with a fenced block labelled for the round's kind and
+#: carrying a path. The fence may be longer than three backticks, so a test
+#: file that itself contains a fence is still expressible -- the block closes
+#: only on a fence at least as long as the one that opened it.
 _FENCE = re.compile(r"^(?P<ticks>`{3,})[ \t]*(?P<info>.*?)[ \t]*$")
-_WRITE_INFO = re.compile(r"^test-write\b[ \t]*(?P<rest>.*)$")
 _WRITE_PATH = re.compile(r"^path[ \t]*=[ \t]*(?P<path>[^\s]+)[ \t]*$")
 
 
@@ -681,17 +731,21 @@ class _Proposal:
     malformed: Optional[str] = None
 
 
-def _parse_proposals(text) -> list:
-    """The test-write blocks in *text*, in the order they appear.
+def _parse_proposals(text, label: str = WRITE_LABEL_TEST) -> list:
+    """The write blocks in *text* carrying *label*, in the order they appear.
 
     Ordinary fenced blocks are skipped whole, so a review that quotes the
-    format inside a code sample does not accidentally propose a write.
-    A block that opens and never closes, or that names no path, is returned
+    format inside a code sample does not accidentally propose a write. A
+    block that opens and never closes, or that names no path, is returned
     as malformed rather than dropped: a proposal that vanishes silently
     looks exactly like one that was never made.
+
+    A block under some other round's label is not this round's proposal and
+    is skipped in the same way an ordinary fence is.
     """
-    if not isinstance(text, str) or "test-write" not in text:
+    if not isinstance(text, str) or label not in text:
         return []
+    marker = re.compile(rf"^{re.escape(label)}\b[ \t]*(?P<rest>.*)$")
     lines = text.replace("\r\n", "\n").split("\n")
     proposals = []
     index = 0
@@ -701,11 +755,11 @@ def _parse_proposals(text) -> list:
             index += 1
             continue
         ticks, info = opening.group("ticks"), opening.group("info")
-        label = _WRITE_INFO.match(info)
+        matched = marker.match(info)
         body, closed, index = _consume_block(lines, index + 1, ticks)
-        if not label:
+        if not matched:
             continue
-        path_match = _WRITE_PATH.match(label.group("rest").strip())
+        path_match = _WRITE_PATH.match(matched.group("rest").strip())
         if not path_match:
             proposals.append(_Proposal(
                 "", "", "the block named no path=<file> to write"
@@ -746,6 +800,11 @@ def _confine(repo_root, grant: AgencyGrant, raw_path: str) -> tuple:
     another to ``open`` is how a boundary fails open, so nothing downstream
     re-interprets the string.
 
+    Two boundaries, never both: a round carrying an envelope is confined to
+    that envelope, and every other round is confined to the declared test
+    root. Which one applies is a property of the grant, so no caller can
+    combine them into a wider surface than either.
+
     Every branch refuses before anything is written, and the order runs from
     the widest boundary inward, so the reason recorded is the outermost one
     the path crossed.
@@ -761,12 +820,19 @@ def _confine(repo_root, grant: AgencyGrant, raw_path: str) -> tuple:
             "the path resolves outside the repository"
         )
     rel = _posix(target.relative_to(Path(repo_root).resolve()))
-    if not grant.test_roots or not grant.test_glob:
+    if grant.write_envelope:
+        if rel not in set(grant.write_envelope):
+            return rel, None, (
+                "outside the envelope: this round may write only to the "
+                "files the session already changed and the files its "
+                "failures implicate"
+            )
+    elif not grant.test_roots or not grant.test_glob:
         return rel, None, (
             "this repository declares no test root, so no path can be "
             "confirmed to be a test"
         )
-    if not names_a_test(rel, grant.test_selection):
+    elif not names_a_test(rel, grant.test_selection):
         roots = ", ".join(grant.test_roots)
         return rel, None, (
             f"outside the declared test root: a write must be under "
@@ -777,17 +843,17 @@ def _confine(repo_root, grant: AgencyGrant, raw_path: str) -> tuple:
     return rel, target, None
 
 
-def apply_test_writes(repo_root, grant: AgencyGrant, text) -> tuple:
-    """Perform the test writes *text* proposes, and report every decision.
+def apply_writes(repo_root, grant: AgencyGrant, text) -> tuple:
+    """Perform the writes *text* proposes, and report every decision.
 
-    This is the whole of operation (d). The verifier never touches the
+    This is the whole of operation (d). The model never touches the
     filesystem: it describes a file, and this function is the only thing
-    that opens one. A proposal outside the declared test root is refused
+    that opens one. A proposal outside the round's boundary is refused
     here, before any bytes are written -- which is the difference between a
     boundary and an instruction.
     """
     writes = []
-    for proposal in _parse_proposals(text):
+    for proposal in _parse_proposals(text, grant.write_label):
         if proposal.malformed:
             writes.append(TestWrite(
                 path=_posix(proposal.path), outcome=WRITE_REFUSED,
@@ -796,7 +862,7 @@ def apply_test_writes(repo_root, grant: AgencyGrant, text) -> tuple:
             continue
         rel, target, reason = _confine(repo_root, grant, proposal.path)
         if reason is None and not proposal.content.strip():
-            # An empty body against an existing test silently empties it,
+            # An empty body against an existing file silently empties it,
             # which is a deletion wearing a write's name.
             reason = "the block carried no content"
         if reason:

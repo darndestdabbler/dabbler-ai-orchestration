@@ -2321,6 +2321,238 @@
       "body": "Round 1 raised a Major finding: the tests phase worked only on copilot-cli. grant_for_transport collapsed every other transport to AgencyGrant(MODE_NONE, (), 0), so briefing() described no write block and _confine() refused every proposal for lacking OP_WRITE. A no-seat install -- the configuration this package ships as its default, per config.py's own statement that the bundled file must stay correct for a fresh install with API keys and no seat -- could not author tests at all, and the tests phase is required of every session.\n\nThe finding was upheld rather than disputed, on the merits. Spec 4.b withholds agency from the direct-API path for a stated reason: the tool surface would need a tool-use loop written three times against three vendors' function-calling protocols. Operation (d) costs none of that. It is a fenced block in an ordinary answer, and the framework -- not the model -- opens the file. So the reason 4.b gives does not reach it, and the set spec's exclusion ('the seat has the tool surface, the API path records agency: none') still holds after the change: the API path still sends no tools and still records mode none.\n\nSession 7 had tied the two together on the grounds that a round which could not look is not a round that may author tests. In this phase that premise does not hold -- the artifacts under test are in the prompt. A tool-less authoring round is briefed that it can see only what it was sent, and the record says mode: none, so a reader can tell the two kinds of round apart.\n\nAlso fixed, from the same round's nit: remediated-at-the-cap is decided against the tree the run left behind rather than the tree it was measuring. A suite that dirties the worktree is already failed evidence and must not be able to call its own side effect a repair.",
       "model": "gpt-5.4",
       "provider": "openai"
+    },
+    {
+      "sessionNumber": 12,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-27T12:56:48.056286-04:00",
+      "description": "Register.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 12,
+      "stepNumber": 2,
+      "stepKey": "the-suite-runs-against-the-tree",
+      "dateTime": "2026-08-27T12:56:48.056286-04:00",
+      "description": "The suite runs against the tree including the verifier's new tests. On failure, `fix \u2192 re-verify \u2192 re-test`, scoped.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 12,
+      "stepNumber": 3,
+      "stepKey": "the-fix-round-receives-only-failing",
+      "dateTime": "2026-08-27T12:56:48.056286-04:00",
+      "description": "The fix round receives **only** failing test names, their output, and the files implicated by the failures.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 12,
+      "stepNumber": 4,
+      "stepKey": "writes-are-restricted-to-the-session",
+      "dateTime": "2026-08-27T12:56:48.056286-04:00",
+      "description": "Writes are restricted to the session diff plus implicated files, using the existing `changed_paths_between` machinery. **A write outside the envelope is rejected, not discouraged.**",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 12,
+      "stepNumber": 5,
+      "stepKey": "no-new-findings-are-solicited-during",
+      "dateTime": "2026-08-27T12:56:48.056286-04:00",
+      "description": "No new findings are solicited during a fix round; unrelated observations are recorded and never acted on.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 12,
+      "stepNumber": 6,
+      "stepKey": "affected-tests-as-preverify",
+      "dateTime": "2026-08-27T12:56:48.056286-04:00",
+      "description": "Affected tests as preverify.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 12,
+      "stepNumber": 7,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-27T12:56:48.056286-04:00",
+      "description": "Cross-provider verification.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 12,
+      "stepNumber": 8,
+      "stepKey": "full-test-suite-recorded-as-the",
+      "dateTime": "2026-08-27T12:56:48.056286-04:00",
+      "description": "Full test suite, recorded as the `final-full` run of record.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 12,
+      "stepNumber": 9,
+      "stepKey": "close-out",
+      "dateTime": "2026-08-27T12:56:48.056286-04:00",
+      "description": "Close-out.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 12,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-27T12:56:48.068618-04:00",
+      "description": "Registered session 12 (copilot).",
+      "status": "complete"
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 12,
+      "dateTime": "2026-08-27T12:56:59.887896-04:00",
+      "task": "Build spec \u00a73.d (plan B3): the complete suite runs against the tree that\nincludes the verifier's authored tests, and a red run opens a bounded fix\nloop whose scope is enforced by the framework rather than requested by the\nprompt.\n\nThe envelope is the feature. A fix round is handed only the failing test\nnames, their output, and the files the failures implicate; its writes are\nconfined to the session's own diff plus those implicated files, decided\nthrough the existing `changed_paths_between` machinery; a write outside\nthat envelope is refused before any bytes are written. No finding is\nsolicited during a fix round \u2014 an unrelated observation is recorded and\nnever acted on.\n\nThe loop carries the same bound and the same three terminal states as the\ntests phase, so a suite that never goes green ends by itself.\n\nNot releasable: this session builds framework code and publishes no\npackage.",
+      "releasable": false
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D71",
+      "ordinal": 71,
+      "sessionNumber": 12,
+      "decidedOn": "2026-08-27",
+      "recordedAt": "2026-08-27T12:59:20.688836-04:00",
+      "decider": "orchestrator",
+      "headline": "The \re-verify in the fix cycle is the framework checking the envelope, not a second review round",
+      "body": "Plan B3 states the loop as `fix \u2192 re-verify \u2192 re-test` in three words and the\nspecification does not expand them. Two readings were available:\n\n1. **Re-verify means another code review round.** Rejected. Spec \u00a73.d ends\n   \"Same cap and same ending as c.ii\", and c.ii is the tests loop, which buys\n   no vendor opinion at all \u2014 it runs a suite and reads an exit code. A\n   reading that inserts a review round into the fix loop would give \u00a73.d a\n   different meter from the one it inherits, and would spend two vendors per\n   failing suite for a verdict the exit code already settles.\n\n2. **Re-verify means the framework verifying the fix before it lands.**\n   Taken. It is the step \u00a73.d spends its whole section on: the envelope is\n   checked, and a write outside it is refused *before any bytes are written*.\n   The model has no filesystem \u2014 a fix arrives as a fenced block and the\n   framework is what opens a file \u2014 so the confinement at the block is the\n   whole of the enforcement, not a first line of it.\n\nSo the cycle is: the suite runs and reports an exit code; a red run opens a\nfix round whose writes are confined to the envelope; the suite runs again.\nThe bound is `verification.settings.max_test_rounds`, the same one c.ii\ncounts, and the loop lands on the same three terminal states through the same\n`run_terminal` implementation, generalised over which run it reads."
+    },
+    {
+      "sessionNumber": 12,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-27T13:12:36.072340-04:00",
+      "description": "Registered as copilot/claude-opus-5 and declared the task list not-releasable before any edit.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 12,
+      "stepNumber": 2,
+      "stepKey": "the-suite-runs-against-the-tree",
+      "dateTime": "2026-08-27T13:12:36.739937-04:00",
+      "description": "ai_router/fixloop.py runs the declared suite whole at the final-full stage against the tree carrying the authored tests; workflow suite records the exit code and the tests the run named.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 12,
+      "stepNumber": 3,
+      "stepKey": "the-fix-round-receives-only-failing",
+      "dateTime": "2026-08-27T13:12:37.338144-04:00",
+      "description": "The fix prompt carries the failing test names, the run's output and the implicated files, and nothing else about the session.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 12,
+      "stepNumber": 4,
+      "stepKey": "writes-are-restricted-to-the-session",
+      "dateTime": "2026-08-27T13:12:44.597618-04:00",
+      "description": "AgencyGrant carries a write envelope built from changed_paths_between plus the implicated files; _confine refuses anything outside it before a file is opened, and the fix round writes under its own fence label.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 12,
+      "stepNumber": 5,
+      "stepKey": "no-new-findings-are-solicited-during",
+      "dateTime": "2026-08-27T13:12:45.267011-04:00",
+      "description": "The fix prompt solicits no finding; an OBSERVATIONS section is parsed, recorded verbatim on the fixed event, and read by nothing that acts.",
+      "status": "complete"
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D72",
+      "ordinal": 72,
+      "sessionNumber": 12,
+      "decidedOn": "2026-08-27",
+      "recordedAt": "2026-08-27T13:13:14.729091-04:00",
+      "decider": "orchestrator",
+      "headline": "Failures and implicated files are read as paths, not as one runner's grammar, and the scan fails closed by narrowing",
+      "body": "Spec \u00a73.d says the fix round receives \"the files implicated by the failures\"\nand does not say how a framework knows which those are. Three constraints\nshaped the answer:\n\n**It cannot be a pytest grammar.** This framework is language-neutral by\nsubtraction, and a parser written to pytest's short summary would silently\nanswer nothing for a repository that runs anything else.\n\n**So the parser reads paths, not syntax.** Whatever the runner, it prints the\nfiles it failed in. `implicated_paths` takes every path-shaped token in the\noutput, drops the ones that do not resolve to a file inside the repository \u2014\nwhich is what keeps a `site-packages` frame in a traceback out of the\nenvelope \u2014 and keeps the rest. `failures` is the same scan narrowed by this\nrepository's own declaration of where its tests live, so a failing test is a\ndeclared test path standing beside a word meaning failure.\n\n**Both halves fail closed, in the direction that matters.** A failure the\nmarkers miss is a file the envelope does not open, so the loop can only ever\nbe narrower than the failures warrant \u2014 never wider. And a red run whose\noutput names no test the parser recognises opens no fix round at all: the\nsuite command prints that it found nothing rather than sending an unscoped\nround, because an unscoped fix round is the thing the envelope exists to\nprevent.\n\nThe alternative \u2014 declaring failure markers in `router-config.yaml` \u2014 was\nrejected. It is configuration a repository would get wrong once and discover\nmuch later, to buy an economy over a scan that is already conservative in the\nsafe direction."
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D73",
+      "ordinal": 73,
+      "sessionNumber": 12,
+      "decidedOn": "2026-08-27",
+      "recordedAt": "2026-08-27T13:13:15.342040-04:00",
+      "decider": "orchestrator",
+      "headline": "The envelope replaces the test-root rule rather than widening it, and the fence label is part of the boundary",
+      "body": "The write path built in session 7 confined every write to the declared test\nroot, because the only round that could write was the one authoring tests. A\nfix round writes implementation code, so the same boundary would refuse\neverything it is for.\n\n**Two boundaries, never both, and which one applies is a property of the\ngrant.** `AgencyGrant.write_envelope` replaces the test-root rule outright\nrather than widening it: a round confined to an envelope is confined to that\nenvelope and to nothing beside it, and no caller can combine the two into a\nsurface wider than either. Membership in the envelope is exact. A prefix rule\nwould let one changed file in a package open the whole package, which is\nprecisely the sprawl \u00a73.d exists to stop, and every entry is a file because\nboth halves are produced by git and by the runner rather than typed.\n\n**The fence label is part of the boundary.** A fix round's blocks are\n`fix-write`; the tests phase keeps `test-write`. `_parse_proposals` honours\none label per round, so a block lifted out of one round's transcript into\nanother's is not silently obeyed by a boundary of a different shape.\n\n**The confinement is complete rather than a first line of defence.** The\nmodel holds no write tool on any transport \u2014 the seat's tool universe is\n`view,grep,glob` and the API path sends no tools at all \u2014 so a write exists\nonly as a fenced block that `agency.apply_writes` decides about. There is no\nsecond route by which a path outside the envelope could change, which is what\nmakes \"rejected, not discouraged\" a statement about the code rather than\nabout the prompt."
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D74",
+      "ordinal": 74,
+      "sessionNumber": 12,
+      "decidedOn": "2026-08-27",
+      "recordedAt": "2026-08-27T13:28:45.917034-04:00",
+      "decider": "verifier",
+      "headline": "The envelope took every path the runner printed, so a red pytest run made pytest.ini writable",
+      "body": "Round 1 found the envelope wider than the section it implements. Correct, and\nagainst the one thing this session exists to build.\n\n`implicated_paths` scanned every path-shaped token anywhere in the run's\noutput. A pytest run prints `configfile: pytest.ini` and `rootdir:` in its\nheader, so on this repository's own suite the envelope would have contained\n`pytest.ini` on every red run \u2014 and a fix round could then have rerouted the\nrunner instead of repairing the code. The boundary was wider than the\nsentence describing it, which on this feature is the whole defect.\n\n**The fix narrows the rule to what the output points at.** A path is\nimplicated when the runner names it with a position \u2014 `app.py:4`,\n`main.go:17`, `a.js:10:5` \u2014 or when it is the file a named failing test lives\nin. A path merely mentioned is not implicated. Runners name a file with a\nposition when they are pointing at code that failed and name it bare when\nthey are reporting their own configuration, and that distinction is the\ngeneric one: it holds across ecosystems without knowing any of their\ngrammars.\n\n`build_envelope` now uses the `selection` it was already being handed, which\nthe finding also noted it was ignoring: the failing tests are parsed there\nand their files join the implicated set directly.\n\n**The nit was taken too.** The fix round's read scope was\n`session_scope(...)`, which adds each file's declared imports. \u00a73.d says the\nround receives the failures and the files they implicate; a read surface that\nreached further made that sentence false for the one round it was written\nabout. The scope is now the envelope itself.",
+      "model": "gpt-5.4",
+      "provider": "openai"
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D75",
+      "ordinal": 75,
+      "sessionNumber": 12,
+      "decidedOn": "2026-08-27",
+      "recordedAt": "2026-08-27T13:38:18.010578-04:00",
+      "decider": "verifier",
+      "headline": "The narrowed matcher missed Python's own traceback shape, and the read surface still carried the whole session diff",
+      "body": "Round 2 confirmed the widening fix and found two Major defects in what\nreplaced it. Both correct.\n\n**The location matcher recognised one spelling of a position, and Python's\nmost common traceback uses the other.** `_LOCATED` required the position to\nsit immediately after the path \u2014 `app.py:4`, `a.js:10:5` \u2014 so a frame reading\n`File \"app.py\", line 4, in add` implicated nothing, and the fix round would\nhave been refused the write to the file that actually broke. A rule that\nnarrows is safe against widening and not safe against uselessness; this one\nhad crossed into the second. The matcher now recognises both spellings, plus\nthe `File.cs:line 12` form, which is the same idea with a third punctuation.\n\n**The read surface still carried the whole session diff.** The write envelope\nis deliberately wider than the implicated set \u2014 \u00a73.d says a fix may land in a\nfile the session already changed \u2014 but the *reading* surface has no such\nwarrant. A session with an unrelated file in flight, which is every real\nsession, was blessing a read of it and recording that read as in scope. The\nseat's `glob`/`grep`/`view` grant is now built from the implicated files\nalone, and the write envelope is unchanged.\n\nOne consequence worth naming: `agency`'s read briefing described its scope as\n\"this session's changed files and what they import\", which stopped being true\nthe moment a second kind of round used it. It now says what it is \u2014 what this\nround is confined to \u2014 because a briefing that describes a surface the round\ndoes not have is how a model comes to report a read it could not have made.",
+      "model": "gpt-5.4",
+      "provider": "openai"
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D76",
+      "ordinal": 76,
+      "sessionNumber": 12,
+      "decidedOn": "2026-08-27",
+      "recordedAt": "2026-08-27T13:51:10.864975-04:00",
+      "decider": "verifier",
+      "headline": "Absolute traceback paths fell out of the envelope: the token stopped at the drive letter and normalisation ran before resolution",
+      "body": "Round 3 found the same defect one spelling further out, and it was right\nagain: the matcher handled `File \"app.py\", line 4` but not\n`File \"C:\\repo\\app.py\", line 4` or `File \"/repo/app.py\", line 4`. Two\nseparate causes, both real.\n\n**The token grammar stopped at the colon.** A drive letter is part of the\npath a Windows traceback prints, and a token that ends before it is not the\npath the runner named. The grammar now carries an optional drive prefix.\n\n**Normalisation ran before resolution.** `_posix()` strips the leading\nseparator, so `/repo/app.py` became `repo/app.py` \u2014 a relative path naming\nsomething that is usually not there \u2014 before `relative_posix` ever saw it.\nThe order is now the other way round: the spelling is preserved until\n`agency.relative_posix` has placed it against the repository, which is the\none function in this package that knows how to do that for either spelling.\n\n`failures()` takes the repository root for the same reason, so a runner that\nprints its failing tests with absolute paths still yields a named failure\nrather than an empty list that would refuse the fix round.\n\n*The pattern across all three rounds is worth naming: every finding was the\nenvelope being the wrong width, twice too wide and twice too narrow. That is\nwhat a boundary feature's review looks like when it is working \u2014 nothing else\nin the session drew a finding at all.*",
+      "model": "gpt-5.4",
+      "provider": "openai"
+    },
+    {
+      "sessionNumber": 12,
+      "stepNumber": 6,
+      "stepKey": "affected-tests-as-preverify",
+      "dateTime": "2026-08-27T14:08:01.315652-04:00",
+      "description": "Selected tests run and recorded at every round; the session's own preverify was 218 tests, each remediation ran what the fix touched.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 12,
+      "stepNumber": 7,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-27T14:08:02.162501-04:00",
+      "description": "Three rounds with gpt-5.4/openai over the seat, every finding against the envelope's width. Landed remediated at the cap: the round 3 fix is unreviewed.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 12,
+      "stepNumber": 8,
+      "stepKey": "full-test-suite-recorded-as-the",
+      "dateTime": "2026-08-27T14:08:03.018805-04:00",
+      "description": "850 tests passed in 901s against the final tree, recorded as the final-full run of record.",
+      "status": "complete"
     }
   ]
 }

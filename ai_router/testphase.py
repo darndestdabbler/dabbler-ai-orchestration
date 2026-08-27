@@ -225,7 +225,7 @@ def author(
             "and its tests would have one author. Refusing to write them."
         )
 
-    writes = agency.apply_test_writes(
+    writes = agency.apply_writes(
         repo_root, _grant(result.transport), result.content
     )
     return Authoring(

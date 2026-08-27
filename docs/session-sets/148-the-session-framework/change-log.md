@@ -90,3 +90,9 @@
 - Orchestrator provider (excluded): anthropic
 - Verifier's read surface: agency: 28 read(s), 0 search(es), 0 listing(s); 3 read(s) were transformed; 5 not confined to scope
 - Raw round output: `.dabbler/runs/148-the-session-framework/s11/`
+
+## Session 12 verification — REMEDIATED AT THE CAP after 3 round(s)
+
+- Every blocking finding of round 3 was fixed; the cap left the fix unreviewed.
+- Fixed, unreviewed: [major] The new traceback matcher still drops common absolute-path Python frames, so the broken implementation file can remain outside the envelope.
+- This work lands UNREVIEWED. It is not a waiver: nothing was accepted over a standing finding — what is unproved is the repair.

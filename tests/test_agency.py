@@ -302,7 +302,7 @@ class TestTheWrite:
     def test_the_framework_writes_the_file_the_verifier_proposes(
         self, tmp_path
     ):
-        writes = agency.apply_test_writes(
+        writes = agency.apply_writes(
             tmp_path, write_grant(),
             "Here is the case the diff misses.\n\n" + proposal(
                 "tests/test_widget.py", "def test_empty():\n    assert True"
@@ -325,7 +325,7 @@ class TestTheWrite:
         target.write_text("def test_old():\n    assert False\n",
                           encoding="utf-8")
 
-        writes = agency.apply_test_writes(
+        writes = agency.apply_writes(
             tmp_path, write_grant(),
             proposal("tests/test_widget.py",
                      "def test_new():\n    assert True"),
@@ -357,7 +357,7 @@ class TestTheWrite:
             "../outside/test_escape.py",     # out of the repository
         ))
 
-        writes = agency.apply_test_writes(tmp_path, write_grant(), text)
+        writes = agency.apply_writes(tmp_path, write_grant(), text)
 
         assert [w.outcome for w in writes] == [agency.WRITE_REFUSED] * 5
         assert all(w.reason for w in writes)
@@ -376,7 +376,7 @@ class TestTheWrite:
     ):
         """The tests phase authors tests; a review round does not. A surface
         offered in every round is a surface used in every round."""
-        writes = agency.apply_test_writes(
+        writes = agency.apply_writes(
             tmp_path, write_grant(allow_write=False),
             proposal("tests/test_widget.py", "def test_x():\n    assert True"),
         )
@@ -393,7 +393,7 @@ class TestTheWrite:
         target = tmp_path / "tests" / "test_widget.py"
         target.write_text("def test_x():\n    assert True\n", encoding="utf-8")
 
-        writes = agency.apply_test_writes(
+        writes = agency.apply_writes(
             tmp_path, write_grant(), proposal("tests/test_widget.py", ""),
         )
 
@@ -413,7 +413,7 @@ class TestTheWrite:
             "def test_x():\n    assert True\n"
         )
 
-        writes = agency.apply_test_writes(
+        writes = agency.apply_writes(
             tmp_path, write_grant(), no_path + "\n" + unterminated,
         )
 
@@ -435,7 +435,7 @@ class TestTheWrite:
             "tests/test_nested.py", "DOC = '''\n```\n'''", ticks=4
         )
 
-        writes = agency.apply_test_writes(
+        writes = agency.apply_writes(
             tmp_path, write_grant(), quoted + nested,
         )
 

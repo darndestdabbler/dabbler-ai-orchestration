@@ -30,6 +30,13 @@ an exit code rather than by an opinion, and its bound is
 terminal states, computed the same way: green is verified, and at the cap a
 tree that has moved since the failing run is a repair the cap left unrun.
 
+**The complete suite runs on that same meter, and a red one opens a fix
+loop whose scope the framework holds.** A fix round is handed the failing
+tests and nothing else, and may write only inside an envelope of the
+session's own diff plus the files those failures implicate. Nothing here
+asks a fix round for a finding: what it noticed on the way past is recorded
+word for word and acted on by nobody.
+
 **Only a step change opens a new loop.** Sending work back or carrying it
 forward resets the round count. Re-entering the step the work is already in
 is inert — it moves nothing, so it changes nothing, and treating it as a move
@@ -71,7 +78,7 @@ REVIEWS_RELDIR = Path(".dabbler") / "solution" / "reviews"
 
 EVENTS = (
     "entered", "reviewed", "approved", "returned", "contract-changed",
-    "tests-authored", "tested",
+    "tests-authored", "tested", "suite-run", "fixed",
 )
 SCOPES = ("solution", "component")
 
@@ -228,6 +235,26 @@ def validate_transition(state, event: dict) -> None:
             f"first."
         )
 
+    if kind == "suite-run" and not (state or {}).get("testsAuthored"):
+        raise WorkflowError(
+            f"{target}: no test has been authored at {STEP_TITLES[current]}, "
+            f"so this would be the suite as it stood before the verifier "
+            f"read anything. The complete suite runs against the tree "
+            f"including the tests it wrote. Run `workflow author-tests` "
+            f"first."
+        )
+
+    if kind == "fixed":
+        last = (state or {}).get("lastSuiteRun") or {}
+        if not last or last.get("green"):
+            raise WorkflowError(
+                f"{target}: no failing suite run at {STEP_TITLES[current]}, "
+                f"so this round would have no named failure to answer. A fix "
+                f"round without one is a model invited to revise whatever it "
+                f"notices, which is the one thing the envelope exists to "
+                f"prevent. Run `workflow suite` first."
+            )
+
 
 def append(root, event: dict) -> dict:
     """Machine-written only. Never edited, never corrected in place."""
@@ -270,6 +297,7 @@ def fold(events: list) -> dict:
             "findings": [], "reviewers": [], "reviewRounds": 0,
             "lastLiveReview": None, "reviewWaitingOn": None,
             "testsAuthored": [], "testRounds": 0, "lastTestRun": None,
+            "suiteRounds": 0, "lastSuiteRun": None, "fixRounds": 0,
         })
         kind = e["event"]
         s["history"].append(e)
@@ -354,22 +382,38 @@ def fold(events: list) -> dict:
             s["waitingOn"] = (
                 s["reviewWaitingOn"] if e.get("green") else "author"
             )
+        elif kind == "suite-run":
+            s["suiteRounds"] += 1
+            s["lastSuiteRun"] = e
+            s["waitingOn"] = (
+                s["reviewWaitingOn"] if e.get("green") else "author"
+            )
+        elif kind == "fixed":
+            # Counted, not judged. A fix round proves nothing by itself --
+            # the suite run after it does -- but a step that took six fixes
+            # to go green reads differently at planning time than one that
+            # took one, and the count is what says so.
+            s["fixRounds"] += 1
         elif kind == "contract-changed":
             s["waitingOn"] = "developer" if e.get("needsApproval") else None
     return state
 
 
 def _open_test_loop(s: dict) -> None:
-    """Start this target's tests phase over.
+    """Start this target's tests phase and its suite loop over.
 
     Called wherever the work moves, and nowhere else. Tests authored against
     what the last step produced answer for that step, so carrying them
     forward would run yesterday's proof against today's code and read the
-    result as this step's.
+    result as this step's. The suite loop goes with them: it is the same
+    tests, run whole.
     """
     s["testsAuthored"] = []
     s["testRounds"] = 0
     s["lastTestRun"] = None
+    s["suiteRounds"] = 0
+    s["lastSuiteRun"] = None
+    s["fixRounds"] = 0
 
 
 def _project_review_loop(node: dict, root, state: dict, cap: int) -> None:
@@ -403,6 +447,23 @@ def _project_test_loop(node: dict, root, state: dict, cap: int) -> None:
     )
 
 
+def _project_suite_loop(node: dict, root, state: dict, cap: int) -> None:
+    """The complete suite's position, and how many fix rounds it cost.
+
+    The fix count is published beside the round count because the two answer
+    different questions: how close the loop came to its bound, and how much
+    repair the step needed to get there.
+    """
+    terminal = suite_terminal(root, state, cap)
+    node["suiteRounds"] = state.get("suiteRounds", 0)
+    node["suiteCap"] = cap
+    node["fixRounds"] = state.get("fixRounds", 0)
+    node["suiteTerminal"] = terminal
+    node["suiteTerminalLabel"] = (
+        TERMINAL_HEADLINES[terminal] if terminal else None
+    )
+
+
 def project(root) -> dict:
     """What the Explorer reads: the manifest, joined to live state."""
     try:
@@ -421,6 +482,7 @@ def project(root) -> dict:
     doc["solution"]["findings"] = sol_state.get("findings", [])
     _project_review_loop(doc["solution"], root, sol_state, cap)
     _project_test_loop(doc["solution"], root, sol_state, tcap)
+    _project_suite_loop(doc["solution"], root, sol_state, tcap)
     if sol_state.get("step"):
         doc["solution"]["step"] = sol_state["step"]
         doc["solution"]["stepTitle"] = STEP_TITLES[sol_state["step"]]
@@ -440,6 +502,7 @@ def project(root) -> dict:
         c["findings"] = cs.get("findings", [])
         _project_review_loop(c, root, cs, cap)
         _project_test_loop(c, root, cs, tcap)
+        _project_suite_loop(c, root, cs, tcap)
 
     waiting = [c["name"] for c in doc["components"] if c["waitingOn"] == "developer"]
     if doc["solution"]["waitingOn"] == "developer":
@@ -629,9 +692,17 @@ def _terminal_refusal(target: str, step: str, state: dict,
 
 # --- The bounded tests loop --------------------------------------------------
 
-def run_terminal(root, state: dict, cap: int) -> Optional[str]:
-    """Which terminal state this target's tests phase has reached, or
-    ``None`` while its loop is still open.
+def run_terminal(root, state: dict, cap: int, *,
+                 run_key: str = "lastTestRun",
+                 rounds_key: str = "testRounds") -> Optional[str]:
+    """Which terminal state a run loop has reached, or ``None`` while it is
+    still open.
+
+    One implementation for both loops that are decided by an exit code — the
+    tests phase and the complete suite — because they differ only in which
+    run they read. A second copy would eventually disagree with this one,
+    and the disagreement would appear as two loops that ended differently on
+    the same facts.
 
     The same three states as the review loop and the same closed vocabulary,
     decided against an exit code instead of an opinion:
@@ -653,12 +724,12 @@ def run_terminal(root, state: dict, cap: int) -> Optional[str]:
     own side effect a repair. Such a run is already failed evidence; it must
     not also be the cheapest way out of an unresolved loop.
     """
-    last = (state or {}).get("lastTestRun")
+    last = (state or {}).get(run_key)
     if not last:
         return None
     if last.get("green"):
         return verdictmod.validate_session_verdict(verdictmod.VERDICT_VERIFIED)
-    if (state.get("testRounds") or 0) < cap:
+    if (state.get(rounds_key) or 0) < cap:
         return None
     from ai_router.checks import snapshot_worktree_tree
 
@@ -672,10 +743,20 @@ def run_terminal(root, state: dict, cap: int) -> Optional[str]:
     return verdictmod.validate_session_verdict(token)
 
 
+def suite_terminal(root, state: dict, cap: int) -> Optional[str]:
+    """The complete suite's loop, on the tests loop's own terms. §3.d ends
+    "same cap and same ending as c.ii", so it is the same function."""
+    return run_terminal(
+        root, state, cap, run_key="lastSuiteRun", rounds_key="suiteRounds"
+    )
+
+
 def _run_terminal_refusal(target: str, step: str, state: dict,
-                          terminal: str, cap: int) -> str:
-    rounds = state.get("testRounds") or 0
-    last = state.get("lastTestRun") or {}
+                          terminal: str, cap: int, *, what: str = "tests",
+                          rounds_key: str = "testRounds",
+                          run_key: str = "lastTestRun") -> str:
+    rounds = state.get(rounds_key) or 0
+    last = state.get(run_key) or {}
     detail = ""
     if terminal == verdictmod.VERDICT_ISSUES_FOUND:
         detail = (
@@ -683,9 +764,10 @@ def _run_terminal_refusal(target: str, step: str, state: dict,
             f"{last.get('command')}"
         )
     return (
-        f"{target} — {STEP_TITLES[step]}: tests {TERMINAL_HEADLINES[terminal]} "
-        f"after {rounds} round(s), cap {cap}. This step's tests loop is closed "
-        f"and no further run or authoring opens on it.{detail}\n"
+        f"{target} — {STEP_TITLES[step]}: {what} "
+        f"{TERMINAL_HEADLINES[terminal]} after {rounds} round(s), cap {cap}. "
+        f"This step's {what} loop is closed and no further round opens on "
+        f"it.{detail}\n"
         "Authoring more tests does not reopen it — that would be spending "
         "past the bound by another name. Move the work instead: "
         "`workflow send-back --to <step> --reason ...` returns it to the "
@@ -807,12 +889,33 @@ def _tests_position(root, target: str, cap: int) -> None:
         print(f"  round {spent} of {cap}")
 
 
+def _suite_position(root, target: str, cap: int) -> None:
+    after = fold(read(root)).get(target) or {}
+    reached = suite_terminal(root, after, cap)
+    spent = after.get("suiteRounds") or 0
+    if reached is not None:
+        print(f"  loop closed: suite {TERMINAL_HEADLINES[reached]} "
+              f"({spent}/{cap} rounds)")
+    else:
+        print(f"  round {spent} of {cap}")
+
+
 def _refuse_if_tests_loop_closed(root, target: str, state: dict,
                                  cap: int) -> None:
     terminal = run_terminal(root, state, cap)
     if terminal is not None:
         raise WorkflowError(_run_terminal_refusal(
             target, state["step"], state, terminal, cap
+        ))
+
+
+def _refuse_if_suite_loop_closed(root, target: str, state: dict,
+                                 cap: int) -> None:
+    terminal = suite_terminal(root, state, cap)
+    if terminal is not None:
+        raise WorkflowError(_run_terminal_refusal(
+            target, state["step"], state, terminal, cap, what="suite",
+            rounds_key="suiteRounds", run_key="lastSuiteRun",
         ))
 
 
@@ -925,10 +1028,151 @@ def _run_tests(args, root) -> int:
     return EXIT_OK
 
 
+def _run_suite(args, root) -> int:
+    """The complete suite against the tree the verifier's tests are in, and
+    what its exit code said. No opinion is solicited and none is recorded."""
+    from ai_router import fixloop
+
+    target = _target(args)
+    state = require_state(root, target)
+    step = state["step"]
+    cap = run_cap(root)
+    _refuse_if_suite_loop_closed(root, target, state, cap)
+    # The same judge the log is read back through, applied before the suite
+    # runs rather than after it has already been paid for.
+    validate_transition(state, {"event": "suite-run", "target": target,
+                                "step": step})
+
+    config = load_config(project_dir=str(root))
+    authored = list(state.get("testsAuthored") or [])
+    try:
+        selection = fixloop.selection_for(config)
+        run = fixloop.run_suite(root, config, authored)
+    except fixloop.FixLoopError as exc:
+        raise WorkflowError(str(exc)) from exc
+
+    failing = fixloop.failures(run.output, selection, root)
+    # Filed verbatim: the fix round reads this, and a summary is not a
+    # record of what a runner said.
+    filed = file_review(root, target, step, [run.output or ""], kind="suite")
+    append(root, {
+        "event": "suite-run", "target": target, "step": step,
+        "green": run.green, "exitCode": run.exit_code,
+        "outcome": run.outcome, "command": run.command,
+        "suite": run.check.name, "tests": authored,
+        "failures": [{"name": f.name, "path": f.path} for f in failing],
+        "records": filed,
+        "treeDigest": run.tree_digest,
+        "postTreeDigest": run.post_tree_digest,
+        "treeMutated": run.tree_mutated,
+        "timedOut": run.timed_out,
+        "durationSeconds": run.duration_seconds,
+    })
+    try:
+        write_projection(root)
+    except (WorkflowError, ManifestError):
+        pass
+
+    print(f"{target} — {STEP_TITLES[step]}: {run.command}")
+    print(f"  exit {run.exit_code} in {run.duration_seconds}s "
+          f"({'green' if run.green else 'red'})")
+    if run.tree_mutated:
+        print("  the run changed the tree it was measuring, so it did not "
+              "measure the tree anyone is about to commit")
+    for failure in failing:
+        print(f"  failed {failure.name}")
+    if not run.green and not failing:
+        print("  the run failed and named no test this parser recognised, "
+              "so no fix round can be scoped to a failure")
+    for path in filed:
+        print(f"  filed {path}")
+    _suite_position(root, target, cap)
+    return EXIT_OK
+
+
+def _last_suite_output(root, event: dict) -> str:
+    """What the failing run said, read back from the file it was filed to.
+
+    The event carries the path rather than the text. A run's output is
+    unbounded and the log is read whole on every fold; the fix round is the
+    only reader that needs the bytes.
+    """
+    for path in event.get("records") or []:
+        try:
+            return Path(path).read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+    return ""
+
+
+def _run_fix(args, root) -> int:
+    """One fix round, confined to the envelope. The framework decides what
+    may be written; the prompt only describes what it decided."""
+    from ai_router import fixloop
+
+    target = _target(args)
+    state = require_state(root, target)
+    step = state["step"]
+    cap = run_cap(root)
+    _refuse_if_suite_loop_closed(root, target, state, cap)
+    validate_transition(state, {"event": "fixed", "target": target,
+                                "step": step})
+
+    config = load_config(project_dir=str(root))
+    last = state["lastSuiteRun"]
+    output = _last_suite_output(root, last)
+    try:
+        selection = fixloop.selection_for(config)
+        failing = fixloop.failures(output, selection, root)
+        envelope = fixloop.build_envelope(root, args.base, output, selection)
+        round_, raw = fixloop.fix(
+            root, config, failing=failing, output=output, envelope=envelope,
+            transport=args.transport,
+        )
+    except fixloop.FixLoopError as exc:
+        raise WorkflowError(str(exc)) from exc
+
+    filed = file_review(root, target, step, [raw], kind="fix")
+    append(root, {
+        "event": "fixed", "target": target, "step": step,
+        "failures": [f.name for f in failing],
+        "envelope": envelope.as_dict(),
+        "fixer": round_.as_dict(),
+        "written": list(round_.written),
+        # Recorded and acted on by nobody. An erased observation leaves
+        # nothing a human can overrule.
+        "observations": list(round_.observations),
+        "records": filed,
+        "simulated": round_.simulated,
+    })
+    try:
+        write_projection(root)
+    except (WorkflowError, ManifestError):
+        pass
+
+    if round_.simulated:
+        print("  SCRIPTED FIX — served from a response file, not a vendor.")
+    print(f"{target} — {STEP_TITLES[step]}: fix round by "
+          f"{round_.model}/{round_.provider}")
+    print(f"  envelope: {len(envelope.paths)} path(s), "
+          f"{len(envelope.implicated)} implicated by the failures")
+    for write in round_.writes:
+        if write.accepted:
+            print(f"  {write.action} {write.path} ({write.bytes_written} bytes)")
+        else:
+            print(f"  refused {write.path}: {write.reason}")
+    for note in round_.observations:
+        print(f"  observed (not acted on): {note[:160]}")
+    for path in filed:
+        print(f"  filed {path}")
+    print("  run `workflow suite` again: what a fix proves is the next run, "
+          "not the fix")
+    return EXIT_OK
+
+
 def _target_args(ap):
     ap.add_argument("--component", help="omit for the solution as a whole")
     ap.add_argument("--workspace-root", default=".")
-
 
 def _target(args) -> str:
     return args.component or "solution"
@@ -971,6 +1215,21 @@ def _main(argv=None) -> int:
         "test", help="run the authored tests and record the exit code")
     _target_args(t)
 
+    su = sub.add_parser(
+        "suite",
+        help="run the complete suite against the tree including the "
+             "authored tests")
+    _target_args(su)
+
+    fx = sub.add_parser(
+        "fix",
+        help="one fix round for the failing suite, confined to the envelope")
+    fx.add_argument("--base", default="HEAD",
+                    help="the tree the session's own diff is measured "
+                         "against; defaults to HEAD")
+    fx.add_argument("--transport")
+    _target_args(fx)
+
     b = sub.add_parser("send-back", help="return work to an earlier step")
     b.add_argument("--to", required=True, choices=STEPS, dest="to_step")
     b.add_argument("--reason", required=True)
@@ -1001,6 +1260,8 @@ def _main(argv=None) -> int:
                   f"{head['stepTitle']}")
             print(f"  review {_loop_label(head)}")
             print(f"  tests  {_loop_label(head, 'test')}")
+            print(f"  suite  {_loop_label(head, 'suite')}"
+                  f", {head['fixRounds']} fix round(s)")
             for comp in doc["components"]:
                 flag = ""
                 if comp["waitingOn"] == "developer":
@@ -1027,6 +1288,10 @@ def _main(argv=None) -> int:
             return _run_author_tests(args, root)
         elif args.cmd == "test":
             return _run_tests(args, root)
+        elif args.cmd == "suite":
+            return _run_suite(args, root)
+        elif args.cmd == "fix":
+            return _run_fix(args, root)
         elif args.cmd == "approve":
             open_findings = fold(read(root)).get(_target(args), {}).get(
                 "findings", [])

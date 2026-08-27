@@ -489,6 +489,7 @@ testing:
           - tests/test_runcore_verified.py
           - tests/test_runcore_fast.py
           - tests/test_testphase.py
+          - tests/test_fixloop.py
       - when: ai_router/config.py
         select:
           - tests/test_config.py
@@ -513,6 +514,10 @@ testing:
           - tests/test_facts.py
           - tests/test_verify.py
           - tests/test_step_execution.py
+      - when: ai_router/fixloop.py
+        select:
+          - tests/test_fixloop.py
+          - tests/test_workflow.py
       - when: ai_router/gates.py
         select:
           - tests/test_gates.py
@@ -621,6 +626,7 @@ testing:
         select:
           - tests/test_testphase.py
           - tests/test_workflow.py
+          - tests/test_fixloop.py
       - when: ai_router/verdict.py
         select:
           - tests/test_verdict.py
@@ -639,6 +645,7 @@ testing:
           - tests/test_agency.py
           - tests/test_verify.py
           - tests/test_testphase.py
+          - tests/test_fixloop.py
       - when: ai_router/verifyjob.py
         select:
           - tests/test_runcore_verified.py

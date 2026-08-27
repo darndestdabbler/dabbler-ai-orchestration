@@ -47,7 +47,7 @@ it.
 | 9 | Model discovery (plan A7) | yes | 2026-08-27 |
 | 10 | The code review loop (plan B1) | no | 2026-08-27 |
 | 11 | The verifier authors tests, the framework runs them (plan B2) | no | 2026-08-27 |
-| 12 | The full suite and its bounded fix loop (plan B3) | — | not declared |
+| 12 | The full suite and its bounded fix loop (plan B3) | no | 2026-08-27 |
 | 13 | Packaging to the feed (plan C) | — | not declared |
 | 14 | Collapse session sets (plan A3) | — | not declared |
 | 15 | The sessions view (plan D1) | — | not declared |
@@ -229,3 +229,26 @@ decomposition product rather than to this framework's session lifecycle.
 **Releasable: no.**
 
 Build the tests phase of spec 3.c.ii: the verifier authors test files through the session 7 write path with the write grant on, the framework runs them through checks.execute and reports the exit code, and a bounded test-fix loop (cap 7) carries its round count into the terminal outcome.
+
+### Session 12 — The full suite and its bounded fix loop (plan B3)
+
+**Releasable: no.**
+
+Build spec §3.d (plan B3): the complete suite runs against the tree that
+includes the verifier's authored tests, and a red run opens a bounded fix
+loop whose scope is enforced by the framework rather than requested by the
+prompt.
+
+The envelope is the feature. A fix round is handed only the failing test
+names, their output, and the files the failures implicate; its writes are
+confined to the session's own diff plus those implicated files, decided
+through the existing `changed_paths_between` machinery; a write outside
+that envelope is refused before any bytes are written. No finding is
+solicited during a fix round — an unrelated observation is recorded and
+never acted on.
+
+The loop carries the same bound and the same three terminal states as the
+tests phase, so a suite that never goes green ends by itself.
+
+Not releasable: this session builds framework code and publishes no
+package.

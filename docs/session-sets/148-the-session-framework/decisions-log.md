@@ -1561,3 +1561,176 @@ The finding was upheld rather than disputed, on the merits. Spec 4.b withholds a
 Session 7 had tied the two together on the grounds that a round which could not look is not a round that may author tests. In this phase that premise does not hold -- the artifacts under test are in the prompt. A tool-less authoring round is briefed that it can see only what it was sent, and the record says mode: none, so a reader can tell the two kinds of round apart.
 
 Also fixed, from the same round's nit: remediated-at-the-cap is decided against the tree the run left behind rather than the tree it was measuring. A suite that dirties the worktree is already failed evidence and must not be able to call its own side effect a repair.
+
+## Session 12 — The full suite and its bounded fix loop (plan B3)
+
+### D71 · 2026-08-27 · Orchestrator · The e-verify in the fix cycle is the framework checking the envelope, not a second review round
+
+Plan B3 states the loop as `fix → re-verify → re-test` in three words and the
+specification does not expand them. Two readings were available:
+
+1. **Re-verify means another code review round.** Rejected. Spec §3.d ends
+   "Same cap and same ending as c.ii", and c.ii is the tests loop, which buys
+   no vendor opinion at all — it runs a suite and reads an exit code. A
+   reading that inserts a review round into the fix loop would give §3.d a
+   different meter from the one it inherits, and would spend two vendors per
+   failing suite for a verdict the exit code already settles.
+
+2. **Re-verify means the framework verifying the fix before it lands.**
+   Taken. It is the step §3.d spends its whole section on: the envelope is
+   checked, and a write outside it is refused *before any bytes are written*.
+   The model has no filesystem — a fix arrives as a fenced block and the
+   framework is what opens a file — so the confinement at the block is the
+   whole of the enforcement, not a first line of it.
+
+So the cycle is: the suite runs and reports an exit code; a red run opens a
+fix round whose writes are confined to the envelope; the suite runs again.
+The bound is `verification.settings.max_test_rounds`, the same one c.ii
+counts, and the loop lands on the same three terminal states through the same
+`run_terminal` implementation, generalised over which run it reads.
+
+### D72 · 2026-08-27 · Orchestrator · Failures and implicated files are read as paths, not as one runner's grammar, and the scan fails closed by narrowing
+
+Spec §3.d says the fix round receives "the files implicated by the failures"
+and does not say how a framework knows which those are. Three constraints
+shaped the answer:
+
+**It cannot be a pytest grammar.** This framework is language-neutral by
+subtraction, and a parser written to pytest's short summary would silently
+answer nothing for a repository that runs anything else.
+
+**So the parser reads paths, not syntax.** Whatever the runner, it prints the
+files it failed in. `implicated_paths` takes every path-shaped token in the
+output, drops the ones that do not resolve to a file inside the repository —
+which is what keeps a `site-packages` frame in a traceback out of the
+envelope — and keeps the rest. `failures` is the same scan narrowed by this
+repository's own declaration of where its tests live, so a failing test is a
+declared test path standing beside a word meaning failure.
+
+**Both halves fail closed, in the direction that matters.** A failure the
+markers miss is a file the envelope does not open, so the loop can only ever
+be narrower than the failures warrant — never wider. And a red run whose
+output names no test the parser recognises opens no fix round at all: the
+suite command prints that it found nothing rather than sending an unscoped
+round, because an unscoped fix round is the thing the envelope exists to
+prevent.
+
+The alternative — declaring failure markers in `router-config.yaml` — was
+rejected. It is configuration a repository would get wrong once and discover
+much later, to buy an economy over a scan that is already conservative in the
+safe direction.
+
+### D73 · 2026-08-27 · Orchestrator · The envelope replaces the test-root rule rather than widening it, and the fence label is part of the boundary
+
+The write path built in session 7 confined every write to the declared test
+root, because the only round that could write was the one authoring tests. A
+fix round writes implementation code, so the same boundary would refuse
+everything it is for.
+
+**Two boundaries, never both, and which one applies is a property of the
+grant.** `AgencyGrant.write_envelope` replaces the test-root rule outright
+rather than widening it: a round confined to an envelope is confined to that
+envelope and to nothing beside it, and no caller can combine the two into a
+surface wider than either. Membership in the envelope is exact. A prefix rule
+would let one changed file in a package open the whole package, which is
+precisely the sprawl §3.d exists to stop, and every entry is a file because
+both halves are produced by git and by the runner rather than typed.
+
+**The fence label is part of the boundary.** A fix round's blocks are
+`fix-write`; the tests phase keeps `test-write`. `_parse_proposals` honours
+one label per round, so a block lifted out of one round's transcript into
+another's is not silently obeyed by a boundary of a different shape.
+
+**The confinement is complete rather than a first line of defence.** The
+model holds no write tool on any transport — the seat's tool universe is
+`view,grep,glob` and the API path sends no tools at all — so a write exists
+only as a fenced block that `agency.apply_writes` decides about. There is no
+second route by which a path outside the envelope could change, which is what
+makes "rejected, not discouraged" a statement about the code rather than
+about the prompt.
+
+### D74 · 2026-08-27 · Verifier (gpt-5.4/openai) · The envelope took every path the runner printed, so a red pytest run made pytest.ini writable
+
+Round 1 found the envelope wider than the section it implements. Correct, and
+against the one thing this session exists to build.
+
+`implicated_paths` scanned every path-shaped token anywhere in the run's
+output. A pytest run prints `configfile: pytest.ini` and `rootdir:` in its
+header, so on this repository's own suite the envelope would have contained
+`pytest.ini` on every red run — and a fix round could then have rerouted the
+runner instead of repairing the code. The boundary was wider than the
+sentence describing it, which on this feature is the whole defect.
+
+**The fix narrows the rule to what the output points at.** A path is
+implicated when the runner names it with a position — `app.py:4`,
+`main.go:17`, `a.js:10:5` — or when it is the file a named failing test lives
+in. A path merely mentioned is not implicated. Runners name a file with a
+position when they are pointing at code that failed and name it bare when
+they are reporting their own configuration, and that distinction is the
+generic one: it holds across ecosystems without knowing any of their
+grammars.
+
+`build_envelope` now uses the `selection` it was already being handed, which
+the finding also noted it was ignoring: the failing tests are parsed there
+and their files join the implicated set directly.
+
+**The nit was taken too.** The fix round's read scope was
+`session_scope(...)`, which adds each file's declared imports. §3.d says the
+round receives the failures and the files they implicate; a read surface that
+reached further made that sentence false for the one round it was written
+about. The scope is now the envelope itself.
+
+### D75 · 2026-08-27 · Verifier (gpt-5.4/openai) · The narrowed matcher missed Python's own traceback shape, and the read surface still carried the whole session diff
+
+Round 2 confirmed the widening fix and found two Major defects in what
+replaced it. Both correct.
+
+**The location matcher recognised one spelling of a position, and Python's
+most common traceback uses the other.** `_LOCATED` required the position to
+sit immediately after the path — `app.py:4`, `a.js:10:5` — so a frame reading
+`File "app.py", line 4, in add` implicated nothing, and the fix round would
+have been refused the write to the file that actually broke. A rule that
+narrows is safe against widening and not safe against uselessness; this one
+had crossed into the second. The matcher now recognises both spellings, plus
+the `File.cs:line 12` form, which is the same idea with a third punctuation.
+
+**The read surface still carried the whole session diff.** The write envelope
+is deliberately wider than the implicated set — §3.d says a fix may land in a
+file the session already changed — but the *reading* surface has no such
+warrant. A session with an unrelated file in flight, which is every real
+session, was blessing a read of it and recording that read as in scope. The
+seat's `glob`/`grep`/`view` grant is now built from the implicated files
+alone, and the write envelope is unchanged.
+
+One consequence worth naming: `agency`'s read briefing described its scope as
+"this session's changed files and what they import", which stopped being true
+the moment a second kind of round used it. It now says what it is — what this
+round is confined to — because a briefing that describes a surface the round
+does not have is how a model comes to report a read it could not have made.
+
+### D76 · 2026-08-27 · Verifier (gpt-5.4/openai) · Absolute traceback paths fell out of the envelope: the token stopped at the drive letter and normalisation ran before resolution
+
+Round 3 found the same defect one spelling further out, and it was right
+again: the matcher handled `File "app.py", line 4` but not
+`File "C:\repo\app.py", line 4` or `File "/repo/app.py", line 4`. Two
+separate causes, both real.
+
+**The token grammar stopped at the colon.** A drive letter is part of the
+path a Windows traceback prints, and a token that ends before it is not the
+path the runner named. The grammar now carries an optional drive prefix.
+
+**Normalisation ran before resolution.** `_posix()` strips the leading
+separator, so `/repo/app.py` became `repo/app.py` — a relative path naming
+something that is usually not there — before `relative_posix` ever saw it.
+The order is now the other way round: the spelling is preserved until
+`agency.relative_posix` has placed it against the repository, which is the
+one function in this package that knows how to do that for either spelling.
+
+`failures()` takes the repository root for the same reason, so a runner that
+prints its failing tests with absolute paths still yields a named failure
+rather than an empty list that would refuse the fix round.
+
+*The pattern across all three rounds is worth naming: every finding was the
+envelope being the wrong width, twice too wide and twice too narrow. That is
+what a boundary feature's review looks like when it is working — nothing else
+in the session drew a finding at all.*

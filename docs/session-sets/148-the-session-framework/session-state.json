@@ -193,9 +193,9 @@
     {
       "number": 10,
       "title": "The code review loop (plan B1)",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-27T10:32:16.738781-04:00",
-      "completedAt": null,
+      "completedAt": "2026-08-27T11:37:12.290742-04:00",
       "orchestrator": {
         "engine": "copilot",
         "provider": "anthropic",

@@ -90,13 +90,16 @@ one thing this set exists to prove out.
 ### 3. Verifying prose has no bottom, and sessions 1 and 2 are prose
 
 **Five real rounds on one plan produced four new Major findings every
-time.** That is why the specification puts the human override in the
-planning sessions and nowhere else.
+time.** The bottom has to come from somewhere, and it comes from the round
+cap and the Minor-only stop — both machine-decidable.
 
-**Sessions 1 and 2 stop when only Minor findings remain, and the operator
-may approve over unresolved findings.** Sessions 3 onward may not — a
-failed code session is cheap, and the next session tries again with better
-instructions.
+**No session in this set waits for a human, including sessions 1 and 2.**
+The specification originally made those two human approval gates; session 2
+removed them, on the operator's decision, because a person supplied no bound
+the cap did not already supply and cost a blocked engine. Every session ends
+in one of the three terminal states of spec §3.c.i — verified, unresolved,
+or remediated at the cap.
+
 
 ---
 
@@ -105,7 +108,7 @@ instructions.
 - **It does not re-litigate the specification.** Session 1 verifies it and
   the operator approves it. After that the spec is the contract, and a
   finding that disagrees with a settled design decision is out of scope.
-- **It does not build agency on the direct-API path.** Spec §4.a settles
+- **It does not build agency on the direct-API path.** Spec §4.b settles
   this: the seat has the tool surface, the API path records `agency: none`.
 - **It does not add a sandbox, a container, a browser surface, or dollar
   cost tracking.** Spec §10 names each absence as a decision.
@@ -128,12 +131,12 @@ instructions.
 4. Record every design decision the round produced in the decisions log
    for this set, by hand for now: the framework that writes it does not
    exist until session 5.
-5. Present the unresolved findings, if any, to the operator for approval
-   over — the one place the specification permits it.
+5. Record the terminal state the loop reached. **No approval is sought** —
+   sessions 1 and 2 are verified like every other session.
 6. Close-out.
 
-**Creates:** a verified specification and plan, an approval record, and the
-first real measurement of what a verification round costs on the seat.
+**Creates:** a verified specification and plan, and the first real
+measurement of what a verification round costs on the seat.
 Est. 0 tests — this session writes no code.
 
 ### Session 2 of 17: Verify this breakdown against that design
@@ -146,34 +149,55 @@ Est. 0 tests — this session writes no code.
    3 and 13 depends on session sets being collapsed, and that sessions 15
    through 17 do.
 4. Cross-provider verification of this spec file.
-5. Remediate; stop on Minor-only; operator approves over what remains.
+5. Remediate; stop on Minor-only; record the terminal state reached.
 6. Close-out.
 
-**Creates:** an approved build sequence. **This is the second and last human
-approval gate in the set** — sessions 3 through 17 run without one.
-Est. 0 tests.
+**Creates:** a verified build sequence, and the removal of the two human
+approval gates the specification used to carry. Est. 0 tests.
+
 
 ### Session 3 of 17: The credential allowlist (plan A1)
 
 1. Register.
-2. **Restrict the operator waiver to planning sessions, first — on every
-   public path, not one of them.** A waiver writes a non-blocking `WAIVED`
-   row and stamps the session's verification. Today two public paths do
-   this and **neither checks which kind of session it is closing**:
-   `ai_router.verify waive`, and the run-core's
-   `dabbler finish --waive ... --attest-operator`, whose
-   `_resolve_verified_verdict` returns `WAIVED` on attestation alone. Both
-   check that the machine path is exhausted and that a human is present;
-   neither checks the session. Spec §9 puts the override in the planning
-   sessions and nowhere else: "Code sessions do not need the escape hatch,
-   because a failed code session is cheap." Refuse both on an ordinary code
-   session, and **treat any future waiver path as bound by the same rule** —
-   the guard belongs at the point a verdict becomes non-blocking, so a third
-   entry point cannot reopen the hole by not knowing about it.
+2. **Replace the operator override with an honest terminal state — one
+   change, because neither half is safe alone.**
+   - **Remove every public waiver path, for every kind of session.** Two
+     exist today and neither checks anything about the session it closes:
+     `ai_router.verify waive`, and the run-core's
+     `dabbler finish --waive ... --attest-operator`, whose
+     `_resolve_verified_verdict` returns `WAIVED` on attestation alone.
+     Retire `WAIVED` from the persisted verdict vocabulary with them. Spec
+     §9 admits **no** override, including for planning sessions — there is
+     no verdict a person can type.
+   - **Add the `remediated at the cap` terminal state of spec §3.c.i** in
+     its place: every blocking finding from the last round fixed, the cap
+     reached before the fix could be reviewed, the work landing labelled
+     unreviewed. **Not a waiver** — nothing is accepted over, and what is
+     unproved is the repair rather than the complaint.
+   - **Wire both cap-terminal states into the paths that exist today, not
+     into session 10's loop.** Sessions 4 through 9 run on the current
+     machinery, so all three of these must terminate a capped session
+     without `WAIVED` and without a person:
+     `ai_router.verify`, which refuses an over-cap round outright;
+     `verifyjob`, which pauses at the cap and offers `resume`,
+     `finish --waive`, or `finish --outcome failed`; and
+     `gates.py::check_verification_clean`, which refuses to close while the
+     latest round is blocking.
+
+   **Removing the override without providing the replacement would strand
+   sessions 4 through 9**, which is why this is not two steps and not two
+   sessions: a session that agrees with every finding and fixes them all
+   would otherwise have no exit at all. **Session 10 may only integrate
+   already-usable states into its new loop** — it inherits a working
+   terminal path rather than creating one, because six sessions need it
+   first.
+
+
    **This is step 2 of the first code session on purpose** — it is in the
-   working tree before this session's own verification can reach a waive
-   path, so session 3 is the first session the guard protects rather than
-   the last one it misses.
+   working tree before this session's own verification can reach a cap, so
+   session 3 is the first session it protects rather than the last one it
+   misses.
+
 3. Build the child environment in `checks.py::_spawn` from an allowlist of
    what the toolchain requires, in **both** branches. Redirect `TEMP` and
    `TMP`. Exclude vendor keys, feed PATs, git tokens, proxy credentials,
@@ -188,13 +212,17 @@ Est. 0 tests.
 9. Close-out.
 
 **Creates:** the allowlisted child environment, its sentinel test, and the
-guard that makes "sessions 3 onward may not be approved over" true in code
-rather than in prose. Est. 7 Python tests.
+end of the operator override — replaced by the terminal state that makes
+"nothing blocks on a person" true in code rather than in prose. Est. 14
+Python tests.
 
-> **Step 2 added by session 2, after round 2.** It was first assigned to
-> session 4, which is one session too late: session 3 is itself an ordinary
-> code session, and until the guard exists its verification can be stamped
-> `WAIVED` by the very path the specification excludes.
+> **Step 2 added by session 2, and rewritten twice under review.** First
+> assigned to session 4, which is one session too late — session 3 is itself
+> a code session. Then written as a *restriction* to planning sessions,
+> which the operator's removal of the approval gates made obsolete: the
+> waiver is deleted outright, for every kind of session, and the honest
+> terminal state takes its place in the same change.
+
 
 
 ### Session 4 of 17: Record authority (plan A2)
@@ -255,15 +283,27 @@ declaration session 13 reads. Est. 8 Python tests.
 3. **Scope**: the session's changed files and their declared dependencies,
    never the whole repository. **Budget**: a fixed number of reads per
    round. **Log**: every list, search and read recorded into the round.
-4. A direct-API round stamps `agency: none` and is never reported as
+4. **Read fidelity, per spec §4.a.** Either the verifier reads the bytes on
+   disk, or the round records that a transform was applied. The
+   secret-scrubbing layer rewrites credential-shaped text, and session 1
+   took a confident Major finding against correct code because of it — the
+   agency log showed the right file being read and said nothing about what
+   was shown. Mark the transform; do not weaken the scrubber.
+5. A direct-API round stamps `agency: none` and is never reported as
    equivalent to a round that could look.
-5. Affected tests as preverify.
-6. Cross-provider verification.
-7. Full test suite, recorded as the `final-full` run of record.
-8. Close-out.
+6. Affected tests as preverify.
+7. Cross-provider verification.
+8. Full test suite, recorded as the `final-full` run of record.
+9. Close-out.
 
-**Creates:** the read half of the agency surface, with its scope, budget
-and log. Est. 10 Python tests.
+**Creates:** the read half of the agency surface, with its scope, budget,
+log, and the fidelity mark that makes a transformed read weighable. Est. 12
+Python tests.
+
+> **Step 4 added by session 2.** Session 1 proved the gap the expensive way:
+> scope, budget and a log record *what* was looked at and never *what was
+> shown*.
+
 
 ### Session 7 of 17: The test-write path (plan A5, second half)
 
@@ -352,17 +392,37 @@ Est. 10 Python tests.
 
 1. Register.
 2. `verify → fix`, cap 3, stopping early when only Minor findings remain.
-   At the cap the session ends unresolved with its round history intact —
-   nothing commits, nobody is asked.
-3. **The cap also closes a live hole:** `workflow review` has no round cap
-   today, so an unattended run keeps calling vendors.
-4. Affected tests as preverify.
-5. Cross-provider verification.
-6. Full test suite, recorded as the `final-full` run of record.
-7. Close-out.
+   At the cap the session ends with its round history intact — nothing
+   commits, nobody is asked.
+3. **The three terminal states of spec §3.c.i, and no fourth.** Verified;
+   unresolved, when the cap is reached with blocking findings outstanding;
+   and **remediated at the cap**, when every blocking finding from the last
+   round was fixed and the cap left the fix unreviewed. **Session 3 built
+   these and wired them into the paths that existed then; this session
+   integrates them into the new loop and adds nothing new.** If this session
+   finds itself inventing a terminal state, session 3 was incomplete and the
+   fix belongs there, not here.
+4. **No terminal state waits for a person, and none can be typed by one.**
+   The waiver paths are already gone by session 3. What remains is that the
+   loop must always reach one of the three — a session that agreed with
+   every finding and fixed them all must land, not hang.
 
-**Creates:** the first loop, and a bound on an unbounded one. Est. 6 Python
+
+5. **The cap also closes a live hole:** `workflow review` has no round cap
+   today, so an unattended run keeps calling vendors.
+6. Affected tests as preverify.
+7. Cross-provider verification.
+8. Full test suite, recorded as the `final-full` run of record.
+9. Close-out.
+
+**Creates:** the first loop, a bound on an unbounded one, and the terminal
+state that makes "nothing blocks on a person" true in code. Est. 10 Python
 tests.
+
+> **Steps 3 and 4 added by session 2**, which hit this exact dead end: at
+> the cap, having agreed with and fixed every finding, with no sanctioned
+> exit that was not a false statement on the record.
+
 
 ### Session 11 of 17: The verifier authors tests, the framework runs them (plan B2)
 
@@ -466,10 +526,13 @@ Python tests.
 
 1. Register.
 2. Create or import the project plan, then break it into numbered sessions
-   — two sessions, both cross-provider verified, both human-approved.
-3. **These two are the human approval gates**, and that is the entire human
-   contract: the two moments a person signs off are the two moments that
-   determine what everything after them will build.
+   — two sessions, both cross-provider verified, neither waiting on a
+   signature.
+3. **Neither is an approval gate.** They are the two moments that determine
+   what everything after them will build, which is an argument for verifying
+   them hardest rather than for parking them in front of a person. Nothing
+   in project setup blocks on a human.
+
 4. Affected tests as preverify.
 5. Cross-provider verification.
 6. Full test suite, recorded as the `final-full` run of record.
@@ -484,9 +547,13 @@ made available to everyone else. Est. 8 TS tests.
 2. Read at planning time rather than as an interruption: what stopped, at
    which round, the findings with vendor and severity, what the verifier
    looked at from the agency log, **whether the round had agency at all**,
-   and three actions — approve over, send back, cancel.
-3. **No running session ever waits for anyone.** There is no queue, no
-   inbox, and no approval that holds an engine open.
+   **whether any read it relied on was transformed**, and **which of the
+   three terminal states it reached** — unresolved and remediated-at-the-cap
+   read very differently. Three actions: send it back, respecify it, cancel.
+3. **No approve-over action, because there is no approval anywhere.** The
+   view reports; it never holds an engine open. There is no queue and no
+   inbox, and reading a record is not the same as being blocked by one.
+
 4. Affected tests as preverify.
 5. Cross-provider verification.
 6. Full test suite, recorded as the `final-full` run of record.

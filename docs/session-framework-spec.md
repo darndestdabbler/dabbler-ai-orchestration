@@ -139,13 +139,35 @@ a message to be regenerated per session, and it is versioned with the release.
 
 `verify(verifier)` → `fix(author)`, repeating.
 
-- **Cap: 3 rounds.** At the cap the session **ends unresolved**. Nothing is
-  committed, nothing is pushed, nothing is packaged.
+- **Cap: 3 rounds.** At the cap the loop stops. It does not keep opening
+  rounds and it does not ask anyone whether it should.
 - **Stop early when only Minor findings remain.** A prose review has no bottom;
   grinding rounds against wording is the failure mode this prevents.
-- **No one is asked anything.** The session terminates with its rounds and
-  findings recorded, and the framework moves on. A failed session is cheap —
-  the code did not land, and the record says why.
+- **No one is asked anything, ever.** The session terminates with its rounds
+  and findings recorded, and the framework moves on. A failed session is
+  cheap — the code did not land, and the record says why.
+
+**Three terminal states, and the record distinguishes them**, because they
+are three different things to read at planning time:
+
+| State | What happened | What lands |
+| --- | --- | --- |
+| **Verified** | A round returned no blocking finding | The work |
+| **Unresolved** | The cap was reached with blocking findings outstanding | Nothing but the record |
+| **Remediated at the cap** | Every blocking finding from the last round was fixed, and the cap left the fix unreviewed | The work, labelled unreviewed |
+
+**The third state is not a waiver and must never be recorded as one.** A
+waiver is a person accepting work over a finding that still stands. This is
+the opposite: nothing stands, and what is unproved is the repair rather than
+the complaint. Collapsing the two would make an honest outcome
+indistinguishable from an override, which is the distinction the whole record
+exists to keep.
+
+**It exists because its absence is a trap.** A session that disputes a
+finding has an exit; a session that agrees with every finding and fixes them
+all has none, and would hang at the cap waiting for a person who is not
+coming. Good behaviour must not be the thing that strands a session.
+
 
 #### c.ii — Tests
 
@@ -231,7 +253,38 @@ a blocking finding by not looking at the counterevidence, and this cannot be
 prevented cheaply. Recording what was requested makes the bias visible
 afterward, which is the difference between a suspicion and something checkable.
 
-### 4.a Agency is not available on both transports, and the record says which
+### 4.a A read must be faithful, or must say that it is not
+
+**Scope, budget and a log do not make a read accurate.** They record *what*
+was looked at and never *what was shown*, and those differ whenever anything
+sits between the file and the verifier.
+
+This is not hypothetical. Session 1 of the set that built this framework took
+a Major finding stating that the OpenAI transport sent a placeholder instead
+of its credential. The code was correct. The secret-scrubbing layer rewrites
+text following the authorization scheme, so a correct interpolation was
+*displayed* as a hardcoded placeholder — and the finding was specific,
+confident, and wrong. The agency log would have shown the verifier reading
+exactly the right file.
+
+So the read surface owes one guarantee:
+
+- **Either the verifier reads the bytes on disk**, or
+- **the round records that a transform was applied**, so a finding resting on
+  transformed content can be weighed rather than trusted.
+
+**An unmarked transformed read is indistinguishable from evidence**, which
+makes it worse than no read at all: gap 1 was a verifier that could not look,
+and this is a verifier that looked and was shown something else. The second
+is harder to catch, because it produces findings that cite real paths.
+
+**Redaction itself is not the defect and must not be removed.** Scrubbing
+credentials out of anything a model sees is correct. The defect is scrubbing
+silently, and the fix is a mark on the round rather than a hole in the
+scrubber.
+
+
+### 4.b Agency is not available on both transports, and the record says which
 
 **The seat has this surface already; the direct-API path does not.** The
 Copilot CLI is agentic and takes a read-only tool allowlist that is operations
@@ -391,44 +444,53 @@ The extension makes this easy, and it is two sessions:
 
 Later work is more sessions. There is no other project-level concept.
 
-**These two are the human approval gates**, and that is not a coincidence
-worth designing away: the two moments a person must sign off are the two
-moments that determine what everything after them will build.
+**Both are cross-provider verified like everything else, and neither waits
+for a signature.** These are the two moments that determine what everything
+after them will build, which is an argument for verifying them hardest — not
+for parking them in front of a person.
+
 
 ---
 
 ## 9. Where the human is, and where they are not
 
-**The human is in the planning sessions. Nowhere else.**
-
-Sessions 1 and 2 of a project set what gets built and how it is divided, and
-both are approved by a person. Later planning sessions do the same for new
-work. That is the entire human contract.
+**Nothing blocks on a person. There is no approval gate anywhere in this
+framework, including the planning sessions.**
 
 **No running session ever waits for anyone.** There is no queue, no inbox, no
 approval that holds an engine open, and no decision that has to be made before
-other work can continue. A session either completes or ends unresolved, and
-either way the framework moves on.
+other work can continue. A session reaches one of the three terminal states in
+§3.c.i and the framework moves on.
+
+**Planning sessions are verified, not approved.** Sessions 1 and 2 of a
+project set what gets built and how it is divided; they go through the same
+cross-provider verification as everything else and terminate on the same
+terms. The earlier design made them human approval gates on the grounds that
+prose review has no bottom — five real rounds on one plan produced four new
+Major findings every time. **That observation was right and the remedy was
+wrong.** The bottom is supplied by the round cap and the Minor-only stop,
+both of which are machine-decidable; adding a person supplied no bound that
+the cap did not already supply, and cost a blocked engine.
 
 **Unresolved sessions are planning input, not interruptions.** When a session
 ends at a cap, the record carries what stopped it, at which round, the findings
 with their vendor and severity, and what the verifier looked at from the agency
-log. That material is read at the *next planning session*, where a person is
-already engaged and can decide what it means — respecify the work, split it,
-accept it as it stands, or drop it.
+log. That material is read at the *next planning session* — by whoever or
+whatever runs it — and can be respecified, split, accepted as it stands, or
+dropped. **Reading a record is not the same as being blocked by one**, and
+this is the difference the framework depends on.
 
-**This is also where an override belongs, and only here.** The reason a human
-must be able to approve over unresolved findings is that a prose document has
-no bottom: five real rounds on one plan produced four new Major findings every
-time. That problem is specific to reviewing *prose*, which is what planning
-sessions review. Code sessions do not need the escape hatch, because a failed
-code session is cheap — nothing landed, and the next session can try again with
-better instructions.
+**Nothing in the framework asks for a human decision.** The §5.c model-list
+diff is read between sessions, never blocks one, and acting on it is optional,
+because a stale preference order cannot break selection. It is a report, not a
+request.
 
-**Model-list maintenance is the one other thing a person is asked for, and it
-is never urgent.** The §5.c diff is read between sessions, it never blocks one,
-and acting on it is optional — because a stale preference order cannot break
-selection.
+**An override has no home here, and that is deliberate.** There is no verdict
+a person can type that the loop did not produce. The three terminal states are
+exhaustive, and "remediated at the cap" is what an honest session reaches when
+it agreed with its verifier and ran out of rounds — which is the case an
+override used to be needed for.
+
 
 ---
 

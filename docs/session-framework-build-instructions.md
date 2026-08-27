@@ -15,25 +15,20 @@ hand-edited record here would falsify the thing being built.
 
 ---
 
-## Blocking precondition: set 148 cannot start yet
+## Precondition: settled 2026-08-26
 
-**Set 145 is still `in-progress`, and two in-progress sets is a drift
-error.** Registering session 1 of set 148 against that state creates the
-second one, and the correct response to a drift error is to stop and
-surface it — not to work around it.
+**Sets 145 and 146 are both `cancelled`, and no set is `in-progress`
+besides 148.** Set 145 `step-execution` was in-progress and set 146
+`measure-then-enable` had never been started, which would have selected 146
+ahead of this set under the lowest-numbered-`not-started` rule.
 
-**Two dispositions are the operator's to make before session 1:**
+Both dispositions already existed in machine-written form on another branch
+and were carried over **by merge, never by editing a state file**.
 
-- **Set 145 `step-execution`** is `in-progress` and must be closed or
-  cancelled.
-- **Set 146 `measure-then-enable`** has never been started, so the
-  next-set rule — lowest-numbered `not-started` set — selects **146**
-  ahead of 148. It must be cancelled or deliberately deferred, or an
-  engine following the rule will start the wrong set.
-
-**Verify both are settled before the register step**, by reading the
-`status` field in each set's `session-state.json`. Do not edit either file
-to make this true.
+**Confirm it still holds before the register step** by reading the `status`
+field in each set's `session-state.json`. Two in-progress sets is a drift
+error: stop and surface it, do not work around it, and do not edit a file to
+make it go away.
 
 ---
 
@@ -41,13 +36,14 @@ to make this true.
 
 1. **Which session is next.** Read the `status` field in
    `docs/session-sets/148-the-session-framework/session-state.json`. Never
-   infer state from which files exist. If the file does not exist yet, you
-   are starting session 1.
-2. **Which branch.** The set spec carries this as an open decision for the
-   operator. **If it is still unsettled, stop and ask** — every session
-   inherits the answer and a wrong guess is expensive to unwind.
+   infer state from which files exist.
+2. **Which branch. Settled: `master`.** The design documents were authored
+   on `design/solution-decomposition` and both it and
+   `experiment/verification-pipeline-v3` are merged in and finished. Commit
+   and push `master`.
 3. **Which model is driving your seat.** You need the exact model id for
    the register step. The seat's label is not trusted.
+
 
 ---
 
@@ -229,18 +225,37 @@ proves the opposite.
 
 ---
 
-## When a session ends unresolved
+## When a session ends at the cap
 
-**That is a permitted outcome and not a failure to hide.** Nothing
-commits, nothing pushes, nothing packages, and the record carries what
-stopped it: at which round, the findings with vendor and severity, and what
-the verifier looked at.
+**That is a permitted outcome and not a failure to hide.** The record
+carries what stopped it: at which round, the findings with vendor and
+severity, and what the verifier looked at.
 
-**Do not ask the operator to approve over it, except in sessions 1 and 2.**
-Those two review prose, which has no bottom, and the specification puts the
-override there for exactly that reason. **A failed code session is cheap** —
-the code did not land, and the next session tries again with better
-instructions.
+**Never ask the operator to approve over it — there is no approval anywhere
+in this framework, including sessions 1 and 2.** Prose review has no bottom,
+which is why the round cap and the Minor-only stop exist; a person adds no
+bound those two do not already supply and costs a blocked engine.
+
+**Two of the three terminal states end a session at the cap, and they are
+not the same thing:**
+
+- **Unresolved** — blocking findings are still outstanding. Nothing lands.
+- **Remediated at the cap** — every blocking finding from the last round was
+  fixed, and the cap left the fix unreviewed. The work lands, labelled
+  unreviewed.
+
+**Remediated-at-the-cap is not a waiver and must never be recorded as one.**
+A waiver accepts work over a finding that still stands; here nothing stands,
+and what is unproved is the repair rather than the complaint.
+
+**A failed code session is cheap** — the code did not land, and the next
+session tries again with better instructions.
+
+**Do not dispute a finding you believe is correct.** Dispute is for a
+finding that is wrong, and it must be evidence-backed. Filing one to reach
+the adjudication path, and through it the waiver, puts a false statement on
+the record of a set whose entire claim is that the record is honest.
+
 
 ---
 

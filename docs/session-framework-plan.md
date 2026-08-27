@@ -130,7 +130,7 @@ direct-API path sends no tools and would need a tool-use loop written three
 times against three vendors' function-calling protocols — **that is a second
 project, and Milestone A does not carry it.**
 
-**A direct-API round therefore stamps `agency: none`** (spec §4.a), so a review
+**A direct-API round therefore stamps `agency: none`** (spec §4.b), so a review
 that could not look is never recorded as one that could.
 
 *This is gap 1, and it is the only genuinely new subsystem in Milestone A.*
@@ -243,12 +243,12 @@ feed was not verified.*
 - Sessions view without the set level, preserving the existing icons, row
   actions, and the two-inline-actions rule.
 - **Project setup: two sessions** — create or import the plan, then break it
-  into sessions. Both cross-provider verified, both human-approved.
+  into sessions. Both cross-provider verified, neither waiting on a signature.
 - **The unresolved-session view**, read at planning time rather than as an
   interruption: what stopped, at which round, the findings with
   vendor and severity, what the verifier looked at from the agency log,
-  **whether the round had agency at all**, and three actions — approve over,
-  send back, cancel.
+  **whether the round had agency at all**, and three actions — send it back,
+  respecify it, cancel.
 
 *Last because staff can run every one of A, B, and C from the command line. The
 extension makes it pleasant; it does not make it work.*

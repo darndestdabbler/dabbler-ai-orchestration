@@ -434,6 +434,158 @@ raising `max_rounds` mid-session, or filing a dispute nobody believes — both
 edit the conditions of a review from inside the review, which is the one
 thing this set exists to make impossible.*
 
+### D19 · 2026-08-26 · Operator · There are no human approval gates anywhere
+
+**Directive: "I don't really want human blockers."**
+
+The specification made sessions 1 and 2 human approval gates, on the
+reasoning that prose review has no bottom — five real rounds on one plan
+produced four new Major findings every time. **The observation was right and
+the remedy was wrong.** The bottom is supplied by the round cap and the
+Minor-only stop, both machine-decidable. A person supplied no bound those
+two did not already supply, and cost a blocked engine — as session 2 proved
+by becoming one.
+
+Removed from `session-framework-spec.md` §8 and §9, the plan's milestone D,
+this set's sessions 1, 2, 16 and 17, and the build instructions. §9 now
+reads that nothing blocks on a person and no verdict can be typed by one.
+
+**Reading a record is not the same as being blocked by one.** The
+unresolved-session view stays exactly as designed — it is read at planning
+time, by whoever or whatever runs that session, and it holds nothing open.
+What is gone is the *gate*, not the *report*.
+
+*Note what this costs: nobody signs off on the plan before seventeen
+sessions are built against it. That is the trade the directive makes, and it
+is only safe because §3.c.i's terminal states keep an unreviewed remediation
+labelled as one instead of laundering it into "verified".*
+
+### D20 · 2026-08-26 · Operator + AI · The three terminal states, which is what makes D19 safe
+
+Removing the approval gate without giving the loop somewhere to land would
+have turned every session that hit D18's dead end into a permanent hang.
+So §3.c.i now names three terminal states and no fourth:
+
+| State | Reached when | What lands |
+| --- | --- | --- |
+| Verified | A round returned no blocking finding | The work |
+| Unresolved | The cap was reached, blocking findings outstanding | Nothing but the record |
+| **Remediated at the cap** | Every blocking finding was fixed; the cap left the fix unreviewed | The work, labelled unreviewed |
+
+**The third is the one that did not exist, and its absence is what stranded
+session 2.** A session that disputes has an exit; a session that agrees with
+every finding and fixes them all had none — dispute requires a rebuttal it
+does not believe, adjudication requires a dispute, and the waiver sits
+behind adjudication. **Good behaviour was the thing that stranded it.**
+
+**It is not a waiver.** A waiver is a person accepting work over a finding
+that still stands. Here nothing stands, and what is unproved is the repair
+rather than the complaint. Recording one as the other would make an honest
+outcome indistinguishable from an override.
+
+**Assigned to session 10**, which owns the code review loop and its cap, and
+surfaced by session 17, which must show which state a session reached
+because unresolved and remediated-at-the-cap read very differently at
+planning time.
+
+### D21 · 2026-08-26 · AI (orchestrator) · Read fidelity is now session 6's problem, in the spec rather than only in this log
+
+D6 recorded the redaction discovery as design input. It is now **spec
+§4.a** — a new subsection stating that the read surface owes one guarantee:
+either the verifier reads the bytes on disk, or the round records that a
+transform was applied.
+
+The existing §4.a became §4.b, and the two references to it in the plan and
+this set's spec were repointed.
+
+**The scrubber is not the defect and is not being weakened.** Scrubbing
+credentials out of anything a model sees is correct; scrubbing *silently* is
+the defect, and the fix is a mark on the round.
+
+Session 6 step 4 now carries it, with session 1's incident named as the
+evidence: an unmarked transformed read produced a confident Major finding
+against correct code, and the agency log recorded only that the right file
+was read.
+
+### D22 · 2026-08-26 · Operator · The cap is raised for session 2, on the record
+
+Session 2 was at the cap and has since produced a substantially new work
+product: the removal of the approval gates across four documents, the three
+terminal states, and the read-fidelity subsection. **That is new material to
+review, not another pass at the same findings** — which is the case the cap
+exists to stop.
+
+**Raised with `verify --max-rounds`, which is an existing operator control,
+under the operator's directive of 2026-08-26.** Recorded here because D18
+called this workaround out by name: raising the bound from inside a review
+is exactly what a session must not do on its own authority. It is the
+operator's to raise and it is being raised explicitly, not quietly.
+
+**This is increasing verification, not reducing it.** The standing rule is
+that no session may reduce its own — if the round count is painful the
+answer is fewer and larger sessions, never fewer rounds.
+
+*The permanent fix is session 10's terminal state, which would have let
+session 2 close honestly without touching the bound at all. Until that
+exists, this is the only exit that does not put a false statement on the
+record.*
+
+### D23 · 2026-08-26 · Verifier (gpt-5.5/openai) · Round 4: removing the gate left session 3 building the gate
+
+Round 4 accepted the transport, pricing and waiver-path assignments, and
+found one Major defect in the new work — a contradiction introduced by the
+D19 amendment itself.
+
+§9 now says there is no approval gate anywhere and no override has a home.
+**Session 3 step 2 still said "restrict the operator waiver to planning
+sessions."** Followed literally, the first code session would have
+*preserved* a human override for exactly the sessions §9 had just stopped
+exempting, and implemented the opposite of the deliverable.
+
+**Rewritten: the waiver is deleted outright, for every kind of session, and
+`WAIVED` retires from the persisted verdict vocabulary with it.**
+
+**The finding also exposed an ordering problem it did not name.** Removing
+the only exit in session 3 while the replacement arrived in session 10 would
+strand sessions 4 through 9 — any of them could reach a cap with nothing to
+land on. So the removal and the `remediated at the cap` state are now **one
+change in session 3**, on the same "do both or neither" logic the plan
+already applies to pricing and role selection. Session 10 wires the state
+into the loop rather than inventing it.
+
+*Three amendments to the same step across three rounds — too late, too
+narrow, then backwards. The step is small; the constraint around it is not,
+and each round found a different way the constraint had been missed.*
+
+### D24 · 2026-08-26 · Verifier (gpt-5.5/openai) · Round 5: "adds the state" is not the same as "the state works"
+
+Round 5 sharpened round 4's ordering point into the one that mattered.
+Session 3 said it would *add* the terminal state while session 10 *wired it
+into the loop* — but sessions 4 through 9 do not run on session 10's loop.
+They run on the machinery that exists today, and all three of its cap paths
+end somewhere a person has to be:
+
+- `ai_router.verify` refuses an over-cap round outright — the refusal this
+  session hit at round 4;
+- `verifyjob` pauses at the cap and offers `resume`, `finish --waive`, or
+  `finish --outcome failed`;
+- `gates.py::check_verification_clean` refuses to close while the latest
+  round is blocking.
+
+**Session 3 now owns all three**, and session 10 is explicitly reduced to
+integrating a terminal path it inherits. The set spec's own rule — no
+session depends on something a later session creates — was being violated by
+the fix for a violation of that same rule.
+
+*The estimate on session 3 went from 4 tests to 14 across these rounds. That
+is the honest cost of the first code session also being the session that
+removes the framework's only escape hatch, and it is better known now than
+discovered at session 7.*
+
+
+
+
+
 
 
 

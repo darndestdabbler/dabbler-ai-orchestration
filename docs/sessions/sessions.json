@@ -486,9 +486,9 @@
     {
       "number": 25,
       "title": "Foundation modules",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-28T16:27:31.901112-04:00",
-      "completedAt": null,
+      "completedAt": "2026-08-28T17:25:10.342729-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

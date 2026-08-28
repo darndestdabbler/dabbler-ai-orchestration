@@ -1,1 +1,0 @@
-VERIFIED — The prior missing-verification finding is resolved for this pre-close stage: step 6 is recorded complete, and step 5 is correctly in-progress as the active `copilot-cli` verification loop. I checked the session ledgers and relevant touched code/tests; no blocking defect appears in the current fix delta.

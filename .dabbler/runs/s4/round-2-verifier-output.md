@@ -1,1 +1,0 @@
-**VERIFIED** — The Round 1 defect is resolved: `validate_transition()` now rejects a first `entered` event unless it names the first step, and both `append()` and `fold()` apply that validator before writing or replaying history. The affected tests now build sequential histories, and I found no new blocking defect in the fix delta.

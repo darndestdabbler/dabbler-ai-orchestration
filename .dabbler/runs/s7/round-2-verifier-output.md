@@ -1,1 +1,0 @@
-**VERIFIED** — The POSIX backslash traversal finding is resolved: `agency._relative_to` normalizes separators before resolution, `_confine` carries the resolved target through to `_write_file`, and the added test covers the previously failing write path. I found no blocking defects in the fix delta.

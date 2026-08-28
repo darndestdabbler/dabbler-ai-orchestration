@@ -1,6 +1,0 @@
-VERIFIED — The implementation correctly folds task state from the approved plan and execution ledger, fails closed on malformed records, and updates watcher/cache inputs for run artifacts. No blocking correctness defect is substantiated by the supplied diff.
-
-## NITS
-
-- **Nit:** Issue → Visible task labels use the humanized `step_id`, despite the plan requiring labels from `steps[].intent`. Location → `tools/dabbler-ai-orchestration/src/providers/workExplorerTreeModel.ts` (`taskRowLabel`); the tests conceal this by making IDs and intents nearly identical. Fix → Prefer `row.intent` for the TreeItem label, falling back to `stepId` and position.
-- **Nit:** Issue → If `approved-plan.json` is missing while `step-execution.jsonl` remains, `build_task_rows` returns an empty list without reading or refusing the execution record. Location → `ai_router/progress.py` (`build_task_rows`). Fix → Treat a missing plan as no tasks only when no execution record exists; otherwise return a refusal because the recorded open step cannot be rendered reliably.

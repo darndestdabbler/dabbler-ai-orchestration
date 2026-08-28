@@ -1,1 +1,0 @@
-**VERIFIED** — I checked the agency scope/dependency logic, pattern-only grep/glob accounting, round persistence/schema wiring, and the related tests. The prior dependency-scope issue is resolved, and pattern-only searches/listings are now recorded as not confined to scope with explicit detail; I found no blocking defects in the fix delta.

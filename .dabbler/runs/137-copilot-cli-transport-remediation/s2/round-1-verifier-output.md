@@ -1,9 +1,0 @@
-ISSUES FOUND
-
-- **Issue 1:** `--machine-scope` does not fall back to user scope when unelevated or when the machine write fails.
-  - **Category:** Correctness
-  - **Severity:** Major
-  - **Evidence paths:** `ai_router/bootstrap.py:466`, `ai_router/bootstrap.py:603`, `tests/test_bootstrap.py:42`, `tests/test_bootstrap.py:105`
-  - **Failure scenario:** A Windows operator runs bootstrap from a normal unelevated shell with `--machine-scope`, which is likely in the target environment described by the task where the admin account may be a different user. Instead of landing the preference in HKCU, the code attempts only the machine write, reports failure, and future shells do not inherit `DABBLER_TRANSPORT` unless the operator manually applies the fallback.
-  - **Acceptance criterion:** `JUDGMENT - Does the machine-scope path check elevation before attempting machine scope, fall back to user scope when machine scope is unavailable or fails, and print the manual fallback only after every intended scope write fails?`
-  - **Details:** **Violation:** the task required “Attempt machine scope only when explicitly asked for it and the process is elevated” and tests for “unelevated falls back to user scope and reports it; both-scopes failure reports failure.” **Impact:** this misses a core pre-close behavior for unelevated persistence and would change a reasonable merge decision. **Evidence:** `persist_transport_preference(..., machine=True)` calls only `writer(..., machine=True)` and returns `None` on failure, with no elevation gate or user-scope fallback; `main` then prints the manual fallback. The added tests assert machine-scope failure/no downgrade rather than the required unelevated user-scope fallback.

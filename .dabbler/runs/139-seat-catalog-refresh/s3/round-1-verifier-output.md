@@ -1,9 +1,0 @@
-**ISSUES FOUND**
-
-- **Issue 1:** Fractional Copilot premium-request samples are still discarded, so a required unknown-cost entry remains unknown after the live `--models` refresh.
-  - **Category:** Correctness / Completeness
-  - **Severity:** Major
-  - **Evidence paths:** `ai_router/transports/copilot.py:1475`, `tests/test_transport_copilot.py:598`, `ai_router/copilot-catalog.lock:56`, `docs/session-sets/139-seat-catalog-refresh/s3-refresh-evidence.md:134`
-  - **Failure scenario:** On the current live seat, Copilot returns fractional `usage.premiumRequests` for cheap models; the product code treats that successful measured sample as malformed, so cost previews and quorum selection continue treating known cheap models as unknown-cost. This is probable because the session’s own live evidence records `claude-haiku-4.5` returning `0.33`.
-  - **Acceptance criterion:** `JUDGMENT - A successful probe whose Copilot result includes fractional usage.premiumRequests, such as 0.33, is persisted/rendered as a known numeric sample and the refreshed claude-haiku-4.5 entry is no longer unknown-cost.`
-  - **Details:** **Violation:** the plan required the `--models` run over `claude-haiku-4.5` / `claude-opus-4.7` “so the unknown-cost entries stop being unknown.” **Impact:** the set’s cost-safety deliverable is not met; the cheapest measured Anthropic model is still sorted after known-cost models and still forces unknown-cost handling. **Evidence:** `_coerce_probe_premium_requests` returns `None` for every non-`int`, the test suite codifies floats as malformed, the lockfile’s refreshed `claude-haiku-4.5` entry has no sample, and the evidence file explicitly says the live 0.33 sample stayed unknown. The correct behavior is to preserve valid non-negative fractional samples as measured samples, not coerce them to unknown.

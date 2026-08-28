@@ -1,9 +1,0 @@
-**ISSUES FOUND**
-
-- **Issue 1:** The waiver remediation still misses the run-core `finish --waive` approval path.
-  - **Category:** Completeness
-  - **Severity:** Major
-  - **Evidence paths:** `docs/session-sets/148-the-session-framework/spec.md:159`, `docs/session-framework-spec.md:400`, `ai_router/runcli.py:706`, `ai_router/runcli.py:1465`, `tests/test_runcore_verified.py:280`, `tests/conftest.py:266`
-  - **Failure scenario:** A staff code session using the run-core verified policy hits a blocking review, then an operator runs `dabbler finish --run <id> --waive "shipping anyway" --attest-operator`; today that path returns `WAIVED` and records the finish. This is probable because the public parser exposes `finish --waive`, and the test suite explicitly asserts it works for `Session 2: Review the parser`, whose fixture text is ordinary implementation work.
-  - **Acceptance criterion:** `JUDGMENT - The approved build sequence explicitly requires the planning-session guard on every public waiver/approve-over path that can finish or stamp a verified session, including both legacy ai_router.verify waive and run-core dabbler finish --waive, with ordinary code sessions refused.`
-  - **Details:** **Violation:** spec §9 says “The human is in the planning sessions. Nowhere else” and “This is also where an override belongs, and only here”; the session-3 fix only calls out `verify waive`. **Impact:** the build sequence can be approved while leaving a public code-session override in the framework, defeating the “sessions 3 onward may not be approved over” gate. **Evidence:** `runcli.py` exposes `finish.add_argument("--waive")`, `_resolve_verified_verdict()` returns `WAIVED` on attestation without checking planning/session kind, and `test_a_waiver_is_operator_attested_and_recorded` verifies that behavior.

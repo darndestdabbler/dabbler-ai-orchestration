@@ -1,9 +1,0 @@
-ISSUES FOUND
-
-- **Issue 1:** Test-root helper/support files are silently treated as mapped even when they select no tests and raise no `selection_unknown` risk.
-  - **Category:** Correctness
-  - **Severity:** Major
-  - **Evidence paths:** `ai_router/affected.py:321-389`
-  - **Failure scenario:** An author changes `tests/helpers.py` or `tests/__init__.py`; it is under `test_root` but is not a collected `test_*.py` file and no rule covers it. `select_tests` marks it matched, returns no selected tests and no risks. Shared test support files are normal in Python suites, and this repo already has `tests/__init__.py`, so this is probable rather than adversarial.
-  - **Acceptance criterion:** `JUDGMENT - A changed non-collected file under testing.selection.test_root must either select concrete affected tests with a named reason or return a selection_unknown risk and smoke selection; it must not produce an empty no-risk result.`
-  - **Details:** **Violation:** the spec requires “a changed path that maps to nothing records `selection_unknown` and raises risk.” **Impact:** the selector can produce false clean targeted-test evidence for a test-support change, undermining the core safety invariant before later verification enforcement relies on it. **Evidence:** `select_tests` sets `matched = True` for any path under `test_root` even when `rel not in known_tests`; with no rule/module match, the later `if not matched: unknown.append(rel)` branch is skipped. The fix is to mark such paths matched only when they actually select tests or are explicitly mapped; otherwise they must become `selection_unknown`.

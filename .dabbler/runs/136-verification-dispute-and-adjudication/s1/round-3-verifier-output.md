@@ -1,1 +1,0 @@
-VERIFIED — The prior truncation defect is resolved fail-closed: oversized bare-file citations are refused with an actionable range-citation alternative, while ranged evidence remains accepted and rendered. The file-only validation also prevents non-renderable directory evidence; no significant defect is evident in the supplied fix delta.

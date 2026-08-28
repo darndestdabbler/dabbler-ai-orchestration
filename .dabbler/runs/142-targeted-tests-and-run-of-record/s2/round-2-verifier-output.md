@@ -1,9 +1,0 @@
-ISSUES FOUND
-
-- **Issue 1:** The no-test preverify bypass also lets unknown selections through when smoke tests are absent.
-  - **Category:** Correctness
-  - **Severity:** Major
-  - **Evidence paths:** `ai_router/affected.py:409`, `ai_router/affected.py:420`, `ai_router/affected.py:607`, `ai_router/verify.py:574`
-  - **Failure scenario:** A repo declares an expensive suite but omits `testing.selection.smoke` (the default is empty). An unmapped changed path produces `selection_unknown` risk with no selected tests; the new `preverify_gate` branch treats that as “nothing is affected” and returns OK, so `verify` dispatches without any targeted evidence. This is probable because missing/empty smoke config is the default path, not an adversarial ledger edit.
-  - **Acceptance criterion:** `JUDGMENT - preverify_gate only skips preverify evidence for deliberate mapped-empty selections with no risks; a SelectionResult with any risk and no selected tests refuses verification instead of dispatching.`
-  - **Details:** **Violation:** The task requires “Make `verify` refuse to dispatch until valid targeted selection evidence exists,” while `affected.py` also distinguishes unmapped paths by adding `selection_unknown` risks. **Impact:** A reasonable merge decision changes because the fix closes the docs/AGENTS empty-rule case by introducing a fail-open path for unmapped changes, undermining the affected-tests-before-verification objective. **Evidence:** `select_tests` appends risks for unmatched paths and only adds smoke tests if configured; the new gate checks only `not result.test_paths`, ignores `result.risks`, and returns `PreverifyGate(True)`, after which `verify.py` dispatches. The correct bypass must require no selected tests **and no risks**.

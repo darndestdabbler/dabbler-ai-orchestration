@@ -1,3 +1,0 @@
-VERIFIED — I checked the fix delta in `ai_router/evidence.py` against the relevant ledger/test/schema paths and could not substantiate a blocking defect.
-
-Round 2 is resolved: unregistered `check_id`s now fail closed with `check-not-registered`. The prior quote-AST and blocked-to-pass findings also remain resolved for the tested paths: required AST kinds come from the registered check, and same-check blocked results cannot later become `pass`.

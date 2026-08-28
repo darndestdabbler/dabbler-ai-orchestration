@@ -1009,7 +1009,10 @@ session is prose, verified the way sessions 1 and 2 were.
 8. Affected tests as preverify. The selector reports no test affected for a
    prose session and **nothing is recorded** — a run recorded against an
    empty selection is a `policy_violation`, and session 2's record shows the
-   shape: no `preverify-targeted` row at all.
+   shape. (In this session's own round 1 it instead reported every tracked
+   ledger file under `.dabbler/runs/` as `selection_unknown` — D134 — and
+   the smoke test was run and recorded; D135 then un-tracked the ledger, so
+   the rows do not recur.)
 9. Cross-provider verification.
 10. Full test suite, recorded as the `final-full` run of record.
 11. Close-out.

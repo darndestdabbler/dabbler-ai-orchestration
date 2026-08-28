@@ -1,1 +1,0 @@
-{"round": 1, "phase": "full", "verdict": "VERIFIED", "blocking": false, "verifier_model": "gpt-5.5", "verifier_provider": "openai", "orchestrator_provider": "anthropic", "findings": [], "cost_usd": null, "completion_tree": "d0d8a802e2a44f069f47ef244c1974ce869ec501", "recorded_at": "2026-08-18T20:46:47.032239-04:00", "transport": "copilot-cli"}

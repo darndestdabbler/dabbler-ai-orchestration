@@ -1,9 +1,0 @@
-ISSUES FOUND
-
-- **Issue 1:** Invalid `docs/modules.yaml` is treated as “scope unavailable” and falls back to unscoped verification.
-  - **Category:** Correctness
-  - **Severity:** Major
-  - **Evidence paths:** `ai_router/context_scope.py:538-544`, `ai_router/verify.py:269-273`, `ai_router/verify.py:807-821`, `ai_router/modules.py:103-118`, `docs/schema-reference.md:31-36`
-  - **Failure scenario:** A user typoes a manifest key such as `codeRoot` in a module-mapped repo. That typo is probable enough that the docs explicitly call it out, but verification catches the resulting `ValueError`, reports the module as unavailable, and routes the old monolithic bundle instead of refusing. The session can then pass without the bounded scope or escalation guarantees the set exists to enforce.
-  - **Acceptance criterion:** `JUDGMENT - A module-declared verification with an invalid docs/modules.yaml, including an unknown manifest key, must refuse before dispatch rather than falling back to the unscoped whole-session bundle.`
-  - **Details:** **Violation:** the schema reference says invalid manifests raise rather than being silently rewritten, and unknown keys are rejected because a misspelled `codeRoot` would produce “a scope that is quietly wrong.” **Impact:** this changes the merge decision because the core acceptance criterion is bounded module verification; fail-open monolithic verification bypasses the bound and the logged pull/escalation path. **Evidence:** `modules.parse_entries` correctly raises on unknown keys, but `context_scope.resolve_scope` converts that `ValueError` into `ScopeUnavailable`, and `verify.run_round` treats `ScopeUnavailable` as permission to build the unscoped bundle.

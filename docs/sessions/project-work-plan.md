@@ -57,6 +57,20 @@ it.
 | 19 | The unresolved-session view (plan D3) | no | 2026-08-28 |
 | 20 | A round baseline that survives the trip (root cause of D98) | no | 2026-08-28 |
 | 21 | Close out set 148 on the record, and make the loop tests cheap | no | 2026-08-28 |
+| 22 | Decide the inventory before anything is translated | no | 2026-08-28 |
+| 23 | Contracts — types from schemas, the Router interface, and the controls | — | not declared |
+| 24 | The extension talks to the interface, and Python answers | — | not declared |
+| 25 | Foundation modules | — | not declared |
+| 26 | The record — journal, ledger, writers | — | not declared |
+| 27 | Evidence, checks, test evidence, affected | — | not declared |
+| 28 | Transports I — API, offline, routing, selection, discovery | — | not declared |
+| 29 | Transport II — the Copilot CLI state machine and seat cost | — | not declared |
+| 30 | The session lifecycle | — | not declared |
+| 31 | Verification support — agency, verifyjob, the approved plan | — | not declared |
+| 32 | The verification loop | — | not declared |
+| 33 | Bootstrap, packaging, and the `dabbler` command on the PATH | — | not declared |
+| 34 | The six-step workflow ported, the run core retired | — | not declared |
+| 35 | Cutover — the extension calls in-process, and Python leaves | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -566,3 +580,25 @@ Three deliverables, nothing else:
 3. Make the loop tests cheap without faking git. Measure first (pytest --durations, sandbox_repo setup timed separately from the loop). Then: build the seeded repo and bare remote once per session and copytree per test; pin the suite's git environment (GIT_CONFIG_GLOBAL empty, gc.auto=0, core.fsmonitor=false, commit.gpgsign=false, core.autocrlf=false); drop fixture git calls whose result no test reads. Target: no test above 1.5 s and the final-full run of record under 3:00 at -n 2, against session 20's 379 s. If measurement shows the loop's own per-round git calls dominate, stop at the seam and record the number.
 
 Then affected tests as preverify, cross-provider verification, the full suite as the final-full run of record (which is also the step-3 measurement), and close-out with STATUS.md pointing at the decision number and the new suite time.
+
+### Session 22 — Decide the inventory before anything is translated
+
+**Releasable: no.**
+
+Session 22 of 35: decide the inventory before anything is translated.
+
+A prose session, verified the way sessions 1 and 2 were. It writes no code and adds no test. Its deliverables are decisions in the decisions log and one design document:
+
+1. The port inventory as a decision (decider: orchestrator): for each of the 45 Python modules, port, retire, or merge, with its line count and the test file(s) that drive it. The plan's default (run core retired, six-step workflow ported) applies unless a row names a reason to depart.
+
+2. D88 decided on the record: whether the run core's projection replaces the lifecycle's record or the run core is retired. The plan's default is retired, meaning deleted in session 34. The entry says which authority it rests on and until when the operator can override it.
+
+3. The runtime floor verified and recorded: the extension host's process.versions on the installed VS Code 1.135, and whether node:sqlite is present there and on the system Node. Recorded with the package layout decision.
+
+4. The package layout and the dependency ceiling as decisions: packages/router (npm dabbler-ai-router, bin dabbler), the extension depending on it through a workspace, esbuild bundling both into the VSIX; runtime dependencies yaml, ajv, smol-toml and nothing native, a fourth being a decision in the log.
+
+5. The parity-control design, as docs/ts-port-parity-control.md and a decision that names it: the fixture corpus (one repository per lifecycle shape: fresh, in-flight, disputed, at-cap, moved-machine), the verb list it drives, the record files it compares, and the two normalizations it applies (timestamps, absolute paths) and no others.
+
+6. This session's seat cost measured and recorded as a decision, naming the currency measured (Claude Code subscription context for the orchestrator; provider API tokens and dollars for the verification rounds).
+
+Then affected tests as preverify (the selector will report no test affected and nothing is recorded, as session 2's record shows), cross-provider verification, the full suite as the final-full run of record, and close-out with STATUS.md pointing at the new decisions and the landed plan.

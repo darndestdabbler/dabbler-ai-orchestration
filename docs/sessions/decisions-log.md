@@ -3360,3 +3360,188 @@ Set 148's acceptance criterion was "the framework can run its own next session":
 **Operator decision, 2026-08-28: the seat cost for set 148 is NOT back-filled.** The sessions are closed, and a figure recovered now would change nothing forward; the next set plans against the $8–$12 per ordinary code session band that D37 named from two samples and D48 confirmed with a third. What carries forward is the step, not the figure: every future session plan carries "measure this session's seat cost and record it" as a numbered step, the way session 3's did and sessions 4–20's did not. This closes the seat-cost question rather than leaving it owed.
 
 Recorded as step 2 of session 21, before any code moves, because a decision appended after the run of record moves the tree and fails the freshness gate.
+
+## Session 22 — Decide the inventory before anything is translated
+
+### D128 · 2026-08-28 · Operator · The router is ported to TypeScript as sessions 22-35, so the framework ships as one artifact and a project holds only its own record
+
+The Python router (`ai_router`: 29,640 lines, 45 modules, 941 tests) is ported to TypeScript so that the whole framework ships as one VS Code Marketplace artifact with the router inside it, and the extension calls it in-process. The port is its own set of fourteen sessions, 22–35, landed in `docs/sessions/session-plan.md` at commit `d77a075a` on 2026-08-28 with `totalSessions` raised from 21 to 35.
+
+**The operator's grounds, as stated when the plan was commissioned.** Staff reject a two-runtime install: an extension that then requires a second toolchain, a per-project `.venv`, and a router version kept in step by convention. Bundling a Python interpreter inside the VSIX was considered and rejected as insufficient — the operator's goal is that the infrastructure not be part of the project at all. After cutover a project holds only `dabbler.yaml`, `docs/sessions/`, `.dabbler/runs/` and the `AGENTS.md` fence.
+
+**Why it is feasible.** The router's runtime is small in kind — process spawning, file I/O, HTTP, JSON/YAML, hashing, one read-only SQLite query — and each has a first-class Node equivalent. Its three dependencies have exact twins. The three Windows-specific items (`.cmd` shim resolution, the rendered-argv measurement against the 24,000-unit handoff threshold, `node:sqlite` in place of a native binding) are bounded and named in the plan.
+
+**Why it is dangerous, and what the plan does about it.** The router is the trust machinery; a mistranslated gate does not crash, it lets something through. The plan's load-bearing rules follow from that one risk: integration-driven order (the extension is rewired to a `Router` interface first, with today's Python spawn as the first implementation); parity with the Python record as a declared deterministic control, byte-identical, run before every round until cutover; no redesign of any rule while porting it; no fake git in the fixtures; seat cost measured every session (D127); `verify.py` ported as five files rather than one.
+
+**Recorded by the orchestrator on the operator's behalf**, from the operator's instruction of 2026-08-28 to start session 22 — which existed only in the drafted plan — and from the grounds the operator gave when asking for that plan. The plan is the draft as written, with four corrections of fact made at landing: line counts moved onto the reproducible basis STATUS.md names (29,640; `journal` 846, `evidence` 902, `checks` 1,001); the git seam named as `journal.run_git`, where session 21 put it; session 22's pre-verification step corrected to record nothing (a run recorded against an empty selection is a `policy_violation`); and the retired run core's test count corrected to 119, since `test_runcore_checks.py` drives the kept `checks.py`. The inventory decision that follows departs from the plan's default table further, with reasons, which is what session 22 exists to do.
+
+### D129 · 2026-08-28 · Orchestrator (claude-fable-5/anthropic) · Port inventory for the 45 modules: 38 ported, 4 merged, 3 retired; facts, fixloop and testphase are kept, journal and verifyjob are split
+
+Every one of the 45 modules under `ai_router/` is assigned *port*, *merge* or *retire*, with its line count (raw `wc -l`, the basis STATUS.md names; 29,640 in total) and the test file(s) that drive it (`pytest --collect-only` counts, 941 in total). The plan's default table put `facts`, `fixloop` and `testphase` in the run core and listed `journal` and `verifyjob` as plain ports; the import graph says otherwise, and each departure below names its reason. **Result: 38 ported, 4 merged, 3 retired; 832 tests ported, 109 deleted.**
+
+**Port — the module is translated whole, behaviour unchanged.** Grouped by the session that ports it.
+
+| Session | Module | Lines | Driven by |
+| --- | --- | ---: | --- |
+| 25 | `config` | 640 | `test_config` (44) |
+| 25 | `secret_resolver` | 47 | through `test_selection`, `test_route`, `test_transport_api` |
+| 25 | `identity` | 235 | `test_identity` (11) |
+| 25 | `verdict` | 419 | `test_verdict` (33) |
+| 25 | `lockfile` | 158 | through `test_discovery`, `test_transport_copilot` |
+| 25 | `runtime_mode` | 84 | through `test_route`, `test_verify` |
+| 25 | `metrics` | 258 | `test_metrics` (10) |
+| 26 | `ledger` | 901 | `test_ledger` (17) |
+| 26 | `writers` | 881 | through `test_session`, `test_progress`, `test_bootstrap`, `test_gates`, `test_packaging` |
+| 27 | `evidence` | 902 | `test_evidence_protocol` (27) |
+| 27 | `checks` | 1,001 | `test_runcore_checks` (24) — drives `checks`, not the run core; ported under a name that says so. Its one import from the run journal (`write_heartbeat`, a liveness stamp for run-core checks) is dropped at the port. |
+| 27 | `test_evidence` | 807 | through `test_evidence_protocol`, `test_affected`, `test_gates`, `test_verify` |
+| 27 | `affected` | 564 | `test_affected` (21) |
+| 28 | `transports/base` | 49 | `test_escalation` (11) |
+| 28 | `transports/offline` | 140 | `test_offline_transport` (13) |
+| 28 | `transports/api` | 292 | `test_transport_api` (10) |
+| 28 | `route` | 586 | `test_route` (13), `test_escalation` |
+| 28 | `selection` | 146 | `test_selection` (15) |
+| 28 | `discovery` | 1,057 | `test_discovery` (20) |
+| 29 | `transports/copilot` | 2,074 | `test_transport_copilot` (90) |
+| 29 | `seat_cost` | 304 | `test_seat_cost` (7) |
+| 30 | `session` | 1,386 | `test_session` (71) |
+| 30 | `gates` | 421 | `test_gates` (23) |
+| 30 | `progress` | 1,050 | `test_progress` (37) |
+| 30 | `modules` | 246 | `test_modules` (7) |
+| 31 | `agency` | 921 | `test_agency` (23) |
+| 31 | `approved_plan` | 590 | `test_approved_plan` (24) |
+| 31 | `plan_review` | 812 | `test_plan_review` (18) |
+| 31 | `facts` | 650 | `test_facts` (3); through `test_verify`, `test_step_execution`. **Departs from the plan's table.** `facts` is not run core: `verify` imports `collect_facts`, `append_facts` and `red_facts_refusal`, it writes `.dabbler/runs/deterministic-facts.jsonl`, and it is the declared-controls machinery (`compile`/`typecheck`/`lint`/`analyzer`) that the parity control itself runs under. Session 31 takes it, which brings that session to 2,973 lines. |
+| 32 | `verify` | 2,537 | `test_verify` (57), `test_critique_contracts` (5), `test_step_execution` (16). Ported as five files on its existing seams. |
+| 33 | `bootstrap` | 1,146 | `test_bootstrap` (34) |
+| 33 | `packaging` | 743 | `test_packaging` (21) |
+| 34 | `workflow` | 1,363 | `test_workflow` (55) |
+| 34 | `solution` | 351 | `test_solution` (16) |
+| 34 | `contractdoc` | 196 | `test_contractdoc` (13) |
+| 34 | `stepreview` | 284 | `test_stepreview` (15) |
+| 34 | `fixloop` | 563 | `test_fixloop` (18). **Departs from the plan's table.** `workflow` imports it (lines 1070 and 1138): it is the six-step workflow's remediation loop, so it goes where the six-step goes. |
+| 34 | `testphase` | 345 | `test_testphase` (10). **Departs, same reason** — `workflow` imports it at lines 971 and 1022. Session 34 becomes 3,102 lines and 127 tests. |
+
+**Merge — part of the module is kept, inside another file.**
+
+| Session | Module | Lines | Disposition |
+| --- | --- | ---: | --- |
+| 25 | `__init__` | 22 | The package index; becomes the router package's `index.ts` export list. Driven through `test_route`. |
+| 28 | `transports/__init__` | 3 | Same, for the transports directory. |
+| 26 | `journal` | 846 | **Kept (~150 lines):** the git seam session 21 built — `run_git` (bytes as a mode of it, not a second function), `repo_root_for`, `snapshot_worktree_tree`, `changed_paths_between` — plus `is_machine_state_path`, `atomic_write_json`/`atomic_write_text`, and the `.dabbler` path constants. These move into the evidence/git file the record modules sit on. **Retired (~700 lines):** the run journal — `journal.jsonl` events, sequences and the v1 upgrade, `journal.lock`, `heartbeat.json`, `run-projection.json`, `control_root`/`repository_id`. `test_journal` (21) tests only the run journal, so it is deleted with it; the seam is proven by the loop tests that already drive it (`test_evidence_protocol`, `test_verify`, `test_gates`). |
+| 32 | `verifyjob` | 782 | **Kept (~100 lines):** `build_verification_prompt`, `build_prompt` and `auto_verify` — what `verify` and `route` import. They move into the verification loop's files in session 32. **Retired (~680 lines):** `cmd_verify`, `build_request`, `build_evidence`, `dispatch`, `interrupted_result`, `_run_targeted`, `_pause_if_exhausted`, `_terminate_at_cap` — the run core's verified-policy job, which imports `runcli` and `runcore`. Its tests live inside the `test_runcore_*` files and go with them. |
+
+**Retire — deleted in session 34, with tests, verbs and docs (D88).**
+
+| Module | Lines | Tests deleted |
+| --- | ---: | --- |
+| `runcli` | 1,497 | `test_runcore_contracts` (18), `test_runcore_fast` (19), `test_runcore_verified` (19), `test_runcore_recovery` (22), `test_runcore_independence` (10) |
+| `runcore` | 811 | (in the files above) |
+| `runproject` | 530 | (in the files above) |
+
+Retired in total: 2,838 lines of run core, ~700 of run journal, ~680 of run job — about 4,200 lines and 109 tests (88 run-core files plus `test_journal`'s 21). Ported: about 25,400 lines and 832 tests. Nothing kept imports `runcli`, `runcore` or `runproject` once `verifyjob` is split; `bootstrap`'s `detect_copilot_seat` and `persist_transport_preference`, which `runcli` imported, stay because `bootstrap` owns them.
+
+**Extension-side drift noted for session 24, not fixed here:** `troubleshoot.ts` tells the user to run `python -m ai_router.report`, and `routerCli.ts` comments on `ai_router.session_lifecycle`; neither module exists. Session 24 removes both when it rewires the spawn sites to the `Router` interface.
+
+### D130 · 2026-08-28 · Orchestrator (claude-fable-5/anthropic) · D88 resolved by the plan's default: the run core is retired and deleted in session 34; the operator can override until session 34 starts
+
+D88 asked the operator one question: does the run core's projection replace the lifecycle's records, or is the run core retired? **The run core is retired.** "Retired" means deleted in session 34 — `runcli`, `runcore`, `runproject`, the run-journal half of `journal`, the run-job half of `verifyjob`, their tests, their `dabbler` verbs (`status`, `run`, `report`), the records only they write (`journal.jsonl`, `heartbeat.json`, `run-projection.json`, `.dabbler/run-projection.json`), the schemas only they validate against (`run-event`, `run-projection`), and every reference in docs. `dabbler status` then reads the lifecycle's record, which closes the other half of D88.
+
+**The evidence, from the record rather than from preference.** No run has ever been registered in this repository; `.dabbler/run-projection.json` lists every session as `not-started` with no run ids, and D88 itself reports that `dabbler status` sees no sets here. The extension never spawns it: its spawn sites name `session`, `progress`, `modules`, `verify`, `workflow`, `bootstrap`, `test_evidence` and `affected`, and not `runcli`. It is a second writer of the same filenames — `runproject` regenerates `session-state.json`, `activity-log.json` and `change-log.md` from its own projection while the lifecycle writers own those names as tracked records — which is the design fault D88 named and which porting would carry across at 4,200 lines and 109 tests. Sessions 1–22 of this repository were registered, verified, tested and closed by the lifecycle alone (D127), so the lifecycle's record is already the one this framework runs on; the projection would be replacing something that is proven by something that has never run.
+
+**Authority.** The plan the operator commissioned names "run core retired" as the default this session records unless overridden, and that default is what this entry records. It is an orchestrator's application of an operator-set default, not an operator ruling in its own right. **The operator can override it up to the start of session 34**, which is when the deletion happens and the first moment anything is lost; sessions 23–33 port nothing the run core owns and delete nothing, so an override before then costs no rework. An override is recorded as a decision with `--decider operator`, and session 34 then does what it says.
+
+**What stays.** `checks` (the process runner the run core used, also used by `affected`, `agency`, `packaging`, `test_evidence`, `fixloop` and `testphase`), `facts` (deterministic controls, used by `verify`), `fixloop` and `testphase` (the six-step workflow's) — each has a live caller outside the run core, and each is in the inventory as a port.
+
+### D131 · 2026-08-28 · Orchestrator (claude-fable-5/anthropic) · Package layout packages/router (npm dabbler-ai-router, bin dabbler) under a root workspace; runtime floor measured on VS Code 1.135: Electron 42.8.1, Node 24.18.1, node:sqlite present
+
+**Package layout.** The router lives at `packages/router`, published to npm as `dabbler-ai-router` with `bin: dabbler`. A root `package.json` declares npm workspaces over `packages/router` and `tools/dabbler-ai-orchestration`; the extension depends on the router package through the workspace, and its existing `esbuild.js` bundles both into the one `dist/extension.js` inside the VSIX. The CLI is bundled separately to `packages/router/dist/dabbler.js` (CommonJS, as the extension host requires; source is ES module syntax under `tsc --strict`). `vitest` runs the router's tests, in the path-list form the targeted-command audit already accepts. Schema-generated types (session 23) live under `packages/router/src/generated/` and are checked in, with a control that fails when they are stale. Versions: router 1.1.0 and extension 1.0.4 today; both become 2.0.0 at cutover, published from session 35 through `dabbler packaging`.
+
+**The runtime floor, measured rather than remembered.** Step 4 of this session ran the installed VS Code's own binary as Node (`ELECTRON_RUN_AS_NODE=1 Code.exe -e …`) and read `process.versions`:
+
+- VS Code **1.135.0** (commit `08d4889f`), Electron **42.8.1**, Node **24.18.1**, V8 14.8.
+- `require('node:sqlite')` **loads without a flag** in that extension host.
+- The system Node on this machine is **25.8.1**; `node:sqlite` loads there too.
+
+So the `seat_cost` port (session 29) uses `node:sqlite` as planned; the `sql.js` fallback and its ~7 % WAL undercount are not needed and are not built. The extension's `engines.vscode` is `^1.85.0` today; it is raised at cutover (session 35) to the lowest VS Code whose extension host carries an unflagged `node:sqlite`, and that floor is **found by running the check on that release, not taken from a changelog** — 1.135 is the one measured here and is the floor until a lower one is measured. Outside VS Code, the CLI's `engines.node` is pinned the same way in session 29, with Node 24 LTS as the tested target.
+
+**One consequence for the extension.** The CLI shim the extension prepends to the integrated terminal's `PATH` (session 33) runs on the extension host's own Node through `ELECTRON_RUN_AS_NODE`, which is exactly the invocation used to measure the floor above — so the measurement is of the runtime the shim will actually use.
+
+### D132 · 2026-08-28 · Orchestrator (claude-fable-5/anthropic) · Dependency ceiling: yaml, ajv, smol-toml at runtime, nothing native; a fourth is a decision in the log
+
+The router package carries **three runtime dependencies and no more**: `yaml`, `ajv`, `smol-toml`. Each replaces one thing the Python router gets from its own dependencies or standard library, and nothing else is needed because the rest of the runtime is a Node built-in.
+
+| Dependency | Replaces | Used for |
+| --- | --- | --- |
+| `yaml` | `pyyaml` | `router-config.yaml`, `dabbler.yaml`, `local-overrides.yaml`, the seat catalog lockfile. Already the extension's only runtime dependency, so the artifact gains nothing new here. |
+| `ajv` | `jsonschema` | Validation against the twenty schemas under `ai_router/schemas/` on every record write and every config load. None of the twenty uses the `format` keyword, so `ajv-formats` is not needed and is not added; a schema that later wants `format` has to justify a fourth dependency here first. |
+| `smol-toml` | stdlib `tomllib` | The one TOML read in the router: `discovery.load_record`, which parses the API-enumeration record. The record's format is kept, because changing a record format is a redesign and this set makes exactly one record change (the `frameworkVersion` stamp, session 35). |
+
+Everything else is built in: `fetch` for the direct API transport (streaming included), `node:child_process` for `checks` and the Copilot CLI, `node:crypto` for every digest, `node:fs`/`node:path` for the record, `node:readline` over the CLI child's streams, `node:sqlite` for `seat_cost` (present in the measured extension host — see the layout decision). **Nothing native, nothing that compiles at install, nothing that downloads at install.** A native binding would put the failure class the port exists to remove — an install that depends on the machine — back into the artifact.
+
+**Adding a fourth runtime dependency is a decision in the log**, naming the module it serves and why a built-in cannot serve it. Development dependencies are outside the ceiling and are the ones the extension already carries — `typescript`, `esbuild`, `eslint` with `@typescript-eslint/*`, `@types/node` — plus `vitest` as the router's test runner. The extension keeps its own (`mocha`, `@playwright/test`, `@vscode/test-electron`, `vsce`).
+
+### D133 · 2026-08-28 · Orchestrator (claude-fable-5/anthropic) · Parity control designed: five corpus shapes, verbs entering by port order, the record files compared byte-for-byte after two normalizations; spec in docs/ts-port-parity-control.md
+
+The parity control is designed; the specification is `docs/ts-port-parity-control.md`, built in session 23 and run before every verification round through session 35. This entry records what it fixes.
+
+**What it is.** A declared deterministic control (`testing.controls`, kind `analyzer`, `required: true`) that runs every verb through both routers against two copies of the same fixture repository and compares every file the router is allowed to write, byte for byte. `facts` records its exit code before a verifier is bought. It is not a test and keeps no golden files: both sides are computed at run time.
+
+**The corpus.** Five real repositories with real bare remotes, built fresh at every run by a builder script that drives the Python router from the seed `tests/conftest.py` already uses — **fresh**, **in-flight**, **disputed**, **at-cap**, **moved-machine** — one per lifecycle shape the record can be in. Git identity and dates are pinned; the verifier is the offline transport fed canned text, so both routers see the same verifier output.
+
+**The verbs.** The union of what the extension spawns and what an engine runs by hand, each entering the control in the session that ports its module and never leaving: the record verbs in 26, `affected` and `test_evidence` in 27, `discovery` in 28, `seat_cost` in 29, the lifecycle and `progress` and `modules` in 30, the plan verbs in 31, `verify` with dispute, adjudicate and reanchor in 32, `bootstrap` and `packaging --dry-run` in 33, `workflow` in 34. `discovery enumerate` is excluded: it needs the network.
+
+**The files.** Everything under `docs/sessions/` and `.dabbler/runs/` the router writes, `copilot-catalog.lock`, what `bootstrap` writes, the six-step's event log and projection, and — for every `refs/dabbler/rounds/s<N>/r<R>` — the anchored commit's **tree**, required to equal the row's `completion_tree` on both sides. Excluded: `router-metrics.jsonl` (gitignored telemetry with elapsed seconds), the two lock files (transient), and the run core's records (retired, never ported).
+
+**The two normalizations, and no third.** (1) Any ISO-8601 date or date-time value becomes `<ts>`; (2) each copy's absolute root becomes `<root>`. Both are defined by the shape of the value, not by field name, so a new field cannot escape them. Anchor commits are compared by tree rather than by id because a commit id differs only through its dates — that is normalization 1 applied to git, not a third rule. Key order, whitespace, float formatting, list order and decision ordinals are all compared exactly.
+
+**Exit codes.** `0` identical; `1` drift, with a unified diff of every differing path; `2` could not run, recorded as `unknown` and never `pass`.
+
+**Two rules that bind later sessions.** When the control fails, the TypeScript side moves — changing Python to match is a redesign, forbidden by the plan; the one exception is a Python defect the port exposes, fixed on the Python side first in its own recorded commit. And the control is run and recorded once more in session 35 *before* the `frameworkVersion` stamp and the Python deletion, then retired in the same step; it is never made to pass across the stamp.
+
+### D134 · 2026-08-28 · Orchestrator (claude-fable-5/anthropic) · Selector defect, owed: round-1 change sets in a repository that tracks its ledger report every .dabbler/runs file as deleted (HEAD's raw tree vs a snapshot that drops .dabbler/), selecting the smoke test on 208 false unknowns
+
+Running `python -m ai_router.affected` in this session — whose only changes are under `docs/` — reported 208 `selection_unknown` risks, one for every tracked file under `.dabbler/runs/`, and selected the smoke test on their account. `git status` showed four changed paths. The record shows the same rows in sessions 19, 20 and 21: each of their round-1 `preverify-targeted` records carries `selection-unknown-smoke`, so this session met a standing condition rather than a new one, and it handled it the way they did — the smoke test was run and recorded. This entry records the cause, so the next session does not rediscover it.
+
+**Cause.** `affected.working_tree_changes` measures a session's first change set as HEAD's raw tree against `snapshot_worktree_tree`, and the snapshot drops `.dabbler/` unconditionally (a throwaway index, `git rm --cached -r .dabbler`, so a round's own ledger writes never move the tree it measures). Since commit `913eb65f` the run ledger under `.dabbler/runs/` is tracked, so HEAD's tree carries it and the snapshot does not: the diff reports every ledger file as deleted. The paths match no `testing.selection.rules` entry, so each one is `selection_unknown` and the smoke fallback is selected. Rounds two and later are unaffected — both sides of a fix delta are snapshots. The verifier is unaffected too: round one's bundle (`facts.assemble_evidence`) is `git diff HEAD` against the working tree with exclusion pathspecs, not a snapshot diff, which is why no verifier output from sessions 19–21 mentions the ledger.
+
+**What it costs.** One 44-test smoke run per session (seconds), and 208 lines of `RISK selection_unknown` noise on every first selection in this repository — which is the real cost, because the loud state exists to flag a missing mapping and it now fires on nothing every time. A genuinely unmapped path would be one row among 209.
+
+**Remedies, in order of correctness.** (1) Apply the snapshot's own rule to the baseline side: derive the HEAD baseline through the same throwaway index with `.dabbler/` removed, or exclude `MACHINE_DIRNAME` in `changed_paths_between` — one place, the git seam — so a change set never names a path the snapshot can never contain. This changes what `affected` proves and needs its one test. (2) Independently, declare `- when: .dabbler/` with `select: []` in `dabbler.yaml`: machine-written records affect no test, which is a mapping and not an unknown. (2) alone silences the noise without correcting the measurement; (1) alone leaves the loud state correct. Both are small.
+
+**Not fixed here.** This session declared itself prose: no code and no test, and a selector change is a behaviour change with a test. It is **owed**, to be scheduled by the operator, and it sits on the port's path: session 27 ports `affected` and the seam and must port this behaviour faithfully for parity, so the fix is either landed before session 27 on the Python side — its own recorded commit, so the parity run that follows compares two routers with the same intended behaviour — or carried across and fixed on both sides afterwards. The plan's session 22 step 8, which said the selector would report nothing, was corrected in this session to say what the selector actually reports here.
+
+### D135 · 2026-08-28 · Operator · The run ledger under .dabbler/runs is no longer tracked: .gitignore takes the framework's own .dabbler/ rule; rounds no longer travel between machines, and D134's symptom disappears here
+
+The run ledger under `.dabbler/runs/` is no longer tracked in this repository. `.gitignore` drops the `.dabbler/*` + `!.dabbler/runs/` pair that re-included it and ignores `.dabbler/` outright — which is the rule `bootstrap.ensure_gitignore` writes for every consumer project (`_IGNORE_RULE = ".dabbler/"`), so this repository stops being the one exception to the framework's own default. The files stay on disk and in git history; `git rm -r --cached .dabbler/runs` removes them from the index in this session's commit.
+
+**The operator's instruction, 2026-08-28, mid-session:** "If `.dabbler/runs` is going to be a recurring issue, just add it to `.gitignore`. I don't think that we need it anymore." It is recurring — every session's first selection reported the tracked ledger as 208 false unknowns (D134), and sessions 19–22 each ran a smoke test on its account.
+
+**What tracking was for, and what is given up.** The ledger was made tracked in session 20's window (`de583d11`, then `913eb65f`, which taught the last gate that ledger rows are not work) so that a session's round rows travel with a push and a session can be picked up on another machine mid-flight. Session 20 then anchored round baselines under `refs/dabbler/rounds/`, which travel with push and fetch independently of tracking — but the rows themselves (`rounds.jsonl`, `test-runs.jsonl`, `state-writes.jsonl`) do not. From this decision on: **a session cannot be moved between machines mid-flight**, and the record of each session's rounds lives on the machine that ran it, not in version control. The orchestrator raised this before acting; the operator's instruction stands as given, and the work computer's migration (still owed) is now a clone plus `bootstrap`, with no ledger to carry.
+
+**What it fixes as a side effect.** D134's symptom disappears in this repository: HEAD no longer carries `.dabbler/runs/`, so the round-1 change set no longer reports it as deleted and a prose session gets the "no test affected, nothing recorded" shape the plan describes. D134's cause — a raw-HEAD baseline against a snapshot that drops `.dabbler/` — remains latent for any repository that tracks its ledger, and stays owed at its lower priority. The close's own residue (a `state-writes.jsonl` row left uncommitted after every close) also disappears, since the file is no longer tracked.
+
+**Session accounting.** This session declared itself prose; this change is configuration, not code, and no test moves. It is reviewed in round 2 as the fix delta over round 1's verified tree. STATUS.md's line saying the ledger is tracked is corrected at close-out; the `.gitignore` comment that cited `de583d11` is replaced.
+
+### D136 · 2026-08-28 · Orchestrator (claude-fable-5/anthropic) · Session 22 seat cost: verifier 26,019 in / 10,144 out tokens over three API rounds (gpt-5-6-sol); orchestrator 312,457 Claude Code context tokens; no dollar figure, the router prices nothing
+
+Session 22's seat cost, measured in the two currencies the session actually ran on. No dollar figure is stated: set 109 removed the router's rate table, the metrics ledger carries tokens and elapsed time only, and a list price recalled from memory would be a guess dressed as a measurement.
+
+**Verification — OpenAI API, gpt-5-6-sol, 3 calls (3 rounds: VERIFIED, VERIFIED, VERIFIED).** From `router-metrics.jsonl` rows with `session_number: 22`:
+
+| Call | Model | Input tokens | Output tokens | Elapsed |
+| --- | --- | ---: | ---: | ---: |
+| 1 | gpt-5-6-sol (openai, api) | 6,711 | 5,973 | 81 s |
+| 2 | gpt-5-6-sol (openai, api) | 9,423 | 2,874 | 38 s |
+| 3 | gpt-5-6-sol (openai, api) | 9,885 | 1,297 | 19 s |
+| **Total** | | **26,019** | **10,144** | **138 s** |
+
+36,163 tokens in all. For scale, session 21 (three rounds, code) used 33,375; the set-148 sessions 15–20 used 20,000–100,000 each. A prose session's rounds are cheap because the bundle is small.
+
+**Orchestrator — Claude Code subscription, claude-fable-5.** The harness's session token counter stood at 15,000,000 at the first prompt and at 14,687,543 when this figure was taken: **312,457 tokens** consumed across the session to this point, covering the plan landing, the seven decisions before this one, the parity design, the selector investigation, the `.gitignore` change and three verification rounds. The suite run and the close come after and are not in the figure. This is the subscription window's currency; it has no exchange rate to the API tokens above or to the Copilot seat's premium requests (D37's $8–$12 band was measured on the seat and is not comparable).
+
+**Method, so the next session repeats it rather than reinvents it:** filter `ai_router/router-metrics.jsonl` on `session_number`, sum `input_tokens` and `output_tokens`; for a Claude Code session read the harness counter at the start and at the point of recording; for a Copilot-seat session run `python -m ai_router.seat_cost <conversation ids>`. Record before the run of record, as step 7 of every session 22–35 says.
+
+### D137 · 2026-08-28 · Verifier (gpt-5-6-sol/openai) · Verifier nits carried to session 23: the parity control should compare stdout and stderr of every invocation, not only read-only verbs and selected refusals
+
+Across three VERIFIED rounds the verifier raised only Minor findings. Two were fixed in round 3's delta (read-only verbs' stdout and every exit code entered the comparison set; the moved-machine fixture was rebuilt as an unmigrated clone plus a fetched copy, since a fetched anchor commit brings its tree). Two are carried, not fixed, under the Minor-only stop: (1) the control still limits stdout comparison to read-only verbs and stderr to selected refusals rather than requiring all observable output of every invocation -- session 23 should take the broader rule when it builds the control, since 'compare everything a verb emits' is both simpler and stricter than a list; (2) the plan's remark that the selector's selection_unknown rows 'do not recur' is premature until the commit that removes .dabbler/runs from HEAD lands, which is this session's commit -- true at close, not at the moment of the round.

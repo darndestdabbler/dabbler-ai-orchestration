@@ -1,3 +1,0 @@
-VERIFIED — I checked the prior failure modes against `ai_router/router-config.yaml`, `ai_router/facts.py`, `ai_router/affected.py`, `.gitignore`, and `pyproject.toml`.
-
-The documented targeted command now produces `.dabbler/coverage.json`, facts collection reads that report, successful preverify gates preserve the accepted command into the deterministic facts record, and coverage data is redirected to ignored `.dabbler/.coverage` with no root `.coverage` present. No blocking defects found.

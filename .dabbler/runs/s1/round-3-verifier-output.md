@@ -1,1 +1,0 @@
-VERIFIED — I checked the fix delta against the prior findings, the close-gate bookkeeping rules, the verification writer behavior, and the Windows path test change. The D3 close-strategy defect is resolved, the OpenAI auth finding remains settled by the recorded dispute, and the test fix is platform-correct without changing product behavior.

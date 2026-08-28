@@ -1,1 +1,0 @@
-VERIFIED — I checked the prior transition defect and the new metadata delta. The first-entry skip is fixed in `workflow.validate_transition()` and used by both `append()`/`fold()`, simulated reviews no longer set `reviewed`, the doc-only self-exemption is removed, and the session metadata matches the recorded two-round s4 ledger.

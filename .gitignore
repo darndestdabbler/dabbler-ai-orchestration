@@ -5,20 +5,11 @@ __pycache__/
 dist/
 build/
 .pytest_cache/
-# The run ledger travels with the session (de583d11): the gates read
-# .dabbler/runs -- rounds, test-run records, state-writes.jsonl -- so a
-# machine picking up a session mid-flight needs them. Ignoring the
-# directory outright would have made that commit a one-time snapshot,
-# because a tracked file overrides .gitignore but a NEW one under an
-# ignored directory is still skipped by 'git add -A'. Round 2's output
-# would have gone missing exactly the way round 1's did.
-.dabbler/*
-!.dabbler/runs/
-# Derived or machine-specific, and never shared: the projection rebuilds
-# from the journal, and the API model record belongs to whichever key set
-# is present on this machine.
-.dabbler/run-projection.json
-.dabbler/api-models.lock
+# Dabbler router machine-side state: the run ledger records each
+# verification round after the tree it describes, so committing it
+# makes verified work look like it changed post-verification. Ignored
+# whole, as bootstrap writes it for every project (D135, 2026-08-28).
+.dabbler/
 router-metrics.jsonl
 local-overrides.yaml
 node_modules/

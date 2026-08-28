@@ -1,9 +1,0 @@
-**ISSUES FOUND**
-
-**Issue 1:** The session continued with schema/config production changes after the reclamation gate failed.
-- **Category:** Completeness
-- **Severity:** Major
-- **Evidence paths:** `docs/session-sets/141-critique-contracts-and-shadow-records/spec.md:84-97`, `docs/session-sets/141-critique-contracts-and-shadow-records/reclamation-ledger.md:7-38`, `docs/session-sets/141-critique-contracts-and-shadow-records/activity-log.json:127-149`, `ai_router/config.py:46-51`, `ai_router/schemas/check-ir.schema.json:1-20`
-- **Failure scenario:** A reviewer accepts session 1 with only 31 reclaimed slots, so the experiment proceeds with production schema/config work despite the entry gate explicitly requiring either 43 reclaimed slots or stopping for a smaller-allocation/kill decision. This is probable because the ledger and activity log state 31 reclaimed and explicitly continue; the config/schema changes are already present.
-- **Acceptance criterion:** `JUDGMENT - The session either shows at least 43 defensible reclaimed tests and a green reduced suite before continuing, or stops at the shortfall with schema/config/test additions removed or deferred and an operator-recorded smaller-allocation or kill decision made before further production work.`
-- **Details:** **Violation:** the spec says “at least 43 must be reclaimed before production code is written” and “If 43 defensible slots cannot be found, stop… Do not proceed on a promise to find them later.” **Impact:** this defeats the entry gate that protects the 480-test ceiling and leaves sets 142–145 12 slots short while still merging set 141’s production work, which changes the merge decision. **Evidence:** the ledger records only `475 → 444` / 31 reclaimed slots and says the remaining decision is deferred, while `config.py` and the new schemas show the session continued anyway. The correct outcome was to stop or reclaim ≥43 first.

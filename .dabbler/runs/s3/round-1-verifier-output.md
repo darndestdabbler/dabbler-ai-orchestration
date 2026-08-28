@@ -1,9 +1,0 @@
-**ISSUES FOUND**
-
-- **Issue 1:** `REMEDIATED_AT_CAP` is granted for any changed tree, not for a proven fix of every blocking finding.
-  - **Category:** Correctness
-  - **Severity:** Major
-  - **Evidence paths:** `docs/session-sets/148-the-session-framework/spec.md:172`, `ai_router/verify.py:361`, `ai_router/verify.py:370`, `ai_router/verify.py:409`, `ai_router/runcli.py:724`, `ai_router/gates.py:168`
-  - **Failure scenario:** A capped session has a real blocking finding, the author changes unrelated code or makes an incomplete fix, and the targeted/final checks still pass. This is probable because incomplete remediations are normal at a round cap, and no verifier sees the repair. The code then records/persists `REMEDIATED_AT_CAP` and the close gate passes it, landing work over a still-standing finding.
-  - **Acceptance criterion:** `JUDGMENT - A reviewer can see that REMEDIATED_AT_CAP is not emitted or passed merely because the tree digest changed; the implementation must require machine-checkable evidence that each last-round blocking finding was remediated, or leave the session unresolved.`
-  - **Details:** **Violation:** the spec requires “every blocking finding from the last round fixed” and says this is “Not a waiver — nothing is accepted over.” **Impact:** the merge would reintroduce a waiver-equivalent path: a person cannot type a verdict, but any changed tree can be treated as if all blocking findings were fixed. **Evidence:** `ai_router/verify.py` only checks `completion_tree == latest["completion_tree"]`; if different, it writes a non-blocking `remediated_at_cap` row. `ai_router/runcli.py` uses the same digest-moved test for `finish`, and `ai_router/gates.py` passes that row as clean.

@@ -1,1 +1,0 @@
-**VERIFIED** — I checked the round-2 delta against the prior findings: D3 now commits all four non-bookkeeping documents before close, matching the clean-tree gate’s bookkeeping exception list, and the disputed OpenAI auth finding should be withdrawn because the displayed `Authorization` text is redacted. No blocking defects found.

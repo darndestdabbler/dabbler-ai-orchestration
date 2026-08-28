@@ -1,9 +1,0 @@
-ISSUES FOUND
-
-- **Issue 1:** `REMEDIATED_AT_CAP` is still granted on “same cited path changed,” not on a proven fix of each blocking finding.
-  - **Category:** Correctness
-  - **Severity:** Major
-  - **Evidence paths:** `ai_router/verdict.py:344`, `ai_router/runcli.py:724`, `ai_router/verify.py:376`, `ai_router/verifyjob.py:680`, `docs/session-sets/148-the-session-framework/spec.md:172`
-  - **Failure scenario:** A capped run has a real blocking finding citing `widget.py`; the author edits `widget.py` with an incomplete fix or unrelated same-file change, targeted/final checks still pass, and `ai_router.verify`, `verifyjob`, or `finish` records/returns `REMEDIATED_AT_CAP`. This is probable because incomplete same-site remediations are normal at a round cap, and the current predicate treats any diff entry on the cited path as enough.
-  - **Acceptance criterion:** `JUDGMENT - REMEDIATED_AT_CAP is granted only when every blocking finding has objective remediation evidence stronger than "a cited path appears in git diff --name-only"; same-file unrelated or incomplete edits must remain unresolved in ai_router.verify, verifyjob, and finish.`
-  - **Details:** **Violation:** the spec requires “every blocking finding from the last round fixed,” and the prior finding rejected granting the state for an unproven fix. **Impact:** the merge decision still changes from blocked/unresolved to completed-unreviewed even when a standing finding was not actually remediated. **Evidence:** `unremediated_findings` only checks whether the fix delta touches an `evidencePaths` entry, and all cap paths accept `not unshown` as `REMEDIATED_AT_CAP`; no semantic or executable per-finding proof is required.

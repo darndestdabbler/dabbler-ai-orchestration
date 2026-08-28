@@ -1,1 +1,0 @@
-VERIFIED — The fix resolves both prior-round defects: npm’s default failing placeholder is excluded, and non-mapping `scripts` values safely yield no Node suite. The added tests cover both regressions while confirming legitimate test scripts remain detectable.

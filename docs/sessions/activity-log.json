@@ -4242,6 +4242,78 @@
       "dateTime": "2026-08-28T10:05:39.569659-04:00",
       "description": "Committed and pushed as 936c5685; closed VERIFIED; the close pushed refs/dabbler/rounds/s20/r1",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 21,
+      "stepNumber": 1,
+      "stepKey": "register-then-declare-not-releasable",
+      "dateTime": "2026-08-28T11:17:34.691690-04:00",
+      "description": "Register, then declare `--not-releasable`. The declaration names the three deliverables below and nothing else.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 21,
+      "stepNumber": 2,
+      "stepKey": "record-the-acceptance-evaluation-as-a",
+      "dateTime": "2026-08-28T11:17:34.691690-04:00",
+      "description": "**Record the acceptance evaluation as a decision, before any code moves.** `session decision --decider orchestrator` with the three checks from `STATUS.md` in substance: criterion met (session 20 ran end to end on the framework this set built); check 1 met with the noted splits and session 20 outside the plan; check 2 met, with session 2's absent pre-verify row and the two framework-written cap-landing rows named as such; **check 3 not met**, with the four measured sessions listed and the operator's 2026-08-28 decision that it is **not back-filled** \u2014 the sessions are closed and the number would change nothing forward. What carries forward is the step, not the figure: every future session plan carries \"measure this session's seat cost\" as a numbered step, the way session 3's did and sessions 4\u201320's did not. A decision appended after the run of record moves the tree and fails the freshness gate, so this is step 2 and not step 8.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 21,
+      "stepNumber": 3,
+      "stepKey": "one-git-seam",
+      "dateTime": "2026-08-28T11:17:34.691690-04:00",
+      "description": "**One git seam.** Delete the `checks.py` copies of `snapshot_worktree_tree` and `changed_paths_between`; `runcli.py`, `verifyjob.py` and `workflow.py` import them from `evidence` as `affected.py`, `packaging.py` and `verify.py` already do. Route the remaining direct `[\"git\", \"-C\", \u2026]` calls in `journal.py` and `ledger.py` through `evidence.run_git` so one function is the only place the router spawns git. Net negative lines; no behaviour changes; no new test \u2014 the existing loop tests are the proof, and a source-text assertion that the duplicate is gone is a banned kind.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 21,
+      "stepNumber": 4,
+      "stepKey": "make-the-loop-tests-cheap-without",
+      "dateTime": "2026-08-28T11:17:34.691690-04:00",
+      "description": "**Make the loop tests cheap without faking git.** Measure first: `pytest --durations=30` with the `sandbox_repo` setup timed separately from the loop, so the seconds are attributed before they are attacked. Then, in order of expected yield: build the seeded repo and its bare remote **once per session** and give each test a `shutil.copytree` copy (a git repository is a directory; the remote path is written relative so the pair stays valid after the copy); pin the git environment for the suite (`GIT_CONFIG_GLOBAL` to an empty file, `gc.auto=0`, `core.fsmonitor=false`, `commit.gpgsign=false`, `core.autocrlf=false`) so no test pays for the host's configuration; and drop any fixture git call whose result no test reads. A fake git is **not** in scope: the loop is trust machinery, and a fake that diverges from git's tree hashing is the failure mode that would matter most and show least. **Target:** no test above 1.5 s, and the `final-full` run of record under 3:00 at `-n 2`, read from `durationSeconds` in `test-runs.jsonl` against session 20's 379 s. `-n 2` stays pinned; this session does not promise `-n auto`.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 21,
+      "stepNumber": 5,
+      "stepKey": "affected-tests-as-preverify",
+      "dateTime": "2026-08-28T11:17:34.691690-04:00",
+      "description": "Affected tests as preverify.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 21,
+      "stepNumber": 6,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-28T11:17:34.691690-04:00",
+      "description": "Cross-provider verification.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 21,
+      "stepNumber": 7,
+      "stepKey": "full-test-suite-recorded-as-the",
+      "dateTime": "2026-08-28T11:17:34.691690-04:00",
+      "description": "Full test suite, recorded as the `final-full` run of record \u2014 which is also the measurement of step 4.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 21,
+      "stepNumber": 8,
+      "stepKey": "close-out",
+      "dateTime": "2026-08-28T11:17:34.691690-04:00",
+      "description": "Close-out. Update `STATUS.md`: the evaluation now points at its decision number and the suite time is the new one.",
+      "status": "pending",
+      "kind": "plan-step"
     }
   ]
 }

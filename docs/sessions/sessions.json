@@ -405,6 +405,19 @@
         "verifierProvider": "openai",
         "transport": "api"
       }
+    },
+    {
+      "number": 21,
+      "title": "Close out set 148 on the record, and make the loop tests cheap",
+      "status": "in-progress",
+      "startedAt": "2026-08-28T11:17:34.629607-04:00",
+      "completedAt": null,
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": null
     }
   ]
 }

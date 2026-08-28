@@ -4039,6 +4039,104 @@
       "dateTime": "2026-08-28T09:29:35.671538-04:00",
       "description": "Committed and pushed as efb42f4f",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 20,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-28T09:43:08.227405-04:00",
+      "description": "Register.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 20,
+      "stepNumber": 2,
+      "stepKey": "anchor-each-snapshot-as-it-is",
+      "dateTime": "2026-08-28T09:43:08.227405-04:00",
+      "description": "**Anchor each snapshot as it is recorded.** Wrap the snapshot tree in a commit and point `refs/dabbler/rounds/s<N>/r<R>` at it, in the same call that appends the round. A ref cannot usefully point at a bare tree \u2014 most servers reject that on push \u2014 so the wrapping commit is the object the ref names. The tree it carries must hash **identically** to the recorded `completion_tree`, and the test asserts that equality rather than asserting a ref exists.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 20,
+      "stepNumber": 3,
+      "stepKey": "push-those-refs-because-git-push",
+      "dateTime": "2026-08-28T09:43:08.227405-04:00",
+      "description": "**Push those refs, because `git push` will not.** This repository configures no push refspec, so custom refs are simply left behind. The close is the one place a session pushes, and it has to carry the round refs with the branch. A push that silently drops them is the same defect in a new place.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 20,
+      "stepNumber": 4,
+      "stepKey": "fetch-them-which-is-the-part",
+      "dateTime": "2026-08-28T09:43:08.227405-04:00",
+      "description": "**Fetch them, which is the part that makes this a session.** The receiving machine needs `+refs/dabbler/*:refs/dabbler/*` before the refs mean anything, and this checkout has only `+refs/heads/*:refs/remotes/origin/*`. `bootstrap` must write the refspec, and **an existing clone must be migrated**, or the fix only works on machines cloned after it ships \u2014 which is not much of a fix. The acceptance test is a two-checkout one: record a round in A, push, fetch in B, and resolve the baseline in B **without** `verify reanchor`.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 20,
+      "stepNumber": 5,
+      "stepKey": "decide-the-retention-rule-and-write",
+      "dateTime": "2026-08-28T09:43:08.227405-04:00",
+      "description": "**Decide the retention rule and write it down.** One ref per round per session, forever, is a namespace that only grows. The objects are tiny and history is the point, so \"keep them\" is a legitimate answer \u2014 but it must be a decision in the record, not an omission.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 20,
+      "stepNumber": 6,
+      "stepKey": "verify-reanchor-stays-and-stays-refused",
+      "dateTime": "2026-08-28T09:43:08.227405-04:00",
+      "description": "**`verify reanchor` stays, and stays refused when the tree resolves.** This session removes the *need* for it on well-configured machines; it does not remove the path. Older rounds carry no ref, a clone may predate the refspec, and a history can be rewritten. Its existing refusals are unchanged, and `head_commit` (shipped in session 14) remains the fallback that places a baseline for rounds recorded before any of this.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 20,
+      "stepNumber": 7,
+      "stepKey": "affected-tests-as-preverify",
+      "dateTime": "2026-08-28T09:43:08.227405-04:00",
+      "description": "Affected tests as preverify.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 20,
+      "stepNumber": 8,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-28T09:43:08.227405-04:00",
+      "description": "Cross-provider verification.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 20,
+      "stepNumber": 9,
+      "stepKey": "full-test-suite-recorded-as-the",
+      "dateTime": "2026-08-28T09:43:08.227405-04:00",
+      "description": "Full test suite, recorded as the `final-full` run of record.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 20,
+      "stepNumber": 10,
+      "stepKey": "close-out",
+      "dateTime": "2026-08-28T09:43:08.227405-04:00",
+      "description": "Close-out.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 20,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-28T09:43:08.234480-04:00",
+      "description": "Registered session 20 (claude-code).",
+      "status": "complete"
     }
   ]
 }

@@ -6,6 +6,7 @@
 // the parity control -- sees the same fact at the same moment.
 
 import { metricsVerb } from "./metrics.ts";
+import { sessionVerb } from "./session.ts";
 
 /** argv after the verb; the process's exit code comes back. */
 export type VerbHandler = (argv: string[]) => Promise<number>;
@@ -17,6 +18,7 @@ export type VerbHandler = (argv: string[]) => Promise<number>;
  */
 export const HANDLERS: Readonly<Record<string, VerbHandler>> = {
   metrics: metricsVerb,
+  session: sessionVerb,
 };
 
 export function isImplemented(verb: string): boolean {

@@ -23,6 +23,7 @@ import { createHash } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 
+import { pythonFloatRepr } from "./pythonJson.ts";
 import { VERSION } from "./version.ts";
 
 export const PROVENANCE_MACHINE_WRITTEN = "machine-written";
@@ -134,38 +135,6 @@ export function renderValue(key: string, value: LockValue): string {
       `${String(value)}. Coerce it where it arrived from -- a value the ` +
       "writer cannot render must never reach the writer.",
   );
-}
-
-/**
- * CPython's `repr` of a float: the shortest text that reads back as the same
- * value, with the same exponent threshold and the same two-digit exponent.
- * JavaScript's own is shortest too, and switches to exponent notation at
- * different magnitudes -- which would put a different string in the file for
- * the same measurement.
- */
-export function pythonFloatRepr(value: number): string {
-  const negative = value < 0 || Object.is(value, -0);
-  const sign = negative ? "-" : "";
-  const abs = Math.abs(value);
-  if (abs === 0) return `${sign}0.0`;
-
-  const [mantissa, exponentText] = abs.toExponential().split("e");
-  const exponent = Number(exponentText);
-  const digits = mantissa.replace(".", "");
-  // CPython uses scientific notation when the decimal point would sit at or
-  // before -4, or past 16 significant places.
-  const decimalPoint = exponent + 1;
-  if (decimalPoint <= -4 || decimalPoint > 16) {
-    const expSign = exponent < 0 ? "-" : "+";
-    return `${sign}${mantissa}e${expSign}${String(Math.abs(exponent)).padStart(2, "0")}`;
-  }
-  if (decimalPoint <= 0) {
-    return `${sign}0.${"0".repeat(-decimalPoint)}${digits}`;
-  }
-  if (decimalPoint >= digits.length) {
-    return `${sign}${digits}${"0".repeat(decimalPoint - digits.length)}.0`;
-  }
-  return `${sign}${digits.slice(0, decimalPoint)}.${digits.slice(decimalPoint)}`;
 }
 
 /**

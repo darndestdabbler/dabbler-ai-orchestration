@@ -33,7 +33,13 @@ export const VERBS: readonly VerbSpec[] = [
   {
     verb: "session",
     pythonModule: "ai_router.session",
-    portedInSession: 30,
+    // Session 26 lands the four subcommands that WRITE the record --
+    // `start`, `declare`, `log`, `decision` -- because the sanctioned
+    // writers land there and a writer no verb reaches cannot be compared
+    // (D171). The handler refuses `close`, `cancel`, `restore`, `plan` and
+    // `migrate` by name until session 30 takes the lifecycle's judgment
+    // half: the gates, the boundary reversals and the legacy migration.
+    portedInSession: 26,
     extensionFacing: true,
     summary: "start, declare, log, decision, close, cancel, restore",
   },

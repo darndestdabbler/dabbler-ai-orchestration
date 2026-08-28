@@ -6,13 +6,33 @@
 // second call: a blob's bytes are what a hash is taken over, and the
 // newline framing that is noise in porcelain is content there.
 //
-// Session 26 ports the rest of this module: the append-only run journal,
-// the lock, the worktree snapshots. What is here is the slice `config`
-// needs to find the repository it belongs to, ported at its seam rather
-// than copied into `config` -- a second `git rev-parse` in this package
-// is exactly the drift the port exists to remove.
+// Beside it sit the primitives the record is made of: the worktree
+// snapshot, the tree diff, the atomic replace, the `.dabbler` predicate
+// and the clock. They are here because they are the same slice of the
+// Python `journal` module -- the part that survives (D129). The
+// append-only run journal, its lock, `heartbeat.json` and
+// `run-projection.json` are the run core, which is retired and never
+// ported (D88, D130), so nothing below reads or writes them.
+//
+// Nothing here takes a timestamp or a path from a caller and trusts it:
+// the writer stamps its own clock, and `.dabbler/` is identified by one
+// predicate rather than by each reader's idea of what the record is.
 
 import { spawnSync } from "node:child_process";
+import {
+  closeSync,
+  mkdirSync,
+  openSync,
+  renameSync,
+  rmSync,
+  writeFileSync,
+  writeSync,
+  fsyncSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
+
+import { dumps } from "./pythonJson.ts";
 
 /** git could not be launched at all. Python answers 127 here and so do we. */
 export const EXIT_GIT_MISSING = 127;
@@ -110,4 +130,208 @@ function stripNewlines(text: string): string {
 export function repoRootFor(path: string): string | null {
   const result = runGit(path, ["rev-parse", "--show-toplevel"]);
   return result.code === 0 && result.stdout ? result.stdout : null;
+}
+
+// --- The machine-side directory ---------------------------------------------
+
+/** The router's own directory inside a repository. */
+export const MACHINE_DIRNAME = ".dabbler";
+export const RUNS_DIRNAME = `${MACHINE_DIRNAME}/runs`;
+
+/**
+ * True for anything under the router's own `.dabbler/` directory.
+ *
+ * The one place that decides what is *the record of* a session rather than
+ * *the work of* one. A round is appended after the tree snapshot it
+ * describes, so counting the ledger as session content makes every verified
+ * session look like it drifted the instant it was verified.
+ */
+export function isMachineStatePath(path: string): boolean {
+  let normalized = String(path).replace(/\\/g, "/");
+  if (normalized.startsWith("./")) normalized = normalized.slice(2);
+  return (
+    normalized === MACHINE_DIRNAME ||
+    normalized.startsWith(`${MACHINE_DIRNAME}/`)
+  );
+}
+
+export function machineDir(root: string): string {
+  return join(root, MACHINE_DIRNAME);
+}
+
+export function runDir(root: string, runId: string): string {
+  return join(root, ...RUNS_DIRNAME.split("/"), runId);
+}
+
+// --- Trees ------------------------------------------------------------------
+
+/**
+ * A tree object capturing tracked AND untracked non-ignored files, via a
+ * throwaway index -- the real index and worktree are untouched. Both ends
+ * of a fix-delta diff must be snapshots like this one: a tree-vs-worktree
+ * diff reports an untracked file as deleted.
+ *
+ * The machine-side `.dabbler/` directory is dropped unconditionally, so the
+ * ledger cannot appear in a snapshot even in a repository that never got
+ * the ignore rule (or that committed the ledger before it did).
+ */
+export function snapshotWorktreeTree(repoRoot: string): string | null {
+  const tempIndex = join(tmpdir(), `dabbler-verify-index-${uniqueSuffix()}`);
+  const env = { GIT_INDEX_FILE: tempIndex };
+  try {
+    if (runGit(repoRoot, ["read-tree", "HEAD"], { env }).code !== 0) {
+      if (runGit(repoRoot, ["read-tree", "--empty"], { env }).code !== 0) {
+        return null;
+      }
+    }
+    if (runGit(repoRoot, ["add", "-A"], { env }).code !== 0) return null;
+    // After the add, so it also clears entries inherited from HEAD. The
+    // exit code is ignored: `--ignore-unmatch` makes "nothing to drop"
+    // the normal case.
+    runGit(
+      repoRoot,
+      ["rm", "--cached", "-r", "-f", "--ignore-unmatch", "-q", "--", MACHINE_DIRNAME],
+      { env },
+    );
+    const written = runGit(repoRoot, ["write-tree"], { env });
+    return written.code === 0 && written.stdout ? written.stdout : null;
+  } finally {
+    rmSync(tempIndex, { force: true });
+  }
+}
+
+/**
+ * Repository-relative paths differing between two trees, or null on a git
+ * failure -- callers fail closed.
+ */
+export function changedPathsBetween(
+  repoRoot: string,
+  treeA: string,
+  treeB: string,
+): string[] | null {
+  const result = runGit(repoRoot, [
+    "diff", "--name-only", "-z", "--no-ext-diff", treeA, treeB,
+  ]);
+  if (result.code !== 0) return null;
+  return result.stdout.split("\0").filter((path) => path !== "");
+}
+
+// --- Time -------------------------------------------------------------------
+
+function offsetSuffix(date: Date): string {
+  const minutes = -date.getTimezoneOffset();
+  const sign = minutes < 0 ? "-" : "+";
+  const absolute = Math.abs(minutes);
+  const hh = String(Math.floor(absolute / 60)).padStart(2, "0");
+  const mm = String(absolute % 60).padStart(2, "0");
+  return `${sign}${hh}:${mm}`;
+}
+
+function localParts(date: Date): string {
+  const pad = (value: number, width = 2): string =>
+    String(value).padStart(width, "0");
+  return (
+    `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` +
+    `T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
+  );
+}
+
+/**
+ * `datetime.now().astimezone().isoformat(...)` -- local time with an
+ * explicit offset. Written only here: an event's clock belongs to the
+ * writer, never to its caller.
+ *
+ * `precision` is the `timespec` the Python twin passes. `milliseconds` is
+ * always three digits; `microseconds` is Python's default, which prints six
+ * -- and omits the fraction entirely when it is zero, which is what
+ * `isoformat()` does and what a naive six-zero pad would get wrong.
+ */
+export function nowIso(
+  precision: "milliseconds" | "microseconds" | "seconds" = "milliseconds",
+  date: Date = new Date(),
+): string {
+  const base = localParts(date);
+  const suffix = offsetSuffix(date);
+  if (precision === "seconds") return `${base}${suffix}`;
+  const millis = date.getMilliseconds();
+  if (precision === "milliseconds") {
+    return `${base}.${String(millis).padStart(3, "0")}${suffix}`;
+  }
+  // JavaScript's clock has millisecond resolution, so the microsecond
+  // places Python would print are zeros -- and a whole-millisecond value
+  // whose microseconds are zero prints no fraction at all in Python.
+  if (millis === 0) return `${base}${suffix}`;
+  return `${base}.${String(millis).padStart(3, "0")}000${suffix}`;
+}
+
+// --- Atomic replace ---------------------------------------------------------
+
+let sequence = 0;
+
+/** Unique within this process, and unique between two of them. */
+function uniqueSuffix(): string {
+  sequence += 1;
+  return `${process.pid}-${sequence}`;
+}
+
+/**
+ * Temp file plus rename, so a reader sees the old document or the new one
+ * and never a half-written middle.
+ *
+ * The temp name is the target's plus `.tmp-<pid>`, as the Python twin's is:
+ * it lands in the same directory, so the rename is on one filesystem and is
+ * therefore atomic.
+ */
+export function atomicWriteJson(path: string, data: unknown): void {
+  writeAtomically(path, dumps(data, { indent: 2, ensureAscii: false }) + "\n");
+}
+
+export function atomicWriteText(path: string, text: string): void {
+  writeAtomically(path, text);
+}
+
+/**
+ * The bytes, then fsync, then rename.
+ *
+ * LF endings on every platform: the Python twin opens with `newline="\n"`,
+ * so the file it writes on Windows holds LF and this one must too.
+ */
+function writeAtomically(path: string, body: string): void {
+  mkdirSync(dirname(path), { recursive: true });
+  const temp = `${path}.tmp-${process.pid}`;
+  const handle = openSync(temp, "w");
+  try {
+    writeSync(handle, body, null, "utf8");
+    fsyncSync(handle);
+  } finally {
+    closeSync(handle);
+  }
+  renameSync(temp, path);
+}
+
+/** A whole file, replaced without the fsync -- for text nothing fsyncs today. */
+export function writeTextLf(path: string, text: string): void {
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, text, { encoding: "utf8" });
+}
+
+// --- Line endings -------------------------------------------------------------
+
+/**
+ * What Python's TEXT mode does on the way out.
+ *
+ * `open(path, "w")` with no `newline=` argument translates every `\n` to
+ * `os.linesep`, so on Windows the Python router writes CRLF into
+ * `sessions.json`, the activity log and every `.dabbler/runs/` JSONL --
+ * while the files it opens with `newline="\n"` or `newline=""` keep LF.
+ * Node writes the bytes it is given either way.
+ *
+ * So the translation lives here, once, and every writer whose Python twin
+ * takes the default goes through it. The rule is not "the record is CRLF":
+ * it is per-file, and getting it wrong in either direction is drift the
+ * parity control finds -- as it found this one, on the first run, in the
+ * one row of `state-writes.jsonl` the case had just appended.
+ */
+export function platformNewlines(text: string): string {
+  return process.platform === "win32" ? text.replace(/\r?\n/g, "\r\n") : text;
 }

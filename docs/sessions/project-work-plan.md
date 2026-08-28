@@ -61,7 +61,7 @@ it.
 | 23 | Contracts — types from schemas, the Router interface, and the controls | no | 2026-08-28 |
 | 24 | The extension talks to the interface, and Python answers | no | 2026-08-28 |
 | 25 | Foundation modules | no | 2026-08-28 |
-| 26 | The record — journal, ledger, writers | — | not declared |
+| 26 | The record — journal, ledger, writers | no | 2026-08-28 |
 | 27 | Evidence, checks, test evidence, affected | — | not declared |
 | 28 | Transports I — API, offline, routing, selection, discovery | — | not declared |
 | 29 | Transport II — the Copilot CLI state machine and seat cost | — | not declared |
@@ -710,3 +710,49 @@ decisions whose deadline falls on or before this session's work.
 10. Full suite — both declared suites — against the final verified tree,
     recorded as the `final-full` run of record.
 11. Commit, push once, close through the gate.
+
+### Session 26 — The record — journal, ledger, writers
+
+**Releasable: no.**
+
+Session 26 of 35 — the record: journal, ledger, writers.
+
+1. Land D160 on the Python side first, in its own commit: `test_evidence.surface_digest`
+   omits a path it cannot read instead of hashing the literal word "deleted", with a
+   test for the deleted-file case. It is a Python defect found by the port, which the
+   parity control's sequencing rules require be fixed before the two routers are
+   compared, and session 27 ports `test_evidence` — after that it is two fixes in two
+   languages plus a parity case for the wrong behaviour.
+
+2. Port the live surface of `journal.py` — `is_machine_state_path`,
+   `snapshot_worktree_tree`, `changed_paths_between`, the atomic writes, the run
+   directories and `now_iso` — into the existing `src/journal.ts`, which session 25
+   opened at the git seam. The run core's journal.jsonl, projection and heartbeat are
+   retired (D88) and are not ported.
+
+3. Port `ledger.py`: rounds, disputes, reanchors, step execution, packaging and the
+   critique tree. Schema validation on every write, refusal on a hand-shaped row,
+   append-only semantics, the quarantine path. `append_round` carries D126's nit
+   forward unchanged.
+
+4. Port `writers.py`: the state array, the activity log, the two rendered files
+   (`decisions-log.md`, `project-work-plan.md`), the change log, and the declaration
+   gate. The lifecycle lock is session 25's `lockfile.ts`.
+
+5. Land the slice of `session.py` those writers are reached through — `start`,
+   `declare`, `log`, `decision`, and the session-plan parser they share — as a
+   `dabbler session` handler that refuses `close`, `cancel`, `restore` and `migrate`
+   by name until session 30. Without it the 1,900 ported lines enter no comparison,
+   which is the green-row-over-a-vacuum the control was rebuilt in session 23 to
+   refuse.
+
+6. Add the parity cases those verbs make possible: `session start`, `session declare`,
+   `session log` and `session decision` over the `fresh` and `in-flight` shapes.
+   The `ledger` reads stay out — their shapes (`disputed`, `at-cap`) have no builder
+   until the offline transport lands in session 28, and a missing builder stops the
+   control at "could not run" rather than at a pass.
+
+7. Measure this session's seat cost and record it.
+
+8. Affected tests as preverify; cross-provider verification; the full suite as the
+   `final-full` run of record; close-out.

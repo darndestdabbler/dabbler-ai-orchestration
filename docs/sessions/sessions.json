@@ -506,11 +506,21 @@
     {
       "number": 26,
       "title": "The record \u2014 journal, ledger, writers",
-      "status": "not-started",
-      "startedAt": null,
+      "status": "in-progress",
+      "startedAt": "2026-08-28T18:04:23.100989-04:00",
       "completedAt": null,
-      "orchestrator": null,
-      "verificationVerdict": null
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": "VERIFIED",
+      "verification": {
+        "rounds": 2,
+        "verifierModel": "gpt-5-6-sol",
+        "verifierProvider": "openai",
+        "transport": "api"
+      }
     },
     {
       "number": 27,

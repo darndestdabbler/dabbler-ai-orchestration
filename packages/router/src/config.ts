@@ -37,11 +37,11 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, resolve as resolvePath } from "node:path";
 
-import Ajv2020, { type ValidateFunction } from "ajv/dist/2020.js";
 import { parse as parseYaml } from "yaml";
 
 import { AI_ROUTER_DIR, SCHEMA_DIR } from "./paths.ts";
 import { repoRootFor } from "./journal.ts";
+import { schemaFailure } from "./schema/validate.ts";
 import { readText } from "./textfile.ts";
 import { validateTransportTimeouts } from "./transports/copilot.ts";
 
@@ -158,12 +158,9 @@ function readYaml(path: string): unknown {
 
 // --- Schemas ----------------------------------------------------------------
 
-const ajv = new Ajv2020({ allErrors: false, strict: false });
-
 let schemaCache: Record<string, unknown> | undefined;
 let projectSchemaCache: Record<string, unknown> | undefined;
 let overlaySchemaCache: Record<string, unknown> | undefined;
-const validatorCache = new Map<Record<string, unknown>, ValidateFunction>();
 
 function loadSchema(): Record<string, unknown> {
   schemaCache ??= JSON.parse(readFileSync(SCHEMA_PATH, "utf8")) as Record<
@@ -199,38 +196,13 @@ function overlaySchema(): Record<string, unknown> {
   return overlaySchemaCache;
 }
 
-function validatorFor(schema: Record<string, unknown>): ValidateFunction {
-  let validate = validatorCache.get(schema);
-  if (!validate) {
-    validate = ajv.compile(schema);
-    validatorCache.set(schema, validate);
-  }
-  return validate;
-}
-
-/** `providers/anthropic`, or `(root)` — the location Python names. */
-function errorLocation(instancePath: string): string {
-  if (!instancePath) return "(root)";
-  return instancePath
-    .replace(/^\//, "")
-    .split("/")
-    .map((segment) => segment.replace(/~1/g, "/").replace(/~0/g, "~"))
-    .join("/");
-}
-
 function validateAgainst(
   data: unknown,
   schema: Record<string, unknown>,
   subject: string,
 ): void {
-  const validate = validatorFor(schema);
-  if (validate(data)) return;
-  const error = validate.errors?.[0];
-  const location = errorLocation(error?.instancePath ?? "");
-  const message = error?.message ?? "does not match the schema";
-  throw new ConfigError(
-    `${subject} failed schema validation at ${location}: ${message}`,
-  );
+  const failure = schemaFailure(data, schema, subject);
+  if (failure) throw new ConfigError(failure);
 }
 
 // --- Where the three layers live --------------------------------------------

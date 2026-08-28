@@ -83,6 +83,140 @@ export const CASES: readonly ParityCase[] = [
       "config load beneath it: the bundled default, the tracked dabbler.yaml " +
       "and the machine-local overlay that names the telemetry it read",
   },
+  {
+    verb: "session",
+    label: "session start",
+    // `fresh` registers from nothing: the first `sessions.json`, the plan
+    // seeding, the first activity-log rows, the first `state-writes.jsonl`
+    // row and the rendered work plan. `in-flight` re-registers over a
+    // record that already exists, which is the path that has to preserve
+    // every earlier session's title, verdict and verification summary --
+    // the array rebuild, not the array creation.
+    shapes: ["fresh", "in-flight"],
+    pythonArgs: (_repo, sessionsDir) => [
+      "ai_router.session", "start",
+      "--sessions-dir", sessionsDir,
+      "--engine", "claude-code",
+      "--provider", "anthropic",
+    ],
+    dabblerArgs: (_repo, sessionsDir) => [
+      "session", "start",
+      "--sessions-dir", sessionsDir,
+      "--engine", "claude-code",
+      "--provider", "anthropic",
+    ],
+    proves:
+      "the whole registration: the session array rebuilt against the plan " +
+      "with titles healed, the orchestrator block and its derived identity " +
+      "provenance, the plan steps seeded under the step keys the engine " +
+      "cannot guess, the register step logged by the machine rather than " +
+      "reported, the digest ledger row, and the rendered project work plan",
+  },
+  {
+    verb: "session",
+    label: "session declare",
+    // Only `fresh`: `in-flight` has already declared, and a second
+    // declaration is refused -- which is a case worth having, but it is
+    // the refusal below rather than this one.
+    shapes: ["fresh"],
+    pythonArgs: (_repo, sessionsDir) => [
+      "ai_router.session", "declare",
+      "--sessions-dir", sessionsDir,
+      "--task", "Build the widget.",
+      "--not-releasable",
+    ],
+    dabblerArgs: (_repo, sessionsDir) => [
+      "session", "declare",
+      "--sessions-dir", sessionsDir,
+      "--task", "Build the widget.",
+      "--not-releasable",
+    ],
+    proves:
+      "the declaration gate and the work plan it renders: the working-tree " +
+      "question that decides whether the work has begun, the activity-log " +
+      "row, and the table and per-session sections folded out of it",
+  },
+  {
+    verb: "session",
+    label: "session declare (refused: already declared)",
+    // The refusal is compared because a refusal's wording is what the
+    // operator reads, and because it exercises the branch a passing case
+    // never reaches. `in-flight` declared during its build, so a second
+    // declaration here is refused by both routers -- with the same
+    // sentence and the same exit code, or it is drift.
+    shapes: ["in-flight"],
+    pythonArgs: (_repo, sessionsDir) => [
+      "ai_router.session", "declare",
+      "--sessions-dir", sessionsDir,
+      "--task", "A second declaration.",
+      "--releasable",
+    ],
+    dabblerArgs: (_repo, sessionsDir) => [
+      "session", "declare",
+      "--sessions-dir", sessionsDir,
+      "--task", "A second declaration.",
+      "--releasable",
+    ],
+    proves:
+      "that a second declaration is refused identically by both routers, " +
+      "with the same sentence and the same exit code, and that neither " +
+      "wrote anything -- a declaration made twice is a session choosing in " +
+      "hindsight what it may publish",
+  },
+  {
+    verb: "session",
+    label: "session log",
+    // `in-flight` only: `fresh` has no session started, and logging there
+    // is the boundary refusal rather than the write.
+    shapes: ["in-flight"],
+    pythonArgs: (_repo, sessionsDir) => [
+      "ai_router.session", "log",
+      "--sessions-dir", sessionsDir,
+      "--step", "build-the-widget",
+      "--status", "complete",
+      "--note", "The widget is real.",
+    ],
+    dabblerArgs: (_repo, sessionsDir) => [
+      "session", "log",
+      "--sessions-dir", sessionsDir,
+      "--step", "build-the-widget",
+      "--status", "complete",
+      "--note", "The widget is real.",
+    ],
+    proves:
+      "resolving a step against the rows `start` seeded and appending its " +
+      "status row -- including the derived step key, which is the identity " +
+      "an orphan row would miss",
+  },
+  {
+    verb: "session",
+    label: "session decision",
+    // Both shapes: the decision's ordinal is `len(decisions) + 1` over the
+    // whole log, and the rendered file emits a session heading where the
+    // session changes. `fresh` writes D1 into an empty file; `in-flight`
+    // writes into a log that already carries plan rows and a declaration,
+    // which is where an off-by-one in the ordinal would show.
+    shapes: ["fresh", "in-flight"],
+    pythonArgs: (_repo, sessionsDir) => [
+      "ai_router.session", "decision",
+      "--sessions-dir", sessionsDir,
+      "--decider", "orchestrator",
+      "--headline", "The widget returns two",
+      "--body", "One was a placeholder — this is the measured value.",
+    ],
+    dabblerArgs: (_repo, sessionsDir) => [
+      "session", "decision",
+      "--sessions-dir", sessionsDir,
+      "--decider", "orchestrator",
+      "--headline", "The widget returns two",
+      "--body", "One was a placeholder — this is the measured value.",
+    ],
+    proves:
+      "the decision row and the log folded from it: the writer-assigned " +
+      "identifier and ordinal, the decider label, and the rendered heading " +
+      "order -- plus that a non-ASCII body survives both serializers, which " +
+      "is where `ensure_ascii` would differ",
+  },
 ];
 
 // --- Preconditions -----------------------------------------------------------

@@ -9,7 +9,6 @@ import {
   PROVENANCE_UNSTAMPED,
   digestText,
   provenance,
-  pythonFloatRepr,
   renderDocument,
   renderValue,
   setOrDrop,
@@ -17,6 +16,7 @@ import {
   writeDocument,
   type LockTable,
 } from "../src/lockfile.ts";
+import { pythonFloatRepr } from "../src/pythonJson.ts";
 import { makeTempDir, removeTempDirs } from "./support/fixtures.ts";
 
 afterAll(removeTempDirs);

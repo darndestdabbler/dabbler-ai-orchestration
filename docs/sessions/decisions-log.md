@@ -4520,3 +4520,119 @@ corpus repositories by driving the Python router — takes about 150 s and
 now runs inside every `verify` invocation. That last number is the one to
 watch as the case table grows: it is paid on every round, and it is already
 comparable to a verifier round's wall time.
+
+## Session 26 — The record — journal, ledger, writers
+
+### D170 · 2026-08-28 · Operator · An unreadable path is omitted from the freshness digest, not hashed as the word "deleted"
+
+`test_evidence.surface_digest` hashed every path `git ls-files` reported and
+wrote the literal string `"deleted"` for one it could not read. A tracked file
+deleted but not yet committed is still listed, so it contributed a
+`path\0deleted` line; committing the deletion dropped it from `ls-files` and
+that line left the digest. No file's content changed across the commit, and
+the digest moved anyway — so `test_run_fresh` failed and asked for a second
+full suite run to prove that nothing had happened.
+
+It cost session 23 a re-run and session 24 a forced close, which promoted
+sessions 25–35 of the port plan to `complete` and had to be undone from git.
+
+The fix is the one the operator ruled: an unreadable path is **omitted**, not
+marked. A deletion now moves the digest once, when the file actually goes, and
+the commit that records it moves nothing. The `"deleted"` marker no longer
+appears anywhere in the router.
+
+Landed on the Python side first and in its own commit, before any of session
+26's TypeScript, because the parity control's sequencing rules require a Python
+defect found by the port to be fixed before the two routers are compared —
+otherwise the run that follows compares two implementations with different
+intended behaviour. Session 27 ports `test_evidence`; after that this would
+have been two fixes in two languages plus a parity case pinning the wrong
+behaviour.
+
+### D171 · 2026-08-28 · Operator · Session 26 also lands writers' three forward slices and the four session write subcommands, so the record it writes can be compared at all
+
+D129 sized session 26 as `journal` + `ledger` + `writers` — 2,628 lines, 38
+tests. Porting it found two things that table could not see.
+
+**`writers` has three forward dependencies.** It cannot be ported alone: it
+imports `progress` (session 30) for the status vocabulary, the derived view and
+the invariants it folds a state through before writing it; `evidence` (session
+27) for the filenames at the sessions root and the digest ledger every
+sanctioned write appends to; and `gates` (session 30) for the working-tree
+question the task declaration refuses on. Their closures are 209, 45 and 48
+lines. Porting the writer without the reader would mean a second statement of
+what a legal record is, inside the module that produces them — the drift the
+port exists to remove — so each is ported as a named slice in a file named for
+its Python module, the way session 25 ported `transports/copilot`'s timeout
+slice.
+
+**Nothing `writers` writes can enter the parity control without a verb.** The
+control compares two routers running the same verb; `sessions.json`, the
+activity log and the two rendered files are reached only through
+`session start`, `declare`, `log` and `decision`, and `contracts/verbs.ts` has
+`session` at `portedInSession: 30`. The parity specification's verb table says
+"26 (writers), full from 30" and session 25's handoff assumed the four
+subcommands land here; the verb table's own session number did not agree with
+either.
+
+**Ruled: land the four write subcommands now.** `session.ts` takes the plan
+parser and `start` / `declare` / `log` / `decision`; the `dabbler session`
+handler refuses `close`, `cancel`, `restore` and `migrate` by name until session
+30, which is what "announced but not yet" already looks like from this command
+line. `verbs.ts` moves `session` to `portedInSession: 26`, because the registry
+— not a constant — is what every reader consults for whether a verb is real,
+and a verb that runs four of its subcommands is ported for those four.
+
+The alternative considered and rejected was deferring the cases to session 30.
+It needs no plan surgery and the modules would still be covered by their ported
+unit tests, but it leaves 1,141 lines of rendering — the most drift-prone code
+in the port, where a stray separator changes every future diff of the record —
+uncompared across two routers for four sessions. The operator ruled for landing
+the slice.
+
+This makes session 26 roughly 1.75× session 25 rather than the 0.9× D129
+implies. The estimate in D129 stands as what was known then; this entry is what
+the work turned out to be, so sessions 27–35 are planned against it.
+
+### D172 · 2026-08-28 · Orchestrator (claude-opus-5/anthropic) · Session 26's seat cost: 77,596 verifier tokens over two rounds, 85% of it in round 1
+
+Session 26's cost, in the two currencies it ran on, by the method D136 set
+down. No dollar figure: set 109 removed the router's rate table, the metrics
+ledger carries tokens and elapsed time only, and a list price recalled from
+memory would be a guess dressed as a measurement.
+
+**Verifier — gpt-5.6-sol over the API, two rounds.**
+
+| Round | Input | Output | Elapsed | Outcome |
+| --- | ---: | ---: | ---: | --- |
+| 1 | 56,923 | 9,083 | 139.5 s | ISSUES_FOUND, 2 blocking |
+| 2 | 8,470 | 3,120 | 46.4 s | VERIFIED, both disputes withdrawn |
+| **Total** | **65,393** | **12,203** | **185.9 s** | |
+
+**77,596 tokens in all**, against session 25's 67,234 and session 23's
+136,020. Round 1 is 85% of it, which is the shape the loop is designed to
+produce: round 1 carries the whole change set — ten new TypeScript files,
+two seams, eight parity cases and a Python fix — and round 2 carries only the
+fix delta plus two rebuttals, at an eighth the input.
+
+The two rounds cost about what one round of a prose session costs, for a
+change set of roughly 4,000 lines. Note what the disputes bought: round 2's
+11,590 tokens settled two Major findings, one of which asked for a behaviour
+change that would have turned the parity control red, and the other for a
+parity case the port plan places six sessions from here. Remediating both as
+asked would have cost more than the session and left the record worse.
+
+**Orchestrator — Claude Code subscription, claude-opus-5 (1M context).** The
+harness counter stood at 15,000,000 at the first prompt and at 14,514,746 when
+this figure was taken: **485,254 tokens** across the session — reading three
+Python modules and four forward slices, porting them, building the serializer
+and verifying it against CPython, adding the parity cases, chasing the CRLF
+defect the control found, writing 74 tests, and two verification rounds with
+two disputes. The run of record, the commit and the close come after and are
+not in the figure. This is the subscription window's currency and has no
+exchange rate to the API tokens above, nor to a Copilot seat's premium
+requests.
+
+**No Copilot seat was used.** This session ran entirely on the API for
+verification and the subscription for orchestration, so the third currency is
+untouched.

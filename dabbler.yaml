@@ -461,6 +461,41 @@ testing:
       - when: packages/router/src/journal.ts
         select:
           - packages/router/test/config.test.ts
+          - packages/router/test/record.test.ts
+      # The record: the ledger, the critique subtree, the sanctioned
+      # writers, the lifecycle flow that reaches them, and the three
+      # forward slices they are built on. One test file answers for all of
+      # them, because what it proves is one thing -- the rules the record
+      # is made of -- and splitting it per module would put the folds and
+      # the refusals they protect in different files.
+      - when: packages/router/src/ledger.ts
+        select:
+          - packages/router/test/record.test.ts
+      - when: packages/router/src/critique.ts
+        select:
+          - packages/router/test/record.test.ts
+      - when: packages/router/src/writers.ts
+        select:
+          - packages/router/test/record.test.ts
+      - when: packages/router/src/session.ts
+        select:
+          - packages/router/test/record.test.ts
+      - when: packages/router/src/progress.ts
+        select:
+          - packages/router/test/record.test.ts
+      - when: packages/router/src/evidence.ts
+        select:
+          - packages/router/test/record.test.ts
+      - when: packages/router/src/gates.ts
+        select:
+          - packages/router/test/record.test.ts
+      # Every record file is written through it, and `metrics` appends its
+      # telemetry the same way.
+      - when: packages/router/src/pythonJson.ts
+        select:
+          - packages/router/test/record.test.ts
+          - packages/router/test/lockfile.test.ts
+          - packages/router/test/metrics.test.ts
       - when: packages/router/src/textfile.ts
         select:
           - packages/router/test/config.test.ts

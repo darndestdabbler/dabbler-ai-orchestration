@@ -17,8 +17,9 @@ import { appendFileSync, existsSync, mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 
 import { isRecord, type RouterConfig } from "./config.ts";
-import { pythonFloatRepr } from "./lockfile.ts";
+import { platformNewlines } from "./journal.ts";
 import { AI_ROUTER_DIR } from "./paths.ts";
+import { PythonFloat, dumps } from "./pythonJson.ts";
 import { readText } from "./textfile.ts";
 import { writeOut } from "./cli/output.ts";
 
@@ -138,7 +139,11 @@ export function recordCall(config: RouterConfig, call: CallRecord): void {
   try {
     const path = logPath(config);
     mkdirSync(dirname(path), { recursive: true });
-    appendFileSync(path, pythonJsonLine(row) + "\n", { encoding: "utf8" });
+    appendFileSync(
+      path,
+      platformNewlines(dumps(Object.fromEntries(row)) + "\n"),
+      { encoding: "utf8" },
+    );
   } catch {
     // Best-effort by contract; see the module header.
   }
@@ -392,52 +397,4 @@ export function roundHalfEven(value: number, digits: number): number {
   else if (remainder < 0.5) rounded = floor;
   else rounded = floor % 2 === 0 ? floor : floor + 1;
   return rounded / factor;
-}
-
-/** A value this row means as a float, so `1.0` does not become `1`. */
-class PythonFloat {
-  readonly value: number;
-
-  constructor(value: number) {
-    this.value = value;
-  }
-}
-
-/**
- * One line as `json.dumps` writes it: `", "` and `": "` between members, and
- * non-ASCII escaped. Both routers append to the same file, so a line has to
- * be indistinguishable whichever wrote it.
- */
-function pythonJsonLine(row: ReadonlyArray<readonly [string, unknown]>): string {
-  const members = row.map(
-    ([key, value]) => `${jsonScalar(key)}: ${jsonScalar(value)}`,
-  );
-  return `{${members.join(", ")}}`;
-}
-
-function jsonScalar(value: unknown): string {
-  if (value instanceof PythonFloat) {
-    return Number.isFinite(value.value)
-      ? pythonFloatRepr(value.value)
-      : JSON.stringify(null);
-  }
-  return escapeNonAscii(JSON.stringify(value ?? null));
-}
-
-function escapeNonAscii(text: string): string {
-  let out = "";
-  for (const char of text) {
-    const code = char.codePointAt(0) ?? 0;
-    if (code < 0x80) {
-      out += char;
-    } else if (code > 0xffff) {
-      // Python escapes an astral character as its surrogate pair.
-      for (let index = 0; index < char.length; index += 1) {
-        out += `\\u${char.charCodeAt(index).toString(16).padStart(4, "0")}`;
-      }
-    } else {
-      out += `\\u${code.toString(16).padStart(4, "0")}`;
-    }
-  }
-  return out;
 }

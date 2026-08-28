@@ -197,7 +197,52 @@ const METRICS_FIXTURE = [
 /** How many rows the telemetry fixture carries, for the control's report. */
 export const METRICS_FIXTURE_ROWS = METRICS_FIXTURE.length;
 
+/**
+ * The API enumeration record, present and dated.
+ *
+ * `session start` prints a warning line for every discovery record that is
+ * absent, undated or overdue -- and an absent record is stale whatever the
+ * threshold says. A corpus without this file would make every
+ * `session start` comparison a comparison of `discovery`, which lands in
+ * session 28. So it is an INPUT, like the telemetry fixture: both copies
+ * are handed the same file, and what is compared is the registration
+ * beneath it.
+ *
+ * The date is fixed rather than current, and the overlay below sets both
+ * freshness thresholds past any age it can reach. That also covers the seat
+ * catalog, which is the real checked-in one and would otherwise start
+ * warning on the day it ages out -- turning the control red for a reason no
+ * diff of the change would explain. `discovery`'s own case, in session 28,
+ * is what proves the freshness rules themselves.
+ */
+export const API_RECORD_PATH = ".dabbler/api-models.lock";
+
+const API_RECORD = `[meta]
+key_set_id = "default"
+source = "parity-corpus"
+enumerated_at = "2026-01-01T00:00:00Z"
+
+[[providers]]
+name = "anthropic"
+enumerated_at = "2026-01-01T00:00:00Z"
+model_count = 0
+
+[[providers]]
+name = "google"
+enumerated_at = "2026-01-01T00:00:00Z"
+model_count = 0
+
+[[providers]]
+name = "openai"
+enumerated_at = "2026-01-01T00:00:00Z"
+model_count = 0
+`;
+
+/** Past any age the fixed dates above can reach; see `API_RECORD`. */
+const NEVER_STALE_HOURS = "100000000.0";
+
 const SEED: Record<string, string> = {
+  [API_RECORD_PATH]: API_RECORD,
   "docs/sessions/session-plan.md": SESSION_PLAN,
   "dabbler.yaml": DABBLER_YAML,
   "src/widget.py": "def widget():\n    return 1\n",
@@ -230,7 +275,11 @@ function localOverrides(repo: string): string {
     /\\/g,
     "/",
   );
-  return `metrics:\n  log_filename: "${fixture}"\n`;
+  return (
+    `metrics:\n  log_filename: "${fixture}"\n` +
+    `discovery:\n  max_age_hours: ${NEVER_STALE_HOURS}\n` +
+    `  seat_max_age_hours: ${NEVER_STALE_HOURS}\n`
+  );
 }
 
 /** A seeded working repository plus the bare `origin` it pushes to. */

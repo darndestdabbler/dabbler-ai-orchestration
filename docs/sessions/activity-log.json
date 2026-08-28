@@ -5548,6 +5548,184 @@
       "body": "Session 25's cost, in the two currencies it was spent in. No dollar figure:\nset 109 removed the rate table and the router prices nothing, so a figure\nhere would be an estimate wearing a measurement's clothes (D136 set this\nform in session 22).\n\n**The verifier, over the API \u2014 measured, from `router-metrics.jsonl`.**\nTwo rounds against `gpt-5-6-sol` / openai:\n\n| Round | Input tokens | Output tokens | Elapsed |\n| --- | ---: | ---: | ---: |\n| 1 (ISSUES_FOUND, 1 blocking + 1 nit) | 49,169 | 9,000 | 153.6 s |\n| 2 (VERIFIED, fix delta only) | 6,357 | 2,708 | 44.2 s |\n| **Total** | **55,526** | **11,708** | **197.8 s** |\n\nRound 2 cost an eighth of round 1's input, which is the fix-delta review\ndoing what it was built to do: the second round saw the remediation, not\nthe session.\n\n**The orchestrator \u2014 Claude Code / claude-opus-5[1m], subscription\nwindow.** Not priced per call and not attributable to a session by the\nrouter, so what is recorded is the work rather than a number: seven modules\nported (1,841 Python lines to 2,790 TypeScript across fourteen files), 122\nvitest tests written, two Python defects fixed, one Python behaviour change\n(D161/D167), two verification rounds driven, and six decisions recorded.\nOne full Python suite run and one targeted run of 212 tests.\n\n**Machine time, which is the cost this session actually felt.** The Python\nsuite dominates everything else by an order of magnitude: the targeted\npre-verification run of nine files took 168 s at `-n 2`, the whole\nTypeScript suite takes 4 s, and the parity control \u2014 which builds four\ncorpus repositories by driving the Python router \u2014 takes about 150 s and\nnow runs inside every `verify` invocation. That last number is the one to\nwatch as the case table grows: it is paid on every round, and it is already\ncomparable to a verifier round's wall time.",
       "model": "claude-opus-5",
       "provider": "anthropic"
+    },
+    {
+      "sessionNumber": 26,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-28T18:04:23.186004-04:00",
+      "description": "Register; declare `--not-releasable`.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 26,
+      "stepNumber": 2,
+      "stepKey": "port-the-three-modules",
+      "dateTime": "2026-08-28T18:04:23.186004-04:00",
+      "description": "Port the three modules. Schema validation on every write, refusal on a hand-shaped row, append-only semantics, the lifecycle lock \u2014 exactly as Python does them. `ledger.append_round` carries D126's nit forward unchanged (it is owed, not fixed here). `run_git` is ported as the one git spawn, bytes as a mode of it and not a second function.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 26,
+      "stepNumber": 3,
+      "stepKey": "parity-control-green-on-every-write",
+      "dateTime": "2026-08-28T18:04:23.186004-04:00",
+      "description": "Parity control green on every write the corpus exercises: state writes, round rows, decisions, the work plan.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 26,
+      "stepNumber": 4,
+      "stepKey": "measure-this-session-s-seat-cost",
+      "dateTime": "2026-08-28T18:04:23.186004-04:00",
+      "description": "Measure this session's seat cost and record it.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 26,
+      "stepNumber": 5,
+      "stepKey": "affected-tests-as-preverify",
+      "dateTime": "2026-08-28T18:04:23.186004-04:00",
+      "description": "Affected tests as preverify.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 26,
+      "stepNumber": 6,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-28T18:04:23.186004-04:00",
+      "description": "Cross-provider verification.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 26,
+      "stepNumber": 7,
+      "stepKey": "full-test-suite-recorded-as-the",
+      "dateTime": "2026-08-28T18:04:23.186004-04:00",
+      "description": "Full test suite, recorded as the `final-full` run of record.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 26,
+      "stepNumber": 8,
+      "stepKey": "close-out",
+      "dateTime": "2026-08-28T18:04:23.186004-04:00",
+      "description": "Close-out.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 26,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-28T18:04:23.188998-04:00",
+      "description": "Registered session 26 (claude-code).",
+      "status": "complete"
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 26,
+      "dateTime": "2026-08-28T18:07:48.256307-04:00",
+      "task": "Session 26 of 35 \u2014 the record: journal, ledger, writers.\n\n1. Land D160 on the Python side first, in its own commit: `test_evidence.surface_digest`\n   omits a path it cannot read instead of hashing the literal word \"deleted\", with a\n   test for the deleted-file case. It is a Python defect found by the port, which the\n   parity control's sequencing rules require be fixed before the two routers are\n   compared, and session 27 ports `test_evidence` \u2014 after that it is two fixes in two\n   languages plus a parity case for the wrong behaviour.\n\n2. Port the live surface of `journal.py` \u2014 `is_machine_state_path`,\n   `snapshot_worktree_tree`, `changed_paths_between`, the atomic writes, the run\n   directories and `now_iso` \u2014 into the existing `src/journal.ts`, which session 25\n   opened at the git seam. The run core's journal.jsonl, projection and heartbeat are\n   retired (D88) and are not ported.\n\n3. Port `ledger.py`: rounds, disputes, reanchors, step execution, packaging and the\n   critique tree. Schema validation on every write, refusal on a hand-shaped row,\n   append-only semantics, the quarantine path. `append_round` carries D126's nit\n   forward unchanged.\n\n4. Port `writers.py`: the state array, the activity log, the two rendered files\n   (`decisions-log.md`, `project-work-plan.md`), the change log, and the declaration\n   gate. The lifecycle lock is session 25's `lockfile.ts`.\n\n5. Land the slice of `session.py` those writers are reached through \u2014 `start`,\n   `declare`, `log`, `decision`, and the session-plan parser they share \u2014 as a\n   `dabbler session` handler that refuses `close`, `cancel`, `restore` and `migrate`\n   by name until session 30. Without it the 1,900 ported lines enter no comparison,\n   which is the green-row-over-a-vacuum the control was rebuilt in session 23 to\n   refuse.\n\n6. Add the parity cases those verbs make possible: `session start`, `session declare`,\n   `session log` and `session decision` over the `fresh` and `in-flight` shapes.\n   The `ledger` reads stay out \u2014 their shapes (`disputed`, `at-cap`) have no builder\n   until the offline transport lands in session 28, and a missing builder stops the\n   control at \"could not run\" rather than at a pass.\n\n7. Measure this session's seat cost and record it.\n\n8. Affected tests as preverify; cross-provider verification; the full suite as the\n   `final-full` run of record; close-out.",
+      "releasable": false
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D170",
+      "ordinal": 170,
+      "sessionNumber": 26,
+      "decidedOn": "2026-08-28",
+      "recordedAt": "2026-08-28T18:08:39.921390-04:00",
+      "decider": "operator",
+      "headline": "An unreadable path is omitted from the freshness digest, not hashed as the word \"deleted\"",
+      "body": "`test_evidence.surface_digest` hashed every path `git ls-files` reported and\nwrote the literal string `\"deleted\"` for one it could not read. A tracked file\ndeleted but not yet committed is still listed, so it contributed a\n`path\\0deleted` line; committing the deletion dropped it from `ls-files` and\nthat line left the digest. No file's content changed across the commit, and\nthe digest moved anyway \u2014 so `test_run_fresh` failed and asked for a second\nfull suite run to prove that nothing had happened.\n\nIt cost session 23 a re-run and session 24 a forced close, which promoted\nsessions 25\u201335 of the port plan to `complete` and had to be undone from git.\n\nThe fix is the one the operator ruled: an unreadable path is **omitted**, not\nmarked. A deletion now moves the digest once, when the file actually goes, and\nthe commit that records it moves nothing. The `\"deleted\"` marker no longer\nappears anywhere in the router.\n\nLanded on the Python side first and in its own commit, before any of session\n26's TypeScript, because the parity control's sequencing rules require a Python\ndefect found by the port to be fixed before the two routers are compared \u2014\notherwise the run that follows compares two implementations with different\nintended behaviour. Session 27 ports `test_evidence`; after that this would\nhave been two fixes in two languages plus a parity case pinning the wrong\nbehaviour."
+    },
+    {
+      "sessionNumber": 26,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-28T18:08:55.324879-04:00",
+      "description": "Session 26 registered and declared not-releasable; D160 landed on the Python side first, in its own commit, as the parity control's sequencing rules require.",
+      "status": "complete"
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D171",
+      "ordinal": 171,
+      "sessionNumber": 26,
+      "decidedOn": "2026-08-28",
+      "recordedAt": "2026-08-28T18:33:40.627892-04:00",
+      "decider": "operator",
+      "headline": "Session 26 also lands writers' three forward slices and the four session write subcommands, so the record it writes can be compared at all",
+      "body": "D129 sized session 26 as `journal` + `ledger` + `writers` \u2014 2,628 lines, 38\ntests. Porting it found two things that table could not see.\n\n**`writers` has three forward dependencies.** It cannot be ported alone: it\nimports `progress` (session 30) for the status vocabulary, the derived view and\nthe invariants it folds a state through before writing it; `evidence` (session\n27) for the filenames at the sessions root and the digest ledger every\nsanctioned write appends to; and `gates` (session 30) for the working-tree\nquestion the task declaration refuses on. Their closures are 209, 45 and 48\nlines. Porting the writer without the reader would mean a second statement of\nwhat a legal record is, inside the module that produces them \u2014 the drift the\nport exists to remove \u2014 so each is ported as a named slice in a file named for\nits Python module, the way session 25 ported `transports/copilot`'s timeout\nslice.\n\n**Nothing `writers` writes can enter the parity control without a verb.** The\ncontrol compares two routers running the same verb; `sessions.json`, the\nactivity log and the two rendered files are reached only through\n`session start`, `declare`, `log` and `decision`, and `contracts/verbs.ts` has\n`session` at `portedInSession: 30`. The parity specification's verb table says\n\"26 (writers), full from 30\" and session 25's handoff assumed the four\nsubcommands land here; the verb table's own session number did not agree with\neither.\n\n**Ruled: land the four write subcommands now.** `session.ts` takes the plan\nparser and `start` / `declare` / `log` / `decision`; the `dabbler session`\nhandler refuses `close`, `cancel`, `restore` and `migrate` by name until session\n30, which is what \"announced but not yet\" already looks like from this command\nline. `verbs.ts` moves `session` to `portedInSession: 26`, because the registry\n\u2014 not a constant \u2014 is what every reader consults for whether a verb is real,\nand a verb that runs four of its subcommands is ported for those four.\n\nThe alternative considered and rejected was deferring the cases to session 30.\nIt needs no plan surgery and the modules would still be covered by their ported\nunit tests, but it leaves 1,141 lines of rendering \u2014 the most drift-prone code\nin the port, where a stray separator changes every future diff of the record \u2014\nuncompared across two routers for four sessions. The operator ruled for landing\nthe slice.\n\nThis makes session 26 roughly 1.75\u00d7 session 25 rather than the 0.9\u00d7 D129\nimplies. The estimate in D129 stands as what was known then; this entry is what\nthe work turned out to be, so sessions 27\u201335 are planned against it."
+    },
+    {
+      "sessionNumber": 26,
+      "stepNumber": 2,
+      "stepKey": "port-the-three-modules",
+      "dateTime": "2026-08-28T18:43:37.670464-04:00",
+      "description": "journal's surviving slice, ledger, the critique subtree and writers ported, with the progress/evidence/gates forward slices they cannot be written without, plus the session verb slice D171 rules in. Two new seams: pythonJson (verified byte-identical to json.dumps over 39 cases) and schema/validate.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 26,
+      "stepNumber": 3,
+      "stepKey": "parity-control-green-on-every-write",
+      "dateTime": "2026-08-28T18:43:38.132499-04:00",
+      "description": "Nine verb cases through both routers over 45 paths: metrics, session start/declare/log/decision and the already-declared refusal, on fresh and in-flight. It found one real defect on the first run -- CRLF.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 26,
+      "stepNumber": 5,
+      "stepKey": "affected-tests-as-preverify",
+      "dateTime": "2026-08-28T18:54:09.103939-04:00",
+      "description": "Selector clean: the eight new modules gained selection rules in dabbler.yaml, so no selection_unknown row. 219 Python in 208s, 161 vitest in 10s, both recorded targeted.",
+      "status": "complete"
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D172",
+      "ordinal": 172,
+      "sessionNumber": 26,
+      "decidedOn": "2026-08-28",
+      "recordedAt": "2026-08-28T19:04:16.031503-04:00",
+      "decider": "orchestrator",
+      "headline": "Session 26's seat cost: 77,596 verifier tokens over two rounds, 85% of it in round 1",
+      "body": "Session 26's cost, in the two currencies it ran on, by the method D136 set\ndown. No dollar figure: set 109 removed the router's rate table, the metrics\nledger carries tokens and elapsed time only, and a list price recalled from\nmemory would be a guess dressed as a measurement.\n\n**Verifier \u2014 gpt-5.6-sol over the API, two rounds.**\n\n| Round | Input | Output | Elapsed | Outcome |\n| --- | ---: | ---: | ---: | --- |\n| 1 | 56,923 | 9,083 | 139.5 s | ISSUES_FOUND, 2 blocking |\n| 2 | 8,470 | 3,120 | 46.4 s | VERIFIED, both disputes withdrawn |\n| **Total** | **65,393** | **12,203** | **185.9 s** | |\n\n**77,596 tokens in all**, against session 25's 67,234 and session 23's\n136,020. Round 1 is 85% of it, which is the shape the loop is designed to\nproduce: round 1 carries the whole change set \u2014 ten new TypeScript files,\ntwo seams, eight parity cases and a Python fix \u2014 and round 2 carries only the\nfix delta plus two rebuttals, at an eighth the input.\n\nThe two rounds cost about what one round of a prose session costs, for a\nchange set of roughly 4,000 lines. Note what the disputes bought: round 2's\n11,590 tokens settled two Major findings, one of which asked for a behaviour\nchange that would have turned the parity control red, and the other for a\nparity case the port plan places six sessions from here. Remediating both as\nasked would have cost more than the session and left the record worse.\n\n**Orchestrator \u2014 Claude Code subscription, claude-opus-5 (1M context).** The\nharness counter stood at 15,000,000 at the first prompt and at 14,514,746 when\nthis figure was taken: **485,254 tokens** across the session \u2014 reading three\nPython modules and four forward slices, porting them, building the serializer\nand verifying it against CPython, adding the parity cases, chasing the CRLF\ndefect the control found, writing 74 tests, and two verification rounds with\ntwo disputes. The run of record, the commit and the close come after and are\nnot in the figure. This is the subscription window's currency and has no\nexchange rate to the API tokens above, nor to a Copilot seat's premium\nrequests.\n\n**No Copilot seat was used.** This session ran entirely on the API for\nverification and the subscription for orchestration, so the third currency is\nuntouched.",
+      "model": "claude-opus-5",
+      "provider": "anthropic"
+    },
+    {
+      "sessionNumber": 26,
+      "stepNumber": 4,
+      "stepKey": "measure-this-session-s-seat-cost",
+      "dateTime": "2026-08-28T19:04:16.519038-04:00",
+      "description": "77,596 API tokens to gpt-5.6-sol over two rounds (186s); ~485k on the Claude Code subscription window; no Copilot seat used.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 26,
+      "stepNumber": 6,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-28T19:04:17.005575-04:00",
+      "description": "Two rounds, gpt-5-6-sol over the API. Round 1 ISSUES_FOUND with two Major findings; both disputed with file-backed rebuttals, one genuine divergence fixed (the ENOENT race) and one genuine gap closed (appendRound tests). Round 2 VERIFIED, both disputes withdrawn.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 26,
+      "stepNumber": 7,
+      "stepKey": "full-test-suite-recorded-as-the",
+      "dateTime": "2026-08-28T19:10:05.024135-04:00",
+      "description": "944 Python in 5:28 and 207 vitest in 18s against the verified tree, both recorded final-full.",
+      "status": "complete"
     }
   ]
 }

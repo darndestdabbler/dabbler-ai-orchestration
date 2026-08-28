@@ -60,7 +60,7 @@ it.
 | 22 | Decide the inventory before anything is translated | no | 2026-08-28 |
 | 23 | Contracts — types from schemas, the Router interface, and the controls | no | 2026-08-28 |
 | 24 | The extension talks to the interface, and Python answers | no | 2026-08-28 |
-| 25 | Foundation modules | — | not declared |
+| 25 | Foundation modules | no | 2026-08-28 |
 | 26 | The record — journal, ledger, writers | — | not declared |
 | 27 | Evidence, checks, test evidence, affected | — | not declared |
 | 28 | Transports I — API, offline, routing, selection, discovery | — | not declared |
@@ -673,3 +673,40 @@ and the only implementation is `PythonSpawnRouter`, which wraps today's
 Not releasable: this session publishes nothing. The router package and
 the extension both keep their current versions; the cutover to 2.0.0 is
 session 35.
+
+### Session 25 — Foundation modules
+
+**Releasable: no.**
+
+Session 25 of 35 — Foundation modules.
+
+Port the leaves of the import graph to TypeScript, and clear the two owed
+decisions whose deadline falls on or before this session's work.
+
+1. Register the session; declare this task list as not-releasable.
+2. D159 (owed at the start of this session) — reword session 23's step 5 in
+   `docs/sessions/session-plan.md` so it describes the control D146 actually
+   shipped: declared and required from session 23, running the comparison
+   that needs one router; the cross-router comparison joins it in session 26
+   with the first ported verb. Documentation only; no step moves.
+3. D161 — a passing control must record what it proved. `facts.run_control`
+   carries a green control's own summary into the fact's `detail`, so a
+   reader of `deterministic-facts.jsonl` can tell a real comparison from a
+   vacuous one. Landed here rather than in session 26 because this session
+   is the first in which the analyzer control compares anything at all.
+4. Port seven modules to `packages/router/src/`, in this order: `config`
+   (640), `secret_resolver` (47), `identity` (235), `verdict` (419),
+   `lockfile` (158), `runtime_mode` (84), `metrics` (258) — 1,841 Python
+   lines. `config` validates against its schema with `ajv`; a routable entry
+   carrying no rate still fails load (BREAKING in set 109 and still true).
+5. Port each module's test file, one behaviour per test — about 98 vitest
+   tests. No falsifier twins, no source-text assertions, no tests of test
+   infrastructure. Python tests stay until session 35.
+6. Extend the parity control with `config` load and `verdict` parse over the
+   fixture corpus, and leave it green.
+7. Measure this session's seat cost and record it.
+8. Affected tests as pre-verification; record the targeted run.
+9. Cross-provider verification to a clean verdict.
+10. Full suite — both declared suites — against the final verified tree,
+    recorded as the `final-full` run of record.
+11. Commit, push once, close through the gate.

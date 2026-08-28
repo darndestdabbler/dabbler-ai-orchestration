@@ -6,9 +6,9 @@
 // exists to catch, so there is one.
 
 import { readdirSync, readFileSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
-import { join, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 
+import { PACKAGE_ROOT, SCHEMA_DIR } from "../paths.ts";
 import {
   generateIndex,
   generateModule,
@@ -16,12 +16,8 @@ import {
   type SchemaSource,
 } from "./generate.ts";
 
-const HERE = dirname(fileURLToPath(import.meta.url));
+export { PACKAGE_ROOT, REPO_ROOT, SCHEMA_DIR } from "../paths.ts";
 
-/** `packages/router` — this file is two directories below it. */
-export const PACKAGE_ROOT = join(HERE, "..", "..");
-export const REPO_ROOT = join(PACKAGE_ROOT, "..", "..");
-export const SCHEMA_DIR = join(REPO_ROOT, "ai_router", "schemas");
 export const GENERATED_DIR = join(PACKAGE_ROOT, "src", "generated");
 
 const SCHEMA_SUFFIX = ".schema.json";

@@ -31,7 +31,6 @@ from .config import (
     resolve_transport,
     TRANSPORT_OFFLINE,
 )
-from .metrics import record_call
 from .runtime_mode import is_no_router_mode
 from .selection import ROLE_GENERATOR, registry_candidates
 from .transports.api import DirectApiTransport
@@ -533,6 +532,13 @@ def route(
 
     on_copilot = transport_name == TRANSPORT_COPILOT_CLI
     session_id = result.metadata.get("session_id") if on_copilot else None
+
+    # Imported here, not at module scope: the package's ``__init__`` imports
+    # this module, so a top-level import would make ``ai_router.metrics``
+    # already-imported by the time ``python -m ai_router.metrics`` runs it,
+    # and runpy would print a RuntimeWarning ahead of the report. ``verifyjob``
+    # reaches it the same way.
+    from .metrics import record_call
 
     record_call(
         config,

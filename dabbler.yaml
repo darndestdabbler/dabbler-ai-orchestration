@@ -112,9 +112,13 @@ testing:
     #      turns this control red today.
     #   2. ROUTER PARITY -- every ported verb run through both routers
     #      against two copies of one shape, comparing written files, exit
-    #      codes and both streams. Grows one case at a time from session
-    #      26; empty before that, which is why (1) is what this control
-    #      rests on until then rather than resting on nothing.
+    #      codes and both streams. Grows one case at a time; `metrics` is
+    #      the first, from session 25. It was empty in session 23, which is
+    #      why (1) is what this control rested on rather than nothing.
+    #
+    # A green row records what it compared, not merely that it passed: an
+    # analyzer over an empty case list and one over a real two-router
+    # comparison are otherwise the same row in the record.
     #
     # Specified in docs/ts-port-parity-control.md. Retired in session 35
     # with the Python router it compares against.
@@ -409,18 +413,80 @@ testing:
       - when: packages/router/src/generated/
         select:
           - packages/router/test/schema.test.ts
+          - packages/router/test/typed-payloads.test.ts
       - when: packages/router/src/contracts/
         select:
           - packages/router/test/contracts.test.ts
+          - packages/router/test/typed-payloads.test.ts
+      # The command's own files: the verb registry, the verbs' entry points
+      # and the one seam every verb writes through. The report is what the
+      # metrics test reads, so it answers for them too.
       - when: packages/router/src/cli/
         select:
           - packages/router/test/contracts.test.ts
+          - packages/router/test/metrics.test.ts
       - when: packages/router/src/parity/
         select:
           - packages/router/test/parity.test.ts
       - when: packages/router/src/index.ts
         select:
           - packages/router/test/contracts.test.ts
+      # The ported modules. A module's own test comes first; the others are
+      # the modules that IMPORT it, because a leaf of the import graph
+      # breaking shows up in its dependants and not in itself.
+      - when: packages/router/src/config.ts
+        select:
+          - packages/router/test/config.test.ts
+          - packages/router/test/metrics.test.ts
+          - packages/router/test/identity.test.ts
+      - when: packages/router/src/verdict.ts
+        select:
+          - packages/router/test/verdict.test.ts
+      - when: packages/router/src/identity.ts
+        select:
+          - packages/router/test/identity.test.ts
+      - when: packages/router/src/metrics.ts
+        select:
+          - packages/router/test/metrics.test.ts
+      - when: packages/router/src/lockfile.ts
+        select:
+          - packages/router/test/lockfile.test.ts
+          - packages/router/test/metrics.test.ts
+      - when: packages/router/src/secretResolver.ts
+        select:
+          - packages/router/test/secretResolver.test.ts
+      - when: packages/router/src/runtimeMode.ts
+        select:
+          - packages/router/test/runtimeMode.test.ts
+      - when: packages/router/src/journal.ts
+        select:
+          - packages/router/test/config.test.ts
+      - when: packages/router/src/textfile.ts
+        select:
+          - packages/router/test/config.test.ts
+          - packages/router/test/metrics.test.ts
+      - when: packages/router/src/version.ts
+        select:
+          - packages/router/test/lockfile.test.ts
+      # Where the bundled config, the schemas and the templates are found.
+      # Every module that reads one of them depends on this answer.
+      - when: packages/router/src/paths.ts
+        select:
+          - packages/router/test/config.test.ts
+          - packages/router/test/metrics.test.ts
+          - packages/router/test/identity.test.ts
+          - packages/router/test/schema.test.ts
+      - when: packages/router/src/transports/
+        select:
+          - packages/router/test/config.test.ts
+          - packages/router/test/identity.test.ts
+      # Not a test file: the suite's glob is `*.test.ts`, so nothing under
+      # it is collected -- but every test that builds a config uses it.
+      - when: packages/router/test/support/
+        select:
+          - packages/router/test/config.test.ts
+          - packages/router/test/metrics.test.ts
+          - packages/router/test/lockfile.test.ts
       - when: packages/router/scripts/
         select: []
       - when: packages/router/build.mjs
@@ -433,22 +499,54 @@ testing:
         select:
           - packages/router/test/schema.test.ts
           - packages/router/test/contracts.test.ts
+          - packages/router/test/typed-payloads.test.ts
           - packages/router/test/parity.test.ts
+          - packages/router/test/config.test.ts
+          - packages/router/test/verdict.test.ts
+          - packages/router/test/identity.test.ts
+          - packages/router/test/metrics.test.ts
+          - packages/router/test/lockfile.test.ts
+          - packages/router/test/runtimeMode.test.ts
+          - packages/router/test/secretResolver.test.ts
       - when: packages/router/package.json
         select:
           - packages/router/test/schema.test.ts
           - packages/router/test/contracts.test.ts
+          - packages/router/test/typed-payloads.test.ts
           - packages/router/test/parity.test.ts
+          - packages/router/test/config.test.ts
+          - packages/router/test/verdict.test.ts
+          - packages/router/test/identity.test.ts
+          - packages/router/test/metrics.test.ts
+          - packages/router/test/lockfile.test.ts
+          - packages/router/test/runtimeMode.test.ts
+          - packages/router/test/secretResolver.test.ts
       - when: package.json
         select:
           - packages/router/test/schema.test.ts
           - packages/router/test/contracts.test.ts
+          - packages/router/test/typed-payloads.test.ts
           - packages/router/test/parity.test.ts
+          - packages/router/test/config.test.ts
+          - packages/router/test/verdict.test.ts
+          - packages/router/test/identity.test.ts
+          - packages/router/test/metrics.test.ts
+          - packages/router/test/lockfile.test.ts
+          - packages/router/test/runtimeMode.test.ts
+          - packages/router/test/secretResolver.test.ts
       - when: package-lock.json
         select:
           - packages/router/test/schema.test.ts
           - packages/router/test/contracts.test.ts
+          - packages/router/test/typed-payloads.test.ts
           - packages/router/test/parity.test.ts
+          - packages/router/test/config.test.ts
+          - packages/router/test/verdict.test.ts
+          - packages/router/test/identity.test.ts
+          - packages/router/test/metrics.test.ts
+          - packages/router/test/lockfile.test.ts
+          - packages/router/test/runtimeMode.test.ts
+          - packages/router/test/secretResolver.test.ts
       # The extension's two layers -- mocha over the vscode stub, and
       # Playwright -- are not declared suites, so no declared test answers
       # for this path and the empty list is what the selector can truly

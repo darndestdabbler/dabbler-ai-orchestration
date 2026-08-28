@@ -25,6 +25,7 @@ import { compareCopies, type PathDifference } from "./compare.ts";
 import { normalize } from "./normalize.ts";
 import {
   CorpusError,
+  METRICS_FIXTURE_ROWS,
   SHAPES,
   buildShape,
   findShape,
@@ -49,15 +50,40 @@ export interface ParityCase {
   readonly pythonArgs: (repo: string, sessionsDir: string) => string[];
   /** Args after `dabbler`, given the built repository. */
   readonly dabblerArgs: (repo: string, sessionsDir: string) => string[];
+  /** What a green row means for this case, for the record. */
+  readonly proves: string;
 }
 
 /**
- * Empty until session 26 lands the first ported writer. The specification
- * carries the full table; duplicating it here before the verbs exist would
- * be a second statement of it, and the two would drift in the direction of
- * whichever was easier to edit.
+ * The verb table as the runner reads it. It grows one entry at a time as
+ * the modules land, and a verb never leaves.
+ *
+ * The specification carries the full table with its shapes and its
+ * sessions; what is here is only what a run needs to execute, so the two
+ * do not restate each other.
  */
-export const CASES: readonly ParityCase[] = [];
+export const CASES: readonly ParityCase[] = [
+  {
+    verb: "metrics",
+    label: "metrics",
+    // Both shapes, because the report is a function of the config the
+    // repository resolves as well as of the telemetry: `fresh` and
+    // `in-flight` differ in what the record holds, and the config layering
+    // must survive both.
+    shapes: ["fresh", "in-flight"],
+    pythonArgs: () => ["ai_router.metrics"],
+    dabblerArgs: () => ["metrics"],
+    // No environment override: the corpus's own `local-overrides.yaml` is
+    // what points the report at the canned telemetry, so the third config
+    // layer is not merely present but LOAD-BEARING. A router that dropped
+    // it would read the machine's file beside the bundled config and print
+    // a different report, which is the difference this case would catch.
+    proves:
+      `the whole report over ${METRICS_FIXTURE_ROWS} canned call(s), and the ` +
+      "config load beneath it: the bundled default, the tracked dabbler.yaml " +
+      "and the machine-local overlay that names the telemetry it read",
+  },
+];
 
 // --- Preconditions -----------------------------------------------------------
 
@@ -122,6 +148,8 @@ export function resolveRouters(packageRoot: string): Routers {
 export interface CaseReport {
   readonly label: string;
   readonly shape: string;
+  /** What a green row for this case means; see `ParityCase.proves`. */
+  readonly proves: string;
   readonly pythonExit: number | null;
   readonly typescriptExit: number | null;
   readonly compared: number;
@@ -184,6 +212,7 @@ function runCase(
   return {
     label: parityCase.label,
     shape,
+    proves: parityCase.proves,
     pythonExit: left.code,
     typescriptExit: right.code,
     compared: comparison.compared,
@@ -325,12 +354,21 @@ function summarize(
   }
 
   if (!drift) {
-    const shapes = determinism.map((r) => r.shape).join(", ");
+    // A green control has to say what it compared. "analyzer: pass" over an
+    // empty case list and over a real two-router comparison are the same row
+    // otherwise, and a reader cannot tell a proof from a vacuum (D161).
+    const shapes = determinism.map((report) => report.shape).join(", ");
     lines.push(
       `parity: ${determinism.length} shape(s) build identically twice ` +
         `(${shapes}); ${reports.length} verb case(s) compared through both ` +
         `routers; ${compared} path(s) in all.`,
     );
+    for (const report of reports) {
+      lines.push(
+        `parity: ${report.label} on ${report.shape} -- same exit code, ` +
+          `stdout, stderr and tree; proves ${report.proves}.`,
+      );
+    }
     if (reports.length === 0) {
       lines.push(
         "parity: no verb is ported yet, so the router comparison is empty; " +

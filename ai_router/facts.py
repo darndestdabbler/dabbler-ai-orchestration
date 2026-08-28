@@ -68,6 +68,11 @@ CONTROL_FIELDS = frozenset({"kind", "command", "required"})
 
 CONTROL_TIMEOUT_SECONDS = 600
 
+#: How much of a control's own output the record keeps, on a pass and on a
+#: failure alike. The record is read by a person and by a verifier's context
+#: budget; a control that prints a whole build log does not get to fill either.
+CONTROL_DETAIL_LIMIT = 1500
+
 KIND_TESTS = "tests"
 
 _BOOKKEEPING_BASENAMES = frozenset(LIFECYCLE_WRITTEN_FILES)
@@ -446,14 +451,22 @@ def run_control(repo_root, spec: ControlSpec) -> ControlFact:
             spec.kind, STATUS_UNKNOWN, spec.command, spec.required,
             f"could not be executed: {exc}",
         )
+    tail = ((proc.stdout or "") + (proc.stderr or "")).strip()
     if proc.returncode == 0:
+        # A green row says what the control PROVED, not merely that it
+        # passed. An analyzer that compared seven record paths and one that
+        # compared nothing both exit 0, and from the record alone they were
+        # indistinguishable -- so a control that reports its own work has
+        # that report kept, and one that reports nothing says so rather than
+        # leaving a reader to assume there was something to report.
         return ControlFact(
             spec.kind, STATUS_PASS, spec.command, spec.required,
+            tail[-CONTROL_DETAIL_LIMIT:] if tail
+            else "exit 0, and the control printed nothing",
         )
-    tail = ((proc.stdout or "") + (proc.stderr or "")).strip()
     return ControlFact(
         spec.kind, STATUS_FAIL, spec.command, spec.required,
-        f"exit {proc.returncode}: {tail[-1500:]}" if tail
+        f"exit {proc.returncode}: {tail[-CONTROL_DETAIL_LIMIT:]}" if tail
         else f"exit {proc.returncode}",
     )
 

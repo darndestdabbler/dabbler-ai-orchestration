@@ -58,6 +58,18 @@ checked in that could go stale or be hand-edited.
 - Runs on the same machine and OS for both routers. **Cross-OS parity is not
   claimed**; path separators and line endings are whatever this host's git
   and this host's Python produce, and the TypeScript side is held to that.
+
+  > **What that costs, measured in session 25.** Python's `print` writes
+  > through a text-mode stream, so on Windows every line it emits ends CRLF
+  > — to a console and to a redirect alike. Node writes the bytes it is
+  > given. The first verb through the control differed on nothing but that,
+  > on every line. So the TypeScript router writes through one seam
+  > (`src/cli/output.ts`) that applies the platform's ending, and no verb
+  > reaches `process.stdout` directly. The same asymmetry runs the other way
+  > on **reading**: Python's text mode translates CRLF to LF before a parser
+  > sees it, so `src/textfile.ts` does too — and a reader whose Python twin
+  > opens the file in *binary* (`tomllib` takes bytes) deliberately does
+  > not.
 - Python stays installed in `.venv` until session 35 so the Python side can
   always be run. The control refuses (`unknown`, not `pass`) if either
   router cannot be executed.
@@ -106,8 +118,27 @@ copies are compared afterwards. The list is the union of what the extension
 spawns and what an engine runs by hand. Each verb enters the control in the
 session that ports its module and stays in it for every later session.
 
+> **Amended in session 25, as built.** Two things the table could not say.
+>
+> First, **`metrics` is the first verb through the control**, not one of
+> session 26's writers: it is the only verb in session 25's batch, its
+> Python side is a real command line, and its report is a pure function of a
+> three-layer `config` load and a telemetry file. So the cross-router
+> comparison begins in session 25 rather than 26, which is earlier than D159
+> assumed and costs nothing — the substance D159 protected was that no
+> session be handed an instruction it cannot follow.
+>
+> Second, **a case may declare an environment**, given to both invocations
+> identically. The `metrics` case points `AI_ROUTER_METRICS_PATH` at a
+> canned telemetry file the corpus builder writes under `.dabbler/`, so the
+> report is a real comparison over four calls rather than the empty branch,
+> and it is the same on a machine that has never routed anything. An env
+> that differed between the two sides would compare two questions rather
+> than two answers, so it is one function evaluated per side, not two.
+
 | Verb | Shapes | Enters in session |
 | --- | --- | --- |
+| `metrics` | fresh, in-flight | 25 |
 | `session start` / `declare` / `log` / `decision` | fresh, in-flight | 26 (writers), full from 30 |
 | `progress`, `progress --json` | all | 30 |
 | `modules` (list / create / retire) | fresh | 30 |
@@ -172,7 +203,11 @@ Compared:
 Excluded, and why:
 
 - `router-metrics.jsonl` — gitignored per-call telemetry carrying elapsed
-  seconds; it is not the record.
+  seconds; it is not the record. Nor is the corpus's canned
+  `.dabbler/parity-metrics.jsonl`, which is an **input**: the allow-list
+  covers `.dabbler/runs/` and nothing else under `.dabbler/`, so both copies
+  are handed the same rows and what is compared is what each router makes of
+  them, on stdout.
 - `.lifecycle.lock`, `journal.lock` — transient.
 - The run core's `journal.jsonl`, `heartbeat.json`, `run-projection.json` —
   retired, never ported (D88, decided in session 22).

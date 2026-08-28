@@ -1039,11 +1039,17 @@ direction, and the drift is a compile error.
    `verify`, `bootstrap`, `workflow`, `ledger`, `test_evidence`,
    `approved_plan`, `affected`), typed by the generated types. The `dabbler`
    CLI verb list is the same list plus the engine-facing verbs.
-5. Build the parity control from session 22's design: a script that runs a
-   verb against a fixture through both routers and compares the written
-   files. Declare it in `dabbler.yaml` as a required control, with `tsc
-   --noEmit` and ESLint beside it — the first controls this repository has
-   ever declared.
+5. Build the parity control from session 22's design, and declare it in
+   `dabbler.yaml` as a required control with `tsc --noEmit` and ESLint
+   beside it — the first controls this repository has ever declared. It is
+   declared and required from this session, running the comparison that
+   needs one router: every corpus shape built twice through the Python
+   router and compared byte for byte. The cross-router comparison — a verb
+   run against a fixture through both routers, with the written files
+   compared — joins it with the first ported verb. A control declared here
+   that compared two routers would have compared nothing, because the
+   second router does not exist yet, and would have written a green
+   `analyzer: pass` on every round (D146, D159).
 6. Declare the second suite in `dabbler.yaml` (`typescript`, vitest,
    `test_roots`, `test_glob`), so `affected` selects across both.
 7. Measure this session's seat cost and record it.
@@ -1093,7 +1099,14 @@ tests. Leaves of the import graph; everything above depends on them.
 2. Port each module and its test file, one behavior per test, in the order
    listed. `config` validates against the schema with `ajv`; the rate-less
    routable entry still fails load (BREAKING in set 109 and still true).
-3. Parity control green for `config` load and `verdict` parse on the corpus.
+3. Parity control green on the corpus for what this session makes runnable.
+   `metrics` is the one verb in this batch, so it is the control's first
+   cross-router case, and the report it prints is computed from a full
+   three-layer `config` load — which is how `config` enters the control.
+   `verdict` has no command line of its own and is reached only through
+   `verify`, so its parity case lands in session 32 with that verb; this
+   session proves it instead against every verifier output this repository
+   holds, and records the result (D163).
 4. Measure this session's seat cost and record it.
 5. Affected tests as preverify.
 6. Cross-provider verification.

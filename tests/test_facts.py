@@ -67,3 +67,21 @@ def test_a_control_that_cannot_be_executed_is_unknown_and_blocks(tmp_path):
     assert by_kind["lint"].red is True
     assert by_kind["compile"].status == STATUS_PASS
     assert by_kind["typecheck"].status == STATUS_NOT_APPLICABLE
+
+
+def test_a_passing_control_records_what_it_proved(tmp_path):
+    """A control that compares seven paths and one that compares nothing
+    both exit 0, and from the record alone they were the same green row.
+    Whatever the control says about its own work is kept; a control that
+    says nothing has that recorded too, rather than reading as a proof."""
+    config = {"testing": {"controls": [
+        {"kind": "analyzer",
+         "command": "python -c \"print('7 path(s) compared')\""},
+        {"kind": "lint", "command": "python -c pass"},
+    ]}}
+    facts, errors = collect_control_facts(tmp_path, config)
+    assert errors == ()
+    by_kind = {f.kind: f for f in facts}
+    assert by_kind["analyzer"].status == STATUS_PASS
+    assert "7 path(s) compared" in by_kind["analyzer"].detail
+    assert by_kind["lint"].detail == "exit 0, and the control printed nothing"

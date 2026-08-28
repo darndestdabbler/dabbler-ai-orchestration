@@ -16,6 +16,16 @@
 
 import { build } from "esbuild";
 
+// `import.meta.url` does not exist in CommonJS, and esbuild would replace it
+// with nothing -- so a module that locates itself by it (`src/paths.ts`, and
+// through it every read of the bundled config and the schemas) resolves
+// `undefined` and the command dies on its first line. The banner computes the
+// same value from `__filename`, and the define points the source's spelling
+// at it. One statement of it, in the only place the two module systems meet.
+const MODULE_URL = "__routerModuleUrl";
+const MODULE_URL_BANNER =
+  `const ${MODULE_URL} = require("url").pathToFileURL(__filename).href;`;
+
 // The three runtime dependencies stay external: they are installed
 // beside the package, and bundling them would hide a fourth arriving.
 const shared = {
@@ -25,6 +35,7 @@ const shared = {
   target: "node22",
   sourcemap: true,
   external: ["yaml", "ajv", "smol-toml"],
+  define: { "import.meta.url": MODULE_URL },
 };
 
 await Promise.all([
@@ -32,11 +43,12 @@ await Promise.all([
     ...shared,
     entryPoints: ["src/cli/dabbler.ts"],
     outfile: "dist/dabbler.cjs",
-    banner: { js: "#!/usr/bin/env node" },
+    banner: { js: `#!/usr/bin/env node\n${MODULE_URL_BANNER}` },
   }),
   build({
     ...shared,
     entryPoints: ["src/index.ts"],
     outfile: "dist/index.cjs",
+    banner: { js: MODULE_URL_BANNER },
   }),
 ]).catch(() => process.exit(1));

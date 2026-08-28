@@ -200,3 +200,10 @@
 - Excluded providers: anthropic, openai
 - Dispute on round 3 finding 0: OVERRULED — The dispute acknowledges that the original finding's concrete defects were fixed, and the remaining point is an acceptance criterion. The orchestrator's arguments (1) through (4) directly address the acceptance criterion. The cited `session-plan.md` outlines the scope of Session 24, which focuses on making the port invisible to the extension by routing spawns through `Router`. It explicitly states "Nothing the user sees changes; Playwright proves it." The orchestrator's evidence from `sessionTerminalCommands.ts` and `host.ts` supports the design intent that Start/Close are user-facing terminal commands, not direct `Router` calls, and that the handling of a "no command line" scenario is a future product decision recorded as "Owed to session 35." The finding's expectation that Start/Close must work through `Router` alone, despite not involving a spawn and being explicitly designed for user interaction via a terminal, exceeds the scope and constraints defined for Session 24.
 - Raw round output: `.dabbler/runs/s24/`
+
+## Session 25 verification — VERIFIED after 2 round(s)
+
+- Verifier: gpt-5-6-sol (openai) over api
+- Orchestrator provider (excluded): anthropic
+- Verifier's read surface: agency: none — this round's verifier could not look at the tree
+- Raw round output: `.dabbler/runs/s25/`

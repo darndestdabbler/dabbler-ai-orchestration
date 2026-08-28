@@ -29,6 +29,30 @@ const PINNED_ENV: Record<string, string> = {
   GIT_COMMITTER_DATE: "2026-01-01T00:00:00+00:00",
 };
 
+/**
+ * Router settings the operator's shell must not reach into the comparison.
+ *
+ * Each of these outranks something the corpus is trying to state. The worst
+ * is `AI_ROUTER_CONFIG`: an operator who has it set makes every verb read
+ * their config instead of the bundled one, and -- because a named config
+ * takes neither layer -- the run would silently stop exercising the very
+ * layering it reports on, in both routers at once and with no drift to show
+ * for it. Both would be wrong together, which is the one failure a
+ * comparison cannot see.
+ */
+const SCRUBBED_ENV = [
+  "AI_ROUTER_CONFIG",
+  "AI_ROUTER_METRICS_PATH",
+  "DABBLER_TRANSPORT",
+  "DABBLER_NO_ROUTER",
+];
+
+function childEnvironment(): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = { ...process.env, ...PINNED_ENV };
+  for (const name of SCRUBBED_ENV) delete env[name];
+  return env;
+}
+
 export interface RunOutcome {
   readonly code: number | null;
   readonly stdout: string;
@@ -39,7 +63,7 @@ export function runProcess(command: string, args: string[], cwd: string): RunOut
   const proc = spawnSync(command, args, {
     cwd,
     encoding: "utf8",
-    env: { ...process.env, ...PINNED_ENV },
+    env: childEnvironment(),
   });
   if (proc.error) {
     throw new CorpusError(`${command} could not be run: ${proc.error.message}`);
@@ -110,13 +134,104 @@ testing:
           - tests/test_widget.py
 `;
 
+/**
+ * Canned per-call telemetry, for the verbs that read it.
+ *
+ * It sits under `.dabbler/`, which the comparison's allow-list does not
+ * cover, so it is an INPUT to the corpus and never an output: both copies
+ * are handed the same rows, and what is compared is what each router makes
+ * of them. The rows are chosen to reach every branch of the report -- a
+ * served-model mismatch, a seat row with a conversation id and one without,
+ * an escalation, a six-figure token count that must carry its separators,
+ * and a row with no session number, which is grouped nowhere.
+ */
+export const METRICS_FIXTURE_PATH = ".dabbler/parity-metrics.jsonl";
+
+const METRICS_FIXTURE = [
+  {
+    timestamp: "2026-01-01T00:00:00.000000+00:00", session_number: 1,
+    call_type: "route", task_type: "code-review", model: "sonnet",
+    requested_model_id: "a-sonnet", served_model_id: "a-sonnet-2",
+    served_model_mismatch: true, provider: "anthropic", effort: "high",
+    thinking_on: true, input_tokens: 1200, output_tokens: 3400,
+    elapsed_seconds: 12.5, escalated: true, stop_reason: "end_turn",
+    transport: "api", billed_usage_unavailable: null,
+    transport_session_id: null, verifier_of: null, verdict: null,
+    issue_count: null,
+  },
+  {
+    timestamp: "2026-01-01T00:01:00.000000+00:00", session_number: 1,
+    call_type: "verify", task_type: "verification", model: "gpt",
+    requested_model_id: null, served_model_id: null,
+    served_model_mismatch: null, provider: "openai", effort: "medium",
+    thinking_on: true, input_tokens: 900000, output_tokens: 15,
+    elapsed_seconds: 1.0, escalated: false, stop_reason: "stop",
+    transport: "copilot-cli", billed_usage_unavailable: true,
+    transport_session_id: "conv-1", verifier_of: "sonnet",
+    verdict: "VERIFIED", issue_count: 0,
+  },
+  {
+    timestamp: "2026-01-01T00:02:00.000000+00:00", session_number: 2,
+    call_type: "route", task_type: "code-review", model: "sonnet",
+    requested_model_id: "a-sonnet", served_model_id: "a-sonnet-2",
+    served_model_mismatch: true, provider: "anthropic", effort: null,
+    thinking_on: false, input_tokens: 7, output_tokens: 8,
+    elapsed_seconds: 0.25, escalated: false, stop_reason: "end_turn",
+    transport: "api", billed_usage_unavailable: true,
+    transport_session_id: null, verifier_of: null, verdict: null,
+    issue_count: null,
+  },
+  {
+    timestamp: "2026-01-01T00:03:00.000000+00:00", session_number: null,
+    call_type: "route", task_type: "planning", model: "flash",
+    requested_model_id: null, served_model_id: null,
+    served_model_mismatch: null, provider: "google", effort: null,
+    thinking_on: false, input_tokens: 0, output_tokens: 0,
+    elapsed_seconds: 0.0, escalated: false, stop_reason: "end_turn",
+    transport: "api", billed_usage_unavailable: null,
+    transport_session_id: null, verifier_of: null, verdict: null,
+    issue_count: null,
+  },
+];
+
+/** How many rows the telemetry fixture carries, for the control's report. */
+export const METRICS_FIXTURE_ROWS = METRICS_FIXTURE.length;
+
 const SEED: Record<string, string> = {
   "docs/sessions/session-plan.md": SESSION_PLAN,
   "dabbler.yaml": DABBLER_YAML,
   "src/widget.py": "def widget():\n    return 1\n",
   "tests/test_widget.py": "from src.widget import widget\n\n\ndef test_widget():\n    assert widget() == 1\n",
-  ".gitignore": ".dabbler/\n",
+  // What `bootstrap` writes, plus the machine-local overlay: neither is
+  // tracked in a real repository, and the corpus is only a corpus if it is
+  // shaped like one.
+  ".gitignore": ".dabbler/\nlocal-overrides.yaml\n",
+  [METRICS_FIXTURE_PATH]:
+    METRICS_FIXTURE.map((row) => JSON.stringify(row)).join("\n") + "\n",
 };
+
+/**
+ * The machine-local layer, written per repository because it names a path
+ * inside it.
+ *
+ * The corpus has to carry all THREE config layers or a control that reports
+ * on the config load is reporting on two of them. It is also written so that
+ * losing it would SHOW: it is what points `metrics` at the corpus's canned
+ * telemetry, so a router that dropped the overlay would read the machine's
+ * own `router-metrics.jsonl` beside the bundled config and print a different
+ * report. A layer that could be deleted without the control noticing would
+ * be scenery.
+ *
+ * Forward slashes on every platform: both YAML loaders take them, and a
+ * Windows backslash in a YAML scalar is an escape.
+ */
+function localOverrides(repo: string): string {
+  const fixture = join(repo, ...METRICS_FIXTURE_PATH.split("/")).replace(
+    /\\/g,
+    "/",
+  );
+  return `metrics:\n  log_filename: "${fixture}"\n`;
+}
 
 /** A seeded working repository plus the bare `origin` it pushes to. */
 function seedRepository(target: string): string {
@@ -128,6 +243,7 @@ function seedRepository(target: string): string {
     mkdirSync(join(path, ".."), { recursive: true });
     writeFileSync(path, text, "utf8");
   }
+  writeFileSync(join(repo, "local-overrides.yaml"), localOverrides(repo), "utf8");
   git(repo, "init", "-q", "-b", "main");
   git(repo, "config", "core.autocrlf", "false");
   git(repo, "config", "commit.gpgsign", "false");

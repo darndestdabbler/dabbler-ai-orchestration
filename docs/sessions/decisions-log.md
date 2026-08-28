@@ -4204,3 +4204,319 @@ A command that is trimmed leaves the contract; a command that is built gets
 its argv read off the parser that receives it, per D152's standing rule.
 Either way the porting session records which it chose and why, so the
 contract stops carrying shapes nothing ever ran.
+
+## Session 25 — Foundation modules
+
+### D163 · 2026-08-28 · Orchestrator (claude-opus-5/anthropic) · Session 25 step 3 resolved: config load enters the parity control through the metrics verb, cross-router from session 25; verdict parse has no runnable surface and enters in session 32, proved here against all 71 real verifier outputs instead
+
+Session 25's step 3 asks for the parity control to be green "for `config`
+load and `verdict` parse on the corpus". Neither is a verb, and the control
+compares verb runs — so as written the step names a comparison the control
+cannot express. This is the shape D147 had, and it is answered the same way:
+say what the control can prove, prove the rest by other means, and record
+which is which.
+
+**`config` load is proved through `metrics`, cross-router.** `metrics` is
+the one verb in session 25's batch, its Python side is a real command line,
+and `print_metrics_report(load_config())` is a pure function of a full
+three-layer config load and a telemetry file. So the case runs `python -m
+ai_router.metrics` against `dabbler metrics` on two copies of one shape and
+compares exit code, stdout, stderr and tree. It is green on `fresh` and
+`in-flight`.
+
+That makes session 25, not 26, the session in which the cross-router half
+of the parity control begins. D159 assumed session 26 because it read the
+verb table's writers; `contracts/verbs.ts` has said `metrics` is ported in
+session 25 since it was written. Nothing D159 protected is lost — its point
+was that no session be handed an instruction it cannot follow, and the case
+landing a session early costs nothing.
+
+**`verdict` parse cannot be compared cross-router this session, and is not
+claimed to be.** It has no command line of its own; it is reached only
+through `verify`, which session 32 ports. Building an entry point for it so
+that a control could call it would be an affordance that exists only to be
+tested. Its parity case lands in session 32 with `verify`, and the
+specification's verb table already places it there.
+
+**What was done instead, and it is stronger than the case would have been.**
+Both parsers were run over every verifier output this repository holds —
+71 files, `.dabbler/runs/s*/round-*-verifier-output.md`, the real output of
+71 rounds across three vendors — and their results compared structurally:
+the verdict token, every finding with every field it carries, the blocking
+classification and its reason. They are identical on all 71. That is a
+larger and more adversarial corpus than any fixture would have been, and it
+is evidence rather than a control: it does not run again, and session 32's
+case is what makes it standing.
+
+Two differences surfaced while establishing this, and both were real:
+
+1. The harness first read the files with Node's `readFileSync` while Python
+   read them in text mode, and 24 of the 71 differed — every finding's
+   `raw` field carried `\r`. That is not a parser difference, it is a
+   READER difference, and it would have been a real one in session 32 when
+   `verify` reads the same files. `src/textfile.ts` now exists for it.
+2. Python's `print` writes through a text-mode stream, so on Windows every
+   line the Python router emits ends CRLF, to a redirect as much as to a
+   console. The first `metrics` comparison differed on nothing else, on
+   every line. `src/cli/output.ts` now applies the platform's ending, and
+   no verb writes to `process.stdout` directly.
+
+### D164 · 2026-08-28 · Orchestrator (claude-opus-5/anthropic) · A forward dependency is ported at its own seam, limited to a whole question -- never copied into the caller and never as a half-built type; identity's session-level entry point is refused until session 30 ports progress
+
+`config` is described in the plan as a leaf of the import graph. It is not:
+it imports `journal.repo_root_for` (session 26) and
+`transports.copilot.validate_transport_timeouts` (session 29) at module
+scope, and `identity` reaches `transports.copilot`'s seat catalog and
+`progress.read_session_state` lazily. So the first batch of the port cannot
+be written without deciding what to do about code five to nine sessions
+away.
+
+**The rule taken: port a forward dependency at its own seam, in the module
+it belongs to, limited to what answers a whole question.** Never a copy in
+the caller, and never a half-built type that will look finished to the
+session that owns it.
+
+Applied three times, and refused once:
+
+- **`journal.ts`** gets `runGit` and `repoRootFor`. Python's `run_git` is
+  the one place the router spawns git, and a second `git rev-parse` in this
+  package would be exactly the duplication the port exists to remove. The
+  binary mode came with it because it is a mode of the one call, not a
+  second call. Session 26 grows the module around them.
+- **`transports/copilot.ts`** gets the timeout contract — three ceilings,
+  their defaults, the ordering rule — because `config` validates it at load
+  and a second statement of "what a timeouts block may say" is a second
+  thing to keep true.
+- **`transports/copilot.ts`** also gets `confirmedCatalogEntries`, which is
+  the whole of what `identity` asks the seat catalog. The alternative was
+  porting `load_catalog` — 130 lines of `ModelEntry`, `CatalogMeta` and
+  coercions, of which `identity` reads two fields. A partial `Catalog` type
+  would have been worse than either: session 29 would have found something
+  that looked finished. One function that answers one question completely
+  is refactored onto the real type when the real type exists.
+- **Refused: `identity.resolve_session_orchestrator_identity`.** It is the
+  one function in `identity` that reads a repository rather than a block,
+  and it reads session state through `progress`, which session 30 ports.
+  The slice needed is not small — `derived_view` canonicalizes status,
+  which is what its session-picking rule keys on — and writing a second
+  reader of `sessions.json` to reach it early is the drift the port exists
+  to remove. It lands in session 30 as a wrapper over
+  `resolveOrchestratorIdentity`, which is where all its judgement already
+  lives. No test covers it today: the Python suite's eleven identity tests
+  are all against the block-level core.
+
+The cost is that sessions 26 and 29 open with some of their code already
+written. That is the right direction for the error to run: a session that
+finds its module partly ported reads what is there and continues, where a
+session that finds a duplicate has to decide which copy is the real one.
+
+### D165 · 2026-08-28 · Orchestrator (claude-opus-5/anthropic) · Four places where Python and JavaScript would write different bytes for the same value are settled in the TypeScript router's favour of matching Python -- line endings both directions, int vs float, float text, and json.dumps separators; schema error WORDING is explicitly not claimed
+
+Two routers agree on a value or they do not, and Python's type system makes
+distinctions JavaScript's does not. Four places in this batch, each decided
+rather than discovered later as drift.
+
+**1. Line endings, both directions.** Python's `print` writes through a
+text-mode stream, so on Windows every line it emits ends CRLF — to a
+redirect exactly as to a console. Node writes the bytes it is given. The
+first cross-router comparison differed on nothing else, on every line. The
+specification already ruled this ("line endings are whatever this host's
+Python produces, and the TypeScript side is held to that"), so
+`src/cli/output.ts` applies the platform's ending and no verb writes to
+`process.stdout` directly. The same asymmetry runs the other way on
+reading: text mode translates CRLF to LF before a parser sees it, so
+`src/textfile.ts` does too — and `confirmedCatalogEntries` deliberately
+does not, because `tomllib` takes bytes and the untranslated file is what
+Python's parser sees.
+
+**2. `int` versus `float`.** `lockfile.render_value` renders `1` as `1` and
+`1.0` as `1.0`, from the Python type. JavaScript has one number type, so an
+integral measurement would be written as a count and read back as one — a
+difference in a committed file for a value neither router chose. A caller
+holding a float says so through `tomlFloat(x)`; an unwrapped integral
+number is an integer, which is what every count in these records is
+(`premium_request_weight` is 0, 1, 3, 15; `probe_premium_requests` is the
+one fraction). `metrics` uses the same marker for `elapsed_seconds`, which
+`json.dumps` writes as `2.0` and `JSON.stringify` would write as `2`.
+
+**3. Float text.** CPython's `repr` and JavaScript's `String` both give the
+shortest text that reads back as the same value, and they switch to
+exponent notation at different magnitudes: `1e-5` is `1e-05` to Python and
+`0.00001` to JavaScript. The lockfile's content digest covers the rendered
+text, so `pythonFloatRepr` implements CPython's rule — scientific when the
+decimal point falls at or before -4 or past 16, two-digit exponent — and
+`renderValue` goes through it.
+
+**4. `json.dumps` versus `JSON.stringify`.** Python writes `{"a": 1, "b":
+null}`; JavaScript writes `{"a":1,"b":null}`, and Python escapes non-ASCII
+where JavaScript does not. Both routers append to one
+`router-metrics.jsonl` on one machine, so a reader must not be able to tell
+which wrote a line. `metrics` builds the line itself with Python's
+separators and Python's escaping.
+
+**What is NOT claimed.** `ajv` and `jsonschema` do not word an error the
+same way, and they do not pick the same error first when several fail. A
+config that fails validation therefore fails on both routers, with the same
+exit code, and says so differently. Matching the text would mean
+reimplementing one validator's messages inside the other, which is a
+second implementation of a rule and is the thing the port exists to stop.
+No parity case triggers a config-load failure, and none should; the
+behaviour that must match is whether the load fails, and it does.
+
+### D166 · 2026-08-28 · Orchestrator (claude-opus-5/anthropic) · Landing one verb found two defects six library ports would not have: python -m ai_router.metrics printed a runpy RuntimeWarning on every run, and session 23's bundled dabbler.cjs died on its first line because esbuild's CommonJS output has no import.meta
+
+Two defects the port surfaced, both fixed here, both in Python.
+
+**1. `python -m ai_router.metrics` printed a RuntimeWarning ahead of its
+report.** `ai_router/__init__.py` imports `.route`, and `route` imported
+`.metrics` at module scope, so by the time runpy executed `metrics` as
+`__main__` it was already in `sys.modules` and runpy said so on stderr —
+on every invocation, for as long as both imports have existed. It surfaced
+because the parity control compares stderr and the Python side was never
+empty. `route` now imports `record_call` inside the function that calls it,
+which is how `verifyjob` already reached the same function; the module-scope
+import had one call site. Nothing else in the package is reachable this way:
+`__init__` imports only `route`, and `metrics` is the only module in its
+import closure with a command line.
+
+**2. `import.meta.url` is empty in the bundled command.** `src/paths.ts`
+locates the package by walking up from its own file, which is how the same
+code serves both depths — `src/` under Node's type stripping and `dist/`
+after esbuild. But esbuild's CommonJS output has no `import.meta`, replaces
+it with nothing, and warns; the bundled `dabbler.cjs` therefore died on its
+first line, and every parity case run through it exited 1. It had not been
+noticed because no verb was implemented, so nothing in the bundle had ever
+read a file. `build.mjs` now defines `import.meta.url` as an identifier a
+banner computes from `__filename`.
+
+The second is the more interesting one: session 23 shipped a bundle that
+could not do anything, and there was no way to know until a verb needed a
+path. It is the argument for landing a verb early rather than porting six
+libraries first, and it is why `metrics` — the least important verb in the
+plan — was worth wiring up in this session rather than deferring.
+
+Two further findings that are not defects, recorded because they cost time:
+
+- Node's type stripping does not support a TypeScript constructor parameter
+  property (`constructor(readonly x: number) {}`). It is syntax that must be
+  compiled rather than erased. Two classes in this batch used it; both now
+  declare and assign. Anything run through `scripts/run-ts.mjs` is subject
+  to this, which is the whole package.
+- `test/support/` holds fixtures and is not collected: the `typescript`
+  suite's glob is `*.test.ts`. A rule maps it to the tests that use it, so
+  changing a fixture still selects them.
+
+### D167 · 2026-08-28 · Orchestrator (claude-opus-5/anthropic) · D161 implemented: a passing control keeps its own output in the record, and a silent one records that it was silent -- with each parity case declaring in the type system what a green row for it proves
+
+D161 required that a passing control be able to say what it proved, and
+left the design to the implementing session. This is that design, and it is
+the smallest one that works.
+
+`facts.run_control` already captured a control's combined output and kept it
+on the FAILING branch only; the passing branch discarded it. It now keeps it
+on both. A control that reports its own work has that report in
+`deterministic-facts.jsonl`, capped at the same 1,500 characters a failure
+is capped at — now a named constant rather than a literal in one branch.
+
+A control that prints nothing on success records
+`"exit 0, and the control printed nothing"`. That is the half of the design
+worth arguing for: `typecheck` and `lint` are silent when they pass, and
+silence there IS the proof. Leaving `detail` absent for them would have left
+a reader unable to tell "this control had nothing to say" from "this control
+had something to say and the record dropped it" — which is the same
+ambiguity D161 exists to end, one level down.
+
+The control D161 was actually about now says, on a green run:
+
+    parity: 2 shape(s) build identically twice (fresh, in-flight); 2 verb
+    case(s) compared through both routers; 14 path(s) in all.
+    parity: metrics on fresh -- same exit code, stdout, stderr and tree;
+    proves the whole report over 4 canned call(s), and with it the
+    three-layer config load the report is computed from.
+    parity: metrics on in-flight -- ...
+
+Each case carries a `proves` string declared beside it, so a case added
+without saying what it proves does not typecheck. That is the part that
+keeps the record honest as the table grows: the sentence is written by
+whoever adds the case, at the moment they know why they added it.
+
+`red_facts_refusal` renders only red facts, so nothing a reader sees on a
+failure changes. Scope: this touches `facts`, which session 31 ports; the
+TypeScript side inherits the behaviour there rather than reimplementing it,
+per D160's two-languages argument.
+
+### D168 · 2026-08-28 · Orchestrator (claude-opus-5/anthropic) · Round 1's nit (a VERIFIED look-alike head parses as VERIFIED) is faithful to Python and is NOT fixed in the port: an improvement on one side only is the drift the parity control exists to prevent -- filed against the shared design, for session 32 with a parity case
+
+Round 1's nit: `verdict.parseVerificationResponse` tests the response head
+with `startsWith("VERIFIED")`, so a look-alike such as
+`VERIFIED_NOT_REALLY` is classified as VERIFIED, which the module's own
+docstring calls fail-closed. The nit asks for a token boundary.
+
+**Not changed, and the reason is the shape of this session rather than a
+disagreement about the observation.** Python does exactly the same thing --
+`head.startswith("VERIFIED")` -- and this session's job is a port. Adding a
+boundary check on the TypeScript side alone makes the two routers disagree
+on an input, which is the one defect the parity control exists to prevent
+and which no test in either suite would have caught, because neither suite
+feeds a look-alike head to the parser. A port that silently improves is a
+port whose diff nobody can review against the original.
+
+It is also less alarming than it reads, for three reasons worth writing
+down so the next reader does not re-raise it:
+
+1. **The token does not decide.** `classifyBlocking` is severity-derived,
+   not token-derived: a VERIFIED head carrying a blocking finding still
+   blocks, and a non-VERIFIED verdict with nothing parseable also blocks.
+   The head chooses which parse branch runs, not whether work is accepted.
+2. **The writer's allowlist is where a token is validated**, and it is
+   exact: `validateSessionVerdict("VERIFIED_NOT_REALLY")` throws, in both
+   languages. Nothing can persist a look-alike.
+3. **The realistic direction of the error is safe.** The head is the first
+   line of a vendor's response. A verifier writing `VERIFIED_NOT_REALLY` as
+   its verdict token is not a failure mode anyone has seen in 71 rounds;
+   what HAS been seen is a verifier writing VERIFIED and then describing a
+   defect, which is why the VERIFIED branch salvages bullets and why a
+   blocking finding under a VERIFIED head still blocks.
+
+**Filed as owed against the shared design, not against the port.** If a
+boundary is wanted, it belongs in Python first and crosses to TypeScript
+with a parity case that feeds a look-alike head to both routers -- the
+change and its proof in one place. Session 32 ports `verify` and is where
+that case would live.
+
+### D169 · 2026-08-28 · Orchestrator (claude-opus-5/anthropic) · Session 25 seat cost measured: 55,526 input / 11,708 output tokens to gpt-5-6-sol over two rounds (round 2 an eighth of round 1, the fix-delta review working), no dollar figure; the parity control's ~150s per verify is the number to watch
+
+Session 25's cost, in the two currencies it was spent in. No dollar figure:
+set 109 removed the rate table and the router prices nothing, so a figure
+here would be an estimate wearing a measurement's clothes (D136 set this
+form in session 22).
+
+**The verifier, over the API — measured, from `router-metrics.jsonl`.**
+Two rounds against `gpt-5-6-sol` / openai:
+
+| Round | Input tokens | Output tokens | Elapsed |
+| --- | ---: | ---: | ---: |
+| 1 (ISSUES_FOUND, 1 blocking + 1 nit) | 49,169 | 9,000 | 153.6 s |
+| 2 (VERIFIED, fix delta only) | 6,357 | 2,708 | 44.2 s |
+| **Total** | **55,526** | **11,708** | **197.8 s** |
+
+Round 2 cost an eighth of round 1's input, which is the fix-delta review
+doing what it was built to do: the second round saw the remediation, not
+the session.
+
+**The orchestrator — Claude Code / claude-opus-5[1m], subscription
+window.** Not priced per call and not attributable to a session by the
+router, so what is recorded is the work rather than a number: seven modules
+ported (1,841 Python lines to 2,790 TypeScript across fourteen files), 122
+vitest tests written, two Python defects fixed, one Python behaviour change
+(D161/D167), two verification rounds driven, and six decisions recorded.
+One full Python suite run and one targeted run of 212 tests.
+
+**Machine time, which is the cost this session actually felt.** The Python
+suite dominates everything else by an order of magnitude: the targeted
+pre-verification run of nine files took 168 s at `-n 2`, the whole
+TypeScript suite takes 4 s, and the parity control — which builds four
+corpus repositories by driving the Python router — takes about 150 s and
+now runs inside every `verify` invocation. That last number is the one to
+watch as the case table grows: it is paid on every round, and it is already
+comparable to a verifier round's wall time.

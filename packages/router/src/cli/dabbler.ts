@@ -10,6 +10,7 @@
 import { VERBS, findVerb } from "../contracts/verbs.ts";
 import { EXIT_OK, EXIT_REFUSED } from "../contracts/router.ts";
 import { HANDLERS, isImplemented } from "./registry.ts";
+import { writeErr, writeOut } from "./output.ts";
 
 const EXIT_USAGE = 2;
 
@@ -28,13 +29,13 @@ export async function run(argv: string[]): Promise<number> {
   const [name, ...rest] = argv;
 
   if (name === undefined || name === "--help" || name === "-h") {
-    process.stdout.write(usage());
+    writeOut(usage());
     return name === undefined ? EXIT_USAGE : EXIT_OK;
   }
 
   const spec = findVerb(name);
   if (!spec) {
-    process.stderr.write(`dabbler: '${name}' is not a verb\n\n${usage()}`);
+    writeErr(`dabbler: '${name}' is not a verb\n\n${usage()}`);
     return EXIT_USAGE;
   }
 
@@ -48,7 +49,7 @@ export async function run(argv: string[]): Promise<number> {
         ? `${spec.pythonModule} has no command line of its own, so there is ` +
           `nothing to run in the meantime`
         : `until then run 'python -m ${spec.pythonModule}'`;
-    process.stderr.write(
+    writeErr(
       `dabbler ${spec.verb}: refused -- this verb is not ported yet. ` +
         `Session ${spec.portedInSession} of the port plan lands it; ` +
         `${meanwhile}.\n`,
@@ -66,7 +67,7 @@ run(process.argv.slice(2)).then(
     process.exitCode = code;
   },
   (error: unknown) => {
-    process.stderr.write(`dabbler: ${error instanceof Error ? error.message : error}\n`);
+    writeErr(`dabbler: ${error instanceof Error ? error.message : error}\n`);
     process.exitCode = 1;
   },
 );

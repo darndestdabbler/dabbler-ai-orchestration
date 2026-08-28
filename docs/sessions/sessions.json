@@ -448,9 +448,9 @@
     {
       "number": 23,
       "title": "Contracts \u2014 types from schemas, the Router interface, and the controls",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-28T12:41:33.922532-04:00",
-      "completedAt": null,
+      "completedAt": "2026-08-28T14:03:20.498923-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

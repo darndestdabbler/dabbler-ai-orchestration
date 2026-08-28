@@ -5029,6 +5029,27 @@
       "dateTime": "2026-08-28T13:50:31.922250-04:00",
       "description": "four API calls, 136,020 tokens; orchestrator 437,884 context tokens; recorded as D148",
       "status": "complete"
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D149",
+      "ordinal": 149,
+      "sessionNumber": 23,
+      "decidedOn": "2026-08-28",
+      "recordedAt": "2026-08-28T13:58:09.662509-04:00",
+      "decider": "orchestrator",
+      "headline": "Close-gate trap found: deleting a tracked file moves the whole-tree digest across the commit, because git ls-files still lists a deleted tracked path, so the run of record taken before the commit no longer binds",
+      "body": "The close's `test_run_fresh` gate failed on both suites with \"the run of record is green but the tree moved under it\", on a tree where nothing had been edited between the run and the close. The covered-surface digests matched exactly; the whole-tree digest did not.\n\n**Cause.** `tree_digest` is `surface_digest(root, (\"\",))`, whose file list is `git ls-files` (tracked) united with `git ls-files --others --exclude-standard` (untracked, not ignored). **`git ls-files` lists a tracked file that has been deleted from the working tree.** This session deleted `tools/dabbler-ai-orchestration/package-lock.json` -- the workspace root owns the lockfile now -- with `git rm --cached` plus `rm`. Until the commit, that path was still in the index and therefore still in the file list; after the commit it was gone from both. The digest before and after the commit are honestly different because the list of paths is different, and nothing in the working tree changed at all.\n\n**Why the lifecycle's own order makes this reachable.** Step 6 runs the suite of record, step 7 commits and pushes, step 9 closes. The run of record is therefore always taken *before* the commit, and the gate compares it *after* -- which is correct and is what binds a run to the tree it proved. It only diverges when the commit changes which paths exist for the digest to walk, and a deletion of a tracked file is exactly that. A session that deletes no tracked file never sees it, which is why twenty-two sessions have not.\n\n**Remedy taken here:** re-run both suites against the committed tree and record them again. That is the gate's own instruction and it is the honest answer -- the second run proves the tree that is actually being closed.\n\n**Remedy owed, and it is the operator's call because it changes a gate.** Either resolve the file list against the working tree rather than the index (`git ls-files` with a deleted path dropped, since `surface_digest` already skips a path it cannot read), or have the close compare against the tree as of the commit rather than the worktree. The first is one line at the git seam and keeps the binding's meaning; the second changes what \"the tree it ran against\" means. Session 27 ports `evidence` and `test_evidence` and inherits whichever shape is chosen, so a decision before then is worth more than after.\n\n**Cost of leaving it:** one extra full-suite run in any session that deletes a tracked file. Here that was five minutes.",
+      "model": "claude-opus-5",
+      "provider": "anthropic"
+    },
+    {
+      "sessionNumber": 23,
+      "stepNumber": 11,
+      "stepKey": "close-out",
+      "dateTime": "2026-08-28T14:03:18.131765-04:00",
+      "description": "VERIFIED via adjudication; both runs of record green against the committed tree",
+      "status": "complete"
     }
   ]
 }

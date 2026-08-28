@@ -352,9 +352,9 @@
     {
       "number": 18,
       "title": "Project setup as two sessions (plan D2)",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-28T07:58:21.481369-04:00",
-      "completedAt": null,
+      "completedAt": "2026-08-28T08:43:40.446138-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

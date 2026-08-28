@@ -5326,6 +5326,50 @@
       "dateTime": "2026-08-28T16:11:20.419004-04:00",
       "description": "Re-running the complete Python suite against the final tree after the forced close was reverted; the TypeScript run of record is already recorded.",
       "status": "in-progress"
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D159",
+      "ordinal": 159,
+      "sessionNumber": 24,
+      "decidedOn": "2026-08-28",
+      "recordedAt": "2026-08-28T16:24:15.910052-04:00",
+      "decider": "operator",
+      "headline": "D147 resolved: reword session 23's step 5; the first cross-router parity case does NOT move earlier, because session 26 already lands it with the first ported verb",
+      "body": "**Operator ruling on the plan defect D147 left owed: reword step 5.**\n\nSession 23's step 5 asks for a control that runs a verb through **both**\nrouters *and* for that control to be declared required, in a session the\nplan gives no second router. The two cannot both hold. D146 found the third\noption and shipped it \u2014 parity has a half needing one router (each corpus\nshape built twice and compared byte for byte), and that half is declared,\nrequired and green \u2014 but the plan still carries the impossible sentence.\n\nThe step's wording changes; the first parity case does **not** move\nearlier. The substantive work is unaffected either way: session 26 lands\nthe first ported verb together with its cross-router parity case, and the\nspecification, D141, D146 and the empty `CASES` list in\n`packages/router/src/parity/run.ts` all already require it there.\n\nWhat the reword must say is what D146 established: the control is declared\nand required from session 23, running the comparison that needs one router;\nthe cross-router comparison joins it in session 26 with the first ported\nverb. It is a documentation edit to `docs/sessions/session-plan.md`, owed\nat the start of the next session, and it exists so that whoever reads\nsession 26's step list is not handed an instruction that cannot be\nfollowed."
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D160",
+      "ordinal": 160,
+      "sessionNumber": 24,
+      "decidedOn": "2026-08-28",
+      "recordedAt": "2026-08-28T16:24:24.546013-04:00",
+      "decider": "operator",
+      "headline": "D149 resolved: fix the freshness digest at the git seam by omitting a path that cannot be read, not by hashing the word 'deleted' for it -- and land it before session 27 ports evidence",
+      "body": "**Operator ruling on D149: fix it at the git seam by skipping unreadable\nfiles, not by binding to the commit's tree.**\n\n`test_evidence.surface_digest` hashes every path `git ls-files` reports and\nwrites the literal string `\"deleted\"` for one it cannot read:\n\n    try:\n        digest = hashlib.sha256((Path(repo_root) / rel).read_bytes()).hexdigest()\n    except OSError:\n        digest = \"deleted\"\n\nA deleted-but-tracked file therefore contributes a `path\\0deleted` line\nbefore the commit and nothing after it, so committing a deletion moves the\nwhole-tree digest although no byte of any file changed. The close's\n`test_run_fresh` gate then demands a second full-suite run to prove nothing\nhappened. D157 reproduced this exactly: re-adding five such marker lines to\nthe current tree regenerates the run-of-record digest bit for bit.\n\n**The fix: omit a path that cannot be read, rather than hashing the word\n\"deleted\" for it.** A deletion then moves the digest once \u2014 when the file is\ndeleted \u2014 instead of twice.\n\nThe alternative considered and rejected was binding the run of record to the\ncommit's tree object instead of a computed file list. It is a larger change,\nand it would tie a run to a commit when the run is taken against a working\ntree that is deliberately not yet committed.\n\n**This must land before session 27**, which ports `evidence` and\n`test_evidence` to TypeScript. Fixing it after means fixing it in two\nlanguages and adding a parity case for the wrong behaviour first. It changes\na gate, which is why it was the operator's call; it is now decided, and the\nsession that lands it owes a test for the deleted-file case.\n\nCost of leaving it unfixed, measured: session 23 paid one extra full-suite\nrun, and session 24 paid one extra run plus a forced close and a ledger\nrestore (D158)."
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D161",
+      "ordinal": 161,
+      "sessionNumber": 24,
+      "decidedOn": "2026-08-28",
+      "recordedAt": "2026-08-28T16:24:24.983540-04:00",
+      "decider": "operator",
+      "headline": "D145/D146 carried nit resolved: a passing control must record what it proved, not merely that it passed -- a green analyzer row cannot be indistinguishable from a vacuous one",
+      "body": "**Operator ruling on the D145/D146 carried nit: a control records what it\nproved, not merely that it passed.**\n\n`facts.run_control` records a control's kind, status, command and whether it\nwas required, and drops the detail on a green result. A reader of\n`deterministic-facts.jsonl` sees `analyzer: pass` and cannot tell whether\nthat meant seven record paths compared or none at all. The verifier raised\nit across three rounds of session 23 and it was carried rather than fixed.\n\n**A passing control must be able to say what it proved.** The reason is the\nfailure mode D145 and D146 spent two rounds on: a declared control that\ncompares nothing writes a green row for a comparison nobody made, and from\nthe record alone that is indistinguishable from a real one. It becomes\nsharper from session 26, when the analyzer gains its first cross-router\ncase \u2014 \"pass\" will then mean either a genuine two-router comparison or an\nempty `CASES` list, and the row as written cannot separate them.\n\nThis is a Python behaviour change in the record, which is why it was the\noperator's call. What a control emits and how `run_control` carries it is\nfor the implementing session to design; the requirement is that a green row\ncarries enough for a reader to tell a real comparison from a vacuous one.\nThe parity control already prints exactly this to stdout (\"2 shape(s) build\nidentically twice ... 7 path(s) in all\") \u2014 the record is where it is lost.\n\nLand it with or before session 26, so the first cross-router case is\nrecorded under the new behaviour rather than needing a second pass. Note it\ntouches `facts`, ported in session 31 \u2014 the same two-languages argument as\nD160 applies, though less sharply."
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D162",
+      "ordinal": 162,
+      "sessionNumber": 24,
+      "decidedOn": "2026-08-28",
+      "recordedAt": "2026-08-28T16:24:25.451712-04:00",
+      "decider": "operator",
+      "headline": "D152 resolved: reconcile the Router contract per command as each module is ported, defaulting to trimming what Python does not have rather than building it",
+      "body": "**Operator ruling on D152: reconcile the contract per command, defaulting to\ntrimming what Python does not have.**\n\nSession 24 found that the `Router` contract declares commands the Python\nside does not have in those shapes. `ai_router.modules` has exactly one\nsubcommand, `create` \u2014 there is no `list` and no `retire` \u2014 and\n`verify dispute` takes `--finding`, not the contract's `--finding-index`.\nNothing calls them, so nothing was broken; `PythonSpawnRouter` refuses them\nby name rather than spawning a command line that would fail.\n\n**Each command is decided on its own merits when its module is ported\n(sessions 30, 32, 34), and the default is to trim rather than to build.**\nAn interface that promises what nothing implements is how the next reader is\nmisled the same way this session was \u2014 the contract's option names were\ntaken as descriptions of a CLI that had never been checked against them.\n\nNamed guidance, not binding on the porting session's judgement:\n\n- **`modules retire`** plausibly earns being built. The module lifecycle has\n  a retire concept elsewhere in the framework, and a caller has no other way\n  to reach it.\n- **`modules list`** probably does not. The extension reads\n  `docs/modules.yaml` directly through `moduleAuthoring`, so the verb would\n  have no caller.\n- **`verify dispute`'s option name** is not a decision at all, just a\n  correction: the contract should say `--finding`.\n\nA command that is trimmed leaves the contract; a command that is built gets\nits argv read off the parser that receives it, per D152's standing rule.\nEither way the porting session records which it chose and why, so the\ncontract stops carrying shapes nothing ever ran."
     }
   ]
 }

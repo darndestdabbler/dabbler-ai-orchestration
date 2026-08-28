@@ -5,7 +5,7 @@
 are merged and finished. Earlier handoff text is in `docs/status-archive.md`.
 
 > **Recorded, 2026-08-28.** Session 24's deliverables are decisions
-> **D150–D158** in `docs/sessions/decisions-log.md`; session 23's are
+> **D150–D162** in `docs/sessions/decisions-log.md`; session 23's are
 > **D138–D149**, plus the amendments inside
 > `docs/ts-port-parity-control.md`. This file summarises them; the
 > decisions are the record.
@@ -186,13 +186,13 @@ is D127; the previous version of this file carried it in full.
 | **D114 nit 2** | `build_task_rows` renders a leaf, not a refusal, when `approved-plan.json` is missing while `step-execution.jsonl` carries an open step. |
 | **D130 (was D88)** | Not owed — decided. The operator's override window on retiring the run core is open until session 34 starts. |
 | **D134** | Round-1 change sets measure HEAD's raw tree against a snapshot that drops `.dabbler/`, so a repository that tracks its ledger reports it as deleted. Moot here since D135 and **confirmed moot** — session 23's first selection reported zero `selection_unknown` rows against 208 in each of 19–22 (D144). Latent elsewhere. If fixed on the Python side, do it before session 27 ports `affected`. |
-| **D147 — operator** | **A plan defect, and the one thing owed back to the operator from session 23.** Step 5 of session 23 asks for a control that runs a verb through **both** routers *and* for that control to be declared required — in a session the plan gives no second router. The adjudication resolved this session; it did not amend the plan. Decide whether step 5's wording changes or the first parity case moves earlier. The substantive answer is already scheduled either way: session 26 lands the first ported verb and its parity case. |
-| **D149 — operator, now reproduced (D157)** | Deleting a tracked file moves the whole-tree digest across the commit, because `git ls-files` still lists a tracked-but-deleted path and `surface_digest` writes it a literal `"deleted"` hash. Session 24 proved it exactly: the run-of-record digest is reproduced bit-for-bit by taking the committed tree and re-adding five `path\0deleted` lines — no file content differs, and the Python suite's own `surfaceDigest` is unchanged. **The operator refused the second full run and the session force-closed instead.** Fix at the git seam (omit an unreadable path rather than hashing the word "deleted") or bind to the commit's tree. It changes a gate, so it is the operator's call — and session 27 ports `evidence`/`test_evidence`, so deciding before then is worth more than after. Until then every session that deletes a tracked file pays one extra full-suite run or one forced close. |
+| **D147 — RULED (D159)** | **A plan defect, and the one thing owed back to the operator from session 23.** Step 5 of session 23 asks for a control that runs a verb through **both** routers *and* for that control to be declared required — in a session the plan gives no second router. The adjudication resolved this session; it did not amend the plan. Decide whether step 5's wording changes or the first parity case moves earlier. The substantive answer is already scheduled either way: session 26 lands the first ported verb and its parity case. |
+| **D149 — RULED (D160), reproduced in D157** | Deleting a tracked file moves the whole-tree digest across the commit, because `git ls-files` still lists a tracked-but-deleted path and `surface_digest` writes it a literal `"deleted"` hash. Session 24 proved it exactly: the run-of-record digest is reproduced bit-for-bit by taking the committed tree and re-adding five `path\0deleted` lines — no file content differs, and the Python suite's own `surfaceDigest` is unchanged. **The operator refused the second full run and the session force-closed instead.** Fix at the git seam (omit an unreadable path rather than hashing the word "deleted") or bind to the commit's tree. It changes a gate, so it is the operator's call — and session 27 ports `evidence`/`test_evidence`, so deciding before then is worth more than after. Until then every session that deletes a tracked file pays one extra full-suite run or one forced close. |
 | **D158 — framework** | `session close --force` promotes EVERY open session to complete, and its help says only "bypass bookkeeping gates". It cost session 24 a damaged ledger and a restore. Three fixes owed: say what the flag does; refuse (or require a second flag) when it would promote sessions that are not in flight; and stamp `forceClosed` on the session's row rather than the repository, so the ledger can say which session forced a close. Until they land, the trap lives in `AGENTS.md`'s preamble. |
-| **D152 — the contract** | `ModuleVerbs.list`/`retire`, and several `VerifyVerbs`/`WorkflowVerbs` option names, describe a Python surface that does not exist in those shapes (`ai_router.modules` has only `create`; `verify dispute` takes `--finding`). Sessions 30/32/34 port those modules — reconcile the contract against what is ported rather than inheriting a shape nothing ever ran. |
+| **D152 — RULED (D162)** | `ModuleVerbs.list`/`retire`, and several `VerifyVerbs`/`WorkflowVerbs` option names, describe a Python surface that does not exist in those shapes (`ai_router.modules` has only `create`; `verify dispute` takes `--finding`). Sessions 30/32/34 port those modules — reconcile the contract against what is ported rather than inheriting a shape nothing ever ran. |
 | **D155 / D116** | The extension's mocha suite is still not a declared suite, so `affected` selects nothing for `tools/dabbler-ai-orchestration/` and session 24's largest change set had no recordable pre-verification evidence. Measured why it is not a one-line declaration: `targeted_command` appends the selected paths, and mocha MERGES a path list with its `spec` (both from the flag and from `.mocharc.json`) rather than being narrowed by it, so the bare command cannot mean "everything" while the appended form means "these". `runs_whole` would be false. It needs a runner entry point — D116's shape. |
 | **Session 24 estimate** | "Net negative TS lines" was not met (+178 in the extension). `implements Router` requires all 32 methods and twenty of them refuse, which still costs their signatures. Not a defect; a fact about the contract's width, worth knowing when sizing sessions 30–34. |
-| **D145/D146 — carried nit** | A reader of `deterministic-facts.jsonl` sees `analyzer: pass` and cannot tell what was compared; `facts.run_control` drops the detail on a green result. The verifier raised it across three rounds. Worth asking in session 26, when the analyzer gets its first cross-router case, whether a control should say what it proved. A Python behaviour change in the record — the operator's call. |
+| **D145/D146 — RULED (D161)** | A reader of `deterministic-facts.jsonl` sees `analyzer: pass` and cannot tell what was compared; `facts.run_control` drops the detail on a green result. The verifier raised it across three rounds. Worth asking in session 26, when the analyzer gets its first cross-router case, whether a control should say what it proved. A Python behaviour change in the record — the operator's call. |
 | **D119** | The solution level (one repository per library or service, plus an integrator) is not formalized. |
 | Suite cost, the remainder | What is left is the loop's own git traffic (134 spawns in the slowest test). A fake git is still refused. The port's `journal.run_git` twin is where fewer round-trips per round would live. |
 
@@ -218,11 +218,23 @@ resolved by being true again.
    validates against the schema with `ajv`, and the rate-less routable
    entry still fails load. The parity control gets its first real work:
    `config` load and `verdict` parse over the corpus.
-2. **Operator, four decisions** — none blocks session 25: the D147 plan
-   defect, **D149** (now reproduced with a proof in D157, and it has cost
-   two sessions in a row — worth settling before session 27 ports
-   `evidence`), the D145/D146 control-row opacity, and D152's contract
-   reconciliation.
+2. **All four owed decisions are RULED (D159–D162, operator).** Nothing is
+   waiting on the operator.
+   - **D159** — reword session 23's step 5; the first cross-router parity
+     case stays in session 26. A one-line plan edit, owed at the start of
+     the next session, so nobody is handed an instruction that cannot be
+     followed.
+   - **D160** — fix the freshness digest by omitting a path that cannot be
+     read, instead of hashing the word `"deleted"` for it. **Must land
+     before session 27** ports `evidence`/`test_evidence`, or it gets
+     fixed twice in two languages.
+   - **D161** — a passing control records what it proved. Land with or
+     before session 26, so the analyzer's first cross-router case is
+     recorded under the new behaviour.
+   - **D162** — reconcile the contract per command as each module is
+     ported, defaulting to trimming. `modules retire` plausibly earns
+     building; `modules list` probably does not; `--finding-index` is just
+     a correction to `--finding`.
 3. **Read before session 26.** It lands the first ported verb *and* the
    parity control's first cross-router case, and the specification, D141,
    D146 and the empty `CASES` list in `packages/router/src/parity/run.ts`

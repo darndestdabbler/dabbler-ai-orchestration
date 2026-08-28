@@ -4075,3 +4075,132 @@ run cost a damaged ledger and a restore.
 Until (1) and (2) land, the trap is written into `AGENTS.md`'s project
 preamble, where every engine reads it — a repo-level guard standing in for
 a framework fix.
+
+### D159 · 2026-08-28 · Operator · D147 resolved: reword session 23's step 5; the first cross-router parity case does NOT move earlier, because session 26 already lands it with the first ported verb
+
+**Operator ruling on the plan defect D147 left owed: reword step 5.**
+
+Session 23's step 5 asks for a control that runs a verb through **both**
+routers *and* for that control to be declared required, in a session the
+plan gives no second router. The two cannot both hold. D146 found the third
+option and shipped it — parity has a half needing one router (each corpus
+shape built twice and compared byte for byte), and that half is declared,
+required and green — but the plan still carries the impossible sentence.
+
+The step's wording changes; the first parity case does **not** move
+earlier. The substantive work is unaffected either way: session 26 lands
+the first ported verb together with its cross-router parity case, and the
+specification, D141, D146 and the empty `CASES` list in
+`packages/router/src/parity/run.ts` all already require it there.
+
+What the reword must say is what D146 established: the control is declared
+and required from session 23, running the comparison that needs one router;
+the cross-router comparison joins it in session 26 with the first ported
+verb. It is a documentation edit to `docs/sessions/session-plan.md`, owed
+at the start of the next session, and it exists so that whoever reads
+session 26's step list is not handed an instruction that cannot be
+followed.
+
+### D160 · 2026-08-28 · Operator · D149 resolved: fix the freshness digest at the git seam by omitting a path that cannot be read, not by hashing the word 'deleted' for it -- and land it before session 27 ports evidence
+
+**Operator ruling on D149: fix it at the git seam by skipping unreadable
+files, not by binding to the commit's tree.**
+
+`test_evidence.surface_digest` hashes every path `git ls-files` reports and
+writes the literal string `"deleted"` for one it cannot read:
+
+    try:
+        digest = hashlib.sha256((Path(repo_root) / rel).read_bytes()).hexdigest()
+    except OSError:
+        digest = "deleted"
+
+A deleted-but-tracked file therefore contributes a `path\0deleted` line
+before the commit and nothing after it, so committing a deletion moves the
+whole-tree digest although no byte of any file changed. The close's
+`test_run_fresh` gate then demands a second full-suite run to prove nothing
+happened. D157 reproduced this exactly: re-adding five such marker lines to
+the current tree regenerates the run-of-record digest bit for bit.
+
+**The fix: omit a path that cannot be read, rather than hashing the word
+"deleted" for it.** A deletion then moves the digest once — when the file is
+deleted — instead of twice.
+
+The alternative considered and rejected was binding the run of record to the
+commit's tree object instead of a computed file list. It is a larger change,
+and it would tie a run to a commit when the run is taken against a working
+tree that is deliberately not yet committed.
+
+**This must land before session 27**, which ports `evidence` and
+`test_evidence` to TypeScript. Fixing it after means fixing it in two
+languages and adding a parity case for the wrong behaviour first. It changes
+a gate, which is why it was the operator's call; it is now decided, and the
+session that lands it owes a test for the deleted-file case.
+
+Cost of leaving it unfixed, measured: session 23 paid one extra full-suite
+run, and session 24 paid one extra run plus a forced close and a ledger
+restore (D158).
+
+### D161 · 2026-08-28 · Operator · D145/D146 carried nit resolved: a passing control must record what it proved, not merely that it passed -- a green analyzer row cannot be indistinguishable from a vacuous one
+
+**Operator ruling on the D145/D146 carried nit: a control records what it
+proved, not merely that it passed.**
+
+`facts.run_control` records a control's kind, status, command and whether it
+was required, and drops the detail on a green result. A reader of
+`deterministic-facts.jsonl` sees `analyzer: pass` and cannot tell whether
+that meant seven record paths compared or none at all. The verifier raised
+it across three rounds of session 23 and it was carried rather than fixed.
+
+**A passing control must be able to say what it proved.** The reason is the
+failure mode D145 and D146 spent two rounds on: a declared control that
+compares nothing writes a green row for a comparison nobody made, and from
+the record alone that is indistinguishable from a real one. It becomes
+sharper from session 26, when the analyzer gains its first cross-router
+case — "pass" will then mean either a genuine two-router comparison or an
+empty `CASES` list, and the row as written cannot separate them.
+
+This is a Python behaviour change in the record, which is why it was the
+operator's call. What a control emits and how `run_control` carries it is
+for the implementing session to design; the requirement is that a green row
+carries enough for a reader to tell a real comparison from a vacuous one.
+The parity control already prints exactly this to stdout ("2 shape(s) build
+identically twice ... 7 path(s) in all") — the record is where it is lost.
+
+Land it with or before session 26, so the first cross-router case is
+recorded under the new behaviour rather than needing a second pass. Note it
+touches `facts`, ported in session 31 — the same two-languages argument as
+D160 applies, though less sharply.
+
+### D162 · 2026-08-28 · Operator · D152 resolved: reconcile the Router contract per command as each module is ported, defaulting to trimming what Python does not have rather than building it
+
+**Operator ruling on D152: reconcile the contract per command, defaulting to
+trimming what Python does not have.**
+
+Session 24 found that the `Router` contract declares commands the Python
+side does not have in those shapes. `ai_router.modules` has exactly one
+subcommand, `create` — there is no `list` and no `retire` — and
+`verify dispute` takes `--finding`, not the contract's `--finding-index`.
+Nothing calls them, so nothing was broken; `PythonSpawnRouter` refuses them
+by name rather than spawning a command line that would fail.
+
+**Each command is decided on its own merits when its module is ported
+(sessions 30, 32, 34), and the default is to trim rather than to build.**
+An interface that promises what nothing implements is how the next reader is
+misled the same way this session was — the contract's option names were
+taken as descriptions of a CLI that had never been checked against them.
+
+Named guidance, not binding on the porting session's judgement:
+
+- **`modules retire`** plausibly earns being built. The module lifecycle has
+  a retire concept elsewhere in the framework, and a caller has no other way
+  to reach it.
+- **`modules list`** probably does not. The extension reads
+  `docs/modules.yaml` directly through `moduleAuthoring`, so the verb would
+  have no caller.
+- **`verify dispute`'s option name** is not a decision at all, just a
+  correction: the contract should say `--finding`.
+
+A command that is trimmed leaves the contract; a command that is built gets
+its argv read off the parser that receives it, per D152's standing rule.
+Either way the porting session records which it chose and why, so the
+contract stops carrying shapes nothing ever ran.

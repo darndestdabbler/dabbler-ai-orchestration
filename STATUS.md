@@ -1,154 +1,122 @@
-# STATUS — set 148 closed and evaluated on the record; session 21 closed its seat-cost question and cut the suite
+# STATUS — sessions 22–35 (the TypeScript port) are landed; session 22 decided the inventory and the founding decisions
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
 `experiment/verification-pipeline-v3` and `design/solution-decomposition` are
 merged and finished. Earlier handoff text is in `docs/status-archive.md`.
 
-> **Recorded, 2026-08-28.** The acceptance evaluation below is no longer a
-> status paragraph: session 21 carried it into the decisions log as **D127**,
-> including the operator's decision not to back-fill the seat cost. This file
-> now summarises that decision rather than standing in for it.
+> **Recorded, 2026-08-28.** Session 22's deliverables are decisions
+> **D128–D137** in `docs/sessions/decisions-log.md` and
+> `docs/ts-port-parity-control.md`. This file summarises them; the decisions
+> are the record.
 
 ## Where things are
 
-- **Set 148 is complete: 21 of 21 sessions closed**, 2026-08-26 → 2026-08-28,
-  all on `master`, all pushed. Sessions 1–14 were driven from the Copilot seat
-  (claude-opus-5 orchestrator, gpt-5.4/5.5 verifier over `copilot-cli`);
-  sessions 15–21 from Claude Code (claude-fable-5 then claude-opus-5
-  orchestrator, gpt-5-6-sol verifier over the direct API).
-- **Terminal states: 19 `VERIFIED`, 2 `REMEDIATED_AT_CAP`** (sessions 12 and
-  17). The two cap sessions' final fixes are unreviewed by construction — see
-  the D122 gap under *Owed*.
-- **Session 21 closed the set on the record.** It recorded the acceptance
-  evaluation as **D127**, put the router's git spawning behind one callable
-  (`journal.run_git`, the only `["git", ...]` argv in the package; bytes are
-  a mode of it, not a second function), and took the host's configuration and
-  the per-test repository build out of the suite. Its verification is worth
-  reading as a specimen: round 1's finding was **disputed and withdrawn** on
-  the facts, and round 2 then caught a real second-spawn defect in the fix
-  itself. The dispute ladder earned its keep in both directions.
+- **Sessions 22–35 are landed** in `docs/sessions/session-plan.md` (commit
+  `d77a075a`, `totalSessions: 35`): the port of `ai_router` to TypeScript so
+  the framework ships as one Marketplace artifact and a project holds only
+  its own record — **D128**, operator. **Session 22 is closed
+  `VERIFIED`** (3 rounds, gpt-5-6-sol over the API; every finding
+  Minor). A prose session: Claude Code / claude-fable-5 orchestrator, no code,
+  no test.
+- **The inventory is decided (D129):** 38 modules ported, 4 merged, 3
+  retired; 832 tests ported, 109 deleted. Three departures from the plan's
+  default table, each from the import graph: `facts` is verification's
+  deterministic-controls module (ported, session 31); `fixloop` and
+  `testphase` are imported by the six-step `workflow` (ported, session 34);
+  `journal` and `verifyjob` split — the git seam and the prompt/auto-verify
+  functions are kept, their run-core halves retired. Only `runcli`,
+  `runcore` and `runproject` retire outright.
+- **D88 is resolved by the plan's default (D130):** the run core is retired
+  and deleted in session 34. It is an orchestrator's application of an
+  operator-set default; **the operator can override until session 34
+  starts**, and nothing is deleted before then.
+- **Runtime floor measured, not remembered (D131):** VS Code 1.135.0's
+  extension host is Electron 42.8.1 / Node 24.18.1 and `node:sqlite` loads
+  unflagged (`ELECTRON_RUN_AS_NODE=1 Code.exe -e …`); system Node 25.8.1
+  likewise. Layout: `packages/router` (npm `dabbler-ai-router`, `bin:
+  dabbler`) under root npm workspaces, esbuild bundling both into the VSIX.
+  **Dependency ceiling (D132):** `yaml`, `ajv`, `smol-toml`; nothing native;
+  a fourth is a decision in the log.
+- **The parity control is designed (D133):** `docs/ts-port-parity-control.md`
+  — five corpus shapes (fresh, in-flight, disputed, at-cap, moved-machine),
+  verbs entering by port order, the record files and every read-only verb's
+  stdout compared byte-for-byte after exactly two normalizations, anchors
+  compared by tree. Session 23 builds it as this repository's first declared
+  control.
+- **The run ledger is no longer tracked (D135, operator):** `.gitignore`
+  ignores `.dabbler/` whole, which is the rule `bootstrap` writes for every
+  project. Rounds no longer travel between machines — a session finishes
+  where it started — and the record of each session's rounds lives on the
+  machine that ran it. As a side effect the selector's 208 false
+  `selection_unknown` rows (D134, a latent defect kept owed at low priority)
+  and the close's uncommitted-residue habit are gone from this repository.
+- **Session 22's seat cost is measured (D136)** in the two currencies it
+  had: the orchestrator's Claude Code context and the verifier's API tokens.
+  No dollar figure — set 109 removed the rate table, and the router prices
+  nothing.
+- **Set 148 is complete: 21 of 21 sessions closed**, 2026-08-26 → 2026-08-28;
+  19 `VERIFIED`, 2 `REMEDIATED_AT_CAP` (sessions 12 and 17, whose final fixes
+  are unreviewed by construction — the D122 gap). Its acceptance is **D127**.
 - **Router `dabbler-ai-router` 1.1.0** (tag `v1.1.0`); **extension 1.0.4**
-  (tag `vsix-v1.0.4`). Session 13 built the packaging path; no packaging
-  ledger exists in `.dabbler/runs/`, so nothing was published by the
-  framework during this set.
-- **Suite: 941 Python (4:45 at `-n 2`, down from 6:26) / 153 TypeScript
-  (0.4 s); `tsc --noEmit` and ESLint clean.** Python 29,640 lines over 45
-  modules, by raw line count over tracked `ai_router/*.py` — the basis is
-  named because the previous figure here (29,286) is not reproducible on any
-  basis and the same count at session 20's close was 29,685. Extension 5,035
-  lines of source, 3,102 of tests.
-- **`verify.py` is 2,537 lines.** The 142–147 envelope wanted it under 1,200
-  by extraction. The envelope is set aside per `docs/operator-decisions.md`,
-  but the debt is real and grew during this set.
+  (tag `vsix-v1.0.4`). Both become 2.0.0 at cutover (session 35).
+- **Suite: 941 Python (4:49 at `-n 2`) / 153 TypeScript (0.4 s);
+  `tsc --noEmit` and ESLint clean.** Python 29,640 lines over 45 modules by
+  raw line count over tracked `ai_router/*.py`; extension 5,035 lines of
+  source, 3,102 of tests. `verify.py` is 2,537 lines and is ported as five
+  files in session 32.
 
 ## Acceptance evaluation for set 148 — recorded as D127
 
-The plan's criterion: **the framework can run its own next session** — could
-session 20 have been specified, developed, verified, tested and closed by the
-thing this set built rather than by the machinery it replaces?
-
-**Session 20 was.** Registered and declared through `session start` /
-`declare`; one targeted pre-verify run; one cross-provider round over the
-API (`VERIFIED`, round 1, its own tree anchored as the first row under
-`refs/dabbler/rounds/`); one `final-full` run of record at 10:05; five gates;
-close committed and pushed by the router. No step ran through v1 machinery.
-
-Three supporting checks, each answered from the record:
-
-### 1. Every plan item appears exactly once — MET, with notes
-
-| Plan item | Session(s) |
-| --- | --- |
-| A1 credential allowlist | 3 |
-| A2 record authority | 4 |
-| A3 collapse session sets | 14 |
-| A4 the two files | 5 |
-| A5 limited agency | 6 (read surface) + 7 (test-write path) |
-| A6 selection by role | 8 |
-| A7 model discovery | 9 |
-| B1 code review loop | 10 |
-| B2 verifier authors tests | 11 |
-| B3 full suite, bounded fix loop | 12 |
-| C packaging | 13 |
-| D1 sessions view | 15 + 16 (task level) |
-| D2 project setup | 18 (17 is its named precondition) |
-| D3 unresolved-session view | 19 |
-
-No item is built twice. Two items were split into halves by design (A5, D1);
-session 17 is a precondition the plan did not list; sessions 1–2 verified the
-design and the breakdown; **session 20 is outside the plan** — D103 promoted
-the D98 root cause from an owed decision to a session. Spec sections 1–6, 8
-and 9 map onto the sessions above; **§7 (cost) is built by reuse**
-(`metrics.py`, `config.py` overlay, `secret_resolver.py`) exactly as the
-plan's "already exists" table says, and §10 is the deliberately-not list. No
-spec section is unbuilt.
-
-### 2. No skipped lifecycle step, no foreign verdict — MET
-
-Every session has a rounds ledger under `.dabbler/runs/s<N>/` ending in a
-verdict from the verifier's vocabulary, at least one `final-full` run of
-record inside its start–close window, and a `preverify-targeted` run — except
-**session 2**, a prose session that changed no code, so the selector had
-nothing to record. The only two rows with no verifier identity are the
-framework-written cap-landing rows of sessions 12 and 17, which is what a
-`REMEDIATED_AT_CAP` terminal row is.
-
-### 3. Seat cost measured from session 3 onward — NOT MET
-
-Measured and recorded for **four sessions only**: 1 (D38 — `costUsd: null`,
-the metrics gap), 3 (D29, ~$22.48), 4 (D37, ~$8), 5 (D48, ~$10.61). Sessions
-6–14 ran on the seat and recorded no measurement; sessions 15–20 ran on the
-direct API and every `verification.costUsd` in `sessions.json` is `null`. The
-step that owed this ("measure this session's seat cost and record it") was in
-session 3's plan and was not carried into the later sessions' step lists.
-
-**Consequence.** The next set can be planned only against the **$8–$12 per
-ordinary code session** band D37 named from two samples and D48 confirmed
-with a third. **The operator decided on 2026-08-28 not to back-fill** — the
-sessions are closed and the figure would change nothing forward. What
-carries forward is the step: every future session plan carries "measure
-this session's seat cost" as a numbered step, which session 3's did and
-sessions 4–20's did not.
-
-**Recorded as D127** (session 21, orchestrator, 2026-08-28), so the question
-is closed rather than owed. What remains owed is the step, not the figure.
+Criterion met (session 20 ran end to end on the framework the set built);
+check 1 (every plan item exactly once) met; check 2 (no skipped step, no
+foreign verdict) met; **check 3 (seat cost measured from session 3 onward)
+not met** — measured for sessions 1, 3, 4 and 5 only, and **not
+back-filled** by operator decision. The step carries forward: every session
+of the port plan carries "measure this session's seat cost" as a numbered
+step, and session 22 executed it (D136). The full evaluation with its table
+is D127; the previous version of this file carried it in full.
 
 ## Owed, from the record
 
 | Source | What is owed |
 | --- | --- |
-| **D122 gap** | No path by which a verifier reviews a remediated-at-the-cap fix. Sessions 12 and 17 ended that way, so their last fixes are unreviewed today. A review round against a closed session's fix delta, or a next-session round baselined on the remediation's `previous_tree`, is not planned. |
-| **D116** | A targeted-run form for filter-style runners (Maven `-Dtest=`, `dotnet test --filter`) plus the audit rule that checks one. Until then a `runs_whole` suite pays its full suite at pre-verification. "A session, not a patch." |
+| **D122 gap** | No path by which a verifier reviews a remediated-at-the-cap fix. Sessions 12 and 17 ended that way, so their last fixes are unreviewed today. |
+| **D116** | A targeted-run form for filter-style runners (Maven `-Dtest=`, `dotnet test --filter`) plus the audit rule that checks one. "A session, not a patch." The port's vitest path-list form does not need it. |
 | **D124** | Record the round cap on the round row as `verify.py` writes it; the unresolved-session view reads the live cap for a historical session. |
-| **D126 nit 1** | `append_round` must refuse when the tree resolves and the anchor fails (`ledger.py`); otherwise a transient git failure recreates the unportable baseline session 20 removed. |
+| **D126 nit 1** | `append_round` must refuse when the tree resolves and the anchor fails (`ledger.py`). Carried across the port unchanged (session 26). |
 | **D114 nit 2** | `build_task_rows` renders a leaf, not a refusal, when `approved-plan.json` is missing while `step-execution.jsonl` carries an open step. |
-| **D88** | Operator question: does the run core's projection replace the lifecycle's records, or is it retired? Two state systems coexist; `dabbler status` sees no runs in this repository. |
+| **D130 (was D88)** | Not owed — decided. The operator's override window on retiring the run core is open until session 34 starts. |
+| **D134** | Round-1 change sets measure HEAD's raw tree against a snapshot that drops `.dabbler/`, so a repository that tracks its ledger reports it as deleted. Moot here since D135; latent elsewhere. Fix: apply the snapshot's exclusion on the baseline side or in `changed_paths_between`, and declare `.dabbler/` → no test in `dabbler.yaml`. If fixed on the Python side, do it before session 27 ports `affected`. |
 | **D119** | The solution level (one repository per library or service, plus an integrator) is not formalized. |
-| Acceptance check 3 (D127) | The per-session seat-cost measurement step in every future session plan. Not back-filled for 148, by operator decision. |
-| Suite cost, the remainder | Session 21 took the fixture cost out; what is left is the loop's own git traffic. The slowest test spends 8.5 s of 9.5 s in 134 git spawns inside `verify`/`runcore`, so "no test above 1.5 s" needs fewer round-trips per round, not a cheaper fixture. A fake git is still refused: the loop is trust machinery. |
+| Suite cost, the remainder | What is left is the loop's own git traffic (134 spawns in the slowest test). A fake git is still refused. The port's `journal.run_git` twin is where fewer round-trips per round would live. |
 
 ## Carried from the archived handoff, status not re-verified
 
-Three items from the pre-148 *Next* list were not touched by this set and
-were not checked when this file was rewritten. Confirm or drop them:
+Three items from the pre-148 *Next* list were not touched and were not
+checked when this file was rewritten. Confirm or drop them:
 
 - a round cap on `workflow review` (an unattended run keeps calling vendors);
 - the Solution Explorer has not been screenshotted from a real VS Code;
 - the CSV walkthrough is the wrong shape for a supervisor audience.
 
-`.dabbler/runs/` is tracked now, so the archived "`.dabbler/` is git-ignored"
-item is resolved.
+`.dabbler/runs/` is **not** tracked (D135, 2026-08-28), which is the
+framework's own default; the archived "`.dabbler/` is git-ignored" item is
+resolved by being true again.
 
 ## Next
 
-Nothing is registered. Candidates, in the order the record argues for them:
-
-1. **D116** — the per-ecosystem targeted-command form.
-2. **Operator decision pending:** whether the router is ported to TypeScript
-   so the whole framework ships as one Marketplace artifact and the extension
-   calls it in-process. Ground: the runtime is process spawning, file I/O,
-   HTTP, JSON/YAML/TOML, hashing and one read-only SQLite query, all
-   first-class in Node; the three Windows-specific items (`.cmd` shims,
-   rendered-argv measurement, `node:sqlite` instead of a native binding) are
-   bounded. If taken, it is its own set at a set boundary, tests first,
-   transports last, with a parity harness over `.dabbler/runs/` output.
+1. **Session 23 of 35 — contracts.** `packages/router` under a root
+   workspace; types generated from the twenty schemas with a staleness
+   control; the `Router` interface from the extension's actual spawn sites
+   (`session`, `progress`, `modules`, `verify`, `workflow`, `bootstrap`,
+   `test_evidence`, `affected` — the stale `ai_router.report` and
+   `session_lifecycle` strings in the extension go in session 24); the
+   parity control built from `docs/ts-port-parity-control.md` and declared
+   in `dabbler.yaml` beside `tsc --noEmit` and ESLint; the `typescript`
+   suite declared. Read D129–D133 before the first command. Measure the seat
+   cost as step 7.
+2. **Operator:** the D130 override window (run core retired) is open until
+   session 34 starts. The work computer, when it next picks up a session,
+   needs only a clone and `bootstrap` (the round refspecs) — there is no
+   ledger to carry, and a session cannot move mid-flight.
+3. **D116** — the per-ecosystem targeted-command form, unchanged in priority.

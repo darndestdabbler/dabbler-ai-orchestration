@@ -90,6 +90,57 @@ were protecting:
 When the sequence ends — merged or killed — rules 1 and 4 resume with their
 original numbers.
 
+## Traps that have already cost a session
+
+Read these before reaching for the tool they name. Each is here because a
+session hit it, not because anyone imagined it.
+
+### `session close --force` closes the WHOLE PLAN, not one session
+
+Its help says "bypass bookkeeping gates, never evidence; stamps
+forceClosed". What it does not say is in `writers.flip_state_to_closed`:
+
+> `forced` promotes every open session — a forensic marker, not a shortcut.
+
+Every session not already `complete` or `cancelled` is flipped to
+`complete`. Session 24 used it to get past one bookkeeping gate and marked
+sessions 25–35 of the port plan finished. `forceClosed` is also stamped at
+the REPOSITORY level, so the record cannot even say which session forced
+it.
+
+**Use it only to abandon a whole set deliberately.** It is never the way
+past a single gate. If a gate is wrong, prove it is wrong, record the
+proof, and satisfy the gate anyway — a five-minute test run is cheaper
+than a damaged ledger, every time. See D157 and D158.
+
+### The close's freshness gate fails after any commit that DELETES a tracked file
+
+`test_evidence.surface_digest` hashes every path `git ls-files` reports and
+writes the literal string `"deleted"` for one it cannot read. Before the
+commit a deleted-but-tracked file contributes a `path\0deleted` line;
+committing drops it from `ls-files` and that line leaves the digest. No file
+content changed, but `test_run_fresh` fails and asks for another full run.
+
+**Do not force past it.** Prove it if you want the record to say so —
+recompute `tree_digest` over the current tree with the deleted paths
+re-added as `deleted` markers and show it reproduces the recorded one, and
+compare the suite's own `surfaceDigest` either side of the commit — then
+re-run the suite once and close normally. This is **D149**; the fix is owed
+at the git seam.
+
+### Repairing state: `sessions.json` is state, `activity-log.json` is history
+
+If the ledger must be recovered from git, restore **`sessions.json` only**.
+
+`activity-log.json` is append-only, and two things derive from it:
+decision numbering (`ordinal = len(decision entries) + 1`) and
+`decisions-log.md`, which is RENDERED from it and is not a source. Rewinding
+the activity log therefore rolls the decision counter back, and the next
+decision recorded silently overwrites the last real one when the log is
+re-rendered. Session 24 did exactly this and lost the operator's D157 until
+it was restored from the later commit and re-rendered with
+`writers.render_decisions_log`.
+
 ## Environment
 
 - Windows 11, PowerShell primary. Python 3.11+; `.venv` in the repo root.

@@ -1,0 +1,10 @@
+{
+  "claims": [
+    {
+      "claim_id": "renders-without-shelling-out",
+      "kind": "behavior-added",
+      "statement": "render() joins rows with the platform line separator and shells out nowhere.",
+      "paths": ["widget.py"]
+    }
+  ]
+}

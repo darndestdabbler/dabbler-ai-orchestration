@@ -436,3 +436,29 @@ class TestScaffoldProjectConfig:
         loaded = load_suites_checked(load_config(project_dir=str(root)))
         assert loaded.errors == ()
         assert loaded.suites == ()
+
+
+class TestRoundRefMigration:
+    def test_rerunning_bootstrap_teaches_an_existing_clone_to_fetch_rounds(
+        self, tmp_path
+    ):
+        """The fix only reaches the machine a session moves to once that
+        clone fetches refs/dabbler/rounds/*, and clones made before the
+        refs existed carry no such refspec. Bootstrap is re-run on
+        existing projects, so it is the migration."""
+        import subprocess
+
+        from ai_router.evidence import ROUND_REFSPEC
+
+        remote = tmp_path / "remote.git"
+        subprocess.run(["git", "init", "-q", "--bare", str(remote)],
+                       capture_output=True)
+        repo = tmp_path / "clone"
+        subprocess.run(["git", "clone", "-q", str(remote), str(repo)],
+                       capture_output=True)
+        assert main(["--project-dir", str(repo), "--no-transport-detect"]) == 0
+        fetch = subprocess.run(
+            ["git", "-C", str(repo), "config", "--get-all",
+             "remote.origin.fetch"], capture_output=True, text=True,
+        ).stdout.split()
+        assert ROUND_REFSPEC in fetch

@@ -144,6 +144,7 @@ Row fields (required: `round`, `verdict`, `blocking`, `findings`,
 | `cost_usd` | number \| null | **historical only** — dollars are not computed anywhere and no writer emits this key; older ledgers carry it |
 | `baseline_tree` | string \| null | tree-SHA before the session's work |
 | `completion_tree` | string | worktree tree-SHA at this round |
+| `anchor_commit` | string | the framework-authored commit whose tree is `completion_tree`, named by `refs/dabbler/rounds/s<N>/r<R>` from the moment the row was appended, so the baseline survives gc and travels with a push; absent on rows written before rounds were anchored (`verify reanchor` is their recovery) |
 | `previous_tree` | string | previous round's tree-SHA; **required for rounds ≥ 2** (the fix-delta base) |
 | `recorded_at` | string | timestamp |
 | `transport` | string | `api` or `copilot-cli` |

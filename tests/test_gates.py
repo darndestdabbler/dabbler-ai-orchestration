@@ -320,3 +320,20 @@ class TestDriver:
         assert "skipped" in results["working_tree_clean"].remediation
         assert not results["verification_clean"].passed  # still enforced
 
+
+
+class TestClosePushesRoundRefs:
+    def test_the_close_carries_the_session_round_refs_to_the_remote(
+        self, close_ready
+    ):
+        """A bare `git push` leaves refs outside refs/heads behind, so the
+        one push a session makes has to name them or the baseline stays
+        on the machine that recorded it."""
+        from ai_router.evidence import round_ref
+        from ai_router.session import close
+
+        repo, sessions_dir = close_ready
+        assert close(sessions_dir) == 0
+        remote = _git(repo, "remote", "get-url", "origin").stdout.strip()
+        listed = _git(repo, "ls-remote", remote, round_ref(1, 1)).stdout
+        assert round_ref(1, 1) in listed

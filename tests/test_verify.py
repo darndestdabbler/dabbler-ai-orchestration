@@ -1265,3 +1265,51 @@ class TestBaselineReanchorRefusals:
         assert rows[0]["anchor_commit"] == before
         rc, tree, _ = run_git(repo, "rev-parse", before + "^{tree}")
         assert rows[0]["anchor_tree"] == tree
+
+
+class TestRoundBaselineTravels:
+    def test_a_round_recorded_in_one_checkout_resolves_in_another(
+        self, flight, tmp_path
+    ):
+        """The two-checkout case D98 was written about: record a round in
+        A, push the way the operator pushes mid-session, fetch in B, and
+        the fix delta is computable in B from the recorded tree itself --
+        no `verify reanchor`, no substitute baseline."""
+        from ai_router.evidence import (
+            changed_paths_between, ensure_round_refspecs, object_exists,
+            snapshot_worktree_tree,
+        )
+
+        repo, sessions_dir, install = flight
+        install([make_result(BLOCKING_RESPONSE)])
+        assert run_round(sessions_dir) == EXIT_BLOCKING
+        recorded = ledger.read_rounds(repo, 1)[0]["completion_tree"]
+
+        ensure_round_refspecs(repo)
+        # Remediation begins the moment a round reports, so the tree the
+        # round reviewed is never the tree that gets committed: the only
+        # way it reaches another checkout is as a round ref.
+        (repo / "widget.py").write_text(
+            "def f(xs): return 1/len(xs) if xs else 0\n", encoding="utf-8",
+        )
+        subprocess.run(["git", "-C", str(repo), "add", "-A"],
+                       capture_output=True)
+        subprocess.run(["git", "-C", str(repo), "commit", "-q", "-m",
+                        "mid-session work"], capture_output=True)
+        pushed = subprocess.run(["git", "-C", str(repo), "push", "-q"],
+                                capture_output=True, text=True)
+        assert pushed.returncode == 0, pushed.stderr
+
+        rc, remote, _ = run_git(repo, "remote", "get-url", "origin")
+        other = tmp_path / "other"
+        subprocess.run(["git", "clone", "-q", "--no-local", "--branch", "main",
+                        remote,
+                        str(other)], capture_output=True)
+        assert not object_exists(other, recorded)   # a plain clone lacks it
+        ensure_round_refspecs(other)
+        subprocess.run(["git", "-C", str(other), "fetch", "-q"],
+                       capture_output=True)
+
+        assert object_exists(other, recorded)
+        current = snapshot_worktree_tree(other)
+        assert changed_paths_between(other, recorded, current) is not None

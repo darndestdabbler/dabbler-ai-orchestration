@@ -49,6 +49,11 @@
     },
     "baseline_tree": { "type": ["string", "null"] },
     "completion_tree": { "type": "string", "minLength": 7 },
+    "anchor_commit": {
+      "type": "string",
+      "minLength": 7,
+      "description": "The framework-authored commit whose tree is completion_tree, named by refs/dabbler/rounds/s<N>/r<R> from the moment the row was appended. It is what makes the baseline survive garbage collection and travel with a push. Absent on rows written before rounds were anchored, and on a row whose tree the writing store did not hold; verify reanchor is the recovery for both."
+    },
     "previous_tree": { "type": "string", "minLength": 7 },
     "head_commit": {
       "type": ["string", "null"],

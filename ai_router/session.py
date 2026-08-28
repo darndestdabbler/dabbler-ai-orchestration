@@ -28,10 +28,13 @@ from pathlib import Path
 from typing import Optional
 
 from .evidence import (
+    ROUND_REF_NAMESPACE,
     SessionsRootNotFoundError,
+    push_round_refs,
     repo_root_for,
     resolve_sessions_dir,
     run_git,
+    upstream_remote,
 )
 from .ledger import RUNS_DIRNAME
 from .progress import (
@@ -957,6 +960,24 @@ def close(sessions_dir, *, dry_run: bool = False, forced: bool = False) -> int:
                         file=sys.stderr,
                     )
                     return EXIT_GATE_FAILED
+                # The round refs ride with the branch or the baselines
+                # this session recorded stay on this machine: a bare push
+                # carries them only on a clone that ensure_round_refspecs
+                # has configured, and the close does not assume that.
+                refs, err = push_round_refs(repo_root, current)
+                if err:
+                    print(
+                        f"close: state flipped, committed and pushed, but "
+                        f"the round refs did not push: {err}. Run: git "
+                        f"push {upstream_remote(repo_root)} "
+                        f"'{ROUND_REF_NAMESPACE}/s{current}/*:"
+                        f"{ROUND_REF_NAMESPACE}/s{current}/*'",
+                        file=sys.stderr,
+                    )
+                    return EXIT_GATE_FAILED
+                if refs:
+                    print(f"close: pushed {len(refs)} round ref(s) under "
+                          f"{ROUND_REF_NAMESPACE}/s{current}/.")
         return EXIT_OK
     finally:
         release_lock(lock)

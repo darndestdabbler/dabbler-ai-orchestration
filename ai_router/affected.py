@@ -503,13 +503,20 @@ def main(argv=None) -> int:
         from .evidence import object_exists
 
         if baseline and not object_exists(repo_root, baseline):
+            from .evidence import ROUND_REFSPEC, upstream_remote
+
             print(
                 f"affected: the recorded baseline tree {baseline[:12]} is "
                 "not in this repository, so the change set cannot be "
-                "measured. A round snapshot is anchored to no ref and never "
-                "travels with a push; a session that moved machines leaves "
-                "it behind. Re-anchor the round onto a commit this history "
-                "passed through:\n"
+                "measured. A round's snapshot travels as a ref under "
+                "refs/dabbler/rounds/, which a clone fetches only when its "
+                "refspec says so. Fetch them first, and let bootstrap make "
+                "that permanent:\n"
+                f"  git fetch {upstream_remote(repo_root)} '{ROUND_REFSPEC}'\n"
+                "  python -m ai_router.bootstrap --no-transport-detect\n"
+                "If the round was recorded before rounds were anchored, or "
+                "its ref was never pushed, re-anchor it onto a commit this "
+                "history passed through:\n"
                 "  python -m ai_router.verify reanchor --commit <sha> "
                 "--reason \"<why the recorded tree is unreachable>\"",
                 file=sys.stderr,

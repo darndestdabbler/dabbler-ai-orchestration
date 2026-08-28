@@ -50,7 +50,12 @@ from .config import (
     TRANSPORT_ENV_VAR,
     VALID_TRANSPORTS,
 )
-from .evidence import SESSION_PLAN_FILENAME, SESSIONS_DIRNAME
+from .evidence import (
+    SESSION_PLAN_FILENAME,
+    SESSIONS_DIRNAME,
+    ensure_round_refspecs,
+    repo_root_for,
+)
 
 MANAGED_START = "<!-- dabbler:managed:start -->"
 MANAGED_END = "<!-- dabbler:managed:end -->"
@@ -1064,6 +1069,13 @@ def main(argv=None) -> int:
         print(f"bootstrap: wrote managed section in {path}")
     if ensure_gitignore(project):
         print(f"bootstrap: added {_IGNORE_RULE} to {project / '.gitignore'}")
+    # Re-run on an existing clone, this is the migration: a clone made
+    # before round refs existed carries neither refspec, and the fix only
+    # reaches the machine a session moves to once its clone fetches them.
+    if repo_root_for(project):
+        for entry in ensure_round_refspecs(project):
+            print(f"bootstrap: configured {entry} so verification-round "
+                  "baselines travel with a push and a fetch")
     hook = ensure_commit_guard(project)
     if hook is not None:
         print(f"bootstrap: installed the step-execution commit guard at {hook}")

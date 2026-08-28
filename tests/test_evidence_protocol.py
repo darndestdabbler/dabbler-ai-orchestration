@@ -325,3 +325,90 @@ def test_the_run_of_record_recipe_names_what_stands_before_a_close():
     assert f"--stage {STAGE_FINAL_FULL}" in text
     assert "git push" in text
     assert "ai_router.session close" in text
+
+
+class TestRoundRefs:
+    """A round's baseline is reachable from the moment it is recorded, and a
+    clone can be taught to carry it both ways. The retention rule is that
+    nothing here deletes a round ref."""
+
+    def _tree(self, repo):
+        return snapshot_worktree_tree(repo)
+
+    def test_the_anchored_commit_carries_exactly_the_recorded_tree(
+        self, git_repo
+    ):
+        from ai_router import ledger
+        from ai_router.evidence import round_ref
+
+        tree = self._tree(git_repo)
+        row = {
+            "round": 1, "phase": "full", "verdict": "VERIFIED",
+            "blocking": False, "verifier_model": "gpt-5-4",
+            "verifier_provider": "openai", "findings": [],
+            "completion_tree": tree,
+            "recorded_at": "2026-08-28T10:00:00+00:00",
+        }
+        ledger.append_round(git_repo, 7, row)
+        recorded = ledger.read_rounds(git_repo, 7)[0]
+        anchored = subprocess.run(
+            ["git", "-C", str(git_repo), "rev-parse",
+             round_ref(7, 1) + "^{tree}"],
+            capture_output=True, text=True,
+        ).stdout.strip()
+        assert anchored == recorded["completion_tree"]
+        assert recorded["anchor_commit"]
+
+    def test_a_tree_this_store_lacks_gets_no_anchor(self, git_repo):
+        from ai_router import ledger
+        from ai_router.evidence import session_round_refs
+
+        ledger.append_round(git_repo, 7, {
+            "round": 1, "phase": "full", "verdict": "VERIFIED",
+            "blocking": False, "verifier_model": "gpt-5-4",
+            "verifier_provider": "openai", "findings": [],
+            "completion_tree": "0" * 40,
+            "recorded_at": "2026-08-28T10:00:00+00:00",
+        })
+        assert "anchor_commit" not in ledger.read_rounds(git_repo, 7)[0]
+        assert session_round_refs(git_repo, 7) == []
+
+    def test_refspecs_are_added_once_and_only_where_a_remote_exists(
+        self, git_repo, tmp_path
+    ):
+        from ai_router.evidence import (
+            ROUND_PUSH_BRANCH_REFSPEC, ROUND_REFSPEC, ensure_round_refspecs,
+        )
+
+        assert ensure_round_refspecs(git_repo) == []
+        remote = tmp_path / "remote.git"
+        subprocess.run(["git", "init", "-q", "--bare", str(remote)],
+                       capture_output=True)
+        subprocess.run(["git", "-C", str(git_repo), "remote", "add",
+                        "origin", str(remote)], capture_output=True)
+        assert ensure_round_refspecs(git_repo) == [
+            f"remote.origin.fetch={ROUND_REFSPEC}",
+            f"remote.origin.push={ROUND_PUSH_BRANCH_REFSPEC}",
+            f"remote.origin.push={ROUND_REFSPEC}",
+        ]
+        assert ensure_round_refspecs(git_repo) == []
+
+    def test_a_clone_that_chose_its_push_refspecs_keeps_them(
+        self, git_repo, tmp_path
+    ):
+        from ai_router.evidence import ROUND_REFSPEC, ensure_round_refspecs
+
+        remote = tmp_path / "remote.git"
+        subprocess.run(["git", "init", "-q", "--bare", str(remote)],
+                       capture_output=True)
+        subprocess.run(["git", "-C", str(git_repo), "remote", "add",
+                        "origin", str(remote)], capture_output=True)
+        subprocess.run(["git", "-C", str(git_repo), "config", "--add",
+                        "remote.origin.push", "refs/heads/main:refs/heads/main"],
+                       capture_output=True)
+        ensure_round_refspecs(git_repo)
+        pushes = subprocess.run(
+            ["git", "-C", str(git_repo), "config", "--get-all",
+             "remote.origin.push"], capture_output=True, text=True,
+        ).stdout.split()
+        assert pushes == ["refs/heads/main:refs/heads/main", ROUND_REFSPEC]

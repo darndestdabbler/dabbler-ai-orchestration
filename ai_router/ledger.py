@@ -159,7 +159,13 @@ def append_round(
     repo_root, session_number: int, record: dict
 ) -> dict:
     """Append one validated round row. Refuses a duplicate round number —
-    rounds are immutable history, never rewritten."""
+    rounds are immutable history, never rewritten.
+
+    The row's ``completion_tree`` is anchored in the same call: wrapped in
+    a commit that ``refs/dabbler/rounds/s<N>/r<R>`` names, so the baseline
+    the next round diffs from survives garbage collection and travels
+    with a push. A tree this store does not hold gets no anchor and the
+    row says so by carrying no ``anchor_commit``."""
     validate_round(record)
     existing = read_rounds(repo_root, session_number)
     if any(r["round"] == record["round"] for r in existing):
@@ -168,6 +174,13 @@ def append_round(
             f"session {session_number}; rounds are append-only and "
             "never overwritten"
         )
+    from .evidence import anchor_round_tree  # evidence imports this module
+
+    anchor = anchor_round_tree(
+        repo_root, session_number, record["round"], record["completion_tree"]
+    )
+    if anchor:
+        record["anchor_commit"] = anchor
     path = rounds_path(repo_root, session_number)
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "a", encoding="utf-8") as f:

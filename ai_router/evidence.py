@@ -158,11 +158,157 @@ def snapshot_worktree_tree(repo_root) -> Optional[str]:
 
 def object_exists(repo_root, rev: str) -> bool:
     """Whether *rev* names an object this store actually holds. A round
-    snapshot is written through a throwaway index and anchored to no ref,
-    so it is both garbage-collectable and unpushable: a session that moves
-    between machines arrives with rounds whose baseline stayed behind."""
+    snapshot is written through a throwaway index, so on its own it is
+    garbage-collectable and unpushable; :func:`anchor_round_tree` is what
+    makes it reachable, and a round recorded before that existed -- or
+    fetched by a clone that lacks :data:`ROUND_REFSPEC` -- still arrives
+    with its baseline left behind."""
     rc, _, _ = run_git(repo_root, "cat-file", "-e", f"{rev}^{{object}}")
     return rc == 0
+
+
+# --- Round refs: the baseline that travels ----------------------------------
+#
+# A round's completion tree is reachable from refs/dabbler/rounds/s<N>/r<R>,
+# through a framework-authored commit, from the moment the round is
+# recorded. A ref cannot usefully name a bare tree (most servers refuse it on
+# push), so the commit is the object the ref names and the tree it carries
+# hashes identically to the row's completion_tree.
+#
+# Retention: one ref per round per session, kept for good. The objects are a
+# tree the session already had plus one commit, and the history is the
+# point -- a baseline that can be pruned is a baseline that can go missing
+# again. Nothing in ai_router deletes a round ref.
+#
+# The refs live outside refs/heads and refs/tags, so a clone's default
+# refspecs neither push nor fetch them; ensure_round_refspecs() is what
+# teaches a clone to carry them both ways.
+
+ROUND_REF_NAMESPACE = "refs/dabbler/rounds"
+ROUND_REFSPEC = f"+{ROUND_REF_NAMESPACE}/*:{ROUND_REF_NAMESPACE}/*"
+# With remote.<name>.push set at all, a bare `git push` sends only what the
+# refspecs name, so the current branch has to be named beside the rounds.
+# HEAD pushes it to the branch of the same name, which is what push.default's
+# `simple` does on the trunk-based layout every session runs on.
+ROUND_PUSH_BRANCH_REFSPEC = "HEAD"
+_ANCHOR_IDENTITY = {
+    "GIT_AUTHOR_NAME": "dabbler-ai-router",
+    "GIT_AUTHOR_EMAIL": "router@dabbler.invalid",
+    "GIT_COMMITTER_NAME": "dabbler-ai-router",
+    "GIT_COMMITTER_EMAIL": "router@dabbler.invalid",
+}
+
+
+def round_ref(session_number: int, round_number: int) -> str:
+    return f"{ROUND_REF_NAMESPACE}/s{int(session_number)}/r{int(round_number)}"
+
+
+def anchor_round_tree(
+    repo_root, session_number: int, round_number: int, tree: str
+) -> Optional[str]:
+    """Make *tree* reachable: wrap it in a commit and point the round's ref
+    at it. Returns the anchoring commit, or ``None`` when the tree is not
+    in this store -- a row can only anchor an object it has, and inventing
+    one would be a baseline nobody snapshotted."""
+    if not object_exists(repo_root, tree):
+        return None
+    env = dict(os.environ, **_ANCHOR_IDENTITY)
+    rc, commit, _ = run_git(
+        repo_root, "commit-tree", tree, "-m",
+        f"dabbler round snapshot: session {session_number} round "
+        f"{round_number}",
+        env=env,
+    )
+    commit = (commit or "").strip()
+    if rc != 0 or not commit:
+        return None
+    rc, _, _ = run_git(
+        repo_root, "update-ref", round_ref(session_number, round_number),
+        commit,
+    )
+    return commit if rc == 0 else None
+
+
+def session_round_refs(repo_root, session_number: int) -> list:
+    """Every round ref this session has, ascending by round."""
+    prefix = f"{ROUND_REF_NAMESPACE}/s{int(session_number)}/"
+    rc, out, _ = run_git(
+        repo_root, "for-each-ref", "--format=%(refname)", prefix,
+    )
+    if rc != 0 or not out:
+        return []
+    refs = [line.strip() for line in out.splitlines() if line.strip()]
+
+    def _round(ref):
+        tail = ref.rsplit("/", 1)[-1]
+        return int(tail[1:]) if tail[1:].isdigit() else 0
+
+    return sorted(refs, key=_round)
+
+
+def upstream_remote(repo_root) -> str:
+    """The remote the current branch pushes to, or ``origin`` when the
+    branch names none."""
+    rc, branch, _ = run_git(repo_root, "symbolic-ref", "--short", "-q", "HEAD")
+    branch = (branch or "").strip()
+    if rc == 0 and branch:
+        rc, remote, _ = run_git(
+            repo_root, "config", "--get", f"branch.{branch}.remote"
+        )
+        remote = (remote or "").strip()
+        if rc == 0 and remote:
+            return remote
+    return "origin"
+
+
+def push_round_refs(repo_root, session_number: int) -> tuple:
+    """``(pushed_refs, error)``: push the session's round refs to the
+    branch's remote. A push that carries the branch and silently leaves
+    the rounds behind is the defect this exists to close, so an error is
+    returned, never swallowed. No refs is not an error."""
+    refs = session_round_refs(repo_root, session_number)
+    if not refs:
+        return [], None
+    rc, _, err = run_git(
+        repo_root, "push", upstream_remote(repo_root),
+        *[f"{ref}:{ref}" for ref in refs],
+    )
+    if rc != 0:
+        return [], err or f"git push exited {rc}"
+    return refs, None
+
+
+def ensure_round_refspecs(repo_root, remote: Optional[str] = None) -> list:
+    """Teach the clone to carry round refs both ways; returns the config
+    values added (empty when it already did). Fetching is what makes a
+    round recorded elsewhere resolve here; pushing is what lets the
+    operator's own mid-session push move a session without stranding its
+    baselines. Any push refspec the clone already had is kept as it is
+    and the branch entry is added only when there was none, because a
+    clone that chose its own push refspecs chose what a bare push sends."""
+    remote = remote or upstream_remote(repo_root)
+    rc, _, _ = run_git(repo_root, "remote", "get-url", remote)
+    if rc != 0:
+        return []  # no remote, nothing to carry the refs to or from
+    added = []
+    for key, value in (
+        (f"remote.{remote}.fetch", ROUND_REFSPEC),
+        (f"remote.{remote}.push", ROUND_REFSPEC),
+    ):
+        rc, existing, _ = run_git(repo_root, "config", "--get-all", key)
+        current = [
+            line.strip() for line in (existing or "").splitlines()
+            if line.strip()
+        ] if rc == 0 else []
+        if value in current:
+            continue
+        if key.endswith(".push") and not current:
+            run_git(repo_root, "config", "--add", key, ROUND_PUSH_BRANCH_REFSPEC)
+            added.append(f"{key}={ROUND_PUSH_BRANCH_REFSPEC}")
+        rc, _, _ = run_git(repo_root, "config", "--add", key, value)
+        if rc == 0:
+            added.append(f"{key}={value}")
+    return added
 
 
 def changed_paths_between(repo_root, tree_a: str, tree_b: str) -> Optional[list]:

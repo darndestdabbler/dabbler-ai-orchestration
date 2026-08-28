@@ -1,0 +1,6 @@
+VERIFIED — The core path correctly anchors each valid snapshot, explicitly pushes round refs at close, configures fetch migration, and demonstrates two-checkout baseline resolution. No likely main-path defect rises to blocking severity.
+
+## NITS
+
+- **Nit:** `ai_router/ledger.py:append_round` still appends a round when `anchor_round_tree` fails, while the requirement says to “Anchor each snapshot as it is recorded.” A transient `commit-tree` or `update-ref` failure would recreate an unportable baseline. This is low-probability, but the append should fail closed rather than recording no `anchor_commit`; `tests/test_evidence_protocol.py::test_a_tree_this_store_lacks_gets_no_anchor` currently endorses the weaker behavior.
+- **Nit:** `tests/test_bootstrap.py::TestRoundRefMigration` is explicitly a migration-path test despite the test-budget prohibition on that test kind. The required portability behavior is already exercised by the two-checkout acceptance test in `tests/test_verify.py`; the standalone migration-path test should be removed or folded into that behavioral test.

@@ -2204,3 +2204,53 @@ invariant test caught this, which is the test doing its job.
 
 869 tests green, one added: a tracked ledger with an uncommitted round-2
 write does not refuse the next registration.
+
+### D97 · 2026-08-27 · Operator · The task level returns in session 15, folded from the enforced record rather than the narrated one
+
+Staff wanted a task level below the session and the previous one was
+withdrawn because it drifted. The operator's condition is exact: it is
+worth having **only if** the Explorer is reliably updated when a task ends
+and the next begins.
+
+**The old level drifted for a structural reason, not a bug.** The tree
+rendered `activity-log.json` step entries written by `writers.log_step`,
+reachable only through `python -m ai_router.session log` -- a command an
+engine calls voluntarily. `progress.build_step_rows` is visibly a
+reconciliation layer for that unreliable writer: "keys are derived slugs
+an engine paraphrases", "unclaimed logged steps append", "an in-progress
+log followed by a complete log must not lose the start". Rows built on a
+narration cannot be more reliable than the narrator.
+
+**The framework already has an enforced record, and it is not the one the
+tree reads.** `.dabbler/runs/s<N>/step-execution.jsonl` takes a row when a
+step is *opened* against a declared `approved-plan.json` step, anchored to
+a base commit; the close is earned against the step's own file envelope
+and deterministic evidence; and `ensure_commit_guard` installs a
+pre-commit hook that refuses a commit while a step is open. The schema
+carries the invariant -- the last `opened` with no `closed` after it is
+the open step, and there is never more than one -- and states that a row
+failing validation is a refusal rather than a skip. Nothing there depends
+on an engine choosing to report.
+
+So the task level is not new work to invent; it is a matter of pointing
+the rows at the record that is already enforced. Added to session 15 as
+steps 6-10.
+
+**Two requirements are load-bearing and are written as such.** The
+watcher must cover `.dabbler/runs/*/step-execution.jsonl`: the tree today
+watches only `docs/session-sets/**` -- dead after session 14 -- and
+otherwise falls back to a 30-second poll, and a task level up to 30
+seconds stale is the same surface staff already rejected. Its acceptance
+test is a *transition*, not a render. And an unreadable execution record
+must make the tree say it cannot tell, never show the last good row as
+current; stale-but-plausible is the failure this level exists to end.
+
+**The session is now two subsystems, which is what made session 14
+unfinishable.** The orchestrator's recommendation was a separate session
+after 15; the operator asked for it in 15, and that is the operator's
+call. What the spec adds in exchange is a **named seam**: steps 2-5 are
+the view, steps 6-10 are the task level, they share only the row
+dispatch, and the task level depends on the view rather than the reverse.
+D92's lesson was that the evidence cap is a planning signal and not a
+threshold to get under. Naming the split in advance is how that signal
+produces a split next time instead of a heroic round.

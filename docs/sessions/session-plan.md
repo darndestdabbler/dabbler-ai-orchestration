@@ -523,13 +523,59 @@ Python tests.
    CLI `--session` argument keep the plain integer. One formatter owns the
    padding so the tree, the CLI's human output and any status line cannot
    disagree about how a session is named.
-6. Affected tests as preverify.
-7. Cross-provider verification.
-8. Full test suite, recorded as the `final-full` run of record.
-9. Close-out.
+6. **A task level below the session, read from the enforced record.** A
+   task row's position and label come from the session's
+   `approved-plan.json` (`steps[].step_id`, `steps[].intent`); its
+   execution state comes from `.dabbler/runs/s<N>/step-execution.jsonl`
+   through `ledger.read_step_events`, `ledger.open_step` and
+   `ledger.closed_step_ids`. Pending, in flight, done — folded, never
+   maintained.
+7. **Do not read step status from `activity-log.json`.** That is the layer
+   that drifted. `writers.log_step` is reached only through
+   `python -m ai_router.session log`, which an engine calls voluntarily or
+   forgets to; `progress.build_step_rows` is visibly built around that
+   unreliability ("keys are derived slugs an engine paraphrases",
+   "unclaimed logged steps append"). `step-execution.jsonl` cannot drift
+   the same way: a step is opened against a declared plan step and
+   anchored to a base commit, the close is *earned* against the step's own
+   envelope and deterministic evidence, and a pre-commit hook refuses a
+   commit while a step is open. **This is the whole reason the task level
+   is worth building now and was not worth keeping before.**
+8. **The invariant is rendered, not recomputed.** The last `opened` row
+   with no `closed` row after it is the open step, and there is never more
+   than one. If the tree ever shows two tasks in flight for one session,
+   that is a defect in the fold, not a state the record can hold.
+9. **An unreadable execution record refuses; it never falls back.** The
+   schema says a row failing validation is a refusal, not a skip, because
+   a framework that cannot tell what is open must not guess. The tree says
+   it cannot tell — it does not show the last good row as if it were
+   current. Stale-but-plausible is the failure mode this level exists to
+   end.
+10. **The watcher covers the execution record, and this is the operator's
+    condition, not a nicety.** The tree today watches only
+    `docs/session-sets/**` (dead after session 14) and otherwise falls
+    back to a 30-second poll. A task level that is up to 30 seconds behind
+    is the same untrustworthy surface staff already rejected. The watcher
+    must include `.dabbler/runs/*/step-execution.jsonl` so a step opening
+    or closing refreshes the row on the event. **The acceptance test is a
+    transition, not a render:** open a step, assert the row goes in-flight
+    without a poll; close it, assert the row completes and the next opens.
+11. Affected tests as preverify.
+12. Cross-provider verification.
+13. Full test suite, recorded as the `final-full` run of record.
+14. Close-out.
 
-**Creates:** the collapsed tree, padded row labels, and the icons
-untouched. Est. 8 TS tests.
+**Creates:** the collapsed tree, padded row labels, the icons untouched,
+and a task level that is a fold of an enforced record rather than a
+narration. Est. 16 TS tests.
+
+**If the evidence bundle refuses, split here and not elsewhere.** Steps
+2–5 are the view; steps 6–10 are the task level. They share no code beyond
+the tree model's row dispatch, and the task level depends on the collapsed
+view existing rather than the reverse. Session 14 was unfinishable because
+it carried two subsystems and the cap said so before the orchestrator did
+(D92); this session names its seam in advance so the same signal produces a
+split instead of a heroic round.
 
 ### Session 16 of 17: Project setup as two sessions (plan D2)
 

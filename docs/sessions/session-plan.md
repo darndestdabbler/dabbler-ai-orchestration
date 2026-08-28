@@ -82,7 +82,7 @@ and the three currencies — seat premium requests, API dollars, and the
 subscription window — do not exchange.
 
 **Measure it at session 3 and re-plan if the rate does not support
-seventeen.** Session 3 is the first ordinary code session, so its cost is
+eighteen.** Session 3 is the first ordinary code session, so its cost is
 the honest unit. Do not wait until session 13 to find out. Re-planning
 means fewer, larger sessions — not fewer verification rounds, which is the
 one thing this set exists to prove out.
@@ -118,7 +118,7 @@ or remediated at the cap.
 
 ## Sessions
 
-### Session 1 of 17: Verify the design before anything is built
+### Session 1 of 18: Verify the design before anything is built
 
 1. Register.
 2. Run cross-provider verification over `docs/session-framework-spec.md`
@@ -139,7 +139,7 @@ or remediated at the cap.
 measurement of what a verification round costs on the seat.
 Est. 0 tests — this session writes no code.
 
-### Session 2 of 17: Verify this breakdown against that design
+### Session 2 of 18: Verify this breakdown against that design
 
 1. Register.
 2. Check this session list against the verified specification and plan:
@@ -156,7 +156,7 @@ Est. 0 tests — this session writes no code.
 approval gates the specification used to carry. Est. 0 tests.
 
 
-### Session 3 of 17: The credential allowlist (plan A1)
+### Session 3 of 18: The credential allowlist (plan A1)
 
 1. Register.
 2. **Replace the operator override with an honest terminal state — one
@@ -205,7 +205,7 @@ approval gates the specification used to carry. Est. 0 tests.
 4. Add a Windows sentinel test that plants a secret in the parent
    environment and asserts a spawned check process cannot see it.
 5. **Measure this session's seat cost and record it in the set's decisions
-   log.** This is the unit that says whether seventeen sessions fit.
+   log.** This is the unit that says whether eighteen sessions fit.
 6. Affected tests as preverify.
 7. Cross-provider verification.
 8. Full test suite, recorded as the `final-full` run of record.
@@ -225,7 +225,7 @@ Python tests.
 
 
 
-### Session 4 of 17: Record authority (plan A2)
+### Session 4 of 18: Record authority (plan A2)
 
 1. Register.
 2. One `validate_transition()` used by both `workflow.append()` and
@@ -246,7 +246,7 @@ Python tests.
 tests.
 
 
-### Session 5 of 17: The two files, framework-written (plan A4)
+### Session 5 of 18: The two files, framework-written (plan A4)
 
 1. Register.
 2. `project-work-plan.md` and `decisions-log.md` written only through
@@ -275,7 +275,7 @@ declaration session 13 reads. Est. 8 Python tests.
 > here because this is the session that already writes the session list.
 
 
-### Session 6 of 17: The verifier's read surface (plan A5, first half)
+### Session 6 of 18: The verifier's read surface (plan A5, first half)
 
 1. Register.
 2. Three operations for the verifier on the Copilot path: list files with a
@@ -305,7 +305,7 @@ Python tests.
 > shown*.
 
 
-### Session 7 of 17: The test-write path (plan A5, second half)
+### Session 7 of 18: The test-write path (plan A5, second half)
 
 1. Register.
 2. The fourth operation: create or modify a test file. **The framework
@@ -320,7 +320,7 @@ Python tests.
 **Creates:** the only write the verifier gets, and its enforcement.
 Est. 8 Python tests.
 
-### Session 8 of 17: Selection by role, and the death of the tier ladder (plan A6)
+### Session 8 of 18: Selection by role, and the death of the tier ladder (plan A6)
 
 1. Register.
 2. Lift roles out of the Copilot transport block; both paths resolve the
@@ -365,7 +365,7 @@ surface; a net deletion. Est. 12 Python tests, with more deleted than added.
 > session already rewrites — one config change, one review.
 
 
-### Session 9 of 17: Model discovery (plan A7)
+### Session 9 of 18: Model discovery (plan A7)
 
 1. Register.
 2. Enumerate each vendor's models endpoint on the direct-API path and write
@@ -388,7 +388,7 @@ surface; a net deletion. Est. 12 Python tests, with more deleted than added.
 **Creates:** enumeration, the staleness check, and the drift diff.
 Est. 10 Python tests.
 
-### Session 10 of 17: The code review loop (plan B1)
+### Session 10 of 18: The code review loop (plan B1)
 
 1. Register.
 2. `verify → fix`, cap 3, stopping early when only Minor findings remain.
@@ -424,7 +424,7 @@ tests.
 > exit that was not a false statement on the record.
 
 
-### Session 11 of 17: The verifier authors tests, the framework runs them (plan B2)
+### Session 11 of 18: The verifier authors tests, the framework runs them (plan B2)
 
 1. Register.
 2. The verifier writes test files through the session 7 write path;
@@ -440,7 +440,7 @@ tests.
 
 **Creates:** the authoring hand-off and the test loop. Est. 8 Python tests.
 
-### Session 12 of 17: The full suite and its bounded fix loop (plan B3)
+### Session 12 of 18: The full suite and its bounded fix loop (plan B3)
 
 1. Register.
 2. The suite runs against the tree including the verifier's new tests. On
@@ -460,7 +460,7 @@ tests.
 **Creates:** the envelope, which is the whole feature. Est. 10 Python
 tests.
 
-### Session 13 of 17: Packaging to the feed (plan C)
+### Session 13 of 18: Packaging to the feed (plan C)
 
 1. Register.
 2. `pack`, then `push` to the Azure DevOps feed with the operator's PAT,
@@ -477,7 +477,7 @@ tests.
 **Creates:** the one thing staff explicitly asked the framework to do.
 Est. 8 Python tests.
 
-### Session 14 of 17: Collapse session sets (plan A3)
+### Session 14 of 18: Collapse session sets (plan A3)
 
 1. Register — **for the last time under the set-based machinery.**
 2. Sessions numbered directly in a repository. Remove the set level from
@@ -495,7 +495,7 @@ Est. 8 Python tests.
 through it. **The risk here is missed references, not design.** Est. 12
 Python tests.
 
-### Session 15 of 17: The sessions view (plan D1)
+### Session 15 of 18: The sessions view (plan D1)
 
 1. Register — under the collapsed machinery from session 14.
 2. Sessions view without the set level, preserving the existing row actions
@@ -523,14 +523,33 @@ Python tests.
    CLI `--session` argument keep the plain integer. One formatter owns the
    padding so the tree, the CLI's human output and any status line cannot
    disagree about how a session is named.
-6. **A task level below the session, read from the enforced record.** A
+6. **The renumbering that created this session is itself a case to
+   handle.** `sessions.json` holds a title per session and
+   `progress.heal_title` replaces a stored title only when it is generic,
+   so re-cutting a plan leaves the moved sessions carrying the titles of
+   whatever used to sit at their numbers — sessions 17 and 18 are in that
+   state right now. This session renders those titles, so it is the one
+   that has to notice they can be stale. A not-started session with no
+   history has no title worth preserving against the plan's.
+7. Affected tests as preverify.
+8. Cross-provider verification.
+9. Full test suite, recorded as the `final-full` run of record.
+10. Close-out.
+
+**Creates:** the collapsed tree, padded row labels, and the icons
+untouched. Est. 8 TS tests.
+
+### Session 16 of 18: The task level (plan D1, second half)
+
+1. Register.
+2. **A task level below the session, read from the enforced record.** A
    task row's position and label come from the session's
    `approved-plan.json` (`steps[].step_id`, `steps[].intent`); its
    execution state comes from `.dabbler/runs/s<N>/step-execution.jsonl`
    through `ledger.read_step_events`, `ledger.open_step` and
    `ledger.closed_step_ids`. Pending, in flight, done — folded, never
    maintained.
-7. **Do not read step status from `activity-log.json`.** That is the layer
+3. **Do not read step status from `activity-log.json`.** That is the layer
    that drifted. `writers.log_step` is reached only through
    `python -m ai_router.session log`, which an engine calls voluntarily or
    forgets to; `progress.build_step_rows` is visibly built around that
@@ -541,43 +560,40 @@ Python tests.
    envelope and deterministic evidence, and a pre-commit hook refuses a
    commit while a step is open. **This is the whole reason the task level
    is worth building now and was not worth keeping before.**
-8. **The invariant is rendered, not recomputed.** The last `opened` row
+4. **The invariant is rendered, not recomputed.** The last `opened` row
    with no `closed` row after it is the open step, and there is never more
    than one. If the tree ever shows two tasks in flight for one session,
    that is a defect in the fold, not a state the record can hold.
-9. **An unreadable execution record refuses; it never falls back.** The
+5. **An unreadable execution record refuses; it never falls back.** The
    schema says a row failing validation is a refusal, not a skip, because
    a framework that cannot tell what is open must not guess. The tree says
    it cannot tell — it does not show the last good row as if it were
    current. Stale-but-plausible is the failure mode this level exists to
    end.
-10. **The watcher covers the execution record, and this is the operator's
-    condition, not a nicety.** The tree today watches only
-    `docs/session-sets/**` (dead after session 14) and otherwise falls
-    back to a 30-second poll. A task level that is up to 30 seconds behind
-    is the same untrustworthy surface staff already rejected. The watcher
-    must include `.dabbler/runs/*/step-execution.jsonl` so a step opening
-    or closing refreshes the row on the event. **The acceptance test is a
-    transition, not a render:** open a step, assert the row goes in-flight
-    without a poll; close it, assert the row completes and the next opens.
-11. Affected tests as preverify.
-12. Cross-provider verification.
-13. Full test suite, recorded as the `final-full` run of record.
-14. Close-out.
+6. **The watcher covers the execution record, and this is the operator's
+   condition, not a nicety.** The tree today watches only
+   `docs/session-sets/**` (dead after session 14) and otherwise falls back
+   to a 30-second poll. A task level that is up to 30 seconds behind is the
+   same untrustworthy surface staff already rejected. The watcher must
+   include `.dabbler/runs/*/step-execution.jsonl` so a step opening or
+   closing refreshes the row on the event. **The acceptance test is a
+   transition, not a render:** open a step, assert the row goes in-flight
+   without a poll; close it, assert the row completes and the next opens.
+7. Affected tests as preverify.
+8. Cross-provider verification.
+9. Full test suite, recorded as the `final-full` run of record.
+10. Close-out.
 
-**Creates:** the collapsed tree, padded row labels, the icons untouched,
-and a task level that is a fold of an enforced record rather than a
-narration. Est. 16 TS tests.
+**Creates:** a task level that is a fold of an enforced record rather than
+a narration. Est. 8 TS tests.
 
-**If the evidence bundle refuses, split here and not elsewhere.** Steps
-2–5 are the view; steps 6–10 are the task level. They share no code beyond
-the tree model's row dispatch, and the task level depends on the collapsed
-view existing rather than the reverse. Session 14 was unfinishable because
-it carried two subsystems and the cap said so before the orchestrator did
-(D92); this session names its seam in advance so the same signal produces a
-split instead of a heroic round.
+**This session depends on session 15 and not the reverse.** The two share
+only the tree model's row dispatch. Session 15's own spec named this seam
+in advance -- steps 2-5 were the view, steps 6-10 were the task level --
+after session 14 proved what carrying two subsystems costs (D92). The
+operator cut it here rather than discovering the cap again mid-round.
 
-### Session 16 of 17: Project setup as two sessions (plan D2)
+### Session 17 of 18: Project setup as two sessions (plan D2)
 
 1. Register.
 2. Create or import the project plan, then break it into numbered sessions
@@ -596,7 +612,7 @@ split instead of a heroic round.
 **Creates:** project setup, which is the framework's own sessions 1 and 2
 made available to everyone else. Est. 8 TS tests.
 
-### Session 17 of 17: The unresolved-session view (plan D3)
+### Session 18 of 18: The unresolved-session view (plan D3)
 
 1. Register.
 2. Read at planning time rather than as an interruption: what stopped, at
@@ -622,7 +638,7 @@ useful instead of merely failed. Est. 8 TS tests.
 ## Acceptance criterion for the set
 
 **The framework can run its own next session.** Not "the tests pass" and
-not "the plan was followed" — the working test is whether session 17 could
+not "the plan was followed" — the working test is whether session 18 could
 have been specified, developed, verified, tested and closed by the thing
 this set built, rather than by the machinery it replaces.
 

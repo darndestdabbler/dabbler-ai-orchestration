@@ -2514,3 +2514,49 @@ operator question (D88) about whether it survives at all. Each fix was
 correct and each exposed the next. That is what verifying a subsystem for
 the first time looks like, and it is also what D92 warned about: session 14
 carries two subsystems, and the second one is where the rounds went.
+
+### D102 · 2026-08-28 · Operator · Session 15 splits in two at the seam its own spec named
+
+Session 15 carried two subsystems. It is now two sessions, cut at the seam
+its own specification named in advance.
+
+**Session 15 is the view** — the collapsed tree, the operator's four status
+icons untouched, and the three-digit padded row label. **Session 16 is the
+task level** — the fold of `step-execution.jsonl`, the invariant rendered
+rather than recomputed, the refusal on an unreadable record, and the
+watcher whose acceptance test is a transition rather than a render. The
+former sessions 16 and 17 become 17 and 18, and the set is eighteen
+sessions.
+
+**The seam was already written down, which is the whole point.** D97
+recorded the orchestrator's recommendation to split and the operator's
+decision to keep both halves in one session, and in exchange the spec named
+where it would break if it had to: steps 2-5 were the view, steps 6-10 were
+the task level, they shared only the tree model's row dispatch, and the
+task level depended on the view rather than the reverse. That is exactly
+where the cut lands. Nothing had to be re-derived.
+
+**Session 14 is why the operator revisited it.** D92 said the evidence cap
+is a planning signal rather than a threshold to get under, and session 14
+then spent seven verification rounds -- four of them on a second subsystem
+it had absorbed mid-flight. A named seam that is never used is just a
+comment. This is the signal producing a split before the rounds rather than
+after them.
+
+**One consequence is not free, and session 15 inherits it.** `sessions.json`
+holds a title per session, and `progress.heal_title` replaces a stored title
+only when it is generic. Re-cutting a plan therefore leaves moved sessions
+carrying the titles of whatever used to sit at their numbers: sessions 17
+and 18 are in that state now, and the next `session start` will rebuild the
+array from the plan without correcting them, because their stored titles are
+specific rather than generic. A not-started session with no history has no
+title worth preserving against the plan's, and the session that renders
+those titles is the one that should notice they can be stale. It is written
+into session 15's specification as step 6 rather than left as a surprise.
+
+**This is a planning edit made outside a session**, at the operator's
+direction, the same way D95 and D97 added steps to session 15's spec.
+Session 14 is closed and verified; no code changed here. The decisions log
+keeps its earlier "seventeen sessions" references untouched -- they were
+true when they were written, and rewriting history to match a later
+decision is the one thing a record must not do.

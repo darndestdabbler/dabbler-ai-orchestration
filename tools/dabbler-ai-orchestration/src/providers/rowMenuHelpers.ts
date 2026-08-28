@@ -103,3 +103,32 @@ export function sessionOffersRunPrompt(
 ): boolean {
   return nextRunnableSessionNumber(repository.sessions) === session.number;
 }
+
+/**
+ * Whether *session* is one the operator acts on at planning time: its
+ * rounds ledger folded to a TERMINAL state that is not clean. Python
+ * decided both; this only asks. A loop still open (no terminal yet) is
+ * rendered but not acted on — offering "send back" against a round the
+ * engine is still answering would race the engine. A refused ledger does
+ * not qualify either: there is nothing readable to send back or respecify
+ * against, and the refusal row already says what is wrong.
+ */
+export function sessionNeedsReading(session: SessionRecord): boolean {
+  const view = session.verification;
+  return view !== null && view.terminal !== null && !view.clean;
+}
+
+/**
+ * Whether *session* is in flight AND unresolved at the cap — the one
+ * state the lifecycle cannot close out of. The router refuses to cancel a
+ * session in flight without `--force`, and that refusal is right for live
+ * work; here it would leave the session with no exit at all, so cancel is
+ * the sanctioned one and the flag is passed on the record's say-so.
+ */
+export function sessionCannotClose(session: SessionRecord): boolean {
+  return (
+    session.status === "in-progress" &&
+    session.verification !== null &&
+    session.verification.terminal === "ISSUES_FOUND"
+  );
+}

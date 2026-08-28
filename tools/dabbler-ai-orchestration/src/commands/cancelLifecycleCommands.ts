@@ -6,6 +6,7 @@ import {
 } from "../utils/sessionLifecycleCli";
 import { RunRouterCliDeps } from "../utils/routerCli";
 import { sessionRowLabel } from "../providers/sessionsModel";
+import { sessionCannotClose } from "../providers/rowMenuHelpers";
 import { asSessionNode } from "./workExplorerTreeCommands";
 
 /** What a row must carry for these flows: where to spawn, and which
@@ -14,6 +15,12 @@ export interface CancellableSession {
   root: string;
   number: number;
   name: string;
+  /**
+   * Pass `--force`: the session is in flight and unresolved at the cap,
+   * so it cannot close and cancel is its one exit. Read off the record,
+   * never asked of the operator.
+   */
+  force?: boolean;
 }
 
 /**
@@ -29,6 +36,7 @@ export function cancellableSessionOf(arg: unknown): CancellableSession | undefin
     root: node.repository.root,
     number: node.session.number,
     name: sessionRowLabel(node.session),
+    force: sessionCannotClose(node.session),
   };
 }
 
@@ -85,7 +93,11 @@ export async function runCancelSessionFlow(
   // "Cancel" reads as "abort this dialog" rather than "perform the action".
   const choice = await ui.confirm(
     `Cancel session ${session.number} "${session.name}"?`,
-    "The reason is recorded on the session, which can be restored later.",
+    session.force
+      ? "This session is unresolved at the cap and cannot close, so it is " +
+          "cancelled in flight. Nothing it built lands; its record stays. " +
+          "The reason is recorded on the session, which can be restored later."
+      : "The reason is recorded on the session, which can be restored later.",
     "Cancel Session",
     "Keep",
   );
@@ -104,6 +116,7 @@ export async function runCancelSessionFlow(
     session.number,
     reason ?? "",
     cliDeps,
+    session.force === true,
   );
   if (!result.ok) {
     ui.showErrorMessage(

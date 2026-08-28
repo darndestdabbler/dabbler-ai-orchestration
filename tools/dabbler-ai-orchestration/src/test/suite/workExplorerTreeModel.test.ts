@@ -4,6 +4,7 @@ import {
   actionToken,
   childrenOf,
   descriptorFor,
+  findingDescriptor,
   hasToken,
   humanizeStepKey,
   repositoryDescriptor,
@@ -18,9 +19,16 @@ import {
   taskNodes,
   taskRowLabel,
   tokenString,
+  verificationDescriptor,
 } from "../../providers/workExplorerTreeModel";
 import { SESSION_ACTIONS } from "../../providers/ActionRegistry";
-import { makeRepository, makeSession, makeTask } from "./helpers";
+import {
+  makeFinding,
+  makeRepository,
+  makeSession,
+  makeTask,
+  makeVerification,
+} from "./helpers";
 
 suite("workExplorerTreeModel: nodes", () => {
   test("sessions render as one list in ledger order, never bucketed by status", () => {
@@ -377,6 +385,7 @@ suite("workExplorerTreeModel: task rows", () => {
       kind: "refusal",
       repository,
       session: makeSession({ status: "in-progress" }),
+      subject: "execution record",
       reason: "execution record: row 2 failed schema validation at event",
     });
     assert.strictEqual(d.label, "Execution record unreadable");
@@ -396,6 +405,156 @@ suite("workExplorerTreeModel: task rows", () => {
     const d = sessionDescriptor({ kind: "session", repository, session: refused });
     assert.ok(hasToken(d.contextValue, "severity-record"));
     assert.strictEqual(d.collapsible, "collapsed");
+  });
+});
+
+suite("workExplorerTreeModel: the unresolved-session view", () => {
+  const repository = makeRepository();
+  const sessionNode = (session: ReturnType<typeof makeSession>) =>
+    ({ kind: "session", repository, session }) as const;
+
+  test("a session that stopped at the cap reads first, then its tasks; a verified one has nothing to read", () => {
+    const stopped = makeSession({
+      status: "in-progress",
+      verification: makeVerification(),
+      tasks: [makeTask()],
+    });
+    assert.deepStrictEqual(
+      childrenOf(sessionNode(stopped)).map((n) => n.kind),
+      ["verification", "task"],
+    );
+    // A closed session carries the row too: it is read at planning time,
+    // long after it stopped being the one in flight.
+    const landed = makeSession({
+      status: "complete",
+      verification: makeVerification({ terminal: "REMEDIATED_AT_CAP" }),
+    });
+    assert.strictEqual(sessionDescriptor(sessionNode(landed)).collapsible, "collapsed");
+    // Python said clean; the tree asks nothing further.
+    const verified = makeSession({
+      status: "complete",
+      verification: makeVerification({ terminal: "VERIFIED", headline: "verified", clean: true }),
+    });
+    assert.deepStrictEqual(childrenOf(sessionNode(verified)), []);
+    assert.strictEqual(sessionDescriptor(sessionNode(verified)).collapsible, "none");
+  });
+
+  test("the verification row repeats Python's headline and mints terminal and agency tokens", () => {
+    const none = verificationDescriptor({
+      kind: "verification",
+      repository,
+      session: makeSession(),
+      view: makeVerification(),
+    });
+    assert.strictEqual(none.label, "Unresolved at the cap");
+    assert.ok(none.description!.includes("round 3 of 3"), none.description);
+    assert.ok(none.description!.includes("gpt-5-6-sol/openai"), none.description);
+    assert.ok(hasToken(none.contextValue, "terminal-issues_found"));
+    assert.ok(hasToken(none.contextValue, "agency-none"));
+    assert.ok(!hasToken(none.contextValue, "transformed-reads"));
+    assert.ok(none.tooltip!.includes("could not look at the tree"));
+    assert.ok(none.tooltip!.includes("no approval to give"));
+
+    const transformed = verificationDescriptor({
+      kind: "verification",
+      repository,
+      session: makeSession(),
+      view: makeVerification({
+        agency: {
+          ...makeVerification().agency,
+          mode: "tools",
+          reads: 4,
+          transformedReads: 1,
+          operations: [
+            { kind: "read", target: "ai_router/checks.py", fidelity: "transformed", inScope: true },
+            { kind: "search", target: "spawn", fidelity: "verbatim", inScope: true },
+            { kind: "read", target: "README.md", fidelity: "verbatim", inScope: false },
+          ],
+        },
+      }),
+    });
+    assert.ok(hasToken(transformed.contextValue, "agency-tools"));
+    assert.ok(hasToken(transformed.contextValue, "transformed-reads"));
+    assert.ok(transformed.tooltip!.includes("1 read(s) were transformed"));
+    // The targets themselves, not only the counts: which file a Major
+    // came from is what the operator weighs it against.
+    assert.ok(transformed.tooltip!.includes("- read ai_router/checks.py (transformed)"));
+    assert.ok(transformed.tooltip!.includes("- search spawn\n"));
+    assert.ok(transformed.tooltip!.includes("- read README.md (out of scope)"));
+  });
+
+  test("a stopping round past a since-lowered cap is not squeezed into 'round 6 of 3'", () => {
+    const d = verificationDescriptor({
+      kind: "verification",
+      repository,
+      session: makeSession(),
+      view: makeVerification({ stoppedAtRound: 6, rounds: 6, cap: 3 }),
+    });
+    assert.ok(d.description!.includes("round 6 (cap now 3)"), d.description);
+  });
+
+  test("a remediated-at-the-cap row names the fix and calls it unreviewed, never a waiver", () => {
+    const d = verificationDescriptor({
+      kind: "verification",
+      repository,
+      session: makeSession(),
+      view: makeVerification({
+        terminal: "REMEDIATED_AT_CAP",
+        headline: "remediated at the cap",
+        findings: [makeFinding({ disposition: "fixed, unreviewed" })],
+        fixPaths: ["ai_router/affected.py", "tests/test_affected.py"],
+      }),
+    });
+    assert.strictEqual(d.label, "Remediated at the cap");
+    assert.ok(hasToken(d.contextValue, "terminal-remediated_at_cap"));
+    assert.ok(d.tooltip!.includes("Not a waiver"));
+    assert.ok(d.tooltip!.includes("1 fixed, unreviewed"));
+    assert.ok(d.tooltip!.includes("Fix touched: ai_router/affected.py, tests/test_affected.py"));
+  });
+
+  test("finding rows carry the severity, the disposition, the scenario and the cited paths", () => {
+    const cited = findingDescriptor({
+      kind: "finding",
+      repository,
+      session: makeSession({ number: 3 }),
+      finding: makeFinding(),
+      index: 0,
+    });
+    assert.ok(cited.label.startsWith("[major] "), cited.label);
+    assert.strictEqual(cited.description, "outstanding");
+    assert.ok(cited.tooltip!.includes("A Java repository gets"));
+    assert.ok(cited.tooltip!.includes("Cited: ai_router/affected.py"));
+    assert.ok(hasToken(cited.contextValue, "finding-blocking"));
+
+    const uncited = findingDescriptor({
+      kind: "finding",
+      repository,
+      session: makeSession({ number: 3 }),
+      finding: makeFinding({ evidencePaths: [], severity: "minor", blocking: false, disposition: "noted" }),
+      index: 1,
+    });
+    assert.ok(uncited.tooltip!.includes("No path cited"));
+    assert.ok(!hasToken(uncited.contextValue, "finding-blocking"));
+    assert.notStrictEqual(cited.id, uncited.id);
+  });
+
+  test("an unreadable rounds ledger is a refusal row and a record severity, never the last round that parsed", () => {
+    const session = makeSession({
+      status: "complete",
+      verification: makeVerification(),
+      verificationRefused: "rounds ledger: line 4 is not valid JSON",
+    });
+    const children = childrenOf(sessionNode(session));
+    assert.deepStrictEqual(children.map((n) => n.kind), ["refusal"]);
+    const d = descriptorFor(children[0]);
+    assert.strictEqual(d.label, "Rounds ledger unreadable");
+    assert.ok(d.tooltip!.includes("line 4 is not valid JSON"));
+    assert.strictEqual(severityOf(session), "record");
+    // Two refusals on one session are two rows, not one id.
+    const tasksRefusal = descriptorFor(
+      childrenOf(sessionNode(makeSession({ status: "in-progress", tasksRefused: "x" })))[0],
+    );
+    assert.notStrictEqual(d.id, tasksRefusal.id);
   });
 });
 

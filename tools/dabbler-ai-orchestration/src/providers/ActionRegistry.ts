@@ -9,7 +9,7 @@
 // would make every entry's signature lie about what it reads.
 
 import { SessionRecord, SessionsRepository } from "../types";
-import { sessionOffersRunPrompt } from "./rowMenuHelpers";
+import { sessionNeedsReading, sessionOffersRunPrompt } from "./rowMenuHelpers";
 
 export interface RepositoryAction {
   id: string;
@@ -43,8 +43,16 @@ export function applicableRepositoryActions(
   );
 }
 
-// Band: 6xx run prompt, 9xx lifecycle. Cancellation is a decision about
-// one session, so it lives here rather than on the repository.
+// Band: 6xx prompts and the plan, 9xx lifecycle. Cancellation is a
+// decision about one session, so it lives here rather than on the
+// repository.
+//
+// The two 60x entries after the run prompt are the planning-time reading
+// of a session that stopped at the cap: send it back, respecify it. The
+// third of that trio is cancel, which already exists. There is NO
+// approve-over entry and none may be added: the framework has no approval
+// anywhere, and a menu item that accepted work over a standing finding
+// would be the retired waiver wearing a click.
 export interface SessionAction {
   id: string;
   label: string;
@@ -58,6 +66,20 @@ export const SESSION_ACTIONS: SessionAction[] = [
     label: "Copy Run Prompt",
     group: 601,
     when: (repository, session) => sessionOffersRunPrompt(repository, session),
+  },
+  {
+    id: "dabbler.copySendBackPrompt",
+    label: "Send Back to Engine",
+    group: 602,
+    // The record goes back to an engine, never to a person: the copied
+    // prompt names the ledger and the engine reads it.
+    when: (_repository, session) => sessionNeedsReading(session),
+  },
+  {
+    id: "dabbler.respecifySession",
+    label: "Respecify Session",
+    group: 603,
+    when: (_repository, session) => sessionNeedsReading(session),
   },
   {
     id: "dabblerSessionSets.cancel",

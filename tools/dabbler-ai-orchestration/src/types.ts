@@ -35,6 +35,71 @@ export interface TaskRecord {
   startedAt: string | null;
 }
 
+/**
+ * What the verifier looked at in the round that stopped a session, and
+ * how faithfully. `mode` is null for a round recorded before the agency
+ * log existed — unknown, which is not the same as `"none"`.
+ */
+export interface VerificationAgency {
+  mode: "tools" | "none" | null;
+  reads: number;
+  searches: number;
+  listings: number;
+  transformedReads: number;
+  outOfScope: number;
+  overBudget: number;
+  reason: string | null;
+  operations: AgencyOperation[];
+}
+
+export interface AgencyOperation {
+  kind: string;
+  target: string;
+  /** "verbatim" / "transformed" / "unverified", or null when unmarked. */
+  fidelity: string | null;
+  inScope: boolean;
+}
+
+/** One finding as the record carries it, with the record's own word for how it stands. */
+export interface VerificationFinding {
+  round: number | null;
+  description: string;
+  severity: string;
+  category: string;
+  failureScenario: string;
+  evidencePaths: string[];
+  blocking: boolean;
+  /** "outstanding" / "fixed, unreviewed" / "noted" — Python's words. */
+  disposition: string;
+}
+
+/**
+ * A session's rounds ledger folded for reading at planning time. Every
+ * fact here is Python's (`progress.build_verification_view`): which of
+ * the three terminal states was reached, how it reads, and whether the
+ * row is clean. TypeScript arranges it and re-derives nothing.
+ */
+export interface SessionVerification {
+  /**
+   * VERIFIED, ISSUES_FOUND (unresolved at the cap) or REMEDIATED_AT_CAP;
+   * null while the loop is still open.
+   */
+  terminal: string | null;
+  /** Python's headline for the state — the one vocabulary every loop reports in. */
+  headline: string;
+  clean: boolean;
+  verdict: string | null;
+  rounds: number;
+  stoppedAtRound: number | null;
+  cap: number | null;
+  verifierModel: string | null;
+  verifierProvider: string | null;
+  transport: string | null;
+  agency: VerificationAgency;
+  findings: VerificationFinding[];
+  fixPaths: string[];
+}
+
 export interface SessionRecord {
   number: number;
   /**
@@ -58,6 +123,15 @@ export interface SessionRecord {
    * is open rather than render the last row it could read.
    */
   tasksRefused: string | null;
+  /**
+   * The rounds ledger folded for planning-time reading, or null when the
+   * session has no rounds. Carried for every session that has one, not
+   * only the in-flight one: a session that stopped at the cap is closed
+   * or cancelled by the time anyone plans against it.
+   */
+  verification: SessionVerification | null;
+  /** Why the rounds ledger could not be read, or null. A refusal, never a fallback. */
+  verificationRefused: string | null;
 }
 
 export interface OrchestratorInfo {

@@ -100,6 +100,16 @@
         "category": "Dabbler"
       },
       {
+        "command": "dabbler.copySendBackPrompt",
+        "title": "Send Back to Engine",
+        "category": "Dabbler"
+      },
+      {
+        "command": "dabbler.respecifySession",
+        "title": "Respecify Session",
+        "category": "Dabbler"
+      },
+      {
         "command": "dabblerSessionSets.startSession",
         "title": "Start Next Session (terminal)",
         "category": "Dabbler"
@@ -167,6 +177,14 @@
         {
           "command": "dabbler.copySessionRunPrompt",
           "when": "false"
+        },
+        {
+          "command": "dabbler.copySendBackPrompt",
+          "when": "false"
+        },
+        {
+          "command": "dabbler.respecifySession",
+          "when": "false"
         }
       ],
       "view/title": [
@@ -216,6 +234,16 @@
           "command": "dabbler.copySessionRunPrompt",
           "when": "view == dabblerWorkExplorerTree && viewItem =~ /;act-copySessionRunPrompt;/",
           "group": "6_session@603"
+        },
+        {
+          "command": "dabbler.copySendBackPrompt",
+          "when": "view == dabblerWorkExplorerTree && viewItem =~ /;act-copySendBackPrompt;/",
+          "group": "6_session@604"
+        },
+        {
+          "command": "dabbler.respecifySession",
+          "when": "view == dabblerWorkExplorerTree && viewItem =~ /;act-respecifySession;/",
+          "group": "6_session@605"
         }
       ],
       "dabblerWorkExplorer.openFile": [

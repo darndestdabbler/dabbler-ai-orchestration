@@ -7,7 +7,13 @@ import {
   parseProjectionPayload,
   projectionCacheKey,
 } from "../../utils/projection";
-import { makeProjection, makeTempDir, rmrf } from "./helpers";
+import {
+  makeProjection,
+  makeSession,
+  makeTempDir,
+  makeVerification,
+  rmrf,
+} from "./helpers";
 
 suite("projection: payload narrowing", () => {
   test("a valid payload round-trips with sessions and steps", () => {
@@ -35,6 +41,8 @@ suite("projection: payload narrowing", () => {
             },
           ],
           tasksRefused: null,
+          verification: null,
+          verificationRefused: null,
         },
       ],
     });
@@ -42,6 +50,43 @@ suite("projection: payload narrowing", () => {
     assert.ok(parsed);
     assert.strictEqual(parsed!.repository.totalSessions, 2);
     assert.strictEqual(parsed!.sessions[0].tasks[0].stepId, "implement");
+  });
+
+  test("the verification view round-trips, and `clean` fails closed", () => {
+    const view = makeVerification({
+      agency: {
+        ...makeVerification().agency,
+        mode: "tools",
+        reads: 2,
+        transformedReads: 1,
+        operations: [
+          { kind: "read", target: "ai_router/checks.py", fidelity: "transformed", inScope: true },
+        ],
+      },
+    });
+    const p = makeProjection({
+      sessions: [makeSession({ number: 1, verification: view })],
+    });
+    const parsed = parseProjectionPayload(JSON.stringify(p))!;
+    assert.deepStrictEqual(parsed.sessions[0].verification, view);
+
+    // A router that never said "clean" has not said the session is
+    // verified: the missing field narrows to unclean, so a stopped
+    // session cannot read as a pass through an older payload.
+    const raw = JSON.parse(JSON.stringify(p)) as {
+      sessions: Array<{ verification: Record<string, unknown> }>;
+    };
+    delete raw.sessions[0].verification.clean;
+    assert.strictEqual(
+      parseProjectionPayload(JSON.stringify(raw))!.sessions[0].verification!.clean,
+      false,
+    );
+    // And a view with no headline is no view at all.
+    delete raw.sessions[0].verification.headline;
+    assert.strictEqual(
+      parseProjectionPayload(JSON.stringify(raw))!.sessions[0].verification,
+      null,
+    );
   });
 
   test("the sessions source is carried, and defaults to the ledger", () => {
@@ -177,6 +222,14 @@ suite("projection: cache", () => {
     fs.mkdirSync(runDir, { recursive: true });
     const before = projectionCacheKey(dir, dir);
     fs.writeFileSync(path.join(runDir, "step-execution.jsonl"), "{}");
+    assert.notStrictEqual(before, projectionCacheKey(dir, dir));
+  });
+
+  test("the cache key moves when a round lands, so the verification row is not a poll behind", () => {
+    const runDir = path.join(dir, ".dabbler", "runs", "s3");
+    fs.mkdirSync(runDir, { recursive: true });
+    const before = projectionCacheKey(dir, dir);
+    fs.writeFileSync(path.join(runDir, "rounds.jsonl"), "{}");
     assert.notStrictEqual(before, projectionCacheKey(dir, dir));
   });
 });

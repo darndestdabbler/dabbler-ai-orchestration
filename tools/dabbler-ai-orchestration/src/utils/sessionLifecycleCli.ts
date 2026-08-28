@@ -24,9 +24,20 @@ export const SESSION_LIFECYCLE_CLI = "ai_router.session";
  * omitted — operators dismiss the reason prompt routinely, and the CLI
  * writes the blank reason line so the timestamp pattern in the history file
  * stays intact.
+ *
+ * `--force` is added only when the caller says the session cannot close:
+ * in flight and unresolved at the cap. The CLI refuses an in-flight cancel
+ * without it, and that refusal stands for live work — the flag is never
+ * the default, so the refusal keeps protecting everything it did.
  */
-export function cancelArgs(sessionNumber: number, reason: string): string[] {
-  return ["cancel", String(sessionNumber), "--reason", reason];
+export function cancelArgs(
+  sessionNumber: number,
+  reason: string,
+  force = false,
+): string[] {
+  const args = ["cancel", String(sessionNumber), "--reason", reason];
+  if (force) args.push("--force");
+  return args;
 }
 
 export function restoreArgs(sessionNumber: number, reason: string): string[] {
@@ -56,10 +67,11 @@ export function runCancelSession(
   sessionNumber: number,
   reason: string,
   deps?: RunRouterCliDeps,
+  force = false,
 ): Promise<RouterCliResult> {
   return run(
     repoRoot,
-    cancelArgs(sessionNumber, reason),
+    cancelArgs(sessionNumber, reason, force),
     "Cancelling a session",
     deps,
   );

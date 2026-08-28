@@ -5,6 +5,7 @@ import pytest
 
 from ai_router.approved_plan import new_plan, write_plan
 from ai_router.ledger import (
+    append_round,
     append_step_event,
     session_run_dir,
     step_execution_path,
@@ -12,8 +13,10 @@ from ai_router.ledger import (
 from ai_router.progress import (
     SessionStateInvariantError,
     TaskRowsRefused,
+    VerificationRefused,
     build_projection,
     build_task_rows,
+    build_verification_view,
     canonicalize_status,
     get_progress,
     heal_title,
@@ -456,3 +459,198 @@ class TestTaskRows:
         p = build_projection(sessions)
         assert p["sessions"][0]["tasks"] == []
         assert "execution record" in p["sessions"][0]["tasksRefused"]
+
+
+class TestVerificationView:
+    """The unresolved-session view: one session's rounds ledger folded for
+    reading at planning time. Which terminal state it reached is the
+    record's answer, never a person's, and an unreadable ledger refuses."""
+
+    CAP = 3
+    MAJOR = {
+        "description": "the suite command is guessed rather than declared",
+        "severity": "major",
+        "category": "Correctness",
+        "failureScenario": "A Java repository gets `python -m pytest`.",
+        "evidencePaths": ["ai_router/affected.py"],
+        "blocking": True,
+    }
+    MINOR = {
+        "description": "a docstring names the old module",
+        "severity": "minor",
+        "blocking": False,
+    }
+
+    def _sessions(self, tmp_path, *sessions):
+        root = tmp_path / "docs" / "sessions"
+        root.mkdir(parents=True, exist_ok=True)
+        (root / "sessions.json").write_text(json.dumps({
+            "schemaVersion": 5,
+            "sessions": list(sessions) or [
+                {"number": 1, "title": "One", "status": "in-progress"},
+            ],
+        }), encoding="utf-8")
+        return root
+
+    def _round(self, tmp_path, number, *, blocking=True, findings=None,
+               **overrides):
+        row = {
+            "round": number,
+            "phase": "full" if number == 1 else "fix-delta",
+            "verdict": "ISSUES_FOUND" if blocking else "VERIFIED",
+            "blocking": blocking,
+            "verifier_model": "gpt-5-6-sol",
+            "verifier_provider": "openai",
+            "transport": "api",
+            "findings": (
+                findings if findings is not None
+                else ([self.MAJOR] if blocking else [])
+            ),
+            "completion_tree": chr(ord("a") + number) * 40,
+            "recorded_at": f"2026-08-28T0{number}:00:00-04:00",
+        }
+        if number > 1:
+            row["previous_tree"] = chr(ord("a") + number - 1) * 40
+        row.update(overrides)
+        append_round(tmp_path, 1, row)
+        return row
+
+    def _remediated(self, tmp_path, after_round, fix_paths):
+        append_round(tmp_path, 1, {
+            "round": after_round + 1,
+            "type": "remediated_at_cap",
+            "verdict": "REMEDIATED_AT_CAP",
+            "blocking": False,
+            "findings": [],
+            "remediated": {
+                "reviewed_round": after_round,
+                "findings": [self.MAJOR],
+                "fix_paths": fix_paths,
+            },
+            "completion_tree": "f" * 40,
+            "previous_tree": chr(ord("a") + after_round) * 40,
+            "recorded_at": "2026-08-28T09:00:00-04:00",
+        })
+
+    def test_a_remediated_at_cap_row_is_that_terminal_state(self, tmp_path):
+        self._sessions(tmp_path)
+        for n in (1, 2, 3):
+            self._round(tmp_path, n)
+        self._remediated(tmp_path, 3, ["ai_router/affected.py", "tests/x.py"])
+
+        view = build_verification_view(tmp_path, 1, self.CAP)
+        assert view["terminal"] == "REMEDIATED_AT_CAP"
+        assert view["headline"] == "remediated at the cap"
+        assert view["clean"] is False
+        # The vendor and the agency log come from the round that stopped
+        # the session, not from the terminal row that disposed of it.
+        assert (view["rounds"], view["stoppedAtRound"]) == (3, 3)
+        assert view["verifierModel"] == "gpt-5-6-sol"
+        assert view["verifierProvider"] == "openai"
+        assert view["transport"] == "api"
+        assert [f["disposition"] for f in view["findings"]] == [
+            "fixed, unreviewed",
+        ]
+        assert view["findings"][0]["round"] == 3
+        assert view["findings"][0]["evidencePaths"] == ["ai_router/affected.py"]
+        assert view["fixPaths"] == ["ai_router/affected.py", "tests/x.py"]
+
+    def test_a_blocking_round_is_unresolved_only_at_the_cap(self, tmp_path):
+        self._sessions(tmp_path)
+        self._round(tmp_path, 1, findings=[self.MAJOR, self.MINOR])
+
+        below = build_verification_view(tmp_path, 1, self.CAP)
+        assert below["terminal"] is None
+        assert below["headline"] == (
+            "blocking findings outstanding after round 1 of 3"
+        )
+        assert [f["disposition"] for f in below["findings"]] == [
+            "outstanding", "noted",
+        ]
+
+        self._round(tmp_path, 2)
+        self._round(tmp_path, 3)
+        at_cap = build_verification_view(tmp_path, 1, self.CAP)
+        assert at_cap["terminal"] == "ISSUES_FOUND"
+        assert at_cap["headline"] == "unresolved at the cap"
+        assert at_cap["clean"] is False
+        # Without a cap there is no "reached": the same ledger is
+        # outstanding, and the headline does not name a bound it never got.
+        unbounded = build_verification_view(tmp_path, 1, None)
+        assert unbounded["terminal"] is None
+        assert unbounded["headline"] == (
+            "blocking findings outstanding after round 3"
+        )
+
+    def test_a_verified_round_is_clean_and_carries_its_nits(self, tmp_path):
+        self._sessions(tmp_path)
+        self._round(tmp_path, 1, blocking=False, findings=[self.MINOR])
+        view = build_verification_view(tmp_path, 1, self.CAP)
+        assert (view["terminal"], view["headline"]) == ("VERIFIED", "verified")
+        assert view["clean"] is True
+        assert [f["disposition"] for f in view["findings"]] == ["noted"]
+
+    def test_the_agency_log_is_read_from_the_stopping_round(self, tmp_path):
+        self._sessions(tmp_path)
+        self._round(tmp_path, 1, agency={
+            "mode": "none",
+            "reason": "this transport sends no tools",
+        })
+        self._round(tmp_path, 2, agency={
+            "mode": "tools", "reads": 2, "searches": 1, "listings": 0,
+            "transformed_reads": 1,
+            "operations": [
+                {"kind": "read", "target": "ai_router/checks.py",
+                 "in_scope": True, "fidelity": "transformed"},
+                {"kind": "search", "target": "spawn", "in_scope": True},
+            ],
+        })
+        self._remediated(tmp_path, 2, ["ai_router/checks.py"])
+
+        agency = build_verification_view(tmp_path, 1, self.CAP)["agency"]
+        assert agency["mode"] == "tools"
+        assert (agency["reads"], agency["searches"]) == (2, 1)
+        assert agency["transformedReads"] == 1
+        assert agency["operations"][0] == {
+            "kind": "read", "target": "ai_router/checks.py",
+            "fidelity": "transformed", "inScope": True,
+        }
+        # A round recorded before the agency log existed says nothing
+        # either way, and is not rendered as a round that looked at nothing.
+        self._sessions(tmp_path)
+        rounds_file = session_run_dir(tmp_path, 1) / "rounds.jsonl"
+        rounds_file.unlink()
+        self._round(tmp_path, 1)
+        assert build_verification_view(tmp_path, 1, self.CAP)["agency"]["mode"] is None
+
+    def test_an_unreadable_rounds_ledger_refuses(self, tmp_path):
+        sessions = self._sessions(tmp_path)
+        self._round(tmp_path, 1)
+        with open(session_run_dir(tmp_path, 1) / "rounds.jsonl", "a",
+                  encoding="utf-8") as f:
+            f.write("not json\n")
+        with pytest.raises(VerificationRefused) as exc:
+            build_verification_view(tmp_path, 1, self.CAP)
+        assert "rounds ledger" in str(exc.value)
+        # The projection carries the refusal as itself: the round that did
+        # parse is not shown as the one that stopped the session.
+        p = build_projection(sessions)
+        assert p["sessions"][0]["verification"] is None
+        assert "rounds ledger" in p["sessions"][0]["verificationRefused"]
+
+    def test_the_projection_carries_the_view_for_every_session_with_rounds(
+        self, tmp_path
+    ):
+        sessions = self._sessions(
+            tmp_path,
+            {"number": 1, "title": "One", "status": "complete"},
+            {"number": 2, "title": "Two", "status": "not-started"},
+        )
+        self._round(tmp_path, 1, blocking=False)
+        p = build_projection(sessions)
+        first, second = p["sessions"]
+        assert first["verification"]["terminal"] == "VERIFIED"
+        assert isinstance(first["verification"]["cap"], int)
+        assert (second["verification"], second["verificationRefused"]) == (
+            None, None,
+        )

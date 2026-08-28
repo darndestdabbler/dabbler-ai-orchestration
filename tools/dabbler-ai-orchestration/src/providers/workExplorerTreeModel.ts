@@ -20,8 +20,10 @@
 import {
   SessionRecord,
   SessionStatus,
+  SessionVerification,
   SessionsRepository,
   TaskRecord,
+  VerificationFinding,
 } from "../types";
 import {
   REPOSITORY_ACTIONS,
@@ -50,6 +52,8 @@ import { isRecognizedVerdictToken } from "../utils/verdictTokens";
 export type WorkExplorerNode =
   | RepositoryNode
   | SessionNode
+  | VerificationNode
+  | FindingNode
   | TaskNode
   | RefusalNode;
 
@@ -77,8 +81,32 @@ export interface TaskNode {
 }
 
 /**
- * The only child a session gets when its execution record is unreadable.
- * It exists so the tree can say it cannot tell which step is open — the
+ * The unresolved-session view: a session's rounds ledger, folded by the
+ * projection, read at planning time rather than as an interruption. One
+ * per session whose fold is not clean; a verified session gets none,
+ * because its tooltip already says so and a row under every session
+ * would bury the ones that need reading.
+ */
+export interface VerificationNode {
+  readonly kind: "verification";
+  readonly repository: SessionsRepository;
+  readonly session: SessionRecord;
+  readonly view: SessionVerification;
+}
+
+/** One finding of the round that stopped the session, in record order. */
+export interface FindingNode {
+  readonly kind: "finding";
+  readonly repository: SessionsRepository;
+  readonly session: SessionRecord;
+  readonly finding: VerificationFinding;
+  readonly index: number;
+}
+
+/**
+ * The only child a session gets for a record it cannot read — the
+ * execution record, or the rounds ledger. It exists so the tree can say
+ * it cannot tell (which step is open; what stopped the session) — the
  * alternative, showing the last row that did parse, is the
  * stale-but-plausible failure this level was built to end.
  */
@@ -86,6 +114,7 @@ export interface RefusalNode {
   readonly kind: "refusal";
   readonly repository: SessionsRepository;
   readonly session: SessionRecord;
+  readonly subject: "execution record" | "rounds ledger";
   readonly reason: string;
 }
 
@@ -128,6 +157,7 @@ export function taskNodes(node: SessionNode): (TaskNode | RefusalNode)[] {
         kind: "refusal",
         repository: node.repository,
         session: node.session,
+        subject: "execution record",
         reason: node.session.tasksRefused,
       },
     ];
@@ -140,12 +170,53 @@ export function taskNodes(node: SessionNode): (TaskNode | RefusalNode)[] {
   }));
 }
 
+/**
+ * The verification row, when there is one to read. A refused ledger
+ * outranks the fold for the same reason a refused execution record
+ * outranks the task list; a clean fold yields nothing, because a verified
+ * session has nothing to read at planning time. Python decided `clean`.
+ */
+export function verificationNodes(
+  node: SessionNode,
+): (VerificationNode | RefusalNode)[] {
+  if (node.session.verificationRefused) {
+    return [
+      {
+        kind: "refusal",
+        repository: node.repository,
+        session: node.session,
+        subject: "rounds ledger",
+        reason: node.session.verificationRefused,
+      },
+    ];
+  }
+  const view = node.session.verification;
+  if (!view || view.clean) return [];
+  return [{ kind: "verification", repository: node.repository, session: node.session, view }];
+}
+
+/** The findings of the stopping round, exactly as the record lists them. */
+export function findingNodes(node: VerificationNode): FindingNode[] {
+  return node.view.findings.map((finding, index) => ({
+    kind: "finding",
+    repository: node.repository,
+    session: node.session,
+    finding,
+    index,
+  }));
+}
+
 export function childrenOf(node: WorkExplorerNode): WorkExplorerNode[] {
   switch (node.kind) {
     case "repository":
       return sessionNodes(node);
     case "session":
-      return taskNodes(node);
+      // What stopped the session reads above what it was doing: the
+      // verification row first, then the tasks.
+      return [...verificationNodes(node), ...taskNodes(node)];
+    case "verification":
+      return findingNodes(node);
+    case "finding":
     case "task":
     case "refusal":
       return [];
@@ -203,6 +274,8 @@ export function hasToken(contextValue: string, token: string): boolean {
 export const NODE_TOKEN = {
   repository: "dabblerRepository",
   session: "dabblerSession",
+  verification: "dabblerVerification",
+  finding: "dabblerFinding",
   task: "dabblerTask",
   refusal: "dabblerRefusal",
 } as const;
@@ -232,10 +305,10 @@ export { verdictIsUnclean } from "./sessionsModel";
  */
 export function severityOf(session: SessionRecord): SessionSeverity {
   if (verdictIsUnclean(session.verificationVerdict)) return "verification";
-  // An unreadable execution record is a severity of its own: the session
-  // may be perfectly clean and the framework still cannot say which of
-  // its steps is open.
-  return session.tasksRefused ? "record" : null;
+  // An unreadable record is a severity of its own: the session may be
+  // perfectly clean and the framework still cannot say which of its
+  // steps is open, or what its verifier said.
+  return session.tasksRefused || session.verificationRefused ? "record" : null;
 }
 
 export function sessionIcon(status: SessionStatus): IconSpec {
@@ -344,6 +417,9 @@ function sessionTooltip(node: SessionNode): string {
   } else if (session.startedAt) {
     lines.push("", `_started ${session.startedAt}_`);
   }
+  if (session.verificationRefused) {
+    lines.push("", `Rounds ledger unreadable: ${session.verificationRefused}`);
+  }
   if (session.tasksRefused) {
     lines.push("", `Execution record unreadable: ${session.tasksRefused}`);
   } else if (session.tasks.length > 0) {
@@ -351,6 +427,16 @@ function sessionTooltip(node: SessionNode): string {
     lines.push("", `${done}/${session.tasks.length} tasks done`);
   }
   return lines.join("\n");
+}
+
+/** Whether the session row has anything beneath it. */
+function sessionHasChildren(session: SessionRecord): boolean {
+  return Boolean(
+    session.tasksRefused ||
+      session.tasks.length > 0 ||
+      session.verificationRefused ||
+      (session.verification && !session.verification.clean),
+  );
 }
 
 export function sessionDescriptor(node: SessionNode): RowDescriptor {
@@ -370,12 +456,211 @@ export function sessionDescriptor(node: SessionNode): RowDescriptor {
     tooltip: sessionTooltip(node),
     icon: sessionIcon(session.iconKey),
     contextValue: tokenString(tokens),
-    // Collapsed only when there is something under it: the task rows, or
-    // the one row that says why there are none. Every session that is
-    // not in flight is a leaf, and so is an in-flight one that declared
-    // no plan.
-    collapsible:
-      session.tasksRefused || session.tasks.length > 0 ? "collapsed" : "none",
+    // Collapsed only when there is something under it: the verification
+    // row of a session that stopped at the cap, the task rows, or the one
+    // row that says why a record could not be read. A verified session
+    // that is not in flight is a leaf, and so is an in-flight one that
+    // declared no plan.
+    collapsible: sessionHasChildren(session) ? "collapsed" : "none",
+  };
+}
+
+/** "unresolved at the cap" -> "Unresolved at the cap". */
+function sentenceCase(text: string): string {
+  return text ? text.charAt(0).toUpperCase() + text.slice(1) : text;
+}
+
+/**
+ * What the terminal state means for the operator, in one sentence each.
+ * Which state it is was Python's decision; this is only what to do about
+ * it, and none of the three answers is "approve it".
+ */
+function terminalNote(view: SessionVerification): string {
+  switch (view.terminal) {
+    case "REMEDIATED_AT_CAP":
+      return (
+        "Every blocking finding of the last round was fixed and the cap " +
+        "left the fix unreviewed. Not a waiver: nothing was accepted over a " +
+        "finding that still stood; what is unproved is the repair."
+      );
+    case "ISSUES_FOUND":
+      return (
+        "Blocking findings still stand and nothing landed but the record. " +
+        "Send it back, respecify it, or cancel it — there is no approval " +
+        "to give."
+      );
+    case null:
+      return "The review loop is still open; these findings await a fix.";
+    default:
+      return "";
+  }
+}
+
+/**
+ * The agency line: what the verifier looked at, and whether what it was
+ * shown was what is on disk. A round without agency is not equivalent to
+ * one that could look, and a transformed read is named as such — session 1
+ * of the framework's own build took a confident Major against correct
+ * code because a scrubbed read went unmarked.
+ */
+export function agencyLines(view: SessionVerification): string[] {
+  const a = view.agency;
+  if (a.mode === null) {
+    return ["Agency: not recorded for this round."];
+  }
+  if (a.mode === "none") {
+    return [
+      "Agency: none — this round's verifier could not look at the tree" +
+        (a.reason ? ` (${a.reason}).` : "."),
+    ];
+  }
+  const lines = [
+    `Agency: ${a.reads} read(s), ${a.searches} search(es), ${a.listings} listing(s).`,
+  ];
+  if (a.transformedReads > 0) {
+    lines.push(
+      `${a.transformedReads} read(s) were transformed — what the verifier ` +
+        "was shown is not the bytes on disk.",
+    );
+  }
+  if (a.outOfScope > 0) lines.push(`${a.outOfScope} not confined to scope.`);
+  if (a.overBudget > 0) lines.push(`${a.overBudget} past the read budget.`);
+  // The operations themselves, target by target. Counts say how much the
+  // verifier looked; only the targets say whether it looked at the thing
+  // its finding is about, and that is what the operator weighs a Major
+  // against. A transformed or out-of-scope read is marked on its line.
+  if (a.operations.length > 0) {
+    lines.push("", "Looked at:");
+    for (const op of a.operations.slice(0, OPERATIONS_SHOWN)) {
+      const marks = [
+        op.fidelity === "transformed" ? "transformed" : null,
+        op.fidelity === "unverified" ? "unverified" : null,
+        op.inScope ? null : "out of scope",
+      ].filter(Boolean);
+      lines.push(
+        `- ${op.kind} ${op.target}${marks.length ? ` (${marks.join(", ")})` : ""}`,
+      );
+    }
+    const more = a.operations.length - OPERATIONS_SHOWN;
+    if (more > 0) lines.push(`- …and ${more} more, in the round ledger`);
+  } else {
+    lines.push("The verifier looked at nothing it was granted.");
+  }
+  return lines;
+}
+
+/** How many agency operations a tooltip lists before pointing at the ledger. */
+export const OPERATIONS_SHOWN = 20;
+
+export function verificationDescriptor(node: VerificationNode): RowDescriptor {
+  const { view } = node;
+  // "round 3 of 3" while the stopping round fits the cap; a session whose
+  // ledger outran a cap that was lowered since is not squeezed into
+  // "round 6 of 3" — the cap is named as the repository's current one.
+  const round =
+    view.stoppedAtRound !== null
+      ? view.cap === null
+        ? `round ${view.stoppedAtRound}`
+        : view.stoppedAtRound <= view.cap
+          ? `round ${view.stoppedAtRound} of ${view.cap}`
+          : `round ${view.stoppedAtRound} (cap now ${view.cap})`
+      : `${view.rounds} round(s)`;
+  const verifier = [view.verifierModel, view.verifierProvider]
+    .filter(Boolean)
+    .join("/");
+  const tally = (disposition: string): number =>
+    view.findings.filter((f) => f.disposition === disposition).length;
+  const counts = [
+    ["outstanding", tally("outstanding")],
+    ["fixed, unreviewed", tally("fixed, unreviewed")],
+    ["noted", tally("noted")],
+  ]
+    .filter(([, n]) => (n as number) > 0)
+    .map(([word, n]) => `${n} ${word}`)
+    .join(", ");
+
+  const lines = [
+    `**${sentenceCase(view.headline)}**`,
+    "",
+    `Stopped at ${round}` +
+      (verifier ? `, reviewed by ${verifier}` : "") +
+      (view.transport ? ` over ${view.transport}` : "") +
+      ".",
+    "",
+    terminalNote(view),
+    "",
+    ...agencyLines(view),
+  ];
+  if (view.findings.length > 0) {
+    lines.push("", `${view.findings.length} finding(s): ${counts}.`);
+  }
+  if (view.fixPaths.length > 0) {
+    lines.push("", `Fix touched: ${view.fixPaths.join(", ")}`);
+  }
+
+  const tokens = [
+    NODE_TOKEN.verification,
+    `terminal-${(view.terminal ?? "open").toLowerCase()}`,
+    `agency-${view.agency.mode ?? "unknown"}`,
+    ...(view.agency.transformedReads > 0 ? ["transformed-reads"] : []),
+  ];
+  return {
+    id: `verification:${node.repository.root}/${node.session.number}`,
+    label: sentenceCase(view.headline),
+    description: `${round}${verifier ? ` · ${verifier}` : ""}`,
+    tooltip: lines.filter((l, i, all) => !(l === "" && all[i - 1] === "")).join("\n"),
+    // A read surface, not a lifecycle state: the glyph says "look here"
+    // and stays out of the status vocabulary the session rows own.
+    icon: { kind: "theme", id: "eye" },
+    contextValue: tokenString(tokens),
+    collapsible: view.findings.length > 0 ? "collapsed" : "none",
+  };
+}
+
+/**
+ * A finding row. The label leads with the severity the verifier wrote,
+ * the description slot carries the record's word for how it stands, and
+ * the tooltip holds the failure scenario and the cited paths — the two
+ * things a reader needs to weigh it, and the one thing (a cited path)
+ * that decides whether it can ever be shown remediated.
+ */
+export function findingDescriptor(node: FindingNode): RowDescriptor {
+  const { finding } = node;
+  const text = finding.description.trim() || "(no description)";
+  const label = `[${finding.severity || "?"}] ${
+    text.length > 80 ? `${text.slice(0, 77)}…` : text
+  }`;
+  const lines = [
+    `**[${finding.severity || "?"}] ${text}**`,
+    "",
+    [
+      finding.round !== null ? `Round ${finding.round}` : null,
+      finding.category || null,
+      finding.disposition || null,
+    ]
+      .filter(Boolean)
+      .join(" · "),
+  ];
+  if (finding.failureScenario.trim()) {
+    lines.push("", finding.failureScenario.trim());
+  }
+  lines.push(
+    "",
+    finding.evidencePaths.length > 0
+      ? `Cited: ${finding.evidencePaths.join(", ")}`
+      : "No path cited — a finding with no site can never be shown remediated.",
+  );
+  return {
+    id: `finding:${node.repository.root}/${node.session.number}/${node.index}`,
+    label,
+    description: finding.disposition || undefined,
+    tooltip: lines.join("\n"),
+    contextValue: tokenString([
+      NODE_TOKEN.finding,
+      `finding-${finding.severity || "unknown"}`,
+      ...(finding.blocking ? ["finding-blocking"] : []),
+    ]),
+    collapsible: "none",
   };
 }
 
@@ -460,18 +745,25 @@ export function taskDescriptor(node: TaskNode): RowDescriptor {
  * rather than wondering why a session has no steps.
  */
 export function refusalDescriptor(node: RefusalNode): RowDescriptor {
+  const tasks = node.subject === "execution record";
+  const title = `${sentenceCase(node.subject)} unreadable`;
   return {
-    id: `refusal:${node.repository.root}/${node.session.number}`,
-    label: "Execution record unreadable",
-    description: "cannot tell which step is open",
+    id: `refusal:${node.repository.root}/${node.session.number}/${
+      tasks ? "tasks" : "verification"
+    }`,
+    label: title,
+    description: tasks
+      ? "cannot tell which step is open"
+      : "cannot tell what stopped this session",
     tooltip: [
-      "**Execution record unreadable**",
+      `**${title}**`,
       "",
       node.reason,
       "",
-      "No task rows are shown. A row that failed validation is a " +
-        "refusal, not a skip: showing the last row that did parse would " +
-        "present a stale step as the current one.",
+      (tasks ? "No task rows are shown. " : "No verification row is shown. ") +
+        "A row that failed validation is a refusal, not a skip: showing " +
+        "the last row that did parse would present a stale " +
+        (tasks ? "step as the current one." : "round as the one that stopped it."),
     ].join("\n"),
     icon: { kind: "file", slug: ICON_FILES.cancelled },
     contextValue: tokenString([NODE_TOKEN.refusal]),
@@ -485,6 +777,10 @@ export function descriptorFor(node: WorkExplorerNode): RowDescriptor {
       return repositoryDescriptor(node);
     case "session":
       return sessionDescriptor(node);
+    case "verification":
+      return verificationDescriptor(node);
+    case "finding":
+      return findingDescriptor(node);
     case "task":
       return taskDescriptor(node);
     case "refusal":

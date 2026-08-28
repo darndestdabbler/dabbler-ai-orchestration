@@ -82,14 +82,10 @@ EVENTS = (
 )
 SCOPES = ("solution", "component")
 
-#: How each terminal state of the review loop reads. The keys are the closed
-#: verdict vocabulary and nothing else: a fourth state would have to be added
-#: to :data:`ai_router.verdict.SESSION_VERDICTS` first, which is the point.
-TERMINAL_HEADLINES = {
-    verdictmod.VERDICT_VERIFIED: "verified",
-    verdictmod.VERDICT_ISSUES_FOUND: "unresolved at the cap",
-    verdictmod.VERDICT_REMEDIATED_AT_CAP: "remediated at the cap",
-}
+#: How each terminal state of the review loop reads. Owned by the verdict
+#: vocabulary, beside the closed token set it is keyed on, and shared with
+#: the session projection so both describe a terminal state in one voice.
+TERMINAL_HEADLINES = verdictmod.TERMINAL_HEADLINES
 
 #: How much of a red run's output the loop echoes. Enough to name what
 #: failed; the whole run is in the record either way.

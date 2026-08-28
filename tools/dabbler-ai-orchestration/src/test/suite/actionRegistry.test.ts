@@ -16,7 +16,7 @@ import {
   planLeftClickActivation,
   sessionOffersRunPrompt,
 } from "../../providers/rowMenuHelpers";
-import { makeRepository, makeSession } from "./helpers";
+import { makeRepository, makeSession, makeVerification } from "./helpers";
 
 const finished = makeRepository({
   currentSession: null,
@@ -80,6 +80,36 @@ suite("ActionRegistry: session actions", () => {
       applicableSessionActions(repository, s).map((a) => a.id);
     assert.ok(offered(sessions[1]).includes("dabbler.copySessionRunPrompt"));
     assert.ok(!offered(sessions[2]).includes("dabbler.copySessionRunPrompt"));
+  });
+
+  test("send back and respecify are offered only on a session with something to read, and nothing approves", () => {
+    const stopped = makeSession({ number: 1, status: "in-progress", verification: makeVerification() });
+    const verified = makeSession({
+      number: 1,
+      status: "complete",
+      verification: makeVerification({ terminal: "VERIFIED", headline: "verified", clean: true }),
+    });
+    const unrecorded = makeSession({ number: 1, status: "not-started" });
+    // A loop still open is rendered but not acted on: no terminal yet.
+    const open = makeSession({
+      number: 1,
+      status: "in-progress",
+      verification: makeVerification({ terminal: null, headline: "blocking findings outstanding after round 1 of 3" }),
+    });
+    const ids = (s: typeof stopped): string[] =>
+      applicableSessionActions(makeRepository({ sessions: [s] }), s).map((a) => a.id);
+    assert.ok(ids(stopped).includes("dabbler.copySendBackPrompt"));
+    assert.ok(ids(stopped).includes("dabbler.respecifySession"));
+    assert.ok(ids(stopped).includes("dabblerSessionSets.cancel"));
+    for (const quiet of [verified, unrecorded, open]) {
+      assert.ok(!ids(quiet).includes("dabbler.copySendBackPrompt"));
+      assert.ok(!ids(quiet).includes("dabbler.respecifySession"));
+    }
+    // There is no approval anywhere in this framework, so there is no
+    // action that could accept work over a standing finding.
+    for (const action of [...REPOSITORY_ACTIONS, ...SESSION_ACTIONS]) {
+      assert.doesNotMatch(`${action.id} ${action.label}`, /approv|waive|accept/i);
+    }
   });
 
   test("cancel and restore are mutually exclusive on one row", () => {

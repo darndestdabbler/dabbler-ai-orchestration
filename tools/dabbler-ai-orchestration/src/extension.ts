@@ -106,9 +106,12 @@ export function activate(context: vscode.ExtensionContext): void {
           path.join(root, SESSIONS_REL),
           "{sessions.json,activity-log.json,session-plan.md,change-log.md}",
         ),
+        // rounds.jsonl for the same reason: a round landing, or the cap
+        // terminal being recorded, is what the verification row folds,
+        // and it has to move on the event too.
         new vscode.RelativePattern(
           path.join(root, RUNS_REL),
-          "*/{step-execution.jsonl,approved-plan.json}",
+          "*/{step-execution.jsonl,approved-plan.json,rounds.jsonl}",
         ),
       ];
       const onEvent = () => {

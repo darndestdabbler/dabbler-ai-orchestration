@@ -718,6 +718,182 @@ def build_task_rows(repo_root, session_number: int) -> list:
     return rows
 
 
+# --- The verification view --------------------------------------------------
+
+class VerificationRefused(RuntimeError):
+    """The rounds ledger could not be read. A refusal, not a skip: the view
+    must say it cannot tell what stopped a session rather than render the
+    last round that did parse as if it were the one that stopped it."""
+
+
+# How a finding stands, in the record's own terms. ``outstanding`` is a
+# blocking finding the latest round left unanswered; ``fixed, unreviewed``
+# is one the cap terminal shows remediated and nobody reviewed; ``noted``
+# is a finding that never blocked and was left standing.
+FINDING_OUTSTANDING = "outstanding"
+FINDING_FIXED_UNREVIEWED = "fixed, unreviewed"
+FINDING_NOTED = "noted"
+
+
+def verification_cap(repo_root):
+    """The round cap the repository's configuration declares, or None when
+    no configuration can be read. Unknown stays unknown: without the cap a
+    blocking round is *outstanding*, and is never called unresolved, because
+    "the cap is reached" is a claim about a number this call did not get."""
+    from .config import load_config, verification_round_cap
+    try:
+        return verification_round_cap(load_config(project_dir=str(repo_root)))
+    except Exception:  # noqa: BLE001 -- a config fault is an unknown cap, not a crash
+        return None
+
+
+def _agency_view(round_row: dict) -> dict:
+    """What the verifier looked at in one round, and how faithfully. A row
+    that predates the agency record carries ``mode: None`` -- unknown is
+    not the same as none, and the view must not claim the round looked at
+    nothing when the record says nothing either way."""
+    agency = round_row.get("agency") or {}
+    operations = []
+    for op in agency.get("operations") or []:
+        if not isinstance(op, dict):
+            continue
+        operations.append({
+            "kind": op.get("kind"),
+            "target": _py_str(op.get("target")),
+            "fidelity": op.get("fidelity"),
+            "inScope": bool(op.get("in_scope", True)),
+        })
+    return {
+        "mode": agency.get("mode"),
+        "reads": int(agency.get("reads") or 0),
+        "searches": int(agency.get("searches") or 0),
+        "listings": int(agency.get("listings") or 0),
+        "transformedReads": int(agency.get("transformed_reads") or 0),
+        "outOfScope": int(agency.get("out_of_scope") or 0),
+        "overBudget": int(agency.get("over_budget") or 0),
+        "reason": _py_str(agency.get("reason")) or None,
+        "operations": operations,
+    }
+
+
+def _finding_view(finding: dict, round_number, disposition: str) -> dict:
+    from .verdict import BLOCKING_SEVERITIES
+    severity = _py_str(finding.get("severity"))
+    blocking = finding.get("blocking")
+    if not isinstance(blocking, bool):
+        blocking = severity in BLOCKING_SEVERITIES
+    return {
+        "round": round_number,
+        "description": _py_str(finding.get("description")),
+        "severity": severity,
+        "category": _py_str(finding.get("category")),
+        "failureScenario": _py_str(finding.get("failureScenario")),
+        "evidencePaths": [str(p) for p in finding.get("evidencePaths") or []],
+        "blocking": blocking,
+        "disposition": disposition,
+    }
+
+
+def build_verification_view(repo_root, session_number: int, cap):
+    """One session's rounds ledger, folded into what is read at planning
+    time: what stopped it and at which round, the findings with vendor and
+    severity, what the verifier looked at and how faithfully, and which of
+    the three terminal states it reached.
+
+    Which state is the record's answer, never a person's. A
+    ``remediated_at_cap`` row is that state, carrying the findings it shows
+    fixed and the paths the fix touched. A blocking latest round at the cap
+    is unresolved; a blocking round below it is a loop still open, and is
+    said to be exactly that. A non-blocking latest round is verified. The
+    headline for each is :data:`ai_router.verdict.TERMINAL_HEADLINES`, the
+    one vocabulary every loop reports in.
+
+    Returns None for a session with no rounds. Raises
+    :class:`VerificationRefused` when the ledger cannot be read: a framework
+    that cannot tell what stopped a session says so rather than guessing.
+    """
+    from . import ledger
+    from .verdict import (
+        SESSION_VERDICTS,
+        TERMINAL_HEADLINES,
+        VERDICT_ISSUES_FOUND,
+        VERDICT_REMEDIATED_AT_CAP,
+        VERDICT_VERIFIED,
+    )
+
+    try:
+        rounds = ledger.read_rounds(repo_root, session_number)
+    except ledger.LedgerError as exc:
+        raise VerificationRefused(f"rounds ledger: {exc}") from exc
+    if not rounds:
+        return None
+
+    latest = rounds[-1]
+    # The verifier's own rounds. A terminal row (remediated at the cap, an
+    # adjudication) is the record's disposition of the last one of these,
+    # so the vendor, the transport and the agency log are read from the
+    # round that actually stopped the session.
+    reviewed = [r for r in rounds if not r.get("type")]
+    stopped = reviewed[-1] if reviewed else latest
+    verdict = latest.get("verdict")
+    fix_paths = []
+
+    if latest.get("type") == ledger.ROW_REMEDIATED_AT_CAP:
+        remediated = latest.get("remediated") or {}
+        terminal = VERDICT_REMEDIATED_AT_CAP
+        findings = [
+            _finding_view(f, remediated.get("reviewed_round"),
+                          FINDING_FIXED_UNREVIEWED)
+            for f in remediated.get("findings") or []
+        ]
+        fix_paths = [str(p) for p in remediated.get("fix_paths") or []]
+    else:
+        blocking_round = bool(latest.get("blocking"))
+        if blocking_round:
+            terminal = (
+                VERDICT_ISSUES_FOUND
+                if cap is not None and latest["round"] >= cap
+                else None
+            )
+        else:
+            terminal = verdict if verdict in SESSION_VERDICTS else None
+        findings = []
+        for f in latest.get("findings") or []:
+            view = _finding_view(f, latest["round"], FINDING_NOTED)
+            if blocking_round and view["blocking"]:
+                view["disposition"] = FINDING_OUTSTANDING
+            findings.append(view)
+
+    if terminal is not None:
+        headline = TERMINAL_HEADLINES[terminal]
+    elif latest.get("blocking"):
+        headline = (
+            f"blocking findings outstanding after round {latest['round']}"
+            + (f" of {cap}" if cap is not None else "")
+        )
+    else:
+        # A verdict the vocabulary no longer issues (a historical waiver).
+        # Rendered as itself: laundering it into a live state is the one
+        # thing a reader of a retired token must not do.
+        headline = f"{str(verdict).lower()} (a retired verdict)"
+
+    return {
+        "terminal": terminal,
+        "headline": headline,
+        "clean": terminal == VERDICT_VERIFIED,
+        "verdict": verdict,
+        "rounds": len(reviewed),
+        "stoppedAtRound": stopped.get("round"),
+        "cap": cap,
+        "verifierModel": stopped.get("verifier_model"),
+        "verifierProvider": stopped.get("verifier_provider"),
+        "transport": stopped.get("transport"),
+        "agency": _agency_view(stopped),
+        "findings": findings,
+        "fixPaths": fix_paths,
+    }
+
+
 # --- The projection ---------------------------------------------------------
 
 def build_projection(sessions_dir) -> dict:
@@ -776,6 +952,10 @@ def build_projection(sessions_dir) -> dict:
         if titles:
             heal_stale_titles(view["sessions"], titles)
 
+    # Read once per projection: the cap is the repository's, not the
+    # session's, and it is what turns a blocking round into "unresolved".
+    cap = verification_cap(repo_root)
+
     sessions_out = []
     for entry in view.get("sessions") or []:
         number = entry.get("number")
@@ -799,12 +979,25 @@ def build_projection(sessions_dir) -> dict:
             "verificationVerdict": entry.get("verificationVerdict"),
             "tasks": [],
             "tasksRefused": None,
+            # The rounds ledger folded for reading at planning time, for
+            # every session that has one -- a session that stopped at the
+            # cap is closed or cancelled by the time anyone plans against
+            # it, so this is not an in-flight-only fact like the tasks.
+            "verification": None,
+            "verificationRefused": None,
         }
         if in_flight and isinstance(number, int):
             try:
                 session_out["tasks"] = build_task_rows(repo_root, number)
             except TaskRowsRefused as exc:
                 session_out["tasksRefused"] = str(exc)
+        if isinstance(number, int):
+            try:
+                session_out["verification"] = build_verification_view(
+                    repo_root, number, cap
+                )
+            except VerificationRefused as exc:
+                session_out["verificationRefused"] = str(exc)
         sessions_out.append(session_out)
 
     return {

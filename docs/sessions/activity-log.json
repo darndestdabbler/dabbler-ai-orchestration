@@ -3853,6 +3853,184 @@
       "dateTime": "2026-08-28T08:43:30.907764-04:00",
       "description": "Committed and pushed as bd5678f6",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 19,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-28T08:46:40.141667-04:00",
+      "description": "Register.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 19,
+      "stepNumber": 2,
+      "stepKey": "read-at-planning-time-rather-than",
+      "dateTime": "2026-08-28T08:46:40.141667-04:00",
+      "description": "Read at planning time rather than as an interruption: what stopped, at which round, the findings with vendor and severity, what the verifier looked at from the agency log, **whether the round had agency at all** (a direct-API round records `agency: none` \u2014 its verifier could never read the files, so its findings weigh differently from a round that could), **whether any read it relied on was transformed** (session 6's fidelity mark: the secret scrubber rewrote what the verifier was shown, which is how session 1 took a confident Major against correct code), and **which of the three terminal states it reached** \u2014 unresolved means blocking findings still stand unfixed and usually wants a respecify; remediated-at-the-cap means every finding was fixed and only the review of the fix is missing, which usually wants a send-back. Three actions, each a front-end over a command that already exists rather than new machinery: **send it back** (re-run the review loop over the outstanding delta), **respecify it** (rewrite the session's entry in this plan, then re-register it), **cancel** (`python -m ai_router.session cancel <N> --reason ...`). This session confirms the exact command each action issues; if one needs a command that does not exist, that is a finding against an earlier session, not licence to build a fourth path here.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 19,
+      "stepNumber": 3,
+      "stepKey": "no-approve-over-action-because-there",
+      "dateTime": "2026-08-28T08:46:40.141667-04:00",
+      "description": "**No approve-over action, because there is no approval anywhere.** The view reports; it never holds an engine open. There is no queue and no inbox, and reading a record is not the same as being blocked by one.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 19,
+      "stepNumber": 4,
+      "stepKey": "affected-tests-as-preverify",
+      "dateTime": "2026-08-28T08:46:40.141667-04:00",
+      "description": "Affected tests as preverify.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 19,
+      "stepNumber": 5,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-28T08:46:40.141667-04:00",
+      "description": "Cross-provider verification.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 19,
+      "stepNumber": 6,
+      "stepKey": "full-test-suite-recorded-as-the",
+      "dateTime": "2026-08-28T08:46:40.141667-04:00",
+      "description": "Full test suite, recorded as the `final-full` run of record.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 19,
+      "stepNumber": 7,
+      "stepKey": "close-out",
+      "dateTime": "2026-08-28T08:46:40.141667-04:00",
+      "description": "Close-out.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 19,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-28T08:46:40.150647-04:00",
+      "description": "Registered session 19 (claude-code).",
+      "status": "complete"
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 19,
+      "dateTime": "2026-08-28T08:54:09.301854-04:00",
+      "task": "Build the unresolved-session view: a session that stopped at the cap is\nread at planning time, from the record, in the Work Explorer.\n\n1. The projection folds each session's rounds ledger into one verification\n   summary -- what stopped, at which round, the findings with vendor and\n   severity, what the verifier looked at, whether the round had agency at\n   all, whether any read it relied on was transformed, and which of the\n   three terminal states it reached. Python decides; the extension renders\n   it and re-derives nothing from the ledger.\n2. The Work Explorer renders that summary under the session row, with the\n   findings as rows, and refuses rather than guesses when the rounds ledger\n   is unreadable. The watcher and the projection cache cover rounds.jsonl,\n   so the view moves on the event rather than on the poll.\n3. Three actions on such a session: send it back (a copied prompt that\n   hands the record back to an engine), respecify it (the plan opened at\n   the session's own block), cancel it (the existing cancel, passing\n   --force only for the unresolved terminal, because an unresolved session\n   cannot close). No approve-over action exists anywhere, and nothing holds\n   an engine open.",
+      "releasable": false
+    },
+    {
+      "sessionNumber": 19,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-28T08:55:12.750474-04:00",
+      "description": "Registered session 19 (claude-code/anthropic) and declared the task list, not releasable",
+      "status": "complete"
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D121",
+      "ordinal": 121,
+      "sessionNumber": 19,
+      "decidedOn": "2026-08-28",
+      "recordedAt": "2026-08-28T09:09:22.607977-04:00",
+      "decider": "orchestrator",
+      "headline": "The unresolved-session view is a fold of the rounds ledger; Python decides the terminal state and the extension repeats it",
+      "body": "The framework never blocks on a person, so a session that reaches the cap\nsimply ends, and until now nothing showed that anywhere but `sessions.json`\nand `.dabbler/runs/s<N>/rounds.jsonl` read by hand. Session 17 closed\n`REMEDIATED_AT_CAP` with one unreviewed finding and the Work Explorer\nrendered it as a complete session with an unclean tooltip line. This\nsession makes the record readable where planning happens.\n\n**The view is a fold of the rounds ledger, and Python does the folding.**\n`progress.build_verification_view` reads `ledger.read_rounds` and emits one\n`verification` object per session that has rounds: which terminal state\nwas reached, how it reads, the round it stopped at against the cap, the\nverifier's model and vendor and transport, the findings of the stopping\nround with the record's own word for how each stands (`outstanding`,\n`fixed, unreviewed`, `noted`), the agency log of that round with its\ntransformed-read count, and the fix paths a cap terminal carried. The\nextension narrows it and arranges it; it re-derives nothing, and it does\nnot open the ledger. The Solution Explorer already renders the run core's\nloop position the same way (`reviewTerminalLabel`), so this is the sessions\nlifecycle catching up to a rule the other subsystem already follows.\n\n**Which state it is comes from the record, in one vocabulary.** A\n`remediated_at_cap` row is that state; a blocking latest round at the cap is\nunresolved; a blocking round below the cap is a loop still open and is\ncalled exactly that; a non-blocking latest round is verified.\n`TERMINAL_HEADLINES` moved from `workflow.py` to `verdict.py`, beside the\nclosed token set it is keyed on, so the run core's loop and this projection\ncannot describe the same state in two voices. The cap is read from the\nrepository's configuration once per projection; when no configuration can be\nread the cap is unknown, and a blocking round is then *outstanding* and\nnever *unresolved*, because \"the cap is reached\" is a claim about a number\nthe projection did not get.\n\n**A verified session gets no row.** The tooltip already says so, and a\nverification row under every session would bury the ones that need\nreading. Python decides `clean` and the tree only asks; on the extension\nside `clean` fails closed, so a payload that never said \"clean\" cannot\nmake a stopped session read as a pass. An unreadable ledger is carried as\n`verificationRefused` and rendered as its own refusal row, with the same\nreasoning the task level settled: the last round that parsed must not be\nshown as the one that stopped the session.\n\n**The vendor and the agency log come from the round that stopped the\nsession, not from the terminal row that disposed of it.** A\n`remediated_at_cap` row carries no agency of its own. Session 1 of this\nbuild took a confident Major against correct code because a scrubbed read\nwent unmarked, so the transformed-read count is a token on the row and a\nsentence in the tooltip, and a round with `agency: none` says it could not\nlook at the tree rather than being rendered as equivalent to one that\ncould.\n\n**The watcher and the projection cache now cover `rounds.jsonl`**, for the\nreason D113 recorded for `step-execution.jsonl`: a round landing changes\nonly that file, and a view up to a poll behind the record is the surface\nstaff already rejected.",
+      "model": "claude-fable-5",
+      "provider": "anthropic"
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D122",
+      "ordinal": 122,
+      "sessionNumber": 19,
+      "decidedOn": "2026-08-28",
+      "recordedAt": "2026-08-28T09:09:23.043460-04:00",
+      "decider": "orchestrator",
+      "headline": "Send back is a prompt to an engine, respecify opens the plan at the block, cancel passes --force only for the unresolved terminal; nothing approves",
+      "body": "The plan names three actions on a session read at planning time \u2014 send it\nback, respecify it, cancel \u2014 and says no approve-over action exists. Each\nmaps onto something that already exists; none is new machinery, and the\nsession plan's own instruction was that an action needing a command that\ndoes not exist is a finding against an earlier session rather than a\nlicence to build a fourth path here.\n\n**Send back is a prompt handed to an engine.** The sessions lifecycle has\nno `send-back` verb \u2014 the run core's step workflow has one\n(`workflow send-back --to <step>`), but it moves a *step* between the\nrun core's own loops and does not touch `.dabbler/runs/s<N>/`. What\nactually re-opens a stopped session is an engine: it remediates, re-runs\nthe affected tests, and re-runs `ai_router.verify`, which at the cap\nrecords whichever terminal state the tree then says it is. So \"send it\nback\" copies a prompt that names the record by path and says what to do\nwith it, in three shapes because the three states ask for different work:\nan unresolved session needs its outstanding findings fixed; one remediated\nat the cap needs its unreviewed fix reviewed before anything builds on it;\na loop still open has findings to answer. The prompt never quotes the\nfindings \u2014 the engine reads them from the record, so what it acts on is\nwhat the verifier wrote and not a paraphrase.\n\n**Respecify opens the plan at the session's own block.** That is the\nleft-click activation, offered by name beside the other two so the trio\nreads as a set. It writes nothing: a plan is edited by a person or an\nengine, and re-registering is the lifecycle's own step. The plan is\ndeliberately not a lifecycle-written file, because a session editing the\nplan it runs against mid-flight is drift.\n\n**Cancel is the existing cancel, with `--force` passed on the record's\nsay-so.** `session cancel` refuses a session in flight without `--force`,\nand that refusal is right for live work. An unresolved session is in\nflight and cannot close \u2014 the close gate blocks on its blocking latest\nround \u2014 so for it cancel is the sanctioned exit, and the flag would\notherwise leave it with no exit at all. The extension passes `--force`\nonly when the session is `in-progress` and its fold says `ISSUES_FOUND` at\nthe cap; a live session, and a complete one remediated at the cap, get the\nplain cancel and its refusal. The confirmation dialog says which case it\nis. The operator is never asked whether to force.\n\n**There is no approve-over, and it is refused structurally.** The registry\ntest now asserts that no repository or session action's id or label reads\nas approve, accept, or waive. The tooltip of an unresolved row says the\nthree things that can be done and that there is no approval to give; the\ntooltip of a remediated-at-the-cap row says it is not a waiver, because\nnothing was accepted over a finding that still stood and what is unproved\nis the repair.\n\n**Verification of this session ran with `agency: none`** \u2014 the direct-API\npath, as sessions 14 through 18 did \u2014 so the view built here was verified\nby a round that could not look at the tree. The row for this session, if\nit had stopped at the cap, would have said so.",
+      "model": "claude-fable-5",
+      "provider": "anthropic"
+    },
+    {
+      "sessionNumber": 19,
+      "stepNumber": 2,
+      "stepKey": "read-at-planning-time-rather-than",
+      "dateTime": "2026-08-28T09:09:23.547321-04:00",
+      "description": "The projection folds each session's rounds ledger into a verification view (terminal state, stopping round, findings with vendor and severity, agency and transformed reads); the Work Explorer renders it under the session row with the findings as rows and refuses an unreadable ledger; watcher and cache cover rounds.jsonl",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 19,
+      "stepNumber": 3,
+      "stepKey": "no-approve-over-action-because-there",
+      "dateTime": "2026-08-28T09:09:24.070041-04:00",
+      "description": "Three actions on a stopped session: Send Back to Engine (a copied prompt naming the record), Respecify Session (the plan at the block), Cancel (--force only for the unresolved terminal); the registry test refuses any approve/accept/waive action",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 19,
+      "stepNumber": 4,
+      "stepKey": "affected-tests-as-preverify",
+      "dateTime": "2026-08-28T09:12:26.557397-04:00",
+      "description": "318 selected tests passed in 163s (7 files); recorded as preverify-targeted. TS: 151 mocha tests green, tsc --noEmit and eslint clean",
+      "status": "complete"
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D123",
+      "ordinal": 123,
+      "sessionNumber": 19,
+      "decidedOn": "2026-08-28",
+      "recordedAt": "2026-08-28T09:18:09.082137-04:00",
+      "decider": "verifier",
+      "headline": "Round 1: the agency log must name its targets, and an action is a front-end over commands that exist or a recorded gap",
+      "body": "Round 1, two Majors, both correct.\n\n**The first: the view projected the verifier's operations and then rendered\nonly their counts.** \"2 reads, 1 search\" cannot tell an operator whether a\nMajor came from the file it is about or from an unrelated one, and that is\nthe whole weight the agency log was built to carry. The tooltip now lists\nthe operations target by target, marking a transformed, unverified or\nout-of-scope read on its own line, and caps the list at twenty with a\npointer at the ledger. Nothing changed in Python: the data was already\nthere, unrendered.\n\n**The second: two of the three actions were labels over navigation and\nprose.** Respecify opened the plan at the block and did nothing else;\nthe remediated-at-the-cap send-back asked for \"a review\" and named no\ncommand. The plan's own instruction was the standard: each action is a\nfront-end over commands that exist, and an action that needs one that does\nnot exist is a finding against an earlier session, not licence to build\none here. Both are now prompts that hand the engine the exact commands.\n\n*Respecify* names, in order: `session cancel <N> --reason ... --force` for\nan unresolved session (it cannot close, so cancel is its exit; a session\nremediated at the cap is already closed and skips this step); the new\nblock, `### Session <M>:` in the plan, where M is the next number after the\nrepository's last \u2014 because sessions are numbered once and a rounds ledger\nis append-only per number, so a respecified session is a NEW number with a\nfresh ledger and never the old one restored; and `session start`, with the\nengine and vendor the repository already runs on, which registers M. The\nplan still opens at the old block, which is where the rewrite is written\nand which stays as the record of what was tried.\n\n*Send back* for a session remediated at the cap says what is true: **no\ncommand re-opens review on a closed session.** Rounds are append-only per\nsession and a terminal row closes them; `verify reanchor` moves a baseline\nfor a fix delta and is refused when the tree resolves. So the review is the\nnext session's declared work, and the prompt names the three commands that\nexist for that \u2014 `session start`, `session declare --task \"Review session\nN's unreviewed remediation ...\"`, and `ai_router.verify`, which reviews\nwhatever the review then corrects as that session's own round. What those\ndo not cover is also stated: a fix that turns out to be right changes\nnothing, and no round ever reads it. **That is the gap the plan said to\nrecord rather than paper over.** It belongs to the terminal state session 3\nbuilt and session 10 integrated: remediated-at-the-cap lands work with no\nlater path by which a verifier reviews the repair. A session that closes\nit \u2014 a review round opened against a closed session's fix delta, or a\nnext-session round whose baseline is the remediation's `previous_tree` \u2014\nis not planned and is owed.\n\n**Both nits were also right and are fixed.** Send-back and respecify were\noffered on any unclean fold, including a loop still open below the cap;\nthey now require a terminal state, so a round the engine is still\nanswering is rendered but not acted on. And a session whose ledger outran\na cap that was lowered since is no longer squeezed into \"round 6 of 3\";\nthe row says \"round 6 (cap now 3)\". The fold itself still reads the\nrepository's current cap, because the rounds carry none \u2014 recording the\ncap on the round is the durable fix and is a one-line change to\n`verify.py` for a later session.",
+      "model": "gpt-5-6-sol",
+      "provider": "openai"
+    },
+    {
+      "sessionNumber": 19,
+      "stepNumber": 5,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-28T09:22:58.209953-04:00",
+      "description": "VERIFIED at round 3 (gpt-5-6-sol/openai, agency none); round 1 found two Majors (agency targets unrendered; respecify and remediated send-back were not front-ends over commands), both remediated; round 2's Major rested on the wrong plan file and was disputed from the record and WITHDRAWN at round 3; one Minor (historical cap read from live config) left standing",
+      "status": "complete"
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D124",
+      "ordinal": 124,
+      "sessionNumber": 19,
+      "decidedOn": "2026-08-28",
+      "recordedAt": "2026-08-28T09:23:10.410876-04:00",
+      "decider": "verifier",
+      "headline": "Round 3: the disputed respecify finding is WITHDRAWN and the session is verified; the historical-cap Minor stands as owed",
+      "body": "Round 2 raised one Major: that Respecify directed the rewrite into the\nwrong file (it named `docs/sessions/project-work-plan.md` as the active\nspecification) and that the selected block had to be rewritten in place\nand re-registered under its own number. The first half was a false\npremise and the second an impossible instruction, so it was disputed from\nthe record rather than fixed: `session-plan.md` is the one hand-written\nplan (`SESSION_PLAN_FILENAME`, the projection's heading source, the scan's\n`PLAN_FILENAME`), `project-work-plan.md` is folded from the activity log\nand is never hand-edited, `session start` refuses a closed number, and a\nrounds ledger is append-only per number with the cap counted over it \u2014 so\na rewritten specification can only run as a new number. The one thing the\nfinding got right, a filename typed into the prompt, was fixed in the same\ndelta: the prompt derives the plan from `repository.planPath`.\n\n**Round 3 WITHDREW the finding and verified the session**, citing the\nimmutable-session and append-only-ledger contracts the dispute pointed at.\nThis is the first dispute this set has filed, and it went the way the\nmechanism is meant to: an argument from the record, judged on the record,\nwith no person in the loop.\n\n**One Minor was re-raised and stands.** `build_verification_view` infers a\nhistorical unresolved terminal from the repository's *current* cap, because\na round row carries no cap of its own. Lowering or raising `max_rounds`\nlater can relabel an old session. The display no longer squeezes\n\"round 6 of 3\" into nonsense, but the fold still reads live configuration\nfor a fact that was fixed when the session ended. The durable fix is to\nrecord the cap on the round as `verify.py` writes it, and read it back\nhere \u2014 a small change to a writer this session did not touch, and\ntherefore owed to a later one rather than made at the cap.\n\nThree rounds, one dispute, verifier gpt-5-6-sol/openai over the direct\nAPI with `agency: none` on every round: the view that shows whether a\nverifier could look at the tree was itself verified by rounds that could\nnot.",
+      "model": "gpt-5-6-sol",
+      "provider": "openai"
+    },
+    {
+      "sessionNumber": 19,
+      "stepNumber": 6,
+      "stepKey": "full-test-suite-recorded-as-the",
+      "dateTime": "2026-08-28T09:29:32.471816-04:00",
+      "description": "934 tests passed in 355s against the verified tree; recorded as final-full",
+      "status": "complete"
     }
   ]
 }

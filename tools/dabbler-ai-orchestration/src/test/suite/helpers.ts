@@ -8,9 +8,59 @@ import * as path from "path";
 import {
   ProjectionPayload,
   SessionRecord,
+  SessionVerification,
   SessionsRepository,
   TaskRecord,
+  VerificationFinding,
 } from "../../types";
+
+export function makeFinding(
+  overrides: Partial<VerificationFinding> = {},
+): VerificationFinding {
+  return {
+    round: 3,
+    description: "the suite command is guessed rather than declared",
+    severity: "major",
+    category: "Correctness",
+    failureScenario: "A Java repository gets `python -m pytest`.",
+    evidencePaths: ["ai_router/affected.py"],
+    blocking: true,
+    disposition: "outstanding",
+    ...overrides,
+  };
+}
+
+/** A session unresolved at the cap, as the projection folds one. */
+export function makeVerification(
+  overrides: Partial<SessionVerification> = {},
+): SessionVerification {
+  return {
+    terminal: "ISSUES_FOUND",
+    headline: "unresolved at the cap",
+    clean: false,
+    verdict: "ISSUES_FOUND",
+    rounds: 3,
+    stoppedAtRound: 3,
+    cap: 3,
+    verifierModel: "gpt-5-6-sol",
+    verifierProvider: "openai",
+    transport: "api",
+    agency: {
+      mode: "none",
+      reads: 0,
+      searches: 0,
+      listings: 0,
+      transformedReads: 0,
+      outOfScope: 0,
+      overBudget: 0,
+      reason: "this transport sends no tools",
+      operations: [],
+    },
+    findings: [makeFinding()],
+    fixPaths: [],
+    ...overrides,
+  };
+}
 
 export function makeTask(overrides: Partial<TaskRecord> = {}): TaskRecord {
   return {
@@ -39,6 +89,8 @@ export function makeSession(overrides: Partial<SessionRecord> = {}): SessionReco
     verificationVerdict: null,
     tasks: [],
     tasksRefused: null,
+    verification: null,
+    verificationRefused: null,
     ...overrides,
   };
 }

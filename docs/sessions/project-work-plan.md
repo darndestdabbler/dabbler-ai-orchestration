@@ -54,7 +54,7 @@ it.
 | 16 | The task level (plan D1, second half) | no | 2026-08-28 |
 | 17 | The tracked project config (precondition for D2) | no | 2026-08-28 |
 | 18 | Project setup as two sessions (plan D2) | no | 2026-08-28 |
-| 19 | The unresolved-session view (plan D3) | — | not declared |
+| 19 | The unresolved-session view (plan D3) | no | 2026-08-28 |
 | 20 | A round baseline that survives the trip (root cause of D98) | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
@@ -491,3 +491,27 @@ waiting on a person.
    sessions, the start-the-next-session affordances — and is honest that
    nothing has run there yet. Neither setup session is an approval gate and
    no row offers one.
+
+### Session 19 — The unresolved-session view (plan D3)
+
+**Releasable: no.**
+
+Build the unresolved-session view: a session that stopped at the cap is
+read at planning time, from the record, in the Work Explorer.
+
+1. The projection folds each session's rounds ledger into one verification
+   summary -- what stopped, at which round, the findings with vendor and
+   severity, what the verifier looked at, whether the round had agency at
+   all, whether any read it relied on was transformed, and which of the
+   three terminal states it reached. Python decides; the extension renders
+   it and re-derives nothing from the ledger.
+2. The Work Explorer renders that summary under the session row, with the
+   findings as rows, and refuses rather than guesses when the rounds ledger
+   is unreadable. The watcher and the projection cache cover rounds.jsonl,
+   so the view moves on the event rather than on the poll.
+3. Three actions on such a session: send it back (a copied prompt that
+   hands the record back to an engine), respecify it (the plan opened at
+   the session's own block), cancel it (the existing cancel, passing
+   --force only for the unresolved terminal, because an unresolved session
+   cannot close). No approve-over action exists anywhere, and nothing holds
+   an engine open.

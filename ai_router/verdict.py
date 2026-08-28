@@ -38,6 +38,17 @@ SESSION_VERDICTS = frozenset(
     {VERDICT_VERIFIED, VERDICT_ISSUES_FOUND, VERDICT_REMEDIATED_AT_CAP}
 )
 
+#: How each terminal state of a review loop reads to a person. Keyed by the
+#: closed vocabulary and nothing else: a fourth state would have to be added
+#: to SESSION_VERDICTS first, which is the point. Every loop and every view
+#: that names a terminal state reads it here, so the run core's loop and the
+#: session projection cannot describe the same record in two vocabularies.
+TERMINAL_HEADLINES = {
+    VERDICT_VERIFIED: "verified",
+    VERDICT_ISSUES_FOUND: "unresolved at the cap",
+    VERDICT_REMEDIATED_AT_CAP: "remediated at the cap",
+}
+
 SEVERITIES = ("critical", "major", "minor")
 BLOCKING_SEVERITIES = frozenset({"critical", "major"})
 

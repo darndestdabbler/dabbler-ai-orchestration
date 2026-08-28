@@ -11,10 +11,13 @@ import * as cp from "child_process";
 import * as fs from "fs";
 import * as path from "path";
 import {
+  AgencyOperation,
   ProjectionPayload,
   SessionRecord,
   SessionStatus,
+  SessionVerification,
   TaskRecord,
+  VerificationFinding,
 } from "../types";
 
 /** The sessions-root files whose mtimes invalidate a cached projection. */
@@ -29,11 +32,11 @@ const CACHE_INPUTS = [
 export const RUNS_REL = path.join(".dabbler", "runs");
 
 /**
- * The per-session run artifacts the task level is folded from. They sit
- * under the REPOSITORY root, not the sessions root, and they must be in
- * the cache key: a step opening changes only these, and a key that
- * ignored them would serve the pre-open payload back to the watcher tick
- * the open fired.
+ * The per-session run artifacts the task level and the verification view
+ * are folded from. They sit under the REPOSITORY root, not the sessions
+ * root, and they must be in the cache key: a step opening or a round
+ * landing changes only these, and a key that ignored them would serve the
+ * stale payload back to the watcher tick the write fired.
  */
 export function taskRecordInputs(
   repositoryRoot: string,
@@ -45,6 +48,7 @@ export function taskRecordInputs(
     if (!/^s\d+$/.test(entry)) continue;
     inputs.push(path.join(runs, entry, "step-execution.jsonl"));
     inputs.push(path.join(runs, entry, "approved-plan.json"));
+    inputs.push(path.join(runs, entry, "rounds.jsonl"));
   }
   return inputs.sort();
 }
@@ -212,6 +216,93 @@ function narrowSession(raw: unknown): SessionRecord | null {
     // projection distinguishes "this session declared no plan" from "the
     // execution record could not be read", and so must the tree.
     tasksRefused: typeof o.tasksRefused === "string" ? o.tasksRefused : null,
+    verification: narrowVerification(o.verification),
+    verificationRefused:
+      typeof o.verificationRefused === "string" ? o.verificationRefused : null,
+  };
+}
+
+const str = (v: unknown): string | null => (typeof v === "string" ? v : null);
+const num = (v: unknown): number | null => (typeof v === "number" ? v : null);
+const count = (v: unknown): number => (typeof v === "number" ? v : 0);
+
+/**
+ * The folded rounds ledger. The headline is the one field the view cannot
+ * do without — it is Python's statement of the state — so a payload
+ * lacking it is not a view the tree can repeat and narrows to null.
+ * `clean` fails closed: anything but an explicit true is unclean, so a
+ * router that never said "clean" cannot make a stopped session read as
+ * verified.
+ */
+function narrowVerification(raw: unknown): SessionVerification | null {
+  if (raw === null || typeof raw !== "object") return null;
+  const o = raw as Record<string, unknown>;
+  if (typeof o.headline !== "string") return null;
+  const agency = (
+    o.agency !== null && typeof o.agency === "object" ? o.agency : {}
+  ) as Record<string, unknown>;
+  return {
+    terminal: str(o.terminal),
+    headline: o.headline,
+    clean: o.clean === true,
+    verdict: str(o.verdict),
+    rounds: count(o.rounds),
+    stoppedAtRound: num(o.stoppedAtRound),
+    cap: num(o.cap),
+    verifierModel: str(o.verifierModel),
+    verifierProvider: str(o.verifierProvider),
+    transport: str(o.transport),
+    agency: {
+      mode: agency.mode === "tools" || agency.mode === "none" ? agency.mode : null,
+      reads: count(agency.reads),
+      searches: count(agency.searches),
+      listings: count(agency.listings),
+      transformedReads: count(agency.transformedReads),
+      outOfScope: count(agency.outOfScope),
+      overBudget: count(agency.overBudget),
+      reason: str(agency.reason),
+      operations: Array.isArray(agency.operations)
+        ? agency.operations
+            .map(narrowOperation)
+            .filter((x): x is AgencyOperation => x !== null)
+        : [],
+    },
+    findings: Array.isArray(o.findings)
+      ? o.findings
+          .map(narrowFinding)
+          .filter((x): x is VerificationFinding => x !== null)
+      : [],
+    fixPaths: Array.isArray(o.fixPaths)
+      ? o.fixPaths.filter((p): p is string => typeof p === "string")
+      : [],
+  };
+}
+
+function narrowOperation(raw: unknown): AgencyOperation | null {
+  if (raw === null || typeof raw !== "object") return null;
+  const o = raw as Record<string, unknown>;
+  return {
+    kind: str(o.kind) ?? "",
+    target: str(o.target) ?? "",
+    fidelity: str(o.fidelity),
+    inScope: o.inScope !== false,
+  };
+}
+
+function narrowFinding(raw: unknown): VerificationFinding | null {
+  if (raw === null || typeof raw !== "object") return null;
+  const o = raw as Record<string, unknown>;
+  return {
+    round: num(o.round),
+    description: str(o.description) ?? "",
+    severity: str(o.severity) ?? "",
+    category: str(o.category) ?? "",
+    failureScenario: str(o.failureScenario) ?? "",
+    evidencePaths: Array.isArray(o.evidencePaths)
+      ? o.evidencePaths.filter((p): p is string => typeof p === "string")
+      : [],
+    blocking: o.blocking === true,
+    disposition: str(o.disposition) ?? "",
   };
 }
 

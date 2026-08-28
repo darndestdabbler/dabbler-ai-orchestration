@@ -6,8 +6,13 @@ import {
   runRestoreSessionFlow,
 } from "../../commands/cancelLifecycleCommands";
 import { NewModuleUi, runNewModuleFlow } from "../../commands/newModule";
-import { planSessionRunPrompt } from "../../commands/copyPromptCommands";
+import {
+  planRespecifyPrompt,
+  planSendBackPrompt,
+  planSessionRunPrompt,
+} from "../../commands/copyPromptCommands";
 import { cancellableSessionOf } from "../../commands/cancelLifecycleCommands";
+import { cancelArgs } from "../../utils/sessionLifecycleCli";
 import { START_NEXT_SESSION_PROMPT } from "../../providers/rowMenuHelpers";
 import { sessionNumberOf, specSectionTargetFor } from "../../commands/openFile";
 import {
@@ -19,6 +24,7 @@ import {
   makeRepository,
   makeSession,
   makeTempDir,
+  makeVerification,
   rmrf,
   writeFileTree,
 } from "./helpers";
@@ -227,5 +233,115 @@ suite("tree command argument narrowing", () => {
     } finally {
       rmrf(dir);
     }
+  });
+});
+
+suite("commandFlows: the three planning-time actions", () => {
+  const nodeFor = (session: ReturnType<typeof makeSession>) => ({
+    kind: "session" as const,
+    repository: makeRepository({ sessions: [session] }),
+    session,
+  });
+
+  test("cancel passes --force only for a session in flight and unresolved at the cap", () => {
+    // The CLI refuses an in-flight cancel without --force, and that
+    // refusal is right for live work. An unresolved session cannot close,
+    // so for it cancel is the sanctioned exit; the flag rides on the
+    // record's terminal state, never on a prompt to the operator.
+    const unresolved = cancellableSessionOf(
+      nodeFor(makeSession({ number: 3, status: "in-progress", verification: makeVerification() })),
+    );
+    assert.strictEqual(unresolved?.force, true);
+    const landed = cancellableSessionOf(
+      nodeFor(
+        makeSession({
+          number: 3,
+          status: "complete",
+          verification: makeVerification({ terminal: "REMEDIATED_AT_CAP" }),
+        }),
+      ),
+    );
+    assert.strictEqual(landed?.force, false);
+    const live = cancellableSessionOf(nodeFor(makeSession({ number: 3, status: "in-progress" })));
+    assert.strictEqual(live?.force, false);
+
+    assert.deepStrictEqual(cancelArgs(3, "r"), ["cancel", "3", "--reason", "r"]);
+    assert.deepStrictEqual(cancelArgs(3, "r", true), ["cancel", "3", "--reason", "r", "--force"]);
+  });
+
+  test("the send-back prompt names the record by path and reads differently per terminal state", () => {
+    const repository = makeRepository();
+    const unresolved = planSendBackPrompt(
+      repository,
+      makeSession({ number: 3, verification: makeVerification() }),
+    );
+    assert.ok(unresolved);
+    assert.ok(unresolved!.text.includes(".dabbler/runs/s3/rounds.jsonl"));
+    assert.ok(unresolved!.text.includes("unresolved at the cap"));
+    assert.ok(unresolved!.text.includes("ai_router.verify"));
+    // Never the finding text itself: the engine reads the record.
+    assert.ok(!unresolved!.text.includes("suite command is guessed"));
+
+    const remediated = planSendBackPrompt(
+      repository,
+      makeSession({
+        number: 3,
+        verification: makeVerification({
+          terminal: "REMEDIATED_AT_CAP",
+          headline: "remediated at the cap",
+          fixPaths: ["ai_router/affected.py"],
+        }),
+      }),
+    );
+    assert.ok(remediated!.text.includes("no verifier reviewed it"));
+    // No command re-opens review on a closed session; the prompt says so
+    // and hands the engine the next session's start and declare.
+    assert.ok(remediated!.text.includes("No command re-opens review"));
+    assert.ok(remediated!.text.includes("python -m ai_router.session start --engine"));
+    assert.ok(remediated!.text.includes("python -m ai_router.session declare --task"));
+
+    const verified = planSendBackPrompt(
+      repository,
+      makeSession({
+        number: 3,
+        verification: makeVerification({ terminal: "VERIFIED", headline: "verified", clean: true }),
+      }),
+    );
+    assert.strictEqual(verified, null);
+  });
+
+  test("the respecify prompt hands the engine cancel, the new plan block, and start — in that order", () => {
+    const repository = makeRepository({
+      totalSessions: 20,
+      orchestrator: { engine: "claude-code", provider: "anthropic" },
+    });
+    const unresolved = planRespecifyPrompt(
+      repository,
+      makeSession({ number: 19, status: "in-progress", verification: makeVerification() }),
+    )!;
+    const cancelAt = unresolved.text.indexOf(
+      'python -m ai_router.session cancel 19 --reason "respecified as session 21" --force',
+    );
+    const blockAt = unresolved.text.indexOf("### Session 21 of 21");
+    // The plan is named by the scan's own path for it, relative to the
+    // root, not by a filename typed into the prompt.
+    assert.ok(unresolved.text.includes("in docs/sessions/session-plan.md"), unresolved.text);
+    const startAt = unresolved.text.indexOf(
+      "python -m ai_router.session start --engine claude-code --provider anthropic",
+    );
+    assert.ok(cancelAt >= 0 && blockAt > cancelAt && startAt > blockAt, unresolved.text);
+    assert.ok(unresolved.toast.includes("session 21"));
+
+    // A session already closed at the cap needs no cancel: two steps.
+    const landed = planRespecifyPrompt(
+      repository,
+      makeSession({
+        number: 17,
+        status: "complete",
+        verification: makeVerification({ terminal: "REMEDIATED_AT_CAP", headline: "remediated at the cap" }),
+      }),
+    )!;
+    assert.ok(!landed.text.includes("session cancel"));
+    assert.ok(landed.text.includes("(2) python -m ai_router.session start"));
   });
 });

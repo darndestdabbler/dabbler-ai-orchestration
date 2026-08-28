@@ -371,9 +371,9 @@
     {
       "number": 19,
       "title": "The unresolved-session view (plan D3)",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-28T08:46:40.067563-04:00",
-      "completedAt": null,
+      "completedAt": "2026-08-28T09:29:45.079046-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

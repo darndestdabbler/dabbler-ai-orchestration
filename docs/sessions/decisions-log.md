@@ -4025,3 +4025,53 @@ than twice (again when it is committed). It changes a gate, so it stays the
 operator's call, and session 27 ports `evidence`/`test_evidence`: deciding
 before then is worth more than after. Until it is fixed, every session that
 deletes a tracked file pays one extra full-suite run or one forced close.
+
+### D158 · 2026-08-28 · Orchestrator (anthropic) · session close --force promotes EVERY open session to complete, not one: it marked sessions 25-35 of the port plan finished, the ledger was restored from the pre-force commit, and the suite was re-run to close honestly
+
+**What happened.** The close's `test_run_fresh` gate failed after the commit
+(D149/D157). Rather than re-run the suite, the orchestrator reached for
+`session close --force`, reading its help — "bypass bookkeeping gates, never
+evidence; stamps forceClosed" — as "skip one bookkeeping gate for this
+session".
+
+It is not that. `writers.flip_state_to_closed` says so in its own docstring:
+
+> ``forced`` promotes every open session — a forensic marker, not a shortcut.
+
+Lines 348–353 flip every session that is not already `complete` or
+`cancelled` to `complete`. **Sessions 25–35 of the port plan were marked
+finished**, with session 24's `completedAt` and no verdict, and the ledger
+claimed the TypeScript port was done. `forceClosed: true` was stamped at the
+REPOSITORY level, not on session 24's row, so nothing in the ledger said
+which session had forced it.
+
+**The repair.** `session restore` accepts only cancelled sessions, so the
+router had no path back. `docs/sessions/sessions.json` and
+`activity-log.json` were restored from commit `6350ee6b` — the state the
+ROUTER wrote immediately before the forced close, recovered from git, not
+hand-authored values — the full 942-test suite was re-run against the final
+tree, and the session closed with all five gates passing and no `--force`.
+Session 24's rounds, decisions and round refs were untouched throughout.
+
+The operator's ruling that a second full-suite run was unnecessary was
+correct on its own terms (D157 proves the digest delta is only the deleted
+paths). The mistake was the tool chosen to act on it. Skipping a five-minute
+run cost a damaged ledger and a restore.
+
+**Three defects this exposes, all owed:**
+
+1. **The `--force` help text does not describe what the flag does.** It
+   should say that it promotes EVERY open session to complete and is for
+   abandoning a set, not for passing a gate. One line in
+   `session.py`'s argparse.
+2. **`--force` should refuse, or require a second explicit flag, when it
+   would promote sessions that are not in flight.** A forensic marker for
+   abandoning a set and a way past one gate should not be the same
+   keystroke.
+3. **`forceClosed` is stamped repository-wide**, so the ledger records that
+   a close was forced but not which session forced it. It belongs on the
+   session's row.
+
+Until (1) and (2) land, the trap is written into `AGENTS.md`'s project
+preamble, where every engine reads it — a repo-level guard standing in for
+a framework fix.

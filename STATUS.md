@@ -1,16 +1,86 @@
-# STATUS — session 24 of 35 landed: the extension talks to the interface, and Python answers
+# STATUS — session 25 of 35 landed: the foundation modules, and the first verb through both routers
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
 `experiment/verification-pipeline-v3` and `design/solution-decomposition`
 are merged and finished. Earlier handoff text is in `docs/status-archive.md`.
 
-> **Recorded, 2026-08-28.** Session 24's deliverables are decisions
-> **D150–D162** in `docs/sessions/decisions-log.md`; session 23's are
-> **D138–D149**, plus the amendments inside
+> **Recorded, 2026-08-28.** Session 25's deliverables are decisions
+> **D163–D169** in `docs/sessions/decisions-log.md`; session 24's are
+> **D150–D162** and session 23's **D138–D149**, plus the amendments inside
 > `docs/ts-port-parity-control.md`. This file summarises them; the
 > decisions are the record.
 
 ## Where things are
+
+- **Session 25 is closed `VERIFIED`** — 2 rounds (gpt-5-6-sol over the
+  API), round 1 blocking and correct, round 2 clean on the fix delta. Claude
+  Code / claude-opus-5[1m] orchestrator. All five gates passed at the first
+  attempt; nothing was forced.
+- **Seven modules are ported.** `config`, `secret_resolver`, `identity`,
+  `verdict`, `lockfile`, `runtime_mode`, `metrics` — 1,841 Python lines
+  becoming **2,790 TypeScript across fourteen files**, with **122 vitest
+  tests** answering for the 98 Python tests. The extra files are the seams:
+  `paths`, `textfile`, `version`, `cli/output`, and the two forward
+  dependencies (below).
+- **Both routers read ONE copy of the bundled data.** `router-config.yaml`,
+  the schemas and the prompt templates are read from `ai_router/` by both,
+  resolved through `src/paths.ts`, which finds the package by walking up for
+  its own `package.json` — the same code runs from `src/` under ts-node and
+  from `dist/` after esbuild, and a fixed number of `..` would be silently
+  wrong in one. A second copy of that data would drift, and the control
+  compares two routers reading the same input. Session 33/35 decides what
+  the package ships with when Python leaves.
+- **`metrics` is the first verb the port makes real**, and the parity
+  control's **first cross-router case** — a session earlier than D159
+  assumed, because `contracts/verbs.ts` has said `metrics` lands in session
+  25 since it was written. Both routers produce byte-identical stdout,
+  stderr and exit code on `fresh` and `in-flight` (**D163**).
+- **Landing one verb found two defects six more library ports would not
+  have (D166).** `python -m ai_router.metrics` printed a runpy
+  `RuntimeWarning` on *every* invocation, because `__init__` imports
+  `route` and `route` imported `metrics` at module scope; `route` now
+  imports `record_call` inside the one function that calls it, which is how
+  `verifyjob` already reached it. And **session 23's bundled `dabbler.cjs`
+  died on its first line**: esbuild's CommonJS output has no
+  `import.meta`, so any module locating itself by it resolved `undefined`.
+  Nothing had noticed because no verb was implemented, so nothing in the
+  bundle had ever read a file. `build.mjs` now defines it from `__filename`.
+- **`config` load enters the control through `metrics`; `verdict` parse
+  could not.** `verdict` has no command line and is reached only through
+  `verify` (session 32), so its case lands there. It was proved instead
+  against **every verifier output this repository holds — 71 files, three
+  vendors — parsed by both implementations and compared structurally:
+  identical on all 71** (**D163**). That is evidence, not a control.
+- **Four cross-language byte differences are settled in Python's favour
+  (D165):** line endings in both directions (`cli/output.ts` writes the
+  platform's ending because Python's `print` does; `textfile.ts` reads
+  universal newlines because Python's text mode does, and the TOML reader
+  deliberately does not, because `tomllib` takes bytes); `int` versus
+  `float` via a `tomlFloat` marker; CPython's float `repr`; and
+  `json.dumps`'s separators and non-ASCII escaping. **Schema error
+  *wording* is explicitly not claimed** — `ajv` and `jsonschema` word and
+  order errors differently, and matching them would be a second
+  implementation of a rule.
+- **Both owed rulings with a deadline here are discharged.** **D159**: session
+  23's step 5 is reworded. **D161**: `facts.run_control` now keeps a passing
+  control's own output in the record, and a silent control records that it
+  was silent — with each parity case declaring, in the type system, what a
+  green row for it proves (**D167**).
+- **Round 1's finding was real and is the reason to keep the loop.** The
+  control claimed a "three-layer config load" the corpus never exercised:
+  there was no `local-overrides.yaml` in it. That is D161's own failure mode
+  arriving in the session that implemented D161. The corpus now carries one,
+  written per repository and **load-bearing rather than scenery** — it is
+  what points `metrics` at the canned telemetry, so with it the report reads
+  4 calls and without it 110. The corpus also scrubs `AI_ROUTER_CONFIG`,
+  `AI_ROUTER_METRICS_PATH`, `DABBLER_TRANSPORT` and `DABBLER_NO_ROUTER` from
+  the child environment: an operator with the first one set would have made
+  both routers read their config and skip both layers, wrong together, which
+  is the one failure a comparison cannot see.
+- **Suite: 943 Python (5:12 at `-n 2`) / 133 router vitest (6 s) / 153
+  extension mocha / 14 Playwright; all four declared controls green.** The
+  Python suite gained one test (D167's). `packages/router` is now ~4,700
+  lines of source (1,400 generated) and ~1,300 of tests.
 
 - **Session 24 is closed `VERIFIED`** — 3 rounds (gpt-5-6-sol over the
   API), the round-3 finding **disputed and OVERRULED** by a third provider
@@ -179,6 +249,9 @@ is D127; the previous version of this file carried it in full.
 
 | Source | What is owed |
 | --- | --- |
+| **D164 — the port** | `identity.resolve_session_orchestrator_identity` is **not ported**. It is the one function in `identity` that reads a repository rather than a block, and it reads state through `progress` — session 30. Writing a second reader of `sessions.json` to reach it early is the drift the port exists to remove, so it lands in session 30 as a wrapper over `resolveOrchestratorIdentity`. No test covers it today on either side; the Python suite's eleven identity tests are all against the block-level core. |
+| **D168 — shared design** | `parseVerificationResponse` tests the head with `startsWith("VERIFIED")`, so a look-alike (`VERIFIED_NOT_REALLY`) classifies as VERIFIED. **Faithful to Python, and deliberately not fixed in the port** — an improvement on one side only is exactly the drift parity exists to catch. Blast radius is small (the token chooses a parse branch, not an outcome: `classifyBlocking` is severity-derived, and `validateSessionVerdict` refuses the token exactly). If a boundary is wanted it goes into Python first and crosses with a parity case that feeds a look-alike to both — session 32. |
+| **D169 — cost to watch** | The parity control takes **~150 s** per run, because it builds four corpus repositories by driving the Python router, and it runs inside every `verify`. That is already comparable to a verifier round's wall time, and the case table only grows. Sessions 26–34 should watch it; caching a built shape across cases is the obvious lever if it becomes the bottleneck. |
 | **D122 gap** | No path by which a verifier reviews a remediated-at-the-cap fix. Sessions 12 and 17 ended that way, so their last fixes are unreviewed today. |
 | **D116** | A targeted-run form for filter-style runners (Maven `-Dtest=`, `dotnet test --filter`) plus the audit rule that checks one. "A session, not a patch." The port's vitest path-list form does not need it. |
 | **D124** | Record the round cap on the round row as `verify.py` writes it; the unresolved-session view reads the live cap for a historical session. |
@@ -186,13 +259,13 @@ is D127; the previous version of this file carried it in full.
 | **D114 nit 2** | `build_task_rows` renders a leaf, not a refusal, when `approved-plan.json` is missing while `step-execution.jsonl` carries an open step. |
 | **D130 (was D88)** | Not owed — decided. The operator's override window on retiring the run core is open until session 34 starts. |
 | **D134** | Round-1 change sets measure HEAD's raw tree against a snapshot that drops `.dabbler/`, so a repository that tracks its ledger reports it as deleted. Moot here since D135 and **confirmed moot** — session 23's first selection reported zero `selection_unknown` rows against 208 in each of 19–22 (D144). Latent elsewhere. If fixed on the Python side, do it before session 27 ports `affected`. |
-| **D147 — RULED (D159)** | **A plan defect, and the one thing owed back to the operator from session 23.** Step 5 of session 23 asks for a control that runs a verb through **both** routers *and* for that control to be declared required — in a session the plan gives no second router. The adjudication resolved this session; it did not amend the plan. Decide whether step 5's wording changes or the first parity case moves earlier. The substantive answer is already scheduled either way: session 26 lands the first ported verb and its parity case. |
+| **D147 — RULED (D159), DONE in 25** | Session 23's step 5 is reworded: the control is declared and required from session 23, running the comparison that needs one router; the cross-router comparison joins it with the first ported verb. That verb turned out to be `metrics`, in session **25** rather than 26 — earlier than the ruling assumed, and costing nothing, because what the ruling protected was that no session be handed an instruction it cannot follow. Closed. |
 | **D149 — RULED (D160), reproduced in D157** | Deleting a tracked file moves the whole-tree digest across the commit, because `git ls-files` still lists a tracked-but-deleted path and `surface_digest` writes it a literal `"deleted"` hash. Session 24 proved it exactly: the run-of-record digest is reproduced bit-for-bit by taking the committed tree and re-adding five `path\0deleted` lines — no file content differs, and the Python suite's own `surfaceDigest` is unchanged. **The operator refused the second full run and the session force-closed instead.** Fix at the git seam (omit an unreadable path rather than hashing the word "deleted") or bind to the commit's tree. It changes a gate, so it is the operator's call — and session 27 ports `evidence`/`test_evidence`, so deciding before then is worth more than after. Until then every session that deletes a tracked file pays one extra full-suite run or one forced close. |
 | **D158 — framework** | `session close --force` promotes EVERY open session to complete, and its help says only "bypass bookkeeping gates". It cost session 24 a damaged ledger and a restore. Three fixes owed: say what the flag does; refuse (or require a second flag) when it would promote sessions that are not in flight; and stamp `forceClosed` on the session's row rather than the repository, so the ledger can say which session forced a close. Until they land, the trap lives in `AGENTS.md`'s preamble. |
 | **D152 — RULED (D162)** | `ModuleVerbs.list`/`retire`, and several `VerifyVerbs`/`WorkflowVerbs` option names, describe a Python surface that does not exist in those shapes (`ai_router.modules` has only `create`; `verify dispute` takes `--finding`). Sessions 30/32/34 port those modules — reconcile the contract against what is ported rather than inheriting a shape nothing ever ran. |
 | **D155 / D116** | The extension's mocha suite is still not a declared suite, so `affected` selects nothing for `tools/dabbler-ai-orchestration/` and session 24's largest change set had no recordable pre-verification evidence. Measured why it is not a one-line declaration: `targeted_command` appends the selected paths, and mocha MERGES a path list with its `spec` (both from the flag and from `.mocharc.json`) rather than being narrowed by it, so the bare command cannot mean "everything" while the appended form means "these". `runs_whole` would be false. It needs a runner entry point — D116's shape. |
 | **Session 24 estimate** | "Net negative TS lines" was not met (+178 in the extension). `implements Router` requires all 32 methods and twenty of them refuse, which still costs their signatures. Not a defect; a fact about the contract's width, worth knowing when sizing sessions 30–34. |
-| **D145/D146 — RULED (D161)** | A reader of `deterministic-facts.jsonl` sees `analyzer: pass` and cannot tell what was compared; `facts.run_control` drops the detail on a green result. The verifier raised it across three rounds. Worth asking in session 26, when the analyzer gets its first cross-router case, whether a control should say what it proved. A Python behaviour change in the record — the operator's call. |
+| **D145/D146 — RULED (D161), DONE in 25** | Implemented as **D167**: `facts.run_control` keeps a passing control's own output in the record (capped at the same 1,500 characters a failure is), and a control that prints nothing on success records that it printed nothing — so "had nothing to say" and "said something the record dropped" are no longer the same row. Each parity case declares a `proves` string beside it, so a case added without saying what it proves does not typecheck. Closed. |
 | **D119** | The solution level (one repository per library or service, plus an integrator) is not formalized. |
 | Suite cost, the remainder | What is left is the loop's own git traffic (134 spawns in the slowest test). A fake git is still refused. The port's `journal.run_git` twin is where fewer round-trips per round would live. |
 
@@ -211,35 +284,33 @@ resolved by being true again.
 
 ## Next
 
-1. **Session 25 of 35 — foundation modules.** `config` (640),
-   `secret_resolver` (47), `identity` (235), `verdict` (419), `lockfile`
-   (158), `runtime_mode` (84), `metrics` (258) — 1,841 lines, ~98 tests.
-   Leaves of the import graph; everything above depends on them. `config`
-   validates against the schema with `ajv`, and the rate-less routable
-   entry still fails load. The parity control gets its first real work:
-   `config` load and `verdict` parse over the corpus.
-2. **All four owed decisions are RULED (D159–D162, operator).** Nothing is
-   waiting on the operator.
-   - **D159** — reword session 23's step 5; the first cross-router parity
-     case stays in session 26. A one-line plan edit, owed at the start of
-     the next session, so nobody is handed an instruction that cannot be
-     followed.
-   - **D160** — fix the freshness digest by omitting a path that cannot be
-     read, instead of hashing the word `"deleted"` for it. **Must land
-     before session 27** ports `evidence`/`test_evidence`, or it gets
-     fixed twice in two languages.
-   - **D161** — a passing control records what it proved. Land with or
-     before session 26, so the analyzer's first cross-router case is
-     recorded under the new behaviour.
-   - **D162** — reconcile the contract per command as each module is
-     ported, defaulting to trimming. `modules retire` plausibly earns
-     building; `modules list` probably does not; `--finding-index` is just
-     a correction to `--finding`.
-3. **Read before session 26.** It lands the first ported verb *and* the
-   parity control's first cross-router case, and the specification, D141,
-   D146 and the empty `CASES` list in `packages/router/src/parity/run.ts`
-   all point at it. Three corpus shapes (`disputed`, `at-cap`,
-   `moved-machine`) have no builder yet and land with the verbs that read
-   them.
-4. **D130 override window** — the operator can still override retiring the
+1. **Session 26 of 35 — the record.** `journal` (846), `ledger` (901),
+   `writers` (881) — 2,628 lines, 38 tests. The sanctioned writers:
+   everything under `.dabbler/runs/` and `docs/sessions/` is written here
+   and nowhere else, and this is the session the git seam crosses.
+   `src/journal.ts` already exists with `runGit`, its binary mode and
+   `repoRootFor` — ported in session 25 because `config` needs them (D164)
+   — so session 26 grows that file rather than creating it. It also gains
+   several parity cases at once (`session start`/`declare`/`log`/`decision`
+   on `fresh` and `in-flight`, the `ledger` reads on `disputed` and
+   `at-cap`), and **the last two of those shapes have no builder** — they
+   need canned verifier text through the offline transport, which is
+   session 28. Read `docs/ts-port-parity-control.md` before planning it.
+2. **D160 must land before session 27**, and 26 is the last comfortable
+   slot: fix the freshness digest by omitting a path that cannot be read
+   instead of hashing the word `"deleted"` for it, with a test for the
+   deleted-file case. Session 27 ports `evidence`/`test_evidence`, so
+   after that it is two fixes in two languages plus a parity case for the
+   wrong behaviour. **Session 25 did not need it** — it deleted no
+   tracked file — so the trap is untriggered, not gone.
+3. **D162 is per-command, from session 30**: reconcile the `Router`
+   contract against what is actually ported, defaulting to trimming.
+   `modules retire` plausibly earns building; `modules list` probably does
+   not; `--finding-index` is just a correction to `--finding`.
+4. **What session 25 leaves for its successors.** `identity`'s
+   session-level entry point is owed to session 30 (D164); `verdict`'s
+   parity case and the `VERIFIED` look-alike question are owed to session
+   32 (D163, D168); the parity control's ~150 s per `verify` is owed
+   watching by everyone (D169).
+5. **D130 override window** — the operator can still override retiring the
    run core, until session 34 starts.

@@ -506,9 +506,9 @@
     {
       "number": 26,
       "title": "The record \u2014 journal, ledger, writers",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-28T18:04:23.100989-04:00",
-      "completedAt": null,
+      "completedAt": "2026-08-28T19:10:45.397125-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

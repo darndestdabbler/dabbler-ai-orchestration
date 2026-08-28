@@ -272,7 +272,7 @@
     {
       "number": 14,
       "title": "Collapse session sets (plan A3)",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-27T15:50:41.385334-04:00",
       "orchestrator": {
         "engine": "copilot",
@@ -280,7 +280,7 @@
         "model": "claude-opus-5",
         "identityProvenance": "asserted"
       },
-      "completedAt": null,
+      "completedAt": "2026-08-28T03:51:22.136292-04:00",
       "verificationVerdict": "VERIFIED",
       "verification": {
         "rounds": 7,

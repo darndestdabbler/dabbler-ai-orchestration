@@ -4234,6 +4234,14 @@
       "dateTime": "2026-08-28T10:05:01.465998-04:00",
       "description": "941 tests passed in 379s against the verified tree; recorded as final-full",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 20,
+      "stepNumber": 10,
+      "stepKey": "close-out",
+      "dateTime": "2026-08-28T10:05:39.569659-04:00",
+      "description": "Committed and pushed as 936c5685; closed VERIFIED; the close pushed refs/dabbler/rounds/s20/r1",
+      "status": "complete"
     }
   ]
 }

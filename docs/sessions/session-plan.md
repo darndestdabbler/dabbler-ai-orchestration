@@ -790,33 +790,22 @@ or the other by different callers — two implementations of one rule, which
 ground rule 3 forbids and which is the seam this session needs anyway.
 
 1. Register, then declare `--not-releasable`. The declaration names the
-   four deliverables below and nothing else.
+   three deliverables below and nothing else.
 2. **Record the acceptance evaluation as a decision, before any code
    moves.** `session decision --decider orchestrator` with the three checks
    from `STATUS.md` in substance: criterion met (session 20 ran end to end
    on the framework this set built); check 1 met with the noted splits and
    session 20 outside the plan; check 2 met, with session 2's absent
    pre-verify row and the two framework-written cap-landing rows named as
-   such; **check 3 not met**, with the four measured sessions listed. A
-   decision appended after the run of record moves the tree and fails the
-   freshness gate, so this is step 2 and not step 9.
-3. **Back-fill seat cost where the store still has it — on the machine
-   that ran the seat sessions.** This clone's `~/.copilot/session-state/`
-   holds no conversation from the 26–27 August window, so sessions 6–14
-   were driven from the other computer and only its store can price them.
-   Method: for each of sessions 6–14, take the start–close window from
-   `sessions.json`, find the orchestrator conversation id(s) whose
-   `session-state/<id>` entry falls inside it, and run
-   `python -m ai_router.seat_cost <ids>` there. The window locates the id;
-   attribution stays by id, as `seat_cost` requires. Record one decision
-   carrying a per-session table with the module's own status vocabulary
-   (`measured` / `floor` / unmeasured); if the store has been pruned, the
-   row says *unrecoverable* — that is also an answer. **Never estimate from
-   token counts** (spec §7). If this session runs on a machine that cannot
-   do this, record that fact and the procedure as the decision, appended
-   later with `--backfill-reason` once the operator has run it; the check
-   stays owed rather than invented.
-4. **One git seam.** Delete the `checks.py` copies of
+   such; **check 3 not met**, with the four measured sessions listed and
+   the operator's 2026-08-28 decision that it is **not back-filled** — the
+   sessions are closed and the number would change nothing forward. What
+   carries forward is the step, not the figure: every future session plan
+   carries "measure this session's seat cost" as a numbered step, the way
+   session 3's did and sessions 4–20's did not. A decision appended after
+   the run of record moves the tree and fails the freshness gate, so this
+   is step 2 and not step 8.
+3. **One git seam.** Delete the `checks.py` copies of
    `snapshot_worktree_tree` and `changed_paths_between`; `runcli.py`,
    `verifyjob.py` and `workflow.py` import them from `evidence` as
    `affected.py`, `packaging.py` and `verify.py` already do. Route the
@@ -825,7 +814,7 @@ ground rule 3 forbids and which is the seam this session needs anyway.
    the router spawns git. Net negative lines; no behaviour changes; no new
    test — the existing loop tests are the proof, and a source-text
    assertion that the duplicate is gone is a banned kind.
-5. **Make the loop tests cheap without faking git.** Measure first:
+4. **Make the loop tests cheap without faking git.** Measure first:
    `pytest --durations=30` with the `sandbox_repo` setup timed separately
    from the loop, so the seconds are attributed before they are attacked.
    Then, in order of expected yield: build the seeded repo and its bare
@@ -842,22 +831,20 @@ ground rule 3 forbids and which is the seam this session needs anyway.
    under 3:00 at `-n 2`, read from `durationSeconds` in `test-runs.jsonl`
    against session 20's 379 s. `-n 2` stays pinned; this session does not
    promise `-n auto`.
-6. Affected tests as preverify.
-7. Cross-provider verification.
-8. Full test suite, recorded as the `final-full` run of record — which is
-   also the measurement of step 5.
-9. Close-out. Update `STATUS.md`: the evaluation now points at its decision
-   number, the seat-cost row says what was recovered, and the suite time
-   is the new one.
+5. Affected tests as preverify.
+6. Cross-provider verification.
+7. Full test suite, recorded as the `final-full` run of record — which is
+   also the measurement of step 4.
+8. Close-out. Update `STATUS.md`: the evaluation now points at its decision
+   number and the suite time is the new one.
 
-**Creates:** the set's acceptance as a decision in the record; seat-cost
-rows for whichever of sessions 6–14 the store still prices, or a recorded
-*unrecoverable*; one git seam with net negative lines; a run of record
-that costs half what it does today. **Est. 0 new Python tests** — the
-fixture is not tested and the seam deletes rather than adds. Not
-releasable.
+**Creates:** the set's acceptance as a decision in the record, with the
+seat-cost question closed rather than left owed; one git seam with net
+negative lines; a run of record that costs half what it does today.
+**Est. 0 new Python tests** — the fixture is not tested and the seam
+deletes rather than adds. Not releasable.
 
-**The risk is step 5's measurement, not its changes.** If the timing shows
+**The risk is step 4's measurement, not its changes.** If the timing shows
 the loop's own per-round git calls dominate rather than the fixture, the
 template copy buys little and the honest move is to stop at the seam and
 record the number, not to reach for a fake.

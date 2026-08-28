@@ -94,10 +94,11 @@ session 3's plan and was not carried into the later sessions' step lists.
 
 **Consequence.** The next set can be planned only against the **$8–$12 per
 ordinary code session** band D37 named from two samples and D48 confirmed
-with a third. If the Copilot CLI's `~/.copilot/session-store.db` still holds
-sessions 6–14's conversation ids, `python -m ai_router.seat_cost` can
-backfill them; the API sessions are reconcilable only against the vendor
-console, as spec §7 says.
+with a third. **The operator decided on 2026-08-28 not to back-fill** — the
+sessions are closed and the figure would change nothing forward. What
+carries forward is the step: every future session plan carries "measure
+this session's seat cost" as a numbered step, which session 3's did and
+sessions 4–20's did not.
 
 ## Owed, from the record
 
@@ -110,7 +111,7 @@ console, as spec §7 says.
 | **D114 nit 2** | `build_task_rows` renders a leaf, not a refusal, when `approved-plan.json` is missing while `step-execution.jsonl` carries an open step. |
 | **D88** | Operator question: does the run core's projection replace the lifecycle's records, or is it retired? Two state systems coexist; `dabbler status` sees no runs in this repository. |
 | **D119** | The solution level (one repository per library or service, plus an integrator) is not formalized. |
-| Acceptance check 3 | Seat-cost backfill for sessions 6–14, and the missing per-session measurement step in every future session plan. |
+| Acceptance check 3 | The per-session seat-cost measurement step in every future session plan. Not back-filled for 148, by operator decision. |
 
 ## Carried from the archived handoff, status not re-verified
 
@@ -128,8 +129,8 @@ item is resolved.
 
 Nothing is registered. Candidates, in the order the record argues for them:
 
-1. **Record this evaluation as a decision** and backfill seat cost where the
-   store still has it — so the next set is planned against numbers.
+1. **Record this evaluation as a decision** (session 21, step 2), closing
+   the seat-cost question rather than leaving it owed.
 2. **Fake the git seam in the loop tests.** The top 30 tests cost 3–11 s
    each and every second is process spawning (nine git calls in
    `sandbox_repo` before the loop starts). This is why `-n auto` cripples a

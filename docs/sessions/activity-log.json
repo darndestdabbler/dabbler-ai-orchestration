@@ -3491,6 +3491,184 @@
       "body": "Nit 1: task rows are labelled with the humanized step_id rather than steps[].intent, which the verifier reads the spec as requiring. That is decision D112 and it was made deliberately -- intent is one imperative sentence and wraps a tree row, step_id is the identity every other layer addresses the step by. It is a presentation call for the operator, not a correctness defect. Nit 2, and the better catch: build_task_rows returns no tasks when approved-plan.json is missing, without reading the execution record -- so a session whose plan was deleted while step-execution.jsonl still carries an open step renders as a leaf rather than a refusal. That is the stale-but-plausible shape this level exists to end, in a rare state. Both are Minor and non-blocking; the loop stops here per the severity-gated rule rather than spending a round on wording, and nit 2 is owed as a follow-up.",
       "model": "gpt-5.6-sol",
       "provider": "openai"
+    },
+    {
+      "sessionNumber": 17,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-28T06:16:01.591956-04:00",
+      "description": "Register.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 17,
+      "stepNumber": 2,
+      "stepKey": "a-third-config-source-tracked",
+      "dateTime": "2026-08-28T06:16:01.591956-04:00",
+      "description": "**A third config source, tracked.** `dabbler.yaml` at the repository root, carrying `testing`, `packaging` and `paths` behind a `schema_version`. Precedence is packaged defaults, then this file, then `local-overrides.yaml`. The bundled config keeps providers, models and roles: those are distribution facts and do not become a per-repository decision.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 17,
+      "stepNumber": 3,
+      "stepKey": "the-overlay-stops-being-able-to",
+      "dateTime": "2026-08-28T06:16:01.591956-04:00",
+      "description": "**The overlay stops being able to say anything it likes.** Deep merge today would let a gitignored machine file replace a suite command or a packaging feed, and the run of record would then attribute to the repository a command it never declared. Give the overlay its own schema and refuse a key the repository owns. \"Machine facts only\" is a comment until something enforces it.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 17,
+      "stepNumber": 4,
+      "stepKey": "suites-become-plural-in-fact-not",
+      "dateTime": "2026-08-28T06:16:01.591956-04:00",
+      "description": "**Suites become plural in fact, not only in the schema.** `test_roots` and `test_glob` are declared per suite, because a repository that is Java and .NET at once has two of each and `pack` cannot say which ecosystem made which artifact. Session 18 will meet such a repository in its first project, so the shape has to exist before it, not after.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 17,
+      "stepNumber": 5,
+      "stepKey": "this-repository-moves-its-own-testing",
+      "dateTime": "2026-08-28T06:16:01.591956-04:00",
+      "description": "**This repository moves its own `testing` block out of package data and into its own `dabbler.yaml`, and that migration is the test.** A rule set that has only ever been read from the package it ships in has never proven it can be read from a repository. Doing it here is also the only way this session makes anything smaller rather than only adding.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 17,
+      "stepNumber": 6,
+      "stepKey": "affected-tests-as-preverify",
+      "dateTime": "2026-08-28T06:16:01.591956-04:00",
+      "description": "Affected tests as preverify.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 17,
+      "stepNumber": 7,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-28T06:16:01.591956-04:00",
+      "description": "Cross-provider verification.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 17,
+      "stepNumber": 8,
+      "stepKey": "full-test-suite-recorded-as-the",
+      "dateTime": "2026-08-28T06:16:01.591956-04:00",
+      "description": "Full test suite, recorded as the `final-full` run of record.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 17,
+      "stepNumber": 9,
+      "stepKey": "close-out",
+      "dateTime": "2026-08-28T06:16:01.591956-04:00",
+      "description": "Close-out.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 17,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-28T06:16:01.597672-04:00",
+      "description": "Registered session 17 (claude-code).",
+      "status": "complete"
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 17,
+      "dateTime": "2026-08-28T06:21:48.489501-04:00",
+      "task": "# Session 17 \u2014 The tracked project config (precondition for D2)\n\nGive a repository a tracked place to declare the facts CI and the next machine\nmust agree on, and stop the gitignored overlay from being able to rewrite them.\n\n## 1. A third config source, tracked: `dabbler.yaml`\n\n- New `ai_router/schemas/dabbler.schema.json`: `schema_version` (required),\n  `testing`, `packaging`, `paths`, `additionalProperties: false`.\n- `config.py` resolves three sources instead of two. Precedence: packaged\n  `router-config.yaml`, then the repository's `dabbler.yaml`, then\n  `local-overrides.yaml`. Providers, models, roles and transports stay in the\n  package: those are distribution facts.\n- An explicitly-named config (argument or `AI_ROUTER_CONFIG`) still takes\n  neither layer. A named config is the whole answer, and that rule now covers\n  the tracked file for the same reason it covered the overlay.\n\n## 2. The overlay stops being able to say anything it likes\n\n- The overlay gets its own schema: the router-config schema with the\n  repository-owned blocks removed.\n- A top-level key the repository owns (`testing`, `packaging`, `paths`) is\n  refused by name in `local-overrides.yaml`, with the refusal saying where it\n  belongs. A gitignored machine file must not be able to replace a suite\n  command or a packaging feed under the run of record's name.\n\n## 3. `paths`, and the one repository fact filed in the wrong block\n\n- `run_policy.sensitive_paths` becomes `paths.sensitive_paths`. Which paths of\n  a repository are sensitive is a fact about that repository, not about the\n  machine running it, and while it sat in `run_policy` the overlay could\n  silently empty it. `runcore.py` reads the new location; `run_policy` gets\n  smaller.\n\n## 4. Suites become plural in fact, not only in the schema\n\n- `test_roots` and `test_glob` move from `testing.selection` onto each suite,\n  because a repository that is Java and .NET at once has two of each.\n- `SelectionConfig` carries `scopes` \u2014 one `(suite, roots, glob)` per suite.\n  `names_a_test` matches any scope. `testing.selection.test_roots` and\n  `.test_glob` leave the vocabulary, so a stale declaration is refused rather\n  than read as a second source.\n- `AgencyGrant` carries the same scopes in place of one root list and one\n  glob; `testphase`, `verify` and `fixloop` pass them through.\n- `SUITE_FIELDS` is declared once and shared, so `test_evidence`'s suite\n  parser and `checks`'s cannot disagree about what a suite may say.\n\n## 5. One selection loader, not two\n\n`affected.py` and `checks.py` each carry a byte-identical copy of the\nselection declaration block (`SelectionConfig`, `load_selection_config`,\n`select_tests`). `checks.py` keeps it; `affected.py` imports and re-exports.\nChanging the shape of a declaration twice, in two copies, is how they drift.\n\n## 6. This repository migrates its own `testing` block\n\n`testing` moves out of `ai_router/router-config.yaml` package data and into a\ntracked `dabbler.yaml` at the repository root \u2014 suites, controls and the two\nhundred lines of selection rules. A rule set that has only ever been read from\nthe package it ships in has never proven it can be read from a repository.\nThe selection rules gain a `dabbler.yaml` entry of their own.\n\n## 7. Tests\n\nAround 12\u201314 Python tests: the three-source precedence and its ordering, the\noverlay's refusal of each repository-owned key, a `dabbler.yaml` that fails\nits schema, `paths.sensitive_paths` firing the escalation trigger, per-suite\nscopes selecting across two ecosystems, and a stale\n`testing.selection.test_roots` being refused.\n\n## Releasable\n\nNot releasable. This is a configuration-surface change with no artifact to\npublish; the package version is unchanged.",
+      "releasable": false
+    },
+    {
+      "sessionNumber": 17,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-28T06:55:53.563465-04:00",
+      "description": "Register.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 17,
+      "stepNumber": 2,
+      "stepKey": "a-third-config-source-tracked",
+      "dateTime": "2026-08-28T06:55:54.007647-04:00",
+      "description": "**A third config source, tracked.** `dabbler.yaml` at the repository root, carrying `testing`, `packaging` and `paths` behind a `schema_version`. Precedence is packaged defaults, then this file, then `local-overrides.yaml`. The bundled config keeps providers, models and roles: those are distribution facts and do not become a per-repository decision.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 17,
+      "stepNumber": 3,
+      "stepKey": "the-overlay-stops-being-able-to",
+      "dateTime": "2026-08-28T06:55:54.377148-04:00",
+      "description": "**The overlay stops being able to say anything it likes.** Deep merge today would let a gitignored machine file replace a suite command or a packaging feed, and the run of record would then attribute to the repository a command it never declared. Give the overlay its own schema and refuse a key the repository owns. \"Machine facts only\" is a comment until something enforces it.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 17,
+      "stepNumber": 4,
+      "stepKey": "suites-become-plural-in-fact-not",
+      "dateTime": "2026-08-28T06:55:54.750608-04:00",
+      "description": "**Suites become plural in fact, not only in the schema.** `test_roots` and `test_glob` are declared per suite, because a repository that is Java and .NET at once has two of each and `pack` cannot say which ecosystem made which artifact. Session 18 will meet such a repository in its first project, so the shape has to exist before it, not after.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 17,
+      "stepNumber": 5,
+      "stepKey": "this-repository-moves-its-own-testing",
+      "dateTime": "2026-08-28T06:55:55.180351-04:00",
+      "description": "**This repository moves its own `testing` block out of package data and into its own `dabbler.yaml`, and that migration is the test.** A rule set that has only ever been read from the package it ships in has never proven it can be read from a repository. Doing it here is also the only way this session makes anything smaller rather than only adding.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 17,
+      "stepNumber": 6,
+      "stepKey": "affected-tests-as-preverify",
+      "dateTime": "2026-08-28T07:41:03.627173-04:00",
+      "description": "Affected tests as preverify.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 17,
+      "stepNumber": 7,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-28T07:41:04.044976-04:00",
+      "description": "Cross-provider verification.",
+      "status": "complete"
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D115",
+      "ordinal": 115,
+      "sessionNumber": 17,
+      "decidedOn": "2026-08-28",
+      "recordedAt": "2026-08-28T07:41:49.287947-04:00",
+      "decider": "orchestrator",
+      "headline": "paths carries sensitive_paths, which was misfiled in run_policy where the machine overlay could empty it",
+      "body": "The session plan says `dabbler.yaml` carries `testing`, `packaging` and\n`paths`, and names contents for the first two only. `paths` was read as the\nblock for path facts that belong to the repository rather than to the machine\nor the distribution, and it was given the one such fact the codebase already\nhad misfiled: `run_policy.sensitive_paths`.\n\nWhich paths a repository treats as sensitive is a property of that\nrepository \u2014 it is the repository's own escalation control \u2014 and while it sat\nin `run_policy` the gitignored overlay could deep-merge it to `[]` and switch\nthat control off with nothing tracked to say so. Moving it makes `paths` a\nreal block rather than a placeholder, makes `run_policy` smaller, and is the\nsession's own thesis applied to the one place the codebase already broke it.\n\nThe rejected alternative was `paths.sessions_root`. It looks like the\nrepository fact a foreign repository most needs, but `evidence.py` derives the\nsessions root deliberately (\"nothing chooses where a record lands\") and its\ninverse, `repo_root_from_sessions_dir`, assumes exactly two path segments. A\nconfigurable root would have broken that inverse for any other depth, which is\na defect traded for a knob nobody has asked for yet.",
+      "model": "claude-opus-5",
+      "provider": "anthropic"
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D116",
+      "ordinal": 116,
+      "sessionNumber": 17,
+      "decidedOn": "2026-08-28",
+      "recordedAt": "2026-08-28T07:41:49.641588-04:00",
+      "decider": "orchestrator",
+      "headline": "A runner with no subset form declares runs_whole; per-ecosystem targeted-command syntax is owed, not invented at the cap",
+      "body": "Three rounds, each Major, each on the same thread: making suites plural in\nfact exposed that the framework had one pytest-shaped assumption after\nanother buried under \"the suite\".\n\n- **Round 1** \u2014 selection collapsed suite ownership to a boolean, so a mixed\n  path set could not be routed. Fixed: `SelectedTest.suite`, resolved once\n  from the same declaration that decides what a test is, and carried into the\n  record.\n- **Round 2** \u2014 ownership was recorded but unused; `run_authored` and\n  `run_suite` still ran everything under the first covering suite. Fixed:\n  `suites_for()` partitions by owner, both runners return one run per owning\n  suite, `ai_router.affected` prints one command per suite narrowed to the\n  tests it owns, and the workflow event aggregates the runs while keeping each\n  suite's own row.\n- **Round 3** \u2014 the narrowed commands were still built by appending paths,\n  which is a pytest/jest/`go test` convention: `mvn -q test <file>` reads the\n  path as a lifecycle argument and `dotnet test` wants a project.\n\n**Round 3 was answered by declaration, not by a templating language.** A suite\nwhose runner has no subset form declares `runs_whole: true` and is handed its\nown command; the run is recorded under the policy `suite-runs-whole`, beside\n`targeted` rather than as it, so a reader can still tell a run that was\nnarrowed from one that could not be.\n\nThe alternative \u2014 a per-suite command template with a `{tests}` placeholder,\na separator, and a path-to-test-name transform \u2014 was rejected at the cap. It\nis not only a mini-language; it also breaks the pre-verification audit, which\nproves a command targeted by finding each selected path as a shell token.\n`-Dtest=AdderTest` contains no path, so templating requires redesigning what\nmakes a command auditable at the same time. That is a session, not a patch,\nand inventing it in the last round of a configuration session is how a\nhalf-designed surface ships.\n\n**Owed:** a targeted-run form for runners that take a filter rather than a\nfile list (Maven `-Dtest=`, `dotnet test --filter`), together with the\naudit rule that can check one. Until then a `runs_whole` suite pays for its\ncomplete suite at the pre-verification stage \u2014 honest, and more expensive than\nthe stage is meant to be.\n\n**The session lands REMEDIATED_AT_CAP.** Every blocking finding was fixed; the\ncap left the last fix unreviewed, and no verifier saw the `runs_whole` repair.",
+      "model": "claude-opus-5",
+      "provider": "anthropic"
     }
   ]
 }

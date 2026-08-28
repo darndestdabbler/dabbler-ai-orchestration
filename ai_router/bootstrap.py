@@ -135,8 +135,8 @@ Sessions are numbered directly in this repository, under one sessions root
 
 6. **Run the complete suite once, against the final verified tree**, and
    record it as the run of record. The command is the `command` the suite
-   declares under `testing.suites` in `router-config.yaml` — the same one
-   `--suite <name>` names here:
+   declares under `testing.suites` in this repository's `dabbler.yaml` —
+   the same one `--suite <name>` names here:
 
        python -m ai_router.test_evidence record \\
            --suite <name> --stage final-full --outcome passed \\
@@ -367,9 +367,18 @@ def ensure_gitignore(project_dir) -> bool:
         existing = path.read_text(encoding="utf-8")
     except (OSError, UnicodeError):
         existing = ""
+    target = _IGNORE_RULE.rstrip("/")
     for line in existing.splitlines():
         stripped = line.strip()
-        if stripped.rstrip("/") in (_IGNORE_RULE.rstrip("/"), "*"):
+        # `.dabbler/*` governs the same directory as `.dabbler/`, and a
+        # repository that wrote it that way did so to re-include something
+        # underneath. Adding the blunter rule after it would exclude the
+        # parent directory outright, and git cannot re-include through an
+        # excluded parent -- the ledger a project deliberately tracks would
+        # silently stop being added.
+        if stripped.endswith("/*"):
+            stripped = stripped[:-2]
+        if stripped.rstrip("/") in (target, "*"):
             return False
     block = "" if not existing.strip() else (
         existing if existing.endswith("\n") else existing + "\n"

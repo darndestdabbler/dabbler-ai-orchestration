@@ -171,9 +171,10 @@ def test_a_change_no_declared_check_covers_escalates(run_repo, run_config):
 
 
 def test_a_sensitive_path_escalates_once(run_repo, run_config):
-    reconfigure(run_repo, run_config, run_policy={
-        **run_config["run_policy"], "sensitive_paths": ["app.py"],
-    })
+    # A repository fact, so it is declared under `paths` where the tracked
+    # dabbler.yaml carries it -- not under run_policy, which the machine
+    # overlay may rewrite.
+    reconfigure(run_repo, run_config, paths={"sensitive_paths": ["app.py"]})
     started = _register()
     (run_repo / "app.py").write_text("VALUE = 2\n", encoding="utf-8")
 

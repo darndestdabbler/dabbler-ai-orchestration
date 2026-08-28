@@ -205,6 +205,87 @@ class TestLocalOverrides:
         assert resolve_transport(config) == "api"
 
 
+class TestTheTrackedProjectConfig:
+    """`dabbler.yaml`: what the repository says about itself, tracked because
+    CI and the next machine read it and a gitignored file serves neither."""
+
+    def _declare(self, project, body):
+        (project / "dabbler.yaml").write_text(
+            yaml.safe_dump(body), encoding="utf-8"
+        )
+
+    def _overlay(self, project, body):
+        (project / "local-overrides.yaml").write_text(
+            yaml.safe_dump(body), encoding="utf-8"
+        )
+
+    def test_the_repository_declares_its_own_suites(self, project):
+        self._declare(project, {
+            "schema_version": 1,
+            "testing": {"suites": [{"name": "mvn", "command": "mvn -q test",
+                                    "covers": ["src/"]}]},
+        })
+        config = load_config()
+        assert config["testing"]["suites"][0]["command"] == "mvn -q test"
+        assert config["_project_config_path"].endswith("dabbler.yaml")
+        # Providers, models and roles stay distribution facts: a repository
+        # declaring how to run its tests must not have to fork the registry.
+        assert config["models"] and config["roles"]
+
+    def test_the_machine_overrides_the_distribution_and_not_the_repository(
+            self, project):
+        """The whole point of the ordering. The overlay may still say what is
+        true of this machine; it may not restate what the repository owns."""
+        self._declare(project, {
+            "schema_version": 1,
+            "paths": {"sensitive_paths": ["infra/"]},
+        })
+        self._overlay(project, {"transport": {"profile": "copilot-cli"}})
+        config = load_config()
+        assert config["paths"]["sensitive_paths"] == ["infra/"]
+        assert resolve_transport(config) == "copilot-cli"
+
+    @pytest.mark.parametrize("block", ["testing", "packaging", "paths"])
+    def test_the_overlay_may_not_claim_a_block_the_repository_owns(
+            self, project, block):
+        """Deep merge would have let a gitignored machine file replace a
+        suite command or a packaging feed, and the run of record would then
+        attribute to the repository a command it never declared."""
+        self._overlay(project, {block: {}})
+        with pytest.raises(ValueError, match="which the repository owns"):
+            load_config()
+
+    def test_a_file_that_states_no_schema_version_is_refused(self, project):
+        """A repository set up under a later shape must be refused with its
+        version named, not read as a pile of unknown keys."""
+        self._declare(project, {"testing": {"suites": []}})
+        with pytest.raises(ValueError, match="schema_version"):
+            load_config()
+
+    def test_a_distribution_fact_is_not_a_repository_s_to_declare(
+            self, project):
+        """`AI_ROUTER_CONFIG` is not the escape either, so this is the only
+        door -- and it opens onto three blocks, not onto the provider list."""
+        self._declare(project, {"schema_version": 1, "providers": {}})
+        with pytest.raises(ValueError, match="schema validation"):
+            load_config()
+
+    def test_an_explicitly_named_config_takes_neither_layer(self, project):
+        self._declare(project, {
+            "schema_version": 1,
+            "testing": {"suites": [{"name": "mvn", "command": "mvn -q test"}]},
+        })
+        config = load_config(_write_config(project, make_config()))
+        assert config["_project_config_path"] is None
+        assert not config.get("testing", {}).get("suites")
+
+    def test_sensitive_paths_default_to_none_rather_than_to_absent(
+            self, project):
+        """Every reader sees the same shape, so nothing has to ask whether a
+        repository that declared nothing means "none" or means "unknown"."""
+        assert load_config()["paths"]["sensitive_paths"] == []
+
+
 class TestGenerationParams:
     def test_task_override_deep_merges_over_model_defaults(self, base_config):
         base_config["models"]["sonnet"]["generation_params"] = {

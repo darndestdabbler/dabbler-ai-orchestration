@@ -173,6 +173,17 @@ class TestGitignoreRule:
         assert ensure_gitignore(tmp_path) is False
         assert path.read_text(encoding="utf-8") == ".dabbler\n"
 
+    def test_a_re_including_rule_is_not_blunted(self, tmp_path):
+        """A project that ignores `.dabbler/*` and re-includes the run
+        ledger meant it. Appending `.dabbler/` after that excludes the
+        parent directory, and git cannot re-include through an excluded
+        parent -- the tracked ledger would silently stop being added."""
+        path = tmp_path / ".gitignore"
+        body = ".dabbler/*\n!.dabbler/runs/\n"
+        path.write_text(body, encoding="utf-8")
+        assert ensure_gitignore(tmp_path) is False
+        assert path.read_text(encoding="utf-8") == body
+
 
 class TestInstructionFiles:
     def test_writes_three_files_with_managed_section(self, tmp_path):

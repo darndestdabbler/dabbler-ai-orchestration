@@ -66,13 +66,13 @@ def ran(target, step, green=False, tree=None, **extra):
 def _fake_run(root, config, test_paths, **kw):
     """Stands in for the suite. What is under test here is what the driver
     records, not what pytest says."""
-    return CheckRun(
+    return (CheckRun(
         check=Check(name="unit", argv=("runner",)), stage="targeted",
         command="runner " + " ".join(test_paths), tree_digest="t1",
         post_tree_digest="t1", tree_mutated=False, exit_code=3,
         duration_seconds=0.2, timed_out=False, outcome="failed",
         selection={}, output="E   assert 1 == 2",
-    )
+    ),)
 
 
 def suite_ran(target, step, green=False, tree=None, **extra):
@@ -84,13 +84,13 @@ def suite_ran(target, step, green=False, tree=None, **extra):
 def _fake_suite(root, config, authored_paths, **kw):
     """The complete suite, standing in. The driver's job is to record what a
     runner said, not to be one."""
-    return CheckRun(
+    return (CheckRun(
         check=Check(name="unit", argv=("runner",)), stage="final-full",
         command="runner", tree_digest="t1", post_tree_digest="t1",
         tree_mutated=False, exit_code=1, duration_seconds=0.4,
         timed_out=False, outcome="failed", selection={},
         output="FAILED tests/test_value.py::test_it - assert 1 == 2\n",
-    )
+    ),)
 
 
 MANIFEST = """
@@ -111,6 +111,28 @@ components:
 def root(tmp_path):
     (tmp_path / "solution.yaml").write_text(MANIFEST)
     return tmp_path
+
+
+@pytest.fixture
+def declaring_root(root):
+    """A workspace that says what its tests are. The router package declares
+    no repository's tests -- that moved to each repository's own tracked
+    dabbler.yaml -- so a workspace that never said has nothing to read."""
+    subprocess.run(["git", "init", "-q"], cwd=str(root), capture_output=True)
+    (root / "dabbler.yaml").write_text(
+        yaml.safe_dump({
+            "schema_version": 1,
+            "testing": {"suites": [{
+                "name": "python",
+                "command": "python -m pytest",
+                "covers": ["tests/"],
+                "test_roots": ["tests"],
+                "test_glob": "test_*.py",
+            }]},
+        }),
+        encoding="utf-8",
+    )
+    return root
 
 
 @pytest.fixture
@@ -641,9 +663,10 @@ class TestTheSuiteLoopAndItsFixRound:
         assert (state["a"]["suiteRounds"], state["a"]["fixRounds"]) == (0, 0)
 
     def test_the_cli_records_which_tests_the_run_named(
-            self, root, monkeypatch, capsys):
+            self, declaring_root, monkeypatch, capsys):
         """The fix round is scoped to these and nothing else, so what the run
         named is on the record rather than re-derived later."""
+        root = declaring_root
         append(root, {"event": "entered", "target": "csv-model", "step": "plan"})
         append(root, authored("csv-model", "plan"))
         monkeypatch.setattr(fixloop, "run_suite", _fake_suite)

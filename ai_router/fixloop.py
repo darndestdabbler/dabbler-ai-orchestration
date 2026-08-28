@@ -36,14 +36,13 @@ from pathlib import Path
 from typing import Optional
 
 from ai_router import agency
-from ai_router.affected import names_a_test
 from ai_router.checks import (
     STAGE_FINAL_FULL, changed_paths_between, execute, load_selection_config,
-    snapshot_worktree_tree, timeout_for,
+    names_a_test, snapshot_worktree_tree, timeout_for,
 )
 from ai_router.route import NoCandidateError, route
 from ai_router.selection import ROLE_GENERATOR
-from ai_router.testphase import PhaseError, suite_for
+from ai_router.testphase import PhaseError, suites_for
 
 TASK_TYPE = "code-fix"
 
@@ -176,12 +175,16 @@ def _posix(path) -> str:
 def run_suite(repo_root, config: dict, authored, *, run_id: str = ""):
     """Run the complete suite against the tree, and report what it said.
 
-    The suite is the one this repository declares for the tests the verifier
-    wrote, resolved through :func:`ai_router.testphase.suite_for` so that
-    "which suite answers for these tests" has one implementation. The command
-    is the declared one, unnarrowed: this stage is the whole suite by
-    definition, and a targeted command here would be a smaller claim wearing
-    the same name.
+    Returns a tuple of :class:`ai_router.checks.CheckRun`, one per suite
+    that owns some of the tests the verifier wrote, resolved through
+    :func:`ai_router.testphase.suites_for` so that "which suite answers for
+    these tests" has one implementation. Plural because a repository running
+    two ecosystems has two complete suites, and running only the first would
+    call one ecosystem's green the whole tree's.
+
+    Each command is the declared one, unnarrowed: this stage is the whole
+    suite by definition, and a targeted command here would be a smaller
+    claim wearing the same name.
     """
     paths = tuple(dict.fromkeys(p for p in authored if p))
     if not paths:
@@ -191,27 +194,32 @@ def run_suite(repo_root, config: dict, authored, *, run_id: str = ""):
             "runs against the tree including the tests it wrote."
         )
     try:
-        check = suite_for(config, paths)
+        groups = suites_for(config, paths)
     except PhaseError as exc:
         raise FixLoopError(str(exc)) from exc
-    tree = snapshot_worktree_tree(repo_root)
-    if tree is None:
-        raise FixLoopError(
-            f"could not snapshot the working tree at {repo_root}. Every run "
-            "is judged against a tree id, so a run that cannot name the tree "
-            "it measured proves nothing about it."
-        )
-    try:
-        timeout = timeout_for(check, config)
-    except (KeyError, TypeError) as exc:
-        raise FixLoopError(
-            "run_policy.check_timeout_seconds is not declared, and an "
-            f"unbounded suite run is how a loop stops being bounded: {exc}"
-        ) from exc
-    return execute(
-        repo_root, check, check.display_command(), stage=STAGE_FINAL_FULL,
-        tree_digest=tree, timeout_seconds=timeout, run_id=run_id,
-    )
+    runs = []
+    for check, _owned in groups:
+        tree = snapshot_worktree_tree(repo_root)
+        if tree is None:
+            raise FixLoopError(
+                f"could not snapshot the working tree at {repo_root}. Every "
+                "run is judged against a tree id, so a run that cannot name "
+                "the tree it measured proves nothing about it."
+            )
+        try:
+            timeout = timeout_for(check, config)
+        except (KeyError, TypeError) as exc:
+            raise FixLoopError(
+                "run_policy.check_timeout_seconds is not declared, and an "
+                f"unbounded suite run is how a loop stops being bounded: "
+                f"{exc}"
+            ) from exc
+        runs.append(execute(
+            repo_root, check, check.display_command(),
+            stage=STAGE_FINAL_FULL, tree_digest=tree,
+            timeout_seconds=timeout, run_id=run_id,
+        ))
+    return tuple(runs)
 
 
 def _candidates(line: str) -> list:
@@ -538,10 +546,10 @@ def selection_for(config: dict):
     disagree with itself about which run proved what.
     """
     loaded = load_selection_config(config)
-    if not loaded.config.test_roots or not loaded.config.test_glob:
+    if not loaded.config.declares_tests:
         raise FixLoopError(
-            "this repository declares no test root under testing.selection, "
-            "so no line of the run's output could be confirmed to name a "
+            "no suite in testing.suites declares where its tests live, so "
+            "no line of the run's output could be confirmed to name a "
             "test and no failure could be found in it."
         )
     return loaded.config

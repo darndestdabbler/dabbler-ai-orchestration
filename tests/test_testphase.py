@@ -8,7 +8,7 @@ import pytest
 from ai_router import testphase
 from ai_router.route import NoCandidateError, RouteResult
 from ai_router.testphase import (PhaseError, author, build_prompt,
-                                 run_authored)
+                                 run_authored, suites_for)
 
 INTERPRETER = sys.executable.replace("\\", "/")
 
@@ -36,8 +36,9 @@ def config(**overrides) -> dict:
                 "name": "unit",
                 "argv": [INTERPRETER, "runner.py"],
                 "covers": ["app.py", "tests/"],
+                "test_roots": ["tests"],
+                "test_glob": "test_*.py",
             }],
-            "selection": {"test_roots": ["tests"], "test_glob": "test_*.py"},
         },
     }
     base.update(overrides)
@@ -117,7 +118,8 @@ class TestTheHandOff:
         from ai_router import agency
 
         grant = agency.grant_for_transport(
-            "copilot-cli", ("app.py",), 40, ("tests",), "test_*.py",
+            "copilot-cli", ("app.py",), 40,
+            (agency.SuiteScope("python", ("tests",), "test_*.py"),),
             allow_write=True,
         )
         prompt = build_prompt(
@@ -159,7 +161,7 @@ class TestTheHandOff:
         """Every write would be refused for want of a root, after the call
         that produced them had already been paid for."""
         monkeypatch.setattr(testphase, "route", FakeRouter("openai", A_TEST))
-        with pytest.raises(PhaseError, match="declares no test root"):
+        with pytest.raises(PhaseError, match="declares where its tests live"):
             author(repo, "csv-demo", "plan", [artifact],
                    config(testing={"suites": []}), transport="copilot-cli")
 
@@ -180,10 +182,11 @@ class TestTheHandOff:
 class TestTheFrameworkRunsThem:
     def test_the_run_names_the_authored_tests_and_reports_the_exit_code(
             self, repo):
-        run = run_authored(repo, config(), ["tests/test_value.py"])
-        assert run.exit_code == 3
-        assert run.green is False
-        assert run.output.strip().endswith("tests/test_value.py")
+        runs = run_authored(repo, config(), ["tests/test_value.py"])
+        assert len(runs) == 1
+        assert runs[0].exit_code == 3
+        assert runs[0].green is False
+        assert runs[0].output.strip().endswith("tests/test_value.py")
 
     def test_a_test_no_declared_suite_covers_is_refused_rather_than_run(
             self, repo):
@@ -191,6 +194,29 @@ class TestTheFrameworkRunsThem:
         suite is, and a green from it would mean nothing."""
         with pytest.raises(PhaseError, match="no declared suite covers"):
             run_authored(repo, config(), ["elsewhere/test_stray.py"])
+
+    def test_each_ecosystem_s_tests_go_to_its_own_runner(self, repo):
+        """Routing is by the suite's own test declaration, not by whichever
+        suite was declared first. A Java test handed to `dotnet test` would
+        file a result under a runner that never saw it, so one round is one
+        run per owning suite rather than one run for the lot."""
+        runner = f"{INTERPRETER} runner.py"
+        two = config(testing={"suites": [
+            {"name": "maven", "command": runner, "covers": ["src/"],
+             "test_roots": ["src/test/java"], "test_glob": "*Test.java"},
+            {"name": "dotnet", "command": runner, "covers": ["src/"],
+             "test_roots": ["test"], "test_glob": "*Tests.cs"},
+        ]})
+        paths = ["test/AdderTests.cs", "src/test/java/AdderTest.java"]
+        assert [(c.name, p) for c, p in suites_for(two, paths)] == [
+            ("maven", ("src/test/java/AdderTest.java",)),
+            ("dotnet", ("test/AdderTests.cs",)),
+        ]
+        runs = run_authored(repo, two, paths)
+        assert [(r.check.name, r.command) for r in runs] == [
+            ("maven", f"{runner} src/test/java/AdderTest.java"),
+            ("dotnet", f"{runner} test/AdderTests.cs"),
+        ]
 
     def test_running_nothing_is_refused(self, repo):
         """A run of no tests exits zero, which is indistinguishable from a

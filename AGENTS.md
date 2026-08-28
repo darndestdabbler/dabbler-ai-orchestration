@@ -185,8 +185,8 @@ Sessions are numbered directly in this repository, under one sessions root
 
 6. **Run the complete suite once, against the final verified tree**, and
    record it as the run of record. The command is the `command` the suite
-   declares under `testing.suites` in `router-config.yaml` — the same one
-   `--suite <name>` names here:
+   declares under `testing.suites` in this repository's `dabbler.yaml` —
+   the same one `--suite <name>` names here:
 
        python -m ai_router.test_evidence record \
            --suite <name> --stage final-full --outcome passed \

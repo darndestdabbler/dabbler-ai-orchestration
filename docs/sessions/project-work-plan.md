@@ -52,7 +52,7 @@ it.
 | 14 | Collapse session sets (plan A3) | no | 2026-08-27 |
 | 15 | The sessions view (plan D1) | no | 2026-08-28 |
 | 16 | The task level (plan D1, second half) | no | 2026-08-28 |
-| 17 | The tracked project config (precondition for D2) | — | not declared |
+| 17 | The tracked project config (precondition for D2) | no | 2026-08-28 |
 | 18 | Project setup as two sessions (plan D2) | — | not declared |
 | 19 | The unresolved-session view (plan D3) | — | not declared |
 | 20 | A round baseline that survives the trip (root cause of D98) | — | not declared |
@@ -388,3 +388,82 @@ extension's tree and the projection's title healing only.
 **Releasable: no.**
 
 Build the task level below the session in the VS Code sessions tree: rows read from approved-plan.json (step_id, intent) with execution state folded from .dabbler/runs/s<N>/step-execution.jsonl via ledger.read_step_events / open_step / closed_step_ids; never from activity-log.json. One open step at most, rendered not recomputed. An unreadable execution record refuses rather than falling back to the last good row. The file watcher covers .dabbler/runs/*/step-execution.jsonl so a step opening or closing refreshes the row on the event rather than on a 30-second poll.
+
+### Session 17 — The tracked project config (precondition for D2)
+
+**Releasable: no.**
+
+# Session 17 — The tracked project config (precondition for D2)
+
+Give a repository a tracked place to declare the facts CI and the next machine
+must agree on, and stop the gitignored overlay from being able to rewrite them.
+
+## 1. A third config source, tracked: `dabbler.yaml`
+
+- New `ai_router/schemas/dabbler.schema.json`: `schema_version` (required),
+  `testing`, `packaging`, `paths`, `additionalProperties: false`.
+- `config.py` resolves three sources instead of two. Precedence: packaged
+  `router-config.yaml`, then the repository's `dabbler.yaml`, then
+  `local-overrides.yaml`. Providers, models, roles and transports stay in the
+  package: those are distribution facts.
+- An explicitly-named config (argument or `AI_ROUTER_CONFIG`) still takes
+  neither layer. A named config is the whole answer, and that rule now covers
+  the tracked file for the same reason it covered the overlay.
+
+## 2. The overlay stops being able to say anything it likes
+
+- The overlay gets its own schema: the router-config schema with the
+  repository-owned blocks removed.
+- A top-level key the repository owns (`testing`, `packaging`, `paths`) is
+  refused by name in `local-overrides.yaml`, with the refusal saying where it
+  belongs. A gitignored machine file must not be able to replace a suite
+  command or a packaging feed under the run of record's name.
+
+## 3. `paths`, and the one repository fact filed in the wrong block
+
+- `run_policy.sensitive_paths` becomes `paths.sensitive_paths`. Which paths of
+  a repository are sensitive is a fact about that repository, not about the
+  machine running it, and while it sat in `run_policy` the overlay could
+  silently empty it. `runcore.py` reads the new location; `run_policy` gets
+  smaller.
+
+## 4. Suites become plural in fact, not only in the schema
+
+- `test_roots` and `test_glob` move from `testing.selection` onto each suite,
+  because a repository that is Java and .NET at once has two of each.
+- `SelectionConfig` carries `scopes` — one `(suite, roots, glob)` per suite.
+  `names_a_test` matches any scope. `testing.selection.test_roots` and
+  `.test_glob` leave the vocabulary, so a stale declaration is refused rather
+  than read as a second source.
+- `AgencyGrant` carries the same scopes in place of one root list and one
+  glob; `testphase`, `verify` and `fixloop` pass them through.
+- `SUITE_FIELDS` is declared once and shared, so `test_evidence`'s suite
+  parser and `checks`'s cannot disagree about what a suite may say.
+
+## 5. One selection loader, not two
+
+`affected.py` and `checks.py` each carry a byte-identical copy of the
+selection declaration block (`SelectionConfig`, `load_selection_config`,
+`select_tests`). `checks.py` keeps it; `affected.py` imports and re-exports.
+Changing the shape of a declaration twice, in two copies, is how they drift.
+
+## 6. This repository migrates its own `testing` block
+
+`testing` moves out of `ai_router/router-config.yaml` package data and into a
+tracked `dabbler.yaml` at the repository root — suites, controls and the two
+hundred lines of selection rules. A rule set that has only ever been read from
+the package it ships in has never proven it can be read from a repository.
+The selection rules gain a `dabbler.yaml` entry of their own.
+
+## 7. Tests
+
+Around 12–14 Python tests: the three-source precedence and its ordering, the
+overlay's refusal of each repository-owned key, a `dabbler.yaml` that fails
+its schema, `paths.sensitive_paths` firing the escalation trigger, per-suite
+scopes selecting across two ecosystems, and a stale
+`testing.selection.test_roots` being refused.
+
+## Releasable
+
+Not releasable. This is a configuration-surface change with no artifact to
+publish; the package version is unchanged.

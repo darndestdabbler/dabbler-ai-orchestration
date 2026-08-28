@@ -2836,3 +2836,71 @@ refresh() is soft: it drops the scan generation but keeps the mtime-keyed projec
 ### D114 · 2026-08-28 · Verifier (gpt-5.6-sol/openai) · Round 1 verified with two Minor nits, both left standing
 
 Nit 1: task rows are labelled with the humanized step_id rather than steps[].intent, which the verifier reads the spec as requiring. That is decision D112 and it was made deliberately -- intent is one imperative sentence and wraps a tree row, step_id is the identity every other layer addresses the step by. It is a presentation call for the operator, not a correctness defect. Nit 2, and the better catch: build_task_rows returns no tasks when approved-plan.json is missing, without reading the execution record -- so a session whose plan was deleted while step-execution.jsonl still carries an open step renders as a leaf rather than a refusal. That is the stale-but-plausible shape this level exists to end, in a rare state. Both are Minor and non-blocking; the loop stops here per the severity-gated rule rather than spending a round on wording, and nit 2 is owed as a follow-up.
+
+## Session 17 — The tracked project config (precondition for D2)
+
+### D115 · 2026-08-28 · Orchestrator (claude-opus-5/anthropic) · paths carries sensitive_paths, which was misfiled in run_policy where the machine overlay could empty it
+
+The session plan says `dabbler.yaml` carries `testing`, `packaging` and
+`paths`, and names contents for the first two only. `paths` was read as the
+block for path facts that belong to the repository rather than to the machine
+or the distribution, and it was given the one such fact the codebase already
+had misfiled: `run_policy.sensitive_paths`.
+
+Which paths a repository treats as sensitive is a property of that
+repository — it is the repository's own escalation control — and while it sat
+in `run_policy` the gitignored overlay could deep-merge it to `[]` and switch
+that control off with nothing tracked to say so. Moving it makes `paths` a
+real block rather than a placeholder, makes `run_policy` smaller, and is the
+session's own thesis applied to the one place the codebase already broke it.
+
+The rejected alternative was `paths.sessions_root`. It looks like the
+repository fact a foreign repository most needs, but `evidence.py` derives the
+sessions root deliberately ("nothing chooses where a record lands") and its
+inverse, `repo_root_from_sessions_dir`, assumes exactly two path segments. A
+configurable root would have broken that inverse for any other depth, which is
+a defect traded for a knob nobody has asked for yet.
+
+### D116 · 2026-08-28 · Orchestrator (claude-opus-5/anthropic) · A runner with no subset form declares runs_whole; per-ecosystem targeted-command syntax is owed, not invented at the cap
+
+Three rounds, each Major, each on the same thread: making suites plural in
+fact exposed that the framework had one pytest-shaped assumption after
+another buried under "the suite".
+
+- **Round 1** — selection collapsed suite ownership to a boolean, so a mixed
+  path set could not be routed. Fixed: `SelectedTest.suite`, resolved once
+  from the same declaration that decides what a test is, and carried into the
+  record.
+- **Round 2** — ownership was recorded but unused; `run_authored` and
+  `run_suite` still ran everything under the first covering suite. Fixed:
+  `suites_for()` partitions by owner, both runners return one run per owning
+  suite, `ai_router.affected` prints one command per suite narrowed to the
+  tests it owns, and the workflow event aggregates the runs while keeping each
+  suite's own row.
+- **Round 3** — the narrowed commands were still built by appending paths,
+  which is a pytest/jest/`go test` convention: `mvn -q test <file>` reads the
+  path as a lifecycle argument and `dotnet test` wants a project.
+
+**Round 3 was answered by declaration, not by a templating language.** A suite
+whose runner has no subset form declares `runs_whole: true` and is handed its
+own command; the run is recorded under the policy `suite-runs-whole`, beside
+`targeted` rather than as it, so a reader can still tell a run that was
+narrowed from one that could not be.
+
+The alternative — a per-suite command template with a `{tests}` placeholder,
+a separator, and a path-to-test-name transform — was rejected at the cap. It
+is not only a mini-language; it also breaks the pre-verification audit, which
+proves a command targeted by finding each selected path as a shell token.
+`-Dtest=AdderTest` contains no path, so templating requires redesigning what
+makes a command auditable at the same time. That is a session, not a patch,
+and inventing it in the last round of a configuration session is how a
+half-designed surface ships.
+
+**Owed:** a targeted-run form for runners that take a filter rather than a
+file list (Maven `-Dtest=`, `dotnet test --filter`), together with the
+audit rule that can check one. Until then a `runs_whole` suite pays for its
+complete suite at the pre-verification stage — honest, and more expensive than
+the stage is meant to be.
+
+**The session lands REMEDIATED_AT_CAP.** Every blocking finding was fixed; the
+cap left the last fix unreviewed, and no verifier saw the `runs_whole` repair.

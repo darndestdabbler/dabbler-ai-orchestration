@@ -289,20 +289,57 @@ Row fields (from `metrics.record_call`):
 `python -m ai_router.metrics` prints the report: token totals, per-model /
 per-task / per-set volume, and requested-vs-served mismatches.
 
+## Project config — `dabbler.yaml`
+
+Project-root YAML, **tracked**, deep-merged over the packaged
+`ai_router/router-config.yaml` and under the machine overlay below. It
+carries what the repository owns and nothing else:
+
+| Key | Contents |
+|---|---|
+| `schema_version` | required, currently `1`; a repository written to a later shape is refused with its version named rather than read as unknown keys |
+| `testing` | `suites` (each with its own `test_roots` and `test_glob`), `controls`, and the `selection` rules that map a changed path to the tests that answer for it |
+| `packaging` | `pack` and `push` — step (f) of the lifecycle |
+| `paths` | `sensitive_paths`: which of this repository's paths escalate a run |
+
+Tracked because CI reads these, the next machine reads them, and
+`ai_router.affected` refuses to run without them — none of which a
+gitignored file can serve. Providers, models, roles and transports are
+deliberately absent: those are distribution facts, and `AI_ROUTER_CONFIG`
+is not the door to them either — a named config is the whole answer and
+takes no layer, so pointing it at a hand-written file would fork the
+model registry in order to declare `mvn -q test`.
+
+`test_roots` and `test_glob` sit on each suite rather than on the
+repository because a repository that is Java and .NET at once has two of
+each, and one glob cannot say both `*Test.java` and `*Tests.cs`. A file
+is a test if any suite's declaration claims it, and the suite that claims
+it is the one handed it to run.
+
+Appending the selected paths to the suite command is a convention, not a
+universal: pytest, jest and `go test` take a file list; `mvn -q test`
+reads one as a lifecycle argument and `dotnet test` wants a project. A
+suite whose runner has no subset form declares **`runs_whole: true`** and
+is run complete at the pre-verification stage, recorded under the policy
+`suite-runs-whole` rather than `targeted` — so a reader can tell a run
+narrowed to the selected tests from one that could not be narrowed. The
+framework does not guess a narrowing syntax per ecosystem. The loaded config records
+the file as `_project_config_path` (null when there is none).
+
 ## Config overlay — `local-overrides.yaml`
 
-Project-root YAML, deep-merged over the packaged
-`ai_router/router-config.yaml`. **Never committed and never packaged**:
-`.gitignore` reserves the name and it is not listed as package data, so
-it can state a fact about one machine that would be wrong for anyone
-else.
+Project-root YAML, deep-merged last. **Never committed and never
+packaged**: `.gitignore` reserves the name and it is not listed as
+package data, so it can state a fact about one machine that would be
+wrong for anyone else.
 
 | Rule | Behaviour |
 |---|---|
 | Partial | carries only the keys it changes; everything else comes from the packaged base |
 | Validated | the *merged* result goes through the same schema and semantic checks as any config, so an overlay cannot produce a config the router would have refused |
 | Unknown keys | **refused at load**, not ignored — where the schema names its properties, that list is the vocabulary; where it declares an open object, recursion stops |
-| Scope | applies only to the packaged default; an explicit `--config` or `AI_ROUTER_CONFIG` path takes no overlay |
+| Scope | applies only to the packaged default; an explicit `--config` or `AI_ROUTER_CONFIG` path takes neither layer |
+| Repository keys | `testing`, `packaging` and `paths` are **refused by name** — they belong in `dabbler.yaml`. Deep merge would otherwise let a gitignored machine file replace a suite command or a packaging feed, and the run of record would attribute to the repository a command it never declared |
 | Location | the git toplevel of the working directory, resolved with the same root discovery the evidence and gate paths use |
 
 It is a config *source*, not a precedence tier: it changes what
@@ -319,13 +356,15 @@ transport:
   profile: api
 ```
 
-The second worked case is the feed. A packaged default cannot name one
-repository's Azure DevOps feed, so `packaging` is declared in the schema
-and absent from the shipped config; the overlay is where a machine states
-its own. `secret` names the credential's environment variable and never
-holds a value:
+The feed is *not* a second worked case for this file. A packaged default
+cannot name one repository's Azure DevOps feed, but neither can a machine:
+the record attributes a publication to the repository, so `packaging`
+belongs in `dabbler.yaml` and the overlay is refused it. `secret` names
+the credential's environment variable and never holds a value, which is
+the only part of publishing that is machine state:
 
 ```yaml
+# dabbler.yaml
 packaging:
   pack:
     argv: ["dotnet", "pack", "-c", "Release", "-o", "{output}"]

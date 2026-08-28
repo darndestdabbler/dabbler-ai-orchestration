@@ -661,7 +661,7 @@ def run_round(
         # quietly edits the tree it is reviewing is not a review.
         return agency.grant_for_transport(
             for_transport, scope, read_budget,
-            selection.test_roots, selection.test_glob, allow_write=False,
+            selection.scopes, allow_write=False,
         )
 
     grant = _grant(resolve_transport(config, transport))
@@ -1725,7 +1725,10 @@ def _step_deterministic_facts(repo_root, config, changed_paths) -> tuple:
     controls, _ = collect_control_facts(repo_root, config)
     result = select_tests(repo_root, changed_paths, selection.config)
     for suite in suites.suites:
-        command = targeted_command(suite.command, result)
+        command = targeted_command(
+            suite.command, result.for_suite(suite.name),
+            runs_whole=suite.runs_whole,
+        )
         if not command:
             controls += (ControlFact(
                 KIND_TESTS, STATUS_NOT_APPLICABLE, "", False,

@@ -236,7 +236,22 @@
       "type": "object"
     },
     "testing": {
-      "type": "object"
+      "type": "object",
+      "description": "Suites, deterministic controls, and the path-to-test selection rules. A repository declares this in its own tracked dabbler.yaml; the block appears here because that file is deep-merged onto this one and the merged result is validated as a whole."
+    },
+    "paths": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Path facts about the repository, declared in its tracked dabbler.yaml. Deliberately not part of run_policy: the machine-local overlay may override run policy and may not override this.",
+      "properties": {
+        "sensitive_paths": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
     },
     "packaging": {
       "type": "object",
@@ -382,13 +397,6 @@
               ],
               "exclusiveMinimum": 0
             }
-          }
-        },
-        "sensitive_paths": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "minLength": 1
           }
         }
       }

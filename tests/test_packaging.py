@@ -149,25 +149,31 @@ class TestTheDeclaration:
         with pytest.raises(PackagingConfigError, match=re.escape(drop)):
             load_declaration(config)
 
-    def test_the_shipped_schema_declares_the_block_an_operator_overlays(
+    def test_the_repository_declares_the_feed_and_the_machine_may_not(
             self, tmp_path, monkeypatch, push_log):
-        """The feed and the credential's name are machine facts, so they
-        arrive through `local-overrides.yaml`. An overlay key the schema does
-        not declare is refused at load, so a block the schema forgot would be
-        undeclarable rather than merely undocumented."""
+        """Which feed a repository publishes to is a repository fact: the
+        record attributes the push to the repository, so the declaration has
+        to be tracked where anyone can read it. The same block in the
+        gitignored overlay is refused rather than honoured -- a machine no
+        one can see must not be able to redirect a publication."""
         subprocess.run(
             ["git", "init", "-q"], cwd=str(tmp_path), capture_output=True,
         )
         monkeypatch.chdir(tmp_path)
-        (tmp_path / "local-overrides.yaml").write_text(
-            yaml.safe_dump(
-                {"packaging": packaging_config(push_log)["packaging"]}
-            ),
+        block = packaging_config(push_log)["packaging"]
+        (tmp_path / "dabbler.yaml").write_text(
+            yaml.safe_dump({"schema_version": 1, "packaging": block}),
             encoding="utf-8",
         )
         declaration = load_declaration(load_config())
         assert declaration.push.feed == FEED
         assert declaration.push.secret == SECRET_ENV
+
+        (tmp_path / "local-overrides.yaml").write_text(
+            yaml.safe_dump({"packaging": block}), encoding="utf-8",
+        )
+        with pytest.raises(ValueError, match="which the repository owns"):
+            load_config()
 
 
 class TestWhoMayPublish:

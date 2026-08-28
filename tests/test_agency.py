@@ -37,7 +37,7 @@ def write_grant(allow_write=True):
     """The seat grant with this repository's own test declaration on it."""
     return agency.grant_for_transport(
         "copilot-cli", ("app.py",), agency.DEFAULT_READ_BUDGET,
-        ("tests",), "test_*.py", allow_write,
+        (agency.SuiteScope("python", ("tests",), "test_*.py"),), allow_write,
     )
 
 
@@ -372,6 +372,30 @@ class TestTheWrite:
         assert not (tmp_path / "ai_router" / "test_escape.py").exists()
         assert not (tmp_path / "tests").exists()
         assert not (tmp_path.parent / "outside").exists()
+
+    def test_every_declared_ecosystem_is_briefed_and_honoured(self, tmp_path):
+        """A repository with two suites has two conventions, and both are
+        real. Briefing only the first would have the verifier write files the
+        framework then refuses, having already been paid for the round."""
+        grant = agency.grant_for_transport(
+            "copilot-cli", ("Adder.java",), agency.DEFAULT_READ_BUDGET,
+            (agency.SuiteScope("maven", ("src/test/java",), "*Test.java"),
+             agency.SuiteScope("dotnet", ("test",), "*Tests.cs")),
+            True,
+        )
+        briefing = agency.briefing(grant)
+        assert "*Test.java" in briefing and "*Tests.cs" in briefing
+
+        writes = agency.apply_writes(tmp_path, grant, "".join(
+            proposal(path, "// x") for path in (
+                "src/test/java/AdderTest.java",
+                "test/AdderTests.cs",
+                "src/test/java/AdderTests.cs",  # right glob, wrong suite
+            )
+        ))
+        assert [w.outcome for w in writes] == [
+            agency.WRITE_ACCEPTED, agency.WRITE_ACCEPTED, agency.WRITE_REFUSED,
+        ]
 
     def test_a_round_that_granted_no_write_refuses_the_proposal(
         self, tmp_path

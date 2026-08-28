@@ -24,18 +24,28 @@ STEP_ID = "build-the-widget"
 OTHER_STEP_ID = "polish-the-widget"
 
 _SELECTION = {
-    "test_roots": ["tests"],
-    "test_glob": "test_*.py",
     "smoke": [],
     "repo_wide": [],
     "rules": [{"when": "widget.py", "select": ["tests/test_widget.py"]}],
 }
 
+# Where the tests are is a suite's declaration now, so a config that says
+# nothing else still has to name a suite for a path to be a test at all.
+_SCOPE_SUITE = {
+    "name": "python",
+    "command": 'python -c ""',
+    "covers": ["tests/"],
+    "test_roots": ["tests"],
+    "test_glob": "test_*.py",
+}
+
 
 def config_with(**testing) -> dict:
-    """A config declaring only what the step pass reads. No suites and no
-    controls means the deterministic pass has nothing to execute, which is
-    what keeps a test of the step boundary from running a test suite."""
+    """A config declaring only what the step pass reads. The one suite exists
+    because a test file is a test only if some suite says so; its command is
+    a no-op, which is what keeps a test of the step boundary from running a
+    real test suite."""
+    testing.setdefault("suites", [copy.deepcopy(_SCOPE_SUITE)])
     return {"testing": {"selection": copy.deepcopy(_SELECTION), **testing}}
 
 

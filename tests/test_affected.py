@@ -11,8 +11,10 @@ from ai_router.affected import (
     REASON_SMOKE,
     RISK_SELECTION_UNKNOWN,
     SelectionConfig,
+    SuiteScope,
     classify_preverify_command,
     load_selection_config,
+    names_a_test,
     preverify_gate,
     select_tests,
     targeted_command,
@@ -20,6 +22,7 @@ from ai_router.affected import (
 from ai_router.test_evidence import (
     POLICY_ALL_TESTS_AFFECTED,
     POLICY_OPERATOR_OVERRIDE,
+    POLICY_SUITE_WHOLE,
     POLICY_TARGETED,
     POLICY_VIOLATION,
 )
@@ -45,8 +48,7 @@ def tree(tmp_path):
 @pytest.fixture
 def selection():
     return SelectionConfig(
-        test_roots=("tests",),
-        test_glob="test_*.py",
+        scopes=(SuiteScope("python", ("tests",), "test_*.py"),),
         smoke=("tests/test_smoke.py",),
         repo_wide=("tests/conftest.py", "pytest.ini"),
         rules=(
@@ -140,6 +142,70 @@ class TestDeclarationErrors:
         assert any("select" in e for e in loaded.errors)
 
 
+class TestSuitesDeclareWhatATestIs:
+    """A repository that is Java and .NET at once has two test roots and two
+    globs, so the declaration is per suite. One glob per repository could
+    only ever describe the first ecosystem."""
+
+    TWO_ECOSYSTEMS = {"testing": {"suites": [
+        {"name": "maven", "command": "mvn -q test", "covers": ["src/"],
+         "test_roots": ["src/test/java"], "test_glob": "*Test.java"},
+        {"name": "dotnet", "command": "dotnet test", "covers": ["src/"],
+         "test_roots": ["test"], "test_glob": "*Tests.cs"},
+    ]}}
+
+    def test_each_suite_s_own_convention_names_a_test(self):
+        selection = load_selection_config(self.TWO_ECOSYSTEMS).config
+        assert names_a_test("src/test/java/AdderTest.java", selection)
+        assert names_a_test("test/AdderTests.cs", selection)
+        # Each suite's glob is confined to that suite's roots: the .NET
+        # convention under the Java root is not a test, and treating it as
+        # one would offer a verifier a write nothing would run.
+        assert not names_a_test("src/test/java/AdderTests.cs", selection)
+        assert not names_a_test("src/main/java/Adder.java", selection)
+
+    def test_the_declaration_is_read_without_any_selection_rules(self):
+        """A repository with one suite and no mapping rules still knows what
+        a test file looks like; the two declarations are independent."""
+        selection = load_selection_config(self.TWO_ECOSYSTEMS).config
+        assert selection.rules == ()
+        assert selection.declares_tests
+        assert selection.test_roots == ("src/test/java", "test")
+
+    def test_a_root_with_no_glob_is_refused(self):
+        """It would make a test of every file under the root, including the
+        fixtures and helpers that live beside them."""
+        loaded = load_selection_config({"testing": {"suites": [
+            {"name": "maven", "command": "mvn -q test",
+             "test_roots": ["src/test/java"]},
+        ]}})
+        assert not loaded.ok
+        assert any("test_glob" in e for e in loaded.errors)
+
+    def test_the_old_repository_wide_declaration_is_refused_by_name(self):
+        """Left readable in testing.selection it would be a second answer to
+        what a test is, and the two would disagree the first time a
+        repository ran two ecosystems."""
+        loaded = load_selection_config({"testing": {
+            "suites": [{"name": "python", "command": "pytest",
+                        "test_roots": ["tests"], "test_glob": "test_*.py"}],
+            "selection": {"test_roots": ["spec"], "test_glob": "*_spec.py"},
+        }})
+        assert not loaded.ok
+        assert any("testing.suites" in e for e in loaded.errors)
+
+    def test_a_suite_that_runs_no_test_files_contributes_no_scope(self):
+        """A suite may run something that is not a test file at all. Saying
+        nothing is how a repository says so, and it must not be read as a
+        root of "" that would make a test of anything anywhere."""
+        loaded = load_selection_config({"testing": {"suites": [
+            {"name": "smoke", "command": "python smoke.py"},
+        ]}})
+        assert loaded.ok
+        assert loaded.config.scopes == ()
+        assert not loaded.config.declares_tests
+
+
 class TestPreverificationPolicy:
     def test_a_full_suite_run_is_not_pre_verification_evidence(
         self, tree, selection
@@ -168,6 +234,41 @@ class TestPreverificationPolicy:
             "tests/test_widget.py",
             result,
         ).policy == POLICY_TARGETED
+
+    def test_a_runner_that_takes_no_file_list_runs_whole_and_says_so(
+        self, tree, selection
+    ):
+        """`mvn -q test src/test/java/AdderTest.java` reads the path as a
+        lifecycle argument and `dotnet test` wants a project, so appending
+        the selected files would emit a command nobody can run — under a
+        policy name claiming it proved something. A suite that declares
+        `runs_whole` is handed its own command instead, recorded under its
+        own policy so a reader can still tell it from a narrowed run."""
+        result = select_tests(tree, ["ai_router/engine.py"], selection)
+
+        assert targeted_command(
+            "mvn -q test", result, runs_whole=True
+        ) == "mvn -q test"
+
+        verdict = classify_preverify_command(
+            "mvn -q test", result,
+            runs_whole=True, declared_command="mvn -q test",
+        )
+        assert verdict.policy == POLICY_SUITE_WHOLE
+        assert verdict.accepted
+
+        # It sanctions that command and no other: `runs_whole` is a
+        # statement about the runner, not permission to run anything.
+        assert classify_preverify_command(
+            "mvn -q test -DskipTests", result,
+            runs_whole=True, declared_command="mvn -q test",
+        ).policy == POLICY_VIOLATION
+
+        # And it is not a back door for a runner that does take a file
+        # list: undeclared, the bare command is still a violation.
+        assert classify_preverify_command(
+            "python -m pytest", result
+        ).policy == POLICY_VIOLATION
 
     def test_a_proved_repo_wide_change_carries_its_own_exception(
         self, tree, selection
@@ -218,9 +319,9 @@ class TestPreverificationPolicy:
 class TestTheGate:
     CONFIG = {"testing": {
         "suites": [{"name": "python", "command": "python -m pytest",
-                    "covers": ["docs/"], "expensive": True}],
-        "selection": {"test_roots": ["tests"], "test_glob": "test_*.py",
-                      "repo_wide": ["pyproject.toml"],
+                    "covers": ["docs/"], "expensive": True,
+                    "test_roots": ["tests"], "test_glob": "test_*.py"}],
+        "selection": {"repo_wide": ["pyproject.toml"],
                       "rules": [
             {"when": "docs/", "select": []},
             {"when": "src/", "select": ["tests/test_thing.py"]},

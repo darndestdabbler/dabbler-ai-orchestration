@@ -36,9 +36,14 @@ OUTCOME_FAILED = "failed"
 
 CONTROL_KINDS = frozenset({"compile", "typecheck", "lint", "analyzer"})
 
+# What a suite may declare. One list, imported by every module that parses a
+# suite: a second copy is a second opinion about whether `argv` is a typo.
+# `test_roots` and `test_glob` are per suite rather than per repository
+# because a repository that is Java and .NET at once has two of each, and one
+# glob cannot say both `*Test.java` and `*Tests.cs`.
 SUITE_FIELDS = frozenset({
     "name", "command", "argv", "covers", "cwd", "expensive", "small",
-    "timeout_seconds",
+    "timeout_seconds", "test_roots", "test_glob", "runs_whole",
 })
 CONTROL_FIELDS = frozenset({
     "name", "kind", "command", "argv", "covers", "cwd", "required",
@@ -48,6 +53,10 @@ CONTROL_FIELDS = frozenset({
 # Why a full suite was allowed at the targeted stage. Anything else is a
 # refusal: unknown selection is not permission to run everything.
 FULL_ALLOWED_SMALL = "suite-declared-small"
+#: The suite declared it has no targeted form at all. Distinct from
+#: `small`, which is about cost: a slow Maven build is not small, and a
+#: fast one still cannot be handed a list of source files.
+FULL_ALLOWED_WHOLE = "suite-runs-whole"
 FULL_ALLOWED_ALL_AFFECTED = "all-tests-affected"
 FULL_ALLOWED_OPERATOR = "operator-override"
 
@@ -77,10 +86,12 @@ REASON_PRECEDENCE = (
 
 RISK_SELECTION_UNKNOWN = "selection_unknown"
 
-SELECTION_FIELDS = frozenset({
-    "test_roots", "test_glob", "smoke", "repo_wide", "rules",
-})
+SELECTION_FIELDS = frozenset({"smoke", "repo_wide", "rules"})
 RULE_FIELDS = frozenset({"when", "select"})
+
+# Where they went. Named in the refusal so a config written against the old
+# shape says so instead of reporting a typo.
+_MOVED_TO_SUITES = ("test_roots", "test_glob")
 
 
 def _posix(path) -> str:
@@ -116,6 +127,11 @@ class SelectedTest:
     path: str
     reason: str
     selected_by: str
+    #: The suite whose declaration claims this file. Carried rather than
+    #: recomputed: a repository running two ecosystems has two runners, and
+    #: a path set that has forgotten which suite owns each entry cannot be
+    #: handed to either one without guessing.
+    suite: str = ""
 
 
 @dataclass(frozen=True)
@@ -126,14 +142,44 @@ class SelectionRisk:
 
 
 @dataclass(frozen=True)
+class SuiteScope:
+    """One suite's answer to "what is a test here": where they live and what
+    this repository calls them. Both are declared, because guessing either
+    one is guessing an ecosystem's convention, and they are declared per
+    suite because a repository may run more than one ecosystem."""
+    suite: str = ""
+    roots: tuple = ()
+    glob: str = ""
+
+    @property
+    def complete(self) -> bool:
+        return bool(self.roots and self.glob)
+
+
+@dataclass(frozen=True)
 class SelectionConfig:
-    # Where this repository's tests live and what it calls them. Both are
-    # declared: guessing either one is guessing an ecosystem's convention.
-    test_roots: tuple = ()
-    test_glob: str = ""
+    #: One entry per suite that declares where its tests live.
+    scopes: tuple = ()
     smoke: tuple = ()
     repo_wide: tuple = ()
     rules: tuple = ()  # ((when_prefix, (test_path, ...)), ...)
+
+    @property
+    def test_roots(self) -> tuple:
+        """Every declared test root, in declaration order, deduplicated."""
+        seen: list = []
+        for scope in self.scopes:
+            for root in scope.roots:
+                if root not in seen:
+                    seen.append(root)
+        return tuple(seen)
+
+    @property
+    def declares_tests(self) -> bool:
+        """Whether any suite said enough for a path to be confirmed a test.
+        A repository that declared nothing cannot have a file offered to it
+        as a test, and the refusal has to say so rather than write it."""
+        return any(scope.complete for scope in self.scopes)
 
 
 @dataclass(frozen=True)
@@ -163,11 +209,31 @@ class SelectionResult:
             r.path for r in self.risks if r.kind == RISK_SELECTION_UNKNOWN
         )
 
+    def for_suite(self, name: str) -> "SelectionResult":
+        """This selection as the named suite sees it: the tests it owns,
+        plus the ones no suite's declaration claims.
+
+        Naming every selected test to every runner is how a Java test ends
+        up in a ``dotnet test`` command. An unclaimed path stays offered to
+        all of them, because "no suite declared this a test file" is not the
+        same as "this suite does not run it" — the suite's ``covers`` may
+        still say it does.
+        """
+        return SelectionResult(
+            selected=tuple(
+                s for s in self.selected if s.suite in ("", name)
+            ),
+            risks=self.risks,
+            all_tests_affected=self.all_tests_affected,
+            all_affected_reason=self.all_affected_reason,
+        )
+
     def to_dict(self) -> dict:
         return {
             "selected": [
                 {"path": s.path, "reason": s.reason,
-                 "selectedBy": s.selected_by}
+                 "selectedBy": s.selected_by,
+                 **({"suite": s.suite} if s.suite else {})}
                 for s in self.selected
             ],
             "risks": [
@@ -179,21 +245,84 @@ class SelectionResult:
         }
 
 
+def load_test_scopes(config) -> tuple:
+    """``(scopes, errors)`` from ``testing.suites``.
+
+    Errors are accumulated rather than raised: this is the same declaration
+    :func:`load_checks` refuses outright, read here by the selector, and a
+    selector that raised would make one bad suite hide every good one.
+    A suite that declares neither key contributes no scope, which is how a
+    repository says "this suite runs something that is not a test file".
+    """
+    raw = (config.get("testing") or {}).get("suites") if isinstance(
+        config, dict
+    ) else None
+    if raw is None:
+        return (), ()
+    if not isinstance(raw, list):
+        return (), ("testing.suites must be a list",)
+    scopes, errors = [], []
+    for index, entry in enumerate(raw):
+        label = f"testing.suites[{index}]"
+        if not isinstance(entry, dict):
+            continue  # load_checks refuses it; one complaint is enough
+        name = str(entry.get("name") or "").strip()
+        roots_raw = entry.get("test_roots")
+        glob_raw = entry.get("test_glob", "")
+        if roots_raw is None and not glob_raw:
+            continue
+        if not isinstance(roots_raw, list) or not all(
+            isinstance(v, str) for v in (roots_raw or [])
+        ):
+            errors.append(f"{label}.test_roots must be a list of strings")
+            continue
+        if not isinstance(glob_raw, str) or not glob_raw.strip():
+            errors.append(
+                f"{label}.test_glob must be a non-empty string: a root with "
+                "no glob would make every file under it a test"
+            )
+            continue
+        roots = tuple(v.strip() for v in roots_raw if v.strip())
+        if not roots:
+            errors.append(
+                f"{label}.test_roots must name at least one root: a glob "
+                "with no root would make a test of any file anywhere"
+            )
+            continue
+        scopes.append(SuiteScope(suite=name, roots=roots, glob=glob_raw.strip()))
+    return tuple(scopes), tuple(errors)
+
+
 def load_selection_config(config) -> SelectionConfigResult:
     """The declared selection rules plus every declaration error. A silently
     dropped rule and no rule at all must never look the same: a typo that
     removes a mapping turns real coverage into ``selection_unknown``."""
     if not isinstance(config, dict):
         return SelectionConfigResult()
+    # Scopes come from the suites, so they are read whether or not this
+    # repository declares any mapping rules: a repository with one suite and
+    # no rules still knows what a test file looks like.
+    scopes, scope_errors = load_test_scopes(config)
     raw = (config.get("testing") or {}).get("selection")
     if raw is None:
-        return SelectionConfigResult()
+        return SelectionConfigResult(
+            SelectionConfig(scopes=scopes), tuple(scope_errors)
+        )
     if not isinstance(raw, dict):
         return SelectionConfigResult(
-            errors=("testing.selection must be a mapping",)
+            SelectionConfig(scopes=scopes),
+            tuple(scope_errors) + ("testing.selection must be a mapping",),
         )
-    errors = []
-    unknown = sorted(set(raw) - SELECTION_FIELDS)
+    errors = list(scope_errors)
+    moved = [key for key in _MOVED_TO_SUITES if key in raw]
+    if moved:
+        errors.append(
+            f"testing.selection declares {moved}, which each suite now "
+            "declares for itself under testing.suites. Left here they would "
+            "be a second answer to what a test is, and the two would "
+            "disagree the first time a repository ran two ecosystems."
+        )
+    unknown = sorted(set(raw) - SELECTION_FIELDS - set(_MOVED_TO_SUITES))
     if unknown:
         errors.append(f"testing.selection has unknown key(s) {unknown}")
 
@@ -206,14 +335,6 @@ def load_selection_config(config) -> SelectionConfigResult:
             errors.append(f"{label} must be a list of strings")
             return ()
         return tuple(v.strip() for v in value if v.strip())
-
-    test_roots = _str_list(
-        raw.get("test_roots"), "testing.selection.test_roots"
-    )
-    test_glob = raw.get("test_glob", "")
-    if not isinstance(test_glob, str):
-        errors.append("testing.selection.test_glob must be a string")
-        test_glob = ""
 
     smoke = _str_list(raw.get("smoke"), "testing.selection.smoke")
     repo_wide = _str_list(raw.get("repo_wide"), "testing.selection.repo_wide")
@@ -249,30 +370,55 @@ def load_selection_config(config) -> SelectionConfigResult:
 
     return SelectionConfigResult(
         SelectionConfig(
-            test_roots=test_roots, test_glob=test_glob.strip(), smoke=smoke,
+            scopes=scopes, smoke=smoke,
             repo_wide=repo_wide, rules=tuple(rules),
         ),
         tuple(errors),
     )
 
 
-def is_test_file(repo_root, rel: str, selection: SelectionConfig) -> bool:
-    """Whether *rel* is one of this repository's tests.
+def scope_for_test(rel: str, selection: SelectionConfig):
+    """The suite scope that claims *rel*, or ``None``.
 
-    Three conditions, all declared or observed rather than assumed: the path
-    sits under a declared test root, its filename matches the declared
-    test-file glob, and the file is present in the tree. Presence is what
-    keeps a deleted test out of the command -- naming it would fail the very
-    run it was meant to prove.
+    The scope rather than a boolean, because "is this a test" and "whose
+    test is it" are one question asked twice. A repository running two
+    ecosystems has two runners, and an answer that collapses to yes/no
+    leaves the caller to guess which of them to hand the file to.
+
+    The first claiming scope wins, in declaration order. Two suites that
+    both claim one path are a declaration this module cannot resolve, and
+    picking the first is at least a stable answer the record can name.
+
+    Presence is deliberately not asked. This is the question a write has to
+    answer -- a test file being created does not exist yet -- and it is the
+    same declaration selection reads, so the test root is defined once.
 
     Matching is case-sensitive on every platform. Selection is evidence, and
     evidence that depends on which filesystem produced it proves nothing.
     """
-    if not selection.test_glob:
-        return False
-    if not matching_prefixes(rel, selection.test_roots):
-        return False
-    if not fnmatch.fnmatchcase(rel.rsplit("/", 1)[-1], selection.test_glob):
+    name = rel.rsplit("/", 1)[-1]
+    for scope in selection.scopes:
+        if not scope.complete:
+            continue
+        if not matching_prefixes(rel, scope.roots):
+            continue
+        if fnmatch.fnmatchcase(name, scope.glob):
+            return scope
+    return None
+
+
+def names_a_test(rel: str, selection: SelectionConfig) -> bool:
+    """Whether any declared suite calls *rel* a test."""
+    return scope_for_test(rel, selection) is not None
+
+
+def is_test_file(repo_root, rel: str, selection: SelectionConfig) -> bool:
+    """Whether *rel* is one of this repository's tests and is there.
+
+    Presence is what keeps a deleted test out of the command -- naming it
+    would fail the very run it was meant to prove.
+    """
+    if not names_a_test(rel, selection):
         return False
     return (Path(repo_root) / rel).is_file()
 
@@ -344,9 +490,16 @@ def select_tests(repo_root, changed_paths, selection: SelectionConfig):
         for smoke in selection.smoke:
             _offer(smoke, REASON_SMOKE, "selection_unknown")
 
+    # Ownership is resolved once, here, from the same declaration that
+    # decided what a test is. A later caller that re-derived it would be a
+    # second opinion about which runner answers for a file.
+    def _owner(path: str) -> str:
+        scope = scope_for_test(path, selection)
+        return scope.suite if scope else ""
+
     selected = tuple(sorted(
         (
-            SelectedTest(path, reason, selected_by)
+            SelectedTest(path, reason, selected_by, _owner(path))
             for path, (_, reason, selected_by) in best.items()
         ),
         key=lambda s: (REASON_PRECEDENCE.index(s.reason), s.path),
@@ -357,17 +510,30 @@ def select_tests(repo_root, changed_paths, selection: SelectionConfig):
     )
 
 
-def targeted_command(base: str, result: SelectionResult) -> str:
+def targeted_command(base: str, result: SelectionResult, *,
+                     runs_whole: bool = False) -> str:
     """The command this change set sanctions, or ``""`` when it sanctions
     none. The bare suite command is correct only where the selector proved
     every test affected; a change mapped to no test has nothing to run, and
     naming the suite there would be this module recommending the one run it
-    exists to refuse."""
+    exists to refuse.
+
+    Appending the selected paths is a *convention*, not a universal: pytest,
+    jest and ``go test`` take a file list, and ``mvn -q test`` and ``dotnet
+    test`` do not — the first would read the path as a lifecycle argument
+    and the second wants a project. A suite whose runner has no subset form
+    declares ``runs_whole`` and is handed its own command unchanged, which
+    is then the smallest honest run of it. Guessing a narrowing syntax per
+    ecosystem is how this module would start emitting commands nobody can
+    run, under a policy name that says they proved something.
+    """
     base = str(base or "").strip()
     if result.all_tests_affected:
         return base
     if not result.test_paths:
         return ""
+    if runs_whole:
+        return base
     return " ".join((base, *result.test_paths))
 
 
@@ -438,7 +604,16 @@ class Check:
     required: bool = True
     kind: str = "suite"
     small: bool = False
+    #: The runner has no way to be asked for a subset of its tests, so a
+    #: run of it is the complete suite. Declared, never inferred: only the
+    #: repository knows whether its command takes a file list.
+    runs_whole: bool = False
     timeout_seconds: Optional[float] = None
+    #: A suite's own answer to what a test file is here. Empty on a control:
+    #: a linter has no test files, and pretending otherwise would put a
+    #: verifier's writes under a root nothing runs.
+    test_roots: tuple = ()
+    test_glob: str = ""
 
     @property
     def is_suite(self) -> bool:
@@ -553,7 +728,10 @@ def load_checks(config: dict) -> tuple:
             required=True,  # a suite is always required
             kind="suite",
             small=bool(entry.get("small")),
+            runs_whole=bool(entry.get("runs_whole")),
             timeout_seconds=entry.get("timeout_seconds"),
+            test_roots=tuple(entry.get("test_roots") or ()),
+            test_glob=str(entry.get("test_glob") or ""),
         ))
 
     for index, entry in enumerate(testing.get("controls") or []):
@@ -676,6 +854,8 @@ def _targeted_suite_command(check: Check, result: SelectionResult,
         return base, FULL_ALLOWED_ALL_AFFECTED
     if check.small:
         return base, FULL_ALLOWED_SMALL
+    if check.runs_whole:
+        return base, FULL_ALLOWED_WHOLE
     if allow_full_reason:
         return base, FULL_ALLOWED_OPERATOR
     return targeted_command(base, result), ""

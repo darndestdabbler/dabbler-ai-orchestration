@@ -28,7 +28,8 @@ from ai_router import agency
 from ai_router.checks import (
     REASON_CHANGED_TEST, STAGE_TARGETED, Check, SelectedTest, SelectionResult,
     covers_any, execute, load_checks, load_selection_config,
-    selection_payload, snapshot_worktree_tree, targeted_command, timeout_for,
+    scope_for_test, selection_payload, snapshot_worktree_tree,
+    targeted_command, timeout_for,
 )
 from ai_router.route import NoCandidateError, route
 from ai_router.selection import ROLE_VERIFIER
@@ -176,12 +177,12 @@ def author(
         )
 
     selection = load_selection_config(config).config
-    if not selection.test_roots or not selection.test_glob:
+    if not selection.declares_tests:
         raise PhaseError(
-            "this repository declares no test root under testing.selection, "
-            "so no file the verifier offers could be confirmed to be a test "
+            "no suite in testing.suites declares where its tests live, so "
+            "no file the verifier offers could be confirmed to be a test "
             "and every write would be refused. Declare test_roots and "
-            "test_glob first."
+            "test_glob on a suite first."
         )
     scope = agency.session_scope(
         repo_root, None, [path for path, _ in artifacts]
@@ -191,7 +192,7 @@ def author(
     def _grant(for_transport: str):
         return agency.grant_for_transport(
             for_transport, scope, budget,
-            selection.test_roots, selection.test_glob, allow_write=True,
+            selection.scopes, allow_write=True,
         )
 
     from ai_router.config import resolve_transport
@@ -237,34 +238,73 @@ def author(
     ), result.content
 
 
-def suite_for(config: dict, test_paths) -> Check:
-    """The declared suite that answers for these test files.
+def suites_for(config: dict, test_paths) -> tuple:
+    """``((suite, its paths), ...)`` — these test files, grouped by the
+    suite that answers for each one, in declaration order.
 
-    A path no declared suite covers is refused rather than handed to some
-    other runner: the framework runs tests through the declaration or it
-    does not run them, and inventing a command here would be a second
-    implementation of what a suite is.
+    Ownership comes from the suite's own ``test_roots`` and ``test_glob``,
+    which is what makes a two-ecosystem repository work: Maven is handed the
+    Java tests and ``dotnet test`` the .NET ones, rather than every path
+    going to whichever suite happened to be declared first. ``covers`` is
+    the fallback for a path no suite's test declaration claims — a suite
+    that runs something which is not a test file still runs it.
+
+    A path nothing claims is refused rather than handed to some other
+    runner: the framework runs tests through the declaration or it does not
+    run them, and inventing a command here would be a second implementation
+    of what a suite is.
     """
     suites = [c for c in load_checks(config) if c.is_suite]
-    for check in suites:
-        if covers_any(check, test_paths):
-            return check
-    declared = ", ".join(c.name for c in suites) or "(none)"
-    raise PhaseError(
-        f"no declared suite covers {', '.join(test_paths)} — declared "
-        f"suites: {declared}. Add the path to a suite's `covers` under "
-        "testing.suites; a test with no declared runner is a test whose "
-        "result nothing can read."
+    by_name = {c.name: c for c in suites}
+    selection = load_selection_config(config).config
+
+    grouped: dict = {}
+    unclaimed = []
+    for path in test_paths:
+        scope = scope_for_test(path, selection)
+        owner = by_name.get(scope.suite) if scope else None
+        if owner is None:
+            unclaimed.append(path)
+        else:
+            grouped.setdefault(owner.name, []).append(path)
+
+    for path in unclaimed:
+        for check in suites:
+            if covers_any(check, [path]):
+                grouped.setdefault(check.name, []).append(path)
+                break
+        else:
+            declared = ", ".join(c.name for c in suites) or "(none)"
+            raise PhaseError(
+                f"no declared suite covers {path} — declared suites: "
+                f"{declared}. Add the path to a suite's `test_roots` and "
+                "`test_glob`, or to its `covers`, under testing.suites; a "
+                "test with no declared runner is a test whose result "
+                "nothing can read."
+            )
+
+    return tuple(
+        (by_name[c.name], tuple(grouped[c.name]))
+        for c in suites if c.name in grouped
     )
 
 
 def run_authored(repo_root, config: dict, test_paths, *, run_id: str = ""):
-    """Run the authored tests and report what the exit code said.
+    """Run the authored tests and report what the exit codes said.
 
-    Returns the :class:`ai_router.checks.CheckRun` unchanged. This module
-    does not decide whether a run passed — ``CheckRun.green`` already does,
-    against the tree the run measured, and a second opinion here would
-    eventually disagree with it.
+    Returns a tuple of :class:`ai_router.checks.CheckRun`, one per suite
+    that owns some of these files, in declaration order. Plural because a
+    repository running two ecosystems has two runners: one run carries one
+    command, one exit code and one tree, so Maven and ``dotnet test`` cannot
+    share a row. A single-suite repository gets a one-element tuple.
+
+    The tree is snapshotted per run rather than once, so a suite that
+    dirties the worktree is measured against what it actually found and the
+    mutation is recorded on the run that caused it.
+
+    This module does not decide whether a run passed — ``CheckRun.green``
+    already does, against the tree the run measured, and a second opinion
+    here would eventually disagree with it.
     """
     paths = tuple(dict.fromkeys(p for p in test_paths if p))
     if not paths:
@@ -272,28 +312,34 @@ def run_authored(repo_root, config: dict, test_paths, *, run_id: str = ""):
             "no authored test to run. A run of nothing exits zero, which is "
             "indistinguishable from a suite that passed."
         )
-    check = suite_for(config, paths)
-    tree = snapshot_worktree_tree(repo_root)
-    if tree is None:
-        raise PhaseError(
-            f"could not snapshot the working tree at {repo_root}. Every run "
-            "is judged against a tree id, so a run that cannot name the tree "
-            "it measured proves nothing about it."
-        )
-    selection = SelectionResult(selected=tuple(
-        SelectedTest(path, REASON_CHANGED_TEST, SELECTED_BY_AUTHORED)
-        for path in paths
-    ))
-    command = targeted_command(check.display_command(), selection)
-    try:
-        timeout = timeout_for(check, config)
-    except (KeyError, TypeError) as exc:
-        raise PhaseError(
-            "run_policy.check_timeout_seconds is not declared, and an "
-            f"unbounded suite run is how a loop stops being bounded: {exc}"
-        ) from exc
-    return execute(
-        repo_root, check, command, stage=STAGE_TARGETED, tree_digest=tree,
-        timeout_seconds=timeout, run_id=run_id,
-        selection=selection_payload(selection),
-    )
+    runs = []
+    for check, owned in suites_for(config, paths):
+        tree = snapshot_worktree_tree(repo_root)
+        if tree is None:
+            raise PhaseError(
+                f"could not snapshot the working tree at {repo_root}. Every "
+                "run is judged against a tree id, so a run that cannot name "
+                "the tree it measured proves nothing about it."
+            )
+        selection = SelectionResult(selected=tuple(
+            SelectedTest(path, REASON_CHANGED_TEST, SELECTED_BY_AUTHORED,
+                         check.name)
+            for path in owned
+        ))
+        try:
+            timeout = timeout_for(check, config)
+        except (KeyError, TypeError) as exc:
+            raise PhaseError(
+                "run_policy.check_timeout_seconds is not declared, and an "
+                f"unbounded suite run is how a loop stops being bounded: "
+                f"{exc}"
+            ) from exc
+        runs.append(execute(
+            repo_root, check,
+            targeted_command(check.display_command(), selection,
+                              runs_whole=check.runs_whole),
+            stage=STAGE_TARGETED, tree_digest=tree,
+            timeout_seconds=timeout, run_id=run_id,
+            selection=selection_payload(selection),
+        ))
+    return tuple(runs)

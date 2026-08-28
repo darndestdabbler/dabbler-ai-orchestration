@@ -692,6 +692,56 @@ def _terminal_refusal(target: str, step: str, state: dict,
 
 # --- The bounded tests loop --------------------------------------------------
 
+def _print_runs(target: str, step: str, runs) -> None:
+    """One line per suite that ran. Named per suite rather than summarised:
+    a repository with two ecosystems has two commands, and a reader told
+    only the aggregate cannot tell which runner said what."""
+    for run in runs:
+        print(f"{target} — {STEP_TITLES[step]}: {run.command}")
+        print(f"  exit {run.exit_code} in {run.duration_seconds}s "
+              f"({'green' if run.green else 'red'})")
+        if run.tree_mutated:
+            print("  the run changed the tree it was measuring, so it did "
+                  "not measure the tree anyone is about to commit")
+
+
+def _run_rows(runs) -> dict:
+    """One event's worth of fields from however many suite runs it took.
+
+    A repository running two ecosystems has two runners, so a round is a
+    tuple of runs rather than one. The scalars are the aggregate and say so:
+    green is every run green, and the exit code and command are the first
+    failing run's, because that is the one a reader has to go and look at.
+    ``postTreeDigest`` is the tree the *last* run left, which is what the
+    terminal-state comparison means by "the tree the run left behind".
+    ``runs`` carries each suite's own row, so nothing is summarised away.
+    """
+    failed = next((r for r in runs if not r.green), None)
+    speaker = failed or runs[-1]
+    return {
+        "green": all(r.green for r in runs),
+        "exitCode": speaker.exit_code,
+        "outcome": speaker.outcome,
+        "command": speaker.command,
+        "suite": speaker.check.name,
+        "treeDigest": runs[0].tree_digest,
+        "postTreeDigest": runs[-1].post_tree_digest,
+        "treeMutated": any(r.tree_mutated for r in runs),
+        "timedOut": any(r.timed_out for r in runs),
+        "durationSeconds": sum(r.duration_seconds or 0 for r in runs),
+        "runs": [
+            {"suite": r.check.name, "command": r.command,
+             "green": r.green, "exitCode": r.exit_code,
+             "outcome": r.outcome, "treeDigest": r.tree_digest,
+             "postTreeDigest": r.post_tree_digest,
+             "treeMutated": r.tree_mutated, "timedOut": r.timed_out,
+             "durationSeconds": r.duration_seconds}
+            for r in runs
+        ],
+    }
+
+
+
 def run_terminal(root, state: dict, cap: int, *,
                  run_key: str = "lastTestRun",
                  rounds_key: str = "testRounds") -> Optional[str]:
@@ -987,40 +1037,30 @@ def _run_tests(args, root) -> int:
 
     authored = list(state.get("testsAuthored") or [])
     try:
-        run = testphase.run_authored(
+        runs = testphase.run_authored(
             root, load_config(project_dir=str(root)), authored
         )
     except testphase.PhaseError as exc:
         raise WorkflowError(str(exc)) from exc
 
+    # The tree the runs measured, and the one they left behind. Whether a
+    # later fix is unrun is decided against the second: a suite that dirtied
+    # the worktree must not be able to call its own side effect a repair.
     append(root, {
         "event": "tested", "target": target, "step": step,
-        "green": run.green, "exitCode": run.exit_code,
-        "outcome": run.outcome, "command": run.command,
-        "suite": run.check.name, "tests": authored,
-        # The tree the run measured, and the one it left behind. Whether a
-        # later fix is unrun is decided against the second: a suite that
-        # dirtied the worktree must not be able to call its own side effect
-        # a repair.
-        "treeDigest": run.tree_digest,
-        "postTreeDigest": run.post_tree_digest,
-        "treeMutated": run.tree_mutated,
-        "timedOut": run.timed_out,
-        "durationSeconds": run.duration_seconds,
+        "tests": authored, **_run_rows(runs),
     })
     try:
         write_projection(root)
     except (WorkflowError, ManifestError):
         pass
 
-    print(f"{target} — {STEP_TITLES[step]}: {run.command}")
-    print(f"  exit {run.exit_code} in {run.duration_seconds}s "
-          f"({'green' if run.green else 'red'})")
-    if run.tree_mutated:
-        print("  the run changed the tree it was measuring, so it did not "
-              "measure the tree anyone is about to commit")
-    if not run.green:
-        tail = [line for line in (run.output or "").splitlines() if line.strip()]
+    _print_runs(target, step, runs)
+    if not all(r.green for r in runs):
+        tail = [
+            line for r in runs
+            for line in (r.output or "").splitlines() if line.strip()
+        ]
         for line in tail[-TEST_OUTPUT_TAIL_LINES:]:
             print(f"  | {line}")
         print("  back with the author")
@@ -1047,41 +1087,32 @@ def _run_suite(args, root) -> int:
     authored = list(state.get("testsAuthored") or [])
     try:
         selection = fixloop.selection_for(config)
-        run = fixloop.run_suite(root, config, authored)
+        runs = fixloop.run_suite(root, config, authored)
     except fixloop.FixLoopError as exc:
         raise WorkflowError(str(exc)) from exc
 
-    failing = fixloop.failures(run.output, selection, root)
+    # Every suite's output, in order. A fix round reads all of it: a failure
+    # in the second ecosystem is not less of a failure for arriving second.
+    output = "\n".join(r.output or "" for r in runs)
+    failing = fixloop.failures(output, selection, root)
     # Filed verbatim: the fix round reads this, and a summary is not a
     # record of what a runner said.
-    filed = file_review(root, target, step, [run.output or ""], kind="suite")
+    filed = file_review(root, target, step, [output], kind="suite")
     append(root, {
         "event": "suite-run", "target": target, "step": step,
-        "green": run.green, "exitCode": run.exit_code,
-        "outcome": run.outcome, "command": run.command,
-        "suite": run.check.name, "tests": authored,
+        "tests": authored,
         "failures": [{"name": f.name, "path": f.path} for f in failing],
-        "records": filed,
-        "treeDigest": run.tree_digest,
-        "postTreeDigest": run.post_tree_digest,
-        "treeMutated": run.tree_mutated,
-        "timedOut": run.timed_out,
-        "durationSeconds": run.duration_seconds,
+        "records": filed, **_run_rows(runs),
     })
     try:
         write_projection(root)
     except (WorkflowError, ManifestError):
         pass
 
-    print(f"{target} — {STEP_TITLES[step]}: {run.command}")
-    print(f"  exit {run.exit_code} in {run.duration_seconds}s "
-          f"({'green' if run.green else 'red'})")
-    if run.tree_mutated:
-        print("  the run changed the tree it was measuring, so it did not "
-              "measure the tree anyone is about to commit")
+    _print_runs(target, step, runs)
     for failure in failing:
         print(f"  failed {failure.name}")
-    if not run.green and not failing:
+    if not all(r.green for r in runs) and not failing:
         print("  the run failed and named no test this parser recognised, "
               "so no fix round can be scoped to a failure")
     for path in filed:

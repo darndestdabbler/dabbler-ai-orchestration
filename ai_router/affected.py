@@ -1,4 +1,9 @@
-"""Which tests a change makes necessary, and the named reason for each.
+"""The pre-verification stage: which tests a change makes necessary, the
+named reason for each, and the standard the command that runs them is held
+to.
+
+The declaration and the selector themselves live in :mod:`ai_router.checks`
+and are re-exported here — one repository, one answer to what a test is.
 
 Selection is deterministic: the same changed paths against the same tree
 always yield the same tests, in the same order, with the same reasons. A
@@ -37,307 +42,54 @@ ship a defect, while a mapping the framework guesses is wrong silently.
 
 from __future__ import annotations
 
-import fnmatch
 import shlex
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
+from .checks import (
+    REASON_CHANGED_TEST,
+    REASON_CONFIGURED_RULE,
+    REASON_PRECEDENCE,
+    REASON_SMOKE,
+    RISK_SELECTION_UNKNOWN,
+    RULE_FIELDS,
+    SELECTION_FIELDS,
+    SelectedTest,
+    SelectionConfig,
+    SelectionConfigResult,
+    SelectionResult,
+    SelectionRisk,
+    SuiteScope,
+    is_test_file,
+    load_selection_config,
+    names_a_test,
+    select_tests,
+    targeted_command,
+)
+from .checks import _posix as _checks_posix
 from .test_evidence import (
     ACCEPTED_POLICIES,
     OUTCOME_PASSED,
     POLICY_ALL_TESTS_AFFECTED,
     POLICY_OPERATOR_OVERRIDE,
+    POLICY_SUITE_WHOLE,
     POLICY_TARGETED,
     POLICY_VIOLATION,
     STAGE_PREVERIFY_TARGETED,
     load_suites_checked,
-    matching_prefixes,
     read_records,
     surface_digest,
 )
 
-REASON_CHANGED_TEST = "changed-test"
-REASON_CONFIGURED_RULE = "configured-rule"
-REASON_SMOKE = "selection-unknown-smoke"
 
-# Strongest first. A test selected by several routes is recorded once, under
-# the most specific reason that reached it.
-REASON_PRECEDENCE = (
-    REASON_CHANGED_TEST,
-    REASON_CONFIGURED_RULE,
-    REASON_SMOKE,
-)
+# --- The repository's declaration and its selector ---------------------------
+#
+# Both live in ``checks``. A repository has one answer to "which tests does
+# this change make necessary", and the copy that used to sit here was
+# byte-identical until the day the declaration changed shape in one of them.
+# Re-exported because this module is the lifecycle-facing name for them.
 
-RISK_SELECTION_UNKNOWN = "selection_unknown"
-
-SELECTION_FIELDS = frozenset({
-    "test_roots", "test_glob", "smoke", "repo_wide", "rules",
-})
-RULE_FIELDS = frozenset({"when", "select"})
-
-
-@dataclass(frozen=True)
-class SelectedTest:
-    path: str
-    reason: str
-    selected_by: str
-
-
-@dataclass(frozen=True)
-class SelectionRisk:
-    kind: str
-    path: str
-    detail: str
-
-
-@dataclass(frozen=True)
-class SelectionConfig:
-    # Where this repository's tests live and what it calls them. Both are
-    # declared: guessing either one is guessing an ecosystem's convention.
-    test_roots: tuple = ()
-    test_glob: str = ""
-    smoke: tuple = ()
-    repo_wide: tuple = ()
-    rules: tuple = ()  # ((when_prefix, (test_path, ...)), ...)
-
-
-@dataclass(frozen=True)
-class SelectionConfigResult:
-    config: SelectionConfig = field(default_factory=SelectionConfig)
-    errors: tuple = ()
-
-    @property
-    def ok(self) -> bool:
-        return not self.errors
-
-
-@dataclass(frozen=True)
-class SelectionResult:
-    selected: tuple = ()
-    risks: tuple = ()
-    all_tests_affected: bool = False
-    all_affected_reason: str = ""
-
-    @property
-    def test_paths(self) -> tuple:
-        return tuple(sorted({s.path for s in self.selected}))
-
-    @property
-    def unknown_paths(self) -> tuple:
-        return tuple(
-            r.path for r in self.risks if r.kind == RISK_SELECTION_UNKNOWN
-        )
-
-    def to_dict(self) -> dict:
-        return {
-            "selected": [
-                {"path": s.path, "reason": s.reason,
-                 "selectedBy": s.selected_by}
-                for s in self.selected
-            ],
-            "risks": [
-                {"kind": r.kind, "path": r.path, "detail": r.detail}
-                for r in self.risks
-            ],
-            "allTestsAffected": self.all_tests_affected,
-            "allAffectedReason": self.all_affected_reason,
-        }
-
-
-# --- Configuration -----------------------------------------------------------
-
-def load_selection_config(config) -> SelectionConfigResult:
-    """The declared selection rules plus every declaration error. A silently
-    dropped rule and no rule at all must never look the same: a typo that
-    removes a mapping turns real coverage into ``selection_unknown``."""
-    if not isinstance(config, dict):
-        return SelectionConfigResult()
-    raw = (config.get("testing") or {}).get("selection")
-    if raw is None:
-        return SelectionConfigResult()
-    if not isinstance(raw, dict):
-        return SelectionConfigResult(
-            errors=("testing.selection must be a mapping",)
-        )
-    errors = []
-    unknown = sorted(set(raw) - SELECTION_FIELDS)
-    if unknown:
-        errors.append(f"testing.selection has unknown key(s) {unknown}")
-
-    def _str_list(value, label):
-        if value is None:
-            return ()
-        if not isinstance(value, list) or not all(
-            isinstance(v, str) for v in value
-        ):
-            errors.append(f"{label} must be a list of strings")
-            return ()
-        return tuple(v.strip() for v in value if v.strip())
-
-    test_roots = _str_list(
-        raw.get("test_roots"), "testing.selection.test_roots"
-    )
-    test_glob = raw.get("test_glob", "")
-    if not isinstance(test_glob, str):
-        errors.append("testing.selection.test_glob must be a string")
-        test_glob = ""
-
-    smoke = _str_list(raw.get("smoke"), "testing.selection.smoke")
-    repo_wide = _str_list(raw.get("repo_wide"), "testing.selection.repo_wide")
-
-    rules = []
-    raw_rules = raw.get("rules")
-    if raw_rules is not None and not isinstance(raw_rules, list):
-        errors.append("testing.selection.rules must be a list")
-        raw_rules = None
-    for index, entry in enumerate(raw_rules or []):
-        label = f"testing.selection.rules[{index}]"
-        if not isinstance(entry, dict):
-            errors.append(f"{label} must be a mapping")
-            continue
-        extra = sorted(set(entry) - RULE_FIELDS)
-        if extra:
-            errors.append(f"{label} has unknown key(s) {extra}")
-        when = entry.get("when")
-        if not isinstance(when, str) or not when.strip():
-            errors.append(f"{label}.when must be a non-empty path prefix")
-            continue
-        select = entry.get("select")
-        # An explicit empty list is the declaration "this path affects no
-        # test", which is different from "unmapped" and must stay expressible.
-        if select is None or not isinstance(select, list) or not all(
-            isinstance(v, str) for v in select
-        ):
-            errors.append(f"{label}.select must be a list of test paths")
-            continue
-        rules.append((
-            when.strip(), tuple(v.strip() for v in select if v.strip())
-        ))
-
-    return SelectionConfigResult(
-        SelectionConfig(
-            test_roots=test_roots, test_glob=test_glob.strip(), smoke=smoke,
-            repo_wide=repo_wide, rules=tuple(rules),
-        ),
-        tuple(errors),
-    )
-
-
-# --- Paths ------------------------------------------------------------------
-
-def _posix(path) -> str:
-    return str(path).replace("\\", "/").strip("/")
-
-
-def names_a_test(rel: str, selection: SelectionConfig) -> bool:
-    """Whether *rel* is a path this repository would call a test: under a
-    declared test root, with a filename matching the declared test glob.
-
-    Presence is deliberately not asked. This is the question a write has to
-    answer -- a test file being created does not exist yet -- and it is the
-    same declaration selection reads, so the test root is defined once.
-
-    Matching is case-sensitive on every platform. Selection is evidence, and
-    evidence that depends on which filesystem produced it proves nothing.
-    """
-    if not selection.test_glob:
-        return False
-    if not matching_prefixes(rel, selection.test_roots):
-        return False
-    return fnmatch.fnmatchcase(rel.rsplit("/", 1)[-1], selection.test_glob)
-
-
-def is_test_file(repo_root, rel: str, selection: SelectionConfig) -> bool:
-    """Whether *rel* is one of this repository's tests and is there.
-
-    Presence is what keeps a deleted test out of the command -- naming it
-    would fail the very run it was meant to prove.
-    """
-    if not names_a_test(rel, selection):
-        return False
-    return (Path(repo_root) / rel).is_file()
-
-
-# --- Selection ---------------------------------------------------------------
-
-def select_tests(repo_root, changed_paths, selection: SelectionConfig):
-    """The tests *changed_paths* make necessary, each with the reason that
-    selected it, plus the risks the selection raised.
-
-    Reasons are assigned by precedence, so a test reachable by several routes
-    is recorded once under the most specific one. Nothing here widens to the
-    full suite except an explicitly declared repository-wide path."""
-    changed = [_posix(p) for p in changed_paths if str(p).strip()]
-
-    repo_wide_hits = [
-        rel for rel in changed if matching_prefixes(rel, selection.repo_wide)
-    ] if selection.repo_wide else []
-    if repo_wide_hits:
-        return SelectionResult(
-            selected=(), risks=(), all_tests_affected=True,
-            all_affected_reason=(
-                "declared repository-wide path(s) changed: "
-                + ", ".join(sorted(set(repo_wide_hits)))
-            ),
-        )
-
-    # Best reason wins: {test path: (precedence index, reason, selected_by)}
-    best: dict = {}
-
-    def _offer(test_path: str, reason: str, selected_by: str) -> None:
-        test_path = _posix(test_path)
-        rank = REASON_PRECEDENCE.index(reason)
-        current = best.get(test_path)
-        if current is None or rank < current[0]:
-            best[test_path] = (rank, reason, selected_by)
-
-    unknown = []
-    for rel in changed:
-        matched = False
-
-        if is_test_file(repo_root, rel, selection):
-            _offer(rel, REASON_CHANGED_TEST, rel)
-            matched = True
-        # Everything else under a test root -- a shared helper, a fixture, a
-        # package marker -- maps to nothing on its own. It must fall through
-        # to the rules and, failing those, to selection_unknown: treating it
-        # as mapped would return clean targeted evidence for a change that
-        # can break any test using it.
-
-        for when, targets in selection.rules:
-            if matching_prefixes(rel, (when,)):
-                # An empty target list is a declaration that this path
-                # affects no test -- mapped, deliberately selecting nothing.
-                matched = True
-                for target in targets:
-                    _offer(target, REASON_CONFIGURED_RULE, rel)
-
-        if not matched:
-            unknown.append(rel)
-
-    risks = []
-    for rel in sorted(set(unknown)):
-        risks.append(SelectionRisk(
-            RISK_SELECTION_UNKNOWN, rel,
-            "no test maps to this path; the configured smoke tests ran "
-            "instead and verification must judge the exposure. Add a "
-            "testing.selection rule rather than widening the run.",
-        ))
-    if unknown:
-        for smoke in selection.smoke:
-            _offer(smoke, REASON_SMOKE, "selection_unknown")
-
-    selected = tuple(sorted(
-        (
-            SelectedTest(path, reason, selected_by)
-            for path, (_, reason, selected_by) in best.items()
-        ),
-        key=lambda s: (REASON_PRECEDENCE.index(s.reason), s.path),
-    ))
-    return SelectionResult(
-        selected=selected, risks=tuple(risks), all_tests_affected=False,
-        all_affected_reason="",
-    )
+_posix = _checks_posix
 
 
 # --- The pre-verification policy ---------------------------------------------
@@ -434,20 +186,6 @@ def command_names_test(command, test_path: str) -> bool:
     )
 
 
-def targeted_command(base: str, result: SelectionResult) -> str:
-    """The command this change set sanctions, or ``""`` when it sanctions
-    none. The bare suite command is correct only where the selector proved
-    every test affected; a change mapped to no test has nothing to run, and
-    naming the suite there would be this module recommending the one run it
-    exists to refuse."""
-    base = str(base or "").strip()
-    if result.all_tests_affected:
-        return base
-    if not result.test_paths:
-        return ""
-    return " ".join((base, *result.test_paths))
-
-
 RECORD_PLACEHOLDER = "<the command you ran>"
 
 
@@ -506,6 +244,7 @@ def _override_or_violation(override_reason, why: str, missing: tuple):
 
 def classify_preverify_command(
     command, result: SelectionResult, *, override_reason=None,
+    runs_whole: bool = False, declared_command: str = "",
 ) -> PreverifyVerdict:
     """What makes *command* acceptable pre-verification evidence, or why it
     is not.
@@ -532,6 +271,25 @@ def classify_preverify_command(
             "the selector maps this change set to no test, so no "
             "pre-verification run was needed and this one is evidence of "
             "nothing",
+            (),
+        )
+    if runs_whole:
+        # The suite said its runner takes no subset, so "names the selected
+        # tests" is a standard it could never meet — and holding it to one
+        # would make every honest run of it a policy_violation. What it can
+        # be held to is running exactly what it declared, unembellished.
+        if _command_tokens(command) == _command_tokens(declared_command):
+            return PreverifyVerdict(
+                POLICY_SUITE_WHOLE,
+                f"the suite declares runs_whole, so its complete run is the "
+                f"smallest evidence available for the "
+                f"{len(result.test_paths)} selected test(s)",
+            )
+        return _override_or_violation(
+            override_reason,
+            "the suite declares runs_whole, so the only run it sanctions is "
+            f"its own declared command ({declared_command!r}); this one is "
+            "something else",
             (),
         )
     missing = tuple(
@@ -620,7 +378,8 @@ def preverify_gate(repo_root, sessions_dir, config) -> PreverifyGate:
                 False,
                 f"the surfaces {suite.name} covers could not be digested "
                 "(failing closed)", suite.name,
-                targeted_command(suite.command, result),
+                targeted_command(suite.command, result.for_suite(suite.name),
+                                 runs_whole=suite.runs_whole),
             )
         mine = [
             r for r in records
@@ -659,7 +418,9 @@ def preverify_gate(repo_root, sessions_dir, config) -> PreverifyGate:
                 "to the surfaces it covers"
             )
         return PreverifyGate(
-            False, why, suite.name, targeted_command(suite.command, result),
+            False, why, suite.name,
+            targeted_command(suite.command, result.for_suite(suite.name),
+                             runs_whole=suite.runs_whole),
         )
     return PreverifyGate(True, accepted=tuple(accepted))
 
@@ -740,13 +501,26 @@ def main(argv=None) -> int:
     print(f"scope: {'the last round' if baseline else 'HEAD'}")
     # The runner is whatever the repository declared, never this module's
     # guess: a printed command an orchestrator cannot paste teaches it to
-    # improvise one.
+    # improvise one. One command per declared suite, each naming only the
+    # tests that suite owns -- a repository that is Java and .NET at once
+    # has two runners, and a single line naming both ecosystems' tests
+    # would fail in whichever of them was asked to run the other's.
     suites = [s for s in load_suites_checked(config).suites if s.expensive]
-    base = suites[0].command if suites else "python -m pytest"
+
+    def _commands() -> list:
+        if not suites:
+            return [targeted_command("python -m pytest", result)]
+        return [
+            command for command in (
+                targeted_command(s.command, result.for_suite(s.name),
+                                 runs_whole=s.runs_whole)
+                for s in suites
+            ) if command
+        ]
 
     if result.all_tests_affected:
         print(f"all tests affected: {result.all_affected_reason}")
-        print("\n" + targeted_command(base, result))
+        print("\n" + "\n".join(_commands()))
         return 0
     for risk in result.risks:
         print(f"  RISK {risk.kind}: {risk.path}")
@@ -755,7 +529,7 @@ def main(argv=None) -> int:
     if not result.selected:
         print("no tests affected by this change set")
         return 0
-    print("\n" + targeted_command(base, result))
+    print("\n" + "\n".join(_commands()))
     return 0
 
 

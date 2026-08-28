@@ -8,15 +8,25 @@ fails at startup rather than mid-call. A role's preference order is
 deliberately not cross-referenced: it is ordering only, so a name that matches
 no model is a stale line rather than an error.
 
-The bundled ``router-config.yaml`` is package data and therefore the
-*published* default: it must stay correct for a fresh install that has
-provider API keys and no seat. A machine that disagrees says so in a
-project-local ``local-overrides.yaml``, which is deep-merged over the bundled
-base and never published. Config is the only layer that is
-client-independent, model-independent and transport-independent — an
-instruction file cannot carry a machine fact because which instruction files
-load at all is a property of the client, and an env var reaches only
-processes started after it was written.
+Configuration resolves in three layers, and each one owns a different kind
+of fact:
+
+1. The bundled ``router-config.yaml`` is package data and therefore the
+   *published* default: providers, models, roles and transports. It must stay
+   correct for a fresh install that has provider API keys and no seat.
+2. ``dabbler.yaml`` at the repository root is **tracked**, and carries what
+   the repository owns — its suites, its selection rules, how it publishes,
+   which of its paths are sensitive. CI reads these and so does the next
+   machine, which is precisely why they cannot live in a gitignored file.
+3. ``local-overrides.yaml`` is machine facts only, deep-merged last and never
+   published. It is refused a key the repository owns, because an overlay
+   nobody can see must not be able to replace a suite command that the run of
+   record will then attribute to the repository.
+
+Config is the only layer that is client-independent, model-independent and
+transport-independent — an instruction file cannot carry a machine fact
+because which instruction files load at all is a property of the client, and
+an env var reaches only processes started after it was written.
 """
 
 from __future__ import annotations
@@ -35,8 +45,16 @@ from .transports.copilot import validate_transport_timeouts
 
 _THIS_DIR = Path(__file__).parent
 _SCHEMA_PATH = _THIS_DIR / "schemas" / "router-config.schema.json"
+_PROJECT_SCHEMA_PATH = _THIS_DIR / "schemas" / "dabbler.schema.json"
 
 LOCAL_OVERRIDES_FILENAME = "local-overrides.yaml"
+PROJECT_CONFIG_FILENAME = "dabbler.yaml"
+
+#: The blocks a repository owns. They are declared in the tracked
+#: ``dabbler.yaml`` and refused in the machine-local overlay: the split is
+#: what keeps a gitignored file from rewriting a fact the record attributes
+#: to the repository.
+REPOSITORY_OWNED_BLOCKS = frozenset({"testing", "packaging", "paths"})
 
 TRANSPORT_API = "api"
 TRANSPORT_COPILOT_CLI = "copilot-cli"
@@ -91,23 +109,32 @@ def _resolve_config_path(path: str | None = None) -> Path:
 
 def _resolve_config_sources(
     path: str | None = None, project_dir: str | None = None,
-) -> tuple[Path, Optional[Path]]:
-    """``(base config, project-local overlay or None)``.
+) -> tuple[Path, Optional[Path], Optional[Path]]:
+    """``(base config, tracked project config, machine overlay)``, the last
+    two ``None`` when they do not apply.
 
     An explicitly-named config — by argument or by ``AI_ROUTER_CONFIG`` — is
-    the whole answer and takes no overlay: a caller that named a file means
-    that file. The overlay layers only over the bundled default, which is
-    the one config nobody on this machine chose.
+    the whole answer and takes neither layer: a caller that named a file
+    means that file. The layers apply only over the bundled default, which
+    is the one config nobody on this machine chose. This is also why
+    ``AI_ROUTER_CONFIG`` is not the way a foreign repository declares
+    itself — pointing it at a hand-written file forks the provider list and
+    the model registry in order to say how to run a test suite, which is the
+    drift the layering exists to prevent. ``dabbler.yaml`` is that way.
 
-    ``project_dir`` names the project whose overlay applies. A caller that
-    was handed a workspace passes it, because the overlay belongs to the
-    workspace under discussion rather than to whatever directory the
-    process happens to be sitting in.
+    ``project_dir`` names the project both layers belong to. A caller that
+    was handed a workspace passes it, because they belong to the workspace
+    under discussion rather than to whatever directory the process happens
+    to be sitting in.
     """
     base = _resolve_config_path(path)
     if path is not None or os.environ.get("AI_ROUTER_CONFIG"):
-        return base, None
-    return base, local_overrides_path(project_dir)
+        return base, None, None
+    return (
+        base,
+        project_config_path(project_dir),
+        local_overrides_path(project_dir),
+    )
 
 
 # Resolved once per working directory: the overlay's location is a property
@@ -127,12 +154,52 @@ def project_root(project_dir: str | None = None) -> Optional[str]:
 
 
 def local_overrides_path(project_dir: str | None = None) -> Optional[Path]:
-    """The project-local overlay, when the project has one."""
+    """The machine-local overlay, when the project has one."""
+    return _root_relative_file(project_dir, LOCAL_OVERRIDES_FILENAME)
+
+
+def project_config_path(project_dir: str | None = None) -> Optional[Path]:
+    """The repository's own tracked config, when it has one."""
+    return _root_relative_file(project_dir, PROJECT_CONFIG_FILENAME)
+
+
+def _root_relative_file(project_dir: str | None, filename: str):
     root = project_root(project_dir)
     if root is None:
         return None
-    candidate = Path(root) / LOCAL_OVERRIDES_FILENAME
+    candidate = Path(root) / filename
     return candidate if candidate.is_file() else None
+
+
+_overlay_schema_cache: dict | None = None
+_project_schema_cache: dict | None = None
+
+
+def _overlay_schema() -> dict:
+    """The vocabulary a machine-local overlay may use: the router-config
+    schema with the repository-owned blocks removed.
+
+    Removed rather than merely checked, so "the overlay may not say this"
+    is one statement in one place. Anything the schema still declares is a
+    machine fact and stays overridable, including the provider key names
+    that make a checkout its own cost center.
+    """
+    global _overlay_schema_cache
+    if _overlay_schema_cache is None:
+        schema = copy.deepcopy(_load_schema())
+        for block in REPOSITORY_OWNED_BLOCKS:
+            schema.get("properties", {}).pop(block, None)
+        _overlay_schema_cache = schema
+    return _overlay_schema_cache
+
+
+def _project_schema() -> dict:
+    global _project_schema_cache
+    if _project_schema_cache is None:
+        _project_schema_cache = json.loads(
+            _PROJECT_SCHEMA_PATH.read_text(encoding="utf-8")
+        )
+    return _project_schema_cache
 
 
 def _reject_unknown_overlay_keys(
@@ -159,6 +226,15 @@ def _reject_unknown_overlay_keys(
             subschema = additional
         elif properties is not None:
             dotted = ".".join(trail + (str(key),))
+            if not trail and key in REPOSITORY_OWNED_BLOCKS:
+                raise ValueError(
+                    f"{source} sets {dotted!r}, which the repository owns. "
+                    f"Declare it in {PROJECT_CONFIG_FILENAME} at the "
+                    "repository root, where it is tracked. A suite command "
+                    "or a packaging feed coming from a gitignored file "
+                    "would be attributed by the run of record to a "
+                    "repository that never declared it."
+                )
             raise ValueError(
                 f"{source} sets unknown key {dotted!r}: "
                 "router-config.schema.json declares no such setting. An "
@@ -173,7 +249,9 @@ def _reject_unknown_overlay_keys(
 
 
 def load_config(path: str | None = None, project_dir: str | None = None) -> dict:
-    config_path, overrides_path = _resolve_config_sources(path, project_dir)
+    config_path, project_path, overrides_path = _resolve_config_sources(
+        path, project_dir
+    )
     if not config_path.exists():
         raise FileNotFoundError(
             f"Router config not found: {config_path}. Create it from the "
@@ -183,6 +261,10 @@ def load_config(path: str | None = None, project_dir: str | None = None) -> dict
     with open(config_path, encoding="utf-8") as f:
         config = yaml.safe_load(f)
 
+    # Tracked first, machine-local second: a machine may disagree with the
+    # distribution, and never with the repository.
+    if project_path is not None:
+        config = _apply_project_config(config, project_path)
     if overrides_path is not None:
         config = _apply_local_overrides(config, overrides_path)
 
@@ -212,6 +294,9 @@ def load_config(path: str | None = None, project_dir: str | None = None) -> dict
     _load_prompt_templates(config, config_path.parent)
 
     config["_config_path"] = str(config_path.resolve())
+    config["_project_config_path"] = (
+        str(project_path.resolve()) if project_path is not None else None
+    )
     config["_local_overrides_path"] = (
         str(overrides_path.resolve()) if overrides_path is not None else None
     )
@@ -241,12 +326,48 @@ def _resolve_critique_block(config: dict) -> None:
     config["critique"] = {**block, "pipeline": mode}
 
 
+def _apply_project_config(config: dict, project_path: Path) -> dict:
+    """Merge the repository's own tracked config over the packaged default.
+
+    The file is validated against its own schema rather than against the
+    router's, because the two declare different things: this one is a short,
+    closed list of what a repository owns, and a key outside that list is a
+    repository trying to fork a distribution fact. ``schema_version`` is
+    stripped after validation — it describes the file, not the router.
+    """
+    with open(project_path, encoding="utf-8") as f:
+        declared = yaml.safe_load(f)
+    if declared is None:
+        raise ValueError(
+            f"{project_path} is empty. A repository with nothing to declare "
+            f"has no {PROJECT_CONFIG_FILENAME}; an empty one cannot state "
+            "its schema_version and so cannot be read at all."
+        )
+    if not isinstance(declared, dict):
+        raise ValueError(
+            f"{project_path} must be a mapping of config blocks, got "
+            f"{type(declared).__name__}"
+        )
+    try:
+        jsonschema.validate(declared, _project_schema())
+    except jsonschema.ValidationError as exc:
+        location = "/".join(str(p) for p in exc.absolute_path) or "(root)"
+        raise ValueError(
+            f"{project_path} failed schema validation at {location}: "
+            f"{exc.message}"
+        ) from exc
+    blocks = {k: v for k, v in declared.items() if k != "schema_version"}
+    return _deep_merge(config, blocks)
+
+
 def _apply_local_overrides(config: dict, overrides_path: Path) -> dict:
-    """Deep-merge the project-local overlay onto the bundled base.
+    """Deep-merge the machine-local overlay on last.
 
     The overlay is partial — only the keys it changes — and the merged
     result goes through the same schema and semantic checks as any config,
     so an overlay cannot produce a config the router would have refused.
+    It is refused the blocks the repository owns before anything is merged:
+    it wins over the distribution, never over ``dabbler.yaml``.
     """
     with open(overrides_path, encoding="utf-8") as f:
         overrides = yaml.safe_load(f)
@@ -257,7 +378,7 @@ def _apply_local_overrides(config: dict, overrides_path: Path) -> dict:
             f"{overrides_path} must be a mapping of config keys to override, "
             f"got {type(overrides).__name__}"
         )
-    _reject_unknown_overlay_keys(overrides, _load_schema(), overrides_path)
+    _reject_unknown_overlay_keys(overrides, _overlay_schema(), overrides_path)
     return _deep_merge(config, overrides)
 
 
@@ -277,8 +398,11 @@ RUN_CORE_DEFAULTS = {
             "model_dispatches": 3,
             "elapsed_minutes": 120,
         },
-        "sensitive_paths": [],
     },
+    # A repository fact, so it is declared in dabbler.yaml and defaulted
+    # here rather than sitting in run_policy where the machine-local overlay
+    # could have quietly emptied it.
+    "paths": {"sensitive_paths": []},
     "git": {
         "push_on_finish": False,
         "worktree_per_run": False,
@@ -290,7 +414,7 @@ RUN_CORE_DEFAULTS = {
 
 
 def _apply_run_core_defaults(config: dict) -> None:
-    """Fill the §5.3 run-core blocks so every reader sees the same shape.
+    """Fill the run-core blocks so every reader sees the same shape.
 
     An existing repository needs no new configuration for ``fast``: an
     absent block is the documented default, not an unconfigured feature.

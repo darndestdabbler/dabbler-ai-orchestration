@@ -156,17 +156,28 @@ Resolved in this precedence (first set wins):
 2. the `DABBLER_TRANSPORT` env var (`api` | `copilot-cli`) — the
    operator's standing preference
 3. `transport.profile` in the loaded config — the packaged
-   `router-config.yaml` with a project-local `local-overrides.yaml`
-   deep-merged over it
+   `router-config.yaml`, with the repository's tracked `dabbler.yaml`
+   and then a machine-local `local-overrides.yaml` deep-merged over it
 4. default: `api`
 
-The overlay is a config *source*, not a precedence tier: it changes what
-tier 3 says and nothing above it. It lives at the project root
-(`local-overrides.yaml`), carries only the keys it changes, and is
-never committed and never packaged — `.gitignore` reserves the name and
-it is not package data. A key the schema does not declare is **refused
-at load**, not dropped, because an override the router silently ignores
-is the failure the file exists to prevent.
+Both layers are config *sources*, not precedence tiers: they change what
+tier 3 says and nothing above it.
+
+`dabbler.yaml` is the repository's own, and it is **tracked**. It carries
+`testing` (suites, controls, selection rules), `packaging` and `paths` —
+the facts CI and the next machine have to read, behind a
+`schema_version`. Providers, models and roles stay in the packaged
+config: those are distribution facts, and a repository declaring how to
+run `mvn -q test` must not have to fork the model registry to do it.
+
+`local-overrides.yaml` is machine facts only. It lives at the project
+root, carries only the keys it changes, and is never committed and never
+packaged — `.gitignore` reserves the name and it is not package data. A
+key the schema does not declare is **refused at load**, not dropped,
+because an override the router silently ignores is the failure the file
+exists to prevent; and a key the repository owns is refused by name,
+because a suite command from a gitignored file would be attributed by
+the run of record to a repository that never declared it.
 
 This is how a machine disagrees with the published default. The packaged
 `router-config.yaml` ships `transport: profile: copilot-cli`, because the

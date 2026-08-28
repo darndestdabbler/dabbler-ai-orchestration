@@ -7,7 +7,8 @@ fresh-looks-stale) are unacceptable in a gate. Records append to
 ``.dabbler/runs/<set>/test-runs.jsonl`` (machine-side, gitignored), so
 recording a run can never stale the very surfaces it just digested.
 
-Suites are declared in router-config.yaml under ``testing.suites``. A suite's
+Suites are declared by the repository in ``dabbler.yaml`` under
+``testing.suites``. A suite's
 ``covers`` is its complete input allowlist — product source, tests,
 fixtures, lockfiles, test config. The failure direction is deliberate: run
 a suite you did not need rather than skip one you did.
@@ -26,6 +27,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
+# One vocabulary for what a suite may declare, imported rather than
+# restated: two lists that disagree make a valid declaration read as a typo
+# in whichever module holds the shorter one.
+from .checks import SUITE_FIELDS
 from .evidence import repo_root_for, run_git
 from .journal import is_machine_state_path
 from .ledger import LIFECYCLE_WRITTEN_FILES, RUNS_DIRNAME
@@ -51,16 +56,22 @@ STAGES = (STAGE_PREVERIFY_TARGETED, STAGE_FINAL_FULL)
 POLICY_TARGETED = "targeted"
 POLICY_ALL_TESTS_AFFECTED = "all-tests-affected"
 POLICY_OPERATOR_OVERRIDE = "operator-override"
+# The suite declared it has no targeted form, so its complete run is the
+# smallest honest evidence for this change. Recorded under its own name
+# rather than as `targeted`, because a reader has to be able to tell a run
+# narrowed to the selected tests from one that could not be narrowed.
+POLICY_SUITE_WHOLE = "suite-runs-whole"
 POLICY_VIOLATION = "policy_violation"
 POLICIES = (
     POLICY_TARGETED, POLICY_ALL_TESTS_AFFECTED, POLICY_OPERATOR_OVERRIDE,
-    POLICY_VIOLATION,
+    POLICY_SUITE_WHOLE, POLICY_VIOLATION,
 )
 # The three that make a run count as pre-verification evidence. A violation
 # is still written -- the wasted run is exactly what the record is for -- and
 # satisfies nothing.
 ACCEPTED_POLICIES = (
     POLICY_TARGETED, POLICY_ALL_TESTS_AFFECTED, POLICY_OPERATOR_OVERRIDE,
+    POLICY_SUITE_WHOLE,
 )
 
 TEST_RUNS_FILENAME = "test-runs.jsonl"
@@ -87,8 +98,6 @@ SESSION_BOOKKEEPING_BASENAMES = frozenset(LIFECYCLE_WRITTEN_FILES) | {
     ".lifecycle.lock"
 }
 
-SUITE_FIELDS = frozenset({"name", "command", "covers", "expensive"})
-
 
 @dataclass(frozen=True)
 class SuiteSpec:
@@ -96,6 +105,8 @@ class SuiteSpec:
     command: str
     covers: tuple
     expensive: bool = False
+    #: The runner takes no subset, so a run of it is the complete suite.
+    runs_whole: bool = False
 
 
 @dataclass(frozen=True)
@@ -232,6 +243,7 @@ def load_suites_checked(config) -> SuiteLoadResult:
         suites.append(SuiteSpec(
             name=name.strip(), command=command.strip(),
             covers=tuple(covers), expensive=bool(entry.get("expensive")),
+            runs_whole=bool(entry.get("runs_whole")),
         ))
     return SuiteLoadResult(tuple(suites), tuple(errors))
 
@@ -644,14 +656,18 @@ def _judge_preverify_command(config, suite: SuiteSpec, args):
             file=sys.stderr,
         )
         return 2
-    result = select_tests(root, changed, loaded.config)
+    # Narrowed to what this suite owns: a repository with two runners has
+    # two selections, and judging one runner's command against the other's
+    # tests would refuse every honest run in a two-ecosystem repository.
+    mine = select_tests(root, changed, loaded.config).for_suite(suite.name)
     verdict = classify_preverify_command(
-        args.command, result, override_reason=args.allow_full_preverify,
+        args.command, mine, override_reason=args.allow_full_preverify,
+        runs_whole=suite.runs_whole, declared_command=suite.command,
     )
     return (
         verdict.policy, verdict.reason,
-        tuple((s.path, s.reason) for s in result.selected),
-        targeted_command(suite.command, result),
+        tuple((s.path, s.reason) for s in mine.selected),
+        targeted_command(suite.command, mine, runs_whole=suite.runs_whole),
     )
 
 

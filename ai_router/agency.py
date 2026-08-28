@@ -40,7 +40,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
-from .affected import SelectionConfig, names_a_test
+from .checks import SelectionConfig, SuiteScope, names_a_test
 
 #: The round could look at the tree through tools.
 MODE_TOOLS = "tools"
@@ -249,11 +249,11 @@ class AgencyGrant:
     mode: str
     scope: tuple = ()
     read_budget: int = DEFAULT_READ_BUDGET
-    #: Where this repository says its tests live and what it calls them.
+    #: Where this repository says its tests live and what it calls them,
+    #: one :class:`~ai_router.checks.SuiteScope` per declaring suite.
     #: Supplied by the caller from the same declaration test selection
     #: reads, so the test root is defined in one place.
-    test_roots: tuple = ()
-    test_glob: str = ""
+    test_scopes: tuple = ()
     #: Whether this round may author tests at all. A code review round may
     #: not: the tests phase is a different round with a different job, and
     #: a surface offered everywhere is a surface used everywhere.
@@ -279,14 +279,21 @@ class AgencyGrant:
 
     @property
     def test_selection(self) -> SelectionConfig:
-        return SelectionConfig(
-            test_roots=self.test_roots, test_glob=self.test_glob
-        )
+        return SelectionConfig(scopes=self.test_scopes)
+
+    @property
+    def test_roots(self) -> tuple:
+        """Every root a write could land under, across the declared suites."""
+        return self.test_selection.test_roots
+
+    @property
+    def declares_tests(self) -> bool:
+        return self.test_selection.declares_tests
 
 
 def grant_for_transport(
     transport: str, scope=(), read_budget: int = DEFAULT_READ_BUDGET,
-    test_roots=(), test_glob: str = "", allow_write: bool = False,
+    test_scopes=(), allow_write: bool = False,
     write_envelope=(), write_label: str = WRITE_LABEL_TEST,
 ) -> AgencyGrant:
     """Only the seat path is agentic. Naming the transport here keeps the
@@ -304,11 +311,11 @@ def grant_for_transport(
     if transport == "copilot-cli":
         return AgencyGrant(
             MODE_TOOLS, tuple(scope), read_budget,
-            tuple(test_roots), test_glob, allow_write,
+            tuple(test_scopes), allow_write,
             tuple(write_envelope), write_label,
         )
     return AgencyGrant(
-        MODE_NONE, (), 0, tuple(test_roots), test_glob, allow_write,
+        MODE_NONE, (), 0, tuple(test_scopes), allow_write,
         tuple(write_envelope), write_label,
     )
 
@@ -369,7 +376,6 @@ def _read_briefing(grant: AgencyGrant) -> list:
 def _write_briefing(grant: AgencyGrant) -> str:
     if grant.write_envelope:
         return _envelope_briefing(grant)
-    roots = ", ".join(f"`{root}/`" for root in grant.test_roots) or "(none)"
     return (
         "## Your one write\n\n"
         "You may **create or modify a test file**, and you do it by asking "
@@ -383,8 +389,8 @@ def _write_briefing(grant: AgencyGrant) -> str:
         "The block carries the **whole file**, never a patch or a fragment: "
         "what it contains is what the file will contain. Emit one block per "
         "file.\n\n"
-        f"**Writes are confined to this repository's declared test root** "
-        f"({roots}), to filenames matching `{grant.test_glob}`. A path "
+        f"**Writes are confined to this repository's declared test "
+        f"locations** — {_declared_locations(grant)}. A path "
         "outside that is refused by the framework before anything is "
         "written, and the refusal is recorded on the round — this is a "
         "boundary, not a request. You have no other write and no filesystem "
@@ -423,12 +429,29 @@ def _envelope_briefing(grant: AgencyGrant) -> str:
     )
 
 
+def _declared_locations(grant: AgencyGrant) -> str:
+    """Every suite's roots and glob, listed rather than summarized. One glob
+    cannot describe a repository that is Java and .NET at once, and a
+    briefing that named only the first would have the verifier write files
+    the framework then refuses."""
+    parts = []
+    for scope in grant.test_scopes:
+        if not scope.complete:
+            continue
+        roots = ", ".join(f"`{root.strip('/')}/`" for root in scope.roots)
+        suite = f" (suite `{scope.suite}`)" if scope.suite else ""
+        parts.append(f"{roots} for filenames matching `{scope.glob}`{suite}")
+    return "; ".join(parts) or "(none declared)"
+
+
 def _example_test_path(grant: AgencyGrant) -> str:
     """A path from this repository's own declaration, so the example the
     verifier is shown is one the framework would actually accept."""
-    root = grant.test_roots[0].strip("/") if grant.test_roots else "tests"
-    name = (grant.test_glob or "test_*.py").replace("*", "example", 1)
-    return f"{root}/{name}"
+    complete = [s for s in grant.test_scopes if s.complete]
+    if not complete:
+        return "tests/test_example.py"
+    scope = complete[0]
+    return f"{scope.roots[0].strip('/')}/{scope.glob.replace('*', 'example', 1)}"
 
 
 # --- What the round actually did ---------------------------------------------
@@ -827,16 +850,15 @@ def _confine(repo_root, grant: AgencyGrant, raw_path: str) -> tuple:
                 "files the session already changed and the files its "
                 "failures implicate"
             )
-    elif not grant.test_roots or not grant.test_glob:
+    elif not grant.declares_tests:
         return rel, None, (
             "this repository declares no test root, so no path can be "
             "confirmed to be a test"
         )
     elif not names_a_test(rel, grant.test_selection):
-        roots = ", ".join(grant.test_roots)
         return rel, None, (
-            f"outside the declared test root: a write must be under "
-            f"{roots} and named {grant.test_glob}"
+            "outside the declared test locations: a write must match "
+            + _declared_locations(grant)
         )
     if target.is_dir():
         return rel, None, "the path is a directory"

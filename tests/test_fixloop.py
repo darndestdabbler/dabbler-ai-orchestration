@@ -6,7 +6,7 @@ import sys
 import pytest
 
 from ai_router import agency, fixloop
-from ai_router.affected import SelectionConfig
+from ai_router.affected import SelectionConfig, SuiteScope
 from ai_router.fixloop import (Envelope, FixLoopError, build_envelope,
                                build_prompt, failures, fix, implicated_paths,
                                observations, run_suite)
@@ -14,7 +14,9 @@ from ai_router.route import RouteResult
 
 INTERPRETER = sys.executable.replace("\\", "/")
 
-SELECTION = SelectionConfig(test_roots=("tests",), test_glob="test_*.py")
+SELECTION = SelectionConfig(
+    scopes=(SuiteScope("python", ("tests",), "test_*.py"),)
+)
 
 RED = (
     "rootdir: /work\n"
@@ -41,8 +43,9 @@ def config(**overrides) -> dict:
                 "name": "unit",
                 "argv": [INTERPRETER, "runner.py"],
                 "covers": ["app.py", "tests/"],
+                "test_roots": ["tests"],
+                "test_glob": "test_*.py",
             }],
-            "selection": {"test_roots": ["tests"], "test_glob": "test_*.py"},
         },
     }
     base.update(overrides)
@@ -117,9 +120,9 @@ class TestWhatTheRunSaid:
             self, repo):
         """Targeting it here would be a smaller claim wearing the same name:
         this stage is the complete suite by definition."""
-        run = run_suite(repo, config(), ["tests/test_add.py"])
-        assert run.command == f"{INTERPRETER} runner.py"
-        assert run.green is False
+        runs = run_suite(repo, config(), ["tests/test_add.py"])
+        assert [r.command for r in runs] == [f"{INTERPRETER} runner.py"]
+        assert runs[0].green is False
 
     def test_a_suite_run_before_any_test_was_authored_is_refused(self, repo):
         """It would be the suite as it stood before the verifier read

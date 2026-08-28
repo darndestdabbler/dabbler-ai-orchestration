@@ -578,7 +578,10 @@ def pending_triggers(
 
     if operator_request:
         fired.append(TRIGGER_OPERATOR)
-    sensitive = policy.get("sensitive_paths") or []
+    # A repository declares its own sensitive paths in dabbler.yaml, not in
+    # run_policy: the machine-local overlay may not reach paths, so no
+    # machine can switch off a repository's own escalation.
+    sensitive = (config.get("paths") or {}).get("sensitive_paths") or []
     if sensitive and any(
         matching_prefixes(p, sensitive) for p in changed_paths
     ):

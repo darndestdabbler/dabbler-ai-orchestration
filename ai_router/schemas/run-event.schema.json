@@ -353,6 +353,11 @@
               },
               "selectedBy": {
                 "type": "string"
+              },
+              "suite": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The declared suite whose test_roots and test_glob claim this file. Absent when no suite's declaration claims it -- a path selected by a mapping rule alone, or a repository that declares no test locations. Optional rather than required because rows written before suites declared their own test locations carry no owner and must stay readable."
               }
             }
           }

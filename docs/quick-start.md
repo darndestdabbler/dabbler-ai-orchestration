@@ -257,6 +257,36 @@ Cancel records the reason in `CANCELLED.md` and preserves the
 pre-cancel status; restore returns the set to it. `--force` cancels
 even with a session in flight.
 
+## This repository's config (`dabbler.yaml`)
+
+Tracked, at the project root, deep-merged over the packaged default. It
+carries the three blocks a repository owns, behind a `schema_version`:
+
+```yaml
+# dabbler.yaml
+schema_version: 1
+testing:
+  suites:
+    - name: python
+      command: python -m pytest
+      covers: [ai_router/, tests/]
+      test_roots: [tests]
+      test_glob: "test_*.py"
+packaging: {}          # omit entirely if this repository publishes nothing
+paths:
+  sensitive_paths: []
+```
+
+- **Tracked, unlike the overlay below.** CI reads the suite command, the
+  next machine reads the selection rules, and `ai_router.affected`
+  refuses to run without them.
+- `test_roots` and `test_glob` belong to a **suite**, not the
+  repository: one that is Java and .NET at once has two of each.
+- Providers, models, roles and transports are not declarable here.
+  `AI_ROUTER_CONFIG` is not the way round that — a named config takes
+  no layer at all, so it forks the whole registry rather than adding
+  to it.
+
 ## This machine's config (`local-overrides.yaml`)
 
 The packaged `ai_router/router-config.yaml` is the published default and
@@ -278,11 +308,15 @@ transport:
 - A key the schema does not declare is **refused at load**, not
   ignored. An override the router silently drops is the failure this
   file exists to prevent.
+- `testing`, `packaging` and `paths` are refused by name: they belong
+  in `dabbler.yaml`. A suite command or a feed coming from a gitignored
+  file would be attributed by the run of record to a repository that
+  never declared it.
 - It sits under `--transport` and `DABBLER_TRANSPORT` in the precedence
   order, so nothing that works today changes its answer.
 
 An explicitly-named config — `--config`, or `AI_ROUTER_CONFIG` — takes
-no overlay: a caller who named a file meant that file.
+neither layer: a caller who named a file meant that file.
 
 ## Refreshing the seat catalog
 

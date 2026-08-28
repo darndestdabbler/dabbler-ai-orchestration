@@ -293,6 +293,8 @@ def run_config(run_repo, monkeypatch):
                 "name": "unit",
                 "argv": [interpreter, "checkrunner.py"],
                 "covers": ["app.py", "tests/", "conftest.py"],
+                "test_roots": ["tests"],
+                "test_glob": "test_*.py",
             }],
             "controls": [{
                 "name": "lint",
@@ -302,8 +304,6 @@ def run_config(run_repo, monkeypatch):
                 "required": True,
             }],
             "selection": {
-                "test_roots": ["tests"],
-                "test_glob": "test_*.py",
                 "repo_wide": ["conftest.py"],
                 "smoke": ["tests/test_smoke.py"],
                 "rules": [{"when": "app.py", "select": ["tests/test_app.py"]}],

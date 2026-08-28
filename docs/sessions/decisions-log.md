@@ -2146,3 +2146,61 @@ Added to session 15's spec as step 5, alongside the icon requirements
 already there: the four status glyphs resolve by name through `ICON_FILES`
 and reach `TreeItem.iconPath` as a `{ light, dark }` pair, and the
 `fill:currentColor` "simplification" stays rejected.
+
+### D96 · 2026-08-27 · Orchestrator (claude-opus-5/anthropic) · The tracked ledger was a one-time snapshot, and one clean-tree gate had not heard about it
+
+de583d11 tracked the run ledger so a session can move between machines.
+It did not change `.gitignore`, and that made it a **one-time snapshot**: a
+tracked file overrides `.gitignore`, but a *new* file under an ignored
+directory is still skipped by `git add -A`. Round 2's verifier output,
+the appended `rounds.jsonl` and the new test-run records would all have
+gone missing exactly the way round 1's did -- the failure the commit
+existed to prevent, one round later.
+
+`.gitignore` now excludes `.dabbler/*` and re-includes `.dabbler/runs/`,
+keeping the derived `run-projection.json` and the machine-specific
+`api-models.lock` out. Probed rather than reasoned about: a new
+`round-2-verifier-output.md` is now visible to `git status`, and both
+derived files are still ignored.
+
+**The operator's objection was the right one to raise, and it is answered
+by measurement rather than by argument.** The worry: verification writes
+into `.dabbler/runs/`, so tracking it could make every verified session
+look changed and spawn re-verification. That exact circularity is already
+named in `is_machine_state_path` -- "a round is appended after the tree
+snapshot it describes, so counting the ledger as session content makes
+every verified session look like it drifted the instant it was verified"
+-- and defended against in three places:
+
+- `snapshot_worktree_tree` adds everything to a throwaway index and then
+  drops `.dabbler` from it, with a comment naming the committed-ledger
+  case specifically.
+- `facts.build_diff_pathspecs` excludes `**/.dabbler` and `**/.dabbler/**`
+  from every evidence diff.
+- `gates.material_worktree_changes` skips machine state at close time:
+  "the run ledger is the record, not the work."
+
+A probe confirms all three: with the ledger tracked, a round-2 write moves
+neither the tree digest nor the evidence diff, while a source edit still
+moves the digest.
+
+**A fourth gate was not defended, and this found it.**
+`runcore.worktree_is_clean` asked git alone. That was correct only while
+the ledger was ignored everywhere; with it tracked, a round writing its
+own output left the tree dirty and the next `run --register` would have
+refused `dirty-worktree` on the evidence of the previous round. It now
+applies the same `is_machine_state_path` exemption the other three use,
+and reads `--untracked-files=all` so a collapsed `.dabbler/` directory row
+cannot slip past the filter as a single umbrella entry.
+
+**The predicate moved rather than being copied.** The first fix imported
+it from `evidence`, and
+`test_the_run_core_imports_nothing_the_cutover_deletes` refused: the run
+core may not depend on the half the cutover deletes. It now lives in
+`journal.py` -- the bottom of the run core, which already owns
+`MACHINE_DIRNAME` -- and `evidence` re-exports it, so both halves share
+one definition and "the one place that decides" stays one place. The
+invariant test caught this, which is the test doing its job.
+
+869 tests green, one added: a tracked ledger with an uncommitted round-2
+write does not refuse the next registration.

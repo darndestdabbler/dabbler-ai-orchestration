@@ -24,7 +24,9 @@ from pathlib import Path
 from typing import Optional
 
 from .checks import matching_prefixes
-from .journal import journal_path, read_events, run_git
+from .journal import (
+    is_machine_state_path, journal_path, read_events, run_git,
+)
 
 POLICY_FAST = "fast"
 POLICY_VERIFIED = "verified"
@@ -428,13 +430,40 @@ def current_branch(worktree) -> Optional[str]:
 
 
 def worktree_is_clean(worktree) -> bool:
-    """Tracked, staged, and untracked non-ignored changes all count. The
-    clean-start rule is the boundary that keeps ``finish`` from committing
-    work the run did not do."""
+    """Tracked, staged, and untracked changes all count -- except the run
+    ledger. The clean-start rule is the boundary that keeps ``finish`` from
+    committing work the run did not do.
+
+    ``.dabbler/`` is the record *of* a session, not the work *of* one, and
+    ``evidence.is_machine_state_path`` is the one place that decides which
+    is which. Asking git alone was correct only while the ledger was
+    ignored everywhere; once a repository tracks it so a session can move
+    between machines, a round writing its own output would leave the tree
+    dirty and refuse the next registration. The tree digest and the
+    evidence diff already drop the ledger unconditionally, and the
+    lifecycle's own close gate already exempts it -- this was the one gate
+    still asking a question git answers differently depending on whether
+    the ledger happens to be tracked.
+
+    ``-uall`` expands a collapsed untracked directory to per-file rows; a
+    single umbrella entry for ``.dabbler/`` would not match the filter.
+    """
     rc, out, _ = run_git(
-        worktree, "status", "--porcelain=v1", "--untracked-files=normal",
+        worktree, "status", "--porcelain=v1", "--untracked-files=all",
     )
-    return rc == 0 and not out.strip()
+    if rc != 0:
+        return False
+    for line in out.splitlines():
+        if len(line) < 4:
+            continue
+        path = line[3:]
+        if " -> " in path:
+            path = path.split(" -> ", 1)[1]
+        path = path.strip().strip('"').replace("\\", "/")
+        if is_machine_state_path(path):
+            continue
+        return False
+    return True
 
 
 def require_clean_start(worktree) -> None:

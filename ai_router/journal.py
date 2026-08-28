@@ -38,6 +38,27 @@ SCHEMA_VERSION = 1
 MACHINE_DIRNAME = ".dabbler"
 RUNS_DIRNAME = f"{MACHINE_DIRNAME}/runs"
 
+
+def is_machine_state_path(path) -> bool:
+    """True for anything under the router's own ``.dabbler/`` directory.
+
+    The one place that decides what is *the record of* a session rather
+    than *the work of* one. A round is appended after the tree snapshot it
+    describes, so counting the ledger as session content makes every
+    verified session look like it drifted the instant it was verified.
+
+    It lives here, at the bottom of the run core, because both halves of
+    the framework need the same answer and the run core may not import the
+    half the cutover deletes.
+    """
+    normalized = str(path).replace("\\", "/")
+    if normalized.startswith("./"):
+        normalized = normalized[2:]
+    return (
+        normalized == MACHINE_DIRNAME
+        or normalized.startswith(MACHINE_DIRNAME + "/")
+    )
+
 JOURNAL_FILENAME = "journal.jsonl"
 LOCK_FILENAME = "journal.lock"
 PROJECTION_FILENAME = "run-projection.json"

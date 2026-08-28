@@ -35,26 +35,12 @@ from pathlib import Path
 from typing import Optional
 
 from . import ledger
+from .journal import is_machine_state_path  # noqa: F401  (re-exported)
 from .ledger import MACHINE_DIRNAME, RUNS_DIRNAME
 
 
 # --- Machine-side state -----------------------------------------------------
 
-def is_machine_state_path(path) -> bool:
-    """True for anything under the router's own ``.dabbler/`` directory.
-
-    The one place that decides what is *the record of* a session rather
-    than *the work of* one. A round is appended after the tree snapshot it
-    describes, so counting the ledger as session content makes every
-    verified session look like it drifted the instant it was verified.
-    """
-    normalized = str(path).replace("\\", "/")
-    if normalized.startswith("./"):
-        normalized = normalized[2:]
-    return (
-        normalized == MACHINE_DIRNAME
-        or normalized.startswith(MACHINE_DIRNAME + "/")
-    )
 
 
 # --- Git primitives ---------------------------------------------------------

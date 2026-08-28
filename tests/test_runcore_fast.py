@@ -75,6 +75,32 @@ def test_registration_refuses_a_dirty_worktree(run_repo, run_config):
     assert payload["refused"] == "dirty-worktree"
 
 
+def test_a_tracked_run_ledger_does_not_make_the_tree_dirty(
+    run_repo, run_config
+):
+    """A repository may track .dabbler/runs so a session can move between
+    machines. A round writes its output there after the snapshot it
+    describes, so counting it as work would refuse the next registration
+    on the evidence of the previous round."""
+    import subprocess
+
+    ledger = run_repo / ".dabbler" / "runs" / "s1"
+    ledger.mkdir(parents=True)
+    (ledger / "rounds.jsonl").write_text('{"round": 1}\n', encoding="utf-8")
+    subprocess.run(
+        ["git", "-C", str(run_repo), "add", "-f", "--", ".dabbler"],
+        capture_output=True,
+    )
+    subprocess.run(
+        ["git", "-C", str(run_repo), "commit", "-q", "-m", "track the ledger"],
+        capture_output=True,
+    )
+    (ledger / "round-2-verifier-output.md").write_text(
+        "VERIFIED\n", encoding="utf-8")
+
+    assert cli(*REGISTER)[0] == 0
+
+
 def test_a_second_live_run_in_one_worktree_is_refused(run_repo, run_config):
     _register()
     code, payload = cli(

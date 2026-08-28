@@ -1,0 +1,1 @@
+{"round": 1, "phase": "full", "verdict": "VERIFIED", "blocking": false, "verifier_model": "gpt-5-6-sol", "verifier_provider": "openai", "orchestrator_provider": "anthropic", "findings": [], "cost_usd": 0.36475, "completion_tree": "31c65e566afd7f20525b29cd52f8823be418384c", "recorded_at": "2026-08-17T17:14:43.841854-04:00", "transport": "api"}

@@ -98,12 +98,15 @@ suite("CLI argv contracts", () => {
     );
   });
 
-  test("start pre-fills the human engine; close carries no --force", () => {
-    const start = startSessionCommandLine("python", "D:\\ws\\docs\\session-sets\\001 a");
+  test("start pre-fills the human engine; neither line names a sessions root", () => {
+    // The terminal opens at the repository root and the router derives
+    // its one sessions root from there. A directory on the command line
+    // would be a handle to something that no longer has one.
+    const start = startSessionCommandLine("python");
     assert.ok(start.includes("ai_router.session start"));
     assert.ok(start.includes("--engine human"));
-    assert.ok(start.includes('"D:\\ws\\docs\\session-sets\\001 a"'));
-    const close = closeSessionCommandLine("python", "D:\\x");
+    assert.ok(!start.includes("--sessions-dir"));
+    const close = closeSessionCommandLine("python");
     assert.ok(close.includes("ai_router.session close"));
     assert.ok(!close.includes("--force"));
   });

@@ -1,31 +1,31 @@
-// First-run posture: a workspace with no session sets must still
-// activate, render the sole Default module with its empty buckets, and
-// keep the command surface reachable.
+// First-run posture: a workspace the router has never run in must still
+// activate and keep the command surface reachable. It shows no
+// repository row, because there is no machine-written ledger to read and
+// inventing one would be the guess this view exists to avoid.
 
 import { test, expect } from "@playwright/test";
 import {
   LaunchedVSCode,
   cleanupTmpDir,
   closeVSCode,
-  expandTreeRow,
   launchVSCode,
   makeTmpDir,
-  openWorkExplorerTree,
-  treeRow,
+  repositoryLabel,
   treeRows,
   triggerRefresh,
+  workExplorerPane,
 } from "./electronLaunch";
 
 test.describe.configure({ mode: "serial" });
 
 let workspace: string;
 let vscode: LaunchedVSCode;
-let pane: Awaited<ReturnType<typeof openWorkExplorerTree>>;
+let pane: Awaited<ReturnType<typeof workExplorerPane>>;
 
 test.beforeAll(async () => {
   workspace = makeTmpDir("dabbler-pw-firstrun");
   vscode = await launchVSCode(workspace);
-  pane = await openWorkExplorerTree(vscode.page);
+  pane = await workExplorerPane(vscode.page);
 });
 
 test.afterAll(async () => {
@@ -33,19 +33,11 @@ test.afterAll(async () => {
   if (workspace) cleanupTmpDir(workspace);
 });
 
-test("an empty workspace renders the sole Default module, never a blank view", async () => {
-  await expect(treeRow(pane, "Default")).toBeVisible();
-});
-
-test("its three default buckets render empty as leaves", async () => {
-  await expandTreeRow(pane, "Default");
-  await expect(treeRow(pane, "In Progress")).toBeVisible();
-  await expect(treeRow(pane, "Not Started")).toBeVisible();
-  await expect(treeRow(pane, "Complete")).toBeVisible();
-  await expect(treeRows(pane).filter({ hasText: "Cancelled" })).toHaveCount(0);
+test("a workspace with no ledger renders no repository row", async () => {
+  await expect(treeRows(pane).filter({ hasText: repositoryLabel(workspace) })).toHaveCount(0);
 });
 
 test("the refresh command runs without disturbing the view", async () => {
   await triggerRefresh(vscode.page);
-  await expect(treeRow(pane, "Default")).toBeVisible();
+  await expect(pane).toBeVisible();
 });

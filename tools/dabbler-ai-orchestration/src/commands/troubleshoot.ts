@@ -2,7 +2,7 @@ import * as vscode from "vscode";
 import * as fs from "fs";
 import * as path from "path";
 import * as cp from "child_process";
-import { SESSION_SETS_REL } from "../utils/fileSystem";
+import { SESSIONS_REL, hasSessionsRoot } from "../utils/fileSystem";
 
 interface DiagItem {
   label: string;
@@ -26,33 +26,37 @@ function checkActivation(): void {
     ch.show();
     return;
   }
-  const dir = path.join(root, SESSION_SETS_REL);
-  const exists = fs.existsSync(dir);
-  ch.appendLine(`docs/session-sets/ exists: ${exists}`);
+  const dir = path.join(root, SESSIONS_REL);
+  ch.appendLine(`docs/sessions/ exists: ${fs.existsSync(dir)}`);
+  ch.appendLine(`sessions.json exists: ${hasSessionsRoot(root)}`);
   ch.appendLine(`Expected path: ${dir}`);
-  if (!exists) {
+  if (!hasSessionsRoot(root)) {
     ch.appendLine("");
     ch.appendLine(
-      "The extension activates on 'workspaceContains:docs/session-sets'. " +
-      "Create this folder (and at least one session-set subdirectory with a spec.md) to activate."
+      "The Work Explorer shows a repository once the router has written " +
+      "docs/sessions/sessions.json. A plan on its own is not enough: the " +
+      "ledger is the machine-written record the view reads."
     );
     ch.appendLine("Run 'Dabbler: Set Up New Project' to scaffold the folder.");
   } else {
-    ch.appendLine("Activation condition is met. If the view is still empty, try 'Dabbler: Refresh'.");
+    ch.appendLine("The view has a ledger to read. If it is still empty, try 'Dabbler: Refresh'.");
   }
   ch.show();
 }
 
 function checkStateStuck(): void {
   const ch = outputChannel();
-  ch.appendLine("Session-set state machine:");
-  ch.appendLine("  not-started  →  only spec.md exists");
-  ch.appendLine("  in-progress  →  activity-log.json OR session-state.json exists");
-  ch.appendLine("  complete     →  change-log.md exists");
+  ch.appendLine("A session's status comes from the router, never from this extension:");
+  ch.appendLine("  python -m ai_router.progress --json");
+  ch.appendLine("");
+  ch.appendLine("Each session's `status` is written to docs/sessions/sessions.json by");
+  ch.appendLine("`session start` and `session close`, and nothing else may write it.");
   ch.appendLine("");
   ch.appendLine(
-    "If a session appears stuck, check that the AI router wrote the expected files. " +
-    "Open 'Activity Log' from the context menu to inspect the raw log."
+    "If a session appears stuck, run the command above and compare it with the " +
+    "row. A row that disagrees with that output is a rendering bug; a row that " +
+    "agrees means the close has not run. Open 'Activity Log' from the context " +
+    "menu to inspect the raw log."
   );
   ch.show();
 }
@@ -69,7 +73,8 @@ function checkWorktrees(): void {
     ch.appendLine(out || "(no output)");
     ch.appendLine("");
     ch.appendLine(
-      "The extension scans all listed worktrees for docs/session-sets/ and merges results."
+      "The extension shows one row per listed worktree that has a docs/sessions/ " +
+      "ledger. Each checkout carries its own ledger, so two rows are two records."
     );
   } catch (err) {
     ch.appendLine(`git worktree list failed: ${err instanceof Error ? err.message : String(err)}`);
@@ -100,7 +105,7 @@ function checkHighCost(): void {
   ch.appendLine("  Haiku 4.x  → ~$0.01–0.05 per session (fast, lowest cost)");
   ch.appendLine("");
   ch.appendLine("Run 'python -m ai_router.report' for cumulative totals and a full spend report.");
-  ch.appendLine("Set effort=low in spec.md Session Set Configuration to reduce token spend.");
+  ch.appendLine("Register a session with --effort low to reduce token spend.");
   ch.show();
 }
 
@@ -109,9 +114,9 @@ function checkLayout(): void {
   const root = workspaceRoot();
   if (!root) { ch.appendLine("No workspace folder open."); ch.show(); return; }
   const dirs = [
-    path.join("docs", "session-sets"),
-    path.join("docs", "planning"),
-    "ai_router",
+    path.join("docs", "sessions"),
+    path.join("docs", "sessions", "sessions.json"),
+    path.join("docs", "sessions", "session-plan.md"),
   ];
   ch.appendLine(`Expected layout under: ${root}`);
   ch.appendLine("");
@@ -131,12 +136,12 @@ export function registerTroubleshootCommand(context: vscode.ExtensionContext): v
       const items: DiagItem[] = [
         {
           label: "$(warning) Extension not activating",
-          detail: "Check for docs/session-sets/ and explain the activation trigger",
+          detail: "Check for docs/sessions/ and the ledger the view reads",
           run: checkActivation,
         },
         {
           label: "$(sync) Session stuck in 'In Progress'",
-          detail: "Explain the file-presence state machine",
+          detail: "Show where a session's status actually comes from",
           run: checkStateStuck,
         },
         {

@@ -1,4 +1,4 @@
-// Shared builders for the unit suite: in-memory SessionSet /
+// Shared builders for the unit suite: in-memory SessionsRepository /
 // SessionRecord / StepRecord records shaped exactly as the scan builds
 // them, with per-test overrides.
 
@@ -8,7 +8,7 @@ import * as path from "path";
 import {
   ProjectionPayload,
   SessionRecord,
-  SessionSet,
+  SessionsRepository,
   StepRecord,
 } from "../../types";
 
@@ -30,8 +30,10 @@ export function makeStep(overrides: Partial<StepRecord> = {}): StepRecord {
 }
 
 export function makeSession(overrides: Partial<SessionRecord> = {}): SessionRecord {
+  const number = overrides.number ?? 1;
   return {
-    number: 1,
+    number,
+    displayNumber: String(number).padStart(3, "0"),
     title: "Session one",
     status: "complete",
     iconKey: "complete",
@@ -44,35 +46,26 @@ export function makeSession(overrides: Partial<SessionRecord> = {}): SessionReco
   };
 }
 
-export function makeSet(overrides: Partial<SessionSet> = {}): SessionSet {
-  const name = overrides.name ?? "001-fixture-set";
-  const dir = overrides.dir ?? path.join("D:", "ws", "docs", "session-sets", name);
+export function makeRepository(
+  overrides: Partial<SessionsRepository> = {},
+): SessionsRepository {
+  const root = overrides.root ?? path.join("D:", "ws");
+  const sessionsDir = path.join(root, "docs", "sessions");
   return {
-    name,
-    module: null,
-    moduleTitle: null,
-    moduleOrder: null,
-    dir,
-    specPath: path.join(dir, "spec.md"),
-    activityPath: path.join(dir, "activity-log.json"),
-    changeLogPath: path.join(dir, "change-log.md"),
-    statePath: path.join(dir, "session-state.json"),
-    root: overrides.root ?? path.join("D:", "ws"),
-    state: "not-started",
+    root,
+    sessionsDir,
+    label: path.basename(root),
+    planPath: path.join(sessionsDir, "session-plan.md"),
+    activityPath: path.join(sessionsDir, "activity-log.json"),
+    changeLogPath: path.join(sessionsDir, "change-log.md"),
+    ledgerPath: path.join(sessionsDir, "sessions.json"),
     totalSessions: null,
     sessionsCompleted: 0,
     currentSession: null,
-    verificationVerdict: null,
     forceClosed: false,
     schemaVersionOnDisk: null,
     invariantViolation: null,
     orchestrator: null,
-    startedAt: null,
-    lastTouched: null,
-    config: { module: null },
-    prerequisites: null,
-    blockedByPrereqs: false,
-    unsatisfiedPrereqs: [],
     sessions: [],
     ...overrides,
   };
@@ -80,27 +73,22 @@ export function makeSet(overrides: Partial<SessionSet> = {}): SessionSet {
 
 export function makeProjection(
   overrides: {
-    set?: Partial<ProjectionPayload["set"]>;
+    repository?: Partial<ProjectionPayload["repository"]>;
     sessions?: SessionRecord[];
   } = {},
 ): ProjectionPayload {
   return {
     schemaVersion: 1,
     generatedAt: "2026-08-17T12:00:00-04:00",
-    set: {
-      slug: "001-fixture-set",
-      status: "complete",
-      iconKey: "complete",
-      schemaVersionOnDisk: 4,
+    repository: {
+      schemaVersionOnDisk: 5,
       totalSessions: 2,
       sessionsCompleted: 2,
       currentSession: null,
-      verificationVerdict: "VERIFIED",
       forceClosed: false,
-      preCancelStatus: null,
       orchestrator: null,
       invariantViolation: null,
-      ...(overrides.set ?? {}),
+      ...(overrides.repository ?? {}),
     },
     sessions: overrides.sessions ?? [
       makeSession({ number: 1 }),

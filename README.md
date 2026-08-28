@@ -13,8 +13,10 @@ Components:
 - **Python package `ai_router`** — routing, session lifecycle, gates,
   verification, token accounting. Everything that decides lives here.
 - **VS Code extension "Dabbler AI Orchestration"** — the Work Explorer
-  tree. A pure renderer: it shells to `python -m ai_router.progress
-  --json` and draws the JSON. It re-implements no logic.
+  tree: one row per repository, its numbered sessions beneath it, and
+  the in-flight session's steps beneath that. A pure renderer: it shells
+  to `python -m ai_router.progress --json` and draws the JSON. It
+  re-implements no logic, and shows nothing when that call cannot run.
 
 ## How a session runs
 

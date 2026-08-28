@@ -1,37 +1,55 @@
 // Cancel/restore round-trip: the state mutation runs through the real
 // `python -m ai_router.session` CLI on disk (the only sanctioned
-// writer), and the tree follows it after a refresh.
+// writer), and the row's glyph follows it after a refresh.
 
 import * as cp from "child_process";
+import * as path from "path";
 import { test, expect } from "@playwright/test";
 import {
   LaunchedVSCode,
   PYTHON,
-  addSpecOnlySet,
   cleanupTmpDir,
   closeVSCode,
   expandTreeRow,
+  expectFileIcon,
   launchVSCode,
   makeTmpDir,
   openWorkExplorerTree,
+  repositoryLabel,
   treeRow,
   triggerRefresh,
+  writeSessionsRoot,
 } from "./electronLaunch";
 
 test.describe.configure({ mode: "serial" });
 
 let workspace: string;
-let setDir: string;
+let repository: string;
 let vscode: LaunchedVSCode;
 let pane: Awaited<ReturnType<typeof openWorkExplorerTree>>;
 
 function runSessionCli(args: string[]): void {
-  const proc = cp.spawnSync(PYTHON, ["-m", "ai_router.session", ...args], {
-    encoding: "utf8",
-    cwd: workspace,
-    timeout: 60_000,
-    windowsHide: true,
-  });
+  // `--sessions-dir` because the fixture workspace is a tmpdir, not a
+  // git checkout, and the router derives its sessions root by finding
+  // the repository it is standing in. This is the caller-outside-the-
+  // tree case the flag exists for — the same reason the extension's own
+  // projection passes it.
+  const proc = cp.spawnSync(
+    PYTHON,
+    [
+      "-m",
+      "ai_router.session",
+      ...args,
+      "--sessions-dir",
+      path.join(workspace, "docs", "sessions"),
+    ],
+    {
+      encoding: "utf8",
+      cwd: workspace,
+      timeout: 60_000,
+      windowsHide: true,
+    },
+  );
   if (proc.status !== 0) {
     throw new Error(
       `session CLI failed (${proc.status}): ${proc.stdout} ${proc.stderr}`,
@@ -41,7 +59,10 @@ function runSessionCli(args: string[]): void {
 
 test.beforeAll(async () => {
   workspace = makeTmpDir("dabbler-pw-cancel");
-  setDir = addSpecOnlySet(workspace, "300-cancel-me");
+  repository = repositoryLabel(workspace);
+  writeSessionsRoot(workspace, [
+    { number: 1, title: "Cancel me", status: "not-started" },
+  ]);
   vscode = await launchVSCode(workspace);
   pane = await openWorkExplorerTree(vscode.page);
 });
@@ -51,22 +72,22 @@ test.afterAll(async () => {
   if (workspace) cleanupTmpDir(workspace);
 });
 
-test("the fresh set starts in Not Started", async () => {
-  await expandTreeRow(pane, "Default");
-  await expandTreeRow(pane, "Not Started");
-  await expect(treeRow(pane, "300-cancel-me")).toBeVisible();
+test("the fresh session renders not started", async () => {
+  await expandTreeRow(pane, repository);
+  await expectFileIcon(treeRow(pane, "001 · Cancel me"), "not-started.svg");
 });
 
-test("cancelling via the CLI moves the row to Cancelled after refresh", async () => {
-  runSessionCli(["cancel", setDir, "--reason", "playwright round-trip"]);
+test("cancelling via the CLI flips the row's glyph after refresh", async () => {
+  runSessionCli(["cancel", "1", "--reason", "playwright round-trip"]);
   await triggerRefresh(vscode.page);
-  await expandTreeRow(pane, "Cancelled");
-  await expect(treeRow(pane, "300-cancel-me")).toBeVisible();
+  await expandTreeRow(pane, repository);
+  await expectFileIcon(treeRow(pane, "001 · Cancel me"), "cancelled.svg");
 });
 
-test("restoring via the CLI returns the row to Not Started", async () => {
-  runSessionCli(["restore", setDir]);
+test("restoring via the CLI returns the row to not started", async () => {
+  runSessionCli(["restore", "1"]);
   await triggerRefresh(vscode.page);
-  await expandTreeRow(pane, "Not Started");
-  await expect(treeRow(pane, "300-cancel-me")).toBeVisible();
+  await expandTreeRow(pane, repository);
+  await expectFileIcon(treeRow(pane, "001 · Cancel me"), "not-started.svg");
+  await expect(treeRow(pane, "001 · Cancel me")).toBeVisible();
 });

@@ -47,6 +47,7 @@ from .progress import (
     read_activity_log,
     read_raw_legacy_state,
     read_raw_session_state,
+    session_display_number,
 )
 # Re-exported so the public surface stays importable from ai_router.session
 # — callers address the lifecycle module; where a helper lives is an
@@ -463,21 +464,25 @@ def start(
         # The boundary triad.
         if current is not None and requested != current:
             print(
-                f"start: refused -- session {current} is still in flight "
-                f"(completedSessions={completed}). Close session {current} "
-                f"before starting session {requested}.", file=sys.stderr,
+                f"start: refused -- session {session_display_number(current)} is "
+                f"still in flight "
+                f"(completedSessions={completed}). Close session "
+                f"{session_display_number(current)} before starting session "
+                f"{session_display_number(requested)}.", file=sys.stderr,
             )
             return EXIT_BOUNDARY
         if requested in set(completed):
             print(
-                f"start: refused -- session {requested} is already closed "
+                f"start: refused -- session {session_display_number(requested)} is "
+                f"already closed "
                 f"(completedSessions={completed}). Sessions are never "
                 "re-opened.", file=sys.stderr,
             )
             return EXIT_BOUNDARY
         if requested in cancelled:
             print(
-                f"start: refused -- session {requested} is cancelled. "
+                f"start: refused -- session {session_display_number(requested)} is "
+                f"cancelled. "
                 "Starting it would erase the cancellation and the reason "
                 f"for it; restore it first: python -m ai_router.session "
                 f"restore {requested}", file=sys.stderr,
@@ -489,7 +494,8 @@ def start(
             )
             if requested != expected:
                 print(
-                    f"start: refused -- session {requested} is not the next "
+                    f"start: refused -- session {session_display_number(requested)} is "
+                    f"not the next "
                     f"sequential session (expected {expected}; "
                     f"completedSessions={completed}). Close the intervening "
                     "sessions first.", file=sys.stderr,
@@ -525,7 +531,8 @@ def start(
             )
 
         print(
-            f"start: session {requested} of {sessions_path.name} registered "
+            f"start: session {session_display_number(requested)} of "
+            f"{sessions_path.name} registered "
             f"({engine}); {seeded} plan step(s) seeded."
         )
         for line in _discovery_warnings():
@@ -647,7 +654,8 @@ def log(sessions_dir, *, step: str, status: str, note=None,
         plan_rows = _plan_rows_for(entries, target)
         if not plan_rows:
             print(
-                f"log: refused -- session {target} of {sessions_path.name} has no "
+                f"log: refused -- session {session_display_number(target)} of "
+                f"{sessions_path.name} has no "
                 "seeded plan rows to log against. Run `session start` "
                 "first.", file=sys.stderr,
             )
@@ -676,7 +684,8 @@ def log(sessions_dir, *, step: str, status: str, note=None,
         if (prior and prior[-1].get("status") == status
                 and (prior[-1].get("description") or "") == description):
             print(
-                f"log: step {key} of session {target} is already {status} "
+                f"log: step {key} of session {session_display_number(target)} is "
+                f"already {status} "
                 "(noop)."
             )
             return EXIT_OK
@@ -684,7 +693,8 @@ def log(sessions_dir, *, step: str, status: str, note=None,
         log_step(sessions_path, target, key, description, status,
                  step_number=row.get("stepNumber"))
         print(
-            f"log: session {target} step {row.get('stepNumber')} "
+            f"log: session {session_display_number(target)} step "
+            f"{row.get('stepNumber')} "
             f"({key}) -> {status}."
         )
         return EXIT_OK
@@ -765,7 +775,8 @@ def decision(sessions_dir, *, decider: str, headline: str, body=None,
     finally:
         release_lock(lock)
     print(
-        f"decision: {entry['decisionId']} recorded for session {target} "
+        f"decision: {entry['decisionId']} recorded for session "
+        f"{session_display_number(target)} "
         f"({entry['decider']})."
     )
     return EXIT_OK
@@ -812,7 +823,7 @@ def declare(sessions_dir, *, task=None, task_file=None, releasable=None,
     finally:
         release_lock(lock)
     print(
-        f"declare: session {target} declared; releasable="
+        f"declare: session {session_display_number(target)} declared; releasable="
         f"{'yes' if releasable else 'no'}."
     )
     return EXIT_OK
@@ -917,7 +928,8 @@ def close(sessions_dir, *, dry_run: bool = False, forced: bool = False) -> int:
                 verdict = row.get("verdict")
 
         flip_state_to_closed(sessions_path, verdict=verdict, forced=forced)
-        print(f"close: session {current} of {sessions_path.name} closed"
+        print(f"close: session {session_display_number(current)} of "
+              f"{sessions_path.name} closed"
               + (f" ({verdict})" if verdict else "") + ".")
 
         if repo_root:
@@ -1113,17 +1125,20 @@ def cancel(sessions_dir, session_number: int, *, reason: str,
         state = _on_disk_state(sessions_path, raw)
         record = _session_record(state, session_number)
         if record is None:
-            print(f"cancel: no session {session_number} on record",
+            print(f"cancel: no session {session_display_number(session_number)} "
+                  "on record",
                   file=sys.stderr)
             return EXIT_USAGE
         prior = canonicalize_status(record.get("status"))
         if prior == STATUS_CANCELLED:
-            print(f"cancel: session {session_number} is already cancelled",
+            print(f"cancel: session {session_display_number(session_number)} is "
+                  "already cancelled",
                   file=sys.stderr)
             return EXIT_BOUNDARY
         if prior == STATUS_IN_PROGRESS and not force:
             print(
-                f"cancel: refused -- session {session_number} is in flight. "
+                f"cancel: refused -- session {session_display_number(session_number)} "
+                f"is in flight. "
                 "Close it first, or pass --force.",
                 file=sys.stderr,
             )
@@ -1165,12 +1180,14 @@ def restore(sessions_dir, session_number: int, *, reason: str = "") -> int:
         state = _on_disk_state(sessions_path, raw)
         record = _session_record(state, session_number)
         if record is None:
-            print(f"restore: no session {session_number} on record",
+            print(f"restore: no session {session_display_number(session_number)} "
+                  "on record",
                   file=sys.stderr)
             return EXIT_USAGE
         if canonicalize_status(record.get("status")) != STATUS_CANCELLED:
             print(
-                f"restore: refused -- session {session_number} is not "
+                f"restore: refused -- session "
+                f"{session_display_number(session_number)} is not "
                 "cancelled; there is nothing to restore.", file=sys.stderr,
             )
             return EXIT_BOUNDARY

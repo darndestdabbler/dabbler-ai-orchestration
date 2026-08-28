@@ -9,11 +9,9 @@ import { registerSessionTerminalCommands } from "./commands/sessionTerminalComma
 import { registerBootstrapProjectCommand } from "./commands/bootstrapProject";
 import { registerInstallAiRouterCommand } from "./commands/installAiRouter";
 import { registerWorkExplorerTreeCommands } from "./commands/workExplorerTreeCommands";
-import { discoverRoots, listSessionSetDirNames } from "./utils/fileSystem";
+import { SESSIONS_REL, discoverRoots, hasSessionsRoot } from "./utils/fileSystem";
 import { SolutionTreeProvider } from "./providers/SolutionTreeProvider";
 import { WorkExplorerTreeProvider } from "./providers/WorkExplorerTreeProvider";
-
-const SESSION_SETS_REL = path.join("docs", "session-sets");
 
 export function activate(context: vscode.ExtensionContext): void {
   // Activation must NOT bail when no folder is open: the bootstrap and
@@ -59,12 +57,12 @@ export function activate(context: vscode.ExtensionContext): void {
   const maybeOfferSetup = async (): Promise<void> => {
     if (setupOffered || !treeView.visible) return;
     const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-    if (!root || listSessionSetDirNames(root).length > 0) return;
+    if (!root || hasSessionsRoot(root)) return;
     setupOffered = true;
     const choice = await vscode.window.showInformationMessage(
-      "This workspace has no Dabbler session sets yet. Set it up now? " +
+      "This workspace has no Dabbler sessions yet. Set it up now? " +
         "This creates the workspace .venv, installs the ai-router into " +
-        "it, and scaffolds the plan and decomposition session sets.",
+        "it, and scaffolds the session plan.",
       "Set Up New Project",
       "Not Now",
     );
@@ -92,13 +90,12 @@ export function activate(context: vscode.ExtensionContext): void {
     watcherSubs = [];
     boundRoots = want;
     for (const root of roots) {
-      const sessionSetsAbs = path.join(root, SESSION_SETS_REL);
-      // Exactly the artifact set the projection derives from (plus the
-      // cancel/restore markers). The projection cache is mtime-keyed on
-      // the same files, so a watcher tick re-projects only changed sets.
+      // Exactly the artifacts the projection derives from. The
+      // projection cache is mtime-keyed on the same files, so a watcher
+      // tick re-projects only repositories that actually changed.
       const pattern = new vscode.RelativePattern(
-        sessionSetsAbs,
-        "**/{spec.md,session-state.json,activity-log.json,change-log.md,CANCELLED.md,RESTORED.md}",
+        path.join(root, SESSIONS_REL),
+        "{sessions.json,activity-log.json,session-plan.md,change-log.md}",
       );
       const watcher = vscode.workspace.createFileSystemWatcher(pattern);
       const onEvent = () => {
@@ -109,22 +106,6 @@ export function activate(context: vscode.ExtensionContext): void {
       watcher.onDidChange(onEvent);
       watcherSubs.push(watcher);
       context.subscriptions.push(watcher);
-
-      // The module-tree watcher: docs/modules.yaml drives grouping and
-      // the manifest diagnostic; the legacy root plan flips the
-      // pseudo-module's visibility. In-workspace globs ride VS Code's
-      // existing recursive watcher — event subscriptions, not a new OS
-      // watch.
-      const modulesPattern = new vscode.RelativePattern(
-        root,
-        "{docs/modules.yaml,docs/planning/project-plan.md}",
-      );
-      const modulesWatcher = vscode.workspace.createFileSystemWatcher(modulesPattern);
-      modulesWatcher.onDidCreate(onEvent);
-      modulesWatcher.onDidDelete(onEvent);
-      modulesWatcher.onDidChange(onEvent);
-      watcherSubs.push(modulesWatcher);
-      context.subscriptions.push(modulesWatcher);
     }
   }
 

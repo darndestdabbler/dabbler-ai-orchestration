@@ -1,11 +1,15 @@
 import * as vscode from "vscode";
 import * as fs from "fs";
 import * as path from "path";
-import { SessionSet } from "../types";
+import { SessionsRepository } from "../types";
 import { locateSessionSection, SpecSectionRange } from "../providers/specSectionLocator";
 
-interface SetItem extends vscode.TreeItem {
-  set: SessionSet;
+/**
+ * Both row kinds carry the repository; a session row carries its record
+ * too, and that is what asks for a section rather than the whole file.
+ */
+interface RepositoryItem extends vscode.TreeItem {
+  repository?: SessionsRepository;
 }
 
 function openIfExists(
@@ -42,7 +46,7 @@ async function revealSection(uri: vscode.Uri, range: SpecSectionRange): Promise<
   try {
     const editor = await vscode.window.showTextDocument(uri);
     // Clamp: the file is read to find the heading and opened separately,
-    // so a spec edited in between must never throw here.
+    // so a plan edited in between must never throw here.
     const lastLine = Math.max(editor.document.lineCount - 1, 0);
     const start = new vscode.Position(Math.min(range.startLine, lastLine), 0);
     const end = new vscode.Position(Math.min(range.endLine, lastLine), 0);
@@ -71,18 +75,18 @@ export function sessionNumberOf(item: unknown): number | undefined {
 }
 
 /**
- * Where spec.md should open for this command argument, or undefined for
- * "at the top". The read happens HERE — on activation, once per click —
- * never on the tree scan.
+ * Where the session plan should open for this command argument, or
+ * undefined for "at the top". The read happens HERE — on activation,
+ * once per click — never on the tree scan.
  */
 export function specSectionTargetFor(
-  specPath: string | undefined,
+  planPath: string | undefined,
   sessionNumber: number | undefined,
 ): SpecSectionRange | undefined {
-  if (!specPath || sessionNumber === undefined) return undefined;
+  if (!planPath || sessionNumber === undefined) return undefined;
   let text: string;
   try {
-    text = fs.readFileSync(specPath, "utf-8");
+    text = fs.readFileSync(planPath, "utf-8");
   } catch {
     return undefined;
   }
@@ -91,24 +95,24 @@ export function specSectionTargetFor(
 
 export function registerOpenFileCommands(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
-    // ONE Open Spec, two callers: a set row opens the file at the top; a
-    // session node opens the same file positioned at its own
-    // `### Session N of M:` block.
-    vscode.commands.registerCommand("dabblerSessionSets.openSpec", (item: SetItem) =>
+    // ONE Open Session Plan, two callers: a repository row opens the
+    // file at the top; a session node opens the same file positioned at
+    // its own `### Session N of M:` block.
+    vscode.commands.registerCommand("dabblerSessionSets.openSpec", (item: RepositoryItem) =>
       openIfExists(
-        item?.set?.specPath,
-        "Spec",
-        specSectionTargetFor(item?.set?.specPath, sessionNumberOf(item)),
+        item?.repository?.planPath,
+        "Session plan",
+        specSectionTargetFor(item?.repository?.planPath, sessionNumberOf(item)),
       ),
     ),
-    vscode.commands.registerCommand("dabblerSessionSets.openActivityLog", (item: SetItem) =>
-      openIfExists(item?.set?.activityPath, "Activity log"),
+    vscode.commands.registerCommand("dabblerSessionSets.openActivityLog", (item: RepositoryItem) =>
+      openIfExists(item?.repository?.activityPath, "Activity log"),
     ),
-    vscode.commands.registerCommand("dabblerSessionSets.openChangeLog", (item: SetItem) =>
-      openIfExists(item?.set?.changeLogPath, "Change log"),
+    vscode.commands.registerCommand("dabblerSessionSets.openChangeLog", (item: RepositoryItem) =>
+      openIfExists(item?.repository?.changeLogPath, "Change log"),
     ),
-    vscode.commands.registerCommand("dabblerSessionSets.openSessionState", (item: SetItem) =>
-      openIfExists(item?.set?.statePath, "Session state"),
+    vscode.commands.registerCommand("dabblerSessionSets.openSessionState", (item: RepositoryItem) =>
+      openIfExists(item?.repository?.ledgerPath, "Sessions ledger"),
     ),
   );
 }

@@ -2607,3 +2607,210 @@ lands before the round, so the next round re-reviews the entire session,
 which can exceed the evidence cap. That is what nearly happened in session
 14, and it is the argument for doing this at all rather than an argument
 for doing it first.
+
+## Session 15 — The sessions view (plan D1)
+
+### D104 · 2026-08-28 · Orchestrator · The status buckets go with the set level: sessions are a sequence, not a pile
+
+**The status buckets went with the set level, and that is a change the
+plan did not spell out.**
+
+The tree was module -> status bucket -> set -> session -> step. Removing
+the set level leaves the buckets with a new thing to group, and the
+honest answer is that they should not group it.
+
+Buckets earned their place over SETS. Sets are unordered, numerous and
+concurrent: several can be in flight, a dozen not started, and "which
+work is live" is a question the row order cannot answer. Bucketing was
+how that got answered.
+
+Sessions are none of those things. They are a strictly sequential
+numbered list with exactly one session in flight, a prefix of complete
+ones behind it and a suffix of not-started ones ahead. Bucketing a
+sequence with that structure produces three contiguous ranges — the same
+information the ordered list already carries — at the cost of three extra
+rows and, decisively, the numeric order itself: "In Progress" first puts
+session 015 above sessions 001 through 014.
+
+That cost lands squarely on step 5 of this session's own plan. The
+three-digit zero-padded label exists because "the operator scans that
+prefix down the left edge". A view that scrambles the sequence and then
+pads the numbers so they can be scanned in order is arguing with itself.
+
+So the tree is repository -> session -> step, and the session list is
+ordered by number ascending — the order the ledger is written and the
+order the work runs. Status is carried where it already was: the
+operator's four authored glyphs, unchanged, plus "in flight" in the
+in-flight row's description and the fraction on the repository row.
+
+What this gives up: on a repository with hundreds of sessions, finding
+the live one means reading down a long list. Buckets would not have
+fixed that either — "Complete" would hold all but a handful — and the
+repository row names the in-flight number, so the answer is one row from
+the top.
+
+### D105 · 2026-08-28 · Orchestrator · The file-presence fallback is deleted, not ported: a projection that fails shows no sessions
+
+**The file-presence fallback is deleted rather than ported, so a
+repository the router cannot be run in shows no sessions and says so.**
+
+`fileSystem.fallbackState` bucketed a set by which files existed —
+`CANCELLED.md` then `change-log.md` then `activity-log.json` — when the
+projection subprocess failed. Its own comment called it "the ONE
+deliberate duplication of a Python rule".
+
+Three reasons it does not come forward:
+
+1. **The files it read are gone.** Session 14 deleted the cancel/restore
+   markers and moved cancellation onto the session record. The ladder has
+   nothing left to climb.
+2. **It answered a question that no longer exists.** A set had a status;
+   a repository does not. What the tree needs now is the LIST of sessions
+   and each one's status, and no arrangement of filenames yields that —
+   the ledger has to be read and normalized, which is what `progress.py`
+   does.
+3. **Guessing is worse than silence here.** A degraded row that shows
+   plausible statuses is the failure mode the framework exists to end.
+
+So a repository whose projection failed still renders — its work is not
+hidden — with no session children, a tooltip saying the router could not
+be run, and one `TreeView.message` naming the install remedy. That is
+"one implementation of any rule, in one language" actually applied,
+rather than stated and excepted.
+
+### D106 · 2026-08-28 · Orchestrator · A worktree is its own repository row, and the duplicate-name merge dies with the set name
+
+**A worktree is its own repository row, and the duplicate-name merge is
+deleted with the thing it was merging.**
+
+The scan used to find one set in a main checkout and again in each
+worktree, and merge them into a single row — the copies were of one set,
+so showing several was noise. That machinery (state ranking, identity
+keys, the collision list, the fail-loud duplicate-name error) is gone.
+
+It cannot survive the collapse, because what it deduplicated was a NAME
+and sessions have numbers instead. Session 15 in a main checkout and
+session 15 in a worktree are not two copies of one record: each checkout
+has its own `docs/sessions/sessions.json` at its own commit, and they can
+legitimately disagree about how many sessions exist and which is in
+flight. Merging them by number would show one checkout's progress under
+the other's name — the exact class of wrong the collision check existed
+to prevent, arrived at by the code that used to prevent it.
+
+So each discovered root with a ledger is one row, identified by its path
+(which is what the row's `id` is), labelled by its folder name. Two rows
+for two checkouts is the honest rendering, and the tooltip and the
+troubleshooter both say so.
+
+What is kept from the old discovery: realpath-based dedup, so a symlink
+or a case-variant of the same directory is still one row.
+
+### D107 · 2026-08-28 · Orchestrator · A historyless session takes the plan's title, and the ledger grows to the plan's count
+
+**A session with no history takes the plan's title; a session that ran
+keeps its own. And the ledger grows to the plan's session count.**
+
+The plan's step 6 named the case and this repository was in it: the
+ledger held seventeen sessions, the plan had been re-cut to twenty, and
+sessions 16 and 17 carried the titles of whatever used to sit at their
+numbers. `heal_title` only replaced a title it judged GENERIC — blank, or
+literally `Session <n>` — so a real-looking stale title survived
+untouched.
+
+The rule that replaces it is about the record, not about the string. A
+session that has run is a statement about something that happened, and
+its stored title is part of that statement; re-cutting a plan does not
+get to rewrite what a closed session was called. A session that is
+`not-started` and carries no `startedAt`, no `completedAt`, no verdict
+and no orchestrator has made no statement at all, so the plan — which is
+the declaration of what that number is for — wins. `session_has_history`
+is that test, and a merely-stamped not-started session counts as history:
+the record has already said something about it.
+
+The same reasoning fixes the count. `register_session_start` took the
+ledger's own length before it considered the plan, so a plan re-cut from
+seventeen sessions to twenty could never make sessions 18 through 20
+exist — they would have been unstartable, and nothing would have said so.
+The ledger now takes the LARGER of what it holds and what the plan
+declares. It still never shrinks: dropping a session drops its record.
+
+Healing happens in two places on purpose, from one implementation.
+`build_projection` heals what it RENDERS, so the tree is correct the
+moment the plan changes and before any registration — that is what makes
+this the session that has to notice. `_build_sessions_array` heals what
+it WRITES, so the next `session start` persists the same correction. The
+render mutates a fresh parse and never touches disk; the test asserts
+that.
+
+### D108 · 2026-08-28 · Verifier (gpt-5.6-sol/openai) · The session-number formatter belonged in Python, not the extension
+
+**Round 1, Major, and correct: the padding had one owner in the wrong
+language. Python owns it now, and the extension renders what it sends.**
+
+Step 5 asks that "one formatter owns the padding so the tree, the CLI's
+human output and any status line cannot disagree about how a session is
+named." The first implementation put `padSessionNumber` in the
+extension's `sessionsModel.ts` and left `ai_router.session` printing
+`session 15`, so the two surfaces an operator moves between all day said
+different things — and nothing stopped them drifting further.
+
+A formatter in each language would satisfy the letter and lose the
+point: two copies of a rule are two places for it to change. The ground
+rule already settles which side wins. **TypeScript renders; Python
+decides**, and how a session is NAMED is a decision.
+
+So: `progress.session_display_number` is the one owner. The CLI's
+human-facing lines call it — start, log, declare, decision, close,
+cancel, restore, and every refusal that names a session. The projection
+carries its result as `displayNumber` beside the integer `number`, and
+the tree renders that string rather than padding for itself.
+
+Two things deliberately do NOT pad, because they are records rather than
+output: the activity-log step description `Registered session 15 (...)`
+and the close's git commit message `Close session 15 of sessions`. So do
+the plan's `### Session N of M:` headings, `sessions.json`'s `number`,
+the `.dabbler/runs/s<N>/` ledger and every `--session` argument — the
+padded string is never parsed back into any of them, and the test
+asserts the ledger keeps the integer while the terminal says `001`.
+
+The extension keeps one three-line function, `sessionDisplayNumber`, and
+it is a READ: `session.displayNumber || String(session.number)`. A
+payload from an older router that carries no name degrades to the plain
+number rather than growing a second copy of the padding rule that could
+disagree with the first.
+
+### D109 · 2026-08-28 · Orchestrator · Round 2's two Nits stand: the loop stops, and one of them is a repair worth refusing
+
+**Round 2 verified with two Nits, and the loop stops there. Neither is
+being fixed in this session, and here is why each one stands.**
+
+The severity vocabulary exists so a session ends. Nit-only is the stop
+condition, and editing code after a VERIFIED verdict would bind the run
+of record and the close to a tree no verifier reviewed.
+
+**Nit 1 — the `displayNumber` fallback renders `15`, not `015`, when an
+older projection sends no name.** The verifier's alternative is to refuse
+an incompatible projection or add a compatibility mechanism. Both are
+worse than the fallback:
+
+- Refusing would blank the tree over a cosmetic difference. The view's
+  whole posture is that it renders what the router says and shows nothing
+  it cannot source — but a MISSING name is not a wrong one, and the
+  session number is right there in the payload.
+- A compatibility shim IS the second copy of the padding rule this fix
+  just removed. That is the defect, not the repair.
+
+The fallback is honest about what it has: an unpadded number, from a
+router that does not name sessions yet. It is also unreachable in
+practice — the extension and the router ship from one repository — and
+a session that upgrades one without the other has a worse problem than
+a narrow label.
+
+**Nit 2 — `start`'s non-sequential refusal mixes forms**: it pads the
+requested session and leaves `expected {expected}` and
+`completedSessions={completed}` plain. Real, and worth fixing, but it is
+one refusal message on one branch and the fix belongs where it can be
+verified rather than appended to a verified tree. Filed here so a later
+session picks it up: format `expected`, and decide whether
+`completedSessions=[1, 2]` — a LIST of numbers echoing state — is human
+output that should pad or a debug echo that should not.

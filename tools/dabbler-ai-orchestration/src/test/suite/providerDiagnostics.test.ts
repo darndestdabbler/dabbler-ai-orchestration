@@ -8,28 +8,19 @@ import {
 
 suite("WorkExplorerTreeProvider: scan diagnostics", () => {
   test("a clean scan clears the message", () => {
-    assert.strictEqual(describeScanFaults([], { projectionErrors: [] }), undefined);
+    assert.strictEqual(describeScanFaults({ projectionErrors: [] }), undefined);
   });
 
   test("failed projections collapse to one line naming the install remedy", () => {
-    const message = describeScanFaults([], {
+    const message = describeScanFaults({
       projectionErrors: [
-        { setDir: "a", error: "No module named ai_router.progress" },
-        { setDir: "b", error: "No module named ai_router.progress" },
+        { root: "D:/a", error: "No module named ai_router.progress" },
+        { root: "D:/b", error: "No module named ai_router.progress" },
       ],
     })!;
-    assert.ok(message.includes("2 session sets"));
+    assert.ok(message.includes("2 repositories"));
     assert.ok(message.includes("Install ai-router"));
-    assert.ok(!message.includes("setDir"));
-  });
-
-  test("a manifest fault names the root and whether last-known-good is showing", () => {
-    const message = describeScanFaults(
-      [{ rootLabel: "myrepo", message: "docs/modules.yaml is invalid.", retainedLastKnownGood: true }],
-      { projectionErrors: [] },
-    )!;
-    assert.ok(message.includes("myrepo"));
-    assert.ok(message.includes("last-known-good"));
+    assert.ok(message.includes("No module named ai_router.progress"));
   });
 });
 

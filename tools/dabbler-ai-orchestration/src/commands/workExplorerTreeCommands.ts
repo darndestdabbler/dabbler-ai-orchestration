@@ -1,69 +1,50 @@
-// Set 110 Session 2 — the commands the native Work Explorer tree needs
-// that the webview surface did not.
+// The commands the native Work Explorer tree needs that a context-menu
+// contribution cannot express: the two left-click activations.
 //
-// There are only two kinds, and both exist because the native tree
-// dispatches differently from the webview:
-//
-//   1. `dabblerWorkExplorer.activateSet` — the webview's L5 left-click
-//      dual-action (open spec.md, and on a non-terminal row also copy
-//      "Start the next session of `<slug>`."). In the webview this was a
-//      message handled inside `CustomSessionSetsView`; a `TreeItem`
-//      needs a real command id to put in `TreeItem.command`. The
-//      BEHAVIOUR is unchanged and still decided by the shared pure
-//      `planLeftClickActivation`, so the two surfaces cannot drift.
-//
-//   2. The module-row actions. The webview strip posted a typed
-//      `moduleAction` message; a native menu invokes a command with the
-//      clicked node. Rather than mint five new command ids, the five
-//      EXISTING palette commands each learned to accept an optional
-//      module node — invoked from the palette with no argument they
-//      behave exactly as before (their own module QuickPick), and
-//      invoked from a tree row they target that row's module directly.
-//      That is the same explicit-target seam Set 093 established, with
-//      no new public surface: see `registerModuleTargetingFromTree`.
-//
-// Every OTHER row action needs nothing here at all. `ROW_ACTIONS` reads
-// its target as `item.set`, and the tree's set/session nodes expose
-// exactly that property, so the whole existing action surface accepts a
-// tree node unmodified.
+// Every OTHER row action needs nothing here at all. The registry's
+// actions read their target off the clicked node — `item.repository` or
+// `item.session` — and the tree's nodes expose exactly those
+// properties, so the whole existing action surface accepts a tree node
+// unmodified.
 
 import * as vscode from "vscode";
 import { planLeftClickActivation } from "../providers/rowMenuHelpers";
-import { SessionNode, SetNode } from "../providers/workExplorerTreeModel";
+import { RepositoryNode, SessionNode } from "../providers/workExplorerTreeModel";
 
-/** Narrow an untrusted command argument to a set-bearing tree node. */
-export function asSetNode(arg: unknown): SetNode | undefined {
+/** Narrow an untrusted command argument to a repository tree node. */
+export function asRepositoryNode(arg: unknown): RepositoryNode | undefined {
   if (arg === null || typeof arg !== "object") return undefined;
-  const node = arg as Partial<SetNode>;
-  return node.kind === "set" && node.set ? (node as SetNode) : undefined;
+  const node = arg as Partial<RepositoryNode>;
+  return node.kind === "repository" && node.repository
+    ? (node as RepositoryNode)
+    : undefined;
 }
 
 /**
- * Narrow an untrusted command argument to a session-bearing tree node
- * (Set 115 S2).
+ * Narrow an untrusted command argument to a session-bearing tree node.
  *
- * Requires BOTH `set` and `session`: a session node with no set cannot say
- * which `spec.md` it belongs to, and one with no session record cannot say
- * which section — either way the honest answer is to do nothing rather
- * than open an arbitrary file.
+ * Requires BOTH `repository` and `session`: a session node with no
+ * repository cannot say which plan it belongs to, and one with no
+ * session record cannot say which section — either way the honest answer
+ * is to do nothing rather than open an arbitrary file.
  */
 export function asSessionNode(arg: unknown): SessionNode | undefined {
   if (arg === null || typeof arg !== "object") return undefined;
   const node = arg as Partial<SessionNode>;
-  return node.kind === "session" && node.set && node.session
+  return node.kind === "session" && node.repository && node.session
     ? (node as SessionNode)
     : undefined;
 }
 
 /**
- * Left-click on a session-set row. Identical to the webview's
- * `handleActivateRow`: spec.md always opens; a non-terminal row also
- * writes the start-next-session prompt to the clipboard and toasts.
+ * Left-click on a repository row: the session plan always opens, and a
+ * repository with work left also writes the start-next-session prompt to
+ * the clipboard and toasts.
  */
-export async function activateSetRow(arg: unknown): Promise<void> {
-  const node = asSetNode(arg);
+export async function activateRepositoryRow(arg: unknown): Promise<void> {
+  const node = asRepositoryNode(arg);
   if (!node) return;
-  const plan = planLeftClickActivation(node.set.name, node.set.state);
+  const plan = planLeftClickActivation(node.repository);
   await vscode.commands.executeCommand(plan.openCommand.commandId, node);
   if (!plan.clipboardWrite) return;
   try {
@@ -71,26 +52,27 @@ export async function activateSetRow(arg: unknown): Promise<void> {
     vscode.window.showInformationMessage(plan.clipboardWrite.toast);
   } catch (err) {
     console.warn(
-      `[WorkExplorerTree] left-click clipboard write failed for "${node.set.name}"`,
+      `[WorkExplorerTree] left-click clipboard write failed for ` +
+        `"${node.repository.label}"`,
       err,
     );
   }
 }
 
 /**
- * Left-click on a SESSION row (Set 115 S2): open the set's `spec.md`
- * positioned at that session's own plan.
+ * Left-click on a SESSION row: open the repository's session plan
+ * positioned at that session's own block.
  *
- * It dispatches the same `dabblerSessionSets.openSpec` the set row's
- * activation already goes through — the session-level sibling of a
- * behaviour that exists, sharing its "does the file exist" answer and its
- * message wording rather than growing a parallel one. The node itself is
- * the argument, which is what tells `openSpec` a section is wanted; a set
- * node through the same command still opens at the top.
+ * It dispatches the same `dabblerSessionSets.openSpec` the repository
+ * row's activation goes through — the session-level sibling of a
+ * behaviour that exists, sharing its "does the file exist" answer and
+ * its message wording rather than growing a parallel one. The node
+ * itself is the argument, which is what tells `openSpec` a section is
+ * wanted; a repository node through the same command opens at the top.
  *
- * No clipboard half. The set row's L5 shortcut copies "start the NEXT
- * session", which is a set-level question; a per-session run prompt is
- * Session 3's job, through the context menu.
+ * No clipboard half. The repository row's shortcut copies "start the
+ * NEXT session", which is a repository-level question; the per-session
+ * run prompt is a context-menu action.
  */
 export async function activateSessionRow(arg: unknown): Promise<void> {
   const node = asSessionNode(arg);
@@ -103,8 +85,8 @@ export function registerWorkExplorerTreeCommands(
 ): void {
   context.subscriptions.push(
     vscode.commands.registerCommand(
-      "dabblerWorkExplorer.activateSet",
-      (arg: unknown) => activateSetRow(arg),
+      "dabblerWorkExplorer.activateRepository",
+      (arg: unknown) => activateRepositoryRow(arg),
     ),
     vscode.commands.registerCommand(
       "dabblerWorkExplorer.activateSession",

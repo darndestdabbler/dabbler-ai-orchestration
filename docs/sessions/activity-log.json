@@ -3068,6 +3068,259 @@
       "decider": "operator",
       "headline": "The baseline root cause becomes session 19 rather than staying owed in a decision entry",
       "body": "D98 recorded the root cause of the baseline problem and left it open at the\noperator's direction; D100 repeated that it was owed. Owed work that lives\nonly in a decision entry is work that gets found by whoever happens to read\nback far enough. It is now session 19, at the end of the plan.\n\n**Appended rather than inserted.** The set was re-cut once already this\nday, and `progress.heal_title` replaces a stored title only when it is\ngeneric \u2014 so every insertion leaves moved sessions wearing the titles of\nwhatever used to sit at their numbers. Sessions 17 and 18 are in that state\nnow because of the session 15 split. Adding at the end costs nothing;\ninserting would have doubled a defect that session 15 has not yet fixed.\n\n**The session is scoped to four parts, and the third is the one that\ndecides it.** Anchoring a snapshot under `refs/dabbler/rounds/s<N>/r<R>` is\nthe easy part. This repository configures no push refspec at all, and its\nonly fetch refspec is `+refs/heads/*:refs/remotes/origin/*`, so custom refs\nwould neither leave the machine that wrote them nor arrive on the one that\nneeds them. `bootstrap` has to write the refspec **and an existing clone\nhas to be migrated**, or the fix works only on machines cloned after it\nships. The acceptance test is therefore a two-checkout one \u2014 record in A,\npush, fetch in B, resolve the baseline in B without `verify reanchor` \u2014\nbecause a single-machine test cannot tell a working fix from a broken one\nhere.\n\n**One design was considered and rejected before it could look attractive\nlater.** Recording `worktree_clean` and recomputing the snapshot from\n`head_commit` would need no refs, no push and no migration. It only helps\nfor rounds taken against a clean tree, and rounds are dirty by\nconstruction: verification reviews the working tree *before* the commit.\nIt would almost never fire, and it would look like a cheap win to whoever\npicks this up without knowing that.\n\n**`verify reanchor` is not removed by this session.** It stops being\n*needed* on a configured machine; it stays for rounds recorded before the\nrefs existed, for clones predating the refspec, and for a rewritten\nhistory. `head_commit`, shipped in session 14, remains the fallback that\nplaces a baseline for those.\n\n**Deliberately last, and honestly labelled as such.** The recovery works\ntoday. What session 19 buys is avoiding its cost \u2014 a re-anchored baseline\nlands before the round, so the next round re-reviews the entire session,\nwhich can exceed the evidence cap. That is what nearly happened in session\n14, and it is the argument for doing this at all rather than an argument\nfor doing it first."
+    },
+    {
+      "sessionNumber": 15,
+      "stepNumber": 1,
+      "stepKey": "register-under-the-collapsed-machinery-from",
+      "dateTime": "2026-08-28T04:39:06.656815-04:00",
+      "description": "Register \u2014 under the collapsed machinery from session 14.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 15,
+      "stepNumber": 2,
+      "stepKey": "sessions-view-without-the-set-level",
+      "dateTime": "2026-08-28T04:39:06.656815-04:00",
+      "description": "Sessions view without the set level, preserving the existing row actions and the two-inline-actions rule.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 15,
+      "stepNumber": 3,
+      "stepKey": "keep-the-operator-s-status-icons",
+      "dateTime": "2026-08-28T04:39:06.656815-04:00",
+      "description": "**Keep the operator's status icons exactly as they are.** A session row renders `not-started.svg`, `in-progress.svg`, `done.svg` or `cancelled.svg` from `media/light/` and `media/dark/`, resolved by name through `SessionSetsModel.ICON_FILES` and passed to `TreeItem.iconPath` as a `{ light, dark }` pair. Removing the set level must not disturb that resolution.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 15,
+      "stepNumber": 4,
+      "stepKey": "do-not-simplify-these-to-a",
+      "dateTime": "2026-08-28T04:39:06.656815-04:00",
+      "description": "**Do not \"simplify\" these to a single `fill:currentColor` asset.** That refactor has been proposed twice by different models at high confidence and it is wrong: a `contributes.viewsContainers` icon and a `TreeItem.iconPath` are not rendered by the same mechanism, and the light/dark split exists because the as-authored glyphs carried hardcoded `#ffffff` that made `not-started` nearly invisible on a light theme. The evidence is in `media/status-icon-theming.md`, and a Playwright test reads the computed style in a real Extension Development Host rather than trusting documentation.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 15,
+      "stepNumber": 5,
+      "stepKey": "a-session-row-is-labelled-with",
+      "dateTime": "2026-08-28T04:39:06.656815-04:00",
+      "description": "**A session row is labelled with a three-digit zero-padded number** \u2014 `001`, `002`, ... `014` \u2014 because that is the shape staff read set numbers in and the operator asked for it back after the collapse. This is **presentation only**: the plan's `### Session N:` headings, `sessions.json`'s `number`, the `.dabbler/runs/s<N>/` ledger and every CLI `--session` argument keep the plain integer. One formatter owns the padding so the tree, the CLI's human output and any status line cannot disagree about how a session is named.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 15,
+      "stepNumber": 6,
+      "stepKey": "the-renumbering-that-created-this-session",
+      "dateTime": "2026-08-28T04:39:06.656815-04:00",
+      "description": "**The renumbering that created this session is itself a case to handle.** `sessions.json` holds a title per session and `progress.heal_title` replaces a stored title only when it is generic, so re-cutting a plan leaves the moved sessions carrying the titles of whatever used to sit at their numbers \u2014 sessions 16 and 17 are in that state right now. This session renders those titles, so it is the one that has to notice they can be stale. A not-started session with no history has no title worth preserving against the plan's.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 15,
+      "stepNumber": 7,
+      "stepKey": "affected-tests-as-preverify",
+      "dateTime": "2026-08-28T04:39:06.656815-04:00",
+      "description": "Affected tests as preverify.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 15,
+      "stepNumber": 8,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-28T04:39:06.656815-04:00",
+      "description": "Cross-provider verification.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 15,
+      "stepNumber": 9,
+      "stepKey": "full-test-suite-recorded-as-the",
+      "dateTime": "2026-08-28T04:39:06.656815-04:00",
+      "description": "Full test suite, recorded as the `final-full` run of record.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 15,
+      "stepNumber": 10,
+      "stepKey": "close-out",
+      "dateTime": "2026-08-28T04:39:06.656815-04:00",
+      "description": "Close-out.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 15,
+      "dateTime": "2026-08-28T04:41:21.383062-04:00",
+      "task": "Session 15 \u2014 the sessions view (plan D1, first half).\n\n1. Collapse the Work Explorer's set level. The tree becomes status\n   buckets over the repository's own numbered sessions; the module\n   grouping and every set-shaped row, descriptor, action and scan path\n   go with it. Deletion, not construction.\n2. Point the view's data layer at the repository-level projection that\n   session 14 shipped -- `python -m ai_router.progress --json` now emits\n   `{repository, sessions}` and takes no set handle. TypeScript renders;\n   Python decides, and nothing is re-derived from a state file in TS.\n3. Keep the operator's status icons exactly as they are: the same four\n   filenames, resolved by name through the shared icon map out of\n   media/light/ and media/dark/, passed to TreeItem.iconPath as a\n   {light, dark} pair. No `fill:currentColor` consolidation.\n4. Preserve the surviving row actions and the at-most-two-inline-actions\n   rule, asserted by the menu-registry test as it is today.\n5. Label a session row with a three-digit zero-padded number. One\n   formatter owns the padding, and the padding is presentation only:\n   the plan headings, sessions.json, the run ledger and every --session\n   argument keep the plain integer.\n6. Heal a stale stored title. A re-cut plan leaves moved not-started\n   sessions carrying the titles that used to sit at their numbers --\n   sessions 16 and 17 are in that state now. A not-started session with\n   no history has no title worth preserving against the plan's.\n\nOut of scope, and named so no round reopens them: the task level below\nthe session and the execution-record watcher (session 16), project\nsetup (session 18), and the unresolved-session view (session 19).\n\nNot releasable. This session publishes no package; it changes the\nextension's tree and the projection's title healing only.",
+      "releasable": false
+    },
+    {
+      "sessionNumber": 15,
+      "stepNumber": 1,
+      "stepKey": "register-under-the-collapsed-machinery-from",
+      "dateTime": "2026-08-28T04:50:58.316151-04:00",
+      "description": "Registered as claude-code/claude-opus-5[1m] and declared the task list not-releasable before any edit.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 15,
+      "stepNumber": 6,
+      "stepKey": "the-renumbering-that-created-this-session",
+      "dateTime": "2026-08-28T04:50:58.682192-04:00",
+      "description": "Title healing and ledger growth: a historyless session takes the plan's title, a session that ran keeps its own, and the ledger grows to the plan's session count. The 17-session ledger now carries the plan's 20, with sessions 16 and 17 healed.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 15,
+      "stepNumber": 2,
+      "stepKey": "sessions-view-without-the-set-level",
+      "dateTime": "2026-08-28T04:50:59.064638-04:00",
+      "description": "Sessions view without the set level, preserving the existing row actions and the two-inline-actions rule.",
+      "status": "in-progress"
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D104",
+      "ordinal": 104,
+      "sessionNumber": 15,
+      "decidedOn": "2026-08-28",
+      "recordedAt": "2026-08-28T05:04:53.125775-04:00",
+      "decider": "orchestrator",
+      "headline": "The status buckets go with the set level: sessions are a sequence, not a pile",
+      "body": "**The status buckets went with the set level, and that is a change the\nplan did not spell out.**\n\nThe tree was module -> status bucket -> set -> session -> step. Removing\nthe set level leaves the buckets with a new thing to group, and the\nhonest answer is that they should not group it.\n\nBuckets earned their place over SETS. Sets are unordered, numerous and\nconcurrent: several can be in flight, a dozen not started, and \"which\nwork is live\" is a question the row order cannot answer. Bucketing was\nhow that got answered.\n\nSessions are none of those things. They are a strictly sequential\nnumbered list with exactly one session in flight, a prefix of complete\nones behind it and a suffix of not-started ones ahead. Bucketing a\nsequence with that structure produces three contiguous ranges \u2014 the same\ninformation the ordered list already carries \u2014 at the cost of three extra\nrows and, decisively, the numeric order itself: \"In Progress\" first puts\nsession 015 above sessions 001 through 014.\n\nThat cost lands squarely on step 5 of this session's own plan. The\nthree-digit zero-padded label exists because \"the operator scans that\nprefix down the left edge\". A view that scrambles the sequence and then\npads the numbers so they can be scanned in order is arguing with itself.\n\nSo the tree is repository -> session -> step, and the session list is\nordered by number ascending \u2014 the order the ledger is written and the\norder the work runs. Status is carried where it already was: the\noperator's four authored glyphs, unchanged, plus \"in flight\" in the\nin-flight row's description and the fraction on the repository row.\n\nWhat this gives up: on a repository with hundreds of sessions, finding\nthe live one means reading down a long list. Buckets would not have\nfixed that either \u2014 \"Complete\" would hold all but a handful \u2014 and the\nrepository row names the in-flight number, so the answer is one row from\nthe top."
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D105",
+      "ordinal": 105,
+      "sessionNumber": 15,
+      "decidedOn": "2026-08-28",
+      "recordedAt": "2026-08-28T05:04:53.475222-04:00",
+      "decider": "orchestrator",
+      "headline": "The file-presence fallback is deleted, not ported: a projection that fails shows no sessions",
+      "body": "**The file-presence fallback is deleted rather than ported, so a\nrepository the router cannot be run in shows no sessions and says so.**\n\n`fileSystem.fallbackState` bucketed a set by which files existed \u2014\n`CANCELLED.md` then `change-log.md` then `activity-log.json` \u2014 when the\nprojection subprocess failed. Its own comment called it \"the ONE\ndeliberate duplication of a Python rule\".\n\nThree reasons it does not come forward:\n\n1. **The files it read are gone.** Session 14 deleted the cancel/restore\n   markers and moved cancellation onto the session record. The ladder has\n   nothing left to climb.\n2. **It answered a question that no longer exists.** A set had a status;\n   a repository does not. What the tree needs now is the LIST of sessions\n   and each one's status, and no arrangement of filenames yields that \u2014\n   the ledger has to be read and normalized, which is what `progress.py`\n   does.\n3. **Guessing is worse than silence here.** A degraded row that shows\n   plausible statuses is the failure mode the framework exists to end.\n\nSo a repository whose projection failed still renders \u2014 its work is not\nhidden \u2014 with no session children, a tooltip saying the router could not\nbe run, and one `TreeView.message` naming the install remedy. That is\n\"one implementation of any rule, in one language\" actually applied,\nrather than stated and excepted."
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D106",
+      "ordinal": 106,
+      "sessionNumber": 15,
+      "decidedOn": "2026-08-28",
+      "recordedAt": "2026-08-28T05:04:53.871603-04:00",
+      "decider": "orchestrator",
+      "headline": "A worktree is its own repository row, and the duplicate-name merge dies with the set name",
+      "body": "**A worktree is its own repository row, and the duplicate-name merge is\ndeleted with the thing it was merging.**\n\nThe scan used to find one set in a main checkout and again in each\nworktree, and merge them into a single row \u2014 the copies were of one set,\nso showing several was noise. That machinery (state ranking, identity\nkeys, the collision list, the fail-loud duplicate-name error) is gone.\n\nIt cannot survive the collapse, because what it deduplicated was a NAME\nand sessions have numbers instead. Session 15 in a main checkout and\nsession 15 in a worktree are not two copies of one record: each checkout\nhas its own `docs/sessions/sessions.json` at its own commit, and they can\nlegitimately disagree about how many sessions exist and which is in\nflight. Merging them by number would show one checkout's progress under\nthe other's name \u2014 the exact class of wrong the collision check existed\nto prevent, arrived at by the code that used to prevent it.\n\nSo each discovered root with a ledger is one row, identified by its path\n(which is what the row's `id` is), labelled by its folder name. Two rows\nfor two checkouts is the honest rendering, and the tooltip and the\ntroubleshooter both say so.\n\nWhat is kept from the old discovery: realpath-based dedup, so a symlink\nor a case-variant of the same directory is still one row."
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D107",
+      "ordinal": 107,
+      "sessionNumber": 15,
+      "decidedOn": "2026-08-28",
+      "recordedAt": "2026-08-28T05:04:54.204628-04:00",
+      "decider": "orchestrator",
+      "headline": "A historyless session takes the plan's title, and the ledger grows to the plan's count",
+      "body": "**A session with no history takes the plan's title; a session that ran\nkeeps its own. And the ledger grows to the plan's session count.**\n\nThe plan's step 6 named the case and this repository was in it: the\nledger held seventeen sessions, the plan had been re-cut to twenty, and\nsessions 16 and 17 carried the titles of whatever used to sit at their\nnumbers. `heal_title` only replaced a title it judged GENERIC \u2014 blank, or\nliterally `Session <n>` \u2014 so a real-looking stale title survived\nuntouched.\n\nThe rule that replaces it is about the record, not about the string. A\nsession that has run is a statement about something that happened, and\nits stored title is part of that statement; re-cutting a plan does not\nget to rewrite what a closed session was called. A session that is\n`not-started` and carries no `startedAt`, no `completedAt`, no verdict\nand no orchestrator has made no statement at all, so the plan \u2014 which is\nthe declaration of what that number is for \u2014 wins. `session_has_history`\nis that test, and a merely-stamped not-started session counts as history:\nthe record has already said something about it.\n\nThe same reasoning fixes the count. `register_session_start` took the\nledger's own length before it considered the plan, so a plan re-cut from\nseventeen sessions to twenty could never make sessions 18 through 20\nexist \u2014 they would have been unstartable, and nothing would have said so.\nThe ledger now takes the LARGER of what it holds and what the plan\ndeclares. It still never shrinks: dropping a session drops its record.\n\nHealing happens in two places on purpose, from one implementation.\n`build_projection` heals what it RENDERS, so the tree is correct the\nmoment the plan changes and before any registration \u2014 that is what makes\nthis the session that has to notice. `_build_sessions_array` heals what\nit WRITES, so the next `session start` persists the same correction. The\nrender mutates a fresh parse and never touches disk; the test asserts\nthat."
+    },
+    {
+      "sessionNumber": 15,
+      "stepNumber": 2,
+      "stepKey": "sessions-view-without-the-set-level",
+      "dateTime": "2026-08-28T05:05:07.254963-04:00",
+      "description": "The tree is repository -> session -> step. The module level, the status buckets, the set rows and their scan are deleted; the data layer reads the repository-level projection session 14 shipped.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 15,
+      "stepNumber": 3,
+      "stepKey": "keep-the-operator-s-status-icons",
+      "dateTime": "2026-08-28T05:05:07.595675-04:00",
+      "description": "ICON_FILES moved to providers/sessionsModel.ts unchanged: same four filenames, resolved by name out of media/light and media/dark, passed to TreeItem.iconPath as a {light, dark} pair.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 15,
+      "stepNumber": 4,
+      "stepKey": "do-not-simplify-these-to-a",
+      "dateTime": "2026-08-28T05:05:07.934992-04:00",
+      "description": "No fill:currentColor consolidation. The reasoning is restated at the icon map and at toIconPath, and the Playwright icon assertions read the computed backgroundImage in a real host.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 15,
+      "stepNumber": 5,
+      "stepKey": "a-session-row-is-labelled-with",
+      "dateTime": "2026-08-28T05:05:08.393222-04:00",
+      "description": "padSessionNumber owns the three-digit padding; sessionRowLabel is its only caller for row text and progressText for the in-flight annotation. No CLI argument, ledger field or plan heading takes a padded value.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 15,
+      "stepNumber": 7,
+      "stepKey": "affected-tests-as-preverify",
+      "dateTime": "2026-08-28T05:11:06.336915-04:00",
+      "description": "Affected selection ran 231 Python tests, all passed. The TypeScript half has no declared suite in router-config testing.suites, so it is recorded as detail rather than as evidence: tsc --noEmit clean, eslint clean, 133 unit tests, 13 Playwright tests green in a real Extension Development Host.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 15,
+      "stepNumber": 8,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-28T05:11:06.734730-04:00",
+      "description": "Cross-provider verification.",
+      "status": "in-progress"
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D108",
+      "ordinal": 108,
+      "sessionNumber": 15,
+      "decidedOn": "2026-08-28",
+      "recordedAt": "2026-08-28T05:21:38.810935-04:00",
+      "decider": "verifier",
+      "headline": "The session-number formatter belonged in Python, not the extension",
+      "body": "**Round 1, Major, and correct: the padding had one owner in the wrong\nlanguage. Python owns it now, and the extension renders what it sends.**\n\nStep 5 asks that \"one formatter owns the padding so the tree, the CLI's\nhuman output and any status line cannot disagree about how a session is\nnamed.\" The first implementation put `padSessionNumber` in the\nextension's `sessionsModel.ts` and left `ai_router.session` printing\n`session 15`, so the two surfaces an operator moves between all day said\ndifferent things \u2014 and nothing stopped them drifting further.\n\nA formatter in each language would satisfy the letter and lose the\npoint: two copies of a rule are two places for it to change. The ground\nrule already settles which side wins. **TypeScript renders; Python\ndecides**, and how a session is NAMED is a decision.\n\nSo: `progress.session_display_number` is the one owner. The CLI's\nhuman-facing lines call it \u2014 start, log, declare, decision, close,\ncancel, restore, and every refusal that names a session. The projection\ncarries its result as `displayNumber` beside the integer `number`, and\nthe tree renders that string rather than padding for itself.\n\nTwo things deliberately do NOT pad, because they are records rather than\noutput: the activity-log step description `Registered session 15 (...)`\nand the close's git commit message `Close session 15 of sessions`. So do\nthe plan's `### Session N of M:` headings, `sessions.json`'s `number`,\nthe `.dabbler/runs/s<N>/` ledger and every `--session` argument \u2014 the\npadded string is never parsed back into any of them, and the test\nasserts the ledger keeps the integer while the terminal says `001`.\n\nThe extension keeps one three-line function, `sessionDisplayNumber`, and\nit is a READ: `session.displayNumber || String(session.number)`. A\npayload from an older router that carries no name degrades to the plain\nnumber rather than growing a second copy of the padding rule that could\ndisagree with the first.",
+      "model": "gpt-5.6-sol",
+      "provider": "openai"
+    },
+    {
+      "sessionNumber": 15,
+      "stepNumber": 8,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-28T05:23:12.572498-04:00",
+      "description": "Round 1 (gpt-5.6-sol/openai) raised two Major findings. One was disputed with evidence and the verifier WITHDREW it: session-plan.md is the authoritative plan, project-work-plan.md is a fold of the activity log. The other was correct and fixed: the padding formatter moved into Python. Round 2 VERIFIED. Two Nits remain and the loop stops there.",
+      "status": "complete"
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D109",
+      "ordinal": 109,
+      "sessionNumber": 15,
+      "decidedOn": "2026-08-28",
+      "recordedAt": "2026-08-28T05:23:32.149681-04:00",
+      "decider": "orchestrator",
+      "headline": "Round 2's two Nits stand: the loop stops, and one of them is a repair worth refusing",
+      "body": "**Round 2 verified with two Nits, and the loop stops there. Neither is\nbeing fixed in this session, and here is why each one stands.**\n\nThe severity vocabulary exists so a session ends. Nit-only is the stop\ncondition, and editing code after a VERIFIED verdict would bind the run\nof record and the close to a tree no verifier reviewed.\n\n**Nit 1 \u2014 the `displayNumber` fallback renders `15`, not `015`, when an\nolder projection sends no name.** The verifier's alternative is to refuse\nan incompatible projection or add a compatibility mechanism. Both are\nworse than the fallback:\n\n- Refusing would blank the tree over a cosmetic difference. The view's\n  whole posture is that it renders what the router says and shows nothing\n  it cannot source \u2014 but a MISSING name is not a wrong one, and the\n  session number is right there in the payload.\n- A compatibility shim IS the second copy of the padding rule this fix\n  just removed. That is the defect, not the repair.\n\nThe fallback is honest about what it has: an unpadded number, from a\nrouter that does not name sessions yet. It is also unreachable in\npractice \u2014 the extension and the router ship from one repository \u2014 and\na session that upgrades one without the other has a worse problem than\na narrow label.\n\n**Nit 2 \u2014 `start`'s non-sequential refusal mixes forms**: it pads the\nrequested session and leaves `expected {expected}` and\n`completedSessions={completed}` plain. Real, and worth fixing, but it is\none refusal message on one branch and the fix belongs where it can be\nverified rather than appended to a verified tree. Filed here so a later\nsession picks it up: format `expected`, and decide whether\n`completedSessions=[1, 2]` \u2014 a LIST of numbers echoing state \u2014 is human\noutput that should pad or a debug echo that should not."
+    },
+    {
+      "sessionNumber": 15,
+      "stepNumber": 9,
+      "stepKey": "full-test-suite-recorded-as-the",
+      "dateTime": "2026-08-28T05:29:17.123947-04:00",
+      "description": "897 Python tests passed against the verified tree, recorded as the run of record. The extension half alongside: 133 unit tests and 13 Playwright tests in a real Extension Development Host, tsc and eslint clean.",
+      "status": "complete"
     }
   ]
 }

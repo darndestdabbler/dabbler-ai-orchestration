@@ -2,16 +2,13 @@ import * as assert from "assert";
 import * as path from "path";
 import * as vscode from "vscode";
 import {
-  deriveBlockedByPrereqs,
-  fallbackState,
-  listSessionSetDirNames,
-  parsePrerequisites,
-  parseSessionSetConfig,
-  readModulesManifest,
-  scanAllSessionSets,
+  hasSessionsRoot,
+  scanRepositories,
+  sessionsDirOf,
 } from "../../utils/fileSystem";
+import { readModuleSlugs } from "../../utils/moduleAuthoring";
 import { ProjectionCache } from "../../utils/projection";
-import { makeProjection, makeSet, makeTempDir, rmrf, writeFileTree } from "./helpers";
+import { makeProjection, makeTempDir, rmrf, writeFileTree } from "./helpers";
 
 interface StubWorkspace {
   workspaceFolders?: Array<{ uri: { fsPath: string } }>;
@@ -22,154 +19,25 @@ function setWorkspaceFolders(roots: string[]): void {
     roots.length > 0 ? roots.map((r) => ({ uri: { fsPath: r } })) : undefined;
 }
 
-const SPEC_WITH_CONFIG = `# Set\n\n## Session Set Configuration\n\n\`\`\`yaml\nmodule: greeter\nkind: plan\nprerequisites:\n  - slug: 001-base\n    condition: complete\n\`\`\`\n\n### Session 1 of 1: Only\n1. Do.\n`;
-
-suite("fileSystem: spec config parsing", () => {
-  let dir: string;
-  setup(() => (dir = makeTempDir("dabbler-fs-")));
-  teardown(() => rmrf(dir));
-
-  function specAt(content: string): string {
-    const p = path.join(dir, "spec.md");
-    writeFileTree(dir, { "spec.md": content });
-    return p;
-  }
-
-  test("module and kind parse from the configuration block", () => {
-    const config = parseSessionSetConfig(specAt(SPEC_WITH_CONFIG));
-    assert.strictEqual(config.module, "greeter");
-    assert.strictEqual(config.kind, "plan");
-  });
-
-  test("quoted scalars parse the same as bare ones", () => {
-    const config = parseSessionSetConfig(
-      specAt('## Session Set Configuration\n```yaml\nmodule: "core-api"\n```\n'),
-    );
-    assert.strictEqual(config.module, "core-api");
-  });
-
-  test("an absent spec reads as the implicit module", () => {
-    const config = parseSessionSetConfig(path.join(dir, "missing.md"));
-    assert.deepStrictEqual(config, { module: null });
-  });
-
-  test("prerequisites: absent is null, empty list is []", () => {
-    assert.strictEqual(
-      parsePrerequisites(specAt("## Session Set Configuration\n```yaml\nmodule: m\n```")),
-      null,
-    );
-    assert.deepStrictEqual(
-      parsePrerequisites(
-        specAt("## Session Set Configuration\n```yaml\nprerequisites: []\n```"),
-      ),
-      [],
-    );
-  });
-
-  test("prerequisite entries parse with default and explicit conditions", () => {
-    const list = parsePrerequisites(specAt(SPEC_WITH_CONFIG));
-    assert.deepStrictEqual(list, [{ slug: "001-base", condition: "complete" }]);
-    const defaulted = parsePrerequisites(
-      specAt(
-        "## Session Set Configuration\n```yaml\nprerequisites:\n  - slug: 002-x\n```",
-      ),
-    );
-    assert.deepStrictEqual(defaulted, [{ slug: "002-x", condition: "complete" }]);
-  });
-
-  test("a present-but-unknown condition drops the entry; a comment does not", () => {
-    const list = parsePrerequisites(
-      specAt(
-        "## Session Set Configuration\n```yaml\nprerequisites:\n" +
-          "  - slug: 003-a # trusted\n    condition: complete # done\n" +
-          "  - slug: 004-b\n    condition: started\n```",
-      ),
-    );
-    assert.deepStrictEqual(list, [{ slug: "003-a", condition: "complete" }]);
-  });
-});
-
-suite("fileSystem: modules manifest", () => {
+suite("fileSystem: module manifest slugs", () => {
   let dir: string;
   setup(() => (dir = makeTempDir("dabbler-man-")));
   teardown(() => rmrf(dir));
 
-  test("absent manifest reads null silently", () => {
-    assert.strictEqual(readModulesManifest(dir), null);
-  });
-
-  test("a bare modules: key is a valid empty manifest", () => {
-    writeFileTree(dir, { "docs/modules.yaml": "modules:\n" });
-    assert.deepStrictEqual(readModulesManifest(dir), []);
-  });
-
-  test("entries keep file order and default title to the slug", () => {
-    writeFileTree(dir, {
-      "docs/modules.yaml":
-        "modules:\n  - slug: beta\n  - slug: alpha\n    title: The Alpha\n",
-    });
-    const entries = readModulesManifest(dir)!;
-    assert.deepStrictEqual(
-      entries.map((e) => [e.slug, e.title]),
-      [["beta", "beta"], ["alpha", "The Alpha"]],
-    );
-  });
-
-  test("a duplicate slug keeps the first entry", () => {
-    writeFileTree(dir, {
-      "docs/modules.yaml":
-        "modules:\n  - slug: a\n    title: First\n  - slug: a\n    title: Second\n",
-    });
-    const entries = readModulesManifest(dir)!;
-    assert.strictEqual(entries.length, 1);
-    assert.strictEqual(entries[0].title, "First");
-  });
-
-  test("invalid YAML degrades to null (the implicit module)", () => {
+  test("an absent, invalid or listless manifest reads as no slugs", () => {
+    assert.deepStrictEqual(readModuleSlugs(dir), []);
     writeFileTree(dir, { "docs/modules.yaml": "modules: [unclosed" });
-    assert.strictEqual(readModulesManifest(dir), null);
+    assert.deepStrictEqual(readModuleSlugs(dir), []);
+    writeFileTree(dir, { "docs/modules.yaml": "something: else\n" });
+    assert.deepStrictEqual(readModuleSlugs(dir), []);
   });
-});
 
-suite("fileSystem: fallback state (projection unavailable)", () => {
-  let dir: string;
-  setup(() => (dir = makeTempDir("dabbler-fb-")));
-  teardown(() => rmrf(dir));
-
-  test("mirrors the Python spec-only presence ladder", () => {
-    assert.strictEqual(fallbackState(dir), "not-started");
-    writeFileTree(dir, { "activity-log.json": "[]" });
-    assert.strictEqual(fallbackState(dir), "in-progress");
-    writeFileTree(dir, { "change-log.md": "# log" });
-    assert.strictEqual(fallbackState(dir), "complete");
-    writeFileTree(dir, { "CANCELLED.md": "x" });
-    assert.strictEqual(fallbackState(dir), "cancelled");
-  });
-});
-
-suite("fileSystem: prerequisite blocking", () => {
-  test("an unknown slug still blocks (a typo must not unblock)", () => {
-    const blocked = makeSet({
-      name: "002-b",
-      prerequisites: [{ slug: "no-such-set", condition: "complete" }],
+  test("slugs keep file order and drop duplicates", () => {
+    writeFileTree(dir, {
+      "docs/modules.yaml":
+        "modules:\n  - slug: beta\n  - slug: alpha\n  - slug: beta\n",
     });
-    deriveBlockedByPrereqs([blocked]);
-    assert.strictEqual(blocked.blockedByPrereqs, true);
-    assert.strictEqual(blocked.unsatisfiedPrereqs[0].targetState, "unknown");
-  });
-
-  test("a complete target satisfies; anything else blocks with its state", () => {
-    const target = makeSet({ name: "001-a", state: "in-progress" });
-    const blocked = makeSet({
-      name: "002-b",
-      prerequisites: [{ slug: "001-a", condition: "complete" }],
-    });
-    deriveBlockedByPrereqs([target, blocked]);
-    assert.strictEqual(blocked.blockedByPrereqs, true);
-    assert.strictEqual(blocked.unsatisfiedPrereqs[0].targetState, "in-progress");
-    target.state = "complete";
-    deriveBlockedByPrereqs([target, blocked]);
-    assert.strictEqual(blocked.blockedByPrereqs, false);
+    assert.deepStrictEqual(readModuleSlugs(dir), ["beta", "alpha"]);
   });
 });
 
@@ -184,94 +52,64 @@ suite("fileSystem: workspace scan", () => {
   });
 
   function fakeCache(
-    bySlug: Record<string, ReturnType<typeof makeProjection> | null>,
+    byDir: Record<string, ReturnType<typeof makeProjection> | null>,
   ): ProjectionCache {
-    return new ProjectionCache(async (_py, setDir) => {
-      const slug = path.basename(setDir);
-      const payload = bySlug[slug];
+    return new ProjectionCache(async (_py, sessionsDir) => {
+      const payload = byDir[sessionsDir];
       return payload
         ? { payload, error: null }
         : { payload: null, error: "No module named ai_router.progress" };
     });
   }
 
-  test("underscore-prefixed set dirs are skipped by the listing", () => {
+  test("a repository row carries the projection's sessions and its own paths", async () => {
     writeFileTree(root, {
-      "docs/session-sets/001-a/spec.md": "# a",
-      "docs/session-sets/_drafts/spec.md": "# draft",
-    });
-    assert.deepStrictEqual(listSessionSetDirNames(root), ["001-a"]);
-  });
-
-  test("a scanned set carries projection state, config, and paths", async () => {
-    writeFileTree(root, {
-      "docs/session-sets/001-a/spec.md": SPEC_WITH_CONFIG,
-      "docs/session-sets/001-a/session-state.json": "{}",
-      "docs/modules.yaml": "modules:\n  - slug: greeter\n    title: Greeter\n",
+      "docs/sessions/sessions.json": "{}",
+      "docs/sessions/session-plan.md": "# plan",
     });
     setWorkspaceFolders([root]);
     const projection = makeProjection({
-      set: { slug: "001-a", status: "in-progress", iconKey: "in-progress" },
+      repository: { totalSessions: 2, sessionsCompleted: 1, currentSession: 2 },
     });
-    const scan = await scanAllSessionSets(fakeCache({ "001-a": projection }));
-    assert.strictEqual(scan.sets.length, 1);
-    const set = scan.sets[0];
-    assert.strictEqual(set.state, "in-progress");
-    assert.strictEqual(set.module, "greeter");
-    assert.strictEqual(set.moduleTitle, "Greeter");
-    assert.strictEqual(set.kind, "plan");
-    assert.strictEqual(set.sessions.length, 2);
-    assert.ok(set.specPath.endsWith("spec.md"));
-    assert.strictEqual(scan.projectionErrors.length, 0);
+    const scan = await scanRepositories(
+      fakeCache({ [sessionsDirOf(root)]: projection }),
+    );
+    assert.strictEqual(scan.repositories.length, 1);
+    const repository = scan.repositories[0];
+    assert.strictEqual(repository.currentSession, 2);
+    assert.strictEqual(repository.sessions.length, 2);
+    assert.strictEqual(repository.label, path.basename(root));
+    assert.ok(repository.planPath.endsWith("session-plan.md"));
+    assert.deepStrictEqual(scan.projectionErrors, []);
   });
 
-  test("a failed projection falls back to file presence and reports the error", async () => {
-    writeFileTree(root, {
-      "docs/session-sets/002-b/spec.md": "# b",
-      "docs/session-sets/002-b/change-log.md": "# done",
-    });
+  test("a failed projection reports the error and shows no sessions", async () => {
+    // There is no file-presence fallback: which sessions exist and what
+    // state they are in is Python's answer, and guessing it here would
+    // be a second implementation of the rule.
+    writeFileTree(root, { "docs/sessions/sessions.json": "{}" });
     setWorkspaceFolders([root]);
-    const scan = await scanAllSessionSets(fakeCache({}));
-    assert.strictEqual(scan.sets[0].state, "complete");
-    assert.strictEqual(scan.sets[0].sessions.length, 0);
+    const scan = await scanRepositories(fakeCache({}));
+    assert.strictEqual(scan.repositories.length, 1);
+    assert.deepStrictEqual(scan.repositories[0].sessions, []);
+    assert.strictEqual(scan.repositories[0].totalSessions, null);
     assert.strictEqual(scan.projectionErrors.length, 1);
     assert.ok(scan.projectionErrors[0].error.includes("ai_router"));
   });
 
-  test("a module stamp unknown to the manifest stays raw config, not validated attribution", async () => {
-    writeFileTree(root, {
-      "docs/session-sets/003-c/spec.md":
-        "## Session Set Configuration\n```yaml\nmodule: ghost\n```",
-    });
+  test("a folder with a plan but no ledger contributes no row", async () => {
+    // The ledger is the machine-written record. A plan alone is a
+    // repository the router has never run in.
+    writeFileTree(root, { "docs/sessions/session-plan.md": "# plan" });
     setWorkspaceFolders([root]);
-    const scan = await scanAllSessionSets(
-      fakeCache({ "003-c": makeProjection({ set: { slug: "003-c" } }) }),
-    );
-    assert.strictEqual(scan.sets[0].module, null);
-    assert.strictEqual(scan.sets[0].config.module, "ghost");
-  });
-
-  test("prerequisites are derived against the merged cross-root map", async () => {
-    writeFileTree(root, {
-      "docs/session-sets/001-a/spec.md": "# a",
-      "docs/session-sets/002-b/spec.md":
-        "## Session Set Configuration\n```yaml\nprerequisites:\n  - slug: 001-a\n```",
-    });
-    setWorkspaceFolders([root]);
-    const scan = await scanAllSessionSets(
-      fakeCache({
-        "001-a": makeProjection({ set: { slug: "001-a", status: "not-started", iconKey: "not-started" } }),
-        "002-b": makeProjection({ set: { slug: "002-b", status: "not-started", iconKey: "not-started" } }),
-      }),
-    );
-    const blocked = scan.sets.find((s) => s.name === "002-b")!;
-    assert.strictEqual(blocked.blockedByPrereqs, true);
+    assert.strictEqual(hasSessionsRoot(root), false);
+    const scan = await scanRepositories(fakeCache({}));
+    assert.deepStrictEqual(scan.repositories, []);
   });
 
   test("no workspace folders scans to an empty result", async () => {
     setWorkspaceFolders([]);
-    const scan = await scanAllSessionSets(fakeCache({}));
-    assert.deepStrictEqual(scan.sets, []);
-    assert.deepStrictEqual(scan.collisions, []);
+    const scan = await scanRepositories(fakeCache({}));
+    assert.deepStrictEqual(scan.repositories, []);
   });
 });

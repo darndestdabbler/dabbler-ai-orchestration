@@ -1,7 +1,5 @@
 // Launch a real VS Code Electron instance with the extension under
-// test, against a tmpdir workspace assembled from the vendored corpus
-// fixtures (tests/fixtures/corpus at the repo root — real v1-era sets,
-// already proven against the Python projection).
+// test, against a tmpdir workspace holding one sessions root.
 //
 // We deliberately do NOT route through @vscode/test-electron's
 // runTests() launcher; Playwright's `_electron.launch` connects via the
@@ -21,7 +19,6 @@ import { _electron, ElectronApplication, Page, expect } from "@playwright/test";
 
 const EXTENSION_ROOT = path.resolve(__dirname, "..", "..", "..");
 const REPO_ROOT = path.resolve(EXTENSION_ROOT, "..", "..");
-const CORPUS_DIR = path.join(REPO_ROOT, "tests", "fixtures", "corpus");
 
 // The launch environment allowlist and binary discovery live in
 // scripts/vscode-launch.js so no harness can drift from another.
@@ -62,116 +59,94 @@ export function makeTmpDir(prefix: string): string {
 
 // ---------------------------------------------------------------------------
 // Workspace fixtures
+//
+// A workspace is a repository with ONE sessions root, `docs/sessions/`,
+// holding the machine-written ledger, the plan the titles come from, and
+// the activity log the step rows are folded out of. The files are
+// written as artifacts and the extension still derives every status
+// through `python -m ai_router.progress`, so these scenarios exercise
+// the real Python data path end to end.
 // ---------------------------------------------------------------------------
 
-/** Corpus slugs the specs compose workspaces from. */
-export const CORPUS = {
-  completeV3: "004-cost-enforcement-and-capacity",
-  completeV4: "059-extension-activation-and-scaffold-fix",
-  inProgress: "113-narrated-video-walkthroughs",
-  cancelled: "040-codex-launch-adapter",
-} as const;
-
-/** Copy a vendored corpus set into the workspace under its own slug. */
-export function addCorpusSet(workspaceRoot: string, slug: string): string {
-  const src = path.join(CORPUS_DIR, slug);
-  if (!fs.existsSync(src)) {
-    throw new Error(`corpus fixture missing: ${src}`);
-  }
-  const dst = path.join(workspaceRoot, "docs", "session-sets", slug);
-  fs.cpSync(src, dst, { recursive: true });
-  return dst;
+export interface FixtureSession {
+  number: number;
+  title: string;
+  status: "not-started" | "in-progress" | "complete" | "cancelled";
+  verificationVerdict?: string;
 }
 
-/** A spec-only (not-started) set, optionally blocked by prerequisites. */
-export function addSpecOnlySet(
-  workspaceRoot: string,
-  slug: string,
-  opts: { prereqSlugs?: string[]; module?: string } = {},
-): string {
-  const dst = path.join(workspaceRoot, "docs", "session-sets", slug);
-  fs.mkdirSync(dst, { recursive: true });
-  const configLines = ["```yaml"];
-  if (opts.module) configLines.push(`module: ${opts.module}`);
-  if (opts.prereqSlugs && opts.prereqSlugs.length > 0) {
-    configLines.push("prerequisites:");
-    for (const p of opts.prereqSlugs) {
-      configLines.push(`  - slug: ${p}`, "    condition: complete");
-    }
-  }
-  configLines.push("```");
-  const spec = [
-    `# ${slug}`,
-    "",
-    "## Session Set Configuration",
-    "",
-    ...configLines,
-    "",
-    "### Session 1 of 1: Do the thing",
-    "1. First step.",
-    "2. Close out.",
-    "",
-  ].join("\n");
-  fs.writeFileSync(path.join(dst, "spec.md"), spec, "utf8");
-  return dst;
+function sessionsDir(workspaceRoot: string): string {
+  const dir = path.join(workspaceRoot, "docs", "sessions");
+  fs.mkdirSync(dir, { recursive: true });
+  return dir;
 }
 
 /**
- * A set whose session 1 is in flight with a three-step plan — the shape
- * the fifth tree level renders. Written as artifact files (v3-shape
- * state, normalized on read); the projection still derives everything.
+ * Write `docs/sessions/{sessions.json,session-plan.md}` for *sessions*.
+ * The plan carries one `### Session N of M:` heading per entry, which is
+ * both where a session row's title is healed from and where clicking a
+ * row lands.
  */
-export function addInFlightSet(workspaceRoot: string, slug: string): string {
-  const dst = path.join(workspaceRoot, "docs", "session-sets", slug);
-  fs.mkdirSync(dst, { recursive: true });
-  fs.writeFileSync(
-    path.join(dst, "spec.md"),
-    [
-      `# ${slug}`,
-      "",
-      "### Session 1 of 2: Build the thing",
+export function writeSessionsRoot(
+  workspaceRoot: string,
+  sessions: readonly FixtureSession[],
+): string {
+  const dir = sessionsDir(workspaceRoot);
+  const total = sessions.length;
+  const plan = [
+    "# Fixture repository",
+    "",
+    ...sessions.flatMap((s) => [
+      `### Session ${s.number} of ${total}: ${s.title}`,
       "1. Implement the feature.",
       "2. Run the tests.",
       "3. Close out.",
       "",
-      "### Session 2 of 2: Polish",
-      "1. Polish.",
-      "",
-    ].join("\n"),
-    "utf8",
-  );
+    ]),
+  ].join("\n");
+  fs.writeFileSync(path.join(dir, "session-plan.md"), plan, "utf8");
   fs.writeFileSync(
-    path.join(dst, "session-state.json"),
+    path.join(dir, "sessions.json"),
     JSON.stringify(
       {
-        schemaVersion: 3,
-        sessionSetName: slug,
-        currentSession: 1,
-        totalSessions: 2,
-        status: "in-progress",
-        lifecycleState: "work_in_progress",
-        startedAt: "2026-08-17T09:00:00-04:00",
-        completedAt: null,
-        verificationVerdict: null,
-        orchestrator: { engine: "human", provider: "anthropic" },
-        completedSessions: [],
-        sessions: [
-          { number: 1, title: "Build the thing", status: "in-progress" },
-          { number: 2, title: "Polish", status: "not-started" },
-        ],
+        schemaVersion: 5,
+        sessions: sessions.map((s) => ({
+          number: s.number,
+          title: s.title,
+          status: s.status,
+          startedAt: s.status === "not-started" ? null : "2026-08-17T09:00:00-04:00",
+          completedAt: s.status === "complete" ? "2026-08-17T11:00:00-04:00" : null,
+          orchestrator:
+            s.status === "not-started"
+              ? null
+              : { engine: "human", provider: "anthropic" },
+          verificationVerdict: s.verificationVerdict ?? null,
+        })),
       },
       null,
       2,
     ),
     "utf8",
   );
+  return dir;
+}
+
+/**
+ * Give the in-flight session a three-step activity log, which is the
+ * shape the third tree level renders.
+ */
+export function writeActivityLog(
+  workspaceRoot: string,
+  sessionNumber: number,
+): void {
+  const dir = sessionsDir(workspaceRoot);
   fs.writeFileSync(
-    path.join(dst, "activity-log.json"),
+    path.join(dir, "activity-log.json"),
     JSON.stringify(
       {
         entries: [
           {
-            sessionNumber: 1,
+            sessionNumber,
             stepNumber: 1,
             stepKey: "implement-the-feature",
             description: "Implement the feature.",
@@ -179,14 +154,14 @@ export function addInFlightSet(workspaceRoot: string, slug: string): string {
             dateTime: "2026-08-17T09:10:00-04:00",
           },
           {
-            sessionNumber: 1,
+            sessionNumber,
             stepNumber: 2,
             stepKey: "run-the-tests",
             description: "Run the tests.",
             status: "not-started",
           },
           {
-            sessionNumber: 1,
+            sessionNumber,
             stepNumber: 3,
             stepKey: "close-out",
             description: "Close out.",
@@ -199,13 +174,11 @@ export function addInFlightSet(workspaceRoot: string, slug: string): string {
     ),
     "utf8",
   );
-  return dst;
 }
 
-export function writeModulesManifest(workspaceRoot: string, yaml: string): void {
-  const docs = path.join(workspaceRoot, "docs");
-  fs.mkdirSync(docs, { recursive: true });
-  fs.writeFileSync(path.join(docs, "modules.yaml"), yaml, "utf8");
+/** The repository row's label: the workspace folder's own name. */
+export function repositoryLabel(workspaceRoot: string): string {
+  return path.basename(workspaceRoot);
 }
 
 export function cleanupTmpDir(tmpPath: string): void {
@@ -352,8 +325,13 @@ export async function openDabblerContainer(page: Page): Promise<void> {
 }
 
 /**
- * The native-tree pane, expanded, WITHOUT waiting for any row. Use for
- * emptiness or TreeView.message assertions.
+ * The Work Explorer's own pane, expanded, WITHOUT waiting for any row.
+ * Use for emptiness or TreeView.message assertions.
+ *
+ * Selected by the pane's OWN heading. The container holds two views and
+ * "the first pane with a list" silently resolves to the Solution
+ * Explorer whenever that one happens to render a list first — which
+ * makes a passing emptiness assertion mean nothing at all.
  */
 export async function workExplorerPane(
   page: Page,
@@ -362,7 +340,9 @@ export async function workExplorerPane(
   if (opts.reveal !== false) await openDabblerContainer(page);
   const pane = page
     .locator(".pane")
-    .filter({ has: page.locator(".monaco-list") })
+    .filter({
+      has: page.locator('.pane-header[aria-label="AI Work Explorer Section"]'),
+    })
     .first();
   await pane.waitFor({ state: "visible", timeout: 30_000 });
   const header = pane.locator(".pane-header");
@@ -420,7 +400,8 @@ export async function expectFileIcon(
 
 /**
  * Expand a row by clicking its twistie — not the row body, which
- * carries a command (opening spec.md) on set and session rows.
+ * carries a command (opening the session plan) on repository and
+ * session rows.
  */
 export async function expandTreeRow(
   pane: import("@playwright/test").Locator,
@@ -435,17 +416,16 @@ export async function expandTreeRow(
 }
 
 /**
- * Drill module -> bucket -> set and return the set's row. The tree is
- * lazy, so a set row does not exist in the DOM until both ancestors are
- * expanded.
+ * Expand the repository row and return one session's row. The tree is
+ * lazy, so a session row does not exist in the DOM until the repository
+ * above it is expanded.
  */
-export async function revealSetRow(
+export async function revealSessionRow(
   pane: import("@playwright/test").Locator,
-  opts: { module?: string; bucket: string; set: string },
+  opts: { repository: string; session: string | RegExp },
 ): Promise<import("@playwright/test").Locator> {
-  await expandTreeRow(pane, opts.module ?? "Default");
-  await expandTreeRow(pane, opts.bucket);
-  const row = treeRow(pane, opts.set);
+  await expandTreeRow(pane, opts.repository);
+  const row = treeRow(pane, opts.session);
   await row.waitFor({ state: "visible", timeout: 15_000 });
   return row;
 }

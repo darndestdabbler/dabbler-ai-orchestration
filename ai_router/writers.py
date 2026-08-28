@@ -46,6 +46,7 @@ from .progress import (
     extract_session_titles_from_plan,
     get_progress,
     heal_title,
+    session_has_history,
     read_raw_session_state,
 )
 from .verdict import validate_session_verdict
@@ -169,7 +170,10 @@ def _build_sessions_array(
     sessions = []
     for n in range(1, total + 1):
         prior = prior_by_number.get(n, {})
-        title = heal_title(prior.get("title"), n, spec_titles) or f"Session {n}"
+        title = heal_title(
+            prior.get("title"), n, spec_titles,
+            has_history=session_has_history(prior),
+        ) or f"Session {n}"
         prior_status = canonicalize_status(prior.get("status"))
         if n == in_progress_number:
             status = STATUS_IN_PROGRESS
@@ -249,13 +253,18 @@ def register_session_start(
     spec_titles = dict(
         extract_session_titles_from_plan(sessions_path / SESSION_PLAN_FILENAME)
     )
+    # The ledger never shrinks — dropping a session would drop its record —
+    # but it does grow to the plan. A plan re-cut from seventeen sessions to
+    # twenty is a declaration that three more exist; leaving the ledger at
+    # seventeen would make them unstartable and say so nowhere.
     total = total_sessions or 0
-    if not total and normalized:
-        total = len(normalized.get("sessions") or [])
-    if not total and spec_titles:
-        total = max(spec_titles)
     if not total:
-        total = max([session_number] + sorted(completed), default=1)
+        total = max(
+            len((normalized or {}).get("sessions") or []),
+            max(spec_titles) if spec_titles else 0,
+            session_number,
+            max(completed, default=0),
+        )
 
     prior_sessions = (normalized or {}).get("sessions")
     sessions = _build_sessions_array(

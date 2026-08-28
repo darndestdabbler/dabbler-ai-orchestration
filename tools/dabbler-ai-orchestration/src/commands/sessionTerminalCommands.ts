@@ -4,17 +4,14 @@
 // the operator to declare the engine (and optionally provider/model),
 // and close runs the gates — both are actions the operator should see
 // and confirm, not side effects of a tree click. The terminal opens at
-// the set's workspace root so the interpreter resolution matches every
-// other router invocation.
+// the repository root, so the interpreter resolution and the router's
+// own sessions-root derivation both match every other invocation.
 
 import * as vscode from "vscode";
-import { SessionSet } from "../types";
+import { SessionsRepository } from "../types";
 import { resolvePythonInterpreter } from "../utils/pythonInterpreter";
 import { quoteForDisplay } from "../utils/routerCli";
-
-interface SetItem extends vscode.TreeItem {
-  set: SessionSet;
-}
+import { asRepositoryNode } from "./workExplorerTreeCommands";
 
 const TERMINAL_NAME = "Dabbler Session";
 
@@ -24,32 +21,33 @@ function sessionTerminal(cwd: string): vscode.Terminal {
   return vscode.window.createTerminal({ name: TERMINAL_NAME, cwd });
 }
 
-export function startSessionCommandLine(pythonPath: string, setDir: string): string {
+/**
+ * Sessions are numbered directly in the repository the terminal opens
+ * in, so neither line names one: the router derives the sessions root
+ * from where it is standing.
+ */
+export function startSessionCommandLine(pythonPath: string): string {
   return [
     quoteForDisplay(pythonPath),
     "-m",
     "ai_router.session",
     "start",
-    "--session-set-dir",
-    quoteForDisplay(setDir),
     "--engine",
     "human",
   ].join(" ");
 }
 
-export function closeSessionCommandLine(pythonPath: string, setDir: string): string {
+export function closeSessionCommandLine(pythonPath: string): string {
   return [
     quoteForDisplay(pythonPath),
     "-m",
     "ai_router.session",
     "close",
-    "--session-set-dir",
-    quoteForDisplay(setDir),
   ].join(" ");
 }
 
-function sendToTerminal(set: SessionSet, commandLine: string): void {
-  const terminal = sessionTerminal(set.root);
+function sendToTerminal(repository: SessionsRepository, commandLine: string): void {
+  const terminal = sessionTerminal(repository.root);
   terminal.show();
   // execute=false: the command sits on the prompt for the operator to
   // adjust (engine, --dry-run, --force) and confirm with Enter.
@@ -62,18 +60,20 @@ export function registerSessionTerminalCommands(
   context.subscriptions.push(
     vscode.commands.registerCommand(
       "dabblerSessionSets.startSession",
-      (item: SetItem) => {
-        if (!item?.set) return;
-        const python = resolvePythonInterpreter(item.set.root);
-        sendToTerminal(item.set, startSessionCommandLine(python, item.set.dir));
+      (arg: unknown) => {
+        const node = asRepositoryNode(arg);
+        if (!node) return;
+        const python = resolvePythonInterpreter(node.repository.root);
+        sendToTerminal(node.repository, startSessionCommandLine(python));
       },
     ),
     vscode.commands.registerCommand(
       "dabblerSessionSets.closeSession",
-      (item: SetItem) => {
-        if (!item?.set) return;
-        const python = resolvePythonInterpreter(item.set.root);
-        sendToTerminal(item.set, closeSessionCommandLine(python, item.set.dir));
+      (arg: unknown) => {
+        const node = asRepositoryNode(arg);
+        if (!node) return;
+        const python = resolvePythonInterpreter(node.repository.root);
+        sendToTerminal(node.repository, closeSessionCommandLine(python));
       },
     ),
   );

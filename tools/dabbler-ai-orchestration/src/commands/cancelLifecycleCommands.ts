@@ -5,6 +5,8 @@ import {
   runRestoreSession,
 } from "../utils/sessionLifecycleCli";
 import { RunRouterCliDeps } from "../utils/routerCli";
+import { sessionRowLabel } from "../providers/sessionsModel";
+import { asSessionNode } from "./workExplorerTreeCommands";
 
 /** What a row must carry for these flows: where to spawn, and which
  * session. A repository has sessions, not sets of them. */
@@ -14,8 +16,20 @@ export interface CancellableSession {
   name: string;
 }
 
-interface SessionItem extends vscode.TreeItem {
-  session: CancellableSession;
+/**
+ * Read a session tree node into the shape the flows take. The node
+ * carries the repository (the spawn cwd) and the session record (the
+ * number and the name shown in the prompts); anything else is refused
+ * rather than guessed at.
+ */
+export function cancellableSessionOf(arg: unknown): CancellableSession | undefined {
+  const node = asSessionNode(arg);
+  if (!node) return undefined;
+  return {
+    root: node.repository.root,
+    number: node.session.number,
+    name: sessionRowLabel(node.session),
+  };
 }
 
 interface RegisterDeps {
@@ -142,16 +156,16 @@ export function registerCancelLifecycleCommands(
   context.subscriptions.push(
     vscode.commands.registerCommand(
       "dabblerSessionSets.cancel",
-      async (item: SessionItem) => {
-        const session = item?.session;
+      async (arg: unknown) => {
+        const session = cancellableSessionOf(arg);
         if (!session) return;
         if (await runCancelSessionFlow(session)) deps.refreshView();
       },
     ),
     vscode.commands.registerCommand(
       "dabblerSessionSets.restore",
-      async (item: SessionItem) => {
-        const session = item?.session;
+      async (arg: unknown) => {
+        const session = cancellableSessionOf(arg);
         if (!session) return;
         if (await runRestoreSessionFlow(session)) deps.refreshView();
       },

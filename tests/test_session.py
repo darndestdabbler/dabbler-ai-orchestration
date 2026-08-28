@@ -242,6 +242,39 @@ class TestWriters:
         assert state["sessions"][1]["verificationVerdict"] is None
         assert "verification" not in state["sessions"][1]
 
+    def test_register_grows_the_ledger_to_a_recut_plan(self, sessions_dir):
+        # A plan re-cut to more sessions is a declaration that they exist.
+        # A ledger that stayed at the old count would leave them
+        # unstartable and say so nowhere; it still never shrinks, because
+        # dropping a session drops its record.
+        register_session_start(sessions_dir, 1, engine="claude-code",
+                               provider="anthropic")
+        (sessions_dir / "session-plan.md").write_text(
+            SESSION_PLAN_MD
+            + "\n### Session 3 of 3: Third things\n1. Register.\n",
+            encoding="utf-8",
+        )
+        flip_state_to_closed(sessions_dir)
+        state = register_session_start(sessions_dir, 2, engine="claude-code",
+                                       provider="anthropic")
+        assert [s["number"] for s in state["sessions"]] == [1, 2, 3]
+        assert state["sessions"][2]["title"] == "Third things"
+
+    def test_register_rewrites_only_a_historyless_stale_title(
+        self, sessions_dir
+    ):
+        register_session_start(sessions_dir, 1, engine="claude-code",
+                               provider="anthropic")
+        (sessions_dir / "session-plan.md").write_text(
+            "### Session 1 of 2: Renamed after the fact\n1. Register.\n"
+            "### Session 2 of 2: The re-cut name\n1. Register.\n",
+            encoding="utf-8",
+        )
+        state = register_session_start(sessions_dir, 1, engine="claude-code",
+                                       provider="anthropic")
+        assert state["sessions"][0]["title"] == "First things"
+        assert state["sessions"][1]["title"] == "The re-cut name"
+
     def test_seed_plan_once(self, sessions_dir):
         register_session_start(sessions_dir, 1, engine="claude-code",
                                provider="anthropic")
@@ -326,6 +359,24 @@ class TestStartChecklistHandoff:
         regs = [e for e in self._log(sessions_dir)["entries"]
                 if e.get("stepKey") == "register" and "kind" not in e]
         assert len(regs) == 1
+
+
+    def test_cli_output_names_a_session_the_way_the_tree_does(
+        self, sessions_dir, capsys
+    ):
+        # One formatter owns the padding, so the terminal and the tree
+        # cannot disagree about how a session is named. The record keeps
+        # the integer: sessions.json and every --session argument.
+        assert start(sessions_dir, engine="claude-code",
+                     provider="anthropic") == EXIT_OK
+        assert "session 001 of" in capsys.readouterr().out
+        assert main(["log", "--sessions-dir", str(sessions_dir),
+                     "--step", "1", "--status", "complete"]) == EXIT_OK
+        assert "log: session 001 step 1" in capsys.readouterr().out
+        ledger = json.loads(
+            (sessions_dir / "sessions.json").read_text(encoding="utf-8")
+        )
+        assert ledger["sessions"][0]["number"] == 1
 
 
 class TestBoundaryTriad:
@@ -576,7 +627,7 @@ class TestCancellationSurvives:
         # to run, not one past the highest closed number.
         assert start(three, engine="claude-code",
                      provider="anthropic") == EXIT_OK
-        assert "session 3" in capsys.readouterr().out
+        assert "session 003" in capsys.readouterr().out
 
     def test_starting_a_cancelled_session_is_refused(self, three, capsys):
         capsys.readouterr()

@@ -348,15 +348,21 @@ invocation that resolves it.
 
 Install the extension VSIX
 (`code --install-extension dabbler-ai-orchestration-1.0.0.vsix`). The
-AI Work Explorer view lists every session under `docs/sessions/` with
-its sessions and, for the in-flight session, its step rows. The tree
-is a pure renderer of
+AI Work Explorer view shows one row per repository in the window that
+has a `docs/sessions/` ledger, its numbered sessions beneath it — `001`,
+`002`, ... in ledger order, each with its status glyph — and, under the
+in-flight session, its step rows. The tree is a pure renderer of
 
 ```
-python -m ai_router.progress --json <set-dir>
+python -m ai_router.progress --json
 ```
 
-so what the extension shows is exactly what the gates read. Tree
-actions cover opening the four artifacts, copying session prompts,
-starting/closing sessions in a terminal, new module scaffolding, and
-cancel/restore.
+so what the extension shows is exactly what the gates read. A
+repository whose projection cannot run shows no sessions and says so;
+it never guesses a status from which files exist.
+
+Row actions: the repository row opens the four sessions-root artifacts
+(plan, activity log, change log, ledger), copies the start-next-session
+prompt, and pre-types `session start` / `session close` into a
+terminal. A session row opens the plan at its own section, and carries
+cancel or restore — a cancellation is a decision about one session.

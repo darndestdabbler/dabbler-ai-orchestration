@@ -274,13 +274,13 @@
       "title": "Collapse session sets (plan A3)",
       "status": "complete",
       "startedAt": "2026-08-27T15:50:41.385334-04:00",
+      "completedAt": "2026-08-28T03:51:22.136292-04:00",
       "orchestrator": {
         "engine": "copilot",
         "provider": "anthropic",
         "model": "claude-opus-5",
         "identityProvenance": "asserted"
       },
-      "completedAt": "2026-08-28T03:51:22.136292-04:00",
       "verificationVerdict": "VERIFIED",
       "verification": {
         "rounds": 7,
@@ -292,15 +292,26 @@
     {
       "number": 15,
       "title": "The sessions view (plan D1)",
-      "status": "not-started",
-      "startedAt": null,
+      "status": "in-progress",
+      "startedAt": "2026-08-28T04:39:06.592320-04:00",
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "model": "claude-opus-5[1m]",
+        "identityProvenance": "direct"
+      },
       "completedAt": null,
-      "orchestrator": null,
-      "verificationVerdict": null
+      "verificationVerdict": "VERIFIED",
+      "verification": {
+        "rounds": 2,
+        "verifierModel": "gpt-5-6-sol",
+        "verifierProvider": "openai",
+        "transport": "api"
+      }
     },
     {
       "number": 16,
-      "title": "Project setup as two sessions (plan D2)",
+      "title": "The task level (plan D1, second half)",
       "status": "not-started",
       "startedAt": null,
       "completedAt": null,
@@ -309,7 +320,34 @@
     },
     {
       "number": 17,
+      "title": "The tracked project config (precondition for D2)",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    },
+    {
+      "number": 18,
+      "title": "Project setup as two sessions (plan D2)",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    },
+    {
+      "number": 19,
       "title": "The unresolved-session view (plan D3)",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    },
+    {
+      "number": 20,
+      "title": "A round baseline that survives the trip (root cause of D98)",
       "status": "not-started",
       "startedAt": null,
       "completedAt": null,

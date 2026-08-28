@@ -1,4 +1,4 @@
-# Project work plan — 148-the-session-framework
+# Project work plan — sessions
 
 **Written by `ai_router.writers` as a fold of `activity-log.json`.**
 Hand edits are overwritten by the next append. The record is the log;
@@ -50,7 +50,7 @@ it.
 | 12 | The full suite and its bounded fix loop (plan B3) | no | 2026-08-27 |
 | 13 | Packaging to the feed (plan C) | no | 2026-08-27 |
 | 14 | Collapse session sets (plan A3) | no | 2026-08-27 |
-| 15 | The sessions view (plan D1) | — | not declared |
+| 15 | The sessions view (plan D1) | no | 2026-08-28 |
 | 16 | Project setup as two sessions (plan D2) | — | not declared |
 | 17 | The unresolved-session view (plan D3) | — | not declared |
 
@@ -343,3 +343,39 @@ builds.
 
 **Not releasable.** This session publishes no package; it changes the shape of
 the record that packaging reads.
+
+### Session 15 — The sessions view (plan D1)
+
+**Releasable: no.**
+
+Session 15 — the sessions view (plan D1, first half).
+
+1. Collapse the Work Explorer's set level. The tree becomes status
+   buckets over the repository's own numbered sessions; the module
+   grouping and every set-shaped row, descriptor, action and scan path
+   go with it. Deletion, not construction.
+2. Point the view's data layer at the repository-level projection that
+   session 14 shipped -- `python -m ai_router.progress --json` now emits
+   `{repository, sessions}` and takes no set handle. TypeScript renders;
+   Python decides, and nothing is re-derived from a state file in TS.
+3. Keep the operator's status icons exactly as they are: the same four
+   filenames, resolved by name through the shared icon map out of
+   media/light/ and media/dark/, passed to TreeItem.iconPath as a
+   {light, dark} pair. No `fill:currentColor` consolidation.
+4. Preserve the surviving row actions and the at-most-two-inline-actions
+   rule, asserted by the menu-registry test as it is today.
+5. Label a session row with a three-digit zero-padded number. One
+   formatter owns the padding, and the padding is presentation only:
+   the plan headings, sessions.json, the run ledger and every --session
+   argument keep the plain integer.
+6. Heal a stale stored title. A re-cut plan leaves moved not-started
+   sessions carrying the titles that used to sit at their numbers --
+   sessions 16 and 17 are in that state now. A not-started session with
+   no history has no title worth preserving against the plan's.
+
+Out of scope, and named so no round reopens them: the task level below
+the session and the execution-record watcher (session 16), project
+setup (session 18), and the unresolved-session view (session 19).
+
+Not releasable. This session publishes no package; it changes the
+extension's tree and the projection's title healing only.

@@ -28,6 +28,7 @@ from typing import Optional
 
 from .evidence import (
     ACTIVITY_LOG_FILENAME,
+    SESSION_PLAN_FILENAME,
     STATE_FILENAME,
 )
 
@@ -59,6 +60,32 @@ class SessionStateInvariantError(ValueError):
     def __init__(self, rule: int, message: str):
         super().__init__(f"[v4 invariant rule {rule}] {message}")
         self.rule = rule
+
+
+# --- How a session number is WRITTEN ----------------------------------------
+
+SESSION_NUMBER_WIDTH = 3
+
+
+def session_display_number(number) -> str:
+    """``15`` -> ``"015"``: the three-digit, zero-padded shape staff read
+    session numbers in.
+
+    The ONE owner of that padding. The CLI's human output calls it, and
+    the projection carries its result to the extension, so a tree row, a
+    status line and a terminal message cannot disagree about how a
+    session is named. Presentation only: the plan's ``### Session N:``
+    headings, ``sessions.json``'s ``number``, the ``.dabbler/runs/s<N>/``
+    ledger and every ``--session`` argument keep the plain integer, and
+    nothing parses a padded string back into one.
+
+    A number wider than the pad is not truncated to fit it, and a value
+    that is not a positive integer is rendered as-is rather than
+    invented into one.
+    """
+    if type(number) is not int or number <= 0:
+        return str(number)
+    return str(number).zfill(SESSION_NUMBER_WIDTH)
 
 
 # --- Spec titles and title heal ---------------------------------------------
@@ -94,8 +121,42 @@ def is_generic_title(title, number: int) -> bool:
     return bool(m) and int(m.group("number")) == number
 
 
-def heal_title(stored_title, number: int, spec_titles: Optional[dict] = None):
-    if not is_generic_title(stored_title, number):
+# The metadata that makes a session record a statement about something
+# that happened, rather than a placeholder for something that has not.
+_HISTORY_KEYS = ("startedAt", "completedAt", "verificationVerdict",
+                 "orchestrator", "verification")
+
+
+def session_has_history(entry) -> bool:
+    """Whether the record says anything about this session having run.
+
+    A session is historyless when it is still ``not-started`` and carries
+    no start, no close, no verdict and no orchestrator. Anything else —
+    in flight, complete, cancelled, or merely stamped — is history.
+    """
+    if not isinstance(entry, dict):
+        return False
+    if canonicalize_status(entry.get("status")) not in (None, STATUS_NOT_STARTED):
+        return True
+    return any(entry.get(key) for key in _HISTORY_KEYS)
+
+
+def heal_title(
+    stored_title, number: int, spec_titles: Optional[dict] = None,
+    *, has_history: bool = True,
+):
+    """The title a session record should carry.
+
+    Two cases where the plan wins over what is stored. A **generic**
+    title (blank, or ``Session <n>``) carries no information, so any plan
+    title beats it. A **historyless** session — not started, never
+    stamped — has no claim of its own to protect: re-cutting a plan moves
+    sessions between numbers, and the title left behind at a number
+    describes whatever used to sit there. Once a session has run, its
+    stored title is what actually happened and the plan does not get to
+    rewrite it.
+    """
+    if not is_generic_title(stored_title, number) and has_history:
         return stored_title
     spec_title = (spec_titles or {}).get(number)
     if spec_title:
@@ -110,14 +171,16 @@ def needs_title_heal(sessions) -> bool:
         if not isinstance(entry, dict):
             continue
         number = entry.get("number")
-        if type(number) is int and number > 0 and is_generic_title(
-            entry.get("title"), number
-        ):
+        if type(number) is not int or number <= 0:
+            continue
+        if is_generic_title(entry.get("title"), number):
+            return True
+        if not session_has_history(entry):
             return True
     return False
 
 
-def heal_generic_titles(sessions, spec_titles: dict) -> int:
+def heal_stale_titles(sessions, spec_titles: dict) -> int:
     healed = 0
     for entry in sessions:
         if not isinstance(entry, dict):
@@ -125,7 +188,10 @@ def heal_generic_titles(sessions, spec_titles: dict) -> int:
         number = entry.get("number")
         if type(number) is not int or number <= 0:
             continue
-        replacement = heal_title(entry.get("title"), number, spec_titles)
+        replacement = heal_title(
+            entry.get("title"), number, spec_titles,
+            has_history=session_has_history(entry),
+        )
         if replacement is not None and replacement != entry.get("title"):
             entry["title"] = replacement
             healed += 1
@@ -216,7 +282,7 @@ def normalize_legacy_state(
             else dict(extract_session_titles_from_plan(spec_md_path))
         )
         if titles:
-            heal_generic_titles(sessions_v4, titles)
+            heal_stale_titles(sessions_v4, titles)
 
     top_status = canonicalize_status(state.get("status"))
 
@@ -650,6 +716,19 @@ def build_projection(sessions_dir) -> dict:
         except SessionStateInvariantError as exc:
             invariant_violation = str(exc)
 
+    # Render the plan's title for a session that has none of its own. The
+    # ledger is written at registration, so a plan re-cut between two
+    # registrations leaves the moved sessions carrying whatever used to sit
+    # at their numbers; the next `session start` writes the same correction
+    # this render is making. `view` is a fresh parse of the file on every
+    # call, so healing it here changes nothing on disk.
+    if needs_title_heal(view.get("sessions") or []):
+        titles = dict(
+            extract_session_titles_from_plan(sessions_path / SESSION_PLAN_FILENAME)
+        )
+        if titles:
+            heal_stale_titles(view["sessions"], titles)
+
     sessions_out = []
     for entry in view.get("sessions") or []:
         number = entry.get("number")
@@ -657,6 +736,10 @@ def build_projection(sessions_dir) -> dict:
         in_flight = session_status == STATUS_IN_PROGRESS
         session_out = {
             "number": number,
+            # The name, beside the number. The extension renders this
+            # rather than padding for itself, so the padding rule has one
+            # owner across both languages.
+            "displayNumber": session_display_number(number),
             "title": entry.get("title") or f"Session {number}",
             "status": session_status,
             "iconKey": (

@@ -71,7 +71,7 @@
       },
       {
         "command": "dabblerSessionSets.openSpec",
-        "title": "Open Spec",
+        "title": "Open Session Plan",
         "category": "Dabbler"
       },
       {
@@ -86,7 +86,7 @@
       },
       {
         "command": "dabblerSessionSets.openSessionState",
-        "title": "Open Session State",
+        "title": "Open Sessions Ledger",
         "category": "Dabbler"
       },
       {
@@ -101,7 +101,7 @@
       },
       {
         "command": "dabblerSessionSets.startSession",
-        "title": "Start Session (terminal)",
+        "title": "Start Next Session (terminal)",
         "category": "Dabbler"
       },
       {
@@ -117,12 +117,12 @@
       },
       {
         "command": "dabblerSessionSets.cancel",
-        "title": "Cancel Session Set",
+        "title": "Cancel Session",
         "category": "Dabbler"
       },
       {
         "command": "dabblerSessionSets.restore",
-        "title": "Restore Session Set",
+        "title": "Restore Session",
         "category": "Dabbler"
       },
       {
@@ -144,8 +144,8 @@
         "icon": "$(debug)"
       },
       {
-        "command": "dabblerWorkExplorer.activateSet",
-        "title": "Open Session Set",
+        "command": "dabblerWorkExplorer.activateRepository",
+        "title": "Open Session Plan",
         "category": "Dabbler"
       },
       {
@@ -157,7 +157,7 @@
     "menus": {
       "commandPalette": [
         {
-          "command": "dabblerWorkExplorer.activateSet",
+          "command": "dabblerWorkExplorer.activateRepository",
           "when": "false"
         },
         {
@@ -183,18 +183,13 @@
       ],
       "view/item/context": [
         {
-          "command": "dabbler.newModule",
-          "when": "view == dabblerWorkExplorerTree && viewItem =~ /;dabblerModule;/",
-          "group": "1_module@1"
-        },
-        {
           "submenu": "dabblerWorkExplorer.openFile",
-          "when": "view == dabblerWorkExplorerTree && viewItem =~ /;dabblerSet;/",
+          "when": "view == dabblerWorkExplorerTree && viewItem =~ /;dabblerRepository;/",
           "group": "1_open@1"
         },
         {
           "submenu": "dabblerWorkExplorer.copyPrompt",
-          "when": "view == dabblerWorkExplorerTree && viewItem =~ /;dabblerSet;/",
+          "when": "view == dabblerWorkExplorerTree && viewItem =~ /;dabblerRepository;/",
           "group": "1_open@2"
         },
         {

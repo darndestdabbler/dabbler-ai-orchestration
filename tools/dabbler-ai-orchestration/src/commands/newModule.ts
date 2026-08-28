@@ -3,10 +3,9 @@
 // surface so the flow is unit-testable under the vscode stub.
 
 import * as vscode from "vscode";
-import { validateNewModuleSlug } from "../utils/moduleAuthoring";
+import { readModuleSlugs, validateNewModuleSlug } from "../utils/moduleAuthoring";
 import { runCreateModule } from "../utils/moduleLifecycleCli";
 import { RouterCliResult, RunRouterCliDeps } from "../utils/routerCli";
-import { readModulesManifest } from "../utils/fileSystem";
 
 export interface NewModuleUi {
   showInputBox: typeof vscode.window.showInputBox;
@@ -46,13 +45,13 @@ export async function runNewModuleFlow(
   // Existing slugs for live validation; the CLI re-reads and re-validates
   // at write time (fail-loud), so a stale read here can only make the
   // input box friendlier, never corrupt the manifest.
-  const existingSlugs = (readModulesManifest(root) ?? []).map((e) => e.slug);
+  const existingSlugs = readModuleSlugs(root);
 
   const slug = await ui.showInputBox({
     title: "New module (1/2): slug",
     prompt:
-      "Machine identity for the module (kebab-case). Session sets declare " +
-      "module: <slug> and the Explorer groups them under it.",
+      "Machine identity for the module (kebab-case). A module bounds part " +
+      "of the repository's code: its roots, its spec sections, its assets.",
     placeHolder: "greeter",
     ignoreFocusOut: true,
     validateInput: (v) => validateNewModuleSlug(v, existingSlugs),
@@ -61,7 +60,7 @@ export async function runNewModuleFlow(
 
   const title = await ui.showInputBox({
     title: "New module (2/2): display title",
-    prompt: `Shown as the module's group header in the Work Explorer. Press Enter to use "${slug.trim()}".`,
+    prompt: `Human-readable name for the module. Press Enter to use "${slug.trim()}".`,
     placeHolder: slug.trim(),
     ignoreFocusOut: true,
   });
@@ -78,8 +77,7 @@ export async function runNewModuleFlow(
   }
 
   ui.showInformationMessage(
-    `Module "${slug.trim()}" added to docs/modules.yaml. Declare ` +
-      `module: ${slug.trim()} in a set's spec.md to group it here.`,
+    `Module "${slug.trim()}" added to docs/modules.yaml.`,
   );
   return true;
 }

@@ -12,6 +12,8 @@ from ai_router.progress import (
     is_generic_title,
     normalize_legacy_state,
     read_session_state,
+    session_display_number,
+    session_has_history,
     step_icon_key,
     step_state,
 )
@@ -98,6 +100,30 @@ class TestLegacyReader:
         assert out["completedAt"] is None  # mid-set: no set completion time
 
 
+class TestSessionDisplayNumber:
+    def test_three_digits_padded_and_never_truncated(self):
+        assert session_display_number(1) == "001"
+        assert session_display_number(15) == "015"
+        assert session_display_number(1234) == "1234"
+
+    def test_a_value_that_is_not_a_session_number_is_not_invented_into_one(self):
+        assert session_display_number(0) == "0"
+        assert session_display_number(None) == "None"
+
+    def test_the_projection_carries_the_written_name_beside_the_integer(
+        self, tmp_path
+    ):
+        # One owner for the padding: the extension renders this rather
+        # than re-deriving it, and sessions.json keeps the integer.
+        (tmp_path / "sessions.json").write_text(json.dumps({
+            "schemaVersion": 5,
+            "sessions": [{"number": 7, "title": "Seven", "status": "not-started"}],
+        }), encoding="utf-8")
+        session = build_projection(tmp_path)["sessions"][0]
+        assert session["number"] == 7
+        assert session["displayNumber"] == "007"
+
+
 class TestTitleHeal:
     def test_generic_is_own_number_only(self):
         assert is_generic_title("Session 3", 3)
@@ -122,6 +148,57 @@ class TestTitleHeal:
         )
         out = normalize_legacy_state(state, tmp_path / "spec.md")
         assert out["sessions"][0]["title"] == "The real name"
+
+    def test_a_session_that_ran_keeps_its_title_over_a_recut_plan(self):
+        # Re-cutting a plan moves sessions between numbers. What the plan
+        # now says at a number a session already ran under describes
+        # something else; what it says at a number nothing has reached is
+        # the only claim there is.
+        ran = {"number": 3, "title": "What actually happened",
+               "status": "complete"}
+        never_ran = {"number": 4, "title": "Whatever used to sit here",
+                     "status": "not-started"}
+        titles = {3: "Something else now", 4: "The plan's session 4"}
+        assert heal_title(ran["title"], 3, titles,
+                          has_history=session_has_history(ran)) == (
+            "What actually happened")
+        assert heal_title(never_ran["title"], 4, titles,
+                          has_history=session_has_history(never_ran)) == (
+            "The plan's session 4")
+
+    def test_a_stamped_not_started_session_counts_as_history(self):
+        # Registered and then reverted: not-started, but the record has
+        # already said something about it.
+        assert session_has_history(
+            {"number": 2, "status": "not-started",
+             "startedAt": "2026-08-28T04:00:00-04:00"})
+        assert not session_has_history({"number": 2, "status": "not-started"})
+
+    def test_projection_renders_a_moved_session_under_the_plan_title(
+        self, tmp_path
+    ):
+        (tmp_path / "session-plan.md").write_text(
+            "### Session 1 of 2: Ran already\n1. Register.\n"
+            "### Session 2 of 2: The re-cut name\n1. Register.\n",
+            encoding="utf-8",
+        )
+        (tmp_path / "sessions.json").write_text(json.dumps({
+            "schemaVersion": 5,
+            "sessions": [
+                {"number": 1, "title": "Ran under this name",
+                 "status": "complete"},
+                {"number": 2, "title": "The name that moved away",
+                 "status": "not-started"},
+            ],
+        }), encoding="utf-8")
+        projection = build_projection(tmp_path)
+        assert [s["title"] for s in projection["sessions"]] == [
+            "Ran under this name", "The re-cut name",
+        ]
+        # A render, never a write.
+        stored = json.loads(
+            (tmp_path / "sessions.json").read_text(encoding="utf-8"))
+        assert stored["sessions"][1]["title"] == "The name that moved away"
 
 
 class TestInvariants:

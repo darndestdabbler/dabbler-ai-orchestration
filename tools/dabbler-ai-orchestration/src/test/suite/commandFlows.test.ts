@@ -6,15 +6,22 @@ import {
   runRestoreSessionFlow,
 } from "../../commands/cancelLifecycleCommands";
 import { NewModuleUi, runNewModuleFlow } from "../../commands/newModule";
-import {
-  buildStartNextSessionPrompt,
-  planSessionRunPrompt,
-  sanitizeSlugForPrompt,
-} from "../../commands/copyPromptCommands";
+import { planSessionRunPrompt } from "../../commands/copyPromptCommands";
+import { cancellableSessionOf } from "../../commands/cancelLifecycleCommands";
+import { START_NEXT_SESSION_PROMPT } from "../../providers/rowMenuHelpers";
 import { sessionNumberOf, specSectionTargetFor } from "../../commands/openFile";
-import { asSessionNode, asSetNode } from "../../commands/workExplorerTreeCommands";
+import {
+  asRepositoryNode,
+  asSessionNode,
+} from "../../commands/workExplorerTreeCommands";
 import { RunRouterCliDeps } from "../../utils/routerCli";
-import { makeSession, makeSet, makeTempDir, rmrf, writeFileTree } from "./helpers";
+import {
+  makeRepository,
+  makeSession,
+  makeTempDir,
+  rmrf,
+  writeFileTree,
+} from "./helpers";
 import * as path from "path";
 
 /** A RunRouterCliDeps whose spawn immediately exits with the given code. */
@@ -137,7 +144,7 @@ suite("new module flow", () => {
     const { ui, infos } = moduleUi(["greeter", "Greeter"], "D:\\ws");
     const created = await runNewModuleFlow(ui, fakeCliDeps(0));
     assert.strictEqual(created, true);
-    assert.ok(infos[0].includes("module: greeter"));
+    assert.ok(infos[0].includes("greeter"));
   });
 
   test("no workspace folder is an error, not a crash", async () => {
@@ -163,53 +170,59 @@ suite("new module flow", () => {
 });
 
 suite("copy prompts", () => {
-  test("the start prompt is the framework's set-scoped trigger phrase", () => {
-    assert.strictEqual(
-      buildStartNextSessionPrompt(makeSet({ name: "007-x" })),
-      "Start the next session of `007-x`.",
-    );
-  });
-
-  test("backticks in slugs are sanitized", () => {
-    assert.strictEqual(sanitizeSlugForPrompt("a`b"), "a'b");
+  test("the start prompt is the framework's trigger phrase, naming no repository", () => {
+    assert.strictEqual(START_NEXT_SESSION_PROMPT, "Start the next session.");
   });
 
   test("planSessionRunPrompt re-checks the gate on dispatch", () => {
     const runnable = makeSession({ number: 1, status: "not-started" });
-    const set = makeSet({ state: "not-started", sessions: [runnable] });
-    assert.ok(planSessionRunPrompt(set, runnable));
     const stale = makeSession({ number: 2, status: "not-started" });
-    assert.strictEqual(planSessionRunPrompt(set, stale), null);
+    const repository = makeRepository({ sessions: [runnable, stale] });
+    assert.ok(planSessionRunPrompt(repository, runnable));
+    assert.strictEqual(planSessionRunPrompt(repository, stale), null);
   });
 });
 
 suite("tree command argument narrowing", () => {
-  test("asSetNode and asSessionNode fail closed on foreign arguments", () => {
-    assert.strictEqual(asSetNode({ kind: "module" }), undefined);
-    assert.strictEqual(asSetNode(null), undefined);
-    assert.ok(asSetNode({ kind: "set", set: makeSet() }));
-    assert.strictEqual(asSessionNode({ kind: "session", set: makeSet() }), undefined);
-    assert.ok(asSessionNode({ kind: "session", set: makeSet(), session: makeSession() }));
+  test("the two narrowings fail closed on foreign arguments", () => {
+    const repository = makeRepository();
+    assert.strictEqual(asRepositoryNode({ kind: "session" }), undefined);
+    assert.strictEqual(asRepositoryNode(null), undefined);
+    assert.ok(asRepositoryNode({ kind: "repository", repository }));
+    assert.strictEqual(asSessionNode({ kind: "session", repository }), undefined);
+    assert.ok(
+      asSessionNode({ kind: "session", repository, session: makeSession() }),
+    );
+  });
+
+  test("cancellableSessionOf reads the spawn root and number off the row", () => {
+    const repository = makeRepository({ root: "D:/ws" });
+    const session = makeSession({ number: 3, title: "Third things" });
+    const target = cancellableSessionOf({ kind: "session", repository, session });
+    assert.strictEqual(target?.root, "D:/ws");
+    assert.strictEqual(target?.number, 3);
+    assert.ok(target?.name.startsWith("003 "));
+    assert.strictEqual(cancellableSessionOf({ kind: "repository", repository }), undefined);
   });
 
   test("sessionNumberOf accepts only positive-integer session nodes", () => {
     assert.strictEqual(sessionNumberOf({ kind: "session", session: { number: 2 } }), 2);
     assert.strictEqual(sessionNumberOf({ kind: "session", session: { number: "2" } }), undefined);
-    assert.strictEqual(sessionNumberOf({ kind: "set" }), undefined);
+    assert.strictEqual(sessionNumberOf({ kind: "repository" }), undefined);
   });
 
-  test("specSectionTargetFor degrades to top-of-file on unreadable spec", () => {
-    assert.strictEqual(specSectionTargetFor("D:\\nope\\spec.md", 1), undefined);
+  test("specSectionTargetFor degrades to top-of-file on an unreadable plan", () => {
+    assert.strictEqual(specSectionTargetFor("D:\\nope\\session-plan.md", 1), undefined);
     assert.strictEqual(specSectionTargetFor(undefined, 1), undefined);
   });
 
   test("specSectionTargetFor finds the session block in a real file", () => {
-    const dir = makeTempDir("dabbler-spec-");
+    const dir = makeTempDir("dabbler-plan-");
     try {
       writeFileTree(dir, {
-        "spec.md": "# t\n### Session 1 of 1: Only\n1. Do.\n",
+        "session-plan.md": "# t\n### Session 1 of 1: Only\n1. Do.\n",
       });
-      const range = specSectionTargetFor(path.join(dir, "spec.md"), 1);
+      const range = specSectionTargetFor(path.join(dir, "session-plan.md"), 1);
       assert.strictEqual(range?.startLine, 1);
     } finally {
       rmrf(dir);

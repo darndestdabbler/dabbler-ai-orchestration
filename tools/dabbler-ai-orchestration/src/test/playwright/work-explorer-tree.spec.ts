@@ -1,16 +1,11 @@
-// The core rendering scenarios: one mixed workspace assembled from the
-// vendored corpus (a v3 complete set, a v4 complete set, a v4
-// in-progress set with steps, a cancelled set, a spec-only set, and a
-// spec-only set blocked by prerequisites), one VS Code launch, every
-// assertion against the tree the real Python projection produced.
+// The core rendering scenarios: one workspace whose sessions root holds
+// a complete session, an in-flight one with steps, a cancelled one and
+// two not-started ones, one VS Code launch, every assertion against the
+// tree the real Python projection produced.
 
 import { test, expect } from "@playwright/test";
 import {
-  CORPUS,
   LaunchedVSCode,
-  addCorpusSet,
-  addInFlightSet,
-  addSpecOnlySet,
   cleanupTmpDir,
   closeVSCode,
   expandTreeRow,
@@ -18,28 +13,33 @@ import {
   launchVSCode,
   makeTmpDir,
   openWorkExplorerTree,
-  revealSetRow,
+  repositoryLabel,
+  revealSessionRow,
   rowContextMenuText,
   treeRow,
+  treeRows,
+  writeActivityLog,
+  writeSessionsRoot,
 } from "./electronLaunch";
 
 test.describe.configure({ mode: "serial" });
 
 let workspace: string;
+let repository: string;
 let vscode: LaunchedVSCode;
 let pane: Awaited<ReturnType<typeof openWorkExplorerTree>>;
 
 test.beforeAll(async () => {
   workspace = makeTmpDir("dabbler-pw-tree");
-  addCorpusSet(workspace, CORPUS.completeV3);
-  addCorpusSet(workspace, CORPUS.completeV4);
-  addCorpusSet(workspace, CORPUS.inProgress);
-  addCorpusSet(workspace, CORPUS.cancelled);
-  addInFlightSet(workspace, "310-in-flight");
-  addSpecOnlySet(workspace, "200-fresh-work");
-  addSpecOnlySet(workspace, "201-blocked-work", {
-    prereqSlugs: [CORPUS.inProgress],
-  });
+  repository = repositoryLabel(workspace);
+  writeSessionsRoot(workspace, [
+    { number: 1, title: "Ship the thing", status: "complete", verificationVerdict: "VERIFIED" },
+    { number: 2, title: "Cancelled work", status: "cancelled" },
+    { number: 3, title: "Build the thing", status: "in-progress" },
+    { number: 4, title: "Polish", status: "not-started" },
+    { number: 5, title: "Close the set", status: "not-started" },
+  ]);
+  writeActivityLog(workspace, 3);
   vscode = await launchVSCode(workspace);
   pane = await openWorkExplorerTree(vscode.page);
 });
@@ -49,73 +49,65 @@ test.afterAll(async () => {
   if (workspace) cleanupTmpDir(workspace);
 });
 
-test("the default module renders with its set count", async () => {
-  const moduleRow = treeRow(pane, "Default");
-  await expect(moduleRow).toBeVisible();
-  await expect(moduleRow).toContainText("7 sets");
+test("the repository row renders with its progress fraction", async () => {
+  const row = treeRow(pane, repository);
+  await expect(row).toBeVisible();
+  await expect(row).toContainText("1/5");
+  await expect(row).toContainText("session 003 in flight");
 });
 
-test("a v3-on-disk set renders in Complete unmodified — the compat contract", async () => {
-  const row = await revealSetRow(pane, {
-    bucket: "Complete",
-    set: CORPUS.completeV3,
+test("sessions render as one ordered list, never bucketed by status", async () => {
+  await expandTreeRow(pane, repository);
+  await expect(treeRow(pane, "001 · Ship the thing")).toBeVisible();
+  await expect(treeRow(pane, "005 · Close the set")).toBeVisible();
+  for (const bucket of ["In Progress", "Not Started", "Complete"]) {
+    await expect(treeRows(pane).filter({ hasText: new RegExp(`^${bucket}$`) })).toHaveCount(0);
+  }
+});
+
+test("each session row carries the operator's authored status glyph", async () => {
+  const complete = await revealSessionRow(pane, {
+    repository,
+    session: "001 · Ship the thing",
   });
-  await expect(row).toBeVisible();
-  await expectFileIcon(row, "done.svg");
+  await expectFileIcon(complete, "done.svg");
+  await expectFileIcon(treeRow(pane, "002 · Cancelled work"), "cancelled.svg");
+  await expectFileIcon(treeRow(pane, "003 · Build the thing"), "in-progress.svg");
+  await expectFileIcon(treeRow(pane, "004 · Polish"), "not-started.svg");
 });
 
-test("a v4 complete set renders beside it", async () => {
-  const row = treeRow(pane, CORPUS.completeV4);
-  await expect(row).toBeVisible();
-});
-
-test("the in-progress set renders under In Progress with its glyph", async () => {
-  await expandTreeRow(pane, "In Progress");
-  const row = treeRow(pane, CORPUS.inProgress);
-  await expect(row).toBeVisible();
-  await expectFileIcon(row, "in-progress.svg");
-});
-
-test("spec-only sets land in Not Started, blocked ones included", async () => {
-  await expandTreeRow(pane, "Not Started");
-  await expect(treeRow(pane, "200-fresh-work")).toBeVisible();
-  await expect(treeRow(pane, "201-blocked-work")).toBeVisible();
-});
-
-test("the cancelled set renders under the Cancelled bucket", async () => {
-  await expandTreeRow(pane, "Cancelled");
-  const row = treeRow(pane, CORPUS.cancelled);
-  await expect(row).toBeVisible();
-  await expectFileIcon(row, "cancelled.svg");
-});
-
-test("expanding the in-flight set reveals its session rows, the running one marked", async () => {
-  await expandTreeRow(pane, "310-in-flight");
-  const inFlight = treeRow(pane, "Build the thing");
-  await expect(inFlight).toBeVisible();
-  await expect(inFlight).toContainText("in flight");
-  await expect(treeRow(pane, "Polish")).toBeVisible();
+test("only the in-flight session says so in its description", async () => {
+  await expect(treeRow(pane, "003 · Build the thing")).toContainText("in flight");
 });
 
 test("expanding the in-flight session reveals its projected step rows", async () => {
-  await expandTreeRow(pane, "Build the thing");
+  await expandTreeRow(pane, "003 · Build the thing");
   await expect(treeRow(pane, "Implement the feature")).toBeVisible();
   await expect(treeRow(pane, "Run the tests")).toBeVisible();
   await expect(treeRow(pane, "Close out")).toBeVisible();
   await expectFileIcon(treeRow(pane, "Implement the feature"), "done.svg");
 });
 
-test("a set row's context menu offers the kept surface and nothing migratory", async () => {
-  const row = treeRow(pane, CORPUS.completeV4);
-  const menu = await rowContextMenuText(vscode.page, row);
+test("the repository row's menu offers the files and the lifecycle launchers", async () => {
+  const menu = await rowContextMenuText(vscode.page, treeRow(pane, repository));
   expect(menu).toContain("Open File");
-  expect(menu).toContain("Cancel Session Set");
-  expect(menu).not.toContain("Migrate");
-  expect(menu).not.toContain("Open PR");
+  expect(menu).toContain("Close Session (terminal)");
+  expect(menu).not.toContain("Cancel Session");
 });
 
-test("clicking a session row opens spec.md in the editor", async () => {
-  await treeRow(pane, "Build the thing").click();
-  const tab = vscode.page.locator(".tabs-container .tab").filter({ hasText: "spec.md" });
+test("cancellation is offered on the session row, where the decision lives", async () => {
+  const menu = await rowContextMenuText(
+    vscode.page,
+    treeRow(pane, "004 · Polish"),
+  );
+  expect(menu).toContain("Cancel Session");
+  expect(menu).not.toContain("Restore Session");
+});
+
+test("clicking a session row opens the session plan in the editor", async () => {
+  await treeRow(pane, "003 · Build the thing").click();
+  const tab = vscode.page
+    .locator(".tabs-container .tab")
+    .filter({ hasText: "session-plan.md" });
   await expect(tab.first()).toBeVisible({ timeout: 15_000 });
 });

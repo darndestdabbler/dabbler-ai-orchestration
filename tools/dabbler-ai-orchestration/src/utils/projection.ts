@@ -1,32 +1,30 @@
-// The one seam between the tree and the Python data layer: every set's
-// display state comes from `python -m ai_router.progress --json <dir>`.
-// The extension never re-derives session state from the artifact files —
-// TypeScript renders, Python decides.
+// The one seam between the tree and the Python data layer: every
+// repository's display state comes from `python -m ai_router.progress
+// --json`. The extension never re-derives session state from the ledger
+// — TypeScript renders, Python decides.
 //
-// Projections are cached per set directory, keyed on the mtimes of the
+// Projections are cached per sessions root, keyed on the mtimes of the
 // files the derivation reads, so a watcher tick or the 30-second poll
-// re-runs Python only for sets that actually changed.
+// re-runs Python only for repositories that actually changed.
 
 import * as cp from "child_process";
 import * as fs from "fs";
 import * as path from "path";
-import { ProjectionPayload, SessionRecord, SessionState, StepRecord } from "../types";
+import { ProjectionPayload, SessionRecord, SessionStatus, StepRecord } from "../types";
 
 /** The files whose mtimes invalidate a cached projection. */
 const CACHE_INPUTS = [
-  "session-state.json",
+  "sessions.json",
   "activity-log.json",
-  "spec.md",
+  "session-plan.md",
   "change-log.md",
-  "CANCELLED.md",
-  "RESTORED.md",
 ];
 
 export function projectionCacheKey(
-  setDir: string,
+  sessionsDir: string,
   statFile: (p: string) => number | null = mtimeOrNull,
 ): string {
-  return CACHE_INPUTS.map((f) => String(statFile(path.join(setDir, f)))).join("|");
+  return CACHE_INPUTS.map((f) => String(statFile(path.join(sessionsDir, f)))).join("|");
 }
 
 function mtimeOrNull(p: string): number | null {
@@ -43,22 +41,29 @@ export interface ProjectionResult {
   error: string | null;
 }
 
-export type ProjectSetFn = (
+export type ProjectRepositoryFn = (
   pythonPath: string,
-  setDir: string,
+  sessionsDir: string,
   cwd: string,
 ) => Promise<ProjectionResult>;
 
-/** Spawn the projection CLI for one set. */
-export function projectSet(
+/**
+ * Spawn the projection CLI for one repository.
+ *
+ * `--sessions-dir` is passed even though the router derives it from the
+ * working directory: the extension is a caller standing outside the
+ * tree, and naming the root it scanned keeps the projection bound to
+ * that root rather than to whatever cwd resolution finds.
+ */
+export function projectRepository(
   pythonPath: string,
-  setDir: string,
+  sessionsDir: string,
   cwd: string,
 ): Promise<ProjectionResult> {
   return new Promise((resolve) => {
     cp.execFile(
       pythonPath,
-      ["-m", "ai_router.progress", "--json", setDir],
+      ["-m", "ai_router.progress", "--json", "--sessions-dir", sessionsDir],
       { cwd, windowsHide: true, timeout: 30000, maxBuffer: 8 * 1024 * 1024 },
       (err, stdout, stderr) => {
         if (err) {
@@ -79,7 +84,7 @@ export function projectSet(
   });
 }
 
-const SET_STATES: ReadonlySet<string> = new Set([
+const STATUSES: ReadonlySet<string> = new Set([
   "complete",
   "in-progress",
   "not-started",
@@ -100,39 +105,30 @@ export function parseProjectionPayload(text: string): ProjectionPayload | null {
   }
   if (raw === null || typeof raw !== "object") return null;
   const obj = raw as Record<string, unknown>;
-  const set = obj.set;
-  if (set === null || typeof set !== "object") return null;
-  const s = set as Record<string, unknown>;
-  if (typeof s.slug !== "string" || !SET_STATES.has(String(s.status))) return null;
-  const sessions = Array.isArray(obj.sessions)
-    ? obj.sessions.map(narrowSession).filter((x): x is SessionRecord => x !== null)
-    : [];
+  const repository = obj.repository;
+  if (repository === null || typeof repository !== "object") return null;
+  const r = repository as Record<string, unknown>;
+  if (!Array.isArray(obj.sessions)) return null;
+  const sessions = obj.sessions
+    .map(narrowSession)
+    .filter((x): x is SessionRecord => x !== null);
   return {
     schemaVersion: Number(obj.schemaVersion) || 0,
     generatedAt: typeof obj.generatedAt === "string" ? obj.generatedAt : "",
-    set: {
-      slug: s.slug,
-      status: s.status as SessionState,
-      iconKey: SET_STATES.has(String(s.iconKey))
-        ? (s.iconKey as SessionState)
-        : (s.status as SessionState),
+    repository: {
       schemaVersionOnDisk:
-        typeof s.schemaVersionOnDisk === "number" ? s.schemaVersionOnDisk : null,
-      totalSessions: typeof s.totalSessions === "number" ? s.totalSessions : null,
+        typeof r.schemaVersionOnDisk === "number" ? r.schemaVersionOnDisk : null,
+      totalSessions: typeof r.totalSessions === "number" ? r.totalSessions : null,
       sessionsCompleted:
-        typeof s.sessionsCompleted === "number" ? s.sessionsCompleted : 0,
-      currentSession: typeof s.currentSession === "number" ? s.currentSession : null,
-      verificationVerdict:
-        typeof s.verificationVerdict === "string" ? s.verificationVerdict : null,
-      forceClosed: s.forceClosed === true,
-      preCancelStatus:
-        typeof s.preCancelStatus === "string" ? s.preCancelStatus : null,
+        typeof r.sessionsCompleted === "number" ? r.sessionsCompleted : 0,
+      currentSession: typeof r.currentSession === "number" ? r.currentSession : null,
+      forceClosed: r.forceClosed === true,
       orchestrator:
-        s.orchestrator !== null && typeof s.orchestrator === "object"
-          ? (s.orchestrator as ProjectionPayload["set"]["orchestrator"])
+        r.orchestrator !== null && typeof r.orchestrator === "object"
+          ? (r.orchestrator as ProjectionPayload["repository"]["orchestrator"])
           : null,
       invariantViolation:
-        typeof s.invariantViolation === "string" ? s.invariantViolation : null,
+        typeof r.invariantViolation === "string" ? r.invariantViolation : null,
     },
     sessions,
   };
@@ -146,16 +142,17 @@ function narrowSession(raw: unknown): SessionRecord | null {
     return null;
   }
   const status = String(o.status);
-  if (!SET_STATES.has(status)) return null;
+  if (!STATUSES.has(status)) return null;
   const steps = Array.isArray(o.steps)
     ? o.steps.map(narrowStep).filter((x): x is StepRecord => x !== null)
     : [];
   return {
     number,
+    displayNumber: typeof o.displayNumber === "string" ? o.displayNumber : "",
     title: typeof o.title === "string" && o.title ? o.title : `Session ${number}`,
-    status: status as SessionRecord["status"],
-    iconKey: SET_STATES.has(String(o.iconKey))
-      ? (o.iconKey as SessionRecord["iconKey"])
+    status: status as SessionStatus,
+    iconKey: STATUSES.has(String(o.iconKey))
+      ? (o.iconKey as SessionStatus)
       : "not-started",
     inFlight: o.inFlight === true,
     startedAt: typeof o.startedAt === "string" ? o.startedAt : null,
@@ -177,8 +174,8 @@ function narrowStep(raw: unknown): StepRecord | null {
     status: typeof o.status === "string" ? o.status : null,
     state: typeof o.state === "string" ? o.state : "",
     box: typeof o.box === "string" ? o.box : "[ ]",
-    iconKey: SET_STATES.has(String(o.iconKey))
-      ? (o.iconKey as StepRecord["iconKey"])
+    iconKey: STATUSES.has(String(o.iconKey))
+      ? (o.iconKey as SessionStatus)
       : "not-started",
     isPlanned: o.isPlanned === true,
     isActive: o.isActive === true,
@@ -193,57 +190,31 @@ interface CacheEntry {
 
 /**
  * Mtime-keyed projection cache. `get` re-projects only when one of the
- * set's derivation inputs changed since the cached run.
+ * repository's derivation inputs changed since the cached run.
  */
 export class ProjectionCache {
   private readonly entries = new Map<string, CacheEntry>();
 
-  constructor(private readonly runner: ProjectSetFn = projectSet) {}
+  constructor(private readonly runner: ProjectRepositoryFn = projectRepository) {}
 
   async get(
     pythonPath: string,
-    setDir: string,
+    sessionsDir: string,
     cwd: string,
   ): Promise<ProjectionResult> {
-    const key = projectionCacheKey(setDir);
-    const cached = this.entries.get(setDir);
+    const key = projectionCacheKey(sessionsDir);
+    const cached = this.entries.get(sessionsDir);
     if (cached && cached.key === key) return cached.result;
-    const result = await this.runner(pythonPath, setDir, cwd);
+    const result = await this.runner(pythonPath, sessionsDir, cwd);
     // A failed projection is cached too — retrying an uninstallable
-    // python on every 30s poll would spawn a failing process per set
-    // forever. The mtime key still re-arms it when the set changes,
-    // and an explicit refresh clears the cache outright.
-    this.entries.set(setDir, { key, result });
+    // python on every 30s poll would spawn a failing process forever.
+    // The mtime key still re-arms it when the ledger changes, and an
+    // explicit refresh clears the cache outright.
+    this.entries.set(sessionsDir, { key, result });
     return result;
   }
 
   clear(): void {
     this.entries.clear();
   }
-}
-
-/**
- * Run projections for many sets with bounded concurrency: interpreter
- * startup is the dominant cost, and an unbounded fan-out over a large
- * corpus would spawn one python per set at once.
- */
-export async function projectAll(
-  cache: ProjectionCache,
-  pythonPath: string,
-  setDirs: readonly string[],
-  cwd: string,
-  concurrency = 6,
-): Promise<Map<string, ProjectionResult>> {
-  const out = new Map<string, ProjectionResult>();
-  let next = 0;
-  const worker = async (): Promise<void> => {
-    while (next < setDirs.length) {
-      const dir = setDirs[next++];
-      out.set(dir, await cache.get(pythonPath, dir, cwd));
-    }
-  };
-  await Promise.all(
-    Array.from({ length: Math.min(concurrency, setDirs.length) }, worker),
-  );
-  return out;
 }

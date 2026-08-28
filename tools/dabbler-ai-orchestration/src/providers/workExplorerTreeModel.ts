@@ -1,88 +1,63 @@
 // The Work Explorer's native-tree view model.
 //
 // PURE. No vscode import: everything here is a plain data transform from
-// the projection-backed SessionSet scan onto row DESCRIPTORS, which
+// the projection-backed repository scan onto row DESCRIPTORS, which
 // WorkExplorerTreeProvider converts into real TreeItems. Status facts
-// (buckets, glyph keys, active step) are the projection's — this module
+// (glyph keys, the active step) are the projection's — this module
 // arranges them and never re-derives them.
 //
 // Three load-bearing display constraints:
-//   1. Set rows carry NO description — every real set name truncates at
-//      working panel width, so a description-borne fraction would be
-//      invisible exactly when it mattered. Progress reads from the
-//      session rows and the tooltip.
-//   2. Row icons consistently communicate lifecycle status; marker
-//      severity (blocked, unclean verdict, duplicate name) lives in the
-//      tooltip and contextValue.
+//   1. Sessions render as ONE ordered list, never bucketed by status.
+//      They are a numbered sequence, and the zero-padded number down the
+//      left edge is how the operator reads it; grouping by status would
+//      put session 015 above session 001 and destroy exactly that.
+//   2. Row icons consistently communicate lifecycle status; severity (an
+//      unclean verdict, an invariant violation) lives in the tooltip and
+//      contextValue.
 //   3. At most two inline actions per row, enforced in package.json and
 //      asserted by the menu-registry test.
 
 import {
   SessionRecord,
-  SessionSet,
-  SessionState,
   SessionStatus,
+  SessionsRepository,
   StepRecord,
 } from "../types";
 import {
-  ROW_ACTIONS,
-  RowAction,
+  REPOSITORY_ACTIONS,
+  RepositoryAction,
   SESSION_ACTIONS,
   SessionAction,
 } from "./ActionRegistry";
 import {
   ICON_FILES,
-  VisibleModule,
-  blockedMarker,
-  blockedTooltip,
-  forceClosedBadge,
-  kindTooltip,
-  orderedBuckets,
-  touchedDate,
+  progressText,
+  sessionRowLabel,
+  sessionsInOrder,
   verdictIsUnclean,
-} from "./SessionSetsModel";
+} from "./sessionsModel";
 import { isRecognizedVerdictToken } from "../utils/verdictTokens";
 
 // ---------------------------------------------------------------------------
-// Nodes: module -> status bucket -> session set -> session -> step
+// Nodes: repository -> session -> step
 // ---------------------------------------------------------------------------
 
 /**
- * SetNode, SessionNode and StepNode all expose a `set` property ON
- * PURPOSE: every row command reads `item.set`, so a node shaped this way
- * is accepted by the whole command surface with no adapter.
+ * SessionNode and StepNode both expose a `repository` property ON
+ * PURPOSE: every row command reads its target off the node, and a node
+ * shaped this way is accepted by the whole command surface with no
+ * adapter.
  */
-export type WorkExplorerNode =
-  | ModuleNode
-  | BucketNode
-  | SetNode
-  | SessionNode
-  | StepNode;
+export type WorkExplorerNode = RepositoryNode | SessionNode | StepNode;
 
-export interface ModuleNode {
-  readonly kind: "module";
-  readonly module: VisibleModule;
-  /** True when at least one DECLARED module is visible anywhere in the tree. */
-  readonly declaredModulesExist: boolean;
-}
-
-export interface BucketNode {
-  readonly kind: "bucket";
-  /** Identifies the owning module so sibling buckets stay distinct. */
-  readonly moduleKey: string;
-  readonly bucketKey: SessionState;
-  readonly label: string;
-  readonly sets: readonly SessionSet[];
-}
-
-export interface SetNode {
-  readonly kind: "set";
-  readonly set: SessionSet;
+export interface RepositoryNode {
+  readonly kind: "repository";
+  readonly repository: SessionsRepository;
 }
 
 export interface SessionNode {
   readonly kind: "session";
-  readonly set: SessionSet;
+  readonly repository: SessionsRepository;
   readonly session: SessionRecord;
 }
 
@@ -94,67 +69,37 @@ export interface SessionNode {
  */
 export interface StepNode {
   readonly kind: "step";
-  readonly set: SessionSet;
+  readonly repository: SessionsRepository;
   readonly session: SessionRecord;
   readonly row: StepRecord;
-}
-
-/** Stable identity for a module across refreshes. */
-export function moduleKeyOf(module: VisibleModule): string {
-  return `${module.kind}:${module.slug ?? ""}`;
-}
-
-/**
- * Translate a command argument into the `preselectedSlug` option the
- * module flows accept. `undefined` when the argument is not a module
- * node (the Command Palette case — those flows keep their own QuickPick).
- */
-export function preselectFromTreeNode(
-  arg: unknown,
-): { preselectedSlug: string } | undefined {
-  if (arg === null || typeof arg !== "object") return undefined;
-  const node = arg as Partial<ModuleNode>;
-  if (node.kind !== "module" || !node.module) return undefined;
-  return { preselectedSlug: node.module.slug ?? "" };
 }
 
 // ---------------------------------------------------------------------------
 // Children — one function per level, each called only on expand
 // ---------------------------------------------------------------------------
 
-export function moduleNodes(modules: readonly VisibleModule[]): ModuleNode[] {
-  const declaredModulesExist = modules.some((m) => m.kind === "declared");
-  return modules.map((module) => ({ kind: "module", module, declaredModulesExist }));
+export function repositoryNodes(
+  repositories: readonly SessionsRepository[],
+): RepositoryNode[] {
+  return repositories.map((repository) => ({ kind: "repository", repository }));
 }
 
-export function bucketNodes(node: ModuleNode): BucketNode[] {
-  return orderedBuckets([...node.module.sets]).map((bucket) => ({
-    kind: "bucket",
-    moduleKey: moduleKeyOf(node.module),
-    bucketKey: bucket.key,
-    label: bucket.label,
-    sets: bucket.sets,
+/**
+ * The second level, ordered by session number ascending — the order the
+ * ledger is written and the order the work runs. A repository whose
+ * projection was unavailable yields no session rows, which is why
+ * RepositoryNode reports itself collapsible only when it has sessions.
+ */
+export function sessionNodes(node: RepositoryNode): SessionNode[] {
+  return sessionsInOrder(node.repository.sessions).map((session) => ({
+    kind: "session",
+    repository: node.repository,
+    session,
   }));
 }
 
-export function setNodes(node: BucketNode): SetNode[] {
-  return node.sets.map((set) => ({ kind: "set", set }));
-}
-
 /**
- * The fourth level, ordered by session number ascending — the order the
- * ledger is written. A set whose projection was unavailable yields no
- * session rows, which is why SetNode reports itself collapsible only
- * when it has sessions.
- */
-export function sessionNodes(node: SetNode): SessionNode[] {
-  return [...node.set.sessions]
-    .sort((a, b) => a.number - b.number)
-    .map((session) => ({ kind: "session", set: node.set, session }));
-}
-
-/**
- * The fifth level: the in-flight session's steps, exactly as the
+ * The third level: the in-flight session's steps, exactly as the
  * projection lists them. Empty for every session that is not in flight
  * and whenever the projection carried no steps — degrading to no
  * children is the requirement; a stale or invented list is worse than an
@@ -163,7 +108,7 @@ export function sessionNodes(node: SetNode): SessionNode[] {
 export function stepNodes(node: SessionNode): StepNode[] {
   return node.session.steps.map((row) => ({
     kind: "step",
-    set: node.set,
+    repository: node.repository,
     session: node.session,
     row,
   }));
@@ -171,11 +116,7 @@ export function stepNodes(node: SessionNode): StepNode[] {
 
 export function childrenOf(node: WorkExplorerNode): WorkExplorerNode[] {
   switch (node.kind) {
-    case "module":
-      return bucketNodes(node);
-    case "bucket":
-      return setNodes(node);
-    case "set":
+    case "repository":
       return sessionNodes(node);
     case "session":
       return stepNodes(node);
@@ -202,8 +143,7 @@ export interface RowDescriptor {
    * Stable across refreshes, unique across the whole tree. NOT
    * cosmetic: VS Code uses TreeItem.id to preserve selection and
    * EXPANSION state; without it every watcher tick (and the 30-second
-   * poll) would fold the tree up under the operator, and repeated
-   * bucket labels would collide.
+   * poll) would fold the tree up under the operator.
    */
   id: string;
   label: string;
@@ -234,18 +174,9 @@ export function hasToken(contextValue: string, token: string): boolean {
 
 /** Node-kind discriminators. Every menu contribution matches one. */
 export const NODE_TOKEN = {
-  module: "dabblerModule",
-  bucket: "dabblerBucket",
-  set: "dabblerSet",
+  repository: "dabblerRepository",
   session: "dabblerSession",
   step: "dabblerStep",
-} as const;
-
-/** Module-row capability tokens. */
-export const MODULE_TOKEN = {
-  declared: "module-declared",
-  fallback: "module-fallback",
-  pseudo: "module-pseudo",
 } as const;
 
 /**
@@ -253,7 +184,7 @@ export const MODULE_TOKEN = {
  * command id so a new registry entry cannot be added without the
  * registry test noticing that no menu contribution matches it.
  */
-export function actionToken(action: RowAction | SessionAction): string {
+export function actionToken(action: RepositoryAction | SessionAction): string {
   return `act-${action.id.replace(/^dabbler(SessionSets)?\./, "").replace(/\./g, "-")}`;
 }
 
@@ -261,25 +192,18 @@ export function actionToken(action: RowAction | SessionAction): string {
 // Severity (tooltip + contextValue only; the icon slot stays lifecycle)
 // ---------------------------------------------------------------------------
 
-export type SetSeverity =
-  | "blocked"
-  | "verification"
-  | "invariant"
-  | "duplicate-name"
-  | null;
+export type SessionSeverity = "verification" | null;
 
-export { verdictIsUnclean } from "./SessionSetsModel";
+export { verdictIsUnclean } from "./sessionsModel";
 
-export function severityOf(set: SessionSet): SetSeverity {
-  if (blockedMarker(set) !== "") return "blocked";
-  if (verdictIsUnclean(set.verificationVerdict)) return "verification";
-  if (set.invariantViolation) return "invariant";
-  if (set.duplicateNameError) return "duplicate-name";
-  return null;
-}
-
-export function setIcon(set: SessionSet): IconSpec {
-  return { kind: "file", slug: ICON_FILES[set.state] };
+/**
+ * What a session row must not render as clean. A verdict the framework
+ * never issued, or one that issued and did not pass, outranks the row's
+ * lifecycle glyph in the tooltip — a complete session with an unclean
+ * verdict is still complete, and still not proof of anything.
+ */
+export function severityOf(session: SessionRecord): SessionSeverity {
+  return verdictIsUnclean(session.verificationVerdict) ? "verification" : null;
 }
 
 export function sessionIcon(status: SessionStatus): IconSpec {
@@ -290,175 +214,94 @@ export function sessionIcon(status: SessionStatus): IconSpec {
 // Descriptors, one per node kind
 // ---------------------------------------------------------------------------
 
-const MODULE_WARNING_TEXT: Record<string, string> = {
-  "manifest-missing": "No `docs/modules.yaml` in this root — these sets are ungrouped.",
-  "manifest-invalid":
-    "`docs/modules.yaml` is invalid; showing the last good module tree. Fix the file by hand.",
-  "unstamped-sets": "Some sets carry no `module:` attribution.",
-  "undeclared-slug": "This module is stamped on sets but is not declared in `docs/modules.yaml`.",
-};
-
-export function moduleDescriptor(node: ModuleNode): RowDescriptor {
-  const { module } = node;
-  const setCount = module.sets.length;
-  const warning = module.warning;
-  const tokens: string[] = [NODE_TOKEN.module];
-  if (module.kind === "declared") {
-    tokens.push(MODULE_TOKEN.declared);
-  } else if (module.kind === "pseudo") {
-    tokens.push(MODULE_TOKEN.pseudo);
-  } else {
-    // Fallback: an undeclared slug observed on sets. It renders (never
-    // hide work) but offers no target-specific actions — there is no
-    // manifest entry behind it.
-    tokens.push(MODULE_TOKEN.fallback);
-  }
-
-  const tooltipLines = [
-    `**${module.displayName}**`,
-    "",
-    `${setCount} session set${setCount === 1 ? "" : "s"}`,
-  ];
-  if (warning) {
-    tooltipLines.push("", `$(warning) ${MODULE_WARNING_TEXT[warning.code] ?? warning.code}`);
-  }
-
-  return {
-    id: `module:${moduleKeyOf(module)}`,
-    label: module.displayName,
-    description: `${setCount} set${setCount === 1 ? "" : "s"}`,
-    tooltip: tooltipLines.join("\n"),
-    // Module rows are structural; lifecycle glyphs belong to buckets,
-    // sets and sessions rather than competing with the module name.
-    icon: undefined,
-    contextValue: tokenString(tokens),
-    collapsible: "collapsed",
-  };
-}
-
-export function bucketDescriptor(node: BucketNode): RowDescriptor {
-  const count = node.sets.length;
-  return {
-    // Scoped by module: "In Progress" exists under every module row.
-    id: `bucket:${node.moduleKey}/${node.bucketKey}`,
-    label: node.label,
-    description: `${count} set${count === 1 ? "" : "s"}`,
-    icon: { kind: "file", slug: ICON_FILES[node.bucketKey] },
-    contextValue: tokenString([NODE_TOKEN.bucket, `bucket-${node.bucketKey}`]),
-    // The three default buckets render even when EMPTY — a declared
-    // module with no work yet still shows where that work will land.
-    // But an empty one is a LEAF: a twisty that opens onto nothing is a
-    // dead affordance.
-    collapsible: count > 0 ? "collapsed" : "none",
-  };
-}
-
 /**
- * Everything the row cannot show inline, in full, as markdown: the row
- * shows one icon, the tooltip shows all of it.
+ * Everything the repository row cannot show inline: the fraction, the
+ * driving engine, and any fault the projection reported.
  */
-export function setTooltip(set: SessionSet): string {
-  const lines: string[] = [`**${set.name}**`];
-
+export function repositoryTooltip(repository: SessionsRepository): string {
+  const lines: string[] = [`**${repository.label}**`];
+  const total = repository.totalSessions;
   const progress =
-    set.totalSessions && set.totalSessions > 0
-      ? `${set.sessionsCompleted}/${set.totalSessions}`
-      : `${set.sessionsCompleted}/?`;
-  const state = set.state.replace("-", " ");
-  lines.push("", `${state} · ${progress} sessions complete`);
+    total && total > 0
+      ? `${repository.sessionsCompleted}/${total}`
+      : `${repository.sessionsCompleted}/?`;
+  lines.push("", `${progress} sessions complete`);
 
   const markers: string[] = [];
-  const blocked = blockedTooltip(set);
-  if (blocked) markers.push(blocked);
-  const verdict = set.verificationVerdict;
-  if (typeof verdict === "string" && verdict.trim() !== "") {
+  const orchestrator = repository.orchestrator;
+  if (orchestrator && (orchestrator.engine || orchestrator.model)) {
     markers.push(
-      isRecognizedVerdictToken(verdict)
-        ? `Verification: ${verdict}`
-        : `Verification: "${verdict}" is not a recognized verdict`,
+      `Driven by ${[orchestrator.engine, orchestrator.model]
+        .filter(Boolean)
+        .join(" / ")}.`,
     );
   }
-  if (set.invariantViolation) {
-    markers.push(`State invariant violation: ${set.invariantViolation}`);
+  if (repository.invariantViolation) {
+    markers.push(`State invariant violation: ${repository.invariantViolation}`);
   }
-  if (set.duplicateNameError) {
+  if (repository.forceClosed) {
+    markers.push("A session here closed via the --force bypass, not the gate.");
+  }
+  if (
+    repository.schemaVersionOnDisk !== null &&
+    repository.schemaVersionOnDisk < 5
+  ) {
     markers.push(
-      `Duplicate session-set name in ${set.duplicateNameError.conflictingDirs.length} ` +
-        `locations. Showing ${set.duplicateNameError.chosenDir}; rename one copy.`,
+      `Ledger on disk is schema v${repository.schemaVersionOnDisk} ` +
+        `(readers normalize on read).`,
     );
   }
-  const kind = kindTooltip(set);
-  if (kind) markers.push(kind);
-  const forced = forceClosedBadge(set);
-  if (forced) markers.push("Closed via the --force bypass, not the deterministic gate.");
-  if (set.schemaVersionOnDisk !== null && set.schemaVersionOnDisk < 4) {
-    markers.push(`Ran under schema v${set.schemaVersionOnDisk} (readers normalize on read).`);
+  if (repository.sessions.length === 0) {
+    markers.push(
+      "No sessions were projected — the router could not be run here.",
+    );
   }
-
-  if (markers.length > 0) {
-    lines.push("", ...markers.map((m) => `- ${m}`));
-  }
-  const touched = touchedDate(set);
-  if (touched) lines.push("", `_last touched ${touched}_`);
+  if (markers.length > 0) lines.push("", ...markers.map((m) => `- ${m}`));
   return lines.join("\n");
 }
 
-/**
- * `label` carries the set name verbatim, numeric prefix included — the
- * operator scans that prefix down the left edge, and a TreeItem label
- * truncates from the RIGHT. NO description (constraint 1).
- */
-export function setDescriptor(set: SessionSet): RowDescriptor {
-  const tokens: string[] = [NODE_TOKEN.set, `state-${set.state}`];
-  const severity = severityOf(set);
-  if (severity) tokens.push(`severity-${severity}`);
-  for (const action of ROW_ACTIONS) {
-    if (action.when(set)) tokens.push(actionToken(action));
-  }
-  const sessionCount = set.sessions.length;
-  return {
-    // Set names are globally unique by invariant, which is why they are
-    // also the identity every row action keys on.
-    id: `set:${set.name}`,
-    label: set.name,
-    tooltip: setTooltip(set),
-    icon: setIcon(set),
-    contextValue: tokenString(tokens),
-    // A set node MUST report Collapsed, never Expanded, or the fourth
-    // level is paid on every refresh. A set with no sessions is a leaf.
-    collapsible: sessionCount > 0 ? "collapsed" : "none",
-  };
-}
-
-export function sessionDescriptor(node: SessionNode): RowDescriptor {
-  const { session } = node;
-  const steps = session.steps;
-  const tokens: string[] = [NODE_TOKEN.session, `session-${session.status}`];
-  for (const action of SESSION_ACTIONS) {
-    if (action.when(node.set, session)) tokens.push(actionToken(action));
+export function repositoryDescriptor(node: RepositoryNode): RowDescriptor {
+  const { repository } = node;
+  const tokens: string[] = [NODE_TOKEN.repository];
+  for (const action of REPOSITORY_ACTIONS) {
+    if (action.when(repository)) tokens.push(actionToken(action));
   }
   return {
-    id: `session:${node.set.name}/${session.number}`,
-    label: session.title || `Session ${session.number}`,
-    // Short labels, so description survives truncation here. Only the
-    // in-flight session says anything — quiet is the default state.
-    description: session.status === "in-progress" ? "in flight" : undefined,
-    tooltip: sessionTooltip(node),
-    icon: sessionIcon(session.iconKey),
+    // The root path is the identity: two worktrees of one repository are
+    // two rows, and only the path tells them apart.
+    id: `repository:${repository.root}`,
+    label: repository.label,
+    description: progressText(repository),
+    tooltip: repositoryTooltip(repository),
+    // The repository row is structural. Lifecycle glyphs belong to the
+    // session rows rather than competing with the repository's name, and
+    // a repository holds no lifecycle state of its own to glyph.
+    icon: undefined,
     contextValue: tokenString(tokens),
-    // Collapsed only when there is something under it: every session
-    // that is not in flight (and an in-flight one whose activity log is
-    // absent) is a leaf.
-    collapsible: steps.length > 0 ? "collapsed" : "none",
+    collapsible: repository.sessions.length > 0 ? "collapsed" : "none",
   };
 }
 
 function sessionTooltip(node: SessionNode): string {
   const { session } = node;
-  const title = session.title || `Session ${session.number}`;
-  const lines = [`**${title}** — ${session.status.replace("-", " ")}`];
-  if (session.verificationVerdict) {
-    lines.push("", `Verification: ${session.verificationVerdict}`);
+  const lines = [
+    `**${sessionRowLabel(session)}**`,
+    "",
+    session.status.replace("-", " "),
+  ];
+  const verdict = session.verificationVerdict;
+  if (typeof verdict === "string" && verdict.trim() !== "") {
+    lines.push(
+      "",
+      isRecognizedVerdictToken(verdict)
+        ? `Verification: ${verdict}`
+        : `Verification: "${verdict}" is not a recognized verdict`,
+    );
+  }
+  if (session.completedAt) {
+    lines.push("", `_closed ${session.completedAt}_`);
+  } else if (session.startedAt) {
+    lines.push("", `_started ${session.startedAt}_`);
   }
   if (session.steps.length > 0) {
     lines.push(
@@ -467,6 +310,30 @@ function sessionTooltip(node: SessionNode): string {
     );
   }
   return lines.join("\n");
+}
+
+export function sessionDescriptor(node: SessionNode): RowDescriptor {
+  const { repository, session } = node;
+  const tokens: string[] = [NODE_TOKEN.session, `session-${session.status}`];
+  const severity = severityOf(session);
+  if (severity) tokens.push(`severity-${severity}`);
+  for (const action of SESSION_ACTIONS) {
+    if (action.when(repository, session)) tokens.push(actionToken(action));
+  }
+  return {
+    id: `session:${repository.root}/${session.number}`,
+    label: sessionRowLabel(session),
+    // Short labels, so a description survives truncation here. Only the
+    // in-flight session says anything — quiet is the default state.
+    description: session.status === "in-progress" ? "in flight" : undefined,
+    tooltip: sessionTooltip(node),
+    icon: sessionIcon(session.iconKey),
+    contextValue: tokenString(tokens),
+    // Collapsed only when there is something under it: every session
+    // that is not in flight (and an in-flight one whose activity log is
+    // absent) is a leaf.
+    collapsible: session.steps.length > 0 ? "collapsed" : "none",
+  };
 }
 
 /** "verify-changes" / "verify_changes" -> "Verify changes". */
@@ -511,9 +378,9 @@ export function stepStartLabel(startedAt: string | null): string {
 
 /**
  * A step row. The ICON is the projection's own glyph key — the same
- * authored lifecycle assets the session and set rows use; the projection
- * already resolved the effective status (including the derived active
- * step), so this renderer never re-derives it.
+ * authored lifecycle assets the session rows use; the projection already
+ * resolved the effective status (including the derived active step), so
+ * this renderer never re-derives it.
  */
 export function stepDescriptor(node: StepNode): RowDescriptor {
   const { row } = node;
@@ -540,7 +407,7 @@ export function stepDescriptor(node: StepNode): RowDescriptor {
 
   const started = stepStartLabel(row.startedAt);
   return {
-    id: `step:${node.set.name}/${node.session.number}/${row.position}`,
+    id: `step:${node.repository.root}/${node.session.number}/${row.position}`,
     label: stepRowLabel(row),
     ...(started ? { description: started } : {}),
     tooltip: tooltipLines.join("\n"),
@@ -557,12 +424,8 @@ export function stepDescriptor(node: StepNode): RowDescriptor {
 
 export function descriptorFor(node: WorkExplorerNode): RowDescriptor {
   switch (node.kind) {
-    case "module":
-      return moduleDescriptor(node);
-    case "bucket":
-      return bucketDescriptor(node);
-    case "set":
-      return setDescriptor(node.set);
+    case "repository":
+      return repositoryDescriptor(node);
     case "session":
       return sessionDescriptor(node);
     case "step":

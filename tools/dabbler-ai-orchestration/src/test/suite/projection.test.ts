@@ -5,7 +5,6 @@ import {
   ProjectionCache,
   ProjectionResult,
   parseProjectionPayload,
-  projectAll,
   projectionCacheKey,
 } from "../../utils/projection";
 import { makeProjection, makeTempDir, rmrf } from "./helpers";
@@ -16,6 +15,7 @@ suite("projection: payload narrowing", () => {
       sessions: [
         {
           number: 1,
+          displayNumber: "001",
           title: "S1",
           status: "in-progress",
           iconKey: "in-progress",
@@ -43,7 +43,7 @@ suite("projection: payload narrowing", () => {
     });
     const parsed = parseProjectionPayload(JSON.stringify(payload));
     assert.ok(parsed);
-    assert.strictEqual(parsed!.set.slug, "001-fixture-set");
+    assert.strictEqual(parsed!.repository.totalSessions, 2);
     assert.strictEqual(parsed!.sessions[0].steps[0].stepKey, "implement");
   });
 
@@ -51,20 +51,22 @@ suite("projection: payload narrowing", () => {
     assert.strictEqual(parseProjectionPayload("Traceback (most recent call)"), null);
   });
 
-  test("a missing set block fails closed", () => {
+  test("a missing repository block fails closed", () => {
     assert.strictEqual(parseProjectionPayload(JSON.stringify({ sessions: [] })), null);
   });
 
-  test("a foreign set status fails closed rather than rendering as truth", () => {
-    const p = makeProjection();
-    (p.set as { status: string }).status = "archived";
+  test("a missing sessions list fails closed rather than reading as empty", () => {
+    // An empty tree and a payload that never mentioned sessions are
+    // different claims, and only one of them is a repository with no work.
+    const p = makeProjection() as unknown as Record<string, unknown>;
+    delete p.sessions;
     assert.strictEqual(parseProjectionPayload(JSON.stringify(p)), null);
   });
 
   test("extra fields are tolerated — the schema is additive", () => {
     const p = makeProjection() as unknown as Record<string, unknown>;
     p.futureField = { anything: true };
-    (p.set as Record<string, unknown>).futureFlag = 1;
+    (p.repository as Record<string, unknown>).futureFlag = 1;
     assert.ok(parseProjectionPayload(JSON.stringify(p)));
   });
 
@@ -82,18 +84,12 @@ suite("projection: payload narrowing", () => {
     assert.strictEqual(parsed!.sessions[0].iconKey, "not-started");
   });
 
-  test("preCancelStatus and orchestrator survive the narrowing", () => {
+  test("the orchestrator block survives the narrowing", () => {
     const p = makeProjection({
-      set: {
-        status: "cancelled",
-        iconKey: "cancelled",
-        preCancelStatus: "in-progress",
-        orchestrator: { engine: "claude", provider: "anthropic" },
-      },
+      repository: { orchestrator: { engine: "claude-code", provider: "anthropic" } },
     });
     const parsed = parseProjectionPayload(JSON.stringify(p));
-    assert.strictEqual(parsed!.set.preCancelStatus, "in-progress");
-    assert.strictEqual(parsed!.set.orchestrator?.engine, "claude");
+    assert.strictEqual(parsed!.repository.orchestrator?.engine, "claude-code");
   });
 });
 
@@ -101,7 +97,7 @@ suite("projection: cache", () => {
   let dir: string;
   setup(() => {
     dir = makeTempDir("dabbler-proj-");
-    fs.writeFileSync(path.join(dir, "session-state.json"), "{}");
+    fs.writeFileSync(path.join(dir, "sessions.json"), "{}");
   });
   teardown(() => rmrf(dir));
 
@@ -116,7 +112,7 @@ suite("projection: cache", () => {
     };
   }
 
-  test("an unchanged set is served from cache", async () => {
+  test("an unchanged repository is served from cache", async () => {
     const { runner, calls } = countingRunner();
     const cache = new ProjectionCache(runner);
     await cache.get("python", dir, dir);
@@ -128,15 +124,15 @@ suite("projection: cache", () => {
     const { runner, calls } = countingRunner();
     const cache = new ProjectionCache(runner);
     await cache.get("python", dir, dir);
-    const state = path.join(dir, "session-state.json");
-    fs.writeFileSync(state, "{\"changed\": true}");
+    const ledger = path.join(dir, "sessions.json");
+    fs.writeFileSync(ledger, '{"changed": true}');
     const future = new Date(Date.now() + 5000);
-    fs.utimesSync(state, future, future);
+    fs.utimesSync(ledger, future, future);
     await cache.get("python", dir, dir);
     assert.strictEqual(calls(), 2);
   });
 
-  test("a failed projection is cached until the set changes or a hard clear", async () => {
+  test("a failed projection is cached until the ledger changes or a hard clear", async () => {
     let calls = 0;
     const cache = new ProjectionCache(async () => {
       calls += 1;
@@ -152,30 +148,7 @@ suite("projection: cache", () => {
 
   test("the cache key covers every derivation input file", () => {
     const before = projectionCacheKey(dir);
-    fs.writeFileSync(path.join(dir, "CANCELLED.md"), "cancelled");
-    const after = projectionCacheKey(dir);
-    assert.notStrictEqual(before, after);
-  });
-});
-
-suite("projection: projectAll", () => {
-  test("projects every set and keys results by directory", async () => {
-    const seen: string[] = [];
-    const cache = new ProjectionCache(async (_py, setDir) => {
-      seen.push(setDir);
-      return { payload: makeProjection(), error: null };
-    });
-    const dirs = ["a", "b", "c", "d"].map((n) => path.join("D:", "ws", n));
-    const out = await projectAll(cache, "python", dirs, "D:\\ws", 2);
-    assert.strictEqual(out.size, 4);
-    assert.deepStrictEqual([...seen].sort(), [...dirs].sort());
-  });
-
-  test("an empty set list resolves without spawning workers", async () => {
-    const cache = new ProjectionCache(async () => {
-      throw new Error("must not run");
-    });
-    const out = await projectAll(cache, "python", [], "D:\\ws");
-    assert.strictEqual(out.size, 0);
+    fs.writeFileSync(path.join(dir, "session-plan.md"), "# plan");
+    assert.notStrictEqual(before, projectionCacheKey(dir));
   });
 });

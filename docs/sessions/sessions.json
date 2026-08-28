@@ -390,9 +390,9 @@
     {
       "number": 20,
       "title": "A round baseline that survives the trip (root cause of D98)",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-28T09:43:08.167111-04:00",
-      "completedAt": null,
+      "completedAt": "2026-08-28T10:05:22.913537-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

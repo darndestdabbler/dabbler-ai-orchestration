@@ -1,0 +1,409 @@
+# ============================================================
+# AI Router Configuration (v2)
+# ============================================================
+# All model info, roles, thresholds, and behavior in one file.
+# API keys are NEVER stored here — providers name an env var and
+# values resolve through ai_router.secret_resolver at call time.
+# Dollars are not computed anywhere: tokens are recorded, and
+# reconciliation happens against the vendor's own console.
+
+providers:
+  anthropic:
+    display_label: Anthropic
+    enabled: true
+    api_key_env: DABBLER_ANTHROPIC_API_KEY
+    base_url: https://api.anthropic.com/v1/messages
+    api_version: "2023-06-01"
+    rate_limit:
+      requests_per_minute: 50
+      tokens_per_minute: 80000
+    timeout_seconds: 600
+    retry:
+      max_retries: 2
+      backoff_base_seconds: 2
+
+  google:
+    display_label: Google
+    enabled: true
+    api_key_env: DABBLER_GEMINI_API_KEY
+    base_url: https://generativelanguage.googleapis.com/v1beta
+    rate_limit:
+      requests_per_minute: 60
+      tokens_per_minute: 100000
+    # 900, not 300: a tier-3 model reasoning at high effort over a large
+    # evidence bundle routinely exceeds 300s, and a timeout on a mandatory
+    # verification call is a correctness failure, not a comfort issue.
+    timeout_seconds: 900
+    retry:
+      max_retries: 2
+      backoff_base_seconds: 2
+
+  openai:
+    display_label: OpenAI
+    enabled: true
+    api_key_env: DABBLER_OPENAI_API_KEY
+    base_url: https://api.openai.com/v1
+    rate_limit:
+      requests_per_minute: 60
+      tokens_per_minute: 100000
+    timeout_seconds: 900
+    retry:
+      max_retries: 2
+      backoff_base_seconds: 2
+
+# Transport for routine dispatch. Resolution precedence: --transport CLI
+# flag > DABBLER_TRANSPORT env var > this value > default "api". The seat is
+# the default because it is the surface staff receive; the direct-API path
+# stays fully supported and merely stops being what you get by not choosing.
+# A machine without a seat says so in a project-local local-overrides.yaml.
+transport:
+  profile: copilot-cli
+
+# Selection is by role, and one resolver applies it on both transports
+# (ai_router.selection). A role declares the provider set it may draw from —
+# a hard filter — and a preference order, which is ordering only: a model the
+# order does not name still qualifies and simply sorts after the named ones.
+# That is what keeps a stale list from costing a candidate. Names are model
+# ids as each transport puts them on the wire, so a name that exists on only
+# one path is inert on the other rather than an error.
+roles:
+  generator:
+    prefer: [claude-sonnet-4.6, gpt-5.5, gemini-3.1-pro-preview]
+    require_provider_in: [anthropic, openai, google]
+  verifier:
+    # A verifier's job is to be right about whether work ships, which is the
+    # wrong place to economise. Entries the registry marks
+    # is_enabled_as_verifier: false are refused on both transports, so this
+    # order never names one.
+    prefer: [gpt-5.6-sol, gpt-5.4, claude-sonnet-4.6]
+    require_provider_in: [anthropic, openai, google]
+  plan-review:
+    prefer: [gpt-5.4-mini, gemini-2.5-flash, claude-haiku-4.5]
+    require_provider_in: [anthropic, openai, google]
+  plan-review-escalated:
+    prefer: [claude-opus-5, gpt-5.5, gemini-3.1-pro-preview]
+    require_provider_in: [anthropic, openai, google]
+
+# The copilot-cli transport's own settings; inert unless that transport is
+# selected. The catalog lockfile is model-truth for this seat; the roles above
+# are intent.
+transports:
+  copilot-cli:
+    binary: copilot
+    lockfile: copilot-catalog.lock   # relative to this file's directory
+    billed_usage_unavailable: true    # honest non-accounting; seat spend is measured by ai_router.seat_cost
+    max_invocations_per_session: 200  # per-process hard circuit breaker, not a budget
+    # Dispatch ceilings; must satisfy spawn < first_byte < total. total is a
+    # correctness knob: a session-verification evidence bundle is the
+    # largest prompt this system sends and does not fit in 300s.
+    timeouts:
+      spawn_seconds: 10
+      first_byte_seconds: 30
+      total_seconds: 1200
+
+# Model discovery. The direct-API path enumerates each vendor's models
+# endpoint; the seat cannot enumerate — the CLI has no list-models command —
+# so its catalog stays probe-confirmed. Enumeration is a metadata request and
+# bills no tokens, which is why max_age_hours is a freshness preference and
+# not a budget control. seat_max_age_hours is far longer because a probe does
+# cost premium requests, and a warning that fires every day is a warning that
+# gets suppressed. Neither threshold ever blocks anything.
+#
+# record resolves against the project root, not this file's directory, and
+# lives under the gitignored .dabbler/ tree: it is derived from whichever key
+# set is present, so it is neither committed nor packaged. The seat catalog
+# ships because it belongs to the distribution; this one belongs to a machine.
+discovery:
+  key_set_id: default
+  record: .dabbler/api-models.lock
+  max_age_hours: 24
+  seat_max_age_hours: 720
+
+# --- Model Registry ---
+# is_enabled: in the routed pool at all (identity-only entries set false —
+#   they exist so orchestrator identity can resolve).
+# is_enabled_as_verifier: trusted to review another model's output. It is a
+#   property of the record rather than of a role, because it says what a model
+#   may be asked to do and not which order the candidates are tried in.
+models:
+  gemini-flash:
+    provider: google
+    model_id: gemini-2.5-flash
+    is_enabled: true
+    is_enabled_as_verifier: true
+    max_context_tokens: 1048576
+    max_output_tokens: 65536
+    system_prompt_file: prompt-templates/system-prompts.md
+    notes: "Best for simple analysis, formatting, boilerplate generation."
+    generation_params:
+      thinking_budget: 0
+
+  gemini-pro:
+    provider: google
+    model_id: gemini-2.5-pro
+    is_enabled: true
+    is_enabled_as_verifier: true
+    max_context_tokens: 1048576
+    max_output_tokens: 65536
+    system_prompt_file: prompt-templates/system-prompts.md
+    notes: "Medium-complexity analysis, documentation, code review."
+    generation_params:
+      thinking_budget: -1
+
+  gemini-3-1-pro:
+    provider: google
+    model_id: gemini-3.1-pro-preview
+    is_enabled: true
+    # New model: generator + explicit-call only until calibrated.
+    is_enabled_as_verifier: false
+    max_context_tokens: 1048576
+    max_output_tokens: 65536
+    system_prompt_file: prompt-templates/system-prompts.md
+    notes: "Frontier Google Pro (preview id; may change at GA)."
+    generation_params:
+      thinking_level: HIGH
+
+  sonnet:
+    provider: anthropic
+    model_id: claude-sonnet-5
+    is_enabled: true
+    is_enabled_as_verifier: true
+    max_context_tokens: 200000
+    max_output_tokens: 16000
+    system_prompt_file: prompt-templates/system-prompts.md
+    notes: "Anthropic quality without Opus cost."
+    generation_params:
+      effort: medium
+      thinking:
+        enabled: false
+        type: adaptive
+
+  opus:
+    provider: anthropic
+    model_id: claude-opus-5
+    is_enabled: true
+    is_enabled_as_verifier: true
+    max_context_tokens: 200000
+    max_output_tokens: 32000
+    system_prompt_file: prompt-templates/system-prompts.md
+    notes: "Reserved for complex architectural reasoning."
+    generation_params:
+      effort: high
+      thinking:
+        enabled: true
+        type: adaptive
+
+  fable:
+    provider: anthropic
+    model_id: claude-fable-5
+    # Registered, not routed: enabling it is an operator decision, not a
+    # default.
+    is_enabled: false
+    is_enabled_as_verifier: false
+    max_context_tokens: 200000
+    max_output_tokens: 32000
+    system_prompt_file: prompt-templates/system-prompts.md
+    notes: "Claude Fable 5. Present so a Fable-5 orchestrator can record its identity."
+
+  gpt-5-4:
+    provider: openai
+    model_id: gpt-5.4
+    is_enabled: true
+    is_enabled_as_verifier: true
+    max_context_tokens: 272000
+    max_output_tokens: 32000
+    system_prompt_file: prompt-templates/system-prompts.md
+    notes: "Frontier OpenAI model; cross-provider verifier for Anthropic/Google output."
+    generation_params:
+      reasoning_effort: high
+
+  gpt-5-5:
+    provider: openai
+    model_id: gpt-5.5
+    is_enabled: true
+    is_enabled_as_verifier: true
+    max_context_tokens: 272000
+    max_output_tokens: 32000
+    system_prompt_file: prompt-templates/system-prompts.md
+    notes: "Frontier OpenAI model (GPT-5.5). Cross-provider verifier + consensus engine."
+    generation_params:
+      reasoning_effort: high
+
+  gpt-5-6-sol:
+    provider: openai
+    model_id: gpt-5.6-sol
+    is_enabled: true
+    is_enabled_as_verifier: true
+    max_context_tokens: 272000
+    max_output_tokens: 32000
+    system_prompt_file: prompt-templates/system-prompts.md
+    notes: "GPT-5.6 'Sol' — the most capable of the 5.6 variants."
+    generation_params:
+      reasoning_effort: high
+
+  gpt-5-6-luna:
+    provider: openai
+    model_id: gpt-5.6-luna
+    is_enabled: true
+    # Enabled so a discovery fan-out can prefer it by name, kept out of the
+    # verifier pool so it can never review work it is not strong enough to
+    # judge.
+    is_enabled_as_verifier: false
+    max_context_tokens: 272000
+    max_output_tokens: 32000
+    system_prompt_file: prompt-templates/system-prompts.md
+    notes: "GPT-5.6 'Luna' — breadth-of-findings work only."
+    generation_params:
+      reasoning_effort: high
+
+  haiku:
+    provider: anthropic
+    model_id: claude-haiku-4-5-20251001
+    is_enabled: true
+    # Enabled so a follow-through study can prefer it by name, kept out of the
+    # verifier pool for the same reason as Luna.
+    is_enabled_as_verifier: false
+    max_context_tokens: 200000
+    max_output_tokens: 8000
+    system_prompt_file: prompt-templates/system-prompts.md
+    notes: "Anthropic's small model. Used as a stand-in for a reader who will not puzzle things out."
+
+  gpt-5-4-mini:
+    provider: openai
+    model_id: gpt-5.4-mini
+    is_enabled: true
+    is_enabled_as_verifier: true
+    max_context_tokens: 400000
+    max_output_tokens: 16000
+    system_prompt_file: prompt-templates/system-prompts.md
+    notes: "Small OpenAI model; cross-provider verifier for Gemini output."
+    generation_params:
+      reasoning_effort: medium
+
+  # --- Identity-registry-only entries ---
+  # Orchestrator models outside the routed pool that must still resolve in
+  # the registry so identity resolution and the verifier exclusion can
+  # derive their effective provider. is_enabled: false keeps them out of
+  # every selection path.
+  gemini-3-pro:
+    provider: google
+    model_id: gemini-3-pro-preview
+    is_enabled: false
+    is_enabled_as_verifier: false
+    notes: "Identity registry only: Gemini Code Assist orchestrator sessions."
+
+task_type_params:
+  formatting:
+    sonnet: {effort: low, thinking: {enabled: false}}
+    opus: {effort: low, thinking: {enabled: false}}
+    gemini-flash: {thinking_budget: 0}
+    gemini-pro: {thinking_budget: 128}   # Pro rejects 0 ("only works in thinking mode"); 128 is its minimum
+    gpt-5-4-mini: {reasoning_effort: none}
+    gpt-5-4: {reasoning_effort: none}
+  summarization:
+    sonnet: {effort: low, thinking: {enabled: false}}
+    opus: {effort: low, thinking: {enabled: false}}
+    gemini-flash: {thinking_budget: 0}
+    gemini-pro: {thinking_budget: 128}   # Pro rejects 0 ("only works in thinking mode"); 128 is its minimum
+    gpt-5-4-mini: {reasoning_effort: none}
+    gpt-5-4: {reasoning_effort: low}
+  documentation:
+    sonnet: {effort: low, thinking: {enabled: false}}
+    gemini-pro: {thinking_budget: -1}
+    gpt-5-4-mini: {reasoning_effort: low}
+  session-close-out:
+    sonnet: {effort: low, thinking: {enabled: false}}
+    gemini-pro: {thinking_budget: 128}   # Pro rejects 0 ("only works in thinking mode"); 128 is its minimum
+    gpt-5-4-mini: {reasoning_effort: none}
+  test-generation:
+    sonnet: {effort: medium, thinking: {enabled: true, type: adaptive}}
+    gemini-pro: {thinking_budget: -1}
+    gpt-5-4-mini: {reasoning_effort: medium}
+  code-review:
+    sonnet: {effort: medium, thinking: {enabled: true, type: adaptive}}
+    gemini-pro: {thinking_budget: -1}
+    gpt-5-4-mini: {reasoning_effort: medium}
+  analysis:
+    sonnet: {effort: medium, thinking: {enabled: true, type: adaptive}}
+    gemini-pro: {thinking_budget: -1}
+    gpt-5-4-mini: {reasoning_effort: medium}
+  refactoring:
+    sonnet: {effort: medium, thinking: {enabled: true, type: adaptive}}
+    gemini-pro: {thinking_budget: -1}
+    gpt-5-4-mini: {reasoning_effort: medium}
+  session-verification:
+    sonnet: {effort: high, thinking: {enabled: true, type: adaptive}}
+    opus: {effort: high, thinking: {enabled: true, type: adaptive}}
+    gemini-pro: {thinking_budget: -1}
+    gpt-5-4: {reasoning_effort: high}
+    gpt-5-4-mini: {reasoning_effort: high}
+  security-review:
+    sonnet: {effort: high, thinking: {enabled: true, type: adaptive}}
+    opus: {effort: high, thinking: {enabled: true, type: adaptive}}
+    gemini-pro: {thinking_budget: -1}
+    gpt-5-4: {reasoning_effort: high}
+  architecture:
+    opus: {effort: max, thinking: {enabled: true, type: adaptive}}
+    gemini-pro: {thinking_budget: -1}
+    gpt-5-4: {reasoning_effort: xhigh}
+  planning:
+    opus: {effort: high, thinking: {enabled: true, type: adaptive}}
+    gemini-pro: {thinking_budget: -1}
+    gpt-5-4: {reasoning_effort: high}
+  verification:
+    sonnet: {effort: medium, thinking: {enabled: true, type: adaptive}}
+    opus: {effort: high, thinking: {enabled: true, type: adaptive}}
+    gemini-pro: {thinking_budget: -1}
+    gpt-5-4: {reasoning_effort: high}
+    gpt-5-4-mini: {reasoning_effort: medium}
+
+escalation:
+  enabled: true
+  # A retry walks down the role's ordered candidate list; this is how far.
+  max_escalations: 2
+  triggers:
+    empty_response: true
+    max_tokens_hit: true
+    min_output_tokens: 30
+    refusal_detection: true
+  refusal_phrases:
+    - "i can't help with"
+    - "i'm unable to"
+    - "i cannot assist"
+    - "beyond my capabilities"
+    - "i don't have enough context"
+
+# Cross-provider verification. Session 2 wires the loop; the settings here
+# are read by the verifier selection and prompt template resolution.
+verification:
+  enabled: true
+  auto_verify_task_types:
+    - code-review
+    - security-review
+    - architecture
+    - documentation
+  settings:
+    # The session-verification loop suspends at this bound. The closed
+    # severity vocabulary is the primary control; the cap is the backstop.
+    max_rounds: 3
+    # The tests phase runs the authored tests at most this many times before
+    # its loop terminates. Separate from max_rounds because a test round
+    # runs a suite the framework already has, where a review round buys a
+    # vendor's opinion.
+    max_test_rounds: 7
+    on_disagreement: merge     # merge | flag | re-route
+    on_disagreement_by_task_type:
+      code-review: merge
+      security-review: merge
+      test-generation: merge
+      documentation: merge
+      analysis: flag
+      planning: flag
+      architecture: flag
+      refactoring: flag
+    tiebreaker_model: opus
+    prompt_template_file: prompt-templates/verification.md
+
+metrics:
+  enabled: true
+  log_filename: router-metrics.jsonl

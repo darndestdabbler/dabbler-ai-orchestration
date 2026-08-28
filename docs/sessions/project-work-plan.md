@@ -55,7 +55,7 @@ it.
 | 17 | The tracked project config (precondition for D2) | no | 2026-08-28 |
 | 18 | Project setup as two sessions (plan D2) | no | 2026-08-28 |
 | 19 | The unresolved-session view (plan D3) | no | 2026-08-28 |
-| 20 | A round baseline that survives the trip (root cause of D98) | — | not declared |
+| 20 | A round baseline that survives the trip (root cause of D98) | no | 2026-08-28 |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -515,3 +515,37 @@ read at planning time, from the record, in the Work Explorer.
    --force only for the unresolved terminal, because an unresolved session
    cannot close). No approve-over action exists anywhere, and nothing holds
    an engine open.
+
+### Session 20 — A round baseline that survives the trip (root cause of D98)
+
+**Releasable: no.**
+
+Make a verification round's baseline portable by construction, so a session
+that changes machines resolves its own fix delta instead of recovering onto a
+wider one (root cause of D98, left open at D98 and D100, scheduled as this
+session by D103).
+
+1. Anchor each snapshot as it is recorded: `ledger.append_round` wraps the
+   round's `completion_tree` in a framework-authored commit and points
+   `refs/dabbler/rounds/s<N>/r<R>` at it, in the same call that appends the
+   row; the row records the anchor commit. The test asserts the anchored
+   commit's tree hashes identically to the recorded `completion_tree`.
+2. Push the refs, because `git push` will not: the close pushes the session's
+   round refs after its bookkeeping push and reports a dropped ref the same
+   way it reports a dropped branch. The clone's `remote.<name>.push` also
+   carries the round pattern, so the operator's own mid-session push -- the
+   push that actually moves a session between machines -- carries them too.
+3. Fetch them: `evidence.ensure_round_refspecs` writes the
+   `+refs/dabbler/rounds/*:refs/dabbler/rounds/*` fetch refspec (and the push
+   pattern) into the clone's remote configuration; `bootstrap` calls it, which
+   is how an existing clone is migrated. Acceptance is a two-checkout test:
+   record a round in A, push, fetch in B, and resolve the baseline in B
+   without `verify reanchor`.
+4. Decide the retention rule and record it as a decision: one ref per round
+   per session, kept forever; nothing deletes them.
+5. `verify reanchor` stays, with its refusals unchanged; `affected`'s
+   missing-baseline hint names the fetch before it names the recovery.
+6. Affected tests as preverify, cross-provider verification, the full suite
+   as the run of record, close-out.
+
+Not releasable: this repository declares no packaging block.

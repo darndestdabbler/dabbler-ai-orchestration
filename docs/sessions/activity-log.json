@@ -4137,6 +4137,13 @@
       "dateTime": "2026-08-28T09:43:08.234480-04:00",
       "description": "Registered session 20 (claude-code).",
       "status": "complete"
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 20,
+      "dateTime": "2026-08-28T09:43:27.922429-04:00",
+      "task": "Make a verification round's baseline portable by construction, so a session\nthat changes machines resolves its own fix delta instead of recovering onto a\nwider one (root cause of D98, left open at D98 and D100, scheduled as this\nsession by D103).\n\n1. Anchor each snapshot as it is recorded: `ledger.append_round` wraps the\n   round's `completion_tree` in a framework-authored commit and points\n   `refs/dabbler/rounds/s<N>/r<R>` at it, in the same call that appends the\n   row; the row records the anchor commit. The test asserts the anchored\n   commit's tree hashes identically to the recorded `completion_tree`.\n2. Push the refs, because `git push` will not: the close pushes the session's\n   round refs after its bookkeeping push and reports a dropped ref the same\n   way it reports a dropped branch. The clone's `remote.<name>.push` also\n   carries the round pattern, so the operator's own mid-session push -- the\n   push that actually moves a session between machines -- carries them too.\n3. Fetch them: `evidence.ensure_round_refspecs` writes the\n   `+refs/dabbler/rounds/*:refs/dabbler/rounds/*` fetch refspec (and the push\n   pattern) into the clone's remote configuration; `bootstrap` calls it, which\n   is how an existing clone is migrated. Acceptance is a two-checkout test:\n   record a round in A, push, fetch in B, and resolve the baseline in B\n   without `verify reanchor`.\n4. Decide the retention rule and record it as a decision: one ref per round\n   per session, kept forever; nothing deletes them.\n5. `verify reanchor` stays, with its refusals unchanged; `affected`'s\n   missing-baseline hint names the fetch before it names the recovery.\n6. Affected tests as preverify, cross-provider verification, the full suite\n   as the run of record, close-out.\n\nNot releasable: this repository declares no packaging block.",
+      "releasable": false
     }
   ]
 }

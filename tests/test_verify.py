@@ -2,6 +2,7 @@ import datetime
 import json
 import os
 import subprocess
+from pathlib import Path
 
 import pytest
 
@@ -1303,7 +1304,7 @@ class TestRoundBaselineTravels:
         rc, remote, _ = run_git(repo, "remote", "get-url", "origin")
         other = tmp_path / "other"
         subprocess.run(["git", "clone", "-q", "--no-local", "--branch", "main",
-                        remote,
+                        str(Path(repo, remote).resolve()),
                         str(other)], capture_output=True)
         assert not object_exists(other, recorded)   # a plain clone lacks it
         ensure_round_refspecs(other)

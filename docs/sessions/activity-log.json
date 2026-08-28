@@ -4314,6 +4314,80 @@
       "description": "Close-out. Update `STATUS.md`: the evaluation now points at its decision number and the suite time is the new one.",
       "status": "pending",
       "kind": "plan-step"
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 21,
+      "dateTime": "2026-08-28T11:17:55.904616-04:00",
+      "task": "Session 21 of 21: close out set 148 on the record, and make the loop tests cheap.\n\nThree deliverables, nothing else:\n\n1. Record set 148's acceptance evaluation as a decision in the decisions log (decider: orchestrator), in the substance STATUS.md carries it: criterion met, checks 1 and 2 met with their noted splits and exceptions, check 3 (seat cost measured from session 3 onward) NOT MET, with the four measured sessions listed and the operator's 2026-08-28 decision that the figure is not back-filled. The step carries forward into every future session plan; the figure does not.\n\n2. One git seam. Delete the checks.py copies of snapshot_worktree_tree and changed_paths_between; runcli.py, verifyjob.py and workflow.py import them from evidence. Route the remaining direct git spawns in journal.py and ledger.py through evidence.run_git, so one function is the only place the router spawns git. Net negative lines, no behaviour change, no new test.\n\n3. Make the loop tests cheap without faking git. Measure first (pytest --durations, sandbox_repo setup timed separately from the loop). Then: build the seeded repo and bare remote once per session and copytree per test; pin the suite's git environment (GIT_CONFIG_GLOBAL empty, gc.auto=0, core.fsmonitor=false, commit.gpgsign=false, core.autocrlf=false); drop fixture git calls whose result no test reads. Target: no test above 1.5 s and the final-full run of record under 3:00 at -n 2, against session 20's 379 s. If measurement shows the loop's own per-round git calls dominate, stop at the seam and record the number.\n\nThen affected tests as preverify, cross-provider verification, the full suite as the final-full run of record (which is also the step-3 measurement), and close-out with STATUS.md pointing at the decision number and the new suite time.",
+      "releasable": false
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D127",
+      "ordinal": 127,
+      "sessionNumber": 21,
+      "decidedOn": "2026-08-28",
+      "recordedAt": "2026-08-28T11:18:19.892304-04:00",
+      "decider": "orchestrator",
+      "headline": "Set 148 acceptance: criterion met, checks 1-2 met, check 3 (seat cost) not met and not back-filled by operator decision; the measurement step carries forward",
+      "body": "Set 148's acceptance criterion was \"the framework can run its own next session\": whether session 20 could have been specified, developed, verified, tested and closed by the thing this set built rather than by the machinery it replaces. Evaluated from the record (sessions.json, the rounds ledgers under .dabbler/runs/s<N>/, test-runs.jsonl, and the decisions log), not from opinion.\n\n**Criterion: MET.** Session 20 was registered, declared, developed, pre-verified with the selector, cross-provider verified (one round, VERIFIED), run-of-record tested and closed through the framework's own lifecycle, and its close committed and pushed its own state write.\n\n**Check 1 \u2014 every plan item appears exactly once, no unbuilt spec section: MET.** Plan items A1\u2013A7, B1\u2013B3, C and D1\u2013D3 each map to exactly one session (A5 split into 6 read surface + 7 test-write path; D1 split into 15 sessions view + 16 task level, both by design). Session 17 is a precondition D2 needed that the plan did not list; sessions 1\u20132 verified the design and the breakdown; session 20 is outside the plan \u2014 D103 promoted the D98 root cause from an owed decision to a session. Spec sections 1\u20136, 8 and 9 map onto sessions; section 7 (cost) is built by reuse of metrics.py, the config.py overlay and secret_resolver.py exactly as the plan's \"already exists\" table says; section 10 is the deliberately-not list. No item is built twice and no section is unbuilt.\n\n**Check 2 \u2014 no skipped lifecycle step, no foreign verdict: MET.** Every session has a rounds ledger ending in a verdict from the verifier's vocabulary, at least one final-full run of record inside its start\u2013close window, and a preverify-targeted run \u2014 except session 2, a prose session that changed no code, so the selector had nothing to record. The only two rows carrying no verifier identity are the framework-written cap-landing rows of sessions 12 and 17, which is what a REMEDIATED_AT_CAP terminal row is; neither is a hand-written verdict.\n\n**Check 3 \u2014 seat cost measured from session 3 onward: NOT MET.** Measured and recorded for four sessions only: 1 (D38 \u2014 costUsd null, the metrics gap), 3 (D29, ~$22.48), 4 (D37, ~$8) and 5 (D48, ~$10.61). Sessions 6\u201314 ran on the Copilot seat and recorded no measurement; sessions 15\u201320 ran on the direct API and every verification.costUsd in sessions.json is null. The step that owed this \u2014 \"measure this session's seat cost and record it\" \u2014 was in session 3's plan and was not carried into sessions 4\u201320's step lists.\n\n**Operator decision, 2026-08-28: the seat cost for set 148 is NOT back-filled.** The sessions are closed, and a figure recovered now would change nothing forward; the next set plans against the $8\u2013$12 per ordinary code session band that D37 named from two samples and D48 confirmed with a third. What carries forward is the step, not the figure: every future session plan carries \"measure this session's seat cost and record it\" as a numbered step, the way session 3's did and sessions 4\u201320's did not. This closes the seat-cost question rather than leaving it owed.\n\nRecorded as step 2 of session 21, before any code moves, because a decision appended after the run of record moves the tree and fails the freshness gate."
+    },
+    {
+      "sessionNumber": 21,
+      "stepNumber": 1,
+      "stepKey": "register-then-declare-not-releasable",
+      "dateTime": "2026-08-28T11:18:28.710617-04:00",
+      "description": "Registered as claude-code/anthropic; declared not-releasable with the three deliverables and nothing else.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 21,
+      "stepNumber": 2,
+      "stepKey": "record-the-acceptance-evaluation-as-a",
+      "dateTime": "2026-08-28T11:18:29.104287-04:00",
+      "description": "D127: acceptance evaluation recorded; seat-cost question closed by operator decision, not owed.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 21,
+      "stepNumber": 3,
+      "stepKey": "one-git-seam",
+      "dateTime": "2026-08-28T11:22:46.134989-04:00",
+      "description": "checks.py copies of snapshot_worktree_tree/changed_paths_between deleted; runcli, verifyjob, workflow and test_workflow import from evidence. evidence.run_git/repo_root_for are now re-exports of journal's (journal is below evidence in the import graph, so the one spawn point lives there). ledger.py had no git calls. Net -59 lines.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 21,
+      "stepNumber": 4,
+      "stepKey": "make-the-loop-tests-cheap-without",
+      "dateTime": "2026-08-28T11:37:24.139599-04:00",
+      "description": "Measured first: one git spawn ~60-100 ms on this host; sandbox_repo build 1.5-2.1 s (9 spawns) vs copytree 45 ms; pinned git env buys 10-30% per spawn. Done: sandbox_repo and run_repo built once per session and copied per test (relative remote so the copied pair is independent); suite-wide pinned git config (identity, autocrlf/fsmonitor/gpgsign/gc off, no system config); the per-repo identity and signing spawns dropped. Full suite 379 s -> 282 s at -n 2 (-26%); every setup phase left the top 40. Targets (no test over 1.5 s, run under 3:00) NOT met: the slowest test spends 8.5 of 9.5 s in 134 git spawns inside the loop itself, so per the plan's stopping rule the fixture work stops here and no fake git is introduced.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 21,
+      "stepNumber": 5,
+      "stepKey": "affected-tests-as-preverify",
+      "dateTime": "2026-08-28T11:37:32.699984-04:00",
+      "description": "Selector: all tests affected (tests/conftest.py is a declared repo-wide path), so the complete suite was the correct preverify command. Recorded: 941 passed, 282 s, policy all-tests-affected, digest 8d099694003f.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 21,
+      "stepNumber": 6,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-28T11:57:58.278958-04:00",
+      "description": "Three rounds (gpt-5-6-sol/openai). R1 ISSUES_FOUND: 'the evidence seam was not implemented' \u2014 disputed on three grounds (evidence.run_git IS journal.run_git, one object; ledger.py contains no git call; the criterion's import direction is forbidden by test_runcore_independence, proven by the four failures the first arrangement produced). R2 WITHDREW the dispute and raised a real new defect: run_git_bytes was a second spawn site. Fixed by making bytes a mode of run_git (binary=True); one ['git', ...] argv remains in the package. R3 VERIFIED.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 21,
+      "stepNumber": 7,
+      "stepKey": "full-test-suite-recorded-as-the",
+      "dateTime": "2026-08-28T11:57:58.724633-04:00",
+      "description": "941 passed in 285.5 s (4:45) at -n 2, recorded as the final-full run of record (digest 4b84f569820d). This is also step 4's measurement: 379 s -> 286 s, -25%.",
+      "status": "complete"
     }
   ]
 }

@@ -777,7 +777,7 @@ def run_terminal(root, state: dict, cap: int, *,
         return verdictmod.validate_session_verdict(verdictmod.VERDICT_VERIFIED)
     if (state.get(rounds_key) or 0) < cap:
         return None
-    from ai_router.checks import snapshot_worktree_tree
+    from ai_router.evidence import snapshot_worktree_tree
 
     left = last.get("postTreeDigest")
     current = snapshot_worktree_tree(root)

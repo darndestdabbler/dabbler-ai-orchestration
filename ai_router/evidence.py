@@ -28,41 +28,27 @@ import json
 import os
 import platform
 import re
-import subprocess
-import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
 from . import ledger
-from .journal import is_machine_state_path  # noqa: F401  (re-exported)
-from .ledger import MACHINE_DIRNAME, RUNS_DIRNAME
+# The router spawns git in exactly one function, journal.run_git, and the
+# tree snapshot and tree diff exist once, beside it. journal sits below this
+# module and inside the run core, which may import nothing from here; this
+# module is the name the lifecycle callers use.
+from .journal import (  # noqa: F401  (re-exported)
+    changed_paths_between,
+    is_machine_state_path,
+    repo_root_for,
+    run_git,
+    snapshot_worktree_tree,
+)
+from .ledger import RUNS_DIRNAME
 
 
 # --- Machine-side state -----------------------------------------------------
 
-
-
-# --- Git primitives ---------------------------------------------------------
-
-def run_git(repo_root, *args, env=None) -> tuple:
-    """``(rc, stdout, stderr)``; a missing git binary is ``rc=127``."""
-    try:
-        result = subprocess.run(
-            ["git", "-C", str(repo_root), *args],
-            capture_output=True, text=True, encoding="utf-8",
-            errors="replace", env=env,
-        )
-    except FileNotFoundError:
-        return 127, "", "git not available on PATH"
-    # stdout drops only the newline framing: porcelain status columns are
-    # positional, and the first line may legitimately begin with a space.
-    return result.returncode, result.stdout.strip("\n"), result.stderr.strip()
-
-
-def repo_root_for(path) -> Optional[str]:
-    rc, out, _ = run_git(Path(path), "rev-parse", "--show-toplevel")
-    return out if rc == 0 and out else None
 
 
 # --- The repository's sessions root -----------------------------------------
@@ -117,43 +103,6 @@ def resolve_sessions_dir(explicit=None, start=None) -> str:
             "Run from the repository, or pass --sessions-dir."
         )
     return str(sessions_dir_for(root))
-
-
-def snapshot_worktree_tree(repo_root) -> Optional[str]:
-    """A tree object capturing tracked AND untracked non-ignored files,
-    via a throwaway index — the real index and worktree are untouched.
-    Both ends of a fix-delta diff must be snapshots like this one: a
-    tree-vs-worktree diff reports an untracked file as deleted.
-
-    The machine-side ``.dabbler/`` directory is dropped unconditionally,
-    so the ledger cannot appear in a snapshot even in a repo that never
-    got the ignore rule (or that committed the ledger before it did)."""
-    fd, tmp_index = tempfile.mkstemp(prefix="dabbler-verify-index-")
-    os.close(fd)
-    os.unlink(tmp_index)  # let git create it
-    env = dict(os.environ, GIT_INDEX_FILE=tmp_index)
-    try:
-        rc, _, _ = run_git(repo_root, "read-tree", "HEAD", env=env)
-        if rc != 0:
-            rc, _, _ = run_git(repo_root, "read-tree", "--empty", env=env)
-            if rc != 0:
-                return None
-        rc, _, _ = run_git(repo_root, "add", "-A", env=env)
-        if rc != 0:
-            return None
-        # After the add, so it also clears entries inherited from HEAD.
-        # rc is ignored: --ignore-unmatch makes "nothing to drop" normal.
-        run_git(
-            repo_root, "rm", "--cached", "-r", "-f", "--ignore-unmatch",
-            "-q", "--", MACHINE_DIRNAME, env=env,
-        )
-        rc, out, _ = run_git(repo_root, "write-tree", env=env)
-        return out if rc == 0 and out else None
-    finally:
-        try:
-            os.unlink(tmp_index)
-        except OSError:
-            pass
 
 
 def object_exists(repo_root, rev: str) -> bool:
@@ -311,18 +260,6 @@ def ensure_round_refspecs(repo_root, remote: Optional[str] = None) -> list:
     return added
 
 
-def changed_paths_between(repo_root, tree_a: str, tree_b: str) -> Optional[list]:
-    """Repo-relative paths differing between two trees, or ``None`` on git
-    failure (callers fail closed)."""
-    rc, out, _ = run_git(
-        repo_root, "diff", "--name-only", "-z", "--no-ext-diff",
-        tree_a, tree_b,
-    )
-    if rc != 0:
-        return None
-    return [p for p in out.split("\0") if p]
-
-
 def read_tree_blob(repo_root, tree: str, path: str) -> Optional[bytes]:
     """The file's exact bytes as *tree* recorded them, or ``None``.
 
@@ -331,17 +268,13 @@ def read_tree_blob(repo_root, tree: str, path: str) -> Optional[bytes]:
     nothing about what was reviewed — and would start passing again the
     moment an author re-typed the line it failed on. Bytes, not text:
     ``run_git`` strips newline framing, which is fine for porcelain and
-    fatal for a content hash.
+    fatal for a content hash, so this one asks the same call for bytes
+    rather than spawning around it.
     """
-    try:
-        result = subprocess.run(
-            ["git", "-C", str(repo_root), "cat-file", "blob",
-             f"{tree}:{path}"],
-            capture_output=True,
-        )
-    except (FileNotFoundError, OSError):
-        return None
-    return result.stdout if result.returncode == 0 else None
+    rc, out, _ = run_git(
+        repo_root, "cat-file", "blob", f"{tree}:{path}", binary=True,
+    )
+    return out if rc == 0 else None
 
 
 def tree_paths(repo_root, tree: str) -> list:

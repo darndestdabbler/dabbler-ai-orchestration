@@ -28,9 +28,9 @@ from ai_router import agency
 from ai_router.checks import (
     REASON_CHANGED_TEST, STAGE_TARGETED, Check, SelectedTest, SelectionResult,
     covers_any, execute, load_checks, load_selection_config,
-    scope_for_test, selection_payload, snapshot_worktree_tree,
-    targeted_command, timeout_for,
+    scope_for_test, selection_payload, targeted_command, timeout_for,
 )
+from ai_router.evidence import snapshot_worktree_tree
 from ai_router.route import NoCandidateError, route
 from ai_router.selection import ROLE_VERIFIER
 from ai_router.solution import STEP_DELIVERABLES, STEP_TITLES

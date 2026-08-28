@@ -56,6 +56,7 @@ it.
 | 18 | Project setup as two sessions (plan D2) | no | 2026-08-28 |
 | 19 | The unresolved-session view (plan D3) | no | 2026-08-28 |
 | 20 | A round baseline that survives the trip (root cause of D98) | no | 2026-08-28 |
+| 21 | Close out set 148 on the record, and make the loop tests cheap | no | 2026-08-28 |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -549,3 +550,19 @@ session by D103).
    as the run of record, close-out.
 
 Not releasable: this repository declares no packaging block.
+
+### Session 21 — Close out set 148 on the record, and make the loop tests cheap
+
+**Releasable: no.**
+
+Session 21 of 21: close out set 148 on the record, and make the loop tests cheap.
+
+Three deliverables, nothing else:
+
+1. Record set 148's acceptance evaluation as a decision in the decisions log (decider: orchestrator), in the substance STATUS.md carries it: criterion met, checks 1 and 2 met with their noted splits and exceptions, check 3 (seat cost measured from session 3 onward) NOT MET, with the four measured sessions listed and the operator's 2026-08-28 decision that the figure is not back-filled. The step carries forward into every future session plan; the figure does not.
+
+2. One git seam. Delete the checks.py copies of snapshot_worktree_tree and changed_paths_between; runcli.py, verifyjob.py and workflow.py import them from evidence. Route the remaining direct git spawns in journal.py and ledger.py through evidence.run_git, so one function is the only place the router spawns git. Net negative lines, no behaviour change, no new test.
+
+3. Make the loop tests cheap without faking git. Measure first (pytest --durations, sandbox_repo setup timed separately from the loop). Then: build the seeded repo and bare remote once per session and copytree per test; pin the suite's git environment (GIT_CONFIG_GLOBAL empty, gc.auto=0, core.fsmonitor=false, commit.gpgsign=false, core.autocrlf=false); drop fixture git calls whose result no test reads. Target: no test above 1.5 s and the final-full run of record under 3:00 at -n 2, against session 20's 379 s. If measurement shows the loop's own per-round git calls dominate, stop at the seam and record the number.
+
+Then affected tests as preverify, cross-provider verification, the full suite as the final-full run of record (which is also the step-3 measurement), and close-out with STATUS.md pointing at the decision number and the new suite time.

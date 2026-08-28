@@ -22,6 +22,7 @@ import hashlib
 import json
 import os
 import subprocess
+import tempfile
 import time
 import uuid
 from pathlib import Path
@@ -95,24 +96,90 @@ class LockContentionError(JournalError):
 
 # --- Git plumbing -----------------------------------------------------------
 
-def run_git(repo_root, *args, env=None) -> tuple:
-    """``(rc, stdout, stderr)``; a missing git binary is ``rc=127``."""
+def run_git(repo_root, *args, env=None, binary=False) -> tuple:
+    """``(rc, stdout, stderr)``; a missing git binary is ``rc=127``.
+
+    The router spawns git here and nowhere else, so anything that must see
+    every git call -- instrumentation, a spawn budget, an error policy --
+    has one place to sit. *binary* is a mode of this call rather than a
+    second one: it returns stdout as the exact bytes git wrote, because a
+    blob's bytes are what a hash is taken over and the newline framing that
+    is noise in porcelain is content there.
+    """
+    text = not binary
     try:
         result = subprocess.run(
             ["git", "-C", str(repo_root), *args],
-            capture_output=True, text=True, encoding="utf-8",
-            errors="replace", env=env,
+            capture_output=True, text=text,
+            encoding="utf-8" if text else None,
+            errors="replace" if text else None,
+            env=env,
         )
     except FileNotFoundError:
-        return 127, "", "git not available on PATH"
+        return 127, ("" if text else b""), "git not available on PATH"
+    stderr = (
+        result.stderr if text
+        else result.stderr.decode("utf-8", "replace")
+    )
+    if binary:
+        return result.returncode, result.stdout, stderr.strip()
     # stdout drops only the newline framing: porcelain status columns are
     # positional, and the first line may legitimately begin with a space.
-    return result.returncode, result.stdout.strip("\n"), result.stderr.strip()
+    return result.returncode, result.stdout.strip("\n"), stderr.strip()
 
 
 def repo_root_for(path) -> Optional[str]:
     rc, out, _ = run_git(Path(path), "rev-parse", "--show-toplevel")
     return out if rc == 0 and out else None
+
+
+def snapshot_worktree_tree(repo_root) -> Optional[str]:
+    """A tree object capturing tracked AND untracked non-ignored files,
+    via a throwaway index — the real index and worktree are untouched.
+    Both ends of a fix-delta diff must be snapshots like this one: a
+    tree-vs-worktree diff reports an untracked file as deleted.
+
+    The machine-side ``.dabbler/`` directory is dropped unconditionally,
+    so the ledger cannot appear in a snapshot even in a repo that never
+    got the ignore rule (or that committed the ledger before it did)."""
+    fd, tmp_index = tempfile.mkstemp(prefix="dabbler-verify-index-")
+    os.close(fd)
+    os.unlink(tmp_index)  # let git create it
+    env = dict(os.environ, GIT_INDEX_FILE=tmp_index)
+    try:
+        rc, _, _ = run_git(repo_root, "read-tree", "HEAD", env=env)
+        if rc != 0:
+            rc, _, _ = run_git(repo_root, "read-tree", "--empty", env=env)
+            if rc != 0:
+                return None
+        rc, _, _ = run_git(repo_root, "add", "-A", env=env)
+        if rc != 0:
+            return None
+        # After the add, so it also clears entries inherited from HEAD.
+        # rc is ignored: --ignore-unmatch makes "nothing to drop" normal.
+        run_git(
+            repo_root, "rm", "--cached", "-r", "-f", "--ignore-unmatch",
+            "-q", "--", MACHINE_DIRNAME, env=env,
+        )
+        rc, out, _ = run_git(repo_root, "write-tree", env=env)
+        return out if rc == 0 and out else None
+    finally:
+        try:
+            os.unlink(tmp_index)
+        except OSError:
+            pass
+
+
+def changed_paths_between(repo_root, tree_a: str, tree_b: str) -> Optional[list]:
+    """Repo-relative paths differing between two trees, or ``None`` on git
+    failure (callers fail closed)."""
+    rc, out, _ = run_git(
+        repo_root, "diff", "--name-only", "-z", "--no-ext-diff",
+        tree_a, tree_b,
+    )
+    if rc != 0:
+        return None
+    return [p for p in out.split("\0") if p]
 
 
 # --- Control root -----------------------------------------------------------

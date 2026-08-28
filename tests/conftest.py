@@ -1,4 +1,5 @@
 import copy
+import shutil
 import subprocess
 
 import pytest
@@ -31,30 +32,78 @@ def _git(cwd, *args):
     )
 
 
-@pytest.fixture
-def sandbox_repo(tmp_path):
-    """A real git repo with one committed session plan and a bare
-    upstream: the sandbox every gate and loop test runs in."""
-    repo = tmp_path / "repo"
-    sessions_dir = repo / "docs" / "sessions"
-    sessions_dir.mkdir(parents=True)
-    (sessions_dir / "session-plan.md").write_text(
-        SESSION_PLAN_MD, encoding="utf-8"
-    )
-    (repo / ".gitignore").write_text(".dabbler/\n", encoding="utf-8")
+# Every git spawn costs a process, and on this framework a test's seconds
+# are almost entirely git spawns. Two rules keep them down without faking
+# git (the loop is trust machinery; a fake that diverged from git's tree
+# hashing would be the failure that matters most and shows least):
+#
+# - The suite runs under one pinned git configuration, so no spawn pays for
+#   the host's (autocrlf, fsmonitor, gpg signing, gc, credential helpers),
+#   and no repository needs its own identity or signing settings.
+# - A seeded repository is built once per session and each test gets a
+#   directory copy. A git repository is a directory; the remote is named by
+#   a relative path, so a copied pair points at its own remote.
+
+GIT_CONFIG = """[user]
+	name = Test
+	email = test@example.invalid
+[init]
+	defaultBranch = main
+[core]
+	autocrlf = false
+	fsmonitor = false
+[commit]
+	gpgsign = false
+[gc]
+	auto = 0
+"""
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _git_env(tmp_path_factory):
+    config = tmp_path_factory.mktemp("git-env") / "gitconfig"
+    config.write_text(GIT_CONFIG, encoding="utf-8")
+    patch = pytest.MonkeyPatch()
+    patch.setenv("GIT_CONFIG_GLOBAL", str(config))
+    patch.setenv("GIT_CONFIG_NOSYSTEM", "1")
+    yield
+    patch.undo()
+
+
+def _seed(repo, files: dict):
+    for rel, text in files.items():
+        (repo / rel).parent.mkdir(parents=True, exist_ok=True)
+        (repo / rel).write_text(text, encoding="utf-8")
     _git(repo, "init", "-q", "-b", "main")
-    _git(repo, "config", "user.email", "test@example.invalid")
-    _git(repo, "config", "user.name", "Test")
-    _git(repo, "config", "commit.gpgsign", "false")
     _git(repo, "add", "-A")
     _git(repo, "commit", "-q", "-m", "seed")
-    remote = tmp_path / "remote.git"
+
+
+@pytest.fixture(scope="session")
+def _sandbox_template(tmp_path_factory, _git_env):
+    base = tmp_path_factory.mktemp("sandbox")
+    repo = base / "repo"
+    _seed(repo, {
+        "docs/sessions/session-plan.md": SESSION_PLAN_MD,
+        ".gitignore": ".dabbler/\n",
+    })
     subprocess.run(
-        ["git", "init", "-q", "--bare", str(remote)], capture_output=True,
+        ["git", "init", "-q", "--bare", str(base / "remote.git")],
+        capture_output=True,
     )
-    _git(repo, "remote", "add", "origin", str(remote))
+    _git(repo, "remote", "add", "origin", "../remote.git")
     _git(repo, "push", "-q", "-u", "origin", "main")
-    return repo, sessions_dir
+    return base
+
+
+@pytest.fixture
+def sandbox_repo(tmp_path, _sandbox_template):
+    """A real git repo with one committed session plan and a bare
+    upstream: the sandbox every gate and loop test runs in."""
+    for name in ("repo", "remote.git"):
+        shutil.copytree(_sandbox_template / name, tmp_path / name)
+    repo = tmp_path / "repo"
+    return repo, repo / "docs" / "sessions"
 
 
 def record_preverify(repo, sessions_dir):
@@ -245,8 +294,22 @@ Implement and test the bounded parser path.
 """
 
 
+@pytest.fixture(scope="session")
+def _run_template(tmp_path_factory, _git_env):
+    base = tmp_path_factory.mktemp("run")
+    _seed(base / "work", {
+        "docs/sessions/session-plan.md": RUN_PLAN_MD,
+        # FAIL is a test's failure sentinel. Ignored so it is not itself an
+        # unmapped change in the candidate tree, which would confound the
+        # selection and escalation assertions it exists to set up.
+        ".gitignore": ".dabbler/\nFAIL\n",
+        "app.py": "VALUE = 1\n",
+    })
+    return base
+
+
 @pytest.fixture
-def run_repo(tmp_path, monkeypatch):
+def run_repo(tmp_path, _run_template, monkeypatch):
     """A committed git repository with one authored session plan, cwd'd into.
 
     The run core resolves its control root, repository id, and config from
@@ -254,26 +317,7 @@ def run_repo(tmp_path, monkeypatch):
     rather than a temp directory that merely looks like one.
     """
     repo = tmp_path / "work"
-    sessions_dir = repo / "docs" / "sessions"
-    sessions_dir.mkdir(parents=True)
-    (sessions_dir / "session-plan.md").write_text(
-        RUN_PLAN_MD, encoding="utf-8"
-    )
-    (repo / ".gitignore").write_text(
-        ".dabbler/\n"
-        # A test's failure sentinel. Ignored so it is not itself an unmapped
-        # change in the candidate tree, which would confound the selection
-        # and escalation assertions it exists to set up.
-        "FAIL\n",
-        encoding="utf-8",
-    )
-    (repo / "app.py").write_text("VALUE = 1\n", encoding="utf-8")
-    _git(repo, "init", "-q", "-b", "main")
-    _git(repo, "config", "user.email", "test@example.invalid")
-    _git(repo, "config", "user.name", "Test")
-    _git(repo, "config", "commit.gpgsign", "false")
-    _git(repo, "add", "-A")
-    _git(repo, "commit", "-q", "-m", "seed")
+    shutil.copytree(_run_template / "work", repo)
     monkeypatch.chdir(repo)
     return repo
 

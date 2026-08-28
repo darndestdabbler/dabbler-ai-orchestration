@@ -25,8 +25,12 @@ from .config import (
     load_config,
     resolve_transport,
 )
-from .checks import changed_paths_between, snapshot_worktree_tree
-from .journal import repo_root_for, run_git
+from .journal import (
+    changed_paths_between,
+    repo_root_for,
+    run_git,
+    snapshot_worktree_tree,
+)
 from .identity import (
     IdentityResolutionError,
     resolve_orchestrator_identity,

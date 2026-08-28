@@ -25,7 +25,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
-from .journal import MACHINE_DIRNAME, run_git, write_heartbeat
+from .journal import changed_paths_between, snapshot_worktree_tree, write_heartbeat
 
 STAGE_TARGETED = "targeted"
 STAGE_FINAL_FULL = "final-full"
@@ -538,55 +538,6 @@ def targeted_command(base: str, result: SelectionResult, *,
 
 
 RECORD_PLACEHOLDER = "<the command you ran>"
-
-
-def snapshot_worktree_tree(repo_root) -> Optional[str]:
-    """A tree object capturing tracked AND untracked non-ignored files,
-    via a throwaway index — the real index and worktree are untouched.
-    Both ends of a fix-delta diff must be snapshots like this one: a
-    tree-vs-worktree diff reports an untracked file as deleted.
-
-    The machine-side ``.dabbler/`` directory is dropped unconditionally,
-    so the ledger cannot appear in a snapshot even in a repo that never
-    got the ignore rule (or that committed the ledger before it did)."""
-    fd, tmp_index = tempfile.mkstemp(prefix="dabbler-verify-index-")
-    os.close(fd)
-    os.unlink(tmp_index)  # let git create it
-    env = dict(os.environ, GIT_INDEX_FILE=tmp_index)
-    try:
-        rc, _, _ = run_git(repo_root, "read-tree", "HEAD", env=env)
-        if rc != 0:
-            rc, _, _ = run_git(repo_root, "read-tree", "--empty", env=env)
-            if rc != 0:
-                return None
-        rc, _, _ = run_git(repo_root, "add", "-A", env=env)
-        if rc != 0:
-            return None
-        # After the add, so it also clears entries inherited from HEAD.
-        # rc is ignored: --ignore-unmatch makes "nothing to drop" normal.
-        run_git(
-            repo_root, "rm", "--cached", "-r", "-f", "--ignore-unmatch",
-            "-q", "--", MACHINE_DIRNAME, env=env,
-        )
-        rc, out, _ = run_git(repo_root, "write-tree", env=env)
-        return out if rc == 0 and out else None
-    finally:
-        try:
-            os.unlink(tmp_index)
-        except OSError:
-            pass
-
-
-def changed_paths_between(repo_root, tree_a: str, tree_b: str) -> Optional[list]:
-    """Repo-relative paths differing between two trees, or ``None`` on git
-    failure (callers fail closed)."""
-    rc, out, _ = run_git(
-        repo_root, "diff", "--name-only", "-z", "--no-ext-diff",
-        tree_a, tree_b,
-    )
-    if rc != 0:
-        return None
-    return [p for p in out.split("\0") if p]
 
 
 class CheckConfigError(ValueError):

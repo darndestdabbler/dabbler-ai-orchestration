@@ -22,9 +22,8 @@ from pathlib import Path
 import jsonschema
 
 from . import checks, journal, runcore
-from .checks import changed_paths_between, snapshot_worktree_tree
 from .config import load_config
-from .journal import run_git
+from .journal import changed_paths_between, run_git, snapshot_worktree_tree
 from .journal import ACTOR_FRAMEWORK
 from .runcore import Refusal
 from .verdict import (

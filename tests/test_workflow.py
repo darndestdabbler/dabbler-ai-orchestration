@@ -7,7 +7,8 @@ import yaml
 
 from ai_router import fixloop, stepreview, testphase
 from ai_router import verdict as verdictmod
-from ai_router.checks import Check, CheckRun, snapshot_worktree_tree
+from ai_router.checks import Check, CheckRun
+from ai_router.evidence import snapshot_worktree_tree
 from ai_router.config import DEFAULT_VERIFICATION_ROUNDS
 from ai_router.solution import STEPS
 from ai_router.stepreview import ReviewerOutcome, StepReview, digest_text

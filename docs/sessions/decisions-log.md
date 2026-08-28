@@ -3342,3 +3342,21 @@ the whole bootstrap scaffold to assert one config line. It stays.
 `refs/dabbler/rounds/s20/r1` names commit `bedca06a`, whose tree is the
 row's `completion_tree` `b8f11643`; the ref was written by the append, not
 by hand, and the close will push it.
+
+## Session 21 — Close out set 148 on the record, and make the loop tests cheap
+
+### D127 · 2026-08-28 · Orchestrator · Set 148 acceptance: criterion met, checks 1-2 met, check 3 (seat cost) not met and not back-filled by operator decision; the measurement step carries forward
+
+Set 148's acceptance criterion was "the framework can run its own next session": whether session 20 could have been specified, developed, verified, tested and closed by the thing this set built rather than by the machinery it replaces. Evaluated from the record (sessions.json, the rounds ledgers under .dabbler/runs/s<N>/, test-runs.jsonl, and the decisions log), not from opinion.
+
+**Criterion: MET.** Session 20 was registered, declared, developed, pre-verified with the selector, cross-provider verified (one round, VERIFIED), run-of-record tested and closed through the framework's own lifecycle, and its close committed and pushed its own state write.
+
+**Check 1 — every plan item appears exactly once, no unbuilt spec section: MET.** Plan items A1–A7, B1–B3, C and D1–D3 each map to exactly one session (A5 split into 6 read surface + 7 test-write path; D1 split into 15 sessions view + 16 task level, both by design). Session 17 is a precondition D2 needed that the plan did not list; sessions 1–2 verified the design and the breakdown; session 20 is outside the plan — D103 promoted the D98 root cause from an owed decision to a session. Spec sections 1–6, 8 and 9 map onto sessions; section 7 (cost) is built by reuse of metrics.py, the config.py overlay and secret_resolver.py exactly as the plan's "already exists" table says; section 10 is the deliberately-not list. No item is built twice and no section is unbuilt.
+
+**Check 2 — no skipped lifecycle step, no foreign verdict: MET.** Every session has a rounds ledger ending in a verdict from the verifier's vocabulary, at least one final-full run of record inside its start–close window, and a preverify-targeted run — except session 2, a prose session that changed no code, so the selector had nothing to record. The only two rows carrying no verifier identity are the framework-written cap-landing rows of sessions 12 and 17, which is what a REMEDIATED_AT_CAP terminal row is; neither is a hand-written verdict.
+
+**Check 3 — seat cost measured from session 3 onward: NOT MET.** Measured and recorded for four sessions only: 1 (D38 — costUsd null, the metrics gap), 3 (D29, ~$22.48), 4 (D37, ~$8) and 5 (D48, ~$10.61). Sessions 6–14 ran on the Copilot seat and recorded no measurement; sessions 15–20 ran on the direct API and every verification.costUsd in sessions.json is null. The step that owed this — "measure this session's seat cost and record it" — was in session 3's plan and was not carried into sessions 4–20's step lists.
+
+**Operator decision, 2026-08-28: the seat cost for set 148 is NOT back-filled.** The sessions are closed, and a figure recovered now would change nothing forward; the next set plans against the $8–$12 per ordinary code session band that D37 named from two samples and D48 confirmed with a third. What carries forward is the step, not the figure: every future session plan carries "measure this session's seat cost and record it" as a numbered step, the way session 3's did and sessions 4–20's did not. This closes the seat-cost question rather than leaving it owed.
+
+Recorded as step 2 of session 21, before any code moves, because a decision appended after the run of record moves the tree and fails the freshness gate.

@@ -37,9 +37,10 @@ from typing import Optional
 
 from ai_router import agency
 from ai_router.checks import (
-    STAGE_FINAL_FULL, changed_paths_between, execute, load_selection_config,
-    names_a_test, snapshot_worktree_tree, timeout_for,
+    STAGE_FINAL_FULL, execute, load_selection_config, names_a_test,
+    timeout_for,
 )
+from ai_router.evidence import changed_paths_between, snapshot_worktree_tree
 from ai_router.route import NoCandidateError, route
 from ai_router.selection import ROLE_GENERATOR
 from ai_router.testphase import PhaseError, suites_for

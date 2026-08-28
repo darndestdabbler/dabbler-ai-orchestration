@@ -1,16 +1,101 @@
-# STATUS — session 25 of 35 landed: the foundation modules, and the first verb through both routers
+# STATUS — session 26 of 35 landed: the record, and the first writes compared across two routers
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
 `experiment/verification-pipeline-v3` and `design/solution-decomposition`
 are merged and finished. Earlier handoff text is in `docs/status-archive.md`.
 
-> **Recorded, 2026-08-28.** Session 25's deliverables are decisions
-> **D163–D169** in `docs/sessions/decisions-log.md`; session 24's are
-> **D150–D162** and session 23's **D138–D149**, plus the amendments inside
-> `docs/ts-port-parity-control.md`. This file summarises them; the
-> decisions are the record.
+> **Recorded, 2026-08-28.** Session 26's deliverables are decisions
+> **D170–D172** in `docs/sessions/decisions-log.md`; session 25's are
+> **D163–D169**, session 24's **D150–D162** and session 23's **D138–D149**,
+> plus the amendments inside `docs/ts-port-parity-control.md`. This file
+> summarises them; the decisions are the record.
 
 ## Where things are
+
+- **Session 26 is closed `VERIFIED`** — 2 rounds (gpt-5.6-sol over the API).
+  Round 1 raised two Major findings; **both were disputed and both were
+  withdrawn**, and round 2 was clean. Claude Code / claude-opus-5[1m]
+  orchestrator. All five gates passed at the first attempt; nothing was
+  forced.
+- **The record is ported.** `ledger` (901), `writers` (881) and `journal`'s
+  surviving slice (~150) became **~4,000 TypeScript lines across ten
+  files**, with **74 vitest tests**. Everything under `.dabbler/runs/` and
+  `docs/sessions/` is written there and nowhere else.
+- **D129 sized this session at three modules; it is nine (D171).**
+  `writers` cannot be ported alone. It imports `progress` (session 30) for
+  the status vocabulary, the derived view and the invariants it folds a
+  state through before writing it; `evidence` (session 27) for the
+  filenames at the sessions root and the digest ledger every sanctioned
+  write appends to; and `gates` (session 30) for the working-tree question
+  the declaration refuses on. Each is ported as a named slice in a file
+  named for its Python module — 302 Python lines in all — the way session
+  25 ported `transports/copilot`'s timeout slice. Porting the writer
+  without the reader would put a second statement of what a legal record is
+  inside the module that produces them.
+- **`session start` / `declare` / `log` / `decision` are real; the rest of
+  the verb is refused by name.** Nothing `writers` writes is reachable
+  except through those four, so without them ~4,000 ported lines would have
+  entered no comparison at all. `contracts/verbs.ts` moves `session` to
+  `portedInSession: 26`; `cli/session.ts` refuses `close`, `cancel`,
+  `restore`, `plan` and `migrate` and names session 30. **Session 30 keeps
+  the lifecycle's judgment half** — the five gates, the boundary reversals,
+  the legacy migration — and its scope is unchanged by this.
+- **The parity control compares nine verb cases over 45 paths**, up from
+  one: `metrics`, `session start` (fresh + in-flight), `declare` (fresh),
+  the already-declared **refusal** (in-flight), `log` (in-flight) and
+  `decision` (both shapes). The refusal case is deliberate — a refusal's
+  wording is what the operator reads, and it exercises a branch no passing
+  case reaches.
+- **It found a real defect on its first run, in the one row it had just
+  appended.** Python's `open(path, "a", encoding="utf-8")` takes the
+  platform default newline, so on Windows every `.dabbler/runs/` JSONL row,
+  `sessions.json` and the activity log carry CRLF — while the files opened
+  with `newline=""` or `newline="\n"` carry LF. Node writes the bytes it is
+  given. The rule is **per file**, and getting it wrong in either direction
+  is drift: `journal.platformNewlines` is the one seam, and every writer
+  whose Python twin takes the default goes through it.
+- **Two seams earned their existence by making other files smaller.**
+  `pythonJson.ts` is `json.dumps`: the `", "` separator, `ensure_ascii`
+  (including DEL, which is ASCII and which CPython still escapes), the
+  astral surrogate pair, and CPython's float `repr` — which moved here out
+  of `lockfile.ts`, so the seat catalog's TOML, the metrics ledger and every
+  record row now get one answer. It was **checked against CPython over 13
+  shapes × 3 modes: all 39 identical**. `schema/validate.ts` is the ajv
+  wrapper `config.ts` had privately; the error *location* matches Python's
+  `jsonschema`, the error *wording* is explicitly not claimed (D165).
+- **D160 is discharged (D170).** `test_evidence.surface_digest` omits an
+  unreadable path instead of hashing the literal word `"deleted"`, so a
+  deletion moves the freshness digest once — when the file goes — and the
+  commit that records it moves nothing. It is its own commit, as the
+  control's sequencing rules require, and it rode in the working tree
+  rather than landing before the session, so the verifier saw a change to a
+  gate. **The trap in `AGENTS.md` is now history rather than a warning.**
+- **The corpus declares both discovery records fresh.** `session start`
+  warns for every discovery record that is absent, undated or overdue, and
+  an absent one is stale whatever the threshold says — so a corpus without
+  them would make every registration comparison a comparison of
+  `discovery`, which lands in session 28. `.dabbler/api-models.lock` is
+  written with a fixed date and the overlay puts both thresholds past any
+  age they can reach. That second half matters on its own: the checked-in
+  seat catalog is dated 2026-08-19 against a 720 h threshold, so **without
+  it the control would have turned red around 2026-09-18** for a reason no
+  diff of the change would explain.
+- **Round 1's two findings were both real questions and both correctly
+  disputed.** The first said malformed `sessions.json` is silently replaced
+  rather than refused — true, and it is *Python's* behaviour
+  (`progress.py:441-452`, `writers.py:398-414`); making TypeScript refuse
+  would have turned the control red, and the specification forbids that
+  repair in as many words. The second asked for a round-append parity case
+  — unreachable, because `ledger` has no Python command line and the only
+  verb that appends a round is `verify`, at session 32 on shapes with no
+  builder until 28. Both halves that *were* actionable were fixed: an
+  `existsSync` probe that turned a deleted-file race into a throw where
+  Python returns null, and six direct tests over `appendRound` including
+  the anchor. **The disputes cost 11,590 tokens and settled both.**
+- **Suite: 944 Python (5:28) / 207 router vitest (18 s) / 153 extension
+  mocha / 14 Playwright; all four declared controls green.** The Python
+  suite gained one test (D170's). `packages/router` is now ~7,400 lines of
+  source (1,400 generated) and ~2,100 of tests.
 
 - **Session 25 is closed `VERIFIED`** — 2 rounds (gpt-5-6-sol over the
   API), round 1 blocking and correct, round 2 clean on the fix delta. Claude
@@ -260,7 +345,7 @@ is D127; the previous version of this file carried it in full.
 | **D130 (was D88)** | Not owed — decided. The operator's override window on retiring the run core is open until session 34 starts. |
 | **D134** | Round-1 change sets measure HEAD's raw tree against a snapshot that drops `.dabbler/`, so a repository that tracks its ledger reports it as deleted. Moot here since D135 and **confirmed moot** — session 23's first selection reported zero `selection_unknown` rows against 208 in each of 19–22 (D144). Latent elsewhere. If fixed on the Python side, do it before session 27 ports `affected`. |
 | **D147 — RULED (D159), DONE in 25** | Session 23's step 5 is reworded: the control is declared and required from session 23, running the comparison that needs one router; the cross-router comparison joins it with the first ported verb. That verb turned out to be `metrics`, in session **25** rather than 26 — earlier than the ruling assumed, and costing nothing, because what the ruling protected was that no session be handed an instruction it cannot follow. Closed. |
-| **D149 — RULED (D160), reproduced in D157** | Deleting a tracked file moves the whole-tree digest across the commit, because `git ls-files` still lists a tracked-but-deleted path and `surface_digest` writes it a literal `"deleted"` hash. Session 24 proved it exactly: the run-of-record digest is reproduced bit-for-bit by taking the committed tree and re-adding five `path\0deleted` lines — no file content differs, and the Python suite's own `surfaceDigest` is unchanged. **The operator refused the second full run and the session force-closed instead.** Fix at the git seam (omit an unreadable path rather than hashing the word "deleted") or bind to the commit's tree. It changes a gate, so it is the operator's call — and session 27 ports `evidence`/`test_evidence`, so deciding before then is worth more than after. Until then every session that deletes a tracked file pays one extra full-suite run or one forced close. |
+| **D149 — CLOSED (D170), session 26** | Deleting a tracked file moved the whole-tree digest across the commit, because `git ls-files` still lists a tracked-but-deleted path and `surface_digest` wrote it a literal `"deleted"` hash. It cost session 23 a re-run and session 24 a forced close. **Fixed at the git seam as D160 ruled**: an unreadable path is omitted rather than marked, so a deletion moves the digest once and the commit that records it moves nothing. The marker string no longer appears anywhere in the router. Landed in its own commit before session 26's port, so the parity control compared two routers with the same intended behaviour, and it rode in the working tree so the verifier saw a change to a gate. |
 | **D158 — framework** | `session close --force` promotes EVERY open session to complete, and its help says only "bypass bookkeeping gates". It cost session 24 a damaged ledger and a restore. Three fixes owed: say what the flag does; refuse (or require a second flag) when it would promote sessions that are not in flight; and stamp `forceClosed` on the session's row rather than the repository, so the ledger can say which session forced a close. Until they land, the trap lives in `AGENTS.md`'s preamble. |
 | **D152 — RULED (D162)** | `ModuleVerbs.list`/`retire`, and several `VerifyVerbs`/`WorkflowVerbs` option names, describe a Python surface that does not exist in those shapes (`ai_router.modules` has only `create`; `verify dispute` takes `--finding`). Sessions 30/32/34 port those modules — reconcile the contract against what is ported rather than inheriting a shape nothing ever ran. |
 | **D155 / D116** | The extension's mocha suite is still not a declared suite, so `affected` selects nothing for `tools/dabbler-ai-orchestration/` and session 24's largest change set had no recordable pre-verification evidence. Measured why it is not a one-line declaration: `targeted_command` appends the selected paths, and mocha MERGES a path list with its `spec` (both from the flag and from `.mocharc.json`) rather than being narrowed by it, so the bare command cannot mean "everything" while the appended form means "these". `runs_whole` would be false. It needs a runner entry point — D116's shape. |
@@ -284,33 +369,50 @@ resolved by being true again.
 
 ## Next
 
-1. **Session 26 of 35 — the record.** `journal` (846), `ledger` (901),
-   `writers` (881) — 2,628 lines, 38 tests. The sanctioned writers:
-   everything under `.dabbler/runs/` and `docs/sessions/` is written here
-   and nowhere else, and this is the session the git seam crosses.
-   `src/journal.ts` already exists with `runGit`, its binary mode and
-   `repoRootFor` — ported in session 25 because `config` needs them (D164)
-   — so session 26 grows that file rather than creating it. It also gains
-   several parity cases at once (`session start`/`declare`/`log`/`decision`
-   on `fresh` and `in-flight`, the `ledger` reads on `disputed` and
-   `at-cap`), and **the last two of those shapes have no builder** — they
-   need canned verifier text through the offline transport, which is
-   session 28. Read `docs/ts-port-parity-control.md` before planning it.
-2. **D160 must land before session 27**, and 26 is the last comfortable
-   slot: fix the freshness digest by omitting a path that cannot be read
-   instead of hashing the word `"deleted"` for it, with a test for the
-   deleted-file case. Session 27 ports `evidence`/`test_evidence`, so
-   after that it is two fixes in two languages plus a parity case for the
-   wrong behaviour. **Session 25 did not need it** — it deleted no
-   tracked file — so the trap is untriggered, not gone.
-3. **D162 is per-command, from session 30**: reconcile the `Router`
+1. **Session 27 of 35 — evidence, checks, test evidence, affected.**
+   `evidence` (902), `checks` (1,001), `test_evidence` (807), `affected`
+   (564) — 3,274 lines, ~72 tests. **Two of those four are already part-way
+   here**: `src/evidence.ts` carries the sessions-root filenames, the round
+   anchor, the digest ledger and `resolveSessionsDir` (session 26), so
+   session 27 grows that file rather than creating it, and D170's fix means
+   `surface_digest` is ported once, correctly, rather than twice.
+   `snapshotWorktreeTree` and `changedPathsBetween` are also already in
+   `src/journal.ts`, which is where `checks` and `evidence` reach for them.
+   **`affected` and `test-evidence` both have real Python command lines and
+   both are already in the corpus builder**, so session 27 can add their
+   parity cases without waiting for a shape it does not have — the first
+   session since 25 for which that is true without argument.
+2. **Read `docs/ts-port-parity-control.md` before planning any session
+   from here.** Its verb table is the growth order, and session 26 is the
+   proof that the *plan's* line counts are not the session's: four forward
+   dependencies and a verb slice were needed before a single ported byte
+   could be compared. Session 27's inventory line should be read the same
+   way — as a floor.
+3. **A Python design question is owed to the operator, from D171's round-1
+   dispute.** A malformed or hand-edited `sessions.json` or
+   `activity-log.json` is *silently replaced* rather than refused, in both
+   routers, today: `read_raw_session_state` returns `None` for unparseable
+   JSON and `_read_or_create_activity_log` builds a fresh log from any read
+   failure. A verifier called that Major and it is a fair call. It was not
+   fixed here because a behaviour change inside a port session is the one
+   failure a parity comparison cannot see — both routers would be wrong
+   together. **It is a redesign and it needs a ruling**: refuse and fail
+   closed, or keep replacing and say so. If it is to be fixed, the cheapest
+   moment is *after* session 35, when there is one implementation again.
+4. **D162 is per-command, from session 30**: reconcile the `Router`
    contract against what is actually ported, defaulting to trimming.
    `modules retire` plausibly earns building; `modules list` probably does
-   not; `--finding-index` is just a correction to `--finding`.
-4. **What session 25 leaves for its successors.** `identity`'s
+   not; `--finding-index` is just a correction to `--finding`. Session 26
+   adds one input to that: `ledger` is declared `extensionFacing` with
+   `pythonCli: false`, and nothing has ever called it — `pythonSpawnRouter`
+   refuses both its methods. It is a candidate for trimming rather than
+   building.
+5. **What sessions 25 and 26 leave for their successors.** `identity`'s
    session-level entry point is owed to session 30 (D164); `verdict`'s
    parity case and the `VERIFIED` look-alike question are owed to session
-   32 (D163, D168); the parity control's ~150 s per `verify` is owed
-   watching by everyone (D169).
-5. **D130 override window** — the operator can still override retiring the
+   32 (D163, D168); the round-append parity case is owed to session 32 for
+   the same reason (D171's round-1 dispute, withdrawn on that basis); the
+   parity control's cost is owed watching by everyone (D169) — it is now
+   nine cases rather than one, and each case builds two repositories.
+6. **D130 override window** — the operator can still override retiring the
    run core, until session 34 starts.

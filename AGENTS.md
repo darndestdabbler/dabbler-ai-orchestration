@@ -113,20 +113,20 @@ past a single gate. If a gate is wrong, prove it is wrong, record the
 proof, and satisfy the gate anyway — a five-minute test run is cheaper
 than a damaged ledger, every time. See D157 and D158.
 
-### The close's freshness gate fails after any commit that DELETES a tracked file
+### FIXED in session 26: the freshness gate and a deleted tracked file
 
-`test_evidence.surface_digest` hashes every path `git ls-files` reports and
-writes the literal string `"deleted"` for one it cannot read. Before the
-commit a deleted-but-tracked file contributes a `path\0deleted` line;
-committing drops it from `ls-files` and that line leaves the digest. No file
-content changed, but `test_run_fresh` fails and asks for another full run.
+`test_evidence.surface_digest` used to hash every path `git ls-files`
+reported and write the literal string `"deleted"` for one it could not read.
+A deleted-but-tracked file contributed a `path\0deleted` line; committing
+dropped it from `ls-files` and that line left the digest. No file's content
+changed, and `test_run_fresh` failed anyway and asked for another full run.
+It cost session 23 a re-run and session 24 a forced close.
 
-**Do not force past it.** Prove it if you want the record to say so —
-recompute `tree_digest` over the current tree with the deleted paths
-re-added as `deleted` markers and show it reproduces the recorded one, and
-compare the suite's own `surfaceDigest` either side of the commit — then
-re-run the suite once and close normally. This is **D149**; the fix is owed
-at the git seam.
+**It no longer happens.** An unreadable path is omitted rather than marked,
+so a deletion moves the digest once — when the file goes — and the commit
+that records it moves nothing. D160 ruled it; D170 landed it. This entry
+stays only so a session that meets the symptom in an older checkout knows
+what it is looking at.
 
 ### Repairing state: `sessions.json` is state, `activity-log.json` is history
 

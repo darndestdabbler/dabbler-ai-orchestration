@@ -4396,6 +4396,113 @@
       "dateTime": "2026-08-28T11:59:11.201825-04:00",
       "description": "STATUS.md updated: acceptance evaluation points at D127, suite time 6:26 -> 4:45, session 21 recorded in Where things are, the two done Next items removed, the remaining suite cost added to Owed with its measurement. STATUS.md is not in LIFECYCLE_WRITTEN_FILES, so it lands as a plain post-close commit rather than inside the verified tree (the same shape session 20 used).",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 22,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-28T12:13:50.826237-04:00",
+      "description": "Register; declare `--not-releasable`.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 22,
+      "stepNumber": 2,
+      "stepKey": "record-the-port-inventory-as-a",
+      "dateTime": "2026-08-28T12:13:50.826237-04:00",
+      "description": "Record the port inventory as a decision: for each of the 45 modules, *port*, *retire*, or *merge*, with its line count and its test file. The default is in the table above; a departure names its reason.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 22,
+      "stepNumber": 3,
+      "stepKey": "decide-d88-on-the-record-with",
+      "dateTime": "2026-08-28T12:13:50.826237-04:00",
+      "description": "Decide D88 on the record, with the operator: the run core's projection replaces the lifecycle's record, or the run core is retired. \"Retired\" means deleted in session 34, not left as Python.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 22,
+      "stepNumber": 4,
+      "stepKey": "verify-the-runtime-floor",
+      "dateTime": "2026-08-28T12:13:50.826237-04:00",
+      "description": "Verify the runtime floor: read the extension host's `process.versions` on VS Code 1.135 and confirm `node:sqlite` is present; if not, the `seat_cost` design in session 29 uses `sql.js` and records the ~7 % WAL undercount as a known limitation rather than a native binding.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 22,
+      "stepNumber": 5,
+      "stepKey": "record-the-package-layout-and-the",
+      "dateTime": "2026-08-28T12:13:50.826237-04:00",
+      "description": "Record the package layout and the dependency ceiling as decisions.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 22,
+      "stepNumber": 6,
+      "stepKey": "design-the-parity-control",
+      "dateTime": "2026-08-28T12:13:50.826237-04:00",
+      "description": "Design the parity control: the fixture corpus (one repository per lifecycle shape: fresh, in-flight, disputed, at-cap, moved-machine), the verb list it drives, the files it compares, and the two things it normalizes (timestamps, absolute paths) \u2014 nothing else.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 22,
+      "stepNumber": 7,
+      "stepKey": "measure-this-session-s-seat-cost",
+      "dateTime": "2026-08-28T12:13:50.826237-04:00",
+      "description": "Measure this session's seat cost and record it.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 22,
+      "stepNumber": 8,
+      "stepKey": "affected-tests-as-preverify",
+      "dateTime": "2026-08-28T12:13:50.826237-04:00",
+      "description": "Affected tests as preverify. The selector reports no test affected for a prose session and **nothing is recorded** \u2014 a run recorded against an empty selection is a `policy_violation`, and session 2's record shows the shape: no `preverify-targeted` row at all.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 22,
+      "stepNumber": 9,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-28T12:13:50.826237-04:00",
+      "description": "Cross-provider verification.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 22,
+      "stepNumber": 10,
+      "stepKey": "full-test-suite-recorded-as-the",
+      "dateTime": "2026-08-28T12:13:50.826237-04:00",
+      "description": "Full test suite, recorded as the `final-full` run of record.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 22,
+      "stepNumber": 11,
+      "stepKey": "close-out",
+      "dateTime": "2026-08-28T12:13:50.826237-04:00",
+      "description": "Close-out.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 22,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-28T12:13:50.833231-04:00",
+      "description": "Registered session 22 (claude-code).",
+      "status": "complete"
     }
   ]
 }

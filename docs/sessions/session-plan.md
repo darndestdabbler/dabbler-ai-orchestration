@@ -41,7 +41,7 @@ requiresUAT: false
 requiresE2E: false
 pathAwareCritique: none
 module: default
-totalSessions: 20
+totalSessions: 21
 prerequisites: []
 ```
 
@@ -770,6 +770,97 @@ buys is avoiding the recovery's cost: a re-anchored baseline lands *before*
 the round, so the next round re-reviews the whole session, and that can
 exceed the evidence cap — which is what nearly happened in session 14. It
 pays for itself the first time a moved session is too large to re-review.
+
+---
+
+### Session 21 of 21: Close out set 148 on the record, and make the loop tests cheap
+
+**Why this exists.** Set 148 is complete, but its acceptance evaluation lives
+in `STATUS.md` as a status paragraph rather than in the decisions log as a
+decision, and the evaluation found the seat-cost check **not met**: measured
+for sessions 1, 3, 4 and 5 only, unmeasured for the seat sessions 6–14, and
+`costUsd: null` for the API sessions 15–20. Separately, the suite's cost is
+not Python: the thirty slowest tests take 3–11 s each and every second is a
+process spawn — `sandbox_repo` runs nine git commands before a loop test
+starts, and the loop shells to git again for every round's snapshot. That is
+why `-n auto` cripples a host, and it is why the run of record takes 6:26.
+Finally, `snapshot_worktree_tree` and `changed_paths_between` exist
+**byte-identically** in both `evidence.py` and `checks.py`, imported from one
+or the other by different callers — two implementations of one rule, which
+ground rule 3 forbids and which is the seam this session needs anyway.
+
+1. Register, then declare `--not-releasable`. The declaration names the
+   four deliverables below and nothing else.
+2. **Record the acceptance evaluation as a decision, before any code
+   moves.** `session decision --decider orchestrator` with the three checks
+   from `STATUS.md` in substance: criterion met (session 20 ran end to end
+   on the framework this set built); check 1 met with the noted splits and
+   session 20 outside the plan; check 2 met, with session 2's absent
+   pre-verify row and the two framework-written cap-landing rows named as
+   such; **check 3 not met**, with the four measured sessions listed. A
+   decision appended after the run of record moves the tree and fails the
+   freshness gate, so this is step 2 and not step 9.
+3. **Back-fill seat cost where the store still has it — on the machine
+   that ran the seat sessions.** This clone's `~/.copilot/session-state/`
+   holds no conversation from the 26–27 August window, so sessions 6–14
+   were driven from the other computer and only its store can price them.
+   Method: for each of sessions 6–14, take the start–close window from
+   `sessions.json`, find the orchestrator conversation id(s) whose
+   `session-state/<id>` entry falls inside it, and run
+   `python -m ai_router.seat_cost <ids>` there. The window locates the id;
+   attribution stays by id, as `seat_cost` requires. Record one decision
+   carrying a per-session table with the module's own status vocabulary
+   (`measured` / `floor` / unmeasured); if the store has been pruned, the
+   row says *unrecoverable* — that is also an answer. **Never estimate from
+   token counts** (spec §7). If this session runs on a machine that cannot
+   do this, record that fact and the procedure as the decision, appended
+   later with `--backfill-reason` once the operator has run it; the check
+   stays owed rather than invented.
+4. **One git seam.** Delete the `checks.py` copies of
+   `snapshot_worktree_tree` and `changed_paths_between`; `runcli.py`,
+   `verifyjob.py` and `workflow.py` import them from `evidence` as
+   `affected.py`, `packaging.py` and `verify.py` already do. Route the
+   remaining direct `["git", "-C", …]` calls in `journal.py` and
+   `ledger.py` through `evidence.run_git` so one function is the only place
+   the router spawns git. Net negative lines; no behaviour changes; no new
+   test — the existing loop tests are the proof, and a source-text
+   assertion that the duplicate is gone is a banned kind.
+5. **Make the loop tests cheap without faking git.** Measure first:
+   `pytest --durations=30` with the `sandbox_repo` setup timed separately
+   from the loop, so the seconds are attributed before they are attacked.
+   Then, in order of expected yield: build the seeded repo and its bare
+   remote **once per session** and give each test a `shutil.copytree` copy
+   (a git repository is a directory; the remote path is written relative so
+   the pair stays valid after the copy); pin the git environment for the
+   suite (`GIT_CONFIG_GLOBAL` to an empty file, `gc.auto=0`,
+   `core.fsmonitor=false`, `commit.gpgsign=false`, `core.autocrlf=false`)
+   so no test pays for the host's configuration; and drop any fixture git
+   call whose result no test reads. A fake git is **not** in scope: the
+   loop is trust machinery, and a fake that diverges from git's tree
+   hashing is the failure mode that would matter most and show least.
+   **Target:** no test above 1.5 s, and the `final-full` run of record
+   under 3:00 at `-n 2`, read from `durationSeconds` in `test-runs.jsonl`
+   against session 20's 379 s. `-n 2` stays pinned; this session does not
+   promise `-n auto`.
+6. Affected tests as preverify.
+7. Cross-provider verification.
+8. Full test suite, recorded as the `final-full` run of record — which is
+   also the measurement of step 5.
+9. Close-out. Update `STATUS.md`: the evaluation now points at its decision
+   number, the seat-cost row says what was recovered, and the suite time
+   is the new one.
+
+**Creates:** the set's acceptance as a decision in the record; seat-cost
+rows for whichever of sessions 6–14 the store still prices, or a recorded
+*unrecoverable*; one git seam with net negative lines; a run of record
+that costs half what it does today. **Est. 0 new Python tests** — the
+fixture is not tested and the seam deletes rather than adds. Not
+releasable.
+
+**The risk is step 5's measurement, not its changes.** If the timing shows
+the loop's own per-round git calls dominate rather than the fixture, the
+template copy buys little and the honest move is to stop at the seam and
+record the number, not to reach for a fake.
 
 ---
 

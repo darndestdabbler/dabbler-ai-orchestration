@@ -1,37 +1,47 @@
-# STATUS — set 148 closed: the session framework is built, and it closed its own last session
+# STATUS — set 148 closed and evaluated on the record; session 21 closed its seat-cost question and cut the suite
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
 `experiment/verification-pipeline-v3` and `design/solution-decomposition` are
 merged and finished. Earlier handoff text is in `docs/status-archive.md`.
 
-> **Draft, 2026-08-28.** Written after session 20 closed and before any
-> session of the next set was registered. The acceptance evaluation below is
-> read from the record; the next session should carry it into the decisions
-> log through `session decision` so it is a recorded decision rather than a
-> status paragraph.
+> **Recorded, 2026-08-28.** The acceptance evaluation below is no longer a
+> status paragraph: session 21 carried it into the decisions log as **D127**,
+> including the operator's decision not to back-fill the seat cost. This file
+> now summarises that decision rather than standing in for it.
 
 ## Where things are
 
-- **Set 148 is complete: 20 of 20 sessions closed**, 2026-08-26 → 2026-08-28,
+- **Set 148 is complete: 21 of 21 sessions closed**, 2026-08-26 → 2026-08-28,
   all on `master`, all pushed. Sessions 1–14 were driven from the Copilot seat
   (claude-opus-5 orchestrator, gpt-5.4/5.5 verifier over `copilot-cli`);
-  sessions 15–20 from Claude Code (claude-fable-5 orchestrator, gpt-5-6-sol
-  verifier over the direct API).
-- **Terminal states: 18 `VERIFIED`, 2 `REMEDIATED_AT_CAP`** (sessions 12 and
+  sessions 15–21 from Claude Code (claude-fable-5 then claude-opus-5
+  orchestrator, gpt-5-6-sol verifier over the direct API).
+- **Terminal states: 19 `VERIFIED`, 2 `REMEDIATED_AT_CAP`** (sessions 12 and
   17). The two cap sessions' final fixes are unreviewed by construction — see
   the D122 gap under *Owed*.
+- **Session 21 closed the set on the record.** It recorded the acceptance
+  evaluation as **D127**, put the router's git spawning behind one callable
+  (`journal.run_git`, the only `["git", ...]` argv in the package; bytes are
+  a mode of it, not a second function), and took the host's configuration and
+  the per-test repository build out of the suite. Its verification is worth
+  reading as a specimen: round 1's finding was **disputed and withdrawn** on
+  the facts, and round 2 then caught a real second-spawn defect in the fix
+  itself. The dispute ladder earned its keep in both directions.
 - **Router `dabbler-ai-router` 1.1.0** (tag `v1.1.0`); **extension 1.0.4**
   (tag `vsix-v1.0.4`). Session 13 built the packaging path; no packaging
   ledger exists in `.dabbler/runs/`, so nothing was published by the
   framework during this set.
-- **Suite: 941 Python (6:26 at `-n 2`) / 153 TypeScript (0.4 s); `tsc
-  --noEmit` and ESLint clean.** Python 29,286 lines over 45 modules;
-  extension 5,035 lines of source, 3,102 of tests.
+- **Suite: 941 Python (4:45 at `-n 2`, down from 6:26) / 153 TypeScript
+  (0.4 s); `tsc --noEmit` and ESLint clean.** Python 29,640 lines over 45
+  modules, by raw line count over tracked `ai_router/*.py` — the basis is
+  named because the previous figure here (29,286) is not reproducible on any
+  basis and the same count at session 20's close was 29,685. Extension 5,035
+  lines of source, 3,102 of tests.
 - **`verify.py` is 2,537 lines.** The 142–147 envelope wanted it under 1,200
   by extraction. The envelope is set aside per `docs/operator-decisions.md`,
   but the debt is real and grew during this set.
 
-## Acceptance evaluation for set 148
+## Acceptance evaluation for set 148 — recorded as D127
 
 The plan's criterion: **the framework can run its own next session** — could
 session 20 have been specified, developed, verified, tested and closed by the
@@ -100,6 +110,9 @@ carries forward is the step: every future session plan carries "measure
 this session's seat cost" as a numbered step, which session 3's did and
 sessions 4–20's did not.
 
+**Recorded as D127** (session 21, orchestrator, 2026-08-28), so the question
+is closed rather than owed. What remains owed is the step, not the figure.
+
 ## Owed, from the record
 
 | Source | What is owed |
@@ -111,7 +124,8 @@ sessions 4–20's did not.
 | **D114 nit 2** | `build_task_rows` renders a leaf, not a refusal, when `approved-plan.json` is missing while `step-execution.jsonl` carries an open step. |
 | **D88** | Operator question: does the run core's projection replace the lifecycle's records, or is it retired? Two state systems coexist; `dabbler status` sees no runs in this repository. |
 | **D119** | The solution level (one repository per library or service, plus an integrator) is not formalized. |
-| Acceptance check 3 | The per-session seat-cost measurement step in every future session plan. Not back-filled for 148, by operator decision. |
+| Acceptance check 3 (D127) | The per-session seat-cost measurement step in every future session plan. Not back-filled for 148, by operator decision. |
+| Suite cost, the remainder | Session 21 took the fixture cost out; what is left is the loop's own git traffic. The slowest test spends 8.5 s of 9.5 s in 134 git spawns inside `verify`/`runcore`, so "no test above 1.5 s" needs fewer round-trips per round, not a cheaper fixture. A fake git is still refused: the loop is trust machinery. |
 
 ## Carried from the archived handoff, status not re-verified
 
@@ -129,15 +143,8 @@ item is resolved.
 
 Nothing is registered. Candidates, in the order the record argues for them:
 
-1. **Record this evaluation as a decision** (session 21, step 2), closing
-   the seat-cost question rather than leaving it owed.
-2. **Fake the git seam in the loop tests.** The top 30 tests cost 3–11 s
-   each and every second is process spawning (nine git calls in
-   `sandbox_repo` before the loop starts). This is why `-n auto` cripples a
-   host, and it is one Python session that pays off regardless of any other
-   decision.
-3. **D116** — the per-ecosystem targeted-command form.
-4. **Operator decision pending:** whether the router is ported to TypeScript
+1. **D116** — the per-ecosystem targeted-command form.
+2. **Operator decision pending:** whether the router is ported to TypeScript
    so the whole framework ships as one Marketplace artifact and the extension
    calls it in-process. Ground: the runtime is process spawning, file I/O,
    HTTP, JSON/YAML/TOML, hashing and one read-only SQLite query, all

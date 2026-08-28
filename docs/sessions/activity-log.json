@@ -4388,6 +4388,14 @@
       "dateTime": "2026-08-28T11:57:58.724633-04:00",
       "description": "941 passed in 285.5 s (4:45) at -n 2, recorded as the final-full run of record (digest 4b84f569820d). This is also step 4's measurement: 379 s -> 286 s, -25%.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 21,
+      "stepNumber": 8,
+      "stepKey": "close-out",
+      "dateTime": "2026-08-28T11:59:11.201825-04:00",
+      "description": "STATUS.md updated: acceptance evaluation points at D127, suite time 6:26 -> 4:45, session 21 recorded in Where things are, the two done Next items removed, the remaining suite cost added to Owed with its measurement. STATUS.md is not in LIFECYCLE_WRITTEN_FILES, so it lands as a plain post-close commit rather than inside the verified tree (the same shape session 20 used).",
+      "status": "complete"
     }
   ]
 }

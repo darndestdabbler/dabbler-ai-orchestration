@@ -41,7 +41,7 @@ requiresUAT: false
 requiresE2E: false
 pathAwareCritique: none
 module: default
-totalSessions: 21
+totalSessions: 35
 prerequisites: []
 ```
 
@@ -880,3 +880,543 @@ banned-test-kinds list are **not** set aside.
 **No falsifier twins, no source-text assertions, no migration-path tests,
 no tests of test infrastructure, and no tests asserting exact markdown
 strings.** Sessions 8 and 14 should delete more tests than they add.
+
+---
+
+# Sessions 22–35: The TypeScript port — one artifact, one language, the record unchanged
+
+> **Landed 2026-08-28, on the operator's instruction to start session 22.**
+> Drafted the same day while session 21 was in flight; landed after session
+> 21 closed, as its own part of this plan. `totalSessions` is now 35. The
+> second suite and the three deterministic controls enter `dabbler.yaml` in
+> session 23 — not here — because a control must be a session's verified
+> work, not a plan edit.
+> **Engine:** whichever seat the operator drives the session from. The
+> seat-cost step in every session names the currency it measured.
+
+## Why this set exists
+
+The framework is one product shipped in two runtimes. The extension renders
+in TypeScript; the router decides in Python (29,640 lines, 45 modules, 941
+tests) and is installed per project into a `.venv` the extension has to
+locate, which is the failure class `pythonInterpreter.ts` exists to paper
+over. Staff who install "an extension" then discover a second install, a
+second toolchain, and a version they must keep in step by convention —
+`installCommandLine` pins nothing. The operator's stated goal is that the
+infrastructure not be part of the project at all: one Marketplace artifact,
+the router inside it, the project holding only its own record.
+
+The port is feasible because the router's runtime is small in kind: process
+spawning, file I/O, HTTP, JSON/YAML/TOML, hashing, and one read-only SQLite
+query. Its three dependencies (`pyyaml`, `httpx`, `jsonschema`) have exact
+Node twins (`yaml`, `fetch`, `ajv`). The Copilot CLI transport — the most
+OS-bound module — gets simpler in Node, not harder: its two reader threads,
+queue and lock become event-driven streams.
+
+The port is dangerous for exactly one reason: **the router is the trust
+machinery.** A gate that is mistranslated does not crash; it lets something
+through. Every decision below serves that one risk.
+
+## Three facts that shape the whole sequence
+
+### 1. Integration first, against the implementation that already exists
+
+The operator's build sequence is integration-driven design: contracts, then
+the integration built against mocks, then mocks replaced by real
+implementations. Applied here: the extension is rewired to talk to a `Router`
+interface **before any Python is translated**, and the first implementation
+of that interface is the Python spawn the extension performs today. The
+"mock" is the real router. From that session on, every ported module slots
+in behind an interface the extension already uses, and the cutover is a
+one-line change of implementation, not a rewrite of forty call sites.
+
+### 2. The record is the contract, and parity is a control, not an opinion
+
+The on-disk record — `.dabbler/runs/`, `sessions.json`, the decisions log,
+the project work plan — is schema-defined and machine-written. The port is
+correct when the TypeScript router, given the same fixture repository and the
+same verb, writes **byte-identical** files to the Python router. That check
+is a **declared deterministic control** in `dabbler.yaml`, run before every
+verification round of this set, with its exit code as the fact. It is not a
+test (a test of test infrastructure is a banned kind) and it is not a
+verifier's judgment (a verifier cannot read 29,000 lines for drift). Python
+stays installed until the last session precisely so the control can run.
+
+### 3. Sessions are sized by lines ported, and the seat is measured every time
+
+Set 148's honest unit was $8–$12 per code session (D37, D48) — and set 148
+measured that for four sessions of twenty (D127). Every session below
+carries the measurement as a numbered step. Sessions port at most ~3,000
+lines plus their tests; `verify.py` (2,537 lines) is one session by itself
+and is split on its existing seams as it is ported, never translated as one
+file. At the operator's cadence of three to five sessions a day, fourteen
+sessions is three to four working days.
+
+## Decisions this set takes, and where
+
+| Decision | Session | Default if not overridden |
+| --- | --- | --- |
+| What is retired rather than ported: the run core (`runcli`, `runcore`, `runproject`, `facts`, `fixloop`, `testphase` — 4,396 lines, 119 tests, not spawned by the extension, no runs ever registered here: D88) and the six-step workflow (`workflow`, `solution`, `contractdoc`, `stepreview` — 2,194 lines, 99 tests, spawned by the Solution Explorer) | 22 | Run core retired; six-step ported |
+| Package layout | 22 | `packages/router` (npm `dabbler-ai-router`, `bin: dabbler`), extension depends on it through a workspace, esbuild bundles both into the VSIX |
+| Node floor | 22 | The extension host's Node (VS Code 1.135) inside VS Code; Node 22+ outside it, for `node:sqlite` |
+| Dependency ceiling | 23 | `yaml`, `ajv`, `smol-toml`. Nothing native. Adding a fourth is a decision in the log |
+| Record versioning | 35 | A `frameworkVersion` stamp on session and round rows, added at cutover as the set's one record change |
+
+## What this set does NOT do (do not reopen)
+
+- **No redesign.** The lifecycle, the five gates, the verdict vocabulary,
+  the schemas, the prompts, the severity rule, the dispute ladder: identical.
+  A session that "improves" a rule while porting it has broken parity and
+  must put it back.
+- **No fake git.** Parity fixtures use real repositories.
+- **No Electron or web shell.** The port makes those possible; this set
+  ships the extension and the CLI.
+- **No per-project code.** After cutover a project holds `dabbler.yaml`,
+  `docs/sessions/`, `.dabbler/runs/`, and the `AGENTS.md` fence. No `.venv`,
+  no `node_modules`, no copy of the router.
+- **No new features.** Every owed item in `STATUS.md` (D116, D122, D124,
+  D126, D114) stays owed; the port carries the gaps across unchanged, and
+  says so.
+
+---
+
+### Session 22 of 35: Decide the inventory before anything is translated
+
+**Why this exists.** Two subsystems have no settled owner. The run core
+(D88) has never registered a run in this repository and the extension never
+spawns it; the six-step workflow is spawned by the Solution Explorer but its
+walkthrough was declared the wrong shape for its audience. Porting either
+without deciding is 6,600 lines of translation that may be deleted. This
+session is prose, verified the way sessions 1 and 2 were.
+
+1. Register; declare `--not-releasable`.
+2. Record the port inventory as a decision: for each of the 45 modules,
+   *port*, *retire*, or *merge*, with its line count and its test file. The
+   default is in the table above; a departure names its reason.
+3. Decide D88 on the record, with the operator: the run core's projection
+   replaces the lifecycle's record, or the run core is retired. "Retired"
+   means deleted in session 34, not left as Python.
+4. Verify the runtime floor: read the extension host's `process.versions`
+   on VS Code 1.135 and confirm `node:sqlite` is present; if not, the
+   `seat_cost` design in session 29 uses `sql.js` and records the ~7 % WAL
+   undercount as a known limitation rather than a native binding.
+5. Record the package layout and the dependency ceiling as decisions.
+6. Design the parity control: the fixture corpus (one repository per
+   lifecycle shape: fresh, in-flight, disputed, at-cap, moved-machine), the
+   verb list it drives, the files it compares, and the two things it
+   normalizes (timestamps, absolute paths) — nothing else.
+7. Measure this session's seat cost and record it.
+8. Affected tests as preverify. The selector reports no test affected for a
+   prose session and **nothing is recorded** — a run recorded against an
+   empty selection is a `policy_violation`, and session 2's record shows the
+   shape: no `preverify-targeted` row at all.
+9. Cross-provider verification.
+10. Full test suite, recorded as the `final-full` run of record.
+11. Close-out.
+
+**Creates:** the inventory, four decisions, the parity design. Est. 0 tests.
+
+---
+
+### Session 23 of 35: Contracts — types from schemas, the Router interface, and the controls
+
+**Why this exists.** The twenty JSON schemas under `ai_router/schemas/` are
+the framework's meaning. Today `types.ts` is a hand-kept mirror of what
+Python writes. From this session the schemas generate the types, in one
+direction, and the drift is a compile error.
+
+1. Register; declare `--not-releasable`.
+2. Create `packages/router` with the root workspace; ESLint and `tsc
+   --strict` configured; `vitest` as the runner, path-list form for
+   targeted runs.
+3. Generate TypeScript types from every schema with one generator, output
+   checked in, a control that fails when the output is stale.
+4. Define the `Router` interface from the extension's spawn sites: one
+   method per verb the extension calls (`session.*`, `progress`, `modules`,
+   `verify`, `bootstrap`, `workflow`, `ledger`, `test_evidence`,
+   `approved_plan`, `affected`), typed by the generated types. The `dabbler`
+   CLI verb list is the same list plus the engine-facing verbs.
+5. Build the parity control from session 22's design: a script that runs a
+   verb against a fixture through both routers and compares the written
+   files. Declare it in `dabbler.yaml` as a required control, with `tsc
+   --noEmit` and ESLint beside it — the first controls this repository has
+   ever declared.
+6. Declare the second suite in `dabbler.yaml` (`typescript`, vitest,
+   `test_roots`, `test_glob`), so `affected` selects across both.
+7. Measure this session's seat cost and record it.
+8. Affected tests as preverify.
+9. Cross-provider verification.
+10. Full test suite (both suites), recorded as the `final-full` run of record.
+11. Close-out.
+
+**Creates:** the package, the types, the interface, three controls, the second
+suite. Est. 6 TS tests (the generator and the interface's error mapping).
+
+---
+
+### Session 24 of 35: The extension talks to the interface, and Python answers
+
+**Why this exists.** Integration before implementation. Every place the
+extension spawns `python -m ai_router.*` becomes a call on `Router`, and
+the only implementation is `PythonSpawnRouter`, which wraps today's
+`routerCli.ts` unchanged. Nothing the user sees changes; Playwright proves
+it. From here the port is invisible to the extension.
+
+1. Register; declare `--not-releasable`.
+2. Implement `PythonSpawnRouter` over `runRouterCli`; the projection poll,
+   the module lifecycle, the session commands, and the troubleshoot command
+   go through it. `pythonInterpreter.ts` stays — it is this implementation's
+   private concern now, not the extension's.
+3. Delete `types.ts` in favour of the generated types.
+4. Playwright and the mocha suite green, unchanged in count except where a
+   test asserted a spawn that no longer exists as such.
+5. Measure this session's seat cost and record it.
+6. Affected tests as preverify.
+7. Cross-provider verification.
+8. Full test suite, recorded as the `final-full` run of record.
+9. Close-out.
+
+**Creates:** one seam. Net negative TS lines. Est. 0 new tests.
+
+---
+
+### Session 25 of 35: Foundation modules
+
+`config` (640), `secret_resolver` (47), `identity` (235), `verdict` (419),
+`lockfile` (158), `runtime_mode` (84), `metrics` (258) — 1,841 lines, ~98
+tests. Leaves of the import graph; everything above depends on them.
+
+1. Register; declare `--not-releasable`.
+2. Port each module and its test file, one behavior per test, in the order
+   listed. `config` validates against the schema with `ajv`; the rate-less
+   routable entry still fails load (BREAKING in set 109 and still true).
+3. Parity control green for `config` load and `verdict` parse on the corpus.
+4. Measure this session's seat cost and record it.
+5. Affected tests as preverify.
+6. Cross-provider verification.
+7. Full test suite, recorded as the `final-full` run of record.
+8. Close-out.
+
+**Creates:** the foundation. Est. 98 TS tests, ported; Python tests stay
+until session 35.
+
+---
+
+### Session 26 of 35: The record — journal, ledger, writers
+
+`journal` (846), `ledger` (901), `writers` (881) — 2,628 lines, 38 tests.
+These are the sanctioned writers: everything under `.dabbler/runs/` and
+`docs/sessions/` is written here and nowhere else. `journal.run_git` is the
+one place the router spawns git (session 21 made it so), so this is also
+the session the git seam crosses. This is the session the parity control
+was built for.
+
+1. Register; declare `--not-releasable`.
+2. Port the three modules. Schema validation on every write, refusal on a
+   hand-shaped row, append-only semantics, the lifecycle lock — exactly as
+   Python does them. `ledger.append_round` carries D126's nit forward
+   unchanged (it is owed, not fixed here). `run_git` is ported as the one
+   git spawn, bytes as a mode of it and not a second function.
+3. Parity control green on every write the corpus exercises: state writes,
+   round rows, decisions, the work plan.
+4. Measure this session's seat cost and record it.
+5. Affected tests as preverify.
+6. Cross-provider verification.
+7. Full test suite, recorded as the `final-full` run of record.
+8. Close-out.
+
+**Creates:** the record, written by TypeScript, indistinguishable from
+Python's. Est. 38 TS tests, ported.
+
+---
+
+### Session 27 of 35: Evidence, checks, test evidence, affected
+
+`evidence` (902), `checks` (1,001), `test_evidence` (807), `affected` (564)
+— 3,274 lines, ~72 tests. Tree snapshots through a throwaway index on the
+`journal.run_git` seam, process execution with the Windows `taskkill /T`
+tree kill and `shell: true` for declared shell commands, the run-of-record
+binding, and the selector.
+
+1. Register; declare `--not-releasable`.
+2. Port `evidence` first: its snapshot trees must hash identically to
+   Python's — the parity control compares `completion_tree` values, not
+   just files.
+3. Port `checks` — spawn, kill, exit-code reading, the `.cmd` shim
+   resolution on Windows (spawn the shim's target, never `shell: true` for
+   an argv command). Capture the Node error code for an over-long command
+   line as a specimen and map it to `argv-too-large`. Its test file is
+   `test_runcore_checks.py`, which drives `checks`, not the run core; it is
+   ported under a name that says so.
+4. Port `test_evidence` and `affected`; the vitest path-list form satisfies
+   the targeted-command audit without D116.
+5. Parity control green on `test-runs.jsonl` and snapshot trees.
+6. Measure this session's seat cost and record it.
+7. Affected tests as preverify.
+8. Cross-provider verification.
+9. Full test suite, recorded as the `final-full` run of record.
+10. Close-out.
+
+**Creates:** process and evidence under TypeScript. Est. 72 TS tests, ported.
+
+---
+
+### Session 28 of 35: Transports I — API, offline, routing, selection, discovery
+
+`transports/base` (49), `transports/offline` (140), `transports/api` (292),
+`route` (586), `selection` (146), `discovery` (1,057) — 2,270 lines, 82
+tests. `fetch` with streaming replaces `httpx`; `exclude_providers` is
+honored on every path including offline (the set-143 defect stays fixed).
+
+1. Register; declare `--not-releasable`.
+2. Port in the order listed; the offline transport first so every later
+   session's tests run without a network, as today.
+3. `discovery` reads and writes `copilot-catalog.lock` identically; parity
+   on the lock file.
+4. One live `e2e`-marked call per provider as evidence, recorded, excluded
+   from the default run.
+5. Measure this session's seat cost and record it.
+6. Affected tests as preverify.
+7. Cross-provider verification.
+8. Full test suite, recorded as the `final-full` run of record.
+9. Close-out.
+
+**Creates:** routing under TypeScript. Est. 82 TS tests, ported.
+
+---
+
+### Session 29 of 35: Transport II — the Copilot CLI state machine and seat cost
+
+`transports/copilot` (2,074) and `seat_cost` (304) — 2,378 lines, 97 tests.
+The most OS-bound code in the router, and the session where Node's model is
+an advantage: reader threads, queue and lock become `readline` over the
+child's streams; three-tier timeouts become timers reset on first byte.
+
+1. Register; declare `--not-releasable`.
+2. Port the dispatch state machine: spawn, first-byte and total timeouts,
+   kill, the temp-file pull handoff above 24,000 rendered units, the
+   nonce-acknowledgement footer, the stderr error taxonomy. Port
+   `list2cmdline` (~20 lines) so the rendered-argv measurement is the same
+   number on the same input.
+3. Resolve `copilot.cmd` to its target and spawn that; never `shell: true`
+   (cmd.exe's 8,191-character line would gut the handoff headroom).
+4. Port `seat_cost` on `node:sqlite`, `readOnly`, `mode=ro` semantics; the
+   WAL is read, `immutable` is not used.
+5. **Live probe on the seat**, as set 137 did: one verification prompt over
+   the handoff threshold, facts planted head, middle and tail, the ack
+   validated and stripped. Recorded as evidence.
+6. Measure this session's seat cost and record it — through the ported
+   module, which is its own acceptance test.
+7. Affected tests as preverify.
+8. Cross-provider verification.
+9. Full test suite, recorded as the `final-full` run of record.
+10. Close-out.
+
+**Creates:** the seat under TypeScript. Est. 97 TS tests, ported.
+
+---
+
+### Session 30 of 35: The session lifecycle
+
+`session` (1,386), `gates` (421), `progress` (1,050), `modules` (246) —
+3,103 lines, 138 tests. Start, declare, log, decision, plan, close, cancel,
+restore, migrate; the five gates; the projection the extension renders; the
+module lifecycle.
+
+1. Register; declare `--not-releasable`.
+2. Port `gates` first and run the parity control on `close --dry-run` rows
+   for every corpus shape — a gate that differs by one row is the set's
+   worst outcome, and this is the cheapest place to see it.
+3. Port `session`, `progress`, `modules`.
+4. Parity control green on `sessions.json`, the activity log, the decisions
+   log, the project work plan, and the projection JSON.
+5. Measure this session's seat cost and record it.
+6. Affected tests as preverify.
+7. Cross-provider verification.
+8. Full test suite, recorded as the `final-full` run of record.
+9. Close-out.
+
+**Creates:** the lifecycle under TypeScript. Est. 138 TS tests, ported.
+
+---
+
+### Session 31 of 35: Verification support — agency, verifyjob, the approved plan
+
+`agency` (921), `verifyjob` (782), `approved_plan` (590), `plan_review`
+(812) — 3,105 lines, ~81 tests. The verifier's read surface and its write
+decisions, the verification job contract, the hashed immutable plan and its
+amendments, the step-execution record.
+
+1. Register; declare `--not-releasable`.
+2. Port `agency`: faithful reads, the recorded write decisions, the
+   `--available-tools` restriction on the seat.
+3. Port `approved_plan` and `plan_review`: the hash covers every field but
+   `amendments`, a step without an evidence contract cannot be written, a
+   plan over seven steps cannot be written — the schema refuses, never a
+   reviewer.
+4. Port `verifyjob`. Parity on `approved-plan.json`, `step-execution.jsonl`,
+   and the agency log.
+5. Measure this session's seat cost and record it.
+6. Affected tests as preverify.
+7. Cross-provider verification.
+8. Full test suite, recorded as the `final-full` run of record.
+9. Close-out.
+
+**Creates:** the verifier's surface under TypeScript. Est. 81 TS tests,
+ported.
+
+---
+
+### Session 32 of 35: The verification loop
+
+`verify` (2,537 lines, 57 tests). The largest module, and the one the
+142–147 envelope wanted under 1,200 by extraction. It is ported **as the
+extraction it never got**: rounds, bundle, disputes and adjudication,
+reanchor, and the loop each become a file, and no file exceeds 800 lines.
+Behavior does not change; the parity control is on `rounds.jsonl`,
+`disputes.jsonl`, the verifier-output files, and the `refs/dabbler/rounds/`
+anchors session 20 introduced.
+
+1. Register; declare `--not-releasable`.
+2. Port by seam, running the corpus after each: round one, the fix-delta
+   round, the cap, the dispute ladder, adjudication, reanchor and its
+   refusals, the severity-gated stop.
+3. Prompts and templates copied byte-for-byte; the verdict parser and the
+   prompt stay pinned by the same round-trip test that pins them today.
+4. Parity control green on every round row the corpus produces, including
+   the anchored commit's tree equalling `completion_tree`.
+5. Measure this session's seat cost and record it.
+6. Affected tests as preverify.
+7. Cross-provider verification — **through the ported loop**, with the
+   Python loop run once more on the same tree as a recorded cross-check.
+8. Full test suite, recorded as the `final-full` run of record.
+9. Close-out.
+
+**Creates:** verification under TypeScript, in five files instead of one.
+Est. 57 TS tests, ported.
+
+---
+
+### Session 33 of 35: Bootstrap, packaging, and the `dabbler` command on the PATH
+
+`bootstrap` (1,146), `packaging` (743) — 1,889 lines, 55 tests — plus the
+CLI itself and its delivery. This is the session that makes the
+infrastructure not part of the project.
+
+1. Register; declare `--not-releasable`.
+2. Port `bootstrap`: the `AGENTS.md` fence is regenerated with `dabbler
+   <verb>` in place of `python -m ai_router.<module>`; the pre-commit hook
+   references the shim, not an interpreter path; the `.gitignore` and the
+   user-scope `DABBLER_TRANSPORT` side effects are kept exactly (they are
+   documented traps, not bugs to fix here).
+3. Port `packaging`: the feed credential resolves at spawn into one argv
+   element and is placed in no environment, as today.
+4. Ship the `dabbler` binary in the router package (`bin`), and have the
+   extension prepend a shim directory to integrated-terminal `PATH` through
+   `EnvironmentVariableCollection`, running the CLI on the extension host's
+   own Node (`ELECTRON_RUN_AS_NODE`). Outside VS Code: `npm i -g`.
+5. Prove it on a scratch repository with no `.venv` and no Python on
+   `PATH`: `dabbler session start` from a VS Code terminal registers a
+   session. Recorded as evidence.
+6. Measure this session's seat cost and record it.
+7. Affected tests as preverify.
+8. Cross-provider verification.
+9. Full test suite, recorded as the `final-full` run of record.
+10. Close-out.
+
+**Creates:** zero-install delivery. Est. 55 TS tests, ported, plus 3 for the
+shim and the fence.
+
+---
+
+### Session 34 of 35: The six-step workflow ported, the run core retired
+
+Per session 22's decisions. Default: `workflow` (1,363), `solution` (351),
+`contractdoc` (196), `stepreview` (284) — 2,194 lines, 99 tests — are
+ported, and `runcli`, `runcore`, `runproject`, `facts`, `fixloop`,
+`testphase` — 4,396 lines, 119 tests — are deleted with their tests, D88
+closed. If session 22 decided otherwise, this session is what it decided.
+
+1. Register; declare `--not-releasable`.
+2. Port the six-step driver; parity on the workflow event log and the
+   Solution Explorer projection.
+3. Delete the run core, its tests, its `dabbler` verbs, and every reference
+   in docs; `dabbler status` now reads the lifecycle's record, which is the
+   half of D88 this closes.
+4. Measure this session's seat cost and record it.
+5. Affected tests as preverify.
+6. Cross-provider verification.
+7. Full test suite, recorded as the `final-full` run of record.
+8. Close-out.
+
+**Creates:** the decision made real. Net negative lines across both
+languages. Est. 99 TS tests, ported; 119 Python tests deleted.
+
+---
+
+### Session 35 of 35: Cutover — the extension calls in-process, and Python leaves
+
+1. Register; declare **`--releasable`** — this session publishes.
+2. `InProcessRouter` replaces `PythonSpawnRouter` as the extension's
+   implementation; delete `PythonSpawnRouter`, `pythonInterpreter.ts`,
+   `installAiRouter.ts`, the venv creation in `bootstrapProject.ts`, and the
+   projection's Python poll (the tree now reads the projection through a
+   function call).
+3. Add `frameworkVersion` to session and round rows — the set's one record
+   change — and bump both schemas.
+4. Run the parity control one last time across the whole corpus and every
+   verb, with Python still present, and record the run. Then delete
+   `ai_router/`, `tests/`, `pyproject.toml`, `pytest.ini`, the Python CI
+   job, the `python` suite from `dabbler.yaml`, and the parity control
+   itself (it has nothing left to compare).
+5. Rewrite `README.md`, `MIGRATION-FROM-V1.md`, `docs/quick-start.md`, and
+   the `AGENTS.md` fence for one artifact; `STATUS.md` says the port is
+   complete and what it changed.
+6. Measure this session's seat cost and record it.
+7. Affected tests as preverify.
+8. Cross-provider verification — this round is verified, recorded and closed
+   **by the TypeScript router**, which is the set's acceptance test.
+9. Full test suite, recorded as the `final-full` run of record.
+10. Commit, push once, then package: extension 2.0.0 and `dabbler-ai-router`
+    2.0.0 to their feeds through `dabbler packaging`.
+11. Close via the gate.
+
+**Creates:** one artifact. **The risk is step 4's ordering** — the parity
+run must be recorded before the deletion, or the set's central claim rests
+on memory.
+
+---
+
+## Acceptance criterion for sessions 22–35
+
+**The framework closes its own last session with no Python in the tree.**
+Session 35's round, run of record, gates and close are performed by the
+TypeScript router, and `ai_router/` does not exist at that close.
+
+Four supporting checks, each answerable from the record:
+
+- **The parity control's final run** (session 35, step 4) shows
+  byte-identical record files for every verb on every corpus shape, and is
+  recorded before the Python deletion.
+- **A project with no `.venv` and no Python on `PATH`** ran `dabbler session
+  start` from a VS Code terminal (session 33, step 5), recorded as evidence.
+- **No behavior lost:** the TypeScript suite carries one test per ported
+  behavior; the ported count equals the Python count for every kept module,
+  and the deleted count equals the retired modules' tests. No Python test
+  remains.
+- **Seat cost is recorded for every session 22–35.**
+
+## Test budget for sessions 22–35
+
+**One test per behavior, ported.** Roughly 820 TypeScript tests for kept
+modules (941 minus the retired run core's 119, less whatever session 22
+retires beyond it and whatever was a banned kind in Python), plus the
+extension's existing 153 and about 10 new ones named above. Python tests are
+deleted with their modules, all in session 35 except the run core's in
+session 34.
+
+**No falsifier twins, no source-text assertions (ESLint is the source-text
+check), no migration-path tests, no tests of test infrastructure (the parity
+control is a control, not a test), and no tests asserting exact markdown
+strings.** A ported test that was one of these in Python is deleted, not
+ported, and the decision names it.

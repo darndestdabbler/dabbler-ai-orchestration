@@ -1,0 +1,78 @@
+name: Test
+
+# The release gate (.github/actions/require-green-test) requires a
+# successful run of THIS workflow for the tagged commit before either
+# publish pipeline (release.yml, publish-vscode.yml) will ship.
+#
+# windows-latest on both jobs deliberately: it is the platform the
+# suites are developed and proven on, and the router shells to git and
+# spawns interpreters where path/quoting behavior is the risk surface.
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+permissions:
+  contents: read
+
+jobs:
+  python:
+    name: Python suite (pytest)
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
+        with:
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version: '3.11'
+
+      - name: Install package + test tooling
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e .
+          python -m pip install pytest pytest-xdist
+
+      - name: Run pytest
+        # -n 0 overrides pytest.ini's local two-worker default: on the
+        # hosted runner, sequential beats xdist worker startup.
+        run: python -m pytest -q -n 0
+
+  extension:
+    name: Extension suite (unit + typecheck + lint)
+    runs-on: windows-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: tools/dabbler-ai-orchestration
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
+        with:
+          fetch-depth: 1
+
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit suite (vscode stub)
+        run: npm run test:unit
+
+      - name: Bundle compiles
+        run: npm run compile

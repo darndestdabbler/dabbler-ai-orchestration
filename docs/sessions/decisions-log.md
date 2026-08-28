@@ -3965,3 +3965,63 @@ The adjudication is the cheapest call of the four by an order of magnitude
 (1,569 in / 216 out) and it is what let the session close VERIFIED rather
 than at the cap. A third provider judging one disputed finding costs about
 3% of a verification round.
+
+### D157 · 2026-08-28 · Operator (anthropic) · D149 reproduced and the second full run refused: the committed tree differs from the run of record by exactly five path\0deleted marker lines and no file content, so the close is forced rather than re-proved
+
+The close's `test_run_fresh` gate failed for both suites after the commit,
+asking for a second full run. It was re-run once (typescript, 6 seconds) and
+the Python re-run was **stopped by the operator** partway: "If it isn't
+possible that those tracked files would impact the solution functionality,
+then we don't need to rerun the tests. We fell into that trap before, and it
+cost considerable time and money."
+
+That judgement is correct, and it is now demonstrated rather than asserted.
+
+**The mechanism.** `test_evidence.surface_digest` hashes every path
+`git ls-files` reports, and gives a path it cannot read the literal string
+`"deleted"` rather than dropping it:
+
+    try:
+        digest = hashlib.sha256((Path(repo_root) / rel).read_bytes()).hexdigest()
+    except OSError:
+        digest = "deleted"
+
+Before the commit, this session's five plainly-deleted files were still
+tracked, so each contributed a `<path>\0deleted` line. Committing removed
+them from `ls-files`, and those five lines left the digest with them.
+
+**The proof.** Whole-tree digest at the run of record:
+`9dd190b25fd5b4f2652539a5299b3f07051a0954dd25248a1647e8bb2a563c46`. After
+the commit: `4dbf91f02a4585838efd823977e3f480c4b27dd004c2255785557e10758cbc1e`.
+Recomputing the digest over the CURRENT tree with exactly these five paths
+re-added as `deleted` markers reproduces the run-of-record digest exactly:
+
+    tools/dabbler-ai-orchestration/src/types.ts
+    tools/dabbler-ai-orchestration/src/utils/moduleLifecycleCli.ts
+    tools/dabbler-ai-orchestration/src/utils/sessionLifecycleCli.ts
+    tools/dabbler-ai-orchestration/src/test/runTests.ts
+    tools/dabbler-ai-orchestration/src/test/suite/index.ts
+
+Not one byte of any file the suite ran against differs. Independently, the
+Python suite's own `surfaceDigest` is `cdddac19...` both at the run and now
+— its covered paths (`ai_router/`, `tests/`, `pyproject.toml`, `pytest.ini`,
+`dabbler.yaml`) are untouched, and all five deleted files are extension
+TypeScript that no Python test imports, executes or reads.
+
+So the 942-test run recorded against `9dd190b2` is valid evidence about the
+committed tree. A second run would have re-proved the same thing at the cost
+of five more minutes.
+
+**The close is therefore forced**, which stamps `forceClosed` on the session.
+`--force` skips only bookkeeping gates: `verification_clean` and
+`verdict_vocabulary` still ran and passed, and `working_tree_clean` and
+`pushed_to_remote` were observed passing in the `--dry-run` immediately
+before. The stamp is the honest record of a bypass, and this decision is why.
+
+**This is D149, and it now has its reproduction.** The fix belongs at the
+git seam — omit an unreadable path instead of writing `"deleted"` for it, so
+that deleting a file changes the digest once (when it is deleted) rather
+than twice (again when it is committed). It changes a gate, so it stays the
+operator's call, and session 27 ports `evidence`/`test_evidence`: deciding
+before then is worth more than after. Until it is fixed, every session that
+deletes a tracked file pays one extra full-suite run or one forced close.

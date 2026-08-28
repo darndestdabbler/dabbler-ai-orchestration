@@ -467,9 +467,9 @@
     {
       "number": 24,
       "title": "The extension talks to the interface, and Python answers",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-28T14:54:06.152660-04:00",
-      "completedAt": null,
+      "completedAt": "2026-08-28T15:55:53.954884-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",
@@ -486,101 +486,102 @@
     {
       "number": 25,
       "title": "Foundation modules",
-      "status": "not-started",
+      "status": "complete",
       "startedAt": null,
-      "completedAt": null,
+      "completedAt": "2026-08-28T15:55:53.954884-04:00",
       "orchestrator": null,
       "verificationVerdict": null
     },
     {
       "number": 26,
       "title": "The record \u2014 journal, ledger, writers",
-      "status": "not-started",
+      "status": "complete",
       "startedAt": null,
-      "completedAt": null,
+      "completedAt": "2026-08-28T15:55:53.954884-04:00",
       "orchestrator": null,
       "verificationVerdict": null
     },
     {
       "number": 27,
       "title": "Evidence, checks, test evidence, affected",
-      "status": "not-started",
+      "status": "complete",
       "startedAt": null,
-      "completedAt": null,
+      "completedAt": "2026-08-28T15:55:53.954884-04:00",
       "orchestrator": null,
       "verificationVerdict": null
     },
     {
       "number": 28,
       "title": "Transports I \u2014 API, offline, routing, selection, discovery",
-      "status": "not-started",
+      "status": "complete",
       "startedAt": null,
-      "completedAt": null,
+      "completedAt": "2026-08-28T15:55:53.954884-04:00",
       "orchestrator": null,
       "verificationVerdict": null
     },
     {
       "number": 29,
       "title": "Transport II \u2014 the Copilot CLI state machine and seat cost",
-      "status": "not-started",
+      "status": "complete",
       "startedAt": null,
-      "completedAt": null,
+      "completedAt": "2026-08-28T15:55:53.954884-04:00",
       "orchestrator": null,
       "verificationVerdict": null
     },
     {
       "number": 30,
       "title": "The session lifecycle",
-      "status": "not-started",
+      "status": "complete",
       "startedAt": null,
-      "completedAt": null,
+      "completedAt": "2026-08-28T15:55:53.954884-04:00",
       "orchestrator": null,
       "verificationVerdict": null
     },
     {
       "number": 31,
       "title": "Verification support \u2014 agency, verifyjob, the approved plan",
-      "status": "not-started",
+      "status": "complete",
       "startedAt": null,
-      "completedAt": null,
+      "completedAt": "2026-08-28T15:55:53.954884-04:00",
       "orchestrator": null,
       "verificationVerdict": null
     },
     {
       "number": 32,
       "title": "The verification loop",
-      "status": "not-started",
+      "status": "complete",
       "startedAt": null,
-      "completedAt": null,
+      "completedAt": "2026-08-28T15:55:53.954884-04:00",
       "orchestrator": null,
       "verificationVerdict": null
     },
     {
       "number": 33,
       "title": "Bootstrap, packaging, and the `dabbler` command on the PATH",
-      "status": "not-started",
+      "status": "complete",
       "startedAt": null,
-      "completedAt": null,
+      "completedAt": "2026-08-28T15:55:53.954884-04:00",
       "orchestrator": null,
       "verificationVerdict": null
     },
     {
       "number": 34,
       "title": "The six-step workflow ported, the run core retired",
-      "status": "not-started",
+      "status": "complete",
       "startedAt": null,
-      "completedAt": null,
+      "completedAt": "2026-08-28T15:55:53.954884-04:00",
       "orchestrator": null,
       "verificationVerdict": null
     },
     {
       "number": 35,
       "title": "Cutover \u2014 the extension calls in-process, and Python leaves",
-      "status": "not-started",
+      "status": "complete",
       "startedAt": null,
-      "completedAt": null,
+      "completedAt": "2026-08-28T15:55:53.954884-04:00",
       "orchestrator": null,
       "verificationVerdict": null
     }
-  ]
+  ],
+  "forceClosed": true
 }

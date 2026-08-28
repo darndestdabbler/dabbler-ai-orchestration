@@ -58,7 +58,7 @@ it.
 | 20 | A round baseline that survives the trip (root cause of D98) | no | 2026-08-28 |
 | 21 | Close out set 148 on the record, and make the loop tests cheap | no | 2026-08-28 |
 | 22 | Decide the inventory before anything is translated | no | 2026-08-28 |
-| 23 | Contracts — types from schemas, the Router interface, and the controls | — | not declared |
+| 23 | Contracts — types from schemas, the Router interface, and the controls | no | 2026-08-28 |
 | 24 | The extension talks to the interface, and Python answers | — | not declared |
 | 25 | Foundation modules | — | not declared |
 | 26 | The record — journal, ledger, writers | — | not declared |
@@ -602,3 +602,33 @@ A prose session, verified the way sessions 1 and 2 were. It writes no code and a
 6. This session's seat cost measured and recorded as a decision, naming the currency measured (Claude Code subscription context for the orchestrator; provider API tokens and dollars for the verification rounds).
 
 Then affected tests as preverify (the selector will report no test affected and nothing is recorded, as session 2's record shows), cross-provider verification, the full suite as the final-full run of record, and close-out with STATUS.md pointing at the new decisions and the landed plan.
+
+### Session 23 — Contracts — types from schemas, the Router interface, and the controls
+
+**Releasable: no.**
+
+# Session 23 of 35 — Contracts: types from schemas, the Router interface, and the controls
+
+1. Create `packages/router` under a root npm workspace (with
+   `tools/dabbler-ai-orchestration`); `tsc --strict` and ESLint configured;
+   `vitest` as the runner in path-list form for targeted runs.
+2. Generate TypeScript types from all twenty schemas under
+   `ai_router/schemas/` with one generator; output checked in under
+   `packages/router/src/generated/`; a staleness control that fails when the
+   checked-in output no longer matches what the generator produces.
+3. Define the `Router` interface from the extension's real spawn sites —
+   one method per verb (`session.*`, `progress`, `modules`, `verify`,
+   `bootstrap`, `workflow`, `ledger`, `test_evidence`, `approved_plan`,
+   `affected`) — typed by the generated types, with the CLI's exit-code
+   mapping expressed as a typed error.
+4. Build the parity control from `docs/ts-port-parity-control.md`: the
+   corpus builder, the two normalizations, the comparison, the three exit
+   codes; `npm run parity` at the workspace root.
+5. Declare the first `testing.controls` in `dabbler.yaml` — `tsc --noEmit`
+   (typecheck), ESLint (lint), the parity control (analyzer, required).
+6. Declare the second suite `typescript` in `dabbler.yaml` (vitest,
+   `test_roots`, `test_glob`) plus the selection rules for the new paths, so
+   `affected` selects across both suites.
+7. Measure this session's seat cost and record it as a decision.
+8. Affected tests as preverify; cross-provider verification; the full run of
+   record over both suites; close-out.

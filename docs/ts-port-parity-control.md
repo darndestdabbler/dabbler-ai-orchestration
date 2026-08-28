@@ -28,9 +28,31 @@ checked in that could go stale or be hand-edited.
 
 ## Where it runs
 
-- Declared once, in session 23, beside `tsc --noEmit` (kind `typecheck`)
-  and ESLint (kind `lint`) — the first controls this repository declares.
+- Declared once, in session 23, as kind `analyzer` and `required: true`,
+  beside `tsc --noEmit` (kind `typecheck`), ESLint (kind `lint`) and the
+  generated-type staleness check (kind `compile`) — the first controls
+  this repository declares.
 - Runs on every `python -m ai_router.verify` from then on, through `facts`.
+
+> **Amended in session 23, over two verifier rounds: the control has two
+> comparisons, not one.** As designed it compared two routers, and there is
+> no second router until session 25 — so a control declared in session 23
+> would have returned exit 0 having compared nothing, writing a green
+> `analyzer: pass` row on every round: a record saying parity was checked
+> where nothing was. Not declaring it was worse, and correctly refused: it
+> leaves the port with no required parity gate at all.
+>
+> The resolution is that parity has a half that needs only one router.
+> **Determinism** — each corpus shape built twice and compared byte for
+> byte after the same two normalizations — is a precondition for router
+> parity being measurable at all: if a record write is not reproducible
+> (a set iterated in hash order, a float formatted by locale, a digest
+> over a timestamp), then a later router difference cannot be told from
+> noise. It runs from session 23, it is what the control's answer rests on
+> until session 26, and it is not a formality — it caught the
+> digest-ledger defect on its first run, and removing that rule turns the
+> control red today. **Router parity** is the second comparison and grows
+> one case at a time from session 26. The control is red if either drifts.
 - Runs by hand as `npm run parity` (workspace root) with the same script and
   the same exit codes, so a session sees drift before it asks for a round.
 - Runs on the same machine and OS for both routers. **Cross-OS parity is not
@@ -48,6 +70,19 @@ every run into a temporary directory by a builder script that drives the
 test suite already uses (`tests/conftest.py`, `_sandbox_template`: a seeded
 working repository plus a bare `origin`, git configuration pinned for the
 process). Nothing under the corpus is checked in as output.
+
+> **Amended in session 23, as built.** A shape is built only when an active
+> verb needs it, and its builder lands in the session that first needs it —
+> the same rule the verbs follow, applied to the fixtures they run against.
+> `fresh` and `in-flight` are built (they buy no model call, and session 23
+> proved both end to end); `disputed`, `at-cap` and `moved-machine` need
+> canned verifier text through the offline transport and land with the verbs
+> that read them. A shape whose builder is missing stops the control at
+> "could not run" (exit 2), never at a pass. `npm run parity -- --build
+> <shape>` builds one by hand, and `npm run parity -- --self-check <shape>`
+> builds it twice and compares the two copies — a builder that fails that is
+> non-deterministic, and every parity run it fed would be flaky for a reason
+> no diff would explain.
 
 | Shape | What the builder does | What it exercises |
 | --- | --- | --- |
@@ -120,14 +155,19 @@ Compared:
   itself is not compared (see normalization 1).
 - **Every verb's exit code.** A verb that refuses on one side and succeeds
   on the other is drift even when no file differs.
-- **The stdout of every read-only verb**, after the same two
-  normalizations: `progress` and `progress --json` (what the extension
-  renders), the `ledger` reads and the unresolved view, `session close
-  --dry-run`'s gate rows, `packaging --dry-run`, `affected`'s selection,
-  and `seat_cost`'s result. Their output *is* their record.
-- **The stderr of every refusal** the corpus provokes (the reanchor
-  refusals, the second declaration, a start over an in-flight session),
-  because a refusal's wording is what the operator reads.
+- **The stdout and the stderr of every invocation**, after the same two
+  normalizations. Not a list of which verbs' output counts: everything a
+  verb emits is compared, on every verb.
+
+  > **Amended in session 23**, taking D137's carried nit. The design named
+  > read-only verbs' stdout (`progress`, the `ledger` reads, `session close
+  > --dry-run`, `packaging --dry-run`, `affected`, `seat_cost`) and the
+  > stderr of selected refusals. A verifier observed in session 22 that
+  > "compare everything a verb emits" is both simpler and stricter than a
+  > list — and a list is a thing to forget to add to. It is the rule as
+  > built. The reasoning behind the old list still holds and is why the
+  > rule matters: for a read-only verb the output *is* the record, and a
+  > refusal's wording is what the operator reads.
 
 Excluded, and why:
 
@@ -157,6 +197,25 @@ whitespace, trailing newlines, float formatting, list order, and the
 ordinal of a decision. That strictness is the point: the record is what a
 reader diffs across sessions, and two routers that serialize the same facts
 differently would make every future diff lie.
+
+> **Amended in session 23, found by running it.** There is a place
+> normalization 1 cannot reach as text: a **digest over content that
+> carries a timestamp**. `.dabbler/runs/state-writes.jsonl` is one row per
+> sanctioned write of `sessions.json`, each row the sha256 of that file's
+> bytes — and `sessions.json` carries `startedAt`, so two runs can never
+> agree on the digest even though the file it covers compares equal a
+> directory away. The first self-check of the `in-flight` shape failed on
+> exactly this. Such a ledger is therefore compared by **row count and row
+> shape**: its `sha256:<hex>` values become `sha256:<digest>`, and what is
+> proved is how many sanctioned writes happened and in what order, which is
+> everything the ledger says that its payload does not.
+>
+> This is normalization 1 reaching a value it cannot reach as text — the
+> same concession already made for a git commit id, compared by tree
+> because a commit differs only through its dates. It is **not** a third
+> rule and is not licence for one: a digest over content with no timestamp
+> in it — every tree hash in the record, `completion_tree` included — is
+> compared exactly, and a new digest ledger has to name itself here.
 
 ## Output and exit codes
 

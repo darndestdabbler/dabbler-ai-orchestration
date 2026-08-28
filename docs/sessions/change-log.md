@@ -186,3 +186,10 @@
 - Orchestrator provider (excluded): anthropic
 - Verifier's read surface: agency: none — this round's verifier could not look at the tree
 - Raw round output: `.dabbler/runs/s22/`
+
+## Session 23 adjudication — VERIFIED (every disputed finding OVERRULED)
+
+- Adjudicator: gemini-flash (google) over api
+- Excluded providers: anthropic, openai
+- Dispute on round 3 finding 0: OVERRULED — The orchestrator's arguments for reachability and impact are well-supported by the cited evidence.
+- Raw round output: `.dabbler/runs/s23/`

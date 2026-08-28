@@ -4724,6 +4724,311 @@
       "dateTime": "2026-08-28T12:38:37.825461-04:00",
       "description": "Close-out: STATUS.md lands in the commit after the close (it is material to the freshness and verification gates); memory notes updated.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 23,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-28T12:41:33.997104-04:00",
+      "description": "Register; declare `--not-releasable`.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 23,
+      "stepNumber": 2,
+      "stepKey": "create-packages-router-with-the-root",
+      "dateTime": "2026-08-28T12:41:33.997104-04:00",
+      "description": "Create `packages/router` with the root workspace; ESLint and `tsc --strict` configured; `vitest` as the runner, path-list form for targeted runs.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 23,
+      "stepNumber": 3,
+      "stepKey": "generate-typescript-types-from-every-schema",
+      "dateTime": "2026-08-28T12:41:33.997104-04:00",
+      "description": "Generate TypeScript types from every schema with one generator, output checked in, a control that fails when the output is stale.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 23,
+      "stepNumber": 4,
+      "stepKey": "define-the-router-interface-from-the",
+      "dateTime": "2026-08-28T12:41:33.997104-04:00",
+      "description": "Define the `Router` interface from the extension's spawn sites: one method per verb the extension calls (`session.*`, `progress`, `modules`, `verify`, `bootstrap`, `workflow`, `ledger`, `test_evidence`, `approved_plan`, `affected`), typed by the generated types. The `dabbler` CLI verb list is the same list plus the engine-facing verbs.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 23,
+      "stepNumber": 5,
+      "stepKey": "build-the-parity-control-from-session",
+      "dateTime": "2026-08-28T12:41:33.997104-04:00",
+      "description": "Build the parity control from session 22's design: a script that runs a verb against a fixture through both routers and compares the written files. Declare it in `dabbler.yaml` as a required control, with `tsc --noEmit` and ESLint beside it \u2014 the first controls this repository has ever declared.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 23,
+      "stepNumber": 6,
+      "stepKey": "declare-the-second-suite-in-dabbler",
+      "dateTime": "2026-08-28T12:41:33.997104-04:00",
+      "description": "Declare the second suite in `dabbler.yaml` (`typescript`, vitest, `test_roots`, `test_glob`), so `affected` selects across both.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 23,
+      "stepNumber": 7,
+      "stepKey": "measure-this-session-s-seat-cost",
+      "dateTime": "2026-08-28T12:41:33.997104-04:00",
+      "description": "Measure this session's seat cost and record it.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 23,
+      "stepNumber": 8,
+      "stepKey": "affected-tests-as-preverify",
+      "dateTime": "2026-08-28T12:41:33.997104-04:00",
+      "description": "Affected tests as preverify.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 23,
+      "stepNumber": 9,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-28T12:41:33.997104-04:00",
+      "description": "Cross-provider verification.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 23,
+      "stepNumber": 10,
+      "stepKey": "full-test-suite-both-suites-recorded",
+      "dateTime": "2026-08-28T12:41:33.997104-04:00",
+      "description": "Full test suite (both suites), recorded as the `final-full` run of record.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 23,
+      "stepNumber": 11,
+      "stepKey": "close-out",
+      "dateTime": "2026-08-28T12:41:33.997104-04:00",
+      "description": "Close-out.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 23,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-28T12:41:34.001335-04:00",
+      "description": "Registered session 23 (claude-code).",
+      "status": "complete"
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 23,
+      "dateTime": "2026-08-28T12:41:47.848969-04:00",
+      "task": "# Session 23 of 35 \u2014 Contracts: types from schemas, the Router interface, and the controls\n\n1. Create `packages/router` under a root npm workspace (with\n   `tools/dabbler-ai-orchestration`); `tsc --strict` and ESLint configured;\n   `vitest` as the runner in path-list form for targeted runs.\n2. Generate TypeScript types from all twenty schemas under\n   `ai_router/schemas/` with one generator; output checked in under\n   `packages/router/src/generated/`; a staleness control that fails when the\n   checked-in output no longer matches what the generator produces.\n3. Define the `Router` interface from the extension's real spawn sites \u2014\n   one method per verb (`session.*`, `progress`, `modules`, `verify`,\n   `bootstrap`, `workflow`, `ledger`, `test_evidence`, `approved_plan`,\n   `affected`) \u2014 typed by the generated types, with the CLI's exit-code\n   mapping expressed as a typed error.\n4. Build the parity control from `docs/ts-port-parity-control.md`: the\n   corpus builder, the two normalizations, the comparison, the three exit\n   codes; `npm run parity` at the workspace root.\n5. Declare the first `testing.controls` in `dabbler.yaml` \u2014 `tsc --noEmit`\n   (typecheck), ESLint (lint), the parity control (analyzer, required).\n6. Declare the second suite `typescript` in `dabbler.yaml` (vitest,\n   `test_roots`, `test_glob`) plus the selection rules for the new paths, so\n   `affected` selects across both suites.\n7. Measure this session's seat cost and record it as a decision.\n8. Affected tests as preverify; cross-provider verification; the full run of\n   record over both suites; close-out.",
+      "releasable": false
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D138",
+      "ordinal": 138,
+      "sessionNumber": 23,
+      "decidedOn": "2026-08-28",
+      "recordedAt": "2026-08-28T13:09:25.826536-04:00",
+      "decider": "orchestrator",
+      "headline": "packages/router under a root npm workspace; the CLI bundles to dist/dabbler.cjs (a .js cannot be CommonJS under type:module), controls are argv for node, and CI installs at the root on Node 24",
+      "body": "`packages/router` exists, published to npm as `dabbler-ai-router` with `bin: dabbler`, under a root `package.json` that declares npm workspaces over it and `tools/dabbler-ai-orchestration` (D131). `tsc --strict` with `moduleResolution: bundler`, ESLint 8 on the extension's own configuration, `vitest` as the runner in the path-list form the targeted-command audit already accepts. The three runtime dependencies of D132 are declared and none is used yet; nothing else was added.\n\nFour things D131 could not know, because they only appear when the layout is run:\n\n**The CLI bundle is `dist/dabbler.cjs`, not `dist/dabbler.js`.** D131 says CommonJS, and CommonJS it is; but the package is `\"type\": \"module\"` so that Node can run the TypeScript sources directly, and under that a `.js` file is an ES module whatever is inside it \u2014 `node dist/dabbler.js` died with \"module is not defined in ES module scope\". The extension bundle is unaffected: it is built by the extension's own esbuild into `dist/extension.js` as CommonJS, which is where D131's reason (\"as the extension host requires\") actually applies. `bin` names the `.cjs`.\n\n**The TypeScript that is not shipped runs on Node, not on a transpiler.** The generator, the staleness control, the workspace typecheck/lint control and the parity control are TypeScript executed directly by `node`, which strips types unflagged from **22.18** on. No `tsx`, no `ts-node`, no build step in front of a control \u2014 a control whose answer depended on a build being fresh would be reporting on the build. `scripts/run-ts.mjs` is the one plain-JavaScript file in the package and exists for one reason: it checks the Node version and exits **2** (\"could not run\", recorded as `unknown`) on an older one, because a bare `SyntaxError` would exit 1 and be read as a finding the tool never made.\n\n**Every declared control's command is argv for `node`.** `facts.run_control` splits the command with `shlex` and runs it with no shell; `npm` and `npx` are shim scripts on Windows that argv cannot reach, and `python`/`python3` are the only names it rewrites. So each control is `node <script> \u2026` and nothing else. The root `npm run typecheck` / `lint` / `check:types` / `parity` scripts are the same command lines verbatim, so what a person runs and what `facts` runs cannot drift.\n\n**CI had to move to the root.** Both workflows ran `npm ci` inside `tools/dabbler-ai-orchestration`; a workspace member has no lockfile of its own, so the install is now `working-directory: .` in both, and `tools/dabbler-ai-orchestration/package-lock.json` is deleted rather than left as a second lockfile nothing reads. Node goes 20 \u2192 24 in both, which is the floor D131 measured and the version the scripts need. `test.yml` gains a `router` job: the staleness control, the typecheck and lint controls, vitest, and the CLI bundle. The parity control is deliberately **not** in CI \u2014 it drives both routers against a git corpus and so needs Python installed beside Node; it runs before every verification round, which is where a comparison of two implementations belongs.\n\nThe extension's 153 mocha tests, its lint and its bundle were green before the workspace and are green after it.",
+      "model": "claude-opus-5",
+      "provider": "anthropic"
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D139",
+      "ordinal": 139,
+      "sessionNumber": 23,
+      "decidedOn": "2026-08-28",
+      "recordedAt": "2026-08-28T13:09:50.364040-04:00",
+      "decider": "orchestrator",
+      "headline": "Types generated from every schema, with a compile control on staleness; a twenty-first schema written for progress --json so types.ts has a generated replacement; the translation states shape and leaves legality to ajv",
+      "body": "Every schema under `ai_router/schemas/` now generates one TypeScript module under `packages/router/src/generated/`, checked in, plus an `index.ts` barrel. `npm run check:types` regenerates in memory and compares; it is declared as the `compile` control, `required: true`, so stale output stops a session before a verifier is bought. The generator is one implementation and nothing reads the generated files to produce them, so a hand edit cannot survive a run.\n\n**A twenty-first schema was added, and this is the reason the session exists.** `progress --json` \u2014 the projection the Work Explorer renders \u2014 had no schema. Its only statement was `tools/dabbler-ai-orchestration/src/types.ts`, 209 hand-kept lines, which is precisely the mirror the plan says this session replaces (\"Today `types.ts` is a hand-kept mirror of what Python writes\"). Without a schema, step 4's \"typed by the generated types\" would have been false for the most-used verb, and session 24's \"delete `types.ts` in favour of the generated types\" would have had nothing to delete into. So `ai_router/schemas/progress-projection.schema.json` was written from `progress.build_projection`, `build_task_rows` and `build_verification_view` \u2014 the Python source, not the TypeScript mirror \u2014 and checked against a real projection of this repository's 35 sessions: **zero validation errors**.\n\nIt is a **new file, not a behaviour change**: nothing validates against it yet, so no code path moved. Wiring `progress` to validate its own output is a behaviour change with a test and belongs to session 30, which ports it.\n\n**What a JSON Schema keyword becomes, stated rather than inferred.** `$ref` resolves only into the file's own `$defs` and a pointer anywhere else is an error rather than a widening to `unknown`; `$defs` entries are named `<Root><PascalKey>`. `oneOf`/`anyOf` become unions, `enum` and `const` become literal unions, `type: [...]` becomes a union. `allOf` becomes an intersection of the members that carry shape \u2014 an `if`/`then`/`else` member carries none, because it refines which values are legal, which is ajv's job at run time and cannot be spelled in a structural type. `not`, `minimum`, `minLength`, `minItems` and their kin are dropped for the same reason. An object with declared `properties` renders them (plus `[key: string]: unknown` when `additionalProperties` is open, because a typed index signature would have to admit every declared property too); an object with none renders `Record<string, T>`, because a schema that declares no property is describing a map.\n\nThe consequence worth naming: **the generated types describe shape, and ajv describes legality.** A row that satisfies its generated type can still be refused by the schema \u2014 `rounds.schema.json` alone carries five conditional `allOf` blocks \u2014 and that is correct. The type is what a reader and the compiler use; the validator is what the record uses.",
+      "model": "claude-opus-5",
+      "provider": "anthropic"
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D140",
+      "ordinal": 140,
+      "sessionNumber": 23,
+      "decidedOn": "2026-08-28",
+      "recordedAt": "2026-08-28T13:10:08.906961-04:00",
+      "decider": "orchestrator",
+      "headline": "The Router interface: one method per verb, refusals as values over the published exit codes, and a verb table whose availability is a registered handler rather than a session number to bump",
+      "body": "`packages/router/src/contracts/router.ts` declares `Router`: one method per verb, grouped as the CLI groups them (`session.*`, `modules.*`, `verify.*`, `workflow.*`, `ledger.*`, `testEvidence.*`, `approvedPlan.*`, plus `progress`, `bootstrap`, `affected`). It is deliberately **not** a spawn interface: `PythonSpawnRouter` satisfies it by spawning (session 24), the ported modules satisfy it in-process (session 35), and neither spelling appears in it \u2014 which is what lets the extension stop knowing that Python exists.\n\n**A refusal is a value, not an exception.** `RouterResult<T>` is `{ok: true, value}` or `{ok: false, outcome, exitCode, message}`, over the CLI's published exit codes: 0 ok, 3 refused with nothing written, 4 write failed, anything else \u2014 including argparse's usage code 2 \u2014 an unclassified failure. Refusing is this framework's normal answer, not its error path; modelling it as a thrown error would have made every call site in session 24 a try/catch for the ordinary case. `outcomeForExitCode(null)` is `failed`: a process that was killed or never ran did not consent to anything. The one genuine exception is `RouterUnavailableError` \u2014 no interpreter, no binary, a spawn that threw \u2014 because that is the absence of an answer rather than an answer.\n\n**`progress` is the only verb with a typed payload, and that is a statement rather than a gap.** It is the only one whose answer is a projection; the rest print for a person to read. Their returns are `RouterText` and sharpen as their modules land. Options interfaces gain fields the same way. Both are additive and move no caller.\n\n**The `dabbler` verb list is one table, read twice.** `src/contracts/verbs.ts` names fifteen verbs \u2014 the extension-facing ones plus the engine-facing ones \u2014 each with the Python module it replaces and the session that ports it. `runcli` is absent: the run core is retired (D130). Availability is **not** a session number anyone has to bump: `src/cli/registry.ts` holds the handlers, a verb is available when a handler is registered, and the CLI and the parity control read that same fact at the same moment. A declared verb with no handler is refused **by name with exit 3**, naming the session that lands it and the `python -m \u2026` to use meanwhile \u2014 which is a different answer from \"unknown verb\", and the difference matters: an orchestrator reading the first should wait and reading the second should check the spelling.",
+      "model": "claude-opus-5",
+      "provider": "anthropic"
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D141",
+      "ordinal": 141,
+      "sessionNumber": 23,
+      "decidedOn": "2026-08-28",
+      "recordedAt": "2026-08-28T13:10:34.829336-04:00",
+      "decider": "orchestrator",
+      "headline": "The parity control is built and declared; two amendments to D133 found by running it: shape builders land with the verbs that need them, and a digest ledger over timestamped content is compared by row count and shape",
+      "body": "The parity control of D133 is built: `packages/router/src/parity/` (the corpus builder, the normalizations, the comparison and its unified diff, the driver) and `scripts/parity.ts`. It is declared in `dabbler.yaml` as kind `analyzer`, `required: true`, and runs green through `ai_router.facts` today. Running it corrected the design in two places, and the specification is amended in both.\n\n**Amendment 1 \u2014 a shape is built when a verb needs it.** D133 said all five shapes are built fresh at every run. Three of them (`disputed`, `at-cap`, `moved-machine`) need canned verifier text through the offline transport, and no TypeScript verb exists to compare against until session 26. Writing three builders now that nothing could execute for three sessions would have been three hundred lines of unverified code rotting in place \u2014 the failure the port exists to end, reintroduced as fixtures. So the shapes follow the same rule as the verbs: `fresh` and `in-flight` are built and **were proven end to end in this session**; the other three land in the session that first needs them, and a missing builder stops the control at exit 2 (\"could not run\", recorded `unknown`), never at a pass.\n\n**Amendment 2 \u2014 a digest over timestamped content, found by running it.** `npm run parity -- --self-check <shape>` builds one shape **twice** and compares the two copies: whatever the two routers later disagree about, two runs of one builder must differ only in their root and their timestamps, which is exactly what the two normalizations erase. Its first run on `in-flight` failed \u2014 on `.dabbler/runs/state-writes.jsonl`, one row per sanctioned write of `sessions.json`, each row the **sha256 of that file's bytes**. `sessions.json` carries `startedAt`, so the digest carries a timestamp one hash away and no textual normalization can reach it, while the file it covers compares equal a directory away.\n\nSuch a ledger is therefore compared by **row count and row shape**: its `sha256:<hex>` values become `sha256:<digest>`. What it proves that its payload does not is how many sanctioned writes happened and in what order, and that is what is now compared. This is normalization 1 reaching a value it cannot reach as text \u2014 the same concession D133 already makes for a git commit id, compared by tree because a commit differs only through its dates. It is **not** a third rule: a digest over content with no timestamp in it, every tree hash in the record and `completion_tree` above all, is compared exactly, and a new digest ledger has to name itself in the list.\n\n**Had the self-check not existed, this would have surfaced in session 26 as a red required control with a one-line diff of two hex strings** and no way to tell a real port defect from an artefact of the design. The mode is kept for that reason.\n\nWhat is built and proven now: the seeded corpus (a working repository with a session plan, a `dabbler.yaml`, a source file and a test, plus a real bare `origin`, with git identity and dates pinned through the environment); the `fresh` and `in-flight` builders driving the Python router for real (`session start`, `declare`, `affected`, `test_evidence record`); the allow-list of compared paths with its exclusions (telemetry, the two lock files, the retired run core's records); the two normalizations; the LCS unified diff; and the three exit codes. `fresh` self-checks over 1 path and `in-flight` over 6. The verb table is empty \u2014 nothing is compared before its TypeScript side exists \u2014 so the control's honest answer today is exit 0 with \"no verb has been ported yet, and both routers are executable\", which is itself worth having: it is the check that the Python router and the `dabbler` CLI can both be run at all.",
+      "model": "claude-opus-5",
+      "provider": "anthropic"
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D142",
+      "ordinal": 142,
+      "sessionNumber": 23,
+      "decidedOn": "2026-08-28",
+      "recordedAt": "2026-08-28T13:10:54.836829-04:00",
+      "decider": "orchestrator",
+      "headline": "The first declared controls in this repository: all four kinds, required, each one node argv; plus the typescript suite, whose vitest path-list form satisfies the targeted-command audit without D116",
+      "body": "This repository declared no deterministic controls until now \u2014 the comment in `dabbler.yaml` said so, and said why: it shipped no typechecker, linter or analyzer, and `not_applicable` was the honest row. The port brings all three, so all four kinds are declared, each `required: true`, and each is one `node` argv:\n\n| Kind | What it is | Why this kind |\n| --- | --- | --- |\n| `compile` | `check-types-fresh.ts` | The generated types are the compiled form of the twenty-one schemas. Stale output is a build that was not re-run. |\n| `typecheck` | `workspace-check.ts typecheck` | `tsc --noEmit` over **both** packages. |\n| `lint` | `workspace-check.ts lint` | ESLint over both packages. |\n| `analyzer` | `parity.ts` | The two routers, compared (D141). Retired in session 35 with the Python router it compares against. |\n\n`facts` admits one control per kind and this repository has two TypeScript packages, so `workspace-check.ts` runs the tool's own entry point (`node_modules/typescript/bin/tsc`, `node_modules/eslint/bin/eslint.js`) once per package and checks **both even after one fails** \u2014 a control that stopped at the first red would hide the second. All four run green in 4.9 seconds through `ai_router.facts`, which is the budget that matters: they run before every round.\n\n**The second suite.** `typescript` is declared beside `python`: `npx vitest run --root packages/router`, `expensive: true`, `test_roots: [packages/router/test]`, `test_glob: \"*.test.ts\"`. Vitest takes positional paths as file filters, so the targeted form `<command> packages/router/test/x.test.ts` that `checks.targeted_command` composes is a real command \u2014 verified from the repository root. **D116 is not needed for this suite**, and remains owed for filter-style runners (`mvn -Dtest=`, `dotnet test --filter`).\n\nSelection rules were added for every new path: the three test files map one-to-one to what they answer for (`src/schema/` and `src/generated/` \u2192 the schema tests, `src/contracts/` and `src/cli/` \u2192 the contract tests, `src/parity/` \u2192 the parity tests); `tsconfig.json`, both `package.json` files and `package-lock.json` select all three, because they change what every test in the package runs under; `scripts/`, `build.mjs` and `.eslintrc.json` declare `select: []`, which is a mapping and not an unknown \u2014 they are the declared controls' own entry points, and the controls run them. `ai_router/schemas/` now selects **on both sides**: a schema is the generator's input as well as Python's contract. `tools/dabbler-ai-orchestration/` declares `select: []` here because the extension is its own suite (mocha and Playwright), not this one, and is not declared as a suite until session 24 makes it one.",
+      "model": "claude-opus-5",
+      "provider": "anthropic"
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D143",
+      "ordinal": 143,
+      "sessionNumber": 23,
+      "decidedOn": "2026-08-28",
+      "recordedAt": "2026-08-28T13:23:33.075892-04:00",
+      "decider": "orchestrator",
+      "headline": "Python defect found by the port and fixed on the Python side first: the preverify gate demanded a targeted record from every expensive suite, including ones the selection named no test of, for which no recordable command exists",
+      "body": "Declaring the second expensive suite (D142) turned 43 tests red, and the cause was not the declaration. `affected.preverify_gate` iterates **every** expensive suite and demands a green `preverify-targeted` record for each \u2014 with no check that the selection named any test that suite runs. When it did not, the suite's targeted command is `\"\"` (`checks.targeted_command` returns the empty string for an empty selection, deliberately: naming the bare suite command there would be the module recommending the one run it exists to refuse), and `test_evidence.record_run` refuses an empty command on a preverify row (\"a preverify-targeted record must name the command that ran\").\n\nSo the gate demanded evidence that no sanctioned writer would produce. **It was not strict; it was unsatisfiable.** A repository with one expensive suite can never reach the state \u2014 the whole-change-set early return three branches up (`not result.all_tests_affected and not result.test_paths` \u2192 nothing to prove) covers it. A repository with two reaches it on the first change that touches only one ecosystem, which is most changes.\n\n**The fix is the rule the function already states, applied per suite instead of per change set:** a suite the selection named no test of has nothing to prove, so it is skipped. `evaluate_freshness` already narrows the same way, by `covers`. This is not a weakening \u2014 an unmapped path is still caught before this loop, by `result.unknown_paths` against the declared smoke fallback, so \"no test of this suite was selected\" can only mean the mapping says so. One test in `tests/test_affected.py` covers it, and it fails against the unfixed gate with `command=''` in the verdict, which is the unsatisfiable state itself.\n\nLanded on the Python side **first, in its own commit**, as `docs/ts-port-parity-control.md` requires of a Python defect the port exposes: the parity run that follows must compare two routers with the same intended behaviour. Session 27 ports `affected` and inherits the fixed rule.\n\n**Two harness consequences, both in `tests/conftest.py` and neither a production change.**\n\n`record_preverify` recorded the *first* expensive suite. It now records every expensive suite that the selection named a test of, skipping any whose targeted command is empty \u2014 the same rule as the gate. It stands in for an orchestrator, who would have run both.\n\nAnd `_hermetic` now strips this repository's own `testing.controls` from `load_config()`. `load_config()` resolves from the **working directory**, which under pytest is this repository whatever sandbox the test is driving; before this session there were no controls to inherit, and now there are four whose commands are paths in this tree (`node packages/router/scripts/\u2026`). `facts` would have run them with `cwd` set to a temp repository and recorded four `fail` rows on every round the suite drives. The config's repository and the tree's repository disagree **only in the harness**; in production they are the same directory. A test that declares controls of its own still gets them \u2014 the strip is keyed on the resolved config path being this repository's `dabbler.yaml`.\n\n**Worth naming as a latent coupling rather than fixing here:** a round driven against repository B while the working directory is repository A takes B's tree and A's configuration. Only the test harness does that today. If it ever becomes a real posture, the fix is for `collect_facts` to resolve its config from the repository root it was handed rather than from the working directory \u2014 which is a behaviour change in a gate, and the operator's call.",
+      "model": "claude-opus-5",
+      "provider": "anthropic"
+    },
+    {
+      "sessionNumber": 23,
+      "stepNumber": 2,
+      "stepKey": "create-packages-router-with-the-root",
+      "dateTime": "2026-08-28T13:26:52.959224-04:00",
+      "description": "packages/router under a root npm workspace with tools/dabbler-ai-orchestration; tsc --strict, ESLint, vitest; CLI bundles to dist/dabbler.cjs",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 23,
+      "stepNumber": 3,
+      "stepKey": "generate-typescript-types-from-every-schema",
+      "dateTime": "2026-08-28T13:26:53.698383-04:00",
+      "description": "21 schemas to 22 checked-in modules, plus a new progress-projection schema; staleness declared as the compile control",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 23,
+      "stepNumber": 4,
+      "stepKey": "define-the-router-interface-from-the",
+      "dateTime": "2026-08-28T13:26:54.555952-04:00",
+      "description": "Router with one method per verb, refusals as values over the published exit codes; the dabbler verb list with a handler registry",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 23,
+      "stepNumber": 5,
+      "stepKey": "build-the-parity-control-from-session",
+      "dateTime": "2026-08-28T13:26:55.254592-04:00",
+      "description": "corpus builder, two normalizations, comparison and diff, three exit codes; fresh and in-flight shapes proven; self-check mode added",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 23,
+      "stepNumber": 6,
+      "stepKey": "declare-the-second-suite-in-dabbler",
+      "dateTime": "2026-08-28T13:26:56.069456-04:00",
+      "description": "typescript suite (vitest) beside python, with selection rules for every new path; all four control kinds declared and green",
+      "status": "complete"
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D144",
+      "ordinal": 144,
+      "sessionNumber": 23,
+      "decidedOn": "2026-08-28",
+      "recordedAt": "2026-08-28T13:28:12.417874-04:00",
+      "decider": "orchestrator",
+      "headline": "D137's two carried nits settled: the parity control compares stdout and stderr of every invocation rather than a list, and the selector's 208 false selection_unknown rows are gone now that the ledger is untracked",
+      "body": "D137 carried two verifier nits from session 22 into this one. Both are settled.\n\n**Nit 1 \u2014 taken, and the specification is amended.** The design named which output counted: read-only verbs' stdout, and the stderr of selected refusals. The verifier's point was that \"compare everything a verb emits\" is both simpler and stricter than a list, and that a list is a thing to forget to add to. The control as built compares **stdout and stderr on every invocation**, after the same two normalizations, with no list of exceptions. The old list's reasoning is kept in the document because it is *why* the rule matters \u2014 for a read-only verb the output is the record, and a refusal's wording is what the operator reads \u2014 but it no longer decides what is compared.\n\n**Nit 2 \u2014 resolved by the world, not by an edit.** The verifier objected that calling the selector's `selection_unknown` rows \"no longer recurring\" was premature until the commit removing `.dabbler/runs` from HEAD had landed, which was session 22's own commit. It has landed (`487cc44d`'s predecessor, D135). This session's first `python -m ai_router.affected` reported **zero** `selection_unknown` rows, against 208 in each of sessions 19\u201322, and selected no smoke test on their account. The claim is now true at the time it is made. D134 stays owed as a latent defect for any repository that does track its ledger, and it stays on session 27's path.",
+      "model": "claude-opus-5",
+      "provider": "anthropic"
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D145",
+      "ordinal": 145,
+      "sessionNumber": 23,
+      "decidedOn": "2026-08-28",
+      "recordedAt": "2026-08-28T13:36:57.997981-04:00",
+      "decider": "orchestrator",
+      "headline": "Round 1's three blocking findings accepted and fixed: ledger and approved-plan added to the verb table, the schema-backed answers typed, and the parity analyzer left undeclared until it has a case rather than writing a green row for a comparison it never made",
+      "body": "Round 1 returned three Major blocking findings. All three are accepted; none is disputed. Two were straightforward omissions. The third is the session's most important correction and is the reason this entry exists.\n\n**Issue 1 \u2014 `ledger` and `approved-plan` were missing from the CLI verb table.** The plan says the `dabbler` verb list is the `Router` list plus the engine-facing verbs, and `Router` exposes both. I left them out because neither Python module has a `main()` today \u2014 which is the wrong reason: the verb list is a contract, and a caller typing `dabbler ledger` was told it \"is not a verb\", i.e. that they had made a spelling mistake. Both are declared now, and `VerbSpec` gained `pythonCli: false` so the refusal tells the truth about the meantime rather than naming a `python -m ai_router.ledger` that would itself fail.\n\n**Issue 3 \u2014 schema-backed answers were returned as untyped text.** `approved-plan.json` and a rounds row both have schemas and both have generated types, and `approvedPlan.read` and `ledger.latestRound` were returning `RouterText`. That defeats the session's own objective at the two seams the extension will use: a schema change would not have produced a compile error there. Both now return `ApprovedPlan` and `Rounds | null`. `ledger.unresolved` stays text, and the comment says why \u2014 the unresolved view is a fold with no schema of its own, and inventing one here would be a second declaration of a shape the record does not carry. `test/typed-payloads.test.ts` asserts the three schema-backed answers are their generated types, assignable in **both** directions so a silent widening to `unknown` fails, and uses `@ts-expect-error` on three payloads the schemas would reject \u2014 a marker that itself fails the build if the error it expects does not occur.\n\n**Issue 2 \u2014 the required parity analyzer was a successful no-op, and this is the finding worth reading.** `dabbler.yaml` declared parity as `analyzer`, `required: true`. With no verb ported, `CASES` is empty, and the control returned exit 0 with \"nothing is compared\". `facts` would then have written **`analyzer: pass`** into `.dabbler/runs/deterministic-facts.jsonl` on every round from this session on \u2014 a permanent record row saying parity was checked, on rounds where nothing was compared. The verifier's words were \"materially overstating readiness\", and they are right: this is the failure mode the whole framework exists to prevent, arriving through the control meant to prevent it. It is also a guard that cannot fail, which ground rule 2 forbids.\n\nI could not satisfy the verifier's criterion literally by adding a case. A case needs a verb implemented in TypeScript, and the first module lands in session 25 \u2014 manufacturing one would mean pulling a port forward past the plan's own sequencing. And making the control red instead would block sessions 23, 24 and 25 on a condition no work in them can clear.\n\nSo the analyzer is **not declared until session 26**, the session that gives it its first case. `facts` writes `not_applicable \u2014 no control of this kind is declared`, which is precisely what is true today. The control is not deleted or weakened: it is built, it is runnable as `npm run parity` (with `--build`, `--self-check` and `--shapes`), it is unit-tested, and `dabbler.yaml` carries the full reasoning at the point where the declaration will go. The other three kinds \u2014 `compile`, `typecheck`, `lint` \u2014 stay declared and `required: true`, because each has real work to do today and each is green.\n\n**The general rule this is an instance of, worth carrying:** a control earns its declaration by being able to fail. Declaring one before it can is not caution, it is a green row that means nothing, and the record cannot tell the difference later.",
+      "model": "claude-opus-5",
+      "provider": "anthropic"
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D146",
+      "ordinal": 146,
+      "sessionNumber": 23,
+      "decidedOn": "2026-08-28",
+      "recordedAt": "2026-08-28T13:44:24.869084-04:00",
+      "decider": "orchestrator",
+      "headline": "Superseding D145 on the verifier's round-2 finding: the parity control is declared required now, because parity has a half that needs one router -- each corpus shape built twice and compared, which is a precondition for router parity and is demonstrably able to fail today",
+      "body": "Round 2 resolved the two other findings and held on this one, rejecting the remedy of D145: \"Replacing the prior successful no-op with no analyzer at all does not remediate the prior finding; it changes the form of the same missing deliverable.\" That is correct, and D145's remedy is superseded here.\n\n**Both of my first two positions were wrong, and they were wrong in opposite directions.** Declared-but-vacuous writes a green `analyzer: pass` row for a comparison nobody made. Undeclared leaves the port with no required parity gate at all, and defers an operator-approved deliverable on an orchestrator's say-so. The verifier named the second in the same terms I had named the first, which is what made the third option visible.\n\n**The third option: parity has a half that needs only one router.** As designed the control compared two routers, and there is no second router until session 25. But two runs of one builder must differ only in their root and their timestamps \u2014 which is exactly what the two normalizations erase \u2014 so building each corpus shape **twice** and comparing byte for byte is a real comparison of real router output, available today.\n\nIt is also a *precondition* for the other half rather than a substitute. If a record write is not reproducible \u2014 a set iterated in hash order, a float formatted by locale, a digest taken over a timestamp \u2014 then a later Python-versus-TypeScript difference cannot be told from noise, and the parity control would be reporting on its own fixtures. Determinism is what makes router parity measurable at all, and it belonged in the control from the start; I had built it as a hand-run `--self-check` mode instead, which is the same code and none of the gate.\n\nSo `dabbler.yaml` declares `analyzer`, `required: true`, and the control now runs two comparisons and is red if either drifts:\n\n1. **Determinism** \u2014 every corpus shape with a builder, built twice through the Python router and compared. Today: `fresh` and `in-flight`, 7 record paths, **12 seconds**.\n2. **Router parity** \u2014 every ported verb through both routers. Empty until session 26, then one case at a time.\n\n**It is demonstrably able to fail, which is the whole of the finding.** Emptying `DIGEST_LEDGERS` \u2014 the one rule that reconciles `state-writes.jsonl`, whose rows are sha256 over a `sessions.json` that carries `startedAt` \u2014 turns the control red on this tree; restoring it turns it green over 7 paths. That is not a hypothetical failure mode: it is the defect this same check found the first time it was ever run.\n\nAll four control kinds are now declared, `required: true`, and green through `facts` in 15.8 seconds.\n\n**What I take from two rounds on one finding.** A control earns its declaration by being able to fail \u2014 that much I had right in D145. What I had wrong is the conclusion I drew: that a control which cannot fail yet should therefore wait. The better question is whether some part of what it exists to prove is provable now, and here a whole half was, sitting in the same file behind a flag nobody would run. Deferring was the easier answer and it would have left sessions 24 and 25 ungated for no reason.",
+      "model": "claude-opus-5",
+      "provider": "anthropic"
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D147",
+      "ordinal": 147,
+      "sessionNumber": 23,
+      "decidedOn": "2026-08-28",
+      "recordedAt": "2026-08-28T13:50:09.039443-04:00",
+      "decider": "orchestrator",
+      "headline": "Round 3's finding disputed and OVERRULED by a third provider (gemini-flash/google); the plan defect it exposed is owed to the operator: session 23 step 5 requires a two-router control in a session the plan gives no second router",
+      "body": "Round 3's single blocking finding was disputed and a third provider **OVERRULED** it: \"The orchestrator's arguments for reachability and impact are well-supported by the cited evidence.\" The session is `VERIFIED`. This entry records what the exchange settled and what it leaves owed, because the substance matters more than the outcome.\n\n**The verifier was right twice and I was wrong twice.** Round 1: a required analyzer that compared nothing wrote a green row for a comparison nobody made. Round 2: removing the declaration did not fix that, it changed the form of the same hole and deferred an operator-approved deliverable on an orchestrator's say-so. Both corrections were correct, and the second is what made the real answer visible -- that parity has a half needing one router, and that determinism was sitting behind a hand-run flag when it should have been the gate.\n\n**What was disputed was narrower than the finding.** Not whether cross-router comparison matters -- it is the point of the control -- but whether round 3's remedy was reachable in session 23, and whether its stated impact was real. On reachability: a cross-router comparison needs a verb in TypeScript, and the operator's plan (D128, D129) assigns every module to sessions 25-34. Session 24 ports nothing; session 25 ports foundation libraries, none of them a verb; the first ported verb is session 26. The only ways to comply were to re-sequence the operator's plan, which is not an orchestrator's call, or to write a stub reproducing one Python verb's bytes so a gate would turn green -- which would make the first real port in session 26 a regression against a stub. On impact: the harm named was that early port work could merge ungated, and the window it names (24, 25) contains no verb for a cross-router comparison to compare.\n\n**The plan defect this exposes is owed to the operator.** Step 5 of session 23 asks for two things that cannot both hold in session 23: a control that runs a verb through **both** routers, and that control declared as required. The second router does not exist in session 23 by the plan's own sequencing. The adjudication resolves this session; it does not amend the plan. **The operator should decide** whether step 5's wording changes, or whether the first parity case moves earlier -- and the substantive answer is already scheduled either way: session 26 lands the first ported verb, and the specification, D141, D146 and this session's `CASES` list all require its parity case in that same session.\n\n**One thing to carry into session 26, from the verifier rather than from me.** Its standing objection is that a reader of `deterministic-facts.jsonl` sees `analyzer: pass` and cannot tell what was compared. That is true, and it is true of every control row -- `facts.run_control` records kind, status, command and required, and drops the detail on a green result. When session 26 gives the analyzer its first cross-router case, it is worth asking whether a control should be able to say what it proved, not merely that it passed. That is a Python behaviour change in the record and therefore the operator's call, not a fix to slip into a port session.",
+      "model": "claude-opus-5",
+      "provider": "anthropic"
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D148",
+      "ordinal": 148,
+      "sessionNumber": 23,
+      "decidedOn": "2026-08-28",
+      "recordedAt": "2026-08-28T13:50:31.427435-04:00",
+      "decider": "orchestrator",
+      "headline": "Session 23 seat cost: verifier 121,670 in / 14,350 out over four API calls (three rounds plus the adjudication); orchestrator 437,884 Claude Code context tokens; round 1 alone is 78% of the input, which is what a code session costs over a prose one",
+      "body": "Session 23's seat cost, in the two currencies it ran on, by the method D136 set down. No dollar figure: set 109 removed the router's rate table, the metrics ledger carries tokens and elapsed time only, and a list price recalled from memory would be a guess dressed as a measurement.\n\n**Verification -- four calls: three rounds plus one adjudication.** From `ai_router/router-metrics.jsonl` rows with `session_number: 23`:\n\n| Call | Model | Input | Output | Elapsed |\n| --- | --- | ---: | ---: | ---: |\n| 1 (round 1) | gpt-5-6-sol (openai, api) | 98,266 | 8,275 | 121 s |\n| 2 (round 2) | gpt-5-6-sol (openai, api) | 7,218 | 3,503 | 48 s |\n| 3 (round 3) | gpt-5-6-sol (openai, api) | 7,927 | 1,981 | 29 s |\n| 4 (adjudication) | gemini-flash (google, api) | 8,259 | 591 | 6 s |\n| **Total** | | **121,670** | **14,350** | **204 s** |\n\n136,020 tokens in all. **Round 1 alone is 78% of the input**, at 98,266 tokens against 6,711 for session 22's first round -- fourteen times as much. That is the cost of a code session against a prose one: round 1 sends the whole change set, and this one created a package, twenty-two generated modules, a contract, a parity control and two workflow files. Rounds 2 and 3 are fix deltas and cost 7-8k each, which is the shape the loop is designed to produce. The adjudication is the cheapest call of the session (8,259 in, 591 out, 6 seconds) and it is the one that settled the session -- a third provider reading two positions and one round's findings, not a re-review.\n\nFor scale: session 22 (prose, three rounds) spent 36,163 tokens; this session spent 3.8 times that for a session that shipped a package.\n\n**Orchestrator -- Claude Code subscription, claude-opus-5 (1M context).** The harness counter stood at 15,000,000 at the first prompt and at 14,562,116 when this figure was taken: **437,884 tokens** across the session -- the workspace, the generator and its twenty-two modules, the twenty-first schema, the contract, the parity control, the four declared controls, the second suite, the Python defect and its fix, six earlier decisions, three verification rounds, one dispute and one adjudication. The run of record and the close come after and are not in the figure. This is the subscription window's currency and has no exchange rate to the API tokens above, nor to a Copilot seat's premium requests.\n\n**The measurement worth carrying:** a code session's round 1 is an order of magnitude more expensive than a prose session's, and the fix deltas after it are not. Anything that reduces round 1's bundle -- and only round 1's -- is where the loop's token cost actually lives.",
+      "model": "claude-opus-5",
+      "provider": "anthropic"
+    },
+    {
+      "sessionNumber": 23,
+      "stepNumber": 7,
+      "stepKey": "measure-this-session-s-seat-cost",
+      "dateTime": "2026-08-28T13:50:31.922250-04:00",
+      "description": "four API calls, 136,020 tokens; orchestrator 437,884 context tokens; recorded as D148",
+      "status": "complete"
     }
   ]
 }

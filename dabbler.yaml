@@ -56,14 +56,71 @@ testing:
         - tests
       test_glob: "test_*.py"
 
-  # Deterministic controls are declared here — one entry per kind, from
-  # compile, typecheck, lint, analyzer. A declared control runs before
-  # verification and its exit code is the fact; `required` sends a red
-  # result back to the author instead of buying a verifier's opinion on
-  # something the exit code already settled. This repository declares none:
-  # it ships no typechecker, linter, or analyzer, and the record says
-  # `not_applicable` rather than inventing a green row for a tool nobody
-  # runs.
+    # The TypeScript half of the framework, from the port. `affected`
+    # selects across both suites, so a change under `packages/router`
+    # runs vitest and a change under `ai_router` runs pytest, and a
+    # change to a schema runs both — it is the input to the generator
+    # and the shape Python validates against.
+    #
+    # Positional paths are vitest's file filters, so the targeted form
+    # `<command> packages/router/test/x.test.ts` is a real command and
+    # the audit needs no per-ecosystem narrowing rule (D116).
+    - name: typescript
+      command: npx vitest run --root packages/router
+      expensive: true
+      covers:
+        - packages/router/
+        - ai_router/schemas/
+        - package.json
+        - package-lock.json
+        - dabbler.yaml
+      test_roots:
+        - packages/router/test
+      test_glob: "*.test.ts"
+
+  # Deterministic controls — one entry per kind, from compile, typecheck,
+  # lint, analyzer. A declared control runs before verification and its
+  # exit code is the fact; `required` sends a red result back to the
+  # author instead of buying a verifier's opinion on something the exit
+  # code already settled.
+  #
+  # Every command here is argv for `node`, never `npm` or `npx`: a
+  # control is run as argv with no shell, and on Windows those are shim
+  # scripts that argv cannot reach. `node` is an executable everywhere.
+  controls:
+    # The generated types are the compiled form of the twenty-one
+    # schemas. Stale output is a build that was not re-run, which is
+    # what `compile` means here.
+    - kind: compile
+      command: node packages/router/scripts/run-ts.mjs packages/router/scripts/check-types-fresh.ts
+      required: true
+    - kind: typecheck
+      command: node packages/router/scripts/run-ts.mjs packages/router/scripts/workspace-check.ts typecheck
+      required: true
+    - kind: lint
+      command: node packages/router/scripts/run-ts.mjs packages/router/scripts/workspace-check.ts lint
+      required: true
+
+    # The parity control. Two comparisons, red if either drifts:
+    #
+    #   1. DETERMINISM -- every corpus shape built twice through the
+    #      Python router and compared byte for byte after the two
+    #      normalizations. Runs from session 23, because it needs one
+    #      router rather than two. It is not a formality: it caught the
+    #      digest-ledger defect the first time it ran (state-writes.jsonl
+    #      hashes a file carrying a timestamp), and removing that rule
+    #      turns this control red today.
+    #   2. ROUTER PARITY -- every ported verb run through both routers
+    #      against two copies of one shape, comparing written files, exit
+    #      codes and both streams. Grows one case at a time from session
+    #      26; empty before that, which is why (1) is what this control
+    #      rests on until then rather than resting on nothing.
+    #
+    # Specified in docs/ts-port-parity-control.md. Retired in session 35
+    # with the Python router it compares against.
+    - kind: analyzer
+      command: node packages/router/scripts/run-ts.mjs packages/router/scripts/parity.ts
+      required: true
 
   selection:
     # Changing one of these changes what every test does, so the selector can
@@ -338,8 +395,69 @@ testing:
           - tests/test_affected.py
           - tests/test_runcore_checks.py
           - tests/test_packaging.py
+
+      # --- The TypeScript router (the port) ---------------------------
+      #
+      # Three test files, one per thing the package states: what the
+      # schemas mean, what the contract is, and what parity compares.
+      # The scripts under `packages/router/scripts` are the declared
+      # controls' own entry points — the controls run them, so they map
+      # to no test rather than to an unknown.
+      - when: packages/router/src/schema/
+        select:
+          - packages/router/test/schema.test.ts
+      - when: packages/router/src/generated/
+        select:
+          - packages/router/test/schema.test.ts
+      - when: packages/router/src/contracts/
+        select:
+          - packages/router/test/contracts.test.ts
+      - when: packages/router/src/cli/
+        select:
+          - packages/router/test/contracts.test.ts
+      - when: packages/router/src/parity/
+        select:
+          - packages/router/test/parity.test.ts
+      - when: packages/router/src/index.ts
+        select:
+          - packages/router/test/contracts.test.ts
+      - when: packages/router/scripts/
+        select: []
+      - when: packages/router/build.mjs
+        select: []
+      - when: packages/router/.eslintrc.json
+        select: []
+      # Changing how the package compiles or what it depends on changes
+      # what every test in it runs under.
+      - when: packages/router/tsconfig.json
+        select:
+          - packages/router/test/schema.test.ts
+          - packages/router/test/contracts.test.ts
+          - packages/router/test/parity.test.ts
+      - when: packages/router/package.json
+        select:
+          - packages/router/test/schema.test.ts
+          - packages/router/test/contracts.test.ts
+          - packages/router/test/parity.test.ts
+      - when: package.json
+        select:
+          - packages/router/test/schema.test.ts
+          - packages/router/test/contracts.test.ts
+          - packages/router/test/parity.test.ts
+      - when: package-lock.json
+        select:
+          - packages/router/test/schema.test.ts
+          - packages/router/test/contracts.test.ts
+          - packages/router/test/parity.test.ts
+      # The extension is its own suite (mocha and Playwright), not this
+      # one, and it is not declared here until session 24 makes it one.
+      - when: tools/dabbler-ai-orchestration/
+        select: []
       - when: ai_router/schemas/
         select:
+          # A schema is the generator's input as well as Python's
+          # contract, so it selects on both sides of the port.
+          - packages/router/test/schema.test.ts
           - tests/test_critique_contracts.py
           - tests/test_approved_plan.py
           - tests/test_plan_review.py

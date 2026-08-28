@@ -1,0 +1,607 @@
+# dabbler.yaml -- what this repository declares about itself.
+#
+# Tracked, unlike local-overrides.yaml, because CI reads these facts and so
+# does the next machine to pick up a session. Precedence is the packaged
+# ai_router/router-config.yaml, then this file, then local-overrides.yaml.
+# Providers, models, roles and transports are deliberately absent: those are
+# distribution facts, and a repository that restated them here would fork the
+# model registry in order to say how to run a test suite.
+schema_version: 1
+
+# Step (f) of the session lifecycle: pack, then push to a feed. A session that
+# declared itself releasable at step (a) publishes through `packaging.pack`
+# and `packaging.push` -- both argv, never shell strings, both spawned with
+# the child-environment allowlist, and `push` naming the credential rather
+# than holding it. The framework substitutes `{output}`, `{artifact}`,
+# `{feed}` and `{secret}` per argv element at spawn time.
+#
+# This repository declares none, and that is the declaration: it publishes to
+# no feed today. Where the block goes when there is one is here, not in
+# local-overrides.yaml: which feed a repository publishes to is a fact about
+# the repository, the record attributes the push to it, and the overlay is
+# refused the key for exactly that reason. Only the credential is machine
+# state, and `secret` names it rather than holding it.
+#
+#   packaging:
+#     pack:
+#       argv: ["dotnet", "pack", "-c", "Release", "-o", "{output}"]
+#     push:
+#       argv: ["dotnet", "nuget", "push", "{artifact}",
+#              "--source", "{feed}", "--api-key", "{secret}"]
+#       feed: https://pkgs.dev.azure.com/<org>/_packaging/<feed>/nuget/v3/index.json
+#       secret: DABBLER_FEED_PAT
+
+# Which tests a change makes necessary, and what proves the suite was green.
+#
+# Pre-verification runs the selected tests only. The full suite is recorded
+# once, against the final verified tree -- never as ordinary pre-verification
+# evidence.
+testing:
+  suites:
+    - name: python
+      command: python -m pytest
+      expensive: true
+      covers:
+        - ai_router/
+        - tests/
+        - pyproject.toml
+        - pytest.ini
+        # This file. It declares the command and the mapping, so a change
+        # to it stales the run that was taken under the old declaration.
+        - dabbler.yaml
+      # Where this suite's tests live and what it calls them. Declared per
+      # suite, because a repository that is Java and .NET at once has two of
+      # each and one glob cannot say both.
+      test_roots:
+        - tests
+      test_glob: "test_*.py"
+
+    # The TypeScript half of the framework, from the port. `affected`
+    # selects across both suites, so a change under `packages/router`
+    # runs vitest and a change under `ai_router` runs pytest, and a
+    # change to a schema runs both — it is the input to the generator
+    # and the shape Python validates against.
+    #
+    # Positional paths are vitest's file filters, so the targeted form
+    # `<command> packages/router/test/x.test.ts` is a real command and
+    # the audit needs no per-ecosystem narrowing rule (D116).
+    - name: typescript
+      command: npx vitest run --root packages/router
+      expensive: true
+      covers:
+        - packages/router/
+        - ai_router/schemas/
+        - package.json
+        - package-lock.json
+        - dabbler.yaml
+      test_roots:
+        - packages/router/test
+      test_glob: "*.test.ts"
+
+  # Deterministic controls — one entry per kind, from compile, typecheck,
+  # lint, analyzer. A declared control runs before verification and its
+  # exit code is the fact; `required` sends a red result back to the
+  # author instead of buying a verifier's opinion on something the exit
+  # code already settled.
+  #
+  # Every command here is argv for `node`, never `npm` or `npx`: a
+  # control is run as argv with no shell, and on Windows those are shim
+  # scripts that argv cannot reach. `node` is an executable everywhere.
+  controls:
+    # The generated types are the compiled form of the twenty-one
+    # schemas. Stale output is a build that was not re-run, which is
+    # what `compile` means here.
+    - kind: compile
+      command: node packages/router/scripts/run-ts.mjs packages/router/scripts/check-types-fresh.ts
+      required: true
+    - kind: typecheck
+      command: node packages/router/scripts/run-ts.mjs packages/router/scripts/workspace-check.ts typecheck
+      required: true
+    - kind: lint
+      command: node packages/router/scripts/run-ts.mjs packages/router/scripts/workspace-check.ts lint
+      required: true
+
+    # The parity control. Two comparisons, red if either drifts:
+    #
+    #   1. DETERMINISM -- every corpus shape built twice through the
+    #      Python router and compared byte for byte after the two
+    #      normalizations. Runs from session 23, because it needs one
+    #      router rather than two. It is not a formality: it caught the
+    #      digest-ledger defect the first time it ran (state-writes.jsonl
+    #      hashes a file carrying a timestamp), and removing that rule
+    #      turns this control red today.
+    #   2. ROUTER PARITY -- every ported verb run through both routers
+    #      against two copies of one shape, comparing written files, exit
+    #      codes and both streams. Grows one case at a time; `metrics` is
+    #      the first, from session 25. It was empty in session 23, which is
+    #      why (1) is what this control rested on rather than nothing.
+    #
+    # A green row records what it compared, not merely that it passed: an
+    # analyzer over an empty case list and one over a real two-router
+    # comparison are otherwise the same row in the record.
+    #
+    # Specified in docs/ts-port-parity-control.md. Retired in session 35
+    # with the Python router it compares against.
+    - kind: analyzer
+      command: node packages/router/scripts/run-ts.mjs packages/router/scripts/parity.ts
+      required: true
+
+  selection:
+    # Changing one of these changes what every test does, so the selector can
+    # prove the whole suite is affected instead of an operator asserting it.
+    repo_wide:
+      - tests/conftest.py
+      - pytest.ini
+      - pyproject.toml
+
+    # Run when a changed path maps to nothing. Cheap, broad, and enough to
+    # notice a structural break -- not a substitute for a real mapping.
+    smoke:
+      - tests/test_config.py
+
+    # Which tests answer for which path. Every mapping is declared here:
+    # nothing is inferred from imports, because inferring it costs a parser
+    # per language and buys an economy, not a proof. The proof is the
+    # complete suite against the final verified tree, so a rule that has gone
+    # stale costs a late discovery there and cannot ship a defect.
+    #
+    # A rule names the tests that would notice this path breaking -- the ones
+    # that drive it, directly or through one thin caller. An empty `select`
+    # declares "this path affects no test", which is a mapping, not an
+    # unknown. A path no rule covers records `selection_unknown`, runs the
+    # smoke tests, and raises a risk; that is the loud state, and it is the
+    # signal that a rule is missing.
+    rules:
+      - when: ai_router/__init__.py
+        select:
+          - tests/test_route.py
+      - when: ai_router/affected.py
+        select:
+          - tests/test_affected.py
+          - tests/test_verify.py
+          - tests/test_step_execution.py
+          - tests/test_agency.py
+      - when: ai_router/approved_plan.py
+        select:
+          - tests/test_approved_plan.py
+          - tests/test_session.py
+          - tests/test_step_execution.py
+      - when: ai_router/bootstrap.py
+        select:
+          - tests/test_bootstrap.py
+          - tests/test_step_execution.py
+      - when: ai_router/checks.py
+        select:
+          - tests/test_runcore_checks.py
+          - tests/test_runcore_verified.py
+          - tests/test_runcore_fast.py
+          - tests/test_testphase.py
+          - tests/test_fixloop.py
+      - when: ai_router/config.py
+        select:
+          - tests/test_config.py
+          - tests/test_critique_contracts.py
+          - tests/test_route.py
+          - tests/test_verify.py
+          - tests/test_workflow.py
+      - when: ai_router/discovery.py
+        select:
+          - tests/test_discovery.py
+          - tests/test_session.py
+      - when: ai_router/evidence.py
+        select:
+          - tests/test_evidence_protocol.py
+          - tests/test_affected.py
+          - tests/test_critique_contracts.py
+          - tests/test_gates.py
+          - tests/test_session.py
+          - tests/test_verify.py
+      - when: ai_router/facts.py
+        select:
+          - tests/test_facts.py
+          - tests/test_verify.py
+          - tests/test_step_execution.py
+      - when: ai_router/fixloop.py
+        select:
+          - tests/test_fixloop.py
+          - tests/test_workflow.py
+      - when: ai_router/gates.py
+        select:
+          - tests/test_gates.py
+          - tests/test_session.py
+          - tests/test_verify.py
+      - when: ai_router/identity.py
+        select:
+          - tests/test_identity.py
+          - tests/test_session.py
+          - tests/test_verify.py
+      - when: ai_router/journal.py
+        select:
+          - tests/test_journal.py
+          - tests/test_runcore_contracts.py
+          - tests/test_runcore_recovery.py
+          - tests/test_runcore_fast.py
+      - when: ai_router/ledger.py
+        select:
+          - tests/test_ledger.py
+          - tests/test_affected.py
+          - tests/test_critique_contracts.py
+          - tests/test_gates.py
+          - tests/test_session.py
+          - tests/test_packaging.py
+          - tests/test_verify.py
+          - tests/test_step_execution.py
+      - when: ai_router/lockfile.py
+        # Both discovery records render and stamp through this module, so a
+        # change here can break either one.
+        select:
+          - tests/test_discovery.py
+          - tests/test_transport_copilot.py
+      - when: ai_router/metrics.py
+        select:
+          - tests/test_metrics.py
+          - tests/test_route.py
+          - tests/test_verify.py
+      - when: ai_router/modules.py
+        select:
+          - tests/test_modules.py
+      - when: ai_router/packaging.py
+        select:
+          - tests/test_packaging.py
+      - when: ai_router/plan_review.py
+        select:
+          - tests/test_plan_review.py
+          - tests/test_step_execution.py
+      - when: ai_router/pricing.py
+        select:
+          - tests/test_pricing.py
+          - tests/test_selection.py
+          - tests/test_metrics.py
+          - tests/test_route.py
+      - when: ai_router/progress.py
+        select:
+          - tests/test_progress.py
+          - tests/test_session.py
+          - tests/test_gates.py
+          - tests/test_verify.py
+      - when: ai_router/route.py
+        select:
+          - tests/test_route.py
+          - tests/test_escalation.py
+          - tests/test_verify.py
+      - when: ai_router/runcli.py
+        select:
+          - tests/test_runcore_fast.py
+          - tests/test_runcore_verified.py
+          - tests/test_runcore_checks.py
+          - tests/test_runcore_recovery.py
+          - tests/test_runcore_contracts.py
+          - tests/test_runcore_independence.py
+      - when: ai_router/runcore.py
+        select:
+          - tests/test_runcore_contracts.py
+          - tests/test_runcore_fast.py
+          - tests/test_runcore_verified.py
+          - tests/test_runcore_recovery.py
+          - tests/test_runcore_independence.py
+      - when: ai_router/runproject.py
+        select:
+          - tests/test_runcore_fast.py
+          - tests/test_runcore_contracts.py
+          - tests/test_runcore_recovery.py
+          - tests/test_runcore_independence.py
+          - tests/test_runcore_verified.py
+      - when: ai_router/runtime_mode.py
+        select:
+          - tests/test_route.py
+          - tests/test_verify.py
+      - when: ai_router/seat_cost.py
+        select:
+          - tests/test_seat_cost.py
+      - when: ai_router/secret_resolver.py
+        select:
+          - tests/test_selection.py
+          - tests/test_route.py
+          - tests/test_transport_api.py
+      - when: ai_router/selection.py
+        select:
+          - tests/test_selection.py
+          - tests/test_route.py
+          - tests/test_escalation.py
+      - when: ai_router/session.py
+        select:
+          - tests/test_session.py
+          - tests/test_affected.py
+          - tests/test_bootstrap.py
+          - tests/test_critique_contracts.py
+          - tests/test_gates.py
+          - tests/test_verify.py
+      - when: ai_router/stepreview.py
+        select:
+          - tests/test_stepreview.py
+          - tests/test_workflow.py
+      - when: ai_router/test_evidence.py
+        select:
+          - tests/test_evidence_protocol.py
+          - tests/test_affected.py
+          - tests/test_gates.py
+          - tests/test_verify.py
+      - when: ai_router/testphase.py
+        select:
+          - tests/test_testphase.py
+          - tests/test_workflow.py
+          - tests/test_fixloop.py
+      - when: ai_router/verdict.py
+        select:
+          - tests/test_verdict.py
+          - tests/test_gates.py
+          - tests/test_session.py
+          - tests/test_verify.py
+          - tests/test_workflow.py
+      - when: ai_router/verify.py
+        select:
+          - tests/test_verify.py
+          - tests/test_critique_contracts.py
+          - tests/test_step_execution.py
+          - tests/test_agency.py
+      - when: ai_router/agency.py
+        select:
+          - tests/test_agency.py
+          - tests/test_verify.py
+          - tests/test_testphase.py
+          - tests/test_fixloop.py
+      - when: ai_router/verifyjob.py
+        select:
+          - tests/test_runcore_verified.py
+          - tests/test_runcore_contracts.py
+          - tests/test_verify.py
+      - when: ai_router/workflow.py
+        select:
+          - tests/test_workflow.py
+      - when: ai_router/writers.py
+        select:
+          - tests/test_session.py
+          - tests/test_progress.py
+          - tests/test_bootstrap.py
+          - tests/test_gates.py
+      - when: ai_router/transports/__init__.py
+        select:
+          - tests/test_transport_api.py
+          - tests/test_escalation.py
+      - when: ai_router/transports/api.py
+        select:
+          - tests/test_transport_api.py
+          - tests/test_route.py
+      - when: ai_router/transports/base.py
+        select:
+          - tests/test_escalation.py
+          - tests/test_transport_api.py
+          - tests/test_transport_copilot.py
+          - tests/test_route.py
+      - when: ai_router/transports/copilot.py
+        select:
+          - tests/test_transport_copilot.py
+          - tests/test_bootstrap.py
+          - tests/test_identity.py
+          - tests/test_route.py
+          - tests/test_agency.py
+      - when: ai_router/router-config.yaml
+        select:
+          - tests/test_config.py
+          - tests/test_route.py
+          - tests/test_packaging.py
+      # This file. Changing it changes what every other rule here means, so
+      # it selects the tests that read the declaration rather than the tests
+      # the declaration points at.
+      - when: dabbler.yaml
+        select:
+          - tests/test_config.py
+          - tests/test_affected.py
+          - tests/test_runcore_checks.py
+          - tests/test_packaging.py
+
+      # --- The TypeScript router (the port) ---------------------------
+      #
+      # Three test files, one per thing the package states: what the
+      # schemas mean, what the contract is, and what parity compares.
+      # The scripts under `packages/router/scripts` are the declared
+      # controls' own entry points — the controls run them, so they map
+      # to no test rather than to an unknown.
+      - when: packages/router/src/schema/
+        select:
+          - packages/router/test/schema.test.ts
+      - when: packages/router/src/generated/
+        select:
+          - packages/router/test/schema.test.ts
+          - packages/router/test/typed-payloads.test.ts
+      - when: packages/router/src/contracts/
+        select:
+          - packages/router/test/contracts.test.ts
+          - packages/router/test/typed-payloads.test.ts
+      # The command's own files: the verb registry, the verbs' entry points
+      # and the one seam every verb writes through. The report is what the
+      # metrics test reads, so it answers for them too.
+      - when: packages/router/src/cli/
+        select:
+          - packages/router/test/contracts.test.ts
+          - packages/router/test/metrics.test.ts
+      - when: packages/router/src/parity/
+        select:
+          - packages/router/test/parity.test.ts
+      - when: packages/router/src/index.ts
+        select:
+          - packages/router/test/contracts.test.ts
+      # The ported modules. A module's own test comes first; the others are
+      # the modules that IMPORT it, because a leaf of the import graph
+      # breaking shows up in its dependants and not in itself.
+      - when: packages/router/src/config.ts
+        select:
+          - packages/router/test/config.test.ts
+          - packages/router/test/metrics.test.ts
+          - packages/router/test/identity.test.ts
+      - when: packages/router/src/verdict.ts
+        select:
+          - packages/router/test/verdict.test.ts
+      - when: packages/router/src/identity.ts
+        select:
+          - packages/router/test/identity.test.ts
+      - when: packages/router/src/metrics.ts
+        select:
+          - packages/router/test/metrics.test.ts
+      - when: packages/router/src/lockfile.ts
+        select:
+          - packages/router/test/lockfile.test.ts
+          - packages/router/test/metrics.test.ts
+      - when: packages/router/src/secretResolver.ts
+        select:
+          - packages/router/test/secretResolver.test.ts
+      - when: packages/router/src/runtimeMode.ts
+        select:
+          - packages/router/test/runtimeMode.test.ts
+      - when: packages/router/src/journal.ts
+        select:
+          - packages/router/test/config.test.ts
+      - when: packages/router/src/textfile.ts
+        select:
+          - packages/router/test/config.test.ts
+          - packages/router/test/metrics.test.ts
+      - when: packages/router/src/version.ts
+        select:
+          - packages/router/test/lockfile.test.ts
+      # Where the bundled config, the schemas and the templates are found.
+      # Every module that reads one of them depends on this answer.
+      - when: packages/router/src/paths.ts
+        select:
+          - packages/router/test/config.test.ts
+          - packages/router/test/metrics.test.ts
+          - packages/router/test/identity.test.ts
+          - packages/router/test/schema.test.ts
+      - when: packages/router/src/transports/
+        select:
+          - packages/router/test/config.test.ts
+          - packages/router/test/identity.test.ts
+      # Not a test file: the suite's glob is `*.test.ts`, so nothing under
+      # it is collected -- but every test that builds a config uses it.
+      - when: packages/router/test/support/
+        select:
+          - packages/router/test/config.test.ts
+          - packages/router/test/metrics.test.ts
+          - packages/router/test/lockfile.test.ts
+      - when: packages/router/scripts/
+        select: []
+      - when: packages/router/build.mjs
+        select: []
+      - when: packages/router/.eslintrc.json
+        select: []
+      # Changing how the package compiles or what it depends on changes
+      # what every test in it runs under.
+      - when: packages/router/tsconfig.json
+        select:
+          - packages/router/test/schema.test.ts
+          - packages/router/test/contracts.test.ts
+          - packages/router/test/typed-payloads.test.ts
+          - packages/router/test/parity.test.ts
+          - packages/router/test/config.test.ts
+          - packages/router/test/verdict.test.ts
+          - packages/router/test/identity.test.ts
+          - packages/router/test/metrics.test.ts
+          - packages/router/test/lockfile.test.ts
+          - packages/router/test/runtimeMode.test.ts
+          - packages/router/test/secretResolver.test.ts
+      - when: packages/router/package.json
+        select:
+          - packages/router/test/schema.test.ts
+          - packages/router/test/contracts.test.ts
+          - packages/router/test/typed-payloads.test.ts
+          - packages/router/test/parity.test.ts
+          - packages/router/test/config.test.ts
+          - packages/router/test/verdict.test.ts
+          - packages/router/test/identity.test.ts
+          - packages/router/test/metrics.test.ts
+          - packages/router/test/lockfile.test.ts
+          - packages/router/test/runtimeMode.test.ts
+          - packages/router/test/secretResolver.test.ts
+      - when: package.json
+        select:
+          - packages/router/test/schema.test.ts
+          - packages/router/test/contracts.test.ts
+          - packages/router/test/typed-payloads.test.ts
+          - packages/router/test/parity.test.ts
+          - packages/router/test/config.test.ts
+          - packages/router/test/verdict.test.ts
+          - packages/router/test/identity.test.ts
+          - packages/router/test/metrics.test.ts
+          - packages/router/test/lockfile.test.ts
+          - packages/router/test/runtimeMode.test.ts
+          - packages/router/test/secretResolver.test.ts
+      - when: package-lock.json
+        select:
+          - packages/router/test/schema.test.ts
+          - packages/router/test/contracts.test.ts
+          - packages/router/test/typed-payloads.test.ts
+          - packages/router/test/parity.test.ts
+          - packages/router/test/config.test.ts
+          - packages/router/test/verdict.test.ts
+          - packages/router/test/identity.test.ts
+          - packages/router/test/metrics.test.ts
+          - packages/router/test/lockfile.test.ts
+          - packages/router/test/runtimeMode.test.ts
+          - packages/router/test/secretResolver.test.ts
+      # The extension's two layers -- mocha over the vscode stub, and
+      # Playwright -- are not declared suites, so no declared test answers
+      # for this path and the empty list is what the selector can truly
+      # say. It is not what a reader should take away: the mocha layer is
+      # exactly the test that notices this source breaking, and CI runs it
+      # on every push.
+      #
+      # Declaring it is owed, and it is D116's shape rather than a line
+      # here. `targeted_command` appends the selected paths to the
+      # declared command, and mocha MERGES a path list with its `spec`
+      # (whether the spec comes from the command line or from
+      # `.mocharc.json`) instead of being narrowed by it -- measured, both
+      # forms. So the bare command cannot mean "the whole suite" and the
+      # appended form mean "these tests", and the honest declaration needs
+      # a runner entry point of its own. `runs_whole` would be the cheap
+      # way through and it would be false: mocha does take a subset.
+      - when: tools/dabbler-ai-orchestration/
+        select: []
+      - when: ai_router/schemas/
+        select:
+          # A schema is the generator's input as well as Python's
+          # contract, so it selects on both sides of the port.
+          - packages/router/test/schema.test.ts
+          - tests/test_critique_contracts.py
+          - tests/test_approved_plan.py
+          - tests/test_plan_review.py
+          - tests/test_step_execution.py
+          - tests/test_ledger.py
+          - tests/test_agency.py
+          - tests/test_verify.py
+          - tests/test_gates.py
+          - tests/test_runcore_contracts.py
+          - tests/test_packaging.py
+      - when: ai_router/prompt-templates/
+        select:
+          - tests/test_verify.py
+      - when: ai_router/copilot-catalog.lock
+        select:
+          - tests/test_transport_copilot.py
+      - when: tests/fixtures/
+        select:
+          - tests/test_modules.py
+      - when: docs/
+        select: []
+      - when: .github/
+        select: []
+      - when: README.md
+        select: []
+      - when: STATUS.md
+        select: []
+      - when: AGENTS.md
+        select: []
+      - when: CLAUDE.md
+        select: []
+      - when: GEMINI.md
+        select: []
+      - when: .gitignore
+        select: []

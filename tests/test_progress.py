@@ -290,6 +290,44 @@ class TestProjection:
         assert read_session_state(tmp_path) is None
 
 
+class TestASetUpButNeverRunRepository:
+    """The two setup sessions exist in the plan until the first
+    registration writes a ledger. Rendering them is what makes project
+    setup visible to a repository that is not this one."""
+
+    PLAN = (
+        "# Session plan\n\n"
+        "### Session 1: Author or import the project plan\n\n"
+        "1. Register.\n\n"
+        "### Session 2: Break the plan into numbered sessions\n\n"
+        "1. Register.\n"
+    )
+
+    def test_the_plan_supplies_the_sessions_when_no_ledger_exists(
+        self, tmp_path
+    ):
+        (tmp_path / "session-plan.md").write_text(self.PLAN, encoding="utf-8")
+        p = build_projection(tmp_path)
+        assert p["repository"]["sessionsSource"] == "plan"
+        assert [s["number"] for s in p["sessions"]] == [1, 2]
+        assert {s["status"] for s in p["sessions"]} == {"not-started"}
+        assert p["sessions"][0]["title"] == "Author or import the project plan"
+        # Rendering is not registering: the ledger still begins at the
+        # first `session start`.
+        assert not (tmp_path / "sessions.json").exists()
+
+    def test_an_unreadable_ledger_is_a_fault_and_never_the_plan(self, tmp_path):
+        (tmp_path / "session-plan.md").write_text(self.PLAN, encoding="utf-8")
+        (tmp_path / "sessions.json").write_text("{not json", encoding="utf-8")
+        p = build_projection(tmp_path)
+        # A broken record replaced by a cheerful "nothing has run here"
+        # is the stale-but-plausible failure this view exists to end --
+        # and an empty repository says the same thing as a repository
+        # with no sessions, so the fault is named instead.
+        assert p["repository"]["sessionsSource"] == "ledger"
+        assert p["sessions"] == []
+        assert "could not be read" in p["repository"]["invariantViolation"]
+
 class TestTaskRows:
     """The task level: plan order from ``approved-plan.json``, state from
     ``step-execution.jsonl``, and nothing from the activity log."""

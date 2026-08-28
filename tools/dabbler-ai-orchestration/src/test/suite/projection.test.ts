@@ -44,6 +44,26 @@ suite("projection: payload narrowing", () => {
     assert.strictEqual(parsed!.sessions[0].tasks[0].stepId, "implement");
   });
 
+  test("the sessions source is carried, and defaults to the ledger", () => {
+    // Only a projection that SAYS "plan" unlocks the never-run copy. A
+    // router too old to send the field has a ledger by construction, so
+    // the default must not announce a fresh repository.
+    const planned = parseProjectionPayload(
+      JSON.stringify(makeProjection({ repository: { sessionsSource: "plan" } })),
+    );
+    assert.strictEqual(planned!.repository.sessionsSource, "plan");
+
+    const older = JSON.parse(JSON.stringify(makeProjection())) as Record<
+      string,
+      Record<string, unknown>
+    >;
+    delete older.repository.sessionsSource;
+    assert.strictEqual(
+      parseProjectionPayload(JSON.stringify(older))!.repository.sessionsSource,
+      "ledger",
+    );
+  });
+
   test("non-JSON fails closed to null", () => {
     assert.strictEqual(parseProjectionPayload("Traceback (most recent call)"), null);
   });

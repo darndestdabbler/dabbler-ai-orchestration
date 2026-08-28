@@ -260,6 +260,12 @@ export function repositoryTooltip(repository: SessionsRepository): string {
   lines.push("", `${progress} sessions complete`);
 
   const markers: string[] = [];
+  if (repository.sessionsSource === "plan") {
+    markers.push(
+      "These sessions come from the session plan. The router has not " +
+        "written a ledger here yet — starting session 1 is what writes it.",
+    );
+  }
   const orchestrator = repository.orchestrator;
   if (orchestrator && (orchestrator.engine || orchestrator.model)) {
     markers.push(
@@ -269,7 +275,10 @@ export function repositoryTooltip(repository: SessionsRepository): string {
     );
   }
   if (repository.invariantViolation) {
-    markers.push(`State invariant violation: ${repository.invariantViolation}`);
+    // The projection reports two kinds of fault here -- a record that
+    // breaks an invariant, and one that could not be read at all -- and
+    // the message says which. The label must not claim the first.
+    markers.push(`Record fault: ${repository.invariantViolation}`);
   }
   if (repository.forceClosed) {
     markers.push("A session here closed via the --force bypass, not the gate.");

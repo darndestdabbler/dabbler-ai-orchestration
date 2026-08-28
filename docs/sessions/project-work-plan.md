@@ -53,7 +53,7 @@ it.
 | 15 | The sessions view (plan D1) | no | 2026-08-28 |
 | 16 | The task level (plan D1, second half) | no | 2026-08-28 |
 | 17 | The tracked project config (precondition for D2) | no | 2026-08-28 |
-| 18 | Project setup as two sessions (plan D2) | — | not declared |
+| 18 | Project setup as two sessions (plan D2) | no | 2026-08-28 |
 | 19 | The unresolved-session view (plan D3) | — | not declared |
 | 20 | A round baseline that survives the trip (root cause of D98) | — | not declared |
 
@@ -467,3 +467,27 @@ scopes selecting across two ecosystems, and a stale
 
 Not releasable. This is a configuration-surface change with no artifact to
 publish; the package version is unchanged.
+
+### Session 18 — Project setup as two sessions (plan D2)
+
+**Releasable: no.**
+
+Make project setup — the framework's own sessions 1 and 2 — available to a
+repository that is not this one, and runnable end to end without anything
+waiting on a person.
+
+1. A bootstrapped repository projects its two setup sessions before the
+   router has ever written to it. `build_projection` reads the session plan
+   when there is no ledger and renders those sessions as not-started, so the
+   plan is the declaration of what exists and the ledger stays unwritten.
+2. The scaffold carries a tracked `dabbler.yaml`, so the first real session
+   in a new project can declare its suites and reach step 4 of its own
+   lifecycle instead of being refused by `test_evidence` and guessed at by
+   `affected`.
+3. The on-ramp says what it costs: bootstrap's own scaffold must be
+   committed before session 1 declares, and bootstrap says so rather than
+   leaving the first `declare` to refuse.
+4. The Work Explorer shows that repository — one row, its two setup
+   sessions, the start-the-next-session affordances — and is honest that
+   nothing has run there yet. Neither setup session is an approval gate and
+   no row offers one.

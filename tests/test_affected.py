@@ -206,6 +206,20 @@ class TestSuitesDeclareWhatATestIs:
         assert not loaded.config.declares_tests
 
 
+class TestTheRunnerIsDeclaredOrAbsent:
+    def test_an_undeclared_suite_prints_no_command_to_paste(self):
+        """A repository that declares no suite gets the declaration to
+        make, not a runner. `python -m pytest` used to be printed here,
+        which in a Java repository is a command nobody declared and the
+        run of record would have cited it."""
+        from ai_router.affected import SelectionResult, runnable_commands
+
+        lines = runnable_commands([], SelectionResult())
+        assert len(lines) == 1
+        assert "pytest" not in lines[0]
+        assert "testing.suites" in lines[0]
+
+
 class TestPreverificationPolicy:
     def test_a_full_suite_run_is_not_pre_verification_evidence(
         self, tree, selection

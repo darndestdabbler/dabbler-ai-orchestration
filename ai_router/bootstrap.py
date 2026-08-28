@@ -1,6 +1,6 @@
 """Consumer-project bootstrap: orchestrator instruction files, the
-``.dabbler/`` ignore rule, plus the two scaffolded bootstrap session sets
-(plan the project, then decompose it into work sets).
+``.dabbler/`` ignore rule, the repository's own ``dabbler.yaml``, and the
+two setup sessions that plan the project and break the plan into the rest.
 
 One canonical instruction block carries the whole session workflow; it is
 written into ``AGENTS.md`` (Codex, Copilot, Gemini — every orchestrator
@@ -9,14 +9,19 @@ in a short engine tail. When a file already exists, only the fenced managed
 section is refreshed — user content above and below the fence is never
 touched.
 
-Into a project with no session sets at all, bootstrap also scaffolds
-``001-default-plan`` and ``002-default-decomposition`` — ordinary
-spec-only sets that run the planning and decomposition work through the
-standard tracked pipeline (register, work, cross-provider verification,
-close), so the very first thing the Work Explorer shows is the on-ramp
-and the plan itself lands on the record. A project that already has any
-set keeps its numbering and history; scaffolding is skipped. The
+Into a project with no session plan at all, bootstrap scaffolds sessions 1
+and 2 — author or import the project plan, then break it into numbered
+sessions. They are ordinary sessions and run the ordinary lifecycle
+(register, work, cross-provider verification, close); neither is an
+approval gate, because what makes them safe is being verified hardest, not
+being parked in front of a person. A project that already has a plan keeps
+its numbering and its history; scaffolding is skipped. The
 ``--print-*-prompt`` flags remain for running the same work untracked.
+
+Beside them goes ``dabbler.yaml``, and it is the piece without which the
+scaffold is unrunnable: ``test_evidence`` refuses a suite the repository
+never declared, so a project handed a lifecycle with nowhere to declare
+one cannot reach step 4 of it.
 
 Bootstrap also writes the ``.dabbler/`` rule into the project's
 ``.gitignore``. That directory is the router's machine-side record, and
@@ -33,8 +38,10 @@ a guard installed by the thing it guards is installed too late.
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
@@ -349,6 +356,335 @@ def scaffold_bootstrap_sessions(project_dir) -> list:
     with open(plan, "w", encoding="utf-8", newline="") as f:
         f.write(_BOOTSTRAP_PLAN)
     return [plan]
+
+
+@dataclass(frozen=True)
+class Ecosystem:
+    """One buildable ecosystem, and the suite declaration it implies.
+
+    ``runs_whole`` is true for every runner that takes a filter rather
+    than a list of test files. The framework then runs that suite
+    complete instead of inventing a narrowing syntax it cannot know --
+    ``mvn -q test <file>`` reads the path as a lifecycle argument, and
+    ``dotnet test`` wants a project.
+    """
+
+    key: str
+    command: str
+    runs_whole: bool
+    test_roots: tuple
+    test_glob: str
+
+
+def _exists(root: Path, *names) -> bool:
+    return any((root / name).exists() for name in names)
+
+
+def _glob_hit(root: Path, pattern: str) -> bool:
+    try:
+        return next(root.glob(pattern), None) is not None
+    except OSError:
+        return False
+
+
+def _reads(root: Path, name: str) -> str:
+    try:
+        return (root / name).read_text(encoding="utf-8")
+    except (OSError, UnicodeError):
+        return ""
+
+
+def _wrapped(root: Path, wrapper: str, command: str, fallback: str) -> str:
+    """The repository's committed entry point when it has one.
+
+    A wrapper is checked in precisely so the build runs without the tool
+    being installed globally, and ``gradle test`` on a machine that has
+    only ``gradlew`` fails for a reason the repository already solved.
+    The relative form resolves in both shells this framework runs in.
+    """
+    return command if _exists(root, wrapper) else fallback
+
+
+def _detect_python(root: Path):
+    """pytest, and only where something says pytest.
+
+    ``pyproject.toml`` declares that this is a Python project; it says
+    nothing about how the tests run, and plenty of them use ``unittest``
+    or ``nox``. A pytest configuration section is the declaration.
+    """
+    declared = (
+        _exists(root, "pytest.ini")
+        or "[tool.pytest" in _reads(root, "pyproject.toml")
+        or "[tool:pytest]" in _reads(root, "setup.cfg")
+        or "[pytest]" in _reads(root, "tox.ini")
+    )
+    if not declared:
+        return None
+    return Ecosystem(
+        key="python", command="python -m pytest", runs_whole=False,
+        test_roots=("tests",), test_glob="test_*.py",
+    )
+
+
+def _detect_maven(root: Path):
+    """Maven's ``test`` phase is declared by the POM being a POM: it is a
+    lifecycle phase, not a script someone had to write."""
+    if not _exists(root, "pom.xml"):
+        return None
+    return Ecosystem(
+        key="maven",
+        command=_wrapped(root, "mvnw", "./mvnw -q test", "mvn -q test"),
+        runs_whole=True,
+        test_roots=("src/test/java",), test_glob="*Test.java",
+    )
+
+
+def _detect_gradle(root: Path):
+    if not _exists(root, "build.gradle", "build.gradle.kts"):
+        return None
+    return Ecosystem(
+        key="gradle",
+        command=_wrapped(root, "gradlew", "./gradlew test", "gradle test"),
+        runs_whole=True,
+        test_roots=("src/test/java",), test_glob="*Test.java",
+    )
+
+
+def _detect_dotnet(root: Path):
+    """``dotnet test`` is the SDK's own test entry point, and it resolves
+    the solution or project in the directory it runs in."""
+    if not any(
+        _glob_hit(root, p) for p in ("*.sln", "*.slnx", "*.csproj", "*.fsproj")
+    ):
+        return None
+    return Ecosystem(
+        key="dotnet", command="dotnet test", runs_whole=True,
+        test_roots=("tests",), test_glob="*Tests.cs",
+    )
+
+
+def _is_placeholder_test_script(script: str) -> bool:
+    """Whether ``scripts.test`` is a script that exists in order to fail.
+
+    ``npm init`` writes ``echo "Error: no test specified" && exit 1``, and
+    a repository that has not replaced it has said the opposite of "my
+    tests run this way". Declaring a suite around it produces a standing
+    red that blocks the lifecycle until someone edits generated
+    configuration -- the failure this detector was narrowed to avoid.
+    """
+    lowered = " ".join(script.lower().split())
+    return "no test specified" in lowered or lowered in ("exit 1", "false")
+
+
+def _detect_node(root: Path):
+    """``npm test`` runs whatever ``scripts.test`` says, so the script is
+    the declaration, and both its absence and its placeholder are the
+    repository saying nothing."""
+    try:
+        manifest = json.loads(_reads(root, "package.json") or "{}")
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(manifest, dict):
+        return None
+    # `scripts` is whatever the file says it is. A manifest that parses is
+    # not a manifest that conforms, and a shape error here must leave node
+    # undetected rather than end the whole bootstrap.
+    scripts = manifest.get("scripts")
+    if not isinstance(scripts, dict):
+        return None
+    script = scripts.get("test")
+    if not isinstance(script, str) or not script.strip():
+        return None
+    if _is_placeholder_test_script(script):
+        return None
+    return Ecosystem(
+        key="node", command="npm test", runs_whole=True,
+        test_roots=("test", "tests"), test_glob="*.test.ts",
+    )
+
+
+#: One detector per ecosystem, in the order suites are declared. A
+#: repository that is Java and .NET at once matches twice and gets two
+#: suites, which is the case ``testing.suites`` was made plural for.
+DETECTORS = (
+    _detect_python, _detect_maven, _detect_gradle, _detect_dotnet,
+    _detect_node,
+)
+
+
+def detect_ecosystems(project_dir) -> list:
+    """Which ecosystems this repository declares itself to be, and how it
+    says its tests run.
+
+    Two limits keep this a reading rather than a guess, and both are
+    deliberate silences:
+
+    - **A build file is not a test command.** Where the ecosystem's
+      runner is a script somebody had to write, the script must be there
+      -- `package.json` with no `scripts.test` declares nothing, and
+      `pyproject.toml` with no pytest section declares nothing about
+      pytest. Where the runner is the toolchain's own lifecycle (`mvn
+      test`, `dotnet test`), the build file is the declaration.
+    - **Only the repository root is read.** A suite declares a command
+      and no working directory, so `service/pom.xml` cannot become a
+      runnable line -- `mvn -q test` at the root would simply fail. A
+      multi-project repository declares its own suites; a scaffold that
+      guessed at the layout would hand it a red suite instead.
+    """
+    root = Path(project_dir)
+    return [eco for eco in (detect(root) for detect in DETECTORS) if eco]
+
+
+def _suite_block(eco: Ecosystem) -> str:
+    lines = [
+        f"    - name: {eco.key}",
+        f"      command: {eco.command}",
+        "      expensive: true",
+        "      covers:",
+        '        - "."',
+    ]
+    if eco.runs_whole:
+        lines.append("      runs_whole: true")
+    lines.append("      test_roots:")
+    lines += [f"        - {root}" for root in eco.test_roots]
+    lines.append(f'      test_glob: "{eco.test_glob}"')
+    return "\n".join(lines)
+
+
+_PROJECT_CONFIG_HEADER = """\
+# dabbler.yaml -- what this repository declares about itself.
+#
+# Tracked, unlike local-overrides.yaml, because CI reads these facts and so
+# does the next machine to pick up a session. Precedence is the packaged
+# router-config.yaml, then this file, then local-overrides.yaml. Providers,
+# models, roles and transports are deliberately absent: those are
+# distribution facts, and a repository that restated them here would fork
+# the model registry in order to say how to run a test suite.
+schema_version: 1
+"""
+
+_PROJECT_CONFIG_TESTING_HEADER = """
+# Which tests a change makes necessary, and what proves the suite was green.
+# Pre-verification runs the selected tests only; the complete suite is
+# recorded once, against the final verified tree.
+#
+# One suite per ecosystem whose root build file says how its tests run, so
+# a repository that is Java and .NET at once hands each runner its own
+# tests. Check the command before you rely on it: it is read from what this
+# repository already carries, and a repository can carry a runner it does
+# not actually use. Two fields are the scaffold's, not yours to keep:
+#
+#   covers      claims the whole repository, because setup cannot know this
+#               layout. The failure direction is fixed -- run a suite you
+#               did not need rather than skip one you did -- so narrow it as
+#               the layout settles.
+#   runs_whole  says the runner takes a filter rather than a list of test
+#               files, so there is no narrowed form of it to run.
+#               Pre-verification runs it complete and the record says so.
+testing:
+  suites:
+"""
+
+_PROJECT_CONFIG_SELECTION = """
+  # Which tests answer for which path.
+  #
+  # A scaffolded repository has declared no mapping yet, and the framework
+  # refuses to invent one: a path no rule covers is `selection_unknown`, and
+  # pre-verification fails closed rather than let a green run for the mapped
+  # half of a change read as covering the other half. So setup declares the
+  # only honest starting mapping there is -- every path is repository-wide,
+  # every change affects every test, and the complete suite is what
+  # pre-verification asks for.
+  #
+  # It is correct and it is expensive, and it is meant to be replaced. Narrow
+  # it as the repository takes shape: `repo_wide` for the few paths that
+  # really do change what every test does (the test config, the lockfile),
+  # `rules` mapping a source path to the tests that would notice it breaking,
+  # and `smoke` for what runs when a path maps to nothing.
+  selection:
+    repo_wide:
+      - "."
+"""
+
+_PROJECT_CONFIG_NO_SUITES = """
+# No suite is declared, because nothing at the root of this repository says
+# how its tests run. Setup reads what is there -- a pytest section, a
+# `scripts.test`, a POM, a solution -- and where none of it says how the
+# tests run, it declares nothing rather than emitting a command that would
+# fail on its first use. That is a declaration, not an omission.
+#
+# A repository whose build files live BELOW the root reaches this too: a
+# suite declares a command and no working directory, so `service/pom.xml`
+# has no runnable line to become. Declare the suite yourself -- a name, the
+# command that runs it, the paths it covers, and where its tests live:
+#
+#   testing:
+#     suites:
+#       - name: python
+#         command: python -m pytest
+#         expensive: true
+#         covers: ["."]
+#         test_roots: [tests]
+#         test_glob: "test_*.py"
+"""
+
+_PROJECT_CONFIG_PACKAGING = """
+# Step (f) of the lifecycle: pack, then push to a feed. A session that
+# declared itself releasable publishes through these -- both argv, never
+# shell strings, and `push` naming the credential rather than holding it.
+# This repository declares none, and that is the declaration: it publishes
+# to no feed today.
+#
+#   packaging:
+#     pack:
+#       argv: ["dotnet", "pack", "-c", "Release", "-o", "{output}"]
+#     push:
+#       argv: ["dotnet", "nuget", "push", "{artifact}",
+#              "--source", "{feed}", "--api-key", "{secret}"]
+#       feed: https://pkgs.dev.azure.com/<org>/_packaging/<feed>/nuget/v3/index.json
+#       secret: DABBLER_FEED_PAT
+"""
+
+
+def render_project_config(ecosystems) -> str:
+    """The scaffolded ``dabbler.yaml`` for a repository of these
+    ecosystems. One suite per ecosystem, in detection order."""
+    out = [_PROJECT_CONFIG_HEADER]
+    if ecosystems:
+        out.append(
+            _PROJECT_CONFIG_TESTING_HEADER
+            + "\n".join(_suite_block(eco) for eco in ecosystems)
+            + "\n"
+            + _PROJECT_CONFIG_SELECTION
+        )
+    else:
+        out.append(_PROJECT_CONFIG_NO_SUITES)
+    out.append(_PROJECT_CONFIG_PACKAGING)
+    return "".join(out)
+
+
+def scaffold_project_config(project_dir) -> Optional[Path]:
+    """Write the repository's tracked ``dabbler.yaml``; return the path
+    when it was written.
+
+    Without this file a scaffolded project cannot reach step 4 of the
+    lifecycle it was just handed: ``test_evidence`` refuses a suite the
+    repository never declared, and there is nowhere tracked to declare
+    one. An existing file is never touched -- it is the repository's own
+    statement about itself, and later runs of bootstrap refresh
+    instructions, not declarations.
+    """
+    from .config import PROJECT_CONFIG_FILENAME
+
+    path = Path(project_dir) / PROJECT_CONFIG_FILENAME
+    if path.exists():
+        return None
+    try:
+        with open(path, "w", encoding="utf-8", newline="") as f:
+            f.write(render_project_config(detect_ecosystems(project_dir)))
+    except OSError:
+        return None
+    return path
 
 
 def ensure_gitignore(project_dir) -> bool:
@@ -757,14 +1093,34 @@ def main(argv=None) -> int:
                     f"yourself: {_manual_persist_hint(value)}",
                     file=sys.stderr,
                 )
+    config_path = scaffold_project_config(project)
+    if config_path is not None:
+        declared = detect_ecosystems(project)
+        print(f"bootstrap: scaffolded {config_path}")
+        print(
+            "bootstrap: it declares "
+            + (
+                ", ".join(eco.key for eco in declared) + " — check the "
+                "command and narrow what each suite covers"
+                if declared else
+                "no test suite, because nothing at the root of this "
+                "repository says how its tests run; declare one before the "
+                "first session that writes code"
+            )
+        )
     scaffolded = scaffold_bootstrap_sessions(project)
     for path in scaffolded:
         print(f"bootstrap: scaffolded {path}")
     if scaffolded:
         print(
-            "bootstrap: next, tell your AI agent to \"start the next "
+            "bootstrap: commit what this just wrote — the declaration a "
+            "session makes comes before its work, so session 1 is refused "
+            "while setup's own files sit uncommitted in the tree."
+        )
+        print(
+            "bootstrap: then tell your AI agent to \"start the next "
             "session\" — session 1 authors the project plan, then session 2 "
-            "breaks it into numbered sessions."
+            "breaks it into numbered sessions. Neither waits on anyone."
         )
     else:
         print(

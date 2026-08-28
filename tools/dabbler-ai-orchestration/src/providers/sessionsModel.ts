@@ -57,8 +57,17 @@ export function sessionsInOrder(
 /**
  * The repository row's description. Always X/total: an "X/X" shape on a
  * finished repository would mask a count that ran ahead of the ledger.
+ *
+ * A repository whose sessions came from its plan says so instead of
+ * counting. "0/2" on a repository the router has never written to reads
+ * as two sessions that have not run YET, which is true of a repository
+ * mid-sequence too; the distinction the operator needs is that nothing
+ * has run here at all.
  */
 export function progressText(repository: SessionsRepository): string {
+  if (repository.sessionsSource === "plan") {
+    return `${repository.sessions.length} planned · nothing has run here yet`;
+  }
   const total = repository.totalSessions;
   const base =
     total && total > 0

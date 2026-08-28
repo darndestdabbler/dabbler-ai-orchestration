@@ -67,6 +67,7 @@ from .checks import (
     targeted_command,
 )
 from .checks import _posix as _checks_posix
+from .config import PROJECT_CONFIG_FILENAME
 from .test_evidence import (
     ACCEPTED_POLICIES,
     OUTCOME_PASSED,
@@ -184,6 +185,33 @@ def command_names_test(command, test_path: str) -> bool:
         token == target or token.startswith(target + "::")
         for token in _command_tokens(command)
     )
+
+
+def runnable_commands(suites, result) -> list:
+    """One command per declared suite, each naming only the tests that
+    suite owns -- or, where the repository declared no suite, the
+    declaration to make instead of a command to run.
+
+    A repository that is Java and .NET at once has two runners, and a
+    single line naming both ecosystems' tests would fail in whichever of
+    them was asked to run the other's. Where nothing is declared there is
+    nothing to print: improvising ``python -m pytest`` teaches an
+    orchestrator in a Java repository to paste a runner nobody declared,
+    and the run of record would then cite it.
+    """
+    if not suites:
+        return [
+            "no suite is declared, so there is no command to run. Declare "
+            f"one under testing.suites in {PROJECT_CONFIG_FILENAME}: a "
+            "name, the command that runs it, and the paths it covers."
+        ]
+    return [
+        command for command in (
+            targeted_command(s.command, result.for_suite(s.name),
+                             runs_whole=s.runs_whole)
+            for s in suites
+        ) if command
+    ]
 
 
 RECORD_PLACEHOLDER = "<the command you ran>"
@@ -508,15 +536,7 @@ def main(argv=None) -> int:
     suites = [s for s in load_suites_checked(config).suites if s.expensive]
 
     def _commands() -> list:
-        if not suites:
-            return [targeted_command("python -m pytest", result)]
-        return [
-            command for command in (
-                targeted_command(s.command, result.for_suite(s.name),
-                                 runs_whole=s.runs_whole)
-                for s in suites
-            ) if command
-        ]
+        return runnable_commands(suites, result)
 
     if result.all_tests_affected:
         print(f"all tests affected: {result.all_affected_reason}")

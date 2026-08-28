@@ -10,7 +10,12 @@
 import * as cp from "child_process";
 import * as fs from "fs";
 import * as path from "path";
-import { ProjectionPayload, SessionRecord, SessionStatus, TaskRecord } from "../types";
+import {
+  ProjectionPayload,
+  SessionRecord,
+  SessionStatus,
+  TaskRecord,
+} from "../types";
 
 /** The sessions-root files whose mtimes invalidate a cached projection. */
 const CACHE_INPUTS = [
@@ -154,6 +159,11 @@ export function parseProjectionPayload(text: string): ProjectionPayload | null {
     schemaVersion: Number(obj.schemaVersion) || 0,
     generatedAt: typeof obj.generatedAt === "string" ? obj.generatedAt : "",
     repository: {
+      // Anything that is not the plan is the ledger, including a router
+      // too old to say. That default is the safe one: it claims a record
+      // exists rather than announcing a repository nothing has run in,
+      // and only the plan case unlocks the "nothing has run here" copy.
+      sessionsSource: r.sessionsSource === "plan" ? "plan" : "ledger",
       schemaVersionOnDisk:
         typeof r.schemaVersionOnDisk === "number" ? r.schemaVersionOnDisk : null,
       totalSessions: typeof r.totalSessions === "number" ? r.totalSessions : null,

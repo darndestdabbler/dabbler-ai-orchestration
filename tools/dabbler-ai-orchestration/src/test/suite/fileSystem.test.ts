@@ -97,10 +97,28 @@ suite("fileSystem: workspace scan", () => {
     assert.ok(scan.projectionErrors[0].error.includes("ai_router"));
   });
 
-  test("a folder with a plan but no ledger contributes no row", async () => {
-    // The ledger is the machine-written record. A plan alone is a
-    // repository the router has never run in.
+  test("a folder with a plan and no ledger is a row, from the plan", async () => {
+    // A bootstrapped repository has a plan and nothing else, and the two
+    // setup sessions live in it until the first registration writes a
+    // ledger. Presence decides only whether to ask the projection; the
+    // projection decides what the sessions are and says where they came
+    // from.
     writeFileTree(root, { "docs/sessions/session-plan.md": "# plan" });
+    setWorkspaceFolders([root]);
+    assert.strictEqual(hasSessionsRoot(root), true);
+    const projection = makeProjection({
+      repository: { sessionsSource: "plan", totalSessions: 2, sessionsCompleted: 0 },
+    });
+    const scan = await scanRepositories(
+      fakeCache({ [sessionsDirOf(root)]: projection }),
+    );
+    assert.strictEqual(scan.repositories.length, 1);
+    assert.strictEqual(scan.repositories[0].sessionsSource, "plan");
+    assert.strictEqual(scan.repositories[0].sessions.length, 2);
+  });
+
+  test("a folder with neither file contributes no row", async () => {
+    writeFileTree(root, { "README.md": "# not a dabbler repository" });
     setWorkspaceFolders([root]);
     assert.strictEqual(hasSessionsRoot(root), false);
     const scan = await scanRepositories(fakeCache({}));

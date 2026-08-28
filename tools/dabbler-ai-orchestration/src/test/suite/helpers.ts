@@ -61,6 +61,7 @@ export function makeRepository(
     currentSession: null,
     forceClosed: false,
     schemaVersionOnDisk: null,
+    sessionsSource: "ledger",
     invariantViolation: null,
     orchestrator: null,
     sessions: [],
@@ -78,6 +79,7 @@ export function makeProjection(
     schemaVersion: 1,
     generatedAt: "2026-08-17T12:00:00-04:00",
     repository: {
+      sessionsSource: "ledger",
       schemaVersionOnDisk: 5,
       totalSessions: 2,
       sessionsCompleted: 2,

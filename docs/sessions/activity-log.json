@@ -3669,6 +3669,182 @@
       "body": "Three rounds, each Major, each on the same thread: making suites plural in\nfact exposed that the framework had one pytest-shaped assumption after\nanother buried under \"the suite\".\n\n- **Round 1** \u2014 selection collapsed suite ownership to a boolean, so a mixed\n  path set could not be routed. Fixed: `SelectedTest.suite`, resolved once\n  from the same declaration that decides what a test is, and carried into the\n  record.\n- **Round 2** \u2014 ownership was recorded but unused; `run_authored` and\n  `run_suite` still ran everything under the first covering suite. Fixed:\n  `suites_for()` partitions by owner, both runners return one run per owning\n  suite, `ai_router.affected` prints one command per suite narrowed to the\n  tests it owns, and the workflow event aggregates the runs while keeping each\n  suite's own row.\n- **Round 3** \u2014 the narrowed commands were still built by appending paths,\n  which is a pytest/jest/`go test` convention: `mvn -q test <file>` reads the\n  path as a lifecycle argument and `dotnet test` wants a project.\n\n**Round 3 was answered by declaration, not by a templating language.** A suite\nwhose runner has no subset form declares `runs_whole: true` and is handed its\nown command; the run is recorded under the policy `suite-runs-whole`, beside\n`targeted` rather than as it, so a reader can still tell a run that was\nnarrowed from one that could not be.\n\nThe alternative \u2014 a per-suite command template with a `{tests}` placeholder,\na separator, and a path-to-test-name transform \u2014 was rejected at the cap. It\nis not only a mini-language; it also breaks the pre-verification audit, which\nproves a command targeted by finding each selected path as a shell token.\n`-Dtest=AdderTest` contains no path, so templating requires redesigning what\nmakes a command auditable at the same time. That is a session, not a patch,\nand inventing it in the last round of a configuration session is how a\nhalf-designed surface ships.\n\n**Owed:** a targeted-run form for runners that take a filter rather than a\nfile list (Maven `-Dtest=`, `dotnet test --filter`), together with the\naudit rule that can check one. Until then a `runs_whole` suite pays for its\ncomplete suite at the pre-verification stage \u2014 honest, and more expensive than\nthe stage is meant to be.\n\n**The session lands REMEDIATED_AT_CAP.** Every blocking finding was fixed; the\ncap left the last fix unreviewed, and no verifier saw the `runs_whole` repair.",
       "model": "claude-opus-5",
       "provider": "anthropic"
+    },
+    {
+      "sessionNumber": 18,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-28T07:58:21.540322-04:00",
+      "description": "Register.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 18,
+      "stepNumber": 2,
+      "stepKey": "create-or-import-the-project-plan",
+      "dateTime": "2026-08-28T07:58:21.540322-04:00",
+      "description": "Create or import the project plan, then break it into numbered sessions \u2014 two sessions, both cross-provider verified, neither waiting on a signature.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 18,
+      "stepNumber": 3,
+      "stepKey": "neither-is-an-approval-gate",
+      "dateTime": "2026-08-28T07:58:21.540322-04:00",
+      "description": "**Neither is an approval gate.** They are the two moments that determine what everything after them will build, which is an argument for verifying them hardest rather than for parking them in front of a person. Nothing in project setup blocks on a human.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 18,
+      "stepNumber": 4,
+      "stepKey": "affected-tests-as-preverify",
+      "dateTime": "2026-08-28T07:58:21.540322-04:00",
+      "description": "Affected tests as preverify.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 18,
+      "stepNumber": 5,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-28T07:58:21.540322-04:00",
+      "description": "Cross-provider verification.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 18,
+      "stepNumber": 6,
+      "stepKey": "full-test-suite-recorded-as-the",
+      "dateTime": "2026-08-28T07:58:21.540322-04:00",
+      "description": "Full test suite, recorded as the `final-full` run of record.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 18,
+      "stepNumber": 7,
+      "stepKey": "close-out",
+      "dateTime": "2026-08-28T07:58:21.540322-04:00",
+      "description": "Close-out.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 18,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-28T07:58:21.546338-04:00",
+      "description": "Registered session 18 (claude-code).",
+      "status": "complete"
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 18,
+      "dateTime": "2026-08-28T08:02:42.148516-04:00",
+      "task": "Make project setup \u2014 the framework's own sessions 1 and 2 \u2014 available to a\nrepository that is not this one, and runnable end to end without anything\nwaiting on a person.\n\n1. A bootstrapped repository projects its two setup sessions before the\n   router has ever written to it. `build_projection` reads the session plan\n   when there is no ledger and renders those sessions as not-started, so the\n   plan is the declaration of what exists and the ledger stays unwritten.\n2. The scaffold carries a tracked `dabbler.yaml`, so the first real session\n   in a new project can declare its suites and reach step 4 of its own\n   lifecycle instead of being refused by `test_evidence` and guessed at by\n   `affected`.\n3. The on-ramp says what it costs: bootstrap's own scaffold must be\n   committed before session 1 declares, and bootstrap says so rather than\n   leaving the first `declare` to refuse.\n4. The Work Explorer shows that repository \u2014 one row, its two setup\n   sessions, the start-the-next-session affordances \u2014 and is honest that\n   nothing has run there yet. Neither setup session is an approval gate and\n   no row offers one.",
+      "releasable": false
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D117",
+      "ordinal": 117,
+      "sessionNumber": 18,
+      "decidedOn": "2026-08-28",
+      "recordedAt": "2026-08-28T08:18:15.278102-04:00",
+      "decider": "orchestrator",
+      "headline": "The scaffold declares the repository's ecosystem; a printed guess is not a declaration",
+      "body": "Session 17 made `dabbler.yaml` the tracked home for what a repository\nowns, and nothing wrote one. A bootstrapped project therefore received the\nwhole lifecycle and could not reach step 4 of it: `test_evidence` refuses a\nsuite the repository never declared, and there was nowhere tracked to\ndeclare one. This session writes the file at scaffold time, and the shape of\nwhat it writes is the decision.\n\n**It declares what the repository already says it is.** A build file at the\nroot is the repository's own statement of its ecosystem, so `pom.xml` yields\na `maven` suite, a `.csproj` a `dotnet` one, and a repository that is both\ngets both \u2014 which is the case suites were made plural for. Every runner that\ntakes a filter rather than a list of test files is declared `runs_whole`,\nper D116, so the framework runs it complete instead of inventing a narrowing\nsyntax it cannot know.\n\n**Detection is not the guessing the framework refuses.** `affected` used to\nprint `python -m pytest` when no suite was declared \u2014 a command with no\nauthor, improvised at print time, in a repository that may be Java. That is\nnow removed: an undeclared suite prints the declaration to make. The\ndifference is where the answer lands. A detected suite is written into a\ntracked file the operator reads, edits and commits; a printed guess is\ncited by the run of record and was never anyone's statement.\n\n**Two fields are deliberately wrong-but-safe, and say so in the file.**\n`covers: [\".\"]` claims the whole repository and `selection.repo_wide: [\".\"]`\nmakes every change repository-wide. Setup cannot know a layout it has never\nseen, and the failure direction is already fixed by the framework: run a\nsuite you did not need rather than skip one you did. The alternative was not\na narrower mapping \u2014 it was no mapping, which fails pre-verification closed\non every path (`selection_unknown` with no smoke fallback) and leaves the\nfirst session unable to reach step 5 either. So the scaffold declares the\none honest starting mapping there is, marks it as the thing to replace, and\nis expensive until the repository narrows it.",
+      "model": "claude-opus-5",
+      "provider": "anthropic"
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D118",
+      "ordinal": 118,
+      "sessionNumber": 18,
+      "decidedOn": "2026-08-28",
+      "recordedAt": "2026-08-28T08:18:15.734707-04:00",
+      "decider": "orchestrator",
+      "headline": "A set-up-but-never-run repository renders its plan's sessions, and only a MISSING ledger qualifies",
+      "body": "The Work Explorer showed a repository only once `sessions.json` existed, on\nthe rule that \"a repository is set up when the router has written to it\".\nThat rule hid project setup from every repository that needed it: bootstrap\nscaffolds sessions 1 and 2 into the session plan, and until the first\n`session start` writes a ledger they exist nowhere the view would look. The\noperator ran Set Up New Project and got an empty tree.\n\n**The plan is a declaration, not a guess.** D105 deleted a file-presence\nladder that inferred a set's STATUS from which files existed, and that\ndeletion stands. What returns here is different in kind: file presence\ndecides only whether to ask the projection, and the projection decides what\nthe sessions are. `build_projection` reads the plan's `### Session N:`\nheadings when there is no ledger and renders them `not-started`, which is\nthe only status a session with no record can honestly hold.\n\n**It is keyed on the ledger file being ABSENT, not on the read failing.**\n`read_raw_session_state` returns None for a missing file and for a corrupt\none alike. Answering both with the plan would replace a broken record with a\ncheerful \"nothing has run here\" \u2014 the stale-but-plausible rendering the view\nexists to end. So an unreadable ledger stays a fault with no sessions, and\nonly a repository that has never been written to renders from its plan.\n\n**The projection says which it did**, in `repository.sessionsSource`, and\nthe row renders that rather than a fraction: \"0/2\" is equally true of a\nrepository mid-sequence, and what the operator needs to know about a\nfreshly bootstrapped one is that nothing has run there at all. The row's\nactions are unchanged and were already correct \u2014 they gate on session\nstatus, never on a ledger \u2014 so the two setup sessions are startable from\nthe moment they are visible.\n\n**Nothing about them is an approval gate.** They render as ordinary\nsessions, they offer the ordinary start affordances, and no row anywhere\noffers an approve action. Verifying them hardest is what makes them safe;\nparking them in front of a person is what the framework removed.",
+      "model": "claude-opus-5",
+      "provider": "anthropic"
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D119",
+      "ordinal": 119,
+      "sessionNumber": 18,
+      "decidedOn": "2026-08-28",
+      "recordedAt": "2026-08-28T08:18:16.135904-04:00",
+      "decider": "operator",
+      "headline": "One repository per library or service, plus an integrator: the solution level is not formalized yet",
+      "body": "Stated by the operator during session 18, and recorded here because it\nchanges what \"a project\" means to this framework.\n\n**The adopted strategy is one repository per library or service, plus a\nseparate repository that integrates them** \u2014 a user application or a\nprocessing pipeline. Staff ask an AI model to decompose a solution into\nthose libraries and services and to keep track of the dependencies within\neach repository. The operator's words: that may need to be formalized so\nthat the relevant docs work the same across .NET and Java applications.\n\n**What this session already serves.** The scaffold detects the ecosystem\nfrom the repository's own build files and declares one suite per ecosystem,\nso a Java service and a .NET service are set up by the same command and\ndescribed in the same tracked shape (D117). That is the cross-ecosystem\nhalf of the ask, and it is the half that was in this session's declared\nscope.\n\n**What it does not.** Nothing in the framework knows that a repository is\npart of a solution. Project setup's two sessions plan and decompose *within*\none repository; the decomposition INTO repositories happens before any of\nthem, in a conversation nothing records. A dependency between repositories\nhas no declared home \u2014 `dabbler.yaml` is where it would go, beside the\nfacts a repository already owns \u2014 and no reader.\n\n**Not folded into session 18.** The task list was declared before the work,\nand adding an unplanned surface to it in flight is the hindsight this\nframework refuses on releasability. It is a session of its own, and the\nshape it has to settle is which repository holds the solution-level plan:\nthe integrator naming its components, or each component naming what it\ndepends on. The operator decides whether that session is added to the\nsequence."
+    },
+    {
+      "sessionNumber": 18,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-28T08:18:27.383047-04:00",
+      "description": "Register.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 18,
+      "stepNumber": 2,
+      "stepKey": "create-or-import-the-project-plan",
+      "dateTime": "2026-08-28T08:18:28.007370-04:00",
+      "description": "Project setup runs end to end in a foreign repository: the scaffold declares the repository's ecosystem in a tracked dabbler.yaml, and the Work Explorer renders the two setup sessions from the plan before any ledger exists",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 18,
+      "stepNumber": 3,
+      "stepKey": "neither-is-an-approval-gate",
+      "dateTime": "2026-08-28T08:18:28.640199-04:00",
+      "description": "Both setup sessions render as ordinary sessions with the ordinary start affordances; no row offers an approve action and nothing in setup holds an engine open",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 18,
+      "stepNumber": 4,
+      "stepKey": "affected-tests-as-preverify",
+      "dateTime": "2026-08-28T08:22:01.342208-04:00",
+      "description": "312 selected tests passed in 183s; recorded as preverify-targeted, policy targeted",
+      "status": "complete"
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D120",
+      "ordinal": 120,
+      "sessionNumber": 18,
+      "decidedOn": "2026-08-28",
+      "recordedAt": "2026-08-28T08:28:13.590488-04:00",
+      "decider": "orchestrator",
+      "headline": "Round 1: a build file is a declaration only where the runner is the toolchain's own lifecycle",
+      "body": "Round 1, Major, and correct. D117 claimed the scaffold \"declares what the\nrepository already says it is\", and the first implementation did not meet\nits own claim: `pyproject.toml` became `python -m pytest` in a repository\nthat uses `unittest`, `package.json` became `npm test` with no test script\nto run, `build.gradle` became `gradle test` on a machine that has only the\ncommitted wrapper, and `*/pom.xml` became `mvn -q test` at a root the POM\nis not in. Each of those is a tracked declaration that fails on first use,\nand the lifecycle then blocks on it until a person repairs the file \u2014 which\nis the human block project setup exists to remove.\n\n**The distinction the fix draws is between a lifecycle and a script.**\nWhere the runner is the toolchain's own phase, the build file IS the\ndeclaration: `mvn test` and `dotnet test` exist because there is a POM or a\nproject, and nobody had to write them. Where the runner is something\nsomebody had to write, that writing is the declaration and its absence is\nthe repository saying nothing \u2014 so `package.json` needs a `scripts.test`,\nand `pyproject.toml` needs a pytest section (`[tool.pytest`, `pytest.ini`,\n`[tool:pytest]`, `[pytest]`) before pytest is declared. A committed wrapper\nwins over the global tool, because a wrapper is checked in precisely so the\nbuild runs without the tool installed.\n\n**Detection reads the repository root and nothing below it.** A suite\ndeclares a command and no working directory, so `service/pom.xml` has no\nrunnable line to become; the nested globs are gone rather than replaced by\na guessed cwd. A multi-project repository declares its own suites, and the\nscaffolded file says so where the operator will read it.\n\n**The verifier's Nit was also right and is fixed.** `progress.py` called an\nunreadable ledger a fault and then rendered it as an empty repository \u2014\nindistinguishable from a repository with no sessions, and no reason for\nanyone to look at the one file that needs looking at. It now reports the\nfault, and the extension's tooltip label changed from \"State invariant\nviolation\" to \"Record fault\", because the field now carries both kinds and\nthe label must not claim the narrower one.",
+      "model": "claude-opus-5",
+      "provider": "anthropic"
+    },
+    {
+      "sessionNumber": 18,
+      "stepNumber": 5,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-28T08:36:25.615910-04:00",
+      "description": "VERIFIED at round 3 (gpt-5-6-sol/openai); rounds 1 and 2 each found a Major on the scaffold's detector and both were remediated",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 18,
+      "stepNumber": 6,
+      "stepKey": "full-test-suite-recorded-as-the",
+      "dateTime": "2026-08-28T08:43:01.666912-04:00",
+      "description": "928 tests passed in 374s against the verified tree; recorded as final-full",
+      "status": "complete"
     }
   ]
 }

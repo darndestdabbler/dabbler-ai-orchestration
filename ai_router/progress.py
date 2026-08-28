@@ -402,6 +402,42 @@ def read_raw_legacy_state(set_dir) -> Optional[dict]:
     return raw if isinstance(raw, dict) else None
 
 
+#: Source of the sessions in a projection. ``ledger`` is the machine-written
+#: record; ``plan`` is a repository that has been set up and never run, whose
+#: sessions are the ones its plan declares.
+SOURCE_LEDGER = "ledger"
+SOURCE_PLAN = "plan"
+
+
+def ledger_exists(sessions_dir) -> bool:
+    """Whether the machine has written this repository's record.
+
+    The distinction the projection turns on: a MISSING ledger is a
+    repository nothing has run in yet, and an unreadable one is a fault.
+    Reading the plan in the first case is rendering a declaration; doing
+    it in the second would replace a broken record with a cheerful guess.
+    """
+    return (Path(sessions_dir) / STATE_FILENAME).is_file()
+
+
+def sessions_from_plan(sessions_dir) -> list:
+    """The sessions a set-up-but-never-run repository declares, as ledger
+    entries would look before anything ran.
+
+    Bootstrap scaffolds two of them -- author the project plan, then break
+    it into numbered sessions -- and until the first ``session start``
+    they exist only in the plan. Rendering them is what makes project
+    setup visible to a repository that is not this one; nothing here
+    writes, so the ledger still begins at registration.
+    """
+    return [
+        {"number": number, "title": title, "status": STATUS_NOT_STARTED}
+        for number, title in extract_session_titles_from_plan(
+            Path(sessions_dir) / SESSION_PLAN_FILENAME
+        )
+    ]
+
+
 def read_raw_session_state(sessions_dir) -> Optional[dict]:
     """The raw on-disk dict, or ``None`` when no usable state exists.
     ``PermissionError`` propagates — a locked file is not an absent one,
@@ -696,9 +732,30 @@ def build_projection(sessions_dir) -> dict:
     repo_root = repo_root_from_sessions_dir(sessions_path)
     raw = read_raw_session_state(sessions_path)
 
+    # A repository that has been set up and never run has no ledger, and its
+    # sessions are the ones its plan declares. Keyed on the file being
+    # ABSENT rather than on the read returning None: an unreadable ledger
+    # comes back None too, and answering that with the plan would report a
+    # fresh repository where there is a broken record.
+    source = SOURCE_LEDGER
+    if raw is None and not ledger_exists(sessions_path):
+        planned = sessions_from_plan(sessions_path)
+        if planned:
+            source = SOURCE_PLAN
+            raw = {"schemaVersion": None, "sessions": planned}
+
     invariant_violation = None
     if raw is None:
         view = derived_view({"schemaVersion": None, "sessions": []})
+        if ledger_exists(sessions_path):
+            # The file is there and did not parse. Rendering that as an
+            # empty repository says the same thing as a repository with
+            # no sessions, and the operator would have no reason to look
+            # at the one file that needs looking at.
+            invariant_violation = (
+                f"{STATE_FILENAME} is present but could not be read; no "
+                "sessions can be listed until it parses"
+            )
     else:
         view = derived_view(raw)
         try:
@@ -754,6 +811,9 @@ def build_projection(sessions_dir) -> dict:
         "schemaVersion": 1,
         "generatedAt": datetime.datetime.now().astimezone().isoformat(),
         "repository": {
+            # Where these sessions came from, so the view can say that
+            # nothing has run here rather than implying that it has.
+            "sessionsSource": source,
             "schemaVersionOnDisk": (raw or {}).get("schemaVersion"),
             "totalSessions": view.get("totalSessions"),
             "sessionsCompleted": len(view.get("completedSessions") or []),

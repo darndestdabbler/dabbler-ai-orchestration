@@ -1,3 +1,5 @@
+import json
+
 from ai_router.bootstrap import (
     MANAGED_END,
     MANAGED_START,
@@ -275,3 +277,162 @@ class TestScaffoldBootstrapSessions:
         fresh.mkdir()
         assert len(scaffold_bootstrap_sessions(fresh)) == 1
         assert scaffold_bootstrap_sessions(fresh) == []
+
+
+class TestScaffoldProjectConfig:
+    """The tracked `dabbler.yaml` a scaffolded repository declares itself
+    in. Without it the project bootstrap just handed a lifecycle cannot
+    reach step 4 of it: `test_evidence` refuses a suite the repository
+    never declared, and there is nowhere tracked to declare one."""
+
+    @staticmethod
+    def _repo(tmp_path):
+        """Config discovers the repository through git, so a scaffold is
+        only readable from a real one."""
+        import subprocess
+
+        subprocess.run(
+            ["git", "init", "-q"], cwd=str(tmp_path), capture_output=True,
+        )
+        return tmp_path
+
+    def test_each_detected_ecosystem_becomes_its_own_suite(self, tmp_path):
+        from ai_router.bootstrap import scaffold_project_config
+        from ai_router.config import load_config
+        from ai_router.test_evidence import load_suites_checked
+
+        # Java and .NET at once is the case suites were made plural for.
+        root = self._repo(tmp_path)
+        (root / "pom.xml").write_text("<project/>", encoding="utf-8")
+        (root / "App.csproj").write_text("<Project/>", encoding="utf-8")
+        assert scaffold_project_config(root) == root / "dabbler.yaml"
+
+        loaded = load_suites_checked(load_config(project_dir=str(root)))
+        assert loaded.errors == ()
+        assert [s.name for s in loaded.suites] == ["maven", "dotnet"]
+        # Neither runner takes a list of test files, so neither can be
+        # narrowed and both say so rather than being handed a subset.
+        assert all(s.runs_whole and s.expensive for s in loaded.suites)
+
+    def test_a_build_file_that_declares_no_test_command_declares_nothing(
+        self, tmp_path
+    ):
+        """Where the runner is a script somebody had to write, the script
+        has to be there. A generated suite whose command exits non-zero
+        on the first run is worse than no suite: it is a standing red the
+        lifecycle blocks on until a person repairs the declaration."""
+        from ai_router.bootstrap import detect_ecosystems
+
+        root = self._repo(tmp_path)
+        # Python that does not use pytest, and a package with no test
+        # script -- npm's own default for that case exits non-zero.
+        (root / "pyproject.toml").write_text(
+            '[project]\nname = "x"\n', encoding="utf-8")
+        (root / "package.json").write_text(
+            '{"name": "x", "scripts": {"build": "tsc"}}', encoding="utf-8")
+        assert detect_ecosystems(root) == []
+
+    def test_a_script_that_exists_in_order_to_fail_declares_nothing(
+        self, tmp_path
+    ):
+        """`npm init` writes a test script whose whole purpose is to exit
+        non-zero. A repository that has not replaced it has said the
+        opposite of "my tests run this way", and a suite built around it
+        is a standing red that blocks the lifecycle."""
+        from ai_router.bootstrap import detect_ecosystems
+
+        root = self._repo(tmp_path)
+        placeholder = json.dumps({
+            "name": "x",
+            "scripts": {"test": 'echo "Error: no test specified" && exit 1'},
+        })
+        (root / "package.json").write_text(placeholder, encoding="utf-8")
+        assert detect_ecosystems(root) == []
+        # And the real thing is detected, so the rule is narrow.
+        (root / "package.json").write_text(
+            json.dumps({"name": "x", "scripts": {"test": "vitest run"}}),
+            encoding="utf-8")
+        assert [e.key for e in detect_ecosystems(root)] == ["node"]
+
+    def test_a_manifest_that_parses_but_does_not_conform_is_not_a_crash(
+        self, tmp_path
+    ):
+        """A shape error in someone else's file must leave node
+        undetected, not end the bootstrap that was setting the project
+        up."""
+        from ai_router.bootstrap import detect_ecosystems
+
+        root = self._repo(tmp_path)
+        (root / "package.json").write_text(
+            '{"name": "x", "scripts": ["test"]}', encoding="utf-8")
+        assert detect_ecosystems(root) == []
+
+    def test_a_build_file_below_the_root_declares_nothing(self, tmp_path):
+        """A suite declares a command and no working directory, so
+        `service/pom.xml` cannot become a runnable line -- `mvn -q test`
+        at the root would simply fail. A multi-project repository
+        declares its own suites."""
+        from ai_router.bootstrap import detect_ecosystems
+
+        root = self._repo(tmp_path)
+        (root / "service").mkdir()
+        (root / "service" / "pom.xml").write_text("<project/>", encoding="utf-8")
+        assert detect_ecosystems(root) == []
+
+    def test_a_committed_wrapper_is_the_entry_point_it_was_committed_to_be(
+        self, tmp_path
+    ):
+        """A wrapper is checked in precisely so the build runs without the
+        tool installed globally. `gradle test` on a machine that has only
+        `gradlew` fails for a reason the repository already solved."""
+        from ai_router.bootstrap import detect_ecosystems
+
+        root = self._repo(tmp_path)
+        (root / "build.gradle").write_text(
+            "plugins { id 'java' }\n", encoding="utf-8")
+        assert detect_ecosystems(root)[0].command == "gradle test"
+        (root / "gradlew").write_text("#!/bin/sh\n", encoding="utf-8")
+        assert detect_ecosystems(root)[0].command == "./gradlew test"
+
+    def test_the_scaffold_maps_every_path_rather_than_none(self, tmp_path):
+        from ai_router.bootstrap import scaffold_project_config
+        from ai_router.checks import load_selection_config, select_tests
+        from ai_router.config import load_config
+
+        root = self._repo(tmp_path)
+        (root / "pytest.ini").write_text("[pytest]\n", encoding="utf-8")
+        scaffold_project_config(root)
+        selection = load_selection_config(load_config(project_dir=str(root)))
+        assert selection.ok
+        # A repository with no mapping at all fails pre-verification
+        # closed: every path is selection_unknown and no smoke fallback
+        # exists, so nothing can be proved to have run for them. The
+        # scaffold declares the one honest starting mapping instead --
+        # every path is repository-wide, so the complete suite is what
+        # the stage asks for, until the repository narrows it.
+        result = select_tests(root, ["src/app.py"], selection.config)
+        assert result.all_tests_affected
+        assert result.risks == ()
+
+    def test_an_existing_declaration_is_never_overwritten(self, tmp_path):
+        from ai_router.bootstrap import scaffold_project_config
+
+        mine = tmp_path / "dabbler.yaml"
+        mine.write_text("schema_version: 1\n", encoding="utf-8")
+        assert scaffold_project_config(tmp_path) is None
+        assert mine.read_text(encoding="utf-8") == "schema_version: 1\n"
+
+    def test_a_repository_that_says_nothing_declares_no_suite(self, tmp_path):
+        from ai_router.bootstrap import detect_ecosystems, scaffold_project_config
+        from ai_router.config import load_config
+        from ai_router.test_evidence import load_suites_checked
+
+        root = self._repo(tmp_path)
+        (root / "README.md").write_text("# nothing yet\n", encoding="utf-8")
+        assert detect_ecosystems(root) == []
+        scaffold_project_config(root)
+        # No suite is a declaration, not an omission: the alternative is
+        # guessing a runner for an ecosystem nothing here names.
+        loaded = load_suites_checked(load_config(project_dir=str(root)))
+        assert loaded.errors == ()
+        assert loaded.suites == ()

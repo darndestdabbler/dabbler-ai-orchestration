@@ -67,9 +67,19 @@ export interface OrchestratorInfo {
   effort?: string;
 }
 
+/**
+ * Where a repository's sessions came from. `ledger` is the
+ * machine-written record; `plan` is a repository that has been set up
+ * and never run, whose sessions are the ones its plan declares — the
+ * two setup sessions bootstrap scaffolds, before the first
+ * registration writes anything.
+ */
+export type SessionsSource = "ledger" | "plan";
+
 // The repository-level half of the projection payload, as progress.py
 // emits it. No `status`: nothing above a session holds one.
 export interface ProjectionRepository {
+  sessionsSource: SessionsSource;
   schemaVersionOnDisk: number | null;
   totalSessions: number | null;
   sessionsCompleted: number;
@@ -111,6 +121,7 @@ export interface SessionsRepository {
   currentSession: number | null;
   forceClosed: boolean;
   schemaVersionOnDisk: number | null;
+  sessionsSource: SessionsSource;
   invariantViolation: string | null;
   orchestrator: OrchestratorInfo | null;
   /**

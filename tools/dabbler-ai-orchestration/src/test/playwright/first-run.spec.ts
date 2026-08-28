@@ -1,7 +1,9 @@
-// First-run posture: a workspace the router has never run in must still
+// First-run posture: a workspace that was never SET UP must still
 // activate and keep the command surface reachable. It shows no
-// repository row, because there is no machine-written ledger to read and
-// inventing one would be the guess this view exists to avoid.
+// repository row, because it carries neither a ledger nor a session
+// plan — there is nothing to read, and inventing rows is the guess this
+// view exists to avoid. A bootstrapped workspace is the other case: it
+// has a plan, and its two setup sessions render from it.
 
 import { test, expect } from "@playwright/test";
 import {

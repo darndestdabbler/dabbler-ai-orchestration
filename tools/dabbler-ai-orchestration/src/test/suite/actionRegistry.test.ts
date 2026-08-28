@@ -48,6 +48,20 @@ suite("ActionRegistry: repository actions", () => {
     assert.ok(!done.includes("dabblerSessionSets.closeSession"));
   });
 
+  test("a repository with only planned sessions can still be started", () => {
+    // The affordances are gated on session status, never on a ledger
+    // existing. Project setup is unreachable otherwise: the two setup
+    // sessions are exactly the ones that run before anything is written.
+    const scaffolded = makeRepository({
+      sessionsSource: "plan",
+      sessions: [makeSession({ number: 1, status: "not-started" })],
+    });
+    const ids = applicableRepositoryActions(scaffolded).map((a) => a.id);
+    assert.ok(ids.includes("dabbler.copyStartNextSessionPrompt"));
+    assert.ok(ids.includes("dabblerSessionSets.startSession"));
+    assert.ok(!ids.includes("dabblerSessionSets.closeSession"));
+  });
+
   test("actions come back sorted by group", () => {
     const groups = applicableRepositoryActions(inFlight).map((a) => a.group);
     assert.deepStrictEqual(groups, [...groups].sort((a, b) => a - b));

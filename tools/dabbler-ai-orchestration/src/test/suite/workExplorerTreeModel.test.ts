@@ -162,6 +162,26 @@ suite("workExplorerTreeModel: repository descriptor", () => {
     assert.notStrictEqual(a.id, b.id);
   });
 
+  test("a never-run repository expands to its planned sessions and says so", () => {
+    // Project setup is two sessions in a plan, and this is the whole
+    // point of rendering them: the operator can see and start them
+    // before the router has written anything here.
+    const [node] = repositoryNodes([
+      makeRepository({
+        sessionsSource: "plan",
+        totalSessions: 2,
+        sessions: [
+          makeSession({ number: 1, status: "not-started", iconKey: "not-started" }),
+          makeSession({ number: 2, status: "not-started", iconKey: "not-started" }),
+        ],
+      }),
+    ]);
+    const d = repositoryDescriptor(node);
+    assert.strictEqual(d.collapsible, "collapsed");
+    assert.ok(d.tooltip!.includes("has not written a ledger here yet"));
+    assert.strictEqual(sessionNodes(node).length, 2);
+  });
+
   test("tooltip surfaces the forced-close bypass and an invariant violation", () => {
     const tip = repositoryTooltip(
       makeRepository({ forceClosed: true, invariantViolation: "rule 7" }),

@@ -31,12 +31,25 @@ export function sessionsDirOf(root: string): string {
 
 /**
  * Whether *root* is a repository this view has anything to say about:
- * it has a sessions root holding the machine-written ledger. The plan
- * alone is not enough — a repository is set up when the router has
- * written to it.
+ * its sessions root holds a machine-written ledger, or a session plan.
+ *
+ * The plan counts because a bootstrapped repository has one and nothing
+ * else — its two setup sessions exist there until the first
+ * registration writes a ledger — and a view that showed nothing until
+ * then would hide project setup from every repository that most needs
+ * it.
+ *
+ * This is not the file-presence state guessing that was deleted with
+ * the set level. Presence decides only whether to ASK the projection;
+ * which sessions exist, what state each is in, and whether they came
+ * from the ledger or the plan are all Python's answers.
  */
 export function hasSessionsRoot(root: string): boolean {
-  return fs.existsSync(path.join(sessionsDirOf(root), LEDGER_FILENAME));
+  const dir = sessionsDirOf(root);
+  return (
+    fs.existsSync(path.join(dir, LEDGER_FILENAME)) ||
+    fs.existsSync(path.join(dir, PLAN_FILENAME))
+  );
 }
 
 export function listGitWorktrees(cwd: string): string[] {
@@ -126,6 +139,10 @@ function buildRepository(
     currentSession: p ? p.repository.currentSession : null,
     forceClosed: p ? p.repository.forceClosed : false,
     schemaVersionOnDisk: p ? p.repository.schemaVersionOnDisk : null,
+    // A failed projection is not a fresh repository. "ledger" is what a
+    // row with no payload claims, so the never-run copy is only ever
+    // shown on a projection that actually said so.
+    sessionsSource: p ? p.repository.sessionsSource : "ledger",
     invariantViolation: p ? p.repository.invariantViolation : null,
     orchestrator: p ? p.repository.orchestrator : null,
     sessions: p ? p.sessions : [],

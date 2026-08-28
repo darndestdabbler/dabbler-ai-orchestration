@@ -78,6 +78,23 @@ suite("sessionsModel: progress text", () => {
     );
     assert.strictEqual(progressText(makeRepository()), "");
   });
+
+  test("a repository whose sessions came from its plan says nothing has run", () => {
+    // "0/2" would be true of a repository mid-sequence too. What the
+    // operator needs from a freshly bootstrapped one is that the router
+    // has never written here at all.
+    const text = progressText(
+      makeRepository({
+        sessionsSource: "plan",
+        totalSessions: 2,
+        sessions: [
+          makeSession({ number: 1, status: "not-started" }),
+          makeSession({ number: 2, status: "not-started" }),
+        ],
+      }),
+    );
+    assert.strictEqual(text, "2 planned · nothing has run here yet");
+  });
 });
 
 suite("sessionsModel: verdict cleanliness", () => {

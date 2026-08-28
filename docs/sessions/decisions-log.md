@@ -2904,3 +2904,149 @@ the stage is meant to be.
 
 **The session lands REMEDIATED_AT_CAP.** Every blocking finding was fixed; the
 cap left the last fix unreviewed, and no verifier saw the `runs_whole` repair.
+
+## Session 18 — Project setup as two sessions (plan D2)
+
+### D117 · 2026-08-28 · Orchestrator (claude-opus-5/anthropic) · The scaffold declares the repository's ecosystem; a printed guess is not a declaration
+
+Session 17 made `dabbler.yaml` the tracked home for what a repository
+owns, and nothing wrote one. A bootstrapped project therefore received the
+whole lifecycle and could not reach step 4 of it: `test_evidence` refuses a
+suite the repository never declared, and there was nowhere tracked to
+declare one. This session writes the file at scaffold time, and the shape of
+what it writes is the decision.
+
+**It declares what the repository already says it is.** A build file at the
+root is the repository's own statement of its ecosystem, so `pom.xml` yields
+a `maven` suite, a `.csproj` a `dotnet` one, and a repository that is both
+gets both — which is the case suites were made plural for. Every runner that
+takes a filter rather than a list of test files is declared `runs_whole`,
+per D116, so the framework runs it complete instead of inventing a narrowing
+syntax it cannot know.
+
+**Detection is not the guessing the framework refuses.** `affected` used to
+print `python -m pytest` when no suite was declared — a command with no
+author, improvised at print time, in a repository that may be Java. That is
+now removed: an undeclared suite prints the declaration to make. The
+difference is where the answer lands. A detected suite is written into a
+tracked file the operator reads, edits and commits; a printed guess is
+cited by the run of record and was never anyone's statement.
+
+**Two fields are deliberately wrong-but-safe, and say so in the file.**
+`covers: ["."]` claims the whole repository and `selection.repo_wide: ["."]`
+makes every change repository-wide. Setup cannot know a layout it has never
+seen, and the failure direction is already fixed by the framework: run a
+suite you did not need rather than skip one you did. The alternative was not
+a narrower mapping — it was no mapping, which fails pre-verification closed
+on every path (`selection_unknown` with no smoke fallback) and leaves the
+first session unable to reach step 5 either. So the scaffold declares the
+one honest starting mapping there is, marks it as the thing to replace, and
+is expensive until the repository narrows it.
+
+### D118 · 2026-08-28 · Orchestrator (claude-opus-5/anthropic) · A set-up-but-never-run repository renders its plan's sessions, and only a MISSING ledger qualifies
+
+The Work Explorer showed a repository only once `sessions.json` existed, on
+the rule that "a repository is set up when the router has written to it".
+That rule hid project setup from every repository that needed it: bootstrap
+scaffolds sessions 1 and 2 into the session plan, and until the first
+`session start` writes a ledger they exist nowhere the view would look. The
+operator ran Set Up New Project and got an empty tree.
+
+**The plan is a declaration, not a guess.** D105 deleted a file-presence
+ladder that inferred a set's STATUS from which files existed, and that
+deletion stands. What returns here is different in kind: file presence
+decides only whether to ask the projection, and the projection decides what
+the sessions are. `build_projection` reads the plan's `### Session N:`
+headings when there is no ledger and renders them `not-started`, which is
+the only status a session with no record can honestly hold.
+
+**It is keyed on the ledger file being ABSENT, not on the read failing.**
+`read_raw_session_state` returns None for a missing file and for a corrupt
+one alike. Answering both with the plan would replace a broken record with a
+cheerful "nothing has run here" — the stale-but-plausible rendering the view
+exists to end. So an unreadable ledger stays a fault with no sessions, and
+only a repository that has never been written to renders from its plan.
+
+**The projection says which it did**, in `repository.sessionsSource`, and
+the row renders that rather than a fraction: "0/2" is equally true of a
+repository mid-sequence, and what the operator needs to know about a
+freshly bootstrapped one is that nothing has run there at all. The row's
+actions are unchanged and were already correct — they gate on session
+status, never on a ledger — so the two setup sessions are startable from
+the moment they are visible.
+
+**Nothing about them is an approval gate.** They render as ordinary
+sessions, they offer the ordinary start affordances, and no row anywhere
+offers an approve action. Verifying them hardest is what makes them safe;
+parking them in front of a person is what the framework removed.
+
+### D119 · 2026-08-28 · Operator · One repository per library or service, plus an integrator: the solution level is not formalized yet
+
+Stated by the operator during session 18, and recorded here because it
+changes what "a project" means to this framework.
+
+**The adopted strategy is one repository per library or service, plus a
+separate repository that integrates them** — a user application or a
+processing pipeline. Staff ask an AI model to decompose a solution into
+those libraries and services and to keep track of the dependencies within
+each repository. The operator's words: that may need to be formalized so
+that the relevant docs work the same across .NET and Java applications.
+
+**What this session already serves.** The scaffold detects the ecosystem
+from the repository's own build files and declares one suite per ecosystem,
+so a Java service and a .NET service are set up by the same command and
+described in the same tracked shape (D117). That is the cross-ecosystem
+half of the ask, and it is the half that was in this session's declared
+scope.
+
+**What it does not.** Nothing in the framework knows that a repository is
+part of a solution. Project setup's two sessions plan and decompose *within*
+one repository; the decomposition INTO repositories happens before any of
+them, in a conversation nothing records. A dependency between repositories
+has no declared home — `dabbler.yaml` is where it would go, beside the
+facts a repository already owns — and no reader.
+
+**Not folded into session 18.** The task list was declared before the work,
+and adding an unplanned surface to it in flight is the hindsight this
+framework refuses on releasability. It is a session of its own, and the
+shape it has to settle is which repository holds the solution-level plan:
+the integrator naming its components, or each component naming what it
+depends on. The operator decides whether that session is added to the
+sequence.
+
+### D120 · 2026-08-28 · Orchestrator (claude-opus-5/anthropic) · Round 1: a build file is a declaration only where the runner is the toolchain's own lifecycle
+
+Round 1, Major, and correct. D117 claimed the scaffold "declares what the
+repository already says it is", and the first implementation did not meet
+its own claim: `pyproject.toml` became `python -m pytest` in a repository
+that uses `unittest`, `package.json` became `npm test` with no test script
+to run, `build.gradle` became `gradle test` on a machine that has only the
+committed wrapper, and `*/pom.xml` became `mvn -q test` at a root the POM
+is not in. Each of those is a tracked declaration that fails on first use,
+and the lifecycle then blocks on it until a person repairs the file — which
+is the human block project setup exists to remove.
+
+**The distinction the fix draws is between a lifecycle and a script.**
+Where the runner is the toolchain's own phase, the build file IS the
+declaration: `mvn test` and `dotnet test` exist because there is a POM or a
+project, and nobody had to write them. Where the runner is something
+somebody had to write, that writing is the declaration and its absence is
+the repository saying nothing — so `package.json` needs a `scripts.test`,
+and `pyproject.toml` needs a pytest section (`[tool.pytest`, `pytest.ini`,
+`[tool:pytest]`, `[pytest]`) before pytest is declared. A committed wrapper
+wins over the global tool, because a wrapper is checked in precisely so the
+build runs without the tool installed.
+
+**Detection reads the repository root and nothing below it.** A suite
+declares a command and no working directory, so `service/pom.xml` has no
+runnable line to become; the nested globs are gone rather than replaced by
+a guessed cwd. A multi-project repository declares its own suites, and the
+scaffolded file says so where the operator will read it.
+
+**The verifier's Nit was also right and is fixed.** `progress.py` called an
+unreadable ledger a fault and then rendered it as an empty repository —
+indistinguishable from a repository with no sessions, and no reason for
+anyone to look at the one file that needs looking at. It now reports the
+fault, and the extension's tooltip label changed from "State invariant
+violation" to "Record fault", because the field now carries both kinds and
+the label must not claim the narrower one.

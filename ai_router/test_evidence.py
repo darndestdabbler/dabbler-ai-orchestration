@@ -313,7 +313,15 @@ def surface_digest(
                 (Path(repo_root) / rel).read_bytes()
             ).hexdigest()
         except OSError:
-            digest = "deleted"
+            # Omitted, not marked. `ls-files` lists a tracked file that has
+            # been deleted but not yet committed, so a marker line here
+            # would leave the digest the moment the deletion is committed
+            # and `ls-files` stops naming the path -- moving the digest
+            # across a commit in which no file's content changed at all,
+            # and making the freshness gate demand a second full suite run
+            # to prove that nothing happened. Omitting it moves the digest
+            # once, when the file actually goes.
+            continue
         lines.append(f"{_normalise_rel(rel)}\0{digest}")
     joined = "\n".join(lines)
     return hashlib.sha256(joined.encode("utf-8")).hexdigest()

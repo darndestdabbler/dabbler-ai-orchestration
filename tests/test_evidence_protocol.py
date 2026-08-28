@@ -98,6 +98,10 @@ class TestTranscripts:
         assert result.ok and result.tier == "ASSERTED"
 
 
+def _git(repo, *args):
+    subprocess.run(["git", "-C", str(repo), *args], capture_output=True)
+
+
 @pytest.fixture
 def git_repo(tmp_path):
     repo = tmp_path / "r"
@@ -213,6 +217,30 @@ class TestSurfaceDigests:
 
         (git_repo / "a.txt").write_text("changed\n", encoding="utf-8")
         assert surface_digest(git_repo, ("",)) != first
+
+    def test_committing_a_deletion_does_not_move_the_digest_again(
+        self, git_repo
+    ):
+        """A deletion moves the digest once -- when the file goes -- and not
+        a second time when it is committed.
+
+        `ls-files` names a tracked file that has been deleted but not yet
+        committed, so an unreadable path used to contribute a marker line
+        that left the digest the moment the commit landed. No file's
+        content changed across that commit, but the freshness gate saw a
+        different tree and demanded a whole suite run to prove nothing had
+        happened. Two sessions paid for it before it was fixed."""
+        (git_repo / "b.txt").write_text("two\n", encoding="utf-8")
+        _git(git_repo, "add", "-A")
+        _git(git_repo, "commit", "-q", "-m", "add b")
+        before = surface_digest(git_repo, ("",))
+
+        (git_repo / "b.txt").unlink()
+        after_delete = surface_digest(git_repo, ("",))
+        assert after_delete != before
+
+        _git(git_repo, "commit", "-q", "-a", "-m", "drop b")
+        assert surface_digest(git_repo, ("",)) == after_delete
 
     def test_record_run_strict_at_the_boundary(self, git_repo):
         sessions_dir = git_repo / "docs" / "sessions"

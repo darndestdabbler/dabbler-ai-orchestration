@@ -1,0 +1,3 @@
+{"timestamp": "2026-04-30T18:15:18.867008Z", "session_number": 3, "event_type": "closeout_succeeded", "forced": true, "method": "snapshot_flip", "failed_checks": ["disposition_present"], "verdict": "VERIFIED"}
+{"timestamp": "2026-05-15T10:22:32.068843Z", "session_number": 4, "event_type": "closeout_requested", "repaired": true, "repair_reason": "state_says_closed_but_no_closeout_event"}
+{"timestamp": "2026-05-15T10:22:32.068843Z", "session_number": 4, "event_type": "closeout_succeeded", "repaired": true, "repair_reason": "state_says_closed_but_no_closeout_event"}

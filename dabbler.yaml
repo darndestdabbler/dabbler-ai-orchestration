@@ -1,0 +1,377 @@
+# dabbler.yaml -- what this repository declares about itself.
+#
+# Tracked, unlike local-overrides.yaml, because CI reads these facts and so
+# does the next machine to pick up a session. Precedence is the packaged
+# ai_router/router-config.yaml, then this file, then local-overrides.yaml.
+# Providers, models, roles and transports are deliberately absent: those are
+# distribution facts, and a repository that restated them here would fork the
+# model registry in order to say how to run a test suite.
+schema_version: 1
+
+# Step (f) of the session lifecycle: pack, then push to a feed. A session that
+# declared itself releasable at step (a) publishes through `packaging.pack`
+# and `packaging.push` -- both argv, never shell strings, both spawned with
+# the child-environment allowlist, and `push` naming the credential rather
+# than holding it. The framework substitutes `{output}`, `{artifact}`,
+# `{feed}` and `{secret}` per argv element at spawn time.
+#
+# This repository declares none, and that is the declaration: it publishes to
+# no feed today. Where the block goes when there is one is here, not in
+# local-overrides.yaml: which feed a repository publishes to is a fact about
+# the repository, the record attributes the push to it, and the overlay is
+# refused the key for exactly that reason. Only the credential is machine
+# state, and `secret` names it rather than holding it.
+#
+#   packaging:
+#     pack:
+#       argv: ["dotnet", "pack", "-c", "Release", "-o", "{output}"]
+#     push:
+#       argv: ["dotnet", "nuget", "push", "{artifact}",
+#              "--source", "{feed}", "--api-key", "{secret}"]
+#       feed: https://pkgs.dev.azure.com/<org>/_packaging/<feed>/nuget/v3/index.json
+#       secret: DABBLER_FEED_PAT
+
+# Which tests a change makes necessary, and what proves the suite was green.
+#
+# Pre-verification runs the selected tests only. The full suite is recorded
+# once, against the final verified tree -- never as ordinary pre-verification
+# evidence.
+testing:
+  suites:
+    - name: python
+      command: python -m pytest
+      expensive: true
+      covers:
+        - ai_router/
+        - tests/
+        - pyproject.toml
+        - pytest.ini
+        # This file. It declares the command and the mapping, so a change
+        # to it stales the run that was taken under the old declaration.
+        - dabbler.yaml
+      # Where this suite's tests live and what it calls them. Declared per
+      # suite, because a repository that is Java and .NET at once has two of
+      # each and one glob cannot say both.
+      test_roots:
+        - tests
+      test_glob: "test_*.py"
+
+  # Deterministic controls are declared here — one entry per kind, from
+  # compile, typecheck, lint, analyzer. A declared control runs before
+  # verification and its exit code is the fact; `required` sends a red
+  # result back to the author instead of buying a verifier's opinion on
+  # something the exit code already settled. This repository declares none:
+  # it ships no typechecker, linter, or analyzer, and the record says
+  # `not_applicable` rather than inventing a green row for a tool nobody
+  # runs.
+
+  selection:
+    # Changing one of these changes what every test does, so the selector can
+    # prove the whole suite is affected instead of an operator asserting it.
+    repo_wide:
+      - tests/conftest.py
+      - pytest.ini
+      - pyproject.toml
+
+    # Run when a changed path maps to nothing. Cheap, broad, and enough to
+    # notice a structural break -- not a substitute for a real mapping.
+    smoke:
+      - tests/test_config.py
+
+    # Which tests answer for which path. Every mapping is declared here:
+    # nothing is inferred from imports, because inferring it costs a parser
+    # per language and buys an economy, not a proof. The proof is the
+    # complete suite against the final verified tree, so a rule that has gone
+    # stale costs a late discovery there and cannot ship a defect.
+    #
+    # A rule names the tests that would notice this path breaking -- the ones
+    # that drive it, directly or through one thin caller. An empty `select`
+    # declares "this path affects no test", which is a mapping, not an
+    # unknown. A path no rule covers records `selection_unknown`, runs the
+    # smoke tests, and raises a risk; that is the loud state, and it is the
+    # signal that a rule is missing.
+    rules:
+      - when: ai_router/__init__.py
+        select:
+          - tests/test_route.py
+      - when: ai_router/affected.py
+        select:
+          - tests/test_affected.py
+          - tests/test_verify.py
+          - tests/test_step_execution.py
+          - tests/test_agency.py
+      - when: ai_router/approved_plan.py
+        select:
+          - tests/test_approved_plan.py
+          - tests/test_session.py
+          - tests/test_step_execution.py
+      - when: ai_router/bootstrap.py
+        select:
+          - tests/test_bootstrap.py
+          - tests/test_step_execution.py
+      - when: ai_router/checks.py
+        select:
+          - tests/test_runcore_checks.py
+          - tests/test_runcore_verified.py
+          - tests/test_runcore_fast.py
+          - tests/test_testphase.py
+          - tests/test_fixloop.py
+      - when: ai_router/config.py
+        select:
+          - tests/test_config.py
+          - tests/test_critique_contracts.py
+          - tests/test_route.py
+          - tests/test_verify.py
+          - tests/test_workflow.py
+      - when: ai_router/discovery.py
+        select:
+          - tests/test_discovery.py
+          - tests/test_session.py
+      - when: ai_router/evidence.py
+        select:
+          - tests/test_evidence_protocol.py
+          - tests/test_affected.py
+          - tests/test_critique_contracts.py
+          - tests/test_gates.py
+          - tests/test_session.py
+          - tests/test_verify.py
+      - when: ai_router/facts.py
+        select:
+          - tests/test_facts.py
+          - tests/test_verify.py
+          - tests/test_step_execution.py
+      - when: ai_router/fixloop.py
+        select:
+          - tests/test_fixloop.py
+          - tests/test_workflow.py
+      - when: ai_router/gates.py
+        select:
+          - tests/test_gates.py
+          - tests/test_session.py
+          - tests/test_verify.py
+      - when: ai_router/identity.py
+        select:
+          - tests/test_identity.py
+          - tests/test_session.py
+          - tests/test_verify.py
+      - when: ai_router/journal.py
+        select:
+          - tests/test_journal.py
+          - tests/test_runcore_contracts.py
+          - tests/test_runcore_recovery.py
+          - tests/test_runcore_fast.py
+      - when: ai_router/ledger.py
+        select:
+          - tests/test_ledger.py
+          - tests/test_affected.py
+          - tests/test_critique_contracts.py
+          - tests/test_gates.py
+          - tests/test_session.py
+          - tests/test_packaging.py
+          - tests/test_verify.py
+          - tests/test_step_execution.py
+      - when: ai_router/lockfile.py
+        # Both discovery records render and stamp through this module, so a
+        # change here can break either one.
+        select:
+          - tests/test_discovery.py
+          - tests/test_transport_copilot.py
+      - when: ai_router/metrics.py
+        select:
+          - tests/test_metrics.py
+          - tests/test_route.py
+          - tests/test_verify.py
+      - when: ai_router/modules.py
+        select:
+          - tests/test_modules.py
+      - when: ai_router/packaging.py
+        select:
+          - tests/test_packaging.py
+      - when: ai_router/plan_review.py
+        select:
+          - tests/test_plan_review.py
+          - tests/test_step_execution.py
+      - when: ai_router/pricing.py
+        select:
+          - tests/test_pricing.py
+          - tests/test_selection.py
+          - tests/test_metrics.py
+          - tests/test_route.py
+      - when: ai_router/progress.py
+        select:
+          - tests/test_progress.py
+          - tests/test_session.py
+          - tests/test_gates.py
+          - tests/test_verify.py
+      - when: ai_router/route.py
+        select:
+          - tests/test_route.py
+          - tests/test_escalation.py
+          - tests/test_verify.py
+      - when: ai_router/runcli.py
+        select:
+          - tests/test_runcore_fast.py
+          - tests/test_runcore_verified.py
+          - tests/test_runcore_checks.py
+          - tests/test_runcore_recovery.py
+          - tests/test_runcore_contracts.py
+          - tests/test_runcore_independence.py
+      - when: ai_router/runcore.py
+        select:
+          - tests/test_runcore_contracts.py
+          - tests/test_runcore_fast.py
+          - tests/test_runcore_verified.py
+          - tests/test_runcore_recovery.py
+          - tests/test_runcore_independence.py
+      - when: ai_router/runproject.py
+        select:
+          - tests/test_runcore_fast.py
+          - tests/test_runcore_contracts.py
+          - tests/test_runcore_recovery.py
+          - tests/test_runcore_independence.py
+          - tests/test_runcore_verified.py
+      - when: ai_router/runtime_mode.py
+        select:
+          - tests/test_route.py
+          - tests/test_verify.py
+      - when: ai_router/seat_cost.py
+        select:
+          - tests/test_seat_cost.py
+      - when: ai_router/secret_resolver.py
+        select:
+          - tests/test_selection.py
+          - tests/test_route.py
+          - tests/test_transport_api.py
+      - when: ai_router/selection.py
+        select:
+          - tests/test_selection.py
+          - tests/test_route.py
+          - tests/test_escalation.py
+      - when: ai_router/session.py
+        select:
+          - tests/test_session.py
+          - tests/test_affected.py
+          - tests/test_bootstrap.py
+          - tests/test_critique_contracts.py
+          - tests/test_gates.py
+          - tests/test_verify.py
+      - when: ai_router/stepreview.py
+        select:
+          - tests/test_stepreview.py
+          - tests/test_workflow.py
+      - when: ai_router/test_evidence.py
+        select:
+          - tests/test_evidence_protocol.py
+          - tests/test_affected.py
+          - tests/test_gates.py
+          - tests/test_verify.py
+      - when: ai_router/testphase.py
+        select:
+          - tests/test_testphase.py
+          - tests/test_workflow.py
+          - tests/test_fixloop.py
+      - when: ai_router/verdict.py
+        select:
+          - tests/test_verdict.py
+          - tests/test_gates.py
+          - tests/test_session.py
+          - tests/test_verify.py
+          - tests/test_workflow.py
+      - when: ai_router/verify.py
+        select:
+          - tests/test_verify.py
+          - tests/test_critique_contracts.py
+          - tests/test_step_execution.py
+          - tests/test_agency.py
+      - when: ai_router/agency.py
+        select:
+          - tests/test_agency.py
+          - tests/test_verify.py
+          - tests/test_testphase.py
+          - tests/test_fixloop.py
+      - when: ai_router/verifyjob.py
+        select:
+          - tests/test_runcore_verified.py
+          - tests/test_runcore_contracts.py
+          - tests/test_verify.py
+      - when: ai_router/workflow.py
+        select:
+          - tests/test_workflow.py
+      - when: ai_router/writers.py
+        select:
+          - tests/test_session.py
+          - tests/test_progress.py
+          - tests/test_bootstrap.py
+          - tests/test_gates.py
+      - when: ai_router/transports/__init__.py
+        select:
+          - tests/test_transport_api.py
+          - tests/test_escalation.py
+      - when: ai_router/transports/api.py
+        select:
+          - tests/test_transport_api.py
+          - tests/test_route.py
+      - when: ai_router/transports/base.py
+        select:
+          - tests/test_escalation.py
+          - tests/test_transport_api.py
+          - tests/test_transport_copilot.py
+          - tests/test_route.py
+      - when: ai_router/transports/copilot.py
+        select:
+          - tests/test_transport_copilot.py
+          - tests/test_bootstrap.py
+          - tests/test_identity.py
+          - tests/test_route.py
+          - tests/test_agency.py
+      - when: ai_router/router-config.yaml
+        select:
+          - tests/test_config.py
+          - tests/test_route.py
+          - tests/test_packaging.py
+      # This file. Changing it changes what every other rule here means, so
+      # it selects the tests that read the declaration rather than the tests
+      # the declaration points at.
+      - when: dabbler.yaml
+        select:
+          - tests/test_config.py
+          - tests/test_affected.py
+          - tests/test_runcore_checks.py
+          - tests/test_packaging.py
+      - when: ai_router/schemas/
+        select:
+          - tests/test_critique_contracts.py
+          - tests/test_approved_plan.py
+          - tests/test_plan_review.py
+          - tests/test_step_execution.py
+          - tests/test_ledger.py
+          - tests/test_agency.py
+          - tests/test_verify.py
+          - tests/test_gates.py
+          - tests/test_runcore_contracts.py
+          - tests/test_packaging.py
+      - when: ai_router/prompt-templates/
+        select:
+          - tests/test_verify.py
+      - when: ai_router/copilot-catalog.lock
+        select:
+          - tests/test_transport_copilot.py
+      - when: tests/fixtures/
+        select:
+          - tests/test_modules.py
+      - when: docs/
+        select: []
+      - when: .github/
+        select: []
+      - when: README.md
+        select: []
+      - when: STATUS.md
+        select: []
+      - when: AGENTS.md
+        select: []
+      - when: CLAUDE.md
+        select: []
+      - when: GEMINI.md
+        select: []
+      - when: .gitignore
+        select: []

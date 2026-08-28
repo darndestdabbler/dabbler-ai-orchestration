@@ -674,13 +674,34 @@ made available to everyone else. Est. 8 TS tests.
 
 ### Session 19 of 20: The unresolved-session view (plan D3)
 
+**Why this exists.** The framework never blocks on a person. A session that
+reaches the round cap simply ends — `unresolved` or `remediated at the cap`,
+per spec §3.c.i — and nothing notifies anyone. Session 17 closed
+`REMEDIATED_AT_CAP` with one unreviewed finding, and the only way to see
+that today is to read `sessions.json` and `.dabbler/runs/s17/` by hand.
+This view is how the operator discovers, at planning time, what stopped and
+why: the record's answer to the question an approval gate used to force.
+
 1. Register.
 2. Read at planning time rather than as an interruption: what stopped, at
    which round, the findings with vendor and severity, what the verifier
-   looked at from the agency log, **whether the round had agency at all**,
-   **whether any read it relied on was transformed**, and **which of the
-   three terminal states it reached** — unresolved and remediated-at-the-cap
-   read very differently. Three actions: send it back, respecify it, cancel.
+   looked at from the agency log, **whether the round had agency at all**
+   (a direct-API round records `agency: none` — its verifier could never
+   read the files, so its findings weigh differently from a round that
+   could), **whether any read it relied on was transformed** (session 6's
+   fidelity mark: the secret scrubber rewrote what the verifier was shown,
+   which is how session 1 took a confident Major against correct code), and
+   **which of the three terminal states it reached** — unresolved means
+   blocking findings still stand unfixed and usually wants a respecify;
+   remediated-at-the-cap means every finding was fixed and only the review
+   of the fix is missing, which usually wants a send-back. Three actions,
+   each a front-end over a command that already exists rather than new
+   machinery: **send it back** (re-run the review loop over the outstanding
+   delta), **respecify it** (rewrite the session's entry in this plan, then
+   re-register it), **cancel** (`python -m ai_router.session cancel <N>
+   --reason ...`). This session confirms the exact command each action
+   issues; if one needs a command that does not exist, that is a finding
+   against an earlier session, not licence to build a fourth path here.
 3. **No approve-over action, because there is no approval anywhere.** The
    view reports; it never holds an engine open. There is no queue and no
    inbox, and reading a record is not the same as being blocked by one.

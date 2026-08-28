@@ -9,8 +9,9 @@ reader a v4 file ever gets.
 Three vocabularies, deliberately distinct:
 - session lifecycle: ``not-started`` / ``in-progress`` / ``complete`` /
   ``cancelled``;
-- step status (the activity-log record, rendered verbatim): ``pending`` /
-  ``in-progress`` / ``complete`` / ``blocked`` plus tolerated drift;
+- task state, folded from the execution record: ``pending`` /
+  ``in flight`` / ``done``, and no fourth -- a step was opened, or
+  closed, or neither;
 - the icon key the extension maps to its four SVG assets: ``complete`` /
   ``in-progress`` / ``not-started`` / ``cancelled``.
 """
@@ -30,6 +31,7 @@ from .evidence import (
     ACTIVITY_LOG_FILENAME,
     SESSION_PLAN_FILENAME,
     STATE_FILENAME,
+    repo_root_from_sessions_dir,
 )
 
 SCHEMA_VERSION_V4 = 4
@@ -574,44 +576,26 @@ def get_progress(state: dict) -> ProgressView:
     )
 
 
-# --- Step rows from activity-log.json ---------------------------------------
+# --- Task rows from the enforced execution record ----------------------------
+#
+# A task row's identity and order come from the session's approved plan;
+# its state comes from ``step-execution.jsonl``. Neither is read from
+# ``activity-log.json``: that layer is written only when an engine
+# remembers to call ``session log``, so it drifts silently, and a task
+# level built on it shows narration rather than what happened. The
+# execution record cannot drift the same way -- a step is opened against
+# a declared plan step, its close is earned against deterministic
+# evidence, and a pre-commit hook refuses a commit while one is open.
 
-STATUS_BOXES = {
-    "complete": "[x]", "done": "[x]",
-    "in-progress": "[~]", "in_progress": "[~]", "started": "[~]",
-    "pending": "[ ]", "not-started": "[ ]",
-    "blocked": "[!]", "failed": "[!]",
-}
-UNKNOWN_BOX = "[?]"
-_BOX_TO_STATE = {"[ ]": "pending", "[~]": "in-progress", "[x]": "complete",
-                 "[!]": "blocked"}
-_RECORD_ANSWERS_BOXES = {"[~]", "[!]"}
-
-# The four icon assets the extension ships; blocked/failed fold into
-# cancelled ("this did not go well") and an unknown token falls back to
-# not-started, while the CLI box for the same token is [?].
-_ICON_KEYS = {
-    "complete": "complete", "done": "complete",
-    "in-progress": "in-progress", "in_progress": "in-progress",
-    "started": "in-progress",
-    "pending": "not-started", "not-started": "not-started",
-    "blocked": "cancelled", "failed": "cancelled",
-}
+STEP_STATE_PENDING = "pending"
+STEP_STATE_IN_FLIGHT = "in flight"
+STEP_STATE_DONE = "done"
 
 
 def _py_str(value) -> str:
     """Python's ``str(x or "")``: falsy values (0, False, None, "") read as
     absent. The TS renderer mirrors this coercion exactly."""
     return str(value) if value else ""
-
-
-def step_state(status) -> str:
-    box = STATUS_BOXES.get(_py_str(status).lower())
-    return _BOX_TO_STATE.get(box, "unknown")
-
-
-def step_icon_key(status) -> str:
-    return _ICON_KEYS.get(_py_str(status).lower(), "not-started")
 
 
 def read_activity_log(sessions_dir) -> Optional[dict]:
@@ -629,70 +613,72 @@ def is_logged_step(entry: dict) -> bool:
     return not _py_str(entry.get("kind"))
 
 
-def _collapse_by_step_key(entries: list) -> list:
-    """Latest entry wins, at the first-seen position, carrying the first
-    entry's ``dateTime`` forward as ``firstDateTime`` — the latest entry
-    is the step's current status, the first is when the step actually
-    started (an in-progress log followed by a complete log must not lose
-    the start). Keyless entries get an anonymous bucket each so two
-    unnamed steps stay two steps."""
-    order: list = []
-    latest: dict = {}
-    for index, entry in enumerate(entries):
-        key = _py_str(entry.get("stepKey")) or f"\0anon-{index}"
-        if key not in latest:
-            order.append(key)
-            first = entry.get("dateTime")
-        else:
-            first = latest[key].get("firstDateTime")
-        latest[key] = dict(entry, firstDateTime=first)
-    return [latest[k] for k in order]
+class TaskRowsRefused(RuntimeError):
+    """The plan or the execution record could not be read. A refusal is
+    not a skip: a framework that cannot tell which step is open must say
+    so, never render the last row it could read as if it were current."""
 
 
-def build_step_rows(sessions_dir, session_number: int) -> list:
-    """Plan rows own position, logged steps own content: a logged step
-    claims a planned row by exact stepKey, or failing that by stepNumber —
-    keys are derived slugs an engine paraphrases, numbers are the stable
-    address; unclaimed logged steps append; unclaimed planned rows stay
-    as pending rows with the spec's words. Nothing is dropped either way."""
-    log = read_activity_log(sessions_dir)
-    if log is None:
-        return []
-    mine = [
-        e for e in log.get("entries", [])
-        if isinstance(e, dict) and e.get("sessionNumber") == session_number
-    ]
-    if not mine:
-        return []
-    plan = _collapse_by_step_key(
-        [e for e in mine if _py_str(e.get("kind")) == "plan-step"]
+def build_task_rows(repo_root, session_number: int) -> list:
+    """The session's approved-plan steps, in plan order, each folded
+    against the execution record.
+
+    The invariant that at most one step is open is the fold's, not this
+    function's: ``ledger.open_step`` returns the last ``opened`` row with
+    no ``closed`` row after it, and there is nothing here to disagree
+    with it. Two rows in flight would be a defect in that fold rather
+    than a state this record can hold.
+
+    Raises :class:`TaskRowsRefused` when either artifact is unreadable.
+    A session with no plan at all has no tasks and is not a refusal --
+    the lifecycle does not require one.
+    """
+    from . import ledger
+    from .approved_plan import (
+        PLAN_FILENAME,
+        PlanIntegrityError,
+        effective_plan,
+        read_plan,
     )
-    real = _collapse_by_step_key([e for e in mine if is_logged_step(e)])
 
-    if not plan:
-        rows = [dict(e, isPlanned=False) for e in real]
-    else:
-        rows = [dict(e, isPlanned=True) for e in plan]
-        claimed = set()
-        by_key = {_py_str(r.get("stepKey")): i for i, r in enumerate(rows)}
-        by_num = {
-            r.get("stepNumber"): i for i, r in enumerate(rows)
-            if isinstance(r.get("stepNumber"), int)
-        }
-        leftovers = []
-        for entry in real:
-            key = _py_str(entry.get("stepKey"))
-            slot = by_key.get(key) if key else None
-            if slot is None or slot in claimed:
-                num = entry.get("stepNumber")
-                slot = by_num.get(num) if isinstance(num, int) else None
-            if slot is not None and slot not in claimed:
-                rows[slot] = dict(entry, isPlanned=True)
-                claimed.add(slot)
-            else:
-                leftovers.append(dict(entry, isPlanned=False))
-        rows.extend(leftovers)
+    run_dir = ledger.session_run_dir(repo_root, session_number)
+    if not (run_dir / PLAN_FILENAME).exists():
+        return []
+    try:
+        plan = effective_plan(read_plan(run_dir))
+    except (PlanIntegrityError, ValueError, OSError, UnicodeError) as exc:
+        raise TaskRowsRefused(f"approved plan: {exc}") from exc
+    try:
+        events = ledger.read_step_events(repo_root, session_number)
+        open_row = ledger.open_step(repo_root, session_number)
+        closed = set(ledger.closed_step_ids(repo_root, session_number))
+    except ledger.LedgerError as exc:
+        raise TaskRowsRefused(f"execution record: {exc}") from exc
 
+    opened_at = {}
+    for event in events:
+        if event["event"] == ledger.STEP_EVENT_OPENED:
+            opened_at[event["step_id"]] = event.get("recorded_at")
+    open_id = open_row["step_id"] if open_row else None
+
+    rows = []
+    for position, step in enumerate(plan.get("steps") or []):
+        step_id = step.get("step_id")
+        if step_id in closed:
+            state, icon = STEP_STATE_DONE, STATUS_COMPLETE
+        elif step_id == open_id:
+            state, icon = STEP_STATE_IN_FLIGHT, STATUS_IN_PROGRESS
+        else:
+            state, icon = STEP_STATE_PENDING, STATUS_NOT_STARTED
+        rows.append({
+            "position": position,
+            "stepId": step_id,
+            "intent": _py_str(step.get("intent")),
+            "state": state,
+            "iconKey": icon,
+            "isOpen": step_id == open_id,
+            "startedAt": opened_at.get(step_id),
+        })
     return rows
 
 
@@ -704,6 +690,10 @@ def build_projection(sessions_dir) -> dict:
     protocol, and the v1 one (digests + stale states) cost more than
     recomputing."""
     sessions_path = Path(sessions_dir)
+    # The task level lives under the repository root, not the sessions
+    # root: `.dabbler/runs/s<N>/`. The inverse of the one rule that places
+    # the sessions root is `evidence.repo_root_from_sessions_dir`.
+    repo_root = repo_root_from_sessions_dir(sessions_path)
     raw = read_raw_session_state(sessions_path)
 
     invariant_violation = None
@@ -750,37 +740,14 @@ def build_projection(sessions_dir) -> dict:
             "startedAt": entry.get("startedAt"),
             "completedAt": entry.get("completedAt"),
             "verificationVerdict": entry.get("verificationVerdict"),
-            "steps": [],
+            "tasks": [],
+            "tasksRefused": None,
         }
         if in_flight and isinstance(number, int):
-            rows = build_step_rows(sessions_path, number)
-            # Only the record marks a step. A row is never active because it
-            # is the first one not yet logged: that inference put the marker
-            # five rows behind a session whose verification had already
-            # opened, and a confidently wrong marker is worse than none.
-            for position, row in enumerate(rows):
-                row_status = row.get("status")
-                # A plan row's dateTime is only when the plan was seeded, so
-                # only a logged row can say when its step began.
-                started = (
-                    row.get("firstDateTime") or row.get("dateTime")
-                    if is_logged_step(row) else None
-                )
-                session_out["steps"].append({
-                    "position": position,
-                    "stepNumber": row.get("stepNumber"),
-                    "stepKey": _py_str(row.get("stepKey")) or None,
-                    "description": _py_str(row.get("description")),
-                    "status": row_status,
-                    "state": step_state(row_status),
-                    "box": STATUS_BOXES.get(
-                        _py_str(row_status).lower(), UNKNOWN_BOX
-                    ),
-                    "iconKey": step_icon_key(row_status),
-                    "isPlanned": bool(row.get("isPlanned")),
-                    "isActive": bool(row.get("isActive")),
-                    "startedAt": started,
-                })
+            try:
+                session_out["tasks"] = build_task_rows(repo_root, number)
+            except TaskRowsRefused as exc:
+                session_out["tasksRefused"] = str(exc)
         sessions_out.append(session_out)
 
     return {

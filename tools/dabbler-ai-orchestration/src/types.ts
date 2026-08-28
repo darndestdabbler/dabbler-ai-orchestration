@@ -7,25 +7,31 @@
 // above a session that carries a lifecycle state: a repository is never
 // "complete", so it has a progress fraction and nothing else.
 
-// The one status vocabulary, shared by sessions and steps; must match
+// The one status vocabulary, shared by sessions and tasks; must match
 // Python's SESSION_STATUSES in ai_router/progress.py.
 export type SessionStatus = "not-started" | "in-progress" | "complete" | "cancelled";
 
-/** One step row of an in-flight session, verbatim from the projection. */
-export interface StepRecord {
+/**
+ * One task row of an in-flight session, verbatim from the projection.
+ *
+ * Identity and order are the session's approved plan's; `state` and
+ * `iconKey` are folded from `step-execution.jsonl`. Nothing here is
+ * derived in TypeScript, and nothing here comes from the activity log —
+ * that is the layer that drifted.
+ */
+export interface TaskRecord {
   position: number;
-  stepNumber?: number | null;
-  stepKey: string | null;
-  description: string;
-  status: string | null;
-  /** Human-readable state phrase the projection derived. */
+  /** `steps[].step_id` from approved-plan.json. */
+  stepId: string | null;
+  /** `steps[].intent` — one imperative sentence. */
+  intent: string;
+  /** The fold's own words: "pending", "in flight", "done". */
   state: string;
-  /** The `[x]`-style checklist box, for tooltips. */
-  box: string;
   /** Which status glyph the row renders. */
   iconKey: SessionStatus;
-  isPlanned: boolean;
-  isActive: boolean;
+  /** The one step in flight, if this is it. At most one per session. */
+  isOpen: boolean;
+  /** When this step was opened, from its `opened` row. */
   startedAt: string | null;
 }
 
@@ -45,7 +51,13 @@ export interface SessionRecord {
   startedAt: string | null;
   completedAt: string | null;
   verificationVerdict: string | null;
-  steps: StepRecord[];
+  tasks: TaskRecord[];
+  /**
+   * Why the execution record could not be read, or null. A refusal is
+   * NOT an empty task list: the tree must say it cannot tell which step
+   * is open rather than render the last row it could read.
+   */
+  tasksRefused: string | null;
 }
 
 export interface OrchestratorInfo {
@@ -102,7 +114,7 @@ export interface SessionsRepository {
   invariantViolation: string | null;
   orchestrator: OrchestratorInfo | null;
   /**
-   * The normalized sessions ledger, with steps populated on the
+   * The normalized sessions ledger, with tasks populated on the
    * in-flight session only. Empty when the projection was unavailable
    * (no python, no router) — the repository row still renders, and the
    * view says the rendering is degraded rather than guessing statuses

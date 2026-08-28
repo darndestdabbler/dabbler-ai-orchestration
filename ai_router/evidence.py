@@ -86,6 +86,16 @@ def sessions_dir_for(repo_root) -> Path:
     return Path(repo_root) / _SESSIONS_PARENT / SESSIONS_DIRNAME
 
 
+def repo_root_from_sessions_dir(sessions_dir) -> Path:
+    """The inverse of :func:`sessions_dir_for`, and it lives here so the
+    two directions of one rule cannot disagree. A caller that already
+    holds a sessions root needs the repository root to reach
+    ``.dabbler/runs/``, and asking git for it would make the answer
+    depend on the tree being a checkout -- which the projection's own
+    fixtures are not."""
+    return Path(sessions_dir).resolve().parent.parent
+
+
 class SessionsRootNotFoundError(ValueError):
     pass
 

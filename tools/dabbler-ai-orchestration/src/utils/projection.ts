@@ -10,9 +10,9 @@
 import * as cp from "child_process";
 import * as fs from "fs";
 import * as path from "path";
-import { ProjectionPayload, SessionRecord, SessionStatus, StepRecord } from "../types";
+import { ProjectionPayload, SessionRecord, SessionStatus, TaskRecord } from "../types";
 
-/** The files whose mtimes invalidate a cached projection. */
+/** The sessions-root files whose mtimes invalidate a cached projection. */
 const CACHE_INPUTS = [
   "sessions.json",
   "activity-log.json",
@@ -20,11 +20,49 @@ const CACHE_INPUTS = [
   "change-log.md",
 ];
 
+/** Where the machine-owned run records live, relative to the repository root. */
+export const RUNS_REL = path.join(".dabbler", "runs");
+
+/**
+ * The per-session run artifacts the task level is folded from. They sit
+ * under the REPOSITORY root, not the sessions root, and they must be in
+ * the cache key: a step opening changes only these, and a key that
+ * ignored them would serve the pre-open payload back to the watcher tick
+ * the open fired.
+ */
+export function taskRecordInputs(
+  repositoryRoot: string,
+  listDir: (p: string) => string[] = readdirOrEmpty,
+): string[] {
+  const runs = path.join(repositoryRoot, RUNS_REL);
+  const inputs: string[] = [];
+  for (const entry of listDir(runs)) {
+    if (!/^s\d+$/.test(entry)) continue;
+    inputs.push(path.join(runs, entry, "step-execution.jsonl"));
+    inputs.push(path.join(runs, entry, "approved-plan.json"));
+  }
+  return inputs.sort();
+}
+
 export function projectionCacheKey(
   sessionsDir: string,
+  repositoryRoot: string,
   statFile: (p: string) => number | null = mtimeOrNull,
+  listDir: (p: string) => string[] = readdirOrEmpty,
 ): string {
-  return CACHE_INPUTS.map((f) => String(statFile(path.join(sessionsDir, f)))).join("|");
+  const files = [
+    ...CACHE_INPUTS.map((f) => path.join(sessionsDir, f)),
+    ...taskRecordInputs(repositoryRoot, listDir),
+  ];
+  return files.map((f) => `${f}=${statFile(f)}`).join("|");
+}
+
+function readdirOrEmpty(p: string): string[] {
+  try {
+    return fs.readdirSync(p);
+  } catch {
+    return [];
+  }
 }
 
 function mtimeOrNull(p: string): number | null {
@@ -143,8 +181,8 @@ function narrowSession(raw: unknown): SessionRecord | null {
   }
   const status = String(o.status);
   if (!STATUSES.has(status)) return null;
-  const steps = Array.isArray(o.steps)
-    ? o.steps.map(narrowStep).filter((x): x is StepRecord => x !== null)
+  const tasks = Array.isArray(o.tasks)
+    ? o.tasks.map(narrowTask).filter((x): x is TaskRecord => x !== null)
     : [];
   return {
     number,
@@ -159,26 +197,26 @@ function narrowSession(raw: unknown): SessionRecord | null {
     completedAt: typeof o.completedAt === "string" ? o.completedAt : null,
     verificationVerdict:
       typeof o.verificationVerdict === "string" ? o.verificationVerdict : null,
-    steps,
+    tasks,
+    // A refusal is carried, never inferred from an empty list: the
+    // projection distinguishes "this session declared no plan" from "the
+    // execution record could not be read", and so must the tree.
+    tasksRefused: typeof o.tasksRefused === "string" ? o.tasksRefused : null,
   };
 }
 
-function narrowStep(raw: unknown): StepRecord | null {
+function narrowTask(raw: unknown): TaskRecord | null {
   if (raw === null || typeof raw !== "object") return null;
   const o = raw as Record<string, unknown>;
   return {
     position: typeof o.position === "number" ? o.position : 0,
-    stepNumber: typeof o.stepNumber === "number" ? o.stepNumber : null,
-    stepKey: typeof o.stepKey === "string" ? o.stepKey : null,
-    description: typeof o.description === "string" ? o.description : "",
-    status: typeof o.status === "string" ? o.status : null,
+    stepId: typeof o.stepId === "string" ? o.stepId : null,
+    intent: typeof o.intent === "string" ? o.intent : "",
     state: typeof o.state === "string" ? o.state : "",
-    box: typeof o.box === "string" ? o.box : "[ ]",
     iconKey: STATUSES.has(String(o.iconKey))
       ? (o.iconKey as SessionStatus)
       : "not-started",
-    isPlanned: o.isPlanned === true,
-    isActive: o.isActive === true,
+    isOpen: o.isOpen === true,
     startedAt: typeof o.startedAt === "string" ? o.startedAt : null,
   };
 }
@@ -202,7 +240,8 @@ export class ProjectionCache {
     sessionsDir: string,
     cwd: string,
   ): Promise<ProjectionResult> {
-    const key = projectionCacheKey(sessionsDir);
+    // `cwd` is the repository root — the run records live under it.
+    const key = projectionCacheKey(sessionsDir, cwd);
     const cached = this.entries.get(sessionsDir);
     if (cached && cached.key === key) return cached.result;
     const result = await this.runner(pythonPath, sessionsDir, cwd);

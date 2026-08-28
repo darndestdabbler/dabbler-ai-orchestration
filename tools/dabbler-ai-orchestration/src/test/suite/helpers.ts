@@ -1,5 +1,5 @@
 // Shared builders for the unit suite: in-memory SessionsRepository /
-// SessionRecord / StepRecord records shaped exactly as the scan builds
+// SessionRecord / TaskRecord records shaped exactly as the scan builds
 // them, with per-test overrides.
 
 import * as fs from "fs";
@@ -9,21 +9,17 @@ import {
   ProjectionPayload,
   SessionRecord,
   SessionsRepository,
-  StepRecord,
+  TaskRecord,
 } from "../../types";
 
-export function makeStep(overrides: Partial<StepRecord> = {}): StepRecord {
+export function makeTask(overrides: Partial<TaskRecord> = {}): TaskRecord {
   return {
     position: 0,
-    stepNumber: 1,
-    stepKey: "implement",
-    description: "Implement the thing",
-    status: "not-started",
-    state: "not started",
-    box: "[ ]",
+    stepId: "implement",
+    intent: "Implement the thing.",
+    state: "pending",
     iconKey: "not-started",
-    isPlanned: true,
-    isActive: false,
+    isOpen: false,
     startedAt: null,
     ...overrides,
   };
@@ -41,7 +37,8 @@ export function makeSession(overrides: Partial<SessionRecord> = {}): SessionReco
     startedAt: null,
     completedAt: null,
     verificationVerdict: null,
-    steps: [],
+    tasks: [],
+    tasksRefused: null,
     ...overrides,
   };
 }

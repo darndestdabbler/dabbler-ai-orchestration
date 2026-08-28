@@ -51,8 +51,11 @@ it.
 | 13 | Packaging to the feed (plan C) | no | 2026-08-27 |
 | 14 | Collapse session sets (plan A3) | no | 2026-08-27 |
 | 15 | The sessions view (plan D1) | no | 2026-08-28 |
-| 16 | Project setup as two sessions (plan D2) | — | not declared |
-| 17 | The unresolved-session view (plan D3) | — | not declared |
+| 16 | The task level (plan D1, second half) | no | 2026-08-28 |
+| 17 | The tracked project config (precondition for D2) | — | not declared |
+| 18 | Project setup as two sessions (plan D2) | — | not declared |
+| 19 | The unresolved-session view (plan D3) | — | not declared |
+| 20 | A round baseline that survives the trip (root cause of D98) | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -379,3 +382,9 @@ setup (session 18), and the unresolved-session view (session 19).
 
 Not releasable. This session publishes no package; it changes the
 extension's tree and the projection's title healing only.
+
+### Session 16 — The task level (plan D1, second half)
+
+**Releasable: no.**
+
+Build the task level below the session in the VS Code sessions tree: rows read from approved-plan.json (step_id, intent) with execution state folded from .dabbler/runs/s<N>/step-execution.jsonl via ledger.read_step_events / open_step / closed_step_ids; never from activity-log.json. One open step at most, rendered not recomputed. An unreadable execution record refuses rather than falling back to the last good row. The file watcher covers .dabbler/runs/*/step-execution.jsonl so a step opening or closing refreshes the row on the event rather than on a 30-second poll.

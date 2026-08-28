@@ -11,15 +11,16 @@ import {
   repositoryTooltip,
   sessionDescriptor,
   sessionNodes,
+  refusalDescriptor,
   severityOf,
-  stepDescriptor,
-  stepNodes,
-  stepRowLabel,
   stepStartLabel,
+  taskDescriptor,
+  taskNodes,
+  taskRowLabel,
   tokenString,
 } from "../../providers/workExplorerTreeModel";
 import { SESSION_ACTIONS } from "../../providers/ActionRegistry";
-import { makeRepository, makeSession, makeStep } from "./helpers";
+import { makeRepository, makeSession, makeTask } from "./helpers";
 
 suite("workExplorerTreeModel: nodes", () => {
   test("sessions render as one list in ledger order, never bucketed by status", () => {
@@ -37,37 +38,56 @@ suite("workExplorerTreeModel: nodes", () => {
     );
   });
 
-  test("stepNodes mirrors the projection's step list verbatim", () => {
+  test("taskNodes mirrors the projection's task list verbatim", () => {
     const session = makeSession({
       status: "in-progress",
-      steps: [makeStep({ position: 0 }), makeStep({ position: 1, stepKey: "verify" })],
+      tasks: [makeTask({ position: 0 }), makeTask({ position: 1, stepId: "verify" })],
     });
-    const nodes = stepNodes({
+    const nodes = taskNodes({
       kind: "session",
       repository: makeRepository(),
       session,
     });
-    assert.deepStrictEqual(nodes.map((n) => n.row.stepKey), ["implement", "verify"]);
+    assert.deepStrictEqual(
+      nodes.map((n) => (n.kind === "task" ? n.row.stepId : n.kind)),
+      ["implement", "verify"],
+    );
   });
 
-  test("a session without projected steps yields no step children", () => {
-    const session = makeSession({ status: "complete", steps: [] });
+  test("a session without projected tasks yields no task children", () => {
+    const session = makeSession({ status: "complete", tasks: [] });
     assert.deepStrictEqual(
-      stepNodes({ kind: "session", repository: makeRepository(), session }),
+      taskNodes({ kind: "session", repository: makeRepository(), session }),
       [],
     );
   });
 
-  test("childrenOf covers every level and terminates at steps", () => {
-    const session = makeSession({ status: "in-progress", steps: [makeStep()] });
+  test("a refused record yields one refusal row and no task rows", () => {
+    // Not an empty list and not the rows that did parse: the tree has to
+    // say it cannot tell which step is open.
+    const session = makeSession({
+      status: "in-progress",
+      tasks: [makeTask()],
+      tasksRefused: "execution record: row 2 failed schema validation",
+    });
+    const nodes = taskNodes({
+      kind: "session",
+      repository: makeRepository(),
+      session,
+    });
+    assert.deepStrictEqual(nodes.map((n) => n.kind), ["refusal"]);
+  });
+
+  test("childrenOf covers every level and terminates at tasks", () => {
+    const session = makeSession({ status: "in-progress", tasks: [makeTask()] });
     const [repositoryNode] = repositoryNodes([
       makeRepository({ sessions: [session] }),
     ]);
     const sessionNode = childrenOf(repositoryNode)[0];
     assert.strictEqual(sessionNode.kind, "session");
-    const stepNode = childrenOf(sessionNode)[0];
-    assert.strictEqual(stepNode.kind, "step");
-    assert.deepStrictEqual(childrenOf(stepNode), []);
+    const taskNode = childrenOf(sessionNode)[0];
+    assert.strictEqual(taskNode.kind, "task");
+    assert.deepStrictEqual(childrenOf(taskNode), []);
   });
 });
 
@@ -181,11 +201,11 @@ suite("workExplorerTreeModel: session descriptor", () => {
     assert.strictEqual(done.description, undefined);
   });
 
-  test("a session with steps is collapsible; without, a leaf", () => {
+  test("a session with tasks is collapsible; without, a leaf", () => {
     const withSteps = sessionDescriptor({
       kind: "session",
       repository,
-      session: makeSession({ status: "in-progress", steps: [makeStep()] }),
+      session: makeSession({ status: "in-progress", tasks: [makeTask()] }),
     });
     const leaf = sessionDescriptor({
       kind: "session",
@@ -271,8 +291,7 @@ suite("workExplorerTreeModel: severity", () => {
     assert.ok(hasToken(d.contextValue, "severity-verification"));
   });
 });
-
-suite("workExplorerTreeModel: step rows", () => {
+suite("workExplorerTreeModel: task rows", () => {
   const repository = makeRepository();
 
   test("humanizeStepKey turns kebab and snake case into a sentence word", () => {
@@ -280,13 +299,13 @@ suite("workExplorerTreeModel: step rows", () => {
     assert.strictEqual(humanizeStepKey("run_tests"), "Run tests");
   });
 
-  test("stepRowLabel prefers the key, then truncated description, then position", () => {
-    assert.strictEqual(stepRowLabel(makeStep({ stepKey: "close-out" })), "Close out");
-    const longDescription = "d".repeat(80);
-    const noKey = makeStep({ stepKey: null, description: longDescription });
-    assert.strictEqual(stepRowLabel(noKey).length, 58);
-    const bare = makeStep({ stepKey: null, description: "", stepNumber: null, position: 2 });
-    assert.strictEqual(stepRowLabel(bare), "Step 3");
+  test("taskRowLabel prefers the step id, then truncated intent, then position", () => {
+    assert.strictEqual(taskRowLabel(makeTask({ stepId: "close-out" })), "Close out");
+    const longIntent = "d".repeat(80);
+    const noId = makeTask({ stepId: null, intent: longIntent });
+    assert.strictEqual(taskRowLabel(noId).length, 58);
+    const bare = makeTask({ stepId: null, intent: "", position: 2 });
+    assert.strictEqual(taskRowLabel(bare), "Step 3");
   });
 
   test("stepStartLabel renders HH:MM- and nothing for unparseable input", () => {
@@ -295,64 +314,91 @@ suite("workExplorerTreeModel: step rows", () => {
     assert.strictEqual(stepStartLabel(null), "");
   });
 
-  test("a derived active step reads as in progress, not as not started", () => {
-    const d = stepDescriptor({
-      kind: "step",
+  test("the open task renders the projection's state and glyph, unmodified", () => {
+    const d = taskDescriptor({
+      kind: "task",
       repository,
       session: makeSession(),
-      row: makeStep({ isActive: true, iconKey: "in-progress" }),
+      row: makeTask({ isOpen: true, state: "in flight", iconKey: "in-progress" }),
     });
-    assert.ok(d.tooltip!.includes("derived from the plan"));
-    assert.ok(hasToken(d.contextValue, "step-active"));
+    assert.ok(d.tooltip!.includes("in flight"));
+    assert.ok(hasToken(d.contextValue, "task-open"));
     assert.deepStrictEqual(d.icon, { kind: "file", slug: "in-progress.svg" });
   });
 
-  test("step ids disambiguate by position so shared keys cannot collide", () => {
-    const a = stepDescriptor({
-      kind: "step",
+  test("task ids disambiguate by plan position", () => {
+    const a = taskDescriptor({
+      kind: "task",
       repository,
       session: makeSession(),
-      row: makeStep({ position: 0 }),
+      row: makeTask({ position: 0 }),
     });
-    const b = stepDescriptor({
-      kind: "step",
+    const b = taskDescriptor({
+      kind: "task",
       repository,
       session: makeSession(),
-      row: makeStep({ position: 1 }),
+      row: makeTask({ position: 1 }),
     });
     assert.notStrictEqual(a.id, b.id);
   });
 
-  test("an unplanned logged step carries the step-logged token", () => {
-    const d = stepDescriptor({
-      kind: "step",
+  test("a started task shows its opening time in the description slot", () => {
+    const d = taskDescriptor({
+      kind: "task",
       repository,
       session: makeSession(),
-      row: makeStep({ isPlanned: false }),
-    });
-    assert.ok(hasToken(d.contextValue, "step-logged"));
-  });
-
-  test("a started step shows its start time in the description slot", () => {
-    const d = stepDescriptor({
-      kind: "step",
-      repository,
-      session: makeSession(),
-      row: makeStep({ startedAt: "2026-08-17T09:06:00-04:00" }),
+      row: makeTask({ startedAt: "2026-08-17T09:06:00-04:00" }),
     });
     assert.match(d.description ?? "", /^\d{2}:\d{2}-$/);
+  });
+
+  test("the refusal row names the fault and shows no task state", () => {
+    const d = refusalDescriptor({
+      kind: "refusal",
+      repository,
+      session: makeSession({ status: "in-progress" }),
+      reason: "execution record: row 2 failed schema validation at event",
+    });
+    assert.strictEqual(d.label, "Execution record unreadable");
+    assert.ok(d.tooltip!.includes("row 2 failed schema validation"));
+    assert.deepStrictEqual(d.icon, { kind: "file", slug: "cancelled.svg" });
+    assert.ok(hasToken(d.contextValue, NODE_TOKEN.refusal));
+  });
+
+  test("an unreadable record is a session severity of its own", () => {
+    const clean = makeSession({ status: "in-progress" });
+    assert.strictEqual(severityOf(clean), null);
+    const refused = makeSession({
+      status: "in-progress",
+      tasksRefused: "execution record: unreadable",
+    });
+    assert.strictEqual(severityOf(refused), "record");
+    const d = sessionDescriptor({ kind: "session", repository, session: refused });
+    assert.ok(hasToken(d.contextValue, "severity-record"));
+    assert.strictEqual(d.collapsible, "collapsed");
   });
 });
 
 suite("workExplorerTreeModel: descriptorFor dispatch", () => {
   test("every node kind resolves to a descriptor with a stable id", () => {
-    const session = makeSession({ status: "in-progress", steps: [makeStep()] });
+    const session = makeSession({ status: "in-progress", tasks: [makeTask()] });
     const [repositoryNode] = repositoryNodes([
       makeRepository({ sessions: [session] }),
     ]);
     const sessionNode = childrenOf(repositoryNode)[0];
-    const stepNode = childrenOf(sessionNode)[0];
-    for (const node of [repositoryNode, sessionNode, stepNode]) {
+    const taskNode = childrenOf(sessionNode)[0];
+    const refusalNode = childrenOf(
+      childrenOf(
+        repositoryNodes([
+          makeRepository({
+            sessions: [
+              makeSession({ status: "in-progress", tasksRefused: "unreadable" }),
+            ],
+          }),
+        ])[0],
+      )[0],
+    )[0];
+    for (const node of [repositoryNode, sessionNode, taskNode, refusalNode]) {
       const d = descriptorFor(node);
       assert.ok(d.id.length > 0, node.kind);
       assert.ok(d.contextValue.startsWith(";"), node.kind);

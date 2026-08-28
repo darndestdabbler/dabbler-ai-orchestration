@@ -10,6 +10,7 @@ import { registerBootstrapProjectCommand } from "./commands/bootstrapProject";
 import { registerInstallAiRouterCommand } from "./commands/installAiRouter";
 import { registerWorkExplorerTreeCommands } from "./commands/workExplorerTreeCommands";
 import { SESSIONS_REL, discoverRoots, hasSessionsRoot } from "./utils/fileSystem";
+import { RUNS_REL } from "./utils/projection";
 import { SolutionTreeProvider } from "./providers/SolutionTreeProvider";
 import { WorkExplorerTreeProvider } from "./providers/WorkExplorerTreeProvider";
 
@@ -93,19 +94,34 @@ export function activate(context: vscode.ExtensionContext): void {
       // Exactly the artifacts the projection derives from. The
       // projection cache is mtime-keyed on the same files, so a watcher
       // tick re-projects only repositories that actually changed.
-      const pattern = new vscode.RelativePattern(
-        path.join(root, SESSIONS_REL),
-        "{sessions.json,activity-log.json,session-plan.md,change-log.md}",
-      );
-      const watcher = vscode.workspace.createFileSystemWatcher(pattern);
+      //
+      // The run records are watched as well as the sessions root, and
+      // that is a requirement rather than a nicety: the task level folds
+      // step-execution.jsonl, and a task row up to 30 seconds behind the
+      // step it describes is the untrustworthy surface this view exists
+      // to replace. A step opening or closing must move the row on the
+      // event.
+      const patterns = [
+        new vscode.RelativePattern(
+          path.join(root, SESSIONS_REL),
+          "{sessions.json,activity-log.json,session-plan.md,change-log.md}",
+        ),
+        new vscode.RelativePattern(
+          path.join(root, RUNS_REL),
+          "*/{step-execution.jsonl,approved-plan.json}",
+        ),
+      ];
       const onEvent = () => {
         treeProvider.refresh();
       };
-      watcher.onDidCreate(onEvent);
-      watcher.onDidDelete(onEvent);
-      watcher.onDidChange(onEvent);
-      watcherSubs.push(watcher);
-      context.subscriptions.push(watcher);
+      for (const pattern of patterns) {
+        const watcher = vscode.workspace.createFileSystemWatcher(pattern);
+        watcher.onDidCreate(onEvent);
+        watcher.onDidDelete(onEvent);
+        watcher.onDidChange(onEvent);
+        watcherSubs.push(watcher);
+        context.subscriptions.push(watcher);
+      }
     }
   }
 

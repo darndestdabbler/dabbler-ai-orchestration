@@ -21,7 +21,7 @@ import {
   SessionRecord,
   SessionStatus,
   SessionsRepository,
-  StepRecord,
+  TaskRecord,
 } from "../types";
 import {
   REPOSITORY_ACTIONS,
@@ -43,12 +43,15 @@ import { isRecognizedVerdictToken } from "../utils/verdictTokens";
 // ---------------------------------------------------------------------------
 
 /**
- * SessionNode and StepNode both expose a `repository` property ON
- * PURPOSE: every row command reads its target off the node, and a node
- * shaped this way is accepted by the whole command surface with no
- * adapter.
+ * Every node exposes a `repository` property ON PURPOSE: every row
+ * command reads its target off the node, and a node shaped this way is
+ * accepted by the whole command surface with no adapter.
  */
-export type WorkExplorerNode = RepositoryNode | SessionNode | StepNode;
+export type WorkExplorerNode =
+  | RepositoryNode
+  | SessionNode
+  | TaskNode
+  | RefusalNode;
 
 export interface RepositoryNode {
   readonly kind: "repository";
@@ -62,16 +65,28 @@ export interface SessionNode {
 }
 
 /**
- * One step of the in-flight session. `position` is the row's index in
- * the projected list and makes the TreeItem.id unique: two steps can
- * legitimately share a stepKey (a logged step that claimed no planned
- * row appends alongside one that did).
+ * One task of the in-flight session: an approved-plan step, in plan
+ * order, carrying the state the execution record folded onto it.
+ * `position` is that plan order and makes the TreeItem.id unique.
  */
-export interface StepNode {
-  readonly kind: "step";
+export interface TaskNode {
+  readonly kind: "task";
   readonly repository: SessionsRepository;
   readonly session: SessionRecord;
-  readonly row: StepRecord;
+  readonly row: TaskRecord;
+}
+
+/**
+ * The only child a session gets when its execution record is unreadable.
+ * It exists so the tree can say it cannot tell which step is open — the
+ * alternative, showing the last row that did parse, is the
+ * stale-but-plausible failure this level was built to end.
+ */
+export interface RefusalNode {
+  readonly kind: "refusal";
+  readonly repository: SessionsRepository;
+  readonly session: SessionRecord;
+  readonly reason: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -99,15 +114,26 @@ export function sessionNodes(node: RepositoryNode): SessionNode[] {
 }
 
 /**
- * The third level: the in-flight session's steps, exactly as the
- * projection lists them. Empty for every session that is not in flight
- * and whenever the projection carried no steps — degrading to no
- * children is the requirement; a stale or invented list is worse than an
- * empty one.
+ * The third level: the in-flight session's tasks, exactly as the
+ * projection lists them. A refusal outranks the list — the projection
+ * refuses an unreadable execution record rather than emitting rows, and
+ * that refusal is rendered as the session's one child. Otherwise empty
+ * is empty: a session with no approved plan has no tasks, and inventing
+ * rows for it is what this level exists not to do.
  */
-export function stepNodes(node: SessionNode): StepNode[] {
-  return node.session.steps.map((row) => ({
-    kind: "step",
+export function taskNodes(node: SessionNode): (TaskNode | RefusalNode)[] {
+  if (node.session.tasksRefused) {
+    return [
+      {
+        kind: "refusal",
+        repository: node.repository,
+        session: node.session,
+        reason: node.session.tasksRefused,
+      },
+    ];
+  }
+  return node.session.tasks.map((row) => ({
+    kind: "task",
     repository: node.repository,
     session: node.session,
     row,
@@ -119,8 +145,9 @@ export function childrenOf(node: WorkExplorerNode): WorkExplorerNode[] {
     case "repository":
       return sessionNodes(node);
     case "session":
-      return stepNodes(node);
-    case "step":
+      return taskNodes(node);
+    case "task":
+    case "refusal":
       return [];
   }
 }
@@ -176,7 +203,8 @@ export function hasToken(contextValue: string, token: string): boolean {
 export const NODE_TOKEN = {
   repository: "dabblerRepository",
   session: "dabblerSession",
-  step: "dabblerStep",
+  task: "dabblerTask",
+  refusal: "dabblerRefusal",
 } as const;
 
 /**
@@ -192,7 +220,7 @@ export function actionToken(action: RepositoryAction | SessionAction): string {
 // Severity (tooltip + contextValue only; the icon slot stays lifecycle)
 // ---------------------------------------------------------------------------
 
-export type SessionSeverity = "verification" | null;
+export type SessionSeverity = "verification" | "record" | null;
 
 export { verdictIsUnclean } from "./sessionsModel";
 
@@ -203,7 +231,11 @@ export { verdictIsUnclean } from "./sessionsModel";
  * verdict is still complete, and still not proof of anything.
  */
 export function severityOf(session: SessionRecord): SessionSeverity {
-  return verdictIsUnclean(session.verificationVerdict) ? "verification" : null;
+  if (verdictIsUnclean(session.verificationVerdict)) return "verification";
+  // An unreadable execution record is a severity of its own: the session
+  // may be perfectly clean and the framework still cannot say which of
+  // its steps is open.
+  return session.tasksRefused ? "record" : null;
 }
 
 export function sessionIcon(status: SessionStatus): IconSpec {
@@ -303,11 +335,11 @@ function sessionTooltip(node: SessionNode): string {
   } else if (session.startedAt) {
     lines.push("", `_started ${session.startedAt}_`);
   }
-  if (session.steps.length > 0) {
-    lines.push(
-      "",
-      `${session.steps.length} step${session.steps.length === 1 ? "" : "s"}`,
-    );
+  if (session.tasksRefused) {
+    lines.push("", `Execution record unreadable: ${session.tasksRefused}`);
+  } else if (session.tasks.length > 0) {
+    const done = session.tasks.filter((t) => t.iconKey === "complete").length;
+    lines.push("", `${done}/${session.tasks.length} tasks done`);
   }
   return lines.join("\n");
 }
@@ -329,10 +361,12 @@ export function sessionDescriptor(node: SessionNode): RowDescriptor {
     tooltip: sessionTooltip(node),
     icon: sessionIcon(session.iconKey),
     contextValue: tokenString(tokens),
-    // Collapsed only when there is something under it: every session
-    // that is not in flight (and an in-flight one whose activity log is
-    // absent) is a leaf.
-    collapsible: session.steps.length > 0 ? "collapsed" : "none",
+    // Collapsed only when there is something under it: the task rows, or
+    // the one row that says why there are none. Every session that is
+    // not in flight is a leaf, and so is an in-flight one that declared
+    // no plan.
+    collapsible:
+      session.tasksRefused || session.tasks.length > 0 ? "collapsed" : "none",
   };
 }
 
@@ -344,20 +378,19 @@ export function humanizeStepKey(key: string): string {
 }
 
 /**
- * The row label: the humanized stepKey, not the description —
- * descriptions are audit-trail prose that routinely runs to several
- * sentences, and a tree row that wraps is not a tree row. The full text
- * is in the tooltip.
+ * The row label: the humanized `step_id`, not the intent — a step_id is
+ * the identity the plan, the execution record and the CLI all address
+ * the step by, and it is short enough for a tree row. The intent is one
+ * imperative sentence and belongs in the tooltip, because a row that
+ * wraps is not a tree row.
  */
-export function stepRowLabel(row: StepRecord): string {
-  if (row.stepKey) return humanizeStepKey(row.stepKey);
-  const description = row.description.trim();
-  if (description) {
-    return description.length > 60 ? `${description.slice(0, 57)}…` : description;
+export function taskRowLabel(row: TaskRecord): string {
+  if (row.stepId) return humanizeStepKey(row.stepId);
+  const intent = row.intent.trim();
+  if (intent) {
+    return intent.length > 60 ? `${intent.slice(0, 57)}…` : intent;
   }
-  return typeof row.stepNumber === "number"
-    ? `Step ${row.stepNumber}`
-    : `Step ${row.position + 1}`;
+  return `Step ${row.position + 1}`;
 }
 
 /**
@@ -377,47 +410,62 @@ export function stepStartLabel(startedAt: string | null): string {
 }
 
 /**
- * A step row. The ICON is the projection's own glyph key — the same
- * authored lifecycle assets the session rows use; the projection already
- * resolved the effective status (including the derived active step), so
- * this renderer never re-derives it.
+ * A task row. Every fact on it is the projection's: the glyph key, the
+ * state phrase, and which step is open. Nothing here recomputes the
+ * fold — if two rows ever read as in flight for one session, that is a
+ * defect in `ledger.open_step`, not a state this renderer can produce.
  */
-export function stepDescriptor(node: StepNode): RowDescriptor {
+export function taskDescriptor(node: TaskNode): RowDescriptor {
   const { row } = node;
-  const tooltipLines = [`**${stepRowLabel(row)}**`];
-  const state = row.isActive
-    ? "in progress — derived from the plan, not yet logged"
-    : row.isPlanned && row.iconKey === "not-started"
-      ? "planned — not started"
-      : row.state || String(row.status || "unknown").replace(/[-_]/g, " ");
-  tooltipLines.push("", state);
-  // The full timestamp goes here, where width is free. A derived-active
-  // row's time is when it became the current step (inferred), not a
-  // logged start.
+  const tooltipLines = [`**${taskRowLabel(row)}**`, "", row.state];
+  // The full timestamp goes here, where width is free.
   if (row.startedAt) {
     tooltipLines.push(
       "",
-      row.isActive
-        ? `Current since ${row.startedAt}`
-        : `Started ${row.startedAt}`,
+      row.isOpen ? `Opened ${row.startedAt}` : `Started ${row.startedAt}`,
     );
   }
-  const description = row.description.trim();
-  if (description) tooltipLines.push("", description);
+  const intent = row.intent.trim();
+  if (intent) tooltipLines.push("", intent);
 
   const started = stepStartLabel(row.startedAt);
   return {
-    id: `step:${node.repository.root}/${node.session.number}/${row.position}`,
-    label: stepRowLabel(row),
+    id: `task:${node.repository.root}/${node.session.number}/${row.position}`,
+    label: taskRowLabel(row),
     ...(started ? { description: started } : {}),
     tooltip: tooltipLines.join("\n"),
     icon: { kind: "file", slug: ICON_FILES[row.iconKey] },
     contextValue: tokenString([
-      NODE_TOKEN.step,
-      `step-${row.iconKey}`,
-      row.isPlanned ? "step-planned" : "step-logged",
-      ...(row.isActive ? ["step-active"] : []),
+      NODE_TOKEN.task,
+      `task-${row.iconKey}`,
+      ...(row.isOpen ? ["task-open"] : []),
     ]),
+    collapsible: "none",
+  };
+}
+
+/**
+ * The row that stands in place of a task list the framework could not
+ * read. It carries no lifecycle glyph of the plan's — there is no state
+ * to show — and says what failed, so the operator repairs the record
+ * rather than wondering why a session has no steps.
+ */
+export function refusalDescriptor(node: RefusalNode): RowDescriptor {
+  return {
+    id: `refusal:${node.repository.root}/${node.session.number}`,
+    label: "Execution record unreadable",
+    description: "cannot tell which step is open",
+    tooltip: [
+      "**Execution record unreadable**",
+      "",
+      node.reason,
+      "",
+      "No task rows are shown. A row that failed validation is a " +
+        "refusal, not a skip: showing the last row that did parse would " +
+        "present a stale step as the current one.",
+    ].join("\n"),
+    icon: { kind: "file", slug: ICON_FILES.cancelled },
+    contextValue: tokenString([NODE_TOKEN.refusal]),
     collapsible: "none",
   };
 }
@@ -428,7 +476,9 @@ export function descriptorFor(node: WorkExplorerNode): RowDescriptor {
       return repositoryDescriptor(node);
     case "session":
       return sessionDescriptor(node);
-    case "step":
-      return stepDescriptor(node);
+    case "task":
+      return taskDescriptor(node);
+    case "refusal":
+      return refusalDescriptor(node);
   }
 }

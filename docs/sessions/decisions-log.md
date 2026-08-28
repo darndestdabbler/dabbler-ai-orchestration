@@ -2814,3 +2814,25 @@ verified rather than appended to a verified tree. Filed here so a later
 session picks it up: format `expected`, and decide whether
 `completedSessions=[1, 2]` — a LIST of numbers echoing state — is human
 output that should pad or a debug echo that should not.
+
+## Session 16 — The task level (plan D1, second half)
+
+### D110 · 2026-08-28 · Orchestrator · The task level replaces the activity-log step rows outright rather than sitting beside them
+
+The projection's step rows were folded out of activity-log.json by build_step_rows, which the spec forbids as the task level's source. Leaving that path in place as dead code would leave a second, drifting answer to 'which step is open' one call away, so build_step_rows, _collapse_by_step_key, step_state, step_icon_key and the STATUS_BOXES/_ICON_KEYS tables are deleted and build_task_rows takes their place. read_activity_log and is_logged_step stay: session.py still uses them for seeding and logging, which is the activity log's remaining job.
+
+### D111 · 2026-08-28 · Orchestrator · A refused execution record is carried as its own field, never as an empty task list
+
+The spec requires that an unreadable record refuse rather than fall back. Emitting zero rows would be indistinguishable from a session that declared no approved plan, which is a legitimate and common state. So build_projection emits tasks and tasksRefused separately; the tree renders the refusal as the session's one child row, and severityOf gains a 'record' severity so the session row says so without displacing its lifecycle glyph.
+
+### D112 · 2026-08-28 · Orchestrator · A task row is labelled with its humanized step_id and carries its intent in the tooltip
+
+The spec names both steps[].step_id and steps[].intent as the row's source. step_id is the one identity the plan, the execution record and the CLI all address the step by and it fits a tree row; intent is one imperative sentence and would wrap. This is the same split the previous step rows used (stepKey label, description tooltip), so the rendering convention does not change under the operator when the data source does.
+
+### D113 · 2026-08-28 · Orchestrator · The projection cache key covers the run records, or the watcher would be inert
+
+refresh() is soft: it drops the scan generation but keeps the mtime-keyed projection cache. The old key covered only the four sessions-root files, so a step opening -- which touches nothing but .dabbler/runs/s<N>/step-execution.jsonl -- would have fired the watcher and then been served the pre-open payload from cache. projectionCacheKey now takes the repository root and stats every s<N>/step-execution.jsonl and s<N>/approved-plan.json alongside. The Playwright transition test is what proves it: two icon changes settle inside one thirty-second poll period.
+
+### D114 · 2026-08-28 · Verifier (gpt-5.6-sol/openai) · Round 1 verified with two Minor nits, both left standing
+
+Nit 1: task rows are labelled with the humanized step_id rather than steps[].intent, which the verifier reads the spec as requiring. That is decision D112 and it was made deliberately -- intent is one imperative sentence and wraps a tree row, step_id is the identity every other layer addresses the step by. It is a presentation call for the operator, not a correctness defect. Nit 2, and the better catch: build_task_rows returns no tasks when approved-plan.json is missing, without reading the execution record -- so a session whose plan was deleted while step-execution.jsonl still carries an open step renders as a leaf rather than a refusal. That is the stale-but-plausible shape this level exists to end, in a rare state. Both are Minor and non-blocking; the loop stops here per the severity-gated rule rather than spending a round on wording, and nit 2 is owed as a follow-up.

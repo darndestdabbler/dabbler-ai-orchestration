@@ -3,9 +3,17 @@ from pathlib import Path
 
 import pytest
 
+from ai_router.approved_plan import new_plan, write_plan
+from ai_router.ledger import (
+    append_step_event,
+    session_run_dir,
+    step_execution_path,
+)
 from ai_router.progress import (
     SessionStateInvariantError,
+    TaskRowsRefused,
     build_projection,
+    build_task_rows,
     canonicalize_status,
     get_progress,
     heal_title,
@@ -14,8 +22,6 @@ from ai_router.progress import (
     read_session_state,
     session_display_number,
     session_has_history,
-    step_icon_key,
-    step_state,
 )
 
 CORPUS = Path(__file__).parent / "fixtures" / "corpus"
@@ -240,18 +246,6 @@ class TestInvariants:
         assert view.next_session == 2
 
 
-class TestStepVocabulary:
-    def test_step_state_and_icon(self):
-        assert step_state("pending") == "pending"
-        assert step_state("blocked") == "blocked"
-        assert step_state("weird prose") == "unknown"
-        # blocked folds into the cancelled icon; unknown falls back.
-        assert step_icon_key("blocked") == "cancelled"
-        assert step_icon_key("weird prose") == "not-started"
-        # Falsy statuses read as absent (the pyStr coercion contract).
-        assert step_state(0) == "unknown"
-
-
 class TestProjection:
     def test_the_projection_reports_the_repository_not_a_set(self, tmp_path):
         (tmp_path / "sessions.json").write_text(json.dumps({
@@ -296,116 +290,131 @@ class TestProjection:
         assert read_session_state(tmp_path) is None
 
 
-class TestProjectionSteps:
-    def test_steps_render_for_in_flight_session(self, tmp_path):
-        (tmp_path / "sessions.json").write_text(json.dumps({
-            "schemaVersion": 5,
-            "sessions": [{"number": 1, "title": "One",
-                          "status": "in-progress"}],
-        }), encoding="utf-8")
-        (tmp_path / "activity-log.json").write_text(json.dumps({
-            "entries": [
-                {"sessionNumber": 1, "stepNumber": 1, "stepKey": "register",
-                 "dateTime": "t", "description": "Register.",
-                 "status": "pending", "kind": "plan-step"},
-                {"sessionNumber": 1, "stepNumber": 1, "stepKey": "register",
-                 "dateTime": "t2", "description": "Registered.",
-                 "status": "complete"},
-                {"sessionNumber": 1, "stepNumber": 2, "stepKey": "work",
-                 "dateTime": "t", "description": "Do the work.",
-                 "status": "pending", "kind": "plan-step"},
-            ],
-        }), encoding="utf-8")
-        p = build_projection(tmp_path)
-        steps = p["sessions"][0]["steps"]
-        assert len(steps) == 2
-        # Logged step claimed the planned register row.
-        assert steps[0]["status"] == "complete"
-        assert steps[0]["isPlanned"]
-        assert steps[0]["startedAt"] == "t2"  # the logged time, not the seed
-        # An unlogged planned row is not active, and does not borrow a start
-        # time: only the record marks a step.
-        assert not steps[1]["isActive"]
-        assert steps[1]["box"] == "[ ]"
-        assert steps[1]["status"] == "pending"  # the record is never edited
-        assert steps[1]["startedAt"] is None
+class TestTaskRows:
+    """The task level: plan order from ``approved-plan.json``, state from
+    ``step-execution.jsonl``, and nothing from the activity log."""
 
-    def test_a_step_row_never_overwrites_the_session_status(self, tmp_path):
-        # A session's status and a step row's status are different
-        # vocabularies. An in-flight session whose last row is "pending"
-        # must still project as in-progress: "pending" is not a session
-        # status, so a consumer narrowing the payload would reject the
-        # whole projection and fall back to guessing.
-        (tmp_path / "sessions.json").write_text(json.dumps({
-            "schemaVersion": 5,
-            "sessions": [{"number": 1, "title": "One",
-                          "status": "in-progress"}],
-        }), encoding="utf-8")
-        (tmp_path / "activity-log.json").write_text(json.dumps({
-            "entries": [
-                {"sessionNumber": 1, "stepNumber": 1, "stepKey": "work",
-                 "dateTime": "t", "description": "Do the work.",
-                 "status": "pending", "kind": "plan-step"},
-            ],
-        }), encoding="utf-8")
-        p = build_projection(tmp_path)
-        assert p["sessions"][0]["steps"][-1]["status"] == "pending"
-        assert p["sessions"][0]["status"] == "in-progress"
-        assert p["sessions"][0]["iconKey"] == "in-progress"
+    BASE = "a" * 40
 
-    def test_logged_start_survives_later_status_entries(self, tmp_path):
-        # A step logged in-progress and later complete keeps the
-        # in-progress entry's time as its start — the latest entry owns
-        # the status, the first owns the start.
-        (tmp_path / "sessions.json").write_text(json.dumps({
+    def _repo(self, tmp_path):
+        sessions = tmp_path / "docs" / "sessions"
+        sessions.mkdir(parents=True)
+        (sessions / "sessions.json").write_text(json.dumps({
             "schemaVersion": 5,
             "sessions": [{"number": 1, "title": "One",
                           "status": "in-progress"}],
         }), encoding="utf-8")
-        (tmp_path / "activity-log.json").write_text(json.dumps({
-            "entries": [
-                {"sessionNumber": 1, "stepNumber": 1, "stepKey": "work",
-                 "dateTime": "t0", "description": "Do the work.",
-                 "status": "pending", "kind": "plan-step"},
-                {"sessionNumber": 1, "stepNumber": 1, "stepKey": "work",
-                 "dateTime": "t1", "description": "Working.",
-                 "status": "in-progress"},
-                {"sessionNumber": 1, "stepNumber": 1, "stepKey": "work",
-                 "dateTime": "t2", "description": "Done.",
-                 "status": "complete"},
-            ],
-        }), encoding="utf-8")
-        p = build_projection(tmp_path)
-        step = p["sessions"][0]["steps"][0]
-        assert step["status"] == "complete"
-        assert step["description"] == "Done."
-        assert step["startedAt"] == "t1"
+        return sessions
 
-    def test_paraphrased_key_claims_planned_row_by_number(self, tmp_path):
-        (tmp_path / "sessions.json").write_text(json.dumps({
-            "schemaVersion": 5,
-            "sessions": [{"number": 1, "title": "One",
-                          "status": "in-progress"}],
-        }), encoding="utf-8")
-        (tmp_path / "activity-log.json").write_text(json.dumps({
-            "entries": [
-                {"sessionNumber": 1, "stepNumber": 1, "stepKey": "register",
-                 "dateTime": "t", "description": "Register.",
-                 "status": "pending", "kind": "plan-step"},
-                {"sessionNumber": 1, "stepNumber": 2,
-                 "stepKey": "choose-the-schema-validation-tool-it",
-                 "dateTime": "t", "description": "Choose the tool.",
-                 "status": "pending", "kind": "plan-step"},
-                {"sessionNumber": 1, "stepNumber": 2,
-                 "stepKey": "choose-the-schema-validation-tool",
-                 "dateTime": "t2", "description": "Chose jsonschema.",
-                 "status": "complete"},
+    def _plan(self, tmp_path, *step_ids):
+        run_dir = session_run_dir(tmp_path, 1)
+        run_dir.mkdir(parents=True, exist_ok=True)
+        write_plan(run_dir, new_plan(1, "one", [
+            {
+                "step_id": step_id,
+                "intent": f"Do {step_id}.",
+                "file_envelope": [f"src/{step_id}.py"],
+                "evidence_contract": [
+                    {"description": "the targeted tests", "kind":
+                     "deterministic"},
+                ],
+                "risk_flags": [],
+            }
+            for step_id in step_ids
+        ]))
+
+    def _open(self, tmp_path, step_id):
+        append_step_event(tmp_path, 1, {
+            "schema_version": 1, "event": "opened", "recorded_at": f"t-{step_id}",
+            "session_number": 1, "step_id": step_id, "base_commit": self.BASE,
+        })
+
+    def _close(self, tmp_path, step_id):
+        append_step_event(tmp_path, 1, {
+            "schema_version": 1, "event": "closed", "recorded_at": f"c-{step_id}",
+            "session_number": 1, "step_id": step_id, "base_commit": self.BASE,
+            "closed_tree": "b" * 40,
+            "envelope": {"inside": [f"src/{step_id}.py"], "outside": []},
+            "deterministic": [
+                {"kind": "targeted-tests", "status": "pass", "required": True},
             ],
-        }), encoding="utf-8")
-        p = build_projection(tmp_path)
-        steps = p["sessions"][0]["steps"]
-        # The paraphrased key misses, but the stepNumber claims the row.
-        assert len(steps) == 2
-        assert steps[1]["status"] == "complete"
-        assert steps[1]["isPlanned"]
-        assert steps[1]["description"] == "Chose jsonschema."
+        })
+
+    def test_rows_fold_plan_order_against_the_execution_record(self, tmp_path):
+        self._repo(tmp_path)
+        self._plan(tmp_path, "first", "second", "third")
+        self._close(tmp_path, "first")
+        self._open(tmp_path, "second")
+
+        rows = build_task_rows(tmp_path, 1)
+        assert [r["stepId"] for r in rows] == ["first", "second", "third"]
+        assert [r["state"] for r in rows] == ["done", "in flight", "pending"]
+        assert [r["iconKey"] for r in rows] == [
+            "complete", "in-progress", "not-started",
+        ]
+        # Exactly one row in flight, because that is what the fold returns.
+        assert [r["isOpen"] for r in rows] == [False, True, False]
+        assert rows[1]["startedAt"] == "t-second"
+        assert rows[1]["intent"] == "Do second."
+
+    def test_closing_the_open_step_leaves_nothing_in_flight(self, tmp_path):
+        # The marker follows the record and is never carried forward: a
+        # closed step with no successor opened is not still "current".
+        self._repo(tmp_path)
+        self._plan(tmp_path, "first", "second")
+        self._open(tmp_path, "first")
+        self._close(tmp_path, "first")
+
+        rows = build_task_rows(tmp_path, 1)
+        assert [r["state"] for r in rows] == ["done", "pending"]
+        assert not any(r["isOpen"] for r in rows)
+
+    def test_an_unreadable_execution_record_refuses(self, tmp_path):
+        self._repo(tmp_path)
+        self._plan(tmp_path, "first", "second")
+        self._open(tmp_path, "first")
+        # A row the schema rejects. The rows before it parsed fine, and
+        # showing them would present a stale step as the current one.
+        path = step_execution_path(tmp_path, 1)
+        with open(path, "a", encoding="utf-8") as f:
+            f.write(json.dumps({"schema_version": 1, "event": "sideways",
+                                "recorded_at": "t", "session_number": 1,
+                                "step_id": "second"}) + "\n")
+        with pytest.raises(TaskRowsRefused) as exc:
+            build_task_rows(tmp_path, 1)
+        assert "execution record" in str(exc.value)
+
+    def test_a_plan_not_backed_by_a_sanctioned_write_refuses(self, tmp_path):
+        self._repo(tmp_path)
+        self._plan(tmp_path, "first")
+        plan_file = session_run_dir(tmp_path, 1) / "approved-plan.json"
+        raw = json.loads(plan_file.read_text(encoding="utf-8"))
+        raw["steps"][0]["intent"] = "Do something else entirely."
+        plan_file.write_text(json.dumps(raw), encoding="utf-8")
+        with pytest.raises(TaskRowsRefused) as exc:
+            build_task_rows(tmp_path, 1)
+        assert "approved plan" in str(exc.value)
+
+    def test_a_session_with_no_plan_has_no_tasks_and_is_not_a_refusal(
+        self, tmp_path
+    ):
+        # The lifecycle does not require an approved plan; a session
+        # without one is a leaf, not a fault.
+        self._repo(tmp_path)
+        assert build_task_rows(tmp_path, 1) == []
+
+    def test_the_projection_carries_tasks_and_the_refusal_separately(
+        self, tmp_path
+    ):
+        sessions = self._repo(tmp_path)
+        self._plan(tmp_path, "first")
+        self._open(tmp_path, "first")
+        p = build_projection(sessions)
+        assert p["sessions"][0]["tasks"][0]["state"] == "in flight"
+        assert p["sessions"][0]["tasksRefused"] is None
+
+        with open(step_execution_path(tmp_path, 1), "a", encoding="utf-8") as f:
+            f.write("not json\n")
+        p = build_projection(sessions)
+        assert p["sessions"][0]["tasks"] == []
+        assert "execution record" in p["sessions"][0]["tasksRefused"]

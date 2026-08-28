@@ -3329,6 +3329,168 @@
       "dateTime": "2026-08-28T05:36:22.742015-04:00",
       "description": "Committed as c7738d89 and pushed once. Five close gates previewed green.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 16,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-28T05:44:11.759978-04:00",
+      "description": "Register.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 16,
+      "stepNumber": 2,
+      "stepKey": "a-task-level-below-the-session",
+      "dateTime": "2026-08-28T05:44:11.759978-04:00",
+      "description": "**A task level below the session, read from the enforced record.** A task row's position and label come from the session's `approved-plan.json` (`steps[].step_id`, `steps[].intent`); its execution state comes from `.dabbler/runs/s<N>/step-execution.jsonl` through `ledger.read_step_events`, `ledger.open_step` and `ledger.closed_step_ids`. Pending, in flight, done \u2014 folded, never maintained.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 16,
+      "stepNumber": 3,
+      "stepKey": "do-not-read-step-status-from",
+      "dateTime": "2026-08-28T05:44:11.759978-04:00",
+      "description": "**Do not read step status from `activity-log.json`.** That is the layer that drifted. `writers.log_step` is reached only through `python -m ai_router.session log`, which an engine calls voluntarily or forgets to; `progress.build_step_rows` is visibly built around that unreliability (\"keys are derived slugs an engine paraphrases\", \"unclaimed logged steps append\"). `step-execution.jsonl` cannot drift the same way: a step is opened against a declared plan step and anchored to a base commit, the close is *earned* against the step's own envelope and deterministic evidence, and a pre-commit hook refuses a commit while a step is open. **This is the whole reason the task level is worth building now and was not worth keeping before.**",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 16,
+      "stepNumber": 4,
+      "stepKey": "the-invariant-is-rendered-not-recomputed",
+      "dateTime": "2026-08-28T05:44:11.759978-04:00",
+      "description": "**The invariant is rendered, not recomputed.** The last `opened` row with no `closed` row after it is the open step, and there is never more than one. If the tree ever shows two tasks in flight for one session, that is a defect in the fold, not a state the record can hold.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 16,
+      "stepNumber": 5,
+      "stepKey": "an-unreadable-execution-record-refuses",
+      "dateTime": "2026-08-28T05:44:11.759978-04:00",
+      "description": "**An unreadable execution record refuses; it never falls back.** The schema says a row failing validation is a refusal, not a skip, because a framework that cannot tell what is open must not guess. The tree says it cannot tell \u2014 it does not show the last good row as if it were current. Stale-but-plausible is the failure mode this level exists to end.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 16,
+      "stepNumber": 6,
+      "stepKey": "the-watcher-covers-the-execution-record",
+      "dateTime": "2026-08-28T05:44:11.759978-04:00",
+      "description": "**The watcher covers the execution record, and this is the operator's condition, not a nicety.** The tree today watches only `docs/session-sets/**` (dead after session 14) and otherwise falls back to a 30-second poll. A task level that is up to 30 seconds behind is the same untrustworthy surface staff already rejected. The watcher must include `.dabbler/runs/*/step-execution.jsonl` so a step opening or closing refreshes the row on the event. **The acceptance test is a transition, not a render:** open a step, assert the row goes in-flight without a poll; close it, assert the row completes and the next opens.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 16,
+      "stepNumber": 7,
+      "stepKey": "affected-tests-as-preverify",
+      "dateTime": "2026-08-28T05:44:11.759978-04:00",
+      "description": "Affected tests as preverify.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 16,
+      "stepNumber": 8,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-28T05:44:11.759978-04:00",
+      "description": "Cross-provider verification.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 16,
+      "stepNumber": 9,
+      "stepKey": "full-test-suite-recorded-as-the",
+      "dateTime": "2026-08-28T05:44:11.759978-04:00",
+      "description": "Full test suite, recorded as the `final-full` run of record.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 16,
+      "stepNumber": 10,
+      "stepKey": "close-out",
+      "dateTime": "2026-08-28T05:44:11.759978-04:00",
+      "description": "Close-out.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 16,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-28T05:44:11.765113-04:00",
+      "description": "Registered session 16 (claude-code).",
+      "status": "complete"
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 16,
+      "dateTime": "2026-08-28T05:44:29.370924-04:00",
+      "task": "Build the task level below the session in the VS Code sessions tree: rows read from approved-plan.json (step_id, intent) with execution state folded from .dabbler/runs/s<N>/step-execution.jsonl via ledger.read_step_events / open_step / closed_step_ids; never from activity-log.json. One open step at most, rendered not recomputed. An unreadable execution record refuses rather than falling back to the last good row. The file watcher covers .dabbler/runs/*/step-execution.jsonl so a step opening or closing refreshes the row on the event rather than on a 30-second poll.",
+      "releasable": false
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D110",
+      "ordinal": 110,
+      "sessionNumber": 16,
+      "decidedOn": "2026-08-28",
+      "recordedAt": "2026-08-28T05:58:14.364000-04:00",
+      "decider": "orchestrator",
+      "headline": "The task level replaces the activity-log step rows outright rather than sitting beside them",
+      "body": "The projection's step rows were folded out of activity-log.json by build_step_rows, which the spec forbids as the task level's source. Leaving that path in place as dead code would leave a second, drifting answer to 'which step is open' one call away, so build_step_rows, _collapse_by_step_key, step_state, step_icon_key and the STATUS_BOXES/_ICON_KEYS tables are deleted and build_task_rows takes their place. read_activity_log and is_logged_step stay: session.py still uses them for seeding and logging, which is the activity log's remaining job."
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D111",
+      "ordinal": 111,
+      "sessionNumber": 16,
+      "decidedOn": "2026-08-28",
+      "recordedAt": "2026-08-28T05:58:28.181665-04:00",
+      "decider": "orchestrator",
+      "headline": "A refused execution record is carried as its own field, never as an empty task list",
+      "body": "The spec requires that an unreadable record refuse rather than fall back. Emitting zero rows would be indistinguishable from a session that declared no approved plan, which is a legitimate and common state. So build_projection emits tasks and tasksRefused separately; the tree renders the refusal as the session's one child row, and severityOf gains a 'record' severity so the session row says so without displacing its lifecycle glyph."
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D112",
+      "ordinal": 112,
+      "sessionNumber": 16,
+      "decidedOn": "2026-08-28",
+      "recordedAt": "2026-08-28T05:58:28.626478-04:00",
+      "decider": "orchestrator",
+      "headline": "A task row is labelled with its humanized step_id and carries its intent in the tooltip",
+      "body": "The spec names both steps[].step_id and steps[].intent as the row's source. step_id is the one identity the plan, the execution record and the CLI all address the step by and it fits a tree row; intent is one imperative sentence and would wrap. This is the same split the previous step rows used (stepKey label, description tooltip), so the rendering convention does not change under the operator when the data source does."
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D113",
+      "ordinal": 113,
+      "sessionNumber": 16,
+      "decidedOn": "2026-08-28",
+      "recordedAt": "2026-08-28T05:58:29.082870-04:00",
+      "decider": "orchestrator",
+      "headline": "The projection cache key covers the run records, or the watcher would be inert",
+      "body": "refresh() is soft: it drops the scan generation but keeps the mtime-keyed projection cache. The old key covered only the four sessions-root files, so a step opening -- which touches nothing but .dabbler/runs/s<N>/step-execution.jsonl -- would have fired the watcher and then been served the pre-open payload from cache. projectionCacheKey now takes the repository root and stats every s<N>/step-execution.jsonl and s<N>/approved-plan.json alongside. The Playwright transition test is what proves it: two icon changes settle inside one thirty-second poll period."
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D114",
+      "ordinal": 114,
+      "sessionNumber": 16,
+      "decidedOn": "2026-08-28",
+      "recordedAt": "2026-08-28T06:04:18.311419-04:00",
+      "decider": "verifier",
+      "headline": "Round 1 verified with two Minor nits, both left standing",
+      "body": "Nit 1: task rows are labelled with the humanized step_id rather than steps[].intent, which the verifier reads the spec as requiring. That is decision D112 and it was made deliberately -- intent is one imperative sentence and wraps a tree row, step_id is the identity every other layer addresses the step by. It is a presentation call for the operator, not a correctness defect. Nit 2, and the better catch: build_task_rows returns no tasks when approved-plan.json is missing, without reading the execution record -- so a session whose plan was deleted while step-execution.jsonl still carries an open step renders as a leaf rather than a refusal. That is the stale-but-plausible shape this level exists to end, in a rare state. Both are Minor and non-blocking; the loop stops here per the severity-gated rule rather than spending a round on wording, and nit 2 is owed as a follow-up.",
+      "model": "gpt-5.6-sol",
+      "provider": "openai"
     }
   ]
 }

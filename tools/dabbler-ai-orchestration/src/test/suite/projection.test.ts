@@ -23,28 +23,25 @@ suite("projection: payload narrowing", () => {
           startedAt: "2026-08-17T09:00:00-04:00",
           completedAt: null,
           verificationVerdict: null,
-          steps: [
+          tasks: [
             {
               position: 0,
-              stepNumber: 1,
-              stepKey: "implement",
-              description: "do it",
-              status: "in-progress",
-              state: "in progress",
-              box: "[~]",
+              stepId: "implement",
+              intent: "Do it.",
+              state: "in flight",
               iconKey: "in-progress",
-              isPlanned: true,
-              isActive: false,
+              isOpen: true,
               startedAt: null,
             },
           ],
+          tasksRefused: null,
         },
       ],
     });
     const parsed = parseProjectionPayload(JSON.stringify(payload));
     assert.ok(parsed);
     assert.strictEqual(parsed!.repository.totalSessions, 2);
-    assert.strictEqual(parsed!.sessions[0].steps[0].stepKey, "implement");
+    assert.strictEqual(parsed!.sessions[0].tasks[0].stepId, "implement");
   });
 
   test("non-JSON fails closed to null", () => {
@@ -147,8 +144,19 @@ suite("projection: cache", () => {
   });
 
   test("the cache key covers every derivation input file", () => {
-    const before = projectionCacheKey(dir);
+    const before = projectionCacheKey(dir, dir);
     fs.writeFileSync(path.join(dir, "session-plan.md"), "# plan");
-    assert.notStrictEqual(before, projectionCacheKey(dir));
+    assert.notStrictEqual(before, projectionCacheKey(dir, dir));
+  });
+
+  test("the cache key moves when a step opens, so a watcher tick re-projects", () => {
+    // The execution record lives under the repository root, not the
+    // sessions root. A key blind to it would hand the watcher back the
+    // very payload the step's opening invalidated.
+    const runDir = path.join(dir, ".dabbler", "runs", "s3");
+    fs.mkdirSync(runDir, { recursive: true });
+    const before = projectionCacheKey(dir, dir);
+    fs.writeFileSync(path.join(runDir, "step-execution.jsonl"), "{}");
+    assert.notStrictEqual(before, projectionCacheKey(dir, dir));
   });
 });

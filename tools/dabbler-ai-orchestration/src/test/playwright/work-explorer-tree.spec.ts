@@ -1,5 +1,5 @@
 // The core rendering scenarios: one workspace whose sessions root holds
-// a complete session, an in-flight one with steps, a cancelled one and
+// a complete session, an in-flight one with tasks, a cancelled one and
 // two not-started ones, one VS Code launch, every assertion against the
 // tree the real Python projection produced.
 
@@ -18,8 +18,9 @@ import {
   rowContextMenuText,
   treeRow,
   treeRows,
-  writeActivityLog,
+  writeApprovedPlan,
   writeSessionsRoot,
+  writeStepEvent,
 } from "./electronLaunch";
 
 test.describe.configure({ mode: "serial" });
@@ -39,7 +40,12 @@ test.beforeAll(async () => {
     { number: 4, title: "Polish", status: "not-started" },
     { number: 5, title: "Close the set", status: "not-started" },
   ]);
-  writeActivityLog(workspace, 3);
+  writeApprovedPlan(workspace, 3, [
+    { stepId: "implement-the-feature", intent: "Implement the feature." },
+    { stepId: "run-the-tests", intent: "Run the tests." },
+    { stepId: "close-out", intent: "Close out." },
+  ]);
+  writeStepEvent(workspace, 3, "opened", "implement-the-feature");
   vscode = await launchVSCode(workspace);
   pane = await openWorkExplorerTree(vscode.page);
 });
@@ -80,12 +86,14 @@ test("only the in-flight session says so in its description", async () => {
   await expect(treeRow(pane, "003 · Build the thing")).toContainText("in flight");
 });
 
-test("expanding the in-flight session reveals its projected step rows", async () => {
+test("expanding the in-flight session reveals its approved-plan task rows", async () => {
   await expandTreeRow(pane, "003 · Build the thing");
   await expect(treeRow(pane, "Implement the feature")).toBeVisible();
   await expect(treeRow(pane, "Run the tests")).toBeVisible();
   await expect(treeRow(pane, "Close out")).toBeVisible();
-  await expectFileIcon(treeRow(pane, "Implement the feature"), "done.svg");
+  // The open step, and only it: the fold marks one row in flight.
+  await expectFileIcon(treeRow(pane, "Implement the feature"), "in-progress.svg");
+  await expectFileIcon(treeRow(pane, "Run the tests"), "not-started.svg");
 });
 
 test("the repository row's menu offers the files and the lifecycle launchers", async () => {
@@ -102,6 +110,21 @@ test("cancellation is offered on the session row, where the decision lives", asy
   );
   expect(menu).toContain("Cancel Session");
   expect(menu).not.toContain("Restore Session");
+});
+
+test("a step opening and closing moves the row on the event, not on the poll", async () => {
+  // The acceptance test for the watcher is a TRANSITION, not a render.
+  // expectFileIcon settles within five seconds and two of them run here,
+  // against a fallback poll on a thirty-second period: the poll cannot
+  // have served both, so at least one row moved because the watcher saw
+  // step-execution.jsonl change. It also proves the projection cache key
+  // covers the run records — a key blind to them would hand the refresh
+  // back the payload the step's close invalidated.
+  writeStepEvent(workspace, 3, "closed", "implement-the-feature");
+  await expectFileIcon(treeRow(pane, "Implement the feature"), "done.svg");
+
+  writeStepEvent(workspace, 3, "opened", "run-the-tests");
+  await expectFileIcon(treeRow(pane, "Run the tests"), "in-progress.svg");
 });
 
 test("clicking a session row opens the session plan in the editor", async () => {

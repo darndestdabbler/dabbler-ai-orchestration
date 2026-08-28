@@ -12,6 +12,7 @@
 // therefore requires an interpreter on PATH with ai_router installed
 // (the repo root's editable install satisfies this).
 
+import * as cp from "child_process";
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
@@ -61,11 +62,14 @@ export function makeTmpDir(prefix: string): string {
 // Workspace fixtures
 //
 // A workspace is a repository with ONE sessions root, `docs/sessions/`,
-// holding the machine-written ledger, the plan the titles come from, and
-// the activity log the step rows are folded out of. The files are
-// written as artifacts and the extension still derives every status
-// through `python -m ai_router.progress`, so these scenarios exercise
-// the real Python data path end to end.
+// holding the machine-written ledger and the plan the titles come from,
+// plus `.dabbler/runs/s<N>/` holding the approved plan and execution
+// record the task rows are folded out of. The ledger and plan are
+// written as plain artifacts; the run records go through the router's
+// own writers, because both refuse content no sanctioned write produced.
+// The extension still derives every status through
+// `python -m ai_router.progress`, so these scenarios exercise the real
+// Python data path end to end.
 // ---------------------------------------------------------------------------
 
 export interface FixtureSession {
@@ -132,48 +136,92 @@ export function writeSessionsRoot(
 }
 
 /**
- * Give the in-flight session a three-step activity log, which is the
- * shape the third tree level renders.
+ * Write the in-flight session's approved plan through the router's own
+ * writer, then open its first step.
+ *
+ * `write_plan` is used rather than a hand-written file ON PURPOSE: a
+ * plan whose content is not backed by a sanctioned write is refused on
+ * read, so a fixture that wrote the JSON itself would exercise the
+ * refusal path and never reach the task rows.
  */
-export function writeActivityLog(
+export function writeApprovedPlan(
   workspaceRoot: string,
   sessionNumber: number,
+  steps: readonly { stepId: string; intent: string }[],
 ): void {
-  const dir = sessionsDir(workspaceRoot);
-  fs.writeFileSync(
-    path.join(dir, "activity-log.json"),
-    JSON.stringify(
-      {
-        entries: [
-          {
-            sessionNumber,
-            stepNumber: 1,
-            stepKey: "implement-the-feature",
-            description: "Implement the feature.",
-            status: "complete",
-            dateTime: "2026-08-17T09:10:00-04:00",
-          },
-          {
-            sessionNumber,
-            stepNumber: 2,
-            stepKey: "run-the-tests",
-            description: "Run the tests.",
-            status: "not-started",
-          },
-          {
-            sessionNumber,
-            stepNumber: 3,
-            stepKey: "close-out",
-            description: "Close out.",
-            status: "not-started",
-          },
-        ],
-      },
-      null,
-      2,
-    ),
-    "utf8",
+  runPython(
+    workspaceRoot,
+    [
+      "from ai_router.approved_plan import new_plan, write_plan",
+      "from ai_router.ledger import session_run_dir",
+      `import json, sys`,
+      `steps = json.loads(sys.argv[1])`,
+      `run = session_run_dir(sys.argv[2], ${sessionNumber})`,
+      "run.mkdir(parents=True, exist_ok=True)",
+      `write_plan(run, new_plan(${sessionNumber}, "fixture", steps))`,
+    ].join("\n"),
+    [
+      JSON.stringify(
+        steps.map((s) => ({
+          step_id: s.stepId,
+          intent: s.intent,
+          file_envelope: [`src/${s.stepId}.py`],
+          evidence_contract: [
+            { description: "the targeted tests", kind: "deterministic" },
+          ],
+          risk_flags: [],
+        })),
+      ),
+      workspaceRoot,
+    ],
   );
+}
+
+/** Append one `opened` or `closed` row through the router's own writer. */
+export function writeStepEvent(
+  workspaceRoot: string,
+  sessionNumber: number,
+  event: "opened" | "closed",
+  stepId: string,
+): void {
+  const base = "a".repeat(40);
+  const row: Record<string, unknown> = {
+    schema_version: 1,
+    event,
+    recorded_at: new Date().toISOString(),
+    session_number: sessionNumber,
+    step_id: stepId,
+    base_commit: base,
+  };
+  if (event === "closed") {
+    row.closed_tree = "b".repeat(40);
+    row.envelope = { inside: [`src/${stepId}.py`], outside: [] };
+    row.deterministic = [
+      { kind: "targeted-tests", status: "pass", required: true },
+    ];
+  }
+  runPython(
+    workspaceRoot,
+    [
+      "from ai_router.ledger import append_step_event",
+      "import json, sys",
+      `append_step_event(sys.argv[2], ${sessionNumber}, json.loads(sys.argv[1]))`,
+    ].join("\n"),
+    [JSON.stringify(row), workspaceRoot],
+  );
+}
+
+function runPython(cwd: string, code: string, args: string[]): void {
+  const result = cp.spawnSync(PYTHON, ["-c", code, ...args], {
+    cwd,
+    encoding: "utf8",
+    windowsHide: true,
+  });
+  if (result.status !== 0) {
+    throw new Error(
+      `fixture python failed (${result.status}): ${result.stderr || result.stdout}`,
+    );
+  }
 }
 
 /** The repository row's label: the workspace folder's own name. */

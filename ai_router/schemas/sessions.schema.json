@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/darndestdabbler/dabbler-ai-orchestration/ai_router/schemas/sessions.schema.json",
+  "title": "sessions.json (v5 on-disk write shape)",
+  "description": "The repository's numbered session ledger, written only by the sanctioned writers in ai_router/writers.py. A repository has sessions, not sets of sessions: there is no name above the list and no lifecycle state above a session, because a repository is never 'complete'. Cancellation is per-session in v5, and preCancelStatus rides on the record it belongs to so a restore returns that session -- and only that session -- to where it was.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "sessions"],
+  "properties": {
+    "schemaVersion": {
+      "const": 5,
+      "description": "v5 collapsed the set level out. v4 files are read once by the migration and never written again."
+    },
+    "sessions": {
+      "type": "array",
+      "description": "The canonical per-session ledger, ordered by number.",
+      "items": { "$ref": "#/$defs/sessionRecord" }
+    },
+    "forceClosed": {
+      "type": "boolean",
+      "description": "Opaque passthrough set by close --force; preserved across rewrites."
+    },
+    "nextOrchestrator": {
+      "type": ["object", "null"],
+      "description": "Recommendation for the next session, written at close."
+    }
+  },
+  "$defs": {
+    "sessionRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["number", "title", "status"],
+      "properties": {
+        "number": { "type": "integer", "minimum": 1 },
+        "title": { "type": "string" },
+        "status": {
+          "type": "string",
+          "enum": ["not-started", "in-progress", "complete", "cancelled"],
+          "description": "v5 admits 'cancelled' here because there is no longer a set to carry it."
+        },
+        "preCancelStatus": {
+          "type": "string",
+          "enum": ["not-started", "in-progress", "complete"],
+          "description": "Where a cancelled session came from. A re-cancel never overwrites it."
+        },
+        "cancelledReason": { "type": "string" },
+        "cancelledAt": { "type": "string" },
+        "restoredReason": { "type": "string" },
+        "type": {
+          "type": "string",
+          "enum": ["verification", "remediation"],
+          "description": "Absent means 'work'; the writer persists only non-work values."
+        },
+        "startedAt": { "type": ["string", "null"] },
+        "completedAt": { "type": ["string", "null"] },
+        "orchestrator": {
+          "oneOf": [
+            { "$ref": "#/$defs/orchestratorBlock" },
+            { "type": "null" }
+          ]
+        },
+        "verificationVerdict": {
+          "type": ["string", "null"],
+          "description": "Canonical tokens are VERIFIED / ISSUES_FOUND / REMEDIATED_AT_CAP (plus the retired WAIVED, still read from historical records and refused by every writer). Typed string rather than enum because operators have shipped extension tokens that readers PREFIX-MATCH; the sanctioned writer (verdict.validate_session_verdict) fails closed against an exact allowlist, so a confabulated non-verdict can never persist here. Readers stay lenient; the writer is strict."
+        },
+        "verification": {
+          "type": ["object", "null"],
+          "description": "The round summary that must ride with the verdict: verifier identity, round count, cost. Shape owned by the verification writer."
+        },
+        "commit": { "type": ["string", "null"] }
+      }
+    },
+    "orchestratorBlock": {
+      "type": "object",
+      "description": "Omit-null: missing keys are valid; null values and 'unknown' placeholders are not. identityProvenance is derived from the engine by build_orchestrator_block and is never a free choice. 'provider' is a seat DESCRIPTOR; the effective provider is derived at use time by registry lookup on 'model'.",
+      "required": ["engine"],
+      "properties": {
+        "engine": { "type": "string", "minLength": 1 },
+        "provider": { "type": "string", "minLength": 1 },
+        "model": { "type": "string", "minLength": 1 },
+        "effort": { "type": "string", "minLength": 1 },
+        "identityProvenance": {
+          "type": "string",
+          "enum": ["direct", "asserted"],
+          "description": "How identity was established: 'asserted' for multi-provider engines (Copilot seats), 'direct' for single-vendor engines."
+        },
+        "seatSessionIds": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "minItems": 1,
+          "uniqueItems": true,
+          "description": "The seat conversation ids that produced this session, in first-seen order. ACCUMULATES -- start is idempotent and is re-run after a context reset, which starts a new conversation on the same session. Absent (never [] and never null) on a Direct-API run: 'not captured' and 'captured, and there were none' are different claims."
+        }
+      }
+    }
+  }
+}

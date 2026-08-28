@@ -428,9 +428,9 @@
     {
       "number": 22,
       "title": "Decide the inventory before anything is translated",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-28T12:13:50.769786-04:00",
-      "completedAt": null,
+      "completedAt": "2026-08-28T12:38:43.038792-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

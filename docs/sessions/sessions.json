@@ -332,9 +332,9 @@
     {
       "number": 17,
       "title": "The tracked project config (precondition for D2)",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-28T06:16:01.526636-04:00",
-      "completedAt": null,
+      "completedAt": "2026-08-28T07:48:40.770675-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

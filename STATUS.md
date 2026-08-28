@@ -16,7 +16,12 @@ are merged and finished. Earlier handoff text is in `docs/status-archive.md`.
   API), the round-3 finding **disputed and OVERRULED** by a third provider
   (gemini-flash/google). Claude Code / claude-opus-5[1m] orchestrator.
   Closed with `--force`: see D157 below, and read it before assuming a
-  gate was waved through.
+  gate was waved through. **`sessions.json` now carries
+  `forceClosed: true` at the REPOSITORY level, not on session 24's row**,
+  so the ledger records that a close was forced but not which session
+  forced it or why — D157 is the only thing that says. That the mark is
+  unattributable is itself worth fixing when someone next touches the
+  close.
 - **The seam is in, and `src/router/` IS the Python implementation.**
   `pythonSpawnRouter` builds the argv and satisfies `Router`; `routerCli`
   runs it, echoes it and classifies the exit code; `pythonInterpreter`

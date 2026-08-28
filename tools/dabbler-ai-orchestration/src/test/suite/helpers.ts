@@ -5,14 +5,16 @@
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
-import {
-  ProjectionPayload,
-  SessionRecord,
-  SessionVerification,
-  SessionsRepository,
-  TaskRecord,
-  VerificationFinding,
-} from "../../types";
+import { PythonSpawnRouter } from "../../router/pythonSpawnRouter";
+import { RunRouterCliDeps } from "../../router/routerCli";
+import type {
+  ProgressProjection as ProjectionPayload,
+  ProgressProjectionSession as SessionRecord,
+  ProgressProjectionVerification as SessionVerification,
+  ProgressProjectionTask as TaskRecord,
+  ProgressProjectionFinding as VerificationFinding,
+} from "dabbler-ai-router";
+import type { SessionsRepository } from "../../utils/fileSystem";
 
 export function makeFinding(
   overrides: Partial<VerificationFinding> = {},
@@ -166,4 +168,52 @@ export function writeFileTree(
 
 export function rmrf(dir: string): void {
   fs.rmSync(dir, { recursive: true, force: true });
+}
+
+/**
+ * A `PythonSpawnRouter` whose spawn settles immediately with the given
+ * exit code, recording the argv it was asked to run.
+ *
+ * It drives the real seam — the argv the router builds, the exit-code
+ * mapping it applies — with no subprocess. `argv` is what a caller would
+ * have run, so an argv contract is asserted by asking the router for the
+ * verb rather than by calling a builder the router does not use.
+ */
+export function fakeRouter(
+  exitCode: number,
+  stderr = "",
+): { router: PythonSpawnRouter; argv: string[][] } {
+  const argv: string[][] = [];
+  const deps: RunRouterCliDeps = {
+    echo: { append: () => {}, reveal: () => {} },
+    resolveInterpreter: () => "python",
+    interpreterExists: () => true,
+    spawn: ((_exe: string, args: string[]) => {
+      argv.push(args);
+      const mkStream = (payload: string) => ({
+        on: (event: string, cb: (chunk: Buffer) => void) => {
+          if (event === "data" && payload) cb(Buffer.from(payload));
+        },
+      });
+      const child = {
+        stdout: mkStream(exitCode === 0 ? '{"status":"ok"}' : ""),
+        stderr: mkStream(stderr),
+        on: (event: string, cb: (arg?: unknown) => void) => {
+          if (event === "close") queueMicrotask(() => cb(exitCode));
+          return child;
+        },
+      };
+      return child;
+    }) as unknown as RunRouterCliDeps["spawn"],
+  };
+  return { router: new PythonSpawnRouter(deps), argv };
+}
+
+/** A router whose spawn must never be reached. */
+export function unusableRouter(): PythonSpawnRouter {
+  return new PythonSpawnRouter({
+    spawn: (() => {
+      throw new Error("must not spawn");
+    }) as never,
+  });
 }

@@ -2,14 +2,19 @@
   "compilerOptions": {
     "module": "commonjs",
     "target": "ES2020",
-    "lib": ["ES2020"],
-    "outDir": "./out",
-    "rootDir": "./src",
+    "lib": ["ES2022"],
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "sourceMap": true,
-    "declaration": true
+    // `noEmit`, because nothing consumes a tsc emit: `dist/extension.js`
+    // is esbuild's, the unit suite runs the sources through ts-node and
+    // Playwright runs its specs directly. It is also what
+    // `allowImportingTsExtensions` requires, and that is what lets this
+    // package read `dabbler-ai-router`'s types from its TypeScript
+    // source — the router is run by Node's own type stripping, so its
+    // imports carry the `.ts` extension ESM requires.
+    "noEmit": true,
+    "allowImportingTsExtensions": true
   },
   "include": ["src"],
   "exclude": ["node_modules", ".vscode-test"]

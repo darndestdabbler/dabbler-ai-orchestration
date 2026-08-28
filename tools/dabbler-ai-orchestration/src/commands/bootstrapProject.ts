@@ -15,8 +15,8 @@ import {
   explicitPythonPathSetting,
   resolveScaffoldBootstrapPython,
   venvInterpreterCandidate,
-} from "../utils/pythonInterpreter";
-import { quoteForDisplay } from "../utils/routerCli";
+} from "../router/pythonInterpreter";
+import { quoteForDisplay } from "../router/routerCli";
 
 export const ROUTER_DISTRIBUTION = "dabbler-ai-router";
 

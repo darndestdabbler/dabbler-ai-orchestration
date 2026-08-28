@@ -3,11 +3,29 @@ import * as fs from "fs";
 import * as path from "path";
 import * as cp from "child_process";
 import { SESSIONS_REL, hasSessionsRoot } from "../utils/fileSystem";
+import { RouterCommands, productionCommands } from "../router/host";
+
+/**
+ * A line for the operator to run by hand, asked of the router rather than
+ * typed here. Every `ai_router.<x>` string this file used to carry was a
+ * second statement of a fact the router already holds, and one of them
+ * (`ai_router.report`) had been wrong since set 109 removed the module —
+ * printed, of all places, to an operator who was already troubleshooting.
+ */
+function routerCommand(
+  commands: RouterCommands,
+  verb: string,
+  args: string[],
+  cwd: string | undefined,
+): string {
+  const line = cwd ? commands.commandLine(verb, args, cwd) : null;
+  return line ?? `(no command line for \`${verb}\` here)`;
+}
 
 interface DiagItem {
   label: string;
   detail: string;
-  run: () => void;
+  run: (commands: RouterCommands) => void;
 }
 
 function workspaceRoot(): string | undefined {
@@ -44,10 +62,10 @@ function checkActivation(): void {
   ch.show();
 }
 
-function checkStateStuck(): void {
+function checkStateStuck(commands: RouterCommands): void {
   const ch = outputChannel();
   ch.appendLine("A session's status comes from the router, never from this extension:");
-  ch.appendLine("  python -m ai_router.progress --json");
+  ch.appendLine(`  ${routerCommand(commands, "progress", ["--json"], workspaceRoot())}`);
   ch.appendLine("");
   ch.appendLine("Each session's `status` is written to docs/sessions/sessions.json by");
   ch.appendLine("`session start` and `session close`, and nothing else may write it.");
@@ -85,7 +103,7 @@ function checkWorktrees(): void {
 
 function checkApiKeys(): void {
   const ch = outputChannel();
-  ch.appendLine("The ai_router reads API keys from environment variables at session start.");
+  ch.appendLine("The router reads API keys from environment variables at session start.");
   ch.appendLine("");
   ch.appendLine("Keys used (depending on configured providers):");
   ch.appendLine("  DABBLER_ANTHROPIC_API_KEY  — Claude (claude.ai)");
@@ -97,15 +115,22 @@ function checkApiKeys(): void {
   ch.show();
 }
 
-function checkHighCost(): void {
+function checkHighCost(commands: RouterCommands): void {
   const ch = outputChannel();
-  ch.appendLine("Cost guidance:");
-  ch.appendLine("  Opus 4.x   → ~$1–5 per session (highest quality, highest cost)");
-  ch.appendLine("  Sonnet 4.x → ~$0.10–0.50 per session (good quality, moderate cost)");
-  ch.appendLine("  Haiku 4.x  → ~$0.01–0.05 per session (fast, lowest cost)");
+  const root = workspaceRoot();
+  // No dollar figures. The router carries no rate table — set 109
+  // removed it — so a price printed here would be this extension's
+  // invention rather than the record's answer, which is the whole class
+  // of bug the projection seam exists to prevent.
+  ch.appendLine("What the record actually carries is calls and tokens, by model:");
+  ch.appendLine(`  ${routerCommand(commands, "metrics", [], root)}`);
   ch.appendLine("");
-  ch.appendLine("Run 'python -m ai_router.report' for cumulative totals and a full spend report.");
-  ch.appendLine("Register a session with --effort low to reduce token spend.");
+  ch.appendLine("A call routed through a Copilot seat is billed in premium requests,");
+  ch.appendLine("not tokens. The seat's own store prices those by conversation id:");
+  ch.appendLine(`  ${routerCommand(commands, "seat-cost", ["<conversation-id>"], root)}`);
+  ch.appendLine("");
+  ch.appendLine("Register a session with --effort low to reduce token spend, and");
+  ch.appendLine("prefer a cheaper model for the verifier role in router-config.yaml.");
   ch.show();
 }
 
@@ -130,7 +155,10 @@ function checkLayout(): void {
   ch.show();
 }
 
-export function registerTroubleshootCommand(context: vscode.ExtensionContext): void {
+export function registerTroubleshootCommand(
+  context: vscode.ExtensionContext,
+  commands: RouterCommands = productionCommands(),
+): void {
   context.subscriptions.push(
     vscode.commands.registerCommand("dabbler.troubleshoot", async () => {
       const items: DiagItem[] = [
@@ -156,7 +184,7 @@ export function registerTroubleshootCommand(context: vscode.ExtensionContext): v
         },
         {
           label: "$(graph) Cost seems high",
-          detail: "Show cost estimates by model and point to the dashboard",
+          detail: "Show where the record reports calls, tokens and seat spend",
           run: checkHighCost,
         },
         {
@@ -170,7 +198,7 @@ export function registerTroubleshootCommand(context: vscode.ExtensionContext): v
         items.map((i) => ({ label: i.label, detail: i.detail, _run: i.run })),
         { placeHolder: "Select a troubleshooting topic" }
       );
-      if (picked) (picked as { _run: () => void })._run();
+      if (picked) (picked as { _run: (c: RouterCommands) => void })._run(commands);
     })
   );
 }

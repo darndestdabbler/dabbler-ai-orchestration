@@ -54,7 +54,7 @@ suite("fileSystem: workspace scan", () => {
   function fakeCache(
     byDir: Record<string, ReturnType<typeof makeProjection> | null>,
   ): ProjectionCache {
-    return new ProjectionCache(async (_py, sessionsDir) => {
+    return new ProjectionCache(async (sessionsDir) => {
       const payload = byDir[sessionsDir];
       return payload
         ? { payload, error: null }

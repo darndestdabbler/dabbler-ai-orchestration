@@ -12,50 +12,23 @@ import {
   planSessionRunPrompt,
 } from "../../commands/copyPromptCommands";
 import { cancellableSessionOf } from "../../commands/cancelLifecycleCommands";
-import { cancelArgs } from "../../utils/sessionLifecycleCli";
 import { START_NEXT_SESSION_PROMPT } from "../../providers/rowMenuHelpers";
 import { sessionNumberOf, specSectionTargetFor } from "../../commands/openFile";
 import {
   asRepositoryNode,
   asSessionNode,
 } from "../../commands/workExplorerTreeCommands";
-import { RunRouterCliDeps } from "../../utils/routerCli";
 import {
+  fakeRouter,
   makeRepository,
   makeSession,
   makeTempDir,
   makeVerification,
   rmrf,
+  unusableRouter,
   writeFileTree,
 } from "./helpers";
 import * as path from "path";
-
-/** A RunRouterCliDeps whose spawn immediately exits with the given code. */
-function fakeCliDeps(exitCode: number, stderr = ""): RunRouterCliDeps {
-  return {
-    echo: { append: () => {}, reveal: () => {} },
-    resolveInterpreter: () => "python",
-    interpreterExists: () => true,
-    spawn: ((/* cmd, args, opts */) => {
-      const listeners = new Map<string, (arg?: unknown) => void>();
-      const mkStream = (payload: string) => ({
-        on: (event: string, cb: (chunk: Buffer) => void) => {
-          if (event === "data" && payload) cb(Buffer.from(payload));
-        },
-      });
-      const child = {
-        stdout: mkStream(exitCode === 0 ? '{"status":"ok"}' : ""),
-        stderr: mkStream(stderr),
-        on: (event: string, cb: (arg?: unknown) => void) => {
-          listeners.set(event, cb);
-          if (event === "close") queueMicrotask(() => cb(exitCode));
-          return child;
-        },
-      };
-      return child;
-    }) as unknown as RunRouterCliDeps["spawn"],
-  };
-}
 
 function cancelUi(overrides: Partial<CancelLifecycleUi> = {}): {
   ui: CancelLifecycleUi;
@@ -83,11 +56,7 @@ const CANCELLABLE: CancellableSession = {
 suite("cancel/restore flows", () => {
   test("cancel runs the CLI and names the session on success", async () => {
     const { ui, infos, errors } = cancelUi();
-    const refreshed = await runCancelSessionFlow(
-      CANCELLABLE,
-      ui,
-      fakeCliDeps(0),
-    );
+    const refreshed = await runCancelSessionFlow(CANCELLABLE, ui, fakeRouter(0).router);
     assert.strictEqual(refreshed, true);
     assert.strictEqual(errors.length, 0);
     assert.ok(infos[0].includes("session 3"));
@@ -95,11 +64,7 @@ suite("cancel/restore flows", () => {
 
   test("dismissing the confirm aborts without running anything", async () => {
     const { ui } = cancelUi({ confirm: async () => undefined });
-    const refreshed = await runCancelSessionFlow(CANCELLABLE, ui, {
-      spawn: (() => {
-        throw new Error("must not spawn");
-      }) as never,
-    });
+    const refreshed = await runCancelSessionFlow(CANCELLABLE, ui, unusableRouter());
     assert.strictEqual(refreshed, false);
   });
 
@@ -108,7 +73,7 @@ suite("cancel/restore flows", () => {
     const refreshed = await runCancelSessionFlow(
       CANCELLABLE,
       ui,
-      fakeCliDeps(3, "a session is in flight"),
+      fakeRouter(3, "a session is in flight").router,
     );
     assert.strictEqual(refreshed, false);
     assert.ok(errors[0].includes("refused"));
@@ -116,11 +81,7 @@ suite("cancel/restore flows", () => {
 
   test("restore names the session it returned", async () => {
     const { ui, infos } = cancelUi({ confirm: async () => "Restore" });
-    const refreshed = await runRestoreSessionFlow(
-      CANCELLABLE,
-      ui,
-      fakeCliDeps(0),
-    );
+    const refreshed = await runRestoreSessionFlow(CANCELLABLE, ui, fakeRouter(0).router);
     assert.strictEqual(refreshed, true);
     assert.ok(infos[0].includes("session 3"));
   });
@@ -148,27 +109,27 @@ suite("new module flow", () => {
 
   test("creates the module and tells the operator how to use it", async () => {
     const { ui, infos } = moduleUi(["greeter", "Greeter"], "D:\\ws");
-    const created = await runNewModuleFlow(ui, fakeCliDeps(0));
+    const created = await runNewModuleFlow(ui, fakeRouter(0).router);
     assert.strictEqual(created, true);
     assert.ok(infos[0].includes("greeter"));
   });
 
   test("no workspace folder is an error, not a crash", async () => {
     const { ui, errors } = moduleUi([], undefined);
-    assert.strictEqual(await runNewModuleFlow(ui, fakeCliDeps(0)), false);
+    assert.strictEqual(await runNewModuleFlow(ui, unusableRouter()), false);
     assert.ok(errors[0].includes("workspace"));
   });
 
   test("cancelling either input aborts silently", async () => {
     const { ui, errors } = moduleUi([undefined], "D:\\ws");
-    assert.strictEqual(await runNewModuleFlow(ui, fakeCliDeps(0)), false);
+    assert.strictEqual(await runNewModuleFlow(ui, unusableRouter()), false);
     assert.strictEqual(errors.length, 0);
   });
 
   test("a duplicate-slug refusal from the CLI surfaces as an error", async () => {
     const { ui, errors } = moduleUi(["dupe", ""], "D:\\ws");
     assert.strictEqual(
-      await runNewModuleFlow(ui, fakeCliDeps(1, 'module "dupe" already exists')),
+      await runNewModuleFlow(ui, fakeRouter(1, 'module "dupe" already exists').router),
       false,
     );
     assert.ok(errors[0].includes("dupe"));
@@ -264,9 +225,6 @@ suite("commandFlows: the three planning-time actions", () => {
     assert.strictEqual(landed?.force, false);
     const live = cancellableSessionOf(nodeFor(makeSession({ number: 3, status: "in-progress" })));
     assert.strictEqual(live?.force, false);
-
-    assert.deepStrictEqual(cancelArgs(3, "r"), ["cancel", "3", "--reason", "r"]);
-    assert.deepStrictEqual(cancelArgs(3, "r", true), ["cancel", "3", "--reason", "r", "--force"]);
   });
 
   test("the send-back prompt names the record by path and reads differently per terminal state", () => {

@@ -7,9 +7,10 @@ import {
   isAiRouterNotInstalled,
   parseJsonPayload,
   quoteForDisplay,
-} from "../../utils/routerCli";
-import { cancelArgs, describeLifecycleFailure, restoreArgs } from "../../utils/sessionLifecycleCli";
-import { createArgs } from "../../utils/moduleLifecycleCli";
+} from "../../router/routerCli";
+import { describeLifecycleFailure } from "../../commands/cancelLifecycleCommands";
+import { fakeRouter } from "./helpers";
+import { PythonSpawnRouter } from "../../router/pythonSpawnRouter";
 import {
   closeSessionCommandLine,
   startSessionCommandLine,
@@ -75,26 +76,50 @@ suite("routerCli: missing-router detection", () => {
 });
 
 suite("CLI argv contracts", () => {
-  test("cancel/restore name a session number, not a directory", () => {
-    assert.deepStrictEqual(cancelArgs(3, "done"), [
-      "cancel",
-      "3",
-      "--reason",
-      "done",
-    ]);
-    assert.deepStrictEqual(restoreArgs(3, ""), ["restore", "3", "--reason", ""]);
+  test("cancel/restore name a session number, not a directory", async () => {
+    const { router, argv } = fakeRouter(0);
+    await router.session.cancel({ repoRoot: "D:\\ws", sessionNumber: 3, reason: "done" });
+    // The empty reason is passed through rather than omitted: operators
+    // dismiss the prompt routinely, and the CLI writes the blank line so
+    // the history file's timestamp pattern stays intact.
+    await router.session.restore({ repoRoot: "D:\\ws", sessionNumber: 3, reason: "" });
+    // `--force` only when the session cannot close; never a default.
+    await router.session.cancel({
+      repoRoot: "D:\\ws",
+      sessionNumber: 3,
+      reason: "done",
+      force: true,
+    });
+    assert.deepStrictEqual(argv[0].slice(0, 2), ["-m", "ai_router.session"]);
+    assert.deepStrictEqual(
+      argv.map((a) => a.slice(2)),
+      [
+        ["cancel", "3", "--reason", "done"],
+        ["restore", "3", "--reason", ""],
+        ["cancel", "3", "--reason", "done", "--force"],
+      ],
+    );
   });
 
-  test("modules create passes the root positionally and omits empty options", () => {
-    assert.deepStrictEqual(createArgs("D:\\ws", { slug: "greeter" }), [
-      "create",
-      "D:\\ws",
-      "--slug",
-      "greeter",
-    ]);
+  test("modules create passes the root positionally and defaults the title to the slug", async () => {
+    const { router, argv } = fakeRouter(0);
+    // No title: `--title` is REQUIRED by the CLI, so the default the
+    // contract promises has to be sent, not omitted. Omitting it sent an
+    // argparse usage error to every operator who pressed Enter past the
+    // title prompt.
+    await router.modules.create({ workspaceRoot: "D:\\ws", slug: "greeter" });
+    await router.modules.create({
+      workspaceRoot: "D:\\ws",
+      slug: "g",
+      title: "Greeter",
+      planPath: "docs/p.md",
+    });
     assert.deepStrictEqual(
-      createArgs("D:\\ws", { slug: "g", title: "Greeter", planPath: "docs/p.md" }),
-      ["create", "D:\\ws", "--slug", "g", "--title", "Greeter", "--plan-path", "docs/p.md"],
+      argv.map((a) => a.slice(2)),
+      [
+        ["create", "D:\\ws", "--slug", "greeter", "--title", "greeter"],
+        ["create", "D:\\ws", "--slug", "g", "--title", "Greeter", "--plan-path", "docs/p.md"],
+      ],
     );
   });
 
@@ -102,13 +127,15 @@ suite("CLI argv contracts", () => {
     // The terminal opens at the repository root and the router derives
     // its one sessions root from there. A directory on the command line
     // would be a handle to something that no longer has one.
-    const start = startSessionCommandLine("python");
-    assert.ok(start.includes("ai_router.session start"));
-    assert.ok(start.includes("--engine human"));
-    assert.ok(!start.includes("--sessions-dir"));
-    const close = closeSessionCommandLine("python");
-    assert.ok(close.includes("ai_router.session close"));
-    assert.ok(!close.includes("--force"));
+    //
+    // The line is the ROUTER's, asked for through `RouterCommands` — the
+    // launcher does not assemble one, and does not know that this router
+    // spells it with a Python interpreter.
+    const commands = new PythonSpawnRouter({ resolveInterpreter: () => "python" });
+    const start = startSessionCommandLine("D:\\ws", commands);
+    assert.strictEqual(start, "python -m ai_router.session start --engine human");
+    const close = closeSessionCommandLine("D:\\ws", commands);
+    assert.strictEqual(close, "python -m ai_router.session close");
   });
 
   test("bootstrap and install command lines are single pip/python invocations", () => {

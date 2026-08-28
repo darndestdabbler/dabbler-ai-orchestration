@@ -5050,6 +5050,250 @@
       "dateTime": "2026-08-28T14:03:18.131765-04:00",
       "description": "VERIFIED via adjudication; both runs of record green against the committed tree",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 24,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-28T14:54:06.217481-04:00",
+      "description": "Register; declare `--not-releasable`.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 24,
+      "stepNumber": 2,
+      "stepKey": "implement-pythonspawnrouter-over-runroutercli",
+      "dateTime": "2026-08-28T14:54:06.217481-04:00",
+      "description": "Implement `PythonSpawnRouter` over `runRouterCli`; the projection poll, the module lifecycle, the session commands, and the troubleshoot command go through it. `pythonInterpreter.ts` stays \u2014 it is this implementation's private concern now, not the extension's.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 24,
+      "stepNumber": 3,
+      "stepKey": "delete-types",
+      "dateTime": "2026-08-28T14:54:06.217481-04:00",
+      "description": "Delete `types.ts` in favour of the generated types.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 24,
+      "stepNumber": 4,
+      "stepKey": "playwright-and-the-mocha-suite-green",
+      "dateTime": "2026-08-28T14:54:06.217481-04:00",
+      "description": "Playwright and the mocha suite green, unchanged in count except where a test asserted a spawn that no longer exists as such.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 24,
+      "stepNumber": 5,
+      "stepKey": "measure-this-session-s-seat-cost",
+      "dateTime": "2026-08-28T14:54:06.217481-04:00",
+      "description": "Measure this session's seat cost and record it.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 24,
+      "stepNumber": 6,
+      "stepKey": "affected-tests-as-preverify",
+      "dateTime": "2026-08-28T14:54:06.217481-04:00",
+      "description": "Affected tests as preverify.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 24,
+      "stepNumber": 7,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-28T14:54:06.217481-04:00",
+      "description": "Cross-provider verification.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 24,
+      "stepNumber": 8,
+      "stepKey": "full-test-suite-recorded-as-the",
+      "dateTime": "2026-08-28T14:54:06.217481-04:00",
+      "description": "Full test suite, recorded as the `final-full` run of record.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 24,
+      "stepNumber": 9,
+      "stepKey": "close-out",
+      "dateTime": "2026-08-28T14:54:06.217481-04:00",
+      "description": "Close-out.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 24,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-28T14:54:06.226207-04:00",
+      "description": "Registered session 24 (claude-code).",
+      "status": "complete"
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 24,
+      "dateTime": "2026-08-28T14:56:47.999382-04:00",
+      "task": "Session 24 of 35 \u2014 the extension talks to the interface, and Python answers.\n\nIntegration before implementation. Every place the extension reaches the\nrouter becomes a call on the `Router` contract that session 23 published,\nand the only implementation is `PythonSpawnRouter`, which wraps today's\n`runRouterCli` unchanged. Nothing the operator sees changes.\n\n1. Implement `PythonSpawnRouter` over `runRouterCli`, satisfying the\n   `Router` interface exported by `dabbler-ai-router`. It owns the argv\n   for every verb \u2014 one table \u2014 and maps the CLI's published exit codes\n   (0/3/4/other) onto `RouterResult`. `pythonInterpreter.ts` stays and\n   becomes this implementation's private concern rather than the\n   extension's.\n2. Route the projection poll, the module lifecycle, the session commands\n   (cancel/restore, and the pre-typed start/close terminal lines) and the\n   troubleshoot command through the seam. The per-verb argv builders in\n   `moduleLifecycleCli.ts` and `sessionLifecycleCli.ts` fold into the one\n   table; no caller names a Python module any more.\n3. Delete `src/types.ts` in favour of the generated types. The projection\n   half is the hand-kept mirror the generated `ProgressProjection` now\n   replaces; `SessionsRepository`, which is the extension's own tree\n   shape and no part of the projection, moves to where it is discovered.\n4. Correct the stale router strings the extension still prints:\n   `ai_router.report` (no such module since set 109 removed the rate\n   table) and the `session_lifecycle` naming in `routerCli.ts` and\n   `sessionLifecycleCli.ts`.\n5. The mocha suite and Playwright stay green, unchanged in count except\n   where a test asserted a spawn that no longer exists as such. No new\n   tests; net negative TypeScript lines.\n6. Measure this session's seat cost and record it.\n7. Affected tests as pre-verification; cross-provider verification; the\n   full suite as the run of record; close.\n\nNot releasable: this session publishes nothing. The router package and\nthe extension both keep their current versions; the cutover to 2.0.0 is\nsession 35.",
+      "releasable": false
+    },
+    {
+      "sessionNumber": 24,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-28T15:25:23.047381-04:00",
+      "description": "Session 24 registered and declared not-releasable.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 24,
+      "stepNumber": 2,
+      "stepKey": "implement-pythonspawnrouter-over-runroutercli",
+      "dateTime": "2026-08-28T15:25:23.544667-04:00",
+      "description": "PythonSpawnRouter implements Router over runRouterCli; the projection poll, the module lifecycle, the session commands and the terminal launchers go through it; pythonInterpreter.ts is now its private concern.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 24,
+      "stepNumber": 3,
+      "stepKey": "delete-types",
+      "dateTime": "2026-08-28T15:25:24.027970-04:00",
+      "description": "src/types.ts deleted; the projection types come from the generated ProgressProjection, and SessionsRepository moved to fileSystem.ts where it is built.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 24,
+      "stepNumber": 4,
+      "stepKey": "playwright-and-the-mocha-suite-green",
+      "dateTime": "2026-08-28T15:27:35.936483-04:00",
+      "description": "mocha 153 passing (unchanged count); Playwright 14/14 green after the rewrite. Extension typecheck, lint and esbuild bundle all clean; the router package is inlined into dist/extension.js.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 24,
+      "stepNumber": 6,
+      "stepKey": "affected-tests-as-preverify",
+      "dateTime": "2026-08-28T15:27:36.465072-04:00",
+      "description": "Selector chose 4 pytest files and 3 vitest files, zero selection_unknown; both recorded as preverify-targeted. The extension's own mocha suite is not a declared suite, so it selects nothing -- flagged in dabbler.yaml and owed.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 24,
+      "stepNumber": 5,
+      "stepKey": "measure-this-session-s-seat-cost",
+      "dateTime": "2026-08-28T15:35:29.247284-04:00",
+      "description": "Round 1 verifier: 31,065 in / 6,941 out (gpt-5-6-sol, api). Final figures recorded as a decision after the loop closes.",
+      "status": "in-progress"
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D150",
+      "ordinal": 150,
+      "sessionNumber": 24,
+      "decidedOn": "2026-08-28",
+      "recordedAt": "2026-08-28T15:41:18.973784-04:00",
+      "decider": "orchestrator",
+      "headline": "The extension stops emitting TypeScript, and the retired electron harness entry points go with it: reading the router's types from source needs allowImportingTsExtensions, which requires noEmit",
+      "body": "The extension must read `dabbler-ai-router`'s types from its TypeScript\nsource, because the router is run by Node's own type stripping and its\nimports therefore carry the `.ts` extension ESM requires. Reading them needs\n`allowImportingTsExtensions`, which TypeScript permits only under `noEmit`\nor `emitDeclarationOnly`.\n\nThree consumption routes were tried and measured. Raw source: blocked by\nthat flag. Emitted declarations (`tsc --emitDeclarationOnly`): the `.d.ts`\noutput keeps the `.ts` specifiers verbatim, so a consumer needs the same\nflag anyway. A rewritten declaration bundle: works, and costs a\nspecifier-rewriting build step whose output can go stale against the source\nit describes, plus a typecheck that depends on a build having run. `noEmit`\nis the one that costs nothing and keeps the types fresh by construction \u2014\nthe consumer reads the source, so there is no second copy to drift.\n\n**Nothing consumed the tsc emit.** `dist/extension.js` is esbuild's; the\nunit suite runs the sources through ts-node; Playwright transpiles its own\nspecs; CI typechecks with `tsc --noEmit`. The single consumer was\n`npm test` -> `out/test/runTests.js`, the `@vscode/test-electron` harness\nthis extension's own CHANGELOG records as broken on Windows 11 with a\nmodern VS Code, which CI has never run and the README does not document.\n`src/test/runTests.ts` and `src/test/suite/index.ts` are deleted with the\nscript; the two live layers, mocha over the vscode stub and Playwright, are\nuntouched and green.\n\n`lib` moves ES2020 -> ES2022 for the same reason: `RouterUnavailableError`\npasses `ErrorOptions` to `Error`, which ES2020's lib does not declare.",
+      "provider": "anthropic"
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D151",
+      "ordinal": 151,
+      "sessionNumber": 24,
+      "decidedOn": "2026-08-28",
+      "recordedAt": "2026-08-28T15:41:35.196184-04:00",
+      "decider": "orchestrator",
+      "headline": "The router package gains a library entry (dist/index.cjs, types from src/index.ts, built by prepare): a CommonJS consumer cannot require the sources of a type:module package",
+      "body": "Session 23 built `packages/router` with `main: src/index.ts` and no\nconsumer. Session 24 is the first consumer, and it found that entry gives\nthe package no importable form at all: the package is `\"type\": \"module\"`,\nso ts-node refuses to `require` any `.ts` inside its scope \u2014 measured,\n`ERR_REQUIRE_ESM`, naming `packages/router/src/index.ts` and the\n`\"type\": \"module\"` that made it one. The extension's unit suite runs\nthrough ts-node, so nothing in it could have called the router.\n\n`build.mjs` now emits **two** bundles: `dist/dabbler.cjs`, the command, and\n`dist/index.cjs`, the library. `main` points at the library bundle and\n`types` at `src/index.ts`, so a consumer type-checks against the source and\nlinks against the bundle. That pairing is deliberate: there is no generated\ndeclaration in between, so nothing can go stale, and the typecheck does not\ndepend on a build having run.\n\n`prepare` runs the build, which means `npm ci` at the workspace root\nproduces `dist/index.cjs` before anything needs it \u2014 verified by deleting\n`dist/` and running `npm ci`. Neither the CI extension job nor a fresh\nclone needs a new step. `files` gains `src`, because the published\npackage's types ARE its sources.\n\nThe extension declares `dabbler-ai-router` as a dependency and esbuild\ninlines it into `dist/extension.js`, so the VSIX ships one bundle as\nbefore; `.vscodeignore` already excludes `node_modules`. The lockfile also\npicked up a correction it was owed: it still recorded `bin: dist/dabbler.js`\nfrom before D138 renamed it to `.cjs`.",
+      "provider": "anthropic"
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D152",
+      "ordinal": 152,
+      "sessionNumber": 24,
+      "decidedOn": "2026-08-28",
+      "recordedAt": "2026-08-28T15:42:04.511288-04:00",
+      "decider": "orchestrator",
+      "headline": "PythonSpawnRouter builds argv only for verbs read off the Python parser; the other twenty refuse by name -- writing them from the contract's option names alone produced three wrong command lines",
+      "body": "A first pass implemented all 32 `Router` methods, writing each argv from\nthe contract's option names. Three were wrong on inspection against the\nPython parsers that would receive them:\n\n- `ai_router.modules` has exactly one subcommand, `create`. `list` and\n  `retire` do not exist, so `ModuleVerbs.list` and `ModuleVerbs.retire`\n  would have spawned an argparse usage error.\n- `verify dispute` takes `--finding`, not `--finding-index`.\n\nNothing in the extension calls any of the three. No test would have caught\nthem, and no operator would have found out until the moment they needed the\nverb to work. An unverified command line that looks authoritative is worse\nthan no command line at all.\n\n**So a verb is built here when its command line was read off the parser\nthat receives it**, and the rest refuse by name. Built and checked against\n`--help` or the parser source: `session` (start, declare, close, cancel,\nrestore, log, decision), `modules create`, `progress`, `bootstrap`, and\n`verify`'s round \u2014 `python -m ai_router.verify` with no subcommand IS the\nround. The other twenty answer with a refusal naming the verb and the\nsession of the port plan that makes it real. `VERBS.pythonCli === false`\nalready distinguished \"reached as a library, has no command line\"\n(`ledger`, `approved-plan`) from \"not built here\", and the refusal says\nwhich.\n\nThis is the same discipline `verbs.ts` states for the CLI: \"Adding a verb\nhere without porting its module is how a verb announces itself before it\nworks: the CLI refuses it by name, which is a better answer than 'unknown\ncommand'.\"\n\n**Owed.** `ModuleVerbs.list`/`retire`, and several `VerifyVerbs` and\n`WorkflowVerbs` option names, describe a Python surface that does not exist\nin those shapes. Sessions 30, 32 and 34 port those modules; each should\nreconcile the contract against what it ports rather than inherit a shape\nnothing ever ran.",
+      "provider": "anthropic"
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D153",
+      "ordinal": 153,
+      "sessionNumber": 24,
+      "decidedOn": "2026-08-28",
+      "recordedAt": "2026-08-28T15:42:04.950978-04:00",
+      "decider": "orchestrator",
+      "headline": "Defect fixed: modules create --title is required, and the extension omitted it whenever the operator accepted the default title -- New Module's likeliest path sent an argparse usage error",
+      "body": "`ai_router/modules.py` declares `--title` with `required=True`. The\nextension's `createArgs` omitted it whenever the operator pressed Enter past\nthe title prompt, on a belief stated twice \u2014 in its own comment (\"the CLI's\nown default is the slug, and passing `--title ''` would declare an empty\ntitle instead of taking it\") and in the contract's `ModuleCreateOptions`\n(\"Omitted rather than empty when the default (the slug) was accepted\").\n\nThere is no such default. That call sent `create <root> --slug <s>` to a\nparser that requires `--title`, which is an argparse usage error: exit 2,\nclassified `failed`, surfaced to the operator as \"New module failed:\nusage: ...\". The New Module flow's most likely path \u2014 accept the suggested\ntitle \u2014 has been broken for as long as the flag has been required.\n\n`PythonSpawnRouter.modules.create` now sends the slug as the title when no\ntitle was typed, which makes the contract's promise true at the\nimplementation rather than at the CLI. The existing argv test changed with\nit; that is the one test the plan anticipated changing, \"where a test\nasserted a spawn that no longer exists as such\".\n\nFound by reading every parser this session builds argv for, which is the\nsame discipline D152 records. It is the kind of defect the seam exists to\nend: a caller's comment asserting a CLI behaviour that the CLI does not\nhave, with nothing checking the two against each other.",
+      "provider": "anthropic"
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D154",
+      "ordinal": 154,
+      "sessionNumber": 24,
+      "decidedOn": "2026-08-28",
+      "recordedAt": "2026-08-28T15:42:40.371906-04:00",
+      "decider": "orchestrator",
+      "headline": "src/router/ IS the Python implementation, and host.ts is the one composition root; commands/bootstrapProject is the single declared exception because it runs before there is a router to ask",
+      "body": "`src/router/` is now the Python implementation and its transport, and\nnothing outside it imports any of them:\n\n- `pythonSpawnRouter.ts` builds the argv and satisfies `Router`;\n- `routerCli.ts` runs it, echoes it, and classifies the exit code;\n- `pythonInterpreter.ts` finds the interpreter;\n- `projectionPayload.ts` narrows what comes back;\n- `host.ts` is the composition root and the only file callers import.\n\n`host.ts` names the production router once. Before it existed each command\ndefault-constructed its own `PythonSpawnRouter` \u2014 that still isolated\ncallers from Python's argv, but it restated the choice of implementation\nonce per command: six places to find and six chances to miss one. Session 35\nnow changes one line.\n\n`host.ts` also carries `RouterCommands`, the extension's own interface for\n\"the OPERATOR runs this verb, not the extension\" \u2014 one method, returning a\ncopy-pasteable line or null. It is deliberately not an addition to `Router`:\n`Router` is about answers, and a router that answers in-process has no\ncommand line to offer. `RouterRefusal` lives here too, because it is derived\nfrom the contract and is the same type whichever router produced it.\n\n**The one deliberate exception is `commands/bootstrapProject`**, the\nfirst-run path: it creates a venv and pip-installs the router, so it runs\nBEFORE there is a router to ask and has to know what it is installing. That\nexception is written into `host.ts`, so a reader looking for \"what changes\nwhen the router stops being Python\" finds this directory and that one file.\n\nTwo defects the verifier caught in this shape, both fixed: `RouterRefusal`\nwas first placed beside the implementation, which broke the rule `host.ts`\nstates; and a null command line returned silently, so a router with nothing\nto pre-type would have made a clicked Start/Close do nothing. It now says\nso.\n\n**Owed to session 35.** Start and Close are pre-typed into a terminal\nrather than executed, because `session start` needs an engine the OPERATOR\nchooses and `session close` runs gates they should watch. An in-process\nrouter has no line to pre-type, so what those two commands become is that\nsession's product decision. It is recorded in `host.ts` rather than left\nimplicit.",
+      "provider": "anthropic"
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D155",
+      "ordinal": 155,
+      "sessionNumber": 24,
+      "decidedOn": "2026-08-28",
+      "recordedAt": "2026-08-28T15:42:40.778754-04:00",
+      "decider": "orchestrator",
+      "headline": "The extension's mocha suite stays undeclared and the extension selects no tests: mocha merges a path list with its spec instead of being narrowed by it, so an honest declaration needs D116's runner entry point",
+      "body": "`affected` selects nothing for `tools/dabbler-ai-orchestration/`, so this\nsession's largest change set had no recordable pre-verification evidence.\nThe mocha layer (153 tests) and Playwright (14) were run by hand at every\nstep and are green; they are simply not evidence the record can accept,\nbecause they belong to no declared suite. `dabbler.yaml` said session 24\nwould declare one. It does not, and this is why.\n\n**Measured.** `checks.targeted_command` appends the selected paths to the\ndeclared command, so the bare command must mean \"the whole suite\" and the\nappended form must mean \"these tests\". Mocha cannot express that: it MERGES\na positional path list with its `spec` rather than being narrowed by it \u2014\ntried both ways, `--spec '<glob>' <one file>` and a `.mocharc.json` carrying\n`spec` plus the same positional, and both ran all 153 tests instead of the\none named.\n\n`runs_whole: true` is the cheap way through and it would be false: mocha\ndoes take a subset, so declaring that its runner has no subset form would\nput an untrue statement into the audit in order to pass it.\n\nWhat is missing is a runner entry point of its own \u2014 a command that runs\nthe whole suite with no arguments and exactly the named files with them.\nThat is the shape of **D116**, already owed and already scoped as \"a\nsession, not a patch\". Two smaller pieces were built and then removed while\nestablishing this: a `ts-node-register.js` shim that points the compiler at\nthe extension's tsconfig from any working directory (needed, because the\nsuite must run from the repository root for repository-relative paths to\nresolve), and the suite block itself.\n\nThe rule stays honest in the meantime: `select: []` is what the selector can\ntruly say about a path no DECLARED test covers, and the comment beside it\nnow says what actually covers it and why the declaration is not a line.",
+      "provider": "anthropic"
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D156",
+      "ordinal": 156,
+      "sessionNumber": 24,
+      "decidedOn": "2026-08-28",
+      "recordedAt": "2026-08-28T15:43:02.774777-04:00",
+      "decider": "orchestrator",
+      "headline": "Session 24 seat cost: verifier 49,408 in / 12,447 out over four API calls (three rounds plus the adjudication); orchestrator one Claude Code context; 2.5x cheaper on input than session 23, and the adjudication cost 3% of a round",
+      "body": "Session 24's seat cost, in the two currencies it ran on, by the method D136\nset down and D148 repeated. No dollar figure: set 109 removed the router's\nrate table, the metrics ledger carries tokens and elapsed time only, and a\nlist price recalled from memory would be a guess dressed as a measurement.\n\n**Verifier, four calls over the API, 214 seconds:**\n\n| Call | Model | In | Out |\n| --- | --- | ---: | ---: |\n| Round 1 | gpt-5-6-sol | 31,065 | 6,941 |\n| Round 2 | gpt-5-6-sol | 10,581 | 3,202 |\n| Round 3 | gpt-5-6-sol | 6,193 | 2,088 |\n| Adjudication | gemini-flash | 1,569 | 216 |\n| **Total** | | **49,408** | **12,447** |\n\n**Orchestrator:** Claude Code / claude-opus-5[1m], one context.\n\n**What the shape says.** Round 1 is 63% of the input and each later round\ncosts about a third of the one before it, because rounds 2 and 3 review only\nthe fix delta. That is the same curve session 23 measured (D148: round 1 was\n78% of four calls), and it is the argument for remediating rather than\nrestarting.\n\nAgainst session 23 \u2014 the comparable code session \u2014 this one is **cheaper by\na factor of 2.5 on input** (49,408 against 121,670) over the same number of\ncalls. The difference is the change set, not the loop: session 23 generated\n1,400 lines of types for the verifier to read; this one moved and deleted\nmore than it added.\n\nThe adjudication is the cheapest call of the four by an order of magnitude\n(1,569 in / 216 out) and it is what let the session close VERIFIED rather\nthan at the cap. A third provider judging one disputed finding costs about\n3% of a verification round.",
+      "provider": "anthropic"
+    },
+    {
+      "sessionNumber": 24,
+      "stepNumber": 5,
+      "stepKey": "measure-this-session-s-seat-cost",
+      "dateTime": "2026-08-28T15:43:03.156122-04:00",
+      "description": "Recorded as D156: 49,408 in / 12,447 out over four calls.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 24,
+      "stepNumber": 7,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-28T15:43:03.549951-04:00",
+      "description": "3 rounds (gpt-5-6-sol/openai) then a dispute at the cap, OVERRULED by gemini-flash/google: VERIFIED. Two real defects fixed from round 1-2 (RouterRefusal placement, the silent null command line) and one nit (projection schemaVersion now fails closed).",
+      "status": "complete"
     }
   ]
 }

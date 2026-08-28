@@ -7,14 +7,17 @@
   "bin": {
     "dabbler": "dist/dabbler.cjs"
   },
-  "main": "src/index.ts",
+  "main": "dist/index.cjs",
+  "types": "src/index.ts",
   "files": [
-    "dist"
+    "dist",
+    "src"
   ],
   "engines": {
     "node": ">=22.18"
   },
   "scripts": {
+    "prepare": "node build.mjs",
     "build": "node build.mjs",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src scripts test build.mjs --ext .ts,.mjs",

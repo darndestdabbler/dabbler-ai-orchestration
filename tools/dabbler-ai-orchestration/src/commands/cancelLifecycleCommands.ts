@@ -1,10 +1,7 @@
 import * as vscode from "vscode";
-import {
-  describeLifecycleFailure,
-  runCancelSession,
-  runRestoreSession,
-} from "../utils/sessionLifecycleCli";
-import { RunRouterCliDeps } from "../utils/routerCli";
+import type { Router } from "dabbler-ai-router";
+import { RouterUnavailableError } from "dabbler-ai-router";
+import { RouterRefusal, productionRouter } from "../router/host";
 import { sessionRowLabel } from "../providers/sessionsModel";
 import { sessionCannotClose } from "../providers/rowMenuHelpers";
 import { asSessionNode } from "./workExplorerTreeCommands";
@@ -73,17 +70,38 @@ function defaultUi(): CancelLifecycleUi {
 }
 
 /**
- * Both flows go through `python -m ai_router.session` rather than a
- * TypeScript writer of the state file. `session.root` is the spawn cwd
- * (that is where `.venv` is resolved from); the router derives the one
- * sessions root from the repository it is standing in.
+ * The failure sentence.
+ *
+ * `refused` is stated as "nothing was written" because that is the
+ * router's guarantee for a refusal — restoring a session that was never
+ * cancelled reaches this path, and telling the operator to reconcile
+ * from git for a call that wrote nothing would be actively misleading.
+ */
+export function describeLifecycleFailure(
+  verb: string,
+  label: string,
+  result: RouterRefusal,
+): string {
+  const detail = result.message.trim() || `exit ${result.exitCode}`;
+  if (result.outcome === "refused") {
+    return `${verb} "${label}" refused — ${detail} Nothing was written.`;
+  }
+  return `Failed to ${verb.toLowerCase()} "${label}": ${detail} Re-run the command to finish.`;
+}
+
+/**
+ * Both flows go through the router's `session` verb rather than a
+ * TypeScript writer of the state file: the state file has one set of
+ * sanctioned writers and a second implementation here would drift from
+ * them. `session.root` is the repository the router stands in, and it
+ * derives its one sessions root from there.
  *
  * Returns true when the tree should refresh.
  */
 export async function runCancelSessionFlow(
   session: CancellableSession,
   ui: CancelLifecycleUi = defaultUi(),
-  cliDeps?: RunRouterCliDeps,
+  router: Router = productionRouter(),
 ): Promise<boolean> {
   // Two-step prompt: a confirmation dialog with explicit "Cancel Session"
   // / "Keep" buttons so the (destructive-ish) action requires an
@@ -111,27 +129,50 @@ export async function runCancelSessionFlow(
     "e.g. scope rolled into another session",
   );
 
-  const result = await runCancelSession(
-    session.root,
-    session.number,
-    reason ?? "",
-    cliDeps,
-    session.force === true,
+  const result = await call(ui, () =>
+    router.session.cancel({
+      repoRoot: session.root,
+      sessionNumber: session.number,
+      reason: reason ?? "",
+      force: session.force === true,
+    }),
   );
-  if (!result.ok) {
-    ui.showErrorMessage(
-      describeLifecycleFailure("Cancelling", session.name, result),
-    );
+  if (!result || !result.ok) {
+    if (result) {
+      ui.showErrorMessage(
+        describeLifecycleFailure("Cancelling", session.name, result),
+      );
+    }
     return false;
   }
   ui.showInformationMessage(`Cancelled session ${session.number}.`);
   return true;
 }
 
+/**
+ * Run one router call, reporting an unreachable router and answering
+ * `null` for it. An unreachable router is not a refusal — nothing
+ * decided anything — so it is reported in the router's own words and
+ * never dressed up as a verdict.
+ */
+async function call<T>(
+  ui: CancelLifecycleUi,
+  invoke: () => Promise<T>,
+): Promise<T | null> {
+  try {
+    return await invoke();
+  } catch (err) {
+    ui.showErrorMessage(
+      err instanceof RouterUnavailableError ? err.message : String(err),
+    );
+    return null;
+  }
+}
+
 export async function runRestoreSessionFlow(
   session: CancellableSession,
   ui: CancelLifecycleUi = defaultUi(),
-  cliDeps?: RunRouterCliDeps,
+  router: Router = productionRouter(),
 ): Promise<boolean> {
   const choice = await ui.confirm(
     `Restore session ${session.number} "${session.name}"?`,
@@ -146,16 +187,19 @@ export async function runRestoreSessionFlow(
     "e.g. scope is back in plan",
   );
 
-  const result = await runRestoreSession(
-    session.root,
-    session.number,
-    reason ?? "",
-    cliDeps,
+  const result = await call(ui, () =>
+    router.session.restore({
+      repoRoot: session.root,
+      sessionNumber: session.number,
+      reason: reason ?? "",
+    }),
   );
-  if (!result.ok) {
-    ui.showErrorMessage(
-      describeLifecycleFailure("Restoring", session.name, result),
-    );
+  if (!result || !result.ok) {
+    if (result) {
+      ui.showErrorMessage(
+        describeLifecycleFailure("Restoring", session.name, result),
+      );
+    }
     return false;
   }
   ui.showInformationMessage(`Restored session ${session.number}.`);

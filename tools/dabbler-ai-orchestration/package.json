@@ -1,7 +1,7 @@
 {
   "name": "dabbler-ai-orchestration",
   "displayName": "Dabbler AI Orchestration",
-  "description": "Organize AI-led development like work: modules, session sets and step-by-step session plans in a native tree \u2014 plus routed verification before every close, normally cross-provider, recorded as evidence you can check.",
+  "description": "Organize AI-led development like work: modules, session sets and step-by-step session plans in a native tree — plus routed verification before every close, normally cross-provider, recorded as evidence you can check.",
   "version": "1.0.4",
   "publisher": "DarndestDabbler",
   "private": true,
@@ -300,9 +300,8 @@
   "scripts": {
     "compile": "node esbuild.js",
     "watch": "node esbuild.js --watch",
-    "test": "npm run compile && npx tsc --outDir out && node ./out/test/runTests.js",
     "test:unit": "mocha --require ts-node/register --require ./src/test/vscode-stub.js --ui tdd --timeout 120000 'src/test/suite/**/*.test.ts'",
-    "test:playwright": "npm run compile && npx tsc --outDir out && npx playwright test",
+    "test:playwright": "npm run compile && npx tsc --noEmit && npx playwright test",
     "package": "npm run compile && npx vsce package",
     "lint": "eslint src --ext ts"
   },
@@ -321,6 +320,7 @@
     "typescript": "^5.3.0"
   },
   "dependencies": {
+    "dabbler-ai-router": "^1.1.0",
     "yaml": "^2.7.0"
   }
 }

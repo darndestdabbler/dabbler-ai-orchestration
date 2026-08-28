@@ -59,7 +59,7 @@ it.
 | 21 | Close out set 148 on the record, and make the loop tests cheap | no | 2026-08-28 |
 | 22 | Decide the inventory before anything is translated | no | 2026-08-28 |
 | 23 | Contracts — types from schemas, the Router interface, and the controls | no | 2026-08-28 |
-| 24 | The extension talks to the interface, and Python answers | — | not declared |
+| 24 | The extension talks to the interface, and Python answers | no | 2026-08-28 |
 | 25 | Foundation modules | — | not declared |
 | 26 | The record — journal, ledger, writers | — | not declared |
 | 27 | Evidence, checks, test evidence, affected | — | not declared |
@@ -632,3 +632,44 @@ Then affected tests as preverify (the selector will report no test affected and 
 7. Measure this session's seat cost and record it as a decision.
 8. Affected tests as preverify; cross-provider verification; the full run of
    record over both suites; close-out.
+
+### Session 24 — The extension talks to the interface, and Python answers
+
+**Releasable: no.**
+
+Session 24 of 35 — the extension talks to the interface, and Python answers.
+
+Integration before implementation. Every place the extension reaches the
+router becomes a call on the `Router` contract that session 23 published,
+and the only implementation is `PythonSpawnRouter`, which wraps today's
+`runRouterCli` unchanged. Nothing the operator sees changes.
+
+1. Implement `PythonSpawnRouter` over `runRouterCli`, satisfying the
+   `Router` interface exported by `dabbler-ai-router`. It owns the argv
+   for every verb — one table — and maps the CLI's published exit codes
+   (0/3/4/other) onto `RouterResult`. `pythonInterpreter.ts` stays and
+   becomes this implementation's private concern rather than the
+   extension's.
+2. Route the projection poll, the module lifecycle, the session commands
+   (cancel/restore, and the pre-typed start/close terminal lines) and the
+   troubleshoot command through the seam. The per-verb argv builders in
+   `moduleLifecycleCli.ts` and `sessionLifecycleCli.ts` fold into the one
+   table; no caller names a Python module any more.
+3. Delete `src/types.ts` in favour of the generated types. The projection
+   half is the hand-kept mirror the generated `ProgressProjection` now
+   replaces; `SessionsRepository`, which is the extension's own tree
+   shape and no part of the projection, moves to where it is discovered.
+4. Correct the stale router strings the extension still prints:
+   `ai_router.report` (no such module since set 109 removed the rate
+   table) and the `session_lifecycle` naming in `routerCli.ts` and
+   `sessionLifecycleCli.ts`.
+5. The mocha suite and Playwright stay green, unchanged in count except
+   where a test asserted a spawn that no longer exists as such. No new
+   tests; net negative TypeScript lines.
+6. Measure this session's seat cost and record it.
+7. Affected tests as pre-verification; cross-provider verification; the
+   full suite as the run of record; close.
+
+Not releasable: this session publishes nothing. The router package and
+the extension both keep their current versions; the cutover to 2.0.0 is
+session 35.

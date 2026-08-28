@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import * as fs from "fs";
 import * as path from "path";
-import { SessionsRepository } from "../types";
+import type { SessionsRepository } from "../utils/fileSystem";
 import { locateSessionSection, SpecSectionRange } from "../providers/specSectionLocator";
 
 /**

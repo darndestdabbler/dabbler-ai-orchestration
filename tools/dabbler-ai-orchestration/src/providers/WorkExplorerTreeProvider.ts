@@ -13,7 +13,7 @@
 // generation.
 
 import * as vscode from "vscode";
-import { SessionsRepository } from "../types";
+import type { SessionsRepository } from "../utils/fileSystem";
 import { ScanResult, scanRepositories } from "../utils/fileSystem";
 import { ProjectionCache } from "../utils/projection";
 import {

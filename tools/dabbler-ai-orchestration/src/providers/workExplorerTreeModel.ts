@@ -17,14 +17,14 @@
 //   3. At most two inline actions per row, enforced in package.json and
 //      asserted by the menu-registry test.
 
-import {
-  SessionRecord,
-  SessionStatus,
-  SessionVerification,
-  SessionsRepository,
-  TaskRecord,
-  VerificationFinding,
-} from "../types";
+import type {
+  ProgressProjectionSession as SessionRecord,
+  ProgressProjectionSessionStatus as SessionStatus,
+  ProgressProjectionVerification as SessionVerification,
+  ProgressProjectionTask as TaskRecord,
+  ProgressProjectionFinding as VerificationFinding,
+} from "dabbler-ai-router";
+import type { SessionsRepository } from "../utils/fileSystem";
 import {
   REPOSITORY_ACTIONS,
   RepositoryAction,

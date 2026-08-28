@@ -1,11 +1,16 @@
-// The "New module" flow — append a docs/modules.yaml entry via
-// `python -m ai_router.modules create`. `ui` is the injectable VS Code
-// surface so the flow is unit-testable under the vscode stub.
+// The "New module" flow — append a docs/modules.yaml entry through the
+// router's `modules create` verb. `ui` is the injectable VS Code surface
+// so the flow is unit-testable under the vscode stub.
+//
+// There is deliberately no TypeScript fallback that writes the manifest
+// itself: a fallback would restore the two-implementations defect,
+// silently, on exactly the machines where the router is broken.
 
 import * as vscode from "vscode";
+import type { Router } from "dabbler-ai-router";
+import { RouterUnavailableError } from "dabbler-ai-router";
 import { readModuleSlugs, validateNewModuleSlug } from "../utils/moduleAuthoring";
-import { runCreateModule } from "../utils/moduleLifecycleCli";
-import { RouterCliResult, RunRouterCliDeps } from "../utils/routerCli";
+import { RouterRefusal, productionRouter } from "../router/host";
 
 export interface NewModuleUi {
   showInputBox: typeof vscode.window.showInputBox;
@@ -23,7 +28,7 @@ function defaultUi(): NewModuleUi {
   };
 }
 
-export function describeCreateFailure(result: RouterCliResult): string {
+export function describeCreateFailure(result: RouterRefusal): string {
   const detail = result.message.trim() || `exit ${result.exitCode}`;
   return `New module failed: ${detail}`;
 }
@@ -34,7 +39,7 @@ export function describeCreateFailure(result: RouterCliResult): string {
  */
 export async function runNewModuleFlow(
   ui: NewModuleUi = defaultUi(),
-  cliDeps?: RunRouterCliDeps,
+  router: Router = productionRouter(),
 ): Promise<boolean> {
   const root = ui.workspaceRoot();
   if (!root) {
@@ -66,11 +71,23 @@ export async function runNewModuleFlow(
   });
   if (title === undefined) return false; // Esc cancels; empty = default to slug
 
-  const result = await runCreateModule(
-    root,
-    { slug: slug.trim(), title: title.trim() },
-    cliDeps,
-  );
+  // The workspace root is the CLI's positional argument as well as the
+  // spawn cwd; `PythonSpawnRouter` passes both. A router that could not
+  // be reached at all is not a refusal — it is the absence of an answer,
+  // and it arrives as an exception rather than as one.
+  let result;
+  try {
+    result = await router.modules.create({
+      workspaceRoot: root,
+      slug: slug.trim(),
+      title: title.trim() || undefined,
+    });
+  } catch (err) {
+    ui.showErrorMessage(
+      err instanceof RouterUnavailableError ? err.message : String(err),
+    );
+    return false;
+  }
   if (!result.ok) {
     ui.showErrorMessage(describeCreateFailure(result));
     return false;

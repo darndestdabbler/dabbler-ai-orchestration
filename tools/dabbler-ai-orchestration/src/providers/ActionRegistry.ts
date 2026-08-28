@@ -8,7 +8,10 @@
 // what can be done to that session. Widening one `when` to cover both
 // would make every entry's signature lie about what it reads.
 
-import { SessionRecord, SessionsRepository } from "../types";
+import type {
+  ProgressProjectionSession as SessionRecord,
+} from "dabbler-ai-router";
+import type { SessionsRepository } from "../utils/fileSystem";
 import { sessionNeedsReading, sessionOffersRunPrompt } from "./rowMenuHelpers";
 
 export interface RepositoryAction {

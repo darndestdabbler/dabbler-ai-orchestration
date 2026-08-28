@@ -29,12 +29,14 @@
 
 import * as vscode from "vscode";
 import * as cp from "child_process";
+import type { RouterOutcome } from "dabbler-ai-router";
+import { outcomeForExitCode } from "dabbler-ai-router";
 import {
   resolvePythonInterpreter,
   interpreterResolves,
   describeMissingPython,
 } from "./pythonInterpreter";
-import { makeUtf8ChunkDecoder } from "./utf8ChunkDecoder";
+import { makeUtf8ChunkDecoder } from "../utils/utf8ChunkDecoder";
 
 /**
  * True when *stderr* says the interpreter cannot import ai_router — an
@@ -81,23 +83,21 @@ export const ROUTER_OUTPUT_CHANNEL = "Dabbler Commands";
 /**
  * How a run ended, as a single discriminator the callers branch on.
  *
- * `refused` and `writeFailed` are the CLI's own exit codes 3 and 4 — they
- * are contract, not inference, and they mean materially different things:
- * a refusal guarantees the workspace is byte-identical to before the call,
- * while a write failure means the apply phase stopped (create/rename roll
- * back; delete stays declared and is re-runnable).
+ * The four the router itself can mean are `RouterOutcome`, from the
+ * contract, and they are not restated here: `refused` and `writeFailed`
+ * are exit codes 3 and 4, they are contract rather than inference, and
+ * they mean materially different things — a refusal guarantees the
+ * workspace is byte-identical to before the call, while a write failure
+ * means the apply phase stopped (create/rename roll back; delete stays
+ * declared and is re-runnable).
  *
- * `unavailable` is the one outcome that is NOT the CLI's verdict: the
- * interpreter or the router itself could not be reached, so nothing ran.
- * It is kept distinct from `failed` because the remedy is completely
- * different — install/point at an interpreter, rather than read an error.
+ * `unavailable` is the one this module adds, and the one that is NOT the
+ * router's verdict: the interpreter or the router itself could not be
+ * reached, so nothing ran. It is kept distinct from `failed` because the
+ * remedy is completely different — install or point at an interpreter,
+ * rather than read an error.
  */
-export type RouterCliOutcome =
-  | "ok"
-  | "refused"
-  | "writeFailed"
-  | "unavailable"
-  | "failed";
+export type RouterCliOutcome = RouterOutcome | "unavailable";
 
 export interface RouterCliResult {
   outcome: RouterCliOutcome;
@@ -129,6 +129,18 @@ export interface RouterCliInvocation {
   cwd: string;
   /** What the operator is doing, for the missing-interpreter message. */
   actionLabel: string;
+  /**
+   * Kill the process after this many milliseconds and settle as
+   * `unavailable`, or run unbounded when omitted.
+   *
+   * Unbounded is right for a command the operator asked for and is
+   * watching: a close that runs its gates for a minute has not failed,
+   * and killing it would be this module deciding how long the router may
+   * take. It is wrong for a poll nobody asked for — the projection runs
+   * every thirty seconds behind a tree that awaits it, so one wedged
+   * interpreter would hang the whole view with no rows and no message.
+   */
+  timeoutMs?: number;
 }
 
 /**
@@ -296,9 +308,11 @@ export function runRouterCli(
 
   return new Promise<RouterCliResult>((resolve) => {
     let settled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     const settle = (result: RouterCliResult): void => {
       if (settled) return;
       settled = true;
+      if (timer) clearTimeout(timer);
       resolve(result);
     };
 
@@ -315,6 +329,21 @@ export function runRouterCli(
         ),
       );
       return;
+    }
+
+    // A process that outlived its budget produced no verdict, so it
+    // settles as `unavailable` — nothing ran, in the sense that matters —
+    // rather than as a refusal it never made.
+    if (invocation.timeoutMs !== undefined) {
+      timer = setTimeout(() => {
+        child.kill();
+        settle(
+          settleUnavailable(
+            `${invocation.actionLabel} did not answer within ` +
+              `${Math.round(invocation.timeoutMs! / 1000)}s and was stopped.`,
+          ),
+        );
+      }, invocation.timeoutMs);
     }
 
     let stdout = "";
@@ -399,13 +428,15 @@ function firstString(
 }
 
 /**
- * Map an exit code onto an outcome.
+ * Map an exit code onto an outcome, and take the message off whichever
+ * stream carried one.
  *
- * The mapping is the CLI's published contract (`ai_router.modules` and
- * `ai_router.session_lifecycle` share it deliberately): 0 ok, 3 refused
- * with nothing written, 4 write failure. Anything else — including the
- * argparse usage code 2 — is an unclassified failure, reported with
- * whatever the process said rather than a guess.
+ * The mapping itself is the router's published contract — every verb
+ * shares it — and the contract states it once, in `outcomeForExitCode`.
+ * This function is where a PROCESS becomes that vocabulary: the code
+ * decides the outcome, and the payload, stdout and stderr decide what
+ * the operator is told. `PythonSpawnRouter` is the one caller that has
+ * to agree with both.
  */
 export function classify(
   code: number | null,
@@ -413,28 +444,16 @@ export function classify(
   stdout: string,
   stderr: string,
 ): Pick<RouterCliResult, "outcome" | "ok" | "exitCode" | "message"> {
-  const fallback = (stderr.trim() || stdout.trim() || `exit ${code}`).slice(
-    0,
-    600,
-  );
-  if (code === 0) {
-    return { outcome: "ok", ok: true, exitCode: code, message: stdout.trim() };
+  const outcome = outcomeForExitCode(code);
+  if (outcome === "ok") {
+    return { outcome, ok: true, exitCode: code, message: stdout.trim() };
   }
-  if (code === 3) {
-    return {
-      outcome: "refused",
-      ok: false,
-      exitCode: code,
-      message: firstString(payload, "refused") ?? fallback,
-    };
-  }
-  if (code === 4) {
-    return {
-      outcome: "writeFailed",
-      ok: false,
-      exitCode: code,
-      message: firstString(payload, "writeFailed") ?? fallback,
-    };
-  }
-  return { outcome: "failed", ok: false, exitCode: code, message: fallback };
+  // A refusal and a failed write each name themselves in `--json` output
+  // when the verb emits any; an unclassified failure has no such key, so
+  // it always falls back. The fallback is whichever stream carried text,
+  // truncated so an operator-facing toast stays readable.
+  const named =
+    outcome === "failed" ? undefined : firstString(payload, outcome);
+  const fallback = (stderr.trim() || stdout.trim() || `exit ${code}`).slice(0, 600);
+  return { outcome, ok: false, exitCode: code, message: named ?? fallback };
 }

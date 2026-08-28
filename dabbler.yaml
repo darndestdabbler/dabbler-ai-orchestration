@@ -449,8 +449,22 @@ testing:
           - packages/router/test/schema.test.ts
           - packages/router/test/contracts.test.ts
           - packages/router/test/parity.test.ts
-      # The extension is its own suite (mocha and Playwright), not this
-      # one, and it is not declared here until session 24 makes it one.
+      # The extension's two layers -- mocha over the vscode stub, and
+      # Playwright -- are not declared suites, so no declared test answers
+      # for this path and the empty list is what the selector can truly
+      # say. It is not what a reader should take away: the mocha layer is
+      # exactly the test that notices this source breaking, and CI runs it
+      # on every push.
+      #
+      # Declaring it is owed, and it is D116's shape rather than a line
+      # here. `targeted_command` appends the selected paths to the
+      # declared command, and mocha MERGES a path list with its `spec`
+      # (whether the spec comes from the command line or from
+      # `.mocharc.json`) instead of being narrowed by it -- measured, both
+      # forms. So the bare command cannot mean "the whole suite" and the
+      # appended form mean "these tests", and the honest declaration needs
+      # a runner entry point of its own. `runs_whole` would be the cheap
+      # way through and it would be false: mocha does take a subset.
       - when: tools/dabbler-ai-orchestration/
         select: []
       - when: ai_router/schemas/

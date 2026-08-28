@@ -3727,3 +3727,241 @@ The close's `test_run_fresh` gate failed on both suites with "the run of record 
 **Remedy owed, and it is the operator's call because it changes a gate.** Either resolve the file list against the working tree rather than the index (`git ls-files` with a deleted path dropped, since `surface_digest` already skips a path it cannot read), or have the close compare against the tree as of the commit rather than the worktree. The first is one line at the git seam and keeps the binding's meaning; the second changes what "the tree it ran against" means. Session 27 ports `evidence` and `test_evidence` and inherits whichever shape is chosen, so a decision before then is worth more than after.
 
 **Cost of leaving it:** one extra full-suite run in any session that deletes a tracked file. Here that was five minutes.
+
+## Session 24 — The extension talks to the interface, and Python answers
+
+### D150 · 2026-08-28 · Orchestrator (anthropic) · The extension stops emitting TypeScript, and the retired electron harness entry points go with it: reading the router's types from source needs allowImportingTsExtensions, which requires noEmit
+
+The extension must read `dabbler-ai-router`'s types from its TypeScript
+source, because the router is run by Node's own type stripping and its
+imports therefore carry the `.ts` extension ESM requires. Reading them needs
+`allowImportingTsExtensions`, which TypeScript permits only under `noEmit`
+or `emitDeclarationOnly`.
+
+Three consumption routes were tried and measured. Raw source: blocked by
+that flag. Emitted declarations (`tsc --emitDeclarationOnly`): the `.d.ts`
+output keeps the `.ts` specifiers verbatim, so a consumer needs the same
+flag anyway. A rewritten declaration bundle: works, and costs a
+specifier-rewriting build step whose output can go stale against the source
+it describes, plus a typecheck that depends on a build having run. `noEmit`
+is the one that costs nothing and keeps the types fresh by construction —
+the consumer reads the source, so there is no second copy to drift.
+
+**Nothing consumed the tsc emit.** `dist/extension.js` is esbuild's; the
+unit suite runs the sources through ts-node; Playwright transpiles its own
+specs; CI typechecks with `tsc --noEmit`. The single consumer was
+`npm test` -> `out/test/runTests.js`, the `@vscode/test-electron` harness
+this extension's own CHANGELOG records as broken on Windows 11 with a
+modern VS Code, which CI has never run and the README does not document.
+`src/test/runTests.ts` and `src/test/suite/index.ts` are deleted with the
+script; the two live layers, mocha over the vscode stub and Playwright, are
+untouched and green.
+
+`lib` moves ES2020 -> ES2022 for the same reason: `RouterUnavailableError`
+passes `ErrorOptions` to `Error`, which ES2020's lib does not declare.
+
+### D151 · 2026-08-28 · Orchestrator (anthropic) · The router package gains a library entry (dist/index.cjs, types from src/index.ts, built by prepare): a CommonJS consumer cannot require the sources of a type:module package
+
+Session 23 built `packages/router` with `main: src/index.ts` and no
+consumer. Session 24 is the first consumer, and it found that entry gives
+the package no importable form at all: the package is `"type": "module"`,
+so ts-node refuses to `require` any `.ts` inside its scope — measured,
+`ERR_REQUIRE_ESM`, naming `packages/router/src/index.ts` and the
+`"type": "module"` that made it one. The extension's unit suite runs
+through ts-node, so nothing in it could have called the router.
+
+`build.mjs` now emits **two** bundles: `dist/dabbler.cjs`, the command, and
+`dist/index.cjs`, the library. `main` points at the library bundle and
+`types` at `src/index.ts`, so a consumer type-checks against the source and
+links against the bundle. That pairing is deliberate: there is no generated
+declaration in between, so nothing can go stale, and the typecheck does not
+depend on a build having run.
+
+`prepare` runs the build, which means `npm ci` at the workspace root
+produces `dist/index.cjs` before anything needs it — verified by deleting
+`dist/` and running `npm ci`. Neither the CI extension job nor a fresh
+clone needs a new step. `files` gains `src`, because the published
+package's types ARE its sources.
+
+The extension declares `dabbler-ai-router` as a dependency and esbuild
+inlines it into `dist/extension.js`, so the VSIX ships one bundle as
+before; `.vscodeignore` already excludes `node_modules`. The lockfile also
+picked up a correction it was owed: it still recorded `bin: dist/dabbler.js`
+from before D138 renamed it to `.cjs`.
+
+### D152 · 2026-08-28 · Orchestrator (anthropic) · PythonSpawnRouter builds argv only for verbs read off the Python parser; the other twenty refuse by name -- writing them from the contract's option names alone produced three wrong command lines
+
+A first pass implemented all 32 `Router` methods, writing each argv from
+the contract's option names. Three were wrong on inspection against the
+Python parsers that would receive them:
+
+- `ai_router.modules` has exactly one subcommand, `create`. `list` and
+  `retire` do not exist, so `ModuleVerbs.list` and `ModuleVerbs.retire`
+  would have spawned an argparse usage error.
+- `verify dispute` takes `--finding`, not `--finding-index`.
+
+Nothing in the extension calls any of the three. No test would have caught
+them, and no operator would have found out until the moment they needed the
+verb to work. An unverified command line that looks authoritative is worse
+than no command line at all.
+
+**So a verb is built here when its command line was read off the parser
+that receives it**, and the rest refuse by name. Built and checked against
+`--help` or the parser source: `session` (start, declare, close, cancel,
+restore, log, decision), `modules create`, `progress`, `bootstrap`, and
+`verify`'s round — `python -m ai_router.verify` with no subcommand IS the
+round. The other twenty answer with a refusal naming the verb and the
+session of the port plan that makes it real. `VERBS.pythonCli === false`
+already distinguished "reached as a library, has no command line"
+(`ledger`, `approved-plan`) from "not built here", and the refusal says
+which.
+
+This is the same discipline `verbs.ts` states for the CLI: "Adding a verb
+here without porting its module is how a verb announces itself before it
+works: the CLI refuses it by name, which is a better answer than 'unknown
+command'."
+
+**Owed.** `ModuleVerbs.list`/`retire`, and several `VerifyVerbs` and
+`WorkflowVerbs` option names, describe a Python surface that does not exist
+in those shapes. Sessions 30, 32 and 34 port those modules; each should
+reconcile the contract against what it ports rather than inherit a shape
+nothing ever ran.
+
+### D153 · 2026-08-28 · Orchestrator (anthropic) · Defect fixed: modules create --title is required, and the extension omitted it whenever the operator accepted the default title -- New Module's likeliest path sent an argparse usage error
+
+`ai_router/modules.py` declares `--title` with `required=True`. The
+extension's `createArgs` omitted it whenever the operator pressed Enter past
+the title prompt, on a belief stated twice — in its own comment ("the CLI's
+own default is the slug, and passing `--title ''` would declare an empty
+title instead of taking it") and in the contract's `ModuleCreateOptions`
+("Omitted rather than empty when the default (the slug) was accepted").
+
+There is no such default. That call sent `create <root> --slug <s>` to a
+parser that requires `--title`, which is an argparse usage error: exit 2,
+classified `failed`, surfaced to the operator as "New module failed:
+usage: ...". The New Module flow's most likely path — accept the suggested
+title — has been broken for as long as the flag has been required.
+
+`PythonSpawnRouter.modules.create` now sends the slug as the title when no
+title was typed, which makes the contract's promise true at the
+implementation rather than at the CLI. The existing argv test changed with
+it; that is the one test the plan anticipated changing, "where a test
+asserted a spawn that no longer exists as such".
+
+Found by reading every parser this session builds argv for, which is the
+same discipline D152 records. It is the kind of defect the seam exists to
+end: a caller's comment asserting a CLI behaviour that the CLI does not
+have, with nothing checking the two against each other.
+
+### D154 · 2026-08-28 · Orchestrator (anthropic) · src/router/ IS the Python implementation, and host.ts is the one composition root; commands/bootstrapProject is the single declared exception because it runs before there is a router to ask
+
+`src/router/` is now the Python implementation and its transport, and
+nothing outside it imports any of them:
+
+- `pythonSpawnRouter.ts` builds the argv and satisfies `Router`;
+- `routerCli.ts` runs it, echoes it, and classifies the exit code;
+- `pythonInterpreter.ts` finds the interpreter;
+- `projectionPayload.ts` narrows what comes back;
+- `host.ts` is the composition root and the only file callers import.
+
+`host.ts` names the production router once. Before it existed each command
+default-constructed its own `PythonSpawnRouter` — that still isolated
+callers from Python's argv, but it restated the choice of implementation
+once per command: six places to find and six chances to miss one. Session 35
+now changes one line.
+
+`host.ts` also carries `RouterCommands`, the extension's own interface for
+"the OPERATOR runs this verb, not the extension" — one method, returning a
+copy-pasteable line or null. It is deliberately not an addition to `Router`:
+`Router` is about answers, and a router that answers in-process has no
+command line to offer. `RouterRefusal` lives here too, because it is derived
+from the contract and is the same type whichever router produced it.
+
+**The one deliberate exception is `commands/bootstrapProject`**, the
+first-run path: it creates a venv and pip-installs the router, so it runs
+BEFORE there is a router to ask and has to know what it is installing. That
+exception is written into `host.ts`, so a reader looking for "what changes
+when the router stops being Python" finds this directory and that one file.
+
+Two defects the verifier caught in this shape, both fixed: `RouterRefusal`
+was first placed beside the implementation, which broke the rule `host.ts`
+states; and a null command line returned silently, so a router with nothing
+to pre-type would have made a clicked Start/Close do nothing. It now says
+so.
+
+**Owed to session 35.** Start and Close are pre-typed into a terminal
+rather than executed, because `session start` needs an engine the OPERATOR
+chooses and `session close` runs gates they should watch. An in-process
+router has no line to pre-type, so what those two commands become is that
+session's product decision. It is recorded in `host.ts` rather than left
+implicit.
+
+### D155 · 2026-08-28 · Orchestrator (anthropic) · The extension's mocha suite stays undeclared and the extension selects no tests: mocha merges a path list with its spec instead of being narrowed by it, so an honest declaration needs D116's runner entry point
+
+`affected` selects nothing for `tools/dabbler-ai-orchestration/`, so this
+session's largest change set had no recordable pre-verification evidence.
+The mocha layer (153 tests) and Playwright (14) were run by hand at every
+step and are green; they are simply not evidence the record can accept,
+because they belong to no declared suite. `dabbler.yaml` said session 24
+would declare one. It does not, and this is why.
+
+**Measured.** `checks.targeted_command` appends the selected paths to the
+declared command, so the bare command must mean "the whole suite" and the
+appended form must mean "these tests". Mocha cannot express that: it MERGES
+a positional path list with its `spec` rather than being narrowed by it —
+tried both ways, `--spec '<glob>' <one file>` and a `.mocharc.json` carrying
+`spec` plus the same positional, and both ran all 153 tests instead of the
+one named.
+
+`runs_whole: true` is the cheap way through and it would be false: mocha
+does take a subset, so declaring that its runner has no subset form would
+put an untrue statement into the audit in order to pass it.
+
+What is missing is a runner entry point of its own — a command that runs
+the whole suite with no arguments and exactly the named files with them.
+That is the shape of **D116**, already owed and already scoped as "a
+session, not a patch". Two smaller pieces were built and then removed while
+establishing this: a `ts-node-register.js` shim that points the compiler at
+the extension's tsconfig from any working directory (needed, because the
+suite must run from the repository root for repository-relative paths to
+resolve), and the suite block itself.
+
+The rule stays honest in the meantime: `select: []` is what the selector can
+truly say about a path no DECLARED test covers, and the comment beside it
+now says what actually covers it and why the declaration is not a line.
+
+### D156 · 2026-08-28 · Orchestrator (anthropic) · Session 24 seat cost: verifier 49,408 in / 12,447 out over four API calls (three rounds plus the adjudication); orchestrator one Claude Code context; 2.5x cheaper on input than session 23, and the adjudication cost 3% of a round
+
+Session 24's seat cost, in the two currencies it ran on, by the method D136
+set down and D148 repeated. No dollar figure: set 109 removed the router's
+rate table, the metrics ledger carries tokens and elapsed time only, and a
+list price recalled from memory would be a guess dressed as a measurement.
+
+**Verifier, four calls over the API, 214 seconds:**
+
+| Call | Model | In | Out |
+| --- | --- | ---: | ---: |
+| Round 1 | gpt-5-6-sol | 31,065 | 6,941 |
+| Round 2 | gpt-5-6-sol | 10,581 | 3,202 |
+| Round 3 | gpt-5-6-sol | 6,193 | 2,088 |
+| Adjudication | gemini-flash | 1,569 | 216 |
+| **Total** | | **49,408** | **12,447** |
+
+**Orchestrator:** Claude Code / claude-opus-5[1m], one context.
+
+**What the shape says.** Round 1 is 63% of the input and each later round
+costs about a third of the one before it, because rounds 2 and 3 review only
+the fix delta. That is the same curve session 23 measured (D148: round 1 was
+78% of four calls), and it is the argument for remediating rather than
+restarting.
+
+Against session 23 — the comparable code session — this one is **cheaper by
+a factor of 2.5 on input** (49,408 against 121,670) over the same number of
+calls. The difference is the change set, not the loop: session 23 generated
+1,400 lines of types for the verifier to read; this one moved and deleted
+more than it added.
+
+The adjudication is the cheapest call of the four by an order of magnitude
+(1,569 in / 216 out) and it is what let the session close VERIFIED rather
+than at the cap. A third provider judging one disputed finding costs about
+3% of a verification round.

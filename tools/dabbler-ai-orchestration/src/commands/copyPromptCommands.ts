@@ -15,7 +15,10 @@
 
 import * as path from "path";
 import * as vscode from "vscode";
-import { SessionRecord, SessionsRepository } from "../types";
+import type {
+  ProgressProjectionSession as SessionRecord,
+} from "dabbler-ai-router";
+import type { SessionsRepository } from "../utils/fileSystem";
 import {
   START_NEXT_SESSION_PROMPT,
   sessionNeedsReading,

@@ -4,9 +4,9 @@ import * as path from "path";
 import {
   ProjectionCache,
   ProjectionResult,
-  parseProjectionPayload,
   projectionCacheKey,
 } from "../../utils/projection";
+import { parseProjectionPayload } from "../../router/projectionPayload";
 import {
   makeProjection,
   makeSession,
@@ -177,20 +177,20 @@ suite("projection: cache", () => {
   test("an unchanged repository is served from cache", async () => {
     const { runner, calls } = countingRunner();
     const cache = new ProjectionCache(runner);
-    await cache.get("python", dir, dir);
-    await cache.get("python", dir, dir);
+    await cache.get(dir, dir);
+    await cache.get(dir, dir);
     assert.strictEqual(calls(), 1);
   });
 
   test("touching a derivation input re-projects", async () => {
     const { runner, calls } = countingRunner();
     const cache = new ProjectionCache(runner);
-    await cache.get("python", dir, dir);
+    await cache.get(dir, dir);
     const ledger = path.join(dir, "sessions.json");
     fs.writeFileSync(ledger, '{"changed": true}');
     const future = new Date(Date.now() + 5000);
     fs.utimesSync(ledger, future, future);
-    await cache.get("python", dir, dir);
+    await cache.get(dir, dir);
     assert.strictEqual(calls(), 2);
   });
 
@@ -200,11 +200,11 @@ suite("projection: cache", () => {
       calls += 1;
       return { payload: null, error: "boom" };
     });
-    await cache.get("python", dir, dir);
-    await cache.get("python", dir, dir);
+    await cache.get(dir, dir);
+    await cache.get(dir, dir);
     assert.strictEqual(calls, 1);
     cache.clear();
-    await cache.get("python", dir, dir);
+    await cache.get(dir, dir);
     assert.strictEqual(calls, 2);
   });
 

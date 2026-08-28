@@ -4,7 +4,7 @@ import {
   findCommandOnPath,
   resolvePythonInterpreter,
   venvInterpreterCandidate,
-} from "../../utils/pythonInterpreter";
+} from "../../router/pythonInterpreter";
 
 suite("WorkExplorerTreeProvider: scan diagnostics", () => {
   test("a clean scan clears the message", () => {

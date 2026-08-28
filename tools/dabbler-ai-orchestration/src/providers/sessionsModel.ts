@@ -2,7 +2,11 @@
 // row naming, progress text, and the verdict-cleanliness rule. No vscode
 // import.
 
-import { SessionRecord, SessionStatus, SessionsRepository } from "../types";
+import type {
+  ProgressProjectionSession as SessionRecord,
+  ProgressProjectionSessionStatus as SessionStatus,
+} from "dabbler-ai-router";
+import type { SessionsRepository } from "../utils/fileSystem";
 import { isRecognizedVerdictToken } from "../utils/verdictTokens";
 
 /**

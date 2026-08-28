@@ -6,7 +6,10 @@
 // a session. They are rules, not renderings, so they live in one place
 // and the native row command and the context menu share them.
 
-import { SessionRecord, SessionsRepository } from "../types";
+import type {
+  ProgressProjectionSession as SessionRecord,
+} from "dabbler-ai-router";
+import type { SessionsRepository } from "../utils/fileSystem";
 
 // ----- left-click dual-action decision -----
 

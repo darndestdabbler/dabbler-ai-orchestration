@@ -1,7 +1,7 @@
 // Workspace discovery and the repository scan.
 //
 // The scan's job is assembly, not derivation: every session's display
-// state comes from the Python projection (utils/projection.ts). This
+// state comes from the router's projection (utils/projection.ts). This
 // module finds the repositories in the window and hands each one's
 // sessions root to that projection.
 //
@@ -13,9 +13,65 @@ import * as cp from "child_process";
 import * as fs from "fs";
 import * as path from "path";
 import * as vscode from "vscode";
-import { SessionsRepository } from "../types";
+import type {
+  ProgressProjectionOrchestrator as OrchestratorInfo,
+  ProgressProjectionRepository,
+  ProgressProjectionSession as SessionRecord,
+} from "dabbler-ai-router";
 import { ProjectionCache, ProjectionResult } from "./projection";
-import { resolvePythonInterpreter } from "./pythonInterpreter";
+
+/**
+ * Where a repository's sessions came from. `ledger` is the
+ * machine-written record; `plan` is a repository that has been set up
+ * and never run, whose sessions are the ones its plan declares — the
+ * two setup sessions bootstrap scaffolds, before the first registration
+ * writes anything.
+ */
+export type SessionsSource = ProgressProjectionRepository["sessionsSource"];
+
+/**
+ * One discovered repository and the sessions it holds — the Work
+ * Explorer's root row.
+ *
+ * This is the extension's own shape, not the projection's: it is what
+ * `buildRepository` below assembles, and it lives here because this is
+ * the only place that assembles one. Everything it carries about
+ * SESSIONS is the projection's answer, typed by the projection's
+ * generated types.
+ *
+ * The four file paths are the sessions root's own artifacts. They are
+ * the whole Open File surface: a repository has one plan, one activity
+ * log, one change log and one ledger, so there is nothing to select
+ * between.
+ */
+export interface SessionsRepository {
+  /** Repository root — the spawn cwd and the interpreter's home. */
+  root: string;
+  /** `<root>/docs/sessions`. */
+  sessionsDir: string;
+  /** Display name; `path.basename(root)`. */
+  label: string;
+  planPath: string;
+  activityPath: string;
+  changeLogPath: string;
+  ledgerPath: string;
+  totalSessions: number | null;
+  sessionsCompleted: number;
+  currentSession: number | null;
+  forceClosed: boolean;
+  schemaVersionOnDisk: number | null;
+  sessionsSource: SessionsSource;
+  invariantViolation: string | null;
+  orchestrator: OrchestratorInfo | null;
+  /**
+   * The projection's sessions, with tasks populated on the in-flight
+   * session only. Empty when the projection was unavailable (no
+   * interpreter, no router) — the repository row still renders, and the
+   * view says the rendering is degraded rather than guessing statuses
+   * that only the router decides.
+   */
+  sessions: SessionRecord[];
+}
 
 export const SESSIONS_REL = path.join("docs", "sessions");
 export const LEDGER_FILENAME = "sessions.json";
@@ -166,11 +222,7 @@ export async function scanRepositories(
   const projectionErrors: Array<{ root: string; error: string }> = [];
   for (const root of discoverRoots()) {
     if (!hasSessionsRoot(root)) continue;
-    const projection = await cache.get(
-      resolvePythonInterpreter(root),
-      sessionsDirOf(root),
-      root,
-    );
+    const projection = await cache.get(sessionsDirOf(root), root);
     if (!projection.payload && projection.error) {
       projectionErrors.push({ root, error: projection.error });
     }

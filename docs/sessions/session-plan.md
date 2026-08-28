@@ -41,7 +41,7 @@ requiresUAT: false
 requiresE2E: false
 pathAwareCritique: none
 module: default
-totalSessions: 17
+totalSessions: 20
 prerequisites: []
 ```
 
@@ -118,7 +118,7 @@ or remediated at the cap.
 
 ## Sessions
 
-### Session 1 of 19: Verify the design before anything is built
+### Session 1 of 20: Verify the design before anything is built
 
 1. Register.
 2. Run cross-provider verification over `docs/session-framework-spec.md`
@@ -139,15 +139,15 @@ or remediated at the cap.
 measurement of what a verification round costs on the seat.
 Est. 0 tests — this session writes no code.
 
-### Session 2 of 19: Verify this breakdown against that design
+### Session 2 of 20: Verify this breakdown against that design
 
 1. Register.
 2. Check this session list against the verified specification and plan:
    every plan item appears exactly once, nothing in the spec is unbuilt by
    the end, and no session depends on something a later session creates.
 3. **Confirm the session 14 reordering is sound** — that no session between
-   3 and 13 depends on session sets being collapsed, and that sessions 15
-   through 17 do.
+   3 and 13 depends on session sets being collapsed, and that the extension
+   sessions — 15, 16, 18 and 19 — do.
 4. Cross-provider verification of this spec file.
 5. Remediate; stop on Minor-only; record the terminal state reached.
 6. Close-out.
@@ -156,7 +156,7 @@ Est. 0 tests — this session writes no code.
 approval gates the specification used to carry. Est. 0 tests.
 
 
-### Session 3 of 19: The credential allowlist (plan A1)
+### Session 3 of 20: The credential allowlist (plan A1)
 
 1. Register.
 2. **Replace the operator override with an honest terminal state — one
@@ -225,7 +225,7 @@ Python tests.
 
 
 
-### Session 4 of 19: Record authority (plan A2)
+### Session 4 of 20: Record authority (plan A2)
 
 1. Register.
 2. One `validate_transition()` used by both `workflow.append()` and
@@ -246,7 +246,7 @@ Python tests.
 tests.
 
 
-### Session 5 of 19: The two files, framework-written (plan A4)
+### Session 5 of 20: The two files, framework-written (plan A4)
 
 1. Register.
 2. `project-work-plan.md` and `decisions-log.md` written only through
@@ -275,7 +275,7 @@ declaration session 13 reads. Est. 8 Python tests.
 > here because this is the session that already writes the session list.
 
 
-### Session 6 of 19: The verifier's read surface (plan A5, first half)
+### Session 6 of 20: The verifier's read surface (plan A5, first half)
 
 1. Register.
 2. Three operations for the verifier on the Copilot path: list files with a
@@ -305,7 +305,7 @@ Python tests.
 > shown*.
 
 
-### Session 7 of 19: The test-write path (plan A5, second half)
+### Session 7 of 20: The test-write path (plan A5, second half)
 
 1. Register.
 2. The fourth operation: create or modify a test file. **The framework
@@ -320,7 +320,7 @@ Python tests.
 **Creates:** the only write the verifier gets, and its enforcement.
 Est. 8 Python tests.
 
-### Session 8 of 19: Selection by role, and the death of the tier ladder (plan A6)
+### Session 8 of 20: Selection by role, and the death of the tier ladder (plan A6)
 
 1. Register.
 2. Lift roles out of the Copilot transport block; both paths resolve the
@@ -365,7 +365,7 @@ surface; a net deletion. Est. 12 Python tests, with more deleted than added.
 > session already rewrites — one config change, one review.
 
 
-### Session 9 of 19: Model discovery (plan A7)
+### Session 9 of 20: Model discovery (plan A7)
 
 1. Register.
 2. Enumerate each vendor's models endpoint on the direct-API path and write
@@ -388,7 +388,7 @@ surface; a net deletion. Est. 12 Python tests, with more deleted than added.
 **Creates:** enumeration, the staleness check, and the drift diff.
 Est. 10 Python tests.
 
-### Session 10 of 19: The code review loop (plan B1)
+### Session 10 of 20: The code review loop (plan B1)
 
 1. Register.
 2. `verify → fix`, cap 3, stopping early when only Minor findings remain.
@@ -424,7 +424,7 @@ tests.
 > exit that was not a false statement on the record.
 
 
-### Session 11 of 19: The verifier authors tests, the framework runs them (plan B2)
+### Session 11 of 20: The verifier authors tests, the framework runs them (plan B2)
 
 1. Register.
 2. The verifier writes test files through the session 7 write path;
@@ -440,7 +440,7 @@ tests.
 
 **Creates:** the authoring hand-off and the test loop. Est. 8 Python tests.
 
-### Session 12 of 19: The full suite and its bounded fix loop (plan B3)
+### Session 12 of 20: The full suite and its bounded fix loop (plan B3)
 
 1. Register.
 2. The suite runs against the tree including the verifier's new tests. On
@@ -460,7 +460,7 @@ tests.
 **Creates:** the envelope, which is the whole feature. Est. 10 Python
 tests.
 
-### Session 13 of 19: Packaging to the feed (plan C)
+### Session 13 of 20: Packaging to the feed (plan C)
 
 1. Register.
 2. `pack`, then `push` to the Azure DevOps feed with the operator's PAT,
@@ -477,7 +477,7 @@ tests.
 **Creates:** the one thing staff explicitly asked the framework to do.
 Est. 8 Python tests.
 
-### Session 14 of 19: Collapse session sets (plan A3)
+### Session 14 of 20: Collapse session sets (plan A3)
 
 1. Register — **for the last time under the set-based machinery.**
 2. Sessions numbered directly in a repository. Remove the set level from
@@ -495,7 +495,7 @@ Est. 8 Python tests.
 through it. **The risk here is missed references, not design.** Est. 12
 Python tests.
 
-### Session 15 of 19: The sessions view (plan D1)
+### Session 15 of 20: The sessions view (plan D1)
 
 1. Register — under the collapsed machinery from session 14.
 2. Sessions view without the set level, preserving the existing row actions
@@ -527,7 +527,7 @@ Python tests.
    handle.** `sessions.json` holds a title per session and
    `progress.heal_title` replaces a stored title only when it is generic,
    so re-cutting a plan leaves the moved sessions carrying the titles of
-   whatever used to sit at their numbers — sessions 17 and 18 are in that
+   whatever used to sit at their numbers — sessions 16 and 17 are in that
    state right now. This session renders those titles, so it is the one
    that has to notice they can be stale. A not-started session with no
    history has no title worth preserving against the plan's.
@@ -539,7 +539,7 @@ Python tests.
 **Creates:** the collapsed tree, padded row labels, and the icons
 untouched. Est. 8 TS tests.
 
-### Session 16 of 19: The task level (plan D1, second half)
+### Session 16 of 20: The task level (plan D1, second half)
 
 1. Register.
 2. **A task level below the session, read from the enforced record.** A
@@ -593,7 +593,67 @@ in advance -- steps 2-5 were the view, steps 6-10 were the task level --
 after session 14 proved what carrying two subsystems costs (D92). The
 operator cut it here rather than discovering the cap again mid-round.
 
-### Session 17 of 19: Project setup as two sessions (plan D2)
+### Session 17 of 20: The tracked project config (precondition for D2)
+
+**Why this exists, and why it sits before project setup.** Session 18 makes
+project setup available to repositories that are not this one. A repository
+set up that way has nowhere tracked to say what its tests are or how to run
+them. Configuration resolves as the packaged `router-config.yaml` deep-merged
+with a project-local `local-overrides.yaml`, and that overlay is gitignored;
+`config._resolve_config_sources` returns those two and nothing else. The
+arrangement works here only because this repository *is* the router, so its
+`testing.suites` and its two hundred lines of `testing.selection.rules` ship
+inside the package they configure.
+
+`AI_ROUTER_CONFIG` is not the escape. A named config "is the whole answer and
+takes no overlay", so a Java repository pointing at its own file would fork
+the provider list, the model registry and the role preferences in order to
+declare `mvn -q test`. That is the drift the layering exists to prevent.
+
+**A suite command, its test roots, its path-to-test mapping and a packaging
+feed are repository facts.** CI reads them, the next machine reads them, and
+`ai_router.affected` refuses to run without them. None of them can live in a
+gitignored file, and none belong in the installed distribution. Project setup
+shipped before this ships a scaffold whose first real session cannot reach
+step 4 of its own lifecycle.
+
+1. Register.
+2. **A third config source, tracked.** `dabbler.yaml` at the repository root,
+   carrying `testing`, `packaging` and `paths` behind a `schema_version`.
+   Precedence is packaged defaults, then this file, then
+   `local-overrides.yaml`. The bundled config keeps providers, models and
+   roles: those are distribution facts and do not become a per-repository
+   decision.
+3. **The overlay stops being able to say anything it likes.** Deep merge
+   today would let a gitignored machine file replace a suite command or a
+   packaging feed, and the run of record would then attribute to the
+   repository a command it never declared. Give the overlay its own schema
+   and refuse a key the repository owns. "Machine facts only" is a comment
+   until something enforces it.
+4. **Suites become plural in fact, not only in the schema.** `test_roots` and
+   `test_glob` are declared per suite, because a repository that is Java and
+   .NET at once has two of each and `pack` cannot say which ecosystem made
+   which artifact. Session 18 will meet such a repository in its first
+   project, so the shape has to exist before it, not after.
+5. **This repository moves its own `testing` block out of package data and
+   into its own `dabbler.yaml`, and that migration is the test.** A rule set
+   that has only ever been read from the package it ships in has never proven
+   it can be read from a repository. Doing it here is also the only way this
+   session makes anything smaller rather than only adding.
+6. Affected tests as preverify.
+7. Cross-provider verification.
+8. Full test suite, recorded as the `final-full` run of record.
+9. Close-out.
+
+**Creates:** the surface a repository that is not the router declares itself
+on. Est. 12 Python tests.
+
+**What this session is not.** It does not touch the record's own integrity —
+there is still no sanctioned way to correct a wrong machine-written entry,
+and an append-only record edited by hand is the one repair the framework must
+never accept. That is a separate session and it is not yet planned.
+
+### Session 18 of 20: Project setup as two sessions (plan D2)
 
 1. Register.
 2. Create or import the project plan, then break it into numbered sessions
@@ -612,7 +672,7 @@ operator cut it here rather than discovering the cap again mid-round.
 **Creates:** project setup, which is the framework's own sessions 1 and 2
 made available to everyone else. Est. 8 TS tests.
 
-### Session 18 of 19: The unresolved-session view (plan D3)
+### Session 19 of 20: The unresolved-session view (plan D3)
 
 1. Register.
 2. Read at planning time rather than as an interruption: what stopped, at
@@ -633,7 +693,7 @@ made available to everyone else. Est. 8 TS tests.
 **Creates:** the last surface, and the one that makes an unresolved session
 useful instead of merely failed. Est. 8 TS tests.
 
-### Session 19 of 19: A round baseline that survives the trip (root cause of D98)
+### Session 20 of 20: A round baseline that survives the trip (root cause of D98)
 
 **Why this exists.** A verification round records `completion_tree`, written
 by `snapshot_worktree_tree` through a throwaway index and anchored to no
@@ -695,7 +755,7 @@ pays for itself the first time a moved session is too large to re-review.
 ## Acceptance criterion for the set
 
 **The framework can run its own next session.** Not "the tests pass" and
-not "the plan was followed" — the working test is whether session 19 could
+not "the plan was followed" — the working test is whether session 20 could
 have been specified, developed, verified, tested and closed by the thing
 this set built, rather than by the machinery it replaces.
 

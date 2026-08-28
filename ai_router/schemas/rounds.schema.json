@@ -50,6 +50,19 @@
     "baseline_tree": { "type": ["string", "null"] },
     "completion_tree": { "type": "string", "minLength": 7 },
     "previous_tree": { "type": "string", "minLength": 7 },
+    "head_commit": {
+      "type": ["string", "null"],
+      "description": "The commit HEAD stood at when this round was recorded. A baseline recovery places itself by topology when this is present and falls back to committer timestamps when it is not, so rows written before this field existed still resolve. Optional for exactly that reason."
+    },
+    "baseline_reanchor": {
+      "description": "Present only when this round was measured from a substitute baseline because the previous round's snapshot tree was unreachable in this object store (see baseline-reanchors.jsonl). previous_tree still names where the previous round ended; anchor_tree names where this round actually diffed from. A round carrying this key is a weaker record than one without it.",
+      "type": "object",
+      "required": ["recorded_tree", "anchor_tree"],
+      "properties": {
+        "recorded_tree": { "type": "string", "minLength": 7 },
+        "anchor_tree": { "type": "string", "minLength": 7 }
+      }
+    },
     "recorded_at": { "type": "string", "minLength": 1 },
     "transport": { "type": "string" },
     "agency": {

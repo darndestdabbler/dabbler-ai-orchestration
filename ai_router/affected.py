@@ -363,7 +363,10 @@ def preverify_baseline(repo_root, sessions_dir):
     )
     for row in reversed(rounds):
         if row.get("completion_tree"):
-            return row["completion_tree"]
+            # The recorded tree, or the substitute a re-anchor supplied when
+            # this object store does not hold it. Selection has to measure
+            # from the same place the round will.
+            return ledger.effective_baseline(repo_root, current, row)
     return None
 
 
@@ -704,6 +707,25 @@ def main(argv=None) -> int:
     )
     changed = working_tree_changes(repo_root, baseline)
     if changed is None:
+        # "git could not answer" is not a useful thing to be told. The one
+        # cause that is not a broken repository is a baseline object this
+        # store does not hold, which is what a session moved between
+        # machines arrives with -- so say that, and name the recovery.
+        from .evidence import object_exists
+
+        if baseline and not object_exists(repo_root, baseline):
+            print(
+                f"affected: the recorded baseline tree {baseline[:12]} is "
+                "not in this repository, so the change set cannot be "
+                "measured. A round snapshot is anchored to no ref and never "
+                "travels with a push; a session that moved machines leaves "
+                "it behind. Re-anchor the round onto a commit this history "
+                "passed through:\n"
+                "  python -m ai_router.verify reanchor --commit <sha> "
+                "--reason \"<why the recorded tree is unreachable>\"",
+                file=sys.stderr,
+            )
+            return 2
         print("affected: could not determine the change set", file=sys.stderr)
         return 2
 

@@ -9,6 +9,8 @@ import pytest
 from ai_router import journal
 from ai_router.journal import JournalCorrupt
 
+NEWLINE = chr(10)
+
 
 def _actor():
     return journal.actor(journal.ACTOR_FRAMEWORK, "test")
@@ -62,7 +64,7 @@ def test_a_torn_final_line_is_ignored_and_repaired_before_the_next_append(
     _checkpoint(root, "one")
     path = journal.journal_path(root)
     with open(path, "ab") as handle:
-        handle.write(b'{"schema_version": 1, "sequence": 2, "eve')
+        handle.write(b'{"schema_version": 2, "sequence": 2, "eve')
 
     assert [e["summary"] for e in journal.read_events(root)] == ["one"]
 
@@ -129,11 +131,113 @@ def test_an_unknown_schema_version_is_never_coerced(run_repo):
     _checkpoint(root, "one")
     path = journal.journal_path(root)
     path.write_bytes(
-        path.read_bytes().replace(b'"schema_version":1', b'"schema_version":9')
+        path.read_bytes().replace(b'"schema_version":2', b'"schema_version":9')
     )
 
     with pytest.raises(JournalCorrupt, match="schema_version 9"):
         journal.read_events(root)
+
+
+def _v1_line(sequence, event_type, payload, run_id="r0001-demo"):
+    """One raw version-1 row: the shape a pre-collapse journal holds."""
+    return json.dumps({
+        "schema_version": 1,
+        "sequence": sequence,
+        "event_id": f"e{sequence:04d}",
+        "event_type": event_type,
+        "occurred_at": "2026-08-20T10:00:00+00:00",
+        "repository_id": "sha256:" + "a" * 64,
+        "worktree_id": "w0001",
+        "run_id": run_id,
+        "attempt": 1,
+        "actor": {"kind": "framework", "id": "test", "provider": None},
+        "summary": event_type,
+        "artifact_refs": [],
+        "payload": payload,
+    })
+
+
+def _write_v1(root, *lines):
+    path = journal.journal_path(root)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(NEWLINE.join(lines) + NEWLINE, encoding="utf-8")
+    return path
+
+
+def _v1_run_created(sequence=1, slug="148-the-session-framework", session=3,
+                    run_id="r0001-demo"):
+    return _v1_line(sequence, "run.created", {
+        "policy": "verified", "ask": "do the thing", "base_commit": None,
+        "worktree_id": "w0001", "branch": None,
+        "set_slug": slug, "session_number": session,
+    }, run_id=run_id)
+
+
+def test_a_pre_collapse_journal_is_read_forward(run_repo):
+    """One set's session numbers are already the repository's, so a version
+    1 journal is migrated on read rather than stranded. The bytes on disk
+    are untouched: the upgrade is what the reader sees, not a rewrite."""
+    root = journal.control_root()
+    path = _write_v1(
+        root,
+        _v1_run_created(1),
+        _v1_line(2, "organization.cancelled", {
+            "target": "session", "set_slug": "148-the-session-framework",
+            "session_number": 4, "reason": "scope cut",
+        }),
+    )
+    before = path.read_bytes()
+
+    events = journal.read_events(root)
+
+    assert [e["sequence"] for e in events] == [1, 2]
+    assert all(e["schema_version"] == journal.SCHEMA_VERSION for e in events)
+    assert "set_slug" not in events[0]["payload"]
+    assert events[0]["payload"]["session_number"] == 3
+    assert "target" not in events[1]["payload"]
+    assert events[1]["payload"]["reason"] == "scope cut"
+    assert path.read_bytes() == before
+
+
+def test_a_journal_spanning_two_sets_keeps_the_older_set_as_history(run_repo):
+    """Each set numbered its sessions from 1, so the numbers agreeing means
+    nothing. The active set -- the one whose run was started last -- becomes
+    the repository's sessions; the earlier set keeps its identity and is
+    never read as a session of this repository."""
+    root = journal.control_root()
+    _write_v1(
+        root,
+        _v1_run_created(1, slug="147-one", session=1, run_id="r0001-old"),
+        _v1_run_created(2, slug="148-two", session=1, run_id="r0002-new"),
+    )
+
+    events = journal.read_events(root)
+
+    assert [e["sequence"] for e in events] == [1, 2]
+    assert events[0]["payload"]["legacy_set"] == "147-one"
+    assert "legacy_set" not in events[1]["payload"]
+    assert all("set_slug" not in e["payload"] for e in events)
+
+
+def test_a_set_level_organization_event_survives_as_a_retired_fact(run_repo):
+    """Cancelling a whole set acted on something that is not a concept any
+    more, so it maps onto no session -- but it happened, and refusing the
+    journal over it would strand every run beside it."""
+    root = journal.control_root()
+    _write_v1(
+        root,
+        _v1_run_created(1),
+        _v1_line(2, "organization.cancelled", {
+            "target": "set", "set_slug": "148-the-session-framework",
+            "reason": "abandoned",
+        }),
+    )
+
+    events = journal.read_events(root)
+
+    assert events[1]["payload"]["legacy_set"] == "148-the-session-framework"
+    assert "session_number" not in events[1]["payload"]
+    assert events[1]["payload"]["reason"] == "abandoned"
 
 
 def test_read_after_returns_the_contiguous_suffix(run_repo):
@@ -184,7 +288,10 @@ def test_events_are_written_as_one_object_per_line(run_repo):
 
     lines = journal.journal_path(root).read_text(encoding="utf-8").splitlines()
     assert len(lines) == 2
-    assert all(json.loads(line)["schema_version"] == 1 for line in lines)
+    assert all(
+        json.loads(line)["schema_version"] == journal.SCHEMA_VERSION
+        for line in lines
+    )
 
 
 def test_a_lock_being_born_is_not_reclaimed(run_repo):

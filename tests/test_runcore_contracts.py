@@ -96,6 +96,60 @@ def test_a_malformed_projection_is_refused(run_repo, run_config):
         runproject._validate(projection, "run-projection", "run projection")
 
 
+def test_a_legacy_run_is_history_and_never_a_session_of_this_repository(
+    run_repo, run_config
+):
+    """The load-bearing half of the version 1 migration. A retired set's
+    run keeps its identity and stays visible under `runs`, but joining it to
+    the plan session whose number it happens to share would merge two
+    histories that both numbered their sessions from 1."""
+    root = journal.control_root()
+    journal.append(
+        root, event_type="run.created", run_id="r0001-legacy", attempt=1,
+        actor=journal.actor(journal.ACTOR_FRAMEWORK, "test"),
+        summary="a run from a retired set",
+        payload={
+            "policy": "fast", "ask": "old work", "base_commit": None,
+            "worktree_id": "w0001", "branch": None, "session_number": 1,
+            "legacy_set": "147-a-retired-set",
+        },
+    )
+
+    projection = runproject.build_projection(root)
+
+    assert "r0001-legacy" in [r["run_id"] for r in projection["runs"]]
+    session_one = next(
+        s for s in projection["sessions"] if s["number"] == 1
+    )
+    assert session_one["run_ids"] == []
+
+
+def test_a_retired_sets_cancellation_leaves_live_work_alone(
+    run_repo, run_config
+):
+    """Every set numbered its sessions from 1, so a retired set's
+    cancellation of its session 1 arrives carrying the number of this
+    repository's session 1. Isolating the runs is not enough; the lifecycle
+    event has to be isolated too, or live work reads as cancelled."""
+    root = journal.control_root()
+    actor = journal.actor(journal.ACTOR_FRAMEWORK, "test")
+    journal.append(
+        root, event_type="organization.cancelled", run_id=None, attempt=1,
+        actor=actor, summary="a retired set cancelled its session 1",
+        payload={"session_number": 1, "reason": "abandoned",
+                 "legacy_set": "147-a-retired-set"},
+    )
+
+    states = runproject.organization_states(journal.read_events(root))
+    assert states == {}
+
+    session_one = next(
+        s for s in runproject.build_projection(root)["sessions"]
+        if s["number"] == 1
+    )
+    assert session_one["state"] != "cancelled"
+
+
 def test_a_malformed_organization_document_is_refused():
     with pytest.raises(ValueError, match="number"):
         runproject._validate(

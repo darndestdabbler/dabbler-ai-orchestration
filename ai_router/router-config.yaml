@@ -551,6 +551,12 @@ testing:
           - tests/test_identity.py
           - tests/test_session.py
           - tests/test_verify.py
+      - when: ai_router/journal.py
+        select:
+          - tests/test_journal.py
+          - tests/test_runcore_contracts.py
+          - tests/test_runcore_recovery.py
+          - tests/test_runcore_fast.py
       - when: ai_router/ledger.py
         select:
           - tests/test_ledger.py
@@ -614,6 +620,13 @@ testing:
           - tests/test_runcore_verified.py
           - tests/test_runcore_recovery.py
           - tests/test_runcore_independence.py
+      - when: ai_router/runproject.py
+        select:
+          - tests/test_runcore_fast.py
+          - tests/test_runcore_contracts.py
+          - tests/test_runcore_recovery.py
+          - tests/test_runcore_independence.py
+          - tests/test_runcore_verified.py
       - when: ai_router/runtime_mode.py
         select:
           - tests/test_route.py

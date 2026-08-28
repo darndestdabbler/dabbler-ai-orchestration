@@ -194,6 +194,63 @@ def next_round_number(repo_root, session_number: int) -> int:
     return (rounds[-1]["round"] + 1) if rounds else 1
 
 
+# --- baseline-reanchors.jsonl ------------------------------------------------
+
+REANCHOR_FILENAME = "baseline-reanchors.jsonl"
+
+
+def reanchors_path(repo_root, session_number: int) -> Path:
+    return session_run_dir(repo_root, session_number) / REANCHOR_FILENAME
+
+
+def validate_reanchor(record: dict) -> dict:
+    return _validate(
+        record, "baseline-reanchor.schema.json", "baseline re-anchor"
+    )
+
+
+def read_reanchors(repo_root, session_number: int) -> list[dict]:
+    """Every recorded re-anchor, ascending by round."""
+    rows = _read_jsonl(
+        reanchors_path(repo_root, session_number), validate_reanchor
+    )
+    rows.sort(key=lambda r: r["round"])
+    return rows
+
+
+def append_reanchor(repo_root, session_number: int, record: dict) -> dict:
+    """Append one validated re-anchor. Refuses a second one for the same
+    round: a baseline is recovered once, and a round whose recovery can be
+    revised is a round whose scope the author chooses."""
+    validate_reanchor(record)
+    for existing in read_reanchors(repo_root, session_number):
+        if existing["round"] == record["round"]:
+            raise LedgerError(
+                f"round {record['round']} of session {session_number} is "
+                f"already re-anchored to {existing['anchor_tree'][:12]}; "
+                "a baseline is recovered once, never revised"
+            )
+    path = reanchors_path(repo_root, session_number)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "a", encoding="utf-8") as f:
+        f.write(json.dumps(record) + "\n")
+    return record
+
+
+def effective_baseline(repo_root, session_number: int, round_row: dict):
+    """The tree a later round actually diffs from: the round's recorded
+    completion tree, or the re-anchored substitute when one was recorded.
+    Callers must use this rather than reading ``completion_tree`` directly,
+    or a recovered session silently diffs against an object it lacks."""
+    recorded = (round_row or {}).get("completion_tree")
+    if not recorded:
+        return recorded
+    for row in read_reanchors(repo_root, session_number):
+        if row["round"] == round_row.get("round"):
+            return row["anchor_tree"]
+    return recorded
+
+
 # --- step-execution.jsonl ----------------------------------------------------
 
 STEP_EXECUTION_FILENAME = "step-execution.jsonl"

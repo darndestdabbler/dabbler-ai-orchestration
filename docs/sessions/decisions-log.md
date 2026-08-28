@@ -2254,3 +2254,263 @@ dispatch, and the task level depends on the view rather than the reverse.
 D92's lesson was that the evidence cap is a planning signal and not a
 threshold to get under. Naming the split in advance is how that signal
 produces a split next time instead of a heroic round.
+
+### D98 · 2026-08-28 · Orchestrator (claude-opus-5/anthropic) · A round's baseline can be recovered when its snapshot tree stayed on another machine
+
+Session 14 moved to the operator's other machine and round 2 could not
+start. `affected` said only "could not determine the change set", and the
+cause was one object: round 1's `completion_tree` `92a55874` is not in this
+repository, so the fix delta had nothing to measure from.
+
+**The ledger rows travelled and the objects they name did not.** A round
+snapshot is written by `snapshot_worktree_tree` through a throwaway index
+and anchored to no ref — there are no `refs/dabbler/*` refs and no
+`update-ref` anywhere in `ai_router`. A dangling tree is garbage-collectable
+on the machine that wrote it and is never pushed. de583d11 tracked
+`.dabbler/runs/` and 913eb65f taught `.gitignore` to keep letting new files
+in; both were necessary and neither was sufficient, because a row that
+points into a machine-local object store is portable only in appearance.
+
+**What was built: a recovery, not a skip.** `python -m ai_router.verify
+reanchor --commit <sha> --reason "<why>"` records one row in
+`.dabbler/runs/s<N>/baseline-reanchors.jsonl` naming a commit-reachable tree
+for the latest round to be diffed from. `ledger.effective_baseline()` is now
+the only way `verify` and `affected` read a prior round's baseline.
+
+Every refusal on it exists so it cannot become a way to choose one's own
+review scope:
+
+- **Refused while the recorded tree resolves.** On a machine that still
+  holds the object there is nothing to recover, and re-anchoring there would
+  be an author selecting what the next round sees.
+- **Refused onto HEAD.** Diffing the working tree against HEAD would leave
+  the committed fix unreviewed — the one outcome this path must not be able
+  to produce.
+- **Refused onto anything that is not a strict ancestor of HEAD.** A
+  baseline is a place this history actually passed through, never a
+  fabricated tree.
+- **Refused a second time for the same round.** A recovery that can be
+  revised is a scope the author keeps re-choosing.
+- **The reason is mandatory and permanent**, and the round it produces
+  carries `baseline_reanchor` naming both trees. `previous_tree` still says
+  where round 1 ended; the new key says where round 2 actually measured
+  from. A reader must not have to infer the difference.
+
+**`gates.py` deliberately does not use it, and the asymmetry is the point.**
+A fix delta measured from a substitute baseline only changes what the next
+round is *shown*. The close's drift check asks whether the tree still *is*
+the verified one, and without the verified tree there is no answer — so it
+keeps reading `completion_tree` directly and fails closed. Widening a review
+is recoverable; asserting an unproven identity is not.
+
+**What this costs, stated plainly.** Round 2 is measured from the tree of
+8a663ed8 rather than from the tree round 1 actually completed at. Those are
+not the same tree: `.dabbler` was ignored then and is dropped from snapshots
+either way, so if nothing had changed between the round-1 snapshot and the
+commit they would be identical, and they are not. Whatever landed in that
+gap is reviewed by no round. It is small and it is not nothing, and the
+ledger now says so out loud rather than leaving a reader to assume round 2
+picked up exactly where round 1 stopped.
+
+**The root cause is still open and is owed.** The fix is to anchor each
+snapshot tree under a ref — `refs/dabbler/rounds/s<N>/r<R>` — at the moment
+the round is recorded, so the object survives gc and travels with the push
+that already carries the row. The operator chose the recovery path alone for
+this session rather than both, on D92's reasoning that an over-large session
+is what made session 14 unfinishable. Until that lands, every session that
+changes machines mid-flight needs this recovery, and every use of it is a
+weaker record.
+
+### D99 · 2026-08-28 · Orchestrator (claude-opus-5/anthropic) · Round 2's three findings: one real fix, one version bump, one dispute the re-anchor caused
+
+Round 2 returned three blocking findings against the re-anchored delta.
+Two were acted on and one is disputed; the reasoning for each is here so
+the next round is not asked to reconstruct it.
+
+**Issue 3 was mine, and it was right.** `run_reanchor` claimed its checks
+meant re-anchoring "cannot become a way to choose one's own review scope",
+and then enforced only that the commit was a strict ancestor of `HEAD`.
+Remediation spans commits. An author with fixes C1, C2, C3 could anchor on
+C2 and the next round would see only C3 -- the earlier fixes dropped out of
+their own review by a path built to prevent exactly that.
+
+The rule is now narrower and derives from what a round actually is. A round
+reviewed a working tree at a moment, so exactly two commits can stand in
+for that tree: **the last one made at or before the round's `recorded_at`**
+(the tree it started from) and **the first one made after it** (what the
+reviewed work became, if it was uncommitted at review time). Everything
+later contains remediation the next round is supposed to see. Against this
+history the rule resolves to `{5c017b82, 8a663ed8}`; the existing anchor
+stays legal and the finding's own scenario -- the newest ancestor,
+`913eb65f` -- is refused. Ancestry is no longer checked separately: walking
+first-parent history from `HEAD` implies it.
+
+**Issue 1 was real in mechanism and is answered by a version, not a
+migration.** `bbc03beb` dropped `set_slug` from `run.created` and
+`target`/`set_slug` from the organization events while leaving
+`schema_version` at `const: 1`, and every payload schema is closed. A
+version 1 journal therefore fails validation as an unexplained
+`additionalProperties` error rather than as the compatibility break it is.
+
+The envelope is now version 2, and `validate_event` refuses an older
+journal **by name and by direction**: "upgrade the router" is the wrong
+advice for a file that predates a breaking change. A deterministic
+migration was considered and rejected for now. It needs a rule mapping
+legacy per-set `(set_slug, session_number)` pairs onto repository-wide
+numbers, and that rule presupposes D88's answer -- whether the run core's
+projection replaces the lifecycle's records or is retired -- which is the
+operator's open question. This repository has no `.dabbler/journal.jsonl`
+at all and its projection carries `runs: []` after fourteen sessions, so
+nothing here is stranded. **The operator chose the version bump over the
+migration**, on the grounds that it is correct whichever way D88 goes.
+
+**Issue 2 is disputed, and the reason it was raised is worth more than the
+finding.** It asserted that round 1's cancelled-session defect was still
+unfixed. It is fixed: `_next_available`, `_cancelled_numbers` and the
+refusal that points at `restore` all landed in `8a663ed8`, and so did
+`tests/test_session.py::TestCancellationSurvives`, which covers all three
+clauses. All four clauses of the acceptance criterion were re-executed
+against the shipped CLI in a scratch repository and pass.
+
+**The finding is an artefact of the re-anchor, and it is the mirror of the
+cost D98 named.** D98 warned that measuring round 2 from `8a663ed8` leaves
+whatever landed between round 1's snapshot and that commit unreviewed. What
+actually happened is the other half of the same fact: the remediation
+*inside* `8a663ed8` is invisible to a round measured from it, so a finding
+fixed there is re-reported rather than confirmed. Any re-anchor onto the
+first post-round commit has this property. It is not a defect in the
+recovery -- it is what the recovery costs, and it belongs beside D98's
+warning rather than as a surprise in the next session.
+
+Issue 2's second half -- that lifecycle cancellation and run-core
+cancellation are separate authorities -- is accurate and is D88/D93's
+recorded open question. Nothing in this delta widened it.
+
+**A selection gap surfaced on the way and is closed.** `journal.py` and
+`runproject.py` were the only modules under `ai_router/` with no rule in
+`testing.selection`, so changing them recorded `selection_unknown` and
+bought the smoke tests. The mapping is declared rather than the run
+widened, which is what the selector's own doctrine asks for.
+
+**The round cap is raised from 3 to 5 for this session**, at the operator's
+direction: three findings landed at once and one carries a dispute, and a
+single remaining round is thin enough that the likely outcome is a terminal
+state rather than a verdict.
+
+### D100 · 2026-08-28 · Orchestrator (claude-opus-5/anthropic) · The anchor narrows to one commit, and the v1 journal is migrated on a premise I had wrong
+
+Round 3 withdrew the cancelled-session finding on the evidence the dispute
+cited, and raised both remaining findings in sharper form. Both are
+accepted; one of them corrects D99 and one corrects me.
+
+**The re-anchor rule was still too loose, and the counter-example is our
+own.** D99 narrowed the legal anchor to two commits: the last one at or
+before the round, and the first one after it. The second was justified by
+"a round reviews an uncommitted working tree, so the first post-round
+commit is what that tree became." That is an assumption, and nothing in the
+framework can check it. Remediation normally begins the moment a round
+reports, so the first post-round commit is at least as likely to *contain*
+fixes as to materialize the reviewed tree -- and accepting it drops those
+fixes out of the next round, which is the defect the rule exists to prevent.
+
+**This repository proves the point against itself.** Round 1 recorded
+completion tree `92a55874`. The tree of `8a663ed8`, the first commit after
+that round and the one this session re-anchored onto, is `b70c5dcae3f3`.
+They are different trees, so `8a663ed8` demonstrably is not what round 1
+reviewed. Under the rule as it now stands the only legal anchor for round 1
+is `5c017b82`, and **the re-anchor this session actually performed would be
+refused.** That is left standing rather than quietly re-cut: rounds 2 and 3
+were measured from `8a663ed8` and the record should say so plainly.
+
+The exposure was not theoretical and it did not stay hidden. Round 1's
+cancelled-session fix landed inside `8a663ed8`, invisible to a round
+measured from it, and round 2 duly re-reported it as unfixed. It took a
+dispute citing the commit and its tests to clear. That is the mechanism
+working -- expensively.
+
+So the rule is now one commit: **the last one made at or before the round.**
+The next round re-reviews the session's own work, which is expensive and is
+the trade. On a path taken only when a session changes machines, a wider
+review is the right price for never silently narrowing one. Where the
+evidence cap refuses that width, D92 already says what the refusal means:
+it is a planning signal, not a threshold to get under.
+
+**The version-1 journal is migrated after all, and the premise that argued
+against it was mine and was wrong.** I told the operator the legacy
+identity mapping needed a rule they would have to choose, and used that to
+recommend a version bump over a migration. It does not, in the case that
+matters. A journal holding one set's events maps deterministically: with a
+single set, that set's session numbers and the repository's are the same
+numbers. Only a journal spanning two sets is genuinely ambiguous, because
+each set numbered its sessions from 1 and nothing in the record says which
+repository-wide number either should take. The operator revisited the
+decision on the corrected premise and chose the migration.
+
+`read_events` now reads a version 1 journal forward through
+`upgrade_v1_records`: `set_slug` leaves `run.created`, `set_slug` and
+`target` leave the organization events, and the envelope reads as version
+2. Two inputs are refused by name rather than guessed at -- a journal
+spanning more than one set, and a set-level `organization.cancelled`, which
+cancelled a thing that is no longer a concept and so maps onto no session.
+
+**The upgrade is in memory and the file is not rewritten.** The bytes on
+disk keep saying exactly what their writer wrote; a later append simply
+writes version 2 beside them, and the reader understands both shapes. A
+migration that rewrote durable history in place would be a worse answer
+than the problem, and the test asserts the file is byte-identical after a
+read.
+
+### D101 · 2026-08-28 · Orchestrator (claude-opus-5/anthropic) · Rounds 4 and 5 were both my own migration's defects, and the timestamp heuristic is retired
+
+Rounds 4 and 5 each returned one blocking finding, and both were mine —
+defects in the migration built to answer round 3, not in the collapse this
+session set out to do. The record says so rather than presenting the
+sequence as steady progress.
+
+**Round 4: refusing a multi-set journal stranded the active set too.** The
+first migration read a single-set journal forward and refused anything
+else. That refusal was the wrong shape: a repository whose journal spans two
+sets cannot read *this* set's runs either, so the migration blocked exactly
+the case the session plan requires to work.
+
+The replacement refuses nothing. `set_slug` is no longer dropped — it is
+kept as `legacy_set` on every record belonging to a retired set, and the
+active set is identified deterministically from the journal alone as the
+set of the newest `run.created`. Its records lose the slug because its
+session numbers *are* this repository's. A set-level cancellation is always
+legacy, whichever set it names: it acted on a thing that is not a concept
+any more, so it maps onto no session and survives as a fact rather than a
+refusal.
+
+**Round 5 found the hole that left.** Isolating legacy *runs* from the
+session join was only half the job. Every set numbered its sessions from 1,
+so a retired set's cancellation of *its* session 1 arrives carrying the
+number of *this* repository's session 1 — and `build_projection` was still
+handing every event, legacy or not, to `organization_states()`. Live work
+could read as cancelled on the strength of a retired set's decision. The
+same records also carry no `session_number` at all when they are set-level,
+which would have raised `KeyError` on the same line.
+
+The filter now lives inside `organization_states()` rather than in the
+projection that called it, because the run CLI asks that function the same
+question when it decides whether a session may be started. A rule enforced
+at one of two call sites is not a rule.
+
+**The re-anchor's timestamp heuristic is retired rather than tightened
+again.** Two rounds raised the same nit: a committer date is user-controlled
+to the second, so no walk over dates can prove commit order. Rounds now
+record `head_commit` — the commit HEAD stood at when the round was written
+— and a recovery reads the anchor straight off the graph when it is
+present, consulting no date at all. It also refuses when that commit is no
+longer an ancestor of HEAD, which is the honest answer to a rewritten
+history. The date walk stays as the fallback for rows written before the
+field existed, including this session's own round 1, and the schema marks
+the field optional for exactly that reason.
+
+**Four rounds went to one subsystem, and the shape is worth naming.** Every
+finding after round 2 was about the run core — a Phase 0 component with no
+journal in this repository, `runs: []` after fourteen sessions, and an open
+operator question (D88) about whether it survives at all. Each fix was
+correct and each exposed the next. That is what verifying a subsystem for
+the first time looks like, and it is also what D92 warned about: session 14
+carries two subsystems, and the second one is where the rounds went.

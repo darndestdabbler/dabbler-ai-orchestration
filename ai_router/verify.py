@@ -84,6 +84,7 @@ from typing import Optional
 from . import agency, ledger
 from .evidence import (
     changed_paths_between,
+    object_exists,
     repo_root_for,
     run_git,
     snapshot_worktree_tree,
@@ -585,7 +586,9 @@ def run_round(
         if round_number == 1:
             evidence = assemble_evidence(repo_root, sessions_path, current)
         else:
-            baseline = prior_rounds[-1]["completion_tree"]
+            baseline = ledger.effective_baseline(
+                repo_root, current, prior_rounds[-1]
+            )
             evidence = assemble_fix_delta_evidence(
                 repo_root, sessions_path, current, baseline
             )
@@ -638,7 +641,9 @@ def run_round(
         repo_root, sessions_path,
         working_tree_changes(
             repo_root, None if round_number == 1
-            else prior_rounds[-1]["completion_tree"]
+            else ledger.effective_baseline(
+                repo_root, current, prior_rounds[-1]
+            )
         ) or (),
     )
     verification_settings = (
@@ -762,12 +767,25 @@ def run_round(
         "orchestrator_provider": orchestrator.effective_provider,
         "findings": findings,
         "completion_tree": completion_tree,
+        "head_commit": _head_commit(repo_root),
         "recorded_at": datetime.datetime.now().astimezone().isoformat(),
         "transport": result.transport,
         "agency": agency_record.as_row(),
     }
     if round_number >= 2:
+        # previous_tree stays the tree the prior round actually completed at.
+        # When that object is gone and a re-anchor supplied the diff base,
+        # the row says so: a reader must not have to infer that this round
+        # was measured from somewhere other than where the last one ended.
         row["previous_tree"] = prior_rounds[-1]["completion_tree"]
+        recovered = ledger.effective_baseline(
+            repo_root, current, prior_rounds[-1]
+        )
+        if recovered != prior_rounds[-1]["completion_tree"]:
+            row["baseline_reanchor"] = {
+                "recorded_tree": prior_rounds[-1]["completion_tree"],
+                "anchor_tree": recovered,
+            }
     ledger.append_round(repo_root, current, row)
 
     if classification.blocking:
@@ -2147,6 +2165,255 @@ def _dispute_main(argv) -> int:
     )
 
 
+def _head_commit(repo_root):
+    """The commit HEAD stood at when a round was recorded, or None.
+
+    Recorded so a later recovery can place a baseline by topology instead of
+    by date. A committer timestamp is user-controlled to the second, so it
+    can only ever be a heuristic; the commit this round actually sat on is a
+    fact about the graph.
+    """
+    rc, out, _ = run_git(repo_root, "rev-parse", "--verify", "HEAD")
+    return out if rc == 0 and out else None
+
+
+def _legal_anchor(repo_root, head: str, recorded_at: str,
+                  round_head=None):
+    """The one commit a round may be re-anchored onto: the last one made at
+    or before the round, or ``(None, reason)``.
+
+    Only one, and deliberately the conservative one. The tempting second
+    candidate is the first commit made *after* the round, on the reasoning
+    that a round reviews an uncommitted working tree and that commit is what
+    the tree became. But nothing here can check that reasoning. Remediation
+    normally begins the moment a round reports, so the first post-round
+    commit is at least as likely to *contain* fixes as to materialize the
+    reviewed tree -- and accepting it would drop those fixes out of the next
+    round, which is the exact defect this rule exists to prevent. A
+    timestamp cannot tell the two apart, and the only evidence that could is
+    the recorded completion tree, which by definition is missing whenever
+    this path runs.
+
+    So the baseline lands before the round and the next round re-reviews the
+    session's own work. That is expensive and it is the point: on a recovery
+    path taken only when a session changes machines, paying a wider review
+    is the right trade against silently narrowing one.
+    """
+    if round_head:
+        # The round told us where it stood. Nothing to infer: that commit is
+        # the last one it could not have reported on, and no date is
+        # consulted. Older rows predate this field and fall through to the
+        # timestamp walk below.
+        rc, _, _ = run_git(
+            repo_root, "merge-base", "--is-ancestor", round_head, head
+        )
+        if rc != 0:
+            return None, (
+                f"the round recorded HEAD as {round_head[:12]}, which is not "
+                "an ancestor of the current HEAD. This history has been "
+                "rewritten since the round, and no baseline can be placed "
+                "on it (failing closed)."
+            )
+        return round_head, (
+            f"Round HEAD was {round_head[:12]}, so that commit is the last "
+            "one the round could not have reported on."
+        )
+    rc, out, _ = run_git(
+        repo_root, "log", "--first-parent", "--format=%H %cI", head
+    )
+    if rc != 0 or not out.strip():
+        return None, "the commit history could not be read (failing closed)"
+    try:
+        moment = datetime.datetime.fromisoformat(recorded_at)
+    except (TypeError, ValueError):
+        return None, (
+            f"the round records an unreadable timestamp {recorded_at!r}, so "
+            "no anchor can be placed against it (failing closed)"
+        )
+    history = []  # newest first, as git log emits them
+    for line in out.splitlines():
+        sha, _, when = line.partition(" ")
+        try:
+            history.append((sha, datetime.datetime.fromisoformat(when.strip())))
+        except ValueError:
+            return None, f"commit {sha[:12]} has an unreadable date"
+    # Oldest first, and the anchor is the newest commit of the unbroken run
+    # of pre-round commits from the root. Scanning newest-first for the
+    # first "date <= moment" would trust a committer date to mean commit
+    # order, and it does not: that field is user-controlled to the second,
+    # so a remediation commit dated backwards would be picked as a baseline
+    # that predates the fixes sitting underneath it. Stopping at the first
+    # post-round commit means a backdated one lands beyond the boundary and
+    # can never be selected, whatever it claims about when it happened.
+    anchor = None
+    for sha, stamped in reversed(history):
+        if stamped > moment:
+            break
+        anchor = sha
+    if anchor is not None:
+        return anchor, (
+            f"The round was recorded at {recorded_at}, so {anchor[:12]} is "
+            "the newest commit reachable without crossing anything the "
+            "round could have reported."
+        )
+    return None, (
+        f"every commit in this history postdates the round ({recorded_at}), "
+        "so all of them may carry remediation and none can serve as a "
+        "baseline. There is nothing to re-anchor onto."
+    )
+
+
+def run_reanchor(sessions_dir, commit: str, reason: str) -> int:
+    """Recover the diff base of the latest round when its recorded tree is
+    unreachable here, by naming a commit-reachable tree to measure from
+    instead.
+
+    Every refusal below exists so this cannot become a way to choose one's
+    own review scope. It is refused while the recorded tree resolves, it is
+    refused a second time for the same round, and the substitute must be the
+    single commit :func:`_legal_anchor` allows — the last one made at or
+    before the round. Not an ancestor of HEAD, and not the first post-round
+    commit either: both let remediation fall outside the next round's diff,
+    and nothing available here can prove a post-round commit is innocent."""
+    from .progress import read_session_state
+
+    sessions_path = Path(sessions_dir)
+    repo_root = repo_root_for(sessions_path)
+    if repo_root is None:
+        print(f"verify reanchor: not inside a git repository: "
+              f"{sessions_path}", file=sys.stderr)
+        return EXIT_STATE
+    state = read_session_state(sessions_path)
+    current = (state or {}).get("currentSession")
+    if current is None:
+        print(
+            f"verify reanchor: no session is in flight under "
+            f"{sessions_path}.", file=sys.stderr,
+        )
+        return EXIT_STATE
+
+    prior_rounds = ledger.read_rounds(repo_root, current)
+    if not prior_rounds:
+        print(
+            f"verify reanchor: refused -- session {current} has no recorded "
+            "round, so there is no baseline to recover. Round 1 measures "
+            "against HEAD and needs no snapshot.", file=sys.stderr,
+        )
+        return EXIT_USAGE
+    latest = prior_rounds[-1]
+    recorded = latest["completion_tree"]
+
+    if object_exists(repo_root, recorded):
+        print(
+            f"verify reanchor: refused -- round {latest['round']}'s recorded "
+            f"tree {recorded[:12]} resolves in this repository. The fix "
+            "delta is computable as recorded, and re-anchoring a baseline "
+            "that is present would let the author choose what the next "
+            "round sees.", file=sys.stderr,
+        )
+        return EXIT_USAGE
+
+    rc, resolved, _ = run_git(
+        repo_root, "rev-parse", "--verify", "--quiet", f"{commit}^{{commit}}"
+    )
+    if rc != 0 or not resolved:
+        print(
+            f"verify reanchor: refused -- {commit!r} does not name a commit "
+            "in this repository.", file=sys.stderr,
+        )
+        return EXIT_USAGE
+    rc, head, _ = run_git(repo_root, "rev-parse", "--verify", "HEAD")
+    if rc != 0 or not head:
+        print("verify reanchor: refused -- HEAD does not resolve.",
+              file=sys.stderr)
+        return EXIT_STATE
+    legal, why = _legal_anchor(
+        repo_root, head, latest["recorded_at"],
+        round_head=latest.get("head_commit"),
+    )
+    if legal is None:
+        print(f"verify reanchor: refused -- {why}", file=sys.stderr)
+        return EXIT_STATE
+    if resolved != legal:
+        print(
+            f"verify reanchor: refused -- {resolved[:12]} is not the legal "
+            f"anchor for round {latest['round']}. {why}\n"
+            "Any later commit may carry remediation this round has not "
+            "seen, and no timestamp can prove otherwise, so the baseline "
+            "lands before the round even though that re-reviews work "
+            f"already reviewed. Use:\n  --commit {legal[:12]}",
+            file=sys.stderr,
+        )
+        return EXIT_USAGE
+
+    rc, anchor_tree, _ = run_git(
+        repo_root, "rev-parse", "--verify", f"{resolved}^{{tree}}"
+    )
+    if rc != 0 or not anchor_tree:
+        print(
+            f"verify reanchor: refused -- {resolved[:12]} has no readable "
+            "tree.", file=sys.stderr,
+        )
+        return EXIT_USAGE
+
+    row = {
+        "round": latest["round"],
+        "session_number": current,
+        "recorded_tree": recorded,
+        "anchor_tree": anchor_tree,
+        "anchor_commit": resolved,
+        "reason": reason,
+        "recorded_at": datetime.datetime.now().astimezone().isoformat(),
+    }
+    try:
+        ledger.append_reanchor(repo_root, current, row)
+    except ledger.LedgerError as exc:
+        print(f"verify reanchor: refused -- {exc}", file=sys.stderr)
+        return EXIT_USAGE
+
+    print(
+        f"verify reanchor: round {latest['round']} of session {current} "
+        f"re-anchored.\n"
+        f"  recorded tree {recorded[:12]} -- absent from this object store\n"
+        f"  diffing instead from {anchor_tree[:12]} "
+        f"(commit {resolved[:12]})\n"
+        f"  reason: {reason}\n"
+        "The next round is measured from a substitute baseline, so it is a "
+        "weaker record than one measured from the tree the last round "
+        "actually completed at. The ledger carries that fact permanently, "
+        "and the round it produces will say so too."
+    )
+    return 0
+
+
+def _reanchor_main(argv) -> int:
+    parser = argparse.ArgumentParser(
+        prog="python -m ai_router.verify reanchor",
+        description="Recover the latest round's diff base when its recorded "
+                    "snapshot tree is unreachable here — the case a session "
+                    "that moved between machines arrives in. Refused while "
+                    "the recorded tree resolves.",
+    )
+    parser.add_argument("--sessions-dir",
+                        help="the repository's sessions root; derived "
+                             "from the working directory when omitted")
+    parser.add_argument("--commit", required=True,
+                        help="the commit whose tree becomes the baseline; "
+                             "must be the last commit made at or before "
+                             "the round it re-anchors")
+    parser.add_argument("--reason", required=True,
+                        help="why the recorded tree is unreachable. "
+                             "Permanent and mandatory: a recovered baseline "
+                             "is a weaker record and the ledger says so.")
+    args = parser.parse_args(argv)
+    try:
+        sessions_dir = resolve_sessions_dir(args.sessions_dir)
+    except ValueError as exc:
+        print(f"verify reanchor: {exc}", file=sys.stderr)
+        return EXIT_USAGE
+    return run_reanchor(sessions_dir, args.commit, args.reason)
+
+
 def _adjudicate_main(argv) -> int:
     from .config import VALID_TRANSPORTS
 
@@ -2236,6 +2503,8 @@ def main(argv=None) -> int:
         return EXIT_USAGE
     if argv[:1] == ["prepare"]:
         return _prepare_main(argv[1:])
+    if argv[:1] == ["reanchor"]:
+        return _reanchor_main(argv[1:])
     if argv[:1] == ["step"]:
         return _step_main(argv[1:])
 

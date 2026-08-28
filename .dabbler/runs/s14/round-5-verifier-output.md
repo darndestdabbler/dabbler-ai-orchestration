@@ -1,0 +1,13 @@
+ISSUES FOUND
+
+- **Issue 1:** Retired-set session lifecycle events still mutate repository sessions with the same number
+  - **Category:** Correctness
+  - **Severity:** Major
+  - **Evidence paths:** `ai_router/journal.py, ai_router/runproject.py, ai_router/schemas/run-event.schema.json, tests/test_journal.py, tests/test_runcore_contracts.py`
+  - **Failure scenario:** A migrated journal contains a cancellation for session 1 of an older set and a run for session 1 of the newest set. Because every set restarted numbering at 1, this collision is expected in multi-set repositories, and session cancellation is a normal lifecycle operation. Migration retains `session_number: 1` and adds `legacy_set`, but `build_projection()` sends all organization events through `organization_states(events)` without excluding legacy events. The older set’s cancellation can therefore make repository session 1 appear cancelled, despite its runs being correctly excluded from that session.
+  - **Acceptance criterion:** `JUDGMENT - Migrating a version-1 journal with a retired-set session cancellation and an active-set run sharing the same session number must retain the historical event while leaving the active repository session’s organization state unchanged.`
+  - **Details:** **Violation:** The migration claims, “Every other set is history” and that the projection “never joins them to a plan session,” but this isolation is implemented only for legacy `run.created` events. **Impact:** The resulting projection can assign a retired set’s cancellation or restoration to current repository work, producing incorrect session status and potentially causing operators or downstream automation to skip or restore the wrong session; this materially defeats safe migration of multi-set journals. **Evidence:** `upgrade_v1_records()` marks retired session-level organization events with `legacy_set` while preserving `session_number`; `build_projection()` filters `legacy_runs` only when constructing `by_session`, after passing every event unfiltered to `organization_states()`. The added tests cover retired runs and set-level event readability, but not retired session-level organization-state isolation. The prior broad rejection of multi-set journals is resolved, but the replacement migration does not preserve lifecycle isolation.
+
+## NITS
+
+- **Nit:** The prior committer-timestamp re-anchor edge case is not fully resolved. `_legal_anchor()` still accepts the **first** remediation commit when that commit itself has an equal or backdated committer timestamp; the new test only backdates a later commit after two normally postdated remediation commits. This remains low-probability because it requires clock skew or timestamp manipulation.

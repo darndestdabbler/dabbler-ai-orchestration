@@ -1,4 +1,6 @@
+import datetime
 import json
+import os
 import subprocess
 
 import pytest
@@ -12,8 +14,10 @@ from ai_router.verify import (
     EXIT_STATE,
     EXIT_UNAVAILABLE,
     EXIT_USAGE,
+    run_reanchor,
     run_round,
 )
+from ai_router.evidence import run_git
 
 from .conftest import record_preverify
 
@@ -1113,3 +1117,151 @@ class TestCritiquePrepare:
         runs = ledger.read_review_runs(repo, 1)
         assert runs[0]["change_id"] == change_id
         assert [a["attempt"] for a in runs[0]["attempts"]] == [1, 2]
+
+
+class TestBaselineReanchorRefusals:
+    """A round snapshot is a dangling tree, so a session that moves between
+    machines arrives with a baseline it cannot resolve. The recovery must
+    not become a way to choose one's own review scope, so only two commits
+    can stand in for the reviewed tree: the last one at or before the round
+    and the first one after it."""
+
+    def _at(self, repo, hours):
+        """A timestamp *hours* after the sandbox's seed commit. Derived
+        rather than fixed: the seed is stamped at real time, and a history
+        whose dates run backwards from it is the pathological case these
+        rules exist to reject, not the ordinary one they are read against."""
+        rc, when, _ = run_git(repo, "log", "-1", "--format=%cI", "HEAD")
+        base = datetime.datetime.fromisoformat(when.strip())
+        return (base + datetime.timedelta(hours=hours)).isoformat()
+
+    def _commit(self, repo, name, when):
+        (repo / name).write_text(f"# {name}", encoding="utf-8")
+        env = dict(os.environ, GIT_COMMITTER_DATE=when, GIT_AUTHOR_DATE=when)
+        subprocess.run(["git", "-C", str(repo), "add", "-A"],
+                       capture_output=True, env=env)
+        subprocess.run(["git", "-C", str(repo), "commit", "-q", "-m", name],
+                       capture_output=True, env=env)
+        rc, sha, _ = run_git(repo, "rev-parse", "HEAD")
+        return sha
+
+    def _round_one(self, repo, tree, recorded_at=None):
+        ledger.append_round(repo, 1, {
+            "round": 1,
+            "phase": "full",
+            "verdict": "ISSUES_FOUND",
+            "blocking": True,
+            "verifier_model": "gpt-5-4",
+            "verifier_provider": "openai",
+            "findings": [{"description": "broken", "severity": "major"}],
+            "completion_tree": tree,
+            "recorded_at": recorded_at or self._at(repo, 1),
+        })
+
+    def _history(self, repo):
+        """One commit before the round, then two remediation commits after
+        it -- the shape every fix-delta recovery actually arrives in."""
+        before = self._commit(repo, "before.py", self._at(repo, 1))
+        round_at = self._at(repo, 2)
+        first = self._commit(repo, "first_fix.py", self._at(repo, 3))
+        second = self._commit(repo, "second_fix.py", self._at(repo, 4))
+        self._round_one(repo, "0" * 40, recorded_at=round_at)
+        return before, first, second
+
+    def test_refused_while_the_recorded_tree_resolves(self, flight):
+        repo, sessions_dir, _ = flight
+        rc, head_tree, _ = run_git(repo, "rev-parse", "HEAD^{tree}")
+        assert rc == 0
+        self._round_one(repo, head_tree)
+        assert run_reanchor(sessions_dir, "HEAD", "moved machines") != 0
+        assert ledger.read_reanchors(repo, 1) == []
+
+    def test_refused_before_any_round_exists(self, flight):
+        repo, sessions_dir, _ = flight
+        assert run_reanchor(sessions_dir, "HEAD", "moved machines") != 0
+        assert ledger.read_reanchors(repo, 1) == []
+
+    def test_refused_when_the_anchor_hides_earlier_remediation(self, flight):
+        """The defect an ancestor-of-HEAD check let through: anchoring on
+        the newest ancestor drops every earlier fix out of the next round."""
+        repo, sessions_dir, _ = flight
+        _, _, second = self._history(repo)
+        assert run_reanchor(sessions_dir, second, "moved machines") != 0
+        assert ledger.read_reanchors(repo, 1) == []
+
+    def test_refused_when_the_anchor_is_not_in_this_history(self, flight):
+        repo, sessions_dir, _ = flight
+        self._history(repo)
+        subprocess.run(["git", "-C", str(repo), "checkout", "-q", "-b",
+                        "sidebranch", "HEAD~1"], capture_output=True)
+        side = self._commit(repo, "side.py", "2026-08-27T13:30:00+00:00")
+        subprocess.run(["git", "-C", str(repo), "checkout", "-q", "main"],
+                       capture_output=True)
+        assert run_reanchor(sessions_dir, side, "moved machines") != 0
+        assert ledger.read_reanchors(repo, 1) == []
+
+    def test_the_first_commit_after_the_round_is_refused(self, flight):
+        """The tempting one. A round reviews an uncommitted tree, so this
+        commit may be what that tree became -- or it may be the first fix.
+        Nothing here can tell, so it is refused rather than assumed."""
+        repo, sessions_dir, _ = flight
+        _, first, _ = self._history(repo)
+        assert run_reanchor(sessions_dir, first, "moved machines") != 0
+        assert ledger.read_reanchors(repo, 1) == []
+
+    def test_a_backdated_remediation_commit_cannot_become_the_anchor(self, flight):
+        """A committer date is user-controlled to the second, so it cannot
+        be read as commit order. The anchor stops at the first post-round
+        commit, which puts anything below it out of reach whatever date it
+        claims."""
+        repo, sessions_dir, _ = flight
+        before, _, _ = self._history(repo)
+        # Dated BEFORE the round but committed after both remediation
+        # commits -- the shape a backdated fix actually has. Read off
+        # `before` rather than HEAD, which by now is the newest commit.
+        rc, when, _ = run_git(repo, "log", "-1", "--format=%cI", before)
+        stamped = datetime.datetime.fromisoformat(when.strip())
+        backdated = self._commit(
+            repo, "backdated.py",
+            (stamped + datetime.timedelta(minutes=1)).isoformat(),
+        )
+        assert run_reanchor(sessions_dir, backdated, "moved machines") != 0
+        assert ledger.read_reanchors(repo, 1) == []
+
+    def test_a_recorded_round_head_settles_the_anchor_without_dates(
+        self, flight
+    ):
+        """A committer date is a heuristic at best. Once a round records the
+        commit it stood on, the anchor is read off the graph: a remediation
+        commit backdated to before the round is still refused, because the
+        round said where it was."""
+        repo, sessions_dir, _ = flight
+        before = self._commit(repo, "before.py", self._at(repo, 1))
+        round_at = self._at(repo, 2)
+        backdated = self._commit(repo, "backdated_fix.py", self._at(repo, 1))
+        self._commit(repo, "later_fix.py", self._at(repo, 4))
+        ledger.append_round(repo, 1, {
+            "round": 1, "phase": "full", "verdict": "ISSUES_FOUND",
+            "blocking": True, "verifier_model": "gpt-5-4",
+            "verifier_provider": "openai",
+            "findings": [{"description": "broken", "severity": "major"}],
+            "completion_tree": "0" * 40, "head_commit": before,
+            "recorded_at": round_at,
+        })
+
+        assert run_reanchor(sessions_dir, backdated, "moved machines") != 0
+        assert run_reanchor(sessions_dir, before, "moved machines") == 0
+        assert ledger.read_reanchors(repo, 1)[0]["anchor_commit"] == before
+
+    def test_the_last_commit_before_the_round_is_the_only_legal_anchor(
+        self, flight
+    ):
+        """It re-reviews the session's own work rather than risking a gap,
+        which is why it is the only one accepted."""
+        repo, sessions_dir, _ = flight
+        before, _, _ = self._history(repo)
+        assert run_reanchor(sessions_dir, before, "moved machines") == 0
+        rows = ledger.read_reanchors(repo, 1)
+        assert rows[0]["anchor_commit"] == before
+        rc, tree, _ = run_git(repo, "rev-parse", before + "^{tree}")
+        assert rows[0]["anchor_tree"] == tree

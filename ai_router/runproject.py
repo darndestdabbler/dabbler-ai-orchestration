@@ -28,6 +28,13 @@ import jsonschema
 
 from . import journal, runcore
 
+# Deliberately NOT bumped alongside journal.SCHEMA_VERSION when the set
+# level was collapsed. Both documents this stamps are derived: the
+# organization is rebuilt in memory from the plan on every read, and
+# read_projection() returns None on a shape or version mismatch so a stale
+# run-projection.json is regenerated rather than misread. A version exists
+# to stop durable history being read as a shape it was not written in, and
+# neither of these is durable history. The journal is.
 SCHEMA_VERSION = 1
 
 SESSIONS_DIRNAME = "docs/sessions"
@@ -353,14 +360,27 @@ def _run_row(view: runcore.RunView, events) -> dict:
 
 def organization_states(events) -> dict:
     """``{session_number: (sequence, state)}`` — the latest cancel/restore
-    per session, with the sequence that decided it."""
+    per session, with the sequence that decided it.
+
+    Events a version 1 migration marked ``legacy_set`` are skipped here and
+    not only in the projection's session join. Every set numbered its
+    sessions from 1, so a retired set's cancellation of *its* session 1
+    carries the number of *this* repository's session 1 and would otherwise
+    cancel live work. The filter sits in this function rather than in its
+    callers because the run CLI asks the same question when it decides
+    whether a session may be started."""
     latest: dict = {}
     for event in events:
         if event["event_type"] not in (
             "organization.cancelled", "organization.restored"
         ):
             continue
-        latest[event["payload"]["session_number"]] = (
+        payload = event.get("payload") or {}
+        if payload.get("legacy_set"):
+            # Also the only records with no session_number at all: a
+            # set-level change names a thing that is not a session.
+            continue
+        latest[payload["session_number"]] = (
             event["sequence"],
             STATE_CANCELLED
             if event["event_type"] == "organization.cancelled"
@@ -411,8 +431,20 @@ def build_projection(root, events=None) -> dict:
             created_sequence[event["run_id"]] = event["sequence"]
 
     cancellations = organization_states(events)
+    # Runs a version 1 migration marked as belonging to a retired set. They
+    # stay under `runs`, because they happened; they are never joined to a
+    # plan session, because that set numbered its sessions from 1 and so
+    # does this repository, so the numbers agreeing means nothing.
+    # organization_states() applies the same rule to lifecycle events.
+    legacy_runs = {
+        event["run_id"] for event in events
+        if event["event_type"] == "run.created"
+        and (event.get("payload") or {}).get("legacy_set")
+    }
     by_session: dict = {}
     for run_id, view in views.items():
+        if run_id in legacy_runs:
+            continue
         by_session.setdefault(view.session_number, []).append({
             "view": view, "created_sequence": created_sequence[run_id],
         })

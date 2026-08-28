@@ -146,6 +146,15 @@ def snapshot_worktree_tree(repo_root) -> Optional[str]:
             pass
 
 
+def object_exists(repo_root, rev: str) -> bool:
+    """Whether *rev* names an object this store actually holds. A round
+    snapshot is written through a throwaway index and anchored to no ref,
+    so it is both garbage-collectable and unpushable: a session that moves
+    between machines arrives with rounds whose baseline stayed behind."""
+    rc, _, _ = run_git(repo_root, "cat-file", "-e", f"{rev}^{{object}}")
+    return rc == 0
+
+
 def changed_paths_between(repo_root, tree_a: str, tree_b: str) -> Optional[list]:
     """Repo-relative paths differing between two trees, or ``None`` on git
     failure (callers fail closed)."""

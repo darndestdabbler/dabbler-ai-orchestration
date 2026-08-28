@@ -29,7 +29,7 @@ from typing import Optional
 
 import jsonschema
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 # Every machine record is anchored to a git object — the repository's
 # identity, a run's base commit, a candidate tree — so the one place that
@@ -395,6 +395,22 @@ def validate_event(event: dict, source: str = "<memory>") -> dict:
     future envelope must never be coerced into this one's shape."""
     version = event.get("schema_version") if isinstance(event, dict) else None
     if version != SCHEMA_VERSION:
+        # Which direction the mismatch runs in is the whole of the advice.
+        # Version 1 carried a set level -- `set_slug` on run.created, and
+        # `target` plus `set_slug` on the organization events -- and the
+        # payload schemas are closed, so a v1 journal cannot be read as a v2
+        # one without silently dropping the identity it was addressed by.
+        # It is refused here by name rather than failing later as an
+        # unexplained additionalProperties error.
+        if isinstance(version, int) and version < SCHEMA_VERSION:
+            raise JournalCorrupt(
+                f"{source}: run event declares schema_version {version!r}, "
+                f"which predates the collapse of session sets (this router "
+                f"writes {SCHEMA_VERSION}). read_events() reads such a "
+                "journal forward through upgrade_v1_records(); this "
+                "validator speaks only the current shape, so an event "
+                "reaching it unupgraded is a caller that skipped that step."
+            )
         raise JournalCorrupt(
             f"{source}: run event declares schema_version {version!r}; this "
             f"router understands {SCHEMA_VERSION}. Upgrade the router rather "
@@ -476,6 +492,77 @@ def _check_sequences(records: list, source: str) -> None:
             )
 
 
+# --- Reading a pre-collapse journal -----------------------------------------
+#
+# Version 1 addressed runs by set slug. The collapse made a repository hold
+# sessions rather than sets of sessions, so those records are read forward
+# here rather than rejected: the journal is durable history and a router
+# upgrade must not strand it. The upgrade is in memory only -- the bytes on
+# disk keep saying exactly what their writer wrote, and a later append
+# simply writes version 2 beside them.
+
+V1_SCHEMA_VERSION = 1
+
+
+def _v1_active_set(records: list):
+    """The set whose sessions are this repository's sessions now.
+
+    The newest ``run.created`` names it: a collapse folds the set that was
+    still running, and the one still running is the one most recently
+    started. Deterministic from the journal alone, so two readers of the
+    same file always agree.
+    """
+    newest = None
+    for record in records:
+        if record.get("event_type") != "run.created":
+            continue
+        payload = record.get("payload")
+        if not isinstance(payload, dict) or not payload.get("set_slug"):
+            continue
+        if newest is None or record.get("sequence", 0) > newest[0]:
+            newest = (record.get("sequence", 0), payload["set_slug"])
+    return newest[1] if newest else None
+
+
+def upgrade_v1_records(records: list, source: str) -> list:
+    """Version 1 events read forward into the version 2 shape.
+
+    Nothing is refused and nothing is merged. One set is the active one and
+    its session numbers are already the repository's, so its records simply
+    lose ``set_slug``. Every other set is history: its records keep their
+    identity as ``legacy_set`` and the projection never joins them to a
+    plan session, because that set numbered its sessions from 1 and so does
+    this repository -- attributing them to a current session would silently
+    merge two histories, and dropping them would strand real runs.
+
+    A set-level cancellation or restoration is always legacy, whichever set
+    it names. It acted on a thing that is no longer a concept, so it has no
+    session to be read as; it stays readable as a fact about a retired set.
+    """
+    active = _v1_active_set(records)
+    upgraded = []
+    for record in records:
+        row = dict(record)
+        if row.get("schema_version") != V1_SCHEMA_VERSION:
+            upgraded.append(row)
+            continue
+        payload = dict(row.get("payload") or {})
+        slug = payload.pop("set_slug", None)
+        event_type = row.get("event_type") or ""
+        if event_type.startswith("organization."):
+            set_level = payload.pop("target", None) == "set"
+            if set_level:
+                payload.pop("session_number", None)
+            if slug and (set_level or slug != active):
+                payload["legacy_set"] = slug
+        elif slug and slug != active:
+            payload["legacy_set"] = slug
+        row["payload"] = payload
+        row["schema_version"] = SCHEMA_VERSION
+        upgraded.append(row)
+    return upgraded
+
+
 def read_events(root, *, after: Optional[int] = None, run_id=None,
                 validate: bool = True) -> list:
     """Every readable event, in sequence order.
@@ -491,6 +578,9 @@ def read_events(root, *, after: Optional[int] = None, run_id=None,
         return []
     records, _ = _split_records(raw, str(path))
     _check_sequences(records, str(path))
+    if any(r.get("schema_version") == V1_SCHEMA_VERSION for r in records):
+        # Before validation, because the v1 shape cannot pass the v2 schema.
+        records = upgrade_v1_records(records, str(path))
     if validate:
         for record in records:
             validate_event(record, str(path))

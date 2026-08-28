@@ -21,7 +21,7 @@
   "additionalProperties": false,
   "properties": {
     "schema_version": {
-      "const": 1
+      "const": 2
     },
     "sequence": {
       "type": "integer",
@@ -436,6 +436,11 @@
         },
         "prepared": {
           "type": "boolean"
+        },
+        "legacy_set": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Only ever set by the version 1 migration, and only on records that belong to a retired session set. Its presence means 'this run is history, not a session of this repository': the projection keeps it visible under runs and never joins it to a plan session, because that set numbered its sessions from 1 and so does this repository. Absent on everything the current machinery writes."
         }
       }
     },
@@ -1014,7 +1019,6 @@
     "organizationChange": {
       "type": "object",
       "required": [
-        "session_number",
         "reason"
       ],
       "additionalProperties": false,
@@ -1026,8 +1030,29 @@
         "reason": {
           "type": "string",
           "minLength": 1
+        },
+        "legacy_set": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Only ever set by the version 1 migration, and only on records that belong to a retired session set. Its presence means 'this run is history, not a session of this repository': the projection keeps it visible under runs and never joins it to a plan session, because that set numbered its sessions from 1 and so does this repository. Absent on everything the current machinery writes."
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "not": {
+              "required": [
+                "legacy_set"
+              ]
+            }
+          },
+          "then": {
+            "required": [
+              "session_number"
+            ]
+          }
+        }
+      ]
     },
     "worktreeCreated": {
       "type": "object",

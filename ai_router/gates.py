@@ -137,6 +137,12 @@ def check_verification_clean(sessions_dir) -> tuple:
     current_tree = snapshot_worktree_tree(root)
     if current_tree is None:
         return False, "could not snapshot the working tree (failing closed)"
+    # Deliberately the recorded tree, never ledger.effective_baseline(): a
+    # re-anchored baseline is safe for a fix delta, which only changes what
+    # the next round is shown, and fatal here, where the question is whether
+    # the tree still IS the verified one. Without that object there is no
+    # answer, and the diff below fails closed rather than substituting a
+    # tree nobody verified.
     changed = changed_paths_between(
         root, latest["completion_tree"], current_tree
     )

@@ -103,3 +103,10 @@
 - Orchestrator provider (excluded): anthropic
 - Verifier's read surface: agency: 23 read(s), 0 search(es), 0 listing(s); 1 read(s) were transformed; 4 not confined to scope
 - Raw round output: `.dabbler/runs/148-the-session-framework/s13/`
+
+## Session 14 verification — VERIFIED after 6 round(s)
+
+- Verifier: gpt-5-6-sol (openai) over api
+- Orchestrator provider (excluded): anthropic
+- Verifier's read surface: agency: none — this round's verifier could not look at the tree
+- Raw round output: `.dabbler/runs/s14/`

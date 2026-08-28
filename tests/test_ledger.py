@@ -161,3 +161,58 @@ class TestAdjudicationRow:
         del bad["outcomes"]
         with pytest.raises(ledger.LedgerError):
             ledger.validate_round(bad)
+
+
+def make_reanchor(round_number=1, **overrides):
+    row = {
+        "round": round_number,
+        "session_number": 1,
+        "recorded_tree": "c" * 40,
+        "anchor_tree": "d" * 40,
+        "anchor_commit": "e" * 40,
+        "reason": "the snapshot stayed on the machine that wrote it",
+        "recorded_at": "2026-08-27T10:00:00+02:00",
+    }
+    row.update(overrides)
+    return row
+
+
+class TestBaselineReanchor:
+    """A round snapshot is a dangling tree, so a session that moves between
+    machines arrives with a baseline it cannot resolve. These cover the
+    recovery record; the refusals that decide whether one may be written
+    live with the CLI that writes it."""
+
+    def test_effective_baseline_is_the_recorded_tree_when_none_recorded(
+        self, tmp_path
+    ):
+        row = make_row(1)
+        assert ledger.effective_baseline(
+            tmp_path, 1, row
+        ) == row["completion_tree"]
+
+    def test_effective_baseline_follows_the_reanchor(self, tmp_path):
+        row = make_row(1)
+        ledger.append_reanchor(
+            tmp_path, 1,
+            make_reanchor(1, recorded_tree=row["completion_tree"]),
+        )
+        assert ledger.effective_baseline(tmp_path, 1, row) == "d" * 40
+
+    def test_a_reanchor_binds_only_to_its_own_round(self, tmp_path):
+        ledger.append_reanchor(tmp_path, 1, make_reanchor(1))
+        other = make_row(2)
+        assert ledger.effective_baseline(
+            tmp_path, 1, other
+        ) == other["completion_tree"]
+
+    def test_second_reanchor_for_one_round_refused(self, tmp_path):
+        ledger.append_reanchor(tmp_path, 1, make_reanchor(1))
+        with pytest.raises(ledger.LedgerError, match="recovered once"):
+            ledger.append_reanchor(
+                tmp_path, 1, make_reanchor(1, anchor_tree="f" * 40)
+            )
+
+    def test_reanchor_without_a_reason_refused(self, tmp_path):
+        with pytest.raises(ledger.LedgerError):
+            ledger.append_reanchor(tmp_path, 1, make_reanchor(1, reason=""))

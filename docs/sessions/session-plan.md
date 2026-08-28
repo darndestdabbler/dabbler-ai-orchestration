@@ -82,7 +82,7 @@ and the three currencies — seat premium requests, API dollars, and the
 subscription window — do not exchange.
 
 **Measure it at session 3 and re-plan if the rate does not support
-eighteen.** Session 3 is the first ordinary code session, so its cost is
+nineteen.** Session 3 is the first ordinary code session, so its cost is
 the honest unit. Do not wait until session 13 to find out. Re-planning
 means fewer, larger sessions — not fewer verification rounds, which is the
 one thing this set exists to prove out.
@@ -118,7 +118,7 @@ or remediated at the cap.
 
 ## Sessions
 
-### Session 1 of 18: Verify the design before anything is built
+### Session 1 of 19: Verify the design before anything is built
 
 1. Register.
 2. Run cross-provider verification over `docs/session-framework-spec.md`
@@ -139,7 +139,7 @@ or remediated at the cap.
 measurement of what a verification round costs on the seat.
 Est. 0 tests — this session writes no code.
 
-### Session 2 of 18: Verify this breakdown against that design
+### Session 2 of 19: Verify this breakdown against that design
 
 1. Register.
 2. Check this session list against the verified specification and plan:
@@ -156,7 +156,7 @@ Est. 0 tests — this session writes no code.
 approval gates the specification used to carry. Est. 0 tests.
 
 
-### Session 3 of 18: The credential allowlist (plan A1)
+### Session 3 of 19: The credential allowlist (plan A1)
 
 1. Register.
 2. **Replace the operator override with an honest terminal state — one
@@ -205,7 +205,7 @@ approval gates the specification used to carry. Est. 0 tests.
 4. Add a Windows sentinel test that plants a secret in the parent
    environment and asserts a spawned check process cannot see it.
 5. **Measure this session's seat cost and record it in the set's decisions
-   log.** This is the unit that says whether eighteen sessions fit.
+   log.** This is the unit that says whether nineteen sessions fit.
 6. Affected tests as preverify.
 7. Cross-provider verification.
 8. Full test suite, recorded as the `final-full` run of record.
@@ -225,7 +225,7 @@ Python tests.
 
 
 
-### Session 4 of 18: Record authority (plan A2)
+### Session 4 of 19: Record authority (plan A2)
 
 1. Register.
 2. One `validate_transition()` used by both `workflow.append()` and
@@ -246,7 +246,7 @@ Python tests.
 tests.
 
 
-### Session 5 of 18: The two files, framework-written (plan A4)
+### Session 5 of 19: The two files, framework-written (plan A4)
 
 1. Register.
 2. `project-work-plan.md` and `decisions-log.md` written only through
@@ -275,7 +275,7 @@ declaration session 13 reads. Est. 8 Python tests.
 > here because this is the session that already writes the session list.
 
 
-### Session 6 of 18: The verifier's read surface (plan A5, first half)
+### Session 6 of 19: The verifier's read surface (plan A5, first half)
 
 1. Register.
 2. Three operations for the verifier on the Copilot path: list files with a
@@ -305,7 +305,7 @@ Python tests.
 > shown*.
 
 
-### Session 7 of 18: The test-write path (plan A5, second half)
+### Session 7 of 19: The test-write path (plan A5, second half)
 
 1. Register.
 2. The fourth operation: create or modify a test file. **The framework
@@ -320,7 +320,7 @@ Python tests.
 **Creates:** the only write the verifier gets, and its enforcement.
 Est. 8 Python tests.
 
-### Session 8 of 18: Selection by role, and the death of the tier ladder (plan A6)
+### Session 8 of 19: Selection by role, and the death of the tier ladder (plan A6)
 
 1. Register.
 2. Lift roles out of the Copilot transport block; both paths resolve the
@@ -365,7 +365,7 @@ surface; a net deletion. Est. 12 Python tests, with more deleted than added.
 > session already rewrites — one config change, one review.
 
 
-### Session 9 of 18: Model discovery (plan A7)
+### Session 9 of 19: Model discovery (plan A7)
 
 1. Register.
 2. Enumerate each vendor's models endpoint on the direct-API path and write
@@ -388,7 +388,7 @@ surface; a net deletion. Est. 12 Python tests, with more deleted than added.
 **Creates:** enumeration, the staleness check, and the drift diff.
 Est. 10 Python tests.
 
-### Session 10 of 18: The code review loop (plan B1)
+### Session 10 of 19: The code review loop (plan B1)
 
 1. Register.
 2. `verify → fix`, cap 3, stopping early when only Minor findings remain.
@@ -424,7 +424,7 @@ tests.
 > exit that was not a false statement on the record.
 
 
-### Session 11 of 18: The verifier authors tests, the framework runs them (plan B2)
+### Session 11 of 19: The verifier authors tests, the framework runs them (plan B2)
 
 1. Register.
 2. The verifier writes test files through the session 7 write path;
@@ -440,7 +440,7 @@ tests.
 
 **Creates:** the authoring hand-off and the test loop. Est. 8 Python tests.
 
-### Session 12 of 18: The full suite and its bounded fix loop (plan B3)
+### Session 12 of 19: The full suite and its bounded fix loop (plan B3)
 
 1. Register.
 2. The suite runs against the tree including the verifier's new tests. On
@@ -460,7 +460,7 @@ tests.
 **Creates:** the envelope, which is the whole feature. Est. 10 Python
 tests.
 
-### Session 13 of 18: Packaging to the feed (plan C)
+### Session 13 of 19: Packaging to the feed (plan C)
 
 1. Register.
 2. `pack`, then `push` to the Azure DevOps feed with the operator's PAT,
@@ -477,7 +477,7 @@ tests.
 **Creates:** the one thing staff explicitly asked the framework to do.
 Est. 8 Python tests.
 
-### Session 14 of 18: Collapse session sets (plan A3)
+### Session 14 of 19: Collapse session sets (plan A3)
 
 1. Register — **for the last time under the set-based machinery.**
 2. Sessions numbered directly in a repository. Remove the set level from
@@ -495,7 +495,7 @@ Est. 8 Python tests.
 through it. **The risk here is missed references, not design.** Est. 12
 Python tests.
 
-### Session 15 of 18: The sessions view (plan D1)
+### Session 15 of 19: The sessions view (plan D1)
 
 1. Register — under the collapsed machinery from session 14.
 2. Sessions view without the set level, preserving the existing row actions
@@ -539,7 +539,7 @@ Python tests.
 **Creates:** the collapsed tree, padded row labels, and the icons
 untouched. Est. 8 TS tests.
 
-### Session 16 of 18: The task level (plan D1, second half)
+### Session 16 of 19: The task level (plan D1, second half)
 
 1. Register.
 2. **A task level below the session, read from the enforced record.** A
@@ -593,7 +593,7 @@ in advance -- steps 2-5 were the view, steps 6-10 were the task level --
 after session 14 proved what carrying two subsystems costs (D92). The
 operator cut it here rather than discovering the cap again mid-round.
 
-### Session 17 of 18: Project setup as two sessions (plan D2)
+### Session 17 of 19: Project setup as two sessions (plan D2)
 
 1. Register.
 2. Create or import the project plan, then break it into numbered sessions
@@ -612,7 +612,7 @@ operator cut it here rather than discovering the cap again mid-round.
 **Creates:** project setup, which is the framework's own sessions 1 and 2
 made available to everyone else. Est. 8 TS tests.
 
-### Session 18 of 18: The unresolved-session view (plan D3)
+### Session 18 of 19: The unresolved-session view (plan D3)
 
 1. Register.
 2. Read at planning time rather than as an interruption: what stopped, at
@@ -633,12 +633,69 @@ made available to everyone else. Est. 8 TS tests.
 **Creates:** the last surface, and the one that makes an unresolved session
 useful instead of merely failed. Est. 8 TS tests.
 
+### Session 19 of 19: A round baseline that survives the trip (root cause of D98)
+
+**Why this exists.** A verification round records `completion_tree`, written
+by `snapshot_worktree_tree` through a throwaway index and anchored to no
+ref. It is garbage-collectable on the machine that wrote it and it never
+travels with a push, so a session continued on another machine arrives
+unable to compute any fix delta. Session 14 hit this and shipped the
+recovery (`verify reanchor`); D98 and D100 record that the root cause was
+left open at the operator's direction. **This session closes it.**
+
+1. Register.
+2. **Anchor each snapshot as it is recorded.** Wrap the snapshot tree in a
+   commit and point `refs/dabbler/rounds/s<N>/r<R>` at it, in the same call
+   that appends the round. A ref cannot usefully point at a bare tree —
+   most servers reject that on push — so the wrapping commit is the object
+   the ref names. The tree it carries must hash **identically** to the
+   recorded `completion_tree`, and the test asserts that equality rather
+   than asserting a ref exists.
+3. **Push those refs, because `git push` will not.** This repository
+   configures no push refspec, so custom refs are simply left behind. The
+   close is the one place a session pushes, and it has to carry the round
+   refs with the branch. A push that silently drops them is the same defect
+   in a new place.
+4. **Fetch them, which is the part that makes this a session.** The
+   receiving machine needs `+refs/dabbler/*:refs/dabbler/*` before the refs
+   mean anything, and this checkout has only
+   `+refs/heads/*:refs/remotes/origin/*`. `bootstrap` must write the
+   refspec, and **an existing clone must be migrated**, or the fix only
+   works on machines cloned after it ships — which is not much of a fix.
+   The acceptance test is a two-checkout one: record a round in A, push,
+   fetch in B, and resolve the baseline in B **without** `verify reanchor`.
+5. **Decide the retention rule and write it down.** One ref per round per
+   session, forever, is a namespace that only grows. The objects are tiny
+   and history is the point, so "keep them" is a legitimate answer — but it
+   must be a decision in the record, not an omission.
+6. **`verify reanchor` stays, and stays refused when the tree resolves.**
+   This session removes the *need* for it on well-configured machines; it
+   does not remove the path. Older rounds carry no ref, a clone may predate
+   the refspec, and a history can be rewritten. Its existing refusals are
+   unchanged, and `head_commit` (shipped in session 14) remains the
+   fallback that places a baseline for rounds recorded before any of this.
+7. Affected tests as preverify.
+8. Cross-provider verification.
+9. Full test suite, recorded as the `final-full` run of record.
+10. Close-out.
+
+**Creates:** a round baseline that is portable by construction, so a session
+that changes machines resolves its own fix delta instead of recovering onto
+a wider one. **The risk is the migration, not the anchoring** — step 4 is
+where this session will actually be won or lost. Est. 10 Python tests.
+
+**Not urgent, and deliberately last.** The recovery path works. What this
+buys is avoiding the recovery's cost: a re-anchored baseline lands *before*
+the round, so the next round re-reviews the whole session, and that can
+exceed the evidence cap — which is what nearly happened in session 14. It
+pays for itself the first time a moved session is too large to re-review.
+
 ---
 
 ## Acceptance criterion for the set
 
 **The framework can run its own next session.** Not "the tests pass" and
-not "the plan was followed" — the working test is whether session 18 could
+not "the plan was followed" — the working test is whether session 19 could
 have been specified, developed, verified, tested and closed by the thing
 this set built, rather than by the machinery it replaces.
 

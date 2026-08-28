@@ -2560,3 +2560,50 @@ Session 14 is closed and verified; no code changed here. The decisions log
 keeps its earlier "seventeen sessions" references untouched -- they were
 true when they were written, and rewriting history to match a later
 decision is the one thing a record must not do.
+
+### D103 · 2026-08-28 · Operator · The baseline root cause becomes session 19 rather than staying owed in a decision entry
+
+D98 recorded the root cause of the baseline problem and left it open at the
+operator's direction; D100 repeated that it was owed. Owed work that lives
+only in a decision entry is work that gets found by whoever happens to read
+back far enough. It is now session 19, at the end of the plan.
+
+**Appended rather than inserted.** The set was re-cut once already this
+day, and `progress.heal_title` replaces a stored title only when it is
+generic — so every insertion leaves moved sessions wearing the titles of
+whatever used to sit at their numbers. Sessions 17 and 18 are in that state
+now because of the session 15 split. Adding at the end costs nothing;
+inserting would have doubled a defect that session 15 has not yet fixed.
+
+**The session is scoped to four parts, and the third is the one that
+decides it.** Anchoring a snapshot under `refs/dabbler/rounds/s<N>/r<R>` is
+the easy part. This repository configures no push refspec at all, and its
+only fetch refspec is `+refs/heads/*:refs/remotes/origin/*`, so custom refs
+would neither leave the machine that wrote them nor arrive on the one that
+needs them. `bootstrap` has to write the refspec **and an existing clone
+has to be migrated**, or the fix works only on machines cloned after it
+ships. The acceptance test is therefore a two-checkout one — record in A,
+push, fetch in B, resolve the baseline in B without `verify reanchor` —
+because a single-machine test cannot tell a working fix from a broken one
+here.
+
+**One design was considered and rejected before it could look attractive
+later.** Recording `worktree_clean` and recomputing the snapshot from
+`head_commit` would need no refs, no push and no migration. It only helps
+for rounds taken against a clean tree, and rounds are dirty by
+construction: verification reviews the working tree *before* the commit.
+It would almost never fire, and it would look like a cheap win to whoever
+picks this up without knowing that.
+
+**`verify reanchor` is not removed by this session.** It stops being
+*needed* on a configured machine; it stays for rounds recorded before the
+refs existed, for clones predating the refspec, and for a rewritten
+history. `head_commit`, shipped in session 14, remains the fallback that
+places a baseline for those.
+
+**Deliberately last, and honestly labelled as such.** The recovery works
+today. What session 19 buys is avoiding its cost — a re-anchored baseline
+lands before the round, so the next round re-reviews the entire session,
+which can exceed the evidence cap. That is what nearly happened in session
+14, and it is the argument for doing this at all rather than an argument
+for doing it first.

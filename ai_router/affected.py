@@ -398,6 +398,17 @@ def preverify_gate(repo_root, sessions_dir, config) -> PreverifyGate:
     records = read_records(repo_root)
     accepted = []
     for suite in expensive:
+        mine = result.for_suite(suite.name)
+        if not result.all_tests_affected and not mine.test_paths:
+            # The rule three branches up, per suite instead of per change
+            # set: a suite the selection named no test of has nothing to
+            # prove. Without it the gate is not merely strict, it is
+            # unsatisfiable -- an empty selection yields an empty targeted
+            # command, and a preverify record must name the command that
+            # ran. A repository with one expensive suite never reaches
+            # this; one with two reaches it whenever a change touches only
+            # the other's surfaces.
+            continue
         current = surface_digest(
             repo_root, suite.covers, sessions_dir=sessions_dir,
         )

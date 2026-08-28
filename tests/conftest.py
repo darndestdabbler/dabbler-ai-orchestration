@@ -1,6 +1,7 @@
 import copy
 import shutil
 import subprocess
+from pathlib import Path
 
 import pytest
 
@@ -126,19 +127,33 @@ def record_preverify(repo, sessions_dir):
     )
 
     config = load_config()
-    suite = next(s for s in load_suites_checked(config).suites if s.expensive)
     result = select_tests(
         repo, working_tree_changes(repo) or (),
         load_selection_config(config).config,
     )
-    command = targeted_command(suite.command, result)
-    verdict = classify_preverify_command(command, result)
-    return record_run(
-        sessions_dir, suite, "passed", stage=STAGE_PREVERIFY_TARGETED,
-        duration_seconds=1.0, command=command, policy=verdict.policy,
-        policy_reason=verdict.reason,
-        selected_tests=tuple((s.path, s.reason) for s in result.selected),
-    )
+    # EVERY expensive suite, not the first one. The pre-verification gate
+    # demands a green targeted record per expensive suite, so a repository
+    # that declares two needs two rows -- and this helper stands in for the
+    # orchestrator, who would have run both.
+    recorded = None
+    for suite in load_suites_checked(config).suites:
+        if not suite.expensive:
+            continue
+        mine = result.for_suite(suite.name)
+        command = targeted_command(suite.command, mine,
+                                   runs_whole=suite.runs_whole)
+        if not command:
+            # The selection named no test this suite runs, so the gate has
+            # nothing to ask of it and there is no command to record.
+            continue
+        verdict = classify_preverify_command(command, mine)
+        recorded = record_run(
+            sessions_dir, suite, "passed", stage=STAGE_PREVERIFY_TARGETED,
+            duration_seconds=1.0, command=command, policy=verdict.policy,
+            policy_reason=verdict.reason,
+            selected_tests=tuple((s.path, s.reason) for s in mine.selected),
+        )
+    return recorded
 
 
 KEY_ENV = {
@@ -267,6 +282,33 @@ def _hermetic(monkeypatch):
         "AI_ROUTER_METRICS_PATH", "COPILOT_AGENT_SESSION_ID",
     ):
         monkeypatch.delenv(var, raising=False)
+
+    # This repository declares deterministic controls of its own, and
+    # `load_config()` resolves from the WORKING DIRECTORY -- which under
+    # pytest is this repository, whatever sandbox the test is driving. A
+    # round run against a temp repository would otherwise execute commands
+    # written for this tree against that one and fail on every row. The
+    # config's repository and the tree's repository disagree only here, in
+    # the harness; in production they are the same directory. A test that
+    # wants controls declares them itself, and they survive this.
+    config_module = importlib.import_module("ai_router.config")
+    real_load_config = config_module.load_config
+    own_config = Path(__file__).resolve().parent.parent / "dabbler.yaml"
+
+    def load_without_this_repositorys_controls(*args, **kwargs):
+        loaded = real_load_config(*args, **kwargs)
+        declared = config_module.project_config_path(kwargs.get("project_dir"))
+        if declared is None or Path(declared).resolve() != own_config:
+            return loaded
+        testing = dict(loaded.get("testing") or {})
+        if "controls" not in testing:
+            return loaded
+        testing.pop("controls")
+        return {**loaded, "testing": testing}
+
+    monkeypatch.setattr(
+        config_module, "load_config", load_without_this_repositorys_controls
+    )
     for env_var in KEY_ENV.values():
         monkeypatch.delenv(env_var, raising=False)
     runtime_mode.reset_for_tests()

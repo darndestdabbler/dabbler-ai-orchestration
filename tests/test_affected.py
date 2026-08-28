@@ -400,6 +400,65 @@ class TestTheGate:
         assert gate.command == "python -m pytest tests/test_thing.py"
 
 
+class TestTwoExpensiveSuites:
+    """A repository can be two ecosystems at once, and most changes touch
+    one of them. The gate must ask each suite only for what the selection
+    named it -- not because that is lenient, but because the alternative is
+    unsatisfiable: an empty selection has no targeted command, and a
+    pre-verification record must name the command that ran."""
+
+    CONFIG = {"testing": {
+        "suites": [
+            {"name": "python", "command": "python -m pytest",
+             "covers": ["src/"], "expensive": True,
+             "test_roots": ["tests"], "test_glob": "test_*.py"},
+            {"name": "typescript", "command": "vitest run",
+             "covers": ["src/"], "expensive": True,
+             "test_roots": ["suite"], "test_glob": "*.test.ts"},
+        ],
+        "selection": {"rules": [
+            {"when": "src/app.py", "select": ["tests/test_app.py"]},
+        ]},
+    }}
+
+    def test_a_suite_the_selection_named_no_test_of_is_not_asked_for_one(
+        self, sandbox_repo
+    ):
+        from ai_router.test_evidence import (
+            STAGE_PREVERIFY_TARGETED,
+            POLICY_TARGETED,
+            load_suites_checked,
+            record_run,
+        )
+
+        repo, sessions_dir = sandbox_repo
+        (repo / "src").mkdir()
+        (repo / "src" / "app.py").write_text("x = 1\n", encoding="utf-8")
+
+        # Only the Python suite's test was selected, so only the Python
+        # suite is asked for a run.
+        gate = preverify_gate(repo, sessions_dir, self.CONFIG)
+        assert not gate.ok
+        assert gate.suite == "python"
+        assert gate.command == "python -m pytest tests/test_app.py"
+
+        python_suite = next(
+            s for s in load_suites_checked(self.CONFIG).suites
+            if s.name == "python"
+        )
+        record_run(
+            sessions_dir, python_suite, "passed",
+            stage=STAGE_PREVERIFY_TARGETED, duration_seconds=1.0,
+            command="python -m pytest tests/test_app.py",
+            policy=POLICY_TARGETED, policy_reason="named every selected test",
+            selected_tests=(("tests/test_app.py", "configured-rule"),),
+        )
+
+        satisfied = preverify_gate(repo, sessions_dir, self.CONFIG)
+        assert satisfied.ok
+        assert [name for name, _, _ in satisfied.accepted] == ["python"]
+
+
 class TestNextCommandMessages:
     """Every message that asks for pre-verification evidence names the whole
     recipe. Naming the run without the record, or the round without the run,

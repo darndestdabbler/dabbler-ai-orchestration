@@ -193,6 +193,27 @@ class TestSurfaceDigests:
         (git_repo / "a.txt").write_text("two\n", encoding="utf-8")
         assert surface_digest(git_repo, ("",)) != first
 
+    def test_the_run_ledger_does_not_move_the_whole_tree_digest(
+        self, git_repo
+    ):
+        """A final-full record binds to this digest and is then written
+        into `.dabbler/runs/` itself. Counting the ledger would make the
+        digest wrong the instant it was stored, so the freshness gate could
+        never pass -- and a source edit must still move it, or the gate
+        would stop meaning anything."""
+        ledger = git_repo / ".dabbler" / "runs"
+        ledger.mkdir(parents=True)
+        (ledger / "test-runs.jsonl").write_text("{}\n", encoding="utf-8")
+        first = surface_digest(git_repo, ("",))
+
+        (ledger / "test-runs.jsonl").write_text(
+            '{}\n{"a": 1}\n', encoding="utf-8"
+        )
+        assert surface_digest(git_repo, ("",)) == first
+
+        (git_repo / "a.txt").write_text("changed\n", encoding="utf-8")
+        assert surface_digest(git_repo, ("",)) != first
+
     def test_record_run_strict_at_the_boundary(self, git_repo):
         sessions_dir = git_repo / "docs" / "sessions"
         sessions_dir.mkdir(parents=True)

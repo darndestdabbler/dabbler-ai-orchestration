@@ -283,7 +283,7 @@
       "completedAt": null,
       "verificationVerdict": "VERIFIED",
       "verification": {
-        "rounds": 6,
+        "rounds": 7,
         "verifierModel": "gpt-5-6-sol",
         "verifierProvider": "openai",
         "transport": "api"

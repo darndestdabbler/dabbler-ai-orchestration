@@ -27,6 +27,7 @@ from pathlib import Path
 from typing import Optional
 
 from .evidence import repo_root_for, run_git
+from .journal import is_machine_state_path
 from .ledger import LIFECYCLE_WRITTEN_FILES, RUNS_DIRNAME
 
 OUTCOME_PASSED = "passed"
@@ -285,6 +286,15 @@ def surface_digest(
         if not matching_prefixes(rel, covers):
             continue
         if is_session_bookkeeping(rel, sessions_rel):
+            continue
+        if is_machine_state_path(rel):
+            # The fifth reader that has to know the run ledger is not work.
+            # Tracking `.dabbler/runs/` put it inside `ls-files`, and this
+            # function records a digest and then appends its own record to
+            # that directory -- so counting it makes the digest it just
+            # stored wrong the instant it is stored, and the freshness gate
+            # can never pass. A round is appended after the tree it
+            # describes; the ledger is the record, not the work.
             continue
         try:
             digest = hashlib.sha256(

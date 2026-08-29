@@ -1,0 +1,358 @@
+import subprocess
+
+import pytest
+import yaml
+
+from ai_router.config import (
+    CRITIQUE_ENFORCE_SET,
+    DEFAULT_VERIFICATION_ROUNDS,
+    load_config,
+    resolve_generation_params,
+    resolve_transport,
+    run_round_cap,
+    verification_round_cap,
+    _split_sections,
+)
+from tests.conftest import make_config
+
+
+class TestTheVerificationRoundCap:
+    """One resolver for every loop that opens rounds. Two loops reading the
+    same setting through two code paths disagree about it eventually."""
+
+    def test_the_configured_bound_is_used(self):
+        assert verification_round_cap(
+            {"verification": {"settings": {"max_rounds": 5}}}
+        ) == 5
+
+    @pytest.mark.parametrize("settings", [
+        {"max_rounds": 0}, {"max_rounds": -1}, {"max_rounds": "soon"},
+        {}, None,
+    ])
+    def test_a_bound_a_malformed_config_could_switch_off_falls_back(
+            self, settings):
+        """A cap an unparseable, absent or non-positive setting turns into
+        no cap at all is not a cap: the loop it was bounding would go back
+        to calling vendors until something else stopped it."""
+        assert verification_round_cap(
+            {"verification": {"settings": settings}}
+        ) == DEFAULT_VERIFICATION_ROUNDS
+
+    def test_the_tests_phase_is_metered_separately(self):
+        """One number serving both loops would tune each against the other's
+        cost: a review round buys a vendor's opinion, a test round runs a
+        suite the framework already has."""
+        settings = {"max_rounds": 2, "max_test_rounds": 9}
+        config = {"verification": {"settings": settings}}
+        assert (verification_round_cap(config), run_round_cap(config)) == (2, 9)
+
+
+def _write_config(tmp_path, config):
+    path = tmp_path / "router-config.yaml"
+    path.write_text(yaml.safe_dump(config), encoding="utf-8")
+    return str(path)
+
+
+@pytest.fixture
+def project(tmp_path, monkeypatch):
+    """A working directory the overlay can live in. Config discovers the
+    project through git, the same discovery the gates use, so the fixture
+    has to be a real repository rather than a bare directory."""
+    subprocess.run(
+        ["git", "init", "-q"], cwd=str(tmp_path), capture_output=True,
+    )
+    monkeypatch.chdir(tmp_path)
+    return tmp_path
+
+
+class TestLoadConfig:
+    def test_bundled_config_loads(self):
+        config = load_config()
+        assert config["models"]
+        assert config["_config_path"].endswith("router-config.yaml")
+
+    def test_missing_file_raises_with_path(self, tmp_path):
+        with pytest.raises(FileNotFoundError, match="nope.yaml"):
+            load_config(str(tmp_path / "nope.yaml"))
+
+    def test_schema_rejects_missing_providers(self, tmp_path):
+        config = make_config()
+        del config["providers"]
+        with pytest.raises(ValueError, match="schema validation"):
+            load_config(_write_config(tmp_path, config))
+
+    def test_unknown_provider_reference_rejected(self, tmp_path):
+        config = make_config()
+        config["models"]["flash"]["provider"] = "mystery"
+        with pytest.raises(ValueError, match="unknown provider"):
+            load_config(_write_config(tmp_path, config))
+
+    def test_schema_rejects_unknown_key_in_a_role(self, tmp_path):
+        # A typo'd role key would silently drop the declaration it meant.
+        config = make_config()
+        config["roles"]["verifier"]["require_provider"] = ["openai"]
+        with pytest.raises(ValueError, match="schema validation"):
+            load_config(_write_config(tmp_path, config))
+
+    def test_a_preference_naming_no_model_is_not_an_error(self, tmp_path):
+        # Ordering only: a stale name costs a slightly older model, never a
+        # candidate, so it must not refuse the load.
+        config = make_config()
+        config["roles"]["verifier"]["prefer"] = ["retired-last-year"]
+        assert load_config(_write_config(tmp_path, config))["roles"]
+
+    def test_copilot_block_missing_lockfile_rejected(self, tmp_path):
+        config = make_config()
+        del config["transports"]["copilot-cli"]["lockfile"]
+        with pytest.raises(ValueError, match="lockfile"):
+            load_config(_write_config(tmp_path, config))
+
+    def test_copilot_bad_timeouts_rejected_at_load(self, tmp_path):
+        config = make_config()
+        config["transports"]["copilot-cli"]["timeouts"] = {
+            "spawn_seconds": 100, "first_byte_seconds": 5,
+        }
+        with pytest.raises(ValueError, match="spawn_seconds <"):
+            load_config(_write_config(tmp_path, config))
+
+
+class TestResolveTransport:
+    def test_default_is_api(self, base_config):
+        assert resolve_transport(base_config) == "api"
+
+    def test_config_profile_wins_over_default(self, base_config):
+        base_config["transport"] = {"profile": "copilot-cli"}
+        assert resolve_transport(base_config) == "copilot-cli"
+
+    def test_env_var_wins_over_config(self, base_config, monkeypatch):
+        base_config["transport"] = {"profile": "copilot-cli"}
+        monkeypatch.setenv("DABBLER_TRANSPORT", "api")
+        assert resolve_transport(base_config) == "api"
+
+    def test_cli_flag_wins_over_env(self, base_config, monkeypatch):
+        monkeypatch.setenv("DABBLER_TRANSPORT", "api")
+        assert resolve_transport(base_config, "copilot-cli") == "copilot-cli"
+
+    def test_unknown_value_fails_loud_naming_its_source(
+        self, base_config, monkeypatch
+    ):
+        monkeypatch.setenv("DABBLER_TRANSPORT", "carrier-pigeon")
+        with pytest.raises(ValueError, match="DABBLER_TRANSPORT"):
+            resolve_transport(base_config)
+
+
+class TestLocalOverrides:
+    """The project-local overlay: how a machine states a fact about itself
+    without editing the packaged default every install would inherit."""
+
+    def _overlay(self, project, body):
+        (project / "local-overrides.yaml").write_text(
+            yaml.safe_dump(body), encoding="utf-8"
+        )
+
+    def test_overlay_merges_over_the_bundled_base(self, project):
+        self._overlay(project, {"transport": {"profile": "copilot-cli"}})
+        config = load_config()
+        assert resolve_transport(config) == "copilot-cli"
+        # Partial: the overlay named one key and inherited the rest.
+        assert config["models"]
+        assert config["_local_overrides_path"].endswith("local-overrides.yaml")
+
+    def test_typo_in_the_seat_transport_block_is_refused(self, project):
+        # The block a seat-only machine most needs to override: a dropped
+        # `timeotus` would leave the bundled ceilings quietly in force.
+        self._overlay(
+            project,
+            {"transports": {"copilot-cli": {"timeotus": {"total_seconds": 60}}}},
+        )
+        with pytest.raises(ValueError, match=r"copilot-cli\.timeotus"):
+            load_config()
+
+    def test_open_block_accepts_keys_the_schema_does_not_name(self, project):
+        # metrics is an object the schema deliberately leaves unstructured;
+        # refusing there would refuse overrides the schema never described.
+        self._overlay(project, {"metrics": {"sink": "stdout"}})
+        config = load_config()
+        assert config["metrics"]["sink"] == "stdout"
+        assert config["metrics"]["enabled"] is True  # base survived
+
+    def test_valid_seat_transport_override_still_loads(self, project):
+        self._overlay(
+            project, {"transports": {"copilot-cli": {"lockfile": "seat.lock"}}}
+        )
+        config = load_config()
+        assert config["transports"]["copilot-cli"]["lockfile"] == "seat.lock"
+        assert config["roles"]["verifier"]  # base survived
+
+    def test_merged_result_is_schema_validated(self, project):
+        self._overlay(project, {"transport": {"profile": "carrier-pigeon"}})
+        with pytest.raises(ValueError, match="schema validation"):
+            load_config()
+
+    def test_explicitly_named_config_takes_no_overlay(self, project):
+        self._overlay(project, {"transport": {"profile": "copilot-cli"}})
+        config = load_config(_write_config(project, make_config()))
+        assert config["_local_overrides_path"] is None
+        assert resolve_transport(config) == "api"
+
+    def test_env_named_config_takes_no_overlay(self, project, monkeypatch):
+        self._overlay(project, {"transport": {"profile": "copilot-cli"}})
+        monkeypatch.setenv(
+            "AI_ROUTER_CONFIG", _write_config(project, make_config())
+        )
+        config = load_config()
+        assert config["_local_overrides_path"] is None
+        assert resolve_transport(config) == "api"
+
+
+class TestTheTrackedProjectConfig:
+    """`dabbler.yaml`: what the repository says about itself, tracked because
+    CI and the next machine read it and a gitignored file serves neither."""
+
+    def _declare(self, project, body):
+        (project / "dabbler.yaml").write_text(
+            yaml.safe_dump(body), encoding="utf-8"
+        )
+
+    def _overlay(self, project, body):
+        (project / "local-overrides.yaml").write_text(
+            yaml.safe_dump(body), encoding="utf-8"
+        )
+
+    def test_the_repository_declares_its_own_suites(self, project):
+        self._declare(project, {
+            "schema_version": 1,
+            "testing": {"suites": [{"name": "mvn", "command": "mvn -q test",
+                                    "covers": ["src/"]}]},
+        })
+        config = load_config()
+        assert config["testing"]["suites"][0]["command"] == "mvn -q test"
+        assert config["_project_config_path"].endswith("dabbler.yaml")
+        # Providers, models and roles stay distribution facts: a repository
+        # declaring how to run its tests must not have to fork the registry.
+        assert config["models"] and config["roles"]
+
+    def test_the_machine_overrides_the_distribution_and_not_the_repository(
+            self, project):
+        """The whole point of the ordering. The overlay may still say what is
+        true of this machine; it may not restate what the repository owns."""
+        self._declare(project, {
+            "schema_version": 1,
+            "paths": {"sensitive_paths": ["infra/"]},
+        })
+        self._overlay(project, {"transport": {"profile": "copilot-cli"}})
+        config = load_config()
+        assert config["paths"]["sensitive_paths"] == ["infra/"]
+        assert resolve_transport(config) == "copilot-cli"
+
+    @pytest.mark.parametrize("block", ["testing", "packaging", "paths"])
+    def test_the_overlay_may_not_claim_a_block_the_repository_owns(
+            self, project, block):
+        """Deep merge would have let a gitignored machine file replace a
+        suite command or a packaging feed, and the run of record would then
+        attribute to the repository a command it never declared."""
+        self._overlay(project, {block: {}})
+        with pytest.raises(ValueError, match="which the repository owns"):
+            load_config()
+
+    def test_a_file_that_states_no_schema_version_is_refused(self, project):
+        """A repository set up under a later shape must be refused with its
+        version named, not read as a pile of unknown keys."""
+        self._declare(project, {"testing": {"suites": []}})
+        with pytest.raises(ValueError, match="schema_version"):
+            load_config()
+
+    def test_a_distribution_fact_is_not_a_repository_s_to_declare(
+            self, project):
+        """`AI_ROUTER_CONFIG` is not the escape either, so this is the only
+        door -- and it opens onto three blocks, not onto the provider list."""
+        self._declare(project, {"schema_version": 1, "providers": {}})
+        with pytest.raises(ValueError, match="schema validation"):
+            load_config()
+
+    def test_an_explicitly_named_config_takes_neither_layer(self, project):
+        self._declare(project, {
+            "schema_version": 1,
+            "testing": {"suites": [{"name": "mvn", "command": "mvn -q test"}]},
+        })
+        config = load_config(_write_config(project, make_config()))
+        assert config["_project_config_path"] is None
+        assert not config.get("testing", {}).get("suites")
+
+    def test_sensitive_paths_default_to_none_rather_than_to_absent(
+            self, project):
+        """Every reader sees the same shape, so nothing has to ask whether a
+        repository that declared nothing means "none" or means "unknown"."""
+        assert load_config()["paths"]["sensitive_paths"] == []
+
+
+class TestGenerationParams:
+    def test_task_override_deep_merges_over_model_defaults(self, base_config):
+        base_config["models"]["sonnet"]["generation_params"] = {
+            "effort": "medium",
+            "thinking": {"enabled": True, "type": "adaptive"},
+        }
+        base_config["task_type_params"] = {
+            "formatting": {"sonnet": {"effort": "low",
+                                      "thinking": {"enabled": False}}},
+        }
+        params = resolve_generation_params("sonnet", "formatting", base_config)
+        assert params["effort"] == "low"
+        assert params["thinking"] == {"enabled": False, "type": "adaptive"}
+
+    def test_no_overrides_returns_model_defaults(self, base_config):
+        base_config["models"]["opus"]["generation_params"] = {"effort": "high"}
+        assert resolve_generation_params("opus", "x", base_config) == {
+            "effort": "high"
+        }
+
+
+class TestSplitSections:
+    TEXT = "preamble\n# alpha\nbody a\n## nested\ndeep\n# Beta Two\nbody b\n"
+
+    def test_exact_level_split_and_slugging(self):
+        sections = _split_sections(self.TEXT, header_level=1)
+        assert sections["alpha"] == "body a\n## nested\ndeep"
+        assert sections["beta-two"] == "body b"
+
+class TestPromptTemplates:
+    def test_bundled_templates_resolve(self):
+        config = load_config()
+        assert "code-review" in config["_task_templates"]
+        assert config["_verification_template"]
+        sonnet_prompt = config["models"]["sonnet"]["_system_prompt"]
+        assert sonnet_prompt  # provider section resolved
+
+    def test_missing_template_file_falls_back_to_default(
+        self, tmp_path
+    ):
+        config = make_config()
+        config["models"]["flash"]["system_prompt_file"] = "absent.md"
+        loaded = load_config(_write_config(tmp_path, config))
+        assert "expert software engineer" in (
+            loaded["models"]["flash"]["_system_prompt"]
+        )
+
+
+class TestCritiquePipeline:
+    """The critique pipeline's authority switch. It ships off, and the mode
+    that would let critique artifacts decide anything is refused until the
+    code that honours it exists."""
+
+    def _overlay(self, project, body):
+        (project / "local-overrides.yaml").write_text(
+            yaml.safe_dump(body), encoding="utf-8"
+        )
+
+    def test_pipeline_is_off_when_the_block_is_absent(self, project):
+        assert load_config()["critique"]["pipeline"] == "off"
+
+    def test_shadow_is_accepted(self, project):
+        self._overlay(project, {"critique": {"pipeline": "shadow"}})
+        assert load_config()["critique"]["pipeline"] == "shadow"
+
+    def test_enforce_is_refused_by_name(self, project):
+        self._overlay(project, {"critique": {"pipeline": "enforce"}})
+        with pytest.raises(ValueError) as excinfo:
+            load_config()
+        assert CRITIQUE_ENFORCE_SET in str(excinfo.value)

@@ -14,6 +14,80 @@ kept by hand, and it is not a substitute for anything under `.dabbler/runs/`.
 
 ---
 
+## 2026-08-29 — Future enhancement: session numbers should be decimals, so a session can be inserted
+
+**Raised by the operator. Not in force — this is a direction for a later
+set, recorded so the next person to feel the pain does not re-derive it.**
+
+> We may want to make session numbers floats moving forward. That way we can
+> just insert a new session in between by adding a decimal point.
+
+**What prompted it.** Session 29 was asked for as a short session between 28
+and 29. The lifecycle would not take an out-of-order number, so inserting one
+meant renumbering every session after it: Transport II moved from 29 to 30,
+the cutover from 35 to 36, and 38 lines across 15 files had to follow. D188
+records what that cost and what it forced — live guidance had to move while
+the append-only record deliberately did not, so the repository now contains
+decisions from sessions 27 and 28 that name "session 29" meaning what is now
+session 30. A reader has to know the renumber happened to read them right.
+
+A decimal number removes the whole problem: session 29 would have been
+**28.5**, nothing after it moves, and every statement already written stays
+literally true.
+
+**What it would touch**, from a scan rather than an audit — costing it
+properly is part of the set that takes it on:
+
+- **The next-number derivation, in both routers.** `max(completed) + 1` at
+  `ai_router/session.py:464` and `:496`, and `Math.max(...completed) + 1` at
+  `packages/router/src/session.ts:506` and `:537`. This is the rule that
+  refuses an out-of-order number, and it is the actual constraint — the
+  successor of 28 has to become "the next declared entry" rather than "one
+  more than the highest closed one".
+- **The schema.** `progress-projection.schema.json:229` pins `number` to
+  `"type": "integer"`.
+- **Parsing.** `int(...)` on numbers read from plan headings and CLI tokens —
+  `ai_router/session.py:337`, `:359`, `:599`.
+- **The zero-padded label.** `progress.py:90` is
+  `str(number).zfill(SESSION_NUMBER_WIDTH)`, which gives `029`. `28.5` does
+  not pad to the same width, and the label is what sorts directory listings.
+
+**Two things to decide before building it**, both of which are why this is a
+note and not a ticket:
+
+1. **Do not store it as a float. Neither language has a decimal type.**
+   TypeScript's `number` is an IEEE 754 binary double, and so is Python's
+   `float`; Python at least ships `decimal.Decimal`, and TypeScript has no
+   native equivalent at all. "Decimal session number" therefore has to mean
+   a **string** (`"28.5"`) or a **scaled integer** (tenths: `285`), not a
+   language float — and the reason is specific to this repository rather
+   than general float-anxiety:
+
+   - **Integer-valued floats already serialize differently in the two
+     routers.** Python writes `29.0` where JavaScript writes `29`. This
+     repository has a `PythonFloat` type solely to paper over that, and the
+     parity control compares these records byte-for-byte. Making the
+     session number a float would put that hazard on the primary key of
+     every record instead of on a duration field.
+   - **Halving is exact; typing is not.** `28.5`, `28.25`, `28.75` are
+     dyadic rationals and are represented exactly, so an insert-by-halving
+     scheme would in fact be safe. But a hand-written `28.1` or `28.3` is
+     not exactly representable, and the numbers here are typed by a person.
+
+   Ordering, not arithmetic, is the actual requirement — a version-style
+   tuple or a plain "insert before" ordinal would satisfy it too, and a
+   sortable string satisfies it without a new numeric type on either side.
+2. **The port is mid-flight.** Both routers implement this rule, so changing
+   it now means changing it twice and the parity control cannot see a
+   behaviour change made on both sides at once. The cheapest moment is after
+   the port's final session, when there is one implementation again — the
+   same reasoning that deferred the malformed-`sessions.json` question.
+
+**Not urgent.** One insertion in 29 sessions is the whole evidence base. The
+note exists so the second one is not paid for at full price again.
+
+---
+
 ## 2026-08-23 — Constraints set aside for the duration of the rebuild
 
 **Authorized by the operator.**

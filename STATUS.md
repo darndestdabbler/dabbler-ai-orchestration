@@ -1,17 +1,127 @@
-# STATUS — session 28 of 35 landed: routing, and the record of what exists
+# STATUS — session 29 of 36 landed: one vocabulary for a failure, one stamp for a measurement
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
 `experiment/verification-pipeline-v3` and `design/solution-decomposition`
 are merged and finished. Earlier handoff text is in `docs/status-archive.md`.
 
-> **Recorded, 2026-08-29.** Session 28's deliverables are decisions
-> **D180–D186** in `docs/sessions/decisions-log.md`; session 27's are
-> **D173–D179**, session 26's **D170–D172**, session 25's **D163–D169**,
-> session 24's **D150–D162** and session 23's **D138–D149**, plus the
-> amendments inside `docs/ts-port-parity-control.md`. This file summarises
-> them; the decisions are the record.
+> **Recorded, 2026-08-29.** Session 29's deliverables are decisions
+> **D187–D189** in `docs/sessions/decisions-log.md`; session 28's are
+> **D180–D186**, session 27's **D173–D179**, session 26's **D170–D172**,
+> session 25's **D163–D169**, session 24's **D150–D162** and session 23's
+> **D138–D149**, plus the amendments inside
+> `docs/ts-port-parity-control.md`. This file summarises them; the decisions
+> are the record.
+
+> **How to read a session number below this line.** Session 29 was inserted
+> between 28 and what was then 29, so the port's remaining sessions each
+> moved up one and the plan now runs to **36** (D188). Live guidance was
+> renumbered; the append-only decisions log and the older sections of this
+> file were **not**, because they were true when written. So "ported in
+> session 29" in anything written before 2026-08-29 means what is now
+> session 30, "session 31" means 32, and so on to the cutover, which was 35
+> and is now 36. The ledger's dates carry the true order. The **Next**
+> section at the foot of this file uses the new numbers.
 
 ## Where things are
+
+- **Session 29 is closed `VERIFIED`** — 2 rounds (gpt-5-6-sol over the
+  API). Round 1 raised one Major; it was **accepted and fixed**, not
+  disputed, and round 2 was clean but for three nits describing one race.
+  Claude Code / claude-opus-5[1m] orchestrator. All five gates passed at the
+  first attempt; nothing was forced.
+- **D173 and D185 are closed by one ruling (D187).** Both were the same
+  complaint: the two routers wrote a different string into a record for the
+  same event, because the string was the name of whichever library did the
+  work. Both are now framework-owned vocabulary. This is a **record change,
+  not a port session** — no module was translated, and both halves landed in
+  Python first.
+- **A failed enumeration has eight names and the list is CLOSED.** `timeout`,
+  `network-error`, `http-error`, `parse-error` and `unknown-error` join the
+  three the field already carried. An unmapped failure becomes
+  `unknown-error` rather than contributing its class name: an open mapping
+  breaks the byte comparison the first time either library raises something
+  unanticipated — silently, in a committed file, on whichever machine hit it
+  first. **The original class name is written nowhere**, because a second
+  field would recreate the problem and excluding it from comparison would put
+  a value in the record that nothing checks.
+- **Timeout and unreachable stay apart**, against one advisor's suggestion to
+  merge them into a single transport term. The remedies differ — raise the
+  ceiling, or fix the URL — and a field whose whole job is to say why the
+  entries are stale should not collapse "your ceiling is too low" into "your
+  address is wrong".
+- **Each side reads its own library's bases, not a list of leaf classes.**
+  `httpx.TimeoutException` / `HTTPStatusError` / `TransportError` in Python;
+  in TypeScript the two classes `transports/api` raises, plus an unwrap of
+  Node's `cause` chain — because Node reports a refused connection as a
+  `TypeError` whose cause carries `ECONNREFUSED`. A new leaf class in either
+  library keeps working.
+- **`run_absence_search` stamps `dabbler-absence-search/1` in both routers.**
+  The field's job is not to name a regex engine but to overwrite what the
+  reviewer claimed: a worker can say it searched and report a number, and
+  this function re-runs the search and stamps its own answer. Naming an
+  engine never did that job. It also ends an instability nobody had noticed —
+  the Python value embedded the interpreter's PATCH version, so it moved on a
+  `3.11.9` → `3.11.10` upgrade, inside one router, with no engine change.
+- **Round 1's Major caught a green control that proved nothing, and it is
+  the session's most useful output.** The parity case built to prove the new
+  vocabulary pointed at `http://127.0.0.1:1`. Port 1 is on the WHATWG
+  bad-port list: Node's `fetch` rejects it with `bad port` **before opening a
+  socket**, while httpx dialled it and was refused. So the case compared a
+  refused connection against a rejected URL and passed — the TypeScript
+  classifier reached `network-error` through its `fetch failed` fallback
+  rather than through a real transport failure. **A control that agrees for
+  different reasons is worse than no control, because it reads as proof.**
+  No test in either router would have caught it.
+- **The corpus now allocates the port rather than picking one.** It binds
+  port 0, reads back what the OS assigned, releases it and uses that —
+  never a bad-port number, and never a port something might be listening on.
+  `discovery.test.ts` asserts `ECONNREFUSED` in the failure chain **before**
+  asserting the vocabulary term, and a second test pins `fetch`'s bad-port
+  refusal from the other side, so the substitution cannot recur unnoticed.
+- **The `enumerate` parity case now covers both halves of the field.** One
+  vendor keeps a fake key and the closed-port base URL; the other two still
+  fail at `no-api-key`. Both routers must write the same word for each, and
+  the two records differ only in their timestamps and the digest over them —
+  which is what normalization already handles. Still 16 cases over 85 paths.
+- **Session 29 was inserted, and it cost a renumber (D188).** The lifecycle
+  derives the next session from the completed ones, so it refuses an
+  out-of-order number; inserting one meant moving Transport II to 30, the
+  cutover to 36, and 38 lines of live guidance across 15 files. The
+  append-only log and this file's older sections were deliberately left
+  alone — see the note above. **Worth knowing for the next insertion:
+  register, declare, *then* renumber** — `declare` refused the first attempt
+  because the tree already carried 15 changes, and it was right to.
+- **A future enhancement is recorded rather than built**, in
+  `docs/operator-decisions.md`: session numbers should become insertable, so
+  a session between 28 and 29 costs nothing. Two caveats went with it —
+  **store it as a string or scaled integer, never a language float** (neither
+  TypeScript nor Python has a native decimal type, and Python already writes
+  `29.0` where JavaScript writes `29`, which is why `PythonFloat` exists);
+  and **wait until the port leaves one implementation**, because a behaviour
+  change made on both sides at once is the one thing parity cannot see.
+- **Seat cost: 18,839 in / 6,570 out to gpt-5-6-sol over two rounds
+  (D189).** The cheapest session of the port by a factor of two — the running
+  total across seven is 537,282 verifier tokens, and the next cheapest is
+  session 24 at 61,855. That is not a better process; it is a 200-line diff
+  instead of a 2,276-line port, and the round-1 prompt is sized by the diff.
+  Round 2 is 55% of round 1, the highest ratio recorded, which also means
+  nothing: it is a fraction of a small denominator. In absolute terms round 2
+  cost 6,666 tokens, the smallest verification round of the port.
+- **One measurement the series has never covered.** The advisory consult
+  that precedes a ruling — `gpt-5-6-sol` and `gemini-3-1-pro`, per the
+  operator's standing directive — leaves no row in `router-metrics.jsonl`.
+  Every seat-cost decision in this port measures verification only, so the
+  series is comparable but incomplete.
+- **Suite: 944 Python (5:45) / 391 router vitest (51 s, plus 3 live tests
+  skipped) / 153 extension mocha / 14 Playwright; all four declared controls
+  green.** Python test counts unchanged; vitest gained two.
+- **Left deliberately.** Round 2's surviving nit is a time-of-check/
+  time-of-use race: between releasing the allocated port and the routers
+  connecting, another process could bind it, and both routers would then
+  agree about whatever they found. The window is microseconds against an
+  ephemeral range, the failure is loud (a 200 where a refusal was expected,
+  in a control that diffs bytes), and the alternative is retry machinery in
+  a corpus builder.
 
 - **Session 28 is closed `VERIFIED`** — 2 rounds (gpt-5-6-sol over the
   API). Round 1 raised one Major and three nits; the Major was **disputed
@@ -538,7 +648,7 @@ is D127; the previous version of this file carried it in full.
 
 | Source | What is owed |
 | --- | --- |
-| **D173 — the port's one record difference** | `run_absence_search`'s `tool_version` names the regex engine, and the two routers name different ones because they *are* different ones. Settle it in the session that first puts a critique write into the parity control (31 or 32). The three answers: normalize the field (forbidden — a third normalization), change Python first so the field names the rule rather than the engine (the specification's sanctioned route), or drop it. Nothing reaches it today. |
+| ~~**D173 — the port's one record difference**~~ **CLOSED in session 29 by D187**, together with D185, which was the same shape. Both routers now stamp `dabbler-absence-search/1`, and a failed enumeration is recorded in a closed eight-term vocabulary rather than under the failing library's class name. The route taken is the one this row called sanctioned: Python changed first, and the field names the rule rather than the engine. | *Nothing further owed.* |
 | **D173 / round 1 — the evidence protocol has no callers** | `validate_transcript`, `validate_finding_evidence`, `authoritative_tier`, `verify_worker_result` and `record_worker_result` are ported and **nothing in either router calls them**. Two real gaps sit inside them, both shared with Python and both recorded rather than repaired on one side: `outputHash` is not re-derived from `rawOutput`, and a check's `evidence.pass.requires` contract is not enforced when its result is recorded. The session that first drives the critique loop owns both, and the second one may belong at dispatch rather than at record — the loop's shape decides. |
 | **D174 — consumer repositories** | A repository declaring `argv: ["npm", "test"]` for a check works under Python and would not have under the port without the shim resolution this session added. This repository declares every control as argv for `node` (D142), so nothing here exercises it. Session 33's `bootstrap` should say so where it writes a first `dabbler.yaml`. |
 | **Round 1 nit — an argv suite is unrecordable** | `checks.load_checks` accepts a suite declaring `argv` and no `command`; `test_evidence.load_suites_checked` refuses it. Such a suite would run and be unrecordable, so it could never close. Latent — `argv` is used for controls, which that reader never sees — and **it may be the permissiveness rather than the refusal that is wrong**: a suite's command lands in the record as evidence, a control's does not. A session, not a patch, and adjacent to D116. |
@@ -579,17 +689,29 @@ resolved by being true again.
 
 ## Next
 
-1. **Session 28 of 35 — transports I: API, offline, routing, selection,
-   discovery.** `transports/base` (49), `transports/offline` (140),
-   `transports/api` (292), `route` (586), `selection` (146), `discovery`
-   (1,057) — 2,270 lines, 82 tests. **Port the offline transport first**, and
-   not only for the reason the plan gives (every later session's tests run
-   without a network). It is also the thing standing between the parity
-   control and its three unbuilt shapes: `disputed`, `at-cap` and
-   `moved-machine` all need canned verifier text through it before a builder
-   can exist, and D176 measures those shapes — not the cases on them — as the
-   control's real cost. Session 28 should consider landing one of the three
-   builders, because doing so unblocks session 32's largest batch of cases.
+1. **Session 30 of 36 — transport II: the Copilot CLI state machine and seat
+   cost.** This is the session `route` currently refuses **by name** — the
+   `copilot-cli` branch throws rather than falling back to the API, because a
+   silent fallback would put a cross-provider verification on the provider
+   the operator was routing away from. `packages/router/test/route.test.ts`
+   asserts that refusal names session 30, so the test tells you when you have
+   arrived.
+   **Session 28 left this session more than a rule to restate.** The seat's
+   half of `selection` is already real, and so is the seat catalog's
+   *reader* — `transports/copilot.ts` grew 171 lines for it. What is missing
+   is the catalog's **writer**, and it cannot be ported without the empirical
+   probe and the dispatch state machine, because a refresh is *defined* as a
+   probe: a writer without one could only mark a model `confirmed` with no
+   evidence, which that file's own design forbids. That is the whole content
+   of session 28's disputed Major (D186), and it is the map for this session.
+   **Read D174 before spawning anything.** Windows spawning is where Node and
+   Python genuinely differ and it is already measured:
+   `spawn("x.cmd", …)` is `EINVAL` on Node, both routers actually pay
+   `cmd.exe` parsing on exactly these programs, the shim goes through
+   `%COMSPEC% /d /s /v:off /c` with each argument quoted itself and **never**
+   `shell: true`, and an over-long command line is `ENAMETOOLONG`.
+   `checks.isArgvTooLarge` is the one reader of that, and it is this
+   session's to import.
 2. **Read `docs/ts-port-parity-control.md` before planning any session
    from here.** Its verb table is the growth order. Session 26 proved the
    *plan's* line counts are a floor (three modules became nine); session 27
@@ -608,7 +730,7 @@ resolved by being true again.
    together. **It is a redesign and it needs a ruling**: refuse and fail
    closed, or keep replacing and say so. If it is to be fixed, the cheapest
    moment is *after* session 35, when there is one implementation again.
-4. **D162 is per-command, from session 30**: reconcile the `Router`
+4. **D162 is per-command, from session 31** (D162 itself says 30): reconcile the `Router`
    contract against what is actually ported, defaulting to trimming.
    `modules retire` plausibly earns building; `modules list` probably does
    not; `--finding-index` is just a correction to `--finding`. Session 26
@@ -616,18 +738,20 @@ resolved by being true again.
    `pythonCli: false`, and nothing has ever called it — `pythonSpawnRouter`
    refuses both its methods. It is a candidate for trimming rather than
    building.
-5. **What sessions 25–27 leave for their successors.** `identity`'s
-   session-level entry point is owed to session 30 (D164); `verdict`'s
-   parity case and the `VERIFIED` look-alike question are owed to session
-   32 (D163, D168); the round-append parity case is owed to session 32 for
-   the same reason (D171's round-1 dispute, withdrawn on that basis), and
+5. **What sessions 25–27 leave for their successors** — renumbered here to
+   the new plan; the decisions themselves say 30/32/34. `identity`'s
+   session-level entry point is owed to **session 31** (D164); `verdict`'s
+   parity case and the `VERIFIED` look-alike question are owed to **session
+   33** (D163, D168); the round-append parity case is owed to **session 33**
+   for the same reason (D171's round-1 dispute, withdrawn on that basis), and
    **so is the `completion_tree` comparison** — session 27 proved the two
    snapshots agree on this repository (D177) but no verb writes a round yet,
-   so the control still cannot check it. The evidence protocol's two gaps and
-   the absence-search engine stamp are owed to whichever of 31/32 first
-   drives the critique loop (D173).
+   so the control still cannot check it. The evidence protocol's two gaps are
+   owed to whichever of **32/33** first drives the critique loop. **The
+   absence-search engine stamp is no longer among them — session 29 closed it
+   (D187).**
 6. **D130 override window** — the operator can still override retiring the
-   run core, until session 34 starts. Session 27 has now made one decision
+   run core, until **session 35** starts. Session 27 has now made one decision
    that leans on it: `checks.plan` is not ported because `runcli` is its only
    caller (D178). An override would mean porting it — with the per-suite
    defect fixed on **both** sides, in Python's own commit first.
@@ -636,3 +760,16 @@ resolved by being true again.
    round 1 for the round that settled the last one (D179). Three of them
    would otherwise have become one-sided behaviour changes to the record's
    trust rules — the single failure a parity comparison cannot see.
+   **Session 29 is the counterweight, and it matters as much.** Its round-1
+   Major was accepted on first reading and fixed, because it was right. The
+   rule that survives both sessions is *check the cited lines before
+   answering* — not *dispute by default*, which is the same reflex the other
+   way round.
+8. **A parity case that passes is not the same as a parity case that
+   proves.** Session 29's Major found a case comparing a refused connection
+   against a URL Node never dialled, agreeing for two different reasons and
+   going green. When a case is built to exercise a *failure*, assert the
+   underlying cause — the syscall code, the status, the exception's shape —
+   **before** asserting the value under test, on both sides. Otherwise the
+   control's own fallback paths can supply the expected answer, and a green
+   control that proves nothing reads exactly like proof.

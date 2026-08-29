@@ -677,9 +677,9 @@
     {
       "number": 35,
       "title": "The six-step workflow ported, the run core retired",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-29T17:10:02.869796-04:00",
-      "completedAt": null,
+      "completedAt": "2026-08-29T18:36:23.410968-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

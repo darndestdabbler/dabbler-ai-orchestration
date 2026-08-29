@@ -67,7 +67,7 @@ _SHARED_BODY = """\
 
 > `AGENTS.md` is the single source of this managed body; `CLAUDE.md` and
 > `GEMINI.md` import it and add only their engine tail. Do not hand-edit
-> inside the fence; re-run `python -m ai_router.bootstrap` to refresh it.
+> inside the fence; re-run `dabbler bootstrap` to refresh it.
 
 ## Your role
 
@@ -90,7 +90,7 @@ Sessions are numbered directly in this repository, under one sessions root
 
 2. **Register the session (state first, work second).**
 
-       python -m ai_router.session start \\
+       dabbler session start \\
            --engine <claude-code|codex|gemini|copilot> --provider <anthropic|openai|google>
 
    Copilot seats must also pass `--model` (the seat label is not trusted;
@@ -99,7 +99,7 @@ Sessions are numbered directly in this repository, under one sessions root
 
    **Then declare the task list, before you edit anything.**
 
-       python -m ai_router.session declare \\
+       dabbler session declare \\
            --task-file <path> --releasable|--not-releasable
 
    The declaration says what this session will do and whether it produces a
@@ -116,14 +116,14 @@ Sessions are numbered directly in this repository, under one sessions root
 
 4. **Run the tests this change makes necessary — only those.**
 
-       python -m ai_router.affected
+       dabbler affected
 
    prints the selected tests, the reason each was selected, and the exact
    command to run. Once a verification round exists, selection is measured
    against that round's snapshot, so a remediation runs what the fix
    touched rather than what the session touched. Run it, then record it:
 
-       python -m ai_router.test_evidence record \\
+       dabbler test-evidence record \\
            --suite <name> --stage preverify-targeted \\
            --command "<the command you ran>" --outcome passed \\
            --duration-seconds <elapsed>
@@ -137,7 +137,7 @@ Sessions are numbered directly in this repository, under one sessions root
 
 5. **Run cross-provider verification (mandatory — there is no skip).**
 
-       python -m ai_router.verify
+       dabbler verify
 
    The verifier is a different provider than you, on either transport.
    Round outcomes land in `.dabbler/runs/` (machine-written; never edit).
@@ -150,7 +150,7 @@ Sessions are numbered directly in this repository, under one sessions root
    declares under `testing.suites` in this repository's `dabbler.yaml` —
    the same one `--suite <name>` names here:
 
-       python -m ai_router.test_evidence record \\
+       dabbler test-evidence record \\
            --suite <name> --stage final-full --outcome passed \\
            --duration-seconds <elapsed>
 
@@ -165,7 +165,7 @@ Sessions are numbered directly in this repository, under one sessions root
 
 8. **Package — only if step 2 declared this session releasable.**
 
-       python -m ai_router.packaging
+       dabbler packaging
 
    Packs, then pushes to the declared feed. It refuses an undeclared or
    not-releasable session, refuses a repository that declares no
@@ -176,7 +176,7 @@ Sessions are numbered directly in this repository, under one sessions root
 
 9. **Close via the gate.**
 
-       python -m ai_router.session close
+       dabbler session close
 
    Five gates run (verification clean, tree clean, pushed, tests fresh,
    verdict vocabulary); use `--dry-run` any time to preview the rows.
@@ -188,15 +188,15 @@ Sessions are numbered directly in this repository, under one sessions root
   `.dabbler/runs/`
   are written by the router only — never by hand, never "fixed up".
 - Verification verdicts come from the verifier. A verdict token you did
-  not receive from `ai_router.verify` does not exist.
+  not receive from `dabbler verify` does not exist.
 - API keys live in env vars (`DABBLER_ANTHROPIC_API_KEY`,
   `DABBLER_OPENAI_API_KEY`, `DABBLER_GEMINI_API_KEY`), never in files. The
   same rule covers a feed PAT: `packaging.push.secret` names it and never
   holds it.
-- Run the router through the project venv:
-  `.venv/Scripts/python -m ai_router.<module>` on Windows,
-  `.venv/bin/python -m ai_router.<module>` on POSIX. "No module named
-  ai_router" is an interpreter problem, not a missing-keys problem.
+- The router is one command, `dabbler <verb>` — no interpreter, no virtual
+  environment. A VS Code terminal has it on `PATH`; anywhere else, run
+  `npm i -g dabbler-ai-router` once. "dabbler: command not found" is a
+  PATH problem, not a missing-keys problem.
 """
 
 _CLAUDE_TAIL = """\
@@ -749,12 +749,12 @@ _PRE_COMMIT_HOOK = """\
 # own to be judged by, so this refuses rather than advises.
 #
 # Only exit {blocking} -- the guard saying "a step is open" -- blocks the commit.
-# A missing interpreter, an uninstalled package or an unreadable ledger
-# exit differently and are let through: none of them is the guard's
-# verdict, and a repository nobody can commit to is a worse failure than
-# an unguarded one. The binding check is `verify step close`, which
-# refuses outright when HEAD has moved off the commit the step opened on.
-"{python}" -m ai_router.verify step guard-commit
+# A router that is not on PATH, or an unreadable ledger, exit differently
+# and are let through: neither is the guard's verdict, and a repository
+# nobody can commit to is a worse failure than an unguarded one. The
+# binding check is `verify step close`, which refuses outright when HEAD
+# has moved off the commit the step opened on.
+dabbler verify step guard-commit
 if [ $? -eq {blocking} ]; then
   exit 1
 fi
@@ -768,10 +768,13 @@ def ensure_commit_guard(project_dir) -> Optional[Path]:
 
     An existing hook this function did not write is never clobbered -- a
     project's own pre-commit checks are not ours to delete, and a guard
-    that silently ate them would be worse than no guard. The interpreter
-    is baked in rather than resolved from PATH, because a hook that ran
-    against a different environment is answering about a different
-    repository.
+    that silently ate them would be worse than no guard.
+
+    The guard invokes the router by name and lets PATH resolve it. There is
+    no interpreter to bake in: the router ships as one command, and a
+    consumer repository is not required to contain the thing that guards
+    it. A machine where the name does not resolve exits non-blocking, which
+    is the same direction every other non-verdict failure takes.
     """
     from .verify import EXIT_BLOCKING
 
@@ -786,8 +789,7 @@ def ensure_commit_guard(project_dir) -> Optional[Path]:
     if existing and _HOOK_MARKER not in existing:
         return None
     content = _PRE_COMMIT_HOOK.format(
-        marker=_HOOK_MARKER, python=Path(sys.executable).as_posix(),
-        blocking=EXIT_BLOCKING,
+        marker=_HOOK_MARKER, blocking=EXIT_BLOCKING,
     )
     if existing == content:
         return None

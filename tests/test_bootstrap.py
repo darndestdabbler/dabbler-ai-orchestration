@@ -202,11 +202,11 @@ class TestInstructionFiles:
         # exactly one file may hold the body; the other two import it.
         write_instruction_files(tmp_path, repo_name="acme-app")
         agents = (tmp_path / "AGENTS.md").read_text(encoding="utf-8")
-        assert "`acme-app`" in agents and "ai_router.verify" in agents
+        assert "`acme-app`" in agents and "dabbler verify" in agents
         for name in ("CLAUDE.md", "GEMINI.md"):
             text = (tmp_path / name).read_text(encoding="utf-8")
             assert "@AGENTS.md" in text
-            assert "ai_router.verify" not in text
+            assert "dabbler verify" not in text
 
     def test_engine_tails_differ(self, tmp_path):
         write_instruction_files(tmp_path, repo_name="x")

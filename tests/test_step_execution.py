@@ -333,9 +333,12 @@ class TestGuardInstallation:
         repo, _ = sandbox_repo
         hook = ensure_commit_guard(repo)
         assert hook == repo / ".git" / "hooks" / "pre-commit"
-        assert "ai_router.verify step guard-commit" in hook.read_text(
-            encoding="utf-8"
-        )
+        text = hook.read_text(encoding="utf-8")
+        # The router is invoked by name and PATH resolves it: there is no
+        # interpreter to bake in, and a consumer repository is not required
+        # to contain the thing that guards it.
+        assert "dabbler verify step guard-commit" in text
+        assert "python" not in text
 
     def test_bootstrap_never_clobbers_a_hook_it_did_not_write(
         self, sandbox_repo

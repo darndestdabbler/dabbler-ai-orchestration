@@ -1,0 +1,303 @@
+import { writeFileSync } from "node:fs";
+import { join } from "node:path";
+
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { CONFIG_ENV_VAR } from "../src/config.ts";
+import { loadMetrics } from "../src/metrics.ts";
+import {
+  NoCandidateError,
+  PromptTooLargeError,
+  RouterError,
+  buildPrompt,
+  resetForTests,
+  route,
+} from "../src/route.ts";
+import { resetForTests as resetRuntimeMode } from "../src/runtimeMode.ts";
+import {
+  clearProviderKeys,
+  makeConfig,
+  makeTempDir,
+  removeTempDirs,
+  setProviderKeys,
+  writeConfig,
+} from "./support/fixtures.ts";
+
+afterAll(removeTempDirs);
+
+let configPath = "";
+
+/**
+ * The config on disk with `AI_ROUTER_CONFIG` pointing at it, so `route`'s
+ * lazy load resolves hermetically -- and the metrics land beside it.
+ */
+function configOnDisk(config: Record<string, unknown> = makeConfig()): string {
+  const directory = makeTempDir();
+  configPath = writeConfig(directory, config);
+  process.env[CONFIG_ENV_VAR] = configPath;
+  return configPath;
+}
+
+function metricRows(): Array<Record<string, unknown>> {
+  return loadMetrics({ _config_path: configPath });
+}
+
+function googleResponse(text: string, outTokens = 100): Response {
+  return new Response(
+    JSON.stringify({
+      candidates: [
+        { content: { parts: [{ text }] }, finishReason: "STOP" },
+      ],
+      usageMetadata: { promptTokenCount: 10, candidatesTokenCount: outTokens },
+      modelVersion: "g-served",
+    }),
+    { status: 200, headers: { "content-type": "application/json" } },
+  );
+}
+
+/** Every request the route takes, answered by `handler`. */
+function mockApi(handler: (url: string) => Response): string[] {
+  const urls: string[] = [];
+  vi.stubGlobal("fetch", (url: string) => {
+    urls.push(String(url));
+    return Promise.resolve(handler(String(url)));
+  });
+  return urls;
+}
+
+beforeEach(() => {
+  setProviderKeys();
+  // `bootstrap` persists this at user scope on a seat machine, and it
+  // outranks the config the fixture writes.
+  delete process.env["DABBLER_TRANSPORT"];
+  delete process.env["DABBLER_NO_ROUTER"];
+  resetForTests();
+  resetRuntimeMode();
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+  clearProviderKeys();
+  delete process.env[CONFIG_ENV_VAR];
+  delete process.env["DABBLER_NO_ROUTER"];
+  delete process.env["DABBLER_TRANSPORT"];
+  resetForTests();
+  resetRuntimeMode();
+});
+
+describe("--no-router mode", () => {
+  it("short-circuits before the config is even loaded", async () => {
+    // No config, no keys, no network -- and it must still answer.
+    process.env["DABBLER_NO_ROUTER"] = "1";
+    resetRuntimeMode();
+    const result = await route("anything");
+    expect(result.model_name).toBe("no-router-mode");
+    expect(result.transport).toBe("none");
+  });
+});
+
+describe("routing over the direct-API transport", () => {
+  it("records the tokens and the telemetry row end to end", async () => {
+    configOnDisk();
+    mockApi(() => googleResponse("the answer"));
+    const result = await route("say hi", { taskType: "formatting", sessionNumber: 3 });
+
+    expect(result.content).toBe("the answer");
+    expect(result.model_name).toBe("flash"); // roles.generator.prefer[0]
+    expect(result.transport).toBe("api");
+    expect([result.input_tokens, result.output_tokens]).toEqual([10, 100]);
+    expect(result.served_model_id).toBe("g-served");
+
+    const rows = metricRows();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!["session_number"]).toBe(3);
+    expect(rows[0]!["transport"]).toBe("api");
+    expect(rows[0]!["billed_usage_unavailable"]).toBeNull();
+    expect(rows[0]!["requested_model_id"]).toBe("g-flash");
+    expect(rows[0]!["served_model_id"]).toBe("g-served");
+  });
+
+  it("walks the role order on an escalation and records the history", async () => {
+    configOnDisk();
+    mockApi((url) =>
+      url.includes("g-flash")
+        ? googleResponse("", 0) // empty -> escalate
+        : googleResponse("recovered ".repeat(20), 200),
+    );
+    const result = await route("say hi", { taskType: "formatting" });
+
+    expect(result.escalated).toBe(true);
+    expect(result.escalation_history).toEqual([["flash", "empty_response"]]);
+    expect(result.model_name).toBe("pro");
+    const rows = metricRows();
+    expect(rows[0]!["escalated"]).toBe(true);
+    expect(rows[0]!["model"]).toBe("pro");
+  });
+
+  it("honours an exclusion end to end", async () => {
+    configOnDisk();
+    const urls = mockApi(
+      () =>
+        new Response(
+          JSON.stringify({
+            content: [{ type: "text", text: "from anthropic ".repeat(5) }],
+            usage: { input_tokens: 5, output_tokens: 50 },
+            stop_reason: "end_turn",
+            model: "a-sonnet",
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        ),
+    );
+    const result = await route("say hi", { excludeProviders: ["google", "openai"] });
+    expect(result.provider).toBe("anthropic");
+    expect(urls.join(" ")).not.toContain("google");
+  });
+
+  it("fails closed when the exclusion leaves no candidate", async () => {
+    configOnDisk();
+    await expect(
+      route("say hi", { excludeProviders: ["google", "openai", "anthropic"] }),
+    ).rejects.toThrow(NoCandidateError);
+  });
+
+  it("fails closed on a keyless machine rather than blowing up on a lookup", async () => {
+    configOnDisk();
+    clearProviderKeys();
+    await expect(route("say hi")).rejects.toThrow(NoCandidateError);
+  });
+
+  it("refuses an excluded provider at the call site, not only at selection", async () => {
+    // Cross-provider review is the one invariant a later preference path
+    // must not be able to undo, so the exclusion is asserted immediately
+    // before the wire as well as where candidates were filtered. No current
+    // path can reach that assertion, which is the point -- so selection is
+    // replaced here with one that ignores the exclusion, as a future
+    // preference path might.
+    configOnDisk();
+    mockApi(() => googleResponse("never sent"));
+    vi.resetModules();
+    vi.doMock("../src/selection.ts", async () => {
+      const actual =
+        await vi.importActual<typeof import("../src/selection.ts")>(
+          "../src/selection.ts",
+        );
+      return { ...actual, registryCandidates: () => ["flash"] };
+    });
+    try {
+      const routed = await import("../src/route.ts");
+      routed.resetForTests();
+      const failure = await routed
+        .route("say hi", { excludeProviders: ["google"] })
+        .then(() => null)
+        .catch((error: unknown) => error);
+      expect(failure).toBeInstanceOf(routed.ExcludedProviderError);
+      expect(String(failure)).toContain("google");
+    } finally {
+      vi.doUnmock("../src/selection.ts");
+      vi.resetModules();
+    }
+  });
+});
+
+describe("the seat transport, before session 30", () => {
+  it("is refused by name rather than falling back to the API", async () => {
+    // A transport that silently fell back would put a cross-provider
+    // verification on the provider the operator was routing away from.
+    configOnDisk();
+    const failure = await route("say hi", { transport: "copilot-cli" })
+      .then(() => null)
+      .catch((error: unknown) => error);
+    expect(failure).toBeInstanceOf(RouterError);
+    expect(String(failure)).toContain("session 30");
+  });
+});
+
+describe("a prompt over the model's input budget", () => {
+  const modelConfig = { max_context_tokens: 1000 };
+
+  it("is refused with the overrun and the remedy, never trimmed", () => {
+    // Tail-chopping a review bundle drops the end of the diff while the
+    // handoff acknowledgement still validates, so a truncated review returns
+    // a clean-looking verdict.
+    const failure = (): unknown =>
+      buildPrompt("x".repeat(5000), "", "code-review", modelConfig, {});
+    expect(failure).toThrow(PromptTooLargeError);
+    expect(failure).toThrow(/an overrun of 450 tokens/);
+    expect(failure).toThrow(/split the session/);
+  });
+
+  it("stops the call before anything is dispatched", async () => {
+    configOnDisk(
+      makeConfig({
+        models: {
+          tiny: { provider: "google", model_id: "g-tiny", max_context_tokens: 1000, max_output_tokens: 100 },
+        },
+        roles: { generator: { prefer: ["g-tiny"] } },
+      }),
+    );
+    const urls = mockApi(() => googleResponse("never sent"));
+    await expect(route("x".repeat(5000))).rejects.toThrow(PromptTooLargeError);
+    expect(urls).toHaveLength(0);
+  });
+});
+
+describe("auto-verification, before session 32", () => {
+  it("is refused rather than dropped, because silence would look verified", async () => {
+    configOnDisk(
+      makeConfig({
+        verification: { enabled: true, auto_verify_task_types: ["code-review"] },
+      }),
+    );
+    mockApi(() => googleResponse("a review ".repeat(20), 200));
+    const failure = await route("say hi", { taskType: "code-review" })
+      .then(() => null)
+      .catch((error: unknown) => error);
+    expect(failure).toBeInstanceOf(RouterError);
+    expect(String(failure)).toContain("session 32");
+  });
+});
+
+describe("the offline transport through route()", () => {
+  it("dispatches one scripted response and does not escalate", async () => {
+    // Escalating between scripted responses would consume the queue to hide
+    // a script the operator wrote on purpose.
+    const responses = makeTempDir();
+    // "short" would escalate on any other path -- it is under the trigger's
+    // floor and there is a second response to walk to.
+    writeFileSync(join(responses, "01.md"), "short\n", "utf8");
+    writeFileSync(join(responses, "02.md"), "the second, never reached\n", "utf8");
+    configOnDisk(
+      makeConfig({
+        transports: { offline: { responses_dir: responses } },
+        transport: { profile: "offline" },
+      }),
+    );
+    const result = await route("say hi");
+    expect(result.content).toBe("short\n");
+    expect(result.provider).toBe("offline");
+    expect(result.escalated).toBe(false);
+    expect(result.served_model_id).toBe("offline:01.md");
+  });
+});
+
+describe("the round-trip through the escalation ladder's ceiling", () => {
+  it("stops at max_escalations even with candidates left", async () => {
+    // The ladder is bounded by two independent limits -- how many models
+    // remain, and how many escalations the config allows -- and a run that
+    // escalated past the second would spend a call the operator capped.
+    configOnDisk(
+      makeConfig({
+        escalation: {
+          enabled: true,
+          max_escalations: 1,
+          triggers: { empty_response: true, min_output_tokens: 30 },
+          refusal_phrases: [],
+        },
+      }),
+    );
+    const urls = mockApi(() => googleResponse("", 0)); // every model empties
+    const result = await route("say hi");
+    expect(result.escalation_history).toHaveLength(1);
+    expect(urls).toHaveLength(2);
+  });
+});

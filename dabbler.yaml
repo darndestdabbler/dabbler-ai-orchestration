@@ -172,9 +172,7 @@ testing:
           - tests/test_step_execution.py
       - when: ai_router/checks.py
         select:
-          - tests/test_runcore_checks.py
-          - tests/test_runcore_verified.py
-          - tests/test_runcore_fast.py
+          - tests/test_affected.py
           - tests/test_testphase.py
           - tests/test_fixloop.py
       - when: ai_router/config.py
@@ -218,9 +216,6 @@ testing:
       - when: ai_router/journal.py
         select:
           - tests/test_journal.py
-          - tests/test_runcore_contracts.py
-          - tests/test_runcore_recovery.py
-          - tests/test_runcore_fast.py
       - when: ai_router/ledger.py
         select:
           - tests/test_ledger.py
@@ -269,28 +264,6 @@ testing:
           - tests/test_route.py
           - tests/test_escalation.py
           - tests/test_verify.py
-      - when: ai_router/runcli.py
-        select:
-          - tests/test_runcore_fast.py
-          - tests/test_runcore_verified.py
-          - tests/test_runcore_checks.py
-          - tests/test_runcore_recovery.py
-          - tests/test_runcore_contracts.py
-          - tests/test_runcore_independence.py
-      - when: ai_router/runcore.py
-        select:
-          - tests/test_runcore_contracts.py
-          - tests/test_runcore_fast.py
-          - tests/test_runcore_verified.py
-          - tests/test_runcore_recovery.py
-          - tests/test_runcore_independence.py
-      - when: ai_router/runproject.py
-        select:
-          - tests/test_runcore_fast.py
-          - tests/test_runcore_contracts.py
-          - tests/test_runcore_recovery.py
-          - tests/test_runcore_independence.py
-          - tests/test_runcore_verified.py
       - when: ai_router/runtime_mode.py
         select:
           - tests/test_route.py
@@ -352,8 +325,6 @@ testing:
           - tests/test_fixloop.py
       - when: ai_router/verifyjob.py
         select:
-          - tests/test_runcore_verified.py
-          - tests/test_runcore_contracts.py
           - tests/test_verify.py
       - when: ai_router/workflow.py
         select:
@@ -397,7 +368,6 @@ testing:
         select:
           - tests/test_config.py
           - tests/test_affected.py
-          - tests/test_runcore_checks.py
           - tests/test_packaging.py
 
       # --- The TypeScript router (the port) ---------------------------
@@ -709,7 +679,6 @@ testing:
           - tests/test_agency.py
           - tests/test_verify.py
           - tests/test_gates.py
-          - tests/test_runcore_contracts.py
           - tests/test_packaging.py
       - when: ai_router/prompt-templates/
         select:

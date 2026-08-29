@@ -359,10 +359,32 @@ function deadEndpoint(): string {
   return deadEndpointUrl;
 }
 
+/**
+ * The solution manifest every shape carries.
+ *
+ * A file rather than a shape: `workflow` needs a manifest before it can fold
+ * a projection, and a sixth corpus shape would be built twice on every round
+ * of every session that follows. This costs one `writeFileSync` per build and
+ * nothing else -- no router runs against it until a case names it, and no
+ * other verb reads `solution.yaml` at all.
+ */
+const SOLUTION_MANIFEST = [
+  "solution:",
+  "  name: parity-solution",
+  "  title: The parity subject",
+  "components:",
+  "  - name: widget-model",
+  "  - name: widget-app",
+  "    kind: integration",
+  "    dependsOn: [widget-model]",
+  "",
+].join("\n");
+
 const SEED: Record<string, string> = {
   [API_RECORD_PATH]: API_RECORD,
   "docs/sessions/session-plan.md": SESSION_PLAN,
   "dabbler.yaml": DABBLER_YAML,
+  "solution.yaml": SOLUTION_MANIFEST,
   "src/widget.py": "def widget():\n    return 1\n",
   "tests/test_widget.py": "from src.widget import widget\n\n\ndef test_widget():\n    assert widget() == 1\n",
   // What `bootstrap` writes, plus the machine-local overlay: neither is

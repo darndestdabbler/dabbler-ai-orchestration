@@ -1,5 +1,12 @@
 # The Thin Run Core — implementation blueprint
 
+> **Superseded, 2026-08-29.** The run core is retired and deleted (D88, D130):
+> `runcli`, `runcore` and `runproject` are gone from the tree, with their
+> tests, their verbs and the records only they wrote. This document is kept
+> because D130's authority rests on the evidence in it, and because a decision
+> whose reasoning has been deleted cannot be re-examined. Read it as what was
+> built and withdrawn, not as what exists.
+
 **Status:** Implementation-ready contract. Section 15 records settled choices
 and the two operator-supplied inputs needed before benchmark/cutover. Authored
 by Fable against the tree at set 145 session 1, then revised after a review of

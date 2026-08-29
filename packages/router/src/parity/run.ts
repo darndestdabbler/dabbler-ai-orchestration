@@ -906,6 +906,82 @@ export const CASES: readonly ParityCase[] = [
       "publish on either side, refused in the same sentence at the same " +
       "exit code, with nothing packed, nothing pushed and nothing filed",
   },
+  {
+    verb: "status",
+    label: "status (the lifecycle's record, under the retired verb's name)",
+    // `in-flight` rather than `fresh`: the claim is that the operator-facing
+    // name reaches the same projection the extension gets, so the shape with
+    // something in the record is the one that would catch a divergence.
+    shapes: ["in-flight"],
+    pythonArgs: (_repo, sessionsDir) => [
+      "ai_router.progress", "--sessions-dir", sessionsDir, "--json",
+    ],
+    dabblerArgs: (_repo, sessionsDir) => [
+      "status", "--sessions-dir", sessionsDir, "--json",
+    ],
+    proves:
+      "that `dabbler status` is the lifecycle's projection and not a second " +
+      "answer to it -- the same bytes `ai_router.progress` prints, which is " +
+      "what D88's other half asked for when the run projection went away",
+  },
+  {
+    verb: "workflow",
+    label: "workflow enter (the event log)",
+    // The setup opens the log at the first step through the Python router,
+    // as every shape is built; the compared verb is the second `enter`. So
+    // what a green row covers is an append to an existing log -- the folded
+    // state that judges the move, the sorted JSON of the row, and the
+    // projection written beside it.
+    shapes: ["fresh"],
+    setup: (repo) => [
+      "ai_router.workflow", "enter", "plan", "--workspace-root", repo,
+    ],
+    pythonArgs: (repo) => [
+      "ai_router.workflow", "enter", "decompose", "--workspace-root", repo,
+    ],
+    dabblerArgs: (repo) => [
+      "workflow", "enter", "decompose", "--workspace-root", repo,
+    ],
+    proves:
+      "the append-only event log byte for byte -- the key order `sort_keys` " +
+      "fixes and the UTC stamp both routers write -- and the Solution " +
+      "Explorer projection folded from it beside it",
+  },
+  {
+    verb: "workflow",
+    label: "workflow status --json (the projection)",
+    // The read half, on a log the setup has already moved twice. It writes
+    // nothing, so what is compared is stdout: the projection as the
+    // extension receives it, which is the one document this verb exists to
+    // produce.
+    shapes: ["fresh"],
+    setup: (repo) => [
+      "ai_router.workflow", "enter", "plan", "--workspace-root", repo,
+    ],
+    pythonArgs: (repo) => [
+      "ai_router.workflow", "status", "--json", "--workspace-root", repo,
+    ],
+    dabblerArgs: (repo) => [
+      "workflow", "status", "--json", "--workspace-root", repo,
+    ],
+    proves:
+      "that the manifest joined to live state renders identically -- every " +
+      "loop's round count, bound and terminal token, and the key order the " +
+      "extension's reader walks",
+  },
+  {
+    verb: "solution",
+    label: "solution check",
+    shapes: ["fresh"],
+    pythonArgs: (repo) => [
+      "ai_router.solution", "check", "--workspace-root", repo,
+    ],
+    dabblerArgs: (repo) => ["solution", "check", "--workspace-root", repo],
+    proves:
+      "the manifest's validation report in the same words and the same " +
+      "column widths, including the derived `used by` direction neither " +
+      "manifest declares",
+  },
 ];
 
 

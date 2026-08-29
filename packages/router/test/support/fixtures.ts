@@ -11,6 +11,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
 import { stringify as stringifyYaml } from "yaml";
+import { vi } from "vitest";
 
 /** A schema-valid config, deep-copied, with top-level keys replaced. */
 export function makeConfig(
@@ -230,3 +231,29 @@ const SANDBOX_SEED: Record<string, string> = {
   "tests/test_widget.py": "def test_widget():\n    assert True\n",
   ".gitignore": ".dabbler/\n",
 };
+
+/**
+ * One verb run, with everything it printed.
+ *
+ * A verb writes through `cli/output.ts` rather than returning text, so a test
+ * of what a person reads has to intercept the stream. `vi.restoreAllMocks`
+ * runs in the `finally` so a throwing verb does not leave the suite's own
+ * reporter writing into an array.
+ */
+export async function captured(
+  run: () => Promise<number>,
+): Promise<{ code: number; out: string; err: string }> {
+  const out: string[] = [];
+  const err: string[] = [];
+  const collect = (sink: string[]) => (chunk: unknown) => {
+    sink.push(String(chunk));
+    return true;
+  };
+  vi.spyOn(process.stdout, "write").mockImplementation(collect(out));
+  vi.spyOn(process.stderr, "write").mockImplementation(collect(err));
+  try {
+    return { code: await run(), out: out.join(""), err: err.join("") };
+  } finally {
+    vi.restoreAllMocks();
+  }
+}

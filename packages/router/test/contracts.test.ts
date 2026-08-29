@@ -18,14 +18,16 @@ describe("the exit-code contract", () => {
 
 describe("the verb table", () => {
   it("declares every verb before it works, so the CLI can refuse it by name", () => {
-    // `workflow` is the example rather than a ported verb: it is declared,
-    // it is not registered, and the CLI therefore refuses it by name and
-    // says which session lands it. Naming a verb that later gets ported
-    // makes this test a countdown -- `verify` was the example until session
-    // 33 -- so the invariant is asserted alongside it.
-    const spec = findVerb("workflow");
-    expect(spec?.pythonModule).toBe("ai_router.workflow");
-    expect(isImplemented("workflow")).toBe(false);
+    // No verb is named here. Naming one made this a countdown -- `verify` was
+    // the example until session 33 and `workflow` until session 35 -- so the
+    // announce-then-implement rule is asserted over whichever verbs are
+    // currently declared without a handler, and every one of them has to
+    // carry the session that lands it.
+    for (const spec of VERBS.filter((entry) => !isImplemented(entry.verb))) {
+      expect(spec.portedInSession, `${spec.verb} names no session`).toBeGreaterThan(0);
+      expect(spec.pythonModule, `${spec.verb} names no module`).toBeTruthy();
+    }
+    // The retired run core is not a verb on either side.
     expect(findVerb("runcli")).toBeUndefined();
     expect(new Set(VERBS.map((entry) => entry.verb)).size).toBe(VERBS.length);
     // The table is the superset: a handler with no declaration would be a

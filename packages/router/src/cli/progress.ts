@@ -20,9 +20,9 @@ import { statSync } from "node:fs";
 const EXIT_OK = 0;
 const EXIT_USAGE = 2;
 
-function usage(): string {
+function usage(name: string): string {
   return [
-    "usage: dabbler progress [-h] [--sessions-dir SESSIONS_DIR] [--json]",
+    `usage: dabbler ${name} [-h] [--sessions-dir SESSIONS_DIR] [--json]`,
     "",
     "Emit the Work Explorer projection for this repository.",
     "",
@@ -44,12 +44,15 @@ function isDirectory(path: string): boolean {
   }
 }
 
-export async function progressVerb(argv: string[]): Promise<number> {
+export async function progressVerb(
+  argv: string[],
+  name = "progress",
+): Promise<number> {
   let explicit: string | undefined;
   for (let index = 0; index < argv.length; index += 1) {
     const token = argv[index];
     if (token === "--help" || token === "-h") {
-      writeOut(usage());
+      writeOut(usage(name));
       return EXIT_OK;
     }
     if (token === "--json") continue;
@@ -67,7 +70,7 @@ export async function progressVerb(argv: string[]): Promise<number> {
       index += 1;
       continue;
     }
-    writeErr(`dabbler progress: unrecognized argument: ${token}\n\n${usage()}`);
+    writeErr(`dabbler ${name}: unrecognized argument: ${token}\n\n${usage(name)}`);
     return EXIT_USAGE;
   }
 
@@ -85,4 +88,25 @@ export async function progressVerb(argv: string[]): Promise<number> {
   }
   writeOut(dumps(buildProjection(sessionsDir), { indent: 2 }) + "\n");
   return EXIT_OK;
+}
+
+/**
+ * `dabbler status` -- the same projection, under the name D88 and D130
+ * promised an operator.
+ *
+ * One implementation, two names, and they are not redundant: `progress` is
+ * what the extension spawns and has since session 31, and `status` is the
+ * command the run core's retirement said would read the lifecycle's record
+ * instead of the run projection. Aliasing rather than renaming keeps the
+ * extension's spawn site working; delegating rather than copying keeps there
+ * from being two answers to "where is this repository".
+ *
+ * The name is passed through so the usage text and the argument refusal say
+ * what the operator typed. The `progress:` prefix on the two resolution
+ * errors below is deliberately NOT renamed -- it is the Python module's own
+ * name, and `python -m ai_router.progress` is what this verb is compared
+ * against.
+ */
+export function statusVerb(argv: string[]): Promise<number> {
+  return progressVerb(argv, "status");
 }

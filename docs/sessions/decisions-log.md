@@ -6883,3 +6883,339 @@ declaration that names the placeholder twice, and the value in both elements
 would be the operator's own credential going to the operator's own feed. If
 it is ever changed it should be changed on both sides at once, or after the
 cutover when there is one side.
+
+## Session 35 — The six-step workflow ported, the run core retired
+
+### D224 · 2026-08-29 · Orchestrator (claude-opus-5/anthropic) · The plan's paragraph and D129's inventory disagreed on fixloop and testphase; the inventory wins, so 6 modules (3,102 lines, 127 tests) are ported and 3 (2,838 lines) deleted -- facts is NOT deleted, it is what verify runs on
+
+The session plan's paragraph for this session and D129's inventory table are
+two records of the same decision, and they disagree on two modules. The plan
+lists `fixloop` and `testphase` on the deletion list, at 4,396 lines and 119
+tests. D129 puts both on the **port** list, and says why in the table itself:
+`workflow` imports `fixloop` at lines 1070 and 1138 and `testphase` at 971 and
+1022, so they are the six-step workflow's own remediation loop and tests
+phase, not the run core's. The plan's own text settles which record wins —
+"If session 22 decided otherwise, this session is what it decided."
+
+**So this session ported six modules and deleted three.**
+
+| Ported | Lines | Tests |
+| --- | ---: | ---: |
+| `workflow` | 1,363 | 55 |
+| `fixloop` | 563 | 18 |
+| `solution` | 351 | 16 |
+| `testphase` | 345 | 10 |
+| `stepreview` | 284 | 15 |
+| `contractdoc` | 196 | 13 |
+| **Total** | **3,102** | **127** |
+
+Deleted: `runcli` (1,497), `runcore` (811), `runproject` (530) — 2,838 lines
+— with `test_runcore_contracts`, `_fast`, `_verified`, `_recovery` and
+`_independence`. The run-core half of `verifyjob.py` went with them (707 of
+782 lines), which is D204's Python-side counterpart: the TypeScript port took
+the surviving 56 lines in session 32 and said the rest is deleted here.
+
+**`facts` is on the plan's deletion list and was not deleted**, because it is
+a live dependency: session 33 ported it precisely because `verify` cannot open
+a round without `collect_facts`, `append_facts` and `red_facts_refusal`. D129
+had already departed from the plan's table on it and D210 recorded why. A
+session that had followed the plan's paragraph rather than the inventory would
+have deleted the module the verification loop runs on.
+
+**The audit that catches this is cheap and it is not optional.** Session 34
+established it as the first act of a porting session; this session ran it
+before touching anything — 21 external symbols across six modules, every one
+resolving on the TypeScript side, with the git seam where D129 said it would
+be (`journal.ts`, not `evidence.ts`). It cost minutes and it is what turned
+the plan/inventory conflict into a decision rather than a deletion.
+
+**The line count is the fifth sizing error's shape, again.** The plan's
+paragraph says 2,194 lines ported; the real figure is 3,102, 41% higher,
+because the two modules it misfiled are 908 lines between them. A session
+planned against the paragraph would have been planned at two-thirds of its
+actual size.
+
+### D225 · 2026-08-29 · Orchestrator (claude-opus-5/anthropic) · test_runcore_checks drives checks THROUGH the run-core CLI, so it dies with it (the TS port already carries it); run_id and the pyproject dabbler entry point go too, settling the shim's name collision
+
+D129 kept `test_runcore_checks.py` (20 tests), on the grounds that it "drives
+`checks`, not the run core it is named for". The reasoning was right about
+the subject and wrong about the driver: every one of its twenty tests reaches
+`checks` through `cli("check", "--run", ...)`, the run core's own command
+line. With `runcli` deleted the file cannot import, let alone run — the
+suite's first collection after the deletion failed on exactly this.
+
+**So it is deleted with the run core, and nothing is lost.** The behaviours it
+covered are already on the TypeScript side: `packages/router/test/checks.test.ts`
+is the port of this file and says so in its first line, at 22 tests against
+its 20, and it explicitly notes that "the half of that file which drove [the
+run core] has no subject here". The alternative was re-authoring twenty
+Python tests against `checks` directly, in a module session 36 deletes
+outright — a migration-path test suite by another name, and one of the kinds
+the ground rules ban.
+
+**The count comes out exactly where D129 predicted it.** That entry says "832
+tests ported, 109 deleted" against 941; after this session `pytest
+--collect-only` reports **832**. The 109 is 88 run-core tests plus
+`test_journal`'s 21 — and since `test_journal` is still in the tree, the file
+this entry deletes is what balances it. The prediction was right about the
+total and wrong about which twenty made it up.
+
+**One live module loses its Python tests for one session.** `ai_router/checks.py`
+is still imported by `test_evidence`, `affected`, `agency`, `packaging`,
+`fixloop` and `testphase`, and after this deletion no Python test drives it
+directly. It is not uncovered: `checks.test.ts` drives the port, the parity
+control compares every verb that runs a check, and session 36 deletes the
+Python module. Recorded rather than papered over, because a reader counting
+coverage will notice.
+
+**`run_id` went with it.** `checks.execute` took a `run_id` for one purpose —
+stamping `write_heartbeat` into the run journal, on a timeout tick — and the
+run core was its only caller. The TypeScript port dropped it at D129's
+instruction ("its one import from the run journal ... is dropped at the
+port"), so the Python signature now matches: the parameter, the import and
+the two lines that used it are gone from `checks.py`, and from `testphase`
+and `fixloop`, which passed it through.
+
+**The `dabbler` console script went too.** `pyproject.toml` pointed
+`[project.scripts] dabbler` at `ai_router.runcli:main`. Deleting the run core
+takes the entry point with it — and settles a collision session 34 created
+rather than resolved: the extension's terminal shim, the managed fence and
+the commit guard all name `dabbler`, and until now a `pip install -e .` put a
+second, unrelated `dabbler` on the same PATH. There is one now, and it is the
+TypeScript one.
+
+**`dabbler status` was never the answer to D88's second half.** D130 says the
+retirement leaves `dabbler status` reading the lifecycle's record. No such
+verb exists on either side: the lifecycle's projection is `progress`, ported
+in session 31 and extension-facing since. Nothing had to be built or renamed;
+the half of D88 that asked "which projection does the Explorer read" was
+already closed by `progress` being the only one.
+
+### D226 · 2026-08-29 · Orchestrator (claude-opus-5/anthropic) · solution.yaml is a SEED file, not a sixth corpus shape: three parity cases (workflow enter, workflow status --json, solution check), contractdoc gets none, and the reviews dir is deliberately not compared
+
+The plan's step 2 asks for "parity on the workflow event log and the Solution
+Explorer projection". Both need a `solution.yaml`, and no corpus shape carried
+one — `workflow` is the first compared verb whose subject is a manifest the
+lifecycle knows nothing about.
+
+**The manifest is a seed file, not a sixth shape.** STATUS's standing guidance
+from session 34 is that "a differential test costs one session, a shape costs
+every round of every session that follows", and a shape is the expensive unit
+because the builder drives the Python router through it twice per run. This
+needs neither: `solution.yaml` is eight lines of static YAML added to `SEED`,
+so every shape gains it for the cost of one `writeFileSync` per copy and no
+router invocation at all. Nothing else reads it — `contractdoc` and `workflow`
+are the only readers in either router — so no existing case changes what it
+compares, and both copies commit identical bytes so every tree digest in the
+corpus moves together or not at all.
+
+**Three cases, and the split between them is what each can actually prove.**
+
+- **`workflow enter` on `fresh`**, with a `setup` that opens the log at the
+  first step through the Python router. What is compared is the *second*
+  `enter`: an append to an existing log, which is the only version of this
+  verb that exercises the fold, the transition judge and the `sort_keys` key
+  order all at once. A first `enter` compared against nothing would prove the
+  file format and not the state machine.
+- **`workflow status --json`** on the same shape. It writes nothing, so what
+  is compared is stdout — the projection as the extension receives it,
+  including every loop's round count, bound and terminal token, and the key
+  order a reader walks. This is the one document the verb exists to produce.
+- **`solution check`**, which is a rendered report with column widths and the
+  derived `usedBy` direction neither manifest declares.
+
+`contractdoc` gets **no case**, deliberately. Its output goes to a path the
+caller names, which no compared-path pattern covers, and its interesting half
+— the mermaid diagram — is a pure function of a manifest and a contract, so
+`test/contractdoc.test.ts` drives it against thirteen inputs a shape could
+never carry. A case here would compare a refusal and call it coverage.
+
+**The compared-path list gains the event log and the projection, and not the
+reviews.** `.dabbler/solution/reviews/` holds each vendor's reply verbatim,
+filed under a name built from the second it was written. Two copies of a
+shape can agree on the bytes and can never agree on the name, and normalizing
+a filename is not one of the two normalizations. The record that matters is
+the event, which carries the paths it filed.
+
+**Two exclusions were removed rather than kept.** `EXCLUDED` listed
+`journal.lock` and the run core's `journal.jsonl`, `heartbeat.json` and
+`run-projection.json`. Nothing writes any of them now on either side, so the
+patterns describe files that cannot appear — and a deny-list entry for an
+impossible file is the kind of thing a later reader takes as evidence that
+something still writes it.
+
+### D227 · 2026-08-29 · Orchestrator (claude-opus-5/anthropic) · 3,102 Python lines became 4,225 TypeScript (1.36x) across 12 files, workflow split four ways on its own seams; the verb table's announce-then-implement example is exhausted and is now computed rather than named
+
+3,102 Python lines became **4,225 TypeScript** across twelve files — **1.36x**,
+against the 1.32x running ratio since session 25. The excess is the CLI: two
+of the twelve files are hand-written argument parsers standing in for
+`argparse` sub-parsers, and `workflow` has ten subcommands, more than any
+other verb in the port.
+
+`workflow` (1,363) split four ways on the seams it already had:
+
+| File | Lines | What it owns |
+| --- | ---: | --- |
+| `workflow/commands.ts` | 564 | the five verbs that call something |
+| `workflow/log.ts` | 523 | the events, the transition judge, the fold |
+| `workflow/terminal.ts` | 302 | the caps and the three terminal states |
+| `workflow/project.ts` | 176 | the Explorer's projection |
+| `cli/workflow.ts` | 381 | ten subcommands' argument surface |
+
+The split is the module's own: `validate_transition` is called by both the
+writer and the reader and belongs with neither, and the terminal states are
+computed from a folded state plus a tree rather than from the log, so they
+read no events at all. The other five modules are one file each.
+
+**`checks.execute` has no `run_id`, so `runAuthored` and `runSuite` take
+none.** The Python signatures carried it purely to reach the run journal's
+heartbeat. The port has the retirement already applied, so the TypeScript
+callers were written without it and the Python ones were trimmed to match —
+which is the only way the two stay comparable.
+
+**Every printed `python -m ai_router` string was kept verbatim.** `solution
+check` still ends by telling a reader to run `python -m ai_router.workflow
+status`, and `contractdoc` still says to regenerate with `python -m
+ai_router.contractdoc`. Both are wrong in a consumer repository and correct
+in this one, both have a byte-identical form, and D218's two-part test for a
+licensed behaviour change fails on the second half. They belong to session
+36's sweep (D221), and this session adds two more strings to it.
+
+**The verb table's announce-then-implement example is exhausted.**
+`contracts.test.ts` asserted the discipline by naming a verb that was
+declared and not registered — `verify` until session 33, `workflow` until
+this one — and its own comment called this "a countdown". This session
+registers the last verb with a command line, so the example was going to
+expire whatever it named. It is now asserted over whichever verbs currently
+lack a handler, computed from the table rather than typed: each must name the
+session that lands it and the module it replaces. Two qualify today (`ledger`
+and `approved-plan`, both `pythonCli: false`), and the test stops needing an
+edit when that changes.
+
+**A `captured` helper moved into `test/support/fixtures.ts`.** Three test
+files had defined their own copy; rather than write a fourth, the new six use
+a shared one. The three existing copies are left where they are — rewriting
+session 27, 31 and 33 test files to route through it would put three
+unrelated files in this session's diff and its verification scope, for no
+change in what anything proves.
+
+### D228 · 2026-08-29 · Orchestrator (claude-opus-5/anthropic) · Deleting the run core's dead EXCLUDED entries silently WIDENED the parity control: they sit under a whole-directory COMPARED pattern, so the deny-list is what bounds it -- restored, caught by the suite
+
+The parity control's `EXCLUDED` list carried four entries for records only the
+run core wrote. With the run core deleted nothing writes them, so they looked
+like dead configuration and were removed as part of "every reference in docs
+and config". The suite went red on `test/parity.test.ts`, and the failure is
+the point.
+
+**In this control the deny-list bounds the allow-list.** `COMPARED` matches
+`^\.dabbler/runs/s\d+/.+$` — every file under a session's run directory,
+whole. `journal.jsonl` and `heartbeat.json` live under exactly that prefix, so
+their `EXCLUDED` entries are not a description of files that exist; they are
+what stops that one pattern from meaning *everything*. Deleting them widened
+what the control compares, in a session with no reason to touch its scope at
+all.
+
+**The entries are restored, with a comment saying why they stay.** Nothing
+writes those names now and nothing is expected to; the entries remain because
+removing them changes a control's behaviour, and D218's two-part test for a
+licensed behaviour change fails on both halves here — the plan did not name
+it, and nothing lacked a working form without it.
+
+**The general shape.** A deny-list entry under a broad allow-list pattern is
+load-bearing whether or not its subject exists. "Nothing writes this any
+more" is an argument for deleting the *writer*, and never on its own an
+argument for deleting the rule that bounds what a reader compares. The two
+questions look identical in a diff and are not the same question.
+
+It was caught by the declared suite rather than by review, on the first full
+run after the change — which is the cheapest place for it, and the reason
+this session ran both suites before buying a verifier rather than after.
+
+### D229 · 2026-08-29 · Orchestrator (claude-opus-5/anthropic) · dabbler status is implemented as an alias delegating to the projection: the dispute was upheld and was right to be -- D130 named the command when dabbler WAS the Python CLI, so D162's no-invented-verbs precedent does not reach it
+
+Round 1 raised `dabbler status` as a Major; the dispute argued that the verb
+never existed in the TypeScript contract and that `progress` already delivers
+D130's outcome. Round 2 **upheld it**, and the counter-argument is right:
+"adding `status` is not inventing an unsolicited verb when the governing plan
+names it."
+
+**The dispute leaned on the wrong fact.** `status` was of course never in
+`contracts/verbs.ts` — that table is the *port's* invention and did not exist
+when D130 was written. At that time `dabbler` was
+`[project.scripts] dabbler = "ai_router.runcli:main"`, so "`dabbler status`
+now reads the lifecycle's record" was an instruction about a command that
+already existed: keep the name, change what it reads. Session 34 then made
+`dabbler` the TypeScript CLI, which moved where the instruction has to land
+without changing what it asked for. D162/D152 is a real precedent and does not
+reach this: `modules list` and `retire` were named by no plan, and this is
+named by two.
+
+**It is an alias, not a second implementation.** `statusVerb` delegates to
+`progressVerb` with the name it was invoked under, so the usage text and the
+argument refusal say what the operator typed while the projection has exactly
+one implementation. Two answers to "where is this repository" is the drift the
+projection exists to remove, and copying the handler to get a second name
+would have created it.
+
+**Two names is the cost, and it is paid deliberately.** `progress` is what the
+extension spawns and has since session 31, so renaming it would break a spawn
+site for a cosmetic gain. `status` is what the operator types. The verb table
+already maps a typed name to the module behind it — `test-evidence` to
+`ai_router.test_evidence`, `approved-plan` to `ai_router.approved_plan` — so
+`status` to `ai_router.progress` is the same mechanism rather than a new one.
+
+**The parity case is what makes the alias a claim rather than a comment.**
+`dabbler status --json` is compared against `python -m ai_router.progress
+--json` on the `in-flight` shape, so the two names are proved to produce the
+same bytes on a record with something in it. The `progress:` prefix on the
+two resolution errors is deliberately not renamed: that is the Python
+module's own name and is what the comparison expects.
+
+**The general lesson is about which fact a dispute rests on.** Three of this
+port's disputes have been withdrawn against citations of what the code does.
+This one cited what the code does not contain, which is a much weaker claim —
+absence proves the verb was not built, not that it should not be. The
+withdrawn finding in the same round (round 1's Issue 3, `--author-provider`)
+is the contrast: it cited `ai_router/workflow.py:1221` showing the flag
+optional in the reference implementation, and it was withdrawn in full.
+
+### D230 · 2026-08-29 · Orchestrator (claude-opus-5/anthropic) · No seat transport this session, so no seat cost to read: 3 API rounds, 147,120 tokens (the port's most expensive session), with rounds 2 and 3 at 5.6% of round 1's input each
+
+**No seat transport was used, so there is no seat cost to read.** All three
+rounds ran over the direct API against `gpt-5-6-sol/openai`; `seat_cost` reads
+a Copilot seat's own SQLite store and has nothing to answer for a session that
+never opened one. The whole project has two seat calls, both from earlier
+sessions, so this session adds nothing to that series and is not comparable
+to it.
+
+**What it cost, in the currency it actually spent:**
+
+| Round | Input | Output | Verdict |
+| --- | ---: | ---: | --- |
+| 1 | 118,097 | 8,737 | ISSUES_FOUND, 3 blocking |
+| 2 | 6,633 | 4,881 | ISSUES_FOUND, 2 blocking |
+| 3 | 6,646 | 2,126 | VERIFIED |
+| **Total** | **131,376** | **15,744** | 3 rounds |
+
+**147,120 tokens is the most expensive session of the port**, ahead of session
+23's 136,020, and round 1 alone is 86% of it — the diff is 4,225 new
+TypeScript lines plus 2,838 deleted Python ones, the largest single session
+the port has run.
+
+**Rounds 2 and 3 are 5.6% and 5.6% of round 1's input.** The port's cheapest
+second round before this was session 34's at 12%, and that one had an *empty*
+fix delta — a pure re-judgement. These are cheaper still while carrying real
+remediation, because rounds after the first review only the delta: round 2 saw
+two `dabbler.yaml` hunks, round 3 saw the `status` alias and the restored
+pricing rule. The shape to expect is that a first round prices the session and
+every round after it prices the fix.
+
+**The three rounds are also the whole of the session's model spend.** Nothing
+else in this session called a provider: the port itself, the deletions, the
+parity cases and the 127 tests were orchestrator work, and the parity control
+runs both routers locally with the offline transport fed canned text. A
+session that ports 3,102 lines and buys exactly three vendor calls is the
+ratio this framework is for.
+
+`cost_usd` is null on all three rows, which is the known metrics gap for the
+API path rather than a claim that the calls were free.

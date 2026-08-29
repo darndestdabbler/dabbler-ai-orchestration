@@ -13,7 +13,7 @@ import { join } from "node:path";
 import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
 
 import { modulesVerb } from "../src/cli/modules.ts";
-import { progressVerb } from "../src/cli/progress.ts";
+import { progressVerb, statusVerb } from "../src/cli/progress.ts";
 import { HANDLERS, isImplemented } from "../src/cli/registry.ts";
 import { sessionVerb } from "../src/cli/session.ts";
 import { readRawSessionState } from "../src/progress.ts";
@@ -177,6 +177,28 @@ describe("dabbler progress", () => {
     const strip = (text: string): string =>
       text.replace(/"generatedAt": "[^"]*"/, '"generatedAt": "<ts>"');
     expect(strip(flagged.out)).toBe(strip(bare.out));
+  });
+
+  it("answers to `status` with the same bytes, under the name D130 promised", async () => {
+    // The run core's retirement said `dabbler status` would read the
+    // lifecycle's record instead of the run projection. It is an alias, not
+    // a second implementation -- two answers to "where is this repository"
+    // is the drift the projection exists to remove -- and the usage text
+    // says whichever name was typed.
+    const { sessionsDir } = makeSandboxRepo();
+    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
+    const strip = (text: string): string =>
+      text.replace(/"generatedAt": "[^"]*"/, '"generatedAt": "<ts>"');
+    const asProgress = await captured(() =>
+      progressVerb(["--sessions-dir", sessionsDir]),
+    );
+    const asStatus = await captured(() =>
+      statusVerb(["--sessions-dir", sessionsDir]),
+    );
+    expect(asStatus.code).toBe(0);
+    expect(strip(asStatus.out)).toBe(strip(asProgress.out));
+    const help = await captured(() => statusVerb(["--help"]));
+    expect(help.out).toContain("usage: dabbler status");
   });
 
   it("refuses a sessions root that is not a directory", async () => {

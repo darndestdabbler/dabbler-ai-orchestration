@@ -289,7 +289,7 @@ def suites_for(config: dict, test_paths) -> tuple:
     )
 
 
-def run_authored(repo_root, config: dict, test_paths, *, run_id: str = ""):
+def run_authored(repo_root, config: dict, test_paths):
     """Run the authored tests and report what the exit codes said.
 
     Returns a tuple of :class:`ai_router.checks.CheckRun`, one per suite
@@ -339,7 +339,7 @@ def run_authored(repo_root, config: dict, test_paths, *, run_id: str = ""):
             targeted_command(check.display_command(), selection,
                               runs_whole=check.runs_whole),
             stage=STAGE_TARGETED, tree_digest=tree,
-            timeout_seconds=timeout, run_id=run_id,
+            timeout_seconds=timeout,
             selection=selection_payload(selection),
         ))
     return tuple(runs)

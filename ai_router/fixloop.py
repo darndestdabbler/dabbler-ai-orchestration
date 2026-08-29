@@ -173,7 +173,7 @@ def _posix(path) -> str:
     return str(path).replace("\\", "/").strip("/")
 
 
-def run_suite(repo_root, config: dict, authored, *, run_id: str = ""):
+def run_suite(repo_root, config: dict, authored):
     """Run the complete suite against the tree, and report what it said.
 
     Returns a tuple of :class:`ai_router.checks.CheckRun`, one per suite
@@ -218,7 +218,7 @@ def run_suite(repo_root, config: dict, authored, *, run_id: str = ""):
         runs.append(execute(
             repo_root, check, check.display_command(),
             stage=STAGE_FINAL_FULL, tree_digest=tree,
-            timeout_seconds=timeout, run_id=run_id,
+            timeout_seconds=timeout,
         ))
     return tuple(runs)
 

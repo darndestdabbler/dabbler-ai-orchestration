@@ -25,7 +25,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
-from .journal import changed_paths_between, snapshot_worktree_tree, write_heartbeat
+from .journal import changed_paths_between, snapshot_worktree_tree
 
 STAGE_TARGETED = "targeted"
 STAGE_FINAL_FULL = "final-full"
@@ -924,7 +924,6 @@ def execute(
     stage: str,
     tree_digest: str,
     timeout_seconds: float,
-    run_id: str = "",
     selection: dict = None,
 ) -> CheckRun:
     """Run one declared check and measure what it did to the tree.
@@ -953,8 +952,6 @@ def execute(
                     )
                     break
                 except subprocess.TimeoutExpired:
-                    if run_id:
-                        write_heartbeat(root, run_id, f"check/{check.name}")
                     if time.monotonic() >= deadline:
                         timed_out = True
                         _terminate_tree(process)

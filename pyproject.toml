@@ -16,11 +16,6 @@ dependencies = [
     "jsonschema>=4.0.0",
 ]
 
-[project.scripts]
-# `python -m ai_router.runcli` stays the collision-proof canonical
-# invocation; this is the same parser and handlers under a short name.
-dabbler = "ai_router.runcli:main"
-
 [project.optional-dependencies]
 tests = [
     "pytest>=7.0",

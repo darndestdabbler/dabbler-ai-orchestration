@@ -37,15 +37,24 @@ export const COMPARED: readonly RegExp[] = [
   /^(AGENTS|CLAUDE|GEMINI)\.md$/,
   /^\.gitignore$/,
   /^\.git\/hooks\/pre-commit$/,
+  // The six-step driver's own record: the append-only event log and the
+  // projection folded from it. `reviews/` is deliberately absent -- each
+  // file there is a vendor's reply verbatim, named with the second it was
+  // filed at, so two copies can agree on the bytes and never on the name.
+  /^\.dabbler\/solution\/(events\.jsonl|projection\.json)$/,
 ];
 
 /**
  * Written, and deliberately not compared.
  *
  * `router-metrics.jsonl` is gitignored per-call telemetry carrying elapsed
- * seconds; it is not the record. The two lock files are transient. The run
- * core's records are retired and never ported (D130), so there is no
- * second side for them to differ from.
+ * seconds; it is not the record. The two lock files are transient.
+ *
+ * The run core's records stay listed after its deletion. Nothing writes them
+ * now, but their names sit under `.dabbler/runs/s<n>/`, which the allow-list
+ * above matches whole -- so the entries are what bounds that pattern rather
+ * than a description of files that exist. Removing them would silently widen
+ * what the control compares, in the session that had the least reason to.
  */
 export const EXCLUDED: readonly RegExp[] = [
   /(^|\/)router-metrics\.jsonl$/,

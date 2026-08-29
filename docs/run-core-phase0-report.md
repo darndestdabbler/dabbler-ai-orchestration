@@ -1,5 +1,12 @@
 # Phase 0 external slice — implementation report
 
+> **Superseded, 2026-08-29.** The run core is retired and deleted (D88, D130):
+> `runcli`, `runcore` and `runproject` are gone from the tree, with their
+> tests, their verbs and the records only they wrote. This document is kept
+> because D130's authority rests on the evidence in it, and because a decision
+> whose reasoning has been deleted cannot be re-examined. Read it as what was
+> built and withdrawn, not as what exists.
+
 **Status:** The external scratch slice of `docs/run-core-blueprint.md` §§3–9
 plus §11 is implemented in this disposable repository, under ordinary Git and
 direct pytest. The production repository and the VS Code extension are

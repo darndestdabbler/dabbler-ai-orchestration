@@ -417,21 +417,6 @@ def run_config(run_repo, monkeypatch):
     return config
 
 
-def cli(*argv) -> tuple:
-    """``(exit_code, payload)`` for one run-core command."""
-    import contextlib
-    import io
-    import json as _json
-
-    from ai_router.runcli import main
-
-    buffer = io.StringIO()
-    with contextlib.redirect_stdout(buffer):
-        code = main([*argv, "--json"] if "--json" not in argv else list(argv))
-    text = buffer.getvalue().strip()
-    return code, (_json.loads(text) if text else {})
-
-
 @pytest.fixture
 def no_model_calls(monkeypatch):
     """Fail the test on any dispatch through either transport.

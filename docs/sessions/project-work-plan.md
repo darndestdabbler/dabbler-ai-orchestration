@@ -70,7 +70,7 @@ it.
 | 32 | Verification support — agency, verifyjob, the approved plan | no | 2026-08-29 |
 | 33 | The verification loop | no | 2026-08-29 |
 | 34 | Bootstrap, packaging, and the `dabbler` command on the PATH | no | 2026-08-29 |
-| 35 | The six-step workflow ported, the run core retired | — | not declared |
+| 35 | The six-step workflow ported, the run core retired | no | 2026-08-29 |
 | 36 | Cutover — the extension calls in-process, and Python leaves | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
@@ -1023,3 +1023,34 @@ installable without Python.
 7. Measure and record this session's seat cost.
 
 Not releasable: this session ships no package to the feed.
+
+### Session 35 — The six-step workflow ported, the run core retired
+
+**Releasable: no.**
+
+Session 35 of 36 — the six-step workflow ported, the run core retired.
+
+Port to TypeScript, behaviour unchanged (D129's inventory, which supersedes
+the session plan's prose on two modules):
+
+- workflow (1,363 lines, test_workflow 55)
+- fixloop (563, test_fixloop 18) — workflow imports it; NOT run core
+- solution (351, test_solution 16)
+- testphase (345, test_testphase 10) — workflow imports it; NOT run core
+- stepreview (284, test_stepreview 15)
+- contractdoc (196, test_contractdoc 13)
+
+Total 3,102 lines, 127 tests. Parity on the workflow event log and the
+Solution Explorer projection.
+
+Delete with their tests, verbs and doc references (D88/D130):
+
+- runcli (1,497), runcore (811), runproject (530) — 2,838 lines
+- test_runcore_contracts, _fast, _verified, _recovery, _independence (88)
+- the run, report and run-core status verbs; dabbler status reads the
+  lifecycle's record
+
+facts is NOT deleted: it is ported and verify depends on it (D210).
+
+Then: measure seat cost, affected tests as preverify, cross-provider
+verification, full suite as the run of record, close.

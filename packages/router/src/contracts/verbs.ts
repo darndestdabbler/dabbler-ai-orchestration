@@ -51,6 +51,18 @@ export const VERBS: readonly VerbSpec[] = [
     summary: "the repository's projection, for a reader or for --json",
   },
   {
+    // The name D88 and D130 promised the operator when the run core was
+    // retired: `dabbler status` used to print the RUN projection, and now
+    // prints the lifecycle's. It maps to `ai_router.progress` because that
+    // is the module that answers it -- the verb table has always mapped a
+    // typed name to the module behind it, and this is one more.
+    verb: "status",
+    pythonModule: "ai_router.progress",
+    portedInSession: 35,
+    extensionFacing: false,
+    summary: "where this repository is, from the lifecycle's own record",
+  },
+  {
     verb: "modules",
     pythonModule: "ai_router.modules",
     portedInSession: 31,

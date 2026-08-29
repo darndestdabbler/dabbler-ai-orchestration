@@ -658,9 +658,9 @@
     {
       "number": 34,
       "title": "Bootstrap, packaging, and the `dabbler` command on the PATH",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-29T16:00:30.814926-04:00",
-      "completedAt": null,
+      "completedAt": "2026-08-29T17:02:54.961801-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

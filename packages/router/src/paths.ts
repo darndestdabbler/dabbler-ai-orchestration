@@ -8,7 +8,7 @@
 // silently wrong in the other, and "silently wrong" here means reading a
 // config from a directory that happens to exist.
 //
-// Until session 35 the bundled defaults -- `router-config.yaml`, the
+// Until session 36 the bundled defaults -- `router-config.yaml`, the
 // schemas, the prompt templates -- are read from `ai_router/`, the one
 // copy. A second copy under this package would be data that drifts, and
 // the parity control compares two routers reading the same input: a

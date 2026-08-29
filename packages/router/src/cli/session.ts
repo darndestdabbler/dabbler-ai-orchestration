@@ -24,7 +24,7 @@ import {
 import { EXIT_REFUSED } from "../contracts/router.ts";
 import { writeErr, writeOut } from "./output.ts";
 
-/** Subcommands session 30 lands, and what a caller should do until then. */
+/** Subcommands session 31 lands, and what a caller should do until then. */
 const NOT_YET: Readonly<Record<string, string>> = {
   close: "run the gates and close the session",
   cancel: "cancel one session",
@@ -39,7 +39,7 @@ function usage(): string {
   const rows = [
     ...IMPLEMENTED.map((name) => `  ${name.padEnd(8)}  ${SUMMARY[name]}`),
     ...Object.entries(NOT_YET).map(
-      ([name, summary]) => `  ${name.padEnd(8)}  ${summary}  (not yet: session 30)`,
+      ([name, summary]) => `  ${name.padEnd(8)}  ${summary}  (not yet: session 31)`,
     ),
   ];
   return ["usage: dabbler session <subcommand> [options]", "", ...rows, ""].join("\n");
@@ -117,7 +117,7 @@ export async function sessionVerb(argv: string[]): Promise<number> {
   if (subcommand in NOT_YET) {
     writeErr(
       `dabbler session ${subcommand}: refused -- this subcommand is not ported ` +
-        "yet. Session 30 of the port plan lands it; until then run " +
+        "yet. Session 31 of the port plan lands it; until then run " +
         `'python -m ai_router.session ${subcommand}'.\n`,
     );
     return EXIT_REFUSED;

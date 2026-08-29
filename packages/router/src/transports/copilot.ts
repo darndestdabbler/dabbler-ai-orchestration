@@ -1,6 +1,6 @@
 // The seat transport, as far as the ported modules reach into it.
 //
-// Session 29 ports the dispatch state machine, the catalog writer and the
+// Session 30 ports the dispatch state machine, the catalog writer and the
 // probe. What is here is what the modules ported before it ask of the seat,
 // and each piece answers a whole question rather than being half of a type
 // nobody has finished:

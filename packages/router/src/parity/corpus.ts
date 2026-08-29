@@ -422,7 +422,7 @@ export const SHAPES: readonly ShapeSpec[] = [
     name: "moved-machine",
     summary: "a clone without the round refspec, and a second copy that fetched it",
     build: null,
-    neededFromSession: 32,
+    neededFromSession: 33,
   },
 ];
 

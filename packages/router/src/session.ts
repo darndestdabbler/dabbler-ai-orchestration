@@ -1,7 +1,7 @@
 // The session lifecycle's flow: the plan grammar, the lifecycle lock, and
 // the four subcommands that write the record.
 //
-// Session 30 ports `session` whole -- the close and its five gates, cancel,
+// Session 31 ports `session` whole -- the close and its five gates, cancel,
 // restore, and the legacy migration. What is here is the half that WRITES:
 // `start`, `declare`, `log` and `decision`. They land now because the
 // sanctioned writers land now, and a writer no verb reaches is a writer the

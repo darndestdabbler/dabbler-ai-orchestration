@@ -1,7 +1,7 @@
 // The session record: its vocabulary, its derived answers, and the
 // invariants that make it readable.
 //
-// Session 30 ports `progress` whole -- the projection the extension
+// Session 31 ports `progress` whole -- the projection the extension
 // renders, the task rows, the CLI. What is here is the slice `writers`
 // cannot be written without: `writers` is the only writer of
 // `sessions.json`, and it validates what it is about to write by folding

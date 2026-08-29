@@ -6223,6 +6223,104 @@
       "dateTime": "2026-08-28T21:55:21.099646-04:00",
       "description": "944 pytest (5:58) and 389 vitest (47s, 3 skipped live) recorded final-full against the verified tree.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 29,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-29T03:47:00.968874-04:00",
+      "description": "Register; declare `--not-releasable`.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 29,
+      "stepNumber": 2,
+      "stepKey": "land-both-changes-in-python-first",
+      "dateTime": "2026-08-29T03:47:00.968874-04:00",
+      "description": "Land both changes in **Python first, in their own commit**. Python decides and the port agrees, and the parity control's sequencing rules want the reference implementation settled before the port moves.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 29,
+      "stepNumber": 3,
+      "stepKey": "update-the-python-tests-and-run",
+      "dateTime": "2026-08-29T03:47:00.968874-04:00",
+      "description": "Update the Python tests and run them.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 29,
+      "stepNumber": 4,
+      "stepKey": "mirror-both-in-the-typescript-router",
+      "dateTime": "2026-08-29T03:47:00.968874-04:00",
+      "description": "Mirror both in the TypeScript router, and mirror the Python tests in vitest.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 29,
+      "stepNumber": 5,
+      "stepKey": "prove-the-vocabulary-in-the-parity",
+      "dateTime": "2026-08-29T03:47:00.968874-04:00",
+      "description": "**Prove the vocabulary in the parity control.** Today the corpus scrubs the provider keys, so every vendor fails as the shared `no-api-key` constant and not one of the new terms is ever compared. A case has to reach a real transport failure with no network \u2014 a provider pointed at a closed local port \u2014 or the vocabulary is asserted rather than checked.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 29,
+      "stepNumber": 6,
+      "stepKey": "measure-this-session-s-seat-cost",
+      "dateTime": "2026-08-29T03:47:00.968874-04:00",
+      "description": "Measure this session's seat cost and record it.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 29,
+      "stepNumber": 7,
+      "stepKey": "affected-tests-as-preverify",
+      "dateTime": "2026-08-29T03:47:00.968874-04:00",
+      "description": "Affected tests as preverify.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 29,
+      "stepNumber": 8,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-29T03:47:00.968874-04:00",
+      "description": "Cross-provider verification.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 29,
+      "stepNumber": 9,
+      "stepKey": "full-test-suite-recorded-as-the",
+      "dateTime": "2026-08-29T03:47:00.968874-04:00",
+      "description": "Full test suite, recorded as the `final-full` run of record.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 29,
+      "stepNumber": 10,
+      "stepKey": "close-out",
+      "dateTime": "2026-08-29T03:47:00.968874-04:00",
+      "description": "Close-out.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 29,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-29T03:47:00.979978-04:00",
+      "description": "Registered session 29 (claude-code).",
+      "status": "complete"
     }
   ]
 }

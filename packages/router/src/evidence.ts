@@ -1128,7 +1128,7 @@ export function verifyWorkerResult(
  * reviewed tree, not that the row carries the ones the check asked for.
  * Python is the same, and neither router has a caller for this function
  * yet, so the enforcement lands with the pipeline that first drives it
- * (session 31/32) rather than being invented on one side here.
+ * (session 32/33) rather than being invented on one side here.
  */
 export function recordWorkerResult(
   repoRoot: string,

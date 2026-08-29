@@ -555,13 +555,13 @@ export async function route(
     taskType !== "verification" &&
     taskType !== "session-verification"
   ) {
-    // `verifyjob.auto_verify` lands in session 31. Refused by name rather
+    // `verifyjob.auto_verify` lands in session 32. Refused by name rather
     // than skipped: a router that quietly dropped the auto-verification a
     // config asked for would return an unverified result that looks
     // verified, and this is the one branch where silence is the failure.
     throw new RouterError(
       `verification.auto_verify_task_types names '${taskType}', and the ` +
-        "auto-verification job it asks for is ported in session 31 of the " +
+        "auto-verification job it asks for is ported in session 32 of the " +
         "port plan (ai_router.verifyjob). Until then this router refuses " +
         "the call rather than returning a result that was never verified.",
     );
@@ -610,13 +610,13 @@ function buildPath(
 
   if (transportName === TRANSPORT_COPILOT_CLI) {
     // The seat's dispatch state machine -- spawn, the three timeouts, the
-    // temp-file handoff, the stderr taxonomy -- is session 29. Refused by
+    // temp-file handoff, the stderr taxonomy -- is session 30. Refused by
     // name, the way `session close` was until the lifecycle landed: a
     // transport that silently fell back to the API would put a
     // cross-provider verification on the provider the operator was
     // routing away from.
     throw new RouterError(
-      "the copilot-cli transport is ported in session 29 of the port plan " +
+      "the copilot-cli transport is ported in session 30 of the port plan " +
         "(ai_router.transports.copilot). Route over the 'api' or 'offline' " +
         "transport, or run this call through the Python router.",
     );

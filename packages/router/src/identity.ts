@@ -10,9 +10,9 @@
 //
 // `resolve_session_orchestrator_identity` -- the one function here that reads
 // a repository rather than a block -- is NOT ported yet. It reads session
-// state through `progress`, which session 30 ports; a second reader of
+// state through `progress`, which session 31 ports; a second reader of
 // `sessions.json` written here to reach it early is precisely the drift the
-// port exists to remove. It lands in session 30 as a thin wrapper over
+// port exists to remove. It lands in session 31 as a thin wrapper over
 // `resolveOrchestratorIdentity` below, which is where all of its judgement
 // already lives.
 

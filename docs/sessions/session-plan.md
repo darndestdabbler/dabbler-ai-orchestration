@@ -883,7 +883,7 @@ strings.** Sessions 8 and 14 should delete more tests than they add.
 
 ---
 
-# Sessions 22–35: The TypeScript port — one artifact, one language, the record unchanged
+# Sessions 22–36: The TypeScript port — one artifact, one language, the record unchanged
 
 > **Landed 2026-08-28, on the operator's instruction to start session 22.**
 > Drafted the same day while session 21 was in flight; landed after session
@@ -980,7 +980,7 @@ sessions is three to four working days.
 
 ---
 
-### Session 22 of 35: Decide the inventory before anything is translated
+### Session 22 of 36: Decide the inventory before anything is translated
 
 **Why this exists.** Two subsystems have no settled owner. The run core
 (D88) has never registered a run in this repository and the extension never
@@ -995,10 +995,10 @@ session is prose, verified the way sessions 1 and 2 were.
    default is in the table above; a departure names its reason.
 3. Decide D88 on the record, with the operator: the run core's projection
    replaces the lifecycle's record, or the run core is retired. "Retired"
-   means deleted in session 34, not left as Python.
+   means deleted in session 35, not left as Python.
 4. Verify the runtime floor: read the extension host's `process.versions`
    on VS Code 1.135 and confirm `node:sqlite` is present; if not, the
-   `seat_cost` design in session 29 uses `sql.js` and records the ~7 % WAL
+   `seat_cost` design in session 30 uses `sql.js` and records the ~7 % WAL
    undercount as a known limitation rather than a native binding.
 5. Record the package layout and the dependency ceiling as decisions.
 6. Design the parity control: the fixture corpus (one repository per
@@ -1021,7 +1021,7 @@ session is prose, verified the way sessions 1 and 2 were.
 
 ---
 
-### Session 23 of 35: Contracts — types from schemas, the Router interface, and the controls
+### Session 23 of 36: Contracts — types from schemas, the Router interface, and the controls
 
 **Why this exists.** The twenty JSON schemas under `ai_router/schemas/` are
 the framework's meaning. Today `types.ts` is a hand-kept mirror of what
@@ -1063,7 +1063,7 @@ suite. Est. 6 TS tests (the generator and the interface's error mapping).
 
 ---
 
-### Session 24 of 35: The extension talks to the interface, and Python answers
+### Session 24 of 36: The extension talks to the interface, and Python answers
 
 **Why this exists.** Integration before implementation. Every place the
 extension spawns `python -m ai_router.*` becomes a call on `Router`, and
@@ -1089,7 +1089,7 @@ it. From here the port is invisible to the extension.
 
 ---
 
-### Session 25 of 35: Foundation modules
+### Session 25 of 36: Foundation modules
 
 `config` (640), `secret_resolver` (47), `identity` (235), `verdict` (419),
 `lockfile` (158), `runtime_mode` (84), `metrics` (258) — 1,841 lines, ~98
@@ -1104,7 +1104,7 @@ tests. Leaves of the import graph; everything above depends on them.
    cross-router case, and the report it prints is computed from a full
    three-layer `config` load — which is how `config` enters the control.
    `verdict` has no command line of its own and is reached only through
-   `verify`, so its parity case lands in session 32 with that verb; this
+   `verify`, so its parity case lands in session 33 with that verb; this
    session proves it instead against every verifier output this repository
    holds, and records the result (D163).
 4. Measure this session's seat cost and record it.
@@ -1114,11 +1114,11 @@ tests. Leaves of the import graph; everything above depends on them.
 8. Close-out.
 
 **Creates:** the foundation. Est. 98 TS tests, ported; Python tests stay
-until session 35.
+until session 36.
 
 ---
 
-### Session 26 of 35: The record — journal, ledger, writers
+### Session 26 of 36: The record — journal, ledger, writers
 
 `journal` (846), `ledger` (901), `writers` (881) — 2,628 lines, 38 tests.
 These are the sanctioned writers: everything under `.dabbler/runs/` and
@@ -1146,7 +1146,7 @@ Python's. Est. 38 TS tests, ported.
 
 ---
 
-### Session 27 of 35: Evidence, checks, test evidence, affected
+### Session 27 of 36: Evidence, checks, test evidence, affected
 
 `evidence` (902), `checks` (1,001), `test_evidence` (807), `affected` (564)
 — 3,274 lines, ~72 tests. Tree snapshots through a throwaway index on the
@@ -1177,7 +1177,7 @@ binding, and the selector.
 
 ---
 
-### Session 28 of 35: Transports I — API, offline, routing, selection, discovery
+### Session 28 of 36: Transports I — API, offline, routing, selection, discovery
 
 `transports/base` (49), `transports/offline` (140), `transports/api` (292),
 `route` (586), `selection` (146), `discovery` (1,057) — 2,270 lines, 82
@@ -1201,7 +1201,67 @@ honored on every path including offline (the set-143 defect stays fixed).
 
 ---
 
-### Session 29 of 35: Transport II — the Copilot CLI state machine and seat cost
+### Session 29 of 36: One vocabulary for a failure, one stamp for a measurement
+
+Inserted between 28 and 29 by the operator, which moved the port's remaining
+sessions up by one — Transport II is now 30, the cutover 36. Earlier decision
+records name the old numbers and are left alone: they were true when written,
+and rewriting an append-only log to match a later plan is the one thing that
+log exists to prevent.
+
+It discharges the two rulings the port left open. They are the same shape:
+**both routers write a different string into a record for the same event,
+because the string is the name of whichever library did the work.**
+
+**The failure vocabulary.** `discovery` records a failed vendor enumeration
+as the failing HTTP library's own exception class — `TimeoutException` under
+`httpx`, `HttpTimeoutError` under `fetch`. Both routers write from a shared
+list instead: `timeout`, `network-error`, `http-error`, `parse-error` and
+`unknown-error`, joining the three terms the field already carries
+(`no-api-key`, `provider-disabled`, `no-enumeration-adapter`). Timeout and
+unreachable-host stay separate terms because their remedies differ — raise
+the ceiling, against fix DNS or the URL.
+
+The mapping is a **closed allow-list**: an unrecognised exception becomes
+`unknown-error` rather than passing its class name through, because an open
+mapping breaks the byte comparison the first time an unmapped failure
+happens. The original class name is written nowhere. A second recorded field
+would recreate the problem, and excluding that field from the comparison
+would put a value in the record that nothing checks.
+
+**The measurement stamp.** `evidence.run_absence_search` re-runs a reviewer's
+declared search and stamps the engine that produced the count —
+`python-re/<version>` against `node-regexp/<node>`. The field's job is not
+engine comparison but anti-forgery: it overwrites whatever the reviewer
+claimed, so the row says the framework measured this rather than the reviewer
+asserting it. One framework-owned token does that job in both routers, and
+ends an instability inside the Python router alone, where today the value
+moves whenever the interpreter's patch version does.
+
+1. Register; declare `--not-releasable`.
+2. Land both changes in **Python first, in their own commit**. Python
+   decides and the port agrees, and the parity control's sequencing rules
+   want the reference implementation settled before the port moves.
+3. Update the Python tests and run them.
+4. Mirror both in the TypeScript router, and mirror the Python tests in
+   vitest.
+5. **Prove the vocabulary in the parity control.** Today the corpus scrubs
+   the provider keys, so every vendor fails as the shared `no-api-key`
+   constant and not one of the new terms is ever compared. A case has to
+   reach a real transport failure with no network — a provider pointed at a
+   closed local port — or the vocabulary is asserted rather than checked.
+6. Measure this session's seat cost and record it.
+7. Affected tests as preverify.
+8. Cross-provider verification.
+9. Full test suite, recorded as the `final-full` run of record.
+10. Close-out.
+
+**Creates:** one word for one event, whichever router wrote it. Closes the
+two owed rulings. Est. ~8 tests changed, ~6 added; net near zero lines.
+
+---
+
+### Session 30 of 36: Transport II — the Copilot CLI state machine and seat cost
 
 `transports/copilot` (2,074) and `seat_cost` (304) — 2,378 lines, 97 tests.
 The most OS-bound code in the router, and the session where Node's model is
@@ -1232,7 +1292,7 @@ child's streams; three-tier timeouts become timers reset on first byte.
 
 ---
 
-### Session 30 of 35: The session lifecycle
+### Session 31 of 36: The session lifecycle
 
 `session` (1,386), `gates` (421), `progress` (1,050), `modules` (246) —
 3,103 lines, 138 tests. Start, declare, log, decision, plan, close, cancel,
@@ -1256,7 +1316,7 @@ module lifecycle.
 
 ---
 
-### Session 31 of 35: Verification support — agency, verifyjob, the approved plan
+### Session 32 of 36: Verification support — agency, verifyjob, the approved plan
 
 `agency` (921), `verifyjob` (782), `approved_plan` (590), `plan_review`
 (812) — 3,105 lines, ~81 tests. The verifier's read surface and its write
@@ -1283,7 +1343,7 @@ ported.
 
 ---
 
-### Session 32 of 35: The verification loop
+### Session 33 of 36: The verification loop
 
 `verify` (2,537 lines, 57 tests). The largest module, and the one the
 142–147 envelope wanted under 1,200 by extraction. It is ported **as the
@@ -1313,7 +1373,7 @@ Est. 57 TS tests, ported.
 
 ---
 
-### Session 33 of 35: Bootstrap, packaging, and the `dabbler` command on the PATH
+### Session 34 of 36: Bootstrap, packaging, and the `dabbler` command on the PATH
 
 `bootstrap` (1,146), `packaging` (743) — 1,889 lines, 55 tests — plus the
 CLI itself and its delivery. This is the session that makes the
@@ -1345,7 +1405,7 @@ shim and the fence.
 
 ---
 
-### Session 34 of 35: The six-step workflow ported, the run core retired
+### Session 35 of 36: The six-step workflow ported, the run core retired
 
 Per session 22's decisions. Default: `workflow` (1,363), `solution` (351),
 `contractdoc` (196), `stepreview` (284) — 2,194 lines, 99 tests — are
@@ -1370,7 +1430,7 @@ languages. Est. 99 TS tests, ported; 119 Python tests deleted.
 
 ---
 
-### Session 35 of 35: Cutover — the extension calls in-process, and Python leaves
+### Session 36 of 36: Cutover — the extension calls in-process, and Python leaves
 
 1. Register; declare **`--releasable`** — this session publishes.
 2. `InProcessRouter` replaces `PythonSpawnRouter` as the extension's
@@ -1403,36 +1463,37 @@ on memory.
 
 ---
 
-## Acceptance criterion for sessions 22–35
+## Acceptance criterion for sessions 22–36
 
 **The framework closes its own last session with no Python in the tree.**
-Session 35's round, run of record, gates and close are performed by the
+Session 36's round, run of record, gates and close are performed by the
 TypeScript router, and `ai_router/` does not exist at that close.
 
 Four supporting checks, each answerable from the record:
 
-- **The parity control's final run** (session 35, step 4) shows
+- **The parity control's final run** (session 36, step 4) shows
   byte-identical record files for every verb on every corpus shape, and is
   recorded before the Python deletion.
 - **A project with no `.venv` and no Python on `PATH`** ran `dabbler session
-  start` from a VS Code terminal (session 33, step 5), recorded as evidence.
+  start` from a VS Code terminal (session 34, step 5), recorded as evidence.
 - **No behavior lost:** the TypeScript suite carries one test per ported
   behavior; the ported count equals the Python count for every kept module,
   and the deleted count equals the retired modules' tests. No Python test
   remains.
-- **Seat cost is recorded for every session 22–35.**
+- **Seat cost is recorded for every session 22–36.**
 
-## Test budget for sessions 22–35
+## Test budget for sessions 22–36
 
 **One test per behavior, ported.** Roughly 820 TypeScript tests for kept
 modules (941 minus the retired run core's 119, less whatever session 22
 retires beyond it and whatever was a banned kind in Python), plus the
 extension's existing 153 and about 10 new ones named above. Python tests are
-deleted with their modules, all in session 35 except the run core's in
-session 34.
+deleted with their modules, all in session 36 except the run core's in
+session 35.
 
 **No falsifier twins, no source-text assertions (ESLint is the source-text
 check), no migration-path tests, no tests of test infrastructure (the parity
 control is a control, not a test), and no tests asserting exact markdown
 strings.** A ported test that was one of these in Python is deleted, not
 ported, and the decision names it.
+

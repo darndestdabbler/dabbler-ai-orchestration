@@ -1,8 +1,8 @@
 # The parity control for the TypeScript port
 
 > Designed in session 22 of `docs/sessions/session-plan.md`; built in session
-> 23; run before every verification round of sessions 23–35; retired in
-> session 35 at the step that deletes the Python router. The decision that
+> 23; run before every verification round of sessions 23–36; retired in
+> session 36 at the step that deletes the Python router. The decision that
 > names this document is in `docs/sessions/decisions-log.md`.
 
 ## What it is, and what it is not
@@ -70,7 +70,7 @@ checked in that could go stale or be hand-edited.
   > sees it, so `src/textfile.ts` does too — and a reader whose Python twin
   > opens the file in *binary* (`tomllib` takes bytes) deliberately does
   > not.
-- Python stays installed in `.venv` until session 35 so the Python side can
+- Python stays installed in `.venv` until session 36 so the Python side can
   always be run. The control refuses (`unknown`, not `pass`) if either
   router cannot be executed.
 
@@ -113,7 +113,7 @@ Until session 28 the corpus drives only the verbs that buy no model call.
 > **Amended in session 28, as built.** The offline transport is ported and
 > `route` dispatches through it, so a canned verifier is now possible — but
 > the three shapes that need one still have no builder, because the verb
-> that would drive them is `verify` at session 32. What session 28 removes
+> that would drive them is `verify` at session 33. What session 28 removes
 > is the *blocker*, not the gap: the builders land with the verbs that read
 > them, which is the rule the shape table already follows.
 
@@ -146,21 +146,21 @@ session that ports its module and stays in it for every later session.
 | Verb | Shapes | Enters in session |
 | --- | --- | --- |
 | `metrics` | fresh, in-flight | 25 |
-| `session start` / `declare` / `log` / `decision` | fresh, in-flight | 26 (writers), full from 30 |
-| `progress`, `progress --json` | all | 30 |
-| `modules` (list / create / retire) | fresh | 30 |
+| `session start` / `declare` / `log` / `decision` | fresh, in-flight | 26 (writers), full from 31 |
+| `progress`, `progress --json` | all | 31 |
+| `modules` (list / create / retire) | fresh | 31 |
 | `affected` | in-flight | 27 |
 | `test_evidence record` (both stages) | in-flight | 27 |
-| `verify` (offline transport), `verify dispute`, `verify adjudicate` | disputed, at-cap | 32 |
-| `verify reanchor` | moved-machine | 32 |
+| `verify` (offline transport), `verify dispute`, `verify adjudicate` | disputed, at-cap | 33 |
+| `verify reanchor` | moved-machine | 33 |
 | `ledger` reads (`latest_round`, the unresolved view) | disputed, at-cap | 26 |
-| `approved_plan`, `plan_review` | in-flight | 31 |
-| `session close --dry-run`, `session close`, `cancel`, `restore` | all | 30 |
-| `bootstrap` | fresh | 33 |
-| `packaging --dry-run` | in-flight | 33 |
+| `approved_plan`, `plan_review` | in-flight | 32 |
+| `session close --dry-run`, `session close`, `cancel`, `restore` | all | 31 |
+| `bootstrap` | fresh | 34 |
+| `packaging --dry-run` | in-flight | 34 |
 | `discovery` (lock-file read and write from a canned catalog; no enumeration) | fresh | 28 |
-| `seat_cost` against a fixture `session-store.db` | — (no repository) | 29 |
-| `workflow` (the six-step driver, offline) | in-flight | 34 |
+| `seat_cost` against a fixture `session-store.db` | — (no repository) | 30 |
+| `workflow` (the six-step driver, offline) | in-flight | 35 |
 
 `discovery enumerate` is excluded: it needs the network and its answer is
 not a function of the repository.
@@ -186,7 +186,7 @@ not a function of the repository.
 > `enumerate`. The seat catalog is **read** by the first three — it resolves
 > relative to the config that names it, so both routers read the same real
 > `ai_router/copilot-catalog.lock` — and it is not written by anything until
-> session 29, which is where the table's "lock-file … write" belongs for the
+> session 30, which is where the table's "lock-file … write" belongs for the
 > seat.
 >
 > **One line in these cases is wall-clock-derived and the normalizations
@@ -222,7 +222,7 @@ Compared:
 - What `bootstrap` writes: the `AGENTS.md` / `CLAUDE.md` / `GEMINI.md`
   fence, the pre-commit hook, `.gitignore`.
 - The six-step workflow's `events.jsonl` and `projection.json` (from
-  session 34).
+  session 35).
 - **The round anchors**: for every `refs/dabbler/rounds/s<N>/r<R>` the
   control compares the **tree** the anchored commit points at, and requires
   it to equal the row's `completion_tree` on both sides. The commit id
@@ -302,7 +302,7 @@ differently would make every future diff lie.
 > it covers compares equal two lines above it. Its `sha256:` value is
 > therefore reduced the same way `state-writes.jsonl`'s is. It is the second
 > and last such value in the record today; the seat catalog's digest will be
-> the third when session 29 gives it a writer.
+> the third when session 30 gives it a writer.
 
 ## Output and exit codes
 
@@ -318,7 +318,7 @@ differently would make every future diff lie.
 - **Port order is the control's growth order.** A verb enters when its
   module is ported; nothing is compared before its TypeScript side exists,
   and nothing is dropped once it has entered.
-- **The one legitimate break.** Session 35 adds `frameworkVersion` to
+- **The one legitimate break.** Session 36 adds `frameworkVersion` to
   session and round rows — the set's single record change. The control is
   run and recorded once more *before* that change and the Python deletion,
   and retired in the same step; it is never made to pass across the stamp.

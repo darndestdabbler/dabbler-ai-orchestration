@@ -1,6 +1,6 @@
 // What the working tree says about whether a session's work has begun.
 //
-// Session 30 ports `gates` whole -- the five gates the close runs, and the
+// Session 31 ports `gates` whole -- the five gates the close runs, and the
 // rows `--dry-run` prints. What is here is the slice `writers` cannot be
 // written without: the task declaration refuses to be made after the work
 // exists, and this is the question it asks.

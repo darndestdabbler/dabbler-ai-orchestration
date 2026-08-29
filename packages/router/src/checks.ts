@@ -12,10 +12,10 @@
 //
 // What is NOT here is the run core's half. Python's `checks.plan` and the
 // `CheckPlan` it returns are called from `runcli` alone -- measured, not
-// assumed -- and the run core is retired and deleted in session 34 (D88,
+// assumed -- and the run core is retired and deleted in session 35 (D88,
 // D130). Porting the planner would have carried a defect into a module
 // nothing calls: it appends the whole selection to every suite's command
-// where the suite owns only part of it. Session 34's `testphase` and
+// where the suite owns only part of it. Session 35's `testphase` and
 // `fixloop` reach for `execute`, `targetedCommand`, `loadChecks`,
 // `loadSelectionConfig`, `scopeForTest`, `selectionPayload`, `coversAny` and
 // `timeoutFor`, and those are what is here. `execute` takes no run id for

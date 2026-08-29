@@ -10,7 +10,7 @@
 //
 // It is deliberately not a spawn interface. `PythonSpawnRouter` (session
 // 24) satisfies it by spawning; the ported modules satisfy it in-process
-// (session 35); neither spelling is visible here, which is the point --
+// (session 36); neither spelling is visible here, which is the point --
 // the extension stops knowing that Python exists.
 //
 // Where a verb's answer has a schema, the method returns the generated

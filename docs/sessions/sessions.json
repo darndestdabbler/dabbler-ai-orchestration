@@ -562,6 +562,19 @@
     },
     {
       "number": 29,
+      "title": "One vocabulary for a failure, one stamp for a measurement",
+      "status": "in-progress",
+      "startedAt": "2026-08-29T03:47:00.864968-04:00",
+      "completedAt": null,
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": null
+    },
+    {
+      "number": 30,
       "title": "Transport II \u2014 the Copilot CLI state machine and seat cost",
       "status": "not-started",
       "startedAt": null,
@@ -570,7 +583,7 @@
       "verificationVerdict": null
     },
     {
-      "number": 30,
+      "number": 31,
       "title": "The session lifecycle",
       "status": "not-started",
       "startedAt": null,
@@ -579,7 +592,7 @@
       "verificationVerdict": null
     },
     {
-      "number": 31,
+      "number": 32,
       "title": "Verification support \u2014 agency, verifyjob, the approved plan",
       "status": "not-started",
       "startedAt": null,
@@ -588,7 +601,7 @@
       "verificationVerdict": null
     },
     {
-      "number": 32,
+      "number": 33,
       "title": "The verification loop",
       "status": "not-started",
       "startedAt": null,
@@ -597,7 +610,7 @@
       "verificationVerdict": null
     },
     {
-      "number": 33,
+      "number": 34,
       "title": "Bootstrap, packaging, and the `dabbler` command on the PATH",
       "status": "not-started",
       "startedAt": null,
@@ -606,7 +619,7 @@
       "verificationVerdict": null
     },
     {
-      "number": 34,
+      "number": 35,
       "title": "The six-step workflow ported, the run core retired",
       "status": "not-started",
       "startedAt": null,
@@ -615,7 +628,7 @@
       "verificationVerdict": null
     },
     {
-      "number": 35,
+      "number": 36,
       "title": "Cutover \u2014 the extension calls in-process, and Python leaves",
       "status": "not-started",
       "startedAt": null,

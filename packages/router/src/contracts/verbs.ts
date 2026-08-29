@@ -37,7 +37,7 @@ export const VERBS: readonly VerbSpec[] = [
     // `start`, `declare`, `log`, `decision` -- because the sanctioned
     // writers land there and a writer no verb reaches cannot be compared
     // (D171). The handler refuses `close`, `cancel`, `restore`, `plan` and
-    // `migrate` by name until session 30 takes the lifecycle's judgment
+    // `migrate` by name until session 31 takes the lifecycle's judgment
     // half: the gates, the boundary reversals and the legacy migration.
     portedInSession: 26,
     extensionFacing: true,
@@ -46,14 +46,14 @@ export const VERBS: readonly VerbSpec[] = [
   {
     verb: "progress",
     pythonModule: "ai_router.progress",
-    portedInSession: 30,
+    portedInSession: 31,
     extensionFacing: true,
     summary: "the repository's projection, for a reader or for --json",
   },
   {
     verb: "modules",
     pythonModule: "ai_router.modules",
-    portedInSession: 30,
+    portedInSession: 31,
     extensionFacing: true,
     summary: "list, create and retire the modules of a workspace",
   },
@@ -69,7 +69,7 @@ export const VERBS: readonly VerbSpec[] = [
     verb: "approved-plan",
     pythonModule: "ai_router.approved_plan",
     pythonCli: false,
-    portedInSession: 31,
+    portedInSession: 32,
     extensionFacing: true,
     summary: "the session's approved plan, as the task level reads it",
   },
@@ -90,14 +90,14 @@ export const VERBS: readonly VerbSpec[] = [
   {
     verb: "facts",
     pythonModule: "ai_router.facts",
-    portedInSession: 31,
+    portedInSession: 32,
     extensionFacing: false,
     summary: "the deterministic controls, run and recorded",
   },
   {
     verb: "verify",
     pythonModule: "ai_router.verify",
-    portedInSession: 32,
+    portedInSession: 33,
     extensionFacing: true,
     summary: "one cross-provider round; dispute, adjudicate, reanchor, step",
   },
@@ -111,7 +111,7 @@ export const VERBS: readonly VerbSpec[] = [
   {
     verb: "seat-cost",
     pythonModule: "ai_router.seat_cost",
-    portedInSession: 29,
+    portedInSession: 30,
     extensionFacing: false,
     summary: "what a Copilot seat spent, from its own session store",
   },
@@ -125,35 +125,35 @@ export const VERBS: readonly VerbSpec[] = [
   {
     verb: "bootstrap",
     pythonModule: "ai_router.bootstrap",
-    portedInSession: 33,
+    portedInSession: 34,
     extensionFacing: true,
     summary: "set a project up: the managed guidance, the hook, the ignore rule",
   },
   {
     verb: "packaging",
     pythonModule: "ai_router.packaging",
-    portedInSession: 33,
+    portedInSession: 34,
     extensionFacing: false,
     summary: "pack, then push to the declared feed",
   },
   {
     verb: "workflow",
     pythonModule: "ai_router.workflow",
-    portedInSession: 34,
+    portedInSession: 35,
     extensionFacing: true,
     summary: "the six-step driver: enter, review, approve, test, suite, fix",
   },
   {
     verb: "solution",
     pythonModule: "ai_router.solution",
-    portedInSession: 34,
+    portedInSession: 35,
     extensionFacing: false,
     summary: "the solution view over a workspace's modules",
   },
   {
     verb: "contractdoc",
     pythonModule: "ai_router.contractdoc",
-    portedInSession: 34,
+    portedInSession: 35,
     extensionFacing: false,
     summary: "render a module's contract from its declaration",
   },

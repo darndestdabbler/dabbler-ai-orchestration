@@ -1,10 +1,11 @@
-# STATUS — session 34 of 36 landed: bootstrap, packaging, and the `dabbler` command on the PATH
+# STATUS — session 35 of 36 landed: the six-step workflow ported, the run core deleted
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
 `experiment/verification-pipeline-v3` and `design/solution-decomposition`
 are merged and finished. Earlier handoff text is in `docs/status-archive.md`.
 
-> **Recorded, 2026-08-29.** Session 34's deliverables are decisions
+> **Recorded, 2026-08-29.** Session 35's deliverables are decisions
+> **D224–D230**; session 34's are
 > **D218–D223**; session 33's are
 > **D210–D217** in `docs/sessions/decisions-log.md`; session 32's are
 > **D204–D209**; session 31's are
@@ -28,6 +29,126 @@ are merged and finished. Earlier handoff text is in `docs/status-archive.md`.
 > section at the foot of this file uses the new numbers.
 
 ## Where things are
+
+- **Session 35 is closed `VERIFIED`** — **3 rounds**, one finding disputed and
+  **withdrawn**, one disputed and **upheld against a dispute that was wrong**
+  (gpt-5-6-sol over the API), Claude Code / claude-opus-5[1m] orchestrator.
+  Round 1 raised three Majors; round 2 raised two more, one of them a defect
+  the remediation itself introduced.
+- **The plan's paragraph and D129's inventory are two records of one
+  decision, and they disagreed** (D224). The session plan lists `fixloop`
+  (563) and `testphase` (345) on the run core's deletion list; D129 puts both
+  on the **port** list and says why in its own table — `workflow` imports
+  them, so they are the six-step driver's remediation loop and tests phase.
+  `facts` is on the plan's deletion list too and is what `verify` runs on.
+  **The real shape was six modules ported and three deleted**, 3,102 lines and
+  127 tests rather than the paragraph's 2,194 and 99 — a session planned
+  against the prose would have been planned at two-thirds of its size.
+- **The import audit is necessary and was again not sufficient.** Twenty-one
+  symbols across six modules, all resolving, with the git seam in `journal.ts`
+  where D129 said it would be. It cost minutes and it is what turned the
+  plan/inventory conflict into a decision instead of a deletion. It did not
+  catch that `dabbler.yaml` still selected deleted test files; the verifier
+  did.
+- **`test_runcore_checks` drives `checks` through the run core's own command
+  line** (D225). D129 kept it on the grounds that its subject is `checks`
+  rather than the run core it is named for. That was right about the subject
+  and wrong about the driver: all twenty tests go through `cli("check",
+  "--run", ...)`, so the file cannot import once `runcli` is gone. It is
+  deleted, and `packages/router/test/checks.test.ts` — which says in its first
+  line that it is the port of that file — already carries the behaviours at 22
+  tests. **The Python suite lands at 832, which is exactly D129's predicted
+  total**; the entry was right about the number and wrong about which twenty
+  made it up.
+- **`ai_router/checks.py` has no Python test driving it directly for one
+  session.** Recorded rather than papered over. It is not uncovered — the TS
+  port has `checks.test.ts`, the parity control compares every verb that runs
+  a check, and session 36 deletes the module.
+- **`[project.scripts] dabbler` pointed at `ai_router.runcli:main` and went
+  with it**, which settles the collision session 34 left open: the terminal
+  shim, the managed fence and the commit guard all name `dabbler`, and until
+  now a `pip install -e .` put a second unrelated one on the same PATH.
+- **`dabbler status` exists, and the dispute that argued it should not was
+  wrong** (D229). Round 1 called its absence a Major; the dispute cited that
+  the verb had never been in `contracts/verbs.ts`; round 2 upheld the finding
+  with "adding `status` is not inventing an unsolicited verb when the
+  governing plan names it." That is right. **D130 named the command when
+  `dabbler` still WAS the Python CLI** (`[project.scripts] dabbler =
+  "ai_router.runcli:main"`), so "`dabbler status` now reads the lifecycle's
+  record" meant *keep the name, change what it reads* — and D162's
+  no-invented-verbs precedent, which covers verbs no plan named, does not
+  reach it. It is an alias: `statusVerb` delegates to `progressVerb` with the
+  name it was invoked under, so there is one projection and the usage text
+  says what the operator typed.
+- **A dispute is only as strong as the kind of fact it cites.** Three of this
+  port's disputes have been withdrawn against citations of what the code
+  *does*. This session filed two: the one citing
+  `ai_router/workflow.py:1221` — `--author-provider` optional in the
+  reference implementation — was **withdrawn in full**; the one citing an
+  *absence* was upheld. Absence proves a thing was not built, never that it
+  should not be.
+- **The remediation introduced its own Major, and the verifier caught it.**
+  Removing the stale `when: ai_router/pricing.py` rule — a genuinely dead
+  rule, whose trigger module was deleted back in session 8 — took three lines
+  and orphaned the other three selects into the preceding rule. The YAML still
+  parsed and every named path still existed, so the audit that prompted the
+  removal was blind to it. **The rule is restored whole.** Out-of-scope
+  tidy-ups in structured config are how a fix becomes a defect.
+- **Deleting a dead deny-list entry silently widened an allow-list** (D228).
+  The parity control's `EXCLUDED` carried four run-core records; nothing writes
+  them now, so they were removed as dead configuration. `COMPARED` matches
+  `^\.dabbler/runs/s\d+/.+$` — the whole directory — so those entries were what
+  *bounded* that pattern rather than a description of files that exist. The
+  suite went red on the first full run and they are restored, with a comment
+  saying why they stay. "Nothing writes this any more" argues for deleting the
+  writer and never on its own for deleting the rule that bounds a reader.
+- **3,102 Python lines became 4,225 TypeScript across twelve files** — 1.36x,
+  against the 1.32x running ratio (D227). The excess is the CLI: `workflow`
+  has ten subcommands and argparse sub-parsers do not translate. `workflow`
+  split four ways on the seams it already had — `log` (523: events, the
+  transition judge both sides call, the fold), `commands` (564), `terminal`
+  (302: the caps and the three terminal states, which read a folded state and
+  a tree rather than the log), `project` (176) — plus `cli/workflow.ts` (381).
+  The other five modules are one file each.
+- **The parity control gains three cases and no shape** (D226). `solution.yaml`
+  is eight lines added to the corpus **seed**, so every shape carries it for
+  one `writeFileSync` per copy and no router invocation — a sixth shape would
+  have been built twice on every round of every session that follows.
+  `workflow enter` compares the *second* `enter`, which is the only version
+  that exercises the fold, the transition judge and `sort_keys` at once;
+  `workflow status --json` compares the projection as the extension receives
+  it; `solution check` compares a rendered report. **`contractdoc` gets no
+  case**, deliberately: its output goes to a caller-named path no compared
+  pattern covers, and its diagram is a pure function driven by thirteen
+  differential tests instead.
+- **Parity: 48 cases, 402 paths, all identical**, across all five shapes.
+- **Suite: 832 Python (4:54) / 964 router vitest (4:09, plus 4 live tests
+  skipped); all four declared controls green.** Python is down 109 and
+  TypeScript up 128 — the 127 ported plus the `status` alias's own.
+- **One test needed a declared timeout.** `testphase.test.ts`'s
+  two-ecosystem case spawns two real subprocesses, which is the claim it
+  makes; under the whole suite's parallelism that outran vitest's 5 s default
+  though it passed in isolation. It carries `30_000` and says why.
+- **The verb table's announce-then-implement example is exhausted.**
+  `contracts.test.ts` asserted the discipline by naming a declared-but-
+  unregistered verb — `verify` until session 33, `workflow` until this one —
+  and its own comment called that "a countdown". It now computes the set from
+  the table and asserts each member names the session that lands it, so it
+  stops needing an edit. Two qualify today: `ledger` and `approved-plan`, both
+  `pythonCli: false`.
+- **Three vendor calls, 147,120 tokens — the port's most expensive session**
+  (D230), ahead of session 23's 136,020, with round 1 alone 86% of it. Rounds
+  2 and 3 cost 5.6% of round 1's input each. **No seat transport was used**, so
+  `seat_cost` has nothing to answer for this session and it is not comparable
+  to the seat series.
+- **The run core's two design documents are marked superseded, not deleted.**
+  `docs/run-core-blueprint.md` (1,361 lines) and
+  `docs/run-core-phase0-report.md` (425) describe an implementation that no
+  longer exists in any tree. They stay because D130's authority rests on the
+  evidence in them, and a decision whose reasoning has been deleted cannot be
+  re-examined.
+
+## Where things were at session 34
 
 - **Session 34 is closed `VERIFIED`** — **2 rounds**, the Major of round 1 disputed and **withdrawn** (gpt-5-6-sol over
   the API), Claude Code / claude-opus-5[1m] orchestrator. Round 1 raised one
@@ -1172,6 +1293,104 @@ framework's own default; the archived "`.dabbler/` is git-ignored" item is
 resolved by being true again.
 
 ## Next
+
+1. **Session 36 of 36 — the cutover. It is the last one, and it publishes.**
+   Declare **`--releasable`**: `InProcessRouter` replaces
+   `PythonSpawnRouter`, `frameworkVersion` is added to session and round rows
+   (the set's one record change), the parity control runs one last time
+   across every verb and shape **and is recorded before anything is deleted**,
+   and then `ai_router/`, `tests/`, `pyproject.toml`, `pytest.ini`, the Python
+   CI job, the `python` suite in `dabbler.yaml` and the parity control itself
+   go. Extension 2.0.0 and `dabbler-ai-router` 2.0.0 publish through
+   `dabbler packaging`. **The acceptance test is that the TypeScript router
+   verifies, records and closes that session with no Python in the tree.**
+
+   **Step 4's ordering is the risk the plan names, and it is real**: record
+   the parity run before the deletion or the set's central claim rests on
+   memory.
+
+2. **The Python-naming sweep is now the largest single item, and it has
+   grown twice.** `REFRESH_COMMAND` and the 24,000 handoff threshold (D196);
+   `session start`'s next-step hint and the selector's recipe (D221); and now
+   `solution check`'s closing line — which tells a reader to run `python -m
+   ai_router.workflow status` — and `contractdoc`'s "regenerate with `python
+   -m ai_router.contractdoc`" (D227). Every one was kept deliberately: each
+   has a byte-identical form, which is the one it has, and each is *correct*
+   in this repository while two routers exist. **Grep for `python -m
+   ai_router` across strings the router PRINTS, not only across the docs the
+   plan names**, and remember that this repository's own `AGENTS.md`,
+   `CLAUDE.md` and `GEMINI.md` are on the list: session 34 changed the
+   generator, not the generated files, and re-running `bootstrap` here is what
+   refreshes them.
+
+3. **Two verbs are declared and unregistered, and neither is a gap.**
+   `ledger` and `approved-plan` carry `pythonCli: false` — their Python sides
+   are libraries with no command line — so `dabbler ledger` refuses by name
+   and says there is nothing to run in the meantime. The cutover should decide
+   whether they become real verbs or leave the table; `contracts.test.ts` now
+   computes this set rather than naming one, so it will not need an edit
+   either way.
+
+4. **`dabbler status` and `dabbler progress` are two names for one
+   projection, and the cutover is where that gets settled if it is going to
+   be.** `progress` is what the extension spawns and has since session 31;
+   `status` is the operator-facing name D88 and D130 promised. Renaming
+   `progress` would break a spawn site; leaving both is the accretion this
+   repository generally refuses. The alias costs three lines, so this is a
+   naming call rather than a cost one — and step 5 rewrites the docs that
+   would have to name whichever survives.
+
+5. **One small fidelity gap is still owed** (D223). `packaging.ts`'s
+   `recordedAt` writes millisecond precision where Python writes microseconds,
+   and `.000` where Python omits the fraction entirely. Nothing compares it
+   today; session 36 is the commit where the record's timestamp format changes
+   for anybody. `journal.ts:249` already implements Python's rule exactly,
+   including the omit-when-zero case.
+
+6. **The evidence protocol's two gaps still have no caller.**
+   `validate_transcript`, `validate_finding_evidence`, `authoritative_tier`,
+   `verify_worker_result` and `record_worker_result` are ported and nothing in
+   either router calls them. `outputHash` is not re-derived from `rawOutput`,
+   and a check's `evidence.pass.requires` contract is not enforced when its
+   result is recorded. This passes to whichever session first turns
+   `critique.pipeline` to `shadow`.
+
+7. **A Python design question is now FIVE sessions past the comfortable
+   moment, and after this session it is finally cheap.** A malformed or
+   hand-edited `sessions.json` or `activity-log.json` is *silently replaced*
+   rather than refused, in both routers: `readRawSessionState` answers `null`
+   for unparseable JSON and the activity log is rebuilt from any read failure.
+   A verifier called it a Major in session 26 and it is a fair call. **It is a
+   redesign and it needs an operator ruling**: refuse and fail closed, or keep
+   replacing and say so. The projection already distinguishes the two — an
+   absent ledger reads the plan, an unreadable one reports
+   `invariantViolation` — so the shape of the honest answer exists at the read
+   boundary. **After session 36 there is one implementation to change.**
+
+8. **Two lessons from this session that generalise past the port.**
+   - **An out-of-scope tidy-up in structured config is how a fix becomes a
+     defect.** Removing three lines of a genuinely dead `dabbler.yaml` rule
+     orphaned three siblings into the preceding rule. The YAML still parsed
+     and every path still existed; only a verifier reading the diff saw it.
+   - **A deny-list entry under a broad allow-list pattern is load-bearing
+     whether or not its subject exists.** Deleting the parity control's
+     run-core exclusions widened what it compares. Both were caught cheaply —
+     one by the suite, one by the verifier — because both suites ran before a
+     verifier was bought rather than after.
+
+9. **Read `docs/ts-port-parity-control.md` before planning session 36.** It
+   was not amended this session: the three new cases and the seed manifest fit
+   the existing rules, and no fifth normalization was needed. The corpus now
+   carries `solution.yaml` in `SEED`, which every shape inherits.
+
+
+---
+
+**Session 35's superseded handoff** (the brief this session ran against,
+kept because D224 is a correction to it and the correction is only
+legible beside what it corrects):
+
+### The brief, as session 35 received it
 
 1. **Session 35 of 36 — the six-step workflow ported, the run core retired.**
    `workflow` (1,363), `solution` (351), `contractdoc` (196) and

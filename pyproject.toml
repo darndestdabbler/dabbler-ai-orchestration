@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dabbler-ai-router"
+version = "1.1.0"
+description = "Multi-provider model routing, session lifecycle, and metrics for the Dabbler AI-led workflow (v2)."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.11"
+authors = [{ name = "darndestdabbler" }]
+dependencies = [
+    "pyyaml>=6.0",
+    "httpx>=0.27.0",
+    "jsonschema>=4.0.0",
+]
+
+[project.scripts]
+# `python -m ai_router.runcli` stays the collision-proof canonical
+# invocation; this is the same parser and handlers under a short name.
+dabbler = "ai_router.runcli:main"
+
+[project.optional-dependencies]
+tests = [
+    "pytest>=7.0",
+    "pytest-xdist>=3.5",
+]
+
+[tool.setuptools]
+packages = ["ai_router", "ai_router.transports"]
+
+[tool.setuptools.package-data]
+ai_router = [
+    "router-config.yaml",
+    "copilot-catalog.lock",
+    "prompt-templates/*.md",
+    "schemas/*.json",
+]

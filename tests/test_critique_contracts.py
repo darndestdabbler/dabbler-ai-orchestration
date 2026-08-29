@@ -178,13 +178,14 @@ def test_evidence_is_re_derived_from_the_reviewed_tree(seeded):
         }],
     })
 
-    # The recorded search is the framework's re-execution, named by the
-    # tool that actually ran it. Two literal matches is what puts this
-    # result on the check's own "mentions_it" branch, not "clean" — the
-    # fixture stays honest about what the measured count actually means.
+    # The recorded search is the framework's re-execution, and the stamp
+    # says so — it overwrites whatever the worker claimed it used. Two
+    # literal matches is what puts this result on the check's own
+    # "mentions_it" branch, not "clean" — the fixture stays honest about
+    # what the measured count actually means.
     search = recorded["absence_searches"][0]
     assert search["matches"] == 2
-    assert search["tool_version"].startswith("python-re/")
+    assert search["tool_version"] == evidence.ABSENCE_TOOL
     assert ledger.read_worker_results(repo, 1, change_id) == [recorded]
     assert ledger.read_checks(
         repo, 1, change_id)[0]["check_id"] == "no-shell-out"

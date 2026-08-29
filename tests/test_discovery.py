@@ -3,9 +3,17 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
+import httpx
+
 from ai_router.discovery import (
     ENUMERATE_COMMAND,
+    ENUMERATION_ERRORS,
+    ERROR_HTTP_STATUS,
+    ERROR_NETWORK,
     ERROR_NO_API_KEY,
+    ERROR_PARSE,
+    ERROR_TIMEOUT,
+    ERROR_UNKNOWN,
     ApiModelEntry,
     ProviderResult,
     compute_drift,
@@ -134,21 +142,37 @@ class TestEnumeration:
         assert entry.created_at == "2026-01-01T00:00:00Z"
         assert get.calls[0][0] == "https://api.openai.com/v1/models"
 
-    def test_a_vendor_error_reports_its_class_and_not_its_message(
+    def test_a_vendor_failure_is_recorded_in_the_shared_vocabulary(
         self, monkeypatch
     ):
-        # The string is written to a committed record, and a vendor error body
-        # can echo the request headers back.
+        # Never the message: a vendor error body can echo the request headers
+        # back, and the string is written to a committed record. Never the
+        # exception's class either: that names whichever HTTP library raised
+        # it, and the TypeScript router raises a different one for the same
+        # event, on a field both must write identically.
         monkeypatch.setenv("TEST_OPENAI_KEY", "k")
 
-        def explode(url, headers, params, timeout):
-            raise TimeoutError(f"failed calling {url} with {headers}")
+        def failing(exc):
+            def explode(url, headers, params, timeout):
+                raise exc
+            return explode
 
-        result = enumerate_provider(
-            _provider_config(), "openai", get=explode
-        )
-
-        assert result.error == "TimeoutError"
+        cases = [
+            (httpx.ConnectTimeout("slow"), ERROR_TIMEOUT),
+            (httpx.ReadTimeout("slow"), ERROR_TIMEOUT),
+            (httpx.ConnectError("no route"), ERROR_NETWORK),
+            (httpx.HTTPStatusError("500", request=None, response=None),
+             ERROR_HTTP_STATUS),
+            (json.JSONDecodeError("bad", "{", 0), ERROR_PARSE),
+            (RuntimeError("something new"), ERROR_UNKNOWN),
+        ]
+        for exc, expected in cases:
+            result = enumerate_provider(
+                _provider_config(), "openai", get=failing(exc)
+            )
+            assert result.error == expected, exc
+            assert result.error in ENUMERATION_ERRORS
+            assert str(exc) not in (result.error or "")
 
 
 class TestUnknownNeverUnsupported:
@@ -187,12 +211,12 @@ class TestUnknownNeverUnsupported:
             "openai", (ApiModelEntry(id="gpt-x", provider="openai"),)
         )])
         after = merge_record(
-            record, [ProviderResult("openai", error="TimeoutError")]
+            record, [ProviderResult("openai", error=ERROR_TIMEOUT)]
         )
 
         assert [e.id for e in after.models] == ["gpt-x"]
         status = next(p for p in after.providers if p.name == "openai")
-        assert status.last_error == "TimeoutError"
+        assert status.last_error == ERROR_TIMEOUT
 
 
 class TestRecord:

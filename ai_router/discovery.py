@@ -81,9 +81,50 @@ DEFAULT_SEAT_MAX_AGE_HOURS = 720.0
 RECORD_API = "api-enumeration"
 RECORD_SEAT = "seat-catalog"
 
+# --- What a failed enumeration is called ------------------------------------
+#
+# One vocabulary, written by both routers. The name of the exception is the
+# name of whichever HTTP library raised it -- `httpx` here, `fetch` in the
+# TypeScript router -- so recording it directly puts a different word in the
+# same record for the same event, on a field whose whole job is to say what
+# happened. These terms belong to the framework instead, and the mapping
+# below is the one place either router decides which term applies.
+#
+# The list is CLOSED. An exception nothing maps becomes ``unknown-error``
+# rather than contributing its class name, because an open mapping breaks the
+# moment a library raises something neither side anticipated -- and it breaks
+# in a committed file, silently, on whichever machine hit it first.
+
 ERROR_NO_API_KEY = "no-api-key"
 ERROR_PROVIDER_DISABLED = "provider-disabled"
 ERROR_PROVIDER_UNSUPPORTED = "no-enumeration-adapter"
+
+# The request outlived the ceiling the provider block configured. The remedy
+# is a bigger ceiling or a slower expectation.
+ERROR_TIMEOUT = "timeout"
+# The endpoint was never reached: DNS, refused, TLS, no route. Kept apart
+# from a timeout because the remedy is different -- a URL, a proxy, a
+# firewall -- and folding the two together would make the field say less
+# than the reader needs to act.
+ERROR_NETWORK = "network-error"
+# The vendor answered, with a 4xx or 5xx.
+ERROR_HTTP_STATUS = "http-error"
+# The vendor answered with something this framework could not read as JSON.
+ERROR_PARSE = "parse-error"
+# Anything the mapping does not name.
+ERROR_UNKNOWN = "unknown-error"
+
+#: Every value ``last_error`` may hold, for a reader and for a test.
+ENUMERATION_ERRORS = (
+    ERROR_NO_API_KEY,
+    ERROR_PROVIDER_DISABLED,
+    ERROR_PROVIDER_UNSUPPORTED,
+    ERROR_TIMEOUT,
+    ERROR_NETWORK,
+    ERROR_HTTP_STATUS,
+    ERROR_PARSE,
+    ERROR_UNKNOWN,
+)
 
 # A vendor that paginated forever would turn a free metadata call into an
 # unbounded loop; every endpoint here returns its whole catalog well inside
@@ -486,6 +527,43 @@ _ADAPTERS = {
 }
 
 
+def classify_enumeration_error(exc: BaseException) -> str:
+    """Which vocabulary term an enumeration failure is recorded under.
+
+    Read on the exception's TYPE and never on its message: a vendor error
+    body can echo the request headers back, and the result is written to a
+    committed record.
+
+    ``httpx`` groups its own failures under bases that say exactly what this
+    field wants to know, so those are matched rather than a list of leaf
+    classes -- a new leaf in a later httpx keeps working. Everything else
+    falls to ``unknown-error`` by design: a bucket that guessed would be a
+    committed record making up what happened.
+
+    Imported here rather than at module scope. ``session start`` reaches this
+    module for a staleness warning and nothing else, and it should not pay
+    for an HTTP client to be told a date.
+    """
+    import httpx
+
+    if isinstance(exc, httpx.TimeoutException):
+        return ERROR_TIMEOUT
+    if isinstance(exc, httpx.HTTPStatusError):
+        return ERROR_HTTP_STATUS
+    # Every remaining transport failure httpx models -- connect, read, write,
+    # proxy, protocol, too-many-redirects. ``TimeoutException`` derives from
+    # this too and is matched above, so the order carries meaning.
+    if isinstance(exc, httpx.TransportError):
+        return ERROR_NETWORK
+    # A body that could not be read as JSON. Deliberately not bare
+    # ``ValueError``: ``JSONDecodeError`` derives from it, and widening to
+    # the base would file a programmer error in the adapter as the vendor's
+    # fault.
+    if isinstance(exc, (json.JSONDecodeError, UnicodeDecodeError)):
+        return ERROR_PARSE
+    return ERROR_UNKNOWN
+
+
 def enumerate_provider(config: dict, name: str, *, get=None) -> ProviderResult:
     """Read one vendor's models endpoint. Never raises for an operational
     failure -- the failure is the result, and the merge decides what it does
@@ -504,9 +582,7 @@ def enumerate_provider(config: dict, name: str, *, get=None) -> ProviderResult:
             cfg, api_key, get or _http_get, cfg.get("timeout_seconds", 60)
         )
     except Exception as exc:  # operational, not programmer, error
-        # The class name and never the message: a vendor error body can echo
-        # request headers, and this string is written to a committed record.
-        return ProviderResult(name, error=type(exc).__name__)
+        return ProviderResult(name, error=classify_enumeration_error(exc))
     return ProviderResult(name, entries=tuple(entries))
 
 

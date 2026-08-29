@@ -26,7 +26,6 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-import platform
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -690,6 +689,24 @@ def scope_paths(repo_root, reviewed_tree: str, scope) -> list:
     )
 
 
+#: What produced an absence count, written onto every measured row.
+#:
+#: The field's job is not to name a regex engine but to overwrite whatever
+#: the reviewer claimed: a worker can say it searched and report a number,
+#: and this function re-runs the search and stamps its own answer. Any
+#: framework-owned constant does that, and a constant is what this is.
+#:
+#: It used to be ``python-re/<version>``, which named the engine honestly and
+#: cost two things. The TypeScript router cannot write it truthfully -- it
+#: would have to claim an engine it did not run -- so the same row differed
+#: between two routers required to write identical bytes. And it moved
+#: whenever the interpreter's PATCH version moved, so it was never stable
+#: inside one router either. Naming the framework fixes both, and loses
+#: nothing a reader used: when two engines genuinely disagree the COUNT
+#: differs, and the count is what is compared.
+ABSENCE_TOOL = "dabbler-absence-search/1"
+
+
 def run_absence_search(repo_root, reviewed_tree: str, declaration) -> dict:
     """Re-run a declared search here and return the framework's row.
 
@@ -751,7 +768,7 @@ def run_absence_search(repo_root, reviewed_tree: str, declaration) -> dict:
         "query": query,
         "query_kind": query_kind,
         "scope": [str(pattern) for pattern in scope],
-        "tool_version": f"python-re/{platform.python_version()}",
+        "tool_version": ABSENCE_TOOL,
         "matches": matches,
     }
 

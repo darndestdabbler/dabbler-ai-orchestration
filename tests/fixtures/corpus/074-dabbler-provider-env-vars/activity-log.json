@@ -1,0 +1,27 @@
+{
+  "sessionSetName": "074-dabbler-provider-env-vars",
+  "createdDate": "2026-06-20T05:23:42.7688303-04:00",
+  "entries": [
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "session-001/path-aware-critique",
+      "dateTime": "2026-06-20T09:24:24.531721+00:00",
+      "description": "Operator set pathAwareCritique: none.",
+      "status": "complete",
+      "kind": "path_aware_critique",
+      "choice": "none"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "session-001/contract-gate",
+      "dateTime": "2026-06-20T09:24:24.531721+00:00",
+      "description": "Operator set contractGate: none.",
+      "status": "complete",
+      "kind": "contract_gate",
+      "choice": "none"
+    }
+  ],
+  "totalSessions": 1
+}

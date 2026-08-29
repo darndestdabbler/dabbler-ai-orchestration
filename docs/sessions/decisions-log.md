@@ -5224,3 +5224,189 @@ verifier tokens: 23 (136,020), 24 (61,855), 25 (67,234), 26 (77,596), 27
 (98,277), 28 (70,891). Session 28 is the third cheapest of the six while
 being the second largest by Python lines ported (2,276, behind session
 27's 3,293) -- which is what two rounds instead of three buys.
+
+## Session 29 — One vocabulary for a failure, one stamp for a measurement
+
+### D187 · 2026-08-29 · Operator · One vocabulary for a failed enumeration, one stamp for a measurement: D173 and D185 are closed
+
+**The operator's ruling, and it closes D173 and D185.** Both were the same
+complaint: the two routers write a different string into a record for the
+same event, because the string is the name of whichever library did the
+work. Both are now framework-owned vocabulary.
+
+Routed to `gpt-5-6-sol` and `gemini-3-1-pro` first, per the operator's
+standing directive, and both were useful. **Neither was reliable on fact** —
+Gemini said the committed lock files would need regenerating (the file is
+gitignored here and does not exist), and Sol said the control needs a fixed
+clock because `last_error_at` cannot match (normalization 1 has replaced
+every timestamp since session 23). Both claims were checked and dropped.
+What they caught that the plan did not: **nothing was proving the
+vocabulary**, because the corpus scrubs the keys and every vendor fails as
+the shared `no-api-key` constant.
+
+## The failure vocabulary
+
+Five new terms join the three the field already carried:
+
+| Term | What it means, and what a reader does about it |
+| --- | --- |
+| `timeout` | outlived the configured ceiling — raise it, or expect slower |
+| `network-error` | never reached — DNS, refused, TLS, no route |
+| `http-error` | the vendor answered, 4xx or 5xx |
+| `parse-error` | the answer was not JSON this framework could read |
+| `unknown-error` | nothing above; the closed list's catch-all |
+
+**Timeout and unreachable stay apart**, against Sol's advice to merge them
+into one transport term: the remedies differ, and a field whose whole job is
+to tell a reader why the entries are stale should not collapse "your ceiling
+is too low" into "your URL is wrong". Gemini's split was the better call.
+
+**The list is closed.** An unmapped failure becomes `unknown-error` rather
+than contributing its class name — both advisors agreed, and the reason is
+decisive: an open mapping breaks the byte comparison the first time either
+library raises something unanticipated, silently, in a committed file, on
+whichever machine hit it first.
+
+**The original class name is written nowhere.** A second recorded field
+would recreate the problem, and excluding that field from comparison would
+put a value in the record that nothing checks.
+
+The mapping reads each library's own bases rather than a list of leaf
+classes — `httpx.TimeoutException` / `HTTPStatusError` / `TransportError` on
+one side, and on the other the two classes `transports/api` raises plus an
+unwrap of Node's `cause` chain, because Node reports a refused connection as
+a `TypeError` whose cause carries `ECONNREFUSED`. A new leaf class in either
+library keeps working.
+
+## The measurement stamp
+
+`run_absence_search` re-runs a reviewer's declared search and stamps what
+produced the count. It stamped the regex engine; it now stamps
+`dabbler-absence-search/1` in both routers.
+
+Gemini argued the field should be **deleted**, on the grounds that if the
+engines genuinely differ the COUNT differs and the comparison fails on the
+count, so the stamp never saves anyone. That is right about engine
+comparison and wrong about the field's job, which the code says plainly: a
+worker can claim it searched and report a number, and this function
+overwrites the claim with its own answer. The stamp is what says the
+framework measured this. A framework-owned constant does that job; naming an
+engine never did.
+
+It also ends an instability nobody had noticed: the Python value embedded
+the interpreter's PATCH version, so it moved on a `3.11.9` → `3.11.10`
+upgrade, inside one router, with no engine change at all.
+
+Sol's alternative — make Node's engine canonical and have Python delegate to
+it — is rejected: it would make the Python router depend on Node for the
+remaining sessions of a port whose whole point is to remove one of them.
+
+## What proves it
+
+The parity control's `enumerate` case now covers both halves of the field.
+The corpus gives one vendor a value that is not a key and points it at
+`127.0.0.1:1`, which refuses immediately — nothing is sent, because the
+connection is refused before a request is written. Two vendors then write
+`no-api-key` and one writes `network-error`, and both routers must agree on
+every word. Measured: the two records differ only in their timestamps and
+the digest over them, which is exactly what the control already normalises.
+
+### D188 · 2026-08-29 · Operator · Session 29 is inserted; the port's remaining sessions move up one and the record keeps the old numbers
+
+The operator asked for the vocabulary work as a short session between 28 and
+29. The lifecycle refuses an out-of-order number — `start` derives the next
+session from the completed ones and says so — so inserting one means
+renumbering. Transport II is now **30**, the cutover **36**, and the plan
+runs to 36 sessions.
+
+**What moved, and what deliberately did not.**
+
+Live guidance follows the new numbers, because it tells a reader what to do
+next and a wrong number there sends them to the wrong session:
+`portedInSession` in the verb contract, the refusal messages that name the
+session a caller should wait for, the module headers, and the parity
+control's verb table — 38 lines across 15 files.
+
+**`docs/sessions/decisions-log.md` and `STATUS.md` are not touched.** They
+carry 49 statements naming sessions 29–35, and they are the record. Those
+statements were true when written; rewriting an append-only log to agree
+with a later plan is the one thing that log exists to prevent, and the repo
+already has the pattern for this — D129 sized session 26 at three modules,
+it became nine, and D171 recorded the change rather than editing D129.
+
+So a reader who finds "ported in session 29" in a decision from session 27
+should read it as the plan of that date. Session 29's own plan entry says
+this, and the ledger's dates carry the true order.
+
+**What it cost to find out.** The renumber was done before the session was
+registered, which meant `declare` refused it — the working tree already
+carried 15 changes, and a declaration made after the work is a model
+deciding in hindsight what it may publish. The gate was right; the renumber
+went in as its own commit first, and the declaration then preceded the
+actual work. Worth knowing for the next insertion: **register, declare, then
+renumber**, or renumber and commit before registering.
+
+**The cheaper alternative was offered and declined**, and it is worth
+recording why the operator's choice is the better one anyway: riding as
+session 30's first commits would have cost no renumber, but it would have
+put a cross-cutting record change inside the session that ports the Copilot
+CLI state machine — the most OS-bound session of the port — and made one
+verification round answer for both.
+
+### D189 · 2026-08-29 · Orchestrator (claude-opus-5/anthropic) · Session 29 seat cost: 18,839 in / 6,570 out over two rounds, the cheapest session of the port, and a Major that caught a green control proving nothing
+
+Two rounds to `gpt-5-6-sol` over the API: **18,839 input / 6,570 output
+tokens** in 100.6 s of model time.
+
+| Round | In | Out | Elapsed | Verdict |
+| --- | ---: | ---: | ---: | --- |
+| 1 | 12,173 | 3,645 | 52.8 s | ISSUES_FOUND, 1 Major |
+| 2 | 6,666 | 2,925 | 47.8 s | VERIFIED, 3 nits |
+
+No Copilot seat was used. One Claude Code context on the subscription
+window.
+
+**The cheapest session of the port by a factor of two.** The running total
+across its seven sessions is 537,282 verifier tokens: 23 (136,020), 24
+(61,855), 25 (67,234), 26 (77,596), 27 (98,277), 28 (70,891), 29 (25,409).
+The next cheapest is session 24 at 61,855. The reason is not a better
+process -- it is that this session changed roughly 200 lines of source
+across two modules instead of porting 2,276, and the round-1 prompt is
+sized by the diff.
+
+**Round 2 is 55% of round 1's input**, against 18% at session 28, 8% at 27
+and 26% at 26 -- the highest ratio the port has recorded, and it does not
+mean the fix-delta review stopped working. The ratio is a fraction of a
+small denominator: a full review of a 200-line diff and a delta review of a
+70-line fix are nearly the same size. Read the absolute number instead. On
+that reading round 2 cost 6,666 tokens, the smallest verification round of
+the port.
+
+**The Major was worth the whole session's verifier budget.** The parity
+case that proves the new vocabulary pointed at `http://127.0.0.1:1`, and
+port 1 is on the WHATWG bad-port list: Node's `fetch` rejects it with
+`bad port` before opening a socket, while Python connected and was refused.
+So the case compared a refused connection against a rejected URL, and went
+green -- the TypeScript classifier reached `network-error` through its
+`fetch failed` fallback rather than through a real transport failure. A
+green control proving nothing is the exact failure this port's control
+exists to prevent, and no test in either router would have caught it. The
+fix allocates an ephemeral port, reads back what the OS assigned, releases
+it, and uses that -- never a bad-port number, and never a port something
+might be listening on.
+
+**The surviving nit is a race and is left.** Between releasing the
+allocated port and the routers connecting, another process could bind it;
+both routers would then agree about whatever they found. The window is
+microseconds against an ephemeral range, the failure is loud (a 200 where a
+refusal was expected, in a control that diffs bytes), and the alternative
+is retry machinery in a corpus builder. Recorded, not fixed.
+
+**One measurement gap, stated rather than estimated.** The advisory pass
+that shaped D187 -- `gpt-5-6-sol` and `gemini-3-1-pro`, per the operator's
+standing directive -- left no row in `router-metrics.jsonl` under session
+29; the only rows dated 2026-08-29 are the two verification calls above. So
+this session's advisory cost is unpriced, and the total above is the
+verification cost alone. Every prior seat-cost decision in this port
+measured the same thing, so the series stays comparable; what it has never
+covered is the consult that precedes a ruling.

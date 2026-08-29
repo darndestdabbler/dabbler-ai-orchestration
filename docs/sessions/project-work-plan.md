@@ -64,13 +64,14 @@ it.
 | 26 | The record — journal, ledger, writers | no | 2026-08-28 |
 | 27 | Evidence, checks, test evidence, affected | no | 2026-08-28 |
 | 28 | Transports I — API, offline, routing, selection, discovery | no | 2026-08-28 |
-| 29 | Transport II — the Copilot CLI state machine and seat cost | — | not declared |
-| 30 | The session lifecycle | — | not declared |
-| 31 | Verification support — agency, verifyjob, the approved plan | — | not declared |
-| 32 | The verification loop | — | not declared |
-| 33 | Bootstrap, packaging, and the `dabbler` command on the PATH | — | not declared |
-| 34 | The six-step workflow ported, the run core retired | — | not declared |
-| 35 | Cutover — the extension calls in-process, and Python leaves | — | not declared |
+| 29 | One vocabulary for a failure, one stamp for a measurement | no | 2026-08-29 |
+| 30 | Transport II — the Copilot CLI state machine and seat cost | — | not declared |
+| 31 | The session lifecycle | — | not declared |
+| 32 | Verification support — agency, verifyjob, the approved plan | — | not declared |
+| 33 | The verification loop | — | not declared |
+| 34 | Bootstrap, packaging, and the `dabbler` command on the PATH | — | not declared |
+| 35 | The six-step workflow ported, the run core retired | — | not declared |
+| 36 | Cutover — the extension calls in-process, and Python leaves | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -819,3 +820,38 @@ tests. Behaviour is not redesigned; Python decides and the port agrees.
 
 Not releasable: this session publishes nothing. Session 35 is the only
 releasable session of the port.
+
+### Session 29 — One vocabulary for a failure, one stamp for a measurement
+
+**Releasable: no.**
+
+Session 29 of 36 — One vocabulary for a failure, one stamp for a measurement.
+
+Discharge the two rulings the port left open. Both are the same shape: the
+two routers write a different string into a record for the same event,
+because the string is the name of whichever library did the work.
+
+1. Register; declare --not-releasable.
+2. Land both changes in Python FIRST, in their own commit:
+   - `discovery` maps a failed vendor enumeration onto a shared vocabulary
+     (`timeout`, `network-error`, `http-error`, `parse-error`,
+     `unknown-error`) joining the three terms the field already carries.
+     Closed allow-list; the library's own class name is written nowhere.
+   - `evidence.run_absence_search` stamps one framework-owned token instead
+     of the regex engine and its version.
+3. Update the Python tests and run them.
+4. Mirror both in the TypeScript router and its vitest tests.
+5. Prove the vocabulary in the parity control: a case that reaches a real
+   transport failure with no network, or the vocabulary is asserted rather
+   than checked.
+6. Measure this session's seat cost and record it.
+7. Affected tests as preverify.
+8. Cross-provider verification.
+9. Full test suite, recorded as the final-full run of record.
+10. Close-out.
+
+This session also carries the plan renumber that inserted it: the port's
+remaining sessions moved up by one (Transport II is now 30, the cutover 36).
+Live guidance was updated; the append-only decisions log was not.
+
+Not releasable: this session publishes nothing.

@@ -182,6 +182,29 @@ not a function of the repository.
 > its own: without it a parity run on the operator's own machine would spend
 > three vendor calls per shape, every run.
 >
+> **Amended in session 29: one vendor keeps a fake key and a closed-port
+> URL, so the case reaches a real transport failure.** With every key
+> scrubbed all three vendors fail at `no-api-key`, which is a constant both
+> routers already agreed on — so the shared failure vocabulary session 29
+> introduced would have been asserted rather than checked. The corpus now
+> gives openai a value that is not a key and points it at a closed loopback
+> port. Nothing is sent: the connection is refused before a request is
+> written. Both routers must then classify a refused connection into the
+> same word (`network-error`) while the other two still write `no-api-key` —
+> one case covering both halves of the field.
+>
+> **The port is allocated and released, not chosen, and round 1 of that
+> session's verification is why.** The first attempt hard-coded
+> `127.0.0.1:1`, and the case went green while comparing two different
+> events: port 1 is on the WHATWG bad-port list, so Node rejected it with
+> `Error: bad port` *before opening a socket* — no syscall, no connection —
+> while httpx dialled it and was refused. A control that agrees for
+> different reasons is worse than no control, because it reads as proof.
+> The corpus now binds port 0, reads what the OS assigned and releases it,
+> which is both certainly closed and certainly not on that list; the
+> router's own tests assert the `ECONNREFUSED` in the failure chain before
+> asserting the term, so the substitution cannot happen again unnoticed.
+>
 > Four cases, all on `fresh`: `status`, `drift`, `enumerate --dry-run` and
 > `enumerate`. The seat catalog is **read** by the first three — it resolves
 > relative to the config that names it, so both routers read the same real

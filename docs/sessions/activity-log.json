@@ -6321,6 +6321,88 @@
       "dateTime": "2026-08-29T03:47:00.979978-04:00",
       "description": "Registered session 29 (claude-code).",
       "status": "complete"
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 29,
+      "dateTime": "2026-08-29T03:47:40.064866-04:00",
+      "task": "Session 29 of 36 \u2014 One vocabulary for a failure, one stamp for a measurement.\n\nDischarge the two rulings the port left open. Both are the same shape: the\ntwo routers write a different string into a record for the same event,\nbecause the string is the name of whichever library did the work.\n\n1. Register; declare --not-releasable.\n2. Land both changes in Python FIRST, in their own commit:\n   - `discovery` maps a failed vendor enumeration onto a shared vocabulary\n     (`timeout`, `network-error`, `http-error`, `parse-error`,\n     `unknown-error`) joining the three terms the field already carries.\n     Closed allow-list; the library's own class name is written nowhere.\n   - `evidence.run_absence_search` stamps one framework-owned token instead\n     of the regex engine and its version.\n3. Update the Python tests and run them.\n4. Mirror both in the TypeScript router and its vitest tests.\n5. Prove the vocabulary in the parity control: a case that reaches a real\n   transport failure with no network, or the vocabulary is asserted rather\n   than checked.\n6. Measure this session's seat cost and record it.\n7. Affected tests as preverify.\n8. Cross-provider verification.\n9. Full test suite, recorded as the final-full run of record.\n10. Close-out.\n\nThis session also carries the plan renumber that inserted it: the port's\nremaining sessions moved up by one (Transport II is now 30, the cutover 36).\nLive guidance was updated; the append-only decisions log was not.\n\nNot releasable: this session publishes nothing.",
+      "releasable": false
+    },
+    {
+      "sessionNumber": 29,
+      "stepNumber": 2,
+      "stepKey": "land-both-changes-in-python-first",
+      "dateTime": "2026-08-29T03:50:09.186314-04:00",
+      "description": "discovery gains a closed 8-term vocabulary and classify_enumeration_error, matching httpx's own bases so a later leaf class keeps working; the library's class name is written nowhere. evidence stamps ABSENCE_TOOL instead of python-re/<version>, which also ends a value that moved on every interpreter patch bump.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 29,
+      "stepNumber": 3,
+      "stepKey": "update-the-python-tests-and-run",
+      "dateTime": "2026-08-29T04:01:07.156538-04:00",
+      "description": "test_discovery's error test became a table over six failure shapes asserting the vocabulary term and that the message never appears; test_critique_contracts asserts evidence.ABSENCE_TOOL. 25 passed.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 29,
+      "stepNumber": 4,
+      "stepKey": "mirror-both-in-the-typescript-router",
+      "dateTime": "2026-08-29T04:01:07.589805-04:00",
+      "description": "classifyEnumerationError mirrors the Python mapping, unwrapping the cause chain because Node reports a refused connection as a TypeError whose cause carries the syscall code. ABSENCE_TOOL replaces node-regexp/<node>. 21 discovery tests including one against a real closed port; 390 vitest green.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 29,
+      "stepNumber": 5,
+      "stepKey": "prove-the-vocabulary-in-the-parity",
+      "dateTime": "2026-08-29T04:01:08.118889-04:00",
+      "description": "The corpus gives openai a fake key and a 127.0.0.1:1 base_url, so the enumerate case now covers both halves of the field: two vendors refused for want of a credential, one classified from a refused connection. Both routers write network-error. 16 cases over 85 paths, green.",
+      "status": "complete"
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D187",
+      "ordinal": 187,
+      "sessionNumber": 29,
+      "decidedOn": "2026-08-29",
+      "recordedAt": "2026-08-29T04:01:58.960158-04:00",
+      "decider": "operator",
+      "headline": "One vocabulary for a failed enumeration, one stamp for a measurement: D173 and D185 are closed",
+      "body": "**The operator's ruling, and it closes D173 and D185.** Both were the same\ncomplaint: the two routers write a different string into a record for the\nsame event, because the string is the name of whichever library did the\nwork. Both are now framework-owned vocabulary.\n\nRouted to `gpt-5-6-sol` and `gemini-3-1-pro` first, per the operator's\nstanding directive, and both were useful. **Neither was reliable on fact** \u2014\nGemini said the committed lock files would need regenerating (the file is\ngitignored here and does not exist), and Sol said the control needs a fixed\nclock because `last_error_at` cannot match (normalization 1 has replaced\nevery timestamp since session 23). Both claims were checked and dropped.\nWhat they caught that the plan did not: **nothing was proving the\nvocabulary**, because the corpus scrubs the keys and every vendor fails as\nthe shared `no-api-key` constant.\n\n## The failure vocabulary\n\nFive new terms join the three the field already carried:\n\n| Term | What it means, and what a reader does about it |\n| --- | --- |\n| `timeout` | outlived the configured ceiling \u2014 raise it, or expect slower |\n| `network-error` | never reached \u2014 DNS, refused, TLS, no route |\n| `http-error` | the vendor answered, 4xx or 5xx |\n| `parse-error` | the answer was not JSON this framework could read |\n| `unknown-error` | nothing above; the closed list's catch-all |\n\n**Timeout and unreachable stay apart**, against Sol's advice to merge them\ninto one transport term: the remedies differ, and a field whose whole job is\nto tell a reader why the entries are stale should not collapse \"your ceiling\nis too low\" into \"your URL is wrong\". Gemini's split was the better call.\n\n**The list is closed.** An unmapped failure becomes `unknown-error` rather\nthan contributing its class name \u2014 both advisors agreed, and the reason is\ndecisive: an open mapping breaks the byte comparison the first time either\nlibrary raises something unanticipated, silently, in a committed file, on\nwhichever machine hit it first.\n\n**The original class name is written nowhere.** A second recorded field\nwould recreate the problem, and excluding that field from comparison would\nput a value in the record that nothing checks.\n\nThe mapping reads each library's own bases rather than a list of leaf\nclasses \u2014 `httpx.TimeoutException` / `HTTPStatusError` / `TransportError` on\none side, and on the other the two classes `transports/api` raises plus an\nunwrap of Node's `cause` chain, because Node reports a refused connection as\na `TypeError` whose cause carries `ECONNREFUSED`. A new leaf class in either\nlibrary keeps working.\n\n## The measurement stamp\n\n`run_absence_search` re-runs a reviewer's declared search and stamps what\nproduced the count. It stamped the regex engine; it now stamps\n`dabbler-absence-search/1` in both routers.\n\nGemini argued the field should be **deleted**, on the grounds that if the\nengines genuinely differ the COUNT differs and the comparison fails on the\ncount, so the stamp never saves anyone. That is right about engine\ncomparison and wrong about the field's job, which the code says plainly: a\nworker can claim it searched and report a number, and this function\noverwrites the claim with its own answer. The stamp is what says the\nframework measured this. A framework-owned constant does that job; naming an\nengine never did.\n\nIt also ends an instability nobody had noticed: the Python value embedded\nthe interpreter's PATCH version, so it moved on a `3.11.9` \u2192 `3.11.10`\nupgrade, inside one router, with no engine change at all.\n\nSol's alternative \u2014 make Node's engine canonical and have Python delegate to\nit \u2014 is rejected: it would make the Python router depend on Node for the\nremaining sessions of a port whose whole point is to remove one of them.\n\n## What proves it\n\nThe parity control's `enumerate` case now covers both halves of the field.\nThe corpus gives one vendor a value that is not a key and points it at\n`127.0.0.1:1`, which refuses immediately \u2014 nothing is sent, because the\nconnection is refused before a request is written. Two vendors then write\n`no-api-key` and one writes `network-error`, and both routers must agree on\nevery word. Measured: the two records differ only in their timestamps and\nthe digest over them, which is exactly what the control already normalises."
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D188",
+      "ordinal": 188,
+      "sessionNumber": 29,
+      "decidedOn": "2026-08-29",
+      "recordedAt": "2026-08-29T04:01:59.567750-04:00",
+      "decider": "operator",
+      "headline": "Session 29 is inserted; the port's remaining sessions move up one and the record keeps the old numbers",
+      "body": "The operator asked for the vocabulary work as a short session between 28 and\n29. The lifecycle refuses an out-of-order number \u2014 `start` derives the next\nsession from the completed ones and says so \u2014 so inserting one means\nrenumbering. Transport II is now **30**, the cutover **36**, and the plan\nruns to 36 sessions.\n\n**What moved, and what deliberately did not.**\n\nLive guidance follows the new numbers, because it tells a reader what to do\nnext and a wrong number there sends them to the wrong session:\n`portedInSession` in the verb contract, the refusal messages that name the\nsession a caller should wait for, the module headers, and the parity\ncontrol's verb table \u2014 38 lines across 15 files.\n\n**`docs/sessions/decisions-log.md` and `STATUS.md` are not touched.** They\ncarry 49 statements naming sessions 29\u201335, and they are the record. Those\nstatements were true when written; rewriting an append-only log to agree\nwith a later plan is the one thing that log exists to prevent, and the repo\nalready has the pattern for this \u2014 D129 sized session 26 at three modules,\nit became nine, and D171 recorded the change rather than editing D129.\n\nSo a reader who finds \"ported in session 29\" in a decision from session 27\nshould read it as the plan of that date. Session 29's own plan entry says\nthis, and the ledger's dates carry the true order.\n\n**What it cost to find out.** The renumber was done before the session was\nregistered, which meant `declare` refused it \u2014 the working tree already\ncarried 15 changes, and a declaration made after the work is a model\ndeciding in hindsight what it may publish. The gate was right; the renumber\nwent in as its own commit first, and the declaration then preceded the\nactual work. Worth knowing for the next insertion: **register, declare, then\nrenumber**, or renumber and commit before registering.\n\n**The cheaper alternative was offered and declined**, and it is worth\nrecording why the operator's choice is the better one anyway: riding as\nsession 30's first commits would have cost no renumber, but it would have\nput a cross-cutting record change inside the session that ports the Copilot\nCLI state machine \u2014 the most OS-bound session of the port \u2014 and made one\nverification round answer for both."
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D189",
+      "ordinal": 189,
+      "sessionNumber": 29,
+      "decidedOn": "2026-08-29",
+      "recordedAt": "2026-08-29T04:25:32.220427-04:00",
+      "decider": "orchestrator",
+      "headline": "Session 29 seat cost: 18,839 in / 6,570 out over two rounds, the cheapest session of the port, and a Major that caught a green control proving nothing",
+      "body": "Two rounds to `gpt-5-6-sol` over the API: **18,839 input / 6,570 output\ntokens** in 100.6 s of model time.\n\n| Round | In | Out | Elapsed | Verdict |\n| --- | ---: | ---: | ---: | --- |\n| 1 | 12,173 | 3,645 | 52.8 s | ISSUES_FOUND, 1 Major |\n| 2 | 6,666 | 2,925 | 47.8 s | VERIFIED, 3 nits |\n\nNo Copilot seat was used. One Claude Code context on the subscription\nwindow.\n\n**The cheapest session of the port by a factor of two.** The running total\nacross its seven sessions is 537,282 verifier tokens: 23 (136,020), 24\n(61,855), 25 (67,234), 26 (77,596), 27 (98,277), 28 (70,891), 29 (25,409).\nThe next cheapest is session 24 at 61,855. The reason is not a better\nprocess -- it is that this session changed roughly 200 lines of source\nacross two modules instead of porting 2,276, and the round-1 prompt is\nsized by the diff.\n\n**Round 2 is 55% of round 1's input**, against 18% at session 28, 8% at 27\nand 26% at 26 -- the highest ratio the port has recorded, and it does not\nmean the fix-delta review stopped working. The ratio is a fraction of a\nsmall denominator: a full review of a 200-line diff and a delta review of a\n70-line fix are nearly the same size. Read the absolute number instead. On\nthat reading round 2 cost 6,666 tokens, the smallest verification round of\nthe port.\n\n**The Major was worth the whole session's verifier budget.** The parity\ncase that proves the new vocabulary pointed at `http://127.0.0.1:1`, and\nport 1 is on the WHATWG bad-port list: Node's `fetch` rejects it with\n`bad port` before opening a socket, while Python connected and was refused.\nSo the case compared a refused connection against a rejected URL, and went\ngreen -- the TypeScript classifier reached `network-error` through its\n`fetch failed` fallback rather than through a real transport failure. A\ngreen control proving nothing is the exact failure this port's control\nexists to prevent, and no test in either router would have caught it. The\nfix allocates an ephemeral port, reads back what the OS assigned, releases\nit, and uses that -- never a bad-port number, and never a port something\nmight be listening on.\n\n**The surviving nit is a race and is left.** Between releasing the\nallocated port and the routers connecting, another process could bind it;\nboth routers would then agree about whatever they found. The window is\nmicroseconds against an ephemeral range, the failure is loud (a 200 where a\nrefusal was expected, in a control that diffs bytes), and the alternative\nis retry machinery in a corpus builder. Recorded, not fixed.\n\n**One measurement gap, stated rather than estimated.** The advisory pass\nthat shaped D187 -- `gpt-5-6-sol` and `gemini-3-1-pro`, per the operator's\nstanding directive -- left no row in `router-metrics.jsonl` under session\n29; the only rows dated 2026-08-29 are the two verification calls above. So\nthis session's advisory cost is unpriced, and the total above is the\nverification cost alone. Every prior seat-cost decision in this port\nmeasured the same thing, so the series stays comparable; what it has never\ncovered is the consult that precedes a ruling.",
+      "model": "claude-opus-5",
+      "provider": "anthropic"
+    },
+    {
+      "sessionNumber": 29,
+      "stepNumber": 6,
+      "stepKey": "measure-this-session-s-seat-cost",
+      "dateTime": "2026-08-29T04:25:44.524981-04:00",
+      "description": "Session 29 verification cost 18,839 in / 6,570 out to gpt-5-6-sol over two rounds (100.6 s) -- the cheapest session of the port, a third of the next cheapest. Recorded as D189, together with the round-1 Major (port 1 is a WHATWG bad port, so the parity case was green while comparing a refused connection against a rejected URL) and the one measurement the series has never covered: the advisory consult that precedes a ruling leaves no metrics row.",
+      "status": "complete"
     }
   ]
 }

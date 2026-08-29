@@ -337,17 +337,21 @@ export const CASES: readonly ParityCase[] = [
     verb: "discovery",
     label: "discovery enumerate",
     // The only compared verb that WRITES a lock file, and the reason the
-    // corpus scrubs the provider keys: with none set, all three vendors
-    // fail as `no-api-key` before a socket opens, so what is compared is
-    // the record both routers fold that identical failure into.
+    // corpus scrubs the provider keys: with none set, a vendor fails as
+    // `no-api-key` before a socket opens. One vendor keeps a fake key and
+    // a closed-port URL, so the same case also reaches a REAL transport
+    // failure and both routers have to classify it into the same word.
     shapes: ["fresh"],
     pythonArgs: () => ["ai_router.discovery", "enumerate"],
     dabblerArgs: () => ["discovery", "enumerate"],
     proves:
-      "the record write: the merge that annotates a failed vendor instead of " +
-      "emptying it, a vendor gaining a status row it did not have, the " +
-      "providers sorted by name, unknown written by omission, the writer " +
-      "stamp, and the per-vendor lines the command prints",
+      "the record write, and the shared failure vocabulary underneath it: " +
+      "two vendors refused for want of a credential and one classified from " +
+      "a refused connection, where each router's own HTTP library raises a " +
+      "different class for the same event; plus the merge that annotates a " +
+      "failed vendor instead of emptying it, a vendor gaining a status row " +
+      "it did not have, the providers sorted by name, unknown written by " +
+      "omission, the writer stamp, and the per-vendor lines the command prints",
   },
 ];
 

@@ -58,9 +58,27 @@ const SCRUBBED_ENV = [
   "DABBLER_GEMINI_API_KEY",
 ];
 
+/**
+ * One vendor keeps a credential, and it is a fake one.
+ *
+ * With every key scrubbed, all three vendors fail at `no-api-key` before a
+ * socket opens -- which is what makes `enumerate` comparable at all, but it
+ * also means the shared failure vocabulary is never exercised, because
+ * `no-api-key` is a constant both routers already agreed on. So openai gets
+ * a value that is not a key, and the overlay points it at a closed port on
+ * the loopback. Nothing is ever sent: the connection is refused before a
+ * request is written.
+ *
+ * The result is one case covering both halves of the field -- two vendors
+ * refused for want of a credential, one classified from a real transport
+ * failure -- and both routers must write the same word for each.
+ */
+const DEAD_ENDPOINT_KEY = "DABBLER_OPENAI_API_KEY";
+
 function childEnvironment(): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = { ...process.env, ...PINNED_ENV };
   for (const name of SCRUBBED_ENV) delete env[name];
+  env[DEAD_ENDPOINT_KEY] = "not-a-key-the-endpoint-is-closed";
   return env;
 }
 
@@ -252,6 +270,51 @@ model_count = 0
 /** Past any age the fixed dates above can reach; see `API_RECORD`. */
 const NEVER_STALE_HOURS = "100000000.0";
 
+/**
+ * A loopback endpoint nothing listens on, so a connection is REFUSED rather
+ * than hung -- and refused the same way in both routers.
+ *
+ * The port is allocated and released rather than picked: a hard-coded one
+ * proves nothing if something happens to be listening on it, and the failure
+ * would be silent, because the two routers would agree about whatever they
+ * both found there.
+ *
+ * It must also not be a port `fetch` refuses on sight. The WHATWG bad-port
+ * list covers 1, 7, 9, 21, 22, 25, 53, 110, 143, 993 and about eighty more,
+ * and Node rejects those with `Error: bad port` BEFORE opening a socket --
+ * no `ECONNREFUSED`, no connection, nothing for httpx's failure to be
+ * compared against. Port 1 was used here first and did exactly that: Python
+ * connected and was refused while Node never left the process, so the case
+ * compared two different events and still went green. An allocated
+ * ephemeral port is never on that list.
+ */
+let deadEndpointUrl: string | null = null;
+
+function deadEndpoint(): string {
+  if (deadEndpointUrl !== null) return deadEndpointUrl;
+  // Sync, because every builder below it is. The child binds port 0, reads
+  // back what the OS assigned, releases it and prints it.
+  const probe = spawnSync(
+    process.execPath,
+    [
+      "-e",
+      "const s=require('node:net').createServer();" +
+        "s.listen(0,'127.0.0.1',()=>{const p=s.address().port;" +
+        "s.close(()=>process.stdout.write(String(p)))});",
+    ],
+    { encoding: "utf8" },
+  );
+  const port = Number(String(probe.stdout).trim());
+  if (!Number.isInteger(port) || port <= 0) {
+    throw new CorpusError(
+      "could not allocate a closed loopback port for the corpus, so the " +
+        "failure-vocabulary case would prove nothing",
+    );
+  }
+  deadEndpointUrl = `http://127.0.0.1:${port}/v1`;
+  return deadEndpointUrl;
+}
+
 const SEED: Record<string, string> = {
   [API_RECORD_PATH]: API_RECORD,
   "docs/sessions/session-plan.md": SESSION_PLAN,
@@ -289,7 +352,12 @@ function localOverrides(repo: string): string {
   return (
     `metrics:\n  log_filename: "${fixture}"\n` +
     `discovery:\n  max_age_hours: ${NEVER_STALE_HOURS}\n` +
-    `  seat_max_age_hours: ${NEVER_STALE_HOURS}\n`
+    `  seat_max_age_hours: ${NEVER_STALE_HOURS}\n` +
+    // A closed loopback port refuses immediately, so `enumerate` reaches a
+    // REAL transport failure without reaching a network. Both routers have
+    // to call it the same thing, which is the only way the shared failure
+    // vocabulary is checked rather than asserted.
+    `providers:\n  openai:\n    base_url: "${deadEndpoint()}"\n`
   );
 }
 

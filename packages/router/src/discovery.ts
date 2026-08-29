@@ -54,7 +54,11 @@ import {
   writerId,
   type LockTable,
 } from "./lockfile.ts";
-import { httpGetJson } from "./transports/api.ts";
+import {
+  HttpStatusError,
+  HttpTimeoutError,
+  httpGetJson,
+} from "./transports/api.ts";
 import { resolveSecret } from "./secretResolver.ts";
 import { confirmedModels, loadCatalog, resolveLockfilePath } from "./transports/copilot.ts";
 
@@ -81,9 +85,54 @@ export const DEFAULT_SEAT_MAX_AGE_HOURS = 720.0;
 export const RECORD_API = "api-enumeration";
 export const RECORD_SEAT = "seat-catalog";
 
+// --- What a failed enumeration is called -------------------------------------
+//
+// One vocabulary, written by both routers. The name of the exception is the
+// name of whichever HTTP library raised it -- `httpx` on the Python side,
+// `fetch` here -- so recording it directly put a different word in the same
+// record for the same event, on a field whose whole job is to say what
+// happened. These terms belong to the framework instead, and the mapping
+// below is the one place this router decides which term applies.
+//
+// The list is CLOSED. A failure nothing maps becomes `unknown-error` rather
+// than contributing its class name, because an open mapping breaks the
+// moment a library throws something neither side anticipated -- and it
+// breaks in a committed file, silently, on whichever machine hit it first.
+
 export const ERROR_NO_API_KEY = "no-api-key";
 export const ERROR_PROVIDER_DISABLED = "provider-disabled";
 export const ERROR_PROVIDER_UNSUPPORTED = "no-enumeration-adapter";
+
+/**
+ * The request outlived the ceiling the provider block configured. The remedy
+ * is a bigger ceiling or a slower expectation.
+ */
+export const ERROR_TIMEOUT = "timeout";
+/**
+ * The endpoint was never reached: DNS, refused, TLS, no route. Kept apart
+ * from a timeout because the remedy is different -- a URL, a proxy, a
+ * firewall -- and folding the two together would make the field say less
+ * than the reader needs to act.
+ */
+export const ERROR_NETWORK = "network-error";
+/** The vendor answered, with a 4xx or 5xx. */
+export const ERROR_HTTP_STATUS = "http-error";
+/** The vendor answered with something this router could not read as JSON. */
+export const ERROR_PARSE = "parse-error";
+/** Anything the mapping does not name. */
+export const ERROR_UNKNOWN = "unknown-error";
+
+/** Every value `last_error` may hold, for a reader and for a test. */
+export const ENUMERATION_ERRORS: readonly string[] = [
+  ERROR_NO_API_KEY,
+  ERROR_PROVIDER_DISABLED,
+  ERROR_PROVIDER_UNSUPPORTED,
+  ERROR_TIMEOUT,
+  ERROR_NETWORK,
+  ERROR_HTTP_STATUS,
+  ERROR_PARSE,
+  ERROR_UNKNOWN,
+];
 
 // A vendor that paginated forever would turn a free metadata call into an
 // unbounded loop; every endpoint here returns its whole catalog well inside
@@ -576,6 +625,53 @@ const ADAPTERS: Readonly<Record<string, Adapter>> = {
 };
 
 /**
+ * Which vocabulary term an enumeration failure is recorded under.
+ *
+ * Read on the failure's SHAPE and never on its message: a vendor error body
+ * can echo the request headers back, and the result is written to a
+ * committed record.
+ *
+ * The two classes `transports/api` raises deliberately carry the two
+ * distinctions the field needs, so they are matched first. Below them Node
+ * reports transport failures as a `TypeError` whose `cause` holds the real
+ * syscall error -- `ECONNREFUSED`, `ENOTFOUND`, `UNABLE_TO_VERIFY_LEAF_SIGNATURE`
+ * -- which is why the cause is unwrapped rather than the outer class trusted.
+ * Everything else falls to `unknown-error` by design: a bucket that guessed
+ * would be a committed record making up what happened.
+ */
+export function classifyEnumerationError(error: unknown): string {
+  if (error instanceof HttpTimeoutError) return ERROR_TIMEOUT;
+  if (error instanceof HttpStatusError) return ERROR_HTTP_STATUS;
+  // `AbortSignal.timeout` fires a `TimeoutError` that never reached the
+  // wrapper -- a caller may pass its own signal.
+  if (error instanceof Error && error.name === "TimeoutError") return ERROR_TIMEOUT;
+  // A body that could not be read as JSON. `Response.json()` rejects with a
+  // SyntaxError, and a mis-encoded body with a TypeError from the decoder.
+  if (error instanceof SyntaxError) return ERROR_PARSE;
+  if (error instanceof Error && isNetworkFailure(error)) return ERROR_NETWORK;
+  return ERROR_UNKNOWN;
+}
+
+/**
+ * A `fetch` rejection that never got an answer.
+ *
+ * Node wraps the syscall failure in a `TypeError` with `cause` set, so the
+ * chain is walked for a `code`. The message is a last resort and is matched
+ * only against the one phrase Node uses for this, never against a vendor's
+ * text -- nothing a vendor sends reaches here.
+ */
+function isNetworkFailure(error: Error): boolean {
+  let current: unknown = error;
+  for (let depth = 0; depth < 4 && current instanceof Error; depth += 1) {
+    const code = (current as NodeJS.ErrnoException).code;
+    if (typeof code === "string" && code !== "") return true;
+    current = (current as { cause?: unknown }).cause;
+  }
+  return error.message.toLowerCase().includes("fetch failed");
+}
+
+
+/**
  * Read one vendor's models endpoint. Never throws for an operational failure
  * -- the failure is the result, and the merge decides what it does to the
  * record.
@@ -604,22 +700,7 @@ export async function enumerateProvider(
     );
     return { provider: name, entries, error: null };
   } catch (error) {
-    // The class name and never the message: a vendor error body can echo
-    // request headers, and this string is written to a committed record.
-    //
-    // The NAME differs across the two routers for the same failure -- a
-    // timeout is `TimeoutException` under httpx and `HttpTimeoutError`
-    // here, because it is the failing library's own class name and the
-    // libraries are different. That is content rather than formatting, so
-    // it is not settled in Python's favour the way every byte difference
-    // before it was (D165); the same open question `run_absence_search`'s
-    // engine stamp raises (D173). Nothing reaches it in the parity control,
-    // which sees only the `no-api-key` constant.
-    return {
-      provider: name,
-      entries: [],
-      error: error instanceof Error ? error.constructor.name : "Error",
-    };
+    return { provider: name, entries: [], error: classifyEnumerationError(error) };
   }
 }
 

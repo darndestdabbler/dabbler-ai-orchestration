@@ -17,6 +17,7 @@ import { afterAll, describe, expect, it } from "vitest";
 import {
   EvidenceError,
   ROUND_PUSH_BRANCH_REFSPEC,
+  ABSENCE_TOOL,
   ROUND_REFSPEC,
   authoritativeTier,
   changedPathsBetween,
@@ -328,7 +329,10 @@ describe("re-running a declared absence search", () => {
       matches: 3,
     });
     expect(row.matches).toBe(3);
-    expect(row.tool_version).toContain("node");
+    // The framework, not the engine: the stamp exists to overwrite what
+    // the reviewer claimed, and naming an engine made the two routers
+    // disagree on a row they must write identically.
+    expect(row.tool_version).toBe(ABSENCE_TOOL);
   });
 
   it("refuses a declaration whose count disagrees with the re-run", () => {

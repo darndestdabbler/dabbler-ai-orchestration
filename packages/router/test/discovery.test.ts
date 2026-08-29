@@ -1,11 +1,19 @@
 import { readFileSync, writeFileSync } from "node:fs";
+import { createServer } from "node:net";
+import type { AddressInfo } from "node:net";
 import { join } from "node:path";
 
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
   ENUMERATE_COMMAND,
+  ENUMERATION_ERRORS,
+  ERROR_HTTP_STATUS,
+  ERROR_NETWORK,
   ERROR_NO_API_KEY,
+  ERROR_PARSE,
+  ERROR_TIMEOUT,
+  ERROR_UNKNOWN,
   RECORD_API,
   RECORD_SEAT,
   checkFreshness,
@@ -25,6 +33,7 @@ import {
   type ModelRecord,
   type ProviderResult,
 } from "../src/discovery.ts";
+import { HttpStatusError, HttpTimeoutError } from "../src/transports/api.ts";
 import { PROVENANCE_HAND_EDITED } from "../src/lockfile.ts";
 import { clearProviderKeys, makeTempDir, removeTempDirs } from "./support/fixtures.ts";
 
@@ -95,6 +104,27 @@ function providerConfig(
     },
     ...overrides,
   };
+}
+
+/** A loopback port the OS has just released, so a connect is refused. */
+async function closedLoopbackPort(): Promise<number> {
+  const server = createServer();
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const port = (server.address() as AddressInfo).port;
+  await new Promise<void>((resolve) => server.close(() => resolve()));
+  return port;
+}
+
+/** Every `code` down an error's `cause` chain. */
+function codesInChain(error: unknown): string[] {
+  const codes: string[] = [];
+  let current: unknown = error;
+  for (let depth = 0; depth < 4 && current instanceof Error; depth += 1) {
+    const code = (current as NodeJS.ErrnoException).code;
+    if (typeof code === "string" && code !== "") codes.push(code);
+    current = (current as { cause?: unknown }).cause;
+  }
+  return codes;
 }
 
 /** A models endpoint that answers from a script and remembers the calls. */
@@ -184,15 +214,74 @@ describe("reading a vendor's models endpoint", () => {
     expect(recorder.calls[0]!.url).toBe("https://api.openai.com/v1/models");
   });
 
-  it("records a vendor error's class and never its message", async () => {
-    // The string is written to a committed record, and a vendor error body
-    // can echo the request headers back.
+  it("records a vendor failure in the shared vocabulary", async () => {
+    // Never the message: a vendor error body can echo the request headers
+    // back, and the string is written to a committed record. Never the
+    // failure's own class either: that names whichever HTTP library threw
+    // it, and the Python router raises a different one for the same event,
+    // on a field both must write identically.
     process.env["TEST_OPENAI_KEY"] = "k";
-    const explode: HttpGet = (url, headers) => {
-      throw new TypeError(`failed calling ${url} with ${JSON.stringify(headers)}`);
-    };
-    const result = await enumerateProvider(providerConfig(), "openai", explode);
-    expect(result.error).toBe("TypeError");
+    const refused = Object.assign(new TypeError("fetch failed"), {
+      cause: Object.assign(new Error("connect ECONNREFUSED"), {
+        code: "ECONNREFUSED",
+      }),
+    });
+    const cases: Array<readonly [unknown, string]> = [
+      [new HttpTimeoutError("timed out after 30s"), ERROR_TIMEOUT],
+      [Object.assign(new Error("aborted"), { name: "TimeoutError" }), ERROR_TIMEOUT],
+      [new HttpStatusError("HTTP 500 for url 'x'"), ERROR_HTTP_STATUS],
+      [refused, ERROR_NETWORK],
+      [new SyntaxError("Unexpected token < in JSON"), ERROR_PARSE],
+      [new RangeError("something new"), ERROR_UNKNOWN],
+    ];
+    for (const [thrown, expected] of cases) {
+      const explode: HttpGet = () => {
+        throw thrown;
+      };
+      const result = await enumerateProvider(providerConfig(), "openai", explode);
+      expect(result.error, String(thrown)).toBe(expected);
+      expect(ENUMERATION_ERRORS).toContain(result.error);
+    }
+  });
+
+  it("calls a refused connection a network error, on the real fetch", async () => {
+    // The classifier reads what Node actually throws, so a hand-built error
+    // is not proof. The port is allocated and released rather than picked:
+    // a hard-coded one proves nothing if something is listening on it.
+    //
+    // It must also not be a port `fetch` refuses on sight -- 1, 7, 9, 21,
+    // 25, 53 and eighty more are on the WHATWG bad-port list, and Node
+    // rejects those with `Error: bad port` before opening a socket. That is
+    // NOT the event this asserts, and it once passed here while proving
+    // nothing: the parity case compared Python's real ECONNREFUSED against
+    // Node never leaving the process. So the syscall code is asserted
+    // first, and the vocabulary term second.
+    process.env["TEST_OPENAI_KEY"] = "k";
+    const port = await closedLoopbackPort();
+
+    const raw = await fetch(`http://127.0.0.1:${port}/v1/models`).then(
+      () => null,
+      (error: unknown) => error,
+    );
+    expect(codesInChain(raw)).toContain("ECONNREFUSED");
+
+    const config = providerConfig();
+    const providers = config["providers"] as Record<string, Record<string, unknown>>;
+    (providers["openai"] as Record<string, unknown>)["base_url"] =
+      `http://127.0.0.1:${port}/v1`;
+    const result = await enumerateProvider(config, "openai");
+    expect(result.error).toBe(ERROR_NETWORK);
+  });
+
+  it("does not mistake fetch's own bad-port refusal for a refused connection", async () => {
+    // The other half of the same lesson: a port fetch will not dial reaches
+    // no network at all, and nothing in the chain carries a syscall code.
+    const raw = await fetch("http://127.0.0.1:1/v1/models").then(
+      () => null,
+      (error: unknown) => error,
+    );
+    expect(codesInChain(raw)).toEqual([]);
+    expect(String((raw as Error).cause)).toContain("bad port");
   });
 });
 

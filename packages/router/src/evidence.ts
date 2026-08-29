@@ -822,18 +822,23 @@ export function verifyQuote(
 export const ABSENCE_QUERY_KINDS: readonly string[] = ["literal", "regex"];
 
 /**
- * The regex engine this router searches with, named in every absence row.
+ * What produced an absence count, written onto every measured row.
  *
- * Python stamps `python-re/<version>` here. The port does NOT copy that
- * string: the field exists to say which engine produced the count, and a
- * Node process claiming CPython's `re` would be a false provenance stamp on
- * the one row whose whole purpose is provenance. The engines genuinely
- * differ -- a query valid in one may be invalid, or mean something else, in
- * the other -- so this is a fact about the run rather than a formatting
- * choice to be settled in Python's favour. Owed to the session that first
- * compares a critique write; nothing reaches it today.
+ * The field's job is not to name a regex engine but to overwrite whatever
+ * the reviewer claimed: a worker can say it searched and report a number,
+ * and this function re-runs the search and stamps its own answer. Any
+ * framework-owned constant does that, and a constant is what this is.
+ *
+ * Both routers used to name their own engine -- `python-re/<version>` there,
+ * `node-regexp/<node>` here -- which cost two things. Neither could write
+ * the other's truthfully, so the same row differed between two routers
+ * required to write identical bytes; and the Python value moved whenever the
+ * interpreter's PATCH version moved, so it was never stable inside one
+ * router either. Naming the framework fixes both and loses nothing a reader
+ * used: when two engines genuinely disagree the COUNT differs, and the count
+ * is what is compared.
  */
-export const ABSENCE_TOOL_VERSION = `node-regexp/${process.versions.node}`;
+export const ABSENCE_TOOL = "dabbler-absence-search/1";
 
 function escapeForRegExp(text: string): string {
   return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -977,7 +982,7 @@ export function runAbsenceSearch(
     query,
     query_kind: queryKind,
     scope: (scope as unknown[]).map(String),
-    tool_version: ABSENCE_TOOL_VERSION,
+    tool_version: ABSENCE_TOOL,
     matches,
   };
 }

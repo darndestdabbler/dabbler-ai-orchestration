@@ -199,7 +199,7 @@ describe("routing over the direct-API transport", () => {
   });
 });
 
-describe("the seat transport, before session 29", () => {
+describe("the seat transport, before session 30", () => {
   it("is refused by name rather than falling back to the API", async () => {
     // A transport that silently fell back would put a cross-provider
     // verification on the provider the operator was routing away from.
@@ -208,7 +208,7 @@ describe("the seat transport, before session 29", () => {
       .then(() => null)
       .catch((error: unknown) => error);
     expect(failure).toBeInstanceOf(RouterError);
-    expect(String(failure)).toContain("session 29");
+    expect(String(failure)).toContain("session 30");
   });
 });
 
@@ -241,7 +241,7 @@ describe("a prompt over the model's input budget", () => {
   });
 });
 
-describe("auto-verification, before session 31", () => {
+describe("auto-verification, before session 32", () => {
   it("is refused rather than dropped, because silence would look verified", async () => {
     configOnDisk(
       makeConfig({
@@ -253,7 +253,7 @@ describe("auto-verification, before session 31", () => {
       .then(() => null)
       .catch((error: unknown) => error);
     expect(failure).toBeInstanceOf(RouterError);
-    expect(String(failure)).toContain("session 31");
+    expect(String(failure)).toContain("session 32");
   });
 });
 

@@ -1,0 +1,6 @@
+{"timestamp":"2026-05-16T17:50:00.000000-04:00","session":1,"event":"work_started","message":"Session 1 work started"}
+{"timestamp":"2026-05-16T18:00:00.000000-04:00","session":1,"event":"closeout_succeeded","message":"Session 1 closed"}
+{"timestamp":"2026-05-16T18:10:00.000000-04:00","session":2,"event":"work_started","message":"Session 2 work started"}
+{"timestamp":"2026-05-16T18:20:00.000000-04:00","session":2,"event":"closeout_succeeded","message":"Session 2 closed"}
+{"timestamp":"2026-05-16T18:30:00.000000-04:00","session":3,"event":"work_started","message":"Session 3 work started"}
+{"timestamp":"2026-05-16T18:45:00.000000-04:00","session":3,"event":"closeout_succeeded","message":"Session 3 closed (final)"}

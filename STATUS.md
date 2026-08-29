@@ -1,11 +1,12 @@
-# STATUS — session 31 of 36 landed: the session lifecycle under TypeScript
+# STATUS — session 32 of 36 landed: the verifier's surface under TypeScript
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
 `experiment/verification-pipeline-v3` and `design/solution-decomposition`
 are merged and finished. Earlier handoff text is in `docs/status-archive.md`.
 
-> **Recorded, 2026-08-29.** Session 31's deliverables are decisions
-> **D197–D203** in `docs/sessions/decisions-log.md`; session 30's are
+> **Recorded, 2026-08-29.** Session 32's deliverables are decisions
+> **D204–D209** in `docs/sessions/decisions-log.md`; session 31's are
+> **D197–D203**; session 30's are
 > **D190–D196**; session 29's are
 > **D187–D189**; session 28's are
 > **D180–D186**, session 27's **D173–D179**, session 26's **D170–D172**,
@@ -25,6 +26,89 @@ are merged and finished. Earlier handoff text is in `docs/status-archive.md`.
 > section at the foot of this file uses the new numbers.
 
 ## Where things are
+
+- **Session 32 is closed `VERIFIED`** — **3 rounds** (gpt-5-6-sol over the
+  API). Round 1 raised three Major: one accepted in part and fixed, two
+  **disputed with file and line and withdrawn**. Round 2 verified. The close
+  then **refused**, correctly, and round 3 was the answer. Claude Code /
+  claude-opus-5[1m] orchestrator. Nothing was forced.
+- **`agency` (921), `approved_plan` (590) and `plan_review` (812) are ported
+  whole; `verifyjob` is ported as 56 lines, not 782** (D204). The session
+  plan sizes that module at its pre-split figure; D129 splits it, and the
+  retired ~680 lines are `cmd_verify` and its helpers, which import `runcli`
+  and `runcore` and are deleted with them in session 35. Measured rather
+  than inherited — `build_prompt`'s only caller in the whole package is
+  `cmd_verify`, so D129's own criterion ("what `verify` and `route` import")
+  names one function too many. **This error has already cost this port a
+  session once**: D178 took `checks.plan` back out of `checks.ts` for the
+  same reason. The suite went 618 → **690**; 2,379 Python lines became
+  2,825 TypeScript across four files.
+- **`route.ts` stops refusing itself by name.** The branch that threw "the
+  auto-verification job … is ported in session 32" is gone, replaced by the
+  real one and four tests: a `code-review` verified through a different
+  provider, the metrics row bound to the model it reviewed, the paid-for
+  answer surviving a verifier that cannot be reached, and a verification
+  that does not verify itself.
+- **The JSON seam gained `sort_keys` and `separators`, because the plan hash
+  is a digest over them** (D206), checked byte-for-byte against CPython on
+  five inputs. `sortKeys` orders by **code point** — JavaScript's default
+  sort is by UTF-16 code unit, and the two disagree above the basic plane.
+  **The proof is the artifact, not the option**: Python wrote and approved a
+  plan the TypeScript `readPlan` accepted (which recomputes both hashes and
+  refuses on either mismatch), and TypeScript wrote one Python accepted,
+  same `plan_hash` on both sides.
+- **Round 1's *nit* was the most valuable thing in the round, and it landed
+  against a comment asserting the opposite of the truth.**
+  `buildVerificationPrompt` filled its placeholders with JavaScript's
+  `replace(string, string)`, which is neither global (Python replaces every
+  occurrence) nor literal (`$&`, `` $` `` and `$1` expand against the
+  match). Both are reachable from an ordinary routed response, because the
+  text under review is substituted verbatim — any answer discussing shell or
+  regex syntax was corrupted before the verifier read it. Fixed with
+  `replaceAll` and a **function** replacement, the one form that is both.
+- **D198's `ApprovedPlanReader` is registered, and proved through the built
+  bundle rather than the source** (D207). Both routers now fold the same
+  non-empty task row out of a real plan.
+- **`approved_plan` has no CLI on either side, so it is compared through its
+  caller — and that is the finding, not a shortcut** (D205). `ParityCase`
+  compares `python -m <module>` against `dabbler <verb>`; `verbs.ts` has
+  recorded `pythonCli: false` for `approved-plan` since session 23 and
+  `plan_review` has no verb entry at all, so no case in the table's shape
+  can exist. The `in-flight` builder now writes and approves a real plan and
+  opens its step, and the existing `progress --json` case compares the fold.
+  **Before this, both routers agreed the task list was empty** — which reads
+  as proof and is not. 28 cases, **179 paths**, up from 137.
+- **The plan WRITER is gated by a different instrument, and it was falsified
+  before it was trusted.** Both copies' artifacts are Python-written, so no
+  CLI case can reach the TypeScript writer. A differential test drives both
+  writers over one input, compares the bytes, and hands the TypeScript
+  output to Python's own `read_plan`. Flipping `sortKeys` to `false` in
+  `coreBytes` turns it red.
+- **A third digest ledger names itself**: `approved-plan-writes.jsonl` joins
+  `state-writes.jsonl` and `api-models.lock`, under the rule those two
+  already state — its rows are hashes over content carrying `approved_at`.
+  The plan's own `plan_hash` is **not** reduced, and is the strongest single
+  check in the corpus that both routers canonicalize JSON identically.
+- **The close refused once, and the gate was right** (D209). Three edits
+  made *after* round 2's VERIFIED — a doc paragraph, a test comment and a
+  flake timeout — moved the tree, and `verification_clean` caught them.
+  Earlier in the session a `close --dry-run` showed that gate passing, and I
+  read it as licence; it passed because the edits had not been made yet.
+  The gate does not ask whether a change was behavioural. **`--force` was
+  not used and would have marked sessions 33–36 complete.** The correct cost
+  was one cheap round.
+- **A pre-existing flake was fixed because a run of record must be green.**
+  `checks.test.ts` ("hands the child an allowlist") seeds a git repository
+  and spawns Node twice against vitest's default 5 s; it passes in 1.3 s
+  alone and timed out under full-suite load. It was failing on the baseline
+  run before this session wrote a line. Re-running until green would have
+  hidden it.
+- **944 pytest / 686 vitest, both green as `final-full`.** Seat cost
+  (D208): 53,419 in / 12,678 out to gpt-5-6-sol over three rounds; round 2
+  cost 23% of round 1 while carrying three rebuttals as well as the fix
+  delta.
+
+### Session 31, still current
 
 - **Session 31 is closed `VERIFIED`** — **1 round** (gpt-5-6-sol over the
   API), three minor findings and nothing blocking; the only session of the
@@ -870,19 +954,42 @@ resolved by being true again.
 
 ## Next
 
-1. **Session 32 of 36 — verification support.** `agency` (921),
-   `verifyjob` (782), `approved_plan` (590), `plan_review` (812): 3,105
-   lines, ~81 tests. **Three things are owed to it specifically.** It
-   registers `progress`'s `ApprovedPlanReader` (D198) — until it does, a
-   repository with an approved plan gets `tasksRefused` where the task rows
-   should be, which is honest and is not finished. Its `approved_plan`
-   parity case should be paired with a `progress --json` case on a shape
-   that HAS a plan, because that is the only thing that proves the two
-   routers fold the steps the same way. And the `VERIFIED` look-alike
-   question (D168) is addressed to it: if a boundary is wanted it goes into
-   Python first and crosses with a case that feeds a look-alike to both.
-2. **A Python design question is still owed to the operator, and session 31
-   was the last comfortable moment to ask it.** A malformed or hand-edited
+1. **Session 33 of 36 — the verification loop.** `verify` (2,537 lines, 57
+   tests), ported as the extraction it never got: rounds, bundle, disputes
+   and adjudication, reanchor and the loop each become a file, none over
+   800 lines. It builds the three unbuilt corpus shapes (`disputed`,
+   `at-cap`, `moved-machine`), and **each multiplies against every case that
+   names it — caching a built shape across cases stops being optional
+   there.** The control is now **~200 s for 28 cases**.
+
+   **Five things are owed to it, three of them new.** `verdict`'s parity
+   case, the round-append case and the `completion_tree` comparison (D163,
+   D177) — it is the first session that writes a round. **D168's
+   look-alike case**, which is *not* what the previous *Next* said: that
+   entry assigned it to session 32 by taking D168's literal "session 32"
+   without applying D188's renumbering, and D168 defines itself as *the
+   session that ports `verify`* (D207). And two the verifier raised here:
+   **differential writer checks for `step-execution.jsonl` and the agency
+   record**, on the pattern the approved-plan writer now uses.
+
+   **On the agency record, the verifier was right and this session's
+   `docs/ts-port-parity-control.md` overstates it.** That amendment says an
+   agency comparison "cannot" exist before `verify` lands. What cannot exist
+   is a *file* or a *CLI case* — the record is the `agency` member of a
+   round row (`ai_router/verify.py:773`). A **module-level** differential
+   test of `record_for_round(...).as_row()` against `recordRow(...)` is
+   possible today, exactly as the plan writer's is. Correct the wording when
+   the test lands.
+
+   **One more inaccurate sentence of this session's**, in
+   `packages/router/test/verificationSupport.test.ts` near the interpreter
+   guard: "Where Python IS present … the check runs" is wrong — the guard
+   is `.venv`-only, so a machine with `ai_router` importable from a PATH
+   Python skips it silently. Left standing rather than fixed because
+   changing it after the verdict is precisely what D209 records; fix it in
+   passing.
+2. **A Python design question is still owed to the operator, and it is now
+   two sessions past the comfortable moment to ask it.** A malformed or hand-edited
    `sessions.json` or `activity-log.json` is *silently replaced* rather than
    refused, in both routers: `readRawSessionState` answers `null` for
    unparseable JSON and the activity log is rebuilt from any read failure.
@@ -895,7 +1002,14 @@ resolved by being true again.
    boundary. The cheapest moment to apply it everywhere is **after session
    35**, when there is one implementation again.
 3. **Read `docs/ts-port-parity-control.md` before planning any session from
-   here.** Its verb table is the growth order, and session 31 added three
+   here.** Session 32 added a fourth amendment: why a module with no CLI is
+   compared through its caller, the `pythonScript` builder step and its
+   pinned stamp, and the third digest ledger. Sessions 26 and 27 proved the
+   plan's line counts run in both directions and session 31 added the
+   import-graph direction; **session 32 adds the fourth failure mode —
+   check whether the module has a command line at all**, because the verb
+   table lists two that do not and a case cannot be written for either.
+   The older text below still applies. Its verb table is the growth order, and session 31 added three
    amendments: the ten cases and what each proves, the `setup` field and why
    it is cheaper than a shape, and `docs/modules.yaml`'s entry with the two
    YAML-emitter differences it does not cover. Sessions 26 and 27 proved the

@@ -1,11 +1,12 @@
-# STATUS — session 30 of 36 landed: the seat under TypeScript, and what it spent
+# STATUS — session 31 of 36 landed: the session lifecycle under TypeScript
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
 `experiment/verification-pipeline-v3` and `design/solution-decomposition`
 are merged and finished. Earlier handoff text is in `docs/status-archive.md`.
 
-> **Recorded, 2026-08-29.** Session 30's deliverables are decisions
-> **D190–D196** in `docs/sessions/decisions-log.md`; session 29's are
+> **Recorded, 2026-08-29.** Session 31's deliverables are decisions
+> **D197–D203** in `docs/sessions/decisions-log.md`; session 30's are
+> **D190–D196**; session 29's are
 > **D187–D189**; session 28's are
 > **D180–D186**, session 27's **D173–D179**, session 26's **D170–D172**,
 > session 25's **D163–D169**, session 24's **D150–D162** and session 23's
@@ -24,6 +25,100 @@ are merged and finished. Earlier handoff text is in `docs/status-archive.md`.
 > section at the foot of this file uses the new numbers.
 
 ## Where things are
+
+- **Session 31 is closed `VERIFIED`** — **1 round** (gpt-5-6-sol over the
+  API), three minor findings and nothing blocking; the only session of the
+  port so far to be verified on the first pass. Claude Code /
+  claude-opus-5[1m] orchestrator. All five gates passed at the first
+  attempt; nothing was forced.
+- **The lifecycle is ported whole, and `cli/session.ts` refuses nothing.**
+  `plan`, `close` (with `--dry-run` and `--force`), `cancel`, `restore` and
+  `migrate` join the four writers session 26 landed, and `dabbler progress`
+  and `dabbler modules` are verbs for the first time. Four modules,
+  3,103 Python lines: `gates` (421), `session` (1,386), `progress` (1,050)
+  and `modules` (246). The suite went 498 → **614**.
+- **`gates` went first, as the session plan insisted, and the instruction
+  paid for itself in a way that has nothing to do with the gates' logic**
+  (D197). Almost everything `gates` emits is prose an operator reads when a
+  close is refused, and a translation loses four things silently: em dashes
+  (three of the five remediations carry one), Python's `repr` on a branch
+  name and a verdict token, Python's `str` on `None`, and `int()` over
+  `git rev-list --count`, which is `0` for anything non-integer rather than
+  `NaN`. The first `close --dry-run` comparison was byte-identical, which
+  fixed the wording as a fixed point before 2,700 more lines were written
+  against it. `pythonStr` moved to `pythonJson.ts` beside `pythonRepr`
+  (three modules now need it), and `writers.validateAndWriteState` is
+  exported so `cancel`, `restore` and `migrate` land a record the way a
+  registration does rather than through a second write path.
+- **The import graph ran the wrong way once, and the answer is a refusal
+  rather than a guess** (D198). `progress.build_task_rows` reads
+  `approved-plan.json` through `approved_plan`, which is **session 32's**
+  module — and porting its read half meant pulling ~250 of its 590 lines
+  (the integrity check, the amendment fold, the risk-flag derivation, which
+  itself reads `docs/modules.yaml`) into a session already carrying 3,103.
+  Rendering an empty task list until then was the option that had to be
+  refused: the projection would say "this session has no tasks" over a
+  session that has seven, in the one field the Work Explorer renders as a
+  list of what to do next, and no corpus shape carries a plan for the
+  control to catch it. So `progress` declares an `ApprovedPlanReader` seam —
+  the same shape `writers.usePlanParser` already uses — and, unregistered,
+  `buildTaskRows` throws the moment a plan file exists. `buildProjection`
+  already had the field for that answer: `tasksRefused`, beside an empty
+  `tasks`. **Session 32 registers the real reader.**
+- **`modules` has one subcommand on both sides, so the contract lost two**
+  (D199, discharging D152 under D162's ruling). `ModuleVerbs.list` and
+  `.retire` — and `ModuleRetireOptions` — are trimmed rather than stubbed:
+  the manifest is create-only by design, and two of the extension's
+  `refuse()` stubs existed only to satisfy an interface. They are gone. The
+  read surface (`loadEntries`, `findEntry`, `parseEntries`) is ported whole
+  even though no ported verb calls it yet, because `approved_plan` is its
+  caller in session 32 and a module's readers are the module.
+- **The first ported verb that writes YAML, and it is compared** (D200).
+  `docs/modules.yaml` joins the compared paths — the one compared path
+  people also edit by hand — because both routers rewrite the whole file on
+  every `create`, and two emitters that disagreed would make every later
+  diff of a tracked file carry noise nobody could attribute. Four options
+  reach the `yaml` package to PyYAML: sequences at their key's indent,
+  single quotes, fold width **81** (PyYAML's `best_width` is 80 and it
+  allows the break past it), and **`version: "1.1"`** — the one that is easy
+  to miss, because YAML 1.1 resolves `yes`/`no`/`on` as booleans and quotes
+  them where the 1.2 core schema leaves them plain. **Two inputs still emit
+  differently and are recorded rather than papered over**: a scalar of
+  exactly `y` or `n`, and a value carrying a newline. Both are legal YAML
+  for the same value; closing them means writing a PyYAML-compatible
+  emitter, which is a session, not a port's side effect, and it is moot at
+  the cutover.
+- **The parity control gained a `setup`, and it is cheaper than a shape**
+  (D201). `restore`'s only write path needs a cancelled session, and no
+  built shape carries one — a shape is a lifecycle position and "cancelled
+  then restored" is a transition. A case may now declare one `python -m`
+  invocation run on **both** copies before the compared verb. It costs the
+  control nothing it did not already trust: the corpus is built by driving
+  the Python router, and this is one more of those invocations, made at case
+  time. D176 had already priced the alternative — a sixth shape is the
+  expensive thing.
+- **Ten cases in, 28 total, 137 paths, still green.** `session plan` and
+  `modules create` on `fresh`; `close --dry-run` on both shapes; `close` on
+  `in-flight` (the rows, then the refusal, and nothing landed on either
+  side); `cancel --force` and `restore` on `in-flight`; `progress --json` on
+  both shapes and `progress` with no flag on `fresh`, which is what *proves*
+  the flag is inert rather than asserting it. **`session migrate` gets no
+  case**, and that is a corpus gap rather than a divergence: every built
+  shape is post-collapse, so there is no legacy set directory to read.
+- **`resolveSessionOrchestratorIdentity` landed as D164 planned** (D202): a
+  wrapper over the block-level resolver, reading the record through
+  `progress` rather than opening `sessions.json` a second time. Five tests
+  cover it — the three selection branches and the two refusals — where the
+  Python suite has none, which is the one place this session deliberately
+  goes past its twin, and it is safe because it adds tests rather than
+  behaviour.
+- **A `progress --json` comparison against this repository's own 31-session
+  ledger was byte-identical** on the first run, timestamp aside. That is the
+  hardest single input either router has been handed — real rounds, real
+  agency logs, real verdicts, a healed title — and it agreed before the
+  corpus did.
+
+### Session 30, still current
 
 - **Session 30 is closed `VERIFIED`** — 3 rounds (gpt-5-6-sol over the API).
   Round 1 raised one Major; it was **accepted and fixed**. Round 2 restated
@@ -737,9 +832,12 @@ is D127; the previous version of this file carried it in full.
 | **Round 1 nit — an argv suite is unrecordable** | `checks.load_checks` accepts a suite declaring `argv` and no `command`; `test_evidence.load_suites_checked` refuses it. Such a suite would run and be unrecordable, so it could never close. Latent — `argv` is used for controls, which that reader never sees — and **it may be the permissiveness rather than the refusal that is wrong**: a suite's command lands in the record as evidence, a control's does not. A session, not a patch, and adjacent to D116. |
 | **Round 3 nits, both non-blocking and both carried** | (1) The Windows batch path still goes through `cmd.exe`, so `%VAR%` expansion remains — as it does on the Python side, for the same reason: a batch file is a cmd script. (2) `classifyPreverifyCommand` accepts a command that names every selected test *and* a broader directory. Both are Python's behaviour; changing either is a cross-router decision. |
 | **D176 — amends D169** | The parity cost to watch is a new SHAPE, not a new case: twelve cases run in less time than nine did. Three shapes are still unbuilt (`disputed`, `at-cap`, `moved-machine`) and each needs the offline transport plus canned verifier text. |
-| **D164 — the port** | `identity.resolve_session_orchestrator_identity` is **not ported**. It is the one function in `identity` that reads a repository rather than a block, and it reads state through `progress` — session 30. Writing a second reader of `sessions.json` to reach it early is the drift the port exists to remove, so it lands in session 30 as a wrapper over `resolveOrchestratorIdentity`. No test covers it today on either side; the Python suite's eleven identity tests are all against the block-level core. |
+| **D164 — CLOSED in session 31 (D202)** | `identity.resolveSessionOrchestratorIdentity` is ported, as a wrapper over `resolveOrchestratorIdentity`, reading the record through `progress` rather than opening `sessions.json` a second time. Five tests cover the three selection branches and the two refusals, where the Python suite had none. *Nothing further owed.* |
 | **D168 — shared design** | `parseVerificationResponse` tests the head with `startsWith("VERIFIED")`, so a look-alike (`VERIFIED_NOT_REALLY`) classifies as VERIFIED. **Faithful to Python, and deliberately not fixed in the port** — an improvement on one side only is exactly the drift parity exists to catch. Blast radius is small (the token chooses a parse branch, not an outcome: `classifyBlocking` is severity-derived, and `validateSessionVerdict` refuses the token exactly). If a boundary is wanted it goes into Python first and crosses with a parity case that feeds a look-alike to both — session 32. |
-| **D169 — cost to watch** | The parity control takes **~150 s** per run, because it builds four corpus repositories by driving the Python router, and it runs inside every `verify`. That is already comparable to a verifier round's wall time, and the case table only grows. Sessions 26–34 should watch it; caching a built shape across cases is the obvious lever if it becomes the bottleneck. |
+| **D169 — cost to watch, RE-MEASURED in session 31** | **193 s** for 28 cases across 2 shapes, against ~150 s for 12 cases — so more than doubling the case table cost ~28%, which confirms D176: the cost is a SHAPE, not a case, because a shape is what gets built twice per case that names it. The three unbuilt shapes (`disputed`, `at-cap`, `moved-machine`) all land with `verify` in session 33, and each will multiply against every case that uses it. **Caching a built shape across the cases that share it is the lever**, and session 33 is where it stops being optional. |
+| **D198 — the approved-plan reader, owed to SESSION 32** | `progress.buildTaskRows` needs `approved_plan`'s `read_plan` and `effective_plan`, which land in session 32. Until a reader is registered through `useApprovedPlanReader`, a session with an `approved-plan.json` on disk gets `tasksRefused` where the task rows should be — deliberately, because rendering an empty list would say "this session has no tasks" over a session that has seven, and no corpus shape carries a plan for the control to catch it. Session 32 registers the real reader **and** should add a `progress --json` case on a shape that has a plan, which is the only thing that proves the two routers fold the steps the same way. |
+| **D200 — two YAML emitter differences, moot at the CUTOVER** | `docs/modules.yaml` is compared and the common path is byte-identical, with four options reaching the `yaml` package to PyYAML (`indentSeq: false`, `singleQuote`, `lineWidth: 81`, `version: "1.1"`). Two inputs still differ: a scalar of exactly `y` or `n` (quoted here, plain in PyYAML) and a value carrying a newline (a `|-` block here, single-quoted and folded there). Both parse back to the same value and neither occurs in a kebab-case slug or an ordinary display name. Closing them means a PyYAML-compatible emitter for this document shape — a session, not a port's side effect — and it stops mattering the moment there is one emitter. |
+| **D201 — `session migrate` has no parity case** | A corpus gap, not a divergence: every built shape is post-collapse, so there is no `docs/session-sets/<NNN-slug>/session-state.json` for the migration to read. Its refusals, its dry run and the cancelled-set fold are covered by both suites. A shape whose only purpose is a verb that runs once per repository, ever, is not worth ~12 s on every parity run — but if one is ever built for another reason, this case rides along free. |
 | **D122 gap** | No path by which a verifier reviews a remediated-at-the-cap fix. Sessions 12 and 17 ended that way, so their last fixes are unreviewed today. |
 | **D116** | A targeted-run form for filter-style runners (Maven `-Dtest=`, `dotnet test --filter`) plus the audit rule that checks one. "A session, not a patch." The port's vitest path-list form does not need it. |
 | **D124** | Record the round cap on the round row as `verify.py` writes it; the unresolved-session view reads the live cap for a historical session. |
@@ -750,7 +848,7 @@ is D127; the previous version of this file carried it in full.
 | **D147 — RULED (D159), DONE in 25** | Session 23's step 5 is reworded: the control is declared and required from session 23, running the comparison that needs one router; the cross-router comparison joins it with the first ported verb. That verb turned out to be `metrics`, in session **25** rather than 26 — earlier than the ruling assumed, and costing nothing, because what the ruling protected was that no session be handed an instruction it cannot follow. Closed. |
 | **D149 — CLOSED (D170), session 26** | Deleting a tracked file moved the whole-tree digest across the commit, because `git ls-files` still lists a tracked-but-deleted path and `surface_digest` wrote it a literal `"deleted"` hash. It cost session 23 a re-run and session 24 a forced close. **Fixed at the git seam as D160 ruled**: an unreadable path is omitted rather than marked, so a deletion moves the digest once and the commit that records it moves nothing. The marker string no longer appears anywhere in the router. Landed in its own commit before session 26's port, so the parity control compared two routers with the same intended behaviour, and it rode in the working tree so the verifier saw a change to a gate. |
 | **D158 — framework** | `session close --force` promotes EVERY open session to complete, and its help says only "bypass bookkeeping gates". It cost session 24 a damaged ledger and a restore. Three fixes owed: say what the flag does; refuse (or require a second flag) when it would promote sessions that are not in flight; and stamp `forceClosed` on the session's row rather than the repository, so the ledger can say which session forced a close. Until they land, the trap lives in `AGENTS.md`'s preamble. |
-| **D152 — RULED (D162)** | `ModuleVerbs.list`/`retire`, and several `VerifyVerbs`/`WorkflowVerbs` option names, describe a Python surface that does not exist in those shapes (`ai_router.modules` has only `create`; `verify dispute` takes `--finding`). Sessions 30/32/34 port those modules — reconcile the contract against what is ported rather than inheriting a shape nothing ever ran. |
+| **D152 — RULED (D162), `modules` half DONE in 31 (D199)** | `ModuleVerbs.list` and `.retire` -- and `ModuleRetireOptions` -- are trimmed from the contract: `ai_router.modules` has exactly `create`, and the manifest is create-only by design. Two of the extension's `refuse()` stubs went with them. **Still owed for the other half**: `VerifyVerbs`' option names (`verify dispute` takes `--finding`, not `--finding-index`) belong to session 33, and `WorkflowVerbs`' to session 35. |
 | **D155 / D116** | The extension's mocha suite is still not a declared suite, so `affected` selects nothing for `tools/dabbler-ai-orchestration/` and session 24's largest change set had no recordable pre-verification evidence. Measured why it is not a one-line declaration: `targeted_command` appends the selected paths, and mocha MERGES a path list with its `spec` (both from the flag and from `.mocharc.json`) rather than being narrowed by it, so the bare command cannot mean "everything" while the appended form means "these". `runs_whole` would be false. It needs a runner entry point — D116's shape. |
 | **Session 24 estimate** | "Net negative TS lines" was not met (+178 in the extension). `implements Router` requires all 32 methods and twenty of them refuse, which still costs their signatures. Not a defect; a fact about the contract's width, worth knowing when sizing sessions 30–34. |
 | **D145/D146 — RULED (D161), DONE in 25** | Implemented as **D167**: `facts.run_control` keeps a passing control's own output in the record (capped at the same 1,500 characters a failure is), and a control that prints nothing on success records that it printed nothing — so "had nothing to say" and "said something the record dropped" are no longer the same row. Each parity case declares a `proves` string beside it, so a case added without saying what it proves does not typecheck. Closed. |
@@ -772,75 +870,56 @@ resolved by being true again.
 
 ## Next
 
-1. **Session 31 of 36 — the session lifecycle.** `session` (1,386), `gates`
-   (421), `progress` (1,050), `modules` (246): 3,103 lines, 138 tests, and
-   the largest single session left. Its own plan says **port `gates` first**
-   and run the parity control on `close --dry-run` rows for every corpus
-   shape before anything else — a gate that differs by one row is the set's
-   worst outcome, and that is the cheapest place to see it.
-   **Three things are owed specifically to this session**, all renumbered
-   from decisions that say 30: `identity.resolve_session_orchestrator_identity`
-   lands here as a wrapper over `resolveOrchestratorIdentity` (D164) — it is
-   the one function in `identity` that reads a repository rather than a
-   block, and it reads state through `progress`, which is why it waited;
-   the `Router` contract is reconciled against what is actually ported,
-   defaulting to trimming (D162/D152 — `modules retire` plausibly earns
-   building, `modules list` probably does not); and `cli/session.ts`'s
-   refusals of `close`, `cancel`, `restore`, `plan` and `migrate` all come
-   out at once.
-2. **The two seat items in the Owed table are both addressed to the cutover,
-   and both are one-line changes that must not be made early.**
-   `REFRESH_COMMAND` still names the Python invocation, and the handoff
-   threshold still waits until 24,000 on a shim-only machine. Each is
-   correct today *because* there are two routers, and wrong the moment there
-   is one. They are the clearest example of the shape this port keeps
-   producing: a difference that is only safe to remove last.
+1. **Session 32 of 36 — verification support.** `agency` (921),
+   `verifyjob` (782), `approved_plan` (590), `plan_review` (812): 3,105
+   lines, ~81 tests. **Three things are owed to it specifically.** It
+   registers `progress`'s `ApprovedPlanReader` (D198) — until it does, a
+   repository with an approved plan gets `tasksRefused` where the task rows
+   should be, which is honest and is not finished. Its `approved_plan`
+   parity case should be paired with a `progress --json` case on a shape
+   that HAS a plan, because that is the only thing that proves the two
+   routers fold the steps the same way. And the `VERIFIED` look-alike
+   question (D168) is addressed to it: if a boundary is wanted it goes into
+   Python first and crosses with a case that feeds a look-alike to both.
+2. **A Python design question is still owed to the operator, and session 31
+   was the last comfortable moment to ask it.** A malformed or hand-edited
+   `sessions.json` or `activity-log.json` is *silently replaced* rather than
+   refused, in both routers: `readRawSessionState` answers `null` for
+   unparseable JSON and the activity log is rebuilt from any read failure.
+   A verifier called that a Major in session 26 and it is a fair call.
+   **It is a redesign and it needs a ruling**: refuse and fail closed, or
+   keep replacing and say so. The projection is now the one place that
+   *does* distinguish them — an absent ledger reads the plan, an unreadable
+   one reports `invariantViolation` and lists nothing (this session tests
+   both) — so the shape of the honest answer already exists at the read
+   boundary. The cheapest moment to apply it everywhere is **after session
+   35**, when there is one implementation again.
 3. **Read `docs/ts-port-parity-control.md` before planning any session from
-   here.** Its verb table is the growth order, and it now carries three
-   amendments from this session: what the two `seat-cost` cases prove, why
-   the seat catalog's **write** is not comparable (a probe is billed), and
-   why `copilot refresh --dry-run` is byte-identical and still not a case
-   (Python's `python -m` prints a runpy warning to stderr, which the control
-   compares). Session 26 proved the plan's line counts are a floor; session
-   27 proved the other direction is also possible. Read an inventory line as
-   "the module", not "every function of the module", and check the import
-   graph before assuming either way.
-4. **A Python design question is still owed to the operator, from D171's
-   round-1 dispute.** A malformed or hand-edited `sessions.json` or
-   `activity-log.json` is *silently replaced* rather than refused, in both
-   routers: `read_raw_session_state` returns `None` for unparseable JSON and
-   `_read_or_create_activity_log` builds a fresh log from any read failure. A
-   verifier called that Major and it is a fair call. **It is a redesign and
-   it needs a ruling**: refuse and fail closed, or keep replacing and say so.
-   If it is to be fixed, the cheapest moment is *after* session 35, when
-   there is one implementation again. **Session 31 is the session that ports
-   both readers**, so it is the last comfortable moment to ask.
-5. **What sessions 25–27 leave for their successors**, renumbered here.
-   `verdict`'s parity case and the `VERIFIED` look-alike question are owed to
-   **session 33** (D163, D168); the round-append parity case is owed to
-   **session 33** for the same reason, and **so is the `completion_tree`
-   comparison** — session 27 proved the two snapshots agree on this
-   repository (D177) but no verb writes a round yet. The evidence protocol's
-   two gaps are owed to whichever of **32/33** first drives the critique
-   loop.
-6. **D130 override window** — the operator can still override retiring the
-   run core, until **session 35** starts. Session 27 leaned on it once:
-   `checks.plan` is not ported because `runcli` is its only caller (D178). An
-   override would mean porting it, with the per-suite defect fixed on
-   **both** sides, in Python's own commit first.
-7. **The verifier has run with `agency: none` for three sessions now**, and
-   this session is the sharpest illustration of what that costs. Round 2's
-   Major was reasoning from the session plan's step 3 — a sentence written
-   before D174 measured Windows spawning and superseded it. The verifier
-   could not read D174, so it could not know. **Cite file and line in a
-   dispute**; an assertion about what the repository says is worth nothing to
-   a reviewer that cannot open it, and both of this session's disputes and
-   acceptances turned on being able to quote.
-8. **Check the cited lines before answering — in both directions.** Session
-   27 recorded four disputes and all four were withdrawn; session 29's Major
-   was right and was fixed on first reading. This session did both, on the
-   same finding: round 1's half was accepted because `resolveProgram` really
-   did reach a different program than Python, and round 2's half was refused
-   because `copilot.bat` really is two lines of PowerShell invocation with no
-   executable to resolve. Neither answer was available without opening the
-   file.
+   here.** Its verb table is the growth order, and session 31 added three
+   amendments: the ten cases and what each proves, the `setup` field and why
+   it is cheaper than a shape, and `docs/modules.yaml`'s entry with the two
+   YAML-emitter differences it does not cover. Sessions 26 and 27 proved the
+   plan's line counts run in both directions; session 31 adds the third
+   failure mode — **check which way the import graph runs**, because
+   `progress` needed a module two sessions later than itself. The control
+   is **193 s** for 28 cases now; the three unbuilt shapes all land with
+   `verify` in session 33, and each multiplies against every case that
+   names it, so caching a built shape across cases stops being optional
+   there.
+4. **D130 override window — the operator can still override retiring the run
+   core, until session 35 starts.** Unchanged.
+5. **What earlier sessions leave for their successors.** `verdict`'s parity
+   case, the round-append case and the `completion_tree` comparison are owed
+   to **session 33** (D163, D177), which is the first session that writes a
+   round. The evidence protocol's two gaps belong to whichever of **32/33**
+   first drives the critique loop.
+6. **The two seat items are still addressed to the CUTOVER and must not be
+   done early.** `REFRESH_COMMAND` names the Python invocation and both
+   routers print it; the handoff threshold still waits until 24,000 on a
+   shim-only machine. Each is correct today *because* there are two routers.
+7. **Cite file and line in a dispute.** The verifier has run with
+   `agency: none` for four sessions. An assertion about what the repository
+   says is worth nothing to a reviewer that cannot open it — and check the
+   cited lines before answering, in both directions: sessions 27 and 28
+   withdrew every dispute they raised, session 29 fixed its Major on first
+   reading, and session 30 did both on the same finding.

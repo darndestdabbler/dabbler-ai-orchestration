@@ -1,0 +1,38 @@
+{
+  "status": "completed",
+  "summary": "Set 028 (3 of 3 FINAL): Drift-class hotfixes + harness hardening completed. Session 1: fixed fresh-set completedSessions[] schema omission (ai_router 0.3.1→0.3.2), added explicit test coverage. Session 2: refactored Electron environment from blocklist to allowlist approach in electronLaunch.ts, future-proofing against IDE host pollution (extension 0.13.16→0.13.17). Session 3: added GitHub Actions CI matrix (.github/workflows/test.yml) running pytest + Playwright on ubuntu-latest, macos-latest, windows-latest; xvfb-run on Linux for headless GUI rendering. Layer 2 (@vscode/test-electron) intentionally skipped — known broken on Windows 11 + VS Code 1.120. All 40 pytest + 5 Playwright tests pass locally. Estimated cost: ~$0.40 (routing negligible; no cross-provider verification needed). Set closes with 3/3 sessions complete.",
+  "files_changed": [
+    "ai_router/session_state.py",
+    "ai_router/tests/test_session_state_v2.py",
+    "ai_router/tests/e2e/test_register_session_start_regression.py",
+    "ai_router/tests/e2e/test_happy_3session.py",
+    "ai_router/CHANGELOG.md",
+    "pyproject.toml",
+    "tools/dabbler-ai-orchestration/src/test/playwright/electronLaunch.ts",
+    "tools/dabbler-ai-orchestration/CHANGELOG.md",
+    "tools/dabbler-ai-orchestration/package.json",
+    "tools/dabbler-ai-orchestration/dist/extension.js",
+    "tools/dabbler-ai-orchestration/dist/extension.js.map",
+    "tools/dabbler-ai-orchestration/out/test/playwright/",
+    "tools/dabbler-ai-orchestration/out/test/suite/e2e/",
+    ".github/workflows/test.yml",
+    "CLAUDE.md",
+    "docs/session-sets/028-drift-hotfix-harness-hardening/session-state.json",
+    "docs/session-sets/028-drift-hotfix-harness-hardening/session-events.jsonl",
+    "docs/session-sets/028-drift-hotfix-harness-hardening/activity-log.json",
+    "docs/session-sets/028-drift-hotfix-harness-hardening/disposition.json"
+  ],
+  "verification_method": "manual",
+  "verification_message_ids": [],
+  "next_orchestrator": {
+    "engine": "claude-code",
+    "provider": "anthropic",
+    "model": "claude-opus-4-7",
+    "effort": "normal",
+    "reason": {
+      "code": "set-complete",
+      "specifics": "Set 028 closes with all 3 sessions and all 3 follow-up items from Set 027 cross-provider review now addressed: fresh-set completedSessions[] schema fixed, Electron env allowlist refactored, CI matrix deployed. No follow-up orchestration needed; operator can cut release tags per standard workflow. Force-closed mid-set downgrade remains as future candidate (Set 029+) pending architectural decision."
+    }
+  },
+  "blockers": []
+}

@@ -1,11 +1,12 @@
-# STATUS — session 29 of 36 landed: one vocabulary for a failure, one stamp for a measurement
+# STATUS — session 30 of 36 landed: the seat under TypeScript, and what it spent
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
 `experiment/verification-pipeline-v3` and `design/solution-decomposition`
 are merged and finished. Earlier handoff text is in `docs/status-archive.md`.
 
-> **Recorded, 2026-08-29.** Session 29's deliverables are decisions
-> **D187–D189** in `docs/sessions/decisions-log.md`; session 28's are
+> **Recorded, 2026-08-29.** Session 30's deliverables are decisions
+> **D190–D196** in `docs/sessions/decisions-log.md`; session 29's are
+> **D187–D189**; session 28's are
 > **D180–D186**, session 27's **D173–D179**, session 26's **D170–D172**,
 > session 25's **D163–D169**, session 24's **D150–D162** and session 23's
 > **D138–D149**, plus the amendments inside
@@ -23,6 +24,83 @@ are merged and finished. Earlier handoff text is in `docs/status-archive.md`.
 > section at the foot of this file uses the new numbers.
 
 ## Where things are
+
+- **Session 30 is closed `VERIFIED`** — 3 rounds (gpt-5-6-sol over the API).
+  Round 1 raised one Major; it was **accepted and fixed**. Round 2 restated
+  it on a narrower claim; that one was **disputed and withdrawn** in round 3.
+  Claude Code / claude-opus-5[1m] orchestrator. All five gates passed at the
+  first attempt; nothing was forced.
+- **The seat's dispatch state machine is ported whole**, and `route`'s
+  `copilot-cli` branch stops refusing itself by name — the refusal that
+  `route.test.ts` asserted against session 30 is gone, replaced by five tests
+  of the real branch. Spawn under a deadline, first-byte and total timeouts,
+  the temp-file pull above 24,000 rendered units with its nonce footer and
+  acknowledgement, the stderr taxonomy, and an unreadable catalog that stops
+  dispatch instead of falling back to the API.
+- **Two shape differences, both forced, neither in the record.** Python's two
+  reader threads and their queue become one line pump feeding the same queue,
+  because there is one thread; and `dispatch` is async, which is what `route`
+  already expected. **The measurement is not allowed to differ**, so
+  `subprocess.list2cmdline` is ported literally — trailing-backslash doubling
+  included — because the inline-vs-handoff branch is chosen from its length,
+  and a different number would send the two routers down different paths for
+  the same prompt.
+- **The catalog gained its writer, and a verb with it.** `dabbler copilot
+  refresh` (D190): the absence of a refresh command IS the incident this
+  record's design turns on, and a cutover that left the seat catalog
+  unrefreshable from the router that dispatches off it would recreate it.
+  `REFRESH_COMMAND` still names the **Python** invocation on purpose — both
+  routers print that string and the control compares it — and re-pointing it
+  is owed to the cutover.
+- **Round 1's Major was a divergence, not just a bug.** `resolveProgram`
+  walked PATH the way `cmd` and `where` do, so `copilot` resolved to the
+  `.BAT` shim VS Code installs ahead of the WinGet `.EXE`. A shim can only be
+  run by `cmd.exe`, whose command line stops at **8,191** where
+  `CreateProcess` allows 32,767 — and the handoff only starts at 24,000, so
+  every prompt in between would have failed before the CLI ran. Python found
+  the executable; this router found the shim. Resolution now prefers an
+  executable anywhere on PATH to a shim nearer the front, which is
+  `CreateProcess`'s rule and the one `subprocess` follows (D195).
+- **Round 2 asked for shim parsing and was refused (D196).** D174 had
+  already measured and rejected it, and this shim has no executable target to
+  find: `copilot.bat` is `@echo off` plus `powershell -ExecutionPolicy Bypass
+  -File …\copilot.ps1 %*`. The residual — a machine with only a shim — is
+  bounded identically on **both** routers, so fixing it on one side would be
+  a capability divergence introduced by a port. **Every round ran with
+  `agency: none`**, which is why the dispute cited file and line rather than
+  asserting.
+- **`seat_cost` is ported on `node:sqlite`**, `readOnly` (which is `mode=ro`);
+  the WAL is read and `immutable` is not used, because `immutable` is what
+  skips the WAL and undercounts a live store by ~7%. It is **fetched with
+  `process.getBuiltinModule`, not imported** (D192): `node:sqlite` is absent
+  from `module.builtinModules`, so resolvers strip the prefix and hunt for a
+  package called `sqlite`. That answer needed no build config and no
+  test-runner config; the `vitest.config.ts` written along the way was
+  deleted.
+- **The live seat probe reached the real CLI and the seat refused for quota
+  (D193).** It spawned the actual `copilot`, measured 31,673 rendered units,
+  took the **handoff** branch, wrote a 31 KB payload and dispatched — then
+  got `You have exceeded your monthly quota`, which the taxonomy classified
+  `quota-rate-class` from real stderr. **The ack-validated half of step 5 is
+  therefore unproven** and is owed to a run after the quota resets; the test
+  is committed behind `DABBLER_E2E=1`. A real failure is not nothing: no fake
+  spawner could have produced it.
+- **Seat cost is measured, and it is its own acceptance test.** The failed
+  turn still cost credits, and both routers priced the same conversation
+  against the CLI's live store identically — `measured`, **9.197 credits /
+  $0.0920** over one event — agreeing with each other and with the CLI's own
+  reported 9.2.
+- **Parity: 18 cases, two of them new, all identical.** `seat-cost` enters
+  with a **floor** case and an **unmeasured** case, over a canned
+  `session-store.db` the corpus writes. The seat catalog's **write** does not
+  enter and cannot: a refresh must probe, and a probe is a billed premium
+  request per model. `copilot refresh --dry-run` spends nothing, was run both
+  ways and is byte-identical — but Python's `python -m` path prints a runpy
+  `RuntimeWarning` to stderr, which the control compares. It becomes
+  comparable for free at the cutover (D194).
+
+
+### Session 29, still current
 
 - **Session 29 is closed `VERIFIED`** — 2 rounds (gpt-5-6-sol over the
   API). Round 1 raised one Major; it was **accepted and fixed**, not
@@ -648,6 +726,11 @@ is D127; the previous version of this file carried it in full.
 
 | Source | What is owed |
 | --- | --- |
+| **D196 — the shim-only ceiling, owed to the CUTOVER** | On a machine where `copilot` resolves only to a batch shim, `cmd.exe` runs it and the command line stops at 8,191 while the handoff waits until 24,000. **Both routers are bounded identically today** — `CreateProcess` wraps a batch file in `cmd /c` — so the fix is to lower the handoff threshold on the shim path, and `HANDOFF_THRESHOLD_UTF16_UNITS` is a constant both routers must agree on or they take different branches for the same prompt. Needs a session that may touch Python; session 36 is where there stops being a second side. Named in `defaultSpawner`. |
+| **D190 — `REFRESH_COMMAND`, owed to the CUTOVER** | Every message about a stale, hand-edited or same-provider catalog names `python -m ai_router.transports.copilot refresh`, and **both** routers print it, which is why it was not changed. It is true today and becomes false the moment Python is deleted. Re-point it to `dabbler copilot refresh` in session 36, in the same commit that removes the Python module it names. |
+| **D193 — the seat probe's second half** | The live handoff test reached the real CLI and took the handoff branch; the seat then refused for quota, so **no model read the payload and no acknowledgement was earned**. Run `DABBLER_E2E=1 npx vitest run test/live.test.ts -t handoff` once the operator's premium-request allowance resets. One billed turn. The failure message now dumps the whole metadata, so whichever way it goes the run is readable. |
+| **D194 — one int/float approximation, four readings** | JavaScript has one number type, so the port stands `Number.isInteger` in for Python's `type(x) is int`. Consequences: a wire `outputTokens: 42.0` fails closed in Python and is accepted here; a seat reporting `premiumRequests: 1.0` would be written `1` here and `1.0` there; and `toFixed` rounds half away from zero where Python's `format` rounds half to even (`seat-cost`'s credits, and `metrics`' escalation percentage since session 25). One fix covers all four — a JSON reader that keeps the lexical int/float distinction, and a shared fixed-point formatter — which is why it is one row and was not half-done in a port session. |
+| **D194 — `copilot refresh --dry-run` as a parity case** | Built, run both ways, stdout byte-identical, and **not** a case: `python -m ai_router.transports.copilot` makes runpy print a `RuntimeWarning` to stderr, which the control compares. Free to add at the cutover, and worth it — it is the only reading of the scope selection and the cost projection that costs nothing. |
 | ~~**D173 — the port's one record difference**~~ **CLOSED in session 29 by D187**, together with D185, which was the same shape. Both routers now stamp `dabbler-absence-search/1`, and a failed enumeration is recorded in a closed eight-term vocabulary rather than under the failing library's class name. The route taken is the one this row called sanctioned: Python changed first, and the field names the rule rather than the engine. | *Nothing further owed.* |
 | **D173 / round 1 — the evidence protocol has no callers** | `validate_transcript`, `validate_finding_evidence`, `authoritative_tier`, `verify_worker_result` and `record_worker_result` are ported and **nothing in either router calls them**. Two real gaps sit inside them, both shared with Python and both recorded rather than repaired on one side: `outputHash` is not re-derived from `rawOutput`, and a check's `evidence.pass.requires` contract is not enforced when its result is recorded. The session that first drives the critique loop owns both, and the second one may belong at dispatch rather than at record — the loop's shape decides. |
 | **D174 — consumer repositories** | A repository declaring `argv: ["npm", "test"]` for a check works under Python and would not have under the port without the shim resolution this session added. This repository declares every control as argv for `node` (D142), so nothing here exercises it. Session 33's `bootstrap` should say so where it writes a first `dabbler.yaml`. |
@@ -689,87 +772,75 @@ resolved by being true again.
 
 ## Next
 
-1. **Session 30 of 36 — transport II: the Copilot CLI state machine and seat
-   cost.** This is the session `route` currently refuses **by name** — the
-   `copilot-cli` branch throws rather than falling back to the API, because a
-   silent fallback would put a cross-provider verification on the provider
-   the operator was routing away from. `packages/router/test/route.test.ts`
-   asserts that refusal names session 30, so the test tells you when you have
-   arrived.
-   **Session 28 left this session more than a rule to restate.** The seat's
-   half of `selection` is already real, and so is the seat catalog's
-   *reader* — `transports/copilot.ts` grew 171 lines for it. What is missing
-   is the catalog's **writer**, and it cannot be ported without the empirical
-   probe and the dispatch state machine, because a refresh is *defined* as a
-   probe: a writer without one could only mark a model `confirmed` with no
-   evidence, which that file's own design forbids. That is the whole content
-   of session 28's disputed Major (D186), and it is the map for this session.
-   **Read D174 before spawning anything.** Windows spawning is where Node and
-   Python genuinely differ and it is already measured:
-   `spawn("x.cmd", …)` is `EINVAL` on Node, both routers actually pay
-   `cmd.exe` parsing on exactly these programs, the shim goes through
-   `%COMSPEC% /d /s /v:off /c` with each argument quoted itself and **never**
-   `shell: true`, and an over-long command line is `ENAMETOOLONG`.
-   `checks.isArgvTooLarge` is the one reader of that, and it is this
-   session's to import.
-2. **Read `docs/ts-port-parity-control.md` before planning any session
-   from here.** Its verb table is the growth order. Session 26 proved the
-   *plan's* line counts are a floor (three modules became nine); session 27
-   proved the other direction is also possible — `checks.plan` and its
-   neighbourhood were **not** ported, because their only caller is the run
-   core (D178). Read an inventory line as "the module", not "every function
-   of the module", and check the import graph before assuming either way.
-3. **A Python design question is owed to the operator, from D171's round-1
-   dispute.** A malformed or hand-edited `sessions.json` or
+1. **Session 31 of 36 — the session lifecycle.** `session` (1,386), `gates`
+   (421), `progress` (1,050), `modules` (246): 3,103 lines, 138 tests, and
+   the largest single session left. Its own plan says **port `gates` first**
+   and run the parity control on `close --dry-run` rows for every corpus
+   shape before anything else — a gate that differs by one row is the set's
+   worst outcome, and that is the cheapest place to see it.
+   **Three things are owed specifically to this session**, all renumbered
+   from decisions that say 30: `identity.resolve_session_orchestrator_identity`
+   lands here as a wrapper over `resolveOrchestratorIdentity` (D164) — it is
+   the one function in `identity` that reads a repository rather than a
+   block, and it reads state through `progress`, which is why it waited;
+   the `Router` contract is reconciled against what is actually ported,
+   defaulting to trimming (D162/D152 — `modules retire` plausibly earns
+   building, `modules list` probably does not); and `cli/session.ts`'s
+   refusals of `close`, `cancel`, `restore`, `plan` and `migrate` all come
+   out at once.
+2. **The two seat items in the Owed table are both addressed to the cutover,
+   and both are one-line changes that must not be made early.**
+   `REFRESH_COMMAND` still names the Python invocation, and the handoff
+   threshold still waits until 24,000 on a shim-only machine. Each is
+   correct today *because* there are two routers, and wrong the moment there
+   is one. They are the clearest example of the shape this port keeps
+   producing: a difference that is only safe to remove last.
+3. **Read `docs/ts-port-parity-control.md` before planning any session from
+   here.** Its verb table is the growth order, and it now carries three
+   amendments from this session: what the two `seat-cost` cases prove, why
+   the seat catalog's **write** is not comparable (a probe is billed), and
+   why `copilot refresh --dry-run` is byte-identical and still not a case
+   (Python's `python -m` prints a runpy warning to stderr, which the control
+   compares). Session 26 proved the plan's line counts are a floor; session
+   27 proved the other direction is also possible. Read an inventory line as
+   "the module", not "every function of the module", and check the import
+   graph before assuming either way.
+4. **A Python design question is still owed to the operator, from D171's
+   round-1 dispute.** A malformed or hand-edited `sessions.json` or
    `activity-log.json` is *silently replaced* rather than refused, in both
-   routers, today: `read_raw_session_state` returns `None` for unparseable
-   JSON and `_read_or_create_activity_log` builds a fresh log from any read
-   failure. A verifier called that Major and it is a fair call. It was not
-   fixed here because a behaviour change inside a port session is the one
-   failure a parity comparison cannot see — both routers would be wrong
-   together. **It is a redesign and it needs a ruling**: refuse and fail
-   closed, or keep replacing and say so. If it is to be fixed, the cheapest
-   moment is *after* session 35, when there is one implementation again.
-4. **D162 is per-command, from session 31** (D162 itself says 30): reconcile the `Router`
-   contract against what is actually ported, defaulting to trimming.
-   `modules retire` plausibly earns building; `modules list` probably does
-   not; `--finding-index` is just a correction to `--finding`. Session 26
-   adds one input to that: `ledger` is declared `extensionFacing` with
-   `pythonCli: false`, and nothing has ever called it — `pythonSpawnRouter`
-   refuses both its methods. It is a candidate for trimming rather than
-   building.
-5. **What sessions 25–27 leave for their successors** — renumbered here to
-   the new plan; the decisions themselves say 30/32/34. `identity`'s
-   session-level entry point is owed to **session 31** (D164); `verdict`'s
-   parity case and the `VERIFIED` look-alike question are owed to **session
-   33** (D163, D168); the round-append parity case is owed to **session 33**
-   for the same reason (D171's round-1 dispute, withdrawn on that basis), and
-   **so is the `completion_tree` comparison** — session 27 proved the two
-   snapshots agree on this repository (D177) but no verb writes a round yet,
-   so the control still cannot check it. The evidence protocol's two gaps are
-   owed to whichever of **32/33** first drives the critique loop. **The
-   absence-search engine stamp is no longer among them — session 29 closed it
-   (D187).**
+   routers: `read_raw_session_state` returns `None` for unparseable JSON and
+   `_read_or_create_activity_log` builds a fresh log from any read failure. A
+   verifier called that Major and it is a fair call. **It is a redesign and
+   it needs a ruling**: refuse and fail closed, or keep replacing and say so.
+   If it is to be fixed, the cheapest moment is *after* session 35, when
+   there is one implementation again. **Session 31 is the session that ports
+   both readers**, so it is the last comfortable moment to ask.
+5. **What sessions 25–27 leave for their successors**, renumbered here.
+   `verdict`'s parity case and the `VERIFIED` look-alike question are owed to
+   **session 33** (D163, D168); the round-append parity case is owed to
+   **session 33** for the same reason, and **so is the `completion_tree`
+   comparison** — session 27 proved the two snapshots agree on this
+   repository (D177) but no verb writes a round yet. The evidence protocol's
+   two gaps are owed to whichever of **32/33** first drives the critique
+   loop.
 6. **D130 override window** — the operator can still override retiring the
-   run core, until **session 35** starts. Session 27 has now made one decision
-   that leans on it: `checks.plan` is not ported because `runcli` is its only
-   caller (D178). An override would mean porting it — with the per-suite
-   defect fixed on **both** sides, in Python's own commit first.
-7. **Disputing is cheap; measure it before remediating on reflex.** Session
-   27 recorded four disputes and all four were withdrawn, at a cost of 8% of
-   round 1 for the round that settled the last one (D179). Three of them
-   would otherwise have become one-sided behaviour changes to the record's
-   trust rules — the single failure a parity comparison cannot see.
-   **Session 29 is the counterweight, and it matters as much.** Its round-1
-   Major was accepted on first reading and fixed, because it was right. The
-   rule that survives both sessions is *check the cited lines before
-   answering* — not *dispute by default*, which is the same reflex the other
-   way round.
-8. **A parity case that passes is not the same as a parity case that
-   proves.** Session 29's Major found a case comparing a refused connection
-   against a URL Node never dialled, agreeing for two different reasons and
-   going green. When a case is built to exercise a *failure*, assert the
-   underlying cause — the syscall code, the status, the exception's shape —
-   **before** asserting the value under test, on both sides. Otherwise the
-   control's own fallback paths can supply the expected answer, and a green
-   control that proves nothing reads exactly like proof.
+   run core, until **session 35** starts. Session 27 leaned on it once:
+   `checks.plan` is not ported because `runcli` is its only caller (D178). An
+   override would mean porting it, with the per-suite defect fixed on
+   **both** sides, in Python's own commit first.
+7. **The verifier has run with `agency: none` for three sessions now**, and
+   this session is the sharpest illustration of what that costs. Round 2's
+   Major was reasoning from the session plan's step 3 — a sentence written
+   before D174 measured Windows spawning and superseded it. The verifier
+   could not read D174, so it could not know. **Cite file and line in a
+   dispute**; an assertion about what the repository says is worth nothing to
+   a reviewer that cannot open it, and both of this session's disputes and
+   acceptances turned on being able to quote.
+8. **Check the cited lines before answering — in both directions.** Session
+   27 recorded four disputes and all four were withdrawn; session 29's Major
+   was right and was fixed on first reading. This session did both, on the
+   same finding: round 1's half was accepted because `resolveProgram` really
+   did reach a different program than Python, and round 2's half was refused
+   because `copilot.bat` really is two lines of PowerShell invocation with no
+   executable to resolve. Neither answer was available without opening the
+   file.

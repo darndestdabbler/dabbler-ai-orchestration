@@ -6256,3 +6256,51 @@ an allowlist") **times out at 5,000 ms under full-suite parallel load and
 passes in 1.3 s alone**. That flake predates this session -- it was present
 on the baseline run before a line was written -- and it is worth a raised
 timeout rather than an investigation.
+
+### D209 · 2026-08-29 · Orchestrator (claude-opus-5/anthropic) · The close refused because three post-VERIFIED edits moved the tree, and the gate was right: 'it is only a comment' is the argument that would let a real change through the same door
+
+Round 2 returned VERIFIED with three nits. Two were declined on the record
+and one -- a test that skips when the repository's `.venv` is absent -- was
+answered with a comment naming why the guard is correct here (the vitest CI
+job installs no Python at all, deliberately, for the same reason the parity
+control is absent from it). I also narrowed an over-broad claim in
+`docs/ts-port-parity-control.md`, and raised the timeout on a pre-existing
+flake that was blocking the run of record.
+
+**All three edits landed after the verdict, and the close refused.**
+
+    verification_clean  FAIL  the working tree changed after verification
+    round 2: docs/ts-port-parity-control.md, packages/router/test/checks.test.ts,
+    packages/router/test/verificationSupport.test.ts
+
+**The gate is right and the reasoning that got past it was wrong.** Earlier
+in the session a `close --dry-run` showed `verification_clean PASS`, and I
+read that as licence to make small edits afterwards. It was not: the dry run
+passed because the edits had not been made yet. The gate does not ask
+whether a change was behavioural; it asks whether the tree a human is being
+asked to trust is the tree a verifier read. A comment, a doc paragraph and a
+timeout are all changes to that tree. "It is only a comment" is exactly the
+argument that would let a real change through the same door, and the reader
+of the record cannot tell the two apart afterwards.
+
+**What should have happened.** The nits were in hand the moment round 2
+landed. Answering them before running the close -- or simply accepting that
+answering them costs a round -- was the whole choice, and it was made
+implicitly by editing rather than deliberately. The severity-gated stop
+(operator guidance: minor-only findings end the loop) governs whether to
+keep *asking a verifier*; it says nothing about whether the tree may move
+after it stops answering.
+
+**What was NOT done.** `session close --force` would have satisfied this
+gate and marked sessions 33 through 36 complete -- it promotes every open
+session, stamps `forceClosed` at the repository level, and is documented in
+this repository's own preamble as never being the way past a single gate
+(D157, D158). AGENTS.md states the rule the other way round: if a gate is
+wrong, prove it, record the proof, and satisfy the gate anyway. This gate
+was not wrong.
+
+**The cost of doing it properly was three files and one cheap round**, which
+is the point of the fix-delta review: round 3 sees a doc paragraph, a
+comment and a timeout, not a session. Recording it because the next session
+will meet the same fork -- a clean verdict, a nit worth answering, and a
+close waiting -- and the cheap wrong answer is very close to hand.

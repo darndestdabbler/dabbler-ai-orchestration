@@ -7117,6 +7117,27 @@
       "dateTime": "2026-08-29T10:48:23.147586-04:00",
       "description": "944 pytest in 379s and 686 vitest in 150s, both green and recorded as final-full",
       "status": "complete"
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D209",
+      "ordinal": 209,
+      "sessionNumber": 32,
+      "decidedOn": "2026-08-29",
+      "recordedAt": "2026-08-29T10:49:44.302389-04:00",
+      "decider": "orchestrator",
+      "headline": "The close refused because three post-VERIFIED edits moved the tree, and the gate was right: 'it is only a comment' is the argument that would let a real change through the same door",
+      "body": "Round 2 returned VERIFIED with three nits. Two were declined on the record\nand one -- a test that skips when the repository's `.venv` is absent -- was\nanswered with a comment naming why the guard is correct here (the vitest CI\njob installs no Python at all, deliberately, for the same reason the parity\ncontrol is absent from it). I also narrowed an over-broad claim in\n`docs/ts-port-parity-control.md`, and raised the timeout on a pre-existing\nflake that was blocking the run of record.\n\n**All three edits landed after the verdict, and the close refused.**\n\n    verification_clean  FAIL  the working tree changed after verification\n    round 2: docs/ts-port-parity-control.md, packages/router/test/checks.test.ts,\n    packages/router/test/verificationSupport.test.ts\n\n**The gate is right and the reasoning that got past it was wrong.** Earlier\nin the session a `close --dry-run` showed `verification_clean PASS`, and I\nread that as licence to make small edits afterwards. It was not: the dry run\npassed because the edits had not been made yet. The gate does not ask\nwhether a change was behavioural; it asks whether the tree a human is being\nasked to trust is the tree a verifier read. A comment, a doc paragraph and a\ntimeout are all changes to that tree. \"It is only a comment\" is exactly the\nargument that would let a real change through the same door, and the reader\nof the record cannot tell the two apart afterwards.\n\n**What should have happened.** The nits were in hand the moment round 2\nlanded. Answering them before running the close -- or simply accepting that\nanswering them costs a round -- was the whole choice, and it was made\nimplicitly by editing rather than deliberately. The severity-gated stop\n(operator guidance: minor-only findings end the loop) governs whether to\nkeep *asking a verifier*; it says nothing about whether the tree may move\nafter it stops answering.\n\n**What was NOT done.** `session close --force` would have satisfied this\ngate and marked sessions 33 through 36 complete -- it promotes every open\nsession, stamps `forceClosed` at the repository level, and is documented in\nthis repository's own preamble as never being the way past a single gate\n(D157, D158). AGENTS.md states the rule the other way round: if a gate is\nwrong, prove it, record the proof, and satisfy the gate anyway. This gate\nwas not wrong.\n\n**The cost of doing it properly was three files and one cheap round**, which\nis the point of the fix-delta review: round 3 sees a doc paragraph, a\ncomment and a timeout, not a session. Recording it because the next session\nwill meet the same fork -- a clean verdict, a nit worth answering, and a\nclose waiting -- and the cheap wrong answer is very close to hand.",
+      "model": "claude-opus-5",
+      "provider": "anthropic"
+    },
+    {
+      "sessionNumber": 32,
+      "stepNumber": 9,
+      "stepKey": "close-out",
+      "dateTime": "2026-08-29T10:54:06.184356-04:00",
+      "description": "closed after round 3; the close refused once on verification_clean and the answer was a round, not --force",
+      "status": "complete"
     }
   ]
 }

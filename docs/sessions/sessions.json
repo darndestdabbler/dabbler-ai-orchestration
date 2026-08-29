@@ -582,9 +582,9 @@
     {
       "number": 30,
       "title": "Transport II \u2014 the Copilot CLI state machine and seat cost",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-29T04:54:48.900824-04:00",
-      "completedAt": null,
+      "completedAt": "2026-08-29T06:00:35.415759-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

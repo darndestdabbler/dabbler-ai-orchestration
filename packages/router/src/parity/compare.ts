@@ -27,6 +27,7 @@ export const COMPARED: readonly RegExp[] = [
   /^\.dabbler\/runs\/[^/]+\.jsonl$/,
   /^\.dabbler\/runs\/s\d+\/.+$/,
   /^copilot-catalog\.lock$/,
+  /^\.dabbler\/api-models\.lock$/,
   /^(AGENTS|CLAUDE|GEMINI)\.md$/,
   /^\.gitignore$/,
   /^\.git\/hooks\/pre-commit$/,
@@ -64,7 +65,17 @@ export const EXCLUDED: readonly RegExp[] = [
  * It is not licence for a third rule: a digest over content with no
  * timestamp in it -- every tree hash in the record -- is compared exactly.
  */
-const DIGEST_LEDGERS: readonly RegExp[] = [/(^|\/)state-writes\.jsonl$/];
+const DIGEST_LEDGERS: readonly RegExp[] = [
+  /(^|\/)state-writes\.jsonl$/,
+  // `.dabbler/api-models.lock` is the second, and it names itself here as
+  // the rule above requires. Its `content_digest` covers the record's own
+  // rendered text -- which carries `written_at` and, after a failed
+  // enumeration, a `last_error_at` per vendor. Every line the digest covers
+  // is compared exactly two lines above it, so reducing the digest proves
+  // nothing less; leaving it exact would convict two identical records of
+  // having been written a second apart.
+  /(^|\/)api-models\.lock$/,
+];
 
 const SHA256_VALUE = /sha256:[0-9a-f]{64}/g;
 export const DIGEST_PLACEHOLDER = "sha256:<digest>";

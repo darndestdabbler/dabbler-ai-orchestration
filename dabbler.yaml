@@ -439,6 +439,7 @@ testing:
           - packages/router/test/config.test.ts
           - packages/router/test/metrics.test.ts
           - packages/router/test/identity.test.ts
+          - packages/router/test/selection.test.ts
       - when: packages/router/src/verdict.ts
         select:
           - packages/router/test/verdict.test.ts
@@ -448,10 +449,12 @@ testing:
       - when: packages/router/src/metrics.ts
         select:
           - packages/router/test/metrics.test.ts
+          - packages/router/test/route.test.ts
       - when: packages/router/src/lockfile.ts
         select:
           - packages/router/test/lockfile.test.ts
           - packages/router/test/metrics.test.ts
+          - packages/router/test/discovery.test.ts
       - when: packages/router/src/secretResolver.ts
         select:
           - packages/router/test/secretResolver.test.ts
@@ -510,6 +513,24 @@ testing:
           - packages/router/test/preverify.test.ts
       # Every record file is written through it, and `metrics` appends its
       # telemetry the same way.
+      # Routing: the role rule both transports resolve through, the one
+      # dispatch body over them, and the record of what currently exists.
+      # `selection.test.ts` carries the escalation triggers as well, because
+      # they live in `route.ts` and are what selection walks the ladder for.
+      - when: packages/router/src/selection.ts
+        select:
+          - packages/router/test/selection.test.ts
+          - packages/router/test/route.test.ts
+      - when: packages/router/src/route.ts
+        select:
+          - packages/router/test/route.test.ts
+          - packages/router/test/selection.test.ts
+      # `session start` prints its staleness warnings, so the record's own
+      # test file answers for that half.
+      - when: packages/router/src/discovery.ts
+        select:
+          - packages/router/test/discovery.test.ts
+          - packages/router/test/record.test.ts
       - when: packages/router/src/pythonJson.ts
         select:
           - packages/router/test/record.test.ts
@@ -532,6 +553,9 @@ testing:
           - packages/router/test/schema.test.ts
       - when: packages/router/src/transports/
         select:
+          - packages/router/test/transports.test.ts
+          - packages/router/test/route.test.ts
+          - packages/router/test/discovery.test.ts
           - packages/router/test/config.test.ts
           - packages/router/test/identity.test.ts
       # Not a test file: the suite's glob is `*.test.ts`, so nothing under
@@ -541,6 +565,9 @@ testing:
           - packages/router/test/config.test.ts
           - packages/router/test/metrics.test.ts
           - packages/router/test/lockfile.test.ts
+          - packages/router/test/transports.test.ts
+          - packages/router/test/selection.test.ts
+          - packages/router/test/route.test.ts
       - when: packages/router/scripts/
         select: []
       - when: packages/router/build.mjs

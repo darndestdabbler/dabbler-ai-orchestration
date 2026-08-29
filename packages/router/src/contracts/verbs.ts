@@ -106,7 +106,7 @@ export const VERBS: readonly VerbSpec[] = [
     pythonModule: "ai_router.discovery",
     portedInSession: 28,
     extensionFacing: false,
-    summary: "the seat catalog: read the lock file, or enumerate against a vendor",
+    summary: "what exists: enumerate a vendor, date the records, diff the roles",
   },
   {
     verb: "seat-cost",

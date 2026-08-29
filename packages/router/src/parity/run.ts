@@ -295,6 +295,60 @@ export const CASES: readonly ParityCase[] = [
       "digest and a different scope from the suite's covers, and the " +
       "`--duration-seconds 42` that both routers must write as the float 42.0",
   },
+  {
+    verb: "discovery",
+    label: "discovery status",
+    // `fresh` is the shape whose seed carries the record; `in-flight` would
+    // add nothing, because freshness is a function of the two lock files and
+    // not of the ledger.
+    shapes: ["fresh"],
+    pythonArgs: () => ["ai_router.discovery", "status"],
+    dabblerArgs: () => ["discovery", "status"],
+    proves:
+      "both records dated against their thresholds: the API record read as " +
+      "TOML and aged from its OLDEST per-vendor stamp rather than its " +
+      "record-level date, the seat catalog resolved relative to the config " +
+      "that names it and read for its probe date, and the stale/fresh " +
+      "verdict and the refresh command each row names",
+  },
+  {
+    verb: "discovery",
+    label: "discovery drift",
+    shapes: ["fresh"],
+    pythonArgs: () => ["ai_router.discovery", "drift"],
+    dabblerArgs: () => ["discovery", "drift"],
+    proves:
+      "the record-against-roles diff: every role's preference order joined " +
+      "against both records, the two sorted directions, the comma-joined " +
+      "provenance of each id, the `(none)` branches, and the freshness " +
+      "block underneath",
+  },
+  {
+    verb: "discovery",
+    label: "discovery enumerate --dry-run",
+    shapes: ["fresh"],
+    pythonArgs: () => ["ai_router.discovery", "enumerate", "--dry-run"],
+    dabblerArgs: () => ["discovery", "enumerate", "--dry-run"],
+    proves:
+      "the vendor count and the record path the write would take, and that " +
+      "a dry run reaches no endpoint and writes nothing",
+  },
+  {
+    verb: "discovery",
+    label: "discovery enumerate",
+    // The only compared verb that WRITES a lock file, and the reason the
+    // corpus scrubs the provider keys: with none set, all three vendors
+    // fail as `no-api-key` before a socket opens, so what is compared is
+    // the record both routers fold that identical failure into.
+    shapes: ["fresh"],
+    pythonArgs: () => ["ai_router.discovery", "enumerate"],
+    dabblerArgs: () => ["discovery", "enumerate"],
+    proves:
+      "the record write: the merge that annotates a failed vendor instead of " +
+      "emptying it, a vendor gaining a status row it did not have, the " +
+      "providers sorted by name, unknown written by omission, the writer " +
+      "stamp, and the per-vendor lines the command prints",
+  },
 ];
 
 // --- Preconditions -----------------------------------------------------------

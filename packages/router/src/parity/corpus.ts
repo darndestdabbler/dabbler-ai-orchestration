@@ -45,6 +45,17 @@ const SCRUBBED_ENV = [
   "AI_ROUTER_METRICS_PATH",
   "DABBLER_TRANSPORT",
   "DABBLER_NO_ROUTER",
+  // The provider keys, so the corpus can never reach a vendor. `discovery
+  // enumerate` is the one compared verb that would: with a key it makes
+  // three live calls whose answers are the vendors' current catalogs, which
+  // are neither a function of the repository nor the same for both copies.
+  // Without one, each vendor fails as `no-api-key` before any socket opens,
+  // and what is compared is the record BOTH routers write out of that
+  // identical failure -- the merge, the per-vendor annotation, the writer
+  // stamp and the digest.
+  "DABBLER_ANTHROPIC_API_KEY",
+  "DABBLER_OPENAI_API_KEY",
+  "DABBLER_GEMINI_API_KEY",
 ];
 
 function childEnvironment(): NodeJS.ProcessEnv {

@@ -121,6 +121,22 @@ function record(value: unknown): Record<string, unknown> {
   return isRecord(value) ? value : {};
 }
 
+/**
+ * Python's truthiness, for the scalars a config value or a recorded row can
+ * hold: `enabled: false`, `enabled: 0`, `enabled:` (null) and an absent key
+ * are all "off", and `entry.get(key, True)` is `truthy(entry[key] ?? true)`.
+ *
+ * Scalars only, deliberately. Python calls `[]` and `{}` falsy where
+ * JavaScript calls them truthy, and every caller here reads a flag: a
+ * container in one of these positions is a config error, and the one thing
+ * this must not do is quietly decide what the operator meant by it.
+ */
+export function truthy(value: unknown): boolean {
+  if (value === undefined || value === null || value === false) return false;
+  if (value === 0 || value === "") return false;
+  return true;
+}
+
 /** Python's `type(x).__name__`, for a refusal that names what it got. */
 function typeName(value: unknown): string {
   if (value === null || value === undefined) return "NoneType";

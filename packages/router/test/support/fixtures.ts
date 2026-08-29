@@ -90,6 +90,27 @@ const BASE_CONFIG: Record<string, unknown> = {
   metrics: { enabled: true },
 };
 
+/**
+ * The three provider keys `BASE_CONFIG` names.
+ *
+ * Selection refuses a provider whose key does not resolve, so a test about
+ * ordering that forgot to set them would be testing reachability instead --
+ * quietly, and with the right-looking answer for the wrong reason.
+ */
+export const PROVIDER_KEYS = [
+  "TEST_ANTHROPIC_KEY",
+  "TEST_GOOGLE_KEY",
+  "TEST_OPENAI_KEY",
+] as const;
+
+export function setProviderKeys(): void {
+  for (const name of PROVIDER_KEYS) process.env[name] = "test-key";
+}
+
+export function clearProviderKeys(): void {
+  for (const name of PROVIDER_KEYS) delete process.env[name];
+}
+
 /** A temporary directory that removes itself when the test file is done. */
 export function makeTempDir(): string {
   const path = mkdtempSync(join(tmpdir(), "dabbler-router-test-"));

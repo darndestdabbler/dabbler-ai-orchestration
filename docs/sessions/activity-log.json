@@ -5994,6 +5994,235 @@
       "dateTime": "2026-08-28T20:44:32.065787-04:00",
       "description": "82,021 input / 16,256 output tokens to gpt-5-6-sol over three rounds, 222.6s; one Claude Code context. Recorded as D179.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 28,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-28T20:50:03.042893-04:00",
+      "description": "Register; declare `--not-releasable`.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 28,
+      "stepNumber": 2,
+      "stepKey": "port-in-the-order-listed",
+      "dateTime": "2026-08-28T20:50:03.042893-04:00",
+      "description": "Port in the order listed; the offline transport first so every later session's tests run without a network, as today.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 28,
+      "stepNumber": 3,
+      "stepKey": "discovery-reads-and-writes-copilot-catalog",
+      "dateTime": "2026-08-28T20:50:03.042893-04:00",
+      "description": "`discovery` reads and writes `copilot-catalog.lock` identically; parity on the lock file.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 28,
+      "stepNumber": 4,
+      "stepKey": "one-live-e2e-marked-call-per",
+      "dateTime": "2026-08-28T20:50:03.042893-04:00",
+      "description": "One live `e2e`-marked call per provider as evidence, recorded, excluded from the default run.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 28,
+      "stepNumber": 5,
+      "stepKey": "measure-this-session-s-seat-cost",
+      "dateTime": "2026-08-28T20:50:03.042893-04:00",
+      "description": "Measure this session's seat cost and record it.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 28,
+      "stepNumber": 6,
+      "stepKey": "affected-tests-as-preverify",
+      "dateTime": "2026-08-28T20:50:03.042893-04:00",
+      "description": "Affected tests as preverify.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 28,
+      "stepNumber": 7,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-28T20:50:03.042893-04:00",
+      "description": "Cross-provider verification.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 28,
+      "stepNumber": 8,
+      "stepKey": "full-test-suite-recorded-as-the",
+      "dateTime": "2026-08-28T20:50:03.042893-04:00",
+      "description": "Full test suite, recorded as the `final-full` run of record.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 28,
+      "stepNumber": 9,
+      "stepKey": "close-out",
+      "dateTime": "2026-08-28T20:50:03.042893-04:00",
+      "description": "Close-out.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 28,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-28T20:50:03.054392-04:00",
+      "description": "Registered session 28 (claude-code).",
+      "status": "complete"
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 28,
+      "dateTime": "2026-08-28T20:50:14.795119-04:00",
+      "task": "Session 28 of 35 \u2014 Transports I: API, offline, routing, selection, discovery.\n\nPort six Python modules of `ai_router` to TypeScript in `packages/router`:\n`transports/base` (49), `transports/offline` (140), `transports/api` (292),\n`route` (592), `selection` (146), `discovery` (1,057) \u2014 2,276 lines, 82\ntests. Behaviour is not redesigned; Python decides and the port agrees.\n\n1. Register; declare `--not-releasable`.\n2. Port in the order listed, the offline transport first, so every later\n   session's tests run without a network exactly as today. `fetch` with\n   streaming replaces `httpx`; `exclude_providers` is honoured on every\n   path including offline (the set-143 defect stays fixed).\n3. `discovery` reads and writes `copilot-catalog.lock` and\n   `api-models.lock` identically; parity on the lock files.\n4. One live `e2e`-marked call per reachable provider as evidence,\n   recorded, excluded from the default run.\n5. Measure this session's seat cost and record it.\n6. Affected tests as preverify.\n7. Cross-provider verification.\n8. Full test suite, recorded as the `final-full` run of record.\n9. Close-out.\n\nNot releasable: this session publishes nothing. Session 35 is the only\nreleasable session of the port.",
+      "releasable": false
+    },
+    {
+      "sessionNumber": 28,
+      "stepNumber": 2,
+      "stepKey": "port-in-the-order-listed",
+      "dateTime": "2026-08-28T21:29:16.634685-04:00",
+      "description": "Six modules ported: transports/base, transports/offline and transports/api (fetch replacing httpx, async where Python blocks), selection, route and discovery -- 2,276 Python lines becoming ~2,470 TypeScript across seven files, plus the seat catalog READER slice transports/copilot.ts needed and cli/discovery.ts. route's copilot-cli branch and its auto-verify tail are refused by name (sessions 29 and 31); every other path is complete. 89 vitest tests.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 28,
+      "stepNumber": 3,
+      "stepKey": "discovery-reads-and-writes-copilot-catalog",
+      "dateTime": "2026-08-28T21:29:17.121469-04:00",
+      "description": "Four discovery cases entered the parity control on the fresh shape -- status, drift, enumerate --dry-run and enumerate -- and 16 cases over 85 paths are green. The seat catalog is READ identically by three of them; api-models.lock is the write, and it is the first lock file any compared verb produces.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 28,
+      "stepNumber": 4,
+      "stepKey": "one-live-e2e-marked-call-per",
+      "dateTime": "2026-08-28T21:29:25.082539-04:00",
+      "description": "One live call per vendor through the ported fetch transport, in test/live.test.ts, gated on DABBLER_E2E=1 and skipped by the default run. All three answered: anthropic 1.3s, openai 2.0s, google 0.7s. OpenAI resolved gpt-5.4 to gpt-5.4-2026-03-05, so the served-model notice fired on the wire rather than only against a canned body.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 28,
+      "stepNumber": 6,
+      "stepKey": "affected-tests-as-preverify",
+      "dateTime": "2026-08-28T21:29:25.546020-04:00",
+      "description": "111 pytest (75s) and 254 vitest (15s, 3 skipped live) recorded preverify-targeted, both policy targeted.",
+      "status": "complete"
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D180",
+      "ordinal": 180,
+      "sessionNumber": 28,
+      "decidedOn": "2026-08-28",
+      "recordedAt": "2026-08-28T21:29:48.495881-04:00",
+      "decider": "orchestrator",
+      "headline": "route is async under Node, and the rate limiter's lock has to survive the change",
+      "body": "`route` is `async` under Node, and that is the whole of the shape\ndifference between the two dispatch bodies.\n\nPython's `route()` blocks: `httpx.Client.post` blocks, `time.sleep` in the\nrate limiter blocks, and `subprocess` on the seat blocks. None of the three\nhas a blocking form under Node \u2014 `fetch` returns a promise, a child process\nis read event by event, and a synchronous facade over either would stall the\nonly thread the process has. So `route`, `DirectApiTransport.dispatch`,\n`OfflineTransport.dispatch` and `callModel` are all `Promise`-returning, and\n`RateLimiter.wait` is too.\n\nThis is the same call session 27 made for `checks.execute` (D174), for the\nsame reason, and it is the second and last module where it applies: the\nremaining ports are file and process readers.\n\nTwo consequences are worth stating rather than discovering.\n\n**The rate limiter's lock survives the change.** Python holds a\n`threading.Lock` across the sleep, so two threads cannot both decide they\nare under the ceiling. Node has one thread and the same hazard: two awaited\n`wait()` calls would otherwise interleave inside the window and both pass.\nThe port serialises through a promise chain \u2014 each call awaits the previous\none's release before it reads the window \u2014 which is what the lock was doing.\nDropping it because \"Node is single-threaded\" would have removed the rate\nlimit under exactly the concurrency it exists for.\n\n**The `finally` that releases it is not optional.** A throw inside the\nwindow with no release would deadlock every later call on that provider\nrather than failing one."
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D181",
+      "ordinal": 181,
+      "sessionNumber": 28,
+      "decidedOn": "2026-08-28",
+      "recordedAt": "2026-08-28T21:30:25.344180-04:00",
+      "decider": "orchestrator",
+      "headline": "route's two unported branches are refused by name, not skipped: silence would return an unverified result that looks verified",
+      "body": "`route` is ported whole except for two branches, and each is REFUSED by\nname rather than skipped, dropped, or quietly redirected.\n\n**The `copilot-cli` branch** needs the dispatch state machine \u2014 spawn, the\nthree timeouts, the temp-file handoff, the stderr taxonomy \u2014 which is\nsession 29's entire subject. Reaching it throws a `RouterError` naming that\nsession. The alternative that looks harmless is falling through to the API\ntransport, and it is the worst option available: it would put a\ncross-provider verification on the provider the operator was routing away\nfrom, and nothing downstream could tell.\n\n**The auto-verification tail** fires when `verification.enabled` is true and\nthe task type is in `auto_verify_task_types` \u2014 which the bundled config\nmakes true for `code-review`, so it is a live branch, not a dead one. It\ncalls `verifyjob.auto_verify`, ported in session 31. Reaching it throws,\nnaming that session. Skipping it would return a result the config asked to\nhave verified, unverified, with a `metadata.verification` key simply absent\n\u2014 and \"absent\" is how a caller reads \"nothing to report\".\n\nThe pattern is session 26's (D171): `cli/session.ts` refuses `close`,\n`cancel`, `restore`, `plan` and `migrate` by name and says which session\nlands them. A refusal that names its session is a better answer than either\na wrong result or an unexplained one.\n\n**What this does NOT hold back.** Everything up to those two branches is\nreal: prompt rendering and the over-budget refusal, the escalation triggers\nand their classification, the truncation heuristic, the rate limiter, the\nexclusion assertion at the call site, the metrics row, and the whole API and\noffline paths. The seat's half of selection is real too \u2014 `resolveRole` is\none implementation and the seat resolves through it \u2014 so session 29 inherits\na transport to write, not a rule to restate.\n\n`resolve_role_candidates` and `validate_catalog` are deliberately NOT\nported here even though `route` names them in Python: their only caller is\nthe branch that is refused, and `validate_catalog` reaches\n`catalog_provenance` \u2192 `catalog_digest` \u2192 the catalog WRITER, which is\nsession 29's. Porting them now would have added the seat catalog's renderer\nto this session to serve a function nothing calls \u2014 the failure session 27\nfound in `checks.plan` (D178) and fixed by deletion."
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D182",
+      "ordinal": 182,
+      "sessionNumber": 28,
+      "decidedOn": "2026-08-28",
+      "recordedAt": "2026-08-28T21:30:25.879396-04:00",
+      "decider": "orchestrator",
+      "headline": "Taking the keys away makes discovery enumerate comparable, so the control compares a lock-file WRITE",
+      "body": "The parity control's specification excluded `discovery enumerate` because\n\"it needs the network and its answer is not a function of the repository.\"\nBoth halves are true on a machine with keys and false on a machine without\none, and the corpus can decide which machine it is.\n\nSo the corpus now scrubs `DABBLER_ANTHROPIC_API_KEY`,\n`DABBLER_OPENAI_API_KEY` and `DABBLER_GEMINI_API_KEY` alongside the four\nrouter variables it already scrubbed. Every vendor then fails as\n`no-api-key` before a socket opens, and the verb becomes a pure function of\nthe repository again \u2014 one that WRITES.\n\nThat matters because `enumerate` is the only compared verb that writes a\nlock file, and the write is where the record format lives: the merge that\nannotates a failed vendor instead of emptying it, a vendor gaining a status\nrow it did not have before, the providers sorted by name, unknown written by\nomission, the writer stamp, and the content digest. Comparing only `status`\nand `drift` would have compared the reader and left the writer to session\n35 to discover.\n\nThe scrub is load-bearing on its own, independently of the new case: without\nit a parity run on the operator's own machine would spend three vendor calls\nper shape, on every run.\n\n**Four cases, all on `fresh`**: `status`, `drift`, `enumerate --dry-run`,\n`enumerate`. Sixteen cases over 85 paths, and green.\n\n**Two amendments the control needed to accept them.**\n\n`.dabbler/api-models.lock` joins the compared paths \u2014 the first path under\n`.dabbler/` outside `runs/` that a router writes \u2014 and it NAMES ITSELF as\nthe second digest ledger, which is what the specification requires of any\ndigest over content that carries a timestamp. Its `content_digest` covers\nthe record's own rendered text, and that text carries `written_at` plus a\n`last_error_at` per failed vendor, so two runs a second apart can never\nagree on the digest while every line it covers compares equal two lines\nabove it.\n\n**One line remains wall-clock-derived and the normalizations cannot reach\nit.** Three of the four cases print a record's age as `f\"{hours:.0f}h old\"`,\ncomputed from each router's own `now`, and the two invocations are about a\nsecond apart. Two runs disagree only if that second straddles a rounding\nboundary \u2014 roughly one run in two thousand \u2014 and the resulting diff reads\n`5713h old` against `5714h old`, which is self-explaining and settled by\nre-running. It is recorded rather than fixed because both available fixes\nare worse: a third normalization is forbidden by the specification, and a\n`--now` flag on both routers would be a CLI knob invented for the control's\nconvenience."
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D183",
+      "ordinal": 183,
+      "sessionNumber": 28,
+      "decidedOn": "2026-08-28",
+      "recordedAt": "2026-08-28T21:30:48.228958-04:00",
+      "decider": "orchestrator",
+      "headline": "session start's discovery warnings land, and the seat lock file gets one parser instead of two",
+      "body": "Session 26 left `session start`'s discovery warnings unported and said so\nin a comment: `discovery` landed in session 28, and the corpus declares both\nrecords fresh so neither router had anything to say (D171). A repository\nwith a stale record therefore got the warning from Python and not from the\nTypeScript router \u2014 an invisible difference the control could not see,\nbecause the only shape it runs against is the one where the line is absent.\n\nThat is now closed. `session.ts` calls `freshnessWarnings(loadConfig())`\nthrough the same fail-silent wrapper its Python twin uses: a staleness check\nthat could fail a registration would be a maintenance signal capable of\ncausing an outage, which is how maintenance signals get suppressed, so any\nfailure reading it leaves the session unblocked and silent.\n\nTwo differences from the Python twin, both deliberate.\n\nPython imports `load_config` and `freshness_warnings` INSIDE the function to\nkeep `ai_router.session` off `discovery`'s import path at module load. Here\nthe graph runs one way only \u2014 `discovery` reads `evidence`, and `evidence`\nreads neither \u2014 so a plain top-level import says the same thing with less\nmachinery. `require()` inside a function would also have been the one place\nin the package that is not an ESM import.\n\nThe corpus still cannot see this line, and that is not a gap this session\ncan close: making the corpus's record stale would put a discovery warning in\nfront of every `session start` comparison, which is the exact thing session\n26 wrote the fixture to prevent. What the control DOES now compare is the\nwarning's own producer, four ways, in `discovery`'s own cases \u2014 the absent\nrecord, the undated record, the overdue record and the per-vendor notes all\nrun through `freshnessMessage` on both routers.\n\n**The seat catalog reader came with it.** `discovery` needs\n`meta.probed_at` and the confirmed entries, so `transports/copilot.ts` grew\na real `loadCatalog` \u2014 the whole reader, with its required keys, its\nmalformed-entry refusals and its `candidate_universe` validation \u2014 and\n`confirmedCatalogEntries`, the lenient reader `identity` had been using,\ncollapsed into a four-line wrapper over it. The lock file now has ONE\nparser, which is what that file's own header had promised since session 25.\n\nThat closes a latent divergence nobody had noticed: the old lenient reader\nSKIPPED a malformed `[[models]]` entry and resolved a provider from the\nrest, where Python's `load_catalog` raises and `identity` catches, resolving\nnothing. A lock with one broken entry says nothing reliable about the\nothers, and the value drives a same-provider safety exclusion \u2014 so failing\nclosed is Python's answer and is now the port's. It is covered by a test."
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D184",
+      "ordinal": 184,
+      "sessionNumber": 28,
+      "decidedOn": "2026-08-28",
+      "recordedAt": "2026-08-28T21:31:07.312603-04:00",
+      "decider": "orchestrator",
+      "headline": "The ported fetch transport reaches all three vendors live; the pytest e2e marker does not yet exclude what it says it does",
+      "body": "Every other test in this suite answers a canned response. That proves the\nrequest the module BUILDS and the reading of a body it was handed, and it\ncannot prove the one thing a transport exists for: that a real vendor\naccepts the request and answers in the shape the reader expects.\n\n`fetch` replaced `httpx` in this port. \"The shape we send is still accepted\"\nis exactly the claim that stopped being inherited from the Python side, so\nit is the claim that needed measuring.\n\n`packages/router/test/live.test.ts` makes one call per vendor through\n`callModel`, using the bundled registry's own model id for each \u2014 nothing\nhere pins a model. All three answered:\n\n| Vendor | Elapsed | Note |\n| --- | ---: | --- |\n| anthropic | 1.3 s | |\n| openai | 2.0 s | served `gpt-5.4-2026-03-05` for `gpt-5.4` |\n| google | 0.7 s | |\n\nThe OpenAI row is the more interesting result. The served-model detection\nexists because OpenAI has resolved a bare id to a differently-priced variant\nwith nothing else able to see it \u2014 and here it did exactly that, on the\nwire, so the notice fired against a real response body rather than a canned\none and both ids reached the metrics row.\n\n**Excluded from the default run, and by an explicit opt-in.**\n`describe.runIf(process.env.DABBLER_E2E === \"1\")` \u2014 not \"are there keys on\nthis machine\", because a developer with keys set must not discover that\n`npm test` spends money. It is the vitest twin of the `e2e` marker\n`pytest.ini` declares for the same reason. The default run reports three\nskipped.\n\n**One thing this session did not fix, and the next session that adds a\nPython live test must.** `pytest.ini` declares the `e2e` marker as\n\"excluded from the default run\", but `addopts` carries no `-m \"not e2e\"`, so\nthe exclusion is a promise the configuration does not keep. No Python e2e\ntest exists today, so nothing is wrong yet; adding one without that flag\nwould put live vendor calls into the run of record."
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D185",
+      "ordinal": 185,
+      "sessionNumber": 28,
+      "decidedOn": "2026-08-28",
+      "recordedAt": "2026-08-28T21:45:42.771518-04:00",
+      "decider": "orchestrator",
+      "headline": "A failed vendor's recorded error class differs between the routers, and it is the second D173-shaped question owed a ruling",
+      "body": "`discovery.enumerate_provider` records a failed vendor as the failing\nexception's CLASS NAME and never its message, because a vendor error body\ncan echo the request headers back and the string is written into a committed\nrecord.\n\nThe class name is the failing library's own, and the libraries differ. The\nsame timeout is `TimeoutException` under `httpx` and `HttpTimeoutError`\nunder the port; the same 500 is `HTTPStatusError` and `HttpStatusError`; a\nmalformed body is `JSONDecodeError` and `SyntaxError`. So the two routers\nwrite different `last_error` values into `.dabbler/api-models.lock` for the\nsame failure.\n\nThis is the SECOND cross-language byte difference of its kind and it is\nowed the same ruling as the first. Every difference settled so far went\nPython's way (D165) because each was a *formatting* choice \u2014 how a float is\nspelled, where a line ends. These two are content:\n\n- **D173**, `evidence.run_absence_search`: the regex engine that produced a\n  count, stamped `python-re/<version>` against `node-regexp/<node>`.\n- **This one**, the vendor failure class.\n\nIn both, the honest value differs because the engine differs, and writing\nPython's string from the Node router would be a false provenance claim.\n\nNothing reaches either today, and the parity control cannot see this one:\nits corpus scrubs the provider keys, so every vendor fails as the\n`no-api-key` CONSTANT before a socket opens, and the constant is shared.\nThe difference appears only on a machine with keys and a vendor that is\ndown \u2014 which is exactly where a record's `last_error` matters.\n\nThree options, and the operator's to pick:\n\n1. **Leave it.** Each router names the failure honestly in its own terms.\n   The record then says which router wrote the row, which is arguably what a\n   reader wants and is already recoverable from `written_by`.\n2. **Normalise it** to a small closed vocabulary of the framework's own\n   (`timeout`, `http-status`, `decode`, `other`), written by both. Loses the\n   library's precision, gains a value a reader can compare across rows.\n3. **Take Python's spelling** in the port. Cheapest to state and the least\n   honest: the Node router would be reporting a class it did not raise.\n\nOption 2 is the one this session would pick if it were the session's to\npick, because it is the only one that leaves the field comparable after\nsession 35 deletes the Python side \u2014 but that is a record-vocabulary\nchange, and record vocabulary is not an orchestrator's call.\n\nSession 35 is the deadline for both this and D173: after it there is only\none router, and whichever string it writes becomes the answer by default\nrather than by decision."
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D186",
+      "ordinal": 186,
+      "sessionNumber": 28,
+      "decidedOn": "2026-08-28",
+      "recordedAt": "2026-08-28T21:51:07.533692-04:00",
+      "decider": "orchestrator",
+      "headline": "Session 28 seat cost: 60,448 in / 10,443 out over two rounds, and the dispute that saved a session cost 3,400 tokens",
+      "body": "Two rounds to `gpt-5-6-sol` over the API: **60,448 input / 10,443 output\ntokens** in 137.6 s of model time.\n\n| Round | In | Out | Elapsed | Verdict |\n| --- | ---: | ---: | ---: | --- |\n| 1 | 51,169 | 7,286 | 95.4 s | ISSUES_FOUND, 1 Major + 3 nits |\n| 2 | 9,279 | 3,157 | 42.2 s | VERIFIED, dispute WITHDRAWN |\n\nNo Copilot seat was used. One Claude Code context on the subscription\nwindow.\n\nRound 2 is **18% of round 1's input**, against 26% at session 26 and 8% at\nsession 27. The shape holds: a round that reviews a fix delta and\nadjudicates one dispute is cheap, and the argument for writing a rebuttal\nout rather than remediating on reflex keeps getting stronger.\n\n**What the dispute cost and bought.** The rebuttal is ~3,400 tokens of\ninput. It settled a Major finding that would otherwise have moved the seat\ncatalog's writer -- and, with it, the probe and the dispatch state machine\n-- out of session 29 and into session 28. Remediating on reflex would have\ncost most of the next session, and the verifier withdrew on the first\nreading of the cited lines.\n\n**Three of the four findings were worth having, and one was a real\ndefect.** The Major was wrong about which module writes the seat catalog,\nbut it was wrong about a real ambiguity in the plan's own wording. Two nits\ndescribed Python's behaviour faithfully ported and were answered with a\ndocstring rather than a change. The remaining nit found a genuine bug: a\nGemini 200 with no candidate became the literal string `\"undefined\"` and\nwould have passed every escalation trigger as an answer.\n\n**The running total across the port's six sessions so far** is 511,873\nverifier tokens: 23 (136,020), 24 (61,855), 25 (67,234), 26 (77,596), 27\n(98,277), 28 (70,891). Session 28 is the third cheapest of the six while\nbeing the second largest by Python lines ported (2,276, behind session\n27's 3,293) -- which is what two rounds instead of three buys."
+    },
+    {
+      "sessionNumber": 28,
+      "stepNumber": 5,
+      "stepKey": "measure-this-session-s-seat-cost",
+      "dateTime": "2026-08-28T21:51:16.348857-04:00",
+      "description": "60,448 input / 10,443 output tokens to gpt-5-6-sol over two rounds, 137.6s; one Claude Code context; no Copilot seat. Round 2 is 18% of round 1's input. Recorded as D186.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 28,
+      "stepNumber": 7,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-28T21:51:17.139202-04:00",
+      "description": "2 rounds, gpt-5-6-sol over the API. Round 1 ISSUES_FOUND with one Major -- that the seat catalog's writer had been deferred -- DISPUTED with file-backed evidence that ai_router.discovery never writes that file and its writer needs the session-29 probe; WITHDRAWN in round 2. Of three nits, one was a real defect (a Gemini 200 with no candidate became the string \"undefined\") and was fixed with a test; two described Python's behaviour faithfully ported and were answered with a docstring. Round 2 VERIFIED.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 28,
+      "stepNumber": 8,
+      "stepKey": "full-test-suite-recorded-as-the",
+      "dateTime": "2026-08-28T21:55:21.099646-04:00",
+      "description": "944 pytest (5:58) and 389 vitest (47s, 3 skipped live) recorded final-full against the verified tree.",
+      "status": "complete"
     }
   ]
 }

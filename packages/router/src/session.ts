@@ -21,6 +21,8 @@ import {
   IdentityResolutionError,
   resolveOrchestratorIdentity,
 } from "./identity.ts";
+import { loadConfig } from "./config.ts";
+import { freshnessWarnings } from "./discovery.ts";
 import { SESSION_PLAN_FILENAME } from "./evidence.ts";
 import { nowIso, platformNewlines } from "./journal.ts";
 import {
@@ -48,6 +50,31 @@ import {
   usePlanParser,
 } from "./writers.ts";
 import { writeErr, writeOut } from "./cli/output.ts";
+
+/**
+ * Stale-record warnings for the session about to start.
+ *
+ * Registration is the last moment before the work at which a refresh may
+ * legitimately happen, and the first at which it may not: discovery runs
+ * between sessions, so the signal belongs here and the refresh does not. It
+ * warns and names the invocation; it never blocks and it never refreshes. A
+ * staleness check that could fail a registration would be a maintenance
+ * signal capable of causing an outage, which is how maintenance signals get
+ * suppressed -- so any failure reading it leaves the session unblocked and
+ * silent.
+ *
+ * Python imports both names inside the function to keep `ai_router.session`
+ * out of `discovery`'s import path at module load; here the graph runs the
+ * other way and one direction only, so a plain import says the same thing
+ * with less machinery.
+ */
+function discoveryWarnings(): string[] {
+  try {
+    return freshnessWarnings(loadConfig());
+  } catch {
+    return [];
+  }
+}
 
 export const EXIT_OK = 0;
 export const EXIT_GATE_FAILED = 1;
@@ -560,11 +587,7 @@ export function start(sessionsDir: string, options: StartOptions): number {
         `${basename(sessionsDir)} registered (${options.engine}); ` +
         `${seeded} plan step(s) seeded.\n`,
     );
-    // The discovery staleness warnings the Python twin prints here are not
-    // reproduced: `discovery` lands in session 28, and the corpus the parity
-    // control runs against declares both records fresh so neither router has
-    // anything to say. A repository with a stale record therefore gets the
-    // warning from Python and not from here until session 28 (D171).
+    for (const line of discoveryWarnings()) writeOut(`${line}\n`);
     if (planRows.length > 0) {
       // The engine cannot guess these derived slugs; a step logged under any
       // other key (and no stepNumber) lands as a NEW row instead of ticking

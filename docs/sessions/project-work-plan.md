@@ -63,7 +63,7 @@ it.
 | 25 | Foundation modules | no | 2026-08-28 |
 | 26 | The record — journal, ledger, writers | no | 2026-08-28 |
 | 27 | Evidence, checks, test evidence, affected | no | 2026-08-28 |
-| 28 | Transports I — API, offline, routing, selection, discovery | — | not declared |
+| 28 | Transports I — API, offline, routing, selection, discovery | no | 2026-08-28 |
 | 29 | Transport II — the Copilot CLI state machine and seat cost | — | not declared |
 | 30 | The session lifecycle | — | not declared |
 | 31 | Verification support — agency, verifyjob, the approved plan | — | not declared |
@@ -790,3 +790,32 @@ Port four Python modules of `ai_router` to TypeScript in `packages/router`:
    as the run of record; close through the five gates.
 
 Not releasable: this is a port session inside the rebuild, publishing nothing.
+
+### Session 28 — Transports I — API, offline, routing, selection, discovery
+
+**Releasable: no.**
+
+Session 28 of 35 — Transports I: API, offline, routing, selection, discovery.
+
+Port six Python modules of `ai_router` to TypeScript in `packages/router`:
+`transports/base` (49), `transports/offline` (140), `transports/api` (292),
+`route` (592), `selection` (146), `discovery` (1,057) — 2,276 lines, 82
+tests. Behaviour is not redesigned; Python decides and the port agrees.
+
+1. Register; declare `--not-releasable`.
+2. Port in the order listed, the offline transport first, so every later
+   session's tests run without a network exactly as today. `fetch` with
+   streaming replaces `httpx`; `exclude_providers` is honoured on every
+   path including offline (the set-143 defect stays fixed).
+3. `discovery` reads and writes `copilot-catalog.lock` and
+   `api-models.lock` identically; parity on the lock files.
+4. One live `e2e`-marked call per reachable provider as evidence,
+   recorded, excluded from the default run.
+5. Measure this session's seat cost and record it.
+6. Affected tests as preverify.
+7. Cross-provider verification.
+8. Full test suite, recorded as the `final-full` run of record.
+9. Close-out.
+
+Not releasable: this session publishes nothing. Session 35 is the only
+releasable session of the port.

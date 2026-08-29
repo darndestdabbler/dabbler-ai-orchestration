@@ -110,6 +110,13 @@ transport** (`transports/offline`, ported in session 28) fed canned verifier
 text from the corpus, so both routers see byte-identical verifier output.
 Until session 28 the corpus drives only the verbs that buy no model call.
 
+> **Amended in session 28, as built.** The offline transport is ported and
+> `route` dispatches through it, so a canned verifier is now possible — but
+> the three shapes that need one still have no builder, because the verb
+> that would drive them is `verify` at session 32. What session 28 removes
+> is the *blocker*, not the gap: the builders land with the verbs that read
+> them, which is the rule the shape table already follows.
+
 ## The verbs
 
 Every verb is run twice against two copies of the same shape — once by
@@ -158,6 +165,41 @@ session that ports its module and stays in it for every later session.
 `discovery enumerate` is excluded: it needs the network and its answer is
 not a function of the repository.
 
+> **Amended in session 28, as built: `discovery enumerate` is compared after
+> all, because the corpus takes the network away from it.** The exclusion
+> above is right about a machine with keys — three live calls whose answers
+> are the vendors' current catalogs, which are neither a function of the
+> repository nor the same for both copies. So the corpus scrubs
+> `DABBLER_ANTHROPIC_API_KEY`, `DABBLER_OPENAI_API_KEY` and
+> `DABBLER_GEMINI_API_KEY` alongside the four router variables it already
+> scrubbed. Every vendor then fails as `no-api-key` before a socket opens,
+> and what is compared is the record both routers fold that identical
+> failure into: the merge that annotates a failed vendor instead of emptying
+> it, a vendor gaining a status row it did not have, the providers sorted by
+> name, unknown written by omission, the writer stamp and the digest. That
+> is the **write** half the table's row asks for, and it is the only compared
+> verb that writes a lock file. Scrubbing the keys is also load-bearing on
+> its own: without it a parity run on the operator's own machine would spend
+> three vendor calls per shape, every run.
+>
+> Four cases, all on `fresh`: `status`, `drift`, `enumerate --dry-run` and
+> `enumerate`. The seat catalog is **read** by the first three — it resolves
+> relative to the config that names it, so both routers read the same real
+> `ai_router/copilot-catalog.lock` — and it is not written by anything until
+> session 29, which is where the table's "lock-file … write" belongs for the
+> seat.
+>
+> **One line in these cases is wall-clock-derived and the normalizations
+> cannot reach it**: `status`, `drift` and the dry run print a record's age
+> as `f"{hours:.0f}h old"`, computed from each router's own `now`, and the
+> two invocations are about a second apart. Two runs disagree only if that
+> second straddles a half-hour-rounding boundary — roughly one run in two
+> thousand — and the diff then says `5713h old` against `5714h old`, which
+> is self-explaining and settled by re-running. It is recorded here rather
+> than fixed, because both available fixes are worse: a third normalization
+> is forbidden, and a `--now` flag would be a CLI knob invented for the
+> control's convenience.
+
 ## The files compared
 
 After both runs, the control walks the **union** of paths under each copy
@@ -175,7 +217,8 @@ Compared:
   `baseline-reanchors.jsonl`, `step-execution.jsonl`, `audits.jsonl`,
   `packaging.jsonl`, `approved-plan.json`, `approved-plan-writes.jsonl`,
   `plan-review.jsonl`.
-- `copilot-catalog.lock`.
+- `copilot-catalog.lock`, and `.dabbler/api-models.lock` (added in session
+  28, the one path under `.dabbler/` outside `runs/` that a router writes).
 - What `bootstrap` writes: the `AGENTS.md` / `CLAUDE.md` / `GEMINI.md`
   fence, the pre-commit hook, `.gitignore`.
 - The six-step workflow's `events.jsonl` and `projection.json` (from
@@ -251,6 +294,15 @@ differently would make every future diff lie.
 > rule and is not licence for one: a digest over content with no timestamp
 > in it — every tree hash in the record, `completion_tree` included — is
 > compared exactly, and a new digest ledger has to name itself here.
+
+> **Naming itself, session 28: `.dabbler/api-models.lock`.** Its
+> `[meta].content_digest` covers the record's own rendered text, and that
+> text carries `written_at` plus a `last_error_at` per vendor that failed —
+> so two runs a second apart can never agree on the digest while every line
+> it covers compares equal two lines above it. Its `sha256:` value is
+> therefore reduced the same way `state-writes.jsonl`'s is. It is the second
+> and last such value in the record today; the seat catalog's digest will be
+> the third when session 29 gives it a writer.
 
 ## Output and exit codes
 

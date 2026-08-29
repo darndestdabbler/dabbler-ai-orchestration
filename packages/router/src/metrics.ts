@@ -16,7 +16,7 @@
 import { appendFileSync, existsSync, mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 
-import { isRecord, type RouterConfig } from "./config.ts";
+import { isRecord, truthy, type RouterConfig } from "./config.ts";
 import { platformNewlines } from "./journal.ts";
 import { AI_ROUTER_DIR } from "./paths.ts";
 import { PythonFloat, dumps } from "./pythonJson.ts";
@@ -354,12 +354,6 @@ export function main(config: RouterConfig): number {
 }
 
 // --- Rendering, as Python renders it -----------------------------------------
-
-function truthy(value: unknown): boolean {
-  if (value === undefined || value === null || value === false) return false;
-  if (value === 0 || value === "") return false;
-  return true;
-}
 
 function comma(value: number): string {
   return String(value).replace(/\B(?=(\d{3})+(?!\d))/g, ",");

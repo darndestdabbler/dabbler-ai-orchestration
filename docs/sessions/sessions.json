@@ -525,9 +525,9 @@
     {
       "number": 27,
       "title": "Evidence, checks, test evidence, affected",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-28T19:38:04.416737-04:00",
-      "completedAt": null,
+      "completedAt": "2026-08-28T20:45:02.917618-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

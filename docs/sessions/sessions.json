@@ -658,11 +658,21 @@
     {
       "number": 34,
       "title": "Bootstrap, packaging, and the `dabbler` command on the PATH",
-      "status": "not-started",
-      "startedAt": null,
+      "status": "in-progress",
+      "startedAt": "2026-08-29T16:00:30.814926-04:00",
       "completedAt": null,
-      "orchestrator": null,
-      "verificationVerdict": null
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": "VERIFIED",
+      "verification": {
+        "rounds": 2,
+        "verifierModel": "gpt-5-6-sol",
+        "verifierProvider": "openai",
+        "transport": "api"
+      }
     },
     {
       "number": 35,

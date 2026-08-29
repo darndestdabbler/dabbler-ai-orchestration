@@ -18,7 +18,24 @@ import { join, relative } from "node:path";
 
 export class CorpusError extends Error {}
 
-/** Git as the corpus needs it: no host configuration, fixed identity and dates. */
+/**
+ * Git as the corpus needs it: no host configuration, fixed identity and
+ * dates. And the one thing that decides what Python's output *bytes* are.
+ *
+ * `PYTHONIOENCODING` is not a normalization -- it is an input, the same kind
+ * of thing as the pinned committer date. Python encodes `sys.stdout` with the
+ * console code page unless told otherwise, so on Windows an em dash leaves
+ * `print` as one cp1252 byte while Node writes the three UTF-8 bytes for the
+ * same character. Left alone, every refusal sentence in the router that
+ * carries a dash would read as drift, and the only way to make the comparison
+ * agree would be to teach the TypeScript router to emit cp1252 -- baking a
+ * Windows console default into a cross-platform command, and leaving session
+ * 36 to change it back silently the moment Python leaves.
+ *
+ * So both routers are asked for the same encoding of the same text. It is set
+ * for both spawns, because the corpus gives one environment per side rather
+ * than two; Node has no such setting and ignores it.
+ */
 const PINNED_ENV: Record<string, string> = {
   GIT_CONFIG_NOSYSTEM: "1",
   GIT_AUTHOR_NAME: "Parity",
@@ -27,6 +44,7 @@ const PINNED_ENV: Record<string, string> = {
   GIT_COMMITTER_EMAIL: "parity@example.invalid",
   GIT_AUTHOR_DATE: "2026-01-01T00:00:00+00:00",
   GIT_COMMITTER_DATE: "2026-01-01T00:00:00+00:00",
+  PYTHONIOENCODING: "utf-8",
 };
 
 /**

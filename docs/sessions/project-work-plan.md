@@ -69,7 +69,7 @@ it.
 | 31 | The session lifecycle | no | 2026-08-29 |
 | 32 | Verification support — agency, verifyjob, the approved plan | no | 2026-08-29 |
 | 33 | The verification loop | no | 2026-08-29 |
-| 34 | Bootstrap, packaging, and the `dabbler` command on the PATH | — | not declared |
+| 34 | Bootstrap, packaging, and the `dabbler` command on the PATH | no | 2026-08-29 |
 | 35 | The six-step workflow ported, the run core retired | — | not declared |
 | 36 | Cutover — the extension calls in-process, and Python leaves | — | not declared |
 
@@ -993,3 +993,33 @@ Behavior does not change.
    suite as the final-full run of record; close out.
 
 Not releasable — this session publishes no package.
+
+### Session 34 — Bootstrap, packaging, and the `dabbler` command on the PATH
+
+**Releasable: no.**
+
+Session 34 of 36 — Bootstrap, packaging, and the `dabbler` command on the PATH.
+
+Port the last two infrastructure modules to TypeScript and make the router
+installable without Python.
+
+1. Port `ai_router/bootstrap.py` (1,146 lines) to the TypeScript router.
+   The managed `AGENTS.md` fence is regenerated with `dabbler <verb>` in
+   place of `python -m ai_router.<module>`; the pre-commit hook references
+   the shim rather than an interpreter path. The `.gitignore` rewrite and
+   the user-scope `DABBLER_TRANSPORT` persistence are kept exactly — they
+   are documented traps, not bugs to fix here.
+2. Port `ai_router/packaging.py` (743 lines). The feed credential resolves
+   at spawn into one argv element and is placed in no environment, as today.
+3. Register both verbs in the verb table and the `dabbler` CLI dispatch.
+4. Ship the `dabbler` binary from the router package (`bin`), and have the
+   VS Code extension prepend a shim directory to the integrated terminal's
+   PATH through `EnvironmentVariableCollection`, running the CLI on the
+   extension host's own Node (`ELECTRON_RUN_AS_NODE`).
+5. Extend the parity control with the cases these two verbs can reach.
+6. Prove zero-install delivery on a scratch repository with no `.venv` and
+   no Python on PATH: `dabbler session start` registers a session. Record
+   the result as evidence.
+7. Measure and record this session's seat cost.
+
+Not releasable: this session ships no package to the feed.

@@ -165,6 +165,54 @@ session that ports its module and stays in it for every later session.
 `discovery enumerate` is excluded: it needs the network and its answer is
 not a function of the repository.
 
+> **Amended in session 34, as built: what the `bootstrap` row reaches, and
+> what it cannot.** The `fresh` shape already carries a session plan, a
+> `dabbler.yaml` and the `.dabbler/` ignore rule, so running `bootstrap` on
+> it compares the **refresh** path — the three engine files written from
+> nothing, the commit guard installed, the ignore rule recognised and left
+> alone, the round refspecs configured. That is the whole of what this verb
+> is allowed to write, and it includes the two files this session's Python
+> change was made for.
+>
+> It does **not** reach the **scaffold** path — the rendered `dabbler.yaml`
+> and the two setup sessions — which is the path a consumer project actually
+> takes. Reaching it needs a project carrying none of those, and that is a
+> sixth corpus shape: built twice on every round of every remaining session,
+> against a headroom the handoff into this session flagged explicitly. It
+> would also not be enough on its own, because neither `dabbler.yaml` nor
+> `session-plan.md` is in the compared-path list. So the branch is driven
+> against the reference implementation directly, in
+> `packages/router/test/differential.test.ts`, over two projects — one with
+> no build file at all and one that is four ecosystems at once. That is
+> session 33's stated pattern for anything a CLI case cannot reach, and it
+> is chosen here over widening both the shape list and the path list.
+>
+> Two flags are not optional on this case and neither is cosmetic.
+> `--repo-name` is pinned because the default is the project directory's own
+> basename, and the two copies are different directories — the fence would
+> differ for a reason that is not the router's. `--no-transport-detect`
+> because the transport preference is written to the **operator's account**,
+> not into the copy: a comparison that persisted an environment variable on
+> the host twice per round would be reaching outside the thing it compares.
+>
+> **Amended in session 34: `PYTHONIOENCODING=utf-8` is pinned, and it is an
+> input rather than a third normalization.** Python encodes `sys.stdout`
+> with the console code page unless told otherwise, so on Windows an em dash
+> leaves `print` as one cp1252 byte while Node writes the three UTF-8 bytes
+> for the same character. No compared verb had emitted a non-ASCII character
+> on stdout before this session; `bootstrap` emits two, and `packaging`'s
+> refusals carry more.
+>
+> Left alone, the only way to make the comparison agree would be to teach
+> the TypeScript router to emit cp1252 — which is what "the TypeScript side
+> is the one that moves" says literally, and which would bake a Windows
+> console default into a cross-platform command and leave session 36 to
+> change it back silently in the commit that deletes Python. So both routers
+> are asked for the same encoding of the same text, in `PINNED_ENV` beside
+> the committer date. It rewrites nothing after the fact, which is why it is
+> not a third rule: the two normalizations still describe everything that
+> happens to an output once it exists.
+
 > **Amended in session 28, as built: `discovery enumerate` is compared after
 > all, because the corpus takes the network away from it.** The exclusion
 > above is right about a machine with keys — three live calls whose answers
@@ -532,3 +580,27 @@ differently would make every future diff lie.
   a Python defect found by the port, which is recorded as a decision and
   fixed on the Python side first, in its own commit, so the parity run that
   follows compares two routers with the same intended behaviour.
+
+  > **Amended in session 34: there is a second exception, and it is the one
+  > the session plan itself wrote.** Session 34's step 2 says the managed
+  > fence is regenerated with `dabbler <verb>` in place of `python -m
+  > ai_router.<module>`, and the pre-commit hook references the shim rather
+  > than an interpreter path. Both of those files are in the compared list,
+  > so a TypeScript side that "moved" to match Python would be a TypeScript
+  > side that disobeyed the plan.
+  >
+  > For the fence that is an argument. For the **hook** it is not: Python
+  > bakes in `sys.executable` and the TypeScript router has no such value to
+  > bake — its nearest equivalent is `process.execPath`, a different absolute
+  > path outside the copy root, which normalization 2 does not touch. The
+  > hook therefore **cannot** be ported byte-identically while each router
+  > names its own interpreter. Either both write a PATH-resolved command or
+  > the control is red forever on a file the plan explicitly assigns to this
+  > session.
+  >
+  > So Python moved first, in its own commit, exactly as the exception above
+  > prescribes — the difference being that this was a planned product change
+  > rather than a defect. It is not licence for a third: the test is whether
+  > the plan named the change *and* the compared artifact has no
+  > byte-identical form without it. Both held here. The parity run that
+  > follows is green on all three engine files and the hook.

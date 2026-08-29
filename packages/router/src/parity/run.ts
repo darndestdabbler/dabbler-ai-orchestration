@@ -844,6 +844,68 @@ export const CASES: readonly ParityCase[] = [
       "that no verdict a person types exists on either side, and that the " +
       "refusal names the two machine-decided cap-terminal states instead",
   },
+  {
+    verb: "bootstrap",
+    label: "bootstrap (refresh)",
+    // `fresh` already carries a plan, a `dabbler.yaml` and the ignore rule,
+    // so what this compares is the REFRESH path: the three engine files
+    // written from nothing, the commit guard installed, the ignore rule
+    // recognised and left alone, and the round refspecs configured. The
+    // SCAFFOLD path -- the rendered declaration and the two setup sessions --
+    // needs a project with none of those, which no shape carries and which
+    // the compared-path list does not cover either; it is driven directly on
+    // both routers in `test/differential.test.ts` instead of buying a sixth
+    // shape that every future round would build twice.
+    shapes: ["fresh"],
+    // `--repo-name` is pinned because the default is the directory's own
+    // basename, and the two copies are different directories -- the fence
+    // would then differ for a reason that is not the router's.
+    //
+    // `--no-transport-detect` because the transport preference is written to
+    // the OPERATOR'S account, not into the copy. A comparison that persisted
+    // an environment variable on the host twice per round would be reaching
+    // outside the thing it is comparing.
+    pythonArgs: (repo) => [
+      "ai_router.bootstrap",
+      "--project-dir", repo,
+      "--repo-name", "parity-subject",
+      "--no-transport-detect",
+    ],
+    dabblerArgs: (repo) => [
+      "bootstrap",
+      "--project-dir", repo,
+      "--repo-name", "parity-subject",
+      "--no-transport-detect",
+    ],
+    proves:
+      "the managed fence byte for byte in all three engine files, the " +
+      "pre-commit guard that names the router rather than an interpreter, " +
+      "the ignore rule recognised as already present, and the round " +
+      "refspecs -- every file this verb is allowed to write, on the one " +
+      "verb whose output IS a document a person then reads",
+  },
+  {
+    verb: "packaging",
+    label: "packaging --dry-run (refused: not releasable)",
+    // `in-flight` declared itself `--not-releasable`, so this reaches the
+    // first refusal and stops there -- which is the one §3.a exists for, and
+    // the only one a shape without a `packaging` block can reach. The
+    // refusals below it, the gate rows and the credential resolution are
+    // covered by `test/packaging.test.ts` on this side and `test_packaging`
+    // on the other; what a shape can prove here is that the two routers
+    // refuse the same session in the same words at the same exit code.
+    shapes: ["in-flight"],
+    pythonArgs: (_repo, sessionsDir) => [
+      "ai_router.packaging", "--dry-run", "--sessions-dir", sessionsDir,
+    ],
+    dabblerArgs: (_repo, sessionsDir) => [
+      "packaging", "--dry-run", "--sessions-dir", sessionsDir,
+    ],
+    proves:
+      "that a session which did not declare itself releasable cannot " +
+      "publish on either side, refused in the same sentence at the same " +
+      "exit code, with nothing packed, nothing pushed and nothing filed",
+  },
 ];
 
 

@@ -8,6 +8,7 @@ import { registerNewModuleCommand } from "./commands/newModule";
 import { registerSessionTerminalCommands } from "./commands/sessionTerminalCommands";
 import { registerBootstrapProjectCommand } from "./commands/bootstrapProject";
 import { registerInstallAiRouterCommand } from "./commands/installAiRouter";
+import { installTerminalShim } from "./router/terminalShim";
 import { registerWorkExplorerTreeCommands } from "./commands/workExplorerTreeCommands";
 import { SESSIONS_REL, discoverRoots, hasSessionsRoot } from "./utils/fileSystem";
 import { RUNS_REL } from "./utils/projection";
@@ -195,6 +196,14 @@ export function activate(context: vscode.ExtensionContext): void {
     registerInstallAiRouterCommand(context),
   );
   safeRegister("troubleshootCommand", () => registerTroubleshootCommand(context));
+  // The integrated terminal gets `dabbler` on PATH, run on the extension
+  // host's own Node. It is registered like a command because it can fail the
+  // same way one can, and for the same reason it must not take activation
+  // down with it: the extension's own router calls do not go through the
+  // shim, so a failure here costs the terminal convenience and nothing else.
+  safeRegister("terminalShim", () => {
+    installTerminalShim(context);
+  });
 }
 
 export function deactivate(): void {}

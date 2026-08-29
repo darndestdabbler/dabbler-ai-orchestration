@@ -18,7 +18,7 @@
 // router lives, so in practice it runs.
 
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
@@ -250,4 +250,106 @@ describe("the deterministic-facts row, against the reference implementation", ()
     );
     expect(ours).toBe(theirs);
   });
+});
+
+describe("the bootstrap scaffold, against the reference implementation", () => {
+  // The parity control runs `bootstrap` on the `fresh` shape, which already
+  // carries a plan and a `dabbler.yaml` -- so the refresh path is compared
+  // and the SCAFFOLD path, the one a consumer project actually takes, is
+  // not. Reaching it from the control would need a sixth corpus shape, and
+  // a shape is built twice on every round of every session from here; the
+  // two files it would add are not in the compared set either. So the branch
+  // is driven directly on both sides instead, which is what this file is for.
+
+  /** Both routers' bootstrap over one empty directory each. */
+  function scaffoldBothWays(ecosystem: Record<string, string>): {
+    ours: Record<string, string>;
+    theirs: Record<string, string>;
+  } {
+    const read = (root: string): Record<string, string> => {
+      const files: Record<string, string> = {};
+      for (const rel of [
+        "dabbler.yaml",
+        "docs/sessions/session-plan.md",
+        "AGENTS.md",
+        "CLAUDE.md",
+        "GEMINI.md",
+        ".gitignore",
+      ]) {
+        const path = join(root, ...rel.split("/"));
+        files[rel] = existsSync(path) ? readFileSync(path, "utf8") : "(absent)";
+      }
+      return files;
+    };
+    const seed = (root: string): void => {
+      mkdirSync(root, { recursive: true });
+      for (const [rel, text] of Object.entries(ecosystem)) {
+        const path = join(root, ...rel.split("/"));
+        mkdirSync(join(path, ".."), { recursive: true });
+        writeFileSync(path, text, "utf8");
+      }
+    };
+    const base = makeTempDir();
+    const mine = join(base, "ts");
+    const theirs = join(base, "py");
+    seed(mine);
+    seed(theirs);
+
+    const ranTs = spawnSync(
+      process.execPath,
+      [
+        join(repoRoot, "packages", "router", "dist", "dabbler.cjs"),
+        "bootstrap",
+        "--project-dir", mine,
+        "--repo-name", "acme-app",
+        "--no-transport-detect",
+      ],
+      { cwd: repoRoot, encoding: "utf8" },
+    );
+    expect(ranTs.status, ranTs.stderr).toBe(0);
+
+    const ranPy = spawnSync(
+      interpreter,
+      [
+        "-m", "ai_router.bootstrap",
+        "--project-dir", theirs,
+        "--repo-name", "acme-app",
+        "--no-transport-detect",
+      ],
+      { cwd: repoRoot, encoding: "utf8" },
+    );
+    expect(ranPy.status, ranPy.stderr).toBe(0);
+
+    return { ours: read(mine), theirs: read(theirs) };
+  }
+
+  it.runIf(havePython)(
+    "writes the same files into a project that has nothing",
+    () => {
+      // No build file at all: the `no suites` declaration, which is a
+      // declaration rather than an omission, plus the two setup sessions.
+      const { ours, theirs } = scaffoldBothWays({});
+      expect(ours).toEqual(theirs);
+      expect(ours["docs/sessions/session-plan.md"]).toContain("### Session 1:");
+      expect(ours["dabbler.yaml"]).toContain("No suite is declared");
+    },
+  );
+
+  it.runIf(havePython)(
+    "declares the same suite for each ecosystem it detects",
+    () => {
+      // Two ecosystems at once is the case `testing.suites` was made plural
+      // for, and the committed wrapper is the entry point the repository
+      // already chose.
+      const { ours, theirs } = scaffoldBothWays({
+        "pytest.ini": "[pytest]\n",
+        "pom.xml": "<project/>\n",
+        "mvnw": "#!/bin/sh\n",
+        "package.json": JSON.stringify({ scripts: { test: "vitest run" } }),
+      });
+      expect(ours).toEqual(theirs);
+      expect(ours["dabbler.yaml"]).toContain("./mvnw -q test");
+      expect(ours["dabbler.yaml"]).toContain("name: node");
+    },
+  );
 });

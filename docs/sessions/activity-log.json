@@ -7338,6 +7338,189 @@
       "body": "Two rounds to `gpt-5-6-sol` over the API, and both were dispatched, parsed\nand recorded by the **TypeScript** loop rather than by Python \u2014 which is the\nsession plan's step 7 taken literally, and the first time the ported router\nhas bought a verdict for the repository's own record.\n\n| round | in | out | outcome |\n| --- | ---: | ---: | --- |\n| 1 (full) | 66,427 | 8,381 | ISSUES_FOUND, 1 blocking + 2 nits |\n| 2 (fix-delta) | 7,313 | 5,918 | VERIFIED |\n| **total** | **73,740** | **14,299** | |\n\nRound 2 cost **11% of round 1's input** while carrying the fix delta and the\nprior round's findings. Session 32's comparable figure was 23%; the difference\nis the size of round 1's bundle here (a 3,200-line port) rather than any change\nto the loop.\n\n**Step 7's second half is deliberately not done, and this is the deviation.**\nThe plan asked for \"the Python loop run once more on the same tree as a\nrecorded cross-check\". After round 2 returned VERIFIED, a Python round would\nhave opened round 3 against an *empty* fix delta \u2014 paying a third verifier to\nreview nothing, and writing a round row that says a model reviewed a tree that\nhad not moved. The cross-check was performed by a stronger instrument that\ncosts nothing: **the parity control compares `verify` through both routers on\nfive shapes and 42 cases, including the cap terminal, the dispute write and\nthe re-anchor write.** A model reviewing an empty diff proves less than 366\nbyte-comparisons of what the two loops actually write.\n\nThe one path parity cannot reach is a real dispatched round, and that is the\npath these two rounds exercised \u2014 through the ported loop, on this\nrepository's own record. Between them, both halves are covered.",
       "model": "claude-opus-5",
       "provider": "anthropic"
+    },
+    {
+      "sessionNumber": 34,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-29T16:00:30.889099-04:00",
+      "description": "Register; declare `--not-releasable`.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 34,
+      "stepNumber": 2,
+      "stepKey": "port-bootstrap",
+      "dateTime": "2026-08-29T16:00:30.889099-04:00",
+      "description": "Port `bootstrap`: the `AGENTS.md` fence is regenerated with `dabbler <verb>` in place of `python -m ai_router.<module>`; the pre-commit hook references the shim, not an interpreter path; the `.gitignore` and the user-scope `DABBLER_TRANSPORT` side effects are kept exactly (they are documented traps, not bugs to fix here).",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 34,
+      "stepNumber": 3,
+      "stepKey": "port-packaging",
+      "dateTime": "2026-08-29T16:00:30.889099-04:00",
+      "description": "Port `packaging`: the feed credential resolves at spawn into one argv element and is placed in no environment, as today.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 34,
+      "stepNumber": 4,
+      "stepKey": "ship-the-dabbler-binary-in-the",
+      "dateTime": "2026-08-29T16:00:30.889099-04:00",
+      "description": "Ship the `dabbler` binary in the router package (`bin`), and have the extension prepend a shim directory to integrated-terminal `PATH` through `EnvironmentVariableCollection`, running the CLI on the extension host's own Node (`ELECTRON_RUN_AS_NODE`). Outside VS Code: `npm i -g`.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 34,
+      "stepNumber": 5,
+      "stepKey": "prove-it-on-a-scratch-repository",
+      "dateTime": "2026-08-29T16:00:30.889099-04:00",
+      "description": "Prove it on a scratch repository with no `.venv` and no Python on `PATH`: `dabbler session start` from a VS Code terminal registers a session. Recorded as evidence.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 34,
+      "stepNumber": 6,
+      "stepKey": "measure-this-session-s-seat-cost",
+      "dateTime": "2026-08-29T16:00:30.889099-04:00",
+      "description": "Measure this session's seat cost and record it.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 34,
+      "stepNumber": 7,
+      "stepKey": "affected-tests-as-preverify",
+      "dateTime": "2026-08-29T16:00:30.889099-04:00",
+      "description": "Affected tests as preverify.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 34,
+      "stepNumber": 8,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-29T16:00:30.889099-04:00",
+      "description": "Cross-provider verification.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 34,
+      "stepNumber": 9,
+      "stepKey": "full-test-suite-recorded-as-the",
+      "dateTime": "2026-08-29T16:00:30.889099-04:00",
+      "description": "Full test suite, recorded as the `final-full` run of record.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 34,
+      "stepNumber": 10,
+      "stepKey": "close-out",
+      "dateTime": "2026-08-29T16:00:30.889099-04:00",
+      "description": "Close-out.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 34,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-29T16:00:30.902822-04:00",
+      "description": "Registered session 34 (claude-code).",
+      "status": "complete"
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 34,
+      "dateTime": "2026-08-29T16:01:23.769663-04:00",
+      "task": "Session 34 of 36 \u2014 Bootstrap, packaging, and the `dabbler` command on the PATH.\n\nPort the last two infrastructure modules to TypeScript and make the router\ninstallable without Python.\n\n1. Port `ai_router/bootstrap.py` (1,146 lines) to the TypeScript router.\n   The managed `AGENTS.md` fence is regenerated with `dabbler <verb>` in\n   place of `python -m ai_router.<module>`; the pre-commit hook references\n   the shim rather than an interpreter path. The `.gitignore` rewrite and\n   the user-scope `DABBLER_TRANSPORT` persistence are kept exactly \u2014 they\n   are documented traps, not bugs to fix here.\n2. Port `ai_router/packaging.py` (743 lines). The feed credential resolves\n   at spawn into one argv element and is placed in no environment, as today.\n3. Register both verbs in the verb table and the `dabbler` CLI dispatch.\n4. Ship the `dabbler` binary from the router package (`bin`), and have the\n   VS Code extension prepend a shim directory to the integrated terminal's\n   PATH through `EnvironmentVariableCollection`, running the CLI on the\n   extension host's own Node (`ELECTRON_RUN_AS_NODE`).\n5. Extend the parity control with the cases these two verbs can reach.\n6. Prove zero-install delivery on a scratch repository with no `.venv` and\n   no Python on PATH: `dabbler session start` registers a session. Record\n   the result as evidence.\n7. Measure and record this session's seat cost.\n\nNot releasable: this session ships no package to the feed.",
+      "releasable": false
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D218",
+      "ordinal": 218,
+      "sessionNumber": 34,
+      "decidedOn": "2026-08-29",
+      "recordedAt": "2026-08-29T16:38:34.623161-04:00",
+      "decider": "orchestrator",
+      "headline": "The fence and the commit guard name `dabbler`, and Python moved first because the hook has no byte-identical form",
+      "body": "The session plan's step 2 and the parity control's compared-path list were\nin direct conflict, and the pre-commit hook is what settled it.\n\nThe plan says the managed fence is regenerated with `dabbler <verb>` in\nplace of `python -m ai_router.<module>`, and that the hook references the\nshim rather than an interpreter path. The control names all four files \u2014\n`AGENTS.md`, `CLAUDE.md`, `GEMINI.md` and `.git/hooks/pre-commit` \u2014 as\ncompared byte for byte, and its sequencing rule says that when a comparison\nfails the TypeScript side is the one that moves.\n\nFor the fence, either reading is arguable. For the hook it is not. Python\nbakes in `sys.executable`; the TypeScript router has no such value, and its\nnearest equivalent, `process.execPath`, is a different absolute path lying\noutside the copy root, which normalization 2 does not rewrite. There is no\nspelling of \"each router names its own interpreter\" that produces the same\nbytes. The hook could therefore never be ported without one side moving,\nand the plan had already said which way.\n\nSo the Python side moved first, in its own commit: `_SHARED_BODY` names\n`dabbler <verb>` throughout, its last hard rule now describes the shim\ninstead of the venv, and `_PRE_COMMIT_HOOK` invokes `dabbler verify step\nguard-commit` with no interpreter baked in and no `{python}` substitution.\n`ensure_commit_guard`'s docstring records the reversal of its own earlier\nreasoning: the interpreter was baked in so that a hook could not answer\nabout a different environment, and the answer now is that a consumer\nrepository is not required to contain the thing that guards it.\n\nThe verification is direct rather than argued: both routers were run\nagainst two scratch repositories, and every file bootstrap writes \u2014\nall three engine files, `.gitignore`, `dabbler.yaml`, the scaffolded\nsession plan and the hook \u2014 is byte-identical. The parity control then\nwent green with the new `bootstrap` case included.\n\nTwo consequences to carry forward. First, this is a second exception to\n\"a behaviour change is not a fix\", and it is narrower than it looks: the\ntest is that the plan named the change AND the compared artifact has no\nbyte-identical form without it. Both held here; neither holds for a\nconvenience. Second, this repository's own three instruction files were\nNOT regenerated. They still name `.venv/Scripts/python -m ai_router.<module>`,\nwhich is what a session in THIS repository actually runs while two routers\nexist. Session 36 already owns rewriting them, and it is the commit that\nmakes the new text true here.",
+      "model": "claude-opus-5",
+      "provider": "anthropic"
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D219",
+      "ordinal": 219,
+      "sessionNumber": 34,
+      "decidedOn": "2026-08-29",
+      "recordedAt": "2026-08-29T16:38:53.892387-04:00",
+      "decider": "orchestrator",
+      "headline": "Python's stdout encoding is pinned to UTF-8 in the corpus, as an input rather than a third normalization",
+      "body": "`bootstrap` is the first compared verb to emit a non-ASCII character on\nstdout, and it exposed a difference that is about the two runtimes rather\nthan about either router.\n\nPython encodes `sys.stdout` with the console code page unless told\notherwise, so on this host an em dash leaves `print` as the single cp1252\nbyte `0x97`. Node writes the three UTF-8 bytes for the same character. The\ncontrol decodes both as UTF-8, so the two outputs differ on every line\ncarrying a dash \u2014 and `bootstrap` emits two such lines, while `packaging`'s\nrefusal sentences carry more. No compared verb had reached this before;\nthe control has been green for eleven sessions because none of them printed\none.\n\nThe control's letter says the TypeScript side moves: \"cross-OS parity is\nnot claimed; line endings are whatever this host's Python produces, and the\nTypeScript side is held to that\". Following it here would mean teaching the\nTypeScript router to emit cp1252 \u2014 baking a Windows console default into a\ncross-platform command, producing mojibake for anyone redirecting its\noutput, and leaving session 36 to change it back silently in the same\ncommit that deletes Python, with no test to notice.\n\nSo `PYTHONIOENCODING=utf-8` is pinned in the corpus's `PINNED_ENV`, beside\nthe fixed committer date. This is deliberately an INPUT and not a third\nnormalization: it rewrites nothing after the fact, so the rule that the two\nnormalizations describe everything that happens to an output once it exists\nstill holds exactly. Both routers are asked for the same encoding of the\nsame text, and what is compared is still what each one meant to write.\n\nThe precedent it does NOT set: this is not licence to pin an environment\nvariable whenever a comparison is inconvenient. The distinguishing fact is\nthat neither router disagrees about the CHARACTER \u2014 only about how the host\nspells it \u2014 and that the disagreement disappears entirely at the cutover,\nwhen there is one runtime left. An input that changed what either router\ndecided would be comparing two questions, which the session 25 amendment\nalready forbids.",
+      "model": "claude-opus-5",
+      "provider": "anthropic"
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D220",
+      "ordinal": 220,
+      "sessionNumber": 34,
+      "decidedOn": "2026-08-29",
+      "recordedAt": "2026-08-29T16:39:16.811451-04:00",
+      "decider": "orchestrator",
+      "headline": "Zero-install proved on a Python-less repository, and it found a commit guard that could never resolve on Windows",
+      "body": "Step 5 asked for one thing and proved it, and in doing so found a defect\nthat no test on either side would have caught.\n\nThe proof: a scratch git repository at `C:\\temp\\s34scratch` with no `.venv`\nand no Python anywhere on `PATH` \u2014 confirmed by resolving `python` and\n`python3` to nothing under a PATH cut down to the shim directory, Node, git\nand the two Windows system directories. `dabbler bootstrap` wrote all six\nfiles and exited 0. `dabbler session start --engine claude-code --provider\nanthropic` registered session 001, seeded six plan steps from the scaffolded\nplan, and wrote a schema-valid `sessions.json` carrying both setup sessions.\nZero install, no interpreter, no virtual environment.\n\nThe defect: the first commit in that repository printed\n`.git/hooks/pre-commit: line 13: dabbler: command not found`. The launcher\nwas `dabbler.cmd`, which is correct for `cmd.exe` and PowerShell, where PATH\nlookup consults `PATHEXT`. But the guard `bootstrap` installs is a\n`#!/bin/sh` script, and the POSIX shell git ships does not consult PATHEXT \u2014\nit looks for a file named exactly `dabbler` and finds nothing. Every commit\non every Windows machine would have printed that line and been let through.\nThe guard would have been installed, present, and inert.\n\nIt is worth naming how close this came to shipping. The hook's failure\ndirection is deliberate \u2014 anything that is not the guard's own verdict\nexits non-blocking, because a repository nobody can commit to is worse than\nan unguarded one \u2014 so the symptom is a line of stderr and a commit that\nsucceeds. Nothing fails. The parity control could not see it either: both\nrouters write the same hook text, so the comparison is green and correct,\nand the file they agree on is one neither of them can execute. Only running\nthe thing end to end on a machine with nothing installed produced it.\n\nThe fix follows npm's own global shims: on Windows the extension writes\nBOTH `dabbler.cmd` and an extensionless `dabbler` POSIX script, the latter\nwith forward-slash paths because MSYS treats a backslash inside double\nquotes as an escape. Re-proved in the same repository: the guard resolves,\nreturns 0 with no step open, and the commit lands with no error line.\n\nOne limitation is documented rather than fixed, because it is not this\nsession's to fix. `EnvironmentVariableCollection` applies to terminals only,\nso a commit made from VS Code's Source Control panel runs git in the\nextension host's environment, where `dabbler` is not on PATH \u2014 the guard\nexits non-blocking again. `npm i -g dabbler-ai-router` closes it, and the\nmanaged fence now tells the operator exactly that for anywhere that is not\na VS Code terminal.",
+      "model": "claude-opus-5",
+      "provider": "anthropic"
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D221",
+      "ordinal": 221,
+      "sessionNumber": 34,
+      "decidedOn": "2026-08-29",
+      "recordedAt": "2026-08-29T16:39:36.552793-04:00",
+      "decider": "orchestrator",
+      "headline": "The recipes the router PRINTS still name Python, and are deliberately left for the cutover",
+      "body": "The zero-install proof surfaced a second thing, and this one is left alone\ndeliberately.\n\nRunning `dabbler session start` in a repository with no Python printed three\nrecipes naming an interpreter that is not there:\n\n    discovery: api-enumeration: no record at ... Run: python -m ai_router.discovery enumerate\n    python -m ai_router.session declare --sessions-dir ... --task ...\n    python -m ai_router.affected --sessions-dir ...\n\nThe first is `REFRESH_COMMAND`, which the handoff into this session named\nexplicitly as addressed to the cutover and not to be done early. The other\ntwo are the same shape and were not named: `session start`'s next-step hint\nand the selector's recipe.\n\nThey are not changed here, for the reason the handoff gives for the first.\nIn THIS repository the recipes are correct: two routers exist, the Python\none is installed in `.venv`, and it is what a session actually runs \u2014 the\npreverify runs recorded by this very session were `python -m pytest`. The\nrecipes only become wrong in a consumer repository that has no Python,\nwhich is a repository the TypeScript router does not yet ship to; the\nextension still spawns the Python router, and that changes in session 36.\n\nChanging them now would also cost a third Python-side edit, because\n`session start`'s output is compared by the parity control on two shapes.\nD218's test for when that is warranted \u2014 the plan named the change AND the\ncompared artifact has no byte-identical form without it \u2014 fails on the\nsecond half here: these strings have a perfectly good byte-identical form,\nwhich is the one they have.\n\nWhat this decision adds is evidence rather than an argument. The handoff\nlisted REFRESH_COMMAND from reading the code; this is the same claim\nobserved from the outside, with two more instances attached and a\ntranscript showing what a consumer sees. Session 36's step 5 already owns\nrewriting the docs \"for one artifact\"; these three recipes belong in that\nsweep, and a grep for `python -m ai_router` across strings the router\nPRINTS is the way to find the rest.",
+      "model": "claude-opus-5",
+      "provider": "anthropic"
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D222",
+      "ordinal": 222,
+      "sessionNumber": 34,
+      "decidedOn": "2026-08-29",
+      "recordedAt": "2026-08-29T16:50:38.238011-04:00",
+      "decider": "orchestrator",
+      "headline": "Session 34 seat cost measured: 50,705 in / 11,481 out to gpt-5-6-sol over two rounds; round 2 cost 12% of round 1 because the fix delta was empty",
+      "body": "Session 34's cost in the two currencies it ran on, by the method D136 set\ndown in session 22. No dollar figure: set 109 removed the router's rate\ntable, the metrics ledger carries tokens and elapsed time only, and a list\nprice recalled from memory is a guess wearing a measurement's clothes.\n\n**The verifier -- 50,705 input / 11,481 output tokens to `gpt-5-6-sol` over\ntwo API rounds, 169.5 s of wall time.** From `ai_router/router-metrics.jsonl`,\n`session_number == 34`:\n\n| Round | Input | Output | Elapsed | Outcome |\n| --- | ---: | ---: | ---: | --- |\n| 1 | 45,219 | 9,804 | 142.6 s | ISSUES_FOUND -- 1 Major, 1 nit |\n| 2 | 5,486 | 1,677 | 26.9 s | VERIFIED -- the Major withdrawn |\n| **Total** | **50,705** | **11,481** | **169.5 s** | |\n\n**Round 2 cost 12% of round 1's input, the cheapest second round the port\nhas bought.** Session 32's was 23% while carrying three rebuttals; session\n25 measured an eighth for a fix delta alone (D169). This round is at the\nbottom of that range for a reason worth naming: **the fix delta was empty.**\nThe session's answer to round 1 was a dispute and no code change, so the\nround carried one rebuttal and nothing else, and the verifier's own first\nsentence is \"The fix delta is empty, so it introduces no new defects.\"\n\n**A dispute with no remediation is the cheapest possible second round, and\nit is also the one most likely to be right.** Nothing moved between the two\nrounds, so round 2 is a clean re-judgement of round 1's claim against the\ncitations rather than a review of new work. That is the dispute ladder doing\nexactly what it was built for.\n\n**The orchestrator -- Claude Code / claude-opus-5[1m], subscription\nwindow.** Not priced per call and not attributable to a session by the\nrouter, so what is recorded is the work rather than a number: two modules\nported (1,891 Python lines to 2,433 TypeScript across six files, one of them\ngenerated from the Python source rather than transcribed), 63 vitest tests\nwritten, 2 differential tests against the reference, 5 extension tests, one\nPython-side behaviour change made first and in its own commit, two parity\ncases added and one corpus shape deliberately not added, one extension\nmodule and its wiring, one dispute drafted with three citations, two\nverification rounds driven, one end-to-end proof on a Python-less machine,\nand five decisions recorded.\n\n**Machine time, which again dominates.** The parity control ran before each\nround at roughly 161 s a time, so the two rounds cost about 322 s of control\nbefore 169.5 s of verifier. The selected pre-verification runs were 20 s of\npytest and 86 s of vitest. The control is still the largest single line item\nin a session, and session 34 added two cases to it without adding a shape,\nwhich was the budget question the handoff posed.",
+      "model": "claude-opus-5",
+      "provider": "anthropic"
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D223",
+      "ordinal": 223,
+      "sessionNumber": 34,
+      "decidedOn": "2026-08-29",
+      "recordedAt": "2026-08-29T16:51:00.366039-04:00",
+      "decider": "orchestrator",
+      "headline": "Two things left undone on purpose: packaging's timestamp fraction, owed to the cutover; and the re-raised nit, which is the reference's own behaviour",
+      "body": "Two things this session did not do, recorded so the next one does not have\nto rediscover them.\n\n**1. `packaging.ts`'s `recordedAt` renders milliseconds where Python renders\nmicroseconds.** `datetime.now(timezone.utc).isoformat()` prints six\nfractional digits, and omits the fraction entirely when it is zero.\nJavaScript's clock has millisecond resolution, so the port writes three\ndigits and writes `.000` where Python would write nothing at all.\n\nIt is not currently wrong in any way a reader or a gate can see.\nNormalization 1 replaces any ISO-8601 value with `<ts>` before comparison,\nso the parity control never sees it; `ai_router/schemas/packaging.schema.json`\nconstrains `recorded_at` only to a non-empty string, so both forms validate;\nand nothing branches on it. The consequence is deferred rather than absent:\nat the cutover the record's timestamp format changes shape, and someone\ndiffing a pre-36 packaging row against a post-36 one would see a difference\nneither router ever announced.\n\nThe fix is small and already written elsewhere -- `journal.ts:249` implements\nPython's fraction rule exactly, including the omit-when-zero case, and says\nso in its own comment. It was not applied here because it was found after\nround 2 returned VERIFIED, and editing a verified tree to change fractional\ndigits in a value nothing compares would spend a third verifier round and a\nthird 161-second control pass to buy nothing the record can see. **Session\n36 is where it belongs**, because that is the commit where the format\nactually changes for anybody.\n\n**2. The re-raised nit is the reference implementation's behaviour, and it\nis not a port defect.** `requirePlaceholders` checks that each required\ntoken appears in the joined argv, while `substitute` replaces every\noccurrence -- so a declaration writing `{secret}` twice gets it twice.\n`ai_router/packaging.py:245-246` does exactly the same thing with the same\n`\" \".join(argv)`, so the port is faithful and the criticism is of the module\nbeing ported.\n\nIt was left rather than disputed a second time because it is not blocking\nand the loop should not grind on a Minor. Whether it is worth changing is a\ngenuine question -- \"one argv element\" is about the framework never putting\nthe credential in an environment or a shell string, not about policing a\ndeclaration that names the placeholder twice, and the value in both elements\nwould be the operator's own credential going to the operator's own feed. If\nit is ever changed it should be changed on both sides at once, or after the\ncutover when there is one side.",
+      "model": "claude-opus-5",
+      "provider": "anthropic"
     }
   ]
 }

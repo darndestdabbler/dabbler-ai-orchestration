@@ -6616,3 +6616,270 @@ byte-comparisons of what the two loops actually write.
 The one path parity cannot reach is a real dispatched round, and that is the
 path these two rounds exercised — through the ported loop, on this
 repository's own record. Between them, both halves are covered.
+
+## Session 34 — Bootstrap, packaging, and the `dabbler` command on the PATH
+
+### D218 · 2026-08-29 · Orchestrator (claude-opus-5/anthropic) · The fence and the commit guard name `dabbler`, and Python moved first because the hook has no byte-identical form
+
+The session plan's step 2 and the parity control's compared-path list were
+in direct conflict, and the pre-commit hook is what settled it.
+
+The plan says the managed fence is regenerated with `dabbler <verb>` in
+place of `python -m ai_router.<module>`, and that the hook references the
+shim rather than an interpreter path. The control names all four files —
+`AGENTS.md`, `CLAUDE.md`, `GEMINI.md` and `.git/hooks/pre-commit` — as
+compared byte for byte, and its sequencing rule says that when a comparison
+fails the TypeScript side is the one that moves.
+
+For the fence, either reading is arguable. For the hook it is not. Python
+bakes in `sys.executable`; the TypeScript router has no such value, and its
+nearest equivalent, `process.execPath`, is a different absolute path lying
+outside the copy root, which normalization 2 does not rewrite. There is no
+spelling of "each router names its own interpreter" that produces the same
+bytes. The hook could therefore never be ported without one side moving,
+and the plan had already said which way.
+
+So the Python side moved first, in its own commit: `_SHARED_BODY` names
+`dabbler <verb>` throughout, its last hard rule now describes the shim
+instead of the venv, and `_PRE_COMMIT_HOOK` invokes `dabbler verify step
+guard-commit` with no interpreter baked in and no `{python}` substitution.
+`ensure_commit_guard`'s docstring records the reversal of its own earlier
+reasoning: the interpreter was baked in so that a hook could not answer
+about a different environment, and the answer now is that a consumer
+repository is not required to contain the thing that guards it.
+
+The verification is direct rather than argued: both routers were run
+against two scratch repositories, and every file bootstrap writes —
+all three engine files, `.gitignore`, `dabbler.yaml`, the scaffolded
+session plan and the hook — is byte-identical. The parity control then
+went green with the new `bootstrap` case included.
+
+Two consequences to carry forward. First, this is a second exception to
+"a behaviour change is not a fix", and it is narrower than it looks: the
+test is that the plan named the change AND the compared artifact has no
+byte-identical form without it. Both held here; neither holds for a
+convenience. Second, this repository's own three instruction files were
+NOT regenerated. They still name `.venv/Scripts/python -m ai_router.<module>`,
+which is what a session in THIS repository actually runs while two routers
+exist. Session 36 already owns rewriting them, and it is the commit that
+makes the new text true here.
+
+### D219 · 2026-08-29 · Orchestrator (claude-opus-5/anthropic) · Python's stdout encoding is pinned to UTF-8 in the corpus, as an input rather than a third normalization
+
+`bootstrap` is the first compared verb to emit a non-ASCII character on
+stdout, and it exposed a difference that is about the two runtimes rather
+than about either router.
+
+Python encodes `sys.stdout` with the console code page unless told
+otherwise, so on this host an em dash leaves `print` as the single cp1252
+byte `0x97`. Node writes the three UTF-8 bytes for the same character. The
+control decodes both as UTF-8, so the two outputs differ on every line
+carrying a dash — and `bootstrap` emits two such lines, while `packaging`'s
+refusal sentences carry more. No compared verb had reached this before;
+the control has been green for eleven sessions because none of them printed
+one.
+
+The control's letter says the TypeScript side moves: "cross-OS parity is
+not claimed; line endings are whatever this host's Python produces, and the
+TypeScript side is held to that". Following it here would mean teaching the
+TypeScript router to emit cp1252 — baking a Windows console default into a
+cross-platform command, producing mojibake for anyone redirecting its
+output, and leaving session 36 to change it back silently in the same
+commit that deletes Python, with no test to notice.
+
+So `PYTHONIOENCODING=utf-8` is pinned in the corpus's `PINNED_ENV`, beside
+the fixed committer date. This is deliberately an INPUT and not a third
+normalization: it rewrites nothing after the fact, so the rule that the two
+normalizations describe everything that happens to an output once it exists
+still holds exactly. Both routers are asked for the same encoding of the
+same text, and what is compared is still what each one meant to write.
+
+The precedent it does NOT set: this is not licence to pin an environment
+variable whenever a comparison is inconvenient. The distinguishing fact is
+that neither router disagrees about the CHARACTER — only about how the host
+spells it — and that the disagreement disappears entirely at the cutover,
+when there is one runtime left. An input that changed what either router
+decided would be comparing two questions, which the session 25 amendment
+already forbids.
+
+### D220 · 2026-08-29 · Orchestrator (claude-opus-5/anthropic) · Zero-install proved on a Python-less repository, and it found a commit guard that could never resolve on Windows
+
+Step 5 asked for one thing and proved it, and in doing so found a defect
+that no test on either side would have caught.
+
+The proof: a scratch git repository at `C:\temp\s34scratch` with no `.venv`
+and no Python anywhere on `PATH` — confirmed by resolving `python` and
+`python3` to nothing under a PATH cut down to the shim directory, Node, git
+and the two Windows system directories. `dabbler bootstrap` wrote all six
+files and exited 0. `dabbler session start --engine claude-code --provider
+anthropic` registered session 001, seeded six plan steps from the scaffolded
+plan, and wrote a schema-valid `sessions.json` carrying both setup sessions.
+Zero install, no interpreter, no virtual environment.
+
+The defect: the first commit in that repository printed
+`.git/hooks/pre-commit: line 13: dabbler: command not found`. The launcher
+was `dabbler.cmd`, which is correct for `cmd.exe` and PowerShell, where PATH
+lookup consults `PATHEXT`. But the guard `bootstrap` installs is a
+`#!/bin/sh` script, and the POSIX shell git ships does not consult PATHEXT —
+it looks for a file named exactly `dabbler` and finds nothing. Every commit
+on every Windows machine would have printed that line and been let through.
+The guard would have been installed, present, and inert.
+
+It is worth naming how close this came to shipping. The hook's failure
+direction is deliberate — anything that is not the guard's own verdict
+exits non-blocking, because a repository nobody can commit to is worse than
+an unguarded one — so the symptom is a line of stderr and a commit that
+succeeds. Nothing fails. The parity control could not see it either: both
+routers write the same hook text, so the comparison is green and correct,
+and the file they agree on is one neither of them can execute. Only running
+the thing end to end on a machine with nothing installed produced it.
+
+The fix follows npm's own global shims: on Windows the extension writes
+BOTH `dabbler.cmd` and an extensionless `dabbler` POSIX script, the latter
+with forward-slash paths because MSYS treats a backslash inside double
+quotes as an escape. Re-proved in the same repository: the guard resolves,
+returns 0 with no step open, and the commit lands with no error line.
+
+One limitation is documented rather than fixed, because it is not this
+session's to fix. `EnvironmentVariableCollection` applies to terminals only,
+so a commit made from VS Code's Source Control panel runs git in the
+extension host's environment, where `dabbler` is not on PATH — the guard
+exits non-blocking again. `npm i -g dabbler-ai-router` closes it, and the
+managed fence now tells the operator exactly that for anywhere that is not
+a VS Code terminal.
+
+### D221 · 2026-08-29 · Orchestrator (claude-opus-5/anthropic) · The recipes the router PRINTS still name Python, and are deliberately left for the cutover
+
+The zero-install proof surfaced a second thing, and this one is left alone
+deliberately.
+
+Running `dabbler session start` in a repository with no Python printed three
+recipes naming an interpreter that is not there:
+
+    discovery: api-enumeration: no record at ... Run: python -m ai_router.discovery enumerate
+    python -m ai_router.session declare --sessions-dir ... --task ...
+    python -m ai_router.affected --sessions-dir ...
+
+The first is `REFRESH_COMMAND`, which the handoff into this session named
+explicitly as addressed to the cutover and not to be done early. The other
+two are the same shape and were not named: `session start`'s next-step hint
+and the selector's recipe.
+
+They are not changed here, for the reason the handoff gives for the first.
+In THIS repository the recipes are correct: two routers exist, the Python
+one is installed in `.venv`, and it is what a session actually runs — the
+preverify runs recorded by this very session were `python -m pytest`. The
+recipes only become wrong in a consumer repository that has no Python,
+which is a repository the TypeScript router does not yet ship to; the
+extension still spawns the Python router, and that changes in session 36.
+
+Changing them now would also cost a third Python-side edit, because
+`session start`'s output is compared by the parity control on two shapes.
+D218's test for when that is warranted — the plan named the change AND the
+compared artifact has no byte-identical form without it — fails on the
+second half here: these strings have a perfectly good byte-identical form,
+which is the one they have.
+
+What this decision adds is evidence rather than an argument. The handoff
+listed REFRESH_COMMAND from reading the code; this is the same claim
+observed from the outside, with two more instances attached and a
+transcript showing what a consumer sees. Session 36's step 5 already owns
+rewriting the docs "for one artifact"; these three recipes belong in that
+sweep, and a grep for `python -m ai_router` across strings the router
+PRINTS is the way to find the rest.
+
+### D222 · 2026-08-29 · Orchestrator (claude-opus-5/anthropic) · Session 34 seat cost measured: 50,705 in / 11,481 out to gpt-5-6-sol over two rounds; round 2 cost 12% of round 1 because the fix delta was empty
+
+Session 34's cost in the two currencies it ran on, by the method D136 set
+down in session 22. No dollar figure: set 109 removed the router's rate
+table, the metrics ledger carries tokens and elapsed time only, and a list
+price recalled from memory is a guess wearing a measurement's clothes.
+
+**The verifier -- 50,705 input / 11,481 output tokens to `gpt-5-6-sol` over
+two API rounds, 169.5 s of wall time.** From `ai_router/router-metrics.jsonl`,
+`session_number == 34`:
+
+| Round | Input | Output | Elapsed | Outcome |
+| --- | ---: | ---: | ---: | --- |
+| 1 | 45,219 | 9,804 | 142.6 s | ISSUES_FOUND -- 1 Major, 1 nit |
+| 2 | 5,486 | 1,677 | 26.9 s | VERIFIED -- the Major withdrawn |
+| **Total** | **50,705** | **11,481** | **169.5 s** | |
+
+**Round 2 cost 12% of round 1's input, the cheapest second round the port
+has bought.** Session 32's was 23% while carrying three rebuttals; session
+25 measured an eighth for a fix delta alone (D169). This round is at the
+bottom of that range for a reason worth naming: **the fix delta was empty.**
+The session's answer to round 1 was a dispute and no code change, so the
+round carried one rebuttal and nothing else, and the verifier's own first
+sentence is "The fix delta is empty, so it introduces no new defects."
+
+**A dispute with no remediation is the cheapest possible second round, and
+it is also the one most likely to be right.** Nothing moved between the two
+rounds, so round 2 is a clean re-judgement of round 1's claim against the
+citations rather than a review of new work. That is the dispute ladder doing
+exactly what it was built for.
+
+**The orchestrator -- Claude Code / claude-opus-5[1m], subscription
+window.** Not priced per call and not attributable to a session by the
+router, so what is recorded is the work rather than a number: two modules
+ported (1,891 Python lines to 2,433 TypeScript across six files, one of them
+generated from the Python source rather than transcribed), 63 vitest tests
+written, 2 differential tests against the reference, 5 extension tests, one
+Python-side behaviour change made first and in its own commit, two parity
+cases added and one corpus shape deliberately not added, one extension
+module and its wiring, one dispute drafted with three citations, two
+verification rounds driven, one end-to-end proof on a Python-less machine,
+and five decisions recorded.
+
+**Machine time, which again dominates.** The parity control ran before each
+round at roughly 161 s a time, so the two rounds cost about 322 s of control
+before 169.5 s of verifier. The selected pre-verification runs were 20 s of
+pytest and 86 s of vitest. The control is still the largest single line item
+in a session, and session 34 added two cases to it without adding a shape,
+which was the budget question the handoff posed.
+
+### D223 · 2026-08-29 · Orchestrator (claude-opus-5/anthropic) · Two things left undone on purpose: packaging's timestamp fraction, owed to the cutover; and the re-raised nit, which is the reference's own behaviour
+
+Two things this session did not do, recorded so the next one does not have
+to rediscover them.
+
+**1. `packaging.ts`'s `recordedAt` renders milliseconds where Python renders
+microseconds.** `datetime.now(timezone.utc).isoformat()` prints six
+fractional digits, and omits the fraction entirely when it is zero.
+JavaScript's clock has millisecond resolution, so the port writes three
+digits and writes `.000` where Python would write nothing at all.
+
+It is not currently wrong in any way a reader or a gate can see.
+Normalization 1 replaces any ISO-8601 value with `<ts>` before comparison,
+so the parity control never sees it; `ai_router/schemas/packaging.schema.json`
+constrains `recorded_at` only to a non-empty string, so both forms validate;
+and nothing branches on it. The consequence is deferred rather than absent:
+at the cutover the record's timestamp format changes shape, and someone
+diffing a pre-36 packaging row against a post-36 one would see a difference
+neither router ever announced.
+
+The fix is small and already written elsewhere -- `journal.ts:249` implements
+Python's fraction rule exactly, including the omit-when-zero case, and says
+so in its own comment. It was not applied here because it was found after
+round 2 returned VERIFIED, and editing a verified tree to change fractional
+digits in a value nothing compares would spend a third verifier round and a
+third 161-second control pass to buy nothing the record can see. **Session
+36 is where it belongs**, because that is the commit where the format
+actually changes for anybody.
+
+**2. The re-raised nit is the reference implementation's behaviour, and it
+is not a port defect.** `requirePlaceholders` checks that each required
+token appears in the joined argv, while `substitute` replaces every
+occurrence -- so a declaration writing `{secret}` twice gets it twice.
+`ai_router/packaging.py:245-246` does exactly the same thing with the same
+`" ".join(argv)`, so the port is faithful and the criticism is of the module
+being ported.
+
+It was left rather than disputed a second time because it is not blocking
+and the loop should not grind on a Minor. Whether it is worth changing is a
+genuine question -- "one argv element" is about the framework never putting
+the credential in an environment or a shell string, not about policing a
+declaration that names the placeholder twice, and the value in both elements
+would be the operator's own credential going to the operator's own feed. If
+it is ever changed it should be changed on both sides at once, or after the
+cutover when there is one side.

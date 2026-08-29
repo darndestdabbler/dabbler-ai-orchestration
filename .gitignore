@@ -1,0 +1,22 @@
+__pycache__/
+*.pyc
+.venv/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+# Dabbler router machine-side state: the run ledger records each
+# verification round after the tree it describes, so committing it
+# makes verified work look like it changed post-verification. Ignored
+# whole, as bootstrap writes it for every project (D135, 2026-08-28).
+.dabbler/
+router-metrics.jsonl
+local-overrides.yaml
+node_modules/
+.vscode-test/
+out/
+*.vsix
+test-results/
+
+# Offline-transport queue position, not content.
+**/scripted-reviews/**/.cursor

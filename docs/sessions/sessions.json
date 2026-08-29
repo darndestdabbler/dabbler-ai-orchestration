@@ -544,9 +544,9 @@
     {
       "number": 28,
       "title": "Transports I \u2014 API, offline, routing, selection, discovery",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-28T20:50:02.968418-04:00",
-      "completedAt": null,
+      "completedAt": "2026-08-28T21:55:52.798599-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

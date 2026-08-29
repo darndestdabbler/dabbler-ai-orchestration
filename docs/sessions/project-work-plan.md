@@ -62,7 +62,7 @@ it.
 | 24 | The extension talks to the interface, and Python answers | no | 2026-08-28 |
 | 25 | Foundation modules | no | 2026-08-28 |
 | 26 | The record — journal, ledger, writers | no | 2026-08-28 |
-| 27 | Evidence, checks, test evidence, affected | — | not declared |
+| 27 | Evidence, checks, test evidence, affected | no | 2026-08-28 |
 | 28 | Transports I — API, offline, routing, selection, discovery | — | not declared |
 | 29 | Transport II — the Copilot CLI state machine and seat cost | — | not declared |
 | 30 | The session lifecycle | — | not declared |
@@ -756,3 +756,37 @@ Session 26 of 35 — the record: journal, ledger, writers.
 
 8. Affected tests as preverify; cross-provider verification; the full suite as the
    `final-full` run of record; close-out.
+
+### Session 27 — Evidence, checks, test evidence, affected
+
+**Releasable: no.**
+
+Session 27 of 35 — Evidence, checks, test evidence, affected.
+
+Port four Python modules of `ai_router` to TypeScript in `packages/router`:
+`evidence` (902), `checks` (1,001), `test_evidence` (815), `affected` (575)
+— ~3,293 lines, ~72 tests.
+
+1. Grow `src/evidence.ts` (session 26 already put the sessions-root
+   filenames, the round anchor, the digest ledger and `resolveSessionsDir`
+   there) into the whole of `evidence`: the throwaway-index tree snapshots,
+   the covered surface, the run-of-record binding. Snapshot trees must hash
+   identically to Python's — the parity control compares `completion_tree`
+   values, not just files.
+2. Port `checks`: spawn, tree kill (`taskkill /T` on Windows), exit-code
+   reading, `shell: true` only for declared shell commands, `.cmd` shim
+   resolution by spawning the shim's target for an argv command. Capture the
+   Node error for an over-long command line and map it to `argv-too-large`.
+   Its Python test file is `test_runcore_checks.py`, which drives `checks`
+   rather than the run core; the ported file is named for what it tests.
+3. Port `test_evidence` and `affected`. The vitest path-list form satisfies
+   the targeted-command audit without D116. D170's fix means `surface_digest`
+   is ported once, correctly.
+4. Add the parity cases the corpus can already carry: `affected` and
+   `test-evidence` both have real Python command lines and are already in the
+   corpus builder. Parity green on `test-runs.jsonl` and snapshot trees.
+5. Measure this session's seat cost and record it.
+6. Affected tests as preverify; cross-provider verification; the full suite
+   as the run of record; close through the five gates.
+
+Not releasable: this is a port session inside the rebuild, publishing nothing.

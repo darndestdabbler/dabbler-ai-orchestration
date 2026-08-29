@@ -217,6 +217,84 @@ export const CASES: readonly ParityCase[] = [
       "order -- plus that a non-ASCII body survives both serializers, which " +
       "is where `ensure_ascii` would differ",
   },
+  {
+    verb: "affected",
+    label: "affected",
+    // `in-flight` only: the selector needs a change set, and `fresh` has no
+    // session started, so its baseline question has no answer to compare.
+    shapes: ["in-flight"],
+    pythonArgs: (_repo, sessionsDir) => [
+      "ai_router.affected", "--sessions-dir", sessionsDir,
+    ],
+    dabblerArgs: (_repo, sessionsDir) => ["affected", "--sessions-dir", sessionsDir],
+    proves:
+      "the whole selection as an operator reads it: the baseline the change " +
+      "set was measured against, the configured rule that maps the edited " +
+      "source to its test, the unmapped record files that raise " +
+      "selection_unknown and buy the smoke test instead of the suite, the " +
+      "reason column's width, and the runner each declared suite is handed",
+  },
+  {
+    verb: "test-evidence",
+    label: "test-evidence record (preverify-targeted)",
+    // The stage whose command is judged rather than trusted. `in-flight`
+    // already carries one such row, so this appends a second and the
+    // comparison covers the row AND the policy that admitted it.
+    shapes: ["in-flight"],
+    pythonArgs: (_repo, sessionsDir) => [
+      "ai_router.test_evidence", "record",
+      "--sessions-dir", sessionsDir,
+      "--suite", "unit",
+      "--stage", "preverify-targeted",
+      "--command", "python -m pytest tests/test_widget.py",
+      "--outcome", "passed",
+      "--duration-seconds", "1.5",
+    ],
+    dabblerArgs: (_repo, sessionsDir) => [
+      "test-evidence", "record",
+      "--sessions-dir", sessionsDir,
+      "--suite", "unit",
+      "--stage", "preverify-targeted",
+      "--command", "python -m pytest tests/test_widget.py",
+      "--outcome", "passed",
+      "--duration-seconds", "1.5",
+    ],
+    proves:
+      "the covered-surface digest computed byte-identically by both routers " +
+      "-- the sorted (path, content-hash) fold, with the session's own " +
+      "bookkeeping and the run ledger left out of it -- plus the policy that " +
+      "judged the command, the selected tests it names, and the float that " +
+      "must be written 1.5 rather than rounded",
+  },
+  {
+    verb: "test-evidence",
+    label: "test-evidence record (final-full)",
+    // The run of record. It binds to the WHOLE tree rather than the suite's
+    // covers, so this compares the second digest as well as the first, and
+    // the branch that refuses a caller-supplied command never runs here.
+    shapes: ["in-flight"],
+    pythonArgs: (_repo, sessionsDir) => [
+      "ai_router.test_evidence", "record",
+      "--sessions-dir", sessionsDir,
+      "--suite", "unit",
+      "--stage", "final-full",
+      "--outcome", "passed",
+      "--duration-seconds", "42",
+    ],
+    dabblerArgs: (_repo, sessionsDir) => [
+      "test-evidence", "record",
+      "--sessions-dir", sessionsDir,
+      "--suite", "unit",
+      "--stage", "final-full",
+      "--outcome", "passed",
+      "--duration-seconds", "42",
+    ],
+    proves:
+      "the run of record and the tree digest it binds to: the whole-tree fold " +
+      "over every tracked and untracked non-ignored path, which is a second " +
+      "digest and a different scope from the suite's covers, and the " +
+      "`--duration-seconds 42` that both routers must write as the float 42.0",
+  },
 ];
 
 // --- Preconditions -----------------------------------------------------------

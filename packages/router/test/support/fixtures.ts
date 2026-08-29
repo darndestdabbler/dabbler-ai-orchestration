@@ -6,9 +6,9 @@
 // repository rather than a bare directory.
 
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 
 import { stringify as stringifyYaml } from "yaml";
 
@@ -110,6 +110,43 @@ export function makeProject(): string {
   const path = makeTempDir();
   execFileSync("git", ["init", "-q"], { cwd: path, stdio: "ignore" });
   return path;
+}
+
+/** Identity and signing pinned, so a commit here needs no host configuration. */
+export function git(repo: string, ...args: string[]): void {
+  execFileSync("git", args, {
+    cwd: repo,
+    stdio: "ignore",
+    env: {
+      ...process.env,
+      GIT_AUTHOR_NAME: "Test", GIT_AUTHOR_EMAIL: "test@example.invalid",
+      GIT_COMMITTER_NAME: "Test", GIT_COMMITTER_EMAIL: "test@example.invalid",
+      GIT_CONFIG_NOSYSTEM: "1",
+    },
+  });
+}
+
+/**
+ * A repository with one committed file.
+ *
+ * The tree-snapshot, digest and provenance rules are all answers git gives,
+ * so they need a checkout rather than a directory -- and a seed commit,
+ * because several of them are about what changes against HEAD.
+ */
+export function makeSeededRepo(
+  files: Record<string, string> = { "a.txt": "one\n" },
+): string {
+  const repo = makeTempDir();
+  git(repo, "init", "-q", "-b", "main");
+  git(repo, "config", "commit.gpgsign", "false");
+  for (const [rel, text] of Object.entries(files)) {
+    const path = join(repo, ...rel.split("/"));
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, text, "utf8");
+  }
+  git(repo, "add", "-A");
+  git(repo, "commit", "-q", "-m", "seed", "--no-gpg-sign");
+  return repo;
 }
 
 export function writeYaml(path: string, body: unknown): string {

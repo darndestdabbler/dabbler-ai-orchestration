@@ -174,3 +174,35 @@ function wrap(
 export function dumps(value: unknown, options: DumpOptions = {}): string {
   return encode(value, options.ensureAscii ?? true, options.indent, 0);
 }
+
+/**
+ * `repr(x)` for the values that reach a refusal an operator reads.
+ *
+ * The Python router writes those messages with `repr`, so a dict renders
+ * with its Python punctuation -- single-quoted keys, `True`/`None`, a space
+ * after each comma -- because that is what the reader of the other router's
+ * message sees. A tuple is not here: its repr differs from a list's and
+ * JavaScript has nothing that distinguishes them, so the two modules whose
+ * Python twins interpolate a tuple spell that one out.
+ *
+ * It sits beside `dumps` for the reason `dumps` gives: rendering a Python
+ * value is what this file is, and four modules asking the question in four
+ * places is four chances for the answers to drift apart.
+ */
+export function pythonRepr(value: unknown): string {
+  if (value === null || value === undefined) return "None";
+  if (value === true) return "True";
+  if (value === false) return "False";
+  if (typeof value === "number") return String(value);
+  if (typeof value === "string") {
+    return `'${value.replace(/\\/g, "\\\\").replace(/'/g, "\\'")}'`;
+  }
+  if (Array.isArray(value)) return `[${value.map(pythonRepr).join(", ")}]`;
+  if (typeof value === "object") {
+    const members = Object.entries(value as Record<string, unknown>).map(
+      ([key, item]) => `${pythonRepr(key)}: ${pythonRepr(item)}`,
+    );
+    return `{${members.join(", ")}}`;
+  }
+  return String(value);
+}

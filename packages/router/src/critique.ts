@@ -30,7 +30,7 @@ import {
   sessionRunDir,
 } from "./ledger.ts";
 import { platformNewlines } from "./journal.ts";
-import { dumps } from "./pythonJson.ts";
+import { dumps, pythonRepr } from "./pythonJson.ts";
 import { loadSchemaFile, schemaFailure } from "./schema/validate.ts";
 
 export const CRITIQUE_DIRNAME = "critique";
@@ -62,12 +62,6 @@ function requireChangeId(changeId: unknown): string {
     );
   }
   return changeId;
-}
-
-function pythonRepr(value: unknown): string {
-  if (value === null || value === undefined) return "None";
-  if (typeof value === "string") return `'${value.replace(/\\/g, "\\\\").replace(/'/g, "\\'")}'`;
-  return String(value);
 }
 
 // --- Paths -------------------------------------------------------------------

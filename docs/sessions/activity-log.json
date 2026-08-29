@@ -5734,6 +5734,266 @@
       "dateTime": "2026-08-28T19:10:55.882341-04:00",
       "description": "Closed VERIFIED through all five gates at the first attempt; nothing forced.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 27,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-28T19:38:04.486350-04:00",
+      "description": "Register; declare `--not-releasable`.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 27,
+      "stepNumber": 2,
+      "stepKey": "port-evidence-first",
+      "dateTime": "2026-08-28T19:38:04.486350-04:00",
+      "description": "Port `evidence` first: its snapshot trees must hash identically to Python's \u2014 the parity control compares `completion_tree` values, not just files.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 27,
+      "stepNumber": 3,
+      "stepKey": "port-checks-spawn-kill-exit-code",
+      "dateTime": "2026-08-28T19:38:04.486350-04:00",
+      "description": "Port `checks` \u2014 spawn, kill, exit-code reading, the `.cmd` shim resolution on Windows (spawn the shim's target, never `shell: true` for an argv command). Capture the Node error code for an over-long command line as a specimen and map it to `argv-too-large`. Its test file is `test_runcore_checks.py`, which drives `checks`, not the run core; it is ported under a name that says so.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 27,
+      "stepNumber": 4,
+      "stepKey": "port-testevidence-and-affected",
+      "dateTime": "2026-08-28T19:38:04.486350-04:00",
+      "description": "Port `test_evidence` and `affected`; the vitest path-list form satisfies the targeted-command audit without D116.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 27,
+      "stepNumber": 5,
+      "stepKey": "parity-control-green-on-test-runs",
+      "dateTime": "2026-08-28T19:38:04.486350-04:00",
+      "description": "Parity control green on `test-runs.jsonl` and snapshot trees.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 27,
+      "stepNumber": 6,
+      "stepKey": "measure-this-session-s-seat-cost",
+      "dateTime": "2026-08-28T19:38:04.486350-04:00",
+      "description": "Measure this session's seat cost and record it.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 27,
+      "stepNumber": 7,
+      "stepKey": "affected-tests-as-preverify",
+      "dateTime": "2026-08-28T19:38:04.486350-04:00",
+      "description": "Affected tests as preverify.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 27,
+      "stepNumber": 8,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-28T19:38:04.486350-04:00",
+      "description": "Cross-provider verification.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 27,
+      "stepNumber": 9,
+      "stepKey": "full-test-suite-recorded-as-the",
+      "dateTime": "2026-08-28T19:38:04.486350-04:00",
+      "description": "Full test suite, recorded as the `final-full` run of record.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 27,
+      "stepNumber": 10,
+      "stepKey": "close-out",
+      "dateTime": "2026-08-28T19:38:04.486350-04:00",
+      "description": "Close-out.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 27,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-28T19:38:04.497645-04:00",
+      "description": "Registered session 27 (claude-code).",
+      "status": "complete"
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 27,
+      "dateTime": "2026-08-28T19:38:27.446265-04:00",
+      "task": "Session 27 of 35 \u2014 Evidence, checks, test evidence, affected.\n\nPort four Python modules of `ai_router` to TypeScript in `packages/router`:\n`evidence` (902), `checks` (1,001), `test_evidence` (815), `affected` (575)\n\u2014 ~3,293 lines, ~72 tests.\n\n1. Grow `src/evidence.ts` (session 26 already put the sessions-root\n   filenames, the round anchor, the digest ledger and `resolveSessionsDir`\n   there) into the whole of `evidence`: the throwaway-index tree snapshots,\n   the covered surface, the run-of-record binding. Snapshot trees must hash\n   identically to Python's \u2014 the parity control compares `completion_tree`\n   values, not just files.\n2. Port `checks`: spawn, tree kill (`taskkill /T` on Windows), exit-code\n   reading, `shell: true` only for declared shell commands, `.cmd` shim\n   resolution by spawning the shim's target for an argv command. Capture the\n   Node error for an over-long command line and map it to `argv-too-large`.\n   Its Python test file is `test_runcore_checks.py`, which drives `checks`\n   rather than the run core; the ported file is named for what it tests.\n3. Port `test_evidence` and `affected`. The vitest path-list form satisfies\n   the targeted-command audit without D116. D170's fix means `surface_digest`\n   is ported once, correctly.\n4. Add the parity cases the corpus can already carry: `affected` and\n   `test-evidence` both have real Python command lines and are already in the\n   corpus builder. Parity green on `test-runs.jsonl` and snapshot trees.\n5. Measure this session's seat cost and record it.\n6. Affected tests as preverify; cross-provider verification; the full suite\n   as the run of record; close through the five gates.\n\nNot releasable: this is a port session inside the rebuild, publishing nothing.",
+      "releasable": false
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D173",
+      "ordinal": 173,
+      "sessionNumber": 27,
+      "decidedOn": "2026-08-28",
+      "recordedAt": "2026-08-28T20:15:02.064695-04:00",
+      "decider": "orchestrator",
+      "headline": "The port refuses to stamp CPython's regex engine on a row Node produced",
+      "body": "`evidence.run_absence_search` stamps every row it writes with the regex engine\nthat produced the count: Python writes `python-re/<version>`. The port does\n**not** copy that string. `packages/router/src/evidence.ts` writes\n`node-regexp/<node version>`.\n\nEvery other cross-language byte difference this port has met was settled in\nPython's favour (D165): line endings, `int` versus `float`, CPython's float\n`repr`, `json.dumps`'s separators. Each of those is a *formatting* choice with\nno content \u2014 the same fact spelled two ways, and one spelling had to win.\n\nThis one is not. `tool_version` exists to say **which engine produced the\ncount**, on the one row whose entire purpose is provenance, and the engines\ngenuinely differ: CPython's `re` and JavaScript's `RegExp` disagree on named\ngroups, `\\Z`, lookbehind and several escapes, so a declared query can be valid\nin one and invalid \u2014 or mean something else \u2014 in the other. A Node process\nwriting `python-re/3.11.9` would be a false provenance stamp, which is worse\nthan a difference a reader can see.\n\n**Nothing reaches it today.** The critique pipeline defaults to `off`, it has\nno verb, and `record_worker_result` is the only path that writes an absence\nrow. So the parity control cannot see this, and no corpus shape exercises it.\n\n**Owed.** Session 31 or 32 \u2014 whichever first puts a critique write into the\nparity control \u2014 has to settle it rather than inherit it. The three answers\nare: keep the divergence and normalize the field (a third normalization, which\nthe specification forbids); make the field name the *rule* rather than the\nengine, on both sides, in a change to Python first (the specification's one\nsanctioned route); or drop the field. This decision does not choose among\nthem; it records that the port refused to lie about which engine ran, and\nnames the session that must decide.",
+      "model": "claude-opus-5",
+      "provider": "anthropic"
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D174",
+      "ordinal": 174,
+      "sessionNumber": 27,
+      "decidedOn": "2026-08-28",
+      "recordedAt": "2026-08-28T20:15:09.571568-04:00",
+      "decider": "orchestrator",
+      "headline": "What spawning a check costs under Node, measured: the .cmd shim, the argv ceiling, and the retired heartbeat",
+      "body": "`checks.execute` runs a repository-declared command and measures what it did\nto the tree. Porting it met three facts about Node that Python's\n`subprocess` hides, and all three were **measured on this host** rather than\nrecalled.\n\n**1. It is async, and it drops the run id.** Python polls its child with\n`communicate(timeout=15)` so it can write a heartbeat and, at the deadline,\nkill the process *tree*. A blocking `spawnSync` cannot do either. So the\nported `execute` returns a promise: one `spawn`, both streams collected, and\na timer that fires `terminateTree`. The heartbeat goes with it \u2014 it wrote\n`heartbeat.json`, which is the run core, retired and never ported (D130), so\n`run_id` is not a parameter here. `testphase` (session 34) is the one caller\nthat passed one and it can stop.\n\n**2. Node refuses to spawn a `.cmd` without a shell; Python does not.**\nMeasured: `spawn(\"hello.cmd\", [\"world\"])` fails `EINVAL` on Node 25.8.1 \u2014\nthe CVE-2024-27980 fix \u2014 while `subprocess.run([\"hello.cmd\", \"world\"])`\nsucceeds, because `CreateProcess` special-cases a batch file. An `argv`\ndeclaration naming a shim (`npm`, `npx`, `vitest`) would therefore run under\nPython and fail under the port, for a reason no diff of the declaration\nwould explain.\n\nThe port resolves the program through `PATH`/`PATHEXT` and, when it lands on\na `.cmd` or `.bat`, spawns `%COMSPEC% /d /s /c` with the argument list\nquoted **here** and `windowsVerbatimArguments`. That is deliberately not\n`shell: true`: `shell: true` joins the argv into one string and lets a shell\nre-parse it, which is the thing an `argv` declaration exists to prevent. The\nargument boundaries stay the declared ones. This repository's own controls\navoid the question entirely \u2014 every one is `argv` for `node` (D142) \u2014 so\nnothing here exercises it; a consumer repository would.\n\n**3. An over-long command line is `ENAMETOOLONG`, and it is thrown, not\nemitted.** Measured on Windows 11 / Node 25.8.1: a rendered command line past\nthe ceiling fails `{code: \"ENAMETOOLONG\", errno: -4064}` at 40k, 100k and\n200k characters. That is libuv's mapping of `ERROR_FILENAME_EXCED_RANGE`\n(206) \u2014 the *same* OS error Python's Copilot transport classifier reads as\n`winerror == 206`; POSIX answers `E2BIG`, which is the other half of the same\nclassifier. So the two routers agree at the OS level and\n`checks.isArgvTooLarge` is the port's one reader of it, for session 29's\n`transports/copilot` to import rather than write again.\n\nIt is **thrown synchronously** from `spawn`, not delivered on the `error`\nevent, because Node measures the length before it asks the OS. A handler-only\nimplementation would let it escape as a crash of the framework instead of a\nfailed check; `execute` catches it and records `argv-too-large` in the run's\noutput. This is the specimen the session plan asked for.",
+      "model": "claude-opus-5",
+      "provider": "anthropic"
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D175",
+      "ordinal": 175,
+      "sessionNumber": 27,
+      "decidedOn": "2026-08-28",
+      "recordedAt": "2026-08-28T20:15:09.998248-04:00",
+      "decider": "orchestrator",
+      "headline": "Where Python states a rule twice, the port states it once",
+      "body": "Ground rule 3 \u2014 one implementation of any rule \u2014 is not among the constraints\nthe operator set aside on 2026-08-23. Two rules in this session's batch were\nabout to acquire a third and fourth statement, so both are now stated once.\n\n**`repr(x)` for a refusal message.** The Python router writes its refusals\nwith `repr`, so the port has to render a value the way CPython prints it \u2014\nsingle-quoted strings, `True`/`None`, a space after each comma. Session 26\nwrote it in `progress.ts` and, because `critique.ts` cannot import `progress`\nwithout a cycle, wrote a second (shorter, and therefore differently wrong)\ncopy there. This session's `checks`, `testEvidence` and `evidence` each needed\nit, which would have made six. It now lives in `pythonJson.ts` beside `dumps`,\nfor the reason that file already gives for holding CPython's float `repr`:\nrendering a Python value is what the file is. `progress.ts` re-exports it, so\nnothing that imported it from there had to move; `critique.ts`'s private copy\nis deleted. Net: three modules smaller, one rule.\n\nA **tuple**'s repr is deliberately not there. `('a', 'b')` and `['a', 'b']`\nare different strings and JavaScript has no value that distinguishes them, so\nthe one module whose Python twin interpolates a tuple spells that out itself\nrather than pretending the shared function can tell.\n\n**The repository-relative path spelling.** `checks.py` and `test_evidence.py`\ncarry byte-identical copies of `_normalise_rel` and `matching_prefixes`, whose\nonly difference is whether their private `_posix` strips separators before the\n`./` loop or after. The two answers can differ for exactly one input shape \u2014 a\npath beginning `/./` \u2014 which nothing git emits, and the comments in the two\ncopies are word-for-word the same, so the duplication is a copy-paste rather\nthan a distinction. The port states the rule once in `checks.ts` and\n`testEvidence.ts` re-exports it. Copying an accidental duplicate into a new\nlanguage is how a duplicate becomes a divergence.\n\n**The one glob rule that is NOT shared.** `checks.fnmatchcase` is\ncase-sensitive and `gates.fnmatch` is not \u2014 on Windows the latter lowercases\nboth sides. They are different questions with different answers, so\n`gates.ts` keeps its own matcher and this session did not touch it.",
+      "model": "claude-opus-5",
+      "provider": "anthropic"
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D176",
+      "ordinal": 176,
+      "sessionNumber": 27,
+      "decidedOn": "2026-08-28",
+      "recordedAt": "2026-08-28T20:15:10.465115-04:00",
+      "decider": "orchestrator",
+      "headline": "The parity control got faster while growing by a third: a new case is cheap, a new shape is not",
+      "body": "D169 asked sessions 26\u201334 to watch what the parity control costs, on the\ngrounds that it builds a corpus repository per side per case and the case\ntable only grows. Session 26 measured **~150 s at nine cases**.\n\nSession 27 takes it to **twelve** \u2014 `affected` on `in-flight`, and\n`test-evidence record` at both stages on `in-flight`, which is the whole of\nwhat `docs/ts-port-parity-control.md` schedules for this session. Measured on\nthe same host: **91.7 s**, over 63 compared paths.\n\nIt got **faster while growing by a third**, so the lever D169 named \u2014 caching\na built shape across cases \u2014 is not needed yet and should not be built on\nspeculation. The reason is visible in the numbers: the two shapes' determinism\nchecks and the `in-flight` builder dominate, and `in-flight` is built by\ndriving the Python router four times, which is a fixed cost the new cases\nshare rather than multiply. The three new cases all run against a shape the\ncontrol already built for session 26's cases.\n\nWhat this does **not** say: the next session's cases are cheap. Sessions 28\nand 32 add the `disputed`, `at-cap` and `moved-machine` shapes, whose builders\ndo not exist yet and which need canned verifier text through the offline\ntransport. A new *shape* is the expensive addition; a new *case* on an\nexisting shape is not. That is the distinction to plan against, and it is\nworth carrying forward as the amendment to D169's warning.\n\nThe three cases were also free of a second cost the session expected to pay:\nboth verbs already had real Python command lines **and** were already in the\n`in-flight` builder, so nothing needed a fixture written for it. That is the\nfirst session since 25 for which that was true.",
+      "model": "claude-opus-5",
+      "provider": "anthropic"
+    },
+    {
+      "sessionNumber": 27,
+      "stepNumber": 2,
+      "stepKey": "port-evidence-first",
+      "dateTime": "2026-08-28T20:15:19.983831-04:00",
+      "description": "evidence.ts grown from session 26's slice to the whole module: round refspecs and the push, tree blobs and tree paths, transcripts and tiers, out-of-band-write detection, quote provenance, the framework-executed absence search and the blocked ladder. D173 records the one deliberate record difference.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 27,
+      "stepNumber": 3,
+      "stepKey": "port-checks-spawn-kill-exit-code",
+      "dateTime": "2026-08-28T20:15:20.461912-04:00",
+      "description": "checks.ts: the declaration loader and its refusals, the selector, targeted_command, plan, and an async execute with a Windows tree kill. The .cmd shim and the ENAMETOOLONG specimen are measured in D174; its test file is checks.test.ts, named for what it drives.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 27,
+      "stepNumber": 4,
+      "stepKey": "port-testevidence-and-affected",
+      "dateTime": "2026-08-28T20:15:20.922806-04:00",
+      "description": "testEvidence.ts and affected.ts, plus cli/affected.ts and cli/testEvidence.ts and their two verb handlers. The vitest path-list form satisfies the targeted-command audit without D116.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 27,
+      "stepNumber": 5,
+      "stepKey": "parity-control-green-on-test-runs",
+      "dateTime": "2026-08-28T20:15:26.359698-04:00",
+      "description": "Twelve cases green, 90.7s over 63 paths: affected on in-flight, and test-evidence record at both stages. The surface digest and the whole-tree digest are computed byte-identically by both routers. D176 measures the cost.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 27,
+      "stepNumber": 7,
+      "stepKey": "affected-tests-as-preverify",
+      "dateTime": "2026-08-28T20:17:34.772664-04:00",
+      "description": "Two suites selected and recorded: 111 pytest (55s) and 243 vitest (31s), both policy targeted.",
+      "status": "complete"
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D177",
+      "ordinal": 177,
+      "sessionNumber": 27,
+      "decidedOn": "2026-08-28",
+      "recordedAt": "2026-08-28T20:21:12.296814-04:00",
+      "decider": "orchestrator",
+      "headline": "Both routers snapshot this repository's worktree to the same git tree id; the control cannot say so until session 32",
+      "body": "The session plan's step 2 says the ported `evidence`'s snapshot trees \"must\nhash identically to Python's \u2014 the parity control compares `completion_tree`\nvalues, not just files.\" They do, and the control cannot yet say so.\n\n**Why the control cannot.** A `completion_tree` reaches the record only on a\nround row, and the only verb that appends a round is `verify`, which lands in\nsession 32 on corpus shapes whose builders need the offline transport\n(session 28). `docs/ts-port-parity-control.md` says the same thing about the\nanchor refs: they are compared \"for every `refs/dabbler/rounds/s<N>/r<R>`\",\nand there are none until a round is written. So the claim in step 2 is true\nof a comparison that does not exist yet, and reporting the step done on that\nbasis alone would be reporting a control that ran on nothing \u2014 the exact\nfailure the control's own session-23 amendment exists to prevent.\n\n**What was proved instead**, by the method session 25 used for `verdict`\n(D163): both implementations were run against **this repository's live\nworking tree** \u2014 2,000-odd files, tracked and untracked, `.dabbler/` dropped,\nthrough a throwaway index that leaves the real one alone \u2014 and asked for the\ntree id.\n\n    python -m ai_router.evidence -> b6d8e262538dff7d8f7bb63e611ce0fa855eb63b\n    packages/router/src/journal.ts -> b6d8e262538dff7d8f7bb63e611ce0fa855eb63b\n\nThat is a git object id computed independently by two implementations over\nthe same worktree, so a match is not a coincidence a larger sample would\nundo: the id is a hash of the whole tree, and any difference in what either\nside staged, dropped or ordered would change it.\n\nThis is **evidence, not a control**, and it is recorded as such. The\ncomparison the plan describes lands in session 32 with `verify` and its round\nrows, and it should not be quietly dropped on the way there: what is proved\nhere is that the two snapshots agree today, not that a later change to either\nwould be caught.\n\nThe port also carries the other half of session 26's work forward unchanged:\n`snapshot_worktree_tree` was ported in that session, into `journal.ts` beside\nthe one git spawn, and session 27 ports the readers around it rather than the\nsnapshot itself.",
+      "model": "claude-opus-5",
+      "provider": "anthropic"
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D178",
+      "ordinal": 178,
+      "sessionNumber": 27,
+      "decidedOn": "2026-08-28",
+      "recordedAt": "2026-08-28T20:28:28.189563-04:00",
+      "decider": "orchestrator",
+      "headline": "checks.plan is not ported: its only caller is the run core, so a round-1 finding is fixed by deleting the function rather than narrowing it",
+      "body": "Round 1's third finding is correct: the ported `plan` appended the whole\nselection to every relevant suite's targeted command, where `forSuite` exists\nprecisely so a Java test does not end up in a `dotnet test` command. The\nverifier's acceptance criterion \u2014 narrow with `result.forSuite(check.name)` \u2014\nwould have fixed the symptom.\n\n**The repair is deletion, not narrowing**, because the function has no caller\nin the world this port is building.\n\nMeasured rather than assumed: `checks.plan` is called from\n`ai_router/runcli.py:400` and `ai_router/runcli.py:814`, and nowhere else in\nthe package. `runcli` is the run core, which D88 left open and **D130 decided\nis retired and deleted in session 34**. The modules that survive and reach\ninto `checks` \u2014 `testphase` and `fixloop`, ported in session 34 \u2014 import\n`execute`, `targeted_command`, `load_checks`, `load_selection_config`,\n`scope_for_test`, `selection_payload`, `covers_any`, `names_a_test` and\n`timeout_for`. None of them imports `plan`.\n\nSo the following came out of `checks.ts`, and nothing else changed:\n\n- `plan` and the `CheckPlan` it returns\n- `changedPathsFor`, its only caller\n- `targetedSuiteCommand`, and with it the four `FULL_ALLOWED_*` constants \u2014\n  `FULL_ALLOWED_OPERATOR`'s one other reader is `verifyjob`'s run-core half,\n  which D129 retires\n- `selectionUnknownPaths`, whose only reader is `runcli`\n\nThat is 1,434 lines down to 1,306, no behaviour changed anywhere, and the\ndefect gone rather than patched. Fixing it instead would have left a\nnarrowing rule in the TypeScript router that Python does not have, in a\nfunction neither router calls \u2014 drift with no upside, invisible to the parity\ncontrol.\n\n**This is the same cut session 26 made and recorded**: `journal` and\n`verifyjob` were split, their git-seam and prompt halves ported and their\nrun-core halves retired (D129). The inventory says port `checks`; it does not\nsay port the half whose only consumer is being deleted. Porting it was the\nerror, and the finding is what caught it.\n\n**What the Python side keeps.** `ai_router/checks.py` is not touched:\n`plan` stays until session 34 deletes `runcli` with it, and the defect stays\nwith it, harmlessly, because the only code that calls it is on its way out.\nA session that revives the run core would inherit the defect and should read\nthis decision first.",
+      "model": "claude-opus-5",
+      "provider": "anthropic"
+    },
+    {
+      "sessionNumber": 27,
+      "stepNumber": 8,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-28T20:36:17.459391-04:00",
+      "description": "3 rounds, gpt-5-6-sol over the API. Round 1: four Major findings, three disputed and all three WITHDRAWN (each described Python's behaviour faithfully ported; two named functions with no caller in either router), the fourth accepted and fixed by DELETING checks.plan rather than narrowing it (D178). Round 2: one Major on that deletion, disputed and WITHDRAWN. Round 3 clean.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 27,
+      "stepNumber": 9,
+      "stepKey": "full-test-suite-recorded-as-the",
+      "dateTime": "2026-08-28T20:43:44.696982-04:00",
+      "description": "944 pytest (7:09) and 299 vitest (50s), both recorded as final-full against the verified tree.",
+      "status": "complete"
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D179",
+      "ordinal": 179,
+      "sessionNumber": 27,
+      "decidedOn": "2026-08-28",
+      "recordedAt": "2026-08-28T20:44:31.560253-04:00",
+      "decider": "orchestrator",
+      "headline": "Session 27 seat cost: 82,021 in / 16,256 out to gpt-5-6-sol over three rounds; a third round spent on a dispute costs 8% of the first",
+      "body": "Session 27's seat cost, in the two currencies it ran on, by the method D136\nset down. No dollar figure: set 109 removed the router's rate table, the\nmetrics ledger carries tokens and elapsed time only, and a list price recalled\nfrom memory would be a guess dressed as a measurement.\n\n**The verifier: 82,021 input / 16,256 output tokens to gpt-5-6-sol over three\nAPI rounds, 222.6 s of wall time.**\n\n| Round | Input | Output | Elapsed | What it reviewed |\n| --- | ---: | ---: | ---: | --- |\n| 1 | 59,751 | 10,349 | 138.5 s | the whole session: four modules, six files, 93 tests |\n| 2 | 15,297 | 4,658 | 67.5 s | the fix delta plus three disputes |\n| 3 | 6,973 | 1,249 | 16.5 s | one dispute, no delta |\n| **Total** | **82,021** | **16,256** | **222.6 s** | |\n\n**The shape is the fix-delta review working, twice.** Round 2 is 26% of round\n1's input and round 3 is 12% of round 2's \u2014 and round 3 cost 8% of round 1\nbecause the delta was *empty*: the dispute was the whole submission. Compare\nsession 25, where round 2 was an eighth of round 1 (D169), and session 26,\nwhere 85% of the cost was round 1 (D172). Three rounds here cost 82k input\nagainst session 26's two rounds at 77.6k, so **a third round on a dispute is\nclose to free** \u2014 it is the first round that prices a session, and it prices\nit by how much code it has to read.\n\n**What that says about disputing.** Session 26 measured its two disputes at\n11,590 tokens and called them cheap. This session recorded four, and the two\nrounds that carried them cost 22,270 input / 5,907 output between them \u2014 a\nquarter of the session's verifier spend to settle four Major findings, three\nof which would otherwise have become one-sided behaviour changes to the\nrecord's trust rules. That is the cheapest thing in the loop, and the\nargument for writing the rebuttal out in full rather than remediating on\nreflex.\n\n**The orchestrator: one Claude Code context**, claude-opus-5[1m], no reset.\nIt carried the four Python modules (3,293 lines) read whole, their three test\nfiles, the parity harness, and both routers' output side by side for the\ncomparisons. The port sessions are the expensive ones on this side, and the\nreason is the same one that prices round 1: the work is reading two\nimplementations at once.",
+      "model": "claude-opus-5",
+      "provider": "anthropic"
+    },
+    {
+      "sessionNumber": 27,
+      "stepNumber": 6,
+      "stepKey": "measure-this-session-s-seat-cost",
+      "dateTime": "2026-08-28T20:44:32.065787-04:00",
+      "description": "82,021 input / 16,256 output tokens to gpt-5-6-sol over three rounds, 222.6s; one Claude Code context. Recorded as D179.",
+      "status": "complete"
     }
   ]
 }

@@ -5,8 +5,10 @@
 // bump: porting a module adds its handler, and every reader -- the CLI,
 // the parity control -- sees the same fact at the same moment.
 
+import { affectedVerb } from "./affected.ts";
 import { metricsVerb } from "./metrics.ts";
 import { sessionVerb } from "./session.ts";
+import { testEvidenceVerb } from "./testEvidence.ts";
 
 /** argv after the verb; the process's exit code comes back. */
 export type VerbHandler = (argv: string[]) => Promise<number>;
@@ -17,8 +19,10 @@ export type VerbHandler = (argv: string[]) => Promise<number>;
  * looks like from a command line.
  */
 export const HANDLERS: Readonly<Record<string, VerbHandler>> = {
+  affected: affectedVerb,
   metrics: metricsVerb,
   session: sessionVerb,
+  "test-evidence": testEvidenceVerb,
 };
 
 export function isImplemented(verb: string): boolean {

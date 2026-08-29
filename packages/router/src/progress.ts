@@ -18,6 +18,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { ACTIVITY_LOG_FILENAME, SESSION_PLAN_FILENAME, STATE_FILENAME } from "./evidence.ts";
+import { pythonRepr } from "./pythonJson.ts";
 import { readText } from "./textfile.ts";
 
 export const SCHEMA_VERSION = 5;
@@ -252,6 +253,19 @@ export function readRawSessionState(
   return isRecord(raw) ? raw : null;
 }
 
+/**
+ * The v5 record with the derived fields every caller asks for.
+ *
+ * The derived keys are computed, never stored: a stored `currentSession` is a
+ * second place for the answer to be wrong.
+ */
+export function readSessionState(
+  sessionsDir: string,
+): Record<string, unknown> | null {
+  const raw = readRawSessionState(sessionsDir);
+  return raw === null ? null : derivedView(raw);
+}
+
 export function readActivityLog(
   sessionsDir: string,
 ): Record<string, unknown> | null {
@@ -466,26 +480,7 @@ export function getProgress(state: Record<string, unknown>): ProgressView {
   };
 }
 
-/**
- * `repr(x)` for the values that reach an invariant message.
- *
- * These strings are refusals an operator reads, and the Python router
- * writes them with `repr`. A dict renders with its Python punctuation --
- * single-quoted keys, `True`/`None` -- because that is what the reader of
- * the other router's message sees.
- */
-export function pythonRepr(value: unknown): string {
-  if (value === null || value === undefined) return "None";
-  if (value === true) return "True";
-  if (value === false) return "False";
-  if (typeof value === "number") return String(value);
-  if (typeof value === "string") return `'${value.replace(/\\/g, "\\\\").replace(/'/g, "\\'")}'`;
-  if (Array.isArray(value)) return `[${value.map(pythonRepr).join(", ")}]`;
-  if (isRecord(value)) {
-    const members = Object.entries(value).map(
-      ([key, item]) => `${pythonRepr(key)}: ${pythonRepr(item)}`,
-    );
-    return `{${members.join(", ")}}`;
-  }
-  return String(value);
-}
+// `repr(x)` for the values that reach an invariant message. It lives beside
+// `dumps` now that four modules ask for it, and is re-exported here because
+// the invariants are where it was first needed.
+export { pythonRepr };

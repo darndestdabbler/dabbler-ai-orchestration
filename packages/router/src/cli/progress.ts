@@ -4,7 +4,13 @@
 // command it replaces takes the flag for the same reason, and a verb that
 // refused a flag its twin accepts would break every caller that passes it.
 // The extension renders this JSON and re-implements none of it.
+//
+// `approvedPlan` is imported for its registration, not for a call: loading it
+// fills the `ApprovedPlanReader` seam `progress` declares, which is what turns
+// `tasksRefused` back into task rows. Without this import the projection is
+// honest and empty, which is exactly the state D198 left session 31 in.
 
+import "../approvedPlan.ts";
 import { SessionsRootNotFoundError, resolveSessionsDir } from "../evidence.ts";
 import { buildProjection } from "../progress.ts";
 import { dumps } from "../pythonJson.ts";

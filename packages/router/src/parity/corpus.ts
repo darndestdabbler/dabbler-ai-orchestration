@@ -119,6 +119,26 @@ export function python(
   return runProcess(interpreter, ["-m", ...moduleArgs], cwd);
 }
 
+/**
+ * The Python router's own writers, for an artifact no `python -m` verb
+ * creates.
+ *
+ * `approved_plan` declares no command line, and its writer is the only thing
+ * that can produce a plan a reader will accept -- a hand-written file is
+ * refused on read, by design, so a fixture that wrote the JSON itself would
+ * build a shape that only exercises the refusal. This is still the reference
+ * implementation building the corpus, which is the rule the shapes already
+ * follow; it is `-c` rather than `-m` because the module has no `__main__`.
+ */
+export function pythonScript(
+  interpreter: string,
+  cwd: string,
+  source: string,
+  args: string[] = [],
+): RunOutcome {
+  return runProcess(interpreter, ["-c", source, ...args], cwd);
+}
+
 const SESSION_PLAN = `# Parity corpus
 
 ## Sessions
@@ -500,8 +520,88 @@ function buildInFlight(target: string, context: BuildContext): string {
     );
   }
 
+  writeApprovedPlan(repo, context);
   return repo;
 }
+
+/**
+ * The session's approved plan, approved, with its one step opened.
+ *
+ * Without it `progress --json` on this shape renders an empty task list, and
+ * the two routers agree on emptiness -- which proves nothing about the fold
+ * that turns a plan and an execution record into rows. The step id is the one
+ * the shape's own session plan derives (`build-the-widget`), so the plan
+ * answers a real goal rather than an invented one.
+ *
+ * `approve_plan` is called rather than skipped because the approval is what
+ * binds `plan_hash` into the artifact, and that hash is over the canonical
+ * JSON both routers have to agree on byte for byte. An unapproved plan would
+ * leave the one field this case exists to compare unwritten.
+ */
+function writeApprovedPlan(repo: string, context: BuildContext): void {
+  const steps = [
+    {
+      step_id: "build-the-widget",
+      intent: "Build the widget",
+      file_envelope: ["src/widget.py"],
+      evidence_contract: [
+        { kind: "deterministic", description: "the targeted tests pass" },
+      ],
+      risk_flags: [],
+    },
+  ];
+  const plan = pythonScript(
+    context.interpreter,
+    repo,
+    [
+      "import json, sys",
+      "from ai_router.approved_plan import approve_plan, new_plan, write_plan",
+      "from ai_router.ledger import session_run_dir",
+      "run = session_run_dir(sys.argv[2], 1)",
+      "run.mkdir(parents=True, exist_ok=True)",
+      "write_plan(run, new_plan(1, 'parity', json.loads(sys.argv[1])))",
+      "approve_plan(run)",
+    ].join("\n"),
+    [JSON.stringify(steps), repo],
+  );
+  if (plan.code !== 0) {
+    throw new CorpusError(`approved plan failed (${plan.code}): ${plan.stderr.trim()}`);
+  }
+
+  const opened = pythonScript(
+    context.interpreter,
+    repo,
+    [
+      "import json, sys",
+      "from ai_router.ledger import append_step_event",
+      "append_step_event(sys.argv[2], 1, json.loads(sys.argv[1]))",
+    ].join("\n"),
+    [
+      JSON.stringify({
+        schema_version: 1,
+        event: "opened",
+        recorded_at: PINNED_STEP_TIME,
+        session_number: 1,
+        step_id: "build-the-widget",
+        base_commit: "a".repeat(40),
+      }),
+      repo,
+    ],
+  );
+  if (opened.code !== 0) {
+    throw new CorpusError(`step event failed (${opened.code}): ${opened.stderr.trim()}`);
+  }
+}
+
+/**
+ * The step row's stamp, fixed rather than read from the clock.
+ *
+ * Every other timestamp in the corpus is written by the router and reduced by
+ * normalization 1. This one is authored by the builder, and authoring a moving
+ * value would make the shape's own bytes differ between two builds for a
+ * reason no diff could attribute.
+ */
+const PINNED_STEP_TIME = "2026-01-01T00:00:00+00:00";
 
 /**
  * The five lifecycle shapes of the record. The three whose builders are

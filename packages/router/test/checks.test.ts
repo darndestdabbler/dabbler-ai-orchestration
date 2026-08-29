@@ -235,7 +235,14 @@ describe("running a declared check", () => {
     } finally {
       for (const name of Object.keys(planted)) delete process.env[name];
     }
-  });
+    // Vitest's default 5 s, against a body that seeds a git repository and
+    // then spawns Node TWICE -- once per spawn branch, because both build
+    // the environment and both must be checked. It runs in ~1.3 s alone and
+    // has timed out under full-suite parallel load on Windows, which made
+    // the whole suite flaky for a reason that is arithmetic rather than a
+    // defect. The budget is raised here, on the one test that earns it,
+    // rather than globally where it would hide a genuine hang.
+  }, 30_000);
 
   it("fails a check that changed the tree it was measuring", async () => {
     const repo = makeSeededRepo();

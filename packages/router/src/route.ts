@@ -653,16 +653,11 @@ export async function route(
     taskType !== "verification" &&
     taskType !== "session-verification"
   ) {
-    // `verifyjob.auto_verify` lands in session 32. Refused by name rather
-    // than skipped: a router that quietly dropped the auto-verification a
-    // config asked for would return an unverified result that looks
-    // verified, and this is the one branch where silence is the failure.
-    throw new RouterError(
-      `verification.auto_verify_task_types names '${taskType}', and the ` +
-        "auto-verification job it asks for is ported in session 32 of the " +
-        "port plan (ai_router.verifyjob). Until then this router refuses " +
-        "the call rather than returning a result that was never verified.",
-    );
+    // Imported here rather than at module scope because `verifyjob` calls
+    // back into `route`; Python defers the same edge the same way.
+    const { autoVerify } = await import("./verifyjob.ts");
+    const outcome = await autoVerify(routeResult, content, taskType, config);
+    if (outcome !== null) routeResult.metadata["verification"] = outcome;
   }
 
   return routeResult;

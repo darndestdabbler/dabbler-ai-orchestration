@@ -313,6 +313,71 @@ not a function of the repository.
 > by the Python one, and a shape whose only purpose is one verb that runs
 > once per repository is not worth ~12 s on every parity run.
 
+> **Amended in session 32: the approved plan is compared through its caller,
+> the `in-flight` builder gained a `python -c` step, and a third digest
+> ledger names itself.**
+>
+> **No new case, and that is the finding.** The verb table lists
+> `approved_plan`, `plan_review` on `in-flight` from this session, but
+> neither module declares a command line — `verbs.ts` has said
+> `pythonCli: false` for `approved-plan` since session 23, and
+> `plan_review` has no entry at all. There is no `python -m` invocation to
+> put on either side, so a case in the table's own shape cannot be written.
+> What the plan has instead is a **caller**: `progress` folds it into the
+> task rows, so the `in-flight` builder now writes and approves a real plan
+> and opens its one step, and the existing `progress --json` case compares
+> the fold. Before this, both routers agreed the task list was empty, which
+> is the shape of a control that proves nothing — the same failure the
+> session-29 port allocation records.
+>
+> **The builder reaches Python's writers directly, through `-c` rather than
+> `-m`.** A plan whose content is not backed by a sanctioned write is
+> refused on read by design, so a builder that wrote the JSON itself would
+> construct a shape that only ever exercises the refusal. `pythonScript`
+> runs `approved_plan.write_plan` / `approve_plan` and
+> `ledger.append_step_event` in the reference implementation, which is the
+> rule every shape already follows; `-c` is forced only because the module
+> has no `__main__`. The step row's `recorded_at` is **pinned**, not read
+> from the clock: every other stamp in the corpus is written by a router and
+> reduced by normalization 1, and a value the *builder* authors would move
+> between two builds of one shape for a reason no diff could attribute.
+>
+> **`approved-plan-writes.jsonl` joins `state-writes.jsonl` and
+> `api-models.lock` as a digest ledger**, under the rule those two already
+> state and for the same reason: each row is a sha256 over the whole
+> `approved-plan.json` as one write left it, that file carries `approved_at`
+> and each amendment's `recorded_at`, and it is compared in full beside the
+> ledger. Measured rather than assumed — two routers writing the same plan
+> produce an identical `approved-plan.json` and differ on exactly the two
+> ledger rows whose digests cover a timestamp.
+>
+> **What is NOT reduced is the plan's own `plan_hash`.** It is bound over
+> the core fields, which deliberately exclude every timestamp, so it is
+> compared exactly — and it is the strongest single check in the corpus that
+> both routers canonicalize JSON identically, because it is a digest over
+> `sort_keys=True, separators=(",", ":")` output.
+>
+> **Say precisely what this case proves, because it is narrower than it
+> looks.** Both copies' `approved-plan.json` and `step-execution.jsonl` are
+> written by **Python**, and the compared verb is a read. So the case proves
+> the two **readers** agree — which is the whole of what a CLI-level case
+> can prove for a module with no CLI. The TypeScript **writer** is gated
+> separately, by a differential test in the router suite ("the plan
+> artifact, against the reference implementation"): it drives both writers
+> over one input, compares the bytes, and hands the TypeScript output to
+> Python's own `read_plan`, which recomputes both hashes and refuses on
+> either mismatch. That test was falsified before it was trusted — flipping
+> `sortKeys` to `false` in `coreBytes` turns it red.
+>
+> **`step-execution.jsonl` has no such differential test and its writer is
+> unproven across routers.** `ledger.appendStepEvent` was ported in session
+> 26 and is exercised by that session's suite on the TypeScript side alone.
+> The **agency record** has neither, and cannot: it is not a file but the
+> `agency` member of a round row (`ai_router/verify.py:773`, shaped by
+> `rounds.schema.json`), so nothing can produce one until `verify` lands in
+> session 33. Both are owed there, alongside the round cases that session
+> already carries.
+
 ## The files compared
 
 After both runs, the control walks the **union** of paths under each copy

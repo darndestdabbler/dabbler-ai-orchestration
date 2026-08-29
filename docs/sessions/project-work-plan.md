@@ -67,7 +67,7 @@ it.
 | 29 | One vocabulary for a failure, one stamp for a measurement | no | 2026-08-29 |
 | 30 | Transport II — the Copilot CLI state machine and seat cost | no | 2026-08-29 |
 | 31 | The session lifecycle | no | 2026-08-29 |
-| 32 | Verification support — agency, verifyjob, the approved plan | — | not declared |
+| 32 | Verification support — agency, verifyjob, the approved plan | no | 2026-08-29 |
 | 33 | The verification loop | — | not declared |
 | 34 | Bootstrap, packaging, and the `dabbler` command on the PATH | — | not declared |
 | 35 | The six-step workflow ported, the run core retired | — | not declared |
@@ -927,3 +927,37 @@ No Python behaviour changes. Where the port finds a Python defect it is
 recorded as a decision and fixed on the Python side first, in its own
 commit, so the control compares two routers with the same intended
 behaviour. Not releasable: no package is published from this session.
+
+### Session 32 — Verification support — agency, verifyjob, the approved plan
+
+**Releasable: no.**
+
+Session 32 of 36 — Verification support: agency, verifyjob, the approved plan.
+
+Port four Python modules to TypeScript under `packages/router/src`:
+
+- `agency` (921 lines) — the verifier's read surface and its recorded write
+  decisions, including the `--available-tools` restriction on the seat.
+- `approved_plan` (590) and `plan_review` (812) — the hashed immutable plan
+  and its amendments, the step-execution record. The hash covers every field
+  but `amendments`; a step without an evidence contract cannot be written; a
+  plan over seven steps cannot be written. The schema refuses, never a
+  reviewer.
+- `verifyjob` (782) — the verification job contract.
+
+Three things are owed to this session specifically:
+
+1. Register `progress`'s `ApprovedPlanReader` seam (D198). Until it does, a
+   repository with an approved plan gets `tasksRefused` where the task rows
+   should be.
+2. Pair the `approved_plan` parity case with a `progress --json` case on a
+   corpus shape that HAS a plan — the only thing that proves both routers
+   fold the steps the same way.
+3. Address the `VERIFIED` look-alike question (D168): if a boundary is
+   wanted it goes into Python first and crosses with a case that feeds a
+   look-alike to both routers.
+
+Parity control green on `approved-plan.json`, `step-execution.jsonl`, and
+the agency log. Behaviour does not change; TS renders, Python decides.
+
+Not releasable: this session publishes no package.

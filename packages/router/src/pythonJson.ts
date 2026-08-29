@@ -40,6 +40,19 @@ export interface DumpOptions {
   readonly indent?: number;
   /** `ensure_ascii`; true, as CPython's default is. */
   readonly ensureAscii?: boolean;
+  /**
+   * `sort_keys`. Keys are ordered by code point, which is what Python
+   * compares strings by -- JavaScript's default sort compares UTF-16 code
+   * units, and the two disagree above the basic plane.
+   */
+  readonly sortKeys?: boolean;
+  /**
+   * `separators`, as `[item, key]`. CPython defaults to `[", ", ": "]`
+   * with no indent and `[",", ": "]` with one, and a caller that hashes
+   * the result passes `[",", ":"]` -- the compact form, whose bytes are
+   * the digest's input rather than a rendering choice.
+   */
+  readonly separators?: readonly [string, string];
 }
 
 /**
@@ -126,53 +139,87 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function encode(
-  value: unknown,
-  ensureAscii: boolean,
-  indent: number | undefined,
-  depth: number,
-): string {
+/** The options as `encode` reads them, every default already resolved. */
+interface Encoding {
+  readonly ensureAscii: boolean;
+  readonly indent: number | undefined;
+  readonly sortKeys: boolean;
+  readonly itemSep: string;
+  readonly keySep: string;
+}
+
+/** `<` on two Python strings: code point order, not UTF-16 code unit order. */
+function byCodePoint(left: string, right: string): number {
+  const leftPoints = [...left];
+  const rightPoints = [...right];
+  const shared = Math.min(leftPoints.length, rightPoints.length);
+  for (let index = 0; index < shared; index += 1) {
+    const a = leftPoints[index].codePointAt(0)!;
+    const b = rightPoints[index].codePointAt(0)!;
+    if (a !== b) return a - b;
+  }
+  return leftPoints.length - rightPoints.length;
+}
+
+function encode(value: unknown, options: Encoding, depth: number): string {
   if (Array.isArray(value)) {
     if (value.length === 0) return "[]";
-    const items = value.map((item) => encode(item, ensureAscii, indent, depth + 1));
-    return wrap("[", items, "]", indent, depth);
+    const items = value.map((item) => encode(item, options, depth + 1));
+    return wrap("[", items, "]", options, depth);
   }
   if (isPlainObject(value) && !(value instanceof PythonFloat)) {
     const keys = Object.keys(value);
     if (keys.length === 0) return "{}";
+    if (options.sortKeys) keys.sort(byCodePoint);
     const items = keys.map(
       (key) =>
-        `${encodeString(key, ensureAscii)}: ` +
-        encode(value[key], ensureAscii, indent, depth + 1),
+        `${encodeString(key, options.ensureAscii)}${options.keySep}` +
+        encode(value[key], options, depth + 1),
     );
-    return wrap("{", items, "}", indent, depth);
+    return wrap("{", items, "}", options, depth);
   }
-  return encodeScalar(value, ensureAscii);
+  return encodeScalar(value, options.ensureAscii);
 }
 
 /**
  * The members between their brackets.
  *
- * Indented: a newline after the opening bracket, `,` plus a newline between
- * members, and the closing bracket back at the parent's depth. Flat: `", "`
- * between members -- the space CPython writes when no indent carries it.
+ * Indented: a newline after the opening bracket, the item separator plus a
+ * newline between members, and the closing bracket back at the parent's
+ * depth. Flat: the item separator alone -- `", "` by default, which is the
+ * space CPython writes when no indent carries it.
  */
 function wrap(
   open: string,
   items: readonly string[],
   close: string,
-  indent: number | undefined,
+  options: Encoding,
   depth: number,
 ): string {
-  if (indent === undefined) return `${open}${items.join(", ")}${close}`;
+  const { indent, itemSep } = options;
+  if (indent === undefined) return `${open}${items.join(itemSep)}${close}`;
   const inner = " ".repeat(indent * (depth + 1));
   const outer = " ".repeat(indent * depth);
-  return `${open}\n${inner}${items.join(`,\n${inner}`)}\n${outer}${close}`;
+  return `${open}\n${inner}${items.join(`${itemSep}\n${inner}`)}\n${outer}${close}`;
 }
 
 /** `json.dumps(value, **options)`. */
 export function dumps(value: unknown, options: DumpOptions = {}): string {
-  return encode(value, options.ensureAscii ?? true, options.indent, 0);
+  // CPython's own defaulting: the item separator loses its trailing space
+  // once an indent supplies the break, and an explicit pair overrides both.
+  const [itemSep, keySep] =
+    options.separators ?? (options.indent === undefined ? [", ", ": "] : [",", ": "]);
+  return encode(
+    value,
+    {
+      ensureAscii: options.ensureAscii ?? true,
+      indent: options.indent,
+      sortKeys: options.sortKeys ?? false,
+      itemSep,
+      keySep,
+    },
+    0,
+  );
 }
 
 /**

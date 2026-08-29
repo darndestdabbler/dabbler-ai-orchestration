@@ -537,6 +537,13 @@ export const CASES: readonly ParityCase[] = [
     // `in-flight` renders the ledger. A router that keyed the fall back on
     // the read returning null rather than on the file being absent would
     // agree on one and not the other.
+    //
+    // `in-flight` also carries an approved plan with one opened step, which
+    // is what makes the task rows a real comparison rather than two routers
+    // agreeing that a list is empty. It is the only case that reads
+    // `approved_plan`, because that module declares no command line of its
+    // own -- the projection is its caller, so the projection is where it is
+    // compared.
     shapes: ["fresh", "in-flight"],
     pythonArgs: (_repo, sessionsDir) => [
       "ai_router.progress", "--json", "--sessions-dir", sessionsDir,
@@ -549,7 +556,9 @@ export const CASES: readonly ParityCase[] = [
       "the display number and healed title per session, the icon key, the " +
       "invariant violation or its absence, and the task and verification " +
       "sub-views with their refusals -- the JSON the extension renders and " +
-      "re-implements nothing of",
+      "re-implements nothing of; and on `in-flight`, the approved plan " +
+      "folded into task rows with the open step in flight, plus the plan " +
+      "artifact and its bound plan_hash compared on disk",
   },
   {
     verb: "progress",

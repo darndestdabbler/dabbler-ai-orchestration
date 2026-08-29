@@ -63,6 +63,17 @@ function googleResponse(text: string, outTokens = 100): Response {
   );
 }
 
+function openaiResponse(text: string, outTokens = 40): Response {
+  return new Response(
+    JSON.stringify({
+      output_text: text,
+      usage: { input_tokens: 12, output_tokens: outTokens },
+      model: "o-served",
+    }),
+    { status: 200, headers: { "content-type": "application/json" } },
+  );
+}
+
 /** Every request the route takes, answered by `handler`. */
 function mockApi(handler: (url: string) => Response): string[] {
   const urls: string[] = [];
@@ -336,19 +347,78 @@ describe("a prompt over the model's input budget", () => {
   });
 });
 
-describe("auto-verification, before session 32", () => {
-  it("is refused rather than dropped, because silence would look verified", async () => {
+describe("auto-verification", () => {
+  const AUTO_VERIFY = {
+    verification: { enabled: true, auto_verify_task_types: ["code-review"] },
+  };
+
+  /** The generator answers from google; the verifier must not. */
+  function twoProviders(verdict: string): string[] {
+    return mockApi((url) =>
+      url.includes("openai")
+        ? openaiResponse(verdict)
+        : googleResponse("a review ".repeat(20), 200),
+    );
+  }
+
+  it("verifies through a different provider and reports the verdict", async () => {
+    configOnDisk(makeConfig(AUTO_VERIFY));
+    const urls = twoProviders("VERIFIED\n\nNothing to raise.");
+    const result = await route("say hi", { taskType: "code-review" });
+
+    expect(urls.some((url) => url.includes("google"))).toBe(true);
+    expect(urls.some((url) => url.includes("openai"))).toBe(true);
+    expect(result.metadata["verification"]).toEqual({
+      verdict: "VERIFIED",
+      blocking: false,
+      issue_count: 0,
+      verifier_model: "gpt",
+      verifier_provider: "openai",
+    });
+  });
+
+  it("records the verifying call against the model it reviewed", async () => {
+    configOnDisk(makeConfig(AUTO_VERIFY));
+    twoProviders("VERIFIED");
+    await route("say hi", { taskType: "code-review" });
+
+    const verify = metricRows().filter((row) => row["call_type"] === "verify");
+    expect(verify).toHaveLength(1);
+    expect(verify[0]["verifier_of"]).toBe("flash");
+    expect(verify[0]["verdict"]).toBe("VERIFIED");
+  });
+
+  it("keeps the paid-for answer when no verifier can be reached", async () => {
+    // Best-effort by contract: the routed call already succeeded and was
+    // billed, so losing the review must not lose the result. The verifier is
+    // confined to the one provider that just did the work, so the exclusion
+    // leaves no candidate and `route` raises rather than reviewing itself --
+    // which is the failure this branch has to swallow.
+    configOnDisk(makeConfig(AUTO_VERIFY));
+    // Google is the only provider whose key resolves, and it is the one the
+    // exclusion removes.
+    clearProviderKeys();
+    process.env["TEST_GOOGLE_KEY"] = "test-key";
+    const urls = mockApi(() => googleResponse("a review ".repeat(20), 200));
+    const result = await route("say hi", { taskType: "code-review" });
+
+    expect(result.content).toContain("a review");
+    expect(result.metadata["verification"]).toBeUndefined();
+    expect(urls.filter((url) => url.includes("openai"))).toHaveLength(0);
+  });
+
+  it("does not verify a verification, which would recurse", async () => {
     configOnDisk(
       makeConfig({
-        verification: { enabled: true, auto_verify_task_types: ["code-review"] },
+        verification: {
+          enabled: true,
+          auto_verify_task_types: ["code-review", "verification"],
+        },
       }),
     );
-    mockApi(() => googleResponse("a review ".repeat(20), 200));
-    const failure = await route("say hi", { taskType: "code-review" })
-      .then(() => null)
-      .catch((error: unknown) => error);
-    expect(failure).toBeInstanceOf(RouterError);
-    expect(String(failure)).toContain("session 32");
+    const urls = twoProviders("VERIFIED");
+    await route("say hi", { taskType: "verification" });
+    expect(urls).toHaveLength(1);
   });
 });
 

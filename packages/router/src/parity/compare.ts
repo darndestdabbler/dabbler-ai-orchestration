@@ -81,6 +81,15 @@ const DIGEST_LEDGERS: readonly RegExp[] = [
   // nothing less; leaving it exact would convict two identical records of
   // having been written a second apart.
   /(^|\/)api-models\.lock$/,
+  // The third, and it names itself here for the same reason. Each row is the
+  // sha256 of the whole `approved-plan.json` as one write left it, and that
+  // file carries `approved_at` and each amendment's `recorded_at` -- so two
+  // runs can never agree on the value, while the file it covers is compared
+  // in full beside it. What is NOT reduced is the plan's own `plan_hash`:
+  // that digest is bound over the core fields, which deliberately exclude
+  // every timestamp, so it is compared exactly and is the strongest single
+  // check that both routers canonicalize JSON identically.
+  /(^|\/)approved-plan-writes\.jsonl$/,
 ];
 
 const SHA256_VALUE = /sha256:[0-9a-f]{64}/g;

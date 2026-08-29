@@ -6011,3 +6011,248 @@ the capability divergence the parity control exists to catch.
 Recorded rather than fixed, and carried to the cutover, where all three stop
 being cross-router questions. The severity rule is what stops the loop here:
 minor-only findings do not buy a second round.
+
+## Session 32 — Verification support — agency, verifyjob, the approved plan
+
+### D204 · 2026-08-29 · Orchestrator (claude-opus-5/anthropic) · verifyjob is ported as its surviving half only -- 56 lines, not 782: the run-core half has no reachable caller and is deleted in session 35 (D129, D130, D178's precedent)
+
+The session plan's step 4 says "Port `verifyjob`" and sizes the module at
+782 lines. The inventory the whole set runs under says otherwise, and the
+inventory wins.
+
+**D129 splits this module.** Its row reads: kept are
+`build_verification_prompt`, `build_prompt` and `auto_verify` -- "what
+`verify` and `route` import"; retired are `cmd_verify`, `build_request`,
+`build_evidence`, `dispatch`, `interrupted_result`, `_run_targeted`,
+`_pause_if_exhausted` and `_terminate_at_cap`, "the run core's
+verified-policy job, which imports `runcli` and `runcore`". D130 retires the
+run core; session 35 deletes it.
+
+**Measured rather than inherited.** D129's own criterion is "what `verify`
+and `route` import", and by that criterion it names one function too many.
+`verifyjob.build_prompt` has exactly one caller in the package --
+`ai_router/verifyjob.py:492`, inside `cmd_verify`. `verify.py:114-115`
+imports `auto_verify` and `build_verification_prompt` and nothing else;
+`route.py:586` imports `auto_verify`. So the surviving half is **two
+functions, 56 lines**, not ~100 and not 782.
+
+**Porting the rest was the option that had to be refused.** It has no
+reachable caller in the world this port is building: `cmd_verify` takes a
+run-core view from `runcli._view`, reads `runcore` policy constants, and
+writes records the cutover deletes. Porting it means porting `runcli` and
+`runcore` too -- 4,396 lines the plan deletes three sessions from now -- or
+porting a function nothing can call. **This exact error has already cost
+this port a session and been corrected once**: D178 removed `checks.plan`
+from `checks.ts` for the same reason, and recorded the rule as "the
+inventory says port `checks`; it does not say port the half whose only
+consumer is being deleted." Session 26 made the same cut for `journal`.
+
+**What the session actually owed, it paid.** `route.ts` carried a refusal
+naming session 32 by number -- "the auto-verification job it asks for is
+ported in session 32" -- and that refusal is gone, replaced by the real
+branch and four tests: a routed `code-review` verified through a different
+provider, the metrics row bound to the model it reviewed, the paid-for
+answer surviving a verifier that cannot be reached, and a verification not
+verifying itself.
+
+Round 1's verifier called this "silently narrowing the deliverable based on
+the unsubstantiated D129 rationale" and raised it Major. It was disputed
+with the four citations above and **withdrawn in round 2**. The verifier ran
+`agency: none` on both rounds, so it could not open the decisions log it was
+characterizing -- which is the argument for citing file and line rather than
+asserting, in both directions.
+
+### D205 · 2026-08-29 · Orchestrator (claude-opus-5/anthropic) · approved_plan has no CLI on either side, so it is compared through its caller: the in-flight shape gains a real plan, progress --json becomes the comparison, and the WRITER is gated by a differential test instead
+
+The verb table says `approved_plan`, `plan_review` enter the control on
+`in-flight` this session. They cannot, in the shape the table means, and the
+reason is structural rather than an omission.
+
+**Neither module declares a command line.** `ParityCase` compares
+`python -m <module> ...` against `dabbler <verb> ...`; those two fields are
+the case. `contracts/verbs.ts` has recorded `pythonCli: false` for
+`approved-plan` since session 23, and `plan_review` has no verb entry at
+all. There is no invocation to put on either side. This is the same reason
+the table's `ledger` row, also `pythonCli: false`, never produced a case in
+session 26.
+
+**What the plan has instead is a caller.** `progress` folds it into the task
+rows, so the `in-flight` builder now writes and approves a real plan and
+opens its one step, and the existing `progress --json` case compares the
+fold. Before this the case compared two empty task lists -- two routers
+agreeing that nothing is nothing, which reads as proof and is not. Both
+routers now emit the identical row (`build-the-widget`, in flight, with its
+`startedAt`), and the artifact and its bound `plan_hash` are compared on
+disk. 137 compared paths became 179.
+
+**The builder reaches Python's writers through `-c`.** A plan whose content
+is not backed by a sanctioned write is refused on read by design, so a
+builder that wrote the JSON itself would build a shape that only ever
+exercises the refusal. `pythonScript` drives `approved_plan.write_plan` /
+`approve_plan` and `ledger.append_step_event` in the reference
+implementation -- which is how every shape is built -- and `-c` is forced
+only because the module has no `__main__`. The step row's `recorded_at` is
+pinned, not read from the clock: every other stamp is written by a router
+and reduced by normalization 1, and a value the *builder* authors would move
+between two builds of one shape.
+
+**A third digest ledger, under the rule the first two state.**
+`approved-plan-writes.jsonl` joins `state-writes.jsonl` and
+`api-models.lock`: each row is a sha256 over the whole `approved-plan.json`
+as one write left it, that file carries `approved_at` and each amendment's
+`recorded_at`, and it is compared in full beside the ledger. Measured, not
+assumed -- two routers writing the same plan produce an identical
+`approved-plan.json` and differ on exactly the two rows whose digests cover
+a timestamp. The plan's own `plan_hash` is **not** reduced: it is bound over
+core fields that exclude every timestamp, so it is compared exactly, and it
+is the strongest check in the corpus that both routers canonicalize JSON
+identically.
+
+**Round 1 was right that this proves the reader and not the writer, and the
+gap is now closed by a different instrument.** Both copies' artifacts are
+Python-written and the compared verb is a read, so no CLI case can reach the
+TypeScript writer. A differential test in the router suite drives both
+writers over one input, compares the bytes, and hands the TypeScript output
+to Python's own `read_plan` -- which recomputes both hashes and raises on
+either mismatch. It was falsified before being trusted: flipping `sortKeys`
+to `false` in `coreBytes` turns it red. Round 2 accepted it and withdrew the
+finding.
+
+**Still owed, and recorded as owed rather than claimed.**
+`step-execution.jsonl`'s writer has no cross-router check;
+`ledger.appendStepEvent` landed in session 26 and is exercised on the
+TypeScript side alone. The **agency record** has none and can have none: it
+is not a file but the `agency` member of a round row
+(`ai_router/verify.py:773`), so nothing produces one until `verify` lands.
+Both belong to session 33, beside the round cases it already carries.
+
+### D206 · 2026-08-29 · Orchestrator (claude-opus-5/anthropic) · The JSON seam gains sort_keys and separators because the plan hash is a digest over them; and JavaScript's replace() is neither global nor literal, which corrupted the verification prompt until round 1's nit caught it
+
+The plan hash is a digest over `json.dumps(core, sort_keys=True,
+separators=(",", ":"))`. Two routers that canonicalize differently produce
+different hashes for the same plan, and every read of an approved plan then
+fails closed on the other's artifact. `pythonJson.dumps` had neither option.
+
+**Both are CPython's semantics, not conveniences.** `sortKeys` orders keys
+by **code point**, which is what Python compares strings by -- JavaScript's
+default sort compares UTF-16 code units, and the two disagree above the
+basic plane. `separators` defaults the way CPython does: `[", ", ": "]` with
+no indent, `[",", ": "]` with one, and an explicit pair overrides both.
+Checked against CPython on five inputs -- nested sorting, the default
+spacing, a real plan core, non-ASCII under `ensure_ascii`, and the indented
+form -- byte-identical on all five.
+
+**The proof is the artifact, not the unit check.** Python wrote and approved
+a plan; the TypeScript `readPlan` accepted it, which means it recomputed
+both the write-ledger content hash and the bound core hash and matched. Then
+TypeScript wrote one and Python's `read_plan` accepted that, with the same
+`plan_hash` on both sides. A hash agreeing in both directions over a real
+artifact is a stronger claim than any assertion about serializer options.
+
+**A related bug the round caught, in the other direction.**
+`buildVerificationPrompt` filled its three placeholders with JavaScript's
+`String.prototype.replace(string, string)`, and I had written a comment
+claiming that matched Python's `str.replace`. It does not, in **two** ways:
+it substitutes only the first occurrence where Python substitutes every one,
+and a string replacement expands `$&`, `` $` `` and `$1` against the match
+where Python treats the replacement literally. Both are reachable from an
+ordinary routed response -- the text under review is substituted verbatim,
+so any answer discussing shell or regex syntax is corrupted before the
+verifier reads it. Measured: `"A {x} B {x}".replace("{x}", "V")` is
+`"A V B {x}"` in JavaScript and `"A V B V"` in Python, and
+`"A {x}".replaceAll("{x}", "cost $& and $\`")` yields `"A cost {x} and A "`.
+
+The fix is `replaceAll` with a **function** replacement, which is the one
+form that is both global and literal. Two tests pin it. The round raised it
+as a nit; it was a correctness divergence, and it is the clearest argument
+in this session for the rule that a port's comments must be checked as
+carefully as its code -- the comment asserted the opposite of the truth and
+would have survived any review that trusted it.
+
+### D207 · 2026-08-29 · Orchestrator (claude-opus-5/anthropic) · D198's ApprovedPlanReader is registered and proved through the bundle; D168 is NOT this session's -- it belongs to the session that ports verify, which the renumbering makes 33, and STATUS's Next took its literal number
+
+Session 31 left `progress` with a declared but unregistered
+`ApprovedPlanReader`: a repository with a plan on disk got `tasksRefused`
+where its task rows belong. That was honest and unfinished. It is now
+registered, and the registration is proved rather than asserted.
+
+`approvedPlan.ts` fills the seam at module scope, exactly as `session.ts`
+fills `writers.usePlanParser`, and `cli/progress.ts` imports it for that
+effect. Python breaks the same cycle with a function-scope import at
+`progress.py:672`; TypeScript has no such form at module scope, which is why
+the seam exists at all rather than a direct import. **Proved through the
+built bundle**, not the source: both routers, run against the same corpus
+shape, emit the identical non-empty row
+`{"position": 0, "stepId": "build-the-widget", "intent": "Build the widget",
+"state": "in flight", "iconKey": "in-progress", "isOpen": true,
+"startedAt": "2026-01-01T00:00:00+00:00"}`.
+
+**D168 is NOT this session's, and STATUS.md's *Next* is wrong about it.**
+That entry says the `VERIFIED` look-alike question "is addressed to it
+[session 32]". D168's own text says "Session 32 ports `verify` and is where
+that case would live" -- but D168 was written 2026-08-28, before D188
+renumbered the plan, so its "session 32" is now **33**, which is the session
+that ports `verify`. The *Next* list took the literal number without
+applying the shift it describes three paragraphs earlier. The defining fact
+is the module, not the number.
+
+The residual is also smaller than it reads. D168 asks for a parity case that
+feeds a look-alike head to both routers; a case needs a verb, and the only
+verb that reaches `parse_verification_response` is `verify`. The safety net
+D168 leans on is **already** covered in both suites:
+`test_verdict.py:223` and `verdict.test.ts:239` each assert
+`validate_session_verdict("VERIFIED_NOT_REALLY")` raises, so no look-alike
+can be persisted by either router. What neither suite pins is the parser
+accepting one -- and pinning it now would enshrine, in a test, behaviour
+D168 flagged as a candidate for change one session before the change is due.
+
+**A second nit declined for the same reason.** Round 1 asked
+`readFidelity` to return `unverified` when every shown line number is out of
+the file's bounds. `ai_router/agency.py:640-643` does exactly what the port
+does -- `continue` past an out-of-range line and fall through to
+`FIDELITY_VERBATIM`. Changing one side is the drift the parity control
+exists to catch, and D168 already ruled this class: it belongs in Python
+first and crosses with a case. Filed against the shared design.
+
+### D208 · 2026-08-29 · Orchestrator (claude-opus-5/anthropic) · Session 32 seat cost measured: 53,419 in / 12,678 out to gpt-5-6-sol over two rounds; round 2 cost 23% of round 1 while carrying three rebuttals as well as the fix delta
+
+Session 32's cost in the two currencies it ran on, by the method D136 set
+down in session 22. No dollar figure: set 109 removed the router's rate
+table, the metrics ledger carries tokens and elapsed time only, and a list
+price recalled from memory is a guess wearing a measurement's clothes.
+
+**The verifier -- 53,419 input / 12,678 output tokens to `gpt-5-6-sol` over
+two API rounds, 175.6 s of wall time.** From `ai_router/router-metrics.jsonl`,
+`session_number == 32`:
+
+| Round | Input | Output | Elapsed | Outcome |
+| --- | ---: | ---: | ---: | --- |
+| 1 | 43,309 | 9,485 | 131.3 s | ISSUES_FOUND -- 3 Major, 2 nits |
+| 2 | 10,110 | 3,193 | 44.2 s | VERIFIED |
+| **Total** | **53,419** | **12,678** | **175.6 s** | |
+
+**Round 2 cost 23% of round 1's input, and it carried three rebuttals as
+well as the fix delta.** That is the fix-delta review working with the
+dispute ladder loaded on top of it -- session 25 measured an eighth for a
+delta alone (D169), and this round was dearer because the three disputes
+ride the prompt whole. Still the cheaper half of the session by a factor of
+four.
+
+**The orchestrator -- Claude Code / claude-opus-5[1m], subscription
+window.** Not priced per call and not attributable to a session by the
+router, so what is recorded is the work rather than a number: three modules
+ported whole and one split (2,323 Python lines to roughly 2,700 TypeScript
+across four files), 69 vitest tests written, four route tests rewritten
+against a branch that used to be a refusal, one seam registered, one corpus
+shape extended, three disputes drafted with citations, two verification
+rounds driven, and five decisions recorded.
+
+**Machine time, which is again the number that dominates.** The parity
+control runs inside every `verify` and now builds a plan through two extra
+Python processes per shape; it remains the largest fixed cost of a round.
+The targeted TypeScript run for the fix delta was 3 s; the whole router
+suite is about 145 s, and one test in it (`checks.test.ts`, "hands the child
+an allowlist") **times out at 5,000 ms under full-suite parallel load and
+passes in 1.3 s alone**. That flake predates this session -- it was present
+on the baseline run before a line was written -- and it is worth a raised
+timeout rather than an investigation.

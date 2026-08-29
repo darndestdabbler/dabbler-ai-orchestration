@@ -22,7 +22,14 @@ import { SCHEMA_DIR } from "../paths.ts";
 
 const ajv = new Ajv2020({ allErrors: false, strict: false });
 
+// A second instance, because `allErrors` is fixed at construction. Only the
+// plan review needs it: every other caller refuses at the first error, and a
+// reviewer is told everything at once so a plan is not revised one exception
+// per round.
+const ajvAll = new Ajv2020({ allErrors: true, strict: false });
+
 const validatorCache = new Map<Record<string, unknown>, ValidateFunction>();
+const allValidatorCache = new Map<Record<string, unknown>, ValidateFunction>();
 const fileCache = new Map<string, Record<string, unknown>>();
 
 /** One of `ai_router/schemas/`, read once. */
@@ -81,4 +88,41 @@ export function schemaFailure(
   const location = errorLocation(error?.instancePath ?? "");
   const message = error?.message ?? "does not match the schema";
   return `${subject} failed schema validation at ${location}: ${message}`;
+}
+
+/** One schema error, split the way a caller reports it. */
+export interface SchemaFailure {
+  readonly location: string;
+  readonly message: string;
+}
+
+/**
+ * Every way `data` breaks `schema`, rather than only the first.
+ *
+ * The order is `(location, message)`, which is this router's own and is NOT
+ * Python's: `jsonschema` sorts by `str(error)` over a multi-line rendering
+ * that has no counterpart here. The set of members reported is the claim; the
+ * sequence and the wording are `ajv`'s, as D165 already settled for the
+ * single-error form.
+ */
+export function allSchemaFailures(
+  data: unknown,
+  schema: Record<string, unknown>,
+): SchemaFailure[] {
+  let validate = allValidatorCache.get(schema);
+  if (!validate) {
+    validate = ajvAll.compile(schema);
+    allValidatorCache.set(schema, validate);
+  }
+  if (validate(data)) return [];
+  return (validate.errors ?? [])
+    .map((error) => ({
+      location: errorLocation(error.instancePath ?? ""),
+      message: error.message ?? "does not match the schema",
+    }))
+    .sort(
+      (left, right) =>
+        left.location.localeCompare(right.location) ||
+        left.message.localeCompare(right.message),
+    );
 }

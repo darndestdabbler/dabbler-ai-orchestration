@@ -1,17 +1,129 @@
-# STATUS — session 27 of 35 landed: evidence, the executor, and the selector through both routers
+# STATUS — session 28 of 35 landed: routing, and the record of what exists
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
 `experiment/verification-pipeline-v3` and `design/solution-decomposition`
 are merged and finished. Earlier handoff text is in `docs/status-archive.md`.
 
-> **Recorded, 2026-08-28.** Session 27's deliverables are decisions
-> **D173–D179** in `docs/sessions/decisions-log.md`; session 26's are
-> **D170–D172**, session 25's **D163–D169**, session 24's **D150–D162** and
-> session 23's **D138–D149**, plus the amendments inside
-> `docs/ts-port-parity-control.md`. This file summarises them; the decisions
-> are the record.
+> **Recorded, 2026-08-29.** Session 28's deliverables are decisions
+> **D180–D186** in `docs/sessions/decisions-log.md`; session 27's are
+> **D173–D179**, session 26's **D170–D172**, session 25's **D163–D169**,
+> session 24's **D150–D162** and session 23's **D138–D149**, plus the
+> amendments inside `docs/ts-port-parity-control.md`. This file summarises
+> them; the decisions are the record.
 
 ## Where things are
+
+- **Session 28 is closed `VERIFIED`** — 2 rounds (gpt-5-6-sol over the
+  API). Round 1 raised one Major and three nits; the Major was **disputed
+  and withdrawn**, and round 2 was clean. Claude Code / claude-opus-5[1m]
+  orchestrator. All five gates passed at the first attempt; nothing was
+  forced.
+- **Six modules are ported.** `transports/base` (49), `transports/offline`
+  (140), `transports/api` (292), `selection` (146), `route` (592) and
+  `discovery` (1,057) — 2,276 Python lines becoming **2,879 TypeScript
+  across seven files**, plus the `discovery` verb, with **90 vitest tests**
+  answering for the 82 Python ones. `transports/copilot.ts` grew by 171
+  lines: the seat catalog's READER.
+- **`fetch` replaces `httpx`, which makes `route` async (D180)** — and that
+  is the whole of the shape difference. Neither a promise nor a child
+  process has a blocking form under Node, and a synchronous facade over
+  either would stall the only thread there is; `checks.execute` took the
+  same shape in session 27 (D174), and these are the last two. **The rate
+  limiter's `threading.Lock` survives as a promise chain rather than being
+  dropped as a Python artefact**: Node has one thread and the same hazard,
+  and two awaited `wait()` calls would otherwise both pass the ceiling.
+- **Two branches of `route` are refused BY NAME (D181), not skipped.** The
+  `copilot-cli` transport names session 29; the auto-verification tail — a
+  live branch, since the bundled config auto-verifies `code-review` — names
+  session 31. A silent fallback to the API would put a cross-provider
+  verification on the provider the operator was routing away from, and a
+  dropped auto-verify would return an unverified result that reads as
+  verified. Everything up to those two branches is real: prompt rendering
+  and the over-budget refusal, the escalation triggers, the truncation
+  heuristic, the exclusion assertion at the call site, the metrics row, and
+  the whole API and offline paths. **The seat's half of selection is real
+  too**, so session 29 inherits a transport to write rather than a rule to
+  restate.
+- **The parity control compares a lock-file WRITE, on 16 cases over 85
+  paths (D182).** Four `discovery` cases on `fresh`: `status`, `drift`,
+  `enumerate --dry-run` and `enumerate`. The specification excluded
+  `enumerate` as needing the network — true on a machine with keys, so
+  **the corpus takes the keys away**. Every vendor then fails `no-api-key`
+  before a socket opens and both routers fold that identical failure into
+  the same record, byte for byte including the writer stamp and the digest.
+  The scrub is load-bearing on its own: without it every parity run on the
+  operator's machine would spend three vendor calls per shape.
+  `.dabbler/api-models.lock` joins the compared paths and **names itself as
+  the second digest-over-a-timestamp**, as the specification requires.
+- **One compared line is wall-clock-derived and no normalization reaches
+  it.** Three of the four cases print a record's age as `f"{h:.0f}h old"`
+  from each router's own `now`, about a second apart. They disagree only
+  when that second straddles a rounding boundary — roughly one run in two
+  thousand — and the diff then reads `5713h old` against `5714h old`, which
+  re-running settles. Recorded rather than fixed: a third normalization is
+  forbidden, and a `--now` flag would be a CLI knob invented for the
+  control's convenience.
+- **Two debts session 26 left by name are closed (D183).** `session start`
+  emits its discovery warnings through the same fail-silent wrapper Python
+  uses — a staleness check that could fail a registration would be a
+  maintenance signal capable of causing an outage. And the seat lock file
+  now has **one parser**: `identity`'s lenient reader collapsed into a
+  wrapper over the real `loadCatalog`, which closed a latent divergence
+  nobody had noticed — the old reader used the good entries of a malformed
+  lock where Python resolves nothing.
+- **The ported transport reaches all three vendors live (D184).**
+  anthropic 1.3 s, openai 2.0 s, google 0.7 s, in `test/live.test.ts`,
+  gated on `DABBLER_E2E=1` and skipped by the default run — an explicit
+  opt-in rather than "are there keys here", because a developer with keys
+  set must not discover that `npm test` spends money. OpenAI served
+  `gpt-5.4-2026-03-05` for `gpt-5.4`, so the served-model notice fired
+  against a real body rather than a canned one.
+- **The disputed Major was wrong about which module writes what, and the
+  rebuttal cost 3,400 tokens.** It read the plan's "`discovery` reads and
+  writes `copilot-catalog.lock`" literally; but `ai_router.discovery` never
+  writes that file (all four of its seat references are reads), its writer
+  is in `transports/copilot.py`, and a refresh is *defined* as an empirical
+  probe — so porting it would have pulled session 29's dispatch state
+  machine into session 28. A writer without the probe could only mark a
+  model `confirmed` with no evidence, which that file's own design forbids.
+  The verifier withdrew on the first reading of the cited lines.
+- **One nit was a real defect and is fixed with a test.** A Gemini 200 with
+  no candidate — what a safety block returns — became the literal string
+  `"undefined"` and would have passed every escalation trigger as an
+  answer. Python indexes and raises, so the port now raises: an empty
+  string would have been just as wrong, converting a blocked response into
+  an escalation the record cannot tell from a model that answered with
+  nothing. The same coercion in the Anthropic caller was fixed with it. Two
+  other nits described Python's behaviour faithfully ported and were
+  answered with a docstring rather than a change — `DispatchError`'s claim
+  to cover exhausted API retries overstates what *either* router does.
+- **A second D173-shaped question is owed a ruling (D185).** A failed
+  vendor's recorded `last_error` is the failing library's own class name,
+  so the routers write `TimeoutException` and `HttpTimeoutError` into
+  `.dabbler/api-models.lock` for the same failure. Every byte difference
+  before these two was settled in Python's favour (D165) because each was
+  *formatting*; both of these are content. The parity corpus cannot see it
+  — with no keys every vendor fails as the shared `no-api-key` constant.
+  **Session 35 is the deadline for both**: after it one router remains and
+  whichever string it writes becomes the answer by default rather than by
+  decision.
+- **Seat cost: 60,448 in / 10,443 out to gpt-5-6-sol over two rounds
+  (D186).** Round 2 is **18%** of round 1's input, against 26% at session
+  26 and 8% at 27. Six ported sessions have now spent 511,873 verifier
+  tokens; session 28 is the third cheapest of them while being the second
+  largest by Python lines ported.
+- **Suite: 944 Python (5:58) / 389 router vitest (47 s, plus 3 live tests
+  skipped) / 153 extension mocha / 14 Playwright; all four declared
+  controls green.** Python test counts unchanged. `packages/router` is
+  ~14,500 lines of source (1,572 generated) and ~5,500 of tests.
+- **Left for whoever needs it, deliberately.** Round 2's surviving nit says
+  the Gemini reader takes `parts[0]` only — which is exactly what Python
+  does, so a multipart response truncates in both routers identically. It
+  is Python's behaviour, not the port's. Separately, `pytest.ini` declares
+  the `e2e` marker as excluded from the default run but `addopts` carries
+  no `-m "not e2e"`; nothing is wrong today because no Python e2e test
+  exists, and adding one without that flag would put live vendor calls into
+  the run of record.
 
 - **Session 27 is closed `VERIFIED`** — 3 rounds (gpt-5-6-sol over the API).
   Round 1 raised four Major findings; **three were disputed and all three

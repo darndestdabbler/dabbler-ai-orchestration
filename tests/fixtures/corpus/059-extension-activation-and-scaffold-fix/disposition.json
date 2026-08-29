@@ -1,0 +1,16 @@
+{
+  "status": "completed",
+  "summary": "Session 2 of 2 (FINAL, close-out + re-scope). Operator UAT of the S1 build surfaced that the entire Getting Started / scaffolder UX is being redesigned (operator mockup docs/planning/getting-started-instructions.svg) — a stateful two-panel Getting Started (interactive form in the Session Set Explorer + static editor instructions) that removes the 'title of the first session set' prompt this set kept. The S1 activation + wizard-tier fix is merged and VERIFIED on master; rather than cut a throwaway standalone 0.28.1 for a scaffolder flow about to be replaced, the release folds forward into Set 060 (0.29.0). This session: re-scoped the spec's S2; annotated CHANGELOG [0.28.1] as not-released-standalone (folded into 0.29.0); authored change-log.md with the Set 060 hand-off and the operator-approved redesign design lock; no new code, no release. TS unit 645 passing / 2 pre-existing Set-026 stub failures; drift_guard exits 0.",
+  "verification_method": "manual",
+  "verification_verdict": "VERIFIED",
+  "verification_notes": "No new code this session — administrative close-out + re-scope only. The set's only code (S1: the activation + wizard-tier fix) was cross-provider VERIFIED by gpt-5-4 over 2 rounds (see s1-verification.md / -round-2.md). The re-scope decision (fold the release into Set 060 rather than ship a soon-obsolete 0.28.1) was operator-approved 2026-06-10.",
+  "files_changed": [
+    "docs/session-sets/059-extension-activation-and-scaffold-fix/spec.md",
+    "docs/session-sets/059-extension-activation-and-scaffold-fix/change-log.md",
+    "docs/session-sets/059-extension-activation-and-scaffold-fix/activity-log.json",
+    "tools/dabbler-ai-orchestration/CHANGELOG.md"
+  ],
+  "verification_message_ids": [],
+  "next_orchestrator": null,
+  "blockers": []
+}

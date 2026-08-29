@@ -425,6 +425,7 @@ testing:
         select:
           - packages/router/test/contracts.test.ts
           - packages/router/test/metrics.test.ts
+          - packages/router/test/lifecycleCli.test.ts
       - when: packages/router/src/parity/
         select:
           - packages/router/test/parity.test.ts
@@ -474,18 +475,24 @@ testing:
       - when: packages/router/src/ledger.ts
         select:
           - packages/router/test/record.test.ts
+          - packages/router/test/projection.test.ts
       - when: packages/router/src/critique.ts
         select:
           - packages/router/test/record.test.ts
       - when: packages/router/src/writers.ts
         select:
           - packages/router/test/record.test.ts
+          - packages/router/test/lifecycle.test.ts
       - when: packages/router/src/session.ts
         select:
           - packages/router/test/record.test.ts
+          - packages/router/test/lifecycle.test.ts
+          - packages/router/test/lifecycleCli.test.ts
       - when: packages/router/src/progress.ts
         select:
           - packages/router/test/record.test.ts
+          - packages/router/test/projection.test.ts
+          - packages/router/test/gates.test.ts
       # The evidence protocol and the record are two readers of one module:
       # the round anchor and the digest ledger are what `record.test.ts`
       # exercises, and the transcripts, quote provenance and absence
@@ -494,9 +501,19 @@ testing:
         select:
           - packages/router/test/record.test.ts
           - packages/router/test/evidence.test.ts
+      # The close's five gates. `record.test.ts` still answers for the
+      # declaration's half of `materialWorktreeChanges`; the gates
+      # themselves and the driver are their own file.
       - when: packages/router/src/gates.ts
         select:
+          - packages/router/test/gates.test.ts
           - packages/router/test/record.test.ts
+          - packages/router/test/lifecycle.test.ts
+      # The module manifest: one reader, one writer, one command line.
+      - when: packages/router/src/modules.ts
+        select:
+          - packages/router/test/lifecycle.test.ts
+          - packages/router/test/lifecycleCli.test.ts
       # The pre-verification stage. `checks` is the leaf -- the declaration,
       # the path grammar and the executor -- so it selects its own test and
       # the two modules that import it; `test_evidence` and `affected` are

@@ -9,6 +9,8 @@ import { affectedVerb } from "./affected.ts";
 import { copilotVerb } from "./copilot.ts";
 import { discoveryVerb } from "./discovery.ts";
 import { metricsVerb } from "./metrics.ts";
+import { modulesVerb } from "./modules.ts";
+import { progressVerb } from "./progress.ts";
 import { seatCostVerb } from "./seatCost.ts";
 import { sessionVerb } from "./session.ts";
 import { testEvidenceVerb } from "./testEvidence.ts";
@@ -26,6 +28,8 @@ export const HANDLERS: Readonly<Record<string, VerbHandler>> = {
   copilot: copilotVerb,
   discovery: discoveryVerb,
   metrics: metricsVerb,
+  modules: modulesVerb,
+  progress: progressVerb,
   "seat-cost": seatCostVerb,
   session: sessionVerb,
   "test-evidence": testEvidenceVerb,

@@ -66,7 +66,7 @@ it.
 | 28 | Transports I — API, offline, routing, selection, discovery | no | 2026-08-28 |
 | 29 | One vocabulary for a failure, one stamp for a measurement | no | 2026-08-29 |
 | 30 | Transport II — the Copilot CLI state machine and seat cost | no | 2026-08-29 |
-| 31 | The session lifecycle | — | not declared |
+| 31 | The session lifecycle | no | 2026-08-29 |
 | 32 | Verification support — agency, verifyjob, the approved plan | — | not declared |
 | 33 | The verification loop | — | not declared |
 | 34 | Bootstrap, packaging, and the `dabbler` command on the PATH | — | not declared |
@@ -881,3 +881,49 @@ Port `ai_router/transports/copilot.py` (2,074 lines) and `ai_router/seat_cost.py
 7. Lift `route`'s refusal of the `copilot-cli` branch, which names session 30.
 
 Not releasable: this is a port session; it publishes no package.
+
+### Session 31 — The session lifecycle
+
+**Releasable: no.**
+
+Session 31 of 36 — The session lifecycle.
+
+Port `ai_router/gates.py` (421), `ai_router/session.py` (1,386),
+`ai_router/progress.py` (1,050) and `ai_router/modules.py` (246) to
+TypeScript under `packages/router/src/`. 3,103 Python lines; est. 138 TS
+tests. The largest single session left, and the one that finishes the
+record's judgment half.
+
+Order, per the session plan:
+
+1. `gates` first, whole: the five gates (verification clean, working tree
+   clean, pushed to remote, test run fresh, verdict vocabulary), the
+   `GateResult` row shape, and `run_gates`. Run the parity control on
+   `session close --dry-run` for every built corpus shape before anything
+   else is ported — a gate that differs by one row is this set's worst
+   outcome and this is the cheapest place to see it.
+2. `session`'s remaining subcommands: `plan`, `close` (including
+   `--dry-run` and `--force`), `cancel`, `restore`, `migrate`. The
+   refusals in `cli/session.ts` come out together.
+3. `progress` whole: the legacy normalization and v2→v3 synthesis, the
+   plan-derived session list, `build_task_rows`, `verification_cap`,
+   `build_verification_view`, `build_projection`, and the `progress` /
+   `progress --json` command line.
+4. `modules`: the manifest reader, `parse_entries`, `create`, and the
+   command line — reconciled against the `Router` contract rather than
+   inheriting a shape nothing ever ran (D162/D152).
+5. `identity.resolveSessionOrchestratorIdentity` lands here as a wrapper
+   over `resolveOrchestratorIdentity` (D164) — it reads a repository
+   rather than a block, through `progress`, which is why it waited.
+6. Parity control green on `sessions.json`, the activity log, the
+   decisions log, the project work plan and the projection JSON, plus the
+   `close --dry-run`, `cancel`, `restore`, `progress`, `progress --json`
+   and `modules` verbs the control's table adds in this session.
+7. Measure this session's seat cost and record it.
+8. Affected tests as preverify; cross-provider verification; the whole
+   suite recorded as the `final-full` run of record; close-out.
+
+No Python behaviour changes. Where the port finds a Python defect it is
+recorded as a decision and fixed on the Python side first, in its own
+commit, so the control compares two routers with the same intended
+behaviour. Not releasable: no package is published from this session.

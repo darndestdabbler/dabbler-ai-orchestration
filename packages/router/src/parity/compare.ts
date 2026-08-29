@@ -21,11 +21,17 @@ export function toPosix(path: string): string {
  * Everything the router is allowed to write. `bootstrap`'s outputs are
  * here too: the managed guidance fence, the pre-commit hook and the
  * ignore rule are writes, and a reader diffs them.
+ *
+ * `docs/modules.yaml` is the one entry here that people also edit by hand.
+ * It is compared anyway, because `modules create` rewrites the whole file
+ * through a YAML emitter on each side and two routers that reformatted a
+ * tracked file differently would make every later diff of it lie.
  */
 export const COMPARED: readonly RegExp[] = [
   /^docs\/sessions\/(sessions\.json|activity-log\.json|decisions-log\.md|project-work-plan\.md|change-log\.md)$/,
   /^\.dabbler\/runs\/[^/]+\.jsonl$/,
   /^\.dabbler\/runs\/s\d+\/.+$/,
+  /^docs\/modules\.yaml$/,
   /^copilot-catalog\.lock$/,
   /^\.dabbler\/api-models\.lock$/,
   /^(AGENTS|CLAUDE|GEMINI)\.md$/,

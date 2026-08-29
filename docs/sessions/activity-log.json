@@ -6663,6 +6663,235 @@
       "dateTime": "2026-08-29T05:59:58.430190-04:00",
       "description": "Both suites run whole against the verified tree and recorded as final-full: 944 pytest in 401s, 498 vitest in 50s",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 31,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-29T06:47:12.377520-04:00",
+      "description": "Register; declare `--not-releasable`.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 31,
+      "stepNumber": 2,
+      "stepKey": "port-gates-first-and-run-the",
+      "dateTime": "2026-08-29T06:47:12.377520-04:00",
+      "description": "Port `gates` first and run the parity control on `close --dry-run` rows for every corpus shape \u2014 a gate that differs by one row is the set's worst outcome, and this is the cheapest place to see it.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 31,
+      "stepNumber": 3,
+      "stepKey": "port-session-progress-modules",
+      "dateTime": "2026-08-29T06:47:12.377520-04:00",
+      "description": "Port `session`, `progress`, `modules`.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 31,
+      "stepNumber": 4,
+      "stepKey": "parity-control-green-on-sessions",
+      "dateTime": "2026-08-29T06:47:12.377520-04:00",
+      "description": "Parity control green on `sessions.json`, the activity log, the decisions log, the project work plan, and the projection JSON.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 31,
+      "stepNumber": 5,
+      "stepKey": "measure-this-session-s-seat-cost",
+      "dateTime": "2026-08-29T06:47:12.377520-04:00",
+      "description": "Measure this session's seat cost and record it.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 31,
+      "stepNumber": 6,
+      "stepKey": "affected-tests-as-preverify",
+      "dateTime": "2026-08-29T06:47:12.377520-04:00",
+      "description": "Affected tests as preverify.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 31,
+      "stepNumber": 7,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-29T06:47:12.377520-04:00",
+      "description": "Cross-provider verification.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 31,
+      "stepNumber": 8,
+      "stepKey": "full-test-suite-recorded-as-the",
+      "dateTime": "2026-08-29T06:47:12.377520-04:00",
+      "description": "Full test suite, recorded as the `final-full` run of record.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 31,
+      "stepNumber": 9,
+      "stepKey": "close-out",
+      "dateTime": "2026-08-29T06:47:12.377520-04:00",
+      "description": "Close-out.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 31,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-29T06:47:12.386013-04:00",
+      "description": "Registered session 31 (claude-code).",
+      "status": "complete"
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 31,
+      "dateTime": "2026-08-29T06:48:13.844300-04:00",
+      "task": "Session 31 of 36 \u2014 The session lifecycle.\n\nPort `ai_router/gates.py` (421), `ai_router/session.py` (1,386),\n`ai_router/progress.py` (1,050) and `ai_router/modules.py` (246) to\nTypeScript under `packages/router/src/`. 3,103 Python lines; est. 138 TS\ntests. The largest single session left, and the one that finishes the\nrecord's judgment half.\n\nOrder, per the session plan:\n\n1. `gates` first, whole: the five gates (verification clean, working tree\n   clean, pushed to remote, test run fresh, verdict vocabulary), the\n   `GateResult` row shape, and `run_gates`. Run the parity control on\n   `session close --dry-run` for every built corpus shape before anything\n   else is ported \u2014 a gate that differs by one row is this set's worst\n   outcome and this is the cheapest place to see it.\n2. `session`'s remaining subcommands: `plan`, `close` (including\n   `--dry-run` and `--force`), `cancel`, `restore`, `migrate`. The\n   refusals in `cli/session.ts` come out together.\n3. `progress` whole: the legacy normalization and v2\u2192v3 synthesis, the\n   plan-derived session list, `build_task_rows`, `verification_cap`,\n   `build_verification_view`, `build_projection`, and the `progress` /\n   `progress --json` command line.\n4. `modules`: the manifest reader, `parse_entries`, `create`, and the\n   command line \u2014 reconciled against the `Router` contract rather than\n   inheriting a shape nothing ever ran (D162/D152).\n5. `identity.resolveSessionOrchestratorIdentity` lands here as a wrapper\n   over `resolveOrchestratorIdentity` (D164) \u2014 it reads a repository\n   rather than a block, through `progress`, which is why it waited.\n6. Parity control green on `sessions.json`, the activity log, the\n   decisions log, the project work plan and the projection JSON, plus the\n   `close --dry-run`, `cancel`, `restore`, `progress`, `progress --json`\n   and `modules` verbs the control's table adds in this session.\n7. Measure this session's seat cost and record it.\n8. Affected tests as preverify; cross-provider verification; the whole\n   suite recorded as the `final-full` run of record; close-out.\n\nNo Python behaviour changes. Where the port finds a Python defect it is\nrecorded as a decision and fixed on the Python side first, in its own\ncommit, so the control compares two routers with the same intended\nbehaviour. Not releasable: no package is published from this session.",
+      "releasable": false
+    },
+    {
+      "sessionNumber": 31,
+      "stepNumber": 2,
+      "stepKey": "port-gates-first-and-run-the",
+      "dateTime": "2026-08-29T07:48:40.626426-04:00",
+      "description": "gates ported whole: the five predicates, the GateResult row, the force/evidence split and the driver that turns a throwing gate into a failed row. close --dry-run compared byte-for-byte on both built corpus shapes before session/progress/modules were touched -- five rows, one width, same remediations, same exit codes.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 31,
+      "stepNumber": 3,
+      "stepKey": "port-session-progress-modules",
+      "dateTime": "2026-08-29T07:48:41.065162-04:00",
+      "description": "session's remaining subcommands (plan, close, cancel, restore, migrate), progress whole (legacy normalization, the plan-sourced projection, task rows, the verification view, the CLI) and modules (manifest reader, create, the one subcommand). cli/session.ts refuses nothing now.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 31,
+      "stepNumber": 4,
+      "stepKey": "parity-control-green-on-sessions",
+      "dateTime": "2026-08-29T07:48:46.602295-04:00",
+      "description": "Parity green: 28 cases, 137 paths, both shapes deterministic. Ten new cases across session/progress/modules; docs/modules.yaml added to the compared paths; a case may now declare a Python-run setup so restore reaches its write path.",
+      "status": "complete"
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D197",
+      "ordinal": 197,
+      "sessionNumber": 31,
+      "decidedOn": "2026-08-29",
+      "recordedAt": "2026-08-29T07:49:09.287838-04:00",
+      "decider": "orchestrator",
+      "headline": "gates ported first as instructed: the close's five rows were byte-identical on the first comparison, and that fixed the wording before 2,700 lines were written against it",
+      "body": "The session plan told this session to port `gates` first and run the parity\ncontrol on `session close --dry-run` for every corpus shape before anything\nelse was translated, on the grounds that a gate that differs by one row is\nthe set's worst outcome and this is the cheapest place to see it. That is\nwhat happened, and it is worth recording that the instruction paid for\nitself in a way that has nothing to do with the gates' logic.\n\n`gates` is 421 Python lines and almost all of what it emits is prose an\noperator reads when a close is refused. The five rows are printed padded to\none width, each with a remediation sentence, and the sentences carry four\nthings a translation loses silently: **em dashes** (three of the five\nremediations have one, and `--` would have been invisible in review and red\nin the control); **Python's `repr`** on a branch name and on a verdict\ntoken, which single-quotes and is not `JSON.stringify`; **Python's `str`**\non `None`, which is the word `None` and not `null`; and **`int()` over\n`git rev-list --count`**, which returns 0 for anything that is not an\ninteger rather than `NaN`.\n\nThe first `close --dry-run` comparison on this repository's own tree \u2014 five\nrows, four of them failing for real reasons \u2014 was byte-identical on the\nfirst run, and the corpus comparison on both built shapes was green with\nit. So the ordering instruction did not catch a defect; it established the\ngate wording as a fixed point before 2,700 more lines were written against\nit, which is what it was for.\n\nTwo things moved to keep that true. `pythonStr` \u2014 `str(x)` with `None`,\n`True` and `False` \u2014 now lives in `pythonJson.ts` beside `pythonRepr`\nrather than privately in `progress.ts`, because `gates` is the third module\nto need it and three private copies is how two of them drift. And\n`writers.validateAndWriteState` is exported, because `cancel`, `restore`\nand `migrate` each edit a session record in place and must land it the way\na registration does; a second write path for `sessions.json` is a second\nchance for an unsanctioned write to look sanctioned."
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D198",
+      "ordinal": 198,
+      "sessionNumber": 31,
+      "decidedOn": "2026-08-29",
+      "recordedAt": "2026-08-29T07:49:43.956375-04:00",
+      "decider": "orchestrator",
+      "headline": "The task rows refuse rather than render an empty plan: progress needs approved_plan, which is session 32, so the reader is a registered seam and the projection says it could not tell",
+      "body": "`progress.build_task_rows` reads `approved-plan.json` through\n`approved_plan.read_plan` and `effective_plan` \u2014 the integrity check that\nrefuses a plan no sanctioned write backs, and the fold of its amendments.\n`approved_plan` is session 32's module. The import graph runs the wrong way\nfor the port order, which is exactly the case STATUS warned about: read an\ninventory line as \"the module\", and check the import graph before assuming\neither way.\n\nThree options and none of them is free.\n\n**Port `approved_plan`'s read half now.** `read_plan` alone needs\n`_validate_schema`, `_full_content_hash`, `_last_recorded_write_hash` and\n`compute_plan_hash`; `effective_plan` additionally needs\n`derive_risk_flags`, which needs the sensitive-path, dependency-path,\npublic-interface and integration-module predicates \u2014 and the last of those\nreads `docs/modules.yaml`. That is roughly 250 of `approved_plan`'s 590\nlines pulled into a session already carrying 3,103, and it leaves the\nmodule half-ported across two sessions.\n\n**Render an empty task list until session 32.** This is the one that had to\nbe refused. The projection would say \"this session has no tasks\" over a\nsession that has seven, in the one field the Work Explorer renders as a\nlist of what to do next \u2014 and the parity control could not see it, because\nno built corpus shape carries an approved plan.\n\n**Refuse, through a registered reader.** `progress` declares an\n`ApprovedPlanReader` seam and `useApprovedPlanReader` registers one, which\nis the same shape `writers.usePlanParser` already uses for the same reason.\nUnregistered, `buildTaskRows` throws `TaskRowsRefused` the moment a plan\nfile exists \u2014 and `buildProjection` already has a field for exactly that\nanswer: `tasksRefused`, beside an empty `tasks`. A framework that cannot\ntell which step is open says so; it does not render the last row it could\nread as if it were current. That rule is the module's own, and it covers\nthis.\n\n**Session 32 registers the real reader.** Until it does, a repository with\nan approved plan gets a refusal string rather than a wrong list, and the\n`approved_plan` parity case that session 32 adds is what proves the two\nrouters agree about the rows. The seam names no session and carries no\nconstant: like the verb registry, it is real when something registers it."
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D199",
+      "ordinal": 199,
+      "sessionNumber": 31,
+      "decidedOn": "2026-08-29",
+      "recordedAt": "2026-08-29T07:49:44.433624-04:00",
+      "decider": "orchestrator",
+      "headline": "modules has one subcommand on both sides, so ModuleVerbs.list and .retire are trimmed from the contract rather than stubbed (D152 discharged under D162)",
+      "body": "D152 observed that `ModuleVerbs.list` and `ModuleVerbs.retire` describe a\nPython surface that does not exist: `ai_router.modules` has exactly one\nsubcommand, `create`. D162 ruled that the sessions porting those modules\nreconcile the contract against what is actually ported rather than\ninheriting a shape nothing ever ran, defaulting to trimming. This is that\nsession for `modules`.\n\nBoth are trimmed, and `ModuleRetireOptions` with them. The module manifest\nis create-only by design \u2014 its own docstring says rename, delete and\nreorganization stay manual edits to the file \u2014 so `list` is a reader the\nextension already has through the projection, and `retire` is a lifecycle\ndecision nobody has made. A contract naming a verb nothing implements is a\npromise to a caller that would be refused at the moment it was needed,\nwhich is what the extension's `pythonSpawnRouter` was doing: two of its\n`refuse()` stubs existed only to satisfy an interface. They are gone.\n\n`dabbler modules create` is the one subcommand, with the flags argparse\ndeclares: the workspace root positionally, `--slug` and `--title` required,\n`--plan-path`, and the three repeatable scope flags. Nothing was invented\nin the translation.\n\nWhat the port did NOT trim is the read surface. `loadEntries`, `findEntry`\nand `parseEntries` are ported whole even though no ported verb calls them\nyet, because `approved_plan._touches_integration_module` is their caller\nand it lands in session 32 \u2014 a module's readers are the module.\n\nIf retirement should be a verb, it is a session: the writer, the record it\nleaves, and what a retired module means to the projection, decided once and\nbuilt on both sides. Re-adding it to the contract first would put the\npromise back before the thing it promises."
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D200",
+      "ordinal": 200,
+      "sessionNumber": 31,
+      "decidedOn": "2026-08-29",
+      "recordedAt": "2026-08-29T07:50:21.071624-04:00",
+      "decider": "orchestrator",
+      "headline": "docs/modules.yaml is compared, and two YAML emitters are reached to each other with four options -- YAML 1.1 being the one that is easy to miss; two exotic inputs still differ and are recorded",
+      "body": "`modules create` is the first ported verb that writes YAML. Every other\nrecord file is JSON, JSONL or TOML, where `pythonJson.dumps` and the TOML\nwriter already make the two routers agree byte for byte. YAML has no such\nguarantee: PyYAML and the `yaml` package are different emitters making\ndifferent legal choices about the same value.\n\nThe parity control's compared-path list did not include\n`docs/modules.yaml`. It could have stayed out \u2014 the list is written as\n\"what the router is allowed to write\", and the manifest is also a file\npeople edit by hand, which is unlike every other entry. It is in anyway,\nbecause the argument for leaving it out is the argument for the drift: both\nrouters rewrite the WHOLE file on every `create`, so two emitters that\ndisagreed would reformat a tracked file differently depending on which\nrouter ran, and every later diff of it would carry noise nobody could\nattribute.\n\nFour options reach the `yaml` package to PyYAML's `safe_dump(sort_keys=\nFalse, allow_unicode=True, default_flow_style=False)`:\n\n- `indentSeq: false` \u2014 PyYAML does not indent a sequence under its key.\n- `singleQuote: true` \u2014 PyYAML prefers `'` where quoting is needed.\n- `lineWidth: 81` \u2014 PyYAML's `best_width` is 80 and it allows the break at\n  the column past it; 80 breaks one word early.\n- `version: \"1.1\"` \u2014 this is the one that is easy to miss. YAML 1.1 resolves\n  `yes`, `no`, `on` and `off` as booleans, so PyYAML quotes them; the\n  package defaults to the 1.2 core schema and leaves them plain. A module\n  titled `No` would have been written two different ways.\n\nThe parity case is green with those four, on a realistic entry: a slug, a\ntitle, a plan path, two `--code-root`s and a `--spec-section`.\n\n**Two inputs still emit differently, and they are recorded rather than\npapered over.** A scalar of exactly `y` or `n` \u2014 the package quotes it\nunder 1.1, PyYAML's bool resolver does not list the single letters. And a\nvalue carrying a newline \u2014 the package writes a `|-` block, PyYAML writes\nit single-quoted and folded. Both are legal YAML parsing back to the same\nvalue, and neither occurs in a kebab-case slug or an ordinary display name.\nClosing them means writing a PyYAML-compatible emitter for this document\nshape, which is a session's worth of fold-rule detail; it is not something\na port session should smuggle in beside 3,100 lines of translation. It\nbecomes moot at the cutover, when there is one emitter."
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D201",
+      "ordinal": 201,
+      "sessionNumber": 31,
+      "decidedOn": "2026-08-29",
+      "recordedAt": "2026-08-29T07:50:21.582019-04:00",
+      "decider": "orchestrator",
+      "headline": "A parity case may declare a Python-run setup, so restore reaches its write path without a sixth corpus shape; migrate gets no case and that is a corpus gap, not a divergence",
+      "body": "Ten cases enter the control this session, and one of them could not be\nwritten under the shape the control had.\n\n`session restore`'s only write path needs a session that has been\ncancelled. `fresh` has no record at all and `in-flight` has a session in\nflight; neither carries a cancelled one, and neither should \u2014 a shape is a\nlifecycle position, and \"cancelled then restored\" is a transition, not a\nposition. So `restore` would have entered as a refusal case only, leaving\nthe verb that actually edits `sessions.json` \u2014 consuming `preCancelStatus`,\ndropping the reason and the stamp, recording the restore reason \u2014 compared\nby nothing.\n\nTwo ways to fix it, and D176 already priced them. A sixth corpus shape is\nthe expensive one: every shape is built twice per case that uses it, and\nD169 measured the control at ~150 s already. The cheap one is a **setup**:\none `python -m` invocation, declared by the case, run on BOTH copies before\nthe compared verb.\n\nIt costs the control nothing it did not already trust. The corpus is built\nby driving the Python router; a setup is one more of those invocations,\nmade at case time rather than shape time. The case still compares exactly\none verb, run twice, against two trees that were identical when the verb\nstarted. A setup that differed between the two copies would be comparing\ntwo questions rather than two answers \u2014 the same rule the `metrics` case's\nenvironment already follows \u2014 so it is one function evaluated per side, and\na setup that exits non-zero stops the control at \"could not run\" (exit 2)\nrather than at a pass.\n\n`session migrate` is the one verb this session ports that gets no case at\nall, and that is a corpus gap rather than a divergence: every built shape\nis post-collapse, so there is no `docs/session-sets/<NNN-slug>/` for the\nmigration to read. A shape whose only purpose is a verb that runs once per\nrepository, ever, is not worth ~12 s on every parity run. Its refusals, its\ndry run and the cancelled-set fold are covered by both suites."
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D202",
+      "ordinal": 202,
+      "sessionNumber": 31,
+      "decidedOn": "2026-08-29",
+      "recordedAt": "2026-08-29T07:50:38.541962-04:00",
+      "decider": "orchestrator",
+      "headline": "resolveSessionOrchestratorIdentity lands here as D164 planned: a wrapper over the block-level resolver, reading the record through progress and never opening it twice",
+      "body": "D164 held `identity.resolve_session_orchestrator_identity` back from the\nsession that ported the rest of `identity`, on the grounds that it is the\none function there which reads a REPOSITORY rather than an orchestrator\nblock, and it reads it through `progress` \u2014 so porting it early meant\nwriting a second reader of `sessions.json`, which is the drift the port\nexists to remove. Session 31 ports `progress`, so it lands here, as a thin\nwrapper over `resolveOrchestratorIdentity` where all of its judgement\nalready lives.\n\nWhat it adds is only which block to ask about, and the order matters\nbecause the verifier's independence is decided from the answer: an explicit\nsession number wins; otherwise the session in flight; otherwise the LAST\nsession that carries an orchestrator block at all. That third branch is\nwhat makes the question answerable between two sessions, which is when\n`verify` most often needs it. A record-level `orchestrator` stands in for a\nchosen session that carries none. Everything else is a refusal \u2014 no\nreadable record, or no block anywhere \u2014 because a caller that cannot tell\nwhose identity this is must not proceed on a guess.\n\nNo test covered it on either side before now; the Python suite's identity\ntests are all against the block-level core. Five tests cover it here: each\nof the three selection branches, and each of the two refusals. That is the\none place this session deliberately goes beyond the Python suite rather\nthan matching it, and it is safe to do because it adds tests rather than\nbehaviour \u2014 the function is a faithful port, and a parity case would prove\nnothing extra, since no verb reaches it until `verify` lands in session 33."
+    },
+    {
+      "sessionNumber": 31,
+      "stepNumber": 6,
+      "stepKey": "affected-tests-as-preverify",
+      "dateTime": "2026-08-29T07:54:28.263441-04:00",
+      "description": "Affected tests run and recorded as preverify-targeted for both suites: 111 pytest in 71s, 352 vitest in 126s. dabbler.yaml gained rules for gates/modules/progress/session and the four new test files.",
+      "status": "complete"
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D203",
+      "ordinal": 203,
+      "sessionNumber": 31,
+      "decidedOn": "2026-08-29",
+      "recordedAt": "2026-08-29T08:02:18.604919-04:00",
+      "decider": "orchestrator",
+      "headline": "Session 31 verified in one round for 54,838 in / 12,532 out; three minor findings, all faithful ports of Python behaviour, carried to the cutover rather than fixed on one side",
+      "body": "One round, `VERIFIED` on the first pass, 54,838 in / 12,532 out to\n`gpt-5-6-sol` over the API in 184.4 s. The largest single session of the\nport so far \u2014 3,103 Python lines translated, ~2,000 TypeScript lines\nwritten, 116 tests added \u2014 and the cheapest per line the port has bought.\n\nThree findings, all **minor**, and all three are the same shape: a faithful\nport of Python behaviour that the reviewer, reading only the TypeScript,\nhad no way to know was faithful. None is remediated, and the reason is the\nsame in each case \u2014 changing one on the TypeScript side alone is exactly\nthe capability divergence the parity control exists to catch.\n\n1. **`checkPushedToRemote` treats a failed `git rev-list --count @{u}..HEAD`\n   as zero commits ahead**, so an unusual git failure passes the gate.\n   `gates.py` is `int(out) if rc == 0 else 0`, character for character. The\n   residual is bounded on both sides and small: a repository whose upstream\n   ref resolves but whose count fails is one whose later real `git push`\n   fails too, and the close reports that.\n2. **`--sessions-dir` naming a repository other than the ambient project\n   makes `governingConfig` return null, so `test_run_fresh` passes\n   vacuously.** That is `_governing_config`'s documented design, not an\n   oversight: a session set living in a different repository never made the\n   ambient repository's testing declarations, and gating it against them\n   would demand a run of record for suites it does not have. Its own\n   docstring says the alternative is worse \u2014 a repository silently gated by\n   another's testing policy.\n3. **`migrate` copies the lifecycle files and moves the run directory before\n   validating and writing the state**, so a malformed legacy record can\n   refuse after partial filesystem changes. Python's ordering exactly. It is\n   a real sharp edge and it is a **cross-router** one; the fix is to\n   validate the transformed state before touching the filesystem, on both\n   sides, and `migrate` runs once per repository ever.\n\nRecorded rather than fixed, and carried to the cutover, where all three stop\nbeing cross-router questions. The severity rule is what stops the loop here:\nminor-only findings do not buy a second round."
+    },
+    {
+      "sessionNumber": 31,
+      "stepNumber": 5,
+      "stepKey": "measure-this-session-s-seat-cost",
+      "dateTime": "2026-08-29T08:02:19.131641-04:00",
+      "description": "Session 31 verification cost 54,838 in / 12,532 out to gpt-5-6-sol over one API round (184.4 s) -- the largest session of the port and the cheapest per line it has bought.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 31,
+      "stepNumber": 7,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-29T08:02:19.562499-04:00",
+      "description": "One round with gpt-5-6-sol over the API: VERIFIED on the first pass, three minor findings, none blocking. All three are faithful ports of Python behaviour and are recorded (D203) rather than fixed on one side.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 31,
+      "stepNumber": 8,
+      "stepKey": "full-test-suite-recorded-as-the",
+      "dateTime": "2026-08-29T08:15:10.450679-04:00",
+      "description": "Both suites run whole against the verified tree and recorded as final-full: 944 pytest in 588s, 614 vitest in 146s (498 before this session).",
+      "status": "complete"
     }
   ]
 }

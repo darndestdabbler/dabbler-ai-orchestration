@@ -47,6 +47,16 @@ export interface ParityCase {
   /** How it is written in a report: `session start`, `verify dispute`. */
   readonly label: string;
   readonly shapes: readonly string[];
+  /**
+   * A `python -m` invocation run on BOTH copies before the compared verb.
+   *
+   * For a verb whose interesting path needs a state no built shape carries
+   * -- `restore` needs a cancelled session. It runs through the Python
+   * router, which is how every shape is built, so the case still compares
+   * exactly one verb; a setup that differed between the copies would be
+   * comparing two questions.
+   */
+  readonly setup?: (repo: string, sessionsDir: string) => string[];
   /** Args after `python -m`, given the built repository. */
   readonly pythonArgs: (repo: string, sessionsDir: string) => string[];
   /** Args after `dabbler`, given the built repository. */
@@ -63,6 +73,13 @@ export interface ParityCase {
  * sessions; what is here is only what a run needs to execute, so the two
  * do not restate each other.
  */
+/** Prose for the `session plan` case; the render is what is compared. */
+const PLAN_BODY =
+  "Two sessions: author the plan, then break it into numbered work.";
+
+const CANCEL_REASON = "the parity control cancels it";
+const RESTORE_REASON = "and puts it back";
+
 export const CASES: readonly ParityCase[] = [
   {
     verb: "metrics",
@@ -395,6 +412,181 @@ export const CASES: readonly ParityCase[] = [
       "line at all, the sentence naming why, and the non-zero exit that " +
       "distinguishes an absent measurement from a measured zero",
   },
+
+  {
+    verb: "session",
+    label: "session plan",
+    // `fresh` only: the plan prose is rewritten wholesale, so the second
+    // write proves nothing the first does not.
+    shapes: ["fresh"],
+    pythonArgs: (_repo, sessionsDir) => [
+      "ai_router.session", "plan",
+      "--sessions-dir", sessionsDir,
+      "--body", PLAN_BODY,
+    ],
+    dabblerArgs: (_repo, sessionsDir) => [
+      "session", "plan",
+      "--sessions-dir", sessionsDir,
+      "--body", PLAN_BODY,
+    ],
+    proves:
+      "the project work plan rendered from the record rather than from the " +
+      "prose it was handed: the plan entry appended to the activity log, and " +
+      "the numbered session list rebuilt beneath the prose from the ledger",
+  },
+  {
+    verb: "session",
+    label: "session close --dry-run",
+    // Both shapes, and this is the case the session was told to run first:
+    // a gate that differs by one row is the set's worst outcome, and the
+    // dry run prints every row with its remediation and writes nothing.
+    // `fresh` has no record at all; `in-flight` has a session, a
+    // declaration, an edited file and a recorded preverify run, so four of
+    // the five gates reach their real predicate rather than their first
+    // guard.
+    shapes: ["fresh", "in-flight"],
+    pythonArgs: (_repo, sessionsDir) => [
+      "ai_router.session", "close", "--dry-run",
+      "--sessions-dir", sessionsDir,
+    ],
+    dabblerArgs: (_repo, sessionsDir) => [
+      "session", "close", "--dry-run",
+      "--sessions-dir", sessionsDir,
+    ],
+    proves:
+      "all five gate rows, in order, padded to one width, each with the " +
+      "remediation sentence an operator acts on -- the ledger read, the " +
+      "worktree diff against the verified tree, the upstream comparison, " +
+      "the freshness verdict per declared suite, and the verdict vocabulary",
+  },
+  {
+    verb: "session",
+    label: "session close (refused at the gates)",
+    // The other half of the same command: the rows are printed, then the
+    // refusal lands on stderr and nothing is written. Only `in-flight`,
+    // because `fresh` has no session to close and never reaches the gates.
+    shapes: ["in-flight"],
+    pythonArgs: (_repo, sessionsDir) => [
+      "ai_router.session", "close",
+      "--sessions-dir", sessionsDir,
+    ],
+    dabblerArgs: (_repo, sessionsDir) => [
+      "session", "close",
+      "--sessions-dir", sessionsDir,
+    ],
+    proves:
+      "that a close over a session with no verification round refuses " +
+      "identically and lands nothing: the same gate rows, the same count in " +
+      "the refusal, the same exit code, and no state flip, no commit and no " +
+      "push on either side",
+  },
+  {
+    verb: "session",
+    label: "session cancel --force",
+    shapes: ["in-flight"],
+    pythonArgs: (_repo, sessionsDir) => [
+      "ai_router.session", "cancel", "1",
+      "--reason", CANCEL_REASON, "--force",
+      "--sessions-dir", sessionsDir,
+    ],
+    dabblerArgs: (_repo, sessionsDir) => [
+      "session", "cancel", "1",
+      "--reason", CANCEL_REASON, "--force",
+      "--sessions-dir", sessionsDir,
+    ],
+    proves:
+      "a boundary reversal written through the sanctioned writer: the prior " +
+      "status kept as preCancelStatus, the reason and the stamp on the " +
+      "session record rather than in a marker file, the schema and " +
+      "invariants re-checked before the write, and the ledger row it earns",
+  },
+  {
+    verb: "session",
+    label: "session restore",
+    shapes: ["in-flight"],
+    // The only write path `restore` has needs a cancelled session, and no
+    // built shape carries one. The setup runs through the PYTHON router on
+    // both copies -- the same way every shape is built -- so what the case
+    // compares is still one verb, run twice.
+    setup: (_repo, sessionsDir) => [
+      "ai_router.session", "cancel", "1",
+      "--reason", CANCEL_REASON, "--force",
+      "--sessions-dir", sessionsDir,
+    ],
+    pythonArgs: (_repo, sessionsDir) => [
+      "ai_router.session", "restore", "1",
+      "--reason", RESTORE_REASON,
+      "--sessions-dir", sessionsDir,
+    ],
+    dabblerArgs: (_repo, sessionsDir) => [
+      "session", "restore", "1",
+      "--reason", RESTORE_REASON,
+      "--sessions-dir", sessionsDir,
+    ],
+    proves:
+      "the reversal undone to the status the session actually carried: " +
+      "preCancelStatus consumed rather than left behind, the cancellation " +
+      "reason and stamp removed, the restore reason recorded, and the same " +
+      "one-line JSON naming the status it went back to",
+  },
+  {
+    verb: "progress",
+    label: "progress --json",
+    // Both shapes, because the projection's SOURCE differs between them:
+    // `fresh` has no ledger and renders the sessions its plan declares,
+    // `in-flight` renders the ledger. A router that keyed the fall back on
+    // the read returning null rather than on the file being absent would
+    // agree on one and not the other.
+    shapes: ["fresh", "in-flight"],
+    pythonArgs: (_repo, sessionsDir) => [
+      "ai_router.progress", "--json", "--sessions-dir", sessionsDir,
+    ],
+    dabblerArgs: (_repo, sessionsDir) => [
+      "progress", "--json", "--sessions-dir", sessionsDir,
+    ],
+    proves:
+      "the whole Work Explorer projection: where the sessions came from, " +
+      "the display number and healed title per session, the icon key, the " +
+      "invariant violation or its absence, and the task and verification " +
+      "sub-views with their refusals -- the JSON the extension renders and " +
+      "re-implements nothing of",
+  },
+  {
+    verb: "progress",
+    label: "progress (no flag)",
+    shapes: ["fresh"],
+    pythonArgs: (_repo, sessionsDir) => [
+      "ai_router.progress", "--sessions-dir", sessionsDir,
+    ],
+    dabblerArgs: (_repo, sessionsDir) => ["progress", "--sessions-dir", sessionsDir],
+    proves:
+      "that `--json` is inert on both sides: there is one output mode, and " +
+      "a router that made the flag mean something would print a different " +
+      "thing here than it does one case above",
+  },
+  {
+    verb: "modules",
+    label: "modules create",
+    shapes: ["fresh"],
+    pythonArgs: (repo) => [
+      "ai_router.modules", "create", repo,
+      "--slug", "greeter", "--title", "Greeter",
+      "--plan-path", "docs/modules/greeter.md",
+      "--code-root", "src/greeter", "--code-root", "tests/greeter",
+      "--spec-section", "docs/reference.md#greeting",
+    ],
+    dabblerArgs: (repo) => [
+      "modules", "create", repo,
+      "--slug", "greeter", "--title", "Greeter",
+      "--plan-path", "docs/modules/greeter.md",
+      "--code-root", "src/greeter", "--code-root", "tests/greeter",
+      "--spec-section", "docs/reference.md#greeting",
+    ],
+    proves:
+      "the manifest as two YAML emitters write it -- the entry appended in " +
+      "declaration order with its repeatable lists, sequences at their key's " +
+      "indent, and the one-line JSON echo of what was written",
+  },
 ];
 
 // --- Preconditions -----------------------------------------------------------
@@ -500,6 +692,21 @@ function runCase(
 
   const pythonSessions = join(pythonRepo, "docs", "sessions");
   const typescriptSessions = join(typescriptRepo, "docs", "sessions");
+
+  if (parityCase.setup) {
+    for (const [repo, sessions] of [
+      [pythonRepo, pythonSessions],
+      [typescriptRepo, typescriptSessions],
+    ] as const) {
+      const prepared = python(routers.interpreter, repo, parityCase.setup(repo, sessions));
+      if (prepared.code !== 0) {
+        throw new CorpusError(
+          `${parityCase.label}: the setup for shape '${shape}' exited ` +
+            `${prepared.code}: ${(prepared.stderr || prepared.stdout).trim()}`,
+        );
+      }
+    }
+  }
 
   const left = python(
     routers.interpreter,

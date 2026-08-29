@@ -14,8 +14,24 @@
 // caller from doing what the CLI refuses; the CLI's exists so an operator
 // gets a sentence rather than a traceback.
 
-import { openSync, closeSync, readFileSync, statSync, unlinkSync, writeSync } from "node:fs";
-import { basename, join } from "node:path";
+import {
+  closeSync,
+  copyFileSync,
+  cpSync,
+  existsSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  readdirSync,
+  renameSync,
+  rmSync,
+  rmdirSync,
+  statSync,
+  unlinkSync,
+  utimesSync,
+  writeSync,
+} from "node:fs";
+import { basename, dirname, join, relative } from "node:path";
 
 import {
   IdentityResolutionError,
@@ -23,17 +39,33 @@ import {
 } from "./identity.ts";
 import { loadConfig } from "./config.ts";
 import { freshnessWarnings } from "./discovery.ts";
-import { SESSION_PLAN_FILENAME } from "./evidence.ts";
-import { nowIso, platformNewlines } from "./journal.ts";
 import {
+  ROUND_REF_NAMESPACE,
+  SESSION_PLAN_FILENAME,
+  pushRoundRefs,
+  upstreamRemote,
+} from "./evidence.ts";
+import { SET_BOOKKEEPING_COMMIT_BASENAMES, runGates } from "./gates.ts";
+import { nowIso, platformNewlines, repoRootFor, runGit } from "./journal.ts";
+import { RUNS_DIRNAME, latestRound } from "./ledger.ts";
+import {
+  SCHEMA_VERSION,
+  STATUS_CANCELLED,
+  STATUS_COMPLETE,
+  STATUS_IN_PROGRESS,
+  STATUS_NOT_STARTED,
+  SessionStateInvariantError,
+  canonicalizeStatus,
   derivedView,
   isLoggedStep,
   isRecord,
+  normalizeLegacyState,
   readActivityLog,
+  readRawLegacyState,
   readRawSessionState,
   sessionDisplayNumber,
 } from "./progress.ts";
-import { dumps } from "./pythonJson.ts";
+import { dumps, pythonRepr, pythonStr } from "./pythonJson.ts";
 import {
   DECIDERS,
   SanctionedWriteError,
@@ -43,11 +75,17 @@ import {
   completedNumbers,
   cancelledNumbers,
   declareSessionTask,
+  flipStateToClosed,
   logStep,
+  nowIsoSeconds,
+  onDiskState,
   readTaskDeclaration,
+  recordProjectPlan,
+  WORK_PLAN_FILENAME,
   registerSessionStart,
   seedSessionPlan,
   usePlanParser,
+  validateAndWriteState,
 } from "./writers.ts";
 import { writeErr, writeOut } from "./cli/output.ts";
 
@@ -440,6 +478,14 @@ usePlanParser({ parseSessionPlans, splitSlugMarker, DuplicateSlugError });
 function isDirectory(path: string): boolean {
   try {
     return statSync(path).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+function isFile(path: string): boolean {
+  try {
+    return statSync(path).isFile();
   } catch {
     return false;
   }
@@ -959,6 +1005,525 @@ export function declare(sessionsDir: string, options: DeclareCliOptions): number
       `${options.releasable ? "yes" : "no"}.\n`,
   );
   return EXIT_OK;
+}
+
+// --- plan --------------------------------------------------------------------
+
+export interface PlanCliOptions {
+  readonly body?: string | null;
+  readonly bodyFile?: string | null;
+}
+
+/** Record the plan prose the numbered session list hangs off. */
+export function plan(sessionsDir: string, options: PlanCliOptions): number {
+  if (!isDirectory(sessionsDir)) {
+    writeErr(`plan: not a directory: ${sessionsDir}\n`);
+    return EXIT_USAGE;
+  }
+  let text: string;
+  try {
+    text = readBody(options.body, options.bodyFile);
+  } catch (error) {
+    if (error instanceof SanctionedWriteError) {
+      writeErr(`plan: refused -- ${error.message}\n`);
+    } else {
+      writeErr(
+        `plan: cannot read body -- ${
+          error instanceof Error ? error.message : String(error)
+        }\n`,
+      );
+    }
+    return EXIT_USAGE;
+  }
+  let lock: string;
+  try {
+    lock = acquireLockWithTimeout(sessionsDir, `plan/${process.pid}`);
+  } catch (error) {
+    if (!(error instanceof LockContentionError)) throw error;
+    writeErr(`plan: refused -- lifecycle lock contention: ${error.message}\n`);
+    return EXIT_LOCK_CONTENTION;
+  }
+  try {
+    recordProjectPlan(sessionsDir, text);
+  } catch (error) {
+    if (!(error instanceof SanctionedWriteError)) throw error;
+    writeErr(`plan: refused -- ${error.message}\n`);
+    return EXIT_USAGE;
+  } finally {
+    releaseLock(lock);
+  }
+  writeOut(`plan: recorded; ${basename(sessionsDir)}/${WORK_PLAN_FILENAME} rewritten.\n`);
+  return EXIT_OK;
+}
+
+// --- close -------------------------------------------------------------------
+
+function localOnly(repoRoot: string): boolean {
+  return isFile(join(repoRoot, ".dabbler", "local-only"));
+}
+
+export interface CloseCliOptions {
+  readonly dryRun?: boolean;
+  readonly forced?: boolean;
+}
+
+/**
+ * Run the five gates and, unless this is a dry run, close the session.
+ *
+ * The order is the point: the state flips first, then the bookkeeping is
+ * committed and pushed. A close that pushed before flipping would leave the
+ * remote holding a session the record still calls in flight.
+ */
+export function close(sessionsDir: string, options: CloseCliOptions = {}): number {
+  const dryRun = options.dryRun === true;
+  const forced = options.forced === true;
+  if (!isDirectory(sessionsDir)) {
+    writeErr(`close: not a directory: ${sessionsDir}\n`);
+    return EXIT_USAGE;
+  }
+  let lock: string;
+  try {
+    lock = acquireLock(sessionsDir, `close_session/${process.pid}`);
+  } catch (error) {
+    if (!(error instanceof LockContentionError)) throw error;
+    writeErr(`close: refused -- ${error.message}\n`);
+    return EXIT_BOUNDARY;
+  }
+  try {
+    const raw = readRawSessionState(sessionsDir);
+    const normalized = raw ? derivedView(raw) : null;
+    const current = (normalized?.["currentSession"] ?? null) as number | null;
+    if (current === null) {
+      const status = normalized?.["status"] ?? null;
+      if (status === STATUS_COMPLETE) {
+        writeOut("close: already closed (noop).\n");
+        return EXIT_OK;
+      }
+      writeErr(
+        "close: refused -- no session is in flight under " +
+          `${sessionsDir} (status=${pythonRepr(status)}).\n`,
+      );
+      return EXIT_BOUNDARY;
+    }
+
+    const results = runGates(sessionsDir, { forced });
+    const width = Math.max(...results.map((row) => row.name.length));
+    for (const row of results) {
+      const mark = row.passed ? "PASS" : "FAIL";
+      let line = `  ${row.name.padEnd(width)}  ${mark}`;
+      if (row.remediation) line += `  ${row.remediation}`;
+      writeOut(`${line}\n`);
+    }
+    const failed = results.filter((row) => !row.passed);
+    if (dryRun) {
+      writeOut(
+        `close --dry-run: ${results.length - failed.length}/` +
+          `${results.length} gates pass; nothing written.\n`,
+      );
+      return failed.length === 0 ? EXIT_OK : EXIT_GATE_FAILED;
+    }
+    if (failed.length > 0) {
+      writeErr(`close: refused -- ${failed.length} gate(s) failed.\n`);
+      return EXIT_GATE_FAILED;
+    }
+
+    const repoRoot = repoRootFor(sessionsDir);
+    let verdict: unknown = null;
+    if (repoRoot) {
+      const row = latestRound(repoRoot, current);
+      if (row) verdict = row["verdict"] ?? null;
+    }
+
+    flipStateToClosed(sessionsDir, {
+      verdict: verdict === null || verdict === undefined ? null : String(verdict),
+      forced,
+    });
+    writeOut(
+      `close: session ${sessionDisplayNumber(current)} of ` +
+        `${basename(sessionsDir)} closed` +
+        (verdict ? ` (${String(verdict)})` : "") +
+        ".\n",
+    );
+
+    if (repoRoot) {
+      const bookkeeping = SET_BOOKKEEPING_COMMIT_BASENAMES.map((name) =>
+        join(sessionsDir, name),
+      ).filter(isFile);
+      if (bookkeeping.length > 0) {
+        runGit(repoRoot, ["add", "--", ...bookkeeping]);
+      }
+      const committed = runGit(repoRoot, [
+        "commit",
+        "-m",
+        `Close session ${current} of ${basename(sessionsDir)}`,
+      ]);
+      if (
+        committed.code !== 0 &&
+        !committed.stderr.toLowerCase().includes("nothing to commit")
+      ) {
+        writeErr(`close: state flipped but commit failed: ${committed.stderr}\n`);
+        return EXIT_GATE_FAILED;
+      }
+      if (!localOnly(repoRoot)) {
+        const pushed = runGit(repoRoot, ["push"]);
+        if (pushed.code !== 0) {
+          writeErr(
+            "close: state flipped and committed but push " +
+              `failed: ${pushed.stderr}. Run \`git push\` manually.\n`,
+          );
+          return EXIT_GATE_FAILED;
+        }
+        // The round refs ride with the branch or the baselines this session
+        // recorded stay on this machine: a bare push carries them only on a
+        // clone that `ensureRoundRefspecs` has configured, and the close does
+        // not assume that.
+        const refs = pushRoundRefs(repoRoot, current);
+        if (refs.error) {
+          writeErr(
+            "close: state flipped, committed and pushed, but " +
+              `the round refs did not push: ${refs.error}. Run: git ` +
+              `push ${upstreamRemote(repoRoot)} ` +
+              `'${ROUND_REF_NAMESPACE}/s${current}/*:` +
+              `${ROUND_REF_NAMESPACE}/s${current}/*'\n`,
+          );
+          return EXIT_GATE_FAILED;
+        }
+        if (refs.pushed.length > 0) {
+          writeOut(
+            `close: pushed ${refs.pushed.length} round ref(s) under ` +
+              `${ROUND_REF_NAMESPACE}/s${current}/.\n`,
+          );
+        }
+      }
+    }
+    return EXIT_OK;
+  } finally {
+    releaseLock(lock);
+  }
+}
+
+// --- migrate (a set-scoped repository, carried forward exactly once) ----------
+
+const MIGRATED_FILES: readonly (readonly [string, string])[] = [
+  ["activity-log.json", "activity-log.json"],
+  ["change-log.md", "change-log.md"],
+  ["decisions-log.md", "decisions-log.md"],
+  ["project-work-plan.md", "project-work-plan.md"],
+  ["spec.md", "session-plan.md"],
+];
+
+/**
+ * The legacy ledger as v5 session records.
+ *
+ * A cancelled set becomes cancelled sessions. That is the only honest
+ * reading: the set said this work would not run, and after the collapse
+ * there is nowhere but the session to say so.
+ */
+function v5SessionsFromLegacy(
+  normalized: Record<string, unknown>,
+): Record<string, unknown>[] {
+  const setCancelled = canonicalizeStatus(normalized["status"]) === STATUS_CANCELLED;
+  const sessions: Record<string, unknown>[] = [];
+  const entries = normalized["sessions"];
+  for (const entry of Array.isArray(entries) ? entries : []) {
+    const source = isRecord(entry) ? entry : {};
+    const record: Record<string, unknown> = {
+      number: source["number"] ?? null,
+      title: source["title"] || `Session ${pythonStr(source["number"])}`,
+      status: canonicalizeStatus(source["status"]),
+    };
+    for (const key of [
+      "startedAt",
+      "completedAt",
+      "orchestrator",
+      "verificationVerdict",
+      "verification",
+      "type",
+    ]) {
+      if (source[key] !== null && source[key] !== undefined) record[key] = source[key];
+    }
+    for (const key of ["startedAt", "completedAt", "orchestrator", "verificationVerdict"]) {
+      if (!(key in record)) record[key] = null;
+    }
+    if (setCancelled && record["status"] !== STATUS_COMPLETE) {
+      record["preCancelStatus"] = record["status"];
+      record["status"] = STATUS_CANCELLED;
+    }
+    sessions.push(record);
+  }
+  return sessions;
+}
+
+export interface MigrateCliOptions {
+  readonly dryRun?: boolean;
+}
+
+/**
+ * Carry one set-scoped directory forward into the repository's sessions
+ * root.
+ *
+ * Run once, and refused once the root carries a record: a second migration
+ * would fold a second set's numbering over the first, and two sets' session
+ * 3 are not the same session. Everything it writes it writes through the
+ * sanctioned writer, so the state-writes ledger covers the migrated file
+ * exactly as it covers a registration.
+ */
+export function migrate(
+  legacySetDir: string,
+  sessionsDir: string,
+  options: MigrateCliOptions = {},
+): number {
+  const dryRun = options.dryRun === true;
+  if (!isDirectory(legacySetDir)) {
+    writeErr(`migrate: not a directory: ${legacySetDir}\n`);
+    return EXIT_USAGE;
+  }
+  const raw = readRawLegacyState(legacySetDir);
+  if (raw === null) {
+    writeErr(`migrate: no session-state.json under ${legacySetDir}\n`);
+    return EXIT_USAGE;
+  }
+  if (readRawSessionState(sessionsDir) !== null) {
+    writeErr(
+      `migrate: refused -- ${sessionsDir} already carries a session ` +
+        "record. A repository is migrated once; a second set folded " +
+        "over the first would renumber work that is already closed.\n",
+    );
+    return EXIT_BOUNDARY;
+  }
+
+  const normalized = normalizeLegacyState(raw, join(legacySetDir, "spec.md"));
+  const sessions = v5SessionsFromLegacy(normalized);
+  if (sessions.length === 0) {
+    writeErr(`migrate: ${legacySetDir} declares no sessions\n`);
+    return EXIT_USAGE;
+  }
+  const state: Record<string, unknown> = {
+    schemaVersion: SCHEMA_VERSION,
+    sessions,
+  };
+  if ("forceClosed" in raw) state["forceClosed"] = raw["forceClosed"];
+
+  const repoRoot = repoRootFor(dirname(sessionsDir)) ?? repoRootFor(legacySetDir);
+  const runsFrom = repoRoot
+    ? join(repoRoot, RUNS_DIRNAME, basename(legacySetDir))
+    : null;
+  const moves = MIGRATED_FILES.filter(([src]) =>
+    isFile(join(legacySetDir, src)),
+  ).map(([src, dst]) => [join(legacySetDir, src), join(sessionsDir, dst)] as const);
+
+  if (dryRun) {
+    writeOut(
+      dumps(
+        {
+          sessions: sessions.length,
+          files: moves.map(([, dst]) => relative(sessionsDir, dst)),
+          runs: runsFrom !== null && isDirectory(runsFrom) ? runsFrom : null,
+        },
+        { indent: 2 },
+      ) + "\n",
+    );
+    return EXIT_OK;
+  }
+
+  mkdirSync(sessionsDir, { recursive: true });
+  for (const [src, dst] of moves) copyPreservingTimes(src, dst);
+  // The ledger moves with the sessions it describes: rounds recorded under
+  // the old address are the same rounds, and leaving them behind would make
+  // every migrated session look unverified.
+  if (runsFrom !== null && isDirectory(runsFrom)) {
+    const runsTo = join(repoRoot!, RUNS_DIRNAME);
+    for (const name of readdirSync(runsFrom)) {
+      const target = join(runsTo, name);
+      if (existsSync(target)) continue;
+      moveEntry(join(runsFrom, name), target);
+    }
+    try {
+      rmdirSync(runsFrom);
+    } catch {
+      // Not empty, or already gone; either way the move stands.
+    }
+  }
+  try {
+    validateAndWriteState(sessionsDir, state);
+  } catch (error) {
+    if (!(error instanceof SessionStateInvariantError)) throw error;
+    writeErr(`migrate: refused -- ${error.message}\n`);
+    return EXIT_GATE_FAILED;
+  }
+  writeOut(dumps({ sessions: sessions.length, sessionsDir }) + "\n");
+  return EXIT_OK;
+}
+
+/** `shutil.copy2`: the bytes, and the times that say when they were written. */
+function copyPreservingTimes(src: string, dst: string): void {
+  copyFileSync(src, dst);
+  const stats = statSync(src);
+  utimesSync(dst, stats.atime, stats.mtime);
+}
+
+/** `shutil.move`: a rename where the filesystem allows one, a copy where not. */
+function moveEntry(src: string, dst: string): void {
+  try {
+    renameSync(src, dst);
+    return;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "EXDEV") throw error;
+  }
+  cpSync(src, dst, { recursive: true, preserveTimestamps: true });
+  rmSync(src, { recursive: true, force: true });
+}
+
+// --- cancel / restore ---------------------------------------------------------
+
+const RESTORABLE_STATUSES: readonly unknown[] = [
+  STATUS_NOT_STARTED,
+  STATUS_IN_PROGRESS,
+  STATUS_COMPLETE,
+];
+
+function sessionRecord(
+  state: Record<string, unknown>,
+  number: number,
+): Record<string, unknown> | null {
+  const sessions = state["sessions"];
+  for (const record of Array.isArray(sessions) ? sessions : []) {
+    if (isRecord(record) && record["number"] === number) return record;
+  }
+  return null;
+}
+
+/**
+ * Cancel one session.
+ *
+ * A repository has no set to cancel, so what is cancelled is the piece of
+ * work, and the reason rides on the session record rather than in a marker
+ * file beside it.
+ */
+export function cancel(
+  sessionsDir: string,
+  sessionNumber: number,
+  options: { readonly reason: string; readonly force?: boolean },
+): number {
+  if (!isDirectory(sessionsDir)) {
+    writeErr(`cancel: not a directory: ${sessionsDir}\n`);
+    return EXIT_USAGE;
+  }
+  let lock: string;
+  try {
+    lock = acquireLock(sessionsDir, `cancel/${process.pid}`);
+  } catch (error) {
+    if (!(error instanceof LockContentionError)) throw error;
+    writeErr(`cancel: refused -- ${error.message}\n`);
+    return EXIT_BOUNDARY;
+  }
+  try {
+    const raw = readRawSessionState(sessionsDir);
+    if (raw === null) {
+      writeErr(`cancel: no session record under ${sessionsDir}\n`);
+      return EXIT_USAGE;
+    }
+    const state = onDiskState(raw);
+    const record = sessionRecord(state, sessionNumber);
+    if (record === null) {
+      writeErr(
+        `cancel: no session ${sessionDisplayNumber(sessionNumber)} on record\n`,
+      );
+      return EXIT_USAGE;
+    }
+    const prior = canonicalizeStatus(record["status"]);
+    if (prior === STATUS_CANCELLED) {
+      writeErr(
+        `cancel: session ${sessionDisplayNumber(sessionNumber)} is ` +
+          "already cancelled\n",
+      );
+      return EXIT_BOUNDARY;
+    }
+    if (prior === STATUS_IN_PROGRESS && options.force !== true) {
+      writeErr(
+        `cancel: refused -- session ${sessionDisplayNumber(sessionNumber)} ` +
+          "is in flight. Close it first, or pass --force.\n",
+      );
+      return EXIT_BOUNDARY;
+    }
+    if (RESTORABLE_STATUSES.includes(prior)) record["preCancelStatus"] = prior;
+    record["status"] = STATUS_CANCELLED;
+    record["cancelledReason"] = options.reason;
+    record["cancelledAt"] = nowIsoSeconds();
+    try {
+      validateAndWriteState(sessionsDir, state);
+    } catch (error) {
+      if (!(error instanceof SessionStateInvariantError)) throw error;
+      writeErr(`cancel: refused -- ${error.message}\n`);
+      return EXIT_GATE_FAILED;
+    }
+    writeOut(`${dumps({ session: sessionNumber, status: STATUS_CANCELLED })}\n`);
+    return EXIT_OK;
+  } finally {
+    releaseLock(lock);
+  }
+}
+
+/** Undo a cancellation, back to the status the session carried before it. */
+export function restore(
+  sessionsDir: string,
+  sessionNumber: number,
+  options: { readonly reason?: string } = {},
+): number {
+  const reason = options.reason ?? "";
+  if (!isDirectory(sessionsDir)) {
+    writeErr(`restore: not a directory: ${sessionsDir}\n`);
+    return EXIT_USAGE;
+  }
+  let lock: string;
+  try {
+    lock = acquireLock(sessionsDir, `restore/${process.pid}`);
+  } catch (error) {
+    if (!(error instanceof LockContentionError)) throw error;
+    writeErr(`restore: refused -- ${error.message}\n`);
+    return EXIT_BOUNDARY;
+  }
+  try {
+    const raw = readRawSessionState(sessionsDir);
+    if (raw === null) {
+      writeErr(`restore: no session record under ${sessionsDir}\n`);
+      return EXIT_USAGE;
+    }
+    const state = onDiskState(raw);
+    const record = sessionRecord(state, sessionNumber);
+    if (record === null) {
+      writeErr(
+        `restore: no session ${sessionDisplayNumber(sessionNumber)} on record\n`,
+      );
+      return EXIT_USAGE;
+    }
+    if (canonicalizeStatus(record["status"]) !== STATUS_CANCELLED) {
+      writeErr(
+        "restore: refused -- session " +
+          `${sessionDisplayNumber(sessionNumber)} is not ` +
+          "cancelled; there is nothing to restore.\n",
+      );
+      return EXIT_BOUNDARY;
+    }
+    let prior: unknown = record["preCancelStatus"] ?? null;
+    delete record["preCancelStatus"];
+    if (!RESTORABLE_STATUSES.includes(prior)) prior = STATUS_NOT_STARTED;
+    record["status"] = prior;
+    delete record["cancelledReason"];
+    delete record["cancelledAt"];
+    if (reason) record["restoredReason"] = reason;
+    try {
+      validateAndWriteState(sessionsDir, state);
+    } catch (error) {
+      if (!(error instanceof SessionStateInvariantError)) throw error;
+      writeErr(`restore: refused -- ${error.message}\n`);
+      return EXIT_GATE_FAILED;
+    }
+    writeOut(`${dumps({ session: sessionNumber, status: prior })}\n`);
+    return EXIT_OK;
+  } finally {
+    releaseLock(lock);
+  }
 }
 
 export { DECIDERS, STEP_STATUSES, SESSION_PLAN_FILENAME };

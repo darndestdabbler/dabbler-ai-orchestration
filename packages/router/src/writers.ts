@@ -197,7 +197,18 @@ export function buildOrchestratorBlock(
   return block;
 }
 
-function validateAndWriteState(sessionsDir: string, state: Record<string, unknown>): void {
+/**
+ * The one write path for `sessions.json`: schema, then invariants, then the
+ * atomic replace and its ledger row.
+ *
+ * Exported because `cancel`, `restore` and `migrate` each edit a record in
+ * place and must land it the same way a registration does -- a second write
+ * path is a second chance for an unsanctioned write to look sanctioned.
+ */
+export function validateAndWriteState(
+  sessionsDir: string,
+  state: Record<string, unknown>,
+): void {
   const failure = schemaFailure(
     state,
     loadSchemaFile("sessions.schema.json"),

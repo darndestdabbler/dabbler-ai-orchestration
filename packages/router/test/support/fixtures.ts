@@ -182,3 +182,51 @@ export function writeConfig(
 ): string {
   return writeYaml(join(directory, "router-config.yaml"), config);
 }
+
+/**
+ * A repository shaped the way the lifecycle expects one: a committed
+ * session plan, a `dabbler.yaml` declaring one expensive suite, a source
+ * file and its test, and a bare `origin` the branch tracks.
+ *
+ * The gates ask git four different questions -- what is uncommitted, what
+ * the upstream holds, what the round anchored and what the suite covers --
+ * so a fixture that was a bare directory would answer none of them, and one
+ * with no remote would waive the push gate rather than exercise it.
+ */
+export function makeSandboxRepo(): { repo: string; sessionsDir: string } {
+  const target = makeTempDir();
+  const repo = join(target, "repo");
+  const remote = join(target, "remote.git");
+  for (const [rel, text] of Object.entries(SANDBOX_SEED)) {
+    const path = join(repo, ...rel.split("/"));
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, text, "utf8");
+  }
+  git(repo, "init", "-q", "-b", "main");
+  git(repo, "config", "core.autocrlf", "false");
+  git(repo, "config", "commit.gpgsign", "false");
+  git(repo, "add", "-A");
+  git(repo, "commit", "-q", "-m", "seed");
+  git(target, "init", "-q", "--bare", remote);
+  git(repo, "remote", "add", "origin", "../remote.git");
+  git(repo, "push", "-q", "-u", "origin", "main");
+  return { repo, sessionsDir: join(repo, "docs", "sessions") };
+}
+
+const SANDBOX_SEED: Record<string, string> = {
+  "docs/sessions/session-plan.md":
+    "### Session 1 of 2: First things\n1. Register.\n2. **Build the widget.** Make it real.\n" +
+    "3. Cross-provider verification.\n4. Close-out.\n\n" +
+    "### Session 2 of 2: Second things\n1. Register.\n2. Polish it.\n",
+  "dabbler.yaml":
+    "schema_version: 1\n\ntesting:\n  suites:\n    - name: unit\n" +
+    "      command: python -m pytest\n      expensive: true\n" +
+    "      covers:\n        - src/\n        - tests/\n" +
+    "      test_roots:\n        - tests\n      test_glob: \"test_*.py\"\n\n" +
+    "  selection:\n    repo_wide:\n      - dabbler.yaml\n" +
+    "    smoke:\n      - tests/test_widget.py\n    rules:\n" +
+    "      - when: src/widget.py\n        select:\n          - tests/test_widget.py\n",
+  "src/widget.py": "def widget():\n    return 1\n",
+  "tests/test_widget.py": "def test_widget():\n    assert True\n",
+  ".gitignore": ".dabbler/\n",
+};

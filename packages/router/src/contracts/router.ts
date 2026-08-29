@@ -163,16 +163,21 @@ export interface ModuleCreateOptions {
   readonly specSection?: string;
 }
 
-export interface ModuleRetireOptions {
-  readonly workspaceRoot: string;
-  readonly slug: string;
-  readonly reason: string;
-}
-
+/**
+ * One verb, because the manifest has one writer.
+ *
+ * `list` and `retire` were declared here before either router grew them,
+ * and session 31 -- which ports `modules` -- found that neither exists on
+ * either side: `ai_router.modules` has exactly `create`, and the manifest
+ * is create-only by design, with rename, delete and reorganization staying
+ * manual edits to the file. A contract naming a verb nothing implements is
+ * a promise to a caller that would be refused at the moment it was needed,
+ * so they are trimmed rather than stubbed (D162/D152). The session that
+ * decides retirement should be a verb adds it here and in both routers, in
+ * that order.
+ */
 export interface ModuleVerbs {
-  list(workspaceRoot: string): Promise<RouterResult<RouterText>>;
   create(options: ModuleCreateOptions): Promise<RouterResult<RouterText>>;
-  retire(options: ModuleRetireOptions): Promise<RouterResult<RouterText>>;
 }
 
 export interface VerifyRoundOptions extends RepositoryTarget {

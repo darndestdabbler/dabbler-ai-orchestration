@@ -5749,3 +5749,265 @@ same prompt — so it has to change on both sides at once, which means a
 session that may touch Python. **Owed to session 36**, the cutover, where
 there is one implementation and the question stops being a parity question.
 Until then the code says so where the spawner lives.
+
+## Session 31 — The session lifecycle
+
+### D197 · 2026-08-29 · Orchestrator · gates ported first as instructed: the close's five rows were byte-identical on the first comparison, and that fixed the wording before 2,700 lines were written against it
+
+The session plan told this session to port `gates` first and run the parity
+control on `session close --dry-run` for every corpus shape before anything
+else was translated, on the grounds that a gate that differs by one row is
+the set's worst outcome and this is the cheapest place to see it. That is
+what happened, and it is worth recording that the instruction paid for
+itself in a way that has nothing to do with the gates' logic.
+
+`gates` is 421 Python lines and almost all of what it emits is prose an
+operator reads when a close is refused. The five rows are printed padded to
+one width, each with a remediation sentence, and the sentences carry four
+things a translation loses silently: **em dashes** (three of the five
+remediations have one, and `--` would have been invisible in review and red
+in the control); **Python's `repr`** on a branch name and on a verdict
+token, which single-quotes and is not `JSON.stringify`; **Python's `str`**
+on `None`, which is the word `None` and not `null`; and **`int()` over
+`git rev-list --count`**, which returns 0 for anything that is not an
+integer rather than `NaN`.
+
+The first `close --dry-run` comparison on this repository's own tree — five
+rows, four of them failing for real reasons — was byte-identical on the
+first run, and the corpus comparison on both built shapes was green with
+it. So the ordering instruction did not catch a defect; it established the
+gate wording as a fixed point before 2,700 more lines were written against
+it, which is what it was for.
+
+Two things moved to keep that true. `pythonStr` — `str(x)` with `None`,
+`True` and `False` — now lives in `pythonJson.ts` beside `pythonRepr`
+rather than privately in `progress.ts`, because `gates` is the third module
+to need it and three private copies is how two of them drift. And
+`writers.validateAndWriteState` is exported, because `cancel`, `restore`
+and `migrate` each edit a session record in place and must land it the way
+a registration does; a second write path for `sessions.json` is a second
+chance for an unsanctioned write to look sanctioned.
+
+### D198 · 2026-08-29 · Orchestrator · The task rows refuse rather than render an empty plan: progress needs approved_plan, which is session 32, so the reader is a registered seam and the projection says it could not tell
+
+`progress.build_task_rows` reads `approved-plan.json` through
+`approved_plan.read_plan` and `effective_plan` — the integrity check that
+refuses a plan no sanctioned write backs, and the fold of its amendments.
+`approved_plan` is session 32's module. The import graph runs the wrong way
+for the port order, which is exactly the case STATUS warned about: read an
+inventory line as "the module", and check the import graph before assuming
+either way.
+
+Three options and none of them is free.
+
+**Port `approved_plan`'s read half now.** `read_plan` alone needs
+`_validate_schema`, `_full_content_hash`, `_last_recorded_write_hash` and
+`compute_plan_hash`; `effective_plan` additionally needs
+`derive_risk_flags`, which needs the sensitive-path, dependency-path,
+public-interface and integration-module predicates — and the last of those
+reads `docs/modules.yaml`. That is roughly 250 of `approved_plan`'s 590
+lines pulled into a session already carrying 3,103, and it leaves the
+module half-ported across two sessions.
+
+**Render an empty task list until session 32.** This is the one that had to
+be refused. The projection would say "this session has no tasks" over a
+session that has seven, in the one field the Work Explorer renders as a
+list of what to do next — and the parity control could not see it, because
+no built corpus shape carries an approved plan.
+
+**Refuse, through a registered reader.** `progress` declares an
+`ApprovedPlanReader` seam and `useApprovedPlanReader` registers one, which
+is the same shape `writers.usePlanParser` already uses for the same reason.
+Unregistered, `buildTaskRows` throws `TaskRowsRefused` the moment a plan
+file exists — and `buildProjection` already has a field for exactly that
+answer: `tasksRefused`, beside an empty `tasks`. A framework that cannot
+tell which step is open says so; it does not render the last row it could
+read as if it were current. That rule is the module's own, and it covers
+this.
+
+**Session 32 registers the real reader.** Until it does, a repository with
+an approved plan gets a refusal string rather than a wrong list, and the
+`approved_plan` parity case that session 32 adds is what proves the two
+routers agree about the rows. The seam names no session and carries no
+constant: like the verb registry, it is real when something registers it.
+
+### D199 · 2026-08-29 · Orchestrator · modules has one subcommand on both sides, so ModuleVerbs.list and .retire are trimmed from the contract rather than stubbed (D152 discharged under D162)
+
+D152 observed that `ModuleVerbs.list` and `ModuleVerbs.retire` describe a
+Python surface that does not exist: `ai_router.modules` has exactly one
+subcommand, `create`. D162 ruled that the sessions porting those modules
+reconcile the contract against what is actually ported rather than
+inheriting a shape nothing ever ran, defaulting to trimming. This is that
+session for `modules`.
+
+Both are trimmed, and `ModuleRetireOptions` with them. The module manifest
+is create-only by design — its own docstring says rename, delete and
+reorganization stay manual edits to the file — so `list` is a reader the
+extension already has through the projection, and `retire` is a lifecycle
+decision nobody has made. A contract naming a verb nothing implements is a
+promise to a caller that would be refused at the moment it was needed,
+which is what the extension's `pythonSpawnRouter` was doing: two of its
+`refuse()` stubs existed only to satisfy an interface. They are gone.
+
+`dabbler modules create` is the one subcommand, with the flags argparse
+declares: the workspace root positionally, `--slug` and `--title` required,
+`--plan-path`, and the three repeatable scope flags. Nothing was invented
+in the translation.
+
+What the port did NOT trim is the read surface. `loadEntries`, `findEntry`
+and `parseEntries` are ported whole even though no ported verb calls them
+yet, because `approved_plan._touches_integration_module` is their caller
+and it lands in session 32 — a module's readers are the module.
+
+If retirement should be a verb, it is a session: the writer, the record it
+leaves, and what a retired module means to the projection, decided once and
+built on both sides. Re-adding it to the contract first would put the
+promise back before the thing it promises.
+
+### D200 · 2026-08-29 · Orchestrator · docs/modules.yaml is compared, and two YAML emitters are reached to each other with four options -- YAML 1.1 being the one that is easy to miss; two exotic inputs still differ and are recorded
+
+`modules create` is the first ported verb that writes YAML. Every other
+record file is JSON, JSONL or TOML, where `pythonJson.dumps` and the TOML
+writer already make the two routers agree byte for byte. YAML has no such
+guarantee: PyYAML and the `yaml` package are different emitters making
+different legal choices about the same value.
+
+The parity control's compared-path list did not include
+`docs/modules.yaml`. It could have stayed out — the list is written as
+"what the router is allowed to write", and the manifest is also a file
+people edit by hand, which is unlike every other entry. It is in anyway,
+because the argument for leaving it out is the argument for the drift: both
+routers rewrite the WHOLE file on every `create`, so two emitters that
+disagreed would reformat a tracked file differently depending on which
+router ran, and every later diff of it would carry noise nobody could
+attribute.
+
+Four options reach the `yaml` package to PyYAML's `safe_dump(sort_keys=
+False, allow_unicode=True, default_flow_style=False)`:
+
+- `indentSeq: false` — PyYAML does not indent a sequence under its key.
+- `singleQuote: true` — PyYAML prefers `'` where quoting is needed.
+- `lineWidth: 81` — PyYAML's `best_width` is 80 and it allows the break at
+  the column past it; 80 breaks one word early.
+- `version: "1.1"` — this is the one that is easy to miss. YAML 1.1 resolves
+  `yes`, `no`, `on` and `off` as booleans, so PyYAML quotes them; the
+  package defaults to the 1.2 core schema and leaves them plain. A module
+  titled `No` would have been written two different ways.
+
+The parity case is green with those four, on a realistic entry: a slug, a
+title, a plan path, two `--code-root`s and a `--spec-section`.
+
+**Two inputs still emit differently, and they are recorded rather than
+papered over.** A scalar of exactly `y` or `n` — the package quotes it
+under 1.1, PyYAML's bool resolver does not list the single letters. And a
+value carrying a newline — the package writes a `|-` block, PyYAML writes
+it single-quoted and folded. Both are legal YAML parsing back to the same
+value, and neither occurs in a kebab-case slug or an ordinary display name.
+Closing them means writing a PyYAML-compatible emitter for this document
+shape, which is a session's worth of fold-rule detail; it is not something
+a port session should smuggle in beside 3,100 lines of translation. It
+becomes moot at the cutover, when there is one emitter.
+
+### D201 · 2026-08-29 · Orchestrator · A parity case may declare a Python-run setup, so restore reaches its write path without a sixth corpus shape; migrate gets no case and that is a corpus gap, not a divergence
+
+Ten cases enter the control this session, and one of them could not be
+written under the shape the control had.
+
+`session restore`'s only write path needs a session that has been
+cancelled. `fresh` has no record at all and `in-flight` has a session in
+flight; neither carries a cancelled one, and neither should — a shape is a
+lifecycle position, and "cancelled then restored" is a transition, not a
+position. So `restore` would have entered as a refusal case only, leaving
+the verb that actually edits `sessions.json` — consuming `preCancelStatus`,
+dropping the reason and the stamp, recording the restore reason — compared
+by nothing.
+
+Two ways to fix it, and D176 already priced them. A sixth corpus shape is
+the expensive one: every shape is built twice per case that uses it, and
+D169 measured the control at ~150 s already. The cheap one is a **setup**:
+one `python -m` invocation, declared by the case, run on BOTH copies before
+the compared verb.
+
+It costs the control nothing it did not already trust. The corpus is built
+by driving the Python router; a setup is one more of those invocations,
+made at case time rather than shape time. The case still compares exactly
+one verb, run twice, against two trees that were identical when the verb
+started. A setup that differed between the two copies would be comparing
+two questions rather than two answers — the same rule the `metrics` case's
+environment already follows — so it is one function evaluated per side, and
+a setup that exits non-zero stops the control at "could not run" (exit 2)
+rather than at a pass.
+
+`session migrate` is the one verb this session ports that gets no case at
+all, and that is a corpus gap rather than a divergence: every built shape
+is post-collapse, so there is no `docs/session-sets/<NNN-slug>/` for the
+migration to read. A shape whose only purpose is a verb that runs once per
+repository, ever, is not worth ~12 s on every parity run. Its refusals, its
+dry run and the cancelled-set fold are covered by both suites.
+
+### D202 · 2026-08-29 · Orchestrator · resolveSessionOrchestratorIdentity lands here as D164 planned: a wrapper over the block-level resolver, reading the record through progress and never opening it twice
+
+D164 held `identity.resolve_session_orchestrator_identity` back from the
+session that ported the rest of `identity`, on the grounds that it is the
+one function there which reads a REPOSITORY rather than an orchestrator
+block, and it reads it through `progress` — so porting it early meant
+writing a second reader of `sessions.json`, which is the drift the port
+exists to remove. Session 31 ports `progress`, so it lands here, as a thin
+wrapper over `resolveOrchestratorIdentity` where all of its judgement
+already lives.
+
+What it adds is only which block to ask about, and the order matters
+because the verifier's independence is decided from the answer: an explicit
+session number wins; otherwise the session in flight; otherwise the LAST
+session that carries an orchestrator block at all. That third branch is
+what makes the question answerable between two sessions, which is when
+`verify` most often needs it. A record-level `orchestrator` stands in for a
+chosen session that carries none. Everything else is a refusal — no
+readable record, or no block anywhere — because a caller that cannot tell
+whose identity this is must not proceed on a guess.
+
+No test covered it on either side before now; the Python suite's identity
+tests are all against the block-level core. Five tests cover it here: each
+of the three selection branches, and each of the two refusals. That is the
+one place this session deliberately goes beyond the Python suite rather
+than matching it, and it is safe to do because it adds tests rather than
+behaviour — the function is a faithful port, and a parity case would prove
+nothing extra, since no verb reaches it until `verify` lands in session 33.
+
+### D203 · 2026-08-29 · Orchestrator · Session 31 verified in one round for 54,838 in / 12,532 out; three minor findings, all faithful ports of Python behaviour, carried to the cutover rather than fixed on one side
+
+One round, `VERIFIED` on the first pass, 54,838 in / 12,532 out to
+`gpt-5-6-sol` over the API in 184.4 s. The largest single session of the
+port so far — 3,103 Python lines translated, ~2,000 TypeScript lines
+written, 116 tests added — and the cheapest per line the port has bought.
+
+Three findings, all **minor**, and all three are the same shape: a faithful
+port of Python behaviour that the reviewer, reading only the TypeScript,
+had no way to know was faithful. None is remediated, and the reason is the
+same in each case — changing one on the TypeScript side alone is exactly
+the capability divergence the parity control exists to catch.
+
+1. **`checkPushedToRemote` treats a failed `git rev-list --count @{u}..HEAD`
+   as zero commits ahead**, so an unusual git failure passes the gate.
+   `gates.py` is `int(out) if rc == 0 else 0`, character for character. The
+   residual is bounded on both sides and small: a repository whose upstream
+   ref resolves but whose count fails is one whose later real `git push`
+   fails too, and the close reports that.
+2. **`--sessions-dir` naming a repository other than the ambient project
+   makes `governingConfig` return null, so `test_run_fresh` passes
+   vacuously.** That is `_governing_config`'s documented design, not an
+   oversight: a session set living in a different repository never made the
+   ambient repository's testing declarations, and gating it against them
+   would demand a run of record for suites it does not have. Its own
+   docstring says the alternative is worse — a repository silently gated by
+   another's testing policy.
+3. **`migrate` copies the lifecycle files and moves the run directory before
+   validating and writing the state**, so a malformed legacy record can
+   refuse after partial filesystem changes. Python's ordering exactly. It is
+   a real sharp edge and it is a **cross-router** one; the fix is to
+   validate the transformed state before touching the filesystem, on both
+   sides, and `migrate` runs once per repository ever.
+
+Recorded rather than fixed, and carried to the cutover, where all three stop
+being cross-router questions. The severity rule is what stops the loop here:
+minor-only findings do not buy a second round.

@@ -8,15 +8,17 @@
 // choice. A Copilot seat's label is never trusted at all: multi-provider
 // engines resolve through the model or fail closed.
 //
-// `resolve_session_orchestrator_identity` -- the one function here that reads
-// a repository rather than a block -- is NOT ported yet. It reads session
-// state through `progress`, which session 31 ports; a second reader of
-// `sessions.json` written here to reach it early is precisely the drift the
-// port exists to remove. It lands in session 31 as a thin wrapper over
-// `resolveOrchestratorIdentity` below, which is where all of its judgement
-// already lives.
+// `resolveSessionOrchestratorIdentity` is the one function here that reads a
+// repository rather than a block, and it reads it through `progress` -- the
+// canonical reader -- rather than opening `sessions.json` itself. That is
+// why it waited for session 31: a second reader of the record written here
+// to reach it early is precisely the drift the port exists to remove. All of
+// its judgement is `resolveOrchestratorIdentity`'s; what it adds is which
+// block to ask about.
 
 import { loadConfig } from "./config.ts";
+import { readSessionState } from "./progress.ts";
+import { pythonRepr } from "./pythonJson.ts";
 import { KNOWN_PROVIDERS, confirmedCatalogEntries } from "./transports/copilot.ts";
 
 export const MULTI_PROVIDER_ENGINES: ReadonlySet<string> = new Set([
@@ -224,4 +226,56 @@ export function resolveOrchestratorIdentity(
     "orchestrator block resolves no provider (no registry-known model, " +
       "no provider label). Re-run start_session with --model, then retry.",
   );
+}
+
+/**
+ * The one session-level path: read state, pick the session, resolve.
+ *
+ * An explicit number wins; otherwise the session in flight; otherwise the
+ * last session that carries an orchestrator block at all -- which is what
+ * makes the question answerable between two sessions. A record-level
+ * `orchestrator` stands in for a session that carries none. Every failure is
+ * an `IdentityResolutionError`, because a caller that cannot tell whose
+ * identity this is must not proceed on a guess: the verifier's independence
+ * is decided from this answer.
+ */
+export function resolveSessionOrchestratorIdentity(
+  sessionsDir: string,
+  sessionNumber?: number | null,
+  options: { modelsRegistry?: ModelsRegistry | null } = {},
+): OrchestratorIdentity {
+  const state = readSessionState(sessionsDir);
+  if (state === null) {
+    throw new IdentityResolutionError(
+      `no readable session-state.json under ${sessionsDir}`,
+    );
+  }
+  const sessions = (Array.isArray(state["sessions"]) ? state["sessions"] : []).filter(
+    isRecord,
+  );
+
+  let chosen: Record<string, unknown> | null = null;
+  const wanted = sessionNumber ?? null;
+  if (wanted !== null) {
+    chosen = sessions.find((entry) => entry["number"] === wanted) ?? null;
+  } else {
+    chosen = sessions.find((entry) => entry["status"] === "in-progress") ?? null;
+    if (chosen === null) {
+      const withBlock = sessions.filter((entry) => isRecord(entry["orchestrator"]));
+      chosen = withBlock.length > 0 ? withBlock[withBlock.length - 1] : null;
+    }
+  }
+  const fromSession = chosen === null ? null : chosen["orchestrator"];
+  const block =
+    fromSession !== null && fromSession !== undefined && fromSession !== false
+      ? fromSession
+      : (state["orchestrator"] ?? null);
+  if (!block || (isRecord(block) && Object.keys(block).length === 0)) {
+    throw new IdentityResolutionError(
+      `no session under ${sessionsDir} carries an orchestrator block ` +
+        `(session_number=${pythonRepr(wanted)}); re-run start_session ` +
+        "with --model, then retry.",
+    );
+  }
+  return resolveOrchestratorIdentity(block, options);
 }

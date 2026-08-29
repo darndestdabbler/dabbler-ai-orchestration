@@ -176,6 +176,22 @@ export function dumps(value: unknown, options: DumpOptions = {}): string {
 }
 
 /**
+ * `str(x)` for the values these records hold.
+ *
+ * It lives beside `pythonRepr` because it is the other half of one rule:
+ * a message the Python router built by interpolation renders `None`,
+ * `True` and `False` where JavaScript would render `null`, `undefined`
+ * and lower case, and a reader diffing two routers' output sees that
+ * before anything else.
+ */
+export function pythonStr(value: unknown): string {
+  if (value === null || value === undefined) return "None";
+  if (value === true) return "True";
+  if (value === false) return "False";
+  return String(value);
+}
+
+/**
  * `repr(x)` for the values that reach a refusal an operator reads.
  *
  * The Python router writes those messages with `repr`, so a dict renders

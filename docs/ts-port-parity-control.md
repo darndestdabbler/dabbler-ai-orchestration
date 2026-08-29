@@ -268,6 +268,51 @@ not a function of the repository.
 > — and a `--dry-run` case is worth adding then, because it is the only
 > reading of the scope selection and the cost projection that costs nothing.
 
+> **Amended in session 31: the lifecycle's judgment half enters, a case may
+> declare a SETUP, and `docs/modules.yaml` joins the compared paths.**
+>
+> Ten cases land, across `session`, `progress` and `modules`: `session plan`
+> and `modules create` on `fresh`; `session close --dry-run` on both built
+> shapes, because a gate that differs by one row is this set's worst
+> outcome and the dry run prints every row with its remediation; `session
+> close` on `in-flight`, which prints the same rows and then refuses,
+> proving that a close over a session with no round lands nothing on either
+> side; `session cancel --force` and `session restore` on `in-flight`; and
+> `progress --json` on both shapes plus `progress` with no flag on `fresh`,
+> which is what proves the flag is inert rather than asserting it.
+>
+> **A case may now declare a `setup`** — one `python -m` invocation run on
+> BOTH copies before the compared verb. `restore`'s only write path needs a
+> cancelled session and no built shape carries one; the alternative was a
+> sixth shape, which D176 named as the expensive thing. The setup runs
+> through the Python router, which is how every shape is built already, so
+> the case still compares exactly one verb. A setup that differed between
+> the copies would be comparing two questions, so it is one function
+> evaluated per side.
+>
+> **`docs/modules.yaml` is compared, and it is the one compared path people
+> also edit by hand.** `modules create` rewrites the whole file through a
+> YAML emitter on each side, so two routers that reformatted a tracked file
+> differently would make every later diff of it lie. PyYAML and the `yaml`
+> package are reached to each other with four options — sequences at their
+> key's indent, single quotes, PyYAML's fold width (which allows the break
+> at column 81 rather than before 80), and YAML **1.1**, which is what makes
+> `yes`, `no` and `on` quote themselves. **Two inputs still emit
+> differently and are recorded rather than papered over**: a scalar of
+> exactly `y` or `n`, which the TypeScript emitter quotes and PyYAML does
+> not, and a title carrying a newline, which the one writes as a `|-` block
+> and the other single-quoted and folded. Both are legal YAML for the same
+> value, neither appears in a kebab-case slug or an ordinary display name,
+> and closing them means writing a PyYAML-compatible emitter — which is a
+> session, not a port's side effect.
+>
+> **`session migrate` is not a case**, and that is a corpus gap rather than
+> a divergence: every built shape is post-collapse, so there is no
+> `docs/session-sets/<NNN-slug>/session-state.json` for the migration to
+> read. Its refusals and its dry run are covered by the TypeScript suite and
+> by the Python one, and a shape whose only purpose is one verb that runs
+> once per repository is not worth ~12 s on every parity run.
+
 ## The files compared
 
 After both runs, the control walks the **union** of paths under each copy
@@ -287,6 +332,9 @@ Compared:
   `plan-review.jsonl`.
 - `copilot-catalog.lock`, and `.dabbler/api-models.lock` (added in session
   28, the one path under `.dabbler/` outside `runs/` that a router writes).
+- `docs/modules.yaml` (added in session 31, the one compared path a person
+  edits by hand as well; see that session's amendment for the two YAML
+  emitter differences it does not cover).
 - What `bootstrap` writes: the `AGENTS.md` / `CLAUDE.md` / `GEMINI.md`
   fence, the pre-commit hook, `.gitignore`.
 - The six-step workflow's `events.jsonl` and `projection.json` (from

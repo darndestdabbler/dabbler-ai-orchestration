@@ -29,11 +29,13 @@
 // parser that will receive it. The rest refuse by name. That is not
 // caution: writing the remaining argv from the contract's option names
 // alone produced three command lines that were wrong on inspection —
-// `modules list` and `modules retire` are not subcommands `ai_router.
+// `modules list` and `modules retire` were not subcommands `ai_router.
 // modules` has (it has exactly `create`), and `verify dispute` takes
 // `--finding`, not `--finding-index`. Nothing in the extension calls any
 // of them, so no test would have caught it and no operator would have
-// found out until the moment they needed it to work.
+// found out until the moment they needed it to work. The two module verbs
+// are gone from the contract entirely now that `modules` is ported and
+// there was nothing behind them to port.
 //
 // A refusal that names the verb is a better answer than a command line
 // nobody has run. Each becomes an argv when something calls it and a test
@@ -330,10 +332,6 @@ export class PythonSpawnRouter implements Router, RouterCommands {
   // --- modules ---------------------------------------------------------------
 
   public readonly modules: ModuleVerbs = {
-    // `ai_router.modules` has one subcommand, `create`. The other two are
-    // the contract describing a surface the Python side never grew.
-    list: () => refuse<RouterText>("modules"),
-    retire: () => refuse<RouterText>("modules"),
     /**
      * The workspace root is passed as the CLI's positional argument as
      * well as being the spawn cwd: a cwd is an ambient value a refactor

@@ -601,9 +601,9 @@
     {
       "number": 31,
       "title": "The session lifecycle",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-29T06:47:12.295552-04:00",
-      "completedAt": null,
+      "completedAt": "2026-08-29T08:15:50.355065-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

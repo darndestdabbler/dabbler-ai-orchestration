@@ -95,17 +95,41 @@ const DIGEST_LEDGERS: readonly RegExp[] = [
 const SHA256_VALUE = /sha256:[0-9a-f]{64}/g;
 export const DIGEST_PLACEHOLDER = "sha256:<digest>";
 
+/**
+ * A git object id, reduced when two BUILDS are being compared.
+ *
+ * A tree hash over content with no timestamp in it is compared exactly, and
+ * stays that way for the two-router comparison. But once a shape records a
+ * verification round, its `completion_tree` is a hash over the working tree
+ * INCLUDING the lifecycle's own bookkeeping -- `sessions.json` carries
+ * `startedAt`, `activity-log.json` carries a stamp per row -- so two builds
+ * of one shape can never agree on its value, while both files are compared
+ * in full a directory away.
+ *
+ * That is the same concession `DIGEST_LEDGERS` already makes, and it is
+ * scoped to the question that needs it. Two builds are two CLOCKS; two
+ * routers share one build (a shape is built once and copied), so nothing is
+ * reduced where a disagreement about which tree was reviewed could hide.
+ */
+const OBJECT_ID = /\b[0-9a-f]{40}\b/g;
+export const OBJECT_ID_PLACEHOLDER = "<oid>";
+
 /** One file's text, made comparable. Both roots, so each becomes `<root>`. */
 export function normalizeForPath(
   relPath: string,
   text: string,
   roots: readonly string[],
+  options: { reduceObjectIds?: boolean } = {},
 ): string {
   const normalized = normalize(text, roots);
-  return DIGEST_LEDGERS.some((pattern) => pattern.test(relPath))
+  const reduced = DIGEST_LEDGERS.some((pattern) => pattern.test(relPath))
     ? normalized.replace(SHA256_VALUE, DIGEST_PLACEHOLDER)
     : normalized;
+  return options.reduceObjectIds === true
+    ? reduced.replace(OBJECT_ID, OBJECT_ID_PLACEHOLDER)
+    : reduced;
 }
+
 
 export function isCompared(relPath: string): boolean {
   if (EXCLUDED.some((pattern) => pattern.test(relPath))) return false;
@@ -262,7 +286,11 @@ function readOrNull(root: string, relPath: string): string | null {
 }
 
 /** Two copies of one shape, after both routers have run against them. */
-export function compareCopies(pythonRoot: string, typescriptRoot: string): ComparisonResult {
+export function compareCopies(
+  pythonRoot: string,
+  typescriptRoot: string,
+  options: { reduceObjectIds?: boolean } = {},
+): ComparisonResult {
   const paths = [
     ...new Set([...comparedPaths(pythonRoot), ...comparedPaths(typescriptRoot)]),
   ].sort();
@@ -280,8 +308,8 @@ export function compareCopies(pythonRoot: string, typescriptRoot: string): Compa
       differences.push({ path, kind: "only-in-python", diff: "" });
       continue;
     }
-    const before = normalizeForPath(path, left, roots);
-    const after = normalizeForPath(path, right, roots);
+    const before = normalizeForPath(path, left, roots, options);
+    const after = normalizeForPath(path, right, roots, options);
     if (before === after) continue;
     differences.push({ path, kind: "content", diff: unifiedDiff(path, before, after) });
   }

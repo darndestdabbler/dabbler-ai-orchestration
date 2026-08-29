@@ -187,13 +187,22 @@ export interface VerifyRoundOptions extends RepositoryTarget {
 
 export interface VerifyDisputeOptions extends RepositoryTarget {
   readonly round: number;
-  readonly findingIndex: number;
+  /**
+   * `--finding`, and named for the flag rather than for the field it lands
+   * in (`finding_index`). D152: an argv built from `findingIndex` reads
+   * `--finding-index`, which the parser does not have. Now that `verify` is
+   * ported the command line is readable rather than inferable, and this is
+   * what it says.
+   */
+  readonly finding: number;
   readonly grounds: string;
   /** Repeatable on the CLI; a file-backed rebuttal is what makes it weighable. */
   readonly evidence: readonly string[];
 }
 
 export interface VerifyAdjudicateOptions extends RepositoryTarget {
+  /** The cap the preconditions check against; `--max-rounds`, as a round takes. */
+  readonly maxRounds?: number;
   readonly transport?: string;
 }
 
@@ -209,6 +218,15 @@ export interface VerifyStepOptions extends RepositoryTarget {
   readonly reason?: string;
 }
 
+/**
+ * `verify prepare` and `verify step guard-commit` are deliberately absent.
+ * Both exist on the command line; neither is extension-facing -- `prepare`
+ * is the critique pipeline's default-off entry point and decides nothing,
+ * and `guard-commit` is a pre-commit hook that takes no arguments and is
+ * invoked by the hook `bootstrap` writes. This interface is what the
+ * extension calls, and every member of it costs a signature the other side
+ * must implement (session 24 measured that at +178 lines).
+ */
 export interface VerifyVerbs {
   /** One round of cross-provider verification. There is no skip. */
   round(options: VerifyRoundOptions): Promise<RouterResult<RouterText>>;

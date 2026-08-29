@@ -13,8 +13,8 @@
 // same announce-then-implement discipline as the verb registry.
 
 import { spawnSync } from "node:child_process";
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { join, relative } from "node:path";
 
 export class CorpusError extends Error {}
 
@@ -88,11 +88,16 @@ export interface RunOutcome {
   readonly stderr: string;
 }
 
-export function runProcess(command: string, args: string[], cwd: string): RunOutcome {
+export function runProcess(
+  command: string,
+  args: string[],
+  cwd: string,
+  extraEnv: Record<string, string> = {},
+): RunOutcome {
   const proc = spawnSync(command, args, {
     cwd,
     encoding: "utf8",
-    env: childEnvironment(),
+    env: { ...childEnvironment(), ...extraEnv },
   });
   if (proc.error) {
     throw new CorpusError(`${command} could not be run: ${proc.error.message}`);
@@ -115,8 +120,9 @@ export function python(
   interpreter: string,
   cwd: string,
   moduleArgs: string[],
+  extraEnv: Record<string, string> = {},
 ): RunOutcome {
-  return runProcess(interpreter, ["-m", ...moduleArgs], cwd);
+  return runProcess(interpreter, ["-m", ...moduleArgs], cwd, extraEnv);
 }
 
 /**
@@ -604,9 +610,236 @@ function writeApprovedPlan(repo: string, context: BuildContext): void {
 const PINNED_STEP_TIME = "2026-01-01T00:00:00+00:00";
 
 /**
- * The five lifecycle shapes of the record. The three whose builders are
- * null need a canned verifier -- the offline transport, ported in session
- * 28 -- and land with the verbs that read them.
+ * The offline transport's scripted answers, for the shapes that need a
+ * verifier.
+ *
+ * Three shapes turn on what a verifier said, and a live one cannot be asked
+ * to produce a specific awkward response on demand -- which is exactly what
+ * a corpus of verification states requires. The responses are files, served
+ * in lexical order, one per dispatch; both copies of a shape are built from
+ * the same directory, so the two routers are handed the same words.
+ */
+function scriptResponses(target: string, responses: readonly string[]): string {
+  const dir = join(target, "verifier-responses");
+  mkdirSync(dir, { recursive: true });
+  responses.forEach((text, index) => {
+    writeFileSync(
+      join(dir, `${String(index + 1).padStart(2, "0")}.md`),
+      text,
+      "utf8",
+    );
+  });
+  return dir;
+}
+
+/** One blocking finding, cited at the file the shape's session edits. */
+const BLOCKING_RESPONSE =
+  "ISSUES FOUND\n\nIssue 1: the widget returns the wrong number.\n" +
+  "Category: correctness\nSeverity: Major\n" +
+  "Failure scenario: a caller reading widget() gets 2 where 1 is meant.\n" +
+  "Evidence paths: src/widget.py\n";
+
+/**
+ * A round with findings, one of them disputed with a rebuttal.
+ *
+ * Everything is written by the PYTHON router, as every shape is: the round
+ * comes from `python -m ai_router.verify` against a scripted verifier, and
+ * the dispute from `verify dispute`. A fixture that wrote `rounds.jsonl`
+ * itself would build a shape that only exercises the reader.
+ */
+function buildDisputed(target: string, context: BuildContext): string {
+  const repo = buildInFlight(target, context);
+  const sessionsDir = join(repo, "docs", "sessions");
+  const responses = scriptResponses(target, [BLOCKING_RESPONSE]);
+
+  const round = python(
+    context.interpreter,
+    repo,
+    ["ai_router.verify", "--sessions-dir", sessionsDir, "--transport", "offline"],
+    { DABBLER_OFFLINE_RESPONSES: responses },
+  );
+  // Exit 4 is a blocking round, which is the state this shape IS.
+  if (round.code !== 4) {
+    throw new CorpusError(
+      `the disputed shape's round exited ${round.code}, not 4 (blocking): ` +
+        `${(round.stderr || round.stdout).trim()}`,
+    );
+  }
+
+  const dispute = python(context.interpreter, repo, [
+    "ai_router.verify", "dispute",
+    "--sessions-dir", sessionsDir,
+    "--round", "1",
+    "--finding", "0",
+    "--grounds", "the widget's contract is the new number, per the plan",
+    "--evidence", "docs/sessions/session-plan.md",
+  ]);
+  if (dispute.code !== 0) {
+    throw new CorpusError(
+      `verify dispute failed (${dispute.code}): ${dispute.stderr.trim()}`,
+    );
+  }
+  return repo;
+}
+
+/**
+ * The cap reached, with a remediation before the last round.
+ *
+ * The cap is lowered to two rather than the tree being driven three times:
+ * `--max-rounds` is the same number the loop reads from configuration, so
+ * the state is the real one and it costs one round less to reach.
+ */
+function buildAtCap(target: string, context: BuildContext): string {
+  const repo = buildInFlight(target, context);
+  const sessionsDir = join(repo, "docs", "sessions");
+  const responses = scriptResponses(target, [BLOCKING_RESPONSE, BLOCKING_RESPONSE]);
+
+  for (const round of [1, 2]) {
+    if (round === 2) {
+      // The remediation, and the evidence it makes necessary. A round two
+      // that opened on an unchanged tree would be reviewing nothing.
+      writeFileSync(
+        join(repo, "src", "widget.py"),
+        "def widget():\n    return 3\n",
+        "utf8",
+      );
+      recordTargetedRun(repo, sessionsDir, context);
+    }
+    const outcome = python(
+      context.interpreter,
+      repo,
+      [
+        "ai_router.verify",
+        "--sessions-dir", sessionsDir,
+        "--transport", "offline",
+        "--max-rounds", "2",
+      ],
+      { DABBLER_OFFLINE_RESPONSES: responses },
+    );
+    if (outcome.code !== 4) {
+      throw new CorpusError(
+        `the at-cap shape's round ${round} exited ${outcome.code}, not 4: ` +
+          `${(outcome.stderr || outcome.stdout).trim()}`,
+      );
+    }
+  }
+  return repo;
+}
+
+/**
+ * A clone that never received the round refspec.
+ *
+ * The recorded completion tree is a real object in the origin and absent
+ * here, which is the state `verify reanchor` exists for and the one no other
+ * shape can reach: a shape built in place always has its own objects. The
+ * clone is the repository the case runs against; the built one is its
+ * origin, kept beside it.
+ */
+function buildMovedMachine(target: string, context: BuildContext): string {
+  const origin = buildDisputed(target, context);
+  const clone = join(target, "clone");
+
+  // Cloned from the BARE remote, not from the working repository. A local
+  // `git clone <dir>` hardlinks the whole object store, unreachable objects
+  // included, so the round's snapshot tree would arrive with it and the
+  // shape would not be the shape it claims. The remote only ever received
+  // the pushed branch: nothing pushed `refs/dabbler/rounds/*`, which is
+  // exactly why the recorded tree goes missing on the far machine.
+  // `--branch main` because a bare repository's HEAD still names the branch
+  // `git init --bare` chose, and nothing here pushed to that name -- so a
+  // clone without it checks out nothing and leaves HEAD unborn.
+  git(target, "clone", "-q", "--branch", "main", join(target, "remote.git"), clone);
+  git(clone, "config", "core.autocrlf", "false");
+  git(clone, "config", "commit.gpgsign", "false");
+  git(clone, "config", "gc.auto", "0");
+
+  // What a clone does NOT bring, and what this shape is about.
+  //
+  // The session record and the run ledger are both untracked here (D135), so
+  // a clone has neither -- and without them the far machine has no session
+  // in flight and no round, which is a different refusal entirely. Every
+  // `verify reanchor` case would then pass by agreeing about the wrong
+  // thing: two routers refusing "no session" while `baseline-reanchors.jsonl`
+  // is never written and never compared. So the record travels and the
+  // OBJECTS do not, which is the real state a session that changed machines
+  // arrives in.
+  cpSync(join(origin, ".dabbler"), join(clone, ".dabbler"), { recursive: true });
+  cpSync(join(origin, "docs", "sessions"), join(clone, "docs", "sessions"), {
+    recursive: true,
+    force: true,
+  });
+
+  // The machine-local layer names a path inside the repository it was
+  // written for, so it is rewritten for this one.
+  rehomeOverrides(clone);
+
+  // The shape asserts its own premise. A vacuous corpus shape is worse than
+  // a missing one: it reports a pass for a comparison that never ran, and
+  // nothing downstream can tell the two apart. If the recorded tree ever
+  // arrives here -- a changed clone flag, a pushed round refspec -- this
+  // stops the run instead of quietly making the reanchor case a no-op.
+  const rounds = readFileSync(
+    join(clone, ".dabbler", "runs", "s1", "rounds.jsonl"),
+    "utf8",
+  )
+    .trim()
+    .split("\n");
+  const recorded = String(
+    (JSON.parse(rounds[rounds.length - 1] as string) as Record<string, unknown>)[
+      "completion_tree"
+    ],
+  );
+  const present = runProcess(
+    "git",
+    ["cat-file", "-e", `${recorded}^{object}`],
+    clone,
+  );
+  if (present.code === 0) {
+    throw new CorpusError(
+      `the 'moved-machine' shape carries round 1's recorded tree ` +
+        `${recorded.slice(0, 12)}, so the recovery it exists to compare ` +
+        "cannot happen and every reanchor case on it would pass vacuously",
+    );
+  }
+  return clone;
+}
+
+
+/** Point the machine-local overlay at this copy's own telemetry fixture. */
+export function rehomeOverrides(repo: string): void {
+  writeFileSync(join(repo, "local-overrides.yaml"), localOverrides(repo), "utf8");
+}
+
+/**
+ * `test_evidence record` for the tests the current change set selects.
+ *
+ * A round is refused without it, so a shape that drives a second round has
+ * to record one -- through the Python router, like everything else the
+ * corpus builds.
+ */
+function recordTargetedRun(
+  repo: string,
+  sessionsDir: string,
+  context: BuildContext,
+): void {
+  const recorded = python(context.interpreter, repo, [
+    "ai_router.test_evidence", "record",
+    "--sessions-dir", sessionsDir,
+    "--suite", "unit",
+    "--stage", "preverify-targeted",
+    "--command", "python -m pytest tests/test_widget.py",
+    "--outcome", "passed",
+    "--duration-seconds", "1",
+  ]);
+  if (recorded.code !== 0) {
+    throw new CorpusError(
+      `test_evidence record failed (${recorded.code}): ${recorded.stderr.trim()}`,
+    );
+  }
+}
+
+/**
+ * The five lifecycle shapes of the record.
  */
 export const SHAPES: readonly ShapeSpec[] = [
   {
@@ -623,20 +856,20 @@ export const SHAPES: readonly ShapeSpec[] = [
   },
   {
     name: "disputed",
-    summary: "a round with findings, one disputed with a rebuttal, then a withdrawal",
-    build: null,
-    neededFromSession: 26,
+    summary: "a round with findings, one disputed with a rebuttal",
+    build: buildDisputed,
+    neededFromSession: 33,
   },
   {
     name: "at-cap",
     summary: "the cap reached, with a remediation before the last round",
-    build: null,
-    neededFromSession: 26,
+    build: buildAtCap,
+    neededFromSession: 33,
   },
   {
     name: "moved-machine",
-    summary: "a clone without the round refspec, and a second copy that fetched it",
-    build: null,
+    summary: "a clone without the round refspec, so the recorded tree is absent",
+    build: buildMovedMachine,
     neededFromSession: 33,
   },
 ];
@@ -659,3 +892,38 @@ export function buildShape(name: string, target: string, context: BuildContext):
   mkdirSync(target, { recursive: true });
   return shape.build(target, context);
 }
+
+/**
+ * A built shape, copied rather than rebuilt.
+ *
+ * D169 measured the cost and D176 named the lever: a SHAPE is what a case
+ * pays for, because a shape is built twice per case that names it. Twenty-
+ * eight cases over two shapes already cost ~200 s, and three of the five
+ * shapes drive a verification round -- so rebuilding per case is what stops
+ * the table from growing.
+ *
+ * A copy is sound because a shape is a directory: the git repository inside
+ * it uses a relative `origin`, and the one absolute path in it -- the
+ * machine-local overlay naming its own telemetry fixture -- is rewritten
+ * here. Every case still gets a pristine tree, because the template is
+ * never run against; it is only ever copied FROM.
+ */
+export function copyShape(template: string, target: string, repoName: string): string {
+  rmSync(target, { recursive: true, force: true });
+  cpSync(template, target, { recursive: true });
+  const repo = join(target, repoName);
+  rehomeOverrides(repo);
+  return repo;
+}
+
+/** The name of the repository directory inside a built shape's target. */
+export function repoDirName(shape: string, repo: string, target: string): string {
+  const rel = relative(target, repo);
+  if (rel === "" || rel.includes("..")) {
+    throw new CorpusError(
+      `the '${shape}' shape built its repository outside its own target`,
+    );
+  }
+  return rel;
+}
+

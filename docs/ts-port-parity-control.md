@@ -369,14 +369,37 @@ not a function of the repository.
 > either mismatch. That test was falsified before it was trusted — flipping
 > `sortKeys` to `false` in `coreBytes` turns it red.
 >
-> **`step-execution.jsonl` has no such differential test and its writer is
-> unproven across routers.** `ledger.appendStepEvent` was ported in session
-> 26 and is exercised by that session's suite on the TypeScript side alone.
-> The **agency record** has neither, and cannot: it is not a file but the
-> `agency` member of a round row (`ai_router/verify.py:773`, shaped by
-> `rounds.schema.json`), so nothing can produce one until `verify` lands in
-> session 33. Both are owed there, alongside the round cases that session
-> already carries.
+> **`step-execution.jsonl` and the agency record are now gated the same
+> way, and the sentence this paragraph used to carry was wrong.** It said
+> the agency record "cannot" have a differential test because it is not a
+> file but the `agency` member of a round row. What cannot exist is a
+> *file* comparison or a *CLI* case — the fold itself is
+> `agency.record_for_round(...).as_row()` against `recordRow(...)`, a pure
+> function of a grant and a transport's reported metadata, and a
+> differential test of it could have been written any time. Session 33
+> wrote it, and three more beside it, in
+> `packages/router/test/differential.test.ts`:
+>
+> - the **closed-step row**, composed on each side and handed to each
+>   ledger, because the composition is what two languages differ over and
+>   the schema would accept several of those differences;
+> - the **agency record**, folded from one metadata payload whose five tool
+>   calls reach five branches — a read inside the scope, a read outside it,
+>   a repository-wide search confined to nothing, a listing, and a tool the
+>   grant never named;
+> - the **deterministic-facts row**, whose `sort_keys` line is the contract
+>   between two writers of the same record;
+> - the **verdict token**, which is D168's look-alike case: `VERIFIED_NOT_
+>   REALLY` classifies as VERIFIED on both sides, and the test records that
+>   AGREEMENT rather than the behaviour, so that the day either side
+>   tightens the token the other is told.
+>
+> All four are guarded on `.venv` alone, with no fallback to a PATH Python.
+> That is a deliberate under-approximation and it is stated in the file: a
+> machine with `ai_router` importable from some other interpreter skips
+> them silently. The vitest CI job installs no Python at all — for the same
+> reason this control is absent from it — so the guard is what lets that
+> file run there rather than a hole in it.
 
 ## The files compared
 

@@ -90,7 +90,11 @@ export const VERBS: readonly VerbSpec[] = [
   {
     verb: "facts",
     pythonModule: "ai_router.facts",
-    portedInSession: 32,
+    // D129 assigned `facts` to the session that is now 32, and the session
+    // plan's own text for 32 never named it. It lands with `verify`, which
+    // is its only caller: `collect_facts`, `append_facts` and
+    // `red_facts_refusal` are what a round runs before it buys a verifier.
+    portedInSession: 33,
     extensionFacing: false,
     summary: "the deterministic controls, run and recorded",
   },

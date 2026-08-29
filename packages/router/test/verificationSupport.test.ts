@@ -959,9 +959,14 @@ describe("the plan artifact, against the reference implementation", () => {
   // check needs `ai_router` importable, not merely a Python. The vitest CI job
   // installs no Python at all -- deliberately, and for the same reason the
   // parity control is absent from it (see .github/workflows/test.yml) -- so
-  // the guard is what lets this file run there rather than a gap in it. Where
-  // Python IS present, which is every machine that can run a verification
-  // round, the check runs and is required.
+  // the guard is what lets this file run there rather than a gap in it.
+  //
+  // The guard is `.venv`-ONLY, and that is an under-approximation rather
+  // than a test of whether Python is present: a machine that can run a
+  // verification round with `ai_router` importable from some other
+  // interpreter SKIPS this silently. It is kept because the venv is where
+  // this repository's router lives, so in practice it runs -- but a green
+  // suite on a machine without one has not made this claim.
   const interpreter = join(
     repoRoot,
     ".venv",

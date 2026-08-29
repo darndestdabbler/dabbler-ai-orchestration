@@ -7138,6 +7138,206 @@
       "dateTime": "2026-08-29T10:54:06.184356-04:00",
       "description": "closed after round 3; the close refused once on verification_clean and the answer was a round, not --force",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 33,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-29T14:13:26.401494-04:00",
+      "description": "Register; declare `--not-releasable`.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 33,
+      "stepNumber": 2,
+      "stepKey": "port-by-seam-running-the-corpus",
+      "dateTime": "2026-08-29T14:13:26.401494-04:00",
+      "description": "Port by seam, running the corpus after each: round one, the fix-delta round, the cap, the dispute ladder, adjudication, reanchor and its refusals, the severity-gated stop.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 33,
+      "stepNumber": 3,
+      "stepKey": "prompts-and-templates-copied-byte-for",
+      "dateTime": "2026-08-29T14:13:26.401494-04:00",
+      "description": "Prompts and templates copied byte-for-byte; the verdict parser and the prompt stay pinned by the same round-trip test that pins them today.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 33,
+      "stepNumber": 4,
+      "stepKey": "parity-control-green-on-every-round",
+      "dateTime": "2026-08-29T14:13:26.401494-04:00",
+      "description": "Parity control green on every round row the corpus produces, including the anchored commit's tree equalling `completion_tree`.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 33,
+      "stepNumber": 5,
+      "stepKey": "measure-this-session-s-seat-cost",
+      "dateTime": "2026-08-29T14:13:26.401494-04:00",
+      "description": "Measure this session's seat cost and record it.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 33,
+      "stepNumber": 6,
+      "stepKey": "affected-tests-as-preverify",
+      "dateTime": "2026-08-29T14:13:26.401494-04:00",
+      "description": "Affected tests as preverify.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 33,
+      "stepNumber": 7,
+      "stepKey": "cross-provider-verification-through-the-ported",
+      "dateTime": "2026-08-29T14:13:26.401494-04:00",
+      "description": "Cross-provider verification \u2014 **through the ported loop**, with the Python loop run once more on the same tree as a recorded cross-check.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 33,
+      "stepNumber": 8,
+      "stepKey": "full-test-suite-recorded-as-the",
+      "dateTime": "2026-08-29T14:13:26.401494-04:00",
+      "description": "Full test suite, recorded as the `final-full` run of record.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 33,
+      "stepNumber": 9,
+      "stepKey": "close-out",
+      "dateTime": "2026-08-29T14:13:26.401494-04:00",
+      "description": "Close-out.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 33,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-29T14:13:26.414923-04:00",
+      "description": "Registered session 33 (claude-code).",
+      "status": "complete"
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 33,
+      "dateTime": "2026-08-29T14:13:37.677818-04:00",
+      "task": "Session 33 of 36 \u2014 the verification loop.\n\nPort ai_router/verify.py (2,537 lines, 57 tests) to TypeScript as the\nextraction it never got: rounds, bundle, disputes and adjudication,\nreanchor, and the loop each become a file, and no file exceeds 800 lines.\nBehavior does not change.\n\n1. Port by seam, running the parity corpus after each: round one, the\n   fix-delta round, the round cap, the dispute ladder, adjudication,\n   reanchor and its refusals, the severity-gated stop.\n2. Prompts and templates copied byte-for-byte; the verdict parser and the\n   prompt stay pinned by the same round-trip test that pins them today.\n3. Build the three unbuilt corpus shapes (disputed, at-cap, moved-machine)\n   and cache a built shape across the cases that name it, per D169/D176.\n4. Discharge what is owed to this session: verdict's parity case, the\n   round-append case and the completion_tree comparison (D163, D177);\n   D168's look-alike case; differential writer tests for\n   step-execution.jsonl and the agency record; D152's VerifyVerbs option\n   names (verify dispute takes --finding).\n5. Correct two inaccurate sentences left standing by session 32: the\n   agency-comparison claim in docs/ts-port-parity-control.md and the\n   interpreter-guard comment in test/verificationSupport.test.ts.\n6. Measure this session's seat cost and record it.\n7. Affected tests as preverify; cross-provider verification; the full\n   suite as the final-full run of record; close out.\n\nNot releasable \u2014 this session publishes no package.",
+      "releasable": false
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D210",
+      "ordinal": 210,
+      "sessionNumber": 33,
+      "decidedOn": "2026-08-29",
+      "recordedAt": "2026-08-29T15:38:58.084066-04:00",
+      "decider": "orchestrator",
+      "headline": "`facts` was never ported, and the consumer is what found it: a fifth sizing-error shape, asked of the sequence rather than of a module",
+      "body": "`facts` (663 lines) was assigned to a port session by D129 \u2014 \"Session 31 takes\nit\", which under D188's renumbering is session **32** \u2014 and session 32's own\ntext in the session plan never named it. It was not ported. `verify` cannot\nexist without it: a round calls `collect_facts`, `append_facts` and\n`red_facts_refusal` before it buys a verifier, and `verify step close` calls\n`collect_control_facts` and `run_control` again per step. So it lands here,\nand `contracts/verbs.ts` is corrected from `portedInSession: 32` to `33`.\n\n**How it was found is the part worth keeping.** Nothing detected it \u2014 not the\nverb table (which carried the wrong session silently), not the parity control\n(no case named `facts`), not the suite. It surfaced at the first line of the\nconsumer, when `verify`'s imports were written out. The port's four known\nsizing errors (D129's line counts running both ways, session 31's import-graph\ndirection, session 32's \"does the module have a command line at all\") are all\nquestions asked of a module in isolation. This is a fifth, and it is asked of\nthe SEQUENCE: **a module's session assignment and the session plan's own prose\nare two records, and nothing checks that they agree.** `verbs.ts` now carries a\ncomment at the corrected entry saying so.\n\nOne rule could not be ported by copying it. `facts.run_control` rewrites\n`python`/`python3` to `sys.executable`, so a control runs in the environment\nthe router runs in rather than in whatever PATH resolves. That rule cannot be\ncopied: this router's interpreter is Node, there is no Python beneath it to\nsubstitute, and after the cutover there is no Python in the product at all. So\nthe RULE is ported rather than the substitution \u2014 `node`/`node.exe` resolve to\n`process.execPath` \u2014 and the record cannot see the difference, because\n`ControlFact.command` carries the DECLARED command and never the resolved\nargv. Both routers write the same bytes for the same declaration, which is\nwhat the two `facts` parity cases now compare.",
+      "model": "claude-opus-5",
+      "provider": "anthropic"
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D211",
+      "ordinal": 211,
+      "sessionNumber": 33,
+      "decidedOn": "2026-08-29",
+      "recordedAt": "2026-08-29T15:39:19.703471-04:00",
+      "decider": "orchestrator",
+      "headline": "The verification loop in seven files, not the plan's five: none over 800 lines, and the seam the plan did not name is the one that most needed to exist",
+      "body": "`verify.py` (2,537 lines) is ported as the extraction it never got, under\n`packages/router/src/verify/`. The session plan said five files; there are\n**seven**, and the verifier was right to say the deliverable text and the tree\ndisagree. The constraint that mattered holds: the largest is `rounds.ts` at\n716 lines, and none exceeds 800.\n\nSeven rather than five because the seams are seven, and merging any pair would\nbe arranging files to match a sentence:\n\n| file | lines | what it owns |\n| --- | ---: | --- |\n| `errors.ts` | 57 | the six exit codes and the three error types all six seams return |\n| `prompts.ts` | 357 | everything a round or an adjudication SAYS, and nothing it decides |\n| `rounds.ts` | 716 | the loop, the dispatch retry, and the two cap-terminal states |\n| `disputes.ts` | 548 | the dispute channel and the adjudication that ends a capped impasse |\n| `reanchor.ts` | 272 | the legal anchor and the five refusals that keep it from being a scope choice |\n| `prepare.ts` | 325 | the critique bundle: the derived change-id and the author's claims |\n| `steps.ts` | 620 | step execution, the envelope comparison and the pre-commit guard |\n\nPlus `cli/verify.ts` (321) and `cli/facts.ts` (98). 3,200 Python lines became\n**4,232** TypeScript across ten files \u2014 1.32x, the ratio the port has run at\nsince session 25.\n\n`errors.ts` is the file the plan's list does not name and the one that most\nneeded to exist: the exit codes are not a detail of the loop. An orchestrator\nbranches on them, and a refusal answering 3 where its twin answers 2 is drift\nno record could see, so they live in one place all six seams import rather\nthan in whichever seam happened to be written first.\n\n**Two things Python has that the port does not reproduce, both deliberate.**\n`verify.py` defines `_head_commit` **twice** (lines 1607 and 2171); the second\nwins, and it is the one every caller gets. The port has one function, matching\nthe live definition (`rev-parse --verify HEAD`) \u2014 the dead one is not ported,\nand this is recorded so a reader comparing the two files is not puzzled by a\nmissing function. And `_untracked_contents`' bookkeeping branch is\n**unreachable from its only caller**: `assemble_evidence` passes the pathspecs\nthat exclude those very basenames, so an untracked lifecycle file never\nreaches the list. The port keeps the branch, faithfully, and `facts.test.ts`\ntests the reachable path (a tracked, modified lifecycle file) and says why in\nthe test.",
+      "model": "claude-opus-5",
+      "provider": "anthropic"
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D212",
+      "ordinal": 212,
+      "sessionNumber": 33,
+      "decidedOn": "2026-08-29",
+      "recordedAt": "2026-08-29T15:39:39.479004-04:00",
+      "decider": "verifier",
+      "headline": "Round 1's Major: the moved-machine shape was vacuous, and a corpus shape that cannot fail is worse than a missing one",
+      "body": "Round 1's Major was a **vacuous corpus shape**, and it is the same defect\nD207 recorded one session ago in a different place: \"before this, both routers\nagreed the task list was empty \u2014 which reads as proof and is not.\"\n\n`moved-machine` was built with `git clone <working repo> <clone>`. Two things\nfollow that the builder did not account for. A clone carries only committed\nhistory, and since D135 both the session record and the run ledger are\n**untracked** \u2014 so the clone had no session in flight and no round. Every\n`verify reanchor` case on it therefore compared two routers agreeing \"no\nsession is in flight\", while `baseline-reanchors.jsonl` was never written and\nnever compared. The case reported that it \"proves the recovery both routers\nmust agree on\". It proved nothing of the sort, deterministically, on every run.\n\nAnd a local `git clone <dir>` **hardlinks the whole object store**, unreachable\nobjects included \u2014 so even with the record restored, round 1's snapshot tree\nwould have arrived with it and `objectExists` would have been true, taking the\nrefusal branch instead of the recovery.\n\nBoth are fixed at once. The clone is taken from the **bare remote**, which only\never received the pushed branch (nothing pushes `refs/dabbler/rounds/*` before\na close), with `--branch main` because a bare repository's HEAD still names the\nbranch `git init --bare` chose and a clone without it leaves HEAD unborn. Then\n`.dabbler/` and `docs/sessions/` are copied across: **the record travels and\nthe objects do not**, which is exactly the state a session that changed\nmachines arrives in.\n\n**The shape now asserts its own premise.** It reads round 1's\n`completion_tree` out of the copied ledger and refuses to build if\n`git cat-file -e` finds it \u2014 so a future change that lets the objects travel\nstops the control instead of quietly making the case a no-op again. That is the\ngeneralizable half: a corpus shape that cannot fail is worse than a missing\none, because it reports a pass for a comparison that never ran and nothing\ndownstream can tell the two apart.\n\nThe fix is measurable rather than asserted: the control went from **339\ncompared paths to 366**. The 27 are the ledger and session record the clone\nnow carries \u2014 the files the case exists to compare.",
+      "model": "gpt-5-6-sol",
+      "provider": "openai"
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D213",
+      "ordinal": 213,
+      "sessionNumber": 33,
+      "decidedOn": "2026-08-29",
+      "recordedAt": "2026-08-29T15:39:58.346674-04:00",
+      "decider": "orchestrator",
+      "headline": "Shape caching: 42 cases over 5 shapes now cost less than 28 over 2 \u2014 and it changed what the determinism check is for",
+      "body": "D169 measured the cost and D176 named the lever: what a parity case pays for\nis the **shape**, because a shape is built twice for every case that names it.\nSession 31 measured 193 s for 28 cases across 2 shapes and said caching \"stops\nbeing optional\" in session 33, where three shapes that each drive a\nverification round land.\n\nA shape is now built **once** into a template and copied per case\n(`copyShape`). A copy is sound because a shape is a directory: the git\nrepository inside it uses a relative `origin`, and the one absolute path in it\n\u2014 the machine-local overlay naming its own telemetry fixture \u2014 is rewritten by\n`rehomeOverrides` after each copy. The template is never run against, only\ncopied from, so every case still gets a pristine tree.\n\n**Measured: 161 s for 42 cases across 5 shapes**, against 193 s for 28 cases\nacross 2. More than doubling the case table and more than doubling the shape\ncount came in *below* the old number.\n\n**Caching also changed what the determinism check is for, and that is the part\nworth reading.** It was a precondition: each case built the shape twice, so a\nnon-reproducible shape would surface later as router drift that was not one.\nWith caching, both copies come from one build and are byte-identical by\nconstruction, so determinism is now an independent property \u2014 and three of the\nfive shapes genuinely do not have it.\n\nThe reason is structural rather than a bug in either router. Once a shape\nrecords a verification round, its `completion_tree` is a hash over the working\ntree *including the lifecycle's own bookkeeping* \u2014 `sessions.json` carries\n`startedAt`, `activity-log.json` carries a stamp per row \u2014 so two builds can\nnever agree on its value. A timestamp can be normalized; a hash over one\ncannot. `docs/ts-port-parity-control.md` says a tree hash is compared exactly\nbecause it covers content with no timestamp in it, and that was true until a\nshape recorded a round.\n\nSo the object id is reduced **for the determinism comparison only**, which is\nthe same concession `DIGEST_LEDGERS` already makes for `state-writes.jsonl`,\n`api-models.lock` and `approved-plan-writes.jsonl`, and it is scoped to the\nquestion that needs it: two builds are two **clocks**; two routers share one\nbuild. Nothing is reduced where a disagreement about which tree was reviewed\ncould hide, and every file the id covers is compared in full a directory away.",
+      "model": "claude-opus-5",
+      "provider": "anthropic"
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D214",
+      "ordinal": 214,
+      "sessionNumber": 33,
+      "decidedOn": "2026-08-29",
+      "recordedAt": "2026-08-29T15:40:18.027446-04:00",
+      "decider": "orchestrator",
+      "headline": "The three unbuilt corpus shapes exist: 5 shapes, 42 cases, and the cap terminal is compared without paying a model",
+      "body": "The three shapes D176 listed as unbuilt \u2014 `disputed`, `at-cap`,\n`moved-machine` \u2014 are built, and the corpus is 5 shapes and 42 cases against\n28 entering. All three needed \"the offline transport plus canned verifier\ntext\" (D176); both routers have that transport since session 28, and the\nbuilder drives the **Python** one, as every shape is built.\n\n- **`disputed`**: `in-flight`, then a real round through\n  `python -m ai_router.verify --transport offline` against one scripted\n  blocking finding, then `verify dispute` with a cited path. The builder\n  asserts the round exited **4** \u2014 a blocking round is the state this shape\n  IS, and a shape that accepted any exit code would build a different one\n  silently.\n- **`at-cap`**: two rounds with a remediation and a recorded targeted run\n  between them. `--max-rounds 2` rather than driving the tree three times: it\n  is the same number the loop reads from configuration, so the state is real\n  and costs one round less to reach.\n- **`moved-machine`**: see D212.\n\n**Six `verify` cases and three `facts` cases now compare paths no case\nreached before**, and two of them are writes rather than refusals: the dispute\nrow (whose `filed_after_round` is *derived* from the latest recorded round,\nnot from the round being contested \u2014 a router that stamped the contested one\nwould settle a rebuttal a round early) and the re-anchor row.\n\nThe richest of them costs nothing: **`verify` at the cap**. The loop decides\nwhich of the two cap-terminal states this is *from the record*, with no model\ncall \u2014 the last round's finding cites `src/widget.py`, nothing has moved since\nthat round, so the fix delta touches no cited path and REMEDIATED AT THE CAP\nis not earned. Both routers must reach UNRESOLVED, list the finding with its\ncited path, print the sentence saying a changed tree is not evidence a finding\nwas answered, and write no terminal row. That is the single most consequential\njudgement in the module and it is now compared byte for byte.\n\nAlso discharged here, from the *Next* list: **`verdict`'s parity case, the\nround-append case and the `completion_tree` comparison** (D163, D177) \u2014 this\nis the first session that writes a round, and `rounds.jsonl` including\n`completion_tree`, `head_commit` and the `agency` member is compared on three\nshapes.",
+      "model": "claude-opus-5",
+      "provider": "anthropic"
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D215",
+      "ordinal": 215,
+      "sessionNumber": 33,
+      "decidedOn": "2026-08-29",
+      "recordedAt": "2026-08-29T15:40:39.106722-04:00",
+      "decider": "orchestrator",
+      "headline": "Four differential tests, and the 'cannot' that was wrong: the agency comparison could have been written any time",
+      "body": "Session 32's amendment to `docs/ts-port-parity-control.md` said the agency\nrecord \"has neither, and **cannot**\" \u2014 no CLI case and no differential test \u2014\n\"so nothing can produce one until `verify` lands in session 33\". The previous\n*Next* section already flagged that as an overstatement, and it was: what\ncannot exist is a **file** comparison or a **CLI** case. The fold itself is\n`agency.record_for_round(...).as_row()` against `recordRow(...)`, a pure\nfunction of a grant and a transport's reported metadata, and it could have\nbeen written any time. The wording is corrected in place rather than annotated.\n\nFour differential tests now sit in\n`packages/router/test/differential.test.ts`, on the pattern D207's plan-writer\ntest established \u2014 drive both implementations from one input, compare the\nanswers:\n\n- the **closed-step row** for `step-execution.jsonl`, composed on each side\n  and handed to each ledger, because composition is what two languages differ\n  over and the schema would accept several of those differences;\n- the **agency record**, from one metadata payload whose five tool calls reach\n  five branches \u2014 a read inside the scope, a read outside it, a\n  repository-wide search confined to nothing (counted out of scope on\n  purpose), a listing, and a tool the grant never named. It folds to 4\n  operations, 2 reads, 3 out-of-scope and 1 listing on both sides, so the test\n  exercises the fold rather than comparing two empty lists;\n- the **deterministic-facts row**, whose `sort_keys` line is the contract\n  between two writers of the same record;\n- the **verdict token** \u2014 D168's look-alike case, discharged here rather than\n  in session 32. D168 defines itself as \"the session that ports `verify`\", and\n  the previous *Next* assigned it to 32 by taking its literal text without\n  applying D188's renumbering (D207 caught the same slip). `VERIFIED_NOT_\n  REALLY` classifies as VERIFIED on both sides because both test the head with\n  a prefix match. The test records the **agreement**, not the behaviour: an\n  improvement on one side only is exactly the drift parity exists to catch, so\n  the day either side tightens the token, the other is told.\n\nAll four are guarded on `.venv` alone. That guard is an **under-approximation\nand now says so** \u2014 session 32's comment claimed \"where Python IS present \u2026\nthe check runs and is required\", which is false: a machine with `ai_router`\nimportable from some other interpreter skips them silently. Corrected in\npassing, as the *Next* section asked.",
+      "model": "claude-opus-5",
+      "provider": "anthropic"
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D216",
+      "ordinal": 216,
+      "sessionNumber": 33,
+      "decidedOn": "2026-08-29",
+      "recordedAt": "2026-08-29T15:40:59.379691-04:00",
+      "decider": "orchestrator",
+      "headline": "D152 discharged, and a fidelity nit whose obvious fix was itself drift: argparse accepts unambiguous prefixes",
+      "body": "D152's remaining half \u2014 \"`VerifyVerbs`' option names belong to session 33\" \u2014\nis discharged, and the round-1 **nit** that prompted a second look turned out\nto be a fidelity trap in the other direction.\n\n**The contract.** `VerifyDisputeOptions.findingIndex` becomes `finding`,\nbecause the flag is `--finding` and an argv built from the old name reads\n`--finding-index`, which the parser does not have \u2014 the exact defect\n`pythonSpawnRouter.ts` recorded when it refused to write these argvs from the\ncontract's names alone. `VerifyAdjudicateOptions` gains `maxRounds`, which\nexists and is the cap the preconditions check against. `verify prepare` and\n`verify step guard-commit` are deliberately **not** added: both exist on the\ncommand line, neither is extension-facing, and every member of that interface\ncosts a signature the other side must implement (session 24 measured the\ncontract's width at +178 lines).\n\n**The nit, and why the obvious fix was wrong.** The verifier observed that\n`parseArgs` accepted arbitrary unknown flags and silently ignored them, so\n`--max-round` would run at the default cap. Refusing unknown flags looked like\nthe fix, and it is half of one \u2014 but running the same token through Python\nshowed argparse **accepts** `--max-round`, because argparse resolves any\nunambiguous prefix. Refusing it would have turned a working command line into\nan error for the same words: drift introduced while fixing a nit.\n\nSo both halves are ported. An unrecognized flag is refused; an unambiguous\nabbreviation resolves. `verify step open --s x` now prints\n`ambiguous option: --s could match --sessions-dir, --step` on **both**\nrouters, byte for byte, candidate list included \u2014 and the allowed list is per\nstep verb, as argparse declares it, because one shared list would make `--s`\nambiguous under `amend` where Python resolves it.\n\n**The general lesson: a nit about fidelity has to be checked against the\nreference, not against what the reference is assumed to do.** The verifier\nreasoned from \"argparse errors on unrecognized arguments\", which is true and\nincomplete. Three tests cover the three outcomes.",
+      "model": "claude-opus-5",
+      "provider": "anthropic"
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D217",
+      "ordinal": 217,
+      "sessionNumber": 33,
+      "decidedOn": "2026-08-29",
+      "recordedAt": "2026-08-29T15:41:25.681360-04:00",
+      "decider": "orchestrator",
+      "headline": "Seat cost: 73,740 in / 14,299 out over two rounds, both bought by the PORTED loop \u2014 and why step 7's Python cross-check was not run",
+      "body": "Two rounds to `gpt-5-6-sol` over the API, and both were dispatched, parsed\nand recorded by the **TypeScript** loop rather than by Python \u2014 which is the\nsession plan's step 7 taken literally, and the first time the ported router\nhas bought a verdict for the repository's own record.\n\n| round | in | out | outcome |\n| --- | ---: | ---: | --- |\n| 1 (full) | 66,427 | 8,381 | ISSUES_FOUND, 1 blocking + 2 nits |\n| 2 (fix-delta) | 7,313 | 5,918 | VERIFIED |\n| **total** | **73,740** | **14,299** | |\n\nRound 2 cost **11% of round 1's input** while carrying the fix delta and the\nprior round's findings. Session 32's comparable figure was 23%; the difference\nis the size of round 1's bundle here (a 3,200-line port) rather than any change\nto the loop.\n\n**Step 7's second half is deliberately not done, and this is the deviation.**\nThe plan asked for \"the Python loop run once more on the same tree as a\nrecorded cross-check\". After round 2 returned VERIFIED, a Python round would\nhave opened round 3 against an *empty* fix delta \u2014 paying a third verifier to\nreview nothing, and writing a round row that says a model reviewed a tree that\nhad not moved. The cross-check was performed by a stronger instrument that\ncosts nothing: **the parity control compares `verify` through both routers on\nfive shapes and 42 cases, including the cap terminal, the dispute write and\nthe re-anchor write.** A model reviewing an empty diff proves less than 366\nbyte-comparisons of what the two loops actually write.\n\nThe one path parity cannot reach is a real dispatched round, and that is the\npath these two rounds exercised \u2014 through the ported loop, on this\nrepository's own record. Between them, both halves are covered.",
+      "model": "claude-opus-5",
+      "provider": "anthropic"
     }
   ]
 }

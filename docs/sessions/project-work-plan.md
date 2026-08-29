@@ -68,7 +68,7 @@ it.
 | 30 | Transport II — the Copilot CLI state machine and seat cost | no | 2026-08-29 |
 | 31 | The session lifecycle | no | 2026-08-29 |
 | 32 | Verification support — agency, verifyjob, the approved plan | no | 2026-08-29 |
-| 33 | The verification loop | — | not declared |
+| 33 | The verification loop | no | 2026-08-29 |
 | 34 | Bootstrap, packaging, and the `dabbler` command on the PATH | — | not declared |
 | 35 | The six-step workflow ported, the run core retired | — | not declared |
 | 36 | Cutover — the extension calls in-process, and Python leaves | — | not declared |
@@ -961,3 +961,35 @@ Parity control green on `approved-plan.json`, `step-execution.jsonl`, and
 the agency log. Behaviour does not change; TS renders, Python decides.
 
 Not releasable: this session publishes no package.
+
+### Session 33 — The verification loop
+
+**Releasable: no.**
+
+Session 33 of 36 — the verification loop.
+
+Port ai_router/verify.py (2,537 lines, 57 tests) to TypeScript as the
+extraction it never got: rounds, bundle, disputes and adjudication,
+reanchor, and the loop each become a file, and no file exceeds 800 lines.
+Behavior does not change.
+
+1. Port by seam, running the parity corpus after each: round one, the
+   fix-delta round, the round cap, the dispute ladder, adjudication,
+   reanchor and its refusals, the severity-gated stop.
+2. Prompts and templates copied byte-for-byte; the verdict parser and the
+   prompt stay pinned by the same round-trip test that pins them today.
+3. Build the three unbuilt corpus shapes (disputed, at-cap, moved-machine)
+   and cache a built shape across the cases that name it, per D169/D176.
+4. Discharge what is owed to this session: verdict's parity case, the
+   round-append case and the completion_tree comparison (D163, D177);
+   D168's look-alike case; differential writer tests for
+   step-execution.jsonl and the agency record; D152's VerifyVerbs option
+   names (verify dispute takes --finding).
+5. Correct two inaccurate sentences left standing by session 32: the
+   agency-comparison claim in docs/ts-port-parity-control.md and the
+   interpreter-guard comment in test/verificationSupport.test.ts.
+6. Measure this session's seat cost and record it.
+7. Affected tests as preverify; cross-provider verification; the full
+   suite as the final-full run of record; close out.
+
+Not releasable — this session publishes no package.

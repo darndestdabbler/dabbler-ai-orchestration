@@ -8,12 +8,14 @@
 import { affectedVerb } from "./affected.ts";
 import { copilotVerb } from "./copilot.ts";
 import { discoveryVerb } from "./discovery.ts";
+import { factsVerb } from "./facts.ts";
 import { metricsVerb } from "./metrics.ts";
 import { modulesVerb } from "./modules.ts";
 import { progressVerb } from "./progress.ts";
 import { seatCostVerb } from "./seatCost.ts";
 import { sessionVerb } from "./session.ts";
 import { testEvidenceVerb } from "./testEvidence.ts";
+import { verifyVerb } from "./verify.ts";
 
 /** argv after the verb; the process's exit code comes back. */
 export type VerbHandler = (argv: string[]) => Promise<number>;
@@ -27,12 +29,14 @@ export const HANDLERS: Readonly<Record<string, VerbHandler>> = {
   affected: affectedVerb,
   copilot: copilotVerb,
   discovery: discoveryVerb,
+  facts: factsVerb,
   metrics: metricsVerb,
   modules: modulesVerb,
   progress: progressVerb,
   "seat-cost": seatCostVerb,
   session: sessionVerb,
   "test-evidence": testEvidenceVerb,
+  verify: verifyVerb,
 };
 
 export function isImplemented(verb: string): boolean {

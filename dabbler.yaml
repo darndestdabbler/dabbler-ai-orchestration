@@ -577,7 +577,30 @@ testing:
         select:
           - packages/router/test/seatCost.test.ts
           - packages/router/test/parity.test.ts
+      # The deterministic pass. `verify` runs it before every round and
+      # `verify step close` runs it again per step, so a change here is a
+      # change to what both of those prove -- and the differential test is
+      # what holds its record's bytes to the Python writer's.
+      - when: packages/router/src/facts.ts
+        select:
+          - packages/router/test/facts.test.ts
+          - packages/router/test/verify.test.ts
+          - packages/router/test/differential.test.ts
+          - packages/router/test/parity.test.ts
+      # The verification loop, split by seam. One rule for the directory
+      # rather than one per file: the seams call each other -- the loop
+      # reads the prompts, the cap reads the dispute ladder, the steps read
+      # the loop's HEAD resolution -- so a change to any of them is a change
+      # to the round, and naming them individually would be a list to forget
+      # to add to.
+      - when: packages/router/src/verify/
+        select:
+          - packages/router/test/verify.test.ts
+          - packages/router/test/differential.test.ts
+          - packages/router/test/verdict.test.ts
+          - packages/router/test/parity.test.ts
       - when: packages/router/src/transports/
+
         select:
           - packages/router/test/transports.test.ts
           - packages/router/test/copilot.test.ts

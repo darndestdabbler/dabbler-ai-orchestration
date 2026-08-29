@@ -29,8 +29,11 @@ import {
   SEAT_STORE_PATH,
   SHAPES,
   buildShape,
+  copyShape,
   findShape,
+  git,
   python,
+  repoDirName,
   runProcess,
   type BuildContext,
   type RunOutcome,
@@ -76,6 +79,19 @@ export interface ParityCase {
 /** Prose for the `session plan` case; the render is what is compared. */
 const PLAN_BODY =
   "Two sessions: author the plan, then break it into numbered work.";
+
+/**
+ * HEAD as a case argument.
+ *
+ * `verify reanchor` demands the one legal anchor by name, and on the
+ * moved-machine shape that is the clone's own HEAD -- a value neither the
+ * table nor the builder can know until the shape exists. Read through git
+ * rather than through either router, so the case is not asking one of the
+ * two under comparison what to compare.
+ */
+function headCommit(repo: string): string {
+  return git(repo, "rev-parse", "--verify", "HEAD").stdout.trim();
+}
 
 const CANCEL_REASON = "the parity control cancels it";
 const RESTORE_REASON = "and puts it back";
@@ -596,7 +612,240 @@ export const CASES: readonly ParityCase[] = [
       "declaration order with its repeatable lists, sequences at their key's " +
       "indent, and the one-line JSON echo of what was written",
   },
+  {
+    verb: "facts",
+    label: "facts",
+    // Both shapes: the four-row vocabulary is the same either way, and what
+    // differs is the change set folded beneath it -- `fresh` has none and
+    // `in-flight` has one edited file. A router that measured the change
+    // against the wrong baseline would print a different count here.
+    shapes: ["fresh", "in-flight"],
+    pythonArgs: (_repo, sessionsDir) => [
+      "ai_router.facts", "--sessions-dir", sessionsDir,
+    ],
+    dabblerArgs: (_repo, sessionsDir) => ["facts", "--sessions-dir", sessionsDir],
+    proves:
+      "the closed four-word control vocabulary with a row per kind whether " +
+      "or not one is declared, and the added-line fold over the change set " +
+      "the pre-verification baseline defines",
+  },
+  {
+    verb: "facts",
+    label: "facts --json",
+    shapes: ["in-flight"],
+    pythonArgs: (_repo, sessionsDir) => [
+      "ai_router.facts", "--sessions-dir", sessionsDir, "--json",
+    ],
+    dabblerArgs: (_repo, sessionsDir) => [
+      "facts", "--sessions-dir", sessionsDir, "--json",
+    ],
+    proves:
+      "the record as a reader parses it: sorted keys, the per-path counts " +
+      "rather than the line numbers, and the null that says the change set " +
+      "could not be measured rather than that it was empty",
+  },
+  {
+    verb: "verify",
+    label: "verify (UNRESOLVED at the cap)",
+    // The richest refusal in the module, and it costs nothing: at the cap
+    // the loop decides which of the two terminal states this is FROM THE
+    // RECORD, with no model call. The last round's finding cites
+    // `src/widget.py`, nothing has moved since that round, so the fix delta
+    // touches no cited path and REMEDIATED AT THE CAP is not earned.
+    shapes: ["at-cap"],
+    pythonArgs: (_repo, sessionsDir) => [
+      "ai_router.verify", "--sessions-dir", sessionsDir, "--max-rounds", "2",
+    ],
+    dabblerArgs: (_repo, sessionsDir) => [
+      "verify", "--sessions-dir", sessionsDir, "--max-rounds", "2",
+    ],
+    proves:
+      "that both routers reach the same cap-terminal state from the same " +
+      "record: the finding listed with its cited path, the sentence saying " +
+      "a changed tree is not evidence a finding was answered, and that " +
+      "neither wrote a terminal row it had not earned",
+  },
+  {
+    verb: "verify",
+    label: "verify (refused: no session in flight)",
+    shapes: ["fresh"],
+    pythonArgs: (_repo, sessionsDir) => [
+      "ai_router.verify", "--sessions-dir", sessionsDir,
+    ],
+    dabblerArgs: (_repo, sessionsDir) => ["verify", "--sessions-dir", sessionsDir],
+    proves:
+      "the boundary refusal both routers give when there is no session to " +
+      "verify, at the exit code an orchestrator branches on",
+  },
+  {
+    verb: "verify",
+    label: "verify dispute",
+    // The write, on the shape that already carries a round to contest. The
+    // dispute row is the compared artifact: its `filed_after_round` is
+    // derived rather than supplied, and a router that stamped the contested
+    // round instead would settle the rebuttal a round early.
+    shapes: ["disputed"],
+    pythonArgs: (_repo, sessionsDir) => [
+      "ai_router.verify", "dispute",
+      "--sessions-dir", sessionsDir,
+      "--round", "1", "--finding", "0",
+      "--grounds", "the plan declares the new number",
+      "--evidence", "dabbler.yaml",
+    ],
+    dabblerArgs: (_repo, sessionsDir) => [
+      "verify", "dispute",
+      "--sessions-dir", sessionsDir,
+      "--round", "1", "--finding", "0",
+      "--grounds", "the plan declares the new number",
+      "--evidence", "dabbler.yaml",
+    ],
+    proves:
+      "the dispute row as both routers write it -- the cited path resolved " +
+      "and made repo-relative, and `filed_after_round` derived from the " +
+      "latest recorded round rather than from the one being contested",
+  },
+  {
+    verb: "verify",
+    label: "verify dispute (refused: prose only)",
+    shapes: ["disputed"],
+    pythonArgs: (_repo, sessionsDir) => [
+      "ai_router.verify", "dispute",
+      "--sessions-dir", sessionsDir,
+      "--round", "1", "--finding", "0",
+      "--grounds", "I simply disagree",
+    ],
+    dabblerArgs: (_repo, sessionsDir) => [
+      "verify", "dispute",
+      "--sessions-dir", sessionsDir,
+      "--round", "1", "--finding", "0",
+      "--grounds", "I simply disagree",
+    ],
+    proves:
+      "that a dispute is an argument from the record on both sides: a " +
+      "prose-only rebuttal is refused identically and nothing is written",
+  },
+  {
+    verb: "verify",
+    label: "verify adjudicate (refused: cap not reached)",
+    shapes: ["disputed"],
+    pythonArgs: (_repo, sessionsDir) => [
+      "ai_router.verify", "adjudicate", "--sessions-dir", sessionsDir,
+    ],
+    dabblerArgs: (_repo, sessionsDir) => [
+      "verify", "adjudicate", "--sessions-dir", sessionsDir,
+    ],
+    proves:
+      "the precondition ladder's first rung, worded and coded the same: " +
+      "adjudication is the exit from a capped impasse, never a shortcut " +
+      "around remediation",
+  },
+  {
+    verb: "verify",
+    label: "verify adjudicate (refused: undisputed finding)",
+    // At the cap with a blocking finding nobody disputed: the refusal names
+    // the index and hands back the `verify dispute` line to run.
+    shapes: ["at-cap"],
+    pythonArgs: (_repo, sessionsDir) => [
+      "ai_router.verify", "adjudicate", "--sessions-dir", sessionsDir,
+      "--max-rounds", "2",
+    ],
+    dabblerArgs: (_repo, sessionsDir) => [
+      "verify", "adjudicate", "--sessions-dir", sessionsDir,
+      "--max-rounds", "2",
+    ],
+    proves:
+      "that adjudication judges disputes rather than findings: both routers " +
+      "name the undisputed blocking index and print the same recipe for " +
+      "recording one",
+  },
+  {
+    verb: "verify",
+    label: "verify reanchor (refused: the recorded tree resolves)",
+    shapes: ["disputed"],
+    pythonArgs: (_repo, sessionsDir) => [
+      "ai_router.verify", "reanchor",
+      "--sessions-dir", sessionsDir,
+      "--commit", "HEAD", "--reason", "testing the refusal",
+    ],
+    dabblerArgs: (_repo, sessionsDir) => [
+      "verify", "reanchor",
+      "--sessions-dir", sessionsDir,
+      "--commit", "HEAD", "--reason", "testing the refusal",
+    ],
+    proves:
+      "that re-anchoring a baseline that is present is refused on both " +
+      "sides -- the one refusal that keeps this from becoming a way to " +
+      "choose one's own review scope",
+  },
+  {
+    verb: "verify",
+    label: "verify reanchor (the recorded tree is absent)",
+    // The clone never received `refs/dabbler/rounds/*`, so the recorded
+    // completion tree is genuinely missing here. This is the write path,
+    // and `baseline-reanchors.jsonl` is the compared artifact.
+    shapes: ["moved-machine"],
+    pythonArgs: (repo, sessionsDir) => [
+      "ai_router.verify", "reanchor",
+      "--sessions-dir", sessionsDir,
+      "--commit", headCommit(repo),
+      "--reason", "cloned without the round refspec",
+    ],
+    dabblerArgs: (repo, sessionsDir) => [
+      "verify", "reanchor",
+      "--sessions-dir", sessionsDir,
+      "--commit", headCommit(repo),
+      "--reason", "cloned without the round refspec",
+    ],
+    proves:
+      "the recovery both routers must agree on: the same commit is the " +
+      "legal anchor, the same tree is written as the substitute baseline, " +
+      "and the record says permanently that it is a weaker one",
+  },
+  {
+    verb: "verify",
+    label: "verify step status",
+    shapes: ["in-flight"],
+    pythonArgs: (_repo, sessionsDir) => [
+      "ai_router.verify", "step", "status", "--sessions-dir", sessionsDir,
+    ],
+    dabblerArgs: (_repo, sessionsDir) => [
+      "verify", "step", "status", "--sessions-dir", sessionsDir,
+    ],
+    proves:
+      "the step projection over a real approved plan: the open/done/blank " +
+      "marker column, the step ids in plan order, and the command offered " +
+      "for what to do next",
+  },
+  {
+    verb: "verify",
+    label: "verify prepare (refused: the pipeline is off)",
+    shapes: ["in-flight"],
+    pythonArgs: (_repo, sessionsDir) => [
+      "ai_router.verify", "prepare", "--sessions-dir", sessionsDir,
+    ],
+    dabblerArgs: (_repo, sessionsDir) => [
+      "verify", "prepare", "--sessions-dir", sessionsDir,
+    ],
+    proves:
+      "that the critique pipeline is off by default on both sides and says " +
+      "so in the same words, naming the two configuration layers that turn " +
+      "it on",
+  },
+  {
+    verb: "verify",
+    label: "verify waive (refused: there is no waiver)",
+    // Not a state at all -- a verb that exists only to be refused by name.
+    // It is compared because it is the one place either router could grow a
+    // path by which a person types a verdict.
+    shapes: ["fresh"],
+    pythonArgs: () => ["ai_router.verify", "waive"],
+    dabblerArgs: () => ["verify", "waive"],
+    proves:
+      "that no verdict a person types exists on either side, and that the " +
+      "refusal names the two machine-decided cap-terminal states instead",
+  },
 ];
+
 
 // --- Preconditions -----------------------------------------------------------
 
@@ -685,18 +934,56 @@ export interface ParityReport {
   readonly lines: readonly string[];
 }
 
+/**
+ * A shape built once and copied per case.
+ *
+ * D169 measured the cost and D176 named the lever: what a case pays for is
+ * the SHAPE, because a shape is built twice for every case that names it.
+ * Three of the five shapes now drive a verification round, so rebuilding per
+ * case is what would stop the table from growing. The template is never run
+ * against -- only copied from -- so every case still gets a pristine tree.
+ */
+export interface ShapeTemplate {
+  readonly target: string;
+  /** The repository's directory name inside the target, for the copy. */
+  readonly repoName: string;
+}
+
+function templateFor(
+  shape: string,
+  routers: Routers,
+  workspace: string,
+  templates: Map<string, ShapeTemplate>,
+): ShapeTemplate {
+  const existing = templates.get(shape);
+  if (existing) return existing;
+  const target = join(workspace, `template-${shape}`);
+  const repo = buildShape(shape, target, { interpreter: routers.interpreter });
+  const built: ShapeTemplate = {
+    target,
+    repoName: repoDirName(shape, repo, target),
+  };
+  templates.set(shape, built);
+  return built;
+}
+
 function runCase(
   parityCase: ParityCase,
   shape: string,
   routers: Routers,
   workspace: string,
+  templates: Map<string, ShapeTemplate>,
 ): CaseReport {
-  const context: BuildContext = { interpreter: routers.interpreter };
-  const pythonRepo = buildShape(shape, join(workspace, `${shape}-python`), context);
-  const typescriptRepo = buildShape(
-    shape,
+  const template = templateFor(shape, routers, workspace, templates);
+  const pythonRepo = copyShape(
+    template.target,
+    join(workspace, `${shape}-python`),
+    template.repoName,
+  );
+  const typescriptRepo = copyShape(
+    template.target,
     join(workspace, `${shape}-typescript`),
-    context,
+    template.repoName,
   );
 
   const pythonSessions = join(pythonRepo, "docs", "sessions");
@@ -778,7 +1065,12 @@ export function checkShapeDeterminism(
   const context: BuildContext = { interpreter: routers.interpreter };
   const left = buildShape(shape, join(workspace, `${shape}-a`), context);
   const right = buildShape(shape, join(workspace, `${shape}-b`), context);
-  const result = compareCopies(left, right);
+  // Two builds are two clocks. A shape that records a verification round
+  // hashes the working tree the round completed at, and that tree carries
+  // the lifecycle's own timestamped bookkeeping -- so its object id cannot
+  // repeat, while every file the id covers is compared here in full. The
+  // two-router half reduces nothing: both copies come from ONE build.
+  const result = compareCopies(left, right, { reduceObjectIds: true });
   return {
     shape,
     compared: result.compared,
@@ -814,6 +1106,7 @@ export function runParity(packageRoot: string): ParityReport {
   }
 
   const workspace = mkdtempSync(join(tmpdir(), "dabbler-parity-"));
+  const templates = new Map<string, ShapeTemplate>();
   try {
     const determinism = buildable.map((shape) =>
       checkShapeDeterminism(shape.name, routers, workspace),
@@ -824,7 +1117,7 @@ export function runParity(packageRoot: string): ParityReport {
         if (!findShape(shape)) {
           throw new CorpusError(`'${parityCase.label}' names no such shape '${shape}'`);
         }
-        reports.push(runCase(parityCase, shape, routers, workspace));
+        reports.push(runCase(parityCase, shape, routers, workspace, templates));
       }
     }
     return summarize(determinism, reports, activeVerbs);

@@ -1,16 +1,108 @@
-# STATUS — session 26 of 35 landed: the record, and the first writes compared across two routers
+# STATUS — session 27 of 35 landed: evidence, the executor, and the selector through both routers
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
 `experiment/verification-pipeline-v3` and `design/solution-decomposition`
 are merged and finished. Earlier handoff text is in `docs/status-archive.md`.
 
-> **Recorded, 2026-08-28.** Session 26's deliverables are decisions
-> **D170–D172** in `docs/sessions/decisions-log.md`; session 25's are
-> **D163–D169**, session 24's **D150–D162** and session 23's **D138–D149**,
-> plus the amendments inside `docs/ts-port-parity-control.md`. This file
-> summarises them; the decisions are the record.
+> **Recorded, 2026-08-28.** Session 27's deliverables are decisions
+> **D173–D179** in `docs/sessions/decisions-log.md`; session 26's are
+> **D170–D172**, session 25's **D163–D169**, session 24's **D150–D162** and
+> session 23's **D138–D149**, plus the amendments inside
+> `docs/ts-port-parity-control.md`. This file summarises them; the decisions
+> are the record.
 
 ## Where things are
+
+- **Session 27 is closed `VERIFIED`** — 3 rounds (gpt-5-6-sol over the API).
+  Round 1 raised four Major findings; **three were disputed and all three
+  withdrawn**, and the fourth was accepted and fixed by *deleting* the
+  function rather than repairing it. Round 2 raised one Major against that
+  deletion; **disputed and withdrawn**. Round 3 was clean. Claude Code /
+  claude-opus-5[1m] orchestrator. All five gates passed at the first attempt;
+  nothing was forced.
+- **Four modules are ported.** `evidence` (902), `checks` (1,001),
+  `test_evidence` (815) and `affected` (575) — 3,293 Python lines becoming
+  **4,159 TypeScript across six files**, plus two verb handlers, with **93
+  vitest tests**. `evidence.ts` grew from session 26's 208-line slice to
+  1,137; `checks.ts` is 1,306, the largest file in the package.
+- **`affected` and `test-evidence` are real verbs, and both entered the
+  parity control in the session that ported them** — the first time since 25
+  that a session needed no forward dependency and no new fixture. Both
+  already had a Python command line and both were already in the `in-flight`
+  corpus builder, so the three new cases run against a shape the control was
+  already building.
+- **Twelve cases, and the control got FASTER: 90.7 s against ~150 s at nine
+  (D176).** A new *case* on an existing shape is nearly free — the corpus
+  build dominates and the new cases share it. A new *shape* is not, and
+  sessions 28 and 32 add three. That is the amendment to D169's warning: the
+  thing to watch is shapes, not cases.
+- **Both digests are byte-identical across the routers.** The
+  `preverify-targeted` case compares the covered-surface fold — sorted
+  (path, content-hash) pairs, with the session's own bookkeeping and the run
+  ledger left out; the `final-full` case compares the whole-tree fold the run
+  of record binds to. `--duration-seconds 42` had to be written `42.0` by
+  both, which is `PythonFloat` earning its keep in the first row either
+  router appends.
+- **Both routers snapshot this repository's live worktree to the same git
+  tree id (D177).** `b6d8e262…` from each, over ~2,000 tracked and untracked
+  files through a throwaway index. The plan asked for `completion_tree`
+  parity; the control cannot compare one until a verb writes a round, which
+  is `verify` in session 32 — so this is **evidence, not a control**, taken
+  the way session 25 took `verdict`'s (D163).
+- **Windows spawning is where Node and Python actually differ, and it is
+  measured (D174).** `spawn("x.cmd", …)` is `EINVAL` on Node where Python
+  appears to run the batch file directly — it does not: `CreateProcess`
+  wraps a batch file in `cmd.exe /c`, so **both routers pay cmd's parsing on
+  exactly these programs**. The port hands the shim to `%COMSPEC% /d /s
+  /v:off /c` with each argument quoted itself, never `shell: true`, which
+  would let a shell re-split a line the module built. An over-long command
+  line is `ENAMETOOLONG` (libuv's mapping of Windows error 206, the same one
+  Python's Copilot classifier reads), it is **thrown rather than emitted**,
+  and `checks.isArgvTooLarge` is the one reader of it for session 29 to
+  import. `execute` is async and takes no run id: the heartbeat it wrote is
+  a run-core file (D130).
+- **`checks.plan` is deliberately NOT ported (D178).** Round 1 found that it
+  appends the whole selection to every suite's command where `forSuite`
+  exists to prevent exactly that. Its only callers are `runcli.py:400` and
+  `runcli.py:814` — measured — and the run core is deleted in session 34, so
+  the repair is deletion: fixing it would have put a narrowing rule in the
+  TypeScript router that Python lacks, in a function neither router calls.
+  `CheckPlan`, `changedPathsFor`, `targetedSuiteCommand`, the four
+  `FULL_ALLOWED_*` constants and `selectionUnknownPaths` went with it. This
+  is the same cut D129 made for `journal` and `verifyjob`. **The per-suite
+  guarantee still exists where it is reachable**, in
+  `affected.runnableCommands` and `preverifyGate`, and is tested against a
+  two-suite repository.
+- **One deliberate record difference, owed a ruling (D173).**
+  `run_absence_search` stamps the regex engine that produced the count;
+  Python writes `python-re/<version>`, the port writes `node-regexp/<node>`.
+  Every other cross-language byte difference was settled in Python's favour
+  (D165) because each was a *formatting* choice; this one is content, on the
+  one row whose purpose is provenance, and the engines genuinely differ.
+  Nothing reaches it today.
+- **Three of round 1's four findings described Python's behaviour faithfully
+  ported, and two named functions with NO CALLER in either router.**
+  `validate_transcript`, `validate_finding_evidence`, `authoritative_tier`,
+  `verify_worker_result` and `record_worker_result` are library surface the
+  critique pipeline would drive, and it defaults to `off`. The verifier
+  withdrew all three on that basis. What the commits added instead is the
+  limit stated in each docstring, so no later reader assumes a guarantee
+  that is not there.
+- **Where Python states a rule twice, the port states it once (D175).**
+  `pythonRepr` was about to have six copies; it now lives in `pythonJson.ts`
+  beside `dumps`, `progress.ts` re-exports it and `critique.ts`'s private
+  copy is deleted. `normaliseRel`/`matchingPrefixes` are stated once where
+  Python carries byte-identical copies in `checks` and `test_evidence`.
+  `gates`'s glob matcher is deliberately not shared: it is case-insensitive
+  and `checks`'s is not.
+- **Seat cost: 82,021 in / 16,256 out to gpt-5-6-sol over three rounds
+  (D179).** Round 2 is 26% of round 1's input and round 3 is 8% — **a third
+  round spent on a dispute is close to free**, which is the argument for
+  writing the rebuttal out rather than remediating on reflex.
+- **Suite: 944 Python (7:09) / 299 router vitest (50 s) / 153 extension
+  mocha / 14 Playwright; all four declared controls green.** Test counts
+  unchanged on the Python side. `packages/router` is ~11,600 lines of source
+  (1,572 generated) and ~3,900 of tests.
 
 - **Session 26 is closed `VERIFIED`** — 2 rounds (gpt-5.6-sol over the API).
   Round 1 raised two Major findings; **both were disputed and both were
@@ -334,6 +426,12 @@ is D127; the previous version of this file carried it in full.
 
 | Source | What is owed |
 | --- | --- |
+| **D173 — the port's one record difference** | `run_absence_search`'s `tool_version` names the regex engine, and the two routers name different ones because they *are* different ones. Settle it in the session that first puts a critique write into the parity control (31 or 32). The three answers: normalize the field (forbidden — a third normalization), change Python first so the field names the rule rather than the engine (the specification's sanctioned route), or drop it. Nothing reaches it today. |
+| **D173 / round 1 — the evidence protocol has no callers** | `validate_transcript`, `validate_finding_evidence`, `authoritative_tier`, `verify_worker_result` and `record_worker_result` are ported and **nothing in either router calls them**. Two real gaps sit inside them, both shared with Python and both recorded rather than repaired on one side: `outputHash` is not re-derived from `rawOutput`, and a check's `evidence.pass.requires` contract is not enforced when its result is recorded. The session that first drives the critique loop owns both, and the second one may belong at dispatch rather than at record — the loop's shape decides. |
+| **D174 — consumer repositories** | A repository declaring `argv: ["npm", "test"]` for a check works under Python and would not have under the port without the shim resolution this session added. This repository declares every control as argv for `node` (D142), so nothing here exercises it. Session 33's `bootstrap` should say so where it writes a first `dabbler.yaml`. |
+| **Round 1 nit — an argv suite is unrecordable** | `checks.load_checks` accepts a suite declaring `argv` and no `command`; `test_evidence.load_suites_checked` refuses it. Such a suite would run and be unrecordable, so it could never close. Latent — `argv` is used for controls, which that reader never sees — and **it may be the permissiveness rather than the refusal that is wrong**: a suite's command lands in the record as evidence, a control's does not. A session, not a patch, and adjacent to D116. |
+| **Round 3 nits, both non-blocking and both carried** | (1) The Windows batch path still goes through `cmd.exe`, so `%VAR%` expansion remains — as it does on the Python side, for the same reason: a batch file is a cmd script. (2) `classifyPreverifyCommand` accepts a command that names every selected test *and* a broader directory. Both are Python's behaviour; changing either is a cross-router decision. |
+| **D176 — amends D169** | The parity cost to watch is a new SHAPE, not a new case: twelve cases run in less time than nine did. Three shapes are still unbuilt (`disputed`, `at-cap`, `moved-machine`) and each needs the offline transport plus canned verifier text. |
 | **D164 — the port** | `identity.resolve_session_orchestrator_identity` is **not ported**. It is the one function in `identity` that reads a repository rather than a block, and it reads state through `progress` — session 30. Writing a second reader of `sessions.json` to reach it early is the drift the port exists to remove, so it lands in session 30 as a wrapper over `resolveOrchestratorIdentity`. No test covers it today on either side; the Python suite's eleven identity tests are all against the block-level core. |
 | **D168 — shared design** | `parseVerificationResponse` tests the head with `startsWith("VERIFIED")`, so a look-alike (`VERIFIED_NOT_REALLY`) classifies as VERIFIED. **Faithful to Python, and deliberately not fixed in the port** — an improvement on one side only is exactly the drift parity exists to catch. Blast radius is small (the token chooses a parse branch, not an outcome: `classifyBlocking` is severity-derived, and `validateSessionVerdict` refuses the token exactly). If a boundary is wanted it goes into Python first and crosses with a parity case that feeds a look-alike to both — session 32. |
 | **D169 — cost to watch** | The parity control takes **~150 s** per run, because it builds four corpus repositories by driving the Python router, and it runs inside every `verify`. That is already comparable to a verifier round's wall time, and the case table only grows. Sessions 26–34 should watch it; caching a built shape across cases is the obvious lever if it becomes the bottleneck. |
@@ -369,25 +467,24 @@ resolved by being true again.
 
 ## Next
 
-1. **Session 27 of 35 — evidence, checks, test evidence, affected.**
-   `evidence` (902), `checks` (1,001), `test_evidence` (807), `affected`
-   (564) — 3,274 lines, ~72 tests. **Two of those four are already part-way
-   here**: `src/evidence.ts` carries the sessions-root filenames, the round
-   anchor, the digest ledger and `resolveSessionsDir` (session 26), so
-   session 27 grows that file rather than creating it, and D170's fix means
-   `surface_digest` is ported once, correctly, rather than twice.
-   `snapshotWorktreeTree` and `changedPathsBetween` are also already in
-   `src/journal.ts`, which is where `checks` and `evidence` reach for them.
-   **`affected` and `test-evidence` both have real Python command lines and
-   both are already in the corpus builder**, so session 27 can add their
-   parity cases without waiting for a shape it does not have — the first
-   session since 25 for which that is true without argument.
+1. **Session 28 of 35 — transports I: API, offline, routing, selection,
+   discovery.** `transports/base` (49), `transports/offline` (140),
+   `transports/api` (292), `route` (586), `selection` (146), `discovery`
+   (1,057) — 2,270 lines, 82 tests. **Port the offline transport first**, and
+   not only for the reason the plan gives (every later session's tests run
+   without a network). It is also the thing standing between the parity
+   control and its three unbuilt shapes: `disputed`, `at-cap` and
+   `moved-machine` all need canned verifier text through it before a builder
+   can exist, and D176 measures those shapes — not the cases on them — as the
+   control's real cost. Session 28 should consider landing one of the three
+   builders, because doing so unblocks session 32's largest batch of cases.
 2. **Read `docs/ts-port-parity-control.md` before planning any session
-   from here.** Its verb table is the growth order, and session 26 is the
-   proof that the *plan's* line counts are not the session's: four forward
-   dependencies and a verb slice were needed before a single ported byte
-   could be compared. Session 27's inventory line should be read the same
-   way — as a floor.
+   from here.** Its verb table is the growth order. Session 26 proved the
+   *plan's* line counts are a floor (three modules became nine); session 27
+   proved the other direction is also possible — `checks.plan` and its
+   neighbourhood were **not** ported, because their only caller is the run
+   core (D178). Read an inventory line as "the module", not "every function
+   of the module", and check the import graph before assuming either way.
 3. **A Python design question is owed to the operator, from D171's round-1
    dispute.** A malformed or hand-edited `sessions.json` or
    `activity-log.json` is *silently replaced* rather than refused, in both
@@ -407,12 +504,23 @@ resolved by being true again.
    `pythonCli: false`, and nothing has ever called it — `pythonSpawnRouter`
    refuses both its methods. It is a candidate for trimming rather than
    building.
-5. **What sessions 25 and 26 leave for their successors.** `identity`'s
+5. **What sessions 25–27 leave for their successors.** `identity`'s
    session-level entry point is owed to session 30 (D164); `verdict`'s
    parity case and the `VERIFIED` look-alike question are owed to session
    32 (D163, D168); the round-append parity case is owed to session 32 for
-   the same reason (D171's round-1 dispute, withdrawn on that basis); the
-   parity control's cost is owed watching by everyone (D169) — it is now
-   nine cases rather than one, and each case builds two repositories.
+   the same reason (D171's round-1 dispute, withdrawn on that basis), and
+   **so is the `completion_tree` comparison** — session 27 proved the two
+   snapshots agree on this repository (D177) but no verb writes a round yet,
+   so the control still cannot check it. The evidence protocol's two gaps and
+   the absence-search engine stamp are owed to whichever of 31/32 first
+   drives the critique loop (D173).
 6. **D130 override window** — the operator can still override retiring the
-   run core, until session 34 starts.
+   run core, until session 34 starts. Session 27 has now made one decision
+   that leans on it: `checks.plan` is not ported because `runcli` is its only
+   caller (D178). An override would mean porting it — with the per-suite
+   defect fixed on **both** sides, in Python's own commit first.
+7. **Disputing is cheap; measure it before remediating on reflex.** Session
+   27 recorded four disputes and all four were withdrawn, at a cost of 8% of
+   round 1 for the round that settled the last one (D179). Three of them
+   would otherwise have become one-sided behaviour changes to the record's
+   trust rules — the single failure a parity comparison cannot see.

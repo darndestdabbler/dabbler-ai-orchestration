@@ -1,5 +1,6 @@
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { Readable } from "node:stream";
 
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -10,9 +11,16 @@ import {
   PromptTooLargeError,
   RouterError,
   buildPrompt,
+  installCopilotForTests,
   resetForTests,
   route,
 } from "../src/route.ts";
+import {
+  CopilotCliTransport,
+  REFRESH_COMMAND,
+  catalogMeta,
+  modelEntry,
+} from "../src/transports/copilot.ts";
 import { resetForTests as resetRuntimeMode } from "../src/runtimeMode.ts";
 import {
   clearProviderKeys,
@@ -199,16 +207,103 @@ describe("routing over the direct-API transport", () => {
   });
 });
 
-describe("the seat transport, before session 30", () => {
-  it("is refused by name rather than falling back to the API", async () => {
-    // A transport that silently fell back would put a cross-provider
-    // verification on the provider the operator was routing away from.
+describe("routing over the seat", () => {
+  const COPILOT_OK = [
+    JSON.stringify({
+      type: "assistant.message",
+      data: { content: "seat answer", model: "claude-x", outputTokens: 64 },
+    }),
+    JSON.stringify({
+      type: "result",
+      sessionId: "conv-42",
+      usage: { premiumRequests: 1 },
+    }),
+    "",
+  ].join("\n");
+
+  /** A fake seat and a synthetic catalog, bypassing lockfile discovery. */
+  function installFakeSeat(stdout: string): void {
+    installCopilotForTests(
+      new CopilotCliTransport({
+        spawner: () => ({
+          stdout: Readable.from([stdout]),
+          stderr: Readable.from([""]),
+          kill: () => { /* nothing to kill: the streams end on their own */ },
+          wait: () => Promise.resolve(0),
+        }),
+      }),
+      {
+        meta: catalogMeta({ cli_version: "v", seat_id: "t" }),
+        models: [
+          modelEntry({ id: "claude-x", provider: "anthropic", enablement: "confirmed" }),
+          modelEntry({ id: "gpt-x", provider: "openai", enablement: "confirmed" }),
+          modelEntry({ id: "gemini-x", provider: "google", enablement: "confirmed" }),
+        ],
+      },
+    );
+  }
+
+  it("records the conversation id and that the spend is not visible here", async () => {
+    configOnDisk();
+    installFakeSeat(COPILOT_OK);
+    const result = await route("do a thing", {
+      transport: "copilot-cli",
+      sessionNumber: 3,
+    });
+    expect(result.content).toBe("seat answer");
+    expect(result.transport).toBe("copilot-cli");
+    expect(result.transport_session_id).toBe("conv-42");
+    // No prefer entry names a seat id, so the catalog order stands.
+    expect(result.model_name).toBe("claude-x");
+    const [row] = metricRows();
+    expect(row!["billed_usage_unavailable"]).toBe(true);
+    expect(row!["transport"]).toBe("copilot-cli");
+    expect(row!["transport_session_id"]).toBe("conv-42");
+  });
+
+  it("walks past the preferred provider when it is excluded", async () => {
+    configOnDisk();
+    installFakeSeat(COPILOT_OK);
+    const result = await route("do a thing", {
+      transport: "copilot-cli",
+      excludeProviders: ["anthropic"],
+    });
+    expect(result.provider).toBe("openai");
+    expect(result.model_name).toBe("gpt-x");
+  });
+
+  it("fails closed when the exclusion leaves no confirmed entry", async () => {
+    configOnDisk();
+    installFakeSeat(COPILOT_OK);
+    await expect(
+      route("x", {
+        transport: "copilot-cli",
+        excludeProviders: ["anthropic", "openai", "google"],
+      }),
+    ).rejects.toBeInstanceOf(NoCandidateError);
+  });
+
+  it("raises a dispatch failure rather than returning empty content", async () => {
+    configOnDisk();
+    installFakeSeat("not json at all\n");
+    await expect(route("x", { transport: "copilot-cli" })).rejects.toThrow(
+      /generic-unknown/,
+    );
+  });
+
+  it("stops on an unreadable catalog instead of falling back to the API", async () => {
+    // The alternative that looks harmless is the worst option available: it
+    // would put a cross-provider verification on the provider the operator
+    // was routing away from, and nothing downstream could tell. The message
+    // names the command that rebuilds the file, because an operator told a
+    // file is wrong and handed no verb edits the file.
     configOnDisk();
     const failure = await route("say hi", { transport: "copilot-cli" })
       .then(() => null)
       .catch((error: unknown) => error);
     expect(failure).toBeInstanceOf(RouterError);
-    expect(String(failure)).toContain("session 30");
+    expect(String(failure)).toContain("could not be loaded");
+    expect(String(failure)).toContain(REFRESH_COMMAND);
   });
 });
 

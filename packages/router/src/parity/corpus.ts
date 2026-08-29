@@ -361,6 +361,52 @@ function localOverrides(repo: string): string {
   );
 }
 
+/**
+ * A seat usage store, canned.
+ *
+ * `seat_cost` reads a store the Copilot CLI owns, at a path outside any
+ * repository -- so unlike every other verb, what it reports is not a function
+ * of the corpus unless the corpus supplies the store. This is that store: the
+ * same rows for both copies, named through `--store` so nothing depends on the
+ * machine having a seat at all. Written with `node:sqlite` because a fixture
+ * both routers must read has to be a real SQLite file; the reader on the
+ * Python side is `sqlite3`, and agreeing on this file is part of what the case
+ * proves.
+ *
+ * The rows reach the branches that matter: a conversation with usage spread
+ * over two events (the sum and the event count), and one present in `sessions`
+ * with no usage at all, which is a genuine zero rather than an absence.
+ */
+export const SEAT_STORE_PATH = ".dabbler/parity-seat-store.db";
+
+function writeSeatStore(repo: string): void {
+  const path = join(repo, ...SEAT_STORE_PATH.split("/"));
+  mkdirSync(join(path, ".."), { recursive: true });
+  const sqlite = process.getBuiltinModule("node:sqlite");
+  if (sqlite === undefined) {
+    throw new CorpusError(
+      "this Node build has no node:sqlite, so the seat-cost fixture cannot " +
+        "be written and that case would report a pass it did not earn",
+    );
+  }
+  const { DatabaseSync } = sqlite as {
+    DatabaseSync: new (path: string) => { exec(sql: string): void; close(): void };
+  };
+  const database = new DatabaseSync(path);
+  database.exec("CREATE TABLE schema_version (version INTEGER)");
+  database.exec("INSERT INTO schema_version VALUES (6)");
+  database.exec(
+    "CREATE TABLE assistant_usage_events (session_id TEXT, total_nano_aiu INTEGER)",
+  );
+  database.exec("CREATE TABLE sessions (id TEXT PRIMARY KEY)");
+  database.exec(
+    "INSERT INTO assistant_usage_events VALUES " +
+      "('conv-a', 1000000000), ('conv-a', 500000000)",
+  );
+  database.exec("INSERT INTO sessions VALUES ('conv-a'), ('conv-b')");
+  database.close();
+}
+
 /** A seeded working repository plus the bare `origin` it pushes to. */
 function seedRepository(target: string): string {
   const repo = join(target, "repo");
@@ -372,6 +418,7 @@ function seedRepository(target: string): string {
     writeFileSync(path, text, "utf8");
   }
   writeFileSync(join(repo, "local-overrides.yaml"), localOverrides(repo), "utf8");
+  writeSeatStore(repo);
   git(repo, "init", "-q", "-b", "main");
   git(repo, "config", "core.autocrlf", "false");
   git(repo, "config", "commit.gpgsign", "false");

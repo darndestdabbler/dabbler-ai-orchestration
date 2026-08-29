@@ -26,10 +26,11 @@ import {
   makeCheck,
   matchingPrefixes,
   normaliseRel,
+  resolveProgram,
   shlexSplit,
 } from "../src/checks.ts";
 import { snapshotWorktreeTree } from "../src/journal.ts";
-import { makeSeededRepo, removeTempDirs } from "./support/fixtures.ts";
+import { makeSeededRepo, makeTempDir, removeTempDirs } from "./support/fixtures.ts";
 
 afterAll(removeTempDirs);
 
@@ -309,5 +310,70 @@ describe("a repository the executor never touches", () => {
       encoding: "utf8",
     });
     expect(status).toContain("?? untracked.txt");
+  });
+});
+
+describe("finding the program a name means", () => {
+  // Windows only: everywhere else the name IS the program and there is
+  // nothing to resolve.
+  const onWindows = process.platform === "win32";
+
+  /** A PATH of two directories, and what each holds. */
+  function pathWith(first: string[], second: string[]): [string, string] {
+    const root = makeTempDir();
+    const one = join(root, "one");
+    const two = join(root, "two");
+    for (const [directory, names] of [[one, first], [two, second]] as const) {
+      mkdirSync(directory, { recursive: true });
+      for (const name of names) writeFileSync(join(directory, name), "", "utf8");
+    }
+    return [one, two];
+  }
+
+  function withPath(directories: string[], body: () => void): void {
+    const previous = process.env["PATH"];
+    const previousExt = process.env["PATHEXT"];
+    process.env["PATH"] = directories.join(";");
+    process.env["PATHEXT"] = ".COM;.EXE;.BAT;.CMD";
+    try {
+      body();
+    } finally {
+      if (previous === undefined) delete process.env["PATH"];
+      else process.env["PATH"] = previous;
+      if (previousExt === undefined) delete process.env["PATHEXT"];
+      else process.env["PATHEXT"] = previousExt;
+    }
+  }
+
+  it.runIf(onWindows)("prefers an executable to a shim ahead of it on PATH", () => {
+    // Not cmd's rule -- cmd takes the first hit in the first directory -- but
+    // neither caller is a shell. Both spawn without one, and that is
+    // `CreateProcess`, which appends `.exe` and never considers `.cmd`. It is
+    // also what Python's `subprocess` reaches from the same PATH, so this is
+    // what stops the two routers running different programs.
+    //
+    // The cost of getting it wrong is not cosmetic: a shim has to be
+    // interpreted by `cmd.exe`, whose command line stops at 8,191 characters
+    // where `CreateProcess` allows 32,767 -- and the seat transport only
+    // switches to its temp-file handoff at 24,000, so everything between
+    // those two numbers would fail before the CLI ran.
+    const [one, two] = pathWith(["tool.cmd"], ["tool.exe"]);
+    withPath([one, two], () => {
+      const resolved = resolveProgram("tool");
+      expect(resolved.path).toBe(join(two, "tool.EXE"));
+      expect(resolved.isBatch).toBe(false);
+    });
+  });
+
+  it.runIf(onWindows)("falls back to the shim when that is all there is", () => {
+    // Then `cmd.exe` is what can run it, and Python pays the same
+    // interpretation for the same file -- `CreateProcess` special-cases a
+    // batch file by launching `cmd /c` around it.
+    const [one, two] = pathWith(["tool.cmd"], []);
+    withPath([one, two], () => {
+      const resolved = resolveProgram("tool");
+      expect(resolved.path).toBe(join(one, "tool.CMD"));
+      expect(resolved.isBatch).toBe(true);
+    });
   });
 });

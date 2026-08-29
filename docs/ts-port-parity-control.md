@@ -223,6 +223,51 @@ not a function of the repository.
 > is forbidden, and a `--now` flag would be a CLI knob invented for the
 > control's convenience.
 
+> **Amended in session 30: `seat_cost` enters with two cases, and the seat
+> catalog's WRITE does not enter at all.**
+>
+> The `seat_cost` row is built as the table says — the corpus writes a canned
+> `session-store.db` under `.dabbler/`, both copies are handed the same file
+> through `--store`, and the verb reads it. Two cases rather than one, because
+> the interesting half of this verb is the vocabulary it refuses in: the first
+> asks for three ids (one with usage over two events, one known with no usage
+> at all, one the store has never heard of) and must come back a **floor**
+> with the credits, the dollars, the event count and the reason line agreeing;
+> the second asks only for the id the store does not know and must come back
+> **unmeasured** with no number at all and a non-zero exit. An absent
+> measurement is never `0.0`, and the exit code is what tells a caller which
+> it got. This is also the first compared verb whose input is another
+> program's SQLite file, read by `sqlite3` on one side and `node:sqlite` on
+> the other.
+>
+> **The seat catalog's write is NOT comparable, and saying so is the
+> amendment.** The paragraph above says the write "belongs to session 30".
+> The writer landed there; the case cannot. A `copilot refresh` that writes
+> anything must first PROBE, and a probe is a billed premium request per model
+> — the control would spend the quorum's cost twice per run, on the operator's
+> own seat, every run. That is not a normalization problem or a fixture
+> problem; it is what the record means. What the write has instead is the
+> round-trip contract asserted in both suites against the real shipped lock
+> (`dumps(load(x)) == x`, byte for byte), which is the property a partial
+> refresh depends on, plus the writer stamp and the digest, which the
+> **`discovery enumerate`** case already compares on the other record that
+> shares this renderer.
+>
+> **`copilot refresh --dry-run` spends nothing and is still not a case.** It
+> was built, run both ways, and its stdout is byte-identical — but Python
+> reaches it as `python -m ai_router.transports.copilot`, and that import path
+> makes runpy print a `RuntimeWarning` to stderr before the command runs. The
+> module's own tail comment explains why (`ai_router/__init__` has already
+> imported it by way of `route`). The control compares stderr on every verb,
+> so the case would be red for the interpreter's bookkeeping rather than for
+> anything either router did. Two ways out and both are worse than waiting:
+> invoking Python as something other than `python -m` would compare an
+> invocation no operator uses, and rearranging the Python package's imports is
+> a change to the reference implementation to suit its own control. **It
+> becomes comparable for free at the cutover**, when the Python side is gone
+> — and a `--dry-run` case is worth adding then, because it is the only
+> reading of the scope selection and the cost projection that costs nothing.
+
 ## The files compared
 
 After both runs, the control walks the **union** of paths under each copy

@@ -5410,3 +5410,342 @@ this session's advisory cost is unpriced, and the total above is the
 verification cost alone. Every prior seat-cost decision in this port
 measured the same thing, so the series stays comparable; what it has never
 covered is the consult that precedes a ruling.
+
+## Session 30 — Transport II — the Copilot CLI state machine and seat cost
+
+### D190 · 2026-08-29 · Orchestrator (claude-opus-5/anthropic) · The seat catalog's writer lands with a verb, because the absence of one is the incident; REFRESH_COMMAND stays Python's until the cutover
+
+The seat catalog's reader landed in session 28; its writer landed here, and
+with it a verb — `dabbler copilot refresh` — rather than a library function
+the TypeScript router has no way to reach.
+
+**Why a verb.** The absence of a refresh command IS the incident this
+record's whole design turns on. `transports/copilot.py` says it in its own
+header: with no refresh verb, hand-editing was the only remedy for a stale
+lockfile, and two people took it. Session 36 deletes Python. A cutover that
+left the seat catalog unrefreshable from the router that dispatches off it
+would recreate that incident exactly, with the added twist that the file
+would still be telling operators to run a command that no longer exists.
+
+So `copilot` joins the verb table with `portedInSession: 30`, and its
+handler is registered — the CLI and the parity control both read the
+registry, so nothing had to be bumped. It parses the same four scopes,
+prices from the same samples, and calls the same `runRefresh` the library
+exposes; the command line owns only the argument parsing and the two things
+it resolves from configuration (which lockfile, which binary).
+
+**`REFRESH_COMMAND` still names the Python invocation, deliberately.** That
+string is embedded in every message about a stale, hand-edited or
+same-provider catalog, and BOTH routers print it. Changing it on the
+TypeScript side would put a different sentence in front of the operator
+depending on which router answered, and the parity control compares exactly
+that. Today `python -m ai_router.transports.copilot refresh` is a real,
+runnable command, so the message is true. **It becomes false at the
+cutover**, and re-pointing it to `dabbler copilot refresh` is owed to
+session 36 — as a one-line change made when there is one implementation
+left, which is the only moment it can be made without splitting the record.
+
+**One thing the confirmation prompt does differently, and it is not a
+behaviour change.** Python asks on a terminal and refuses when stdin is not
+one. The TypeScript side does both: the non-terminal branch prints the same
+sentence and returns the same exit code, and the terminal branch reads one
+line synchronously from fd 0. The unattended case — a plan that needs
+authorizing with nobody to authorize it — fails closed on both, which is
+the case that matters, because an unattended run that guessed `yes` would
+spend the operator's premium requests without being asked.
+
+### D191 · 2026-08-29 · Orchestrator (claude-opus-5/anthropic) · The seat's Windows spawn is checks', not a second copy -- and the kill had to become a tree kill, because cmd.exe is now the child
+
+D174 measured how a program is reached on Windows and session 27 built it
+into `checks`: `spawn("x.cmd", …)` is `EINVAL` on Node, a batch shim goes
+through `%COMSPEC% /d /s /v:off /c` with each argument quoted itself, never
+`shell: true`, and an over-long command line is `ENAMETOOLONG` (POSIX says
+`E2BIG`). The seat transport is the second program in the router that spawns
+something, so the question was whether to restate those rules or import
+them.
+
+**Imported.** `resolveProgram`, `quoteForCmd`, `terminateTree` and
+`isArgvTooLarge` are now exported from `checks.ts` and used here. A second
+answer about what `copilot` resolves to, or about which error code means
+"too long", is a second thing to keep true — and the argv-size classifier in
+particular spent a year wearing the generic-unknown mask, which is what
+happens when the knowledge lives in more than one place.
+
+This matters on this machine today: `copilot` resolves to a `.bat` shim
+under the VS Code global storage, ahead of a `copilot.exe` further down
+`PATH`. Python's `CreateProcess` appends `.exe` and finds the executable;
+Node's resolution walks `PATHEXT` per directory, the way `cmd` and `where`
+do, and lands on the shim. Both end up paying `cmd.exe` parsing — Python's
+`CreateProcess` special-cases a batch file by launching `cmd /c` around it —
+so this is the same cost reached by a different route, not a new one.
+
+**The kill had to grow, and that IS a difference the port introduces.**
+Python's `_kill_and_reap` calls `proc.kill()` on a handle to the seat's own
+process. Under Node the immediate child is `cmd.exe` and the billed process
+is its grandchild, so a plain kill on a first-byte or total timeout would
+leave a live, billed CLI behind with nobody reading its pipes. The handle's
+`kill` is therefore `checks.terminateTree` — `taskkill /F /T` on Windows,
+the negative pid on POSIX — and the spawner asks for its own process group
+off Windows so that negative pid means the child rather than the router.
+
+Two further shape differences, both forced and neither visible in the
+record: the two reader THREADS and their queue become one line pump feeding
+the same queue, because there is one thread; and `dispatch` is async, which
+is what `route` already expected of a transport. The measurement is not
+allowed to differ, so `subprocess.list2cmdline` is ported literally —
+trailing-backslash doubling and all — rather than approximated. A different
+number there would send the two routers down different branches (inline vs
+temp-file handoff) for the same prompt, and the branch is not something a
+diff of the record would show.
+
+### D192 · 2026-08-29 · Orchestrator (claude-opus-5/anthropic) · node:sqlite is fetched with process.getBuiltinModule, not imported: it is absent from builtinModules and every resolver strips the prefix
+
+`seat_cost` reads a SQLite store the Copilot CLI owns. Session 22 checked
+`node:sqlite` was present in the extension host precisely so this module
+could use a native binding instead of a JavaScript SQLite that would have to
+skip the WAL and carry a ~7% undercount as a known limitation. It is
+present, so the port uses it — `readOnly: true`, which is `mode=ro`, and
+`immutable` is not used, because `immutable` is the thing that skips the WAL
+and a live seat's most recent turns are in the WAL.
+
+**How it is loaded is the decision.** `node:sqlite` is a `node:`-only
+builtin: it is absent from `module.builtinModules`, so tools that decide
+"is this a builtin?" from that list answer no, strip the prefix, and then
+fail looking for a package called `sqlite`. Vitest does exactly this, and a
+static `import { DatabaseSync } from "node:sqlite"` made the whole test file
+unloadable.
+
+Three ways out were tried. A vitest config externalising the specifier did
+not work — the prefix is gone before resolution runs. A resolver plugin
+restored the prefix and the runner still tried to read a file for it. A
+`createRequire` hop inside the module would have worked, and would have been
+a change to shipping code to suit a test runner, which is the wrong way
+round.
+
+What landed is `process.getBuiltinModule("node:sqlite")` for the value and a
+type-only `import type` for the type. That is the API Node added for exactly
+this situation: it returns the real module, it is invisible to static
+analysis, and a type-only import is erased before any resolver sees it. No
+build configuration, no test-runner configuration, and nothing added to
+`build.mjs` — esbuild's `platform: "node"` already externalises every
+`node:` specifier. The `vitest.config.ts` written along the way was deleted;
+the package still has none.
+
+The verb around it is `dabbler seat-cost`, which was already declared in the
+verb table for this session.
+
+### D193 · 2026-08-29 · Orchestrator (claude-opus-5/anthropic) · The live seat probe reached the real CLI and took the handoff branch; the seat refused for quota, so the acknowledgement half is unproven
+
+Step 5 of this session's plan asks for a live probe on the seat: one prompt
+over the handoff threshold, facts planted head, middle and tail, the ack
+validated and stripped. It was built, it was run, and it is **half proven**.
+
+**What the live call proved.** The router spawned the real `copilot` — which
+on this machine is a `.bat` shim reached through `cmd.exe`, so D174's whole
+Windows path ran for real. The dispatch measured the rendered command line
+at 31,673 UTF-16 units, took the **handoff** branch, wrote a 31 KB payload
+to the system temp directory, closed the handle, and spawned. The CLI read
+its arguments, ran, and answered. The assertion that the branch was taken
+passed before any assertion about content, deliberately: session 29's Major
+was a parity case that agreed for two different reasons and went green, and
+a probe whose prompt quietly fell under the ceiling would satisfy every
+content check below it while proving nothing at all about the handoff.
+
+**What it did not prove.** The seat answered `You have exceeded your monthly
+quota`. The operator's premium-request allowance for the month is spent, so
+no model read the payload and no acknowledgement was earned. The
+ack-validated-and-stripped half of step 5 is **not proven by a live call**
+and is owed to a run after the quota resets. The test is committed, opt-in
+behind `DABBLER_E2E=1` the way session 28's vendor probes are, and its
+failure message now dumps the whole metadata rather than only the stderr —
+a seat refusing for quota and a model under-reading a payload are different
+failures, and the run that has to be read later is the one that failed.
+
+**A real failure is not nothing.** This was the transport's error taxonomy
+meeting an event nobody staged: the CLI exited non-zero with that sentence
+on stderr, and the classifier answered `quota-rate-class` — not the
+generic-unknown bucket, and not retryable, which is right, because retrying
+a quota-exhausted seat spends nothing and gains nothing. Every other seat
+test in this suite drives a fake spawner and could not have produced this.
+
+**The seat cost is measured, and it is the acceptance test for the module
+that measured it.** The failed turn still cost credits, and the CLI's own
+banner named the conversation. Priced through the ported `seat-cost` against
+the CLI's live store — the real `~/.copilot/session-store.db`, WAL and all:
+
+    status: measured
+    credits: 9.197
+    usd: $0.0920
+    events: 1
+
+The Python router, run on the same id immediately after, printed the same
+four lines byte for byte. That is the strongest form this check takes: not a
+fixture agreeing with a fixture, but two implementations reading one real
+store written by a third program and agreeing with each other and with the
+CLI's own reported figure of 9.2 credits.
+
+### D194 · 2026-08-29 · Orchestrator (claude-opus-5/anthropic) · Two seat-cost parity cases in, the catalog write and refresh --dry-run out; and one int/float approximation now carried in four places
+
+Two `seat_cost` cases are in the control and both are green: one that must
+come back a **floor** (three ids — one with usage over two events, one known
+with no usage, one the store has never heard of) and one that must come back
+**unmeasured** with no number and a non-zero exit. The corpus writes the
+fixture store with `node:sqlite` and hands the same file to both copies
+through `--store`. It is the first compared verb whose input is another
+program's SQLite database, read by `sqlite3` on one side and `node:sqlite`
+on the other. Eighteen cases now, all identical.
+
+**The seat catalog's WRITE is not comparable, and the control's own
+specification said it would be.** The writer landed here; the case cannot. A
+`copilot refresh` that writes anything must PROBE first, and a probe is a
+billed premium request per model — the control would spend the quorum's cost
+twice per run, on the operator's own seat, every run. That is not a fixture
+problem to solve later; it is what the record means. What the write has
+instead is the round-trip contract asserted in both suites against the real
+shipped lock (`dumps(load(x)) == x`, byte for byte), plus the writer stamp
+and the content digest, which `discovery enumerate` already compares on the
+other record that shares this renderer.
+
+**`copilot refresh --dry-run` spends nothing, was built, was run both ways,
+and its stdout is byte-identical — and it is still not a case.** Python
+reaches it as `python -m ai_router.transports.copilot`, and that import path
+makes runpy print a `RuntimeWarning` to stderr before the command runs; the
+Python module's own tail comment explains why. The control compares stderr
+on every verb, so the case would be red for the interpreter's bookkeeping.
+Both ways out are worse than waiting: invoking Python as something other
+than `python -m` would compare an invocation no operator uses, and
+rearranging the Python package's imports is a change to the reference
+implementation to suit its own control. It becomes comparable for free at
+the cutover, and is worth adding then.
+
+**One approximation is now carried in three places, and it is one
+approximation.** JavaScript has a single number type, so the port stands
+`Number.isInteger` in for Python's `type(x) is int`. That convention is
+already load-bearing in `evidence`, `metrics` and `writers`; this session
+adds two more readings of it, and neither is reachable by the control:
+
+- a wire `"outputTokens": 42.0` fails closed in Python (a float is not an
+  int) and is accepted in TypeScript;
+- a seat reporting `premiumRequests: 1.0` would be written to the lock as
+  `1` by TypeScript and `1.0` by Python — invisible to the control only
+  because the write is not compared, per the paragraph above.
+
+A fourth reading is the inverse: `toFixed` rounds half away from zero where
+Python's `format` rounds half to even, so `credits: 0.0625` would print
+`0.063` and `0.062`. `metrics` has carried the same thing since session 25
+on its escalation percentage.
+
+Fixing any of these means a JSON reader that preserves the lexical
+int/float distinction, and a shared fixed-point formatter. That is one
+change, in one place, for all four — which is exactly why it is recorded as
+one thing and not fixed here. Doing half of it in a port session would leave
+the codebase with two answers to the same question, and a port session is
+the worst place to introduce a behaviour difference, because both routers
+being wrong together is the single failure a parity comparison cannot see.
+
+### D195 · 2026-08-29 · Orchestrator (claude-opus-5/anthropic) · Round 1's Major accepted: PATH resolution preferred a batch shim, capping the seat's command line at cmd.exe's 8,191 and diverging from Python
+
+Round 1 raised one Major and it was right. `checks.resolveProgram` walked
+PATH the way `cmd` and `where` do — first hit in the first directory,
+whatever its extension — so on this machine `copilot` resolved to the
+`copilot.BAT` shim VS Code installs, ahead of the WinGet `copilot.EXE`. A
+batch shim can only be run by `cmd.exe`, whose command line stops at **8,191
+characters** where `CreateProcess` allows 32,767. The seat transport only
+switches to its temp-file handoff at 24,000 rendered units, so every prompt
+between roughly 8,191 and 24,000 would have been handed to `cmd.exe` inline
+and failed before the CLI ran. A verification bundle sits squarely in that
+interval. The verifier called it probable on the main Windows path, and it
+was.
+
+**It was also a divergence, which is worse.** Python's `subprocess` spawns
+without a shell, so `CreateProcess` appends `.exe` and finds the real
+executable; this router found the shim. The two routers were reaching
+different programs from the same PATH, with different ceilings.
+
+**The fix is the resolution, not the shim.** `resolveProgram` now searches
+PATH twice: once accepting only non-batch candidates, then once accepting
+anything. An executable anywhere on PATH beats a shim nearer the front.
+That is deliberately not `cmd`'s rule, because neither caller here is a
+shell — `checks` and the seat transport both `spawn` without one, and the OS
+rule for that is `CreateProcess`. Matching it is what makes this router reach
+the same program Python's `subprocess` reaches, and on this machine it turns
+an 8,191-character ceiling back into a 32,767-character one. Two tests pin
+it, Windows-only: an executable in the second directory beats a `.cmd` in
+the first, and a shim with no executable anywhere still resolves to the
+shim.
+
+**What the verifier asked for instead was the one thing D174 already
+refused.** Its acceptance criterion was to resolve the shim to its
+underlying executable and argument prefix and spawn that. D174 measured this
+and ruled it out: a batch file IS a cmd script, something has to interpret
+it, and parsing an npm-style generated shim to find the invocation inside
+would be a guess about one package manager's output. The fix above answers
+the same failure without the guess, because the real question was never "how
+do we run the shim" — it was "why are we running the shim at all".
+
+**The residual is named, in the code and here.** On a machine where ONLY a
+shim exists, `cmd.exe` is what runs it and the 8,191 ceiling is real. It is
+equally real for the Python router there: `CreateProcess` special-cases a
+batch file by launching `cmd /c` around it, so both are bounded identically.
+Closing that means lowering the handoff threshold on the shim path — a
+change to a constant both routers must agree on, or they take different
+branches for the same prompt. It belongs to a session that can make it on
+both sides at once. It is not this one.
+
+**The round's nit is a faithful port, not a defect.** It observes that the
+first-byte timeout is really a first-complete-LINE timeout, because nothing
+is enqueued until a newline. That is exactly Python's behaviour — its reader
+thread is `iter(stream.readline, "")`, which also yields nothing until a line
+ends — and the CLI's output is JSONL, where a partial line is not yet a
+record. Changing it would have made this router differ from the reference
+for no gain. It is now stated in the code where the pump lives, so the next
+reader does not have to re-derive it.
+
+### D196 · 2026-08-29 · Orchestrator (claude-opus-5/anthropic) · Round 2's restated Major disputed and withdrawn: shim parsing is a guess D174 already refused, and the residual is shared with Python; the threshold fix is owed to the cutover
+
+Round 2 restated round 1's Major after the fix, on a narrower claim: that a
+shim-only Windows installation still pays cmd.exe's 8,191-character ceiling,
+and that the remedy is to parse `copilot.cmd` and spawn its underlying
+target. It was disputed rather than remediated, and round 3 withdrew it.
+
+The disputed half was not the defect. Round 1's finding had two halves, and
+the load-bearing one — that resolution preferred a shim over an executable
+that existed on PATH, capping the line at 8,191 and making this router reach
+a different program than Python does — was accepted on first reading and
+fixed (D195). What round 2 asked for on top was shim parsing, and three
+things stood against it:
+
+- **D174 already measured and refused it.** "Spawn the shim's target is
+  therefore not available to either router — a batch file IS a cmd script,
+  and something has to interpret it — and parsing an npm-style shim to find
+  the `node` invocation inside it would be a guess about one package
+  manager's generated file." The finding quoted the session plan's step 3,
+  which predates that measurement.
+- **This shim has no executable target.** Read on the host that has it,
+  `copilot.bat` is `@echo off` followed by `powershell -ExecutionPolicy
+  Bypass -File …\copilot.ps1 %*`. "Resolve the target" means recognising one
+  vendor's generated batch shape and rebuilding a PowerShell invocation from
+  it — and silently spawning the wrong program for any other shape.
+- **The residual is shared with the reference implementation.** Python's
+  `default_spawner` hands argv to `Popen` with no shim resolution, and
+  `CreateProcess` wraps a batch file in `cmd /c`, so on a shim-only machine
+  both routers are bounded identically today. Teaching only this side to
+  parse shims would let it dispatch a 20,000-unit prompt the Python router
+  cannot — a capability divergence introduced by a port.
+
+**The verifier could not see any of that**: every round of this session ran
+with `agency: none`, so it was reasoning from the session plan and the diff.
+That is not a complaint about the finding — it is why the dispute was worth
+four minutes rather than a remediation, and why the grounds cited file and
+line rather than asserting.
+
+**What is owed, and it is a real thing.** The clean way to close the
+shim-only interval is to lower the handoff threshold when the resolved
+program is a shim, so the temp-file pull happens below cmd's ceiling instead
+of the OS's. It needs no parsing and cannot pick the wrong program. But
+`HANDOFF_THRESHOLD_UTF16_UNITS` is a constant both routers must agree on —
+a different value on one side sends them down different branches for the
+same prompt — so it has to change on both sides at once, which means a
+session that may touch Python. **Owed to session 36**, the cutover, where
+there is one implementation and the question stops being a parity question.
+Until then the code says so where the spawner lives.

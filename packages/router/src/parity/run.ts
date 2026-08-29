@@ -26,6 +26,7 @@ import { normalize } from "./normalize.ts";
 import {
   CorpusError,
   METRICS_FIXTURE_ROWS,
+  SEAT_STORE_PATH,
   SHAPES,
   buildShape,
   findShape,
@@ -352,6 +353,47 @@ export const CASES: readonly ParityCase[] = [
       "failed vendor instead of emptying it, a vendor gaining a status row " +
       "it did not have, the providers sorted by name, unknown written by " +
       "omission, the writer stamp, and the per-vendor lines the command prints",
+  },
+  {
+    verb: "seat-cost",
+    label: "seat-cost (a measurement that is a floor)",
+    // The shape is irrelevant: this verb reads a store outside the
+    // repository, which the corpus supplies. `fresh` is the cheapest one to
+    // build.
+    shapes: ["fresh"],
+    pythonArgs: (repo) => [
+      "ai_router.seat_cost", "conv-a", "conv-b", "conv-nope",
+      "--store", join(repo, ...SEAT_STORE_PATH.split("/")),
+    ],
+    dabblerArgs: (repo) => [
+      "seat-cost", "conv-a", "conv-b", "conv-nope",
+      "--store", join(repo, ...SEAT_STORE_PATH.split("/")),
+    ],
+    proves:
+      "the whole reading of another program's SQLite store: the nano-AIU sum " +
+      "over two events and the credits and dollars derived from it, a " +
+      "conversation known with no usage read as a genuine zero rather than " +
+      "an absence, the id the store does not know demoting the answer to a " +
+      "floor, and the reason line that says which of the three it was",
+  },
+  {
+    verb: "seat-cost",
+    label: "seat-cost (nothing to measure)",
+    shapes: ["fresh"],
+    pythonArgs: (repo) => [
+      "ai_router.seat_cost", "conv-nope",
+      "--store", join(repo, ...SEAT_STORE_PATH.split("/")),
+    ],
+    dabblerArgs: (repo) => [
+      "seat-cost", "conv-nope",
+      "--store", join(repo, ...SEAT_STORE_PATH.split("/")),
+    ],
+    // The branch worth its own case: an absent measurement is never 0.0, and
+    // the exit code is what a caller reads to tell the two apart.
+    proves:
+      "that neither router invents a number it does not have: no credits " +
+      "line at all, the sentence naming why, and the non-zero exit that " +
+      "distinguishes an absent measurement from a measured zero",
   },
 ];
 

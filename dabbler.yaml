@@ -551,9 +551,19 @@ testing:
           - packages/router/test/metrics.test.ts
           - packages/router/test/identity.test.ts
           - packages/router/test/schema.test.ts
+      # The seat has two halves and they are read from different places. The
+      # catalog, the dispatch state machine and the handoff are `transports/`;
+      # what a seat SPENT is read from a store the Copilot CLI owns, so it is
+      # its own module with its own file. The parity control's corpus writes
+      # that store's fixture, which is why the control answers here too.
+      - when: packages/router/src/seatCost.ts
+        select:
+          - packages/router/test/seatCost.test.ts
+          - packages/router/test/parity.test.ts
       - when: packages/router/src/transports/
         select:
           - packages/router/test/transports.test.ts
+          - packages/router/test/copilot.test.ts
           - packages/router/test/route.test.ts
           - packages/router/test/discovery.test.ts
           - packages/router/test/config.test.ts

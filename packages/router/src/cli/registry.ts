@@ -6,8 +6,10 @@
 // the parity control -- sees the same fact at the same moment.
 
 import { affectedVerb } from "./affected.ts";
+import { copilotVerb } from "./copilot.ts";
 import { discoveryVerb } from "./discovery.ts";
 import { metricsVerb } from "./metrics.ts";
+import { seatCostVerb } from "./seatCost.ts";
 import { sessionVerb } from "./session.ts";
 import { testEvidenceVerb } from "./testEvidence.ts";
 
@@ -21,8 +23,10 @@ export type VerbHandler = (argv: string[]) => Promise<number>;
  */
 export const HANDLERS: Readonly<Record<string, VerbHandler>> = {
   affected: affectedVerb,
+  copilot: copilotVerb,
   discovery: discoveryVerb,
   metrics: metricsVerb,
+  "seat-cost": seatCostVerb,
   session: sessionVerb,
   "test-evidence": testEvidenceVerb,
 };

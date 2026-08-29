@@ -41,6 +41,17 @@ import {
   OfflineTransport,
   resolveResponsesDir,
 } from "./transports/offline.ts";
+import {
+  CopilotCliTransport,
+  REFRESH_COMMAND,
+  getCliVersion,
+  loadCatalog,
+  resolveLockfilePath,
+  resolveRoleCandidates,
+  resolveTransportTimeouts,
+  validateCatalog,
+  type Catalog,
+} from "./transports/copilot.ts";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -354,13 +365,100 @@ export class RateLimiter {
 interface RouteState {
   config: RouterConfig | null;
   rateLimiters: Record<string, RateLimiter>;
+  copilotTransport: CopilotCliTransport | null;
+  copilotCatalog: Catalog | null;
 }
 
-const state: RouteState = { config: null, rateLimiters: {} };
+const state: RouteState = {
+  config: null,
+  rateLimiters: {},
+  copilotTransport: null,
+  copilotCatalog: null,
+};
 
 export function resetForTests(): void {
   state.config = null;
   state.rateLimiters = {};
+  state.copilotTransport = null;
+  state.copilotCatalog = null;
+}
+
+/**
+ * Put a seat in the process's hands without a lockfile or a CLI.
+ *
+ * The seat branch resolves its transport from configuration and its
+ * candidates from a file on disk, and a test of the ROUTING has no business
+ * arranging either. Everything downstream of this -- the ladder, the
+ * exclusion, the escalation, the metrics row -- is the code that ships.
+ */
+export function installCopilotForTests(
+  transport: CopilotCliTransport,
+  catalog: Catalog,
+): void {
+  state.copilotTransport = transport;
+  state.copilotCatalog = catalog;
+}
+
+/**
+ * Load and fail-closed-validate the seat catalog, and build the CLI
+ * transport, once per process.
+ *
+ * An unreadable or invalid lockfile STOPS dispatch with an actionable
+ * message. Never a silent fallback to the API transport: that would put a
+ * cross-provider verification on the provider the operator was routing away
+ * from, and nothing downstream could tell.
+ *
+ * The transport is cached because its invocation breaker is a per-process
+ * count of billed spawns; a fresh transport per call would reset the ceiling
+ * every time it mattered.
+ */
+function getCopilot(config: RouterConfig): [CopilotCliTransport, Catalog] {
+  if (state.copilotTransport !== null && state.copilotCatalog !== null) {
+    return [state.copilotTransport, state.copilotCatalog];
+  }
+
+  const cliConfig = record(config["transports"])[TRANSPORT_COPILOT_CLI];
+  if (!isRecord(cliConfig)) {
+    throw new RouterError(
+      "the copilot-cli transport is selected but router-config.yaml " +
+        "has no transports.copilot-cli block",
+    );
+  }
+  const lockfile = resolveLockfilePath(config);
+  let catalog: Catalog;
+  try {
+    catalog = loadCatalog(lockfile);
+  } catch (error: unknown) {
+    throw new RouterError(
+      `the copilot-cli catalog lockfile at '${lockfile}' could ` +
+        `not be loaded (${error instanceof Error ? error.message : String(error)}). ` +
+        `Rebuild it with \`${REFRESH_COMMAND} --all\`, or switch the transport ` +
+        "back to 'api'.",
+    );
+  }
+
+  const binary = String(cliConfig["binary"] ?? "copilot");
+  const validation = validateCatalog(catalog, {
+    liveCliVersion: getCliVersion({ binary }),
+  });
+  if (!validation.ok) {
+    throw new RouterError(
+      "the copilot-cli catalog lockfile failed fail-closed validation: " +
+        validation.reasons.join("; "),
+    );
+  }
+  for (const warning of validation.warnings) {
+    process.stderr.write(`ai_router: copilot-cli catalog: ${warning}\n`);
+  }
+
+  const maxInvocations = cliConfig["max_invocations_per_session"];
+  state.copilotCatalog = catalog;
+  state.copilotTransport = new CopilotCliTransport({
+    binary,
+    timeouts: resolveTransportTimeouts(cliConfig),
+    maxInvocations: typeof maxInvocations === "number" ? maxInvocations : null,
+  });
+  return [state.copilotTransport, catalog];
 }
 
 function getConfig(): RouterConfig {
@@ -609,17 +707,39 @@ function buildPath(
   }
 
   if (transportName === TRANSPORT_COPILOT_CLI) {
-    // The seat's dispatch state machine -- spawn, the three timeouts, the
-    // temp-file handoff, the stderr taxonomy -- is session 30. Refused by
-    // name, the way `session close` was until the lifecycle landed: a
-    // transport that silently fell back to the API would put a
-    // cross-provider verification on the provider the operator was
-    // routing away from.
-    throw new RouterError(
-      "the copilot-cli transport is ported in session 30 of the port plan " +
-        "(ai_router.transports.copilot). Route over the 'api' or 'offline' " +
-        "transport, or run this call through the Python router.",
-    );
+    const [transport, catalog] = getCopilot(config);
+    const ladder: Candidate[] = resolveRoleCandidates(
+      config,
+      catalog,
+      role,
+      exclude,
+    ).map(([modelId, provider]) => ({
+      alias: modelId,
+      model_id: modelId,
+      provider,
+    }));
+    if (ladder.length === 0) {
+      throw new NoCandidateError(
+        "copilot-cli: no confirmed catalog entry survives the " +
+          `provider exclusion ${renderList(exclude)} for the '${role}' role`,
+      );
+    }
+    return {
+      ladder,
+      escalates: true,
+      dispatch: (candidate, systemPrompt, userMessage) =>
+        transport.dispatch({
+          model_id: candidate.model_id,
+          system_prompt: systemPrompt,
+          user_message: userMessage,
+        }),
+      modelConfig: () => ({}),
+      // The CLI exposes no generation knobs.
+      generationParams: () => ({}),
+      // The seat is billed per request, not per token, and the CLI does its
+      // own pacing; a limiter here would be a second, invented ceiling.
+      rateLimit: () => Promise.resolve(),
+    };
   }
 
   const models = record(config["models"]);

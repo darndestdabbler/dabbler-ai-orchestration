@@ -65,7 +65,7 @@ it.
 | 27 | Evidence, checks, test evidence, affected | no | 2026-08-28 |
 | 28 | Transports I — API, offline, routing, selection, discovery | no | 2026-08-28 |
 | 29 | One vocabulary for a failure, one stamp for a measurement | no | 2026-08-29 |
-| 30 | Transport II — the Copilot CLI state machine and seat cost | — | not declared |
+| 30 | Transport II — the Copilot CLI state machine and seat cost | no | 2026-08-29 |
 | 31 | The session lifecycle | — | not declared |
 | 32 | Verification support — agency, verifyjob, the approved plan | — | not declared |
 | 33 | The verification loop | — | not declared |
@@ -855,3 +855,29 @@ remaining sessions moved up by one (Transport II is now 30, the cutover 36).
 Live guidance was updated; the append-only decisions log was not.
 
 Not releasable: this session publishes nothing.
+
+### Session 30 — Transport II — the Copilot CLI state machine and seat cost
+
+**Releasable: no.**
+
+Session 30 of 36 — Transport II: the Copilot CLI state machine and seat cost.
+
+Port `ai_router/transports/copilot.py` (2,074 lines) and `ai_router/seat_cost.py`
+(304 lines) to TypeScript under `packages/router`, ~97 ported tests.
+
+1. Port the dispatch state machine: spawn, first-byte and total timeouts, kill,
+   the temp-file pull handoff above 24,000 rendered units, the nonce-
+   acknowledgement footer, the stderr error taxonomy. Port `list2cmdline` so the
+   rendered-argv measurement is the same number on the same input.
+2. Resolve `copilot.cmd` to its target and spawn that; never `shell: true`.
+   Import `checks.isArgvTooLarge` (D174).
+3. Port the seat catalog WRITER, which requires the empirical probe (D186).
+4. Port `seat_cost` on `node:sqlite`, readOnly / `mode=ro`; WAL is read,
+   `immutable` is not used.
+5. Live probe on the seat: one verification prompt over the handoff threshold,
+   facts planted head, middle and tail, the ack validated and stripped.
+   Recorded as evidence.
+6. Measure this session's seat cost through the ported module.
+7. Lift `route`'s refusal of the `copilot-cli` branch, which names session 30.
+
+Not releasable: this is a port session; it publishes no package.

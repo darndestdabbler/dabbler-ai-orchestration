@@ -6403,6 +6403,266 @@
       "dateTime": "2026-08-29T04:25:44.524981-04:00",
       "description": "Session 29 verification cost 18,839 in / 6,570 out to gpt-5-6-sol over two rounds (100.6 s) -- the cheapest session of the port, a third of the next cheapest. Recorded as D189, together with the round-1 Major (port 1 is a WHATWG bad port, so the parity case was green while comparing a refused connection against a rejected URL) and the one measurement the series has never covered: the advisory consult that precedes a ruling leaves no metrics row.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 30,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-29T04:54:48.975406-04:00",
+      "description": "Register; declare `--not-releasable`.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 30,
+      "stepNumber": 2,
+      "stepKey": "port-the-dispatch-state-machine",
+      "dateTime": "2026-08-29T04:54:48.975406-04:00",
+      "description": "Port the dispatch state machine: spawn, first-byte and total timeouts, kill, the temp-file pull handoff above 24,000 rendered units, the nonce-acknowledgement footer, the stderr error taxonomy. Port `list2cmdline` (~20 lines) so the rendered-argv measurement is the same number on the same input.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 30,
+      "stepNumber": 3,
+      "stepKey": "resolve-copilot",
+      "dateTime": "2026-08-29T04:54:48.975406-04:00",
+      "description": "Resolve `copilot.cmd` to its target and spawn that; never `shell: true` (cmd.exe's 8,191-character line would gut the handoff headroom).",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 30,
+      "stepNumber": 4,
+      "stepKey": "port-seatcost-on-node",
+      "dateTime": "2026-08-29T04:54:48.975406-04:00",
+      "description": "Port `seat_cost` on `node:sqlite`, `readOnly`, `mode=ro` semantics; the WAL is read, `immutable` is not used.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 30,
+      "stepNumber": 5,
+      "stepKey": "live-probe-on-the-seat-as",
+      "dateTime": "2026-08-29T04:54:48.975406-04:00",
+      "description": "**Live probe on the seat**, as set 137 did: one verification prompt over the handoff threshold, facts planted head, middle and tail, the ack validated and stripped. Recorded as evidence.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 30,
+      "stepNumber": 6,
+      "stepKey": "measure-this-session-s-seat-cost",
+      "dateTime": "2026-08-29T04:54:48.975406-04:00",
+      "description": "Measure this session's seat cost and record it \u2014 through the ported module, which is its own acceptance test.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 30,
+      "stepNumber": 7,
+      "stepKey": "affected-tests-as-preverify",
+      "dateTime": "2026-08-29T04:54:48.975406-04:00",
+      "description": "Affected tests as preverify.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 30,
+      "stepNumber": 8,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-29T04:54:48.975406-04:00",
+      "description": "Cross-provider verification.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 30,
+      "stepNumber": 9,
+      "stepKey": "full-test-suite-recorded-as-the",
+      "dateTime": "2026-08-29T04:54:48.975406-04:00",
+      "description": "Full test suite, recorded as the `final-full` run of record.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 30,
+      "stepNumber": 10,
+      "stepKey": "close-out",
+      "dateTime": "2026-08-29T04:54:48.975406-04:00",
+      "description": "Close-out.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 30,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-29T04:54:48.978920-04:00",
+      "description": "Registered session 30 (claude-code).",
+      "status": "complete"
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 30,
+      "dateTime": "2026-08-29T04:55:03.979873-04:00",
+      "task": "Session 30 of 36 \u2014 Transport II: the Copilot CLI state machine and seat cost.\n\nPort `ai_router/transports/copilot.py` (2,074 lines) and `ai_router/seat_cost.py`\n(304 lines) to TypeScript under `packages/router`, ~97 ported tests.\n\n1. Port the dispatch state machine: spawn, first-byte and total timeouts, kill,\n   the temp-file pull handoff above 24,000 rendered units, the nonce-\n   acknowledgement footer, the stderr error taxonomy. Port `list2cmdline` so the\n   rendered-argv measurement is the same number on the same input.\n2. Resolve `copilot.cmd` to its target and spawn that; never `shell: true`.\n   Import `checks.isArgvTooLarge` (D174).\n3. Port the seat catalog WRITER, which requires the empirical probe (D186).\n4. Port `seat_cost` on `node:sqlite`, readOnly / `mode=ro`; WAL is read,\n   `immutable` is not used.\n5. Live probe on the seat: one verification prompt over the handoff threshold,\n   facts planted head, middle and tail, the ack validated and stripped.\n   Recorded as evidence.\n6. Measure this session's seat cost through the ported module.\n7. Lift `route`'s refusal of the `copilot-cli` branch, which names session 30.\n\nNot releasable: this is a port session; it publishes no package.",
+      "releasable": false
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D190",
+      "ordinal": 190,
+      "sessionNumber": 30,
+      "decidedOn": "2026-08-29",
+      "recordedAt": "2026-08-29T05:32:56.559283-04:00",
+      "decider": "orchestrator",
+      "headline": "The seat catalog's writer lands with a verb, because the absence of one is the incident; REFRESH_COMMAND stays Python's until the cutover",
+      "body": "The seat catalog's reader landed in session 28; its writer landed here, and\nwith it a verb \u2014 `dabbler copilot refresh` \u2014 rather than a library function\nthe TypeScript router has no way to reach.\n\n**Why a verb.** The absence of a refresh command IS the incident this\nrecord's whole design turns on. `transports/copilot.py` says it in its own\nheader: with no refresh verb, hand-editing was the only remedy for a stale\nlockfile, and two people took it. Session 36 deletes Python. A cutover that\nleft the seat catalog unrefreshable from the router that dispatches off it\nwould recreate that incident exactly, with the added twist that the file\nwould still be telling operators to run a command that no longer exists.\n\nSo `copilot` joins the verb table with `portedInSession: 30`, and its\nhandler is registered \u2014 the CLI and the parity control both read the\nregistry, so nothing had to be bumped. It parses the same four scopes,\nprices from the same samples, and calls the same `runRefresh` the library\nexposes; the command line owns only the argument parsing and the two things\nit resolves from configuration (which lockfile, which binary).\n\n**`REFRESH_COMMAND` still names the Python invocation, deliberately.** That\nstring is embedded in every message about a stale, hand-edited or\nsame-provider catalog, and BOTH routers print it. Changing it on the\nTypeScript side would put a different sentence in front of the operator\ndepending on which router answered, and the parity control compares exactly\nthat. Today `python -m ai_router.transports.copilot refresh` is a real,\nrunnable command, so the message is true. **It becomes false at the\ncutover**, and re-pointing it to `dabbler copilot refresh` is owed to\nsession 36 \u2014 as a one-line change made when there is one implementation\nleft, which is the only moment it can be made without splitting the record.\n\n**One thing the confirmation prompt does differently, and it is not a\nbehaviour change.** Python asks on a terminal and refuses when stdin is not\none. The TypeScript side does both: the non-terminal branch prints the same\nsentence and returns the same exit code, and the terminal branch reads one\nline synchronously from fd 0. The unattended case \u2014 a plan that needs\nauthorizing with nobody to authorize it \u2014 fails closed on both, which is\nthe case that matters, because an unattended run that guessed `yes` would\nspend the operator's premium requests without being asked.",
+      "model": "claude-opus-5",
+      "provider": "anthropic"
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D191",
+      "ordinal": 191,
+      "sessionNumber": 30,
+      "decidedOn": "2026-08-29",
+      "recordedAt": "2026-08-29T05:32:56.984017-04:00",
+      "decider": "orchestrator",
+      "headline": "The seat's Windows spawn is checks', not a second copy -- and the kill had to become a tree kill, because cmd.exe is now the child",
+      "body": "D174 measured how a program is reached on Windows and session 27 built it\ninto `checks`: `spawn(\"x.cmd\", \u2026)` is `EINVAL` on Node, a batch shim goes\nthrough `%COMSPEC% /d /s /v:off /c` with each argument quoted itself, never\n`shell: true`, and an over-long command line is `ENAMETOOLONG` (POSIX says\n`E2BIG`). The seat transport is the second program in the router that spawns\nsomething, so the question was whether to restate those rules or import\nthem.\n\n**Imported.** `resolveProgram`, `quoteForCmd`, `terminateTree` and\n`isArgvTooLarge` are now exported from `checks.ts` and used here. A second\nanswer about what `copilot` resolves to, or about which error code means\n\"too long\", is a second thing to keep true \u2014 and the argv-size classifier in\nparticular spent a year wearing the generic-unknown mask, which is what\nhappens when the knowledge lives in more than one place.\n\nThis matters on this machine today: `copilot` resolves to a `.bat` shim\nunder the VS Code global storage, ahead of a `copilot.exe` further down\n`PATH`. Python's `CreateProcess` appends `.exe` and finds the executable;\nNode's resolution walks `PATHEXT` per directory, the way `cmd` and `where`\ndo, and lands on the shim. Both end up paying `cmd.exe` parsing \u2014 Python's\n`CreateProcess` special-cases a batch file by launching `cmd /c` around it \u2014\nso this is the same cost reached by a different route, not a new one.\n\n**The kill had to grow, and that IS a difference the port introduces.**\nPython's `_kill_and_reap` calls `proc.kill()` on a handle to the seat's own\nprocess. Under Node the immediate child is `cmd.exe` and the billed process\nis its grandchild, so a plain kill on a first-byte or total timeout would\nleave a live, billed CLI behind with nobody reading its pipes. The handle's\n`kill` is therefore `checks.terminateTree` \u2014 `taskkill /F /T` on Windows,\nthe negative pid on POSIX \u2014 and the spawner asks for its own process group\noff Windows so that negative pid means the child rather than the router.\n\nTwo further shape differences, both forced and neither visible in the\nrecord: the two reader THREADS and their queue become one line pump feeding\nthe same queue, because there is one thread; and `dispatch` is async, which\nis what `route` already expected of a transport. The measurement is not\nallowed to differ, so `subprocess.list2cmdline` is ported literally \u2014\ntrailing-backslash doubling and all \u2014 rather than approximated. A different\nnumber there would send the two routers down different branches (inline vs\ntemp-file handoff) for the same prompt, and the branch is not something a\ndiff of the record would show.",
+      "model": "claude-opus-5",
+      "provider": "anthropic"
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D192",
+      "ordinal": 192,
+      "sessionNumber": 30,
+      "decidedOn": "2026-08-29",
+      "recordedAt": "2026-08-29T05:32:57.402442-04:00",
+      "decider": "orchestrator",
+      "headline": "node:sqlite is fetched with process.getBuiltinModule, not imported: it is absent from builtinModules and every resolver strips the prefix",
+      "body": "`seat_cost` reads a SQLite store the Copilot CLI owns. Session 22 checked\n`node:sqlite` was present in the extension host precisely so this module\ncould use a native binding instead of a JavaScript SQLite that would have to\nskip the WAL and carry a ~7% undercount as a known limitation. It is\npresent, so the port uses it \u2014 `readOnly: true`, which is `mode=ro`, and\n`immutable` is not used, because `immutable` is the thing that skips the WAL\nand a live seat's most recent turns are in the WAL.\n\n**How it is loaded is the decision.** `node:sqlite` is a `node:`-only\nbuiltin: it is absent from `module.builtinModules`, so tools that decide\n\"is this a builtin?\" from that list answer no, strip the prefix, and then\nfail looking for a package called `sqlite`. Vitest does exactly this, and a\nstatic `import { DatabaseSync } from \"node:sqlite\"` made the whole test file\nunloadable.\n\nThree ways out were tried. A vitest config externalising the specifier did\nnot work \u2014 the prefix is gone before resolution runs. A resolver plugin\nrestored the prefix and the runner still tried to read a file for it. A\n`createRequire` hop inside the module would have worked, and would have been\na change to shipping code to suit a test runner, which is the wrong way\nround.\n\nWhat landed is `process.getBuiltinModule(\"node:sqlite\")` for the value and a\ntype-only `import type` for the type. That is the API Node added for exactly\nthis situation: it returns the real module, it is invisible to static\nanalysis, and a type-only import is erased before any resolver sees it. No\nbuild configuration, no test-runner configuration, and nothing added to\n`build.mjs` \u2014 esbuild's `platform: \"node\"` already externalises every\n`node:` specifier. The `vitest.config.ts` written along the way was deleted;\nthe package still has none.\n\nThe verb around it is `dabbler seat-cost`, which was already declared in the\nverb table for this session.",
+      "model": "claude-opus-5",
+      "provider": "anthropic"
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D193",
+      "ordinal": 193,
+      "sessionNumber": 30,
+      "decidedOn": "2026-08-29",
+      "recordedAt": "2026-08-29T05:32:57.891321-04:00",
+      "decider": "orchestrator",
+      "headline": "The live seat probe reached the real CLI and took the handoff branch; the seat refused for quota, so the acknowledgement half is unproven",
+      "body": "Step 5 of this session's plan asks for a live probe on the seat: one prompt\nover the handoff threshold, facts planted head, middle and tail, the ack\nvalidated and stripped. It was built, it was run, and it is **half proven**.\n\n**What the live call proved.** The router spawned the real `copilot` \u2014 which\non this machine is a `.bat` shim reached through `cmd.exe`, so D174's whole\nWindows path ran for real. The dispatch measured the rendered command line\nat 31,673 UTF-16 units, took the **handoff** branch, wrote a 31 KB payload\nto the system temp directory, closed the handle, and spawned. The CLI read\nits arguments, ran, and answered. The assertion that the branch was taken\npassed before any assertion about content, deliberately: session 29's Major\nwas a parity case that agreed for two different reasons and went green, and\na probe whose prompt quietly fell under the ceiling would satisfy every\ncontent check below it while proving nothing at all about the handoff.\n\n**What it did not prove.** The seat answered `You have exceeded your monthly\nquota`. The operator's premium-request allowance for the month is spent, so\nno model read the payload and no acknowledgement was earned. The\nack-validated-and-stripped half of step 5 is **not proven by a live call**\nand is owed to a run after the quota resets. The test is committed, opt-in\nbehind `DABBLER_E2E=1` the way session 28's vendor probes are, and its\nfailure message now dumps the whole metadata rather than only the stderr \u2014\na seat refusing for quota and a model under-reading a payload are different\nfailures, and the run that has to be read later is the one that failed.\n\n**A real failure is not nothing.** This was the transport's error taxonomy\nmeeting an event nobody staged: the CLI exited non-zero with that sentence\non stderr, and the classifier answered `quota-rate-class` \u2014 not the\ngeneric-unknown bucket, and not retryable, which is right, because retrying\na quota-exhausted seat spends nothing and gains nothing. Every other seat\ntest in this suite drives a fake spawner and could not have produced this.\n\n**The seat cost is measured, and it is the acceptance test for the module\nthat measured it.** The failed turn still cost credits, and the CLI's own\nbanner named the conversation. Priced through the ported `seat-cost` against\nthe CLI's live store \u2014 the real `~/.copilot/session-store.db`, WAL and all:\n\n    status: measured\n    credits: 9.197\n    usd: $0.0920\n    events: 1\n\nThe Python router, run on the same id immediately after, printed the same\nfour lines byte for byte. That is the strongest form this check takes: not a\nfixture agreeing with a fixture, but two implementations reading one real\nstore written by a third program and agreeing with each other and with the\nCLI's own reported figure of 9.2 credits.",
+      "model": "claude-opus-5",
+      "provider": "anthropic"
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D194",
+      "ordinal": 194,
+      "sessionNumber": 30,
+      "decidedOn": "2026-08-29",
+      "recordedAt": "2026-08-29T05:32:58.371578-04:00",
+      "decider": "orchestrator",
+      "headline": "Two seat-cost parity cases in, the catalog write and refresh --dry-run out; and one int/float approximation now carried in four places",
+      "body": "Two `seat_cost` cases are in the control and both are green: one that must\ncome back a **floor** (three ids \u2014 one with usage over two events, one known\nwith no usage, one the store has never heard of) and one that must come back\n**unmeasured** with no number and a non-zero exit. The corpus writes the\nfixture store with `node:sqlite` and hands the same file to both copies\nthrough `--store`. It is the first compared verb whose input is another\nprogram's SQLite database, read by `sqlite3` on one side and `node:sqlite`\non the other. Eighteen cases now, all identical.\n\n**The seat catalog's WRITE is not comparable, and the control's own\nspecification said it would be.** The writer landed here; the case cannot. A\n`copilot refresh` that writes anything must PROBE first, and a probe is a\nbilled premium request per model \u2014 the control would spend the quorum's cost\ntwice per run, on the operator's own seat, every run. That is not a fixture\nproblem to solve later; it is what the record means. What the write has\ninstead is the round-trip contract asserted in both suites against the real\nshipped lock (`dumps(load(x)) == x`, byte for byte), plus the writer stamp\nand the content digest, which `discovery enumerate` already compares on the\nother record that shares this renderer.\n\n**`copilot refresh --dry-run` spends nothing, was built, was run both ways,\nand its stdout is byte-identical \u2014 and it is still not a case.** Python\nreaches it as `python -m ai_router.transports.copilot`, and that import path\nmakes runpy print a `RuntimeWarning` to stderr before the command runs; the\nPython module's own tail comment explains why. The control compares stderr\non every verb, so the case would be red for the interpreter's bookkeeping.\nBoth ways out are worse than waiting: invoking Python as something other\nthan `python -m` would compare an invocation no operator uses, and\nrearranging the Python package's imports is a change to the reference\nimplementation to suit its own control. It becomes comparable for free at\nthe cutover, and is worth adding then.\n\n**One approximation is now carried in three places, and it is one\napproximation.** JavaScript has a single number type, so the port stands\n`Number.isInteger` in for Python's `type(x) is int`. That convention is\nalready load-bearing in `evidence`, `metrics` and `writers`; this session\nadds two more readings of it, and neither is reachable by the control:\n\n- a wire `\"outputTokens\": 42.0` fails closed in Python (a float is not an\n  int) and is accepted in TypeScript;\n- a seat reporting `premiumRequests: 1.0` would be written to the lock as\n  `1` by TypeScript and `1.0` by Python \u2014 invisible to the control only\n  because the write is not compared, per the paragraph above.\n\nA fourth reading is the inverse: `toFixed` rounds half away from zero where\nPython's `format` rounds half to even, so `credits: 0.0625` would print\n`0.063` and `0.062`. `metrics` has carried the same thing since session 25\non its escalation percentage.\n\nFixing any of these means a JSON reader that preserves the lexical\nint/float distinction, and a shared fixed-point formatter. That is one\nchange, in one place, for all four \u2014 which is exactly why it is recorded as\none thing and not fixed here. Doing half of it in a port session would leave\nthe codebase with two answers to the same question, and a port session is\nthe worst place to introduce a behaviour difference, because both routers\nbeing wrong together is the single failure a parity comparison cannot see.",
+      "model": "claude-opus-5",
+      "provider": "anthropic"
+    },
+    {
+      "sessionNumber": 30,
+      "stepNumber": 2,
+      "stepKey": "port-the-dispatch-state-machine",
+      "dateTime": "2026-08-29T05:33:16.188894-04:00",
+      "description": "Dispatch state machine ported: spawn under a deadline, first-byte and total timeouts, tree kill, the temp-file pull above 24,000 rendered units, the nonce footer and its acknowledgement, the stderr taxonomy, and list2cmdline ported literally so the branch decision is the same number on the same input",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 30,
+      "stepNumber": 3,
+      "stepKey": "resolve-copilot",
+      "dateTime": "2026-08-29T05:33:16.688027-04:00",
+      "description": "The .bat shim is resolved and spawned through %COMSPEC% /d /s /v:off /c with each argument quoted itself, never shell:true, by importing checks.resolveProgram/quoteForCmd/terminateTree/isArgvTooLarge rather than restating them (D191)",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 30,
+      "stepNumber": 4,
+      "stepKey": "port-seatcost-on-node",
+      "dateTime": "2026-08-29T05:33:17.125473-04:00",
+      "description": "seatCost ported on node:sqlite with readOnly (mode=ro); the WAL is read and immutable is not used. Loaded via process.getBuiltinModule rather than a static import (D192)",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 30,
+      "stepNumber": 5,
+      "stepKey": "live-probe-on-the-seat-as",
+      "dateTime": "2026-08-29T05:33:17.573592-04:00",
+      "description": "Live probe ran against the real CLI and took the handoff branch (31,673 rendered units, 31 KB payload); the seat refused with 'exceeded your monthly quota', classified quota-rate-class from real stderr. The ack-validated half is unproven until the quota resets (D193)",
+      "status": "blocked"
+    },
+    {
+      "sessionNumber": 30,
+      "stepNumber": 6,
+      "stepKey": "measure-this-session-s-seat-cost",
+      "dateTime": "2026-08-29T05:33:18.067071-04:00",
+      "description": "Seat cost measured through the ported module against the CLI's live store: 9.197 credits / $0.0920 over one event, byte-identical to the Python router's answer and to the CLI's own reported 9.2 (D193)",
+      "status": "complete"
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D195",
+      "ordinal": 195,
+      "sessionNumber": 30,
+      "decidedOn": "2026-08-29",
+      "recordedAt": "2026-08-29T05:43:42.600104-04:00",
+      "decider": "orchestrator",
+      "headline": "Round 1's Major accepted: PATH resolution preferred a batch shim, capping the seat's command line at cmd.exe's 8,191 and diverging from Python",
+      "body": "Round 1 raised one Major and it was right. `checks.resolveProgram` walked\nPATH the way `cmd` and `where` do \u2014 first hit in the first directory,\nwhatever its extension \u2014 so on this machine `copilot` resolved to the\n`copilot.BAT` shim VS Code installs, ahead of the WinGet `copilot.EXE`. A\nbatch shim can only be run by `cmd.exe`, whose command line stops at **8,191\ncharacters** where `CreateProcess` allows 32,767. The seat transport only\nswitches to its temp-file handoff at 24,000 rendered units, so every prompt\nbetween roughly 8,191 and 24,000 would have been handed to `cmd.exe` inline\nand failed before the CLI ran. A verification bundle sits squarely in that\ninterval. The verifier called it probable on the main Windows path, and it\nwas.\n\n**It was also a divergence, which is worse.** Python's `subprocess` spawns\nwithout a shell, so `CreateProcess` appends `.exe` and finds the real\nexecutable; this router found the shim. The two routers were reaching\ndifferent programs from the same PATH, with different ceilings.\n\n**The fix is the resolution, not the shim.** `resolveProgram` now searches\nPATH twice: once accepting only non-batch candidates, then once accepting\nanything. An executable anywhere on PATH beats a shim nearer the front.\nThat is deliberately not `cmd`'s rule, because neither caller here is a\nshell \u2014 `checks` and the seat transport both `spawn` without one, and the OS\nrule for that is `CreateProcess`. Matching it is what makes this router reach\nthe same program Python's `subprocess` reaches, and on this machine it turns\nan 8,191-character ceiling back into a 32,767-character one. Two tests pin\nit, Windows-only: an executable in the second directory beats a `.cmd` in\nthe first, and a shim with no executable anywhere still resolves to the\nshim.\n\n**What the verifier asked for instead was the one thing D174 already\nrefused.** Its acceptance criterion was to resolve the shim to its\nunderlying executable and argument prefix and spawn that. D174 measured this\nand ruled it out: a batch file IS a cmd script, something has to interpret\nit, and parsing an npm-style generated shim to find the invocation inside\nwould be a guess about one package manager's output. The fix above answers\nthe same failure without the guess, because the real question was never \"how\ndo we run the shim\" \u2014 it was \"why are we running the shim at all\".\n\n**The residual is named, in the code and here.** On a machine where ONLY a\nshim exists, `cmd.exe` is what runs it and the 8,191 ceiling is real. It is\nequally real for the Python router there: `CreateProcess` special-cases a\nbatch file by launching `cmd /c` around it, so both are bounded identically.\nClosing that means lowering the handoff threshold on the shim path \u2014 a\nchange to a constant both routers must agree on, or they take different\nbranches for the same prompt. It belongs to a session that can make it on\nboth sides at once. It is not this one.\n\n**The round's nit is a faithful port, not a defect.** It observes that the\nfirst-byte timeout is really a first-complete-LINE timeout, because nothing\nis enqueued until a newline. That is exactly Python's behaviour \u2014 its reader\nthread is `iter(stream.readline, \"\")`, which also yields nothing until a line\nends \u2014 and the CLI's output is JSONL, where a partial line is not yet a\nrecord. Changing it would have made this router differ from the reference\nfor no gain. It is now stated in the code where the pump lives, so the next\nreader does not have to re-derive it.",
+      "model": "claude-opus-5",
+      "provider": "anthropic"
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D196",
+      "ordinal": 196,
+      "sessionNumber": 30,
+      "decidedOn": "2026-08-29",
+      "recordedAt": "2026-08-29T05:52:35.389917-04:00",
+      "decider": "orchestrator",
+      "headline": "Round 2's restated Major disputed and withdrawn: shim parsing is a guess D174 already refused, and the residual is shared with Python; the threshold fix is owed to the cutover",
+      "body": "Round 2 restated round 1's Major after the fix, on a narrower claim: that a\nshim-only Windows installation still pays cmd.exe's 8,191-character ceiling,\nand that the remedy is to parse `copilot.cmd` and spawn its underlying\ntarget. It was disputed rather than remediated, and round 3 withdrew it.\n\nThe disputed half was not the defect. Round 1's finding had two halves, and\nthe load-bearing one \u2014 that resolution preferred a shim over an executable\nthat existed on PATH, capping the line at 8,191 and making this router reach\na different program than Python does \u2014 was accepted on first reading and\nfixed (D195). What round 2 asked for on top was shim parsing, and three\nthings stood against it:\n\n- **D174 already measured and refused it.** \"Spawn the shim's target is\n  therefore not available to either router \u2014 a batch file IS a cmd script,\n  and something has to interpret it \u2014 and parsing an npm-style shim to find\n  the `node` invocation inside it would be a guess about one package\n  manager's generated file.\" The finding quoted the session plan's step 3,\n  which predates that measurement.\n- **This shim has no executable target.** Read on the host that has it,\n  `copilot.bat` is `@echo off` followed by `powershell -ExecutionPolicy\n  Bypass -File \u2026\\copilot.ps1 %*`. \"Resolve the target\" means recognising one\n  vendor's generated batch shape and rebuilding a PowerShell invocation from\n  it \u2014 and silently spawning the wrong program for any other shape.\n- **The residual is shared with the reference implementation.** Python's\n  `default_spawner` hands argv to `Popen` with no shim resolution, and\n  `CreateProcess` wraps a batch file in `cmd /c`, so on a shim-only machine\n  both routers are bounded identically today. Teaching only this side to\n  parse shims would let it dispatch a 20,000-unit prompt the Python router\n  cannot \u2014 a capability divergence introduced by a port.\n\n**The verifier could not see any of that**: every round of this session ran\nwith `agency: none`, so it was reasoning from the session plan and the diff.\nThat is not a complaint about the finding \u2014 it is why the dispute was worth\nfour minutes rather than a remediation, and why the grounds cited file and\nline rather than asserting.\n\n**What is owed, and it is a real thing.** The clean way to close the\nshim-only interval is to lower the handoff threshold when the resolved\nprogram is a shim, so the temp-file pull happens below cmd's ceiling instead\nof the OS's. It needs no parsing and cannot pick the wrong program. But\n`HANDOFF_THRESHOLD_UTF16_UNITS` is a constant both routers must agree on \u2014\na different value on one side sends them down different branches for the\nsame prompt \u2014 so it has to change on both sides at once, which means a\nsession that may touch Python. **Owed to session 36**, the cutover, where\nthere is one implementation and the question stops being a parity question.\nUntil then the code says so where the spawner lives.",
+      "model": "claude-opus-5",
+      "provider": "anthropic"
+    },
+    {
+      "sessionNumber": 30,
+      "stepNumber": 7,
+      "stepKey": "affected-tests-as-preverify",
+      "dateTime": "2026-08-29T05:52:42.992084-04:00",
+      "description": "Affected tests run and recorded as preverify-targeted for both suites, plus the remediation's own narrowed selection; dabbler.yaml gained rules for seatCost.ts and copilot.test.ts so nothing reports selection_unknown",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 30,
+      "stepNumber": 8,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-29T05:52:43.564636-04:00",
+      "description": "Three rounds with gpt-5-6-sol over the API. Round 1's Major accepted and fixed (D195), round 2's restatement disputed and withdrawn (D196), round 3 VERIFIED",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 30,
+      "stepNumber": 9,
+      "stepKey": "full-test-suite-recorded-as-the",
+      "dateTime": "2026-08-29T05:59:58.430190-04:00",
+      "description": "Both suites run whole against the verified tree and recorded as final-full: 944 pytest in 401s, 498 vitest in 50s",
+      "status": "complete"
     }
   ]
 }

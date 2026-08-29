@@ -1101,7 +1101,7 @@ export function isArgvTooLarge(error: unknown): boolean {
 }
 
 /** Kill the child and everything it started. */
-function terminateTree(child: ChildProcess): void {
+export function terminateTree(child: ChildProcess): void {
   const pid = child.pid;
   if (pid === undefined) return;
   if (process.platform === "win32") {
@@ -1144,7 +1144,7 @@ function terminateTree(child: ChildProcess): void {
  * `%VAR%` is still expanded by cmd on both sides, and there is no command
  * line that prevents it.
  */
-function resolveProgram(program: string): { path: string; isBatch: boolean } {
+export function resolveProgram(program: string): { path: string; isBatch: boolean } {
   const batch = (path: string): boolean => /\.(cmd|bat)$/i.test(path);
   if (process.platform !== "win32") return { path: program, isBatch: false };
   if (/[\\/]/.test(program)) return { path: program, isBatch: batch(program) };
@@ -1154,17 +1154,42 @@ function resolveProgram(program: string): { path: string; isBatch: boolean } {
   const candidates = /\.[^\\/.]+$/.test(program)
     ? [program]
     : extensions.map((extension) => program + extension);
-  for (const directory of directories) {
-    for (const candidate of candidates) {
-      const full = join(directory, candidate);
-      if (existsSync(full)) return { path: full, isBatch: batch(full) };
+
+  // Two passes, and an executable anywhere on PATH beats a shim nearer the
+  // front. That is not `cmd`'s rule -- `cmd` and `where` take the first hit in
+  // the first directory, whatever its extension -- but neither caller here is
+  // a shell: both `spawn` without one, and the OS rule for that is
+  // `CreateProcess`, which appends `.exe` and never considers `.cmd` at all.
+  // Matching it is what makes this router reach the SAME program Python's
+  // `subprocess` reaches from the same PATH.
+  //
+  // On this machine that is the difference between the Copilot CLI's real
+  // executable and a batch shim VS Code installs ahead of it -- and the shim
+  // has to be interpreted by `cmd.exe`, whose command line stops at 8,191
+  // characters where `CreateProcess` allows 32,767. Preferring the executable
+  // is therefore not a tidiness: it is four times the room for a prompt.
+  const search = (accept: (path: string) => boolean): string | null => {
+    for (const directory of directories) {
+      for (const candidate of candidates) {
+        const full = join(directory, candidate);
+        if (accept(full) && existsSync(full)) return full;
+      }
     }
-  }
+    return null;
+  };
+  const executable = search((path) => !batch(path));
+  if (executable !== null) return { path: executable, isBatch: false };
+  // No executable: a shim is what exists, so it is what runs -- and Python
+  // pays exactly the same `cmd.exe` interpretation there, because
+  // `CreateProcess` special-cases a batch file by launching `cmd /c` around
+  // it. Equal, and equally bounded by cmd's shorter line.
+  const shim = search(() => true);
+  if (shim !== null) return { path: shim, isBatch: batch(shim) };
   return { path: program, isBatch: batch(program) };
 }
 
 /** `cmd.exe`'s quoting for one argument of a `/c` command line. */
-function quoteForCmd(argument: string): string {
+export function quoteForCmd(argument: string): string {
   if (argument !== "" && !/[\s"^&|<>()%!]/.test(argument)) return argument;
   return `"${argument.replace(/(\\*)"/g, '$1$1\\"').replace(/(\\*)$/, "$1$1")}"`;
 }

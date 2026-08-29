@@ -116,6 +116,19 @@ export const VERBS: readonly VerbSpec[] = [
     summary: "what a Copilot seat spent, from its own session store",
   },
   {
+    // The seat catalog's only writer. It is a verb rather than a library
+    // call because the absence of one IS the incident this record's design
+    // turns on: with no refresh command, hand-editing was the only remedy
+    // for a stale lockfile and two people took it. A cutover that left the
+    // seat record unrefreshable from the router that dispatches off it
+    // would recreate that exactly.
+    verb: "copilot",
+    pythonModule: "ai_router.transports.copilot",
+    portedInSession: 30,
+    extensionFacing: false,
+    summary: "refresh the seat catalog: probe a named scope and merge it in",
+  },
+  {
     verb: "metrics",
     pythonModule: "ai_router.metrics",
     portedInSession: 25,

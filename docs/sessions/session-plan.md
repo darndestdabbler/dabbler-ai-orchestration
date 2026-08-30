@@ -1551,3 +1551,563 @@ control is a control, not a test), and no tests asserting exact markdown
 strings.** A ported test that was one of these in Python is deleted, not
 ported, and the decision names it.
 
+
+---
+
+## Why sessions 37–50 exist
+
+The port finished a rebuild; it did not change who the framework serves.
+Sessions 37–50 do that, against four inputs that arrived together on
+2026-08-30: the operator's eight DX principles, `csv-model`'s feedback log
+(nine items found by *using* the framework on a real three-repository .NET
+project), the RACI matrix's allocation rule, and a parallel review of this
+plan's own first draft by `gpt-5-6-sol` and `gemini-3-1-pro`.
+
+**The allocation rule governs every session here**, asked in order:
+(1) can it be made deterministic? — then it is the framework's, as a check, a
+selector, a projection or a state machine; (2) is it judgment-shaped? — then it
+is the working AI's, resolved by the ordered tiebreaks and journaled; (3) does
+it fall in a human-required class? — external or hard-to-reverse consequence,
+underivable value trade-off, accountability sign-off, or **anything that
+reduces verification**, which is checked first and is absolute.
+
+**The ordering of the last two is the correction the review forced.** The
+draft had "nothing blocks on a person" and "verification reduction is always
+the operator's" both in force, and session 41 proceeding on a default when no
+test suite was declared. Both reviewers found the same hole: a repository could
+then run ten sessions of untested code and close clean every time. There is no
+contradiction once the two are ordered as the RACI already orders them —
+**nothing blocks on a person for a judgment call, and verification reduction is
+not a judgment call.** Where an unanswered decision would reduce what
+verification proves, the *close* refuses. Work never stops; the record does not
+get to say verified.
+
+### One correction to the RACI, and it makes a session cheaper
+
+The RACI marks the Solution Explorer row a live defect, on the grounds that the
+projection's *"only writer was Python — deleted at the cutover. Nothing writes
+it."* **That is not the case.** `writeProjection` is TypeScript in
+`packages/router/src/workflow/project.ts`, and `tryWriteProjection` is called
+from six sites. Every mutating `dabbler workflow` command rewrites the
+projection today. The tree is empty for three cheaper reasons, all addressed in
+session 42: nothing scaffolds a `solution.yaml`; the one read-only verb
+(`workflow status`) computes the projection without writing it; and the view
+has no `viewsWelcome`. The framework does not owe this row a writer. It owes it
+a first run and a sentence.
+
+### What this block deliberately does NOT do
+
+- **No executor.** RACI open item 1 is not settled here. The operator still
+  hands off a work package.
+- **No build orchestration.** Reinforced by review: session 45 reads build and
+  feed configuration and reconciles it. It writes only a repository-scoped
+  declaration, only as the execution of an answered decision, never
+  machine-global state and never a credential. Maven source-switching is
+  **deleted from the plan** — its mechanism is an install, and an install is a
+  build.
+- **No git submodules.** Session 45 serves the request that produced them.
+- **No opportunistic refactor.** Session 37 is a survey that files findings and
+  fixes only what needs no design decision.
+
+### Settled before session 44, not left open
+
+- **The file is `solution-dependencies.json`.** "Local" names a resolution
+  mode, not a property of the dependency, and the file outlives the local feed.
+  A tracked filename is part of the public contract and cannot be chosen while
+  its readers are being written.
+- **Who asserts that a package is ours.** The framework cannot derive it from a
+  `.csproj` or a POM. It is supplied once, when a dependency is first seen, as
+  an owed decision, and validated on every run thereafter.
+- **Where a solution-spanning plan lives** remains open and blocks nothing.
+
+---
+
+### How to run one of these
+
+Each session below is one run of the lifecycle in `AGENTS.md` — register,
+declare, work, targeted tests, cross-provider verification, the full suite as
+the run of record, commit and push once, close through the gates. **The
+sessions are strictly sequential**: the ledger holds one `in-progress` entry,
+`declare` takes the lifecycle lock, and several of these amend the plan for
+ones that follow. Session 37's survey in particular rewrites the step lists of
+41, 42 and 47 before they run.
+
+Nothing here needs a decision from the operator before it starts. Where a
+session meets one, it raises it in the shape session 39 builds — with a stated
+default — and keeps going, except where the answer would reduce what
+verification proves, in which case the close waits rather than the work.
+
+---
+
+### Session 37 of 50: The extension surveyed against the principles
+
+*Allocation: question 2 — judgment-shaped, so the working AI leads and
+journals. Scheduled first because sessions 41, 42 and 47 all reopen extension
+code, and a conformance pass after them guarantees the same handlers are
+designed twice.*
+
+The extension is 24 files, 4,029 lines and 123 tests. This session walks all of
+it and produces a **finite findings table** — file, principle, severity,
+reproduction, owning session, and for anything deferred an explicit reason. It
+is a survey, not a refactor.
+
+1. Register; declare `--not-releasable`.
+2. Inventory every contributed command, view, menu, welcome state and
+   walkthrough from the manifest, and every operator-facing string.
+3. Evaluate four journeys — open an existing project, create a project, watch a
+   session run, navigate to a related repository — in empty, loading, success
+   and error states, against each of the eight principles.
+4. Fix only what needs no design decision. Two are already identified: **all
+   eight status icons declare `width="16mm" height="16mm"` against a 16-unit
+   viewBox** — roughly 60px of intrinsic size in a 16px row, which is the
+   probable cause of `csv-model` item 1, filed by a session that could not see
+   the UI; and two file headers still name `python -m ai_router.workflow` as the
+   projection's writer. Verify the icons under both themes with indent guides
+   on.
+5. Amend the plan for sessions 41, 42 and 47 with what the survey found. A
+   session that cannot follow its plan amends the plan on the record.
+6. Affected; verify; full suite as `final-full`; close.
+
+**Known material going in, so the session is bounded rather than exploratory:**
+`bootstrapProject.ts` ends setup with *"Open a terminal and run `dabbler
+session start`"*; `sessionTerminalCommands.ts` pre-types start and close into a
+terminal rather than running them; four `copyPromptCommands` write a prompt to
+the clipboard for the operator to paste, which is the RACI's open item 1 made
+concrete; `extension.ts` polls every 30 s.
+
+**Creates:** the findings table the extension sessions implement against.
+**Closes:** `csv-model` item 1. Est. 6 tests.
+
+---
+
+### Session 38 of 50: The projection stops withholding the plan
+
+*Allocation: question 1.*
+
+`progress.ts` reads `session-plan.md` only when the ledger is absent, so once
+`sessions.json` exists the plan is never read again. `csv-model` closed session
+2 of a nine-session plan and every indicator said `2 of 2 complete, nothing in
+flight`. The ledger does grow to the plan at the next `session start`; nothing
+surfaces that, and the reassurance lives in a source comment.
+
+1. Register; declare `--not-releasable`.
+2. Read the plan's headings on every projection **using the exact parser
+   `session start` already uses**. A second heading interpretation would be the
+   same rule stated twice.
+3. A session the plan declares and the ledger has not reached projects as
+   **`planned`** — never `not-started`, which already means "registered, not
+   begun".
+4. Never report a repository complete while the plan declares sessions the
+   ledger has not reached.
+5. **Reconciliation is specified, not assumed:** duplicate numbers, gaps,
+   renamed headings, a plan shorter than the ledger, and malformed headings each
+   have a defined projection. "Which session registers next" is derived under
+   those cases rather than assuming a contiguous plan.
+6. `session close` prints what comes next. The close is the moment the operator
+   asks "what now?"
+7. The Work Explorer renders `planned` rows greyed, from the projection alone.
+8. Affected; verify; full suite as `final-full`; close.
+
+**Closes:** `csv-model` item 9. Est. 12 tests.
+
+---
+
+### Session 39 of 50: Verification stops lying, and an unanswered gap stops the close
+
+*Allocation: question 1 for the gate and the record; **question 3, verification-
+reduction class, for what the record carries**. Moved ahead of the extension
+work because both reviewers rated it the most serious defect in the draft.*
+
+`checkTestRunFresh` returns `[true, ""]` when no declared suite is `expensive`.
+`csv-model` closed session 1 at a clean 5/5 with nothing runnable, and would
+close the session that writes its entire model the same way. Relabelling PASS
+as SKIP fixes the label and not the defect.
+
+1. Register; declare `--not-releasable`.
+2. `checkTestRunFresh` reports **`SKIP (no suite declared)`** and never `PASS`.
+   A gate that cannot see its own precondition must not report success.
+3. An **owed-decision record** under the run ledger, machine-written: what is
+   missing, which file it belongs in, what the framework determined on its own,
+   options with consequences, a recommendation with confidence, and the default
+   on no answer. Stable id, severity, and `open | answered | superseded`,
+   surviving across sessions.
+4. **An owed decision in the verification-reduction class refuses the close.**
+   Work continues and no engine is held open; the session simply cannot record
+   itself verified while the thing that would have verified it is undeclared.
+   Every other class proceeds on the stated default with the wait recorded.
+5. Three named consumers, so this is a mechanism and not a subsystem:
+   `testing.suites` at the first session that writes code; the remote question
+   at setup (session 41); and the ours/producer assertion (session 44).
+6. The operator answers once and **the framework writes the file.**
+7. **A `none-selected` evidence outcome**, recorded through `test-evidence
+   record` — not written by `dabbler affected`, which is a query and must not
+   mutate the ledger. The row binds to the selector's own invocation and
+   surface digest, so it cannot be hand-authored.
+8. The malformed-suite message names `dabbler.yaml`, not `router-config.yaml`.
+   `--help` is accepted after a subcommand on every verb.
+9. Affected; verify; full suite as `final-full`; close.
+
+**Closes:** `csv-model` items 3, 6, 7, 8. Est. 24 tests.
+
+---
+
+### Session 40 of 50: Task rows — a structured declaration, a framework-owned state machine
+
+*Allocation: question 1 owns legality; question 2 owns the transition. **This
+is the session both reviewers rewrote**, and the draft's mechanism is
+withdrawn.*
+
+Everything renders except the artifact. `approvedPlan.ts` has the schema, the
+content hash, append-only amendments and derived risk flags;
+`progress.buildTaskRows` folds it; the extension renders it onto the operator's
+own icons. `writePlan` has no production caller, and `session declare
+--task-file` stores prose.
+
+**The draft proposed inferring the open step by diffing the tree against each
+step's `file_envelope`. Both reviewers rejected it as Critical and they are
+right:** envelopes overlap, work is done out of order, and a reversion moves the
+pointer backwards. `compareToEnvelope` can say whether a change is *in scope*;
+it cannot say which task is *done*. Principle (g) asks the framework to own
+what is decidable by rule — it does not ask it to manufacture a deterministic
+answer where none exists.
+
+1. Register; declare `--not-releasable`.
+2. **The task file gets a schema**: an ordered list of steps with stable ids,
+   each with a title and a file envelope. Prose that does not parse is
+   **refused**, not guessed at.
+3. `session declare` writes the approved plan from it.
+4. The framework opens step 1 at `declare` and closes the last at the run of
+   record. One verb — `dabbler session step --done <id>` — moves the rest. The
+   framework owns legality: an out-of-order, unknown or repeated transition is
+   refused, and every transition is journaled with the tree digest and the plan
+   hash.
+5. **Envelopes are used only as a scope check on a transition** — a step
+   claiming completion whose declared files were never touched is refused. The
+   framework never infers `done`; it may mark `in-progress` from the first
+   matching change.
+6. Task rows render Not Started / In Progress / Done, and the session tooltip's
+   `N/M tasks done` becomes true.
+7. Affected; verify; full suite as `final-full`; close.
+
+**Creates:** the Work Explorer's third level, first rendered. Est. 18 tests.
+
+---
+
+### Session 41 of 50: Setup owns the runway
+
+*Allocation: question 1 for every command; question 3 for the one decision.
+Moved ahead of session 42 so bootstrap is not redesigned twice.*
+
+Both ends of the lifecycle terminate in "now go run git yourself". `bootstrap`
+prints *commit what this just wrote* about files it wrote itself, knowing why
+session 1 is refused while they sit uncommitted. The close prints `git push
+--set-upstream <remote> main` for a remote that does not exist.
+
+1. Register; declare `--not-releasable`.
+2. `Dabbler: Set Up New Project` creates the folder when VS Code has none, runs
+   `git init`, and commits its own scaffold.
+3. The remote question is asked once, at setup, through session 39's mechanism:
+   **attach an existing remote URL, or stay local.** *Hosted remote creation is
+   deferred* — authentication, host, organisation, name, visibility and
+   collision handling are a provider contract this session does not have, and
+   review flagged the draft's version as unbounded.
+4. **"Stay local" is durable repository state, not a per-run default**, and
+   `pushed_to_remote` reads it rather than printing a command that cannot work.
+5. A `contributes.walkthroughs` entry and a `file/newFile` contribution: as
+   close to *File > New > Dabbler Project* as the API allows. The native
+   File > New submenu is not extensible, and recording that here stops a later
+   session rediscovering it.
+6. Affected; verify; full suite as `final-full`; close.
+
+**Closes:** `csv-model` item 2. Est. 14 tests, of which 5 are the extension's.
+
+---
+
+### Session 42 of 50: The panes say what they are, and the Solution Explorer lights up
+
+*Allocation: question 1. See the correction above — this session wires what
+exists rather than building a writer.*
+
+1. Register; declare `--not-releasable`.
+2. The container becomes **`AI Orchestration`**; the views become **`Solution
+   Explorer`** and **`Work Explorer`**. Today a container called AI Work
+   Explorer holds a view of the same name.
+3. `viewsWelcome` on the Solution Explorer: what it will show once there is
+   something to show, and a button that scaffolds it.
+4. `bootstrap` scaffolds a `solution.yaml` — one component, named for the
+   repository — and writes the first projection, so the view has content from
+   the first minute rather than after a verb nobody knew to run.
+5. Whatever session 37's survey assigned here.
+6. Affected; verify; full suite as `final-full`; close.
+
+**Closes:** `csv-model` item 4, operator point 4. Est. 8 tests, of which 6 are
+the extension's.
+
+---
+
+### Session 43 of 50: Liveness, and one place the operator looks
+
+*Allocation: question 1 — liveness is a process fact, and a process fact the
+agent authors is not a fact. Progress **meaning** stays the working AI's, and
+this session does not touch it.*
+
+The operator supervises several projects at once and is away from any one of
+them for hours at a time. Nothing today says whether a session is working,
+stalled, or waiting on something — and after session 39 there are owed
+decisions to see, after session 38 there are planned sessions to see, and after
+session 40 there are tasks to see. Three new things to look at, in three
+places, is not an improvement.
+
+1. Register; declare `--not-releasable`.
+2. The framework stamps `lastActivityAt` on every state write and every
+   verification round. The projection derives **`possibly stalled`** from it
+   against a declared threshold. The agent never writes either — an engine that
+   reports its own liveness reports it right up until it cannot.
+3. **The heartbeat proves the process is alive, not that the thinking is
+   useful.** The row says which, and never implies the other.
+4. One **attention view** in the Work Explorer, gathering what is already
+   computed: what is in flight and how long since it moved; what it is waiting
+   on; owed decisions with their defaults and states; and any session that
+   stopped at the round cap. Nothing new is derived here — this is the fourth
+   consumer of three existing projections, and if it needs a new field the
+   field belongs to whichever session owns that fact.
+5. Affected; verify; full suite as `final-full`; close.
+
+**Creates:** the answer to "what happened while I was away", in one place.
+Est. 14 tests, of which 5 are the extension's.
+
+---
+
+### Session 44 of 50: `solution-dependencies.json` — the edge, never the pin
+
+*Allocation: question 1 for the checks; question 3 for the one assertion the
+framework cannot derive.*
+
+A `.csproj` saying it needs `Dabbler.Csv.Model >= 1.0.0` is authoritative. What
+no build file can say is **which repository produces it** — the single missing
+fact, and the reason the cross-repository record can live distributed rather
+than in a superproject.
+
+1. Register; declare `--not-releasable`.
+2. A tracked, versioned-schema file at each repository root declaring what this
+   repository **consumes** from its own solution: package id, kind, the
+   producing repository, and how it resolves. **No versions** — the pin lives in
+   the `.csproj` or POM and is never copied. **No `produces` block** — that is
+   `dabbler.yaml`'s `packaging`, and restating it would fork it.
+3. **Repository identity is settled here**: a stable id plus an optional remote
+   URL and an optional relative checkout path, with defined behaviour when a
+   sibling is absent, moved, offline, or cloned twice. A missing sibling is a
+   reported state, never an error that stops work.
+4. The "this package is ours" assertion is supplied once through session 39's
+   mechanism and validated thereafter.
+5. Direct dependencies are read from `.csproj` and `pom.xml` as XML — manifest
+   reading, not building. **The parser fails loudly rather than guessing:** a
+   version or id that resolves through an MSBuild property, `Directory.Build.
+   props`, or Maven dependency management is reported as *cannot determine*,
+   never as drift. A false drift report is worse than no report.
+6. Four reconciliations, reported and never silently repaired:
+   referenced-but-not-declared; declared-but-not-referenced; two repositories
+   pinning different versions of one package; and an unsanctioned source
+   reference crossing a repository boundary.
+7. Affected; verify; full suite as `final-full`; close.
+
+**Creates:** the cross-repository graph — one edge-set per repository, in git,
+assembled by union, with no superproject and no shared mutable state.
+Est. 22 tests.
+
+---
+
+### Session 45 of 50: Resolution modes, inside the declare-and-check line
+
+*Allocation: question 1 for the reconciliations; **question 3 for accepting
+evidence produced in source mode** — which is the correct location for the
+carve-out, and not where the draft put it.*
+
+The draft said the *swap* to source resolution is verification-reducing.
+Review sharpened it: **the swap is ordinary; accepting final evidence produced
+in source mode is what reduces verification.** That is the event to reserve, and
+it is better prohibited than approved.
+
+1. Register; declare `--not-releasable`.
+2. Two further reconciliations, both of which cost `csv-model` time: the pinned
+   version is behind what the producer published, and the named feed is not
+   registered on this machine — its Phase 3 flagged that the one local source
+   configured points at an unrelated project and is disabled.
+3. **Read and reconcile feed configuration; write only a repository-scoped
+   declaration, and only as the execution of an answered decision.** Never
+   machine-global state, never a credential. Writing a repo-scoped
+   `NuGet.config` is declaring; running an install is orchestrating.
+4. `resolve: source` for .NET only: a reversible `PackageReference` ⇄
+   `ProjectReference` swap with crash recovery and an exact restoration check.
+   **Maven source-switching is not in this plan** — its mechanism is
+   install-to-local-repository, which is a build.
+5. **`final-full`, `packaging` and `session close` refuse while any dependency
+   resolves from source.** A green build against a sibling checkout says nothing
+   about the published package, so the record never gets to claim it did.
+6. Affected; verify; full suite as `final-full`; close.
+
+**Creates:** the reason this framework does not need git submodules. What was
+wanted was the ability to step into a dependency's source while debugging; a
+sibling checkout and a reversible switch deliver it without changing what git
+tracks — and without the two defects a submodule walks into: `surfaceDigest`
+cannot read a gitlink, so nothing inside a submodule moves the freshness digest,
+and the pushed gate does not recurse.
+Est. 18 tests.
+
+---
+
+### Session 46 of 50: Packaging declared for the ecosystem it is
+
+*Allocation: question 1 for the detection; question 3 for the feed, which is
+external-consequence. Serves the operator's point 7 directly, and it is the one
+DX principle from 2026-08-30 that no other session in this block reaches.*
+
+`bootstrap/detect.ts` reads a repository and derives its test-suite
+declaration. It derives nothing about packaging, so the `packaging` block is
+hand-authored in every repository that publishes — and `csv-model`'s Phase 3
+has to invent pack and push argv, register a local feed, and get all of it
+right before it can publish once.
+
+1. Register; declare `--not-releasable`.
+2. `detect.ts` gains packaging detection beside suite detection, with the same
+   two silences: a `.csproj` carrying package metadata implies `dotnet pack`
+   and `dotnet nuget push`; a POM implies `mvn -q package` and `deploy`; a
+   repository whose build files sit below the root declares nothing rather
+   than emitting a line that would fail on first use.
+3. Argv, never shell strings — the existing block's rule, and the reason a
+   detected line can be trusted at spawn.
+4. The feed and the credential's **name** are raised as owed decisions
+   (session 39), asked once at setup, and **the framework writes the block**.
+   The credential itself is never written anywhere: `packaging.push.secret`
+   names it and resolves at spawn into one argv element.
+5. `dabbler packaging --dry-run` explains in plain language what it would pack,
+   where it would push, and which gates it is waiting on. A repository that
+   declares no packaging says so as a declaration, not as a gap.
+6. Affected; verify; full suite as `final-full`; close.
+
+**Creates:** publishing that a repository does not have to be taught by hand.
+Est. 16 tests.
+
+---
+
+### Session 47 of 50: The Solution Explorer goes cross-repo
+
+*Allocation: question 1.*
+
+1. Register; declare `--not-releasable`.
+2. **External component rows are derived from `solution-dependencies.json`, and
+   `solution.yaml` gains no vocabulary for them.** Review caught the draft
+   proposing both: two tracked homes for one edge is the drift this codebase
+   already refuses for `usedBy`.
+3. The graph is assembled by union across the repositories the dependency files
+   name. Each repository owns its own edges; `usedBy` stays derived.
+4. Rows for an external component: the producing repository, the pinned
+   version, and drift against the feed — the `⚠ you're pinned to 0.8.1` row the
+   2026-08-23 direction sketched and nothing has rendered.
+5. Navigation: **Open Repository**, **Open in New Window**, **Reveal in File
+   Explorer**. The tree has no context menu at all today.
+6. Whatever session 37's survey assigned here.
+7. Affected; verify; full suite as `final-full`; close.
+
+**Closes:** operator point 3. Est. 16 tests, of which 7 are the extension's.
+
+---
+
+### Session 48 of 50: The generated workspace
+
+*Allocation: question 1.*
+
+1. Register; declare `--not-releasable`.
+2. A `.code-workspace` generated from the graph, so one window shows the whole
+   solution. Multi-root is a VS Code default, not a limit.
+3. **It is derived local state and is never tracked.** It carries
+   machine-specific sibling paths, and a tracked copy would be wrong on the
+   second machine that opened it.
+4. Affected; verify; full suite as `final-full`; close.
+
+Est. 10 tests.
+
+---
+
+### Session 49 of 50: The thing becomes installable
+
+*Allocation: question 3, external-consequence class — the operator decides and
+the framework executes. **This session exists because review found that every
+other session is `--not-releasable`, so the block would have ended with the
+product still uninstallable and its acceptance criterion unreachable.***
+
+`csv-model` item 5: `npm i -g dabbler-ai-router` returns 404. Router 2.0.0 and
+the extension are built and unpublished; the tag push is the operator's.
+
+1. Register; declare **`--releasable`**.
+2. Raise the publication decision as a brief: what ships, at what versions, to
+   which registries, and what a wrong answer costs.
+3. On the answer, **the framework executes** the tag and publication workflow.
+   The operator is not asked to type a command.
+4. Verify installation from the public registry in a clean environment, and
+   record it as evidence.
+5. Affected; verify; full suite as `final-full`; `dabbler packaging`; close.
+
+**Closes:** `csv-model` item 5.
+
+---
+
+### Session 50 of 50: The field trial, and the exercise reported back
+
+*Review's objection to the draft: a session cannot be both the last feature
+session and the first field trial, because the trial will find defects and
+there is nowhere to put them. It is separated here, and it is allowed to amend
+the plan.*
+
+1. Register; declare `--not-releasable`.
+2. Walk `csv-model` and its two downstream repositories end to end, from a
+   clean profile and a registry install.
+3. Run the acceptance exercise below and record every observed failure.
+4. **Amend the plan with bounded remediation sessions for what it finds.** A
+   trial with no route to fix what it finds is a demonstration, not a trial.
+5. Consolidate `csv-model`'s `docs/feedback/`: which items closed, which remain
+   with a dated owner, which turned out to be right about something else.
+6. Affected; verify; full suite as `final-full`; close.
+
+---
+
+## Acceptance criterion for sessions 37–50
+
+**Mechanical, and checked in session 50.** From a clean VS Code profile, with
+the router installed from the public registry and a fresh clone of `csv-model`:
+
+1. The Solution Explorer renders all three repositories of the csv pipeline
+   from `solution-dependencies.json`, with every declared edge resolved and any
+   drift shown.
+2. The Work Explorer shows the repository's completed, current and planned
+   sessions, and the current session's tasks moving through Not Started /
+   In Progress / Done.
+3. Every owed decision is visible with its default and its state, in the same
+   place that shows what is in flight and how long since it moved.
+4. No gate reports `PASS` for a precondition it cannot see, and a repository
+   with no declared suite cannot close a code-changing session.
+5. **All nine `csv-model` feedback items have a linked test, a recorded release
+   verification, or a dated deferred issue with an owner.** Prose classification
+   does not satisfy this.
+6. **Nothing in the block asked the operator to run a command.** Every git
+   operation, config write and publication was executed by the framework; where
+   a decision was required it arrived as a brief and the framework executed the
+   answer.
+7. A repository that publishes had its `packaging` block written for it, and
+   the credential appears nowhere but as a name.
+
+The operator performs it in one sitting, answering from visible UI only, with
+the expected answers written down beforehand.
+
+## Test budget for sessions 37–50
+
+Baseline at session 37 is **942 router tests and 123 extension tests**. This
+block adds roughly **160 router tests and 30 extension tests**, one per
+behavior.
+
+The port's banned kinds still apply: no falsifier twins, no source-text
+assertions, no migration-path tests, no tests of test infrastructure, and no
+tests asserting exact markdown strings. Two additions: **no test asserts the
+wording of a brief** — the five parts are structure and are asserted as
+structure — and **no test asserts a projection's rendered layout**, which is the
+extension's business and is covered there.

@@ -67,5 +67,9 @@ export type OwedDecisions = {
    * Only an operator answers. The enum is the point: no model may record an answer to a question reserved for a person.
    */
   answeredBy?: "operator" | null;
+  /**
+   * The datum an answer carries when the choice alone is not enough -- a remote URL for 'attach', for instance. Distinct from `note`, which is commentary: this is a parameter the framework acts on, and an option whose consequence does not say it needs one never has it.
+   */
+  value?: string | null;
   note?: string | null;
 };

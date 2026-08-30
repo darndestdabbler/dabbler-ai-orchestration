@@ -48,6 +48,7 @@
     "onNoAnswer": { "type": ["string", "null"] },
     "answer": { "type": ["string", "null"] },
     "answeredBy": { "type": ["string", "null"], "enum": ["operator", null] },
+    "value": { "type": ["string", "null"] },
     "note": { "type": ["string", "null"] },
     "sessionNumber": { "type": ["integer", "null"] },
     "recordedAt": { "type": "string" },

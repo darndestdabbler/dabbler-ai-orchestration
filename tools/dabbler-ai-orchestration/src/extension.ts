@@ -61,9 +61,13 @@ export function activate(context: vscode.ExtensionContext): void {
     if (!root || hasSessionsRoot(root)) return;
     setupOffered = true;
     const choice = await vscode.window.showInformationMessage(
+      // Survey finding F2, and a correctness fix rather than copy: this
+      // claimed setup creates a .venv and installs the router, which it has
+      // not done since the cutover bundled the router into the extension.
+      // It is the first sentence a new operator reads.
       "This workspace has no Dabbler sessions yet. Set it up now? " +
-        "This creates the workspace .venv, installs the ai-router into " +
-        "it, and scaffolds the session plan.",
+        "Nothing is installed: this writes the guidance files, the ignore " +
+        "rule and the first two sessions, and commits them.",
       "Set Up New Project",
       "Not Now",
     );

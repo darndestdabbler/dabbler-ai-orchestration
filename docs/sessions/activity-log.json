@@ -8564,6 +8564,140 @@
       "dateTime": "2026-08-30T15:25:05.721000-04:00",
       "description": "Affected; verify; full suite as `final-full`; close.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 41,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-30T15:31:24.919000-04:00",
+      "description": "Register; declare `--not-releasable`.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 41,
+      "stepNumber": 2,
+      "stepKey": "dabbler",
+      "dateTime": "2026-08-30T15:31:24.919000-04:00",
+      "description": "`Dabbler: Set Up New Project` creates the folder when VS Code has none, runs `git init`, and commits its own scaffold.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 41,
+      "stepNumber": 3,
+      "stepKey": "the-remote-question-is-asked-once",
+      "dateTime": "2026-08-30T15:31:24.919000-04:00",
+      "description": "The remote question is asked once, at setup, through session 39's mechanism: **attach an existing remote URL, or stay local.** *Hosted remote creation is deferred* \u2014 authentication, host, organisation, name, visibility and collision handling are a provider contract this session does not have, and review flagged the draft's version as unbounded.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 41,
+      "stepNumber": 4,
+      "stepKey": "stay-local-is-durable-repository-state",
+      "dateTime": "2026-08-30T15:31:24.919000-04:00",
+      "description": "**\"Stay local\" is durable repository state, not a per-run default**, and `pushed_to_remote` reads it rather than printing a command that cannot work.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 41,
+      "stepNumber": 5,
+      "stepKey": "a-contributes",
+      "dateTime": "2026-08-30T15:31:24.919000-04:00",
+      "description": "A `contributes.walkthroughs` entry and a `file/newFile` contribution: as close to *File > New > Dabbler Project* as the API allows. The native File > New submenu is not extensible, and recording that here stops a later session rediscovering it. *(Survey F6.)*",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 41,
+      "stepNumber": 6,
+      "stepKey": "amended-by-session-37-s-survey",
+      "dateTime": "2026-08-30T15:31:24.919000-04:00",
+      "description": "**Amended by session 37's survey** (`docs/extension-dx-survey.md`), which found three of its four Majors on this journey: - **F1** \u2014 setup ends with *\"Open a terminal and run `dabbler session start`\"* (`bootstrapProject.ts:60`). The framework wrote the files and knows the next verb. - **F2** \u2014 the first-run offer claims setup *\"creates the workspace .venv, installs the ai-router into it\"* (`extension.ts:63-65`). It has done neither since the cutover. **Treat this as a correctness fix, not copy:** it is the only string in the extension that describes work the product stopped doing, and it is the first sentence a new operator reads. - **F3** \u2014 Start and Close are pre-typed into a terminal rather than run (`sessionTerminalCommands.ts`). Start carries a decision and the keystroke is not it; Close carries no decision at all.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 41,
+      "stepNumber": 7,
+      "stepKey": "affected",
+      "dateTime": "2026-08-30T15:31:24.919000-04:00",
+      "description": "Affected; verify; full suite as `final-full`; close.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 41,
+      "dateTime": "2026-08-30T15:31:58.509000-04:00",
+      "task": "Session 41 of 50 \u2014 Setup owns the runway.\n\nBoth ends of the lifecycle currently finish by handing the operator a\nterminal command. `bootstrap` prints \"commit what this just wrote\" about\nfiles it wrote itself, knowing exactly why session 1 is refused while they\nsit uncommitted. The close prints `git push --set-upstream <remote> main`\nfor a remote that does not exist and that the framework neither created nor\noffered to create. csv-model's item 2 is both of those, and principle (e)\nis the rule they break: the operator is never asked to run a command the\nframework can run.\n\nWhat this session does:\n\n1. `Dabbler: Set Up New Project` owns the whole runway \u2014 it creates the\n   folder when VS Code has no suitable one, runs `git init`, and commits\n   its own scaffold.\n2. The remote question is asked once, at setup, through session 39's\n   owed-decision mechanism: attach an existing remote URL, or stay local.\n   Hosted remote creation is deferred \u2014 authentication, host, organisation,\n   name, visibility and collision handling are a provider contract this\n   session does not have.\n3. \"Stay local\" becomes durable repository state rather than a per-run\n   default, and `pushed_to_remote` reads it instead of printing a command\n   that cannot work.\n4. A `contributes.walkthroughs` entry and a `file/newFile` contribution:\n   as close to File > New > Dabbler Project as the VS Code API allows. The\n   native File > New submenu is not extensible, and recording that stops a\n   later session rediscovering it.\n5. The three findings session 37's survey assigned here:\n   - F1, `bootstrapProject.ts`: setup ends with \"Open a terminal and run\n     `dabbler session start`\".\n   - F2, `extension.ts`: the first-run offer claims setup creates a .venv\n     and installs the router. It has done neither since the cutover, and it\n     is the first sentence a new operator reads. A correctness fix, not\n     copy.\n   - F3, `sessionTerminalCommands.ts`: Start and Close are pre-typed into a\n     terminal rather than run. Start carries a decision and the keystroke is\n     not it; Close carries no decision at all.\n\nBoth suites are declared now, so this session owes a run of record for each.\n\nNot releasable: it publishes nothing.",
+      "releasable": false
+    },
+    {
+      "sessionNumber": 41,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-30T15:31:58.535000-04:00",
+      "description": "Register; declare `--not-releasable`.",
+      "status": "in-progress"
+    },
+    {
+      "sessionNumber": 41,
+      "stepNumber": 2,
+      "stepKey": "dabbler",
+      "dateTime": "2026-08-30T15:42:04.201000-04:00",
+      "description": "`Dabbler: Set Up New Project` creates the folder when VS Code has none, runs `git init`, and commits its own scaffold.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 41,
+      "stepNumber": 3,
+      "stepKey": "the-remote-question-is-asked-once",
+      "dateTime": "2026-08-30T15:42:04.394000-04:00",
+      "description": "The remote question is asked once, at setup, through session 39's mechanism: **attach an existing remote URL, or stay local.** *Hosted remote creation is deferred* \u2014 authentication, host, organisation, name, visibility and collision handling are a provider contract this session does not have, and review flagged the draft's version as unbounded.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 41,
+      "stepNumber": 4,
+      "stepKey": "stay-local-is-durable-repository-state",
+      "dateTime": "2026-08-30T15:42:04.586000-04:00",
+      "description": "**\"Stay local\" is durable repository state, not a per-run default**, and `pushed_to_remote` reads it rather than printing a command that cannot work.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 41,
+      "stepNumber": 5,
+      "stepKey": "a-contributes",
+      "dateTime": "2026-08-30T15:42:04.787000-04:00",
+      "description": "A `contributes.walkthroughs` entry and a `file/newFile` contribution: as close to *File > New > Dabbler Project* as the API allows. The native File > New submenu is not extensible, and recording that here stops a later session rediscovering it. *(Survey F6.)*",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 41,
+      "stepNumber": 6,
+      "stepKey": "amended-by-session-37-s-survey",
+      "dateTime": "2026-08-30T15:42:04.993000-04:00",
+      "description": "**Amended by session 37's survey** (`docs/extension-dx-survey.md`), which found three of its four Majors on this journey: - **F1** \u2014 setup ends with *\"Open a terminal and run `dabbler session start`\"* (`bootstrapProject.ts:60`). The framework wrote the files and knows the next verb. - **F2** \u2014 the first-run offer claims setup *\"creates the workspace .venv, installs the ai-router into it\"* (`extension.ts:63-65`). It has done neither since the cutover. **Treat this as a correctness fix, not copy:** it is the only string in the extension that describes work the product stopped doing, and it is the first sentence a new operator reads. - **F3** \u2014 Start and Close are pre-typed into a terminal rather than run (`sessionTerminalCommands.ts`). Start carries a decision and the keystroke is not it; Close carries no decision at all.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 41,
+      "stepNumber": 7,
+      "stepKey": "affected",
+      "dateTime": "2026-08-30T15:52:03.722000-04:00",
+      "description": "Affected; verify; full suite as `final-full`; close.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 41,
+      "stepNumber": 7,
+      "stepKey": "affected",
+      "dateTime": "2026-08-30T15:52:04.140000-04:00",
+      "description": "Affected; verify; full suite as `final-full`; close.",
+      "status": "complete"
     }
   ]
 }

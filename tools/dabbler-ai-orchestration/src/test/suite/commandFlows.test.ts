@@ -141,28 +141,115 @@ suite("new module flow", () => {
 });
 
 suite("set up new project", () => {
-  function setUpUi(root: string | undefined): {
+  function setUpUi(
+    root: string | undefined,
+    options: {
+      choose?: string;
+      initFails?: string;
+      noGit?: boolean;
+      newFolder?: string;
+      offerFolder?: boolean;
+    } = {},
+  ): {
     ui: SetUpProjectUi;
     errors: string[];
     infos: string[];
+    offers: string[];
+    ran: string[];
+    inits: number;
   } {
     const errors: string[] = [];
     const infos: string[] = [];
-    return {
-      ui: {
-        showInformationMessage: (m: string) => infos.push(m),
-        showErrorMessage: (m: string) => errors.push(m),
-        workspaceRoot: () => root,
+    const offers: string[] = [];
+    const ran: string[] = [];
+    let inits = 0;
+    const ui: SetUpProjectUi = {
+      showInformationMessage: (m: string) => infos.push(m),
+      showErrorMessage: (m: string) => errors.push(m),
+      offer: (message: string) => {
+        offers.push(message);
+        return Promise.resolve(options.choose);
       },
+      workspaceRoot: () => root,
+      startSession: (root: string) => {
+        ran.push(root);
+        return Promise.resolve(undefined);
+      },
+    };
+    if (options.newFolder !== undefined || options.offerFolder) {
+      ui.chooseNewProjectFolder = () => Promise.resolve(options.newFolder);
+    }
+    if (!options.noGit) {
+      ui.initRepository = () => {
+        inits += 1;
+        return Promise.resolve(options.initFails ?? "");
+      };
+    }
+    return {
+      ui,
       errors,
       infos,
+      offers,
+      ran,
+      get inits() {
+        return inits;
+      },
     };
   }
 
-  test("bootstraps the workspace and says what to run next", async () => {
-    const { ui, infos } = setUpUi("D:\\ws");
+  test("offers to start session 1 rather than naming a command to type", async () => {
+    // Survey finding F1: the flow used to end with "Open a terminal and run
+    // `dabbler session start`" -- the framework naming a command it can run,
+    // about a project it had just finished preparing.
+    const { ui, offers, ran } = setUpUi("D:\\ws");
     assert.strictEqual(await runSetUpProjectFlow(ui, fakeRouter(0).router), true);
-    assert.ok(infos[0].includes("dabbler session start"));
+    assert.strictEqual(offers.length, 1);
+    assert.ok(!offers[0].includes("terminal"));
+    assert.strictEqual(ran.length, 0);
+  });
+
+  test("starts the session in the project it prepared", async () => {
+    // Dispatching the tree command instead sent no repository argument, and
+    // that handler reads its repository off the argument — so the offered
+    // start reached nothing at all.
+    const { ui, ran } = setUpUi("D:\\ws", { choose: "Start session 1" });
+    await runSetUpProjectFlow(ui, fakeRouter(0).router);
+    assert.deepStrictEqual(ran, ["D:\\ws"]);
+  });
+
+  test("creates the project when VS Code has no folder open at all", async () => {
+    // The one onboarding path this command exists for, and the one it used
+    // to refuse outright.
+    const { ui } = setUpUi(undefined, { newFolder: "D:\\fresh" });
+    assert.strictEqual(await runSetUpProjectFlow(ui, fakeRouter(0).router), true);
+  });
+
+  test("cancelling the folder question cancels the command", async () => {
+    const { ui, errors } = setUpUi(undefined, { offerFolder: true });
+    assert.strictEqual(await runSetUpProjectFlow(ui, unusableRouter()), false);
+    assert.strictEqual(errors.length, 0);
+  });
+
+  test("initialises a repository when bootstrap refuses for want of one", async () => {
+    // `bootstrap` refuses a directory that is not a git repository. That is
+    // a thing the framework can fix, so it fixes it and retries once.
+    const fake = fakeRouter(3, "not a git repository");
+    const { ui } = setUpUi("D:\\ws");
+    await runSetUpProjectFlow(ui, fake.router);
+    // Two bootstraps: the refusal, then the retry after `git init`.
+    assert.strictEqual(
+      fake.asked.filter((verb) => verb === "bootstrap").length,
+      2,
+    );
+  });
+
+  test("says why it could not initialise, rather than retrying blindly", async () => {
+    const { ui, errors } = setUpUi("D:\\ws", { initFails: "no git extension" });
+    assert.strictEqual(
+      await runSetUpProjectFlow(ui, fakeRouter(3, "not a git repository").router),
+      false,
+    );
+    assert.ok(errors[0].includes("no git extension"));
   });
 
   test("no workspace folder is an error, and nothing is asked of the router", async () => {
@@ -171,13 +258,13 @@ suite("set up new project", () => {
     assert.ok(errors[0].includes("Open the project folder"));
   });
 
-  test("a refusal from bootstrap is shown, not swallowed", async () => {
-    const { ui, errors } = setUpUi("D:\\ws");
+  test("a refusal that an init cannot fix is shown, not swallowed", async () => {
+    const { ui, errors } = setUpUi("D:\\ws", { noGit: true });
     assert.strictEqual(
-      await runSetUpProjectFlow(ui, fakeRouter(3, "not a git repository").router),
+      await runSetUpProjectFlow(ui, fakeRouter(3, "not a directory").router),
       false,
     );
-    assert.ok(errors[0].includes("not a git repository"));
+    assert.ok(errors[0].includes("not a directory"));
   });
 });
 

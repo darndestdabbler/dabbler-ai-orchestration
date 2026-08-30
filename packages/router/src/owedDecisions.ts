@@ -258,6 +258,7 @@ export function answerOwed(
   choice: string,
   sessionNumber: number | null = null,
   note: string | null = null,
+  value: string | null = null,
 ): Row {
   const current = foldOwed(readOwed(repoRoot)).get(id);
   if (current === undefined) {
@@ -290,6 +291,7 @@ export function answerOwed(
     sessionNumber,
     answer: choice,
     answeredBy: "operator",
+    value,
     note,
   });
 }
@@ -343,6 +345,8 @@ export function owedExists(repoRoot: string): boolean {
  * to close green.
  */
 export const ID_TESTING_SUITES = "testing-suites";
+/** Where this repository pushes, asked once at setup. */
+export const ID_GIT_REMOTE = "git-remote";
 /**
  * The second question, asked once the first one's answer stops being true.
  *
@@ -447,6 +451,66 @@ export function refreshOwedDecisions(
       "Nothing. This is the one class that waits: work continues and the " +
       "session runs to the end, but the close will not call it verified, " +
       "because there is nothing that could have verified it.",
+    sessionNumber: options.sessionNumber ?? null,
+  });
+}
+
+/**
+ * Where this repository pushes, asked once and at setup.
+ *
+ * External-consequence rather than verification-reduction, so it does NOT
+ * hold the close: a repository that stays local is a legitimate answer, and
+ * the close reads the answer instead of printing `git push --set-upstream`
+ * for a remote nobody created. That printed line is csv-model's item 2 --
+ * the framework naming a command that could not work, about a thing it never
+ * offered to do.
+ *
+ * Hosted creation is deliberately not an option. Authentication, host,
+ * organisation, name, visibility and collision handling are a provider
+ * contract, and an option whose consequence cannot be stated in one sentence
+ * is not a choice anyone can make from a brief.
+ */
+export function raiseRemoteDecision(
+  repoRoot: string,
+  options: {
+    readonly hasRemote: boolean;
+    readonly sessionNumber?: number | null;
+  },
+): Row | null {
+  if (options.hasRemote) return null;
+  return raiseOwed(repoRoot, {
+    id: ID_GIT_REMOTE,
+    decisionClass: CLASS_EXTERNAL_CONSEQUENCE,
+    question:
+      "Where should this repository push? It has no remote, and the close " +
+      "cannot prove work left this machine without one.",
+    file: null,
+    determined:
+      "The repository is a git repository with no remote configured. " +
+      "Whether that is deliberate is not derivable -- a scratch project and " +
+      "an unfinished setup look identical from here.",
+    options: [
+      {
+        label: "attach",
+        consequence:
+          "The framework adds the remote URL you give and pushes the branch " +
+          "with an upstream. Answer with the URL: " +
+          "`dabbler owed answer --id git-remote --choice attach --value <url>`.",
+      },
+      {
+        label: "stay-local",
+        consequence:
+          "Recorded as deliberate. The close stops asking for a push and " +
+          "says the repository is local-only, rather than naming a command " +
+          "that cannot work.",
+      },
+    ],
+    recommendation: "attach",
+    confidence: "medium",
+    onNoAnswer:
+      "Nothing waits. The close still refuses an unpushed branch, because " +
+      "work that never left this machine is work one disk failure ends -- " +
+      "but it is the push it wants, not this answer.",
     sessionNumber: options.sessionNumber ?? null,
   });
 }

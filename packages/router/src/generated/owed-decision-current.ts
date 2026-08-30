@@ -32,6 +32,7 @@ export type OwedDecisionCurrent = {
   onNoAnswer?: string | null;
   answer?: string | null;
   answeredBy?: "operator" | null;
+  value?: string | null;
   note?: string | null;
   sessionNumber?: number | null;
   recordedAt?: string;

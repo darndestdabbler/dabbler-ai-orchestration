@@ -28,7 +28,14 @@ import {
   writeInstructionFiles,
 } from "../src/bootstrap/index.ts";
 import { TRANSPORT_COPILOT_CLI, TRANSPORT_ENV_VAR } from "../src/config.ts";
-import { makeProject, makeTempDir, removeTempDirs } from "./support/fixtures.ts";
+import { makeProject, makeSandboxRepo, makeTempDir, removeTempDirs } from "./support/fixtures.ts";
+import { bootstrapVerb } from "../src/cli/bootstrap.ts";
+import {
+  ID_GIT_REMOTE,
+  blockingDecisions,
+  openDecisions,
+  raiseRemoteDecision,
+} from "../src/owedDecisions.ts";
 
 afterAll(removeTempDirs);
 
@@ -429,5 +436,55 @@ describe("the round-ref migration", () => {
     });
     expect(config).toContain("refs/dabbler/rounds");
     expect(existsSync(join(repo, "AGENTS.md"))).toBe(true);
+  });
+});
+
+describe("what setup does about the operator's typing", () => {
+  it("commits the files it wrote, and only those", async () => {
+    // It used to print "commit what this just wrote" -- the framework asking
+    // the operator to run a command it could run, about files it had just
+    // written, knowing session 1 would be refused while they sat there.
+    const { repo, sessionsDir } = makeSandboxRepo();
+    void sessionsDir;
+    writeFileSync(join(repo, "mine.txt"), "the operator's own work\n", "utf8");
+    await bootstrapVerb(["--project-dir", repo, "--no-transport-detect"]);
+    const status = execFileSync("git", ["status", "--porcelain", "-uall"], {
+      cwd: repo,
+      encoding: "utf8",
+    });
+    // The operator's file is untouched; setup's own are committed.
+    expect(status).toContain("mine.txt");
+    expect(status).not.toContain("AGENTS.md");
+    const subject = execFileSync("git", ["log", "-1", "--format=%s"], {
+      cwd: repo,
+      encoding: "utf8",
+    });
+    expect(subject.trim()).toBe("Set up Dabbler");
+  });
+
+  it("asks where the repository pushes rather than printing a push command", async () => {
+    // csv-model item 2's other half: the close printed `git push
+    // --set-upstream <remote> main` for a remote nobody had created.
+    const repo = makeProject();
+    execFileSync("git", ["init", "-q", "-b", "main"], { cwd: repo });
+    execFileSync("git", ["config", "user.email", "t@t"], { cwd: repo });
+    execFileSync("git", ["config", "user.name", "t"], { cwd: repo });
+    await bootstrapVerb(["--project-dir", repo, "--no-transport-detect"]);
+    const owed = openDecisions(repo).map((row) => String(row["id"]));
+    expect(owed).toContain(ID_GIT_REMOTE);
+  });
+});
+
+describe("the remote question", () => {
+  it("is not asked of a repository that already has a remote", () => {
+    const { repo } = makeSandboxRepo();
+    expect(raiseRemoteDecision(repo, { hasRemote: true })).toBeNull();
+  });
+
+  it("does not hold the close, because staying local is a real answer", () => {
+    const { repo } = makeSandboxRepo();
+    const row = raiseRemoteDecision(repo, { hasRemote: false });
+    expect(row?.["severity"]).toBe("advisory");
+    expect(blockingDecisions(repo)).toHaveLength(0);
   });
 });

@@ -9,10 +9,12 @@
 // must not touch the host opts out of the second.
 
 import { statSync } from "node:fs";
-import { join } from "node:path";
+import { join, relative as relativeTo } from "node:path";
 
 import { TRANSPORT_ENV_VAR, VALID_TRANSPORTS } from "../config.ts";
 import { ensureRoundRefspecs, repoRootFor } from "../evidence.ts";
+import { runGit } from "../journal.ts";
+import { raiseRemoteDecision } from "../owedDecisions.ts";
 import {
   DECOMPOSITION_PROMPT,
   IGNORE_RULE,
@@ -186,13 +188,18 @@ export async function bootstrapVerb(argv: string[]): Promise<number> {
     return EXIT_USAGE;
   }
 
+  // Every path bootstrap itself writes, so it can commit exactly those and
+  // nothing else. Sweeping the tree would fold whatever the operator had
+  // open into a commit they did not write.
+  const written: string[] = [];
   for (const path of writeInstructionFiles(project, parsed.repoName)) {
     writeOut(`bootstrap: wrote managed section in ${path}\n`);
+    written.push(path);
   }
   if (ensureGitignore(project)) {
-    writeOut(
-      `bootstrap: added ${IGNORE_RULE} to ${join(project, ".gitignore")}\n`,
-    );
+    const path = join(project, ".gitignore");
+    writeOut(`bootstrap: added ${IGNORE_RULE} to ${path}\n`);
+    written.push(path);
   }
   // Re-run on an existing clone, this is the migration: a clone made before
   // round refs existed carries neither refspec, and the fix only reaches the
@@ -212,6 +219,7 @@ export async function bootstrapVerb(argv: string[]): Promise<number> {
   if (!parsed.noTransportDetect) applyTransportPreference(parsed);
 
   const configPath = scaffoldProjectConfig(project);
+  if (configPath !== null) written.push(configPath);
   if (configPath !== null) {
     const declared = detectEcosystems(project);
     writeOut(`bootstrap: scaffolded ${configPath}\n`);
@@ -226,18 +234,54 @@ export async function bootstrapVerb(argv: string[]): Promise<number> {
         "\n",
     );
   }
+  // Asked at setup, where the answer is cheap, rather than at the close --
+  // which is where it used to surface, as a printed `git push
+  // --set-upstream` for a remote nobody had created.
+  const repoRoot = repoRootFor(project);
+  if (repoRoot !== null) {
+    try {
+      const raised = raiseRemoteDecision(repoRoot, {
+        hasRemote: runGit(repoRoot, ["remote"]).stdout.trim() !== "",
+      });
+      if (raised !== null) {
+        writeOut(
+          "bootstrap: this repository has no remote. `dabbler owed list` " +
+            "asks where it should push; answering settles it once.\n",
+        );
+      }
+    } catch {
+      // A brief that cannot be written must not fail a setup.
+    }
+  }
+
   const scaffolded = scaffoldBootstrapSessions(project);
   for (const path of scaffolded) {
     writeOut(`bootstrap: scaffolded ${path}\n`);
+    written.push(path);
+  }
+  // It used to print "commit what this just wrote" — the framework asking
+  // the operator to run a command it could run itself, about files it had
+  // just written, knowing exactly why session 1 would be refused while they
+  // sat uncommitted. It commits them, whether or not this run also
+  // scaffolded the sessions: a re-run that only refreshes the guidance
+  // leaves the same dirty tree behind, and the same session 1 refusal.
+  const commit = commitOwnScaffold(project, written);
+  if (commit.committed) {
+    writeOut(
+      `bootstrap: committed ${written.length} file(s) it wrote; the ` +
+        "declaration a session makes comes before its work, so session 1 " +
+        "would be refused while they sat uncommitted.\n",
+    );
+  } else if (commit.reason) {
+    writeErr(
+      `bootstrap: could not commit its own scaffold (${commit.reason}). ` +
+        "Commit these files before session 1, which is refused while they " +
+        "sit uncommitted.\n",
+    );
   }
   if (scaffolded.length > 0) {
     writeOut(
-      "bootstrap: commit what this just wrote — the declaration a " +
-        "session makes comes before its work, so session 1 is refused " +
-        "while setup's own files sit uncommitted in the tree.\n",
-    );
-    writeOut(
-      'bootstrap: then tell your AI agent to "start the next ' +
+      'bootstrap: now tell your AI agent to "start the next ' +
         'session" — session 1 authors the project plan, then session 2 ' +
         "breaks it into numbered sessions. Neither waits on anyone.\n",
     );
@@ -248,4 +292,52 @@ export async function bootstrapVerb(argv: string[]): Promise<number> {
     );
   }
   return EXIT_OK;
+}
+
+/**
+ * Commit the files bootstrap just wrote, and only those.
+ *
+ * Named paths rather than `git add -A`: setup runs in a directory the
+ * operator may already have work in, and folding that into a commit they did
+ * not write is worse than leaving the scaffold uncommitted.
+ *
+ * Every failure is reported and none is fatal. A repository with no committer
+ * identity, or a hook that refuses, is a thing an operator can fix -- and a
+ * bootstrap that died at the commit would leave the files written and the
+ * project half set up, which is the state this whole session exists to stop
+ * handing people.
+ */
+function commitOwnScaffold(
+  projectDir: string,
+  paths: readonly string[],
+): { readonly committed: boolean; readonly reason: string } {
+  if (paths.length === 0) return { committed: false, reason: "" };
+  const root = repoRootFor(projectDir);
+  if (root === null) {
+    return { committed: false, reason: "not inside a git repository" };
+  }
+  const relative = paths.map((path) => relativeTo(root, path));
+  const added = runGit(root, ["add", "--", ...relative]);
+  if (added.code !== 0) {
+    return { committed: false, reason: added.stderr.trim() || "git add failed" };
+  }
+  // Nothing staged means the files were already committed -- a re-run on an
+  // existing project, which is the ordinary case and not a failure.
+  if (runGit(root, ["diff", "--cached", "--quiet", "--", ...relative]).code === 0) {
+    return { committed: false, reason: "" };
+  }
+  const committed = runGit(root, [
+    "commit",
+    "-m",
+    "Set up Dabbler\n\nWritten and committed by `dabbler bootstrap`: the managed guidance, the\nignore rule for the router's machine state, the project's own declaration,\nand the two setup sessions. Session 1 is refused while these sit\nuncommitted, so the command that wrote them commits them.",
+    "--",
+    ...relative,
+  ]);
+  if (committed.code !== 0) {
+    return {
+      committed: false,
+      reason: committed.stderr.trim() || "git commit failed",
+    };
+  }
+  return { committed: true, reason: "" };
 }

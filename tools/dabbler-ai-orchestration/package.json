@@ -111,12 +111,12 @@
       },
       {
         "command": "dabblerSessionSets.startSession",
-        "title": "Start Next Session (terminal)",
+        "title": "Start Session",
         "category": "Dabbler"
       },
       {
         "command": "dabblerSessionSets.closeSession",
-        "title": "Close Session (terminal)",
+        "title": "Close Session",
         "category": "Dabbler"
       },
       {
@@ -268,6 +268,12 @@
           "when": "view == dabblerWorkExplorerTree && viewItem =~ /;act-copyStartNextSessionPrompt;/",
           "group": "1@304"
         }
+      ],
+      "file/newFile": [
+        {
+          "command": "dabbler.setupNewProject",
+          "group": "file"
+        }
       ]
     },
     "submenus": [
@@ -278,6 +284,42 @@
       {
         "id": "dabblerWorkExplorer.copyPrompt",
         "label": "Copy Prompt"
+      }
+    ],
+    "walkthroughs": [
+      {
+        "id": "dabblerGetStarted",
+        "title": "Set up an AI-led project",
+        "description": "Prepare a repository for the Dabbler session workflow. Nothing is installed, and you are not asked to run any commands.",
+        "steps": [
+          {
+            "id": "setUp",
+            "title": "Set the project up",
+            "description": "Writes the guidance files, the ignore rule for the router's machine state, the project's own declaration and the first two sessions -- then commits them, because session 1 is refused while they sit uncommitted.\n[Set Up New Project](command:dabbler.setupNewProject)",
+            "media": {
+              "markdown": "media/walkthrough-setup.md"
+            },
+            "completionEvents": [
+              "onCommand:dabbler.setupNewProject"
+            ]
+          },
+          {
+            "id": "answerOwed",
+            "title": "Answer what the framework cannot decide",
+            "description": "Setup asks where the repository pushes, and a later session asks how its tests run. Each arrives as one question with its options, a recommendation and what happens if you leave it -- and the framework writes the answer.\n[Open the Work Explorer](command:workbench.view.extension.dabblerSessionSetsContainer)",
+            "media": {
+              "markdown": "media/walkthrough-owed.md"
+            }
+          },
+          {
+            "id": "startSession",
+            "title": "Start session 1",
+            "description": "Session 1 authors the project plan; session 2 breaks it into numbered sessions. Neither waits on anyone.\n[Open the Work Explorer](command:workbench.view.extension.dabblerSessionSetsContainer)",
+            "media": {
+              "markdown": "media/walkthrough-session.md"
+            }
+          }
+        ]
       }
     ]
   },

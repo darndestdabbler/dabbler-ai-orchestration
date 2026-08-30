@@ -10,7 +10,11 @@
 import { repoRootFor, resolveSessionsDir, SessionsRootNotFoundError } from "../evidence.ts";
 import { appendSuitesToProjectConfig, detectEcosystems } from "../bootstrap/detect.ts";
 import { PROJECT_CONFIG_FILENAME } from "../config.ts";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { runGit } from "../journal.ts";
 import {
+  ID_GIT_REMOTE,
   ID_TESTING_SUITES,
   ID_TESTING_SUITES_NOW_TESTS_EXIST,
   OwedDecisionError,
@@ -40,7 +44,9 @@ function usage(): string {
     "options:",
     "  --id ID                  which decision (answer)",
     "  --choice LABEL           the option chosen, by its label (answer)",
-    "  --note TEXT              optional, recorded beside the answer",
+    "  --value TEXT             the datum an answer carries, when its option",
+    "                           says it needs one (a remote URL, say)",
+    "  --note TEXT              optional commentary, recorded beside the answer",
     "  --all                    list settled decisions too (list)",
     "  --sessions-dir PATH      the sessions root; derived from the cwd when absent",
     "  -h, --help               show this message",
@@ -192,6 +198,30 @@ function run(argv: string[]): number {
     }
     acted = written;
   }
+  if (id === ID_GIT_REMOTE && choice === "attach") {
+    const url = values.get("--value");
+    if (url === undefined || url.trim() === "") {
+      writeErr(
+        "owed: refused -- 'attach' needs the remote URL. Nothing was " +
+          "changed. Answer with --value <url>.\n",
+      );
+      return EXIT_REFUSED;
+    }
+    const attached = attachRemote(root, url.trim());
+    if (attached) {
+      writeErr(`owed: refused -- ${attached} Nothing was changed.\n`);
+      return EXIT_REFUSED;
+    }
+    acted = url.trim();
+  }
+  if (id === ID_GIT_REMOTE && choice === "stay-local") {
+    const marked = markLocalOnly(root);
+    if (marked) {
+      writeErr(`owed: refused -- ${marked} Nothing was changed.\n`);
+      return EXIT_REFUSED;
+    }
+    acted = "local-only";
+  }
 
   try {
     answerOwed(
@@ -200,6 +230,7 @@ function run(argv: string[]): number {
       choice,
       typeof current === "number" ? current : null,
       values.get("--note") ?? null,
+      values.get("--value") ?? null,
     );
   } catch (error) {
     if (!(error instanceof OwedDecisionError)) throw error;
@@ -219,4 +250,81 @@ function run(argv: string[]): number {
     "The framework acts on it from here; you are not asked to run anything.\n",
   );
   return EXIT_OK;
+}
+
+/**
+ * Add the remote the operator named, and push the branch with an upstream.
+ *
+ * Returns a sentence on failure and the empty string on success. The
+ * operator supplies the URL, which is the part only they know; the framework
+ * runs `git remote add` and `git push --set-upstream`, which is the part it
+ * was previously printing at them.
+ */
+function attachRemote(repoRoot: string, url: string): string {
+  if (runGit(repoRoot, ["remote", "get-url", "origin"]).code === 0) {
+    return "this repository already has an 'origin' remote.";
+  }
+  const added = runGit(repoRoot, ["remote", "add", "origin", url]);
+  if (added.code !== 0) {
+    return `git remote add failed: ${added.stderr.trim() || "unknown error"}.`;
+  }
+  const head = runGit(repoRoot, ["symbolic-ref", "--short", "HEAD"]);
+  if (head.code !== 0) {
+    return "HEAD is detached, so there is no branch to push.";
+  }
+  const pushed = runGit(repoRoot, [
+    "push",
+    "--set-upstream",
+    "origin",
+    head.stdout.trim(),
+  ]);
+  if (pushed.code !== 0) {
+    // Put the repository back. A first push fails for entirely routine
+    // reasons -- no credentials to hand, an initial commit on the far side,
+    // a network that is briefly not there -- and leaving `origin` behind
+    // would make the honest message ("nothing was changed") a lie AND make
+    // the retry impossible, because the next attempt refuses a remote that
+    // already exists. Either the attach happened or it did not.
+    const removed = runGit(repoRoot, ["remote", "remove", "origin"]);
+    if (removed.code !== 0) {
+      return (
+        `the push failed (${pushed.stderr.trim() || "unknown error"}) and the ` +
+        "remote it had just added could not be removed, so this repository " +
+        "now has an 'origin' that was never pushed to. Remove it, or push it " +
+        "yourself."
+      );
+    }
+    return `the push failed: ${pushed.stderr.trim() || "unknown error"}.`;
+  }
+  return "";
+}
+
+/**
+ * Record that this repository is deliberately local.
+ *
+ * The marker lives under `.dabbler/`, which is gitignored -- and that is
+ * right rather than a compromise: a repository with no remote has nowhere to
+ * share the fact through, and the statement is about this checkout.
+ * `checkPushedToRemote` already reads it; nothing until now wrote it.
+ */
+function markLocalOnly(repoRoot: string): string {
+  if (runGit(repoRoot, ["remote"]).stdout.trim() !== "") {
+    return "this repository has a remote configured, so it is not local-only.";
+  }
+  const path = join(repoRoot, ".dabbler", "local-only");
+  try {
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(
+      path,
+      "This repository is deliberately local. Recorded by `dabbler owed " +
+        "answer --id git-remote --choice stay-local`; the close reads it and " +
+        "stops asking for a push.\n",
+      "utf8",
+    );
+  } catch (error) {
+    return `the local-only marker could not be written: ${
+      error instanceof Error ? error.message : String(error)
+    }.`;
+  }
+  return "";
 }

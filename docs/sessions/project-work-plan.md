@@ -76,7 +76,7 @@ it.
 | 38 | The projection stops withholding the plan | no | 2026-08-30 |
 | 39 | Verification stops lying, and an unanswered gap stops the close | no | 2026-08-30 |
 | 40 | Task rows — a structured declaration, a framework-owned state machine | no | 2026-08-30 |
-| 41 | Setup owns the runway | — | not declared |
+| 41 | Setup owns the runway | no | 2026-08-30 |
 | 42 | The panes say what they are, and the Solution Explorer lights up | — | not declared |
 | 43 | Liveness, and one place the operator looks | — | not declared |
 | 44 | `solution-dependencies.json` — the edge, never the pin | — | not declared |
@@ -1288,5 +1288,52 @@ What this session does instead:
    (`Router.approvedPlan`, `planReview`) and is not touched.
 5. Task rows render Not Started / In Progress / Done with the operator's
    icons, and the session tooltip's `N/M tasks done` becomes true.
+
+Not releasable: it publishes nothing.
+
+### Session 41 — Setup owns the runway
+
+**Releasable: no.**
+
+Session 41 of 50 — Setup owns the runway.
+
+Both ends of the lifecycle currently finish by handing the operator a
+terminal command. `bootstrap` prints "commit what this just wrote" about
+files it wrote itself, knowing exactly why session 1 is refused while they
+sit uncommitted. The close prints `git push --set-upstream <remote> main`
+for a remote that does not exist and that the framework neither created nor
+offered to create. csv-model's item 2 is both of those, and principle (e)
+is the rule they break: the operator is never asked to run a command the
+framework can run.
+
+What this session does:
+
+1. `Dabbler: Set Up New Project` owns the whole runway — it creates the
+   folder when VS Code has no suitable one, runs `git init`, and commits
+   its own scaffold.
+2. The remote question is asked once, at setup, through session 39's
+   owed-decision mechanism: attach an existing remote URL, or stay local.
+   Hosted remote creation is deferred — authentication, host, organisation,
+   name, visibility and collision handling are a provider contract this
+   session does not have.
+3. "Stay local" becomes durable repository state rather than a per-run
+   default, and `pushed_to_remote` reads it instead of printing a command
+   that cannot work.
+4. A `contributes.walkthroughs` entry and a `file/newFile` contribution:
+   as close to File > New > Dabbler Project as the VS Code API allows. The
+   native File > New submenu is not extensible, and recording that stops a
+   later session rediscovering it.
+5. The three findings session 37's survey assigned here:
+   - F1, `bootstrapProject.ts`: setup ends with "Open a terminal and run
+     `dabbler session start`".
+   - F2, `extension.ts`: the first-run offer claims setup creates a .venv
+     and installs the router. It has done neither since the cutover, and it
+     is the first sentence a new operator reads. A correctness fix, not
+     copy.
+   - F3, `sessionTerminalCommands.ts`: Start and Close are pre-typed into a
+     terminal rather than run. Start carries a decision and the keystroke is
+     not it; Close carries no decision at all.
+
+Both suites are declared now, so this session owes a run of record for each.
 
 Not releasable: it publishes nothing.

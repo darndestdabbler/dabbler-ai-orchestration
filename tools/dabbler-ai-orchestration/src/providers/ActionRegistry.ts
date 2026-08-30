@@ -42,8 +42,8 @@ export const REPOSITORY_ACTIONS: RepositoryAction[] = [
   { id: "dabblerSessionSets.openChangeLog", label: "Change Log", group: 103, when: () => true },
   { id: "dabblerSessionSets.openSessionState", label: "Sessions Ledger", group: 104, when: () => true },
   { id: "dabbler.copyStartNextSessionPrompt", label: "Start Next Session", group: 304, when: hasNextSession },
-  { id: "dabblerSessionSets.startSession", label: "Start Next Session (terminal)", group: 905, when: hasNextSession },
-  { id: "dabblerSessionSets.closeSession", label: "Close Session (terminal)", group: 906,
+  { id: "dabblerSessionSets.startSession", label: "Start Session", group: 905, when: hasNextSession },
+  { id: "dabblerSessionSets.closeSession", label: "Close Session", group: 906,
     when: (r) => r.currentSession !== null },
 ];
 

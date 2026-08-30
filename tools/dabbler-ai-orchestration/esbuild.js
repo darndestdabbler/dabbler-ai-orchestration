@@ -11,6 +11,17 @@
 //   package.json   what that bundle IS, so it can find its own data
 //   schemas/ …     the data both of them read
 //
+// **`vsce package` is run with `--no-dependencies`, and that is not a
+// convenience.** vsce otherwise collects the manifest's runtime
+// dependencies into the VSIX, and under npm workspaces
+// `node_modules/dabbler-ai-router` is a SYMLINK to `packages/router`. vsce
+// follows it out of the extension root and emits entries like
+// `extension/../../STATUS.md`, which it then refuses as an invalid relative
+// path — so the package step fails outright rather than shipping something
+// wrong. Nothing is lost by skipping the collection: esbuild has already
+// bundled every dependency into the two files below, and `.vscodeignore`
+// excludes `node_modules` anyway.
+//
 // **The stamped `package.json` is the load-bearing part.** `paths.ts`
 // locates the router's data by walking up for a `package.json` NAMING the
 // router. In a checkout that finds `packages/router`; inside a VSIX the

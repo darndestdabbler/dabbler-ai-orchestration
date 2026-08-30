@@ -1,4 +1,4 @@
-# STATUS — 40 of 50 closed: task rows render at last, and two sessions in a row hit the round cap
+# STATUS — 51 of 52 closed. One thing is waiting, and it is yours
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
 `experiment/verification-pipeline-v3` and `design/solution-decomposition`
@@ -37,9 +37,92 @@ are merged and finished. Earlier handoff text is in `docs/status-archive.md`.
 > session 30, "session 31" means 32, and so on to the cutover, which was 35
 > and is now 36.
 
+## What is waiting on you
+
+**Nothing is published, and nothing will be until you answer one question.**
+
+    dabbler owed list          # read the brief
+    dabbler owed answer --id publication --choice publish
+
+`dabbler-ai-router 2.0.0` and `dabbler-ai-orchestration 2.0.0` are built,
+tested and unpublished, which is why `npm i -g dabbler-ai-router` returns 404
+and why every adoption walkthrough stops at its first step. Session 49 built
+the whole release path and then stopped, because publishing is the one act
+here that cannot be taken back: npm refuses `unpublish` after 72 hours and a
+Marketplace version slot is never reusable.
+
+The brief names three answers. **`publish`** is the recommendation and the
+only one that closes the item: it pushes `v2.0.0`, waits for npm to actually
+serve it, and only then pushes `vsix-v2.0.0` — the order matters because the
+extension bundles the router, and a Marketplace version whose npm half is
+missing is a broken half-release. **`release-candidate`** rehearses the npm
+half onto the `next` dist-tag and leaves the 404 in place. **`not yet`**
+changes nothing.
+
+You do not run a git command either way. Answer, and the framework tags.
+`dabbler release --verify-install` then performs a real global install of the
+unqualified package from `registry.npmjs.org` into a throwaway prefix, which
+is the check that a green workflow and a working `npm i` are the same fact.
+
+**Session 52 cannot start until that is answered.** It is the half of the
+acceptance exercise that needs a published router, and it is the only session
+left.
+
 ## Where things are
 
-**40 of 50 closed. Task rows render for the first time** — the Work Explorer's
+**51 of 52 closed.** Sessions 37–50 were the DX block; 51 was the bounded
+remediation the field trial mandated; 52 is blocked on you. The trial's full
+record is `docs/field-trial-50.md`.
+
+**Eight of `csv-model`'s nine feedback items are closed, with the code that
+closed each one named.** The ninth is the publication decision above.
+
+### What the block built
+
+- **Sessions 37–40 — the operator's own surfaces.** A survey of 24 extension
+  files (`docs/extension-dx-survey.md`, 13 findings); planned sessions
+  projected so a repository stops reading as finished; owed decisions as a
+  record with a class, a severity and a brief; task rows rendering at last,
+  folded from the `plan-step` rows `session start` has always written.
+- **Sessions 41–43 — setup, naming, liveness.** The icons that rendered with a
+  line through them (`width="16mm"`); setup that creates the folder and runs
+  `git init` itself; the pane renamed "AI Orchestration" with Solution and
+  Work Explorers under it; an attention view over what is stalled and what is
+  owed.
+- **Sessions 44–48 — the multi-repository half.** `solution-dependencies.json`
+  carries the edge and never the pin; the graph is the union of what every
+  reachable repository declares, with `usedBy` derived; source-mode switching
+  that makes git submodules unnecessary and refuses to let its evidence count;
+  packaging detected and written for you; the Solution Explorer rendering and
+  navigating the whole solution; one VS Code window over all of it.
+- **Session 49 — the release path**, which is the section above.
+- **Sessions 50–51 — the trial, and what it found.**
+
+### Three sessions closed `REMEDIATED_AT_CAP`
+
+44 and 45 hit the round cap; their final repairs are unreviewed code. 46
+through 51 all closed `VERIFIED`, five of them inside two rounds. The
+verification loop was not gentle and it was right more often than I was: a
+dispute in session 40 was upheld against me, session 45's fourth round caught
+that a self-reported test duration cannot prove when a run happened, and
+session 48's first round caught a workspace generator whose paths would have
+resolved into the wrong directory on its only path.
+
+### Two things the trial found in what you read
+
+Both fixed. `raiseOwed` was idempotent on a decision's *id*, so a brief
+corrected in code never replaced the one on disk — live, and it would have
+had you reading a recommendation the code had since reversed. And
+`test-evidence --help` documented only `record`, omitting the framework-timed
+`run` that a session now needs.
+
+A third finding, F-50-4, was withdrawn in session 51: I had misread
+`dabbler status` during the trial, printing its top-level keys and concluding
+that fields nested under `repository` were missing.
+
+### Still current, written at session 40
+
+**Task rows render for the first time** — the Work Explorer's
 third level has been built and unexercised since the port, and the reason was
 not a missing feature.
 

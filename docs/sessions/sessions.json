@@ -857,9 +857,9 @@
     {
       "number": 44,
       "title": "`solution-dependencies.json` \u2014 the edge, never the pin",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-30T16:20:47.814000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-08-30T16:54:16.245000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

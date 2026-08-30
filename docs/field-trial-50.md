@@ -20,10 +20,10 @@ operator's behalf to avoid writing this paragraph.
 
 | # | Criterion | Result |
 |---|---|---|
-| 3 | Owed decisions visible with their default and their state | **Partly.** The default renders (`publish (recommended)`). The state does not — see F-50-3. |
+| 3 | Owed decisions visible with their default and their state | **Yes**, after F-50-3 was fixed in session 51. |
 | 4 | No gate reports `PASS` for a precondition it cannot see | **Yes.** `test_run_fresh` reports `SKIP` where no suite is declared; the sixth gate carries what the fifth cannot see. |
 | 6 | Nothing asked the operator to run a command | **Yes**, for the fourteen sessions. `session start`/`close` run in-process from the Work Explorer, `bootstrap` writes the config, an answered owed decision is *executed* rather than returned as an instruction, and `dabbler release` does the tagging. |
-| 7 | A publishing repository has its `packaging` block written for it, credential as a name only | **Yes** by unit test; **never exercised on a real repository**, because no repository in this solution publishes through the packaging verb. See F-50-4. |
+| 7 | A publishing repository has its `packaging` block written for it, credential as a name only | **Yes** by unit test; **never exercised on a real repository**, because no repository in this solution publishes through the packaging verb — this one releases through tag-driven CI. It is the weakest of the passing rows and it is honest about that. |
 
 ### Reachable, and failing
 
@@ -48,18 +48,26 @@ run that a repository which has used source mode now *requires* for its run of
 record — and left the top-level usage naming one subcommand. The verb a
 session cannot finish without was undiscoverable from its own help.
 
-**F-50-3 — an owed row does not show its state.** `dabbler owed list` prints
-the id, the class, the question, the options and the recommendation. It does
-not print whether the decision is open, answered or superseded. Criterion 3
-asks for the state, and a reader looking at a list cannot tell which rows are
-still waiting on them.
+**F-50-3 — an owed row does not show its state. FIXED in session 51.** The
+state rendered only when it was *not* `open`, so an open advisory row showed
+nothing at all, and a reader looking down a list could not tell which rows
+were still waiting on them from which had been settled. That is the one thing
+the list is for. Every row now states its state, and a blocking open one says
+that it holds the close.
 
-**F-50-4 — `dabbler status` carries no planned sessions.** Session 38 added
-`plannedSessions` and `nextSession` to the projection the extension reads.
-`dabbler status` is a different reading of the same repository and has
-neither, so the CLI still cannot answer "what comes next" — which is
-`csv-model` item 9's actual complaint, closed in the extension and open at the
-command line.
+**F-50-4 — WITHDRAWN, 2026-08-30, in session 51. It was not a defect; it was
+a bad reading.** The trial reported that `dabbler status` carried no planned
+sessions. It carries both `plannedSessions` and `nextSession`; they are nested
+under `repository`, and the check that produced the finding printed only the
+document's top-level keys and concluded from their absence there.
+
+It is left here rather than deleted because the observation is part of the
+trial's record and because the mistake is the instructive part: a check that
+looks at the shape of an answer instead of asking the question is how a
+working framework gets reported as broken. The session opened to fix it
+verified the claim first and found nothing to fix.
+
+`csv-model` item 9 is therefore **closed in both surfaces**, not one.
 
 ### Not reachable
 
@@ -80,11 +88,11 @@ publication decision, and the decision is the operator's.
 | 6 | `--help` unusable on subcommands | **Closed, sessions 41 and 50.** F-50-2 above was the last of it. |
 | 7 | A gate's error text names the wrong file | **Closed, session 39.** It names `dabbler.yaml`. |
 | 8 | No way to record "the selector chose nothing" | **Closed before this block** — `none-selected` is an outcome, and the framework re-runs the selection rather than trusting the claim. |
-| 9 | Planned sessions invisible; the project reads as finished | **Closed in the extension, session 38. OPEN at the CLI** — F-50-4. |
+| 9 | Planned sessions invisible; the project reads as finished | **Closed, session 38** — in the projection the extension reads and in `dabbler status`, which reads the same builder. The trial briefly reported otherwise; see F-50-4. |
 
-Seven closed with the code that closed them named, two open with an owner: 5
-is the operator's decision, 9 is F-50-4 and belongs to the remediation session
-below.
+Eight closed with the code that closed them named. **One open, and it is the
+operator's**: item 5, the publication decision. Nothing in this list is
+waiting on the framework.
 
 ## What this trial hands forward
 
@@ -92,3 +100,9 @@ The plan is amended with **session 51**, bounded to F-50-3 and F-50-4 and to
 nothing else, and with **session 52**, which is the half of this exercise that
 needs a published router and can only run after the operator answers. A trial
 with no route to fix what it finds is a demonstration; these are the route.
+
+**Session 51 ran and closed both.** F-50-3 was real and is fixed; F-50-4 was
+not real and is withdrawn above. That is the remediation session doing its
+job in both directions: it is as much a check on the trial as on the code,
+and a finding that survives being acted on is worth more than one that was
+merely written down.

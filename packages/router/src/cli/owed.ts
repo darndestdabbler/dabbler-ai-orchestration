@@ -62,13 +62,17 @@ function usage(): string {
   ].join("\n");
 }
 
-function renderDecision(row: Row): string {
+export function renderDecision(row: Row): string {
   const lines: string[] = [];
   const state = String(row["state"]);
   const blocking = String(row["severity"]) === SEVERITY_BLOCKING;
+  // ALWAYS the state. It used to render only when it was not `open`, so an
+  // open advisory row showed nothing at all -- and a reader looking down a
+  // list could not tell which rows were still waiting on them from which had
+  // been settled. That is the one thing the list is for.
   lines.push(
-    `${String(row["id"])}  [${String(row["class"])}]` +
-      (state === STATE_OPEN ? (blocking ? "  -- holds the close" : "") : `  -- ${state}`),
+    `${String(row["id"])}  [${String(row["class"])}]  -- ${state}` +
+      (state === STATE_OPEN && blocking ? ", holds the close" : ""),
   );
   lines.push(`  ${String(row["question"])}`);
   if (row["determined"]) lines.push(`  what is already known: ${String(row["determined"])}`);

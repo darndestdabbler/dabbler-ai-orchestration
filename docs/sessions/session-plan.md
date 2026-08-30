@@ -2182,15 +2182,14 @@ verb missing from its own help. These two remain.
    the question, the options and the recommendation, and not whether the
    decision is open, answered or superseded. A reader cannot tell which rows
    are still waiting on them, which is what the list is for.
-3. **F-50-4: `dabbler status` carries no planned sessions.** Session 38 put
-   `plannedSessions` and `nextSession` in the projection the extension reads;
-   the CLI reading of the same repository has neither, so `csv-model` item 9 is
-   closed in one surface and open in the other. One fact, two readings, and
-   only one of them true — which is the shape this codebase refuses everywhere
-   else.
+3. ~~**F-50-4: `dabbler status` carries no planned sessions.**~~ **Withdrawn
+   in session 51, before any code was written.** It carries both, nested under
+   `repository`; the trial's check printed the top-level keys and read their
+   absence there as absence. The claim was verified before it was acted on,
+   which is the whole reason a remediation session verifies before it fixes.
 4. Affected; verify; full suite as `final-full`; close.
 
-Est. 6 tests. **Nothing else.** Anything the trial found that is not F-50-3 or
+Est. 3 tests, one finding having been withdrawn. **Nothing else.** Anything the trial found that is not F-50-3 or
 F-50-4 is a new session, not a widening of this one.
 
 ---

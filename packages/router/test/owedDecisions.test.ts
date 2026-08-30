@@ -32,6 +32,8 @@ import {
   supersedeOwed,
 } from "../src/owedDecisions.ts";
 import { checkOwedDecisions } from "../src/gates.ts";
+import { renderDecision } from "../src/cli/owed.ts";
+import type { Row } from "../src/ledger.ts";
 import { appendSuitesToProjectConfig } from "../src/bootstrap/detect.ts";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -39,6 +41,8 @@ import { parse as parseYaml } from "yaml";
 import { makeSandboxRepo, removeTempDirs } from "./support/fixtures.ts";
 
 afterAll(removeTempDirs);
+
+const NEWLINE = String.fromCharCode(10);
 
 const BRIEF = {
   id: "example",
@@ -406,6 +410,30 @@ describe("a suites list that sits at its key's own column", () => {
       "cheap",
       "node",
     ]);
+  });
+});
+
+describe("what a row in the list says about itself", () => {
+  it("states its state even when that state is open", () => {
+    // It used to render the state only when it was NOT open, so an open
+    // advisory row showed nothing at all -- and a reader looking down a list
+    // could not tell which rows were still waiting on them from which had
+    // been settled, which is the one thing the list is for.
+    const { repo } = makeSandboxRepo();
+    const row = raiseOwed(repo, BRIEF);
+    expect(row?.["state"]).toBe(STATE_OPEN);
+    const rendered = renderDecision(row as Row);
+    expect(rendered.split(NEWLINE)[0]).toContain(STATE_OPEN);
+  });
+
+  it("says when an open row is the kind that holds the close", () => {
+    const { repo } = makeSandboxRepo();
+    const row = raiseOwed(repo, {
+      ...BRIEF,
+      id: "reduces-verification",
+      decisionClass: CLASS_VERIFICATION_REDUCTION,
+    });
+    expect(renderDecision(row as Row).split(NEWLINE)[0]).toContain("holds the close");
   });
 });
 

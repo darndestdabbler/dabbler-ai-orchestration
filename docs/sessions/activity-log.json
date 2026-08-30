@@ -9525,6 +9525,57 @@
       "dateTime": "2026-08-30T18:22:32.320000-04:00",
       "description": "Register; declare `--not-releasable`.",
       "status": "in-progress"
+    },
+    {
+      "sessionNumber": 51,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-30T18:31:42.528000-04:00",
+      "description": "Register; declare `--not-releasable`.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 51,
+      "stepNumber": 2,
+      "stepKey": "f-50-3",
+      "dateTime": "2026-08-30T18:31:42.528000-04:00",
+      "description": "**F-50-3: an owed row does not show its state.** `dabbler owed list` prints the question, the options and the recommendation, and not whether the decision is open, answered or superseded. A reader cannot tell which rows are still waiting on them, which is what the list is for.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 51,
+      "stepNumber": 3,
+      "stepKey": "f-50-4",
+      "dateTime": "2026-08-30T18:31:42.528000-04:00",
+      "description": "**F-50-4: `dabbler status` carries no planned sessions.** Session 38 put `plannedSessions` and `nextSession` in the projection the extension reads; the CLI reading of the same repository has neither, so `csv-model` item 9 is closed in one surface and open in the other. One fact, two readings, and only one of them true \u2014 which is the shape this codebase refuses everywhere else.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 51,
+      "stepNumber": 4,
+      "stepKey": "affected",
+      "dateTime": "2026-08-30T18:31:42.528000-04:00",
+      "description": "Affected; verify; full suite as `final-full`; close.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 51,
+      "dateTime": "2026-08-30T18:31:42.906000-04:00",
+      "task": "Affected; verify; full suite as final-full; close",
+      "releasable": false
+    },
+    {
+      "sessionNumber": 51,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-30T18:31:42.933000-04:00",
+      "description": "Register; declare `--not-releasable`.",
+      "status": "in-progress"
     }
   ]
 }

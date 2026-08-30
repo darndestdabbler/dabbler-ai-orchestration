@@ -696,9 +696,9 @@
     {
       "number": 36,
       "title": "Cutover \u2014 the extension calls in-process, and Python leaves",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-29T18:42:01.280295-04:00",
-      "completedAt": null,
+      "completedAt": "2026-08-29T20:18:11.533000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

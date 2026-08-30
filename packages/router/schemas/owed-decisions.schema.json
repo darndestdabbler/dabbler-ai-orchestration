@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "owed-decisions.jsonl (.dabbler/runs/owed-decisions.jsonl)",
+  "description": "One row per event in the life of a decision the framework cannot make for itself. Append-only and repository-scoped rather than session-scoped, because an unanswered question outlives the session that raised it -- folding by `id` and taking the last row gives the current state. The shape is the education-mode brief: the operator arrives cold, may be watching several projects, and must be able to decide without reading the code. A row that states the question without stating a recommendation and a default has pushed the context-rebuilding back onto the person it was written for.",
+  "type": "object",
+  "required": ["id", "event", "state", "severity", "recordedAt", "sessionNumber"],
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Stable across the decision's whole life. The fold keys on it, so a re-raise of the same question is the same row rather than a second one."
+    },
+    "event": {
+      "type": "string",
+      "enum": ["raised", "answered", "superseded"],
+      "description": "What this row records. 'raised' carries the brief; 'answered' carries the operator's choice; 'superseded' retires a question the repository outgrew without anyone answering it."
+    },
+    "state": {
+      "type": "string",
+      "enum": ["open", "answered", "superseded"],
+      "description": "The state this row puts the decision INTO, stored beside the event that did it. Denormalised on purpose: the mapping from event to state is one-to-one and both are written at the same instant, so there is nothing here that can drift -- and the alternative made every consumer of the ledger reimplement the fold before it could read a state the record was supposed to publish."
+    },
+    "recordedAt": { "type": "string", "minLength": 1 },
+    "sessionNumber": {
+      "type": ["integer", "null"],
+      "description": "The session that recorded the row. Null when raised outside a session."
+    },
+    "severity": {
+      "type": "string",
+      "enum": ["blocking", "advisory"],
+      "description": "How much the framework is prepared to do without the answer. 'blocking' belongs to the verification-reduction class alone and refuses the close; 'advisory' proceeds on the stated default with the wait recorded. Derived from the class when the decision is raised and carried onto every later row of the same decision, so a reader of ANY single row knows what it costs to leave it unanswered."
+    },
+    "class": {
+      "type": "string",
+      "enum": [
+        "verification-reduction",
+        "external-consequence",
+        "value-tradeoff",
+        "accountability-signoff"
+      ],
+      "description": "Which human-required class the question falls in, checked in the rubric's own precedence. 'verification-reduction' is first and absolute: it is the only class that refuses a close, because proceeding on a default would let the record claim something verification did not establish. The other three proceed on their default with the wait recorded, so no engine is ever held open."
+    },
+    "question": {
+      "type": "string",
+      "description": "One sentence, in the operator's language rather than the framework's."
+    },
+    "file": {
+      "type": ["string", "null"],
+      "description": "Where the answer lands, repository-relative. Null when the answer is not a file edit. The framework writes it; the operator never does."
+    },
+    "determined": {
+      "type": "string",
+      "description": "What the framework established on its own before asking. Its purpose is to prove the question could not simply be computed -- a brief that asks for something derivable is a framework gap wearing a question's clothes."
+    },
+    "options": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["label", "consequence"],
+        "additionalProperties": false,
+        "properties": {
+          "label": { "type": "string", "minLength": 1 },
+          "consequence": { "type": "string" }
+        }
+      },
+      "description": "Each choice with what follows from it, in plain language. Never fewer than two: a single option is a notification, not a decision."
+    },
+    "recommendation": {
+      "type": ["string", "null"],
+      "description": "Which option the framework would take, by label. Withholding one to seem neutral pushes the work back onto the operator, which is the failure this format exists to prevent."
+    },
+    "confidence": {
+      "type": ["string", "null"],
+      "enum": ["high", "medium", "low", null]
+    },
+    "onNoAnswer": {
+      "type": ["string", "null"],
+      "description": "What happens if nobody answers. For every class but verification-reduction this is what actually happens, and saying so is what makes a non-blocking question honest rather than ignorable."
+    },
+    "answer": {
+      "type": ["string", "null"],
+      "description": "The chosen option's label, on an 'answered' row."
+    },
+    "answeredBy": {
+      "type": ["string", "null"],
+      "enum": ["operator", null],
+      "description": "Only an operator answers. The enum is the point: no model may record an answer to a question reserved for a person."
+    },
+    "note": { "type": ["string", "null"] }
+  }
+}

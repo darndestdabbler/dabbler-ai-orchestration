@@ -715,9 +715,9 @@
     {
       "number": 37,
       "title": "The extension surveyed against the principles",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-30T12:16:57.207000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-08-30T12:28:32.213000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

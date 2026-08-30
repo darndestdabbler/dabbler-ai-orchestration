@@ -333,7 +333,24 @@
         "contents": "This shows the work: which session is running, which step it is on, and anything waiting on you.\n\nNothing has run here yet.\n[Set Up New Project](command:dabbler.setupNewProject)",
         "when": "true"
       }
-    ]
+    ],
+    "configuration": {
+      "title": "AI Orchestration",
+      "properties": {
+        "dabbler.refreshSeconds": {
+          "type": "number",
+          "default": 30,
+          "minimum": 5,
+          "markdownDescription": "How often the Work Explorer re-reads a repository whose files have not changed. File watchers do most of the work; this is the backstop for changes they miss."
+        },
+        "dabbler.stalledAfterSeconds": {
+          "type": "number",
+          "default": 1800,
+          "minimum": 60,
+          "markdownDescription": "How long an in-flight session's record may sit still before the Work Explorer says nothing has been written for a while. It is a heartbeat, not a judgment: it reports that the record stopped moving, never that the work stopped being useful. Verification rounds routinely take ten minutes, so a short threshold calls every ordinary round a stall — and a signal that cries wolf is one people stop reading.\n\nThis wins over `verification.stalled_after_seconds` in the repository's `dabbler.yaml`, which wins over the built-in default."
+        }
+      }
+    }
   },
   "scripts": {
     "compile": "node esbuild.js",

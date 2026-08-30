@@ -3,7 +3,7 @@ import * as fs from "fs";
 import * as path from "path";
 import * as cp from "child_process";
 import { SESSIONS_REL, hasSessionsRoot } from "../utils/fileSystem";
-import { RouterCommands, productionCommands } from "../router/host";
+import { RouterCommands, productionCommands, productionRouter } from "../router/host";
 
 /**
  * A line for the operator to run by hand, asked of the router rather than
@@ -25,7 +25,7 @@ function routerCommand(
 interface DiagItem {
   label: string;
   detail: string;
-  run: (commands: RouterCommands) => void;
+  run: (commands: RouterCommands) => void | Promise<void>;
 }
 
 function workspaceRoot(): string | undefined {
@@ -62,19 +62,43 @@ function checkActivation(): void {
   ch.show();
 }
 
-function checkStateStuck(commands: RouterCommands): void {
+/**
+ * Ask the router where the sessions actually stand, and show the answer.
+ *
+ * Survey finding F10: this printed the command line for the operator to run
+ * by hand -- a diagnostic naming a command the extension can already make,
+ * to someone who is in here because something is not working. It runs it.
+ *
+ * The other two diagnostics below still print a line, and that is not the
+ * same omission: `metrics` and `seat-cost` are not on the Router contract,
+ * so there is nothing for the extension to call. A printed line for a verb
+ * it cannot reach is honest; one for a verb it can is not.
+ */
+async function checkStateStuck(_commands: RouterCommands): Promise<void> {
   const ch = outputChannel();
-  ch.appendLine("A session's status comes from the router, never from this extension:");
-  ch.appendLine(`  ${routerCommand(commands, "status", ["--json"], workspaceRoot())}`);
+  const root = workspaceRoot();
+  ch.appendLine("A session's status comes from the router, never from this extension.");
+  if (root) {
+    const result = await productionRouter().progress({
+      repoRoot: root,
+      sessionsDir: path.join(root, SESSIONS_REL),
+    });
+    ch.appendLine(
+      result.ok
+        ? JSON.stringify(result.value.repository, null, 2)
+        : `The router refused: ${result.message.trim() || `exit ${result.exitCode}`}`,
+    );
+  } else {
+    ch.appendLine("No workspace folder is open, so there is no record to read.");
+  }
   ch.appendLine("");
   ch.appendLine("Each session's `status` is written to docs/sessions/sessions.json by");
   ch.appendLine("`session start` and `session close`, and nothing else may write it.");
   ch.appendLine("");
   ch.appendLine(
-    "If a session appears stuck, run the command above and compare it with the " +
-    "row. A row that disagrees with that output is a rendering bug; a row that " +
-    "agrees means the close has not run. Open 'Activity Log' from the context " +
-    "menu to inspect the raw log."
+    "Compare that with the row. A row that disagrees with it is a rendering " +
+    "bug; a row that agrees means the close has not run. Open 'Activity Log' " +
+    "from the context menu to inspect the raw log."
   );
   ch.show();
 }
@@ -198,7 +222,13 @@ export function registerTroubleshootCommand(
         items.map((i) => ({ label: i.label, detail: i.detail, _run: i.run })),
         { placeHolder: "Select a troubleshooting topic" }
       );
-      if (picked) (picked as { _run: (c: RouterCommands) => void })._run(commands);
+      // Awaited: one diagnostic now asks the router rather than printing a
+      // line, and a floating promise there would show an empty channel.
+      if (picked) {
+        await (
+          picked as { _run: (c: RouterCommands) => void | Promise<void> }
+        )._run(commands);
+      }
     })
   );
 }

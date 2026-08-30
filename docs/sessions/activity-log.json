@@ -8815,6 +8815,123 @@
       "dateTime": "2026-08-30T15:58:34.579000-04:00",
       "description": "Affected; verify; full suite as `final-full`; close.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 43,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-30T15:58:45.593000-04:00",
+      "description": "Register; declare `--not-releasable`.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 43,
+      "stepNumber": 2,
+      "stepKey": "the-framework-stamps-lastactivityat-on-every",
+      "dateTime": "2026-08-30T15:58:45.593000-04:00",
+      "description": "The framework stamps `lastActivityAt` on every state write and every verification round. The projection derives **`possibly stalled`** from it against a declared threshold. The agent never writes either \u2014 an engine that reports its own liveness reports it right up until it cannot.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 43,
+      "stepNumber": 3,
+      "stepKey": "the-heartbeat-proves-the-process-is",
+      "dateTime": "2026-08-30T15:58:45.593000-04:00",
+      "description": "**The heartbeat proves the process is alive, not that the thinking is useful.** The row says which, and never implies the other.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 43,
+      "stepNumber": 4,
+      "stepKey": "one-attention-view-in-the-work",
+      "dateTime": "2026-08-30T15:58:45.593000-04:00",
+      "description": "One **attention view** in the Work Explorer, gathering what is already computed: what is in flight and how long since it moved; what it is waiting on; owed decisions with their defaults and states; and any session that stopped at the round cap. Nothing new is derived here \u2014 this is the fourth consumer of three existing projections, and if it needs a new field the field belongs to whichever session owns that fact.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 43,
+      "stepNumber": 5,
+      "stepKey": "amended-by-session-37-s-survey",
+      "dateTime": "2026-08-30T15:58:45.593000-04:00",
+      "description": "**Amended by session 37's survey** (`docs/extension-dx-survey.md`). The survey was scoped to amend 41, 42 and 47; it assigned four findings here as well, and they are recorded rather than left unowned: - **F11** \u2014 a 30-second `setInterval` (`extension.ts:148`) is the only thing advancing state between file events, and nothing anywhere says whether a session is alive, moving or stalled. That is step 2's reason for existing. - **F12** \u2014 there are **zero** `withProgress` call sites in the extension. Verification rounds run for minutes and the UI is indistinguishable from hung. The heartbeat in step 2 is the record; this is the feedback. - **F13** \u2014 the extension contributes **no configuration properties at all**. The stall threshold in step 2 is the first setting that needs a home, so this session establishes one. - **F10** \u2014 `troubleshoot.ts` composes \"a line for the operator to run by hand\" instead of running it and showing the result. A copyable line is defensible in a diagnostic; running it is better, and this is the session that owns operator-facing liveness.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 43,
+      "stepNumber": 6,
+      "stepKey": "affected",
+      "dateTime": "2026-08-30T15:58:45.593000-04:00",
+      "description": "Affected; verify; full suite as `final-full`; close.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 43,
+      "dateTime": "2026-08-30T15:58:59.982000-04:00",
+      "task": "Session 43 of 50 \u2014 Liveness, and one place the operator looks.\n\nThe operator supervises several projects at once and is away from any one\nof them for hours. Nothing today says whether a session is working,\nstalled, or waiting. And after sessions 38, 39 and 40 there are three new\nthings to look at -- planned sessions, owed decisions, task rows -- in\nthree places, which is not an improvement.\n\nWhat this session does:\n\n1. The framework stamps `lastActivityAt` on every state write and every\n   verification round, and the projection derives `possibly stalled` from\n   it against a declared threshold. The agent never writes either: an\n   engine that reports its own liveness reports it right up until it\n   cannot.\n2. The heartbeat proves the process is alive, not that the thinking is\n   useful. The row says which and never implies the other.\n3. One attention view in the Work Explorer, gathering what is already\n   computed: what is in flight and how long since it moved, what it is\n   waiting on, owed decisions with their defaults and states, and any\n   session that stopped at the round cap. Nothing new is derived.\n4. The findings session 37's survey assigned here:\n   - F10: `troubleshoot.ts` composes \"a line for the operator to run by\n     hand\" instead of running it and showing the result.\n   - F11: a 30-second `setInterval` is the only thing advancing state\n     between file events, and nothing says whether a session is alive.\n   - F12: there are ZERO `withProgress` call sites. Verification rounds run\n     for minutes and the UI is indistinguishable from hung.\n   - F13: the extension contributes no configuration at all, so the stall\n     threshold has nowhere to live. This session establishes one.\n\nNot releasable: it publishes nothing.",
+      "releasable": false
+    },
+    {
+      "sessionNumber": 43,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-30T15:59:00.007000-04:00",
+      "description": "Register; declare `--not-releasable`.",
+      "status": "in-progress"
+    },
+    {
+      "sessionNumber": 43,
+      "stepNumber": 2,
+      "stepKey": "the-framework-stamps-lastactivityat-on-every",
+      "dateTime": "2026-08-30T16:03:24.358000-04:00",
+      "description": "The framework stamps `lastActivityAt` on every state write and every verification round. The projection derives **`possibly stalled`** from it against a declared threshold. The agent never writes either \u2014 an engine that reports its own liveness reports it right up until it cannot.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 43,
+      "stepNumber": 3,
+      "stepKey": "the-heartbeat-proves-the-process-is",
+      "dateTime": "2026-08-30T16:03:24.550000-04:00",
+      "description": "**The heartbeat proves the process is alive, not that the thinking is useful.** The row says which, and never implies the other.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 43,
+      "stepNumber": 4,
+      "stepKey": "one-attention-view-in-the-work",
+      "dateTime": "2026-08-30T16:03:24.761000-04:00",
+      "description": "One **attention view** in the Work Explorer, gathering what is already computed: what is in flight and how long since it moved; what it is waiting on; owed decisions with their defaults and states; and any session that stopped at the round cap. Nothing new is derived here \u2014 this is the fourth consumer of three existing projections, and if it needs a new field the field belongs to whichever session owns that fact.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 43,
+      "stepNumber": 5,
+      "stepKey": "amended-by-session-37-s-survey",
+      "dateTime": "2026-08-30T16:03:24.967000-04:00",
+      "description": "**Amended by session 37's survey** (`docs/extension-dx-survey.md`). The survey was scoped to amend 41, 42 and 47; it assigned four findings here as well, and they are recorded rather than left unowned: - **F11** \u2014 a 30-second `setInterval` (`extension.ts:148`) is the only thing advancing state between file events, and nothing anywhere says whether a session is alive, moving or stalled. That is step 2's reason for existing. - **F12** \u2014 there are **zero** `withProgress` call sites in the extension. Verification rounds run for minutes and the UI is indistinguishable from hung. The heartbeat in step 2 is the record; this is the feedback. - **F13** \u2014 the extension contributes **no configuration properties at all**. The stall threshold in step 2 is the first setting that needs a home, so this session establishes one. - **F10** \u2014 `troubleshoot.ts` composes \"a line for the operator to run by hand\" instead of running it and showing the result. A copyable line is defensible in a diagnostic; running it is better, and this is the session that owns operator-facing liveness.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 43,
+      "stepNumber": 6,
+      "stepKey": "affected",
+      "dateTime": "2026-08-30T16:20:34.928000-04:00",
+      "description": "Affected; verify; full suite as `final-full`; close.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 43,
+      "stepNumber": 6,
+      "stepKey": "affected",
+      "dateTime": "2026-08-30T16:20:35.370000-04:00",
+      "description": "Affected; verify; full suite as `final-full`; close.",
+      "status": "complete"
     }
   ]
 }

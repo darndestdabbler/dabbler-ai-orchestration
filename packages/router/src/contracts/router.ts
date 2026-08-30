@@ -93,6 +93,16 @@ export class RouterUnavailableError extends Error {
 export interface RepositoryTarget {
   readonly repoRoot: string;
   readonly sessionsDir?: string;
+  /**
+   * How long an in-flight session's record may sit still before the
+   * projection says nothing has been written for a while.
+   *
+   * The caller's, when it has one -- the VS Code setting is where an
+   * operator looks for it -- then the repository's own declaration, then a
+   * default. One authoritative value with a stated precedence, rather than
+   * a setting in one place and the number that decides in another.
+   */
+  readonly stalledAfterSeconds?: number;
 }
 
 // --- The verbs ---------------------------------------------------------------

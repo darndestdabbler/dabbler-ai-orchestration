@@ -78,7 +78,7 @@ it.
 | 40 | Task rows — a structured declaration, a framework-owned state machine | no | 2026-08-30 |
 | 41 | Setup owns the runway | no | 2026-08-30 |
 | 42 | The panes say what they are, and the Solution Explorer lights up | no | 2026-08-30 |
-| 43 | Liveness, and one place the operator looks | — | not declared |
+| 43 | Liveness, and one place the operator looks | no | 2026-08-30 |
 | 44 | `solution-dependencies.json` — the edge, never the pin | — | not declared |
 | 45 | Resolution modes, inside the declare-and-check line | — | not declared |
 | 46 | Packaging declared for the ecosystem it is | — | not declared |
@@ -1370,5 +1370,42 @@ What this session does:
    - F5: neither view has an empty state.
    - F9: a projection failure reaches the operator as `projection failed:
      <raw error>`, which says what broke and never what to do.
+
+Not releasable: it publishes nothing.
+
+### Session 43 — Liveness, and one place the operator looks
+
+**Releasable: no.**
+
+Session 43 of 50 — Liveness, and one place the operator looks.
+
+The operator supervises several projects at once and is away from any one
+of them for hours. Nothing today says whether a session is working,
+stalled, or waiting. And after sessions 38, 39 and 40 there are three new
+things to look at -- planned sessions, owed decisions, task rows -- in
+three places, which is not an improvement.
+
+What this session does:
+
+1. The framework stamps `lastActivityAt` on every state write and every
+   verification round, and the projection derives `possibly stalled` from
+   it against a declared threshold. The agent never writes either: an
+   engine that reports its own liveness reports it right up until it
+   cannot.
+2. The heartbeat proves the process is alive, not that the thinking is
+   useful. The row says which and never implies the other.
+3. One attention view in the Work Explorer, gathering what is already
+   computed: what is in flight and how long since it moved, what it is
+   waiting on, owed decisions with their defaults and states, and any
+   session that stopped at the round cap. Nothing new is derived.
+4. The findings session 37's survey assigned here:
+   - F10: `troubleshoot.ts` composes "a line for the operator to run by
+     hand" instead of running it and showing the result.
+   - F11: a 30-second `setInterval` is the only thing advancing state
+     between file events, and nothing says whether a session is alive.
+   - F12: there are ZERO `withProgress` call sites. Verification rounds run
+     for minutes and the UI is indistinguishable from hung.
+   - F13: the extension contributes no configuration at all, so the stall
+     threshold has nowhere to live. This session establishes one.
 
 Not releasable: it publishes nothing.

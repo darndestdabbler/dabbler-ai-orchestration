@@ -53,6 +53,10 @@
         "totalSessions",
         "sessionsCompleted",
         "currentSession",
+        "lastActivityAt",
+        "possiblyStalled",
+        "stalledAfterSeconds",
+        "owedDecisions",
         "plannedSessions",
         "nextSession",
         "forceClosed",
@@ -70,6 +74,37 @@
         "totalSessions": { "type": ["integer", "null"] },
         "sessionsCompleted": { "type": "integer", "minimum": 0 },
         "currentSession": { "type": ["integer", "null"] },
+        "lastActivityAt": {
+          "type": ["string", "null"],
+          "description": "When this repository's record last moved: the latest timestamp across the activity log and the verification rounds. DERIVED, never stamped -- the framework already timestamps every row it writes, and a field written beside them would be a second statement of one fact. Null when nothing has been written yet."
+        },
+        "possiblyStalled": {
+          "type": "boolean",
+          "description": "A session is in flight and its record has not moved for longer than the declared threshold. It proves the process has stopped WRITING, never that the thinking has stopped being useful, and the row that renders it must say which -- a heartbeat that implied the second would be a liveness signal making a judgment it cannot make."
+        },
+        "stalledAfterSeconds": {
+          "type": ["integer", "null"],
+          "description": "The threshold `possiblyStalled` was judged against, published so a reader never has to guess which number produced the answer. Null when nothing is in flight."
+        },
+        "owedDecisions": {
+          "type": "array",
+          "description": "What this repository is waiting on a person for, folded from the owed-decision ledger. Carried on the projection because the Explorer's attention view is meant to be ONE place the operator looks -- a view that had to read a second file to answer half its rows would be the second place.",
+          "items": {
+            "type": "object",
+            "required": ["id", "question", "severity", "blocking"],
+            "additionalProperties": false,
+            "properties": {
+              "id": { "type": "string" },
+              "question": { "type": "string" },
+              "severity": { "type": "string", "enum": ["blocking", "advisory"] },
+              "blocking": {
+                "type": "boolean",
+                "description": "Whether leaving this unanswered refuses the close."
+              },
+              "onNoAnswer": { "type": ["string", "null"] }
+            }
+          }
+        },
         "plannedSessions": {
           "description": "How many sessions the plan declares that the ledger has not reached. Zero for a repository whose ledger has caught up. It is published rather than left to be counted from the rows because 'is this project finished' is the question the count answers, and a reader that re-derived it would be a second implementation of the rule.",
           "type": "integer",

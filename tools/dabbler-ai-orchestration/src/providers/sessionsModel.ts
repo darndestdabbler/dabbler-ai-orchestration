@@ -85,7 +85,12 @@ export function progressText(repository: SessionsRepository): string {
   // and the row beneath it name it identically.
   const inFlight = repository.sessions.find((s) => s.number === current);
   const written = inFlight ? sessionDisplayNumber(inFlight) : String(current);
-  const annotation = `session ${written} in flight`;
+  // A heartbeat, and only a heartbeat. It says the record has stopped
+  // MOVING; it does not say the thinking has stopped being useful, and a
+  // row that implied the second would be making a judgment it cannot make.
+  const annotation = repository.possiblyStalled
+    ? `session ${written} in flight · nothing written for a while`
+    : `session ${written} in flight`;
   return base ? `${base} · ${annotation}` : annotation;
 }
 

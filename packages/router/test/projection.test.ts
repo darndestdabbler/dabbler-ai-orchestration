@@ -24,7 +24,10 @@ import {
   TaskRowsRefused,
   VerificationRefused,
   buildProjection,
+  DEFAULT_STALLED_AFTER_SECONDS,
   buildTaskRows,
+  lastActivityAt,
+  possiblyStalled,
   buildVerificationView,
   healStaleTitles,
   ledgerExists,
@@ -828,5 +831,47 @@ describe("a repository whose plan is its only record", () => {
     // fresh repository report an invariant violation instead of its sessions.
     const { sessionsDir } = makeSandboxRepo();
     expect(repository(sessionsDir)["invariantViolation"]).toBeNull();
+  });
+});
+
+describe("liveness, derived rather than stamped", () => {
+  it("reads the latest timestamp the framework already wrote", () => {
+    // A field stamped beside them would be a second statement of "when did
+    // this last move", and the answer is already on disk twice over.
+    const { repo, sessionsDir } = makeSandboxRepo();
+    start(sessionsDir);
+    const at = lastActivityAt(sessionsDir, repo, 1);
+    expect(typeof at).toBe("string");
+    expect(Date.parse(at as string)).toBeGreaterThan(0);
+  });
+
+  it("says nothing about a repository nothing has run in", () => {
+    const { repo, sessionsDir } = makeSandboxRepo();
+    expect(lastActivityAt(sessionsDir, repo, null)).toBeNull();
+  });
+
+  it("calls no repository stalled while nothing is in flight", () => {
+    // Between sessions is not stalled; it is finished with the last one.
+    expect(possiblyStalled("2000-01-01T00:00:00+00:00", null, 60)).toBe(false);
+  });
+
+  it("calls a session stalled only once the threshold has passed", () => {
+    const now = new Date("2026-01-01T12:00:00Z");
+    const recent = "2026-01-01T11:59:00+00:00";
+    const old = "2026-01-01T10:00:00+00:00";
+    expect(possiblyStalled(recent, 1, 1800, now)).toBe(false);
+    expect(possiblyStalled(old, 1, 1800, now)).toBe(true);
+  });
+
+  it("publishes the threshold it judged against", () => {
+    const { sessionsDir } = makeSandboxRepo();
+    start(sessionsDir);
+    const repository = buildProjection(sessionsDir)["repository"] as Record<
+      string,
+      unknown
+    >;
+    expect(repository["stalledAfterSeconds"]).toBe(DEFAULT_STALLED_AFTER_SECONDS);
+    expect(repository["possiblyStalled"]).toBe(false);
+    expect(typeof repository["lastActivityAt"]).toBe("string");
   });
 });

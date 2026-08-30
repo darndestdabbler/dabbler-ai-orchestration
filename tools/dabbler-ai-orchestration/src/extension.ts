@@ -149,7 +149,18 @@ export function activate(context: vscode.ExtensionContext): void {
     );
   }
   context.subscriptions.push(vscode.workspace.onDidChangeWorkspaceFolders(refreshAll));
-  const pollHandle = setInterval(refreshAll, 30000);
+  // The backstop behind the file watchers, and now a declared number rather
+  // than a literal: a repository whose sessions are minutes long and one
+  // whose rounds take ten of them cannot share a refresh rate.
+  const pollHandle = setInterval(
+    refreshAll,
+    Math.max(
+      5,
+      vscode.workspace
+        .getConfiguration("dabbler")
+        .get<number>("refreshSeconds", 30),
+    ) * 1000,
+  );
   context.subscriptions.push({ dispose: () => clearInterval(pollHandle) });
 
   context.subscriptions.push(

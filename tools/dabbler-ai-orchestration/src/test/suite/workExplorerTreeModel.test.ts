@@ -10,6 +10,7 @@ import {
   repositoryDescriptor,
   repositoryNodes,
   repositoryTooltip,
+  attentionNodes,
   sessionDescriptor,
   sessionNodes,
   refusalDescriptor,
@@ -202,6 +203,72 @@ suite("workExplorerTreeModel: repository descriptor", () => {
 suite("workExplorerTreeModel: session descriptor", () => {
   const repository = makeRepository({
     sessions: [makeSession({ number: 1, status: "complete" })],
+  });
+
+  test("attention rows read above the sessions, and only when there is something", () => {
+    // Sessions 38, 39 and 40 each added something worth seeing and each put
+    // it somewhere different. This is the one place, and an empty one
+    // renders nothing: a view that always has a row teaches people its rows
+    // mean nothing.
+    const quiet = makeRepository();
+    assert.deepStrictEqual(attentionNodes({ kind: "repository", repository: quiet }), []);
+
+    const waiting = makeRepository({
+      currentSession: 3,
+      possiblyStalled: true,
+      owedDecisions: [
+        {
+          id: "testing-suites",
+          question: "How do this repository's tests run?",
+          severity: "blocking",
+          blocking: true,
+          onNoAnswer: null,
+        },
+      ],
+    });
+    const rows = attentionNodes({ kind: "repository", repository: waiting });
+    assert.strictEqual(rows.length, 2);
+    // Blocking first: it is the one that costs something.
+    assert.strictEqual(rows[0].subject, "owed");
+    assert.strictEqual(rows[0].urgent, true);
+    assert.strictEqual(rows[1].subject, "stalled");
+    // Never urgent: a quiet record is worth saying and is not an alarm.
+    assert.strictEqual(rows[1].urgent, false);
+  });
+
+  test("says how long since the record moved, whether or not it looks stalled", () => {
+    // "What happened while I was away" is a question about a RUNNING
+    // session, so answering it only once the session looks stuck leaves the
+    // ordinary case blank.
+    const running = makeRepository({
+      currentSession: 3,
+      possiblyStalled: false,
+      lastActivityAt: new Date(Date.now() - 45 * 60 * 1000).toISOString(),
+      sessions: [makeSession({ number: 3, status: "in-progress", inFlight: true })],
+    });
+    const rows = attentionNodes({ kind: "repository", repository: running });
+    assert.strictEqual(rows.length, 1);
+    assert.ok(rows[0].label.includes("003"));
+    assert.ok(rows[0].detail.includes("45 minutes"));
+  });
+
+  test("does not hide a round-cap stop just because the session is still open", () => {
+    // It is the case where the operator has to decide what happens next.
+    const stopped = makeRepository({
+      currentSession: 4,
+      sessions: [
+        makeSession({
+          number: 4,
+          status: "in-progress",
+          inFlight: true,
+          verification: makeVerification(),
+        }),
+      ],
+    });
+    const rows = attentionNodes({ kind: "repository", repository: stopped });
+    const cap = rows.find((row) => row.subject === "unresolved");
+    assert.ok(cap, "an in-flight session that stopped at the cap must be shown");
+    assert.strictEqual(cap.urgent, true);
   });
 
   test("a planned session says so, since it shares the not-started glyph", () => {

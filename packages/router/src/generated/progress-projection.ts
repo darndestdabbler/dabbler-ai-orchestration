@@ -36,6 +36,31 @@ export type ProgressProjectionRepository = {
   sessionsCompleted: number;
   currentSession: number | null;
   /**
+   * When this repository's record last moved: the latest timestamp across the activity log and the verification rounds. DERIVED, never stamped -- the framework already timestamps every row it writes, and a field written beside them would be a second statement of one fact. Null when nothing has been written yet.
+   */
+  lastActivityAt: string | null;
+  /**
+   * A session is in flight and its record has not moved for longer than the declared threshold. It proves the process has stopped WRITING, never that the thinking has stopped being useful, and the row that renders it must say which -- a heartbeat that implied the second would be a liveness signal making a judgment it cannot make.
+   */
+  possiblyStalled: boolean;
+  /**
+   * The threshold `possiblyStalled` was judged against, published so a reader never has to guess which number produced the answer. Null when nothing is in flight.
+   */
+  stalledAfterSeconds: number | null;
+  /**
+   * What this repository is waiting on a person for, folded from the owed-decision ledger. Carried on the projection because the Explorer's attention view is meant to be ONE place the operator looks -- a view that had to read a second file to answer half its rows would be the second place.
+   */
+  owedDecisions: Array<{
+    id: string;
+    question: string;
+    severity: "blocking" | "advisory";
+    /**
+     * Whether leaving this unanswered refuses the close.
+     */
+    blocking: boolean;
+    onNoAnswer?: string | null;
+  }>;
+  /**
    * How many sessions the plan declares that the ledger has not reached. Zero for a repository whose ledger has caught up. It is published rather than left to be counted from the rows because 'is this project finished' is the question the count answers, and a reader that re-derived it would be a second implementation of the rule.
    */
   plannedSessions: number;

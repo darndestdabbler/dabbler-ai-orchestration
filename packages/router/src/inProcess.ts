@@ -521,9 +521,9 @@ export class InProcessRouter implements Router {
     return this.read(
       o.repoRoot,
       () =>
-        buildProjection(
-          o.sessionsDir ?? sessionsDirFor(o.repoRoot),
-        ) as unknown as ProgressProjection,
+        buildProjection(o.sessionsDir ?? sessionsDirFor(o.repoRoot), {
+          stalledAfterSeconds: o.stalledAfterSeconds,
+        }) as unknown as ProgressProjection,
     );
   }
 

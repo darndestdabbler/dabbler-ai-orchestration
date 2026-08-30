@@ -34,6 +34,7 @@ import {
   ROW_REMEDIATED_AT_CAP,
   readRounds,
 } from "./ledger.ts";
+import { openDecisions } from "./owedDecisions.ts";
 import { pythonRepr, pythonStr } from "./pythonJson.ts";
 import { readText } from "./textfile.ts";
 import {
@@ -1217,7 +1218,10 @@ export function buildVerificationView(
  * Computed fresh on every call -- a cache would need a freshness protocol,
  * and the v1 one (digests plus stale states) cost more than recomputing.
  */
-export function buildProjection(sessionsDir: string): Record<string, unknown> {
+export function buildProjection(
+  sessionsDir: string,
+  options: { readonly stalledAfterSeconds?: number } = {},
+): Record<string, unknown> {
   // The task level lives under the repository root, not the sessions root:
   // `.dabbler/runs/s<N>/`. The inverse of the one rule that places the
   // sessions root is `evidence.repoRootFromSessionsDir`.
@@ -1276,6 +1280,18 @@ export function buildProjection(sessionsDir: string): Record<string, unknown> {
   // Read once per projection: the cap is the repository's, not the session's,
   // and it is what turns a blocking round into "unresolved".
   const cap = verificationCap(repoRoot);
+  // Read once per projection, beside the cap and for the same reason: the
+  // threshold is the repository's, not a session's.
+  // The caller's number wins, then the repository's declaration, then the
+  // default. One value decides, and where it came from is stated rather
+  // than left for a reader to work out from which file they opened.
+  const threshold =
+    typeof options.stalledAfterSeconds === "number" &&
+    Number.isFinite(options.stalledAfterSeconds) &&
+    options.stalledAfterSeconds > 0
+      ? Math.trunc(options.stalledAfterSeconds)
+      : stalledAfterSeconds(repoRoot);
+  const movedAt = lastActivityAt(sessionsDir, repoRoot, view["currentSession"]);
 
   const sessionsOut: Record<string, unknown>[] = [];
   for (const entry of viewSessions) {
@@ -1411,6 +1427,10 @@ export function buildProjection(sessionsDir: string): Record<string, unknown> {
       totalSessions,
       sessionsCompleted: (view["completedSessions"] as unknown[] | null)?.length ?? 0,
       currentSession: view["currentSession"] ?? null,
+      lastActivityAt: movedAt,
+      possiblyStalled: possiblyStalled(movedAt, view["currentSession"] ?? null, threshold),
+      stalledAfterSeconds: view["currentSession"] ? threshold : null,
+      owedDecisions: owedForProjection(repoRoot),
       // Counted off the rows rather than off `planned`, so the two ways a row
       // can be planned -- merged over a ledger, or sourced from the plan
       // because there is no ledger -- are counted once each and by one rule.
@@ -1429,3 +1449,128 @@ export function buildProjection(sessionsDir: string): Record<string, unknown> {
 // `dumps` now that four modules ask for it, and is re-exported here because
 // the invariants are where it was first needed.
 export { pythonRepr };
+
+// --- Liveness -----------------------------------------------------------------
+
+/**
+ * How long a session's record may sit still before the projection says so.
+ *
+ * A default rather than a guess: verification rounds routinely take ten
+ * minutes, so anything shorter would call every ordinary round a stall, and
+ * a liveness signal that cries wolf is one people learn to ignore -- which
+ * is the failure mode that matters, because it is silent.
+ */
+export const DEFAULT_STALLED_AFTER_SECONDS = 1800;
+
+/**
+ * When this repository's record last moved.
+ *
+ * Derived from the timestamps the framework already writes -- every activity
+ * log entry is stamped and every verification round carries `recorded_at` --
+ * rather than stamped again beside them. A second statement of "when did
+ * this last move" is a second thing to keep in sync, and the answer is
+ * already on disk twice over.
+ *
+ * The agent writes neither this nor the judgment below, which is the
+ * property worth protecting: an engine that reports its own liveness reports
+ * it right up until the moment it cannot.
+ */
+export function lastActivityAt(
+  sessionsDir: string,
+  repoRoot: string | null,
+  sessionNumber: unknown,
+): string | null {
+  const stamps: string[] = [];
+  const log = readActivityLog(sessionsDir);
+  const entries = log && Array.isArray(log["entries"]) ? log["entries"] : [];
+  for (const entry of entries) {
+    if (!isRecord(entry)) continue;
+    const at = entry["dateTime"];
+    if (typeof at === "string" && at) stamps.push(at);
+  }
+  if (repoRoot !== null && Number.isInteger(sessionNumber)) {
+    try {
+      for (const round of readRounds(repoRoot, sessionNumber as number)) {
+        const at = round["recorded_at"];
+        if (typeof at === "string" && at) stamps.push(at);
+      }
+    } catch {
+      // An unreadable ledger is `verification_clean`'s to refuse. Liveness
+      // does not get to fail a projection over it.
+    }
+  }
+  if (stamps.length === 0) return null;
+  // String comparison, because every writer here emits ISO-8601 with an
+  // offset and lexical order is chronological within one. Parsing to compare
+  // would introduce a timezone question the records do not have.
+  return stamps.reduce((latest, at) => (at > latest ? at : latest));
+}
+
+/**
+ * Whether the in-flight session's record has stopped moving.
+ *
+ * False whenever nothing is in flight: a repository between sessions is not
+ * stalled, it is finished with the last one. And false when nothing has been
+ * written at all, because "no activity yet" and "activity that stopped" are
+ * different states and only the second is worth a row.
+ */
+export function possiblyStalled(
+  at: string | null,
+  currentSession: unknown,
+  thresholdSeconds: number,
+  now: Date = new Date(),
+): boolean {
+  if (currentSession === null || currentSession === undefined) return false;
+  if (at === null) return false;
+  const moved = Date.parse(at);
+  if (!Number.isFinite(moved)) return false;
+  return (now.getTime() - moved) / 1000 > thresholdSeconds;
+}
+
+/**
+ * The threshold this repository judges a stall against, in seconds.
+ *
+ * Configurable because a repository whose sessions are minutes long and one
+ * whose rounds take ten of them cannot share a number, and a signal tuned
+ * for neither is one nobody reads.
+ */
+export function stalledAfterSeconds(repoRoot: string): number {
+  try {
+    const config = loadConfig(undefined, repoRoot) as Record<string, unknown>;
+    const declared = (config["verification"] as Record<string, unknown> | undefined)
+      ?.["stalled_after_seconds"];
+    if (typeof declared === "number" && Number.isFinite(declared) && declared > 0) {
+      return Math.trunc(declared);
+    }
+  } catch {
+    // An unreadable config gets the default, never a failed projection.
+  }
+  return DEFAULT_STALLED_AFTER_SECONDS;
+}
+
+/**
+ * What the repository is waiting on a person for, in the shape a row renders.
+ *
+ * Carried on the projection rather than read separately by the Explorer,
+ * because the attention view is supposed to be ONE place the operator looks
+ * -- and a view that had to open a second file to answer half its rows would
+ * be the second place rather than the first.
+ *
+ * Never fails a projection: a record that cannot be read is a fault the
+ * `owed_decisions` gate reports at the close, where refusing is useful. A
+ * tree that would not render because of it would be the fault made worse.
+ */
+function owedForProjection(repoRoot: string | null): Record<string, unknown>[] {
+  if (repoRoot === null) return [];
+  try {
+    return openDecisions(repoRoot).map((row) => ({
+      id: String(row["id"]),
+      question: String(row["question"] ?? ""),
+      severity: String(row["severity"] ?? "advisory"),
+      blocking: row["severity"] === "blocking",
+      onNoAnswer: (row["onNoAnswer"] as string | null) ?? null,
+    }));
+  } catch {
+    return [];
+  }
+}

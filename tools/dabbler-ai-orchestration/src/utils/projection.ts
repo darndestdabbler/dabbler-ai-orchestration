@@ -9,6 +9,7 @@
 // of it.
 
 import * as fs from "fs";
+import * as vscode from "vscode";
 import * as path from "path";
 import type { ProgressProjection, Router } from "dabbler-ai-router";
 import { RouterUnavailableError } from "dabbler-ai-router";
@@ -97,7 +98,14 @@ export async function projectRepository(
   repoRoot: string,
 ): Promise<ProjectionResult> {
   try {
-    const result = await router.progress({ repoRoot, sessionsDir });
+    // The operator's setting reaches the projection that judges against it.
+    // A setting in one place and the number that decides in another is worse
+    // than no setting: it is a control that looks connected.
+    const result = await router.progress({
+      repoRoot,
+      sessionsDir,
+      stalledAfterSeconds: stalledAfterSecondsSetting(),
+    });
     return result.ok
       ? { payload: result.value, error: null }
       : { payload: null, error: actionable(result.message.trim()) };
@@ -146,6 +154,19 @@ function actionable(message: string): string {
     );
   }
   return `The session record could not be read: ${text}`;
+}
+
+/** The operator's threshold, or undefined to let the repository decide. */
+function stalledAfterSecondsSetting(): number | undefined {
+  try {
+    const value = vscode.workspace
+      .getConfiguration("dabbler")
+      .get<number>("stalledAfterSeconds");
+    return typeof value === "number" && value > 0 ? value : undefined;
+  } catch {
+    // Reachable from the unit suite, which has no configuration host.
+    return undefined;
+  }
 }
 
 export type ProjectRepositoryFn = (

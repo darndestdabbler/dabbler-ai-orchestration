@@ -53,6 +53,15 @@ export interface SessionRunUi {
   pickEngine: () => Thenable<EngineChoice | undefined>;
   report: (title: string, body: string) => void;
   showErrorMessage: (message: string) => unknown;
+  /**
+   * Run something slow where the operator can see it is running.
+   *
+   * Survey finding F12: the extension had ZERO progress call sites, and a
+   * close evaluates six gates while a verification round takes minutes. An
+   * editor that shows nothing for that long is indistinguishable from one
+   * that has hung, and an operator who believes it hung kills it.
+   */
+  withProgress: <T>(title: string, work: () => Promise<T>) => Promise<T>;
 }
 
 function channel(): vscode.OutputChannel {
@@ -83,6 +92,13 @@ export function defaultSessionRunUi(): SessionRunUi {
       out.show(true);
     },
     showErrorMessage: (m) => vscode.window.showErrorMessage(m),
+    withProgress: <T,>(title: string, work: () => Promise<T>): Promise<T> =>
+      Promise.resolve(
+        vscode.window.withProgress(
+          { location: vscode.ProgressLocation.Notification, title },
+          () => work(),
+        ),
+      ),
   };
 }
 
@@ -99,12 +115,14 @@ export async function runStartSession(
 ): Promise<boolean> {
   const picked = await ui.pickEngine();
   if (!picked) return false;
-  const result = await router.session.start({
-    repoRoot: repository.root,
-    sessionsDir: repository.sessionsDir,
-    engine: picked.engine,
-    provider: picked.provider,
-  });
+  const result = await ui.withProgress(`Starting a session in ${repository.label}`, () =>
+    router.session.start({
+      repoRoot: repository.root,
+      sessionsDir: repository.sessionsDir,
+      engine: picked.engine,
+      provider: picked.provider,
+    }),
+  );
   if (!result.ok) {
     ui.showErrorMessage(
       `Start session refused: ${result.message.trim() || `exit ${result.exitCode}`}`,
@@ -126,10 +144,14 @@ export async function runCloseSession(
   ui: SessionRunUi,
   router: Router,
 ): Promise<boolean> {
-  const result = await router.session.close({
-    repoRoot: repository.root,
-    sessionsDir: repository.sessionsDir,
-  });
+  const result = await ui.withProgress(
+    `Closing the session in ${repository.label} — running the gates`,
+    () =>
+      router.session.close({
+        repoRoot: repository.root,
+        sessionsDir: repository.sessionsDir,
+      }),
+  );
   // A refused close is not an error to hide behind a toast: its rows say
   // which gate refused and what to do, and that is the whole value of it.
   ui.report("session close", result.ok ? result.value.stdout : result.message);

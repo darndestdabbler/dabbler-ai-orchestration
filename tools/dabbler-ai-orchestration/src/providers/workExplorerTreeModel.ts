@@ -55,6 +55,7 @@ export type WorkExplorerNode =
   | VerificationNode
   | FindingNode
   | TaskNode
+  | AttentionNode
   | RefusalNode;
 
 export interface RepositoryNode {
@@ -209,7 +210,9 @@ export function findingNodes(node: VerificationNode): FindingNode[] {
 export function childrenOf(node: WorkExplorerNode): WorkExplorerNode[] {
   switch (node.kind) {
     case "repository":
-      return sessionNodes(node);
+      // Attention above the work: what is waiting on the operator is the
+      // reason they opened the view, and it reads first.
+      return [...attentionNodes(node), ...sessionNodes(node)];
     case "session":
       // What stopped the session reads above what it was doing: the
       // verification row first, then the tasks.
@@ -218,6 +221,7 @@ export function childrenOf(node: WorkExplorerNode): WorkExplorerNode[] {
       return findingNodes(node);
     case "finding":
     case "task":
+    case "attention":
     case "refusal":
       return [];
   }
@@ -277,6 +281,7 @@ export const NODE_TOKEN = {
   verification: "dabblerVerification",
   finding: "dabblerFinding",
   task: "dabblerTask",
+  attention: "dabblerAttention",
   refusal: "dabblerRefusal",
 } as const;
 
@@ -783,6 +788,8 @@ export function descriptorFor(node: WorkExplorerNode): RowDescriptor {
   switch (node.kind) {
     case "repository":
       return repositoryDescriptor(node);
+    case "attention":
+      return attentionDescriptor(node);
     case "session":
       return sessionDescriptor(node);
     case "verification":
@@ -794,4 +801,143 @@ export function descriptorFor(node: WorkExplorerNode): RowDescriptor {
     case "refusal":
       return refusalDescriptor(node);
   }
+}
+
+/**
+ * One row of what is waiting on the operator, above the sessions.
+ *
+ * The attention view is the answer to "three new things to look at, in three
+ * places, is not an improvement": sessions 38, 39 and 40 each added something
+ * worth seeing — planned sessions, owed decisions, task rows — and each of
+ * them lived somewhere different. Nothing here is derived. Every row restates
+ * a fact the projection already carries, in the place the operator is
+ * already looking.
+ */
+export interface AttentionNode {
+  readonly kind: "attention";
+  readonly repository: SessionsRepository;
+  readonly subject: "owed" | "stalled" | "unresolved";
+  readonly label: string;
+  readonly detail: string;
+  /** Blocking work, as opposed to merely worth knowing. */
+  readonly urgent: boolean;
+}
+
+/**
+ * What the operator is being waited on for, in the order it costs them.
+ *
+ * Empty is the ordinary state and renders nothing: a view that always has a
+ * row teaches people that its rows mean nothing.
+ */
+export function attentionNodes(node: RepositoryNode): AttentionNode[] {
+  const repository = node.repository;
+  const rows: AttentionNode[] = [];
+
+  for (const owed of repository.owedDecisions ?? []) {
+    rows.push({
+      kind: "attention",
+      repository,
+      subject: "owed",
+      label: owed.question,
+      // The blocking one says what it costs; the advisory one says what
+      // happens if it is never answered, which is the honest reason it is
+      // safe to ignore.
+      detail: owed.blocking
+        ? "Holds the close until you answer it"
+        : owed.onNoAnswer || "Waiting on you",
+      urgent: owed.blocking,
+    });
+  }
+
+  // The liveness row renders whenever something is in flight, not only when
+  // it has gone quiet: "what happened while I was away" is a question about
+  // a running session, and answering it only once the session looks stuck
+  // leaves the ordinary case blank.
+  if (repository.currentSession !== null) {
+    const inFlight = repository.sessions.find(
+      (session) => session.number === repository.currentSession,
+    );
+    const named = inFlight
+      ? `Session ${inFlight.displayNumber} is in flight`
+      : `Session ${repository.currentSession} is in flight`;
+    const age = elapsedSince(repository.lastActivityAt);
+    rows.push({
+      kind: "attention",
+      repository,
+      subject: "stalled",
+      label: repository.possiblyStalled
+        ? `${named} — nothing written for ${age ?? "a while"}`
+        : named,
+      // Deliberately never "stalled" or "stuck". It reports that the record
+      // stopped moving; it cannot see whether the thinking is still useful,
+      // and a row that implied it could would be making that judgment.
+      detail: age
+        ? `Last written ${age} ago. This is the record moving, not the work.`
+        : "Nothing has been written yet.",
+      urgent: false,
+    });
+  }
+
+  for (const session of repository.sessions) {
+    const view = session.verification;
+    if (!view || view.clean || !view.terminal) continue;
+    // An in-flight session that stopped at the cap is the MOST worth saying:
+    // suppressing it hid the one case where the operator has to decide what
+    // happens next.
+    rows.push({
+      kind: "attention",
+      repository,
+      subject: "unresolved",
+      label: `Session ${session.displayNumber} — ${view.headline}`,
+      detail:
+        session.status === "in-progress"
+          ? "Still in flight, and its verification stopped. Read it before it closes."
+          : "Planning input, not an interruption: read it between sessions.",
+      urgent: session.status === "in-progress",
+    });
+  }
+
+  return rows;
+}
+
+/** An attention row, which is a leaf and carries no menu of its own. */
+export function attentionDescriptor(node: AttentionNode): RowDescriptor {
+  return {
+    id: `attention:${node.repository.root}/${node.subject}/${node.label}`,
+    label: node.label,
+    description: node.detail,
+    tooltip: `**${node.label}**\n\n${node.detail}`,
+    icon: {
+      kind: "theme",
+      // Urgency is the icon's whole job here: an operator scanning several
+      // projects needs "this one is blocked" to survive peripheral vision.
+      id: node.urgent ? "error" : "info",
+      color: node.urgent ? "charts.yellow" : undefined,
+    },
+    contextValue: tokenString([NODE_TOKEN.attention, `attention-${node.subject}`]),
+    collapsible: "none",
+  };
+}
+
+/**
+ * How long ago, in the words a person uses.
+ *
+ * Coarse on purpose: an operator watching several projects wants "about two
+ * hours", and a row that said "2h 14m 09s" would be reporting a precision
+ * the question does not have.
+ */
+export function elapsedSince(
+  at: string | null,
+  now: Date = new Date(),
+): string | null {
+  if (!at) return null;
+  const then = Date.parse(at);
+  if (!Number.isFinite(then)) return null;
+  const seconds = Math.max(0, Math.floor((now.getTime() - then) / 1000));
+  if (seconds < 90) return "less than 2 minutes";
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 90) return `${minutes} minutes`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 36) return `${hours} hours`;
+  return `${Math.round(hours / 24)} days`;
 }

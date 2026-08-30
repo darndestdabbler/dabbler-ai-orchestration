@@ -62,6 +62,11 @@ export interface SessionsRepository {
   schemaVersionOnDisk: number | null;
   sessionsSource: SessionsSource;
   invariantViolation: string | null;
+  /** Derived liveness: when the record last moved, and whether it stopped. */
+  lastActivityAt: string | null;
+  possiblyStalled: boolean;
+  /** What the repository is waiting on a person for, as the attention view reads it. */
+  owedDecisions: ProgressProjectionRepository["owedDecisions"];
   orchestrator: OrchestratorInfo | null;
   /**
    * The projection's sessions, with tasks populated on the in-flight
@@ -193,6 +198,9 @@ function buildRepository(
     totalSessions: p ? p.repository.totalSessions : null,
     sessionsCompleted: p ? p.repository.sessionsCompleted : 0,
     currentSession: p ? p.repository.currentSession : null,
+    lastActivityAt: p ? p.repository.lastActivityAt : null,
+    possiblyStalled: p ? p.repository.possiblyStalled : false,
+    owedDecisions: p ? p.repository.owedDecisions : [],
     forceClosed: p ? p.repository.forceClosed : false,
     schemaVersionOnDisk: p ? p.repository.schemaVersionOnDisk : null,
     // A failed projection is not a fresh repository. "ledger" is what a

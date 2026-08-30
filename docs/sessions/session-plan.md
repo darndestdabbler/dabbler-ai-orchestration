@@ -1909,10 +1909,17 @@ session 40 there are tasks to see. Three new things to look at, in three
 places, is not an improvement.
 
 1. Register; declare `--not-releasable`.
-2. The framework stamps `lastActivityAt` on every state write and every
-   verification round. The projection derives **`possibly stalled`** from it
-   against a declared threshold. The agent never writes either — an engine that
-   reports its own liveness reports it right up until it cannot.
+2. **`lastActivityAt` is DERIVED, not stamped** — amended in session 43,
+   before the code, for the reason the plan already holds itself to
+   elsewhere. The framework timestamps every row it writes: the activity log
+   stamps each entry and every verification round carries `recorded_at`. A
+   new field stamped beside them would be a second statement of "when did
+   this last move", and a second statement of one fact is the drift this
+   repository refuses everywhere else. So the projection takes the latest of
+   the timestamps that already exist and derives **`possibly stalled`** from
+   it against a declared threshold. What the original text was protecting is
+   unchanged and is the whole point: **the agent writes neither**, because an
+   engine that reports its own liveness reports it right up until it cannot.
 3. **The heartbeat proves the process is alive, not that the thinking is
    useful.** The row says which, and never implies the other.
 4. One **attention view** in the Work Explorer, gathering what is already

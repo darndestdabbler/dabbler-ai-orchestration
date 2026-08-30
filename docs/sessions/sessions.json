@@ -817,9 +817,9 @@
     {
       "number": 42,
       "title": "The panes say what they are, and the Solution Explorer lights up",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-30T15:52:31.898000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-08-30T15:58:37.518000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

@@ -939,9 +939,9 @@
     {
       "number": 48,
       "title": "The generated workspace",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-30T17:58:17.248000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-08-30T18:07:44.112000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

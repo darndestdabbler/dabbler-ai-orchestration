@@ -309,11 +309,11 @@ export async function testEvidenceVerb(argv: string[]): Promise<number> {
   );
   if (record.outcome === OUTCOME_PASSED) {
     if (record.stage === STAGE_PREVERIFY_TARGETED) {
-      writeOut(`Next: python -m ai_router.verify --sessions-dir ${sessionsDir}\n`);
+      writeOut(`Next: dabbler verify --sessions-dir ${sessionsDir}\n`);
     } else if (record.stage === STAGE_FINAL_FULL) {
       writeOut(
         "Next: git commit, then git push -- once -- then\n" +
-          `  python -m ai_router.session close --sessions-dir ${sessionsDir}\n`,
+          `  dabbler session close --sessions-dir ${sessionsDir}\n`,
       );
     }
   }

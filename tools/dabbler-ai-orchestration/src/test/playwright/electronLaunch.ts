@@ -6,16 +6,18 @@
 // Chrome DevTools Protocol and drives the same Code.exe binary
 // test-electron downloads to `.vscode-test/`.
 //
-// The workspace fixtures are plain artifact files — the extension still
-// derives every status through `python -m ai_router.progress`, so these
-// scenarios exercise the real Python data path end to end. The suite
-// therefore requires an interpreter on PATH with ai_router installed
-// (the repo root's editable install satisfies this).
+// The workspace fixtures are plain artifact files, and the extension
+// derives every status by calling the router in-process — so these
+// scenarios exercise the real data path end to end. The suite requires
+// nothing installed: the router is bundled with the extension under test,
+// and the two fixture writes that must go through a sanctioned writer run
+// the router's own source on this Node.
 
 import * as cp from "child_process";
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
+import { pathToFileURL } from "url";
 import { _electron, ElectronApplication, Page, expect } from "@playwright/test";
 
 const EXTENSION_ROOT = path.resolve(__dirname, "..", "..", "..");
@@ -31,31 +33,24 @@ const _launch = require("../../../scripts/vscode-launch.js") as {
   describeLaunchFailure: (message: string, childOutput: string) => string;
 };
 
+/** The router's own source, which the two sanctioned writes below run. */
+const ROUTER_SRC = path.join(REPO_ROOT, "packages", "router", "src");
+
 /**
- * The interpreter that has ai_router importable: the repo root's .venv
- * (editable install) when present, else bare `python`. Fixture
- * workspaces have no .venv of their own, so every workspace this
- * harness builds pins `dabblerSessionSets.pythonPath` at this — the
- * projection must run the real Python data path, not the file-presence
- * fallback.
+ * The `dabbler` command the extension under test ships, which is what a
+ * spec spawns when it needs the router to WRITE through its command line.
+ * It is the bundle beside the extension, not the workspace's copy of the
+ * package: a scenario that drove a different build than the one loaded
+ * would be comparing two routers.
  */
-export const PYTHON = (() => {
-  const venv =
-    process.platform === "win32"
-      ? path.join(REPO_ROOT, ".venv", "Scripts", "python.exe")
-      : path.join(REPO_ROOT, ".venv", "bin", "python");
-  return fs.existsSync(venv) ? venv : "python";
-})();
+export const DABBLER_CLI = path.join(EXTENSION_ROOT, "dist", "dabbler.cjs");
 
 export function makeTmpDir(prefix: string): string {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), `${prefix}-`));
-  fs.mkdirSync(path.join(dir, ".vscode"), { recursive: true });
-  fs.writeFileSync(
-    path.join(dir, ".vscode", "settings.json"),
-    JSON.stringify({ "dabblerSessionSets.pythonPath": PYTHON }, null, 2),
-    "utf8",
-  );
-  return dir;
+  // No `.vscode/settings.json` any more. It used to pin an interpreter,
+  // because the projection ran as a subprocess and a fixture workspace has
+  // no environment of its own; the extension calls the router in-process
+  // now, so there is nothing about the host for a workspace to declare.
+  return fs.mkdtempSync(path.join(os.tmpdir(), `${prefix}-`));
 }
 
 // ---------------------------------------------------------------------------
@@ -67,9 +62,6 @@ export function makeTmpDir(prefix: string): string {
 // record the task rows are folded out of. The ledger and plan are
 // written as plain artifacts; the run records go through the router's
 // own writers, because both refuse content no sanctioned write produced.
-// The extension still derives every status through
-// `python -m ai_router.progress`, so these scenarios exercise the real
-// Python data path end to end.
 // ---------------------------------------------------------------------------
 
 export interface FixtureSession {
@@ -149,16 +141,16 @@ export function writeApprovedPlan(
   sessionNumber: number,
   steps: readonly { stepId: string; intent: string }[],
 ): void {
-  runPython(
+  runRouter(
     workspaceRoot,
     [
-      "from ai_router.approved_plan import new_plan, write_plan",
-      "from ai_router.ledger import session_run_dir",
-      `import json, sys`,
-      `steps = json.loads(sys.argv[1])`,
-      `run = session_run_dir(sys.argv[2], ${sessionNumber})`,
-      "run.mkdir(parents=True, exist_ok=True)",
-      `write_plan(run, new_plan(${sessionNumber}, "fixture", steps))`,
+      `import { mkdirSync } from "node:fs";`,
+      `const plan = await import("${moduleUrl("approvedPlan.ts")}");`,
+      `const ledger = await import("${moduleUrl("ledger.ts")}");`,
+      `const [stepsJson, root] = process.argv.slice(2);`,
+      `const run = ledger.sessionRunDir(root, ${sessionNumber});`,
+      `mkdirSync(run, { recursive: true });`,
+      `plan.writePlan(run, plan.newPlan(${sessionNumber}, "fixture", JSON.parse(stepsJson)));`,
     ].join("\n"),
     [
       JSON.stringify(
@@ -200,26 +192,40 @@ export function writeStepEvent(
       { kind: "targeted-tests", status: "pass", required: true },
     ];
   }
-  runPython(
+  runRouter(
     workspaceRoot,
     [
-      "from ai_router.ledger import append_step_event",
-      "import json, sys",
-      `append_step_event(sys.argv[2], ${sessionNumber}, json.loads(sys.argv[1]))`,
+      `const ledger = await import("${moduleUrl("ledger.ts")}");`,
+      `const [rowJson, root] = process.argv.slice(2);`,
+      `ledger.appendStepEvent(root, ${sessionNumber}, JSON.parse(rowJson));`,
     ].join("\n"),
     [JSON.stringify(row), workspaceRoot],
   );
 }
 
-function runPython(cwd: string, code: string, args: string[]): void {
-  const result = cp.spawnSync(PYTHON, ["-c", code, ...args], {
-    cwd,
-    encoding: "utf8",
-    windowsHide: true,
-  });
+/** One of the router's modules, as an import specifier a `-e` can use. */
+function moduleUrl(fileName: string): string {
+  return pathToFileURL(path.join(ROUTER_SRC, fileName)).href;
+}
+
+/**
+ * Run a snippet against the router's own modules.
+ *
+ * Node strips the types itself from 22.18 on, which is the floor this
+ * extension declares, so there is no transpiler here and no build to be
+ * stale. The source is reached by absolute path rather than through the
+ * package: Node refuses to strip types under `node_modules`, and the
+ * workspace link would put it there.
+ */
+function runRouter(cwd: string, code: string, args: string[]): void {
+  const result = cp.spawnSync(
+    process.execPath,
+    ["--experimental-strip-types", "--input-type=module", "-e", code, "--", ...args],
+    { cwd, encoding: "utf8", windowsHide: true },
+  );
   if (result.status !== 0) {
     throw new Error(
-      `fixture python failed (${result.status}): ${result.stderr || result.stdout}`,
+      `fixture write failed (${result.status}): ${result.stderr || result.stdout}`,
     );
   }
 }

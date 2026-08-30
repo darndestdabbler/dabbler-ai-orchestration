@@ -74,7 +74,7 @@ const SELECTION: SelectionConfig = {
   repoWide: ["tests/conftest.py", "pytest.ini"],
   rules: [
     ["docs/", []],
-    ["ai_router/router-config.yaml", ["tests/test_engine.py"]],
+    ["packages/router/router-config.yaml", ["tests/test_engine.py"]],
     ["ai_router/engine.py", ["tests/test_engine.py", "tests/test_widget.py"]],
   ],
 };
@@ -457,9 +457,9 @@ describe("every message that asks for evidence", () => {
     // the gate: the fix moved the surfaces, so the evidence the round was
     // opened on no longer answers for them.
     const text = remediationRecipe("docs/sessions", "python");
-    expect(text).toContain("ai_router.affected");
+    expect(text).toContain("dabbler affected");
     expect(text).toContain("--stage preverify-targeted");
-    expect(text).toContain("ai_router.verify");
+    expect(text).toContain("dabbler verify");
   });
 
   it("names the complete run, its record and the push before a close", () => {
@@ -469,7 +469,7 @@ describe("every message that asks for evidence", () => {
     expect(text).toContain("python -m pytest");
     expect(text).toContain(`--stage ${STAGE_FINAL_FULL}`);
     expect(text).toContain("git push");
-    expect(text).toContain("ai_router.session close");
+    expect(text).toContain("dabbler session close");
   });
 });
 

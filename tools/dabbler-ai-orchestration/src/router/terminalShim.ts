@@ -34,22 +34,22 @@ import * as path from "path";
 const COMMAND_NAME = "dabbler";
 
 /**
- * The bundled CLI entry point, or null when the router package cannot be
- * resolved.
+ * The bundled CLI entry point, or null when it is not there.
  *
- * `require.resolve` answers with the package's `main` (`dist/index.cjs`);
- * the command sits beside it. Resolving the package rather than reaching
- * for a path keeps this correct under a workspace symlink and under a
- * packaged VSIX, which are different layouts.
+ * It sits beside this file, because the extension's own build produces it:
+ * `esbuild.js` bundles the router's command into `dist/dabbler.cjs` next to
+ * `dist/extension.js`, with the same runtime assets both of them read.
+ *
+ * It used to be `require.resolve("dabbler-ai-router")`, which answered
+ * correctly in a workspace and could not answer at all in a VSIX --
+ * `.vscodeignore` excludes `node_modules`, so the package the extension
+ * bundles is not shipped as a package. The terminal shim is the operator's
+ * only hand-run surface now that the router is in-process, so "correct in
+ * development, absent in the artifact" is not a shape it can have.
  */
-export function resolveRouterCli(): string | null {
-  try {
-    const main = require.resolve("dabbler-ai-router");
-    const candidate = path.join(path.dirname(main), "dabbler.cjs");
-    return fs.existsSync(candidate) ? candidate : null;
-  } catch {
-    return null;
-  }
+export function resolveRouterCli(beside: string = __dirname): string | null {
+  const candidate = path.join(beside, "dabbler.cjs");
+  return fs.existsSync(candidate) ? candidate : null;
 }
 
 /**
@@ -119,8 +119,8 @@ export function launchers(
  */
 export function installTerminalShim(
   context: vscode.ExtensionContext,
+  cli: string | null = resolveRouterCli(),
 ): string | null {
-  const cli = resolveRouterCli();
   if (cli === null) return null;
 
   const directory = path.join(context.globalStorageUri.fsPath, "bin");

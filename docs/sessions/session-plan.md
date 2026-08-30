@@ -1461,6 +1461,53 @@ languages. Est. 99 TS tests, ported; 119 Python tests deleted.
 run must be recorded before the deletion, or the set's central claim rests
 on memory.
 
+> **Amended in session 36, 2026-08-29, on the record.** Two of the steps
+> above ask for something the implementation cannot do, and a third session-36
+> verification round upheld that leaving the prose unchanged was itself the
+> defect: a plan and a record that disagree are two records of one decision,
+> which is D224's lesson from session 35. The amendment is here rather than
+> in a decision alone so that a reader of the plan meets it. **It changes
+> what this session was required to deliver, so it is the operator's to
+> reverse** — D237 and D234 carry the full reasoning, and the verifier's two
+> upheld findings are in `.dabbler/runs/s36/`.
+>
+> **Step 3 — "and bump both schemas" is not performed, and the round row
+> spells the field `framework_version`.** The round record has never carried
+> a version discriminator: `rounds.schema.json` requires `round`, `verdict`,
+> `blocking`, `findings`, `completion_tree` and `recorded_at`, and declares
+> no version field anywhere. Incrementing one would mean ADDING a second new
+> field to the round record, which the same sentence forbids ("the set's one
+> record change"). The session record does carry one, and moving
+> `schemaVersion` from 5 to 6 for an additive optional property would make
+> every existing ledger fail validation against the shipped schema and would
+> tell a reader nothing `frameworkVersion` does not already say more
+> precisely. On the name: `rounds.jsonl` is snake_case in all twenty-four of
+> its keys and `sessions.json` is camelCase in all twelve of its; the plan's
+> sentence names one FACT for two records with two conventions, and each
+> record keeps its own. `docs/schema-reference.md` documents both spellings
+> side by side.
+>
+> **Step 10 — the artifacts are prepared at 2.0.0 and published by their tag
+> pipelines, not by `dabbler packaging`.** The packaging declaration models
+> exactly one `pack` and one `push` with one `feed` and one `secret`
+> (`packages/router/src/packaging.ts`), and this repository releases two
+> artifacts to two registries under two credentials. Declaring one would file
+> a release record that names half of a release; declaring both needs a
+> packaging model this set has no room to redesign. A local run would also
+> fail to authenticate — both pipelines mint their credential by OIDC from a
+> workflow identity — and would bypass the `require-green-test` gate on the
+> tagged commit, which is an operator decision recorded in the workflows
+> themselves. **What this session delivers instead:** both artifacts at
+> 2.0.0, `release.yml` repointed from PyPI to npm, `publish-vscode.yml`
+> intact, the `Test` workflow's Python job removed, and the tag push left to
+> the operator because it is irreversible and goes to two public registries.
+>
+> **Step 6 — there is no seat cost to measure.** No call this session went
+> through a Copilot seat; the verification rounds were bought over the direct
+> API. The cost is recorded as tokens per round instead, which is what the
+> metrics ledger carries.
+
+
 ---
 
 ## Acceptance criterion for sessions 22–36

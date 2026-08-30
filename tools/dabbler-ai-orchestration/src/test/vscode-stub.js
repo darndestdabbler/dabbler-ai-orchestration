@@ -87,9 +87,7 @@ const vscodeStub = {
     // practice (the change is visible immediately after the call
     // returns).
     const folderListeners = [];
-    // Set 122 S2: a few suites need an operator-set value (notably
-    // `dabblerSessionSets.pythonPath`, so a temp-root scaffold resolves an
-    // interpreter that actually has `ai_router`). Keyed `<section>.<key>`;
+    // A few suites need an operator-set value. Keyed `<section>.<key>`;
     // empty by default, so every existing test still sees a workspace with
     // no operator-set values.
     const configOverrides = new Map();

@@ -1,18 +1,25 @@
-// Where this package sits, and where the Python package it is replacing
-// sits, resolved from the running file rather than from the working
-// directory.
+// Where this package sits, resolved from the running file rather than from
+// the working directory.
 //
-// It walks up looking for this package's own `package.json`, because the
-// same code runs from two depths: `src/` under ts-node and `dist/` after
-// esbuild. A constant number of `..` segments would be right in one and
-// silently wrong in the other, and "silently wrong" here means reading a
-// config from a directory that happens to exist.
+// It walks up looking for a `package.json` that NAMES this package, because
+// the same code runs from three layouts and the depth differs in each:
+// `src/` under Node's type stripping, `dist/` after esbuild, and
+// `<extension>/dist/` inside the VSIX. A constant number of `..` segments
+// would be right in one and silently wrong in the others, and "silently
+// wrong" here means reading a config from a directory that happens to
+// exist.
 //
-// Until session 36 the bundled defaults -- `router-config.yaml`, the
-// schemas, the prompt templates -- are read from `ai_router/`, the one
-// copy. A second copy under this package would be data that drifts, and
-// the parity control compares two routers reading the same input: a
-// second copy would make a difference between them mean nothing.
+// The third layout is why the marker is the NAME rather than the file. A
+// VSIX bundles this package into the extension's own `dist/`, where the
+// nearest `package.json` above is the extension's; the build writes one
+// beside the bundle that says what it is, and the walk finds that. A
+// bundle that could not say what it is would resolve to the extension and
+// read its schemas from a directory with none.
+//
+// The bundled defaults -- `router-config.yaml`, the schemas, the prompt
+// templates, the seat catalog -- sit at that root, so they travel with
+// whichever copy of the package is running and there is never a second one
+// to drift.
 
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -53,10 +60,15 @@ export const PACKAGE_ROOT = findPackageRoot(
   dirname(fileURLToPath(import.meta.url)),
 );
 
-/** The repository holding this package. */
+/** The repository holding this package, in a development checkout. */
 export const REPO_ROOT = join(PACKAGE_ROOT, "..", "..");
 
-/** The Python package: the bundled config, the schemas, the templates. */
-export const AI_ROUTER_DIR = join(REPO_ROOT, "ai_router");
+/**
+ * The bundled data: `router-config.yaml`, the schemas, the prompt
+ * templates, the seat catalog. It is the package root because that is what
+ * ships -- `files` in the manifest names each of them, and the extension's
+ * build copies the same set beside its bundle.
+ */
+export const ASSET_DIR = PACKAGE_ROOT;
 
-export const SCHEMA_DIR = join(AI_ROUTER_DIR, "schemas");
+export const SCHEMA_DIR = join(ASSET_DIR, "schemas");

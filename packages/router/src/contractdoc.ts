@@ -207,7 +207,7 @@ export function render(
     // and it is the one it has. Every recipe the router PRINTS is swept at
     // the cutover, when there is one router for it to be true about.
     "*Generated from the contract definition. Do not edit by hand — " +
-      "regenerate with `python -m ai_router.contractdoc`.*",
+      "regenerate with `dabbler contractdoc`.*",
   );
   return `${out.join("\n")}\n`;
 }

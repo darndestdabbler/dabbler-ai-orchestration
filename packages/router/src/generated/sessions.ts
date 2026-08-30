@@ -32,6 +32,10 @@ export type SessionsSessionRecord = {
    */
   verification?: Record<string, unknown> | null;
   commit?: string | null;
+  /**
+   * The router version that registered this session, as its own manifest declares it. Additive and absent on every row written before it existed: a record cannot be back-filled with a version nobody can check, and 'written before the stamp' is a fact the absence states exactly. It answers the question a reader of an old ledger cannot otherwise ask -- which implementation produced this -- and it is the one place that question is answerable, because the orchestrator block names the ENGINE and not the framework.
+   */
+  frameworkVersion?: string;
 };
 
 /**

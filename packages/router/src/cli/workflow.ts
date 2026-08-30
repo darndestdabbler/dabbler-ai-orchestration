@@ -1,8 +1,8 @@
 // `dabbler workflow` -- the six-step driver's command line.
 //
-// Ten subcommands, exactly the ten `python -m ai_router.workflow` has. The
-// usage text is argparse's, because a refusal a person reads is compared byte
-// for byte like every other output the router writes.
+// Ten subcommands, one per step of the driver plus the two that move work
+// between them. The usage text is laid out like a parser's because it is
+// what a person reads when they mistype one.
 
 import { ManifestError, STEP_TITLES, STEPS } from "../solution.ts";
 import {

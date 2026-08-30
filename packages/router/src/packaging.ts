@@ -215,11 +215,25 @@ function roundHalfEven(value: number, digits: number): number {
   return rounded / factor;
 }
 
-function nowIso(): string {
-  // `datetime.now(timezone.utc).isoformat()` writes `+00:00`, never `Z`, and
-  // writes microseconds. Node writes `Z` and milliseconds; the offset is
-  // what the record carries, so it is spelled Python's way.
-  return new Date().toISOString().replace("Z", "+00:00");
+/**
+ * `datetime.now(timezone.utc).isoformat()`.
+ *
+ * Three differences from what `toISOString` gives, and each one is a byte
+ * in a record other tools read. The offset is `+00:00`, never `Z`. The
+ * fraction is six places, not three -- JavaScript's clock stops at
+ * milliseconds, so the last three are the zeros Python would print. And a
+ * whole-second value prints NO fraction at all, which is what `isoformat`
+ * does and what a naive six-zero pad gets wrong.
+ *
+ * `journal.nowIso` states the same rule for local time; this one is UTC,
+ * which is what the packaging record carries.
+ */
+function nowIso(date: Date = new Date()): string {
+  const iso = date.toISOString();
+  const base = iso.slice(0, 19);
+  const millis = date.getUTCMilliseconds();
+  const fraction = millis === 0 ? "" : `.${String(millis).padStart(3, "0")}000`;
+  return `${base}${fraction}+00:00`;
 }
 
 // --- The declaration ---------------------------------------------------------

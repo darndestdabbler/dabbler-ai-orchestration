@@ -37,6 +37,7 @@ import {
   runGitBinary,
 } from "./journal.ts";
 import { dumps, pythonRepr } from "./pythonJson.ts";
+import { workingDirectory } from "./workdir.ts";
 
 // The router spawns git in exactly one function, `journal.runGit`, and the
 // tree snapshot and tree diff exist once, beside it. `journal` sits below
@@ -92,7 +93,7 @@ export class SessionsRootNotFoundError extends Error {
  */
 export function resolveSessionsDir(explicit?: string | null, start?: string): string {
   if (explicit) return String(explicit);
-  const from = start ?? process.cwd();
+  const from = start ?? workingDirectory();
   const root = repoRootFor(from);
   if (root === null) {
     throw new SessionsRootNotFoundError(

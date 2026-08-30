@@ -7,6 +7,10 @@ import {
 } from "../../commands/cancelLifecycleCommands";
 import { NewModuleUi, runNewModuleFlow } from "../../commands/newModule";
 import {
+  SetUpProjectUi,
+  runSetUpProjectFlow,
+} from "../../commands/bootstrapProject";
+import {
   planRespecifyPrompt,
   planSendBackPrompt,
   planSessionRunPrompt,
@@ -136,6 +140,47 @@ suite("new module flow", () => {
   });
 });
 
+suite("set up new project", () => {
+  function setUpUi(root: string | undefined): {
+    ui: SetUpProjectUi;
+    errors: string[];
+    infos: string[];
+  } {
+    const errors: string[] = [];
+    const infos: string[] = [];
+    return {
+      ui: {
+        showInformationMessage: (m: string) => infos.push(m),
+        showErrorMessage: (m: string) => errors.push(m),
+        workspaceRoot: () => root,
+      },
+      errors,
+      infos,
+    };
+  }
+
+  test("bootstraps the workspace and says what to run next", async () => {
+    const { ui, infos } = setUpUi("D:\\ws");
+    assert.strictEqual(await runSetUpProjectFlow(ui, fakeRouter(0).router), true);
+    assert.ok(infos[0].includes("dabbler session start"));
+  });
+
+  test("no workspace folder is an error, and nothing is asked of the router", async () => {
+    const { ui, errors } = setUpUi(undefined);
+    assert.strictEqual(await runSetUpProjectFlow(ui, unusableRouter()), false);
+    assert.ok(errors[0].includes("Open the project folder"));
+  });
+
+  test("a refusal from bootstrap is shown, not swallowed", async () => {
+    const { ui, errors } = setUpUi("D:\\ws");
+    assert.strictEqual(
+      await runSetUpProjectFlow(ui, fakeRouter(3, "not a git repository").router),
+      false,
+    );
+    assert.ok(errors[0].includes("not a git repository"));
+  });
+});
+
 suite("copy prompts", () => {
   test("the start prompt is the framework's trigger phrase, naming no repository", () => {
     assert.strictEqual(START_NEXT_SESSION_PROMPT, "Start the next session.");
@@ -236,7 +281,7 @@ suite("commandFlows: the three planning-time actions", () => {
     assert.ok(unresolved);
     assert.ok(unresolved!.text.includes(".dabbler/runs/s3/rounds.jsonl"));
     assert.ok(unresolved!.text.includes("unresolved at the cap"));
-    assert.ok(unresolved!.text.includes("ai_router.verify"));
+    assert.ok(unresolved!.text.includes("dabbler verify"));
     // Never the finding text itself: the engine reads the record.
     assert.ok(!unresolved!.text.includes("suite command is guessed"));
 
@@ -255,8 +300,8 @@ suite("commandFlows: the three planning-time actions", () => {
     // No command re-opens review on a closed session; the prompt says so
     // and hands the engine the next session's start and declare.
     assert.ok(remediated!.text.includes("No command re-opens review"));
-    assert.ok(remediated!.text.includes("python -m ai_router.session start --engine"));
-    assert.ok(remediated!.text.includes("python -m ai_router.session declare --task"));
+    assert.ok(remediated!.text.includes("dabbler session start --engine"));
+    assert.ok(remediated!.text.includes("dabbler session declare --task"));
 
     const verified = planSendBackPrompt(
       repository,
@@ -278,14 +323,14 @@ suite("commandFlows: the three planning-time actions", () => {
       makeSession({ number: 19, status: "in-progress", verification: makeVerification() }),
     )!;
     const cancelAt = unresolved.text.indexOf(
-      'python -m ai_router.session cancel 19 --reason "respecified as session 21" --force',
+      'dabbler session cancel 19 --reason "respecified as session 21" --force',
     );
     const blockAt = unresolved.text.indexOf("### Session 21 of 21");
     // The plan is named by the scan's own path for it, relative to the
     // root, not by a filename typed into the prompt.
     assert.ok(unresolved.text.includes("in docs/sessions/session-plan.md"), unresolved.text);
     const startAt = unresolved.text.indexOf(
-      "python -m ai_router.session start --engine claude-code --provider anthropic",
+      "dabbler session start --engine claude-code --provider anthropic",
     );
     assert.ok(cancelAt >= 0 && blockAt > cancelAt && startAt > blockAt, unresolved.text);
     assert.ok(unresolved.toast.includes("session 21"));
@@ -300,6 +345,6 @@ suite("commandFlows: the three planning-time actions", () => {
       }),
     )!;
     assert.ok(!landed.text.includes("session cancel"));
-    assert.ok(landed.text.includes("(2) python -m ai_router.session start"));
+    assert.ok(landed.text.includes("(2) dabbler session start"));
   });
 });

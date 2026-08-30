@@ -39,11 +39,12 @@ import { dirname, join, resolve as resolvePath } from "node:path";
 
 import { parse as parseYaml } from "yaml";
 
-import { AI_ROUTER_DIR, SCHEMA_DIR } from "./paths.ts";
+import { ASSET_DIR, SCHEMA_DIR } from "./paths.ts";
 import { repoRootFor } from "./journal.ts";
 import { schemaFailure } from "./schema/validate.ts";
 import { readText } from "./textfile.ts";
 import { validateTransportTimeouts } from "./transports/copilot.ts";
+import { workingDirectory } from "./workdir.ts";
 
 /** The loaded config: schema-shaped data plus the `_`-prefixed provenance. */
 export type RouterConfig = Record<string, unknown>;
@@ -56,7 +57,7 @@ export class ConfigNotFoundError extends ConfigError {}
 
 const SCHEMA_PATH = join(SCHEMA_DIR, "router-config.schema.json");
 const PROJECT_SCHEMA_PATH = join(SCHEMA_DIR, "dabbler.schema.json");
-const BUNDLED_CONFIG_PATH = join(AI_ROUTER_DIR, "router-config.yaml");
+const BUNDLED_CONFIG_PATH = join(ASSET_DIR, "router-config.yaml");
 
 export const LOCAL_OVERRIDES_FILENAME = "local-overrides.yaml";
 export const PROJECT_CONFIG_FILENAME = "dabbler.yaml";
@@ -273,7 +274,7 @@ const projectRootCache = new Map<string, string | null>();
  * would be a second thing to disagree.
  */
 export function projectRoot(projectDir?: string): string | null {
-  const start = resolvePath(projectDir ?? process.cwd());
+  const start = resolvePath(projectDir ?? workingDirectory());
   if (!projectRootCache.has(start)) {
     projectRootCache.set(start, repoRootFor(start));
   }
@@ -376,7 +377,7 @@ export function loadConfig(path?: string, projectDir?: string): RouterConfig {
   if (!existsSync(sources.base)) {
     throw new ConfigNotFoundError(
       `Router config not found: ${sources.base}. Create it from the ` +
-        "bundled ai_router/router-config.yaml.",
+        "bundled router-config.yaml."
     );
   }
 

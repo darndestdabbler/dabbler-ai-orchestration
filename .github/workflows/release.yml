@@ -1,28 +1,32 @@
-name: Release dabbler-ai-router to PyPI
+name: Release dabbler-ai-router to npm
 
-# OIDC trusted publishing (no API tokens in repo secrets).
-# See `docs/planning/release-process.md` for one-time setup and the
-# per-release checklist. Triggered on tag push:
+# OIDC trusted publishing (no long-lived token in repo secrets). npm has
+# supported it since 2025; the publish step mints a short-lived credential
+# from this workflow's identity, and the package's npm settings name the
+# repository and workflow that are allowed to do it.
 #
-#   - `vX.Y.Z-rcN` (e.g. `v0.1.0-rc1`) -> TestPyPI only.
-#   - `vX.Y.Z`     (e.g. `v0.1.0`)     -> PyPI proper.
+# Triggered on tag push:
 #
-# Anything else (e.g. `v1.0.0rc1`, `v1.2`, `vfoo`) is rejected by the
-# `classify` job before any artifact build runs.
+#   - `v-rcN` (e.g. `v2.0.0-rc1`) -> the npm `next` dist-tag only. The RC
+#                     exercises the whole publish path without moving
+#                     `latest`, which is what an `npm i` gets.
+#   - `vX.Y.Z`      -> the `latest` dist-tag.
 #
-# The build job runs after `classify` so artifacts exist for inspection
-# even if the publish step is gated by environment review.
+# Anything else (`v2.0`, `vfoo`) is rejected by `classify` before any
+# artifact is built.
 #
-# The `!vsix-v*` negative pattern excludes Marketplace tags because
-# GitHub's tag-pattern matcher treats `v*` as a glob that also matches
-# `vsix-v0.13.0` (the leading `v` is just a literal). Without this
-# exclusion, every Marketplace tag push would trigger a spurious PyPI
-# workflow run that fails the classify job. `publish-vscode.yml` (the
-# Marketplace pipeline) is the canonical handler for `vsix-v*`; this
-# workflow only sees `v*` tags that are *not* prefixed with `vsix-`.
-# Note: `branches`/`tags` and the corresponding `*-ignore` keys cannot
-# be combined in the same `on:` block, so we use the `!pattern` form
-# inside the `tags:` list instead.
+# **The `!vsix-v*` exclusion is load-bearing**, not tidiness: GitHub's
+# tag-pattern matcher treats `v*` as a glob whose leading `v` is a literal,
+# so it also matches `vsix-v2.0.0`. Without the exclusion every Marketplace
+# tag push would start this workflow too and fail its classify job.
+# `publish-vscode.yml` is the canonical handler for `vsix-v*`. Note that
+# `tags` and `tags-ignore` cannot both appear in one `on:` block, so the
+# `!pattern` form goes inside the list.
+#
+# The router used to be a Python package published to PyPI. It is one
+# TypeScript implementation now, so this workflow publishes to npm and the
+# PyPI project is left as history: a version already on PyPI stays
+# downloadable, and nothing new is uploaded there.
 
 on:
   push:
@@ -35,12 +39,9 @@ permissions:
 
 jobs:
   # ---------------------------------------------------------------------------
-  # Classify the pushed tag into one of {final, rc, invalid}. Final and
-  # RC tags must match the strict regexes below; anything else fails the
-  # workflow before any build/publish work happens. The classification
-  # outputs gate the downstream publish jobs so they cannot fire for
-  # the wrong tag shape (e.g., a final tag accidentally also satisfying
-  # the RC condition).
+  # Classify the pushed tag into one of {final, rc, invalid}. The
+  # classification outputs gate the publish jobs, so they cannot fire for
+  # the wrong tag shape even if this job later grows a third case.
   # ---------------------------------------------------------------------------
   classify:
     name: Classify tag
@@ -48,7 +49,7 @@ jobs:
     outputs:
       is_final: ${{ steps.classify.outputs.is_final }}
       is_rc: ${{ steps.classify.outputs.is_rc }}
-      pep440_version: ${{ steps.classify.outputs.pep440_version }}
+      version: ${{ steps.classify.outputs.version }}
     steps:
       - name: Classify ${{ github.ref_name }}
         id: classify
@@ -57,26 +58,25 @@ jobs:
           if [[ "$tag" =~ ^v([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
             echo "is_final=true"  >> "$GITHUB_OUTPUT"
             echo "is_rc=false"    >> "$GITHUB_OUTPUT"
-            echo "pep440_version=${BASH_REMATCH[1]}" >> "$GITHUB_OUTPUT"
-            echo "Tag $tag classified as FINAL (PEP 440 version ${BASH_REMATCH[1]})."
-          elif [[ "$tag" =~ ^v([0-9]+\.[0-9]+\.[0-9]+)-rc([0-9]+)$ ]]; then
+            echo "version=${BASH_REMATCH[1]}" >> "$GITHUB_OUTPUT"
+            echo "Tag $tag classified as FINAL (${BASH_REMATCH[1]})."
+          elif [[ "$tag" =~ ^v([0-9]+\.[0-9]+\.[0-9]+-rc[0-9]+)$ ]]; then
             echo "is_final=false" >> "$GITHUB_OUTPUT"
             echo "is_rc=true"     >> "$GITHUB_OUTPUT"
-            # PEP 440 normalizes `0.1.0-rc1` to `0.1.0rc1` (no dash).
-            echo "pep440_version=${BASH_REMATCH[1]}rc${BASH_REMATCH[2]}" >> "$GITHUB_OUTPUT"
-            echo "Tag $tag classified as RC (PEP 440 version ${BASH_REMATCH[1]}rc${BASH_REMATCH[2]})."
+            echo "version=${BASH_REMATCH[1]}" >> "$GITHUB_OUTPUT"
+            echo "Tag $tag classified as RC (${BASH_REMATCH[1]}). Publishes to the 'next' dist-tag."
           else
             echo "::error::tag $tag does not match the release pattern. Expected v[0-9]+.[0-9]+.[0-9]+ for finals or v[0-9]+.[0-9]+.[0-9]+-rcN for release candidates."
             exit 1
           fi
 
   # ---------------------------------------------------------------------------
-  # Build sdist + wheel. Uploaded as a workflow artifact so the publish
-  # jobs (and any human reviewing the release) can inspect the same bytes
-  # that go to PyPI.
+  # Build the tarball. Uploaded as a workflow artifact so the publish job
+  # (and any human reviewing the release) can inspect the same bytes that
+  # go to the registry.
   # ---------------------------------------------------------------------------
   build:
-    name: Build sdist + wheel
+    name: Build the package tarball
     needs: classify
     runs-on: ubuntu-latest
     steps:
@@ -85,46 +85,36 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: Set up Python
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
         with:
-          python-version: '3.11'
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
 
-      - name: Install build tooling
-        run: python -m pip install --upgrade pip build packaging
+      - name: Install dependencies
+        run: npm ci
 
-      - name: Verify tag matches pyproject.toml version
-        # Catches the "tagged v0.1.1 but forgot to bump pyproject.toml"
-        # mistake before we waste a build/publish cycle. The check
-        # compares the PEP 440 version the classify job derived from
-        # the tag (`v0.1.0` -> `0.1.0`, `v0.1.0-rc1` -> `0.1.0rc1`)
-        # against the canonicalized version from pyproject.toml. Using
-        # `packaging.version.Version` on both sides catches any
-        # subtle PEP 440 normalization differences.
+      - name: Verify tag matches packages/router/package.json version
+        # Catches the "tagged v2.0.1 but forgot to bump the manifest"
+        # mistake before a build/publish cycle is spent on it. npm has one
+        # canonical spelling of a version, so this is a string comparison
+        # and needs no normalizer.
         env:
-          EXPECTED_VERSION: ${{ needs.classify.outputs.pep440_version }}
+          EXPECTED_VERSION: ${{ needs.classify.outputs.version }}
         run: |
-          python <<'PY'
-          import os, sys, tomllib
-          from packaging.version import Version
-          expected = os.environ["EXPECTED_VERSION"]
-          with open("pyproject.toml", "rb") as f:
-              pyproject_version = tomllib.load(f)["project"]["version"]
-          # `Version()` normalizes both sides to canonical PEP 440 form,
-          # so `0.1.0rc1` and `0.1.0-rc1` and `0.1.0.rc1` all compare
-          # equal — the Version class is the source of truth here.
-          if Version(expected) != Version(pyproject_version):
-              print(
-                  f"::error::tag PEP 440 version {expected!r} does not "
-                  f"match pyproject.toml [project].version {pyproject_version!r}",
-                  file=sys.stderr,
-              )
-              sys.exit(1)
-          print(f"tag-vs-pyproject check OK: {expected} == {pyproject_version}")
-          PY
+          declared="$(node -p "require('./packages/router/package.json').version")"
+          if [[ "$declared" != "$EXPECTED_VERSION" ]]; then
+            echo "::error::tag version '$EXPECTED_VERSION' does not match packages/router/package.json version '$declared'"
+            exit 1
+          fi
+          echo "tag-vs-manifest check OK: $EXPECTED_VERSION == $declared"
 
-      - name: Build sdist + wheel
-        run: python -m build
+      - name: Build the bundles
+        run: npm run build -w dabbler-ai-router
+
+      - name: Pack
+        working-directory: packages/router
+        run: npm pack --pack-destination "$GITHUB_WORKSPACE/dist"
 
       - name: Upload dist artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
@@ -137,9 +127,8 @@ jobs:
   # ---------------------------------------------------------------------------
   # Release prerequisite (operator-decided 2026-06-12): the tagged
   # commit must have a SUCCESSFUL `Test` workflow run before anything
-  # publishes (TestPyPI included — it exercises the same upload path).
-  # The gate waits while Test is still running for the commit, and
-  # fails loud on a red or absent run — re-run THIS workflow after
+  # publishes. The gate waits while Test is still running for the commit,
+  # and fails loud on a red or absent run — re-run THIS workflow after
   # Test is green; no tag re-push needed.
   # ---------------------------------------------------------------------------
   require-green-test:
@@ -167,21 +156,20 @@ jobs:
           infra-override-reason: ${{ vars.RELEASE_INFRA_OVERRIDE_REASON }}
 
   # ---------------------------------------------------------------------------
-  # TestPyPI publish — release-candidate tags only (`v[0-9]+.[0-9]+.[0-9]+-rcN`).
-  # Lets the release workflow exercise the full upload path against
-  # TestPyPI before the equivalent run against PyPI proper. TestPyPI
-  # rejects re-uploads of the same version, so each RC must bump the
-  # suffix (rc1, rc2, ...).
+  # Publish. One job, two dist-tags: a final moves `latest`, a release
+  # candidate moves `next` and leaves `latest` where it is. `npm i
+  # dabbler-ai-router` resolves `latest`, so an RC that landed there would
+  # be shipped to everyone by the next fresh install.
   # ---------------------------------------------------------------------------
-  publish-testpypi:
-    name: Publish to TestPyPI (release candidates only)
+  publish-npm:
+    name: Publish to npm
     needs: [classify, build, require-green-test]
-    if: ${{ needs.classify.outputs.is_rc == 'true' }}
     runs-on: ubuntu-latest
     environment:
-      name: testpypi
-      url: https://test.pypi.org/p/dabbler-ai-router
+      name: npm
+      url: https://www.npmjs.com/package/dabbler-ai-router
     permissions:
+      contents: read
       id-token: write   # required for OIDC trusted publishing
     steps:
       - name: Download dist artifact
@@ -190,44 +178,20 @@ jobs:
           name: dist
           path: dist/
 
-      - name: Publish to TestPyPI
-        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33  # v1.14.2
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
         with:
-          repository-url: https://test.pypi.org/legacy/
-          skip-existing: true
-          # No `password:` — OIDC mints a short-lived token from the
-          # trusted-publisher config in the TestPyPI project settings.
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
 
-  # ---------------------------------------------------------------------------
-  # PyPI publish — final tags only (`v[0-9]+.[0-9]+.[0-9]+` exactly).
-  # The classify job already rejected anything else, so this gate is a
-  # belt-and-suspenders check: even if `classify` ever evolves, an RC
-  # tag cannot end up here.
-  # ---------------------------------------------------------------------------
-  publish-pypi:
-    name: Publish to PyPI (final releases only)
-    needs: [classify, build, require-green-test]
-    if: ${{ needs.classify.outputs.is_final == 'true' }}
-    runs-on: ubuntu-latest
-    environment:
-      name: pypi
-      url: https://pypi.org/p/dabbler-ai-router
-    permissions:
-      id-token: write   # required for OIDC trusted publishing
-    steps:
-      - name: Download dist artifact
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
-        with:
-          name: dist
-          path: dist/
-
-      - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33  # v1.14.2
-        # No `repository-url:` — defaults to https://upload.pypi.org/legacy/.
-        # No `password:` — OIDC mints the short-lived token from the
-        # trusted-publisher config in the PyPI project settings.
-        with:
-          # A version's files can never be replaced on PyPI, so a re-run
-          # (or a tag whose version was already published out-of-band, as
-          # 1.0.1 was) must no-op green rather than fail the release.
-          skip-existing: true
+      - name: Publish
+        # No `NODE_AUTH_TOKEN` — OIDC mints a short-lived credential from
+        # the trusted-publisher config in the package's npm settings.
+        # A version's files can never be replaced on npm, so a re-run after
+        # a successful publish fails; that is the registry's rule and not
+        # something to work around.
+        run: |
+          tarball="$(ls dist/*.tgz)"
+          npm publish "$tarball" \
+            --provenance \
+            --tag "${{ needs.classify.outputs.is_final == 'true' && 'latest' || 'next' }}"

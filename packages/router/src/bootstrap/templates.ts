@@ -12,8 +12,10 @@
 // in it, and after the port there is none in the product either. The same
 // goes for the commit guard: it invokes the router by name.
 //
-// Every string here is compared byte for byte against its Python twin, so it
-// is written one source line per rendered line and nothing is reflowed.
+// It is written one source line per rendered line and nothing is reflowed:
+// the fence lands in three files a person then reads and edits around, so a
+// change to it should read as a change to the text rather than as a reflow
+// of the whole block.
 
 export const MANAGED_START = "<!-- dabbler:managed:start -->";
 export const MANAGED_END = "<!-- dabbler:managed:end -->";

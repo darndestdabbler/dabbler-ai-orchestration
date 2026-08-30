@@ -27,7 +27,7 @@ import {
 } from "../session.ts";
 import { writeErr, writeOut } from "./output.ts";
 
-/** Every subcommand, in the order `python -m ai_router.session` declares them. */
+/** Every subcommand, in the order the usage text lists them. */
 const SUMMARY: Record<string, string> = {
   start: "register a session start",
   log: "record a plan step's status in activity-log.json",

@@ -2,11 +2,11 @@
   "name": "dabbler-ai-orchestration",
   "displayName": "Dabbler AI Orchestration",
   "description": "Organize AI-led development like work: modules, session sets and step-by-step session plans in a native tree — plus routed verification before every close, normally cross-provider, recorded as evidence you can check.",
-  "version": "1.0.4",
+  "version": "2.0.0",
   "publisher": "DarndestDabbler",
   "private": true,
   "engines": {
-    "vscode": "^1.85.0"
+    "vscode": "^1.135.0"
   },
   "categories": [
     "Other",
@@ -142,12 +142,6 @@
         "icon": "$(add)"
       },
       {
-        "command": "dabblerSessionSets.installAiRouter",
-        "title": "Install ai-router",
-        "category": "Dabbler",
-        "icon": "$(cloud-download)"
-      },
-      {
         "command": "dabbler.troubleshoot",
         "title": "Troubleshoot",
         "category": "Dabbler",
@@ -276,16 +270,6 @@
         }
       ]
     },
-    "configuration": {
-      "title": "Dabbler AI Orchestration",
-      "properties": {
-        "dabblerSessionSets.pythonPath": {
-          "type": "string",
-          "default": "python",
-          "markdownDescription": "Python executable used for every `python -m ai_router.*` invocation (tree projections, session lifecycle, module creation, install). Accepts an absolute path, a workspace-relative path (e.g. `.venv/Scripts/python.exe`), or a bare command on `PATH`. When unset, a workspace `.venv` interpreter is auto-detected."
-        }
-      }
-    },
     "submenus": [
       {
         "id": "dabblerWorkExplorer.openFile",
@@ -308,7 +292,7 @@
   "devDependencies": {
     "@playwright/test": "^1.60.0",
     "@types/mocha": "^10.0.6",
-    "@types/node": "^20.0.0",
+    "@types/node": "^22.0.0",
     "@types/vscode": "^1.85.0",
     "@typescript-eslint/eslint-plugin": "^7.0.0",
     "@typescript-eslint/parser": "^7.0.0",
@@ -320,7 +304,7 @@
     "typescript": "^5.3.0"
   },
   "dependencies": {
-    "dabbler-ai-router": "^1.1.0",
+    "dabbler-ai-router": "^2.0.0",
     "yaml": "^2.7.0"
   }
 }

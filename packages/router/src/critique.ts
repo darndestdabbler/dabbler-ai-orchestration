@@ -58,7 +58,7 @@ function requireChangeId(changeId: unknown): string {
     throw new LedgerError(
       `change-id ${pythonRepr(changeId)} is not a derived digest (7-64 ` +
         "lowercase hex characters). It is computed from the reviewed tree by " +
-        "python -m ai_router.verify prepare; it is never supplied.",
+        "dabbler verify prepare; it is never supplied.",
     );
   }
   return changeId;

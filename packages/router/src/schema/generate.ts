@@ -1,4 +1,4 @@
-// The twenty schemas under `ai_router/schemas/` are the framework's
+// The schemas under `packages/router/schemas/` are the framework's
 // meaning. This turns each of them into one TypeScript declaration file,
 // in one direction only: a schema changes, the generator runs, and the
 // checked-in output moves with it. Nothing here reads the generated files,
@@ -47,7 +47,7 @@ export class SchemaTranslationError extends Error {}
 
 /** One schema file on its way to one module. */
 export interface SchemaSource {
-  /** File name as it sits in `ai_router/schemas/`, e.g. `rounds.schema.json`. */
+  /** File name as it sits in the schema directory, e.g. `rounds.schema.json`. */
   fileName: string;
   schema: JsonSchemaObject;
 }

@@ -41,6 +41,7 @@ import {
   sessionHasHistory,
 } from "../src/progress.ts";
 import { PythonFloat, dumps } from "../src/pythonJson.ts";
+import { VERSION } from "../src/version.ts";
 import {
   DuplicateSlugError,
   MalformedSlugError,
@@ -393,6 +394,34 @@ describe("registering a session start", () => {
     );
   });
 
+  it("stamps the framework version that registered the session", () => {
+    // The set's one record change. The orchestrator block names the
+    // ENGINE; nothing else in the row says which implementation of the
+    // framework produced it, and a reader of an old ledger cannot ask.
+    const { sessionsDir } = makeSessionsDir();
+    const state = registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
+    const sessions = state["sessions"] as Array<Record<string, unknown>>;
+    expect(sessions[0]["frameworkVersion"]).toBe(VERSION);
+    // Only the session being registered. A rebuild that restamped every
+    // row would make each one claim the framework that last touched the
+    // file rather than the one that ran it.
+    expect(sessions[1]).not.toHaveProperty("frameworkVersion");
+  });
+
+  it("carries an earlier session's stamp instead of restamping it", () => {
+    const { sessionsDir } = makeSessionsDir();
+    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
+    const path = join(sessionsDir, "sessions.json");
+    const state = JSON.parse(readFileSync(path, "utf8"));
+    state.sessions[0].status = "complete";
+    state.sessions[0].frameworkVersion = "1.1.0";
+    writeFileSync(path, JSON.stringify(state), "utf8");
+    const rebuilt = registerSessionStart(sessionsDir, 2, { engine: "claude-code" });
+    const sessions = rebuilt["sessions"] as Array<Record<string, unknown>>;
+    expect(sessions[0]["frameworkVersion"]).toBe("1.1.0");
+    expect(sessions[1]["frameworkVersion"]).toBe(VERSION);
+  });
+
   it("drops a stale verification summary when a session is restarted", () => {
     // A leftover summary beside a null verdict is a lie about what has
     // been verified.
@@ -599,6 +628,17 @@ describe("appending a round", () => {
     const { repo, tree } = repoWithTree();
     appendRound(repo, 1, { ...ROUND, completion_tree: tree });
     expect(readRounds(repo, 1)).toHaveLength(1);
+  });
+
+  it("stamps the framework version on every row type, in the writer", () => {
+    // Stamped here rather than at the three call sites that build a row,
+    // because a stamp a caller can forget is absent on the row that most
+    // needed it -- and absence already means something else, namely a row
+    // written before the stamp existed.
+    const { repo, tree } = repoWithTree();
+    const row = appendRound(repo, 1, { ...ROUND, completion_tree: tree });
+    expect(row["framework_version"]).toBe(VERSION);
+    expect(readRounds(repo, 1)[0]?.["framework_version"]).toBe(VERSION);
   });
 
   it("carries no anchor for a tree this store does not hold", () => {

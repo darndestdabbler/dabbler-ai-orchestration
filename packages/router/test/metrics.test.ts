@@ -153,7 +153,7 @@ describe("the report", () => {
     });
     const out = reportOf(config);
     expect(out).toContain("billed_usage_unavailable");
-    expect(out).toContain("ai_router.seat_cost");
+    expect(out).toContain("dabbler seat-cost");
   });
 
   it("reports an empty log cleanly", () => {

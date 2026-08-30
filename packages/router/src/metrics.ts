@@ -18,7 +18,7 @@ import { dirname, resolve } from "node:path";
 
 import { isRecord, truthy, type RouterConfig } from "./config.ts";
 import { platformNewlines } from "./journal.ts";
-import { AI_ROUTER_DIR } from "./paths.ts";
+import { ASSET_DIR } from "./paths.ts";
 import { PythonFloat, dumps } from "./pythonJson.ts";
 import { readText } from "./textfile.ts";
 import { writeOut } from "./cli/output.ts";
@@ -50,7 +50,7 @@ function logPath(config: RouterConfig): string {
   if (typeof configPath === "string" && configPath) {
     return resolve(dirname(configPath), filename);
   }
-  return resolve(AI_ROUTER_DIR, filename);
+  return resolve(ASSET_DIR, filename);
 }
 
 function metricsEnabled(config: RouterConfig): boolean {
@@ -240,7 +240,7 @@ export function printMetricsReport(
     print(
       "                                    real spend in AI credits; " +
         `${withId} carry the conversation id that prices them ` +
-        "(python -m ai_router.seat_cost)",
+        "(dabbler seat-cost)",
     );
   }
 
@@ -347,7 +347,7 @@ export function printMetricsReport(
   print(rule + "\n");
 }
 
-/** `python -m ai_router.metrics`, and `dabbler metrics`. */
+/** `dabbler metrics`. */
 export function main(config: RouterConfig): number {
   printMetricsReport(config);
   return 0;

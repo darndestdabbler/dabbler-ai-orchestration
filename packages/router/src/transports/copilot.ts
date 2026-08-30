@@ -80,7 +80,7 @@ import {
   type LockTable,
   type LockValue,
 } from "../lockfile.ts";
-import { AI_ROUTER_DIR } from "../paths.ts";
+import { ASSET_DIR } from "../paths.ts";
 import { pythonFloatRepr } from "../pythonJson.ts";
 import { resolveRole } from "../selection.ts";
 import { truthy, type RouterConfig } from "../config.ts";
@@ -1343,16 +1343,11 @@ export const ENABLEMENT_UNCONFIRMED = "unconfirmed";
  * resolves it -- an operator told "re-probe the seat" and given no verb does
  * the only thing left.
  *
- * It still names the PYTHON invocation, and that is correct while both
- * routers exist: `dabbler copilot refresh` and
- * `python -m ai_router.transports.copilot refresh` do the same thing today,
- * and this string is what BOTH routers print, so the two records stay
- * comparable. The cutover is what re-points it.
  */
-export const REFRESH_COMMAND = "python -m ai_router.transports.copilot refresh";
+export const REFRESH_COMMAND = "dabbler copilot refresh";
 
-/** The lock the seat catalog ships in, beside the Python package. */
-export const CATALOG_LOCK_PATH = join(AI_ROUTER_DIR, "copilot-catalog.lock");
+/** The lock the seat catalog ships in, beside the package that reads it. */
+export const CATALOG_LOCK_PATH = join(ASSET_DIR, "copilot-catalog.lock");
 
 /**
  * v1 lockfiles spell the probe sample `premium_request_weight`; v2 renamed it
@@ -1855,7 +1850,7 @@ export function stampCatalog(
 ): Catalog {
   const meta: CatalogMeta = {
     ...catalog.meta,
-    written_by: writerId("ai_router.transports.copilot"),
+    written_by: writerId("dabbler.copilot"),
     written_at: options.writtenAt ?? utcNow(),
     content_digest: null,
   };

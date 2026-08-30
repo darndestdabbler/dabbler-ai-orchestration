@@ -1,9 +1,8 @@
 // `dabbler metrics` -- the per-call telemetry summary.
 //
-// The first verb the port makes real. It takes no options, because the
-// Python command it replaces takes none: `python -m ai_router.metrics`
-// loads the config and prints the report. An argument here would be a verb
-// the two routers do not share.
+// It takes no options: the verb loads the config and prints the report,
+// and there is nothing to narrow that the report does not already carry a
+// column for.
 
 import { loadConfig } from "../config.ts";
 import { printMetricsReport } from "../metrics.ts";

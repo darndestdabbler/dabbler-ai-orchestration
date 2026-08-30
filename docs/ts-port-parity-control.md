@@ -1,5 +1,18 @@
 # The parity control for the TypeScript port
 
+> **Retired in session 36, and kept rather than deleted.** The control
+> compared two routers; there is one. `packages/router/src/parity/`,
+> `scripts/parity.ts`, `test/parity.test.ts` and the `analyzer` entry in
+> `dabbler.yaml` went with the Python router in the same step, exactly as
+> the sequencing rule below prescribes.
+>
+> This file stays because **D231's claim rests on it**. That decision
+> records the last run — 5 shapes, 48 verb cases, 402 paths identical,
+> with the two router trees named — and a claim whose method has been
+> deleted cannot be re-examined. Read it as what was done, not as
+> something to run.
+
+
 > Designed in session 22 of `docs/sessions/session-plan.md`; built in session
 > 23; run before every verification round of sessions 23–36; retired in
 > session 36 at the step that deletes the Python router. The decision that

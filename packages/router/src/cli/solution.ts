@@ -115,7 +115,7 @@ function run(argv: string[]): number {
   );
   writeOut(
     "  not where it has got to. For that, run " +
-      "`python -m ai_router.workflow status`.\n",
+      "`dabbler workflow status`.\n",
   );
   return EXIT_OK;
 }

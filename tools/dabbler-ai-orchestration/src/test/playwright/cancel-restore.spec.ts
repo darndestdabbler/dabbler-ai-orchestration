@@ -1,5 +1,5 @@
 // Cancel/restore round-trip: the state mutation runs through the real
-// `python -m ai_router.session` CLI on disk (the only sanctioned
+// `dabbler session` command the extension ships (the only sanctioned
 // writer), and the row's glyph follows it after a refresh.
 
 import * as cp from "child_process";
@@ -7,7 +7,7 @@ import * as path from "path";
 import { test, expect } from "@playwright/test";
 import {
   LaunchedVSCode,
-  PYTHON,
+  DABBLER_CLI,
   cleanupTmpDir,
   closeVSCode,
   expandTreeRow,
@@ -35,10 +35,10 @@ function runSessionCli(args: string[]): void {
   // tree case the flag exists for — the same reason the extension's own
   // projection passes it.
   const proc = cp.spawnSync(
-    PYTHON,
+    process.execPath,
     [
-      "-m",
-      "ai_router.session",
+      DABBLER_CLI,
+      "session",
       ...args,
       "--sessions-dir",
       path.join(workspace, "docs", "sessions"),
@@ -52,7 +52,7 @@ function runSessionCli(args: string[]): void {
   );
   if (proc.status !== 0) {
     throw new Error(
-      `session CLI failed (${proc.status}): ${proc.stdout} ${proc.stderr}`,
+      `session command failed (${proc.status}): ${proc.stdout} ${proc.stderr}`,
     );
   }
 }

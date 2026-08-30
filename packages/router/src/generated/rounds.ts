@@ -44,6 +44,10 @@ export type Rounds = {
     anchor_tree: string;
   };
   recorded_at: string;
+  /**
+   * The router version that recorded this round, as its own manifest declares it. Additive and absent on rows written before it existed. A round is the framework's own judgement of a change, so which framework made it is part of what the row says -- and unlike the verifier's model, nothing else in the row carries it.
+   */
+  framework_version?: string;
   transport?: string;
   /**
    * The verifier's tool surface for this round: what it was granted, and what it did with it. mode 'none' is a round that could not look at the tree at all (the direct-API path sends no tools) and is never equivalent to one that could. in_scope means the operation was confined to the grant: a read names a path and is placed against the scope, while a search or listing is confined only when it also names a path — a pattern on its own reaches the whole tree and is recorded as unconfined. Each read carries a fidelity: 'verbatim' means the shown lines matched the bytes on disk, 'transformed' means they did not (the credential scrubber rewrites text before a model sees it, and a finding resting on a transformed read is weighable rather than trustable), 'unverified' means the comparison could not be made. 'writes' is the fourth operation and the only one no tool performs: the verifier proposes a test file in its answer and the framework writes the bytes, so a proposal outside the declared test root is refused before anything reaches the filesystem. Every proposal is recorded, applied or refused, because a boundary nobody can see being enforced is indistinguishable from one that is not there.

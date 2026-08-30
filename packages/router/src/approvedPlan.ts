@@ -47,7 +47,7 @@ export const RISK_DEPENDENCY_CHANGE = "dependency-change";
 // Paths whose mere presence in an envelope is sensitive regardless of what
 // module they belong to: the router's own machine state, its schemas, and the
 // config/lockfiles that decide what a session is allowed to do.
-const SENSITIVE_PREFIXES: readonly string[] = [".dabbler/", "ai_router/schemas/"];
+const SENSITIVE_PREFIXES: readonly string[] = [".dabbler/", "packages/router/schemas/"];
 const SENSITIVE_BASENAMES: ReadonlySet<string> = new Set([
   "router-config.yaml",
   "local-overrides.yaml",
@@ -63,9 +63,11 @@ const DEPENDENCY_BASENAMES: ReadonlySet<string> = new Set([
   "setup.py",
   "setup.cfg",
 ]);
-// A file directly in the package root is a CLI entrypoint
-// (`python -m ai_router.<name>`) -- the framework's public surface.
-const TOP_LEVEL_MODULE = /^ai_router\/[^/]+\.py$/;
+// A file directly in the router's source root is a verb or a seam every
+// verb reaches through -- the framework's own public surface. It is a
+// self-reference and always was: no consumer repository has this path, so
+// the flag fires in the repository that builds the router and nowhere else.
+const TOP_LEVEL_MODULE = /^packages\/router\/src\/[^/]+\.ts$/;
 
 /**
  * The plan's core content does not match its bound hash: an edit happened

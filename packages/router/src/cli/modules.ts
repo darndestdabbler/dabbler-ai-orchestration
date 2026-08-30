@@ -1,9 +1,10 @@
 // `dabbler modules create` -- append one entry to `docs/modules.yaml`.
 //
-// One subcommand, because `python -m ai_router.modules` has one. The
-// `Router` contract used to name `list` and `retire`; neither exists on
-// either side, and a port is not where a verb gets invented (D162/D152).
-// Rename, delete and reorganization stay manual edits to the manifest.
+// One subcommand, because the manifest has one writer. The `Router`
+// contract used to name `list` and `retire`; nothing implemented either,
+// and a contract naming a verb nothing implements is a promise that would
+// be refused at the moment it was needed (D162/D152). Rename, delete and
+// reorganization stay manual edits to the manifest.
 
 import { create } from "../modules.ts";
 import { writeErr, writeOut } from "./output.ts";

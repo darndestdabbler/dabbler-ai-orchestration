@@ -337,7 +337,7 @@ export async function runAdjudication(
         `carries its terminal '${String(terminal["type"])}' row ` +
         `(${String(terminal["verdict"])}); there is nothing left to ` +
         "adjudicate. Close the session:\n" +
-        `  python -m ai_router.session close --sessions-dir ` +
+        `  dabbler session close --sessions-dir ` +
         `${sessionsDir}\n`,
     );
     return EXIT_STATE;
@@ -383,7 +383,7 @@ export async function runAdjudication(
         `finding(s) ${undisputed.join(", ")} of round ${String(latest["round"])} ` +
         "carry no recorded dispute. Adjudication judges disputes; record one " +
         "per finding first:\n" +
-        `  python -m ai_router.verify dispute --sessions-dir ` +
+        `  dabbler verify dispute --sessions-dir ` +
         `${sessionsDir} --round ${String(latest["round"])} --finding <F> ` +
         '--grounds "..." --evidence <path>\n',
     );
@@ -439,7 +439,7 @@ export async function runAdjudication(
           "and nothing lands but the record.\n" +
           "The one exit is a third provider: enable a model from outside " +
           "the exclusions and re-run:\n" +
-          `  python -m ai_router.verify adjudicate --sessions-dir ` +
+          `  dabbler verify adjudicate --sessions-dir ` +
           `${sessionsDir}\n` +
           "There is no verdict a person can type in its place.\n",
       );

@@ -217,8 +217,8 @@ export function commandNamesTest(command: unknown, testPath: string): boolean {
  * A repository that is Java and .NET at once has two runners, and a single
  * line naming both ecosystems' tests would fail in whichever of them was asked
  * to run the other's. Where nothing is declared there is nothing to print:
- * improvising `python -m pytest` teaches an orchestrator in a Java repository
- * to paste a runner nobody declared, and the run of record would then cite it.
+ * improvising `pytest` teaches an orchestrator in a Java repository to paste
+ * a runner nobody declared, and the run of record would then cite it.
  */
 export function runnableCommands(
   suites: readonly SuiteSpec[],
@@ -253,7 +253,7 @@ export function recordCommand(
   command = "",
 ): string {
   return (
-    `python -m ai_router.test_evidence record --sessions-dir ${sessionsDir} ` +
+    `dabbler test-evidence record --sessions-dir ${sessionsDir} ` +
     `--suite ${suite || "<name>"} --stage preverify-targeted ` +
     `--command "${command || RECORD_PLACEHOLDER}" --outcome passed ` +
     "--duration-seconds <elapsed>"
@@ -285,10 +285,10 @@ export function preverifyRecipe(
 export function remediationRecipe(sessionsDir: string, suite = ""): string {
   return (
     "Prove the fix before the next round:\n" +
-    `  python -m ai_router.affected --sessions-dir ${sessionsDir}\n` +
+    `  dabbler affected --sessions-dir ${sessionsDir}\n` +
     "  <run the command it prints>\n" +
     `  ${recordCommand(sessionsDir, suite)}\n` +
-    `  python -m ai_router.verify --sessions-dir ${sessionsDir}`
+    `  dabbler verify --sessions-dir ${sessionsDir}`
   );
 }
 

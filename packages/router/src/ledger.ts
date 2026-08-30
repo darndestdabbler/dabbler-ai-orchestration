@@ -33,6 +33,7 @@ import { anchorRoundTree } from "./evidence.ts";
 import { RUNS_DIRNAME, platformNewlines } from "./journal.ts";
 import { dumps } from "./pythonJson.ts";
 import { loadSchemaFile, schemaFailure } from "./schema/validate.ts";
+import { VERSION } from "./version.ts";
 
 export { MACHINE_DIRNAME, RUNS_DIRNAME } from "./journal.ts";
 
@@ -211,6 +212,12 @@ export function appendRound(
   sessionNumber: number,
   record: Row,
 ): Row {
+  // The framework stamps itself here rather than at each of the three call
+  // sites that build a row -- the round, the adjudication, the cap
+  // terminal. A stamp a caller can forget is a stamp that is absent on the
+  // row that most needed it, and absence already means something else: a
+  // row written before the stamp existed.
+  record["framework_version"] = VERSION;
   validateRound(record);
   const existing = readRounds(repoRoot, sessionNumber);
   if (existing.some((row) => row["round"] === record["round"])) {

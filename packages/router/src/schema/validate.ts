@@ -32,7 +32,7 @@ const validatorCache = new Map<Record<string, unknown>, ValidateFunction>();
 const allValidatorCache = new Map<Record<string, unknown>, ValidateFunction>();
 const fileCache = new Map<string, Record<string, unknown>>();
 
-/** One of `ai_router/schemas/`, read once. */
+/** One of the bundled schemas, read once. */
 export function loadSchemaFile(fileName: string): Record<string, unknown> {
   let schema = fileCache.get(fileName);
   if (!schema) {

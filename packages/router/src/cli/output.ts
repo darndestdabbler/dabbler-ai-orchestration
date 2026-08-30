@@ -1,4 +1,4 @@
-// What the command writes, and how a line ends.
+// What the command writes, where a line ends, and where it goes.
 //
 // Python's `print` goes through a text-mode stream, which translates `\n` to
 // the platform's line ending -- CRLF on Windows, and it does so whether the
@@ -10,6 +10,13 @@
 // to that". So the translation lives here, once, and every verb writes
 // through it. A verb that reached for `process.stdout.write` directly would
 // be red on Windows for a reason no diff of its logic would explain.
+//
+// **Where it goes is a seam, because the router is no longer only a
+// command.** In-process there is no stdout to inherit: the extension runs a
+// verb and needs what it said. `capture` collects the same bytes the process
+// would have received -- after the newline translation, not before, so what
+// a caller reads is what a command line would have shown and not a second
+// spelling of it.
 
 import { EOL } from "node:os";
 
@@ -17,10 +24,58 @@ function withPlatformNewlines(text: string): string {
   return EOL === "\n" ? text : text.replace(/\r?\n/g, EOL);
 }
 
+interface Buffers {
+  out: string;
+  err: string;
+}
+
+let collecting: Buffers | null = null;
+
 export function writeOut(text: string): void {
-  process.stdout.write(withPlatformNewlines(text));
+  const bytes = withPlatformNewlines(text);
+  if (collecting) collecting.out += bytes;
+  else process.stdout.write(bytes);
 }
 
 export function writeErr(text: string): void {
-  process.stderr.write(withPlatformNewlines(text));
+  const bytes = withPlatformNewlines(text);
+  if (collecting) collecting.err += bytes;
+  else process.stderr.write(bytes);
+}
+
+/** Everything one verb wrote, as the two streams it wrote them to. */
+export interface CapturedOutput<T> {
+  readonly value: T;
+  readonly stdout: string;
+  readonly stderr: string;
+}
+
+export class OutputAlreadyCapturedError extends Error {
+  constructor() {
+    super(
+      "output is already being captured: two verbs cannot write to one " +
+        "buffer at once. Serialize them.",
+    );
+    this.name = "OutputAlreadyCapturedError";
+  }
+}
+
+/**
+ * Collect what `fn` writes instead of letting it reach the process.
+ *
+ * Not re-entrant, and it says so rather than interleaving two verbs'
+ * output into one buffer. The in-process router serializes, so the
+ * refusal is a statement of the invariant rather than a path anything
+ * takes.
+ */
+export async function capture<T>(fn: () => Promise<T>): Promise<CapturedOutput<T>> {
+  if (collecting) throw new OutputAlreadyCapturedError();
+  const buffers: Buffers = { out: "", err: "" };
+  collecting = buffers;
+  try {
+    const value = await fn();
+    return { value, stdout: buffers.out, stderr: buffers.err };
+  } finally {
+    collecting = null;
+  }
 }

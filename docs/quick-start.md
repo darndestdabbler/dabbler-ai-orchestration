@@ -1,19 +1,33 @@
 # Quick start
 
-Prerequisites: Python 3.11+, git, `pip install dabbler-ai-router`, and a
-GitHub Copilot seat with the Copilot CLI — the shipped default transport.
-Direct provider APIs remain fully supported: put at least two keys in env
-vars (`DABBLER_ANTHROPIC_API_KEY`, `DABBLER_OPENAI_API_KEY`,
-`DABBLER_GEMINI_API_KEY`) — verification needs a second provider — and
-select that path with `DABBLER_TRANSPORT=api`, or `transport: profile: api`
-in a project-root `local-overrides.yaml` (see below).
+Prerequisites: git, and the `dabbler` command.
+
+Inside VS Code there is nothing to install: the Dabbler AI Orchestration
+extension bundles the router and puts `dabbler` on the integrated
+terminal's PATH, run on the editor's own Node. Everywhere else — another
+editor, a bare shell, or a commit made from VS Code's Source Control panel,
+whose git does not inherit the terminal's environment:
+
+```
+npm i -g dabbler-ai-router
+```
+
+Node 22.18 or newer; VS Code 1.135 or newer for the extension.
+
+Then a way to reach models. Either a GitHub Copilot seat with the Copilot
+CLI — the shipped default transport — or the direct provider APIs: put at
+least two keys in env vars (`DABBLER_ANTHROPIC_API_KEY`,
+`DABBLER_OPENAI_API_KEY`, `DABBLER_GEMINI_API_KEY`) — verification needs a
+second provider — and select that path with `DABBLER_TRANSPORT=api`, or
+`transport: profile: api` in a project-root `local-overrides.yaml` (see
+below).
 
 ## 1. Bootstrap a project
 
 From your project root:
 
 ```
-python -m ai_router.bootstrap --project-dir .
+dabbler bootstrap --project-dir .
 ```
 
 This writes a fenced managed block into `AGENTS.md`, `CLAUDE.md` and
@@ -57,14 +71,14 @@ it from the plan.
 Prefer the untracked route? The same prompts are available loose:
 
 ```
-python -m ai_router.bootstrap --print-plan-prompt
-python -m ai_router.bootstrap --print-decomposition-prompt
+dabbler bootstrap --print-plan-prompt
+dabbler bootstrap --print-decomposition-prompt
 ```
 
 ## 2. Start a session
 
 ```
-python -m ai_router.session start --engine <engine>
+dabbler session start --engine <engine>
 ```
 
 No command names a sessions root: there is one per repository and it is
@@ -88,7 +102,7 @@ empty diff.
 Log each step against the rows the start seeded:
 
 ```
-python -m ai_router.session log \
+dabbler session log \
     --step <stepKey|stepNumber> --status <pending|in-progress|complete|blocked>
 ```
 
@@ -109,9 +123,9 @@ through the framework rather than freehand. One step is in flight at a
 time:
 
 ```
-python -m ai_router.verify step open   --step <step_id>
-python -m ai_router.verify step status
-python -m ai_router.verify step close 
+dabbler verify step open   --step <step_id>
+dabbler verify step status
+dabbler verify step close 
 ```
 
 `open` anchors the step to the current `HEAD` and prints the paths it may
@@ -127,7 +141,7 @@ model is paid anything:
    earns:
 
    ```
-   python -m ai_router.verify step amend \
+   dabbler verify step amend \
        --add-file <path> --reason "<why the declared envelope was wrong>"
    ```
 
@@ -137,8 +151,7 @@ model is paid anything:
    to you here, because an exit code has already settled what a verifier
    would be paid to notice.
 
-**You do not commit while a step is open.** `python -m
-ai_router.bootstrap` installs a `pre-commit` hook that refuses a manual
+**You do not commit while a step is open.** `dabbler bootstrap` installs a `pre-commit` hook that refuses a manual
 commit while a step is open and names the command that closes it. The
 binding check is not the hook — `--no-verify` bypasses any hook — but
 `step close` itself, which refuses when `HEAD` has moved off the commit
@@ -156,7 +169,7 @@ close.
 
 ## 4. Verify (mandatory, before commit)
 ```
-python -m ai_router.verify
+dabbler verify
 ```
 
 - **Round 1** sends the full evidence: spec excerpt, `git status`, the
@@ -187,7 +200,7 @@ rung's exact command:
    verifier must UPHOLD it with reasons or WITHDRAW it.
 
    ```
-   python -m ai_router.verify dispute \
+   dabbler verify dispute \
        --round <R> --finding <F> --grounds "..." --evidence <path>
    ```
 
@@ -201,7 +214,7 @@ rung's exact command:
    after it.
 
    ```
-   python -m ai_router.verify adjudicate
+   dabbler verify adjudicate
    ```
 
 There is no third rung, and no waiver: no verdict a person can type
@@ -223,23 +236,23 @@ the repair rather than the complaint.
 Then record the test run of record and commit/push the verified work:
 
 ```
-python -m ai_router.test_evidence record \
+dabbler test-evidence record \
     --suite <name> --outcome passed --duration-seconds <elapsed>
 ```
 
 ## 5. Close
 
 ```
-python -m ai_router.session close
+dabbler session close
 ```
 
 Five gates run: verification clean (reads the round ledger),
 working tree clean, pushed to remote, test run fresh, verdict
-vocabulary. All pass → the session (and, on the last session, the set)
-flips state, and the close commits and pushes its bookkeeping.
+vocabulary. All pass → the session flips state, and the close commits and
+pushes its bookkeeping.
 
 ```
-python -m ai_router.session close --dry-run
+dabbler session close --dry-run
 ```
 
 previews the gate rows read-only at any time. `--force` bypasses
@@ -249,13 +262,13 @@ bookkeeping gates only — never the evidence gates — and stamps
 ## Cancel and restore
 
 ```
-python -m ai_router.session cancel <set> --reason "why"
-python -m ai_router.session restore <set> [--reason "why"]
+dabbler session cancel <n> --reason "why"
+dabbler session restore <n> [--reason "why"]
 ```
 
-Cancel records the reason in `CANCELLED.md` and preserves the
-pre-cancel status; restore returns the set to it. `--force` cancels
-even with a session in flight.
+Cancel records the reason and the stamp on the session's own record and
+preserves the status it had; restore returns that session — and only that
+session — to it. `--force` cancels even with a session in flight.
 
 ## This repository's config (`dabbler.yaml`)
 
@@ -269,7 +282,7 @@ testing:
   suites:
     - name: python
       command: python -m pytest
-      covers: [ai_router/, tests/]
+      covers: [src/, tests/]
       test_roots: [tests]
       test_glob: "test_*.py"
 packaging: {}          # omit entirely if this repository publishes nothing
@@ -278,7 +291,7 @@ paths:
 ```
 
 - **Tracked, unlike the overlay below.** CI reads the suite command, the
-  next machine reads the selection rules, and `ai_router.affected`
+  next machine reads the selection rules, and `dabbler affected`
   refuses to run without them.
 - `test_roots` and `test_glob` belong to a **suite**, not the
   repository: one that is Java and .NET at once has two of each.
@@ -289,7 +302,7 @@ paths:
 
 ## This machine's config (`local-overrides.yaml`)
 
-The packaged `ai_router/router-config.yaml` is the published default and
+The packaged `router-config.yaml` is the published default and
 ships `transport: profile: copilot-cli`, because the seat is the surface
 staff receive. A machine without a seat says so in a project-root
 `local-overrides.yaml`, deep-merged over the packaged file:
@@ -320,14 +333,14 @@ neither layer: a caller who named a file meant that file.
 
 ## Refreshing the seat catalog
 
-On the `copilot-cli` transport, `ai_router/copilot-catalog.lock` records
+On the `copilot-cli` transport, the packaged `copilot-catalog.lock` records
 what this seat can dispatch: which models answered, on which CLI build,
 and a one-call `probe_premium_requests` sample each. The CLI has no
 `list-models` command and no provider field, so every value in it was
 earned by a real billed call. Refresh it with:
 
 ```
-python -m ai_router.transports.copilot refresh [--quorum|--stale|--models a,b|--all] [--dry-run]
+dabbler copilot refresh [--quorum|--stale|--models a,b|--all] [--dry-run]
 ```
 
 The scopes exist because cost is the design constraint — a refresh that
@@ -349,7 +362,7 @@ Samples are what the seat reported for one call, and the seat reports
 fractions for sub-premium models — `claude-haiku-4.5` measures 0.33.
 They are observations, never prices: they fund the cost preview below
 and never feed model selection. Real spend is measured afterwards by
-`python -m ai_router.seat_cost`.
+`dabbler seat-cost`.
 
 - **Priced before it spends.** Every run prints its projected cost from
   the samples already in the file, names entries of unknown cost as
@@ -388,7 +401,7 @@ has a `docs/sessions/` ledger, its numbered sessions beneath it — `001`,
 in-flight session, its step rows. The tree is a pure renderer of
 
 ```
-python -m ai_router.progress --json
+dabbler status --json
 ```
 
 so what the extension shows is exactly what the gates read. A

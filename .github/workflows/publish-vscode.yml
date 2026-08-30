@@ -12,7 +12,7 @@ name: Publish dabbler-ai-orchestration to VS Code Marketplace
 #
 # Anything else (e.g. `vsix-v1.0.0rc1`, `vsix-v1.2`, `vsix-vfoo`, plain `v0.1.0`)
 # is rejected by the `classify` job before any artifact build runs. The plain
-# `v*` pattern is reserved for `dabbler-ai-router`'s PyPI release workflow at
+# `v*` pattern is reserved for `dabbler-ai-router`'s npm release workflow at
 # `.github/workflows/release.yml`; the `vsix-v*` prefix keeps the two
 # tag-driven release pipelines from colliding in a single repo.
 #

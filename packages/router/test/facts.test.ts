@@ -5,7 +5,7 @@
 // not be launched must never look like a control that ran and was green.
 
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -79,6 +79,20 @@ describe("the round-1 evidence bundle", () => {
     expect(bundle).toContain("#### Untracked file contents");
     expect(bundle).toContain("**new.txt**");
     expect(bundle).toContain("brand new");
+  });
+
+  it("names a deleted file and does not reproduce it", () => {
+    // The contents of a deleted file are the whole of what a deletion
+    // costs the bundle and none of what a reviewer needs from it: the
+    // question is which file went and what still reaches for it, and
+    // neither is in the removed lines. The header is still there, so the
+    // deletion is visible rather than hidden.
+    const repo = makeSeededRepo({ "src/widget.py": "def widget():\n    return 1\n" });
+    rmSync(join(repo, "src", "widget.py"));
+    const bundle = assembleEvidence(repo, join(repo, "docs"), 1);
+    expect(bundle).toContain("deleted file mode");
+    expect(bundle).toContain("src/widget.py");
+    expect(bundle).not.toContain("-def widget():");
   });
 
   it("names every untracked path it did not inline, with the reason", () => {

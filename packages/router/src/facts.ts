@@ -50,6 +50,24 @@ export const DEFAULT_DIFF_EXCLUDES: readonly string[] = [
   ".dabbler",
 ];
 
+/**
+ * A deleted file is named, not reproduced.
+ *
+ * git's own flag, with git's own rationale: the patch stops being one
+ * `git apply` could use, and is "solely for people who want to just
+ * concentrate on reviewing the text after the change". That is exactly a
+ * verifier. What it needs from a deletion is WHICH file went and whether
+ * anything still reaches for it, and neither of those is in the removed
+ * lines -- while the removed lines are the whole of the cost. The session
+ * that retired the reference implementation would have sent 2 MB of
+ * deleted Python to a model that must then find the twenty lines that were
+ * not a deletion, and the cap would have refused it first.
+ *
+ * The deletion stays visible: every `deleted file mode` header is in the
+ * bundle, and `git status --short` above it lists them again.
+ */
+const IRREVERSIBLE_DELETE = "--irreversible-delete";
+
 export const FACTS_FILENAME = "deterministic-facts.jsonl";
 
 // A control gets one word, and the four are not interchangeable. "pass" is
@@ -294,6 +312,7 @@ export function assembleEvidence(
   const diffRun = runGit(repoRoot, [
     "diff",
     "--no-color",
+    IRREVERSIBLE_DELETE,
     "HEAD",
     "--",
     ...pathspecs,
@@ -314,7 +333,8 @@ export function assembleEvidence(
     );
   }
   const heading =
-    "Complete diff (working tree vs `HEAD`; generated-bundle " +
+    "Complete diff (working tree vs `HEAD`; a deleted file is its header " +
+    "alone, contents omitted; generated-bundle " +
     `exclusions: ${DEFAULT_DIFF_EXCLUDES.join(", ")})`;
   const rendered = renderEvidence(
     statusRun.stdout,
@@ -350,6 +370,7 @@ export function assembleFixDeltaEvidence(
   const diffRun = runGit(repoRoot, [
     "diff",
     "--no-color",
+    IRREVERSIBLE_DELETE,
     baselineTree,
     currentTree,
     "--",
@@ -361,7 +382,8 @@ export function assembleFixDeltaEvidence(
   const heading =
     `FIX DELTA ONLY (tree-to-tree: previous round ${baselineTree.slice(0, 12)}` +
     ` -> current working tree ${currentTree.slice(0, 12)}). This is NOT the ` +
-    "full session diff — new defects are admissible only within these hunks.";
+    "full session diff — new defects are admissible only within these " +
+    "hunks. A deleted file is its header alone, contents omitted.";
   const rendered = renderEvidence(
     statusRun.stdout,
     diffRun.stdout,

@@ -1,11 +1,12 @@
-# STATUS — session 35 of 36 landed: the six-step workflow ported, the run core deleted
+# STATUS — the port is complete: the extension calls the router in-process, and there is no Python
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
 `experiment/verification-pipeline-v3` and `design/solution-decomposition`
 are merged and finished. Earlier handoff text is in `docs/status-archive.md`.
 
-> **Recorded, 2026-08-29.** Session 35's deliverables are decisions
-> **D224–D230**; session 34's are
+> **Recorded, 2026-08-29.** Session 36's deliverables are decisions
+> **D231–D238**; session 35's are **D224–D230**;
+> session 34's are
 > **D218–D223**; session 33's are
 > **D210–D217** in `docs/sessions/decisions-log.md`; session 32's are
 > **D204–D209**; session 31's are
@@ -20,15 +21,138 @@ are merged and finished. Earlier handoff text is in `docs/status-archive.md`.
 
 > **How to read a session number below this line.** Session 29 was inserted
 > between 28 and what was then 29, so the port's remaining sessions each
-> moved up one and the plan now runs to **36** (D188). Live guidance was
+> moved up one and the plan ran to **36** (D188). Live guidance was
 > renumbered; the append-only decisions log and the older sections of this
 > file were **not**, because they were true when written. So "ported in
 > session 29" in anything written before 2026-08-29 means what is now
 > session 30, "session 31" means 32, and so on to the cutover, which was 35
-> and is now 36. The ledger's dates carry the true order. The **Next**
-> section at the foot of this file uses the new numbers.
+> and is now 36.
 
 ## Where things are
+
+**The port is done.** Sessions 22–36 replaced a Python package and a
+TypeScript renderer over it with one TypeScript implementation. There is no
+`ai_router/`, no `tests/`, no `pyproject.toml`, no `pytest.ini`, no Python CI
+job, no Python suite in `dabbler.yaml`, and no parity control — the control
+compared two routers and there is one. A project that adopts this framework
+installs **nothing**: the extension bundles the router, calls it in-process,
+and puts `dabbler` on the integrated terminal's PATH run on the editor's own
+Node.
+
+- **Session 36 is closed `VERIFIED`** — see the round count below — Claude
+  Code / claude-opus-5[1m] orchestrator. **The whole set's acceptance test is
+  that this paragraph is true**: the round, the run of record, the gates and
+  the close were performed by the TypeScript router, in a tree with no
+  Python in it.
+- **The parity control's last run is D231, and it is recorded with the trees
+  it ran against.** 5 shapes, 48 verb cases, 402 paths, all identical, exit
+  0 — the same figures as session 35, which is the second thing it records:
+  the first half of this session moved the extension off the spawn and put
+  three new seams into the router package (`workdir.ts`, the capture in
+  `cli/output.ts`, `inProcess.ts`), and every verb writes through two of
+  them. 402 identical paths afterwards is the evidence that none of it
+  changed what a verb says or writes. The Python tree
+  (`52b0c51c`) and the TypeScript tree (`f8e93b7e`) are named in the
+  decision, so the claim is checkable rather than remembered.
+- **`InProcessRouter` reaches every verb through its own command-line
+  handler** (D232), with `capture` collecting what the handler wrote and
+  `standIn` answering the paths it did not name. Reaching past the handler
+  into the module would have been a second implementation of the argument
+  checking and the refusal wording — the extension would then show an
+  operator a sentence the terminal never says. The three answers with a
+  schema call their module directly, because rendering an object to JSON to
+  parse it back is a round trip nothing needs.
+- **`process.chdir` was not available, and that is why `workdir.ts`
+  exists.** The extension host is one Node process shared with every other
+  extension. `workingDirectory()` is now the one answer to "where is the
+  router standing", replacing three scattered `process.cwd()` calls, and
+  `standIn` refuses to nest rather than let two verbs resolve half their
+  paths against each other.
+- **A verb runs on the caller's thread, which bounds what the extension may
+  ask for.** The projection is a few file reads behind an mtime cache;
+  `session cancel` is a click the operator is watching. `verify` and
+  `workflow` buy models and run suites, and they belong in the terminal,
+  which is where the lifecycle runs them. A future session that wants
+  `verify` behind a button needs a worker, not a smaller comment.
+- **The bundle carries a `package.json` that says what it is** (D233), and
+  that is the load-bearing part of the asset move. `PACKAGE_ROOT` walks up
+  for a manifest NAMING the router; inside a VSIX the nearest one above
+  `dist/extension.js` is the extension's, so the walk would have run off the
+  top of the filesystem on the first config load — on somebody else's
+  machine, with nothing to fall back to. `esbuild.js` writes a two-line
+  manifest beside the bundle and copies the router's runtime data next to
+  it, taking the asset list from the router's own `files` rather than
+  restating it.
+- **The terminal shim stopped resolving a package it does not ship.**
+  `require.resolve("dabbler-ai-router")` answered correctly in a workspace
+  and could not answer at all in a VSIX, because `.vscodeignore` excludes
+  `node_modules`. That was survivable while the shim was a convenience; it
+  is the operator's only hand-run surface now. The extension builds
+  `dist/dabbler.cjs` itself and the shim looks beside itself — proved
+  directly: `node tools/dabbler-ai-orchestration/dist/dabbler.cjs status`
+  reads this repository's ledger and finds its own schemas.
+- **`engines.vscode` is `^1.135.0`**, which is D131's rule rather than a
+  guess: the lowest VS Code whose extension host carries an unflagged
+  `node:sqlite`, *found by running the check on that release*. 1.135 is the
+  one that has been measured, so it is the floor until a lower one is.
+- **`frameworkVersion` is the set's one record change and nothing is
+  back-filled** (D234). A row without the stamp was written before the stamp
+  existed, and filling it in with today's version would replace a fact with
+  a guess nobody can check. The session stamp is carried across rebuilds
+  beside `startedAt`; the round stamp is written in `appendRound` rather
+  than at the three call sites that build a row, because a stamp a caller
+  can forget is absent on the row that most needed it.
+- **The verb table shed the port's scaffolding** (D235). `pythonModule`,
+  `pythonCli` and `portedInSession` are gone; `contracts.test.ts` now holds
+  the table and the registry to each other in both directions. `ledger` and
+  `approved-plan` leave the table (libraries, no command line) and stay on
+  the contract, where `InProcessRouter` implements both for the first time.
+  `ledger.unresolved` is trimmed outright — declared in session 23 and never
+  implemented on either side, which is D162/D152 exactly. **`progress` is
+  gone and `status` is the one name**: the alias existed because the
+  extension spawned `progress`, and it calls a method now.
+- **`--irreversible-delete` is what made this session reviewable at all**
+  (D236). Deleting `ai_router/` and `tests/` makes `git diff HEAD` **2.3
+  MB** — four times the cap, and roughly 600,000 tokens of removed Python
+  with the twenty lines that are not a deletion somewhere inside it. git's
+  own flag drops the removed LINES and keeps every `deleted file mode`
+  header: **256,668 characters**, inside the cap, nothing hidden.
+- **The session plan is AMENDED, and that is the operator's to reverse**
+  (D238). Two of session 36's steps ask for what the implementation cannot
+  do — publish two artifacts through a packaging block that models one, and
+  bump a version discriminator the round record has never had. Rounds 1 and
+  2 both raised them as Major and both of round 2's acceptance criteria
+  named the same resolution: *or the governing plan must be formally amended
+  before the session claims completion*. The amendment is written into
+  `docs/sessions/session-plan.md` beside the steps it changes, so a reader
+  of the plan meets it rather than finding it in a decision. **It changes
+  what this session was required to deliver**, which is not a model's call
+  to make silently — it names what the plan asked, what was done instead,
+  and what reversing it would cost.
+- **The release path is the two tag-driven pipelines, not the packaging
+  block** (D237). `dabbler packaging` refuses this repository and is right
+  to: the block describes one pack and one push, and there are two artifacts
+  and two registries. `release.yml` publishes to npm now instead of PyPI
+  (same tag shapes, same OIDC, same green-Test gate); the `Test` workflow
+  lost its Python job. **Both artifacts sit at 2.0.0 and the tag push is the
+  operator's** — it is irreversible, it goes to two public registries, and
+  the credentials live in GitHub environments rather than on this machine.
+- **`packaging.ts`'s `recordedAt` writes Python's rule** (D223, discharged):
+  microseconds, and no fraction at all when the value is whole. It had
+  millisecond precision and wrote `.000` where the reference omitted the
+  fraction; nothing compared it then and this is the commit where the
+  record's timestamp format changes for anybody.
+- **The Playwright layer was ported and is NOT exercised by this session.**
+  It built its fixtures by running Python snippets and pinned a
+  `dabblerSessionSets.pythonPath` that no longer exists as a setting; it now
+  spawns the extension's own `dist/dabbler.cjs` for the CLI verbs and runs
+  the router's source under Node's type stripping for the two writes that
+  must go through a sanctioned writer. It is not a declared suite and does
+  not run in CI, so this is a coherent harness rather than a verified one.
+  **What would verify it is one Layer-3 run on a machine with the VSIX
+  installed.**
+
+### Session 35, still current
 
 - **Session 35 is closed `VERIFIED`** — **3 rounds**, one finding disputed and
   **withdrawn**, one disputed and **upheld against a dispute that was wrong**
@@ -1294,101 +1418,96 @@ resolved by being true again.
 
 ## Next
 
-1. **Session 36 of 36 — the cutover. It is the last one, and it publishes.**
-   Declare **`--releasable`**: `InProcessRouter` replaces
-   `PythonSpawnRouter`, `frameworkVersion` is added to session and round rows
-   (the set's one record change), the parity control runs one last time
-   across every verb and shape **and is recorded before anything is deleted**,
-   and then `ai_router/`, `tests/`, `pyproject.toml`, `pytest.ini`, the Python
-   CI job, the `python` suite in `dabbler.yaml` and the parity control itself
-   go. Extension 2.0.0 and `dabbler-ai-router` 2.0.0 publish through
-   `dabbler packaging`. **The acceptance test is that the TypeScript router
-   verifies, records and closes that session with no Python in the tree.**
+**The port plan is finished. There is no session 37; the next plan is the
+operator's to cut.** What follows is what session 36 leaves owed.
 
-   **Step 4's ordering is the risk the plan names, and it is real**: record
-   the parity run before the deletion or the set's central claim rests on
-   memory.
+1. **The release is one tag push away, and it is the operator's** (D237).
+   Both artifacts sit at 2.0.0, both pipelines point at the right registries
+   (`release.yml` → npm, `publish-vscode.yml` → the Marketplace), and both
+   are gated on a green `Test` run for the tagged commit. Pushing `v2.0.0`
+   publishes the router; pushing `vsix-v2.0.0` publishes the extension. Both
+   are irreversible — npm will not let a version's files be replaced — and
+   the credentials live in GitHub deployment environments rather than on any
+   development machine, which is why no session takes this step.
 
-2. **The Python-naming sweep is now the largest single item, and it has
-   grown twice.** `REFRESH_COMMAND` and the 24,000 handoff threshold (D196);
-   `session start`'s next-step hint and the selector's recipe (D221); and now
-   `solution check`'s closing line — which tells a reader to run `python -m
-   ai_router.workflow status` — and `contractdoc`'s "regenerate with `python
-   -m ai_router.contractdoc`" (D227). Every one was kept deliberately: each
-   has a byte-identical form, which is the one it has, and each is *correct*
-   in this repository while two routers exist. **Grep for `python -m
-   ai_router` across strings the router PRINTS, not only across the docs the
-   plan names**, and remember that this repository's own `AGENTS.md`,
-   `CLAUDE.md` and `GEMINI.md` are on the list: session 34 changed the
-   generator, not the generated files, and re-running `bootstrap` here is what
-   refreshes them.
+   **Publish the router first.** The extension declares
+   `"dabbler-ai-router": "^2.0.0"` and bundles it, so the VSIX does not need
+   the registry — but a consumer who reads the manifest and tries to install
+   the dependency does.
 
-3. **Two verbs are declared and unregistered, and neither is a gap.**
-   `ledger` and `approved-plan` carry `pythonCli: false` — their Python sides
-   are libraries with no command line — so `dabbler ledger` refuses by name
-   and says there is nothing to run in the meantime. The cutover should decide
-   whether they become real verbs or leave the table; `contracts.test.ts` now
-   computes this set rather than naming one, so it will not need an edit
-   either way.
+2. **The Playwright layer is ported and has not been run.** It built its
+   fixtures with Python snippets and pinned an interpreter setting that no
+   longer exists; it now spawns the extension's own `dist/dabbler.cjs` and
+   runs the router's source under Node's type stripping for the two writes
+   that must go through a sanctioned writer. It is not a declared suite and
+   CI does not run it, so nothing in this session's record says it works.
+   **One Layer-3 run on a machine with the VSIX installed is what would
+   close this**, and it is worth doing before 2.0.0 is announced rather than
+   after: Layer 3 is the only layer that has ever caught a webview layout
+   regression.
 
-4. **`dabbler status` and `dabbler progress` are two names for one
-   projection, and the cutover is where that gets settled if it is going to
-   be.** `progress` is what the extension spawns and has since session 31;
-   `status` is the operator-facing name D88 and D130 promised. Renaming
-   `progress` would break a spawn site; leaving both is the accretion this
-   repository generally refuses. The alias costs three lines, so this is a
-   naming call rather than a cost one — and step 5 rewrites the docs that
-   would have to name whichever survives.
+3. **A first-run walk on a machine that has never had this framework.**
+   Session 34 proved the zero-install claim with a scratch repository and a
+   terminal; session 36 changed what "installed" means — the extension now
+   carries the router, its schemas and its command in `dist/`. The claim is
+   checked here as far as it can be (`node
+   tools/dabbler-ai-orchestration/dist/dabbler.cjs status` reads this
+   repository's ledger and finds its own bundled schemas), but the thing to
+   walk is a real VSIX install on a machine with no Node project, no
+   `node_modules` and no `.venv`.
 
-5. **One small fidelity gap is still owed** (D223). `packaging.ts`'s
-   `recordedAt` writes millisecond precision where Python writes microseconds,
-   and `.000` where Python omits the fraction entirely. Nothing compares it
-   today; session 36 is the commit where the record's timestamp format changes
-   for anybody. `journal.ts:249` already implements Python's rule exactly,
-   including the omit-when-zero case.
+4. **The `dabblerSessionSets.pythonPath` setting is gone from the manifest,
+   and an operator who set it has a dead value in their settings.json.** VS
+   Code does not warn about a setting no extension declares. Nothing breaks;
+   it is worth a line in the release notes rather than code.
 
-6. **The evidence protocol's two gaps still have no caller.**
+5. **The evidence protocol's two gaps still have no caller.**
    `validate_transcript`, `validate_finding_evidence`, `authoritative_tier`,
-   `verify_worker_result` and `record_worker_result` are ported and nothing in
-   either router calls them. `outputHash` is not re-derived from `rawOutput`,
-   and a check's `evidence.pass.requires` contract is not enforced when its
-   result is recorded. This passes to whichever session first turns
+   `verify_worker_result` and `record_worker_result` are ported and nothing
+   calls them. `outputHash` is not re-derived from `rawOutput`, and a
+   check's `evidence.pass.requires` contract is not enforced when its result
+   is recorded. This passes to whichever session first turns
    `critique.pipeline` to `shadow`.
 
-7. **A Python design question is now FIVE sessions past the comfortable
-   moment, and after this session it is finally cheap.** A malformed or
-   hand-edited `sessions.json` or `activity-log.json` is *silently replaced*
-   rather than refused, in both routers: `readRawSessionState` answers `null`
-   for unparseable JSON and the activity log is rebuilt from any read failure.
-   A verifier called it a Major in session 26 and it is a fair call. **It is a
-   redesign and it needs an operator ruling**: refuse and fail closed, or keep
-   replacing and say so. The projection already distinguishes the two — an
-   absent ledger reads the plan, an unreadable one reports
-   `invariantViolation` — so the shape of the honest answer exists at the read
-   boundary. **After session 36 there is one implementation to change.**
+6. **The silently-replaced record is now cheap to fix, and it is still
+   owed.** A malformed or hand-edited `sessions.json` or `activity-log.json`
+   is *replaced* rather than refused: `readRawSessionState` answers `null`
+   for unparseable JSON and the activity log is rebuilt from any read
+   failure. A verifier called it a Major in session 26 and it is a fair call.
+   **It is a redesign and it needs an operator ruling** — refuse and fail
+   closed, or keep replacing and say so. It has been deferred through ten
+   sessions on the grounds that two implementations would both have to
+   change. There is one.
 
-8. **Two lessons from this session that generalise past the port.**
-   - **An out-of-scope tidy-up in structured config is how a fix becomes a
-     defect.** Removing three lines of a genuinely dead `dabbler.yaml` rule
-     orphaned three siblings into the preceding rule. The YAML still parsed
-     and every path still existed; only a verifier reading the diff saw it.
-   - **A deny-list entry under a broad allow-list pattern is load-bearing
-     whether or not its subject exists.** Deleting the parity control's
-     run-core exclusions widened what it compares. Both were caught cheaply —
-     one by the suite, one by the verifier — because both suites ran before a
-     verifier was bought rather than after.
+7. **`docs/ts-port-parity-control.md` and the run core's two design
+   documents are superseded, not deleted.** Each carries a banner saying so.
+   They stay because a decision whose reasoning has been deleted cannot be
+   re-examined: D231 rests on the parity control's specification, and D130
+   on the run-core blueprint.
 
-9. **Read `docs/ts-port-parity-control.md` before planning session 36.** It
-   was not amended this session: the three new cases and the seed manifest fit
-   the existing rules, and no fifth normalization was needed. The corpus now
-   carries `solution.yaml` in `SEED`, which every shape inherits.
+8. **`BATON.md` at the repository root is stale** — a 2026-08-25 handoff
+   that tells its reader work happens on `design/solution-decomposition`.
+   `AGENTS.md` says `master` and is what an orchestrator reads first, so
+   this is a trip hazard rather than a live contradiction. It was left alone
+   deliberately: session 35's lesson is that an out-of-scope tidy-up is how
+   a fix becomes a defect, and the cutover is not the session to test it.
 
+9. **Two lessons from this session that generalise past the port.**
+   - **A diff of a deletion is cost without information.** Removing the
+     reference implementation made the evidence bundle 2.3 MB — four times
+     the cap — and 95% of it was removed Python nobody would read.
+     `--irreversible-delete` made it 257 KB with every deleted path still
+     named. Any session that retires a module was paying this.
+   - **An artifact that bundles a package has to let that package find
+     itself.** `paths.ts` walks up for a `package.json` naming the router,
+     which is correct in a checkout and in `node_modules` and answers
+     nothing inside a VSIX. The fix was to make the bundle say what it is,
+     not to teach the finder a fourth case.
 
 ---
 
-**Session 35's superseded handoff** (the brief this session ran against,
-kept because D224 is a correction to it and the correction is only
-legible beside what it corrects):
+**Session 35's superseded handoff**, kept because D224 is a correction to
+it and the correction is only legible beside what it corrects:
 
 ### The brief, as session 35 received it
 

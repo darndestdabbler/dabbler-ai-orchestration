@@ -71,7 +71,7 @@ it.
 | 33 | The verification loop | no | 2026-08-29 |
 | 34 | Bootstrap, packaging, and the `dabbler` command on the PATH | no | 2026-08-29 |
 | 35 | The six-step workflow ported, the run core retired | no | 2026-08-29 |
-| 36 | Cutover — the extension calls in-process, and Python leaves | — | not declared |
+| 36 | Cutover — the extension calls in-process, and Python leaves | yes | 2026-08-29 |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -1054,3 +1054,51 @@ facts is NOT deleted: it is ported and verify depends on it (D210).
 
 Then: measure seat cost, affected tests as preverify, cross-provider
 verification, full suite as the run of record, close.
+
+### Session 36 — Cutover — the extension calls in-process, and Python leaves
+
+**Releasable: yes.**
+
+# Session 36 of 36 — Cutover: the extension calls in-process, and Python leaves
+
+Releasable. This is the port's last session; it publishes extension 2.0.0 and
+`dabbler-ai-router` 2.0.0.
+
+1. **`InProcessRouter` replaces `PythonSpawnRouter`.** The extension's
+   `router/host.ts` returns an implementation that satisfies the `Router`
+   contract by calling the ported TypeScript modules directly. Delete
+   `pythonSpawnRouter.ts`, `pythonInterpreter.ts`, `installAiRouter.ts`, the
+   venv creation in `bootstrapProject.ts`, and the projection's Python poll —
+   the tree reads the projection through a function call. `RouterCommands`
+   answers null where an in-process router has no line to pre-type, and the
+   two operator-driven verbs (`session start`, `session close`) get the UX
+   decision `host.ts` says is owed to this session.
+
+2. **`frameworkVersion` on session and round rows.** The set's one record
+   change: both schemas bump, both writers stamp it, and the ledger carries
+   which framework version produced a row.
+
+3. **The parity control's final run, recorded before anything is deleted.**
+   Every verb, every corpus shape, with Python still present. Then
+   `ai_router/`, `tests/`, `pyproject.toml`, `pytest.ini`, the Python CI job,
+   the `python` suite in `dabbler.yaml`, and the parity control itself are
+   deleted — it has nothing left to compare.
+
+4. **One artifact in the docs.** `README.md`, `MIGRATION-FROM-V1.md`,
+   `docs/quick-start.md` and the `AGENTS.md` managed fence stop naming two
+   routers. The sweep covers strings the router PRINTS, not only the docs the
+   plan names: `REFRESH_COMMAND`, `session start`'s next-step hint, the
+   selector's recipe, `solution check`'s closing line, `contractdoc`'s
+   regenerate line. This repository's own `AGENTS.md`/`CLAUDE.md`/`GEMINI.md`
+   are refreshed by re-running `bootstrap` here.
+
+5. **The small settlements this session owns.** `packaging.ts`'s `recordedAt`
+   takes Python's microsecond rule (D223); `ledger` and `approved-plan` are
+   decided as verbs or dropped from the table; `status`/`progress` is settled.
+
+6. Seat cost measured and recorded; affected tests as preverify;
+   cross-provider verification; the full suite as the `final-full` run of
+   record; commit, push once, package both artifacts, close via the gate.
+
+**The acceptance test of the whole set:** the TypeScript router verifies,
+records and closes this session, with no Python in the tree.

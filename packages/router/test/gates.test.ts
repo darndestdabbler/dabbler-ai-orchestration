@@ -130,7 +130,7 @@ describe("verification_clean", () => {
     registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
     const row = byName(runGates(sessionsDir))["verification_clean"];
     expect(row.passed).toBe(false);
-    expect(row.remediation).toContain("ai_router.verify");
+    expect(row.remediation).toContain("dabbler verify");
   });
 
   it("refuses while the latest round is blocking", () => {

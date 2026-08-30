@@ -7219,3 +7219,446 @@ ratio this framework is for.
 
 `cost_usd` is null on all three rows, which is the known metrics gap for the
 API path rather than a claim that the calls were free.
+
+## Session 36 — Cutover — the extension calls in-process, and Python leaves
+
+### D231 · 2026-08-29 · Orchestrator (claude-opus-5/anthropic) · The parity control's last run: 5 shapes, 48 cases, 402 paths identical, recorded before the stamp and the deletion
+
+The parity control's last run, recorded before the `frameworkVersion`
+stamp and the Python deletion, exactly where `docs/ts-port-parity-control.md`
+puts it: *"the control is run and recorded once more before that change and
+the Python deletion, and retired in the same step; it is never made to pass
+across the stamp."*
+
+**The run.** `npm run parity`, exit **0**, on this machine, with both routers
+present:
+
+```
+parity: 5 shape(s) build identically twice (fresh, in-flight, disputed,
+at-cap, moved-machine); 48 verb case(s) compared through both routers;
+402 path(s) in all.
+```
+
+**What it ran against.** The worktree tree it was taken from is
+`223d79d39e08243d860311338585912e4f600210`, and the two subtrees that are
+the control's whole subject are
+
+| Router | Tree |
+| --- | --- |
+| Python (`ai_router/`) | `52b0c51c0390affcb57fe53161d88f6505ea1368` |
+| TypeScript (`packages/router/`) | `f8e93b7e4267348805332a8c9e868f070f83e39d` |
+
+Both are reachable from this session's commits, so the claim is checkable
+rather than remembered: `git cat-file -p <tree>` names every file each
+router consisted of when the two last agreed. That is what the plan's
+step 4 means by *record the run before the deletion* — after it, the
+Python tree exists only in history, and a summary line with nothing
+underneath it would be memory.
+
+**The figures are session 35's, unchanged**, which is the second thing this
+records. Session 36's first half moved the extension off the spawn and put
+three seams into the router package — `workdir.ts`, the capture in
+`cli/output.ts`, and `inProcess.ts` — and every verb writes through the
+first two. 48 cases and 402 paths identical afterwards is the evidence that
+none of it changed what a verb says or writes.
+
+**The control is retired in the same step.** `packages/router/src/parity/`,
+`scripts/parity.ts`, `test/parity.test.ts` and the `analyzer` control in
+`dabbler.yaml` go with the router they compared against. Nothing replaces
+it: a control that compares two implementations has no subject when there
+is one.
+
+### D232 · 2026-08-29 · Orchestrator (claude-opus-5/anthropic) · The extension calls the router in-process: handlers with captured output, a working directory that is a value, and one call at a time
+
+`PythonSpawnRouter` is gone and the extension holds `createInProcessRouter`.
+Three things had to be decided to get there, and none of them was "call the
+functions".
+
+**The verbs are still reached through their own command-line handlers.** Not
+because a command line is wanted — there is none — but because a handler is
+where a verb's arguments are checked and its refusals are worded. Reaching
+past it into the module would have been a second implementation of both, and
+the extension would then show an operator a sentence the terminal never says.
+`cli/output.ts` gained `capture`, which collects the same bytes the process
+would have received (after the newline translation, not before), and
+`inProcess.ts` calls the handler between a `capture` and a `standIn`. The
+exception is the three answers that have a schema: `progress`,
+`ledger.latestRound` and `approvedPlan.read` call their module directly,
+because rendering an object to JSON in order to parse it back is a round trip
+nothing needs. That is the plan's "the tree now reads the projection through
+a function call", and it is also what let `projectionPayload.ts` go: it
+narrowed a subprocess's stdout so a truncated pipe read as *no answer* rather
+than as a session list with holes, and there is no pipe.
+
+**Where the router stands is now a value, not the process.** `workdir.ts` is
+new and small: `workingDirectory()` answers every path a caller did not name,
+and `standIn(dir, fn)` sets it for one call. `process.chdir` was not
+available — the extension host is one Node process shared with every other
+extension, and moving the ground under all of them to run one verb is not a
+thing a well-behaved extension does. Three readers changed
+(`resolveSessionsDir`, `projectRoot`, `resolveRecordPath`) and they are now
+the only three, which is itself an improvement: "where is the router" used to
+be three scattered `process.cwd()` calls.
+
+**Calls serialize, and `standIn` refuses to nest rather than interleave.**
+Both the captured buffer and the working directory are process-wide, and
+neither has a correct answer for two verbs standing in two repositories. The
+queue survives a rejection — one failed verb must not wedge every call after
+it — and there is a test for exactly that.
+
+**A verb runs on the caller's thread, which is a design constraint and not a
+regret.** In the extension host that thread is the UI's. What the extension
+asks for is therefore bounded on purpose: the projection is a few file reads
+and is polled behind an mtime cache, and `session cancel` is a click the
+operator is watching. The verbs that buy a model or run a suite — `verify`,
+`workflow` — are engine-facing and belong in the terminal `dabbler` is on,
+which is where the framework's own lifecycle runs them. A future session that
+wants `verify` behind a button needs a worker, not a smaller comment.
+
+**Transparency survived the loss of the process.** The operator's standing
+requirement is that Dabbler SHOWS what it runs; there is no argv to show any
+more, so `RouterEcho` reports the line they could have typed —
+`dabbler session cancel 3 --reason "..."` — before the verb runs, and what
+came back after. That line is real: `terminalShim` puts `dabbler` on the
+integrated terminal's PATH. Reads stay out of the log, as they always did.
+
+**What went with it.** `pythonSpawnRouter.ts`, `pythonInterpreter.ts`,
+`routerCli.ts`, `projectionPayload.ts`, `commands/installAiRouter.ts`,
+`utils/utf8ChunkDecoder.ts`, and the venv-and-pip sequence inside
+`bootstrapProject.ts` — 1,600 lines, replaced by 480 in the router package
+and 85 in the extension. "Set Up New Project" is now one `Router.bootstrap`
+call, which is the zero-install claim the port was for. The extension's
+`dabblerSessionSets.pythonPath` setting is gone from the manifest: a setting
+that names an interpreter nothing spawns is a promise the UI makes and the
+code cannot keep.
+
+**The argv contract moved with the implementation.** The extension's suite
+used to drive `PythonSpawnRouter` with an injected spawn and assert the argv
+it built. There is no spawn to inject, and the argv is no longer the
+extension's to assert — so `test/inProcess.test.ts` in the router package
+drives the real thing against real repositories instead, and what it checks
+is that the record moved rather than that a string was assembled. That is a
+stronger claim than the one it replaces.
+
+### D233 · 2026-08-29 · Orchestrator (claude-opus-5/anthropic) · The bundled data moved to the package, and the VSIX copy carries a package.json that says what it is
+
+The router's bundled data — `router-config.yaml`, the twenty-one schemas,
+the prompt templates, the seat catalog — moved from `ai_router/` to
+`packages/router/`, and `paths.ts` stopped naming the Python package. That
+part was bookkeeping. What it exposed was not.
+
+**`PACKAGE_ROOT` is found by walking up for a `package.json` that NAMES this
+package**, and that walk has three layouts to answer for, not two. `src/`
+under Node's type stripping and `dist/` after esbuild were the known pair. The
+third arrived with the cutover: the extension bundles the router into its own
+`dist/extension.js`, and the nearest manifest above that file is the
+*extension's*. The walk would have run off the top of the filesystem and
+thrown on the first config load — inside a VSIX, on somebody else's machine,
+with no Python left to fall back to.
+
+**The fix is that the bundle carries a `package.json` saying what it is.**
+`esbuild.js` writes a two-line manifest — the router's name and version —
+beside `dist/extension.js`, and copies the router's runtime data next to it.
+`PACKAGE_ROOT` then resolves to the extension's `dist/`, which is exactly
+where the data sits, and `version.ts` reads its stamp from the same file, so
+a copy cannot claim a version its source did not. Nothing in `paths.ts`
+changed to make this work; the marker was already the name.
+
+**The asset list is taken from the router's own `files`, not restated.** A
+fifth asset added to the manifest and forgotten here would be a file the VSIX
+silently lacks, and the failure would be a schema that cannot be loaded on
+somebody else's machine — the exact class the port existed to remove.
+
+**The terminal shim stopped resolving the package and started resolving the
+file beside it.** `resolveRouterCli` was `require.resolve("dabbler-ai-router")`,
+which answers correctly in a workspace and cannot answer at all in a VSIX:
+`.vscodeignore` excludes `node_modules`, so the package the extension bundles
+is not shipped as a package. That was survivable while the shim was a
+convenience. It is not now — the shim is the operator's only hand-run
+surface, because the router is in-process for everything else. So the
+extension's build produces `dist/dabbler.cjs` itself, from the same router
+source it bundles, and the shim looks beside itself. Verified directly:
+`node tools/dabbler-ai-orchestration/dist/dabbler.cjs status` reads this
+repository's ledger and finds its own schemas.
+
+**`engines.vscode` is raised to `^1.135.0`**, which D131 said would happen at
+the cutover and named the rule for: the lowest VS Code whose extension host
+carries an unflagged `node:sqlite`, *found by running the check on that
+release rather than taken from a changelog*. 1.135 is the one release that
+has been measured (Electron 42.8.1, Node 24.18.1), so it is the floor until a
+lower one is measured. This is a real constraint now rather than a
+precaution: `seat_cost` runs in the host.
+
+### D234 · 2026-08-29 · Orchestrator (claude-opus-5/anthropic) · frameworkVersion on session and round rows: additive, never back-filled, stamped in the one writer
+
+The set's one record change, and the last one it makes.
+
+**Session rows carry `frameworkVersion`; round rows carry
+`framework_version`.** Each is the router version as the running manifest
+declares it — `2.0.0` from here. Both are additive and optional, and neither
+schema's version number moves: an optional field cannot invalidate a file
+written before it, and bumping `schemaVersion` to 6 would have made every
+existing v5 ledger require a migration in order to gain a string.
+
+**Absence already means something, which is why nothing is back-filled.** A
+row without the stamp was written before the stamp existed. Back-filling it
+with the version running today would replace a fact ("we do not know") with a
+guess dressed as a record, and it would be unfalsifiable — nobody can check
+which framework wrote a row from 2026-08-27.
+
+**The session stamp is written at `start` and carried thereafter.**
+`register_session_start` rebuilds the whole `sessions` array on every
+registration, so `frameworkVersion` joins the carried keys beside
+`startedAt`, `orchestrator` and the verification summary. Without that, every
+row in the file would claim the framework that last touched the file rather
+than the one that ran it — and the rebuild happens on every start, so it
+would have happened immediately.
+
+**The round stamp is written in `appendRound`, not at the three call sites.**
+The round, the adjudication and the cap terminal each build a row of their
+own; a stamp any of them can forget is a stamp that is absent on the row that
+most needed it, and — because absence means "written before the stamp
+existed" — the record would be *wrong* rather than merely incomplete. One
+writer, one place.
+
+**What it answers.** The orchestrator block names the ENGINE (`claude-code`,
+a seat, a model). Nothing in either row said which implementation of the
+framework produced it, and after this session that question has a sharp
+answer for the first time: every row stamped `1.x` was written by the Python
+router, and every row stamped `2.x` by this one. A reader of a ledger that
+spans the cutover can now tell which side of it a row is on without dating
+it.
+
+### D235 · 2026-08-29 · Orchestrator (claude-opus-5/anthropic) · The verb table sheds the port's scaffolding: no portedInSession, no pythonModule, no second name for the projection
+
+Four names left the surface at the cutover, and one that had been provisional
+for thirteen sessions became permanent. Each has its own reason and they are
+not the same reason.
+
+**`VerbSpec` loses `pythonModule`, `pythonCli` and `portedInSession`.** They
+were the port's scaffolding: a verb declared before it worked, refused by
+name, naming the session that would land it and the `python -m` to run in the
+meantime. There is no meantime. `contracts.test.ts`'s countdown — which
+session 35 rewrote to compute the announced-but-unregistered set rather than
+name one — now computes the empty set by construction, so it asserts the
+table and the registry against each other in both directions instead: a verb
+offered without a handler is a promise the command breaks, and a handler
+without a declaration is a command nobody can find.
+
+**`ledger` and `approved-plan` leave the verb table and stay on the
+contract.** The table is the `dabbler` command's list, and neither has a
+command line on any router — they are libraries, which is what `pythonCli:
+false` was recording. Keeping them in a table the usage text prints would
+advertise two verbs that dispatch to nothing. They remain `Router` members
+because the extension reaches them as functions, and `InProcessRouter`
+implements both for the first time.
+
+**`ledger.unresolved` is trimmed from the contract entirely.** It was
+declared in session 23 and neither router ever grew it: no
+`ai_router.ledger` function computed it and nothing called it. That is
+D162/D152's rule exactly — the one that took `modules list` and `modules
+retire` out — *a contract naming a verb nothing implements is a promise that
+would be refused at the moment it was needed*. The projection already answers
+the question a reader has, per session, from the same rows.
+
+**`progress` is gone; `status` is the one name.** D88 and D130 promised the
+operator `dabbler status`, and session 35 delivered it as an alias because
+the extension SPAWNED `progress` and a rename would have broken the spawn
+site. The extension calls `Router.progress` now — a method, not a command
+line — so the thing holding the second name up is gone, and leaving both
+would be the accretion this repository refuses. `cli/progress.ts` is
+`cli/status.ts`, and the `progress:` prefix on its two resolution errors,
+kept for one session because it was the Python module's own name, says
+`status:`.
+
+**`RouterUnavailableError` stays, and it is worth saying why, because the
+same rule points the other way here.** The bundled implementation never
+throws it and cannot — it calls functions in this process, so there is no
+interpreter to be missing and no spawn to fail. But D162 is about a verb a
+caller could ISSUE and be refused; nobody issues an error type. It is the
+shape of "the router could not be reached" for an implementation that has
+somewhere to reach, three callers already branch on it, and removing it would
+be a breaking change to a published contract bought with tidiness. Its
+comment now says all of that instead of describing an interpreter.
+
+### D236 · 2026-08-29 · Orchestrator (claude-opus-5/anthropic) · A deleted file is its header, not its contents: --irreversible-delete takes the evidence bundle from 2.3 MB to 257 KB
+
+The plan's step 4 says to delete `ai_router/` and `tests/`. Doing so makes
+this session's `git diff HEAD` **2.3 MB**, against an evidence cap of 600 KB
+— and the cap is not the real wall. A 2.3 MB bundle is roughly 600,000
+tokens, most of it removed Python, and the twenty lines that are *not* a
+deletion would be somewhere inside it. `AI_ROUTER_VERIFY_MAX_EVIDENCE_CHARS`
+is the escape the refusal itself names, and raising it here would have bought
+a verifier that could not read what it was sent.
+
+**So the round-1 and fix-delta diffs pass `--irreversible-delete`.** It is
+git's own flag with git's own rationale: the patch stops being one `git
+apply` could use, and is "solely for people who want to just concentrate on
+reviewing the text after the change". That is a verifier, exactly. Measured:
+**256,668 characters**, comfortably inside the cap, against the 2.3 MB the
+same tree produced without it.
+
+**Nothing is hidden.** Every `deleted file mode` header is still in the
+bundle, `git status --short` above it lists every deleted path again, and the
+heading says the contents were omitted. What is dropped is only the removed
+LINES — and those are the whole of the cost and none of the question. What a
+reviewer asks about a deletion is which file went and whether anything still
+reaches for it; neither is answerable from the file's former contents, and
+both are answerable from the header plus the rest of the diff.
+
+**It is a product change made by the session that needed it, and that is
+worth naming rather than burying.** The test is whether it would be right for
+a session that did not need it, and it is: any session that retires a module
+hits this shape, and every one of them was paying to send a model text nobody
+reads. The change is four lines and one test; it does not touch what is
+compared, only what is quoted.
+
+### D237 · 2026-08-29 · Orchestrator (claude-opus-5/anthropic) · The release path is two tag-driven pipelines, not the packaging block: PyPI becomes npm, and the tag push stays the operator's
+
+The plan's step 10 says to package extension 2.0.0 and `dabbler-ai-router`
+2.0.0 "to their feeds through `dabbler packaging`". Two facts settle that
+differently, and both are checkable.
+
+**`dabbler packaging` refuses this repository, correctly.** Run it and it
+says so: *this repository declares no packaging block, so it publishes
+nothing.* The block describes ONE `pack` and ONE `push`, and this repository
+releases two artifacts to two registries under two credentials. Declaring
+half a release here would be worse than declaring none — the packaging record
+would read as this repository's release history while naming one of the two
+things it releases. The `dabbler.yaml` comment now says that instead of the
+older and now-false "it publishes to no feed today".
+
+**The real release path is the two tag-driven pipelines, and they are what
+this session repointed.** `.github/workflows/release.yml` published the
+Python package to PyPI; it publishes the npm package now — same tag shapes
+(`vX.Y.Z` final, `vX.Y.Z-rcN` to the `next` dist-tag rather than `latest`),
+same OIDC trusted publishing with no long-lived token, same
+`require-green-test` gate on the tagged commit, and a tag-versus-manifest
+check that is now a string comparison because npm has one spelling of a
+version. `publish-vscode.yml` needed one comment corrected. The PyPI project
+is left as history: what is published there stays downloadable and nothing
+new is uploaded.
+
+**The `Test` workflow loses its Python job.** Two remain — the extension
+suite and the router suite — and the note explaining why the parity control
+was absent from CI goes with the control. The extension job's typecheck now
+runs the workspace script the declared control names rather than a bare `npx
+tsc --noEmit`, so CI and the control cannot disagree about what typechecks.
+
+**The publish itself is a tag push, and a tag push is the operator's.** It
+sends 2.0.0 to two public registries under credentials that live in GitHub
+deployment environments and not on this machine; neither is reversible, and
+npm will not let a version's files be replaced. This session leaves both
+artifacts at 2.0.0, both pipelines pointed at the right registries, and the
+`Test` workflow green — which is everything a release needs except the
+decision to make one.
+
+### D238 · 2026-08-29 · Orchestrator (claude-opus-5/anthropic) · The session plan is amended on the record where it asks for what the implementation cannot do — the route the verifier's own acceptance criteria named
+
+Two of session 36's plan steps ask for something the implementation cannot
+do. Rounds 1 and 2 both raised them as Major, and both of round 2's
+acceptance criteria named the same resolution: *or the governing plan must
+be formally amended before the session claims completion*. That is the right
+call and it is what this decision records. The amendment is written into
+`docs/sessions/session-plan.md` beside the steps it changes, not only here,
+because a reader of the plan has to meet it.
+
+**Why the disputes were not enough.** Both were upheld, and the verifier did
+not contradict a single fact in either — it agreed the packaging model
+supports one artifact and that the round record has no version discriminator.
+What it said is that establishing why a requirement cannot be met *proves the
+missing capability rather than satisfying the requirement*, and that a
+unilateral substitution is not an amendment. It is right. A plan that still
+reads "through `dabbler packaging`" and a session that published another way
+are two records of one decision that disagree — which is exactly what D224
+recorded in session 35, and the resolution there was to make the two agree.
+
+**Step 3, "and bump both schemas", is not performed.** The round record has
+never carried a version discriminator: `rounds.schema.json` requires `round`,
+`verdict`, `blocking`, `findings`, `completion_tree` and `recorded_at`, and
+declares no version field anywhere in the row. Incrementing one would mean
+ADDING a second new field to the round record, which the same plan sentence
+forbids — "the set's one record change". The session record does carry one,
+and moving `schemaVersion` from 5 to 6 for an *additive optional* property
+would make every existing ledger on every consumer's disk fail validation
+against the shipped schema, in exchange for telling a reader something
+`frameworkVersion` already says more precisely. Compliance is therefore
+impossible on one half and harmful on the other, which is why no amount of
+remediation closes this finding and only an amendment does.
+
+**Step 3's field name stays `framework_version` on the round row.**
+`rounds.jsonl` is snake_case in all twenty-four of its keys;
+`sessions.json` is camelCase in all twelve of its. The plan's sentence names
+one FACT for two records with two conventions. The verifier's counter — that
+a wire-field name is an exact public contract and casing is not
+interchangeable — is a fair general principle; it is outweighed here by the
+fact that the round record would otherwise carry its first and only
+camelCase key, and every reader that walks it would carry the exception.
+`docs/schema-reference.md` documents both spellings side by side and says
+which convention each follows, so the record is self-describing rather than
+requiring the reader to know.
+
+**Step 10 publishes through the tag pipelines rather than `dabbler
+packaging`.** Three facts, each in the code: the declaration models exactly
+one `pack` and one `push` with one `feed` and one `secret`
+(`packages/router/src/packaging.ts`), and this repository releases two
+artifacts to two registries under two credentials; a declared push would fail
+to authenticate here, because both pipelines mint their credential by OIDC
+from a workflow identity and neither token exists on a development machine,
+so the record would read `failed` rather than `refused`; and a local publish
+would bypass `require-green-test`, the gate that requires a successful `Test`
+run for the TAGGED commit, which at packaging time does not exist. The
+verifier's third option — extend the packaging model to coordinate the gated
+workflows — is a redesign of a record contract in the session whose plan says
+it makes exactly one record change.
+
+**Step 6 has nothing to measure.** No call this session went through a
+Copilot seat, so `seat_cost` has no conversation id to price. The cost is
+recorded as tokens per round, which is what the metrics ledger carries.
+
+**What is owed to the operator.** This amendment changes what session 36 was
+required to deliver, and that is not a model's call to make silently. It is
+written where a reader of the plan meets it, it names what the plan asked and
+what was done instead, and it is reversible: restoring the original
+requirements means either building a two-artifact packaging model or
+publishing by hand, and both are decisions the operator can take with this
+record in front of them. The tag push that actually releases 2.0.0 is
+untouched by it and remains theirs.
+
+### D239 · 2026-08-29 · Orchestrator (claude-opus-5/anthropic) · Three rounds, 139,326 tokens, no seat: what the loop cost and what it caught
+
+**Three vendor calls, 125,632 in / 13,694 out — 139,326 tokens**, all
+`gpt-5-6-sol` over the direct API, all `session-verification`. Rounds 1, 2
+and 3.
+
+**No seat transport was used**, so `seat_cost` has no conversation id to
+price and this session is not comparable to the seat series. The plan's step
+6 says "measure this session's seat cost and record it"; there is none, and
+the amendment on the plan says so rather than filing a zero that would read
+as a measurement.
+
+It is the second most expensive session of the port, behind session 35's
+147,120 and ahead of session 23's 136,020 — and the shape is different from
+either. Session 35's round 1 was 86% of its total. Here the three rounds are
+comparable in size, because rounds 2 and 3 each carried two file-backed
+disputes and then a plan amendment into a fix delta that was otherwise a few
+documents. **Disputing is not free**: a rebuttal rides the prompt whole, and
+the second dispute cited two schemas in full.
+
+**The evidence bundle is why this session is not far more expensive.** The
+round-1 diff would have been 2.3 MB without `--irreversible-delete` (D236);
+it was 256,668 characters with it. At roughly four characters per token that
+is the difference between a round that fits in a context window and one that
+does not, and the whole of the saving was removed Python nobody would have
+read.
+
+**What the three rounds bought.** Round 1 raised two Major and three nits;
+one nit was a real defect this session introduced — dropping the `!vsix-v*`
+exclusion from the npm release trigger, which would have started the router's
+publish workflow on every Marketplace tag. The other two nits were an
+unwritten `STATUS.md` and a stale `docs/schema-reference.md`, both fair.
+Round 2 upheld both Majors and, in doing so, named the resolution neither
+dispute had reached: amend the plan. Round 3 verified, with two nits about
+the amendment's own wording. **The loop earned its cost**: the defect it
+caught was invisible to every control, and the process point it made in round
+2 is the one this session would otherwise have got wrong.

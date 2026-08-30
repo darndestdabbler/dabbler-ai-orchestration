@@ -60,6 +60,7 @@ import {
   httpGetJson,
 } from "./transports/api.ts";
 import { resolveSecret } from "./secretResolver.ts";
+import { workingDirectory } from "./workdir.ts";
 import { confirmedModels, loadCatalog, resolveLockfilePath } from "./transports/copilot.ts";
 
 export const RECORD_SOURCE = "vendor-enumeration";
@@ -70,9 +71,9 @@ export const RECORD_SOURCE = "vendor-enumeration";
 // same-provider exclusion turns on.
 export const PROVIDER_SOURCE_ENUMERATION = "vendor-enumeration";
 
-export const ENUMERATE_COMMAND = "python -m ai_router.discovery enumerate";
-export const DRIFT_COMMAND = "python -m ai_router.discovery drift";
-export const SEAT_REFRESH_COMMAND = "python -m ai_router.transports.copilot refresh";
+export const ENUMERATE_COMMAND = "dabbler discovery enumerate";
+export const DRIFT_COMMAND = "dabbler discovery drift";
+export const SEAT_REFRESH_COMMAND = "dabbler copilot refresh";
 
 export const DEFAULT_RECORD_FILENAME = ".dabbler/api-models.lock";
 export const DEFAULT_MAX_AGE_HOURS = 24.0;
@@ -417,7 +418,7 @@ export function stampRecord(
 ): ModelRecord {
   const meta: RecordMeta = {
     ...recordValue.meta,
-    written_by: writerId("ai_router.discovery"),
+    written_by: writerId("dabbler.discovery"),
     written_at: writtenAt ?? utcNow(),
     content_digest: null,
   };
@@ -854,7 +855,7 @@ export function resolveRecordPath(config: RouterConfig): string {
   const value = discoverySettings(config).record;
   if (isAbsolute(value)) return value;
   const root = projectRoot();
-  return join(root ?? process.cwd(), ...value.split("/"));
+  return join(root ?? workingDirectory(), ...value.split("/"));
 }
 
 // --- Freshness --------------------------------------------------------------

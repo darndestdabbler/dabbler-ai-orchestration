@@ -7,7 +7,6 @@ import { registerCancelLifecycleCommands } from "./commands/cancelLifecycleComma
 import { registerNewModuleCommand } from "./commands/newModule";
 import { registerSessionTerminalCommands } from "./commands/sessionTerminalCommands";
 import { registerBootstrapProjectCommand } from "./commands/bootstrapProject";
-import { registerInstallAiRouterCommand } from "./commands/installAiRouter";
 import { installTerminalShim } from "./router/terminalShim";
 import { registerWorkExplorerTreeCommands } from "./commands/workExplorerTreeCommands";
 import { SESSIONS_REL, discoverRoots, hasSessionsRoot } from "./utils/fileSystem";
@@ -191,9 +190,6 @@ export function activate(context: vscode.ExtensionContext): void {
   );
   safeRegister("bootstrapProjectCommand", () =>
     registerBootstrapProjectCommand(context),
-  );
-  safeRegister("installAiRouterCommand", () =>
-    registerInstallAiRouterCommand(context),
   );
   safeRegister("troubleshootCommand", () => registerTroubleshootCommand(context));
   // The integrated terminal gets `dabbler` on PATH, run on the extension

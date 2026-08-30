@@ -72,12 +72,19 @@ suite("the terminal shim", () => {
     assert.ok(!sh.includes("\\"));
   });
 
+  test("finds the command the build puts beside it, and nothing else", () => {
+    // The rule, not the build: the CLI is `dabbler.cjs` in this module's own
+    // directory, which is `dist/` in the artifact and in the Extension
+    // Development Host. Asserting that the built file exists would make this
+    // a test of whether `npm run compile` had been run.
+    const beside = fs.mkdtempSync(path.join(os.tmpdir(), "dabbler-cli-"));
+    assert.strictEqual(resolveRouterCli(beside), null);
+    fs.writeFileSync(path.join(beside, "dabbler.cjs"), "", "utf8");
+    assert.strictEqual(resolveRouterCli(beside), path.join(beside, "dabbler.cjs"));
+    fs.rmSync(beside, { recursive: true, force: true });
+  });
+
   test("writes the launchers and prepends their directory to PATH", () => {
-    // Asserted rather than skipped past: the extension declares the router
-    // as a dependency, so a run where it does not resolve is a broken
-    // install, and a test that returned early there would report a pass for
-    // a shim it never wrote.
-    assert.ok(resolveRouterCli() !== null, "the router package must resolve");
     const storage = fs.mkdtempSync(path.join(os.tmpdir(), "dabbler-shim-"));
     const prepended: { variable: string; value: string }[] = [];
     let cleared = false;
@@ -94,7 +101,7 @@ suite("the terminal shim", () => {
       },
     } as unknown as Parameters<typeof installTerminalShim>[0];
 
-    const directory = installTerminalShim(context);
+    const directory = installTerminalShim(context, "C:\\ext\\dist\\dabbler.cjs");
     assert.ok(directory !== null);
     for (const name of Object.keys(launchers("node", "cli.cjs"))) {
       assert.ok(fs.existsSync(path.join(directory as string, name)), name);

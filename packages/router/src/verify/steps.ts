@@ -84,7 +84,7 @@ import { headCommit } from "./rounds.ts";
 
 function stepCommand(verb: string, sessionsDir: string, suffix = ""): string {
   return (
-    `python -m ai_router.verify step ${verb} --sessions-dir ` +
+    `dabbler verify step ${verb} --sessions-dir ` +
     `${sessionsDir}${suffix}`
   );
 }
@@ -102,7 +102,7 @@ function stepSession(sessionsDir: string): readonly [string, number] {
     throw new StepRefusal(
       `no session is in flight under ${sessionsDir}; register the session ` +
         "first:\n" +
-        `  python -m ai_router.session start --sessions-dir ${sessionsDir}` +
+        `  dabbler session start --sessions-dir ${sessionsDir}` +
         " --engine <engine> --provider <provider>",
     );
   }
@@ -614,7 +614,7 @@ export function runStepGuardCommit(cwd = "."): number {
       `${rows}\n` +
       "The framework commits a step, and it does so once the step's " +
       "evidence is satisfied. Close the step and let it:\n" +
-      "  python -m ai_router.verify step close\n",
+      "  dabbler verify step close\n",
   );
   return EXIT_BLOCKING;
 }

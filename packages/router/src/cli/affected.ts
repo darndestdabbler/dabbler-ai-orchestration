@@ -115,11 +115,11 @@ export async function affectedVerb(argv: string[]): Promise<number> {
           "fetches only when its refspec says so. Fetch them first, and let " +
           "bootstrap make that permanent:\n" +
           `  git fetch ${upstreamRemote(repoRoot)} '${ROUND_REFSPEC}'\n` +
-          "  python -m ai_router.bootstrap --no-transport-detect\n" +
+          "  dabbler bootstrap --no-transport-detect\n" +
           "If the round was recorded before rounds were anchored, or its ref " +
           "was never pushed, re-anchor it onto a commit this history passed " +
           "through:\n" +
-          '  python -m ai_router.verify reanchor --commit <sha> --reason ' +
+          '  dabbler verify reanchor --commit <sha> --reason ' +
           '"<why the recorded tree is unreachable>"\n',
       );
       return EXIT_USAGE;

@@ -1,141 +1,74 @@
-// Set Up New Project: the WHOLE first-run sequence in one visible
-// terminal — create the workspace venv when it is missing, install (or
-// upgrade) the router into the interpreter every later spawn resolves,
-// then run the bootstrap. The old single-line form assumed the venv and
-// router already existed; on a fresh project the resolver fell back to
-// bare `python` and `-m ai_router.bootstrap` died with
-// ModuleNotFoundError (two real first-runs, same day). Lines are sent
-// separately (`;` semantics, shell-agnostic): a pip upgrade that fails
-// offline must not block a bootstrap that can already run.
+// Set Up New Project: the whole first-run sequence, which is now one call.
+//
+// It used to be three lines sent to a visible terminal — create the
+// workspace venv when it was missing, `pip install --upgrade
+// dabbler-ai-router` into the interpreter every later spawn would resolve,
+// then run the bootstrap. Each of those existed because the router was a
+// Python package the project had to acquire before the extension could ask
+// it anything, and two real first-runs died at the second step.
+//
+// The router is bundled with the extension now, so a project acquires
+// nothing: there is no venv, no install, and no interpreter to resolve.
+// `Router.bootstrap` writes the managed guidance, the pre-commit guard and
+// the ignore rule, and the operator sees what it ran in the command log
+// like every other verb. This is the zero-install claim the port was for.
 
 import * as vscode from "vscode";
-import {
-  describeMissingPython,
-  detectWorkspaceVenvInterpreter,
-  explicitPythonPathSetting,
-  resolveScaffoldBootstrapPython,
-  venvInterpreterCandidate,
-} from "../router/pythonInterpreter";
-import { quoteForDisplay } from "../router/routerCli";
+import type { Router } from "dabbler-ai-router";
+import { productionRouter } from "../router/host";
 
-export const ROUTER_DISTRIBUTION = "dabbler-ai-router";
-
-export function installCommandLine(pythonPath: string): string {
-  return [
-    quoteForDisplay(pythonPath),
-    "-m",
-    "pip",
-    "install",
-    "--upgrade",
-    ROUTER_DISTRIBUTION,
-  ].join(" ");
+export interface SetUpProjectUi {
+  showInformationMessage: (message: string) => unknown;
+  showErrorMessage: (message: string) => unknown;
+  workspaceRoot: () => string | undefined;
 }
 
-export function bootstrapCommandLine(pythonPath: string, projectDir: string): string {
-  return [
-    quoteForDisplay(pythonPath),
-    "-m",
-    "ai_router.bootstrap",
-    "--project-dir",
-    quoteForDisplay(projectDir),
-  ].join(" ");
+function defaultUi(): SetUpProjectUi {
+  return {
+    showInformationMessage: (m) => vscode.window.showInformationMessage(m),
+    showErrorMessage: (m) => vscode.window.showErrorMessage(m),
+    workspaceRoot: () => vscode.workspace.workspaceFolders?.[0]?.uri.fsPath,
+  };
 }
 
 /**
- * The pure setup sequence. `python` is an interpreter to use directly
- * (the operator's explicit setting, or an existing workspace venv);
- * when null, `basePython` creates `.venv` first and the venv
- * interpreter runs the rest. Returns null when no interpreter exists at
- * all — the caller surfaces the missing-Python explainer instead of
- * composing a command destined to fail.
+ * Bootstrap one project, and say what happened. Returns true when the
+ * project was set up, so a caller can refresh the view.
+ *
+ * The refusal is shown rather than swallowed: `bootstrap` refuses a
+ * directory that is not a git repository, and an operator who clicked Set
+ * Up New Project on the wrong folder needs to read that sentence.
  */
-export function setupCommandSequence(opts: {
-  projectDir: string;
-  python: string | null;
-  basePython: string | null;
-  runBootstrap: boolean;
-}): string[] | null {
-  const lines: string[] = [];
-  let python = opts.python;
-  if (!python) {
-    if (!opts.basePython) return null;
-    lines.push([quoteForDisplay(opts.basePython), "-m", "venv", ".venv"].join(" "));
-    python = venvInterpreterCandidate(opts.projectDir);
+export async function runSetUpProjectFlow(
+  ui: SetUpProjectUi = defaultUi(),
+  router: Router = productionRouter(),
+): Promise<boolean> {
+  const root = ui.workspaceRoot();
+  if (!root) {
+    ui.showErrorMessage(
+      "Open the project folder first, then run Set Up New Project.",
+    );
+    return false;
   }
-  lines.push(installCommandLine(python));
-  if (opts.runBootstrap) {
-    lines.push(bootstrapCommandLine(python, opts.projectDir));
+  const result = await router.bootstrap({ projectDir: root });
+  if (!result.ok) {
+    ui.showErrorMessage(
+      `Set Up New Project failed: ${result.message.trim() || `exit ${result.exitCode}`}`,
+    );
+    return false;
   }
-  return lines;
-}
-
-/**
- * Host-facing resolution for the setup sequence:
- *   1. explicit `dabblerSessionSets.pythonPath` (validated; a
- *      configured-but-missing interpreter is an operator error to
- *      surface, and no venv is created around an operator's pin);
- *   2. an existing workspace `.venv` interpreter;
- *   3. a PATH interpreter that creates `.venv` first;
- *   4. null — nothing usable resolves.
- */
-export function resolveSetupSequence(
-  workspaceRoot: string,
-  runBootstrap: boolean,
-): string[] | null {
-  const explicitSet = explicitPythonPathSetting() !== undefined;
-  if (!explicitSet) {
-    const venv = detectWorkspaceVenvInterpreter(workspaceRoot);
-    if (venv) {
-      return setupCommandSequence({
-        projectDir: workspaceRoot, python: venv, basePython: null,
-        runBootstrap,
-      });
-    }
-  }
-  // Explicit-only validation when set; first PATH candidate otherwise.
-  const resolved = resolveScaffoldBootstrapPython(workspaceRoot);
-  if (!resolved) return null;
-  return setupCommandSequence({
-    projectDir: workspaceRoot,
-    python: explicitSet ? resolved : null,
-    basePython: explicitSet ? null : resolved,
-    runBootstrap,
-  });
-}
-
-export function runSetupSequenceInTerminal(
-  terminalName: string,
-  root: string,
-  runBootstrap: boolean,
-  actionLabel: string,
-): void {
-  const lines = resolveSetupSequence(root, runBootstrap);
-  if (!lines) {
-    vscode.window.showErrorMessage(describeMissingPython(actionLabel));
-    return;
-  }
-  const terminal = vscode.window.createTerminal({ name: terminalName, cwd: root });
-  terminal.show();
-  for (const line of lines) {
-    terminal.sendText(line, true);
-  }
+  ui.showInformationMessage(
+    "Dabbler: project set up. Open a terminal and run `dabbler session start`.",
+  );
+  return true;
 }
 
 export function registerBootstrapProjectCommand(
   context: vscode.ExtensionContext,
 ): void {
   context.subscriptions.push(
-    vscode.commands.registerCommand("dabbler.setupNewProject", () => {
-      const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-      if (!root) {
-        vscode.window.showErrorMessage(
-          "Open the project folder first, then run Set Up New Project.",
-        );
-        return;
-      }
-      runSetupSequenceInTerminal(
-        "Dabbler Bootstrap", root, true, "Set Up New Project",
-      );
-    }),
+    vscode.commands.registerCommand("dabbler.setupNewProject", () =>
+      runSetUpProjectFlow(),
+    ),
   );
 }

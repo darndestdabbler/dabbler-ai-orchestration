@@ -1,23 +1,17 @@
 // The one seam between a caller and the router.
 //
-// Everything the extension does today it does by spawning
-// `python -m ai_router.<module>` and reading what comes back. That is an
-// implementation, not a contract: the argv is assembled in one file, the
-// exit code is classified in another, and the payload is described by a
-// hand-kept TypeScript mirror. This file is the contract those three were
-// standing in for. One method per verb, typed by the generated types, and
-// one statement of what a non-zero exit means.
-//
-// It is deliberately not a spawn interface. `PythonSpawnRouter` (session
-// 24) satisfies it by spawning; the ported modules satisfy it in-process
-// (session 36); neither spelling is visible here, which is the point --
-// the extension stops knowing that Python exists.
+// One method per verb, typed by the generated types, and one statement of
+// what a non-zero exit means. It is deliberately not a spawn interface:
+// the extension once satisfied it by running `python -m ai_router.<module>`
+// and reading the pipe, and now satisfies it by calling this package's own
+// modules. Neither spelling is visible here, which is the point -- and it
+// is why the cutover moved one line in the extension rather than every
+// caller.
 //
 // Where a verb's answer has a schema, the method returns the generated
-// type. Where it does not, the method returns `RouterText`: what the CLI
-// printed, unparsed. Those sharpen as their modules are ported, and an
-// options interface gains fields the same way -- both are additive, and
-// neither moves an existing caller.
+// type. Where it does not, the method returns `RouterText`: what the verb
+// printed, unparsed. An options interface gains fields additively, which
+// moves no existing caller.
 
 import type { ApprovedPlan } from "../generated/approved-plan.ts";
 import type { ProgressProjection } from "../generated/progress-projection.ts";
@@ -70,9 +64,17 @@ export interface RouterText {
 }
 
 /**
- * The router could not be reached at all -- no interpreter, no binary, a
- * spawn that threw. Distinct from every `RouterResult`: those are answers,
- * and this is the absence of one.
+ * The router could not be reached at all. Distinct from every
+ * `RouterResult`: those are answers, and this is the absence of one.
+ *
+ * The bundled implementation never throws it, and cannot: it calls
+ * functions in this process, so there is no interpreter to be missing and
+ * no spawn to fail. It is kept because it is the shape of that answer for
+ * an implementation that does have somewhere to reach -- and because a
+ * caller's catch is where the distinction has to be made, whichever
+ * implementation it is holding. It is not trimmed on the D162 rule that
+ * took `modules list` out: that rule is about a verb a caller could
+ * ISSUE and be refused, and nobody issues an error type.
  */
 export class RouterUnavailableError extends Error {
   constructor(message: string, options?: { cause?: unknown }) {
@@ -250,7 +252,15 @@ export interface WorkflowOptions {
 }
 
 export interface WorkflowStepOptions extends WorkflowOptions {
-  readonly artifact?: string;
+  /**
+   * The step id. Only `enter` takes one -- it is that subcommand's
+   * positional argument -- and every other step reads it back from the
+   * event log, which is why it is optional here rather than on `enter`
+   * alone: one options type per subcommand would be nine.
+   */
+  readonly step?: string;
+  /** Repeatable; a step's outputs, as the review and the tests read them. */
+  readonly artifact?: readonly string[];
   readonly authorProvider?: string;
   readonly transport?: string;
 }
@@ -269,18 +279,21 @@ export interface WorkflowVerbs {
   status(options: WorkflowOptions): Promise<RouterResult<RouterText>>;
 }
 
+/**
+ * `unresolved` -- every session whose loop stopped without a clean verdict
+ * -- was declared here before either router grew it, and the cutover found
+ * that neither ever did: no `ai_router.ledger` function computes it and no
+ * caller asks for it. The projection already answers the question a reader
+ * has, per session, from the same rows. A contract naming a verb nothing
+ * implements is a promise that would be refused at the moment it was
+ * needed, so it is trimmed rather than stubbed -- D162/D152, the same
+ * ruling that took `modules list` and `modules retire` out.
+ */
 export interface LedgerVerbs {
   /** The last round row of one session, or null when it has none. */
   latestRound(
     options: RepositoryTarget & { readonly sessionNumber: number },
   ): Promise<RouterResult<Rounds | null>>;
-  /**
-   * Every session whose loop stopped without a clean verdict. Text: the
-   * unresolved view is a fold over the ledger with no schema of its own,
-   * and inventing one here would be a second declaration of a shape the
-   * record does not carry.
-   */
-  unresolved(options: RepositoryTarget): Promise<RouterResult<RouterText>>;
 }
 
 export interface TestEvidenceRecordOptions extends RepositoryTarget {

@@ -65,7 +65,7 @@ function checkActivation(): void {
 function checkStateStuck(commands: RouterCommands): void {
   const ch = outputChannel();
   ch.appendLine("A session's status comes from the router, never from this extension:");
-  ch.appendLine(`  ${routerCommand(commands, "progress", ["--json"], workspaceRoot())}`);
+  ch.appendLine(`  ${routerCommand(commands, "status", ["--json"], workspaceRoot())}`);
   ch.appendLine("");
   ch.appendLine("Each session's `status` is written to docs/sessions/sessions.json by");
   ch.appendLine("`session start` and `session close`, and nothing else may write it.");
@@ -179,7 +179,7 @@ export function registerTroubleshootCommand(
         },
         {
           label: "$(key) API key not found",
-          detail: "Show which environment variables the ai_router expects",
+          detail: "Show which environment variables the router expects",
           run: checkApiKeys,
         },
         {

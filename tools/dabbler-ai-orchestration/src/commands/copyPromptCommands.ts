@@ -56,7 +56,7 @@ export function planSessionRunPrompt(
  * for a row that has nothing to send back.
  *
  * "Send it back" hands the record to an engine — it is the engine that
- * remediates, re-runs the affected tests and re-runs `ai_router.verify`,
+ * remediates, re-runs the affected tests and re-runs `dabbler verify`,
  * which at the cap records whichever terminal state the tree then says
  * it is. The prompt names the ledger by path and never quotes it: the
  * findings are read from the record by the engine that acts on them, so
@@ -91,25 +91,25 @@ export function planSendBackPrompt(
       `blocking finding(s) and no verifier reviewed it. No command ` +
       `re-opens review on a closed session, so the review is the next ` +
       `session's declared work. Run ${startCommand(repository)}, then ` +
-      `python -m ai_router.session declare --task "Review session ${n}'s ` +
+      `dabbler session declare --task "Review session ${n}'s ` +
       `unreviewed remediation of ${paths} against ${record}" ` +
       `--not-releasable. Read ${record}, correct what the review finds, ` +
-      `and python -m ai_router.verify then reviews that correction as ` +
+      `and dabbler verify then reviews that correction as ` +
       `this session's own round.`;
   } else if (view.terminal === "ISSUES_FOUND") {
     text =
       `Session ${n} is unresolved at the cap: round ${round} left ` +
       `${outstanding} blocking finding(s) standing. Read ${record}, ` +
       `remediate each finding at the path it cites, run the affected ` +
-      `tests (python -m ai_router.affected prints them), record them ` +
-      `with python -m ai_router.test_evidence record, then run ` +
-      `python -m ai_router.verify — at the cap that records the terminal ` +
+      `tests (dabbler affected prints them), record them ` +
+      `with dabbler test-evidence record, then run ` +
+      `dabbler verify — at the cap that records the terminal ` +
       `state the tree says it is.`;
   } else {
     text =
       `Session ${n} has ${outstanding} blocking finding(s) outstanding ` +
       `after round ${round}. Read ${record}, remediate each at the path ` +
-      `it cites, run the affected tests, then run python -m ai_router.verify.`;
+      `it cites, run the affected tests, then run dabbler verify.`;
   }
   return { text, toast: `Copied: send session ${n} back to the engine` };
 }
@@ -119,7 +119,7 @@ function startCommand(repository: SessionsRepository): string {
   const o = repository.orchestrator;
   const engine = o?.engine ?? "<engine>";
   const provider = o?.provider ?? "<vendor>";
-  return `python -m ai_router.session start --engine ${engine} --provider ${provider}`;
+  return `dabbler session start --engine ${engine} --provider ${provider}`;
 }
 
 /**
@@ -154,7 +154,7 @@ export function planRespecifyPrompt(
   const steps: string[] = [];
   if (view.terminal === "ISSUES_FOUND") {
     steps.push(
-      `python -m ai_router.session cancel ${n} --reason "respecified as ` +
+      `dabbler session cancel ${n} --reason "respecified as ` +
         `session ${next}" --force — an unresolved session cannot close, so ` +
         `it is cancelled with the reason on record`,
     );

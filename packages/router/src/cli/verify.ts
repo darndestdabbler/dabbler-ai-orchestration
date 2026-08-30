@@ -1,7 +1,7 @@
 // `dabbler verify …` -- the cross-provider verification loop's command line.
 //
-// Six commands share one entry point, as `python -m ai_router.verify` does:
-// the bare round, `dispute`, `adjudicate`, `prepare`, `reanchor` and `step`.
+// Six commands share one entry point: the bare round, `dispute`,
+// `adjudicate`, `prepare`, `reanchor` and `step`.
 // A seventh, `waive`, exists only to be refused by name -- there is no
 // verdict a person can type, and argparse's "invalid choice" would read like
 // an oversight rather than a decision.
@@ -332,7 +332,7 @@ export async function verifyVerb(argv: string[]): Promise<number> {
         "THE CAP when every blocking finding was fixed and the cap " +
         "left the fix unreviewed, or UNRESOLVED when findings still " +
         "stand. Re-run the loop and it will record whichever it is:\n" +
-        "  python -m ai_router.verify --sessions-dir <dir>\n",
+        "  dabbler verify --sessions-dir <dir>\n",
     );
     return EXIT_USAGE;
   }

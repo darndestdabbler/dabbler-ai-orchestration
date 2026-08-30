@@ -5,9 +5,10 @@
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
-import { PythonSpawnRouter } from "../../router/pythonSpawnRouter";
-import { RunRouterCliDeps } from "../../router/routerCli";
+import { outcomeForExitCode } from "dabbler-ai-router";
 import type {
+  Router,
+  RouterResult,
   ProgressProjection as ProjectionPayload,
   ProgressProjectionSession as SessionRecord,
   ProgressProjectionVerification as SessionVerification,
@@ -171,49 +172,84 @@ export function rmrf(dir: string): void {
 }
 
 /**
- * A `PythonSpawnRouter` whose spawn settles immediately with the given
- * exit code, recording the argv it was asked to run.
+ * A `Router` that answers every verb the same way, recording which was
+ * asked.
  *
- * It drives the real seam — the argv the router builds, the exit-code
- * mapping it applies — with no subprocess. `argv` is what a caller would
- * have run, so an argv contract is asserted by asking the router for the
- * verb rather than by calling a builder the router does not use.
+ * The router it replaces was the real `PythonSpawnRouter` with an injected
+ * spawn, which let a flow test assert the argv as well as the outcome.
+ * There is no spawn to inject now, and the argv is no longer the
+ * extension's to assert: `InProcessRouter` builds it and the router
+ * package's own suite drives it against real repositories. What is left
+ * here is what these tests were ever about -- a flow, given an answer.
  */
 export function fakeRouter(
   exitCode: number,
-  stderr = "",
-): { router: PythonSpawnRouter; argv: string[][] } {
-  const argv: string[][] = [];
-  const deps: RunRouterCliDeps = {
-    echo: { append: () => {}, reveal: () => {} },
-    resolveInterpreter: () => "python",
-    interpreterExists: () => true,
-    spawn: ((_exe: string, args: string[]) => {
-      argv.push(args);
-      const mkStream = (payload: string) => ({
-        on: (event: string, cb: (chunk: Buffer) => void) => {
-          if (event === "data" && payload) cb(Buffer.from(payload));
-        },
-      });
-      const child = {
-        stdout: mkStream(exitCode === 0 ? '{"status":"ok"}' : ""),
-        stderr: mkStream(stderr),
-        on: (event: string, cb: (arg?: unknown) => void) => {
-          if (event === "close") queueMicrotask(() => cb(exitCode));
-          return child;
-        },
-      };
-      return child;
-    }) as unknown as RunRouterCliDeps["spawn"],
+  message = "",
+): { router: Router; asked: string[] } {
+  const asked: string[] = [];
+  const answer = <T,>(verb: string, value: T): Promise<RouterResult<T>> => {
+    asked.push(verb);
+    const outcome = outcomeForExitCode(exitCode);
+    return Promise.resolve(
+      outcome === "ok"
+        ? ({ ok: true, outcome, value } as RouterResult<T>)
+        : ({ ok: false, outcome, exitCode, message } as RouterResult<T>),
+    );
   };
-  return { router: new PythonSpawnRouter(deps), argv };
+  const text = (verb: string) => () => answer(verb, { stdout: message });
+  return {
+    router: {
+      session: {
+        start: text("session start"),
+        declare: text("session declare"),
+        close: text("session close"),
+        cancel: text("session cancel"),
+        restore: text("session restore"),
+        log: text("session log"),
+        decision: text("session decision"),
+      },
+      modules: { create: text("modules create") },
+      verify: {
+        round: text("verify"),
+        dispute: text("verify dispute"),
+        adjudicate: text("verify adjudicate"),
+        reanchor: text("verify reanchor"),
+        stepOpen: text("verify step open"),
+        stepClose: text("verify step close"),
+        stepStatus: text("verify step status"),
+        stepAmend: text("verify step amend"),
+      },
+      workflow: {
+        enter: text("workflow enter"),
+        review: text("workflow review"),
+        approve: text("workflow approve"),
+        authorTests: text("workflow author-tests"),
+        test: text("workflow test"),
+        suite: text("workflow suite"),
+        fix: text("workflow fix"),
+        sendBack: text("workflow send-back"),
+        status: text("workflow status"),
+      },
+      ledger: { latestRound: () => answer("ledger latestRound", null) },
+      testEvidence: { record: text("test-evidence record") },
+      approvedPlan: {
+        read: () => answer("approved-plan read", {} as never),
+      },
+      progress: () => answer("progress", makeProjection()),
+      bootstrap: text("bootstrap"),
+      affected: text("affected"),
+    },
+    asked,
+  };
 }
 
-/** A router whose spawn must never be reached. */
-export function unusableRouter(): PythonSpawnRouter {
-  return new PythonSpawnRouter({
-    spawn: (() => {
-      throw new Error("must not spawn");
-    }) as never,
+/** A router no flow under test may reach. */
+export function unusableRouter(): Router {
+  const never = (): never => {
+    throw new Error("the router must not be reached");
+  };
+  return new Proxy({} as Router, {
+    get: () =>
+      new Proxy(never, { get: () => never, apply: never }) as unknown,
   });
 }

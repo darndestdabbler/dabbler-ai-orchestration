@@ -574,7 +574,7 @@ export function start(sessionsDir: string, options: StartOptions): number {
       writeErr(
         `start: refused -- session ${sessionDisplayNumber(requested)} is ` +
           "cancelled. Starting it would erase the cancellation and the reason " +
-          `for it; restore it first: python -m ai_router.session restore ${requested}\n`,
+          `for it; restore it first: dabbler session restore ${requested}\n`,
       );
       return EXIT_BOUNDARY;
     }
@@ -653,13 +653,13 @@ export function start(sessionsDir: string, options: StartOptions): number {
       // be published.
       writeOut(
         "This session has not declared its task list. Before the edits:\n" +
-          `  python -m ai_router.session declare --sessions-dir ${sessionsDir} \\\n` +
+          `  dabbler session declare --sessions-dir ${sessionsDir} \\\n` +
           '      --task "<what this session will do>" --releasable|--not-releasable\n',
       );
     }
     writeOut(
       "Next, once the edits are made:\n" +
-        `  python -m ai_router.affected --sessions-dir ${sessionsDir}\n` +
+        `  dabbler affected --sessions-dir ${sessionsDir}\n` +
         "It prints the tests this change makes necessary and the exact command " +
         "to run. The complete suite is not accepted before verification -- it " +
         "is the run of record, and it comes after the final verified tree.\n",

@@ -13,8 +13,9 @@ import { join } from "node:path";
 import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
 
 import { modulesVerb } from "../src/cli/modules.ts";
-import { progressVerb, statusVerb } from "../src/cli/progress.ts";
-import { HANDLERS, isImplemented } from "../src/cli/registry.ts";
+import { statusVerb } from "../src/cli/status.ts";
+import { HANDLERS } from "../src/cli/registry.ts";
+import { VERBS } from "../src/contracts/verbs.ts";
 import { sessionVerb } from "../src/cli/session.ts";
 import { readRawSessionState } from "../src/progress.ts";
 import { registerSessionStart } from "../src/writers.ts";
@@ -156,11 +157,11 @@ describe("dabbler session, the whole surface", () => {
   });
 });
 
-describe("dabbler progress", () => {
+describe("dabbler status", () => {
   it("emits the projection as indented JSON", async () => {
     const { sessionsDir } = makeSandboxRepo();
     registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
-    const result = await captured(() => progressVerb(["--sessions-dir", sessionsDir]));
+    const result = await captured(() => statusVerb(["--sessions-dir", sessionsDir]));
     expect(result.code).toBe(0);
     const projection = JSON.parse(result.out) as Record<string, unknown>;
     expect(projection["schemaVersion"]).toBe(1);
@@ -170,54 +171,43 @@ describe("dabbler progress", () => {
   it("treats --json as the one output mode rather than as a switch", async () => {
     const { sessionsDir } = makeSandboxRepo();
     registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
-    const bare = await captured(() => progressVerb(["--sessions-dir", sessionsDir]));
+    const bare = await captured(() => statusVerb(["--sessions-dir", sessionsDir]));
     const flagged = await captured(() =>
-      progressVerb(["--json", "--sessions-dir", sessionsDir]),
+      statusVerb(["--json", "--sessions-dir", sessionsDir]),
     );
     const strip = (text: string): string =>
       text.replace(/"generatedAt": "[^"]*"/, '"generatedAt": "<ts>"');
     expect(strip(flagged.out)).toBe(strip(bare.out));
   });
 
-  it("answers to `status` with the same bytes, under the name D130 promised", async () => {
-    // The run core's retirement said `dabbler status` would read the
-    // lifecycle's record instead of the run projection. It is an alias, not
-    // a second implementation -- two answers to "where is this repository"
-    // is the drift the projection exists to remove -- and the usage text
-    // says whichever name was typed.
-    const { sessionsDir } = makeSandboxRepo();
-    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
-    const strip = (text: string): string =>
-      text.replace(/"generatedAt": "[^"]*"/, '"generatedAt": "<ts>"');
-    const asProgress = await captured(() =>
-      progressVerb(["--sessions-dir", sessionsDir]),
-    );
-    const asStatus = await captured(() =>
-      statusVerb(["--sessions-dir", sessionsDir]),
-    );
-    expect(asStatus.code).toBe(0);
-    expect(strip(asStatus.out)).toBe(strip(asProgress.out));
+  it("is the one name for the projection, and `progress` is not a verb", async () => {
+    // `status` is what D88 and D130 promised the operator when the run
+    // core's own `status` went away. It was an alias over `progress` for one
+    // session, because the extension spawned `progress`; the extension calls
+    // a method now, so the second name has nothing holding it up.
+    expect(VERBS.map((spec) => spec.verb)).not.toContain("progress");
+    expect(HANDLERS["progress"]).toBeUndefined();
     const help = await captured(() => statusVerb(["--help"]));
     expect(help.out).toContain("usage: dabbler status");
   });
 
   it("refuses a sessions root that is not a directory", async () => {
     const result = await captured(() =>
-      progressVerb(["--sessions-dir", join(makeTempDir(), "nowhere")]),
+      statusVerb(["--sessions-dir", join(makeTempDir(), "nowhere")]),
     );
     expect(result.code).toBe(2);
     expect(result.err).toContain("not a directory");
   });
 
   it("refuses an argument it does not know rather than ignoring it", async () => {
-    const result = await captured(() => progressVerb(["--sessions"]));
+    const result = await captured(() => statusVerb(["--sessions"]));
     expect(result.code).toBe(2);
     expect(result.err).toContain("unrecognized argument");
   });
 });
 
 describe("dabbler modules", () => {
-  it("has one subcommand, because the Python command line has one", async () => {
+  it("has one subcommand, because the manifest has one writer", async () => {
     const result = await captured(() => modulesVerb(["list", makeTempDir()]));
     expect(result.code).toBe(2);
     expect(result.err).toContain("is not a subcommand");
@@ -258,11 +248,10 @@ describe("dabbler modules", () => {
   });
 });
 
-describe("the verb registry after session 31", () => {
-  it("has a handler for every verb this session ported", () => {
-    for (const verb of ["session", "progress", "modules"]) {
-      expect(isImplemented(verb)).toBe(true);
-      expect(typeof HANDLERS[verb]).toBe("function");
+describe("the verb registry", () => {
+  it("has a handler for every verb the table offers", () => {
+    for (const spec of VERBS) {
+      expect(typeof HANDLERS[spec.verb], spec.verb).toBe("function");
     }
   });
 });

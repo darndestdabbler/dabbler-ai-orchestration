@@ -5,7 +5,7 @@
 // corpus shape triggers, and the boundaries that only show themselves when
 // something tries to cross them.
 
-import { execFileSync, spawnSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -212,7 +212,7 @@ describe("risk flags", () => {
     const directory = runDir();
     const steps = goodSteps();
     steps[0]["risk_flags"] = ["nothing-to-see-here"];
-    steps[0]["file_envelope"] = ["ai_router/session.py", "pyproject.toml"];
+    steps[0]["file_envelope"] = ["packages/router/src/session.ts", "package.json"];
     const written = writePlan(directory, newPlan(1, "fixture", steps));
     expect((written["steps"] as Record<string, unknown>[])[0]["risk_flags"]).toEqual([
       "public-interface",
@@ -222,14 +222,14 @@ describe("risk flags", () => {
 
   it("keeps one fixed order however the envelope is written", () => {
     const forward = deriveRiskFlags([
-      "ai_router/a.py",
+      "packages/router/src/a.ts",
       ".dabbler/runs/x",
-      "pyproject.toml",
+      "package.json",
     ]);
     const backward = deriveRiskFlags([
-      "pyproject.toml",
+      "package.json",
       ".dabbler/runs/x",
-      "ai_router/a.py",
+      "packages/router/src/a.ts",
     ]);
     expect(forward).toEqual(["public-interface", "sensitive-path", "dependency-change"]);
     expect(backward).toEqual(forward);
@@ -942,88 +942,6 @@ describe("the auto-verification prompt", () => {
     );
     expect(dollars).toBe("R:cost $& and $` and $1");
   });
-});
-
-describe("the plan artifact, against the reference implementation", () => {
-  // The parity control compares two routers at the command line, and
-  // `approved_plan` declares none on either side -- so the control can compare
-  // this artifact only as `progress` reads it, which proves the READER. This
-  // is the other half: the TypeScript writer's bytes, against the bytes the
-  // Python writer produces from the same input.
-  // Anchored to this file, never to `process.cwd()`: vitest is invoked from
-  // the repository root and from `packages/router`, and a cwd-relative path
-  // silently SKIPS this check from one of them -- which is worse than failing.
-  const repoRoot = join(import.meta.dirname, "..", "..", "..");
-  //
-  // The repository's own interpreter, and no fallback to one on PATH: this
-  // check needs `ai_router` importable, not merely a Python. The vitest CI job
-  // installs no Python at all -- deliberately, and for the same reason the
-  // parity control is absent from it (see .github/workflows/test.yml) -- so
-  // the guard is what lets this file run there rather than a gap in it.
-  //
-  // The guard is `.venv`-ONLY, and that is an under-approximation rather
-  // than a test of whether Python is present: a machine that can run a
-  // verification round with `ai_router` importable from some other
-  // interpreter SKIPS this silently. It is kept because the venv is where
-  // this repository's router lives, so in practice it runs -- but a green
-  // suite on a machine without one has not made this claim.
-  const interpreter = join(
-    repoRoot,
-    ".venv",
-    process.platform === "win32" ? "Scripts" : "bin",
-    process.platform === "win32" ? "python.exe" : "python",
-  );
-
-  it.runIf(existsSync(interpreter))(
-    "writes an approved plan Python accepts, byte for byte",
-    () => {
-      const steps = goodSteps().map((step) => ({ ...step, risk_flags: [] }));
-
-      const ours = runDir();
-      writePlan(ours, newPlan(7, "cross-check", steps));
-      approvePlan(ours);
-
-      const theirs = runDir();
-      const result = spawnSync(
-        interpreter,
-        [
-          "-c",
-          [
-            "import json, sys",
-            "from ai_router.approved_plan import approve_plan, new_plan, write_plan",
-            "write_plan(sys.argv[2], new_plan(7, 'cross-check', json.loads(sys.argv[1])))",
-            "approve_plan(sys.argv[2])",
-          ].join("\n"),
-          JSON.stringify(steps),
-          theirs,
-        ],
-        { cwd: repoRoot, encoding: "utf8" },
-      );
-      expect(result.status, result.stderr).toBe(0);
-
-      // `approved_at` is the one field a clock writes; everything else --
-      // including the bound `plan_hash`, which is a digest over the canonical
-      // JSON both routers must produce identically -- is compared exactly.
-      const stamp = /"approved_at": "[^"]+"/;
-      const ourText = readFileSync(join(ours, "approved-plan.json"), "utf8");
-      const theirText = readFileSync(join(theirs, "approved-plan.json"), "utf8");
-      expect(ourText.replace(stamp, "<ts>")).toBe(theirText.replace(stamp, "<ts>"));
-
-      // And the reference implementation's own integrity check accepts it,
-      // which is the claim a byte comparison cannot make on its own.
-      const read = spawnSync(
-        interpreter,
-        [
-          "-c",
-          "import sys\nfrom ai_router.approved_plan import read_plan\nprint(read_plan(sys.argv[1])['plan_hash'])",
-          ours,
-        ],
-        { cwd: repoRoot, encoding: "utf8" },
-      );
-      expect(read.status, read.stderr).toBe(0);
-      expect(read.stdout.trim()).toBe(readPlan(ours)["plan_hash"]);
-    },
-  );
 });
 
 // --- Helpers -----------------------------------------------------------------

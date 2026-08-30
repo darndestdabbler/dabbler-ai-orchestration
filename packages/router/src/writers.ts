@@ -46,6 +46,7 @@ import {
 import { dumps } from "./pythonJson.ts";
 import { loadSchemaFile, schemaFailure } from "./schema/validate.ts";
 import { validateSessionVerdict } from "./verdict.ts";
+import { VERSION } from "./version.ts";
 
 export { SCHEMA_VERSION } from "./progress.ts";
 
@@ -273,6 +274,10 @@ function buildSessionsArray(
       "orchestrator",
       "verificationVerdict",
       "verification",
+      // Carried like the rest: a rebuild must not restamp an earlier
+      // session with the version running today, which would make every
+      // row claim the framework that last touched the file.
+      "frameworkVersion",
     ]) {
       if (prior[key] !== null && prior[key] !== undefined) record[key] = prior[key];
     }
@@ -391,6 +396,10 @@ export function registerSessionStart(
       options.effort,
     );
     record["verificationVerdict"] = null;
+    // Stamped at the start, where the session's identity is settled, and
+    // never afterwards: it says which framework REGISTERED this session,
+    // which is a fact about the row and not about the reader.
+    record["frameworkVersion"] = VERSION;
     // The session being (re)started owes fresh verification; a leftover
     // summary beside a null verdict would be a lie.
     delete record["verification"];

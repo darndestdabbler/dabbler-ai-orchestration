@@ -95,11 +95,11 @@ export function runOfRecordRecipe(
   return (
     "The run of record and the push remain:\n" +
     `  ${command}\n` +
-    `  python -m ai_router.test_evidence record --sessions-dir ` +
+    `  dabbler test-evidence record --sessions-dir ` +
     `${sessionsDir} --suite ${suite} --stage ${STAGE_FINAL_FULL} ` +
     "--outcome passed --duration-seconds <elapsed>\n" +
     "  git commit, then git push -- once, here\n" +
-    `  python -m ai_router.session close --sessions-dir ${sessionsDir}`
+    `  dabbler session close --sessions-dir ${sessionsDir}`
   );
 }
 
@@ -669,7 +669,7 @@ export function evaluateFreshness(
         passed: false,
         reason:
           `${preamble}; run \`${suite.command}\` after your last code change, ` +
-          `then \`python -m ai_router.test_evidence record --sessions-dir ` +
+          `then \`dabbler test-evidence record --sessions-dir ` +
           `<dir> --suite ${suite.name} --stage ${STAGE_FINAL_FULL} ` +
           `--outcome passed --duration-seconds <elapsed>\``,
         changedInputs: changed,

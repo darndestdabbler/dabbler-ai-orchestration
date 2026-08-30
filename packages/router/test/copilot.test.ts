@@ -46,18 +46,18 @@ import {
   PROVENANCE_MACHINE_WRITTEN,
   PROVENANCE_UNSTAMPED,
 } from "../src/lockfile.ts";
-import { REPO_ROOT } from "../src/paths.ts";
+import { ASSET_DIR } from "../src/paths.ts";
 import { makeTempDir, removeTempDirs } from "./support/fixtures.ts";
 
 afterAll(removeTempDirs);
 
-const V1_LOCK = join(REPO_ROOT, "tests", "fixtures", "seat-catalog.lock");
+const V1_LOCK = join(import.meta.dirname, "fixtures", "seat-catalog.lock");
 
 // The operator's live seat record, which a real refresh rewrites. Only the
 // contracts that must hold for ANY lockfile are asserted against it; a test
 // that pinned its values would fail on the next honest refresh, and a test
 // that fails when the record is updated is pressure to edit the record.
-const SHIPPED_LOCK = join(REPO_ROOT, "ai_router", "copilot-catalog.lock");
+const SHIPPED_LOCK = join(ASSET_DIR, "copilot-catalog.lock");
 
 /**
  * The file as Python's `read_text` yields it.
@@ -592,7 +592,7 @@ describe("the writer stamp", () => {
     const path = written([entry("a", "anthropic"), entry("b", "openai")], STAMP);
     const meta = loadCatalog(path).meta;
     expect(meta.written_at).toBe(STAMP);
-    expect(meta.written_by).toMatch(/^ai_router\.transports\.copilot/);
+    expect(meta.written_by).toMatch(/^dabbler\.copilot/);
     expect(catalogProvenance(loadCatalog(path))).toBe(
       PROVENANCE_MACHINE_WRITTEN,
     );

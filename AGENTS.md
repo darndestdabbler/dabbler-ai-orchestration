@@ -1,14 +1,23 @@
 # dabbler-ai-orchestration v2
 
-Rebuild of the AI-led coding-session framework. Python package `ai_router`
-(distribution `dabbler-ai-router`), plus a VS Code extension under `tools/`
-(Session 3). The compatibility contract, module inventory, and session plan
-live in the rebuild work plan; `STATUS.md` carries the inter-session handoff.
+The AI-led coding-session framework: one TypeScript implementation under
+`packages/router`, published as the npm package `dabbler-ai-router` with a
+`dabbler` command, plus the VS Code extension under `tools/` that bundles it
+and calls it in-process. The session plan and the decisions log live under
+`docs/sessions/`; `STATUS.md` carries the inter-session handoff.
+
+**There is no Python in this repository.** The rebuild started as a Python
+package with a TypeScript renderer over it, and sessions 22–36 ported the
+whole of it; session 36 deleted `ai_router/`, its suite, and the parity
+control that held the two implementations to each other. An instruction, a
+document or a comment that names `python -m ai_router.<module>` is describing
+something that no longer exists — the equivalent is `dabbler <verb>`, with
+the same arguments.
 
 ## Working branch
 
-**Work happens on `master`.** Set 148 builds the session framework there,
-per the standing trunk-based directive. Commit to it and push it.
+**Work happens on `master`**, per the standing trunk-based directive. Commit
+to it and push it.
 
 `experiment/verification-pipeline-v3` and `design/solution-decomposition`
 are both merged into `master` and are finished. The experiment branch
@@ -18,20 +27,18 @@ one as the trunk strands work where nothing else can see it.
 
 ## Ground rules
 
-1. **No new module without deleting one.** The module inventory in the rebuild
-   work plan is the ceiling. *(Suspended for sets 142–147 — see "The envelope
-   sets 142–147 run under" below.)*
+1. **No new module without deleting one.** The module inventory in the
+   rebuild work plan is the ceiling.
 2. **No guard may guard another guard.** Every gate must cite the concrete v1
    incident it would have prevented (the five kept gates each have one; see
    Session 2).
-3. **One implementation of any rule, in one language.** TS renders; Python
-   decides.
-4. **Test budget is a ceiling: 480 Python / 215 TS.** One test per behavior.
-   No falsifier-twin doctrine, no tests of test infrastructure, no source-text
-   assertions (use ruff/ESLint), no migration-path tests, no tests asserting
-   exact markdown strings. *(Numbers suspended for sets 142–147 — see "The
-   envelope sets 142–147 run under" below. The one-test-per-behavior rule and
-   the banned-test-kinds list are **not** suspended.)*
+3. **One implementation of any rule.** It was "in one language, TS renders and
+   Python decides" while there were two; there is one now, and the rule is
+   the same one it always was — a rule stated twice is a rule that drifts.
+4. **Test budget is a ceiling: 215 TS.** One test per behavior. No
+   falsifier-twin doctrine, no tests of test infrastructure, no source-text
+   assertions (use ESLint), no migration-path tests, no tests asserting exact
+   markdown strings.
 5. **The machine owns the record.** Nothing under `.dabbler/runs/` is ever
    hand-edited or exempted; no code path may accept a hand-written verdict.
 6. **No process ceremony on this repo itself.** Plain git commits with plain
@@ -42,53 +49,16 @@ one as the trunk strands work where nothing else can see it.
 8. **LOC budgets are targets ±30%, not gates.** If a module wants to be 2× its
    budget, stop and reconsider the design instead of writing a justification.
 
-> **Superseded, 2026-08-23.** The operator has set aside the ground rules and
-> the envelope below for the duration of the rebuild — see
-> `docs/operator-decisions.md`, which is the governing record. The text is kept
-> because the constraints are restored once the replacement works. Read it as
-> what returns, not as what is in force.
-
-## The envelope sets 142–147 run under
-
-The operator has relaxed ground rules 1 and 4 for sets 142–147, on the grounds
-that the verification-pipeline rewrite is a replacement rather than an
-increment. One envelope replaces both, measured against the post-141 baseline
-and acting as a **ceiling for the whole sequence**, not a per-set budget to
-spend down:
-
-| Dimension | Baseline (`fa3c28c7`) | Ceiling | After 145 s1 | Headroom |
-| --- | ---: | ---: | ---: | ---: |
-| Python source | 12,650 LOC | **16,800** | 16,327 | **473** |
-| Python modules | 25 | **33** | 29 | 4 |
-| Python tests | 455 | **605** | 547 | **58** |
-| TypeScript tests | 161 | **215** (unchanged) | 161 | 54 |
-
-Measured over `ai_router/**/*.py` by raw line count; the suite figure is
-`pytest --collect-only`. **Set 147 is cancelled**, so the sequence in flight
-is 142–146 and set 146 closes it. The operator's relaxation window still
-reads 142–147, because 147 is restorable; a restore reopens the budget
-question rather than inheriting this table.
-
-The headroom column is the point. Session 1 of set 145 alone spent 771 LOC
-and 16 tests, so what remains does not cover the sequence at the rate it has
-been running. The `verify.py` extraction relocates lines and creates no
-headroom. Sets 145 and 146 must be planned against these numbers, not
-against the entering counts their specs were written with.
-
-Two rules survive the relaxation unchanged, because they are what the ceilings
-were protecting:
-
-- **One test per behavior.** No falsifier twins, no source-text assertions, no
-  migration-path tests, no tests of test infrastructure.
-- **A module earns its existence by making another module smaller.** New
-  modules are permitted; new modules that only add are not. `verify.py` is the
-  named target: this sequence must leave it **under 1,200 lines**, by moving
-  code out rather than by adding beside it. It stands at **2,367** — it grew
-  by 578 during set 145 session 1, so the extraction now has to move roughly
-  1,170 lines, double what it was scoped for.
-
-When the sequence ends — merged or killed — rules 1 and 4 resume with their
-original numbers.
+> **Superseded, 2026-08-23.** The operator has set aside the ground rules for
+> the duration of the rebuild — see `docs/operator-decisions.md`, which is the
+> governing record. The text is kept because the constraints are restored once
+> the replacement works. Read it as what returns, not as what is in force.
+>
+> **The port's own envelope is spent.** Sets 142–147 ran under a relaxation of
+> rules 1 and 4 measured in Python lines, modules and tests; there are none of
+> those left to measure. Rule 4's number above is the TypeScript half of the
+> original, and the port's own budget is in the session plan under "Test
+> budget for sessions 22–36".
 
 ## Traps that have already cost a session
 
@@ -98,7 +68,7 @@ session hit it, not because anyone imagined it.
 ### `session close --force` closes the WHOLE PLAN, not one session
 
 Its help says "bypass bookkeeping gates, never evidence; stamps
-forceClosed". What it does not say is in `writers.flip_state_to_closed`:
+forceClosed". What it does not say is in `writers.flipStateToClosed`:
 
 > `forced` promotes every open session — a forensic marker, not a shortcut.
 
@@ -108,14 +78,14 @@ sessions 25–35 of the port plan finished. `forceClosed` is also stamped at
 the REPOSITORY level, so the record cannot even say which session forced
 it.
 
-**Use it only to abandon a whole set deliberately.** It is never the way
+**Use it only to abandon a whole plan deliberately.** It is never the way
 past a single gate. If a gate is wrong, prove it is wrong, record the
 proof, and satisfy the gate anyway — a five-minute test run is cheaper
 than a damaged ledger, every time. See D157 and D158.
 
 ### FIXED in session 26: the freshness gate and a deleted tracked file
 
-`test_evidence.surface_digest` used to hash every path `git ls-files`
+`testEvidence.surfaceDigest` used to hash every path `git ls-files`
 reported and write the literal string `"deleted"` for one it could not read.
 A deleted-but-tracked file contributed a `path\0deleted` line; committing
 dropped it from `ls-files` and that line left the digest. No file's content
@@ -133,19 +103,22 @@ what it is looking at.
 If the ledger must be recovered from git, restore **`sessions.json` only**.
 
 `activity-log.json` is append-only, and two things derive from it:
-decision numbering (`ordinal = len(decision entries) + 1`) and
+decision numbering (`ordinal = decision entries + 1`) and
 `decisions-log.md`, which is RENDERED from it and is not a source. Rewinding
 the activity log therefore rolls the decision counter back, and the next
 decision recorded silently overwrites the last real one when the log is
 re-rendered. Session 24 did exactly this and lost the operator's D157 until
 it was restored from the later commit and re-rendered with
-`writers.render_decisions_log`.
+`writers.renderDecisionsLog`.
 
 ## Environment
 
-- Windows 11, PowerShell primary. Python 3.11+; `.venv` in the repo root.
-- Run tests: `.venv/Scripts/python -m pytest` (no live network outside the
-  `e2e` marker).
+- Windows 11, PowerShell primary. Node 22.18+; nothing else to install.
+- Run the suite: `npx vitest run --root packages/router` (no live network
+  outside the tests marked live, which skip without keys).
+- Run the router by hand: `node packages/router/dist/dabbler.cjs <verb>`
+  after `npm run build -w dabbler-ai-router`, or `dabbler <verb>` from a VS
+  Code terminal once the extension has installed its shim.
 - Provider keys via env vars: `DABBLER_ANTHROPIC_API_KEY`,
   `DABBLER_OPENAI_API_KEY`, `DABBLER_GEMINI_API_KEY`. Never in config or logs.
 - Transport preference: CLI flag `--transport` > `DABBLER_TRANSPORT` env >
@@ -156,7 +129,7 @@ it was restored from the later commit and re-rendered with
 
 > `AGENTS.md` is the single source of this managed body; `CLAUDE.md` and
 > `GEMINI.md` import it and add only their engine tail. Do not hand-edit
-> inside the fence; re-run `python -m ai_router.bootstrap` to refresh it.
+> inside the fence; re-run `dabbler bootstrap` to refresh it.
 
 ## Your role
 
@@ -179,7 +152,7 @@ Sessions are numbered directly in this repository, under one sessions root
 
 2. **Register the session (state first, work second).**
 
-       python -m ai_router.session start \
+       dabbler session start \
            --engine <claude-code|codex|gemini|copilot> --provider <anthropic|openai|google>
 
    Copilot seats must also pass `--model` (the seat label is not trusted;
@@ -188,7 +161,7 @@ Sessions are numbered directly in this repository, under one sessions root
 
    **Then declare the task list, before you edit anything.**
 
-       python -m ai_router.session declare \
+       dabbler session declare \
            --task-file <path> --releasable|--not-releasable
 
    The declaration says what this session will do and whether it produces a
@@ -205,14 +178,14 @@ Sessions are numbered directly in this repository, under one sessions root
 
 4. **Run the tests this change makes necessary — only those.**
 
-       python -m ai_router.affected
+       dabbler affected
 
    prints the selected tests, the reason each was selected, and the exact
    command to run. Once a verification round exists, selection is measured
    against that round's snapshot, so a remediation runs what the fix
    touched rather than what the session touched. Run it, then record it:
 
-       python -m ai_router.test_evidence record \
+       dabbler test-evidence record \
            --suite <name> --stage preverify-targeted \
            --command "<the command you ran>" --outcome passed \
            --duration-seconds <elapsed>
@@ -226,7 +199,7 @@ Sessions are numbered directly in this repository, under one sessions root
 
 5. **Run cross-provider verification (mandatory — there is no skip).**
 
-       python -m ai_router.verify
+       dabbler verify
 
    The verifier is a different provider than you, on either transport.
    Round outcomes land in `.dabbler/runs/` (machine-written; never edit).
@@ -239,7 +212,7 @@ Sessions are numbered directly in this repository, under one sessions root
    declares under `testing.suites` in this repository's `dabbler.yaml` —
    the same one `--suite <name>` names here:
 
-       python -m ai_router.test_evidence record \
+       dabbler test-evidence record \
            --suite <name> --stage final-full --outcome passed \
            --duration-seconds <elapsed>
 
@@ -254,7 +227,7 @@ Sessions are numbered directly in this repository, under one sessions root
 
 8. **Package — only if step 2 declared this session releasable.**
 
-       python -m ai_router.packaging
+       dabbler packaging
 
    Packs, then pushes to the declared feed. It refuses an undeclared or
    not-releasable session, refuses a repository that declares no
@@ -265,7 +238,7 @@ Sessions are numbered directly in this repository, under one sessions root
 
 9. **Close via the gate.**
 
-       python -m ai_router.session close
+       dabbler session close
 
    Five gates run (verification clean, tree clean, pushed, tests fresh,
    verdict vocabulary); use `--dry-run` any time to preview the rows.
@@ -277,15 +250,15 @@ Sessions are numbered directly in this repository, under one sessions root
   `.dabbler/runs/`
   are written by the router only — never by hand, never "fixed up".
 - Verification verdicts come from the verifier. A verdict token you did
-  not receive from `ai_router.verify` does not exist.
+  not receive from `dabbler verify` does not exist.
 - API keys live in env vars (`DABBLER_ANTHROPIC_API_KEY`,
   `DABBLER_OPENAI_API_KEY`, `DABBLER_GEMINI_API_KEY`), never in files. The
   same rule covers a feed PAT: `packaging.push.secret` names it and never
   holds it.
-- Run the router through the project venv:
-  `.venv/Scripts/python -m ai_router.<module>` on Windows,
-  `.venv/bin/python -m ai_router.<module>` on POSIX. "No module named
-  ai_router" is an interpreter problem, not a missing-keys problem.
+- The router is one command, `dabbler <verb>` — no interpreter, no virtual
+  environment. A VS Code terminal has it on `PATH`; anywhere else, run
+  `npm i -g dabbler-ai-router` once. "dabbler: command not found" is a
+  PATH problem, not a missing-keys problem.
 
 ---
 

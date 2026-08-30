@@ -132,7 +132,7 @@ function resolvedPath(path: string): string {
 }
 
 function verifyCommand(sessionsDir: string): string {
-  return `python -m ai_router.verify --sessions-dir ${sessionsDir}`;
+  return `dabbler verify --sessions-dir ${sessionsDir}`;
 }
 
 function currentSession(sessionsDir: string): unknown {

@@ -21,35 +21,38 @@ steps as a top-level ordered list. Session start seeds those steps into
 
 ## sessions.json (schema v5)
 
-Machine-written by `ai_router` only. JSON Schema:
-`ai_router/schemas/session-state.schema.json`. Readers tolerate v3
-files on disk via a normalize shim; writers only emit v4.
+Machine-written by the router only. JSON Schema:
+`packages/router/schemas/sessions.schema.json`. v4 set-shaped files are
+read once by `session migrate` and never written again.
 
-Top level (required: `schemaVersion`, `sessionSetName`, `status`):
+Top level (required: `schemaVersion`, `sessions`):
 
 | Field | Type | Meaning |
 |---|---|---|
-| `schemaVersion` | const `4` | older versions read-normalized, never written |
-| `sessionSetName` | string | basename of the set directory |
-| `status` | enum | `not-started` / `in-progress` / `complete` / `cancelled` |
-| `sessions` | array | per-session ledger (absent only in the plan-less carve-out) |
-| `startedAt`, `orchestrator` | — | plan-less carve-out passthrough only; the canonical shape carries both per session |
+| `schemaVersion` | const `5` | v5 collapsed the set level out; v4 files are migrated, never written |
+| `sessions` | array | the canonical per-session ledger, ordered by number |
 | `nextOrchestrator` | object \| null | recommendation for the next session, written at close |
 | `forceClosed` | boolean | set by `session close --force`; preserved across rewrites |
-| `preCancelStatus` | enum \| null | status captured at cancel; restore returns the set to it |
+
+There is no name above the list and no lifecycle state above a session: a
+repository has sessions, not sets of them, and a repository is never
+"complete".
 
 Each `sessions[]` record (required: `number`, `title`, `status`):
 
 | Field | Type | Meaning |
 |---|---|---|
 | `number` | integer ≥ 1 | |
-| `title` | string | healed from spec.md when a v3 file lacks it |
-| `status` | enum | `not-started` / `in-progress` / `complete` (per-session `cancelled` is rejected in v4) |
+| `title` | string | healed from the session plan when the record lacks one |
+| `status` | enum | `not-started` / `in-progress` / `complete` / `cancelled` |
+| `preCancelStatus` | enum | where a cancelled session came from; a re-cancel never overwrites it |
+| `cancelledReason`, `cancelledAt`, `restoredReason` | string | the reversal, on the record it belongs to |
 | `type` | enum | `verification` or `remediation`; absent means work |
 | `startedAt`, `completedAt` | string \| null | timestamps |
 | `orchestrator` | object \| null | see below |
-| `verificationVerdict` | string \| null | canonical `VERIFIED` / `ISSUES_FOUND` (plus `WAIVED`); the writer fails closed against an exact allowlist, readers prefix-match leniently |
+| `verificationVerdict` | string \| null | canonical `VERIFIED` / `ISSUES_FOUND` / `REMEDIATED_AT_CAP` (plus the retired `WAIVED`, still read from historical records); the writer fails closed against an exact allowlist, readers prefix-match leniently |
 | `verification` | object | summary stamped when the loop finishes: `rounds`, `verifierModel`, `verifierProvider`, `transport`; carried across later registrations like the verdict |
+| `frameworkVersion` | string | the router version that registered this session. Additive: absent on every row written before it existed, and never back-filled — "we do not know" is a fact, and a guess dressed as a record is not |
 
 The `orchestrator` block (required: `engine`; omit-null — missing keys
 are valid, `null` values are not):
@@ -57,7 +60,7 @@ are valid, `null` values are not):
 | Field | Type | Meaning |
 |---|---|---|
 | `engine` | string | e.g. `claude-code`, `codex`, `copilot`, `gemini` |
-| `provider` | string | seat descriptor; the *effective* provider is derived by registry lookup on `model` (`ai_router/identity.py`) |
+| `provider` | string | seat descriptor; the *effective* provider is derived by registry lookup on `model` (`identity.ts`) |
 | `model` | string | registry alias or catalog id |
 | `effort` | string | |
 | `identityProvenance` | enum | `direct` (single-vendor engine) or `asserted` (multi-provider seat) — derived by the writer, never a free choice |
@@ -97,7 +100,7 @@ Machine-written step log. Shape:
   unclaimed planned rows stay pending. Nothing is dropped either way.
   `session start` prints the seeded keys and numbers so the logger
   never has to re-derive the slug.
-- Progress entries are written by `python -m ai_router.session log
+- Progress entries are written by `dabbler session log
   --step <stepKey|stepNumber> --status <s>`,
   the only sanctioned writer. The step must resolve against a seeded
   `plan-step` row: an unresolvable `--step` is **refused**, listing the
@@ -119,24 +122,24 @@ summary block per session (verdict, verifier provider, rounds); the close
 appends its close-out block. Presence of this file is also the
 completeness signal for legacy spec-only folders with no state file.
 
-## Rounds ledger — `.dabbler/runs/<set>/s<N>/rounds.jsonl`
+## Rounds ledger — `.dabbler/runs/s<N>/rounds.jsonl`
 
 One JSON object per line, one line per completed verification round.
-Written **only** by `ai_router.verify`; schema-validated on read
-(`ai_router/schemas/rounds.schema.json`). A line that fails parsing or
+Written **only** by `dabbler verify`; schema-validated on read
+(`packages/router/schemas/rounds.schema.json`). A line that fails parsing or
 validation blocks the close — a bad line is evidence of tampering, not
 noise to skip. Duplicate round numbers are refused; rounds are
 immutable history.
 
 Row fields (required: `round`, `verdict`, `blocking`, `findings`,
 `completion_tree`, `recorded_at`; `verifier_model` and
-`verifier_provider` are required on every row except `type: "waive"`):
+`verifier_provider` are required on every row except the terminal ones):
 
 | Field | Type | Meaning |
 |---|---|---|
 | `round` | integer ≥ 1 | |
 | `phase` | enum | `full` (round 1) or `fix-delta` (rounds ≥ 2) |
-| `verdict` | enum | `VERIFIED` / `ISSUES_FOUND`; `WAIVED` on waive rows only |
+| `verdict` | enum | `VERIFIED` / `ISSUES_FOUND` / `REMEDIATED_AT_CAP`; `WAIVED` on retired waive rows only |
 | `blocking` | boolean | any `critical`/`major` finding outstanding |
 | `verifier_model`, `verifier_provider` | string | who verified (on an adjudication row: the adjudicator) |
 | `orchestrator_provider` | string | the excluded provider |
@@ -147,14 +150,15 @@ Row fields (required: `round`, `verdict`, `blocking`, `findings`,
 | `anchor_commit` | string | the framework-authored commit whose tree is `completion_tree`, named by `refs/dabbler/rounds/s<N>/r<R>` from the moment the row was appended, so the baseline survives gc and travels with a push; absent on rows written before rounds were anchored (`verify reanchor` is their recovery) |
 | `previous_tree` | string | previous round's tree-SHA; **required for rounds ≥ 2** (the fix-delta base) |
 | `recorded_at` | string | timestamp |
+| `framework_version` | string | the router version that recorded this round. Additive and absent on rows written before it existed; **snake_case**, because every other key on this row is — the session record spells the same fact `frameworkVersion`, because every key on THAT record is camelCase |
 | `transport` | string | `api` or `copilot-cli` |
-| `type` | enum | absent on plain rounds; `adjudication` or `waive` — both terminal: no later round may open |
+| `type` | enum | absent on plain rounds; `adjudication` or `remediated_at_cap` — both terminal, so no later round may open. `waive` is retired and readable only |
 
 Raw verifier output is saved beside the ledger as
 `round-<N>-verifier-output.md`, byte-identical to the response.
 
 **The adjudication row** (`type: "adjudication"`, written by
-`ai_router.verify adjudicate`, one per session ever) additionally
+`dabbler verify adjudicate`, one per session ever) additionally
 requires:
 
 | Field | Type | Meaning |
@@ -166,24 +170,20 @@ All disputes overruled → `verdict: "VERIFIED"`, `blocking: false`, and
 the close gate passes unchanged. Any upheld → `ISSUES_FOUND`, still
 blocked.
 
-**The waive row** (`type: "waive"`, written by `ai_router.verify
-waive` — interactive-only, operator-attested) has no verifier fields;
-it requires `verdict: "WAIVED"`, `blocking: false`, and:
+**The waive row is RETIRED and is documented only because historical
+ledgers carry it.** `type: "waive"` rows require `verdict: "WAIVED"`,
+`blocking: false`, an `attestation` and a `waived` block naming
+`exhausted_via` and the findings. No writer emits one, `WAIVED` is not in
+the writer's verdict vocabulary, and `dabbler verify waive` exists only to
+be refused by name — there is no verdict a person can type. A capped
+session ends in one of two states the loop decides for itself:
+**remediated at the cap** or **unresolved**.
 
-| Field | Type | Meaning |
-|---|---|---|
-| `attestation` | string | the operator's typed attestation, verbatim |
-| `waived` | object | `exhausted_via` (`upheld-adjudication` / `adjudication-unavailable`) and `findings` — the blocking findings being waived, copied verbatim |
+## Disputes ledger — `.dabbler/runs/s<N>/disputes.jsonl`
 
-WAIVED means the operator accepted **unverified** work; it is not a
-verification. The command is permitted only when the machine path is
-exhausted, and refuses when stdin is not a TTY.
-
-## Disputes ledger — `.dabbler/runs/<set>/s<N>/disputes.jsonl`
-
-One row per disputed finding, written **only** by `ai_router.verify
+One row per disputed finding, written **only** by `dabbler verify
 dispute`; schema-validated on read
-(`ai_router/schemas/disputes.schema.json`). One dispute per finding,
+(`packages/router/schemas/disputes.schema.json`). One dispute per finding,
 ever — rows are immutable, and a second dispute of the same finding is
 refused. The next round's prompt presents the rebuttal beside the
 finding exactly once (UPHOLD-or-WITHDRAW); the adjudicator reads it
@@ -200,11 +200,11 @@ Row fields (all required):
 | `evidence_paths` | array, min 1 | repo-relative cites, optionally `path:START-END`; prose-only disputes are refused at the CLI |
 | `recorded_at` | string | timestamp |
 
-## Step execution ledger — `.dabbler/runs/<set>/s<N>/step-execution.jsonl`
+## Step execution ledger — `.dabbler/runs/s<N>/step-execution.jsonl`
 
 Two rows per step of the session's approved plan — one `opened`, one
-`closed` — written **only** by `ai_router.verify step`; schema-validated
-on read (`ai_router/schemas/step-execution.schema.json`). This file is
+`closed` — written **only** by `dabbler verify step`; schema-validated
+on read (`packages/router/schemas/step-execution.schema.json`). This file is
 what says whether a step is in flight: the last `opened` row with no
 `closed` row after it is the open step, and there is never more than one.
 A row that fails validation is a refusal, not a skip — a framework that
@@ -227,11 +227,11 @@ that commit's tree. `verify step close` therefore refuses outright when
 HEAD has moved — a commit landed mid-step, and both measurements would
 otherwise be describing someone else's change.
 
-## Packaging ledger — `.dabbler/runs/<set>/s<N>/packaging.jsonl`
+## Packaging ledger — `.dabbler/runs/s<N>/packaging.jsonl`
 
 One row per attempt at step (f), written **only** by
-`ai_router.packaging`; schema-validated on read
-(`ai_router/schemas/packaging.schema.json`). Append-only, and **refusals
+`dabbler packaging`; schema-validated on read
+(`packages/router/schemas/packaging.schema.json`). Append-only, and **refusals
 append beside publications**: "this session was not allowed to publish"
 is a fact about the session, and a ledger holding only the successes
 cannot be read as a history of what was released.
@@ -257,7 +257,7 @@ resolved value before it is written, so the value exists only in the argv
 of a process that has already exited. A dry run is never filed: a
 rehearsal of the gates is not an attempt.
 
-`pack` writes into `.dabbler/runs/<set>/s<N>/package/`, which is emptied
+`pack` writes into `.dabbler/runs/s<N>/package/`, which is emptied
 first — so every artifact is one this run built. The worktree is compared
 against its own tree id after every command: a build that leaves
 intermediates in the repository fails the attempt whatever its exit code
@@ -284,16 +284,16 @@ Row fields (from `metrics.record_call`):
 | `effort`, `thinking_on` | per-provider reasoning params |
 | `input_tokens`, `output_tokens` | integers. **Tokens are the record; dollars are not computed anywhere**, and reconciliation happens against the vendor's own console |
 | `elapsed_seconds`, `escalated`, `stop_reason` | call outcome |
-| `transport`, `billed_usage_unavailable`, `transport_session_id` | Copilot rows carry `billed_usage_unavailable: true`; the conversation id is what `python -m ai_router.seat_cost` prices them by |
+| `transport`, `billed_usage_unavailable`, `transport_session_id` | Copilot rows carry `billed_usage_unavailable: true`; the conversation id is what `dabbler seat-cost` prices them by |
 | `verifier_of`, `verdict`, `issue_count` | verification calls only |
 
-`python -m ai_router.metrics` prints the report: token totals, per-model /
+`dabbler metrics` prints the report: token totals, per-model /
 per-task / per-set volume, and requested-vs-served mismatches.
 
 ## Project config — `dabbler.yaml`
 
 Project-root YAML, **tracked**, deep-merged over the packaged
-`ai_router/router-config.yaml` and under the machine overlay below. It
+the packaged `router-config.yaml` and under the machine overlay below. It
 carries what the repository owns and nothing else:
 
 | Key | Contents |
@@ -304,7 +304,7 @@ carries what the repository owns and nothing else:
 | `paths` | `sensitive_paths`: which of this repository's paths escalate a run |
 
 Tracked because CI reads these, the next machine reads them, and
-`ai_router.affected` refuses to run without them — none of which a
+`dabbler affected` refuses to run without them — none of which a
 gitignored file can serve. Providers, models, roles and transports are
 deliberately absent: those are distribution facts, and `AI_ROUTER_CONFIG`
 is not the door to them either — a named config is the whole answer and
@@ -386,7 +386,7 @@ Seat-scoped, empirically-probed TOML: the load-bearing record of what a
 Copilot seat can dispatch, named by
 `transports.copilot-cli.lockfile`. The CLI has no `list-models` command
 and no first-party provider field, so every value here was earned by a
-real billed call. `ai_router.transports.copilot` is its only writer —
+real billed call. `dabbler copilot` is its only writer —
 see `refresh` in the quick start.
 
 A restricted TOML subset: one flat `[meta]` table, then repeated flat
@@ -415,7 +415,7 @@ never silently drops them.
 | `enablement` | `confirmed` \| `unconfirmed`. Strictly empirical: an invalid model name and a policy-blocked one return the identical CLI error, so nothing is inferred from a name |
 | `confirmed_at`, `confirmed_on_cli_version` | provenance of the last successful probe |
 | `echoed_model` | the model id the CLI reported serving |
-| `probe_premium_requests` | a **one-call sample**, not a price. An integer for premium models and a **fraction** for sub-premium ones (`claude-haiku-4.5` measures `0.33`). Absent means unknown and **never free**. It funds the refresh cost preview and never feeds selection; real spend is measured by `python -m ai_router.seat_cost`. v1 lockfiles spell it `premium_request_weight`, which still reads and is written back under the name it was read under |
+| `probe_premium_requests` | a **one-call sample**, not a price. An integer for premium models and a **fraction** for sub-premium ones (`claude-haiku-4.5` measures `0.33`). Absent means unknown and **never free**. It funds the refresh cost preview and never feeds selection; real spend is measured by `dabbler seat-cost`. v1 lockfiles spell it `premium_request_weight`, which still reads and is written back under the name it was read under |
 | `last_probe_error`, `last_probe_at` | the most recent *failed* probe, by its own error class. It annotates rather than replaces the confirmation above it: a transient CLI failure is not a withdrawn model |
 
 Fail-closed rules (`validate_catalog`), which refuse the seat:
@@ -432,7 +432,7 @@ The writer records what wrote the file, when, and a SHA-256 over what it
 wrote:
 
 ```toml
-written_by = "ai_router.transports.copilot 1.1.0"
+written_by = "dabbler.copilot 2.0.0"
 written_at = "2026-08-19T11:42:07Z"
 content_digest = "sha256:…"
 ```

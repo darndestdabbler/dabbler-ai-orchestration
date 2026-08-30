@@ -1,6 +1,6 @@
 {
   "name": "dabbler-ai-router",
-  "version": "1.1.0",
+  "version": "2.0.0",
   "description": "The Dabbler session router: session lifecycle, the record, cross-provider verification, and the six-step workflow.",
   "license": "MIT",
   "type": "module",
@@ -11,7 +11,11 @@
   "types": "src/index.ts",
   "files": [
     "dist",
-    "src"
+    "src",
+    "schemas",
+    "prompt-templates",
+    "router-config.yaml",
+    "copilot-catalog.lock"
   ],
   "engines": {
     "node": ">=22.18"
@@ -23,8 +27,7 @@
     "lint": "eslint src scripts test build.mjs --ext .ts,.mjs",
     "test:unit": "vitest run",
     "generate:types": "node scripts/run-ts.mjs scripts/generate-types.ts",
-    "check:types": "node scripts/run-ts.mjs scripts/check-types-fresh.ts",
-    "parity": "node scripts/run-ts.mjs scripts/parity.ts"
+    "check:types": "node scripts/run-ts.mjs scripts/check-types-fresh.ts"
   },
   "dependencies": {
     "ajv": "^8.17.1",

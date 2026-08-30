@@ -1,9 +1,9 @@
 // Which verbs the `dabbler` command can actually run.
 //
-// A verb is available when a handler is registered here, not when a
-// constant says the port has reached its session. There is nothing to
-// bump: porting a module adds its handler, and every reader -- the CLI,
-// the parity control -- sees the same fact at the same moment.
+// It is the second half of `contracts/verbs.ts`: the table says what the
+// command offers and this says what answers. `contracts.test.ts` holds the
+// two to each other in both directions, so a verb cannot be advertised
+// without a handler or reachable without being listed.
 
 import { affectedVerb } from "./affected.ts";
 import { bootstrapVerb } from "./bootstrap.ts";
@@ -14,7 +14,7 @@ import { factsVerb } from "./facts.ts";
 import { metricsVerb } from "./metrics.ts";
 import { modulesVerb } from "./modules.ts";
 import { packagingVerb } from "./packaging.ts";
-import { progressVerb, statusVerb } from "./progress.ts";
+import { statusVerb } from "./status.ts";
 import { seatCostVerb } from "./seatCost.ts";
 import { sessionVerb } from "./session.ts";
 import { solutionVerb } from "./solution.ts";
@@ -25,11 +25,6 @@ import { workflowVerb } from "./workflow.ts";
 /** argv after the verb; the process's exit code comes back. */
 export type VerbHandler = (argv: string[]) => Promise<number>;
 
-/**
- * `VERBS` in `../contracts/verbs.ts` is the full list; a verb declared
- * there and absent here is announced and refused, which is what "not yet"
- * looks like from a command line.
- */
 export const HANDLERS: Readonly<Record<string, VerbHandler>> = {
   affected: affectedVerb,
   bootstrap: bootstrapVerb,
@@ -40,7 +35,6 @@ export const HANDLERS: Readonly<Record<string, VerbHandler>> = {
   metrics: metricsVerb,
   modules: modulesVerb,
   packaging: packagingVerb,
-  progress: progressVerb,
   "seat-cost": seatCostVerb,
   session: sessionVerb,
   solution: solutionVerb,
@@ -49,7 +43,3 @@ export const HANDLERS: Readonly<Record<string, VerbHandler>> = {
   verify: verifyVerb,
   workflow: workflowVerb,
 };
-
-export function isImplemented(verb: string): boolean {
-  return Object.prototype.hasOwnProperty.call(HANDLERS, verb);
-}

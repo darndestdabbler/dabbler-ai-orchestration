@@ -164,7 +164,7 @@ export async function runOfRecordLines(
   if (loaded.errors.length > 0 || suite === undefined) {
     return (
       "The run of record and the push remain before " +
-      "`python -m ai_router.session close`."
+      "`dabbler session close`."
     );
   }
   return runOfRecordRecipe(sessionsDir, suite.name, suite.command);
@@ -204,7 +204,7 @@ export async function terminateAtCap(
       `verify: refused -- round ${String(latest["round"])} left no blocking ` +
         `finding and the cap (${cap}) is reached; there is nothing ` +
         "left to verify. Close the session:\n" +
-        `  python -m ai_router.session close --sessions-dir ` +
+        `  dabbler session close --sessions-dir ` +
         `${sessionsDir}\n`,
     );
     return EXIT_USAGE;
@@ -221,7 +221,7 @@ export async function terminateAtCap(
         "dispute says a finding is wrong, not that it was fixed, so it " +
         "is judged rather than terminated. Route the disputes to a " +
         "third provider:\n" +
-        `  python -m ai_router.verify adjudicate --sessions-dir ` +
+        `  dabbler verify adjudicate --sessions-dir ` +
         `${sessionsDir}\n`,
     );
     return EXIT_USAGE;
@@ -412,7 +412,7 @@ export async function runRound(
         `terminal '${String(terminal["type"])}' row ` +
         `(${String(terminal["verdict"])}); no further verification round ` +
         "may open after it. Close the session:\n" +
-        `  python -m ai_router.session close --sessions-dir ` +
+        `  dabbler session close --sessions-dir ` +
         `${sessionsDir}\n`,
     );
     return EXIT_USAGE;
@@ -468,7 +468,7 @@ export async function runRound(
         "the change affects are. The full suite is neither required nor " +
         "accepted here -- it is the run of record, and it comes AFTER " +
         `the final verified tree.\n${preverifyRefusalTail(sessionsDir, gate)}\n` +
-        "`python -m ai_router.affected` prints the selection and the " +
+        "`dabbler affected` prints the selection and the " +
         "reason behind each row.\n",
     );
     return EXIT_USAGE;
@@ -561,7 +561,7 @@ export async function runRound(
           "Operator exit: enable a model from another provider in " +
           "router-config.yaml (or set its API key env var), then " +
           "re-run:\n" +
-          `  python -m ai_router.verify --sessions-dir ${sessionsDir}\n`,
+          `  dabbler verify --sessions-dir ${sessionsDir}\n`,
       );
       return EXIT_UNAVAILABLE;
     }

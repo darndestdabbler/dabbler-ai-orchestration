@@ -1,0 +1,938 @@
+{
+  "schemaVersion": 5,
+  "sessions": [
+    {
+      "number": 1,
+      "title": "Verify the design before anything is built",
+      "status": "complete",
+      "startedAt": "2026-08-26T16:17:37.608719-04:00",
+      "completedAt": "2026-08-26T16:54:53.587544-04:00",
+      "orchestrator": {
+        "engine": "copilot",
+        "provider": "anthropic",
+        "model": "claude-opus-5",
+        "identityProvenance": "asserted"
+      },
+      "verificationVerdict": "VERIFIED",
+      "verification": {
+        "rounds": 3,
+        "verifierModel": "gpt-5.5",
+        "verifierProvider": "openai",
+        "transport": "copilot-cli",
+        "costUsd": null
+      }
+    },
+    {
+      "number": 2,
+      "title": "Verify this breakdown against that design",
+      "status": "complete",
+      "startedAt": "2026-08-26T16:55:24.934155-04:00",
+      "completedAt": "2026-08-26T20:45:28.408927-04:00",
+      "orchestrator": {
+        "engine": "copilot",
+        "provider": "anthropic",
+        "model": "claude-opus-5",
+        "identityProvenance": "asserted"
+      },
+      "verificationVerdict": "VERIFIED",
+      "verification": {
+        "rounds": 6,
+        "verifierModel": "gpt-5.5",
+        "verifierProvider": "openai",
+        "transport": "copilot-cli",
+        "costUsd": null
+      }
+    },
+    {
+      "number": 3,
+      "title": "The credential allowlist (plan A1)",
+      "status": "complete",
+      "startedAt": "2026-08-26T20:55:03.679888-04:00",
+      "completedAt": "2026-08-26T22:31:28.608098-04:00",
+      "orchestrator": {
+        "engine": "copilot",
+        "provider": "anthropic",
+        "model": "claude-opus-5",
+        "identityProvenance": "asserted"
+      },
+      "verificationVerdict": "VERIFIED",
+      "verification": {
+        "rounds": 3,
+        "verifierModel": "gpt-5.5",
+        "verifierProvider": "openai",
+        "transport": "copilot-cli",
+        "costUsd": null
+      }
+    },
+    {
+      "number": 4,
+      "title": "Record authority (plan A2)",
+      "status": "complete",
+      "startedAt": "2026-08-27T02:40:06.188648-04:00",
+      "completedAt": "2026-08-27T03:20:53.551146-04:00",
+      "orchestrator": {
+        "engine": "copilot",
+        "provider": "anthropic",
+        "model": "claude-opus-5",
+        "identityProvenance": "asserted"
+      },
+      "verificationVerdict": "VERIFIED",
+      "verification": {
+        "rounds": 3,
+        "verifierModel": "gpt-5.5",
+        "verifierProvider": "openai",
+        "transport": "copilot-cli",
+        "costUsd": null
+      }
+    },
+    {
+      "number": 5,
+      "title": "The two files, framework-written (plan A4)",
+      "status": "complete",
+      "startedAt": "2026-08-27T03:23:02.276817-04:00",
+      "completedAt": "2026-08-27T04:13:09.842012-04:00",
+      "orchestrator": {
+        "engine": "copilot",
+        "provider": "anthropic",
+        "model": "claude-opus-5",
+        "identityProvenance": "asserted"
+      },
+      "verificationVerdict": "VERIFIED",
+      "verification": {
+        "rounds": 2,
+        "verifierModel": "gpt-5.5",
+        "verifierProvider": "openai",
+        "transport": "copilot-cli",
+        "costUsd": null
+      }
+    },
+    {
+      "number": 6,
+      "title": "The verifier's read surface (plan A5, first half)",
+      "status": "complete",
+      "startedAt": "2026-08-27T04:21:25.765671-04:00",
+      "completedAt": "2026-08-27T06:26:34.489845-04:00",
+      "orchestrator": {
+        "engine": "copilot",
+        "provider": "anthropic",
+        "model": "claude-opus-5",
+        "identityProvenance": "asserted"
+      },
+      "verificationVerdict": "VERIFIED",
+      "verification": {
+        "rounds": 3,
+        "verifierModel": "gpt-5.5",
+        "verifierProvider": "openai",
+        "transport": "copilot-cli",
+        "costUsd": null
+      }
+    },
+    {
+      "number": 7,
+      "title": "The test-write path (plan A5, second half)",
+      "status": "complete",
+      "startedAt": "2026-08-27T06:34:06.691336-04:00",
+      "completedAt": "2026-08-27T07:12:41.685321-04:00",
+      "orchestrator": {
+        "engine": "copilot",
+        "provider": "anthropic",
+        "model": "claude-opus-5",
+        "identityProvenance": "asserted"
+      },
+      "verificationVerdict": "VERIFIED",
+      "verification": {
+        "rounds": 2,
+        "verifierModel": "gpt-5.5",
+        "verifierProvider": "openai",
+        "transport": "copilot-cli",
+        "costUsd": null
+      }
+    },
+    {
+      "number": 8,
+      "title": "Selection by role, and the death of the tier ladder (plan A6)",
+      "status": "complete",
+      "startedAt": "2026-08-27T07:18:03.608364-04:00",
+      "completedAt": "2026-08-27T09:03:04.641955-04:00",
+      "orchestrator": {
+        "engine": "copilot",
+        "provider": "anthropic",
+        "model": "claude-opus-5",
+        "identityProvenance": "asserted"
+      },
+      "verificationVerdict": "VERIFIED",
+      "verification": {
+        "rounds": 2,
+        "verifierModel": "gpt-5.4",
+        "verifierProvider": "openai",
+        "transport": "copilot-cli"
+      }
+    },
+    {
+      "number": 9,
+      "title": "Model discovery (plan A7)",
+      "status": "complete",
+      "startedAt": "2026-08-27T09:13:19.801767-04:00",
+      "completedAt": "2026-08-27T10:25:40.295114-04:00",
+      "orchestrator": {
+        "engine": "copilot",
+        "provider": "anthropic",
+        "model": "claude-opus-5",
+        "identityProvenance": "asserted"
+      },
+      "verificationVerdict": "VERIFIED",
+      "verification": {
+        "rounds": 3,
+        "verifierModel": "gpt-5.4",
+        "verifierProvider": "openai",
+        "transport": "copilot-cli"
+      }
+    },
+    {
+      "number": 10,
+      "title": "The code review loop (plan B1)",
+      "status": "complete",
+      "startedAt": "2026-08-27T10:32:16.738781-04:00",
+      "completedAt": "2026-08-27T11:37:12.290742-04:00",
+      "orchestrator": {
+        "engine": "copilot",
+        "provider": "anthropic",
+        "model": "claude-opus-5",
+        "identityProvenance": "asserted"
+      },
+      "verificationVerdict": "VERIFIED",
+      "verification": {
+        "rounds": 3,
+        "verifierModel": "gpt-5.4",
+        "verifierProvider": "openai",
+        "transport": "copilot-cli"
+      }
+    },
+    {
+      "number": 11,
+      "title": "The verifier authors tests, the framework runs them (plan B2)",
+      "status": "complete",
+      "startedAt": "2026-08-27T11:43:11.762067-04:00",
+      "completedAt": "2026-08-27T12:49:08.521309-04:00",
+      "orchestrator": {
+        "engine": "copilot",
+        "provider": "anthropic",
+        "model": "claude-opus-5",
+        "identityProvenance": "asserted"
+      },
+      "verificationVerdict": "VERIFIED",
+      "verification": {
+        "rounds": 2,
+        "verifierModel": "gpt-5.4",
+        "verifierProvider": "openai",
+        "transport": "copilot-cli"
+      }
+    },
+    {
+      "number": 12,
+      "title": "The full suite and its bounded fix loop (plan B3)",
+      "status": "complete",
+      "startedAt": "2026-08-27T12:56:47.921031-04:00",
+      "completedAt": "2026-08-27T14:09:07.053408-04:00",
+      "orchestrator": {
+        "engine": "copilot",
+        "provider": "anthropic",
+        "model": "claude-opus-5",
+        "identityProvenance": "asserted"
+      },
+      "verificationVerdict": "REMEDIATED_AT_CAP",
+      "verification": {
+        "rounds": 3,
+        "verifierModel": "gpt-5.4",
+        "verifierProvider": "openai",
+        "transport": "copilot-cli",
+        "unreviewedFindings": 1
+      }
+    },
+    {
+      "number": 13,
+      "title": "Packaging to the feed (plan C)",
+      "status": "complete",
+      "startedAt": "2026-08-27T14:19:55.291575-04:00",
+      "completedAt": "2026-08-27T15:40:55.115901-04:00",
+      "orchestrator": {
+        "engine": "copilot",
+        "provider": "anthropic",
+        "model": "claude-opus-5",
+        "identityProvenance": "asserted"
+      },
+      "verificationVerdict": "VERIFIED",
+      "verification": {
+        "rounds": 2,
+        "verifierModel": "gpt-5.4",
+        "verifierProvider": "openai",
+        "transport": "copilot-cli"
+      }
+    },
+    {
+      "number": 14,
+      "title": "Collapse session sets (plan A3)",
+      "status": "complete",
+      "startedAt": "2026-08-27T15:50:41.385334-04:00",
+      "completedAt": "2026-08-28T03:51:22.136292-04:00",
+      "orchestrator": {
+        "engine": "copilot",
+        "provider": "anthropic",
+        "model": "claude-opus-5",
+        "identityProvenance": "asserted"
+      },
+      "verificationVerdict": "VERIFIED",
+      "verification": {
+        "rounds": 7,
+        "verifierModel": "gpt-5-6-sol",
+        "verifierProvider": "openai",
+        "transport": "api"
+      }
+    },
+    {
+      "number": 15,
+      "title": "The sessions view (plan D1)",
+      "status": "complete",
+      "startedAt": "2026-08-28T04:39:06.592320-04:00",
+      "completedAt": "2026-08-28T05:36:25.143101-04:00",
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "model": "claude-opus-5[1m]",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": "VERIFIED",
+      "verification": {
+        "rounds": 2,
+        "verifierModel": "gpt-5-6-sol",
+        "verifierProvider": "openai",
+        "transport": "api"
+      }
+    },
+    {
+      "number": 16,
+      "title": "The task level (plan D1, second half)",
+      "status": "complete",
+      "startedAt": "2026-08-28T05:44:11.701997-04:00",
+      "completedAt": "2026-08-28T06:10:43.921530-04:00",
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "model": "claude-opus-5",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": "VERIFIED",
+      "verification": {
+        "rounds": 1,
+        "verifierModel": "gpt-5-6-sol",
+        "verifierProvider": "openai",
+        "transport": "api"
+      }
+    },
+    {
+      "number": 17,
+      "title": "The tracked project config (precondition for D2)",
+      "status": "complete",
+      "startedAt": "2026-08-28T06:16:01.526636-04:00",
+      "completedAt": "2026-08-28T07:48:40.770675-04:00",
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": "REMEDIATED_AT_CAP",
+      "verification": {
+        "rounds": 3,
+        "verifierModel": "gpt-5-6-sol",
+        "verifierProvider": "openai",
+        "transport": "api",
+        "unreviewedFindings": 1
+      }
+    },
+    {
+      "number": 18,
+      "title": "Project setup as two sessions (plan D2)",
+      "status": "complete",
+      "startedAt": "2026-08-28T07:58:21.481369-04:00",
+      "completedAt": "2026-08-28T08:43:40.446138-04:00",
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": "VERIFIED",
+      "verification": {
+        "rounds": 3,
+        "verifierModel": "gpt-5-6-sol",
+        "verifierProvider": "openai",
+        "transport": "api"
+      }
+    },
+    {
+      "number": 19,
+      "title": "The unresolved-session view (plan D3)",
+      "status": "complete",
+      "startedAt": "2026-08-28T08:46:40.067563-04:00",
+      "completedAt": "2026-08-28T09:29:45.079046-04:00",
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": "VERIFIED",
+      "verification": {
+        "rounds": 3,
+        "verifierModel": "gpt-5-6-sol",
+        "verifierProvider": "openai",
+        "transport": "api"
+      }
+    },
+    {
+      "number": 20,
+      "title": "A round baseline that survives the trip (root cause of D98)",
+      "status": "complete",
+      "startedAt": "2026-08-28T09:43:08.167111-04:00",
+      "completedAt": "2026-08-28T10:05:22.913537-04:00",
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": "VERIFIED",
+      "verification": {
+        "rounds": 1,
+        "verifierModel": "gpt-5-6-sol",
+        "verifierProvider": "openai",
+        "transport": "api"
+      }
+    },
+    {
+      "number": 21,
+      "title": "Close out set 148 on the record, and make the loop tests cheap",
+      "status": "complete",
+      "startedAt": "2026-08-28T11:17:34.629607-04:00",
+      "completedAt": "2026-08-28T11:58:26.263289-04:00",
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": "VERIFIED",
+      "verification": {
+        "rounds": 3,
+        "verifierModel": "gpt-5-6-sol",
+        "verifierProvider": "openai",
+        "transport": "api"
+      }
+    },
+    {
+      "number": 22,
+      "title": "Decide the inventory before anything is translated",
+      "status": "complete",
+      "startedAt": "2026-08-28T12:13:50.769786-04:00",
+      "completedAt": "2026-08-28T12:38:43.038792-04:00",
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "model": "claude-fable-5",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": "VERIFIED",
+      "verification": {
+        "rounds": 3,
+        "verifierModel": "gpt-5-6-sol",
+        "verifierProvider": "openai",
+        "transport": "api"
+      }
+    },
+    {
+      "number": 23,
+      "title": "Contracts \u2014 types from schemas, the Router interface, and the controls",
+      "status": "complete",
+      "startedAt": "2026-08-28T12:41:33.922532-04:00",
+      "completedAt": "2026-08-28T14:03:20.498923-04:00",
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": "VERIFIED",
+      "verification": {
+        "rounds": 4,
+        "verifierModel": "gemini-flash",
+        "verifierProvider": "google",
+        "transport": "api"
+      }
+    },
+    {
+      "number": 24,
+      "title": "The extension talks to the interface, and Python answers",
+      "status": "complete",
+      "startedAt": "2026-08-28T14:54:06.152660-04:00",
+      "completedAt": "2026-08-28T16:14:19.073764-04:00",
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": "VERIFIED",
+      "verification": {
+        "rounds": 4,
+        "verifierModel": "gemini-flash",
+        "verifierProvider": "google",
+        "transport": "api"
+      }
+    },
+    {
+      "number": 25,
+      "title": "Foundation modules",
+      "status": "complete",
+      "startedAt": "2026-08-28T16:27:31.901112-04:00",
+      "completedAt": "2026-08-28T17:25:10.342729-04:00",
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "model": "claude-opus-5",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": "VERIFIED",
+      "verification": {
+        "rounds": 2,
+        "verifierModel": "gpt-5-6-sol",
+        "verifierProvider": "openai",
+        "transport": "api"
+      }
+    },
+    {
+      "number": 26,
+      "title": "The record \u2014 journal, ledger, writers",
+      "status": "complete",
+      "startedAt": "2026-08-28T18:04:23.100989-04:00",
+      "completedAt": "2026-08-28T19:10:45.397125-04:00",
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": "VERIFIED",
+      "verification": {
+        "rounds": 2,
+        "verifierModel": "gpt-5-6-sol",
+        "verifierProvider": "openai",
+        "transport": "api"
+      }
+    },
+    {
+      "number": 27,
+      "title": "Evidence, checks, test evidence, affected",
+      "status": "complete",
+      "startedAt": "2026-08-28T19:38:04.416737-04:00",
+      "completedAt": "2026-08-28T20:45:02.917618-04:00",
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": "VERIFIED",
+      "verification": {
+        "rounds": 3,
+        "verifierModel": "gpt-5-6-sol",
+        "verifierProvider": "openai",
+        "transport": "api"
+      }
+    },
+    {
+      "number": 28,
+      "title": "Transports I \u2014 API, offline, routing, selection, discovery",
+      "status": "complete",
+      "startedAt": "2026-08-28T20:50:02.968418-04:00",
+      "completedAt": "2026-08-28T21:55:52.798599-04:00",
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": "VERIFIED",
+      "verification": {
+        "rounds": 2,
+        "verifierModel": "gpt-5-6-sol",
+        "verifierProvider": "openai",
+        "transport": "api"
+      }
+    },
+    {
+      "number": 29,
+      "title": "One vocabulary for a failure, one stamp for a measurement",
+      "status": "complete",
+      "startedAt": "2026-08-29T03:47:00.864968-04:00",
+      "completedAt": "2026-08-29T04:42:43.693690-04:00",
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": "VERIFIED",
+      "verification": {
+        "rounds": 2,
+        "verifierModel": "gpt-5-6-sol",
+        "verifierProvider": "openai",
+        "transport": "api"
+      }
+    },
+    {
+      "number": 30,
+      "title": "Transport II \u2014 the Copilot CLI state machine and seat cost",
+      "status": "complete",
+      "startedAt": "2026-08-29T04:54:48.900824-04:00",
+      "completedAt": "2026-08-29T06:00:35.415759-04:00",
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": "VERIFIED",
+      "verification": {
+        "rounds": 3,
+        "verifierModel": "gpt-5-6-sol",
+        "verifierProvider": "openai",
+        "transport": "api"
+      }
+    },
+    {
+      "number": 31,
+      "title": "The session lifecycle",
+      "status": "complete",
+      "startedAt": "2026-08-29T06:47:12.295552-04:00",
+      "completedAt": "2026-08-29T08:15:50.355065-04:00",
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": "VERIFIED",
+      "verification": {
+        "rounds": 1,
+        "verifierModel": "gpt-5-6-sol",
+        "verifierProvider": "openai",
+        "transport": "api"
+      }
+    },
+    {
+      "number": 32,
+      "title": "Verification support \u2014 agency, verifyjob, the approved plan",
+      "status": "complete",
+      "startedAt": "2026-08-29T09:34:52.724862-04:00",
+      "completedAt": "2026-08-29T10:54:08.660025-04:00",
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": "VERIFIED",
+      "verification": {
+        "rounds": 3,
+        "verifierModel": "gpt-5-6-sol",
+        "verifierProvider": "openai",
+        "transport": "api"
+      }
+    },
+    {
+      "number": 33,
+      "title": "The verification loop",
+      "status": "complete",
+      "startedAt": "2026-08-29T14:13:26.310063-04:00",
+      "completedAt": "2026-08-29T15:52:14.224259-04:00",
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": "VERIFIED",
+      "verification": {
+        "rounds": 2,
+        "verifierModel": "gpt-5-6-sol",
+        "verifierProvider": "openai",
+        "transport": "api"
+      }
+    },
+    {
+      "number": 34,
+      "title": "Bootstrap, packaging, and the `dabbler` command on the PATH",
+      "status": "complete",
+      "startedAt": "2026-08-29T16:00:30.814926-04:00",
+      "completedAt": "2026-08-29T17:02:54.961801-04:00",
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": "VERIFIED",
+      "verification": {
+        "rounds": 2,
+        "verifierModel": "gpt-5-6-sol",
+        "verifierProvider": "openai",
+        "transport": "api"
+      }
+    },
+    {
+      "number": 35,
+      "title": "The six-step workflow ported, the run core retired",
+      "status": "complete",
+      "startedAt": "2026-08-29T17:10:02.869796-04:00",
+      "completedAt": "2026-08-29T18:36:23.410968-04:00",
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": "VERIFIED",
+      "verification": {
+        "rounds": 3,
+        "verifierModel": "gpt-5-6-sol",
+        "verifierProvider": "openai",
+        "transport": "api"
+      }
+    },
+    {
+      "number": 36,
+      "title": "Cutover \u2014 the extension calls in-process, and Python leaves",
+      "status": "complete",
+      "startedAt": "2026-08-29T18:42:01.280295-04:00",
+      "completedAt": "2026-08-29T20:18:11.533000-04:00",
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": "VERIFIED",
+      "verification": {
+        "rounds": 3,
+        "verifierModel": "gpt-5-6-sol",
+        "verifierProvider": "openai",
+        "transport": "api"
+      }
+    },
+    {
+      "number": 37,
+      "title": "The extension surveyed against the principles",
+      "status": "complete",
+      "startedAt": "2026-08-30T12:16:57.207000-04:00",
+      "completedAt": "2026-08-30T12:28:32.213000-04:00",
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": "VERIFIED",
+      "verification": {
+        "rounds": 1,
+        "verifierModel": "gpt-5-6-sol",
+        "verifierProvider": "openai",
+        "transport": "api"
+      },
+      "frameworkVersion": "2.0.0"
+    },
+    {
+      "number": 38,
+      "title": "The projection stops withholding the plan",
+      "status": "complete",
+      "startedAt": "2026-08-30T13:47:42.920000-04:00",
+      "completedAt": "2026-08-30T14:06:50.945000-04:00",
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": "VERIFIED",
+      "verification": {
+        "rounds": 2,
+        "verifierModel": "gpt-5-6-sol",
+        "verifierProvider": "openai",
+        "transport": "api"
+      },
+      "frameworkVersion": "2.0.0"
+    },
+    {
+      "number": 39,
+      "title": "Verification stops lying, and an unanswered gap stops the close",
+      "status": "complete",
+      "startedAt": "2026-08-30T14:10:23.811000-04:00",
+      "completedAt": "2026-08-30T14:53:44.856000-04:00",
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": "REMEDIATED_AT_CAP",
+      "verification": {
+        "rounds": 3,
+        "verifierModel": "gpt-5-6-sol",
+        "verifierProvider": "openai",
+        "transport": "api",
+        "unreviewedFindings": 1
+      },
+      "frameworkVersion": "2.0.0"
+    },
+    {
+      "number": 40,
+      "title": "Task rows \u2014 a structured declaration, a framework-owned state machine",
+      "status": "complete",
+      "startedAt": "2026-08-30T14:57:09.144000-04:00",
+      "completedAt": "2026-08-30T15:25:38.383000-04:00",
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": "REMEDIATED_AT_CAP",
+      "verification": {
+        "rounds": 3,
+        "verifierModel": "gpt-5-6-sol",
+        "verifierProvider": "openai",
+        "transport": "api",
+        "unreviewedFindings": 1
+      },
+      "frameworkVersion": "2.0.0"
+    },
+    {
+      "number": 41,
+      "title": "Setup owns the runway",
+      "status": "complete",
+      "startedAt": "2026-08-30T15:31:24.855000-04:00",
+      "completedAt": "2026-08-30T15:52:23.865000-04:00",
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": "VERIFIED",
+      "verification": {
+        "rounds": 2,
+        "verifierModel": "gpt-5-6-sol",
+        "verifierProvider": "openai",
+        "transport": "api"
+      },
+      "frameworkVersion": "2.0.0"
+    },
+    {
+      "number": 42,
+      "title": "The panes say what they are, and the Solution Explorer lights up",
+      "status": "complete",
+      "startedAt": "2026-08-30T15:52:31.898000-04:00",
+      "completedAt": "2026-08-30T15:58:37.518000-04:00",
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": "VERIFIED",
+      "verification": {
+        "rounds": 1,
+        "verifierModel": "gpt-5-6-sol",
+        "verifierProvider": "openai",
+        "transport": "api"
+      },
+      "frameworkVersion": "2.0.0"
+    },
+    {
+      "number": 43,
+      "title": "Liveness, and one place the operator looks",
+      "status": "complete",
+      "startedAt": "2026-08-30T15:58:45.529000-04:00",
+      "completedAt": "2026-08-30T16:20:38.647000-04:00",
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": "VERIFIED",
+      "verification": {
+        "rounds": 3,
+        "verifierModel": "gpt-5-6-sol",
+        "verifierProvider": "openai",
+        "transport": "api"
+      },
+      "frameworkVersion": "2.0.0"
+    },
+    {
+      "number": 44,
+      "title": "`solution-dependencies.json` \u2014 the edge, never the pin",
+      "status": "complete",
+      "startedAt": "2026-08-30T16:20:47.814000-04:00",
+      "completedAt": "2026-08-30T16:54:16.245000-04:00",
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": "REMEDIATED_AT_CAP",
+      "verification": {
+        "rounds": 3,
+        "verifierModel": "gpt-5-6-sol",
+        "verifierProvider": "openai",
+        "transport": "api",
+        "unreviewedFindings": 2
+      },
+      "frameworkVersion": "2.0.0"
+    },
+    {
+      "number": 45,
+      "title": "Resolution modes, inside the declare-and-check line",
+      "status": "in-progress",
+      "startedAt": "2026-08-30T16:54:31.082000-04:00",
+      "completedAt": null,
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": null,
+      "frameworkVersion": "2.0.0"
+    },
+    {
+      "number": 46,
+      "title": "Packaging declared for the ecosystem it is",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    },
+    {
+      "number": 47,
+      "title": "The Solution Explorer goes cross-repo",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    },
+    {
+      "number": 48,
+      "title": "The generated workspace",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    },
+    {
+      "number": 49,
+      "title": "The thing becomes installable",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    },
+    {
+      "number": 50,
+      "title": "The field trial, and the exercise reported back",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    }
+  ]
+}

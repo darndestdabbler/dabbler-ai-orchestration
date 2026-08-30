@@ -797,9 +797,9 @@
     {
       "number": 41,
       "title": "Setup owns the runway",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-30T15:31:24.855000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-08-30T15:52:23.865000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

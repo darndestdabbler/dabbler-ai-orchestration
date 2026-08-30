@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "dabbler.yaml (the repository's own configuration)",
+  "description": "The tracked third config source, at the repository root. It carries the facts that belong to the repository rather than to the distribution or to the machine: what its tests are and how to run them, how it publishes, and which of its paths are sensitive. Precedence is the packaged router-config.yaml, then this file, then local-overrides.yaml. Providers, models, roles and transports are deliberately absent: those are distribution facts, and a repository that forked them would fork the model registry in order to declare 'mvn -q test'. Everything here is tracked because CI reads it, the next machine reads it, and ai_router.affected refuses to run without it -- none of which a gitignored file can serve.",
+  "type": "object",
+  "required": ["schema_version"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "const": 1,
+      "description": "The shape this file is written in. Required, so a repository set up under a later shape is refused with its version named rather than read as a set of unknown keys."
+    },
+    "testing": {
+      "type": "object",
+      "description": "Suites, deterministic controls, and the path-to-test selection rules. Validated in full by ai_router.checks and ai_router.affected, which is where the vocabulary lives; the shape is left open here so there is one parser rather than two that eventually disagree. Each suite declares its own test_roots and test_glob, because a repository that is Java and .NET at once has two of each; a suite whose runner takes no list of test files -- `mvn -q test`, `dotnet test` -- declares runs_whole, and the framework then runs it complete rather than inventing a narrowing syntax it cannot know."
+    },
+    "packaging": {
+      "type": "object",
+      "description": "Step (f) of the session lifecycle: pack, then push to the feed. Validated in full by ai_router.packaging. A repository that declares nothing here publishes nothing, which is a declaration rather than an omission."
+    },
+    "paths": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Path facts about this repository.",
+      "properties": {
+        "sensitive_paths": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "description": "Paths whose modification escalates a run to the verified path. Which paths a repository treats as sensitive is a property of the repository, so it is declared here and tracked -- a machine-local file that could quietly empty this list would be a machine turning off a repository's own control."
+        }
+      }
+    }
+  }
+}

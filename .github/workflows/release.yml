@@ -1,0 +1,197 @@
+name: Release dabbler-ai-router to npm
+
+# OIDC trusted publishing (no long-lived token in repo secrets). npm has
+# supported it since 2025; the publish step mints a short-lived credential
+# from this workflow's identity, and the package's npm settings name the
+# repository and workflow that are allowed to do it.
+#
+# Triggered on tag push:
+#
+#   - `v-rcN` (e.g. `v2.0.0-rc1`) -> the npm `next` dist-tag only. The RC
+#                     exercises the whole publish path without moving
+#                     `latest`, which is what an `npm i` gets.
+#   - `vX.Y.Z`      -> the `latest` dist-tag.
+#
+# Anything else (`v2.0`, `vfoo`) is rejected by `classify` before any
+# artifact is built.
+#
+# **The `!vsix-v*` exclusion is load-bearing**, not tidiness: GitHub's
+# tag-pattern matcher treats `v*` as a glob whose leading `v` is a literal,
+# so it also matches `vsix-v2.0.0`. Without the exclusion every Marketplace
+# tag push would start this workflow too and fail its classify job.
+# `publish-vscode.yml` is the canonical handler for `vsix-v*`. Note that
+# `tags` and `tags-ignore` cannot both appear in one `on:` block, so the
+# `!pattern` form goes inside the list.
+#
+# The router used to be a Python package published to PyPI. It is one
+# TypeScript implementation now, so this workflow publishes to npm and the
+# PyPI project is left as history: a version already on PyPI stays
+# downloadable, and nothing new is uploaded there.
+
+on:
+  push:
+    tags:
+      - 'v*'
+      - '!vsix-v*'
+
+permissions:
+  contents: read
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Classify the pushed tag into one of {final, rc, invalid}. The
+  # classification outputs gate the publish jobs, so they cannot fire for
+  # the wrong tag shape even if this job later grows a third case.
+  # ---------------------------------------------------------------------------
+  classify:
+    name: Classify tag
+    runs-on: ubuntu-latest
+    outputs:
+      is_final: ${{ steps.classify.outputs.is_final }}
+      is_rc: ${{ steps.classify.outputs.is_rc }}
+      version: ${{ steps.classify.outputs.version }}
+    steps:
+      - name: Classify ${{ github.ref_name }}
+        id: classify
+        run: |
+          tag="${GITHUB_REF#refs/tags/}"
+          if [[ "$tag" =~ ^v([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
+            echo "is_final=true"  >> "$GITHUB_OUTPUT"
+            echo "is_rc=false"    >> "$GITHUB_OUTPUT"
+            echo "version=${BASH_REMATCH[1]}" >> "$GITHUB_OUTPUT"
+            echo "Tag $tag classified as FINAL (${BASH_REMATCH[1]})."
+          elif [[ "$tag" =~ ^v([0-9]+\.[0-9]+\.[0-9]+-rc[0-9]+)$ ]]; then
+            echo "is_final=false" >> "$GITHUB_OUTPUT"
+            echo "is_rc=true"     >> "$GITHUB_OUTPUT"
+            echo "version=${BASH_REMATCH[1]}" >> "$GITHUB_OUTPUT"
+            echo "Tag $tag classified as RC (${BASH_REMATCH[1]}). Publishes to the 'next' dist-tag."
+          else
+            echo "::error::tag $tag does not match the release pattern. Expected v[0-9]+.[0-9]+.[0-9]+ for finals or v[0-9]+.[0-9]+.[0-9]+-rcN for release candidates."
+            exit 1
+          fi
+
+  # ---------------------------------------------------------------------------
+  # Build the tarball. Uploaded as a workflow artifact so the publish job
+  # (and any human reviewing the release) can inspect the same bytes that
+  # go to the registry.
+  # ---------------------------------------------------------------------------
+  build:
+    name: Build the package tarball
+    needs: classify
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout tag
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
+        with:
+          fetch-depth: 1
+
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify tag matches packages/router/package.json version
+        # Catches the "tagged v2.0.1 but forgot to bump the manifest"
+        # mistake before a build/publish cycle is spent on it. npm has one
+        # canonical spelling of a version, so this is a string comparison
+        # and needs no normalizer.
+        env:
+          EXPECTED_VERSION: ${{ needs.classify.outputs.version }}
+        run: |
+          declared="$(node -p "require('./packages/router/package.json').version")"
+          if [[ "$declared" != "$EXPECTED_VERSION" ]]; then
+            echo "::error::tag version '$EXPECTED_VERSION' does not match packages/router/package.json version '$declared'"
+            exit 1
+          fi
+          echo "tag-vs-manifest check OK: $EXPECTED_VERSION == $declared"
+
+      - name: Build the bundles
+        run: npm run build -w dabbler-ai-router
+
+      - name: Pack
+        working-directory: packages/router
+        run: npm pack --pack-destination "$GITHUB_WORKSPACE/dist"
+
+      - name: Upload dist artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
+          retention-days: 7
+
+  # ---------------------------------------------------------------------------
+  # Release prerequisite (operator-decided 2026-06-12): the tagged
+  # commit must have a SUCCESSFUL `Test` workflow run before anything
+  # publishes. The gate waits while Test is still running for the commit,
+  # and fails loud on a red or absent run — re-run THIS workflow after
+  # Test is green; no tag re-push needed.
+  # ---------------------------------------------------------------------------
+  require-green-test:
+    name: Require green Test for the tagged commit
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+      # Set 110 S4: the gate reads each failed job's ANNOTATIONS to tell a
+      # provider fault from a real test failure. Those live on the checks API.
+      checks: read
+    steps:
+      - name: Checkout tag (for the local composite action)
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
+        with:
+          fetch-depth: 1
+
+      - name: Require a successful Test run for ${{ github.sha }}
+        uses: ./.github/actions/require-green-test
+        with:
+          sha: ${{ github.sha }}
+          # Operator escape hatch for a GitHub outage; authorizes ONE commit
+          # and never tolerates a genuine test failure. Clear after release.
+          infra-override-sha: ${{ vars.RELEASE_INFRA_OVERRIDE_SHA }}
+          infra-override-reason: ${{ vars.RELEASE_INFRA_OVERRIDE_REASON }}
+
+  # ---------------------------------------------------------------------------
+  # Publish. One job, two dist-tags: a final moves `latest`, a release
+  # candidate moves `next` and leaves `latest` where it is. `npm i
+  # dabbler-ai-router` resolves `latest`, so an RC that landed there would
+  # be shipped to everyone by the next fresh install.
+  # ---------------------------------------------------------------------------
+  publish-npm:
+    name: Publish to npm
+    needs: [classify, build, require-green-test]
+    runs-on: ubuntu-latest
+    environment:
+      name: npm
+      url: https://www.npmjs.com/package/dabbler-ai-router
+    permissions:
+      contents: read
+      id-token: write   # required for OIDC trusted publishing
+    steps:
+      - name: Download dist artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
+        with:
+          name: dist
+          path: dist/
+
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Publish
+        # No `NODE_AUTH_TOKEN` — OIDC mints a short-lived credential from
+        # the trusted-publisher config in the package's npm settings.
+        # A version's files can never be replaced on npm, so a re-run after
+        # a successful publish fails; that is the registry's rule and not
+        # something to work around.
+        run: |
+          tarball="$(ls dist/*.tgz)"
+          npm publish "$tarball" \
+            --provenance \
+            --tag "${{ needs.classify.outputs.is_final == 'true' && 'latest' || 'next' }}"

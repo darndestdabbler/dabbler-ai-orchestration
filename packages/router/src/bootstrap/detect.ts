@@ -393,3 +393,254 @@ export function scaffoldProjectConfig(projectDir: string): string | null {
   }
   return path;
 }
+
+// --- What a repository publishes ----------------------------------------------
+
+/**
+ * The pack and push commands a repository's own build files imply.
+ *
+ * Detected under the same two silences the suites are, and for the same
+ * reason. A `.csproj` carrying package metadata says "this is meant to be a
+ * package", which is what makes `dotnet pack` a reading rather than a guess;
+ * a `.csproj` that is an application says nothing of the kind, and emitting
+ * a pack line for it produces a nupkg nobody wanted. And only the repository
+ * root is read: `pack` declares a command and no working directory, so
+ * `service/lib.csproj` cannot become a runnable line, and a detected line
+ * that fails on first use is worse than an honest absence.
+ *
+ * `reason` carries what was found when nothing was declared. Silence that
+ * explains itself is the difference between a framework the operator trusts
+ * and one they work around.
+ */
+export interface PackagingRecipe {
+  readonly key: string;
+  readonly pack: readonly string[];
+  readonly push: readonly string[];
+}
+
+export interface PackagingReading {
+  readonly recipe: PackagingRecipe | null;
+  readonly reason: string;
+}
+
+/** Whether a `.csproj` says it is meant to become a package. */
+export function declaresPackage(text: string): boolean {
+  return (
+    /<PackageId>/.test(text) ||
+    /<GeneratePackageOnBuild>\s*true/i.test(text) ||
+    /<IsPackable>\s*true/i.test(text) ||
+    (/<Version>/.test(text) && /<TargetFramework/.test(text) &&
+      !/<OutputType>\s*Exe/i.test(text))
+  );
+}
+
+/**
+ * The packaging this repository implies, or why it implies none.
+ *
+ * Never inferred from an ecosystem alone: a repository can be a .NET
+ * repository and publish nothing, and the great majority are. What is read is
+ * the statement the build file itself makes.
+ */
+export function detectPackaging(projectDir: string): PackagingReading {
+  if (exists(projectDir, "pom.xml")) {
+    // Maven does not fit the contract, and saying so is the honest answer.
+    //
+    // Two things are required of every declared recipe here: `pack` takes its
+    // output directory from the framework, and the credential arrives as ONE
+    // argv element. Maven satisfies neither. `project.build.directory` is set
+    // in the POM and is not reliably overridable from the command line, so
+    // `{output}` has nowhere to go; and Maven authenticates through a
+    // `<server>` entry in `settings.xml` keyed by a repository id, so a
+    // credential passed on the command line is read as the name of a server
+    // rather than as a password.
+    //
+    // The plan said a POM implies `mvn -q package` and `deploy`. It does not,
+    // and a detected line that fails the first time it runs is worse than an
+    // honest absence -- which is the rule this whole detector already
+    // follows. Amended on the record rather than implemented differently in
+    // silence.
+    return {
+      recipe: null,
+      reason:
+        "Maven publishes through its own lifecycle: `distributionManagement` " +
+        "in the POM names the repository, and a `<server>` entry in " +
+        "settings.xml holds the credential. Neither is something this " +
+        "framework can write for you without holding a credential or " +
+        "editing a file outside this repository, so `mvn deploy` stays " +
+        "yours to run. Everything else in the session -- the gates, the " +
+        "evidence, the close -- is unaffected.",
+    };
+  }
+
+  const projects = rootFiles(projectDir).filter((name) => name.endsWith(".csproj"));
+  if (projects.length === 0) {
+    const deeper = hasDeeperProject(projectDir);
+    return {
+      recipe: null,
+      reason: deeper
+        ? "the project files are below the repository root, and a pack " +
+          "command declares no working directory. A line naming one of them " +
+          "would fail the first time it ran, so nothing is declared -- say " +
+          "which project publishes and the block can be written."
+        : "no .csproj or pom.xml at the repository root, so there is nothing " +
+          "here that says what a package would be built from.",
+    };
+  }
+  const packable = projects.filter((name) => declaresPackage(reads(projectDir, name)));
+  if (packable.length === 0) {
+    return {
+      recipe: null,
+      reason:
+        `${projects.join(", ")} carries no package metadata -- no PackageId, ` +
+        "no IsPackable, no GeneratePackageOnBuild. A project that is an " +
+        "application is not a package, and packing it produces a nupkg " +
+        "nobody wanted.",
+    };
+  }
+  if (packable.length > 1) {
+    // Which of them publishes is an external-consequence choice, and
+    // filesystem order is not an answer to it.
+    return {
+      recipe: null,
+      reason:
+        `${packable.join(" and ")} both declare package metadata, and which ` +
+        "of them publishes is not derivable from the files. Picking the " +
+        "first would decide by directory order where an artifact carrying " +
+        "your name arrives.",
+    };
+  }
+  return {
+    recipe: {
+      key: "dotnet",
+      pack: ["dotnet", "pack", packable[0], "-c", "Release", "-o", "{output}"],
+      push: [
+        "dotnet",
+        "nuget",
+        "push",
+        "{artifact}",
+        "--source",
+        "{feed}",
+        "--api-key",
+        "{secret}",
+      ],
+    },
+    reason: "",
+  };
+}
+
+/** Names directly inside the repository root. */
+function rootFiles(root: string): string[] {
+  try {
+    return readdirSync(root);
+  } catch {
+    return [];
+  }
+}
+
+/** Whether a project file exists somewhere below the root but not at it. */
+function hasDeeperProject(root: string, depth = 3): boolean {
+  const walk = (dir: string, left: number): boolean => {
+    let entries: string[];
+    try {
+      entries = readdirSync(dir, { withFileTypes: true }).map((entry) =>
+        entry.isDirectory() ? `/${entry.name}` : entry.name,
+      );
+    } catch {
+      return false;
+    }
+    for (const entry of entries) {
+      if (!entry.startsWith("/")) {
+        if (dir !== root && (entry.endsWith(".csproj") || entry === "pom.xml")) return true;
+        continue;
+      }
+      const name = entry.slice(1);
+      if (name === "node_modules" || name === ".git" || name === "bin") continue;
+      if (name === "obj" || name === "target" || name === ".dabbler") continue;
+      if (left > 0 && walk(join(dir, name), left - 1)) return true;
+    }
+    return false;
+  };
+  return walk(root, depth);
+}
+
+/**
+ * The `packaging:` block for a detected recipe, with the operator's answers.
+ *
+ * `secret` is a NAME. The credential itself is never written here, never read
+ * here, and never placed in an environment: it resolves at spawn into one
+ * argv element. A block holding a PAT is a block that reaches a git history.
+ */
+export function renderPackagingBlock(
+  recipe: PackagingRecipe,
+  feed: string,
+  secret: string,
+): string {
+  const argv = (values: readonly string[]): string =>
+    `[${values.map((value) => JSON.stringify(value)).join(", ")}]`;
+  return [
+    "",
+    "# Step (f) of the lifecycle: pack, then push. Both argv and never shell",
+    "# strings, so a credential cannot be re-split by a shell; `secret` names",
+    "# the credential and never holds it.",
+    "packaging:",
+    "  pack:",
+    `    argv: ${argv(recipe.pack)}`,
+    "  push:",
+    `    argv: ${argv(recipe.push)}`,
+    // Quoted, both of them. A feed URL carrying ` #` or a credential name
+    // somebody pasted with a newline would otherwise rewrite the document
+    // around it -- and this is a file the framework writes on the operator's
+    // behalf, so it does not get to produce one that parses differently than
+    // it reads.
+    `    feed: ${JSON.stringify(feed)}`,
+    `    secret: ${JSON.stringify(secret)}`,
+    "",
+  ].join("\n");
+}
+
+/**
+ * Write a detected `packaging:` block into a `dabbler.yaml` that has none.
+ *
+ * Returns null when there is nothing to do, or when the file already declares
+ * `packaging:` -- a second mapping key would produce a document whose later
+ * copy silently wins, and this repository's statement about how it publishes
+ * is not something to overwrite.
+ */
+export function appendPackagingToProjectConfig(
+  projectDir: string,
+  recipe: PackagingRecipe,
+  feed: string,
+  secret: string,
+): string | null {
+  const path = join(projectDir, PROJECT_CONFIG_FILENAME);
+  if (!existsSync(path)) return null;
+  let existing: string;
+  try {
+    existing = readText(path);
+  } catch {
+    return null;
+  }
+  if (/^packaging:/m.test(existing)) return null;
+  const separator = existing.endsWith("\n") ? "" : "\n";
+  try {
+    writeFileSync(
+      path,
+      existing + separator + renderPackagingBlock(recipe, feed, secret),
+      "utf8",
+    );
+  } catch {
+    return null;
+  }
+  return path;
+}
+
+/** Whether this repository already states how it publishes. */
+export function declaresPackaging(projectDir: string): boolean {
+  const path = join(projectDir, PROJECT_CONFIG_FILENAME);
+  if (!existsSync(path)) return false;
+  try {
+    return /^packaging:/m.test(readText(path));
+  } catch {
+    return false;
+  }
+}

@@ -5,12 +5,15 @@
 // only after the evidence for (a) through (e) exists. `--dry-run` shows the
 // gates and stops: it is a rehearsal, so it is never filed.
 
+import { detectPackaging } from "../bootstrap/detect.ts";
+import { loadConfig } from "../config.ts";
 import { repoRootFor, resolveSessionsDir } from "../evidence.ts";
 import { packagingPath, readPackaging } from "../ledger.ts";
 import {
   type PackagingRun,
   PackagingConfigError,
   PackagingError,
+  loadDeclaration,
   packageSession,
   record,
   runAsRecord,
@@ -73,6 +76,64 @@ function parseArgs(argv: readonly string[]): Parsed | string {
     index += 1;
   }
   return { sessionsDir, dryRun, showRecord, json };
+}
+
+/**
+ * What a dry run would do, said in sentences rather than in a config dump.
+ *
+ * The operator is not reading this to audit argv. They are reading it to
+ * answer three questions -- what gets built, where it goes, and what is
+ * standing in the way -- and a rehearsal that printed the gate rows alone
+ * answered only the third. A repository that declares no packaging says so as
+ * a DECLARATION here, with what was detected and what is missing, because
+ * "publishes nothing" and "you have not told me how to publish" are the same
+ * silence and not the same fact.
+ */
+function explain(sessionsDir: string, run: PackagingRun): string {
+  const root = repoRootFor(sessionsDir);
+  const lines: string[] = [];
+  const declaration = root === null ? null : loadDeclaration(loadConfig());
+  if (declaration === null) {
+    const reading = root === null ? null : detectPackaging(root);
+    if (reading?.recipe) {
+      // NOT a declaration. A repository whose build files say they are meant
+      // to be published, and whose feed question is still open, is waiting on
+      // an answer -- and calling that "publishes nothing" tells the operator
+      // the state is settled one sentence before saying it is not.
+      lines.push(
+        "This repository publishes nothing YET -- not as a declaration, but " +
+          "because the two answers that would let it are still open.",
+      );
+      lines.push(
+        `Its build files say it is meant to: they look packable with ` +
+          `\`${reading.recipe.pack.join(" ")}\`. Two answers are all that is ` +
+          "missing -- which feed, and the NAME of the credential. " +
+          "`dabbler owed list` has both questions waiting.",
+      );
+    } else {
+      lines.push("This repository publishes nothing today, and that is a declaration.");
+      if (reading?.reason) lines.push(`Nothing was detected: ${reading.reason}`);
+    }
+    return lines.join("\n");
+  }
+
+  lines.push(`It would pack with:   ${declaration.pack.argv.join(" ")}`);
+  lines.push(`It would push to:     ${declaration.push.feed}`);
+  lines.push(
+    `Using the credential named ${declaration.push.secret}, which is read ` +
+      "at the moment of the push and written nowhere.",
+  );
+  const failed = run.gates.filter((gate) => !gate.passed);
+  if (failed.length === 0) {
+    lines.push("Every gate the close reads passes, so a real run would publish.");
+  } else {
+    lines.push(
+      `Waiting on ${failed.length} gate(s): ` +
+        failed.map((gate) => `${gate.name} (${gate.remediation})`).join("; "),
+    );
+  }
+  if (run.refusal) lines.push(run.refusal);
+  return lines.join("\n");
 }
 
 function render(run: PackagingRun): string {
@@ -163,7 +224,11 @@ export async function packagingVerb(argv: string[]): Promise<number> {
   if (!parsed.dryRun) record(sessionsDir, run);
 
   writeOut(
-    (parsed.json ? dumps(runAsRecord(run), { indent: 2 }) : render(run)) + "\n",
+    (parsed.json
+      ? dumps(runAsRecord(run), { indent: 2 })
+      : parsed.dryRun
+        ? `${explain(sessionsDir, run)}\n\n${render(run)}`
+        : render(run)) + "\n",
   );
   return runIsPublished(run) || run.ready ? EXIT_OK : EXIT_ERROR;
 }

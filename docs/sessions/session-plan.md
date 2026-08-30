@@ -2048,6 +2048,22 @@ right before it can publish once.
    and `dotnet nuget push`; a POM implies `mvn -q package` and `deploy`; a
    repository whose build files sit below the root declares nothing rather
    than emitting a line that would fail on first use.
+
+   > **Amended in session 46, on the record.** The Maven half is withdrawn:
+   > **a POM declares nothing**, with a reason. Maven does not fit either
+   > half of the packaging contract this framework already has.
+   > `project.build.directory` is set in the POM and is not reliably
+   > overridable from the command line, so the `{output}` the schema requires
+   > in `pack` has nowhere to go; and Maven authenticates through a
+   > `<server>` entry in `settings.xml` keyed by a repository id, so the
+   > credential this framework passes as one argv element is read as the name
+   > of a server rather than as a password. Making it work would mean either
+   > writing a credential into a file outside the repository or holding one,
+   > and both are refused everywhere else in this framework.
+   >
+   > The alternative was a detected `deploy:deploy-file` line that fails the
+   > first time it runs, which is exactly what this step's own rule forbids.
+   > The .NET half is unchanged and is what `csv-model` needs.
 3. Argv, never shell strings — the existing block's rule, and the reason a
    detected line can be trusted at spawn.
 4. The feed and the credential's **name** are raised as owed decisions

@@ -28,6 +28,7 @@ import { nowIso, platformNewlines } from "./journal.ts";
 import { RUNS_DIRNAME, type Row, readJsonl } from "./ledger.ts";
 import { appendFileSync } from "node:fs";
 import { dumps } from "./pythonJson.ts";
+import { PROJECT_CONFIG_FILENAME } from "./config.ts";
 import { loadSchemaFile, schemaFailure } from "./schema/validate.ts";
 
 export const OWED_FILENAME = "owed-decisions.jsonl";
@@ -630,4 +631,117 @@ export function raiseFeedDecision(
       "dependency cannot be restored from a feed until a source has this name.",
     sessionNumber: options.sessionNumber ?? null,
   });
+}
+
+/**
+ * The answer that settles publishing for the whole repository.
+ *
+ * One label shared by both packaging questions, because it is a decision
+ * about the repository rather than about one of two fields: answering it on
+ * either question settles the other.
+ */
+export const NOT_PUBLISHED = "publishes nothing";
+
+export const ID_PACKAGING_FEED = "packaging-feed";
+export const ID_PACKAGING_SECRET = "packaging-secret";
+
+/**
+ * Ask where this repository publishes, and under what credential NAME.
+ *
+ * Two questions and not one, because they fail differently: a wrong feed
+ * sends a release somewhere real, and a wrong credential name sends a build
+ * nowhere at all. Both are asked ONCE, at the point the framework can already
+ * see what would be packed -- the alternative is the state csv-model was in,
+ * inventing pack and push argv by hand and getting all of it right before it
+ * could publish once.
+ *
+ * `external-consequence`: what is answered here decides where an artifact
+ * carrying this repository's name arrives.
+ */
+export function raisePackagingDecisions(
+  repoRoot: string,
+  options: {
+    readonly ecosystem: string;
+    readonly packCommand: string;
+    readonly sessionNumber?: number | null;
+  },
+): Row[] {
+  const raised: Row[] = [];
+  const feed = raiseOwed(repoRoot, {
+    id: ID_PACKAGING_FEED,
+    decisionClass: CLASS_EXTERNAL_CONSEQUENCE,
+    question: "Which feed does this repository publish to?",
+    file: PROJECT_CONFIG_FILENAME,
+    determined:
+      `Its build files say what would be packed -- \`${options.packCommand}\` ` +
+      `is derivable from them. Where the result goes is not: a feed URL is a ` +
+      "fact about your organisation, and there is nothing in this repository " +
+      "that could be read to find it.",
+    options: [
+      {
+        label: "<the feed's index URL>",
+        consequence:
+          "Written into the packaging block. A releasable session packs and " +
+          "pushes there; nothing else changes, and no credential is written.",
+      },
+      {
+        label: NOT_PUBLISHED,
+        consequence:
+          "No packaging block is written, which is a declaration rather than " +
+          "a gap: this repository publishes to no feed today, and the " +
+          "packaging step says so instead of failing.",
+      },
+    ],
+    recommendation: null,
+    confidence: null,
+    onNoAnswer:
+      "Nothing is written and nothing breaks. A session that declares itself " +
+      "releasable is refused at step (f) with the reason that no feed is " +
+      "declared, rather than pushing somewhere nobody chose.",
+    sessionNumber: options.sessionNumber ?? null,
+  });
+  if (feed !== null) raised.push(feed);
+
+  const secret = raiseOwed(repoRoot, {
+    id: ID_PACKAGING_SECRET,
+    decisionClass: CLASS_EXTERNAL_CONSEQUENCE,
+    question: "What is the NAME of the environment variable holding the feed credential?",
+    file: PROJECT_CONFIG_FILENAME,
+    determined:
+      "The name goes in the configuration; the credential never does. It " +
+      "resolves at spawn into one argv element and is placed in no " +
+      "environment, so a repository's history never carries a PAT and a " +
+      "child process never inherits one.",
+    options: [
+      {
+        label: "DABBLER_FEED_PAT",
+        consequence:
+          "The conventional name. Set it in your shell or your CI secret " +
+          "store; the framework reads it at the moment it pushes and nowhere " +
+          "else.",
+      },
+      {
+        label: NOT_PUBLISHED,
+        consequence:
+          "No packaging block is written. Answering it here settles the feed " +
+          "question too: publishing is one decision about this repository, " +
+          "not two about two fields.",
+      },
+      {
+        label: "<another variable name>",
+        consequence:
+          "Whatever your organisation already uses. Only the name is " +
+          "written, so an existing secret store keeps working unchanged.",
+      },
+    ],
+    recommendation: "DABBLER_FEED_PAT",
+    confidence: null,
+    onNoAnswer:
+      "Nothing is written. The packaging step refuses with the reason that " +
+      "no credential is named, which costs one message rather than a build " +
+      "that cannot be sent anywhere.",
+    sessionNumber: options.sessionNumber ?? null,
+  });
+  if (secret !== null) raised.push(secret);
+  return raised;
 }

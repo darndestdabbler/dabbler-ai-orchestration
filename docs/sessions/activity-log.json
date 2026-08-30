@@ -9135,6 +9135,75 @@
       "dateTime": "2026-08-30T16:54:37.103000-04:00",
       "description": "Register; declare `--not-releasable`.",
       "status": "in-progress"
+    },
+    {
+      "sessionNumber": 46,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-30T17:27:03.359000-04:00",
+      "description": "Register; declare `--not-releasable`.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 46,
+      "stepNumber": 2,
+      "stepKey": "detect",
+      "dateTime": "2026-08-30T17:27:03.359000-04:00",
+      "description": "`detect.ts` gains packaging detection beside suite detection, with the same two silences: a `.csproj` carrying package metadata implies `dotnet pack` and `dotnet nuget push`; a POM implies `mvn -q package` and `deploy`; a repository whose build files sit below the root declares nothing rather than emitting a line that would fail on first use.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 46,
+      "stepNumber": 3,
+      "stepKey": "argv-never-shell-strings-the-existing",
+      "dateTime": "2026-08-30T17:27:03.359000-04:00",
+      "description": "Argv, never shell strings \u2014 the existing block's rule, and the reason a detected line can be trusted at spawn.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 46,
+      "stepNumber": 4,
+      "stepKey": "the-feed-and-the-credential-s",
+      "dateTime": "2026-08-30T17:27:03.359000-04:00",
+      "description": "The feed and the credential's **name** are raised as owed decisions (session 39), asked once at setup, and **the framework writes the block**. The credential itself is never written anywhere: `packaging.push.secret` names it and resolves at spawn into one argv element.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 46,
+      "stepNumber": 5,
+      "stepKey": "dabbler-packaging-dry-run-explains-in",
+      "dateTime": "2026-08-30T17:27:03.359000-04:00",
+      "description": "`dabbler packaging --dry-run` explains in plain language what it would pack, where it would push, and which gates it is waiting on. A repository that declares no packaging says so as a declaration, not as a gap.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 46,
+      "stepNumber": 6,
+      "stepKey": "affected",
+      "dateTime": "2026-08-30T17:27:03.359000-04:00",
+      "description": "Affected; verify; full suite as `final-full`; close.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 46,
+      "dateTime": "2026-08-30T17:27:03.733000-04:00",
+      "task": "Affected; verify; full suite as final-full; close",
+      "releasable": false
+    },
+    {
+      "sessionNumber": 46,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-30T17:27:03.759000-04:00",
+      "description": "Register; declare `--not-releasable`.",
+      "status": "in-progress"
     }
   ]
 }

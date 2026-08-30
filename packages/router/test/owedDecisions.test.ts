@@ -24,6 +24,9 @@ import {
   foldOwed,
   openDecisions,
   raiseOwed,
+  raisePackagingDecisions,
+  ID_PACKAGING_FEED,
+  ID_PACKAGING_SECRET,
   readOwed,
   refreshOwedDecisions,
   supersedeOwed,
@@ -403,5 +406,46 @@ describe("a suites list that sits at its key's own column", () => {
       "cheap",
       "node",
     ]);
+  });
+});
+
+describe("asking how a repository publishes", () => {
+  it("asks the feed and the credential's name as two questions", () => {
+    // They fail differently: a wrong feed sends a release somewhere real, a
+    // wrong credential name sends a build nowhere at all.
+    const { repo } = makeSandboxRepo();
+    const raised = raisePackagingDecisions(repo, {
+      ecosystem: "dotnet",
+      packCommand: "dotnet pack -o {output}",
+    });
+    expect(raised.map((row) => String(row["id"])).sort()).toEqual(
+      [ID_PACKAGING_FEED, ID_PACKAGING_SECRET].sort(),
+    );
+  });
+
+  it("asks once, however often setup runs", () => {
+    const { repo } = makeSandboxRepo();
+    raisePackagingDecisions(repo, { ecosystem: "dotnet", packCommand: "dotnet pack" });
+    expect(
+      raisePackagingDecisions(repo, { ecosystem: "dotnet", packCommand: "dotnet pack" }),
+    ).toEqual([]);
+  });
+
+  it("does not block a close on either of them", () => {
+    // Publishing is external consequence, not verification reduction. A
+    // session that has not decided where it publishes still closes.
+    const { repo } = makeSandboxRepo();
+    raisePackagingDecisions(repo, { ecosystem: "dotnet", packCommand: "dotnet pack" });
+    expect(blockingDecisions(repo)).toEqual([]);
+  });
+
+  it("names the credential and never carries one", () => {
+    const { repo } = makeSandboxRepo();
+    const [, secret] = raisePackagingDecisions(repo, {
+      ecosystem: "dotnet",
+      packCommand: "dotnet pack",
+    });
+    expect(String(secret["question"])).toContain("NAME");
+    expect(String(secret["determined"])).toContain("never does");
   });
 });

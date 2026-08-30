@@ -8,13 +8,21 @@
 // context-rebuilding back on the person it was written for.
 
 import { repoRootFor, resolveSessionsDir, SessionsRootNotFoundError } from "../evidence.ts";
-import { appendSuitesToProjectConfig, detectEcosystems } from "../bootstrap/detect.ts";
+import {
+  appendPackagingToProjectConfig,
+  appendSuitesToProjectConfig,
+  detectEcosystems,
+  detectPackaging,
+} from "../bootstrap/detect.ts";
 import { PROJECT_CONFIG_FILENAME } from "../config.ts";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { runGit } from "../journal.ts";
 import {
   ID_GIT_REMOTE,
+  ID_PACKAGING_FEED,
+  NOT_PUBLISHED,
+  ID_PACKAGING_SECRET,
   ID_TESTING_SUITES,
   ID_TESTING_SUITES_NOW_TESTS_EXIST,
   OwedDecisionError,
@@ -198,6 +206,75 @@ function run(argv: string[]): number {
     }
     acted = written;
   }
+  // Both packaging answers are executed, not returned as instructions: the
+  // operator decides where the release goes and what the credential is
+  // called, and the framework does the typing. They behave as a PAIR --
+  // half a packaging block is a configuration error rather than a partial
+  // feature, and "publishes nothing" is a decision about the repository
+  // rather than about one of two fields.
+  if (id === ID_PACKAGING_FEED || id === ID_PACKAGING_SECRET) {
+    const other = id === ID_PACKAGING_FEED ? ID_PACKAGING_SECRET : ID_PACKAGING_FEED;
+    if (choice === NOT_PUBLISHED) {
+      // Settles both. Leaving the sibling open is what let a later answer
+      // combine with this one and write a block whose feed was the words
+      // "publishes nothing" -- the opposite of the decision just made.
+      try {
+        if (answeredChoice(root, other) === null) {
+          answerOwed(root, other, NOT_PUBLISHED, typeof current === "number" ? current : null);
+        }
+      } catch (error) {
+        if (!(error instanceof OwedDecisionError)) throw error;
+      }
+      acted = "no packaging block; this repository publishes to no feed";
+    } else {
+      const value = values.get("--value")?.trim() ?? "";
+      if (value === "") {
+        writeErr(
+          `owed: refused -- '${id}' needs the value itself. Nothing was ` +
+            "changed. Answer with --value <the feed URL or variable name>.\n",
+        );
+        return EXIT_REFUSED;
+      }
+      const answered = answeredValue(root, other);
+      if (answered === NOT_PUBLISHED) {
+        writeErr(
+          "owed: refused -- this repository has already been declared as " +
+            "publishing nothing. Nothing was changed; raise the question " +
+            "again if that has changed.\n",
+        );
+        return EXIT_REFUSED;
+      }
+      if (answered === null) {
+        acted = "recorded; the block is written once the other answer is in";
+      } else {
+        const reading = detectPackaging(root);
+        if (reading.recipe === null) {
+          writeErr(
+            `owed: refused -- ${reading.reason} Nothing was changed, and ` +
+              `'${id}' is still open.\n`,
+          );
+          return EXIT_REFUSED;
+        }
+        const written = appendPackagingToProjectConfig(
+          root,
+          reading.recipe,
+          id === ID_PACKAGING_FEED ? value : answered,
+          id === ID_PACKAGING_FEED ? answered : value,
+        );
+        if (written === null) {
+          writeErr(
+            "owed: refused -- the packaging block could not be written, so " +
+              `the answer is not recorded and '${id}' is still open. Either ` +
+              `${PROJECT_CONFIG_FILENAME} already declares packaging, or it ` +
+              "could not be read. Nothing was changed.\n",
+          );
+          return EXIT_REFUSED;
+        }
+        acted = written;
+      }
+    }
+  }
+
   if (id === ID_GIT_REMOTE && choice === "attach") {
     const url = values.get("--value");
     if (url === undefined || url.trim() === "") {
@@ -327,4 +404,41 @@ function markLocalOnly(repoRoot: string): string {
     }.`;
   }
   return "";
+}
+
+/**
+ * The answer already given to another decision, when there is one.
+ *
+ * Read from the folded record rather than remembered, because the two
+ * packaging questions are answered in separate commands, minutes or days
+ * apart, and the second one is what completes the block.
+ */
+function answeredChoice(repoRoot: string, id: string): string | null {
+  for (const row of currentDecisions(repoRoot)) {
+    if (String(row["id"]) !== id) continue;
+    const answer = row["answer"];
+    return typeof answer === "string" && answer ? answer : null;
+  }
+  return null;
+}
+
+/**
+ * The VALUE behind an answer, which is what the block is written from.
+ *
+ * The offered labels are placeholders -- `<the feed's index URL>` is not a
+ * URL -- so reading `answer` and writing it into a configuration file
+ * produces a feed nobody can reach. The real string arrives as `--value` and
+ * is persisted beside the choice; this reads that, and falls back to the
+ * choice only for an answer that IS its own value.
+ */
+function answeredValue(repoRoot: string, id: string): string | null {
+  for (const row of currentDecisions(repoRoot)) {
+    if (String(row["id"]) !== id) continue;
+    const answer = row["answer"];
+    if (typeof answer !== "string" || !answer) return null;
+    if (answer === NOT_PUBLISHED) return NOT_PUBLISHED;
+    const value = row["value"];
+    return typeof value === "string" && value.trim() ? value.trim() : answer;
+  }
+  return null;
 }

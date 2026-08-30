@@ -14,14 +14,16 @@ import { join, relative as relativeTo } from "node:path";
 import { TRANSPORT_ENV_VAR, VALID_TRANSPORTS } from "../config.ts";
 import { ensureRoundRefspecs, repoRootFor } from "../evidence.ts";
 import { runGit } from "../journal.ts";
-import { raiseRemoteDecision } from "../owedDecisions.ts";
+import { raisePackagingDecisions, raiseRemoteDecision } from "../owedDecisions.ts";
 import { writeProjection } from "../workflow/project.ts";
 import {
   DECOMPOSITION_PROMPT,
   IGNORE_RULE,
   PLAN_PROMPT,
   SCOPE_USER,
+  declaresPackaging,
   detectEcosystems,
+  detectPackaging,
   ensureCommitGuard,
   ensureGitignore,
   manualPersistHint,
@@ -236,6 +238,38 @@ export async function bootstrapVerb(argv: string[]): Promise<number> {
         "\n",
     );
   }
+  // The same, for publishing. A repository whose build files say they are
+  // meant to become a package has everything derivable already derived; what
+  // it cannot derive is where the result goes, and asking that once at setup
+  // is the difference between publishing and hand-authoring pack and push
+  // argv before the first release.
+  const packaging = detectPackaging(project);
+  const packagingRoot = repoRootFor(project);
+  if (packagingRoot !== null && !declaresPackaging(project)) {
+    if (packaging.recipe !== null) {
+      try {
+        raisePackagingDecisions(packagingRoot, {
+          ecosystem: packaging.recipe.key,
+          packCommand: packaging.recipe.pack.join(" "),
+        });
+        writeOut(
+          "bootstrap: this repository's build files say they are meant to be " +
+            `published (${packaging.recipe.key}). Two questions are waiting in ` +
+            "`dabbler owed list`: which feed, and the NAME of the credential. " +
+            "Answer them and the packaging block is written for you.\n",
+        );
+      } catch {
+        // A brief that cannot be written must not fail a bootstrap.
+      }
+    } else if (packaging.reason) {
+      // Silence that explains itself. "No packaging block" and "no packaging
+      // block BECAUSE your project files are below the root" are the same
+      // outcome and not the same message, and only one of them can be acted
+      // on.
+      writeOut(`bootstrap: no packaging declared -- ${packaging.reason}\n`);
+    }
+  }
+
   // Asked at setup, where the answer is cheap, rather than at the close --
   // which is where it used to surface, as a printed `git push
   // --set-upstream` for a remote nobody had created.

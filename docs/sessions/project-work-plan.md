@@ -81,7 +81,7 @@ it.
 | 43 | Liveness, and one place the operator looks | no | 2026-08-30 |
 | 44 | `solution-dependencies.json` — the edge, never the pin | no | 2026-08-30 |
 | 45 | Resolution modes, inside the declare-and-check line | no | 2026-08-30 |
-| 46 | Packaging declared for the ecosystem it is | — | not declared |
+| 46 | Packaging declared for the ecosystem it is | no | 2026-08-30 |
 | 47 | The Solution Explorer goes cross-repo | — | not declared |
 | 48 | The generated workspace | — | not declared |
 | 49 | The thing becomes installable | — | not declared |
@@ -1450,6 +1450,12 @@ What this session does:
 Not releasable: it publishes nothing.
 
 ### Session 45 — Resolution modes, inside the declare-and-check line
+
+**Releasable: no.**
+
+Affected; verify; full suite as final-full; close
+
+### Session 46 — Packaging declared for the ecosystem it is
 
 **Releasable: no.**
 

@@ -999,9 +999,9 @@
     {
       "number": 51,
       "title": "What the field trial found, and nothing else",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-30T18:31:42.463000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-08-30T18:37:24.181000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

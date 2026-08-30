@@ -5,8 +5,9 @@
 // driveable from the unit suite. This class converts descriptors into TreeItems
 // and owns the platform lifecycle.
 //
-// It reads a projection written by `python -m ai_router.workflow`; it never
-// folds the event log itself.
+// It reads a projection written by the router (`workflow/project.ts`, called
+// from every mutating `dabbler workflow` command); it never folds the event
+// log itself.
 
 import * as fs from "fs";
 import * as path from "path";

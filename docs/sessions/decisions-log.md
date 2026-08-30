@@ -7662,3 +7662,139 @@ dispute had reached: amend the plan. Round 3 verified, with two nits about
 the amendment's own wording. **The loop earned its cost**: the defect it
 caught was invisible to every control, and the process point it made in round
 2 is the one this session would otherwise have got wrong.
+
+## Session 37 — The extension surveyed against the principles
+
+### D240 · 2026-08-30 · Orchestrator · Session 40's premise is half wrong: plan steps are already seeded and ticked
+
+Session 40 was planned on the premise that a session's steps do not exist in
+machine-readable form, and that a task-file schema must be introduced so that
+`session declare` can write `approved-plan.json` for the task rows to fold.
+
+Half of that premise is wrong, and this session found it by starting: `dabbler
+session start` printed *"6 plan step(s) seeded"*, parsed from session 37's own
+numbered step list in `session-plan.md`, each with a `stepKey`, and `session
+log --step <key> --status complete` ticks them. Those rows are written to the
+activity log by `writers.seedSessionPlan`.
+
+So a session's steps already exist, already come from the plan, and already
+have a completion mechanism. What does not exist is the join to the projection
+the tree renders: `progress.buildTaskRows` folds
+`.dabbler/runs/s<N>/approved-plan.json`, which has no production writer, while
+the seeded rows sit in the activity log where the task level never looks.
+
+Two mechanisms, one purpose, and the tree reads the one nobody writes.
+
+Session 40 must re-derive its approach from both before writing code. Reading
+the rows `start` already seeds is the cheaper route and the one "one
+implementation of any rule" prefers; introducing a second declaration grammar
+beside a working one is the outcome that constraint exists to prevent. The
+choice is session 40's to make with the evidence in front of it, so this
+session amends nothing in session 40's plan text -- it records the evidence
+that the plan's stated premise is not what the tree does.
+
+Note that this does not rescue the reviewers' finding against the ORIGINAL
+draft: inferring a step's completion from a file-envelope diff remains
+unsound, and the seeded rows are ticked by an explicit call, which is the
+shape both reviewers asked for.
+
+### D241 · 2026-08-30 · Orchestrator · The clipboard prompt commands are measured, not changed: removing them is the executor decision
+
+The survey rates the four clipboard prompt commands a Major against principles
+(a) and (c): `dabbler.copyStartNextSessionPrompt`, `copySessionRunPrompt`,
+`copySendBackPrompt` and `respecifySession` exist to move text from the
+framework to an engine through a person. With the `Copy Prompt` submenu and the
+left-click clipboard handler in `workExplorerTreeCommands.ts`, that is six
+places where the operator is the transport layer.
+
+It is recorded and not changed, and the reason is an authority boundary rather
+than effort. Removing it means the framework advancing sessions on its own,
+which is an executor -- RACI open item 1, named there as "infrastructure the
+operator has not asked for", and named in this block's own "does NOT do"
+section. Building one because a survey found the alternative undignified would
+be the working AI deciding its own scheduling authority.
+
+What the survey owed here was a measurement, and the measurement is the finding
+itself: six sites, four commands, one submenu. If the operator settles open
+item 1 toward an executor, this row is the inventory of what it replaces. If
+they settle it the other way, the row is the honest name for the current
+design -- "human-operated sessions", not "silent supervision".
+
+### D242 · 2026-08-30 · Orchestrator · The extension is covered by no declared suite; assigned to session 39 before session 41 runs
+
+This repository under-declares its own test suites, and this session found it
+by being the first one in a long while to change only extension files.
+
+`dabbler.yaml` declares one suite, `typescript`, covering `packages/router/`,
+`package.json`, `package-lock.json` and `dabbler.yaml`. The VS Code extension
+under `tools/dabbler-ai-orchestration/` is covered by nothing. Its 123 tests
+(`npm run test:unit`) are not declared as a suite at all.
+
+The consequence is the shape of `csv-model` feedback item 3, on the framework's
+own repository: a session that changes only the extension has `dabbler
+affected` select zero tests, records no preverification evidence because there
+is no suite to name, and closes with the gates green. This session is that
+session -- `affected` printed "no tests affected by this change set" for a
+change set containing two extension source files and eight extension assets.
+
+It matters immediately rather than eventually. Sessions 41, 42, 43 and 47 are
+all extension-heavy, and under the present declaration each of them would run
+zero tests and close clean.
+
+This session does NOT fix it, and the reason is the tiebreak ladder rather than
+effort. `defer-to-existing-gate`: session 39 is scheduled next, its entire
+subject is verification that reports what it cannot see, and it lands before
+every extension-heavy session in the block. Declaring a second suite is also
+not free -- it puts the extension suite in every later session's selection --
+and that trade belongs in the session that is already reasoning about suite
+declaration, not in a survey that widened its own scope to reach it.
+
+Assigned to session 39, which must declare the extension suite in `dabbler.yaml`
+before session 41 runs. If session 39 decides against declaring it, that
+decision has to say what makes four sessions of untested extension work
+acceptable.
+
+Evidence recorded by hand in this session instead: the extension suite was run
+directly and its result is reported in the close-out, because a survey that
+edits eight assets and two sources and proves nothing about them is not a
+survey anyone should trust.
+
+### D243 · 2026-08-30 · Orchestrator · Three config tests read a real env var, so the run of record measured the shell
+
+The run of record for this session came back RED on the first attempt -- three
+failures in `test/config.test.ts`, all of them asserting that
+`resolveTransport` returns the value an overlay declares. Nothing in this
+session touched transport code, config, or the router at all.
+
+The cause is the environment. `DABBLER_TRANSPORT=api` was set in the shell the
+suite ran in, and the documented precedence is `--transport` flag, then the
+`DABBLER_TRANSPORT` environment variable, then `transport.profile` in
+configuration, then the `api` default. The environment variable outranks the
+overlay the test declares, so the test measured the shell rather than the code.
+Re-running the same file with the variable cleared: 47 passed, 0 failed.
+
+**Three tests in this suite pass or fail according to a variable nobody
+declared.** That is a defect in a framework whose entire claim is that the
+record is honest. A run of record is supposed to bind a verdict to a tree;
+these three bind it to a shell. CI is green because CI happens not to set the
+variable -- not because the tests are correct.
+
+It is worse than an ordinary flake for two reasons. It is silent: the failure
+names an assertion about configuration precedence, and nothing in the output
+suggests the environment is the cause, so the honest reading of a red run is
+"my change broke transport resolution". And it is reachable by ordinary use --
+`dabbler bootstrap` persists `DABBLER_TRANSPORT=copilot-cli` at user scope as a
+documented side effect, so any operator who has run bootstrap has ambient state
+that these tests read.
+
+Assigned to session 39, which owns verification that reports something other
+than what is true. The fix is to make the resolution's inputs explicit to the
+test rather than ambient -- the test declares an overlay and should be able to
+declare the environment beside it. Widening the suite command to scrub
+variables would be the wrong repair: it hides the coupling instead of removing
+it, and the next ambient input would land the same way.
+
+What this session did: cleared the stray variable and re-ran the declared suite
+command verbatim, so the recorded command is the command that ran. The run of
+record for session 37 is that run, not the contaminated one. A failed run of
+record is not reusable proof and was not reused.

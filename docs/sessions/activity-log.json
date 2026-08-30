@@ -7930,6 +7930,159 @@
       "body": "**Three vendor calls, 125,632 in / 13,694 out \u2014 139,326 tokens**, all\n`gpt-5-6-sol` over the direct API, all `session-verification`. Rounds 1, 2\nand 3.\n\n**No seat transport was used**, so `seat_cost` has no conversation id to\nprice and this session is not comparable to the seat series. The plan's step\n6 says \"measure this session's seat cost and record it\"; there is none, and\nthe amendment on the plan says so rather than filing a zero that would read\nas a measurement.\n\nIt is the second most expensive session of the port, behind session 35's\n147,120 and ahead of session 23's 136,020 \u2014 and the shape is different from\neither. Session 35's round 1 was 86% of its total. Here the three rounds are\ncomparable in size, because rounds 2 and 3 each carried two file-backed\ndisputes and then a plan amendment into a fix delta that was otherwise a few\ndocuments. **Disputing is not free**: a rebuttal rides the prompt whole, and\nthe second dispute cited two schemas in full.\n\n**The evidence bundle is why this session is not far more expensive.** The\nround-1 diff would have been 2.3 MB without `--irreversible-delete` (D236);\nit was 256,668 characters with it. At roughly four characters per token that\nis the difference between a round that fits in a context window and one that\ndoes not, and the whole of the saving was removed Python nobody would have\nread.\n\n**What the three rounds bought.** Round 1 raised two Major and three nits;\none nit was a real defect this session introduced \u2014 dropping the `!vsix-v*`\nexclusion from the npm release trigger, which would have started the router's\npublish workflow on every Marketplace tag. The other two nits were an\nunwritten `STATUS.md` and a stale `docs/schema-reference.md`, both fair.\nRound 2 upheld both Majors and, in doing so, named the resolution neither\ndispute had reached: amend the plan. Round 3 verified, with two nits about\nthe amendment's own wording. **The loop earned its cost**: the defect it\ncaught was invisible to every control, and the process point it made in round\n2 is the one this session would otherwise have got wrong.",
       "model": "claude-opus-5",
       "provider": "anthropic"
+    },
+    {
+      "sessionNumber": 37,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-30T12:16:57.294000-04:00",
+      "description": "Register; declare `--not-releasable`.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 37,
+      "stepNumber": 2,
+      "stepKey": "inventory-every-contributed-command-view-menu",
+      "dateTime": "2026-08-30T12:16:57.294000-04:00",
+      "description": "Inventory every contributed command, view, menu, welcome state and walkthrough from the manifest, and every operator-facing string.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 37,
+      "stepNumber": 3,
+      "stepKey": "evaluate-four-journeys-open-an-existing",
+      "dateTime": "2026-08-30T12:16:57.294000-04:00",
+      "description": "Evaluate four journeys \u2014 open an existing project, create a project, watch a session run, navigate to a related repository \u2014 in empty, loading, success and error states, against each of the eight principles.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 37,
+      "stepNumber": 4,
+      "stepKey": "fix-only-what-needs-no-design",
+      "dateTime": "2026-08-30T12:16:57.294000-04:00",
+      "description": "Fix only what needs no design decision. Two are already identified: **all eight status icons declare `width=\"16mm\" height=\"16mm\"` against a 16-unit viewBox** \u2014 roughly 60px of intrinsic size in a 16px row, which is the probable cause of `csv-model` item 1, filed by a session that could not see the UI; and two file headers still name `python -m ai_router.workflow` as the projection's writer. Verify the icons under both themes with indent guides on.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 37,
+      "stepNumber": 5,
+      "stepKey": "amend-the-plan-for-sessions-41",
+      "dateTime": "2026-08-30T12:16:57.294000-04:00",
+      "description": "Amend the plan for sessions 41, 42 and 47 with what the survey found. A session that cannot follow its plan amends the plan on the record.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 37,
+      "stepNumber": 6,
+      "stepKey": "affected",
+      "dateTime": "2026-08-30T12:16:57.294000-04:00",
+      "description": "Affected; verify; full suite as `final-full`; close.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 37,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-30T12:16:57.314000-04:00",
+      "description": "Registered session 37 (claude-code).",
+      "status": "complete"
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 37,
+      "dateTime": "2026-08-30T12:17:40.004000-04:00",
+      "task": "Session 37 of 50 \u2014 The extension surveyed against the principles.\n\nWalk the whole VS Code extension (24 files, 4,029 lines, 123 tests) against\nthe operator's eight DX principles of 2026-08-30, and produce a finite\nfindings table that sessions 41, 42 and 47 implement against.\n\nWhat this session does:\n\n1. Inventory every contributed command, view, menu, welcome state and\n   walkthrough from the extension manifest, and every operator-facing\n   string in the source.\n2. Evaluate four journeys \u2014 open an existing project, create a project,\n   watch a session run, navigate to a related repository \u2014 in their empty,\n   loading, success and error states, against each of the eight principles.\n3. Write the survey to docs/extension-dx-survey.md: one row per finding\n   with file, principle, severity, reproduction, owning session, and an\n   explicit reason for anything deferred.\n4. Fix only what needs no design decision:\n   - the eight status icons in media/{light,dark}/ declare width/height of\n     \"16mm\" (~60 CSS px) against a 16-unit viewBox, in a 16 px tree row \u2014\n     the probable cause of csv-model feedback item 1;\n   - two provider file headers still name `python -m ai_router.workflow` as\n     the projection's writer, which has been TypeScript since the cutover.\n5. Amend the plan for sessions 41, 42 and 47 with what the survey found.\n\nThis session is a survey. It does not refactor the extension, and it does\nnot implement any finding that needs a design decision \u2014 those are filed\nwith an owning session and left.\n\nNot releasable: it publishes nothing.",
+      "releasable": false
+    },
+    {
+      "sessionNumber": 37,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-30T12:20:50.151000-04:00",
+      "description": "Register; declare `--not-releasable`.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 37,
+      "stepNumber": 2,
+      "stepKey": "inventory-every-contributed-command-view-menu",
+      "dateTime": "2026-08-30T12:20:50.376000-04:00",
+      "description": "Inventory every contributed command, view, menu, welcome state and walkthrough from the manifest, and every operator-facing string.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 37,
+      "stepNumber": 3,
+      "stepKey": "evaluate-four-journeys-open-an-existing",
+      "dateTime": "2026-08-30T12:20:50.558000-04:00",
+      "description": "Evaluate four journeys \u2014 open an existing project, create a project, watch a session run, navigate to a related repository \u2014 in empty, loading, success and error states, against each of the eight principles.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 37,
+      "stepNumber": 4,
+      "stepKey": "fix-only-what-needs-no-design",
+      "dateTime": "2026-08-30T12:20:50.749000-04:00",
+      "description": "Fix only what needs no design decision. Two are already identified: **all eight status icons declare `width=\"16mm\" height=\"16mm\"` against a 16-unit viewBox** \u2014 roughly 60px of intrinsic size in a 16px row, which is the probable cause of `csv-model` item 1, filed by a session that could not see the UI; and two file headers still name `python -m ai_router.workflow` as the projection's writer. Verify the icons under both themes with indent guides on.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 37,
+      "stepNumber": 5,
+      "stepKey": "amend-the-plan-for-sessions-41",
+      "dateTime": "2026-08-30T12:20:50.942000-04:00",
+      "description": "Amend the plan for sessions 41, 42 and 47 with what the survey found. A session that cannot follow its plan amends the plan on the record.",
+      "status": "complete"
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D240",
+      "ordinal": 240,
+      "sessionNumber": 37,
+      "decidedOn": "2026-08-30",
+      "recordedAt": "2026-08-30T12:21:18.931000-04:00",
+      "decider": "orchestrator",
+      "headline": "Session 40's premise is half wrong: plan steps are already seeded and ticked",
+      "body": "Session 40 was planned on the premise that a session's steps do not exist in\nmachine-readable form, and that a task-file schema must be introduced so that\n`session declare` can write `approved-plan.json` for the task rows to fold.\n\nHalf of that premise is wrong, and this session found it by starting: `dabbler\nsession start` printed *\"6 plan step(s) seeded\"*, parsed from session 37's own\nnumbered step list in `session-plan.md`, each with a `stepKey`, and `session\nlog --step <key> --status complete` ticks them. Those rows are written to the\nactivity log by `writers.seedSessionPlan`.\n\nSo a session's steps already exist, already come from the plan, and already\nhave a completion mechanism. What does not exist is the join to the projection\nthe tree renders: `progress.buildTaskRows` folds\n`.dabbler/runs/s<N>/approved-plan.json`, which has no production writer, while\nthe seeded rows sit in the activity log where the task level never looks.\n\nTwo mechanisms, one purpose, and the tree reads the one nobody writes.\n\nSession 40 must re-derive its approach from both before writing code. Reading\nthe rows `start` already seeds is the cheaper route and the one \"one\nimplementation of any rule\" prefers; introducing a second declaration grammar\nbeside a working one is the outcome that constraint exists to prevent. The\nchoice is session 40's to make with the evidence in front of it, so this\nsession amends nothing in session 40's plan text -- it records the evidence\nthat the plan's stated premise is not what the tree does.\n\nNote that this does not rescue the reviewers' finding against the ORIGINAL\ndraft: inferring a step's completion from a file-envelope diff remains\nunsound, and the seeded rows are ticked by an explicit call, which is the\nshape both reviewers asked for."
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D241",
+      "ordinal": 241,
+      "sessionNumber": 37,
+      "decidedOn": "2026-08-30",
+      "recordedAt": "2026-08-30T12:21:37.395000-04:00",
+      "decider": "orchestrator",
+      "headline": "The clipboard prompt commands are measured, not changed: removing them is the executor decision",
+      "body": "The survey rates the four clipboard prompt commands a Major against principles\n(a) and (c): `dabbler.copyStartNextSessionPrompt`, `copySessionRunPrompt`,\n`copySendBackPrompt` and `respecifySession` exist to move text from the\nframework to an engine through a person. With the `Copy Prompt` submenu and the\nleft-click clipboard handler in `workExplorerTreeCommands.ts`, that is six\nplaces where the operator is the transport layer.\n\nIt is recorded and not changed, and the reason is an authority boundary rather\nthan effort. Removing it means the framework advancing sessions on its own,\nwhich is an executor -- RACI open item 1, named there as \"infrastructure the\noperator has not asked for\", and named in this block's own \"does NOT do\"\nsection. Building one because a survey found the alternative undignified would\nbe the working AI deciding its own scheduling authority.\n\nWhat the survey owed here was a measurement, and the measurement is the finding\nitself: six sites, four commands, one submenu. If the operator settles open\nitem 1 toward an executor, this row is the inventory of what it replaces. If\nthey settle it the other way, the row is the honest name for the current\ndesign -- \"human-operated sessions\", not \"silent supervision\"."
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D242",
+      "ordinal": 242,
+      "sessionNumber": 37,
+      "decidedOn": "2026-08-30",
+      "recordedAt": "2026-08-30T12:22:52.681000-04:00",
+      "decider": "orchestrator",
+      "headline": "The extension is covered by no declared suite; assigned to session 39 before session 41 runs",
+      "body": "This repository under-declares its own test suites, and this session found it\nby being the first one in a long while to change only extension files.\n\n`dabbler.yaml` declares one suite, `typescript`, covering `packages/router/`,\n`package.json`, `package-lock.json` and `dabbler.yaml`. The VS Code extension\nunder `tools/dabbler-ai-orchestration/` is covered by nothing. Its 123 tests\n(`npm run test:unit`) are not declared as a suite at all.\n\nThe consequence is the shape of `csv-model` feedback item 3, on the framework's\nown repository: a session that changes only the extension has `dabbler\naffected` select zero tests, records no preverification evidence because there\nis no suite to name, and closes with the gates green. This session is that\nsession -- `affected` printed \"no tests affected by this change set\" for a\nchange set containing two extension source files and eight extension assets.\n\nIt matters immediately rather than eventually. Sessions 41, 42, 43 and 47 are\nall extension-heavy, and under the present declaration each of them would run\nzero tests and close clean.\n\nThis session does NOT fix it, and the reason is the tiebreak ladder rather than\neffort. `defer-to-existing-gate`: session 39 is scheduled next, its entire\nsubject is verification that reports what it cannot see, and it lands before\nevery extension-heavy session in the block. Declaring a second suite is also\nnot free -- it puts the extension suite in every later session's selection --\nand that trade belongs in the session that is already reasoning about suite\ndeclaration, not in a survey that widened its own scope to reach it.\n\nAssigned to session 39, which must declare the extension suite in `dabbler.yaml`\nbefore session 41 runs. If session 39 decides against declaring it, that\ndecision has to say what makes four sessions of untested extension work\nacceptable.\n\nEvidence recorded by hand in this session instead: the extension suite was run\ndirectly and its result is reported in the close-out, because a survey that\nedits eight assets and two sources and proves nothing about them is not a\nsurvey anyone should trust."
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D243",
+      "ordinal": 243,
+      "sessionNumber": 37,
+      "decidedOn": "2026-08-30",
+      "recordedAt": "2026-08-30T12:27:01.130000-04:00",
+      "decider": "orchestrator",
+      "headline": "Three config tests read a real env var, so the run of record measured the shell",
+      "body": "The run of record for this session came back RED on the first attempt -- three\nfailures in `test/config.test.ts`, all of them asserting that\n`resolveTransport` returns the value an overlay declares. Nothing in this\nsession touched transport code, config, or the router at all.\n\nThe cause is the environment. `DABBLER_TRANSPORT=api` was set in the shell the\nsuite ran in, and the documented precedence is `--transport` flag, then the\n`DABBLER_TRANSPORT` environment variable, then `transport.profile` in\nconfiguration, then the `api` default. The environment variable outranks the\noverlay the test declares, so the test measured the shell rather than the code.\nRe-running the same file with the variable cleared: 47 passed, 0 failed.\n\n**Three tests in this suite pass or fail according to a variable nobody\ndeclared.** That is a defect in a framework whose entire claim is that the\nrecord is honest. A run of record is supposed to bind a verdict to a tree;\nthese three bind it to a shell. CI is green because CI happens not to set the\nvariable -- not because the tests are correct.\n\nIt is worse than an ordinary flake for two reasons. It is silent: the failure\nnames an assertion about configuration precedence, and nothing in the output\nsuggests the environment is the cause, so the honest reading of a red run is\n\"my change broke transport resolution\". And it is reachable by ordinary use --\n`dabbler bootstrap` persists `DABBLER_TRANSPORT=copilot-cli` at user scope as a\ndocumented side effect, so any operator who has run bootstrap has ambient state\nthat these tests read.\n\nAssigned to session 39, which owns verification that reports something other\nthan what is true. The fix is to make the resolution's inputs explicit to the\ntest rather than ambient -- the test declares an overlay and should be able to\ndeclare the environment beside it. Widening the suite command to scrub\nvariables would be the wrong repair: it hides the coupling instead of removing\nit, and the next ambient input would land the same way.\n\nWhat this session did: cleared the stray variable and re-ran the declared suite\ncommand verbatim, so the recorded command is the command that ran. The run of\nrecord for session 37 is that run, not the contaminated one. A failed run of\nrecord is not reusable proof and was not reused."
     }
   ]
 }

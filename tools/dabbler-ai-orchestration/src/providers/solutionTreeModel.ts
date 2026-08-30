@@ -1,8 +1,8 @@
 // What the Solution Explorer says, decided without vscode so the unit suite
 // can drive it.
 //
-// This file renders; it never decides. The projection is written by
-// `python -m ai_router.workflow`, and folding the event log stays in Python —
+// This file renders; it never decides. The projection is written by the
+// router (`workflow/project.ts`), and folding the event log stays there —
 // two implementations of one rule disagree eventually, and the disagreement
 // surfaces as a status nobody can explain.
 

@@ -72,6 +72,20 @@ it.
 | 34 | Bootstrap, packaging, and the `dabbler` command on the PATH | no | 2026-08-29 |
 | 35 | The six-step workflow ported, the run core retired | no | 2026-08-29 |
 | 36 | Cutover — the extension calls in-process, and Python leaves | yes | 2026-08-29 |
+| 37 | The extension surveyed against the principles | no | 2026-08-30 |
+| 38 | The projection stops withholding the plan | — | not declared |
+| 39 | Verification stops lying, and an unanswered gap stops the close | — | not declared |
+| 40 | Task rows — a structured declaration, a framework-owned state machine | — | not declared |
+| 41 | Setup owns the runway | — | not declared |
+| 42 | The panes say what they are, and the Solution Explorer lights up | — | not declared |
+| 43 | Liveness, and one place the operator looks | — | not declared |
+| 44 | `solution-dependencies.json` — the edge, never the pin | — | not declared |
+| 45 | Resolution modes, inside the declare-and-check line | — | not declared |
+| 46 | Packaging declared for the ecosystem it is | — | not declared |
+| 47 | The Solution Explorer goes cross-repo | — | not declared |
+| 48 | The generated workspace | — | not declared |
+| 49 | The thing becomes installable | — | not declared |
+| 50 | The field trial, and the exercise reported back | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -1102,3 +1116,38 @@ Releasable. This is the port's last session; it publishes extension 2.0.0 and
 
 **The acceptance test of the whole set:** the TypeScript router verifies,
 records and closes this session, with no Python in the tree.
+
+### Session 37 — The extension surveyed against the principles
+
+**Releasable: no.**
+
+Session 37 of 50 — The extension surveyed against the principles.
+
+Walk the whole VS Code extension (24 files, 4,029 lines, 123 tests) against
+the operator's eight DX principles of 2026-08-30, and produce a finite
+findings table that sessions 41, 42 and 47 implement against.
+
+What this session does:
+
+1. Inventory every contributed command, view, menu, welcome state and
+   walkthrough from the extension manifest, and every operator-facing
+   string in the source.
+2. Evaluate four journeys — open an existing project, create a project,
+   watch a session run, navigate to a related repository — in their empty,
+   loading, success and error states, against each of the eight principles.
+3. Write the survey to docs/extension-dx-survey.md: one row per finding
+   with file, principle, severity, reproduction, owning session, and an
+   explicit reason for anything deferred.
+4. Fix only what needs no design decision:
+   - the eight status icons in media/{light,dark}/ declare width/height of
+     "16mm" (~60 CSS px) against a 16-unit viewBox, in a 16 px tree row —
+     the probable cause of csv-model feedback item 1;
+   - two provider file headers still name `python -m ai_router.workflow` as
+     the projection's writer, which has been TypeScript since the cutover.
+5. Amend the plan for sessions 41, 42 and 47 with what the survey found.
+
+This session is a survey. It does not refactor the extension, and it does
+not implement any finding that needs a design decision — those are filed
+with an owning session and left.
+
+Not releasable: it publishes nothing.

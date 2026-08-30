@@ -1745,9 +1745,18 @@ as SKIP fixes the label and not the defect.
    surface digest, so it cannot be hand-authored.
 8. The malformed-suite message names `dabbler.yaml`, not `router-config.yaml`.
    `--help` is accepted after a subcommand on every verb.
-9. Affected; verify; full suite as `final-full`; close.
+9. **Declare the extension as a suite in `dabbler.yaml` (D242, from session
+   37).** `tools/` is covered by nothing today, so `dabbler affected` selects
+   zero tests for an extension-only change and the session closes green having
+   run nothing — `csv-model` item 3's defect on this repository. Session 37 hit
+   it live. **This must land before session 41**, because 41, 42, 43 and 47 are
+   all extension-heavy and would each run zero tests. Note the cost being
+   accepted: a second expensive suite enters every later session's selection.
+   If this session decides against declaring it, the decision must say what
+   makes four sessions of untested extension work acceptable.
+10. Affected; verify; full suite as `final-full`; close.
 
-**Closes:** `csv-model` items 3, 6, 7, 8. Est. 24 tests.
+**Closes:** `csv-model` items 3, 6, 7, 8; D242. Est. 26 tests.
 
 ---
 
@@ -1816,10 +1825,24 @@ session 1 is refused while they sit uncommitted. The close prints `git push
 5. A `contributes.walkthroughs` entry and a `file/newFile` contribution: as
    close to *File > New > Dabbler Project* as the API allows. The native
    File > New submenu is not extensible, and recording that here stops a later
-   session rediscovering it.
-6. Affected; verify; full suite as `final-full`; close.
+   session rediscovering it. *(Survey F6.)*
+6. **Amended by session 37's survey** (`docs/extension-dx-survey.md`), which
+   found three of its four Majors on this journey:
+   - **F1** — setup ends with *"Open a terminal and run `dabbler session
+     start`"* (`bootstrapProject.ts:60`). The framework wrote the files and
+     knows the next verb.
+   - **F2** — the first-run offer claims setup *"creates the workspace .venv,
+     installs the ai-router into it"* (`extension.ts:63-65`). It has done
+     neither since the cutover. **Treat this as a correctness fix, not copy:**
+     it is the only string in the extension that describes work the product
+     stopped doing, and it is the first sentence a new operator reads.
+   - **F3** — Start and Close are pre-typed into a terminal rather than run
+     (`sessionTerminalCommands.ts`). Start carries a decision and the keystroke
+     is not it; Close carries no decision at all.
+7. Affected; verify; full suite as `final-full`; close.
 
-**Closes:** `csv-model` item 2. Est. 14 tests, of which 5 are the extension's.
+**Closes:** `csv-model` item 2, survey F1, F2, F3, F6. Est. 14 tests, of which
+5 are the extension's.
 
 ---
 
@@ -1837,11 +1860,17 @@ exists rather than building a writer.*
 4. `bootstrap` scaffolds a `solution.yaml` — one component, named for the
    repository — and writes the first projection, so the view has content from
    the first minute rather than after a verb nobody knew to run.
-5. Whatever session 37's survey assigned here.
+5. **Amended by session 37's survey** (`docs/extension-dx-survey.md`):
+   - **F5** — neither view has a `viewsWelcome`, so a new project shows two
+     blank panels and no explanation. This is `csv-model` item 4, and step 3
+     above is its fix; the Work Explorer needs one too.
+   - **F9** — a projection failure reaches the operator as `projection failed:
+     <raw error>` (`utils/projection.ts:104-112`). It says what broke and never
+     what to do about it.
 6. Affected; verify; full suite as `final-full`; close.
 
-**Closes:** `csv-model` item 4, operator point 4. Est. 8 tests, of which 6 are
-the extension's.
+**Closes:** `csv-model` item 4, operator point 4, survey F5, F9. Est. 8 tests,
+of which 6 are the extension's.
 
 ---
 
@@ -1871,10 +1900,27 @@ places, is not an improvement.
    stopped at the round cap. Nothing new is derived here — this is the fourth
    consumer of three existing projections, and if it needs a new field the
    field belongs to whichever session owns that fact.
-5. Affected; verify; full suite as `final-full`; close.
+5. **Amended by session 37's survey** (`docs/extension-dx-survey.md`). The
+   survey was scoped to amend 41, 42 and 47; it assigned four findings here as
+   well, and they are recorded rather than left unowned:
+   - **F11** — a 30-second `setInterval` (`extension.ts:148`) is the only thing
+     advancing state between file events, and nothing anywhere says whether a
+     session is alive, moving or stalled. That is step 2's reason for existing.
+   - **F12** — there are **zero** `withProgress` call sites in the extension.
+     Verification rounds run for minutes and the UI is indistinguishable from
+     hung. The heartbeat in step 2 is the record; this is the feedback.
+   - **F13** — the extension contributes **no configuration properties at
+     all**. The stall threshold in step 2 is the first setting that needs a
+     home, so this session establishes one.
+   - **F10** — `troubleshoot.ts` composes "a line for the operator to run by
+     hand" instead of running it and showing the result. A copyable line is
+     defensible in a diagnostic; running it is better, and this is the session
+     that owns operator-facing liveness.
+6. Affected; verify; full suite as `final-full`; close.
 
 **Creates:** the answer to "what happened while I was away", in one place.
-Est. 14 tests, of which 5 are the extension's.
+**Closes:** survey F10, F11, F12, F13. Est. 14 tests, of which 5 are the
+extension's.
 
 ---
 
@@ -2006,7 +2052,12 @@ Est. 16 tests.
    2026-08-23 direction sketched and nothing has rendered.
 5. Navigation: **Open Repository**, **Open in New Window**, **Reveal in File
    Explorer**. The tree has no context menu at all today.
-6. Whatever session 37's survey assigned here.
+6. **Amended by session 37's survey** (`docs/extension-dx-survey.md`): the
+   "navigate to a related repository" journey was found to **not exist at all**
+   — the Solution Explorer contributes no `view/item/context` menu and no
+   command opens or reveals a repository. Step 5 is therefore net-new surface
+   rather than a change to existing behaviour, and it is the whole of that
+   journey.
 7. Affected; verify; full suite as `final-full`; close.
 
 **Closes:** operator point 3. Est. 16 tests, of which 7 are the extension's.

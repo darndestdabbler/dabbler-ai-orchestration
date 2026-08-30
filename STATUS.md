@@ -1,8 +1,15 @@
-# STATUS — the port is complete: the extension calls the router in-process, and there is no Python
+# STATUS — sessions 37–50 are planned and the first is closed: the framework turns toward the operator
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
 `experiment/verification-pipeline-v3` and `design/solution-decomposition`
 are merged and finished. Earlier handoff text is in `docs/status-archive.md`.
+
+> **Recorded, 2026-08-30.** Session 37's deliverables are decisions
+> **D240–D243** in `docs/sessions/decisions-log.md`, and its survey is
+> `docs/extension-dx-survey.md`. Three of the four were found by *running*
+> the session rather than by planning it, and each one changes a later
+> session: D240 (session 40's premise), D242 (session 39 owes the extension
+> suite before session 41), D243 (the suite is not hermetic).
 
 > **Recorded, 2026-08-29.** Session 36's deliverables are decisions
 > **D231–D238**; session 35's are **D224–D230**;
@@ -29,6 +36,58 @@ are merged and finished. Earlier handoff text is in `docs/status-archive.md`.
 > and is now 36.
 
 ## Where things are
+
+**Session 37 of 50 is closed, and the block it opens is the operator's.**
+Sessions 37–50 turn the framework toward the person operating it, planned
+against the operator's eight DX principles of 2026-08-30, `csv-model`'s
+nine-item feedback log, the RACI proposal in `docs/raci-fable.md`, and a
+parallel review of the plan's first draft by `gpt-5-6-sol` and
+`gemini-3-1-pro`.
+
+- **Session 37 was a survey, and it is `docs/extension-dx-survey.md`.** Thirteen
+  findings across 24 files and 4,029 lines of extension, each with an owning
+  session. Two were fixed in the session because they needed no design
+  decision; the rest were filed, not fixed. Four Majors, three of which sit on
+  the "create a project" journey — the one a new developer meets first.
+- **The eight status icons were declared in millimetres.**
+  `width="16mm" height="16mm"` against a 16-unit viewBox, rendered in a 16-pixel
+  tree row: about 60 CSS pixels of intrinsic size. That is the probable cause
+  of `csv-model` feedback item 1, which its own session filed as unverifiable
+  because a session has no view of the rendered UI. Static reading found what
+  looking could not.
+- **Three decisions, and the one that matters most was not in the plan.**
+  D242: `tools/` is covered by no declared suite, so `dabbler affected`
+  selected **zero tests** for a change set of two extension sources and eight
+  extension assets, and this session could have closed green having run
+  nothing. That is `csv-model` item 3's defect on this repository. It is
+  assigned to session 39 and **must land before session 41**, because 41, 42,
+  43 and 47 are all extension-heavy. The extension suite was run by hand
+  instead: 123 passing, exit 0.
+- **D240 corrects session 40's premise before session 40 starts.** `dabbler
+  session start` already seeds a session's plan steps from its step list —
+  this session's own start printed six, each with a `stepKey`, and `session log`
+  ticks them. Session 40 was planned as though those steps did not exist. They
+  do; what does not exist is the join to the projection the tree renders, since
+  `buildTaskRows` folds an `approved-plan.json` nothing writes while the seeded
+  rows sit in the activity log. Two mechanisms, one purpose, and the tree reads
+  the one nobody writes. Session 40 must re-derive its approach from both.
+- **D241 records what the survey deliberately did not change.** Six sites move
+  text from the framework to an engine through a person. Removing them means
+  building an executor, which is RACI open item 1 and the operator's decision,
+  not a survey's.
+- **One RACI cell is corrected rather than followed.** It marks the Solution
+  Explorer a live defect because the projection's only writer was Python and
+  was deleted at the cutover. `writeProjection` is TypeScript and six sites
+  call it; the tree is empty because nothing scaffolds a manifest, the one
+  read-only verb computes without writing, and there is no `viewsWelcome`.
+  Session 42 wires rather than builds.
+
+**The sessions are strictly sequential.** The ledger holds one `in-progress`
+entry, `declare` takes the lifecycle lock, and session 37 has now amended the
+step lists of 39, 41, 42, 43 and 47 — two more than it planned to, because the
+survey found findings they owned.
+
+## Where things were at session 36
 
 **The port is done.** Sessions 22–36 replaced a Python package and a
 TypeScript renderer over it with one TypeScript implementation. There is no

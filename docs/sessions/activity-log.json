@@ -9333,6 +9333,66 @@
       "dateTime": "2026-08-30T17:58:17.721000-04:00",
       "description": "Register; declare `--not-releasable`.",
       "status": "in-progress"
+    },
+    {
+      "sessionNumber": 49,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-30T18:08:06.337000-04:00",
+      "description": "Register; declare **`--releasable`**.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 49,
+      "stepNumber": 2,
+      "stepKey": "raise-the-publication-decision-as-a",
+      "dateTime": "2026-08-30T18:08:06.337000-04:00",
+      "description": "Raise the publication decision as a brief: what ships, at what versions, to which registries, and what a wrong answer costs.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 49,
+      "stepNumber": 3,
+      "stepKey": "on-the-answer-the-framework-executes",
+      "dateTime": "2026-08-30T18:08:06.337000-04:00",
+      "description": "On the answer, **the framework executes** the tag and publication workflow. The operator is not asked to type a command.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 49,
+      "stepNumber": 4,
+      "stepKey": "verify-installation-from-the-public-registry",
+      "dateTime": "2026-08-30T18:08:06.337000-04:00",
+      "description": "Verify installation from the public registry in a clean environment, and record it as evidence.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 49,
+      "stepNumber": 5,
+      "stepKey": "affected",
+      "dateTime": "2026-08-30T18:08:06.337000-04:00",
+      "description": "Affected; verify; full suite as `final-full`; `dabbler packaging`; close.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 49,
+      "dateTime": "2026-08-30T18:08:06.724000-04:00",
+      "task": "Affected; verify; full suite as final-full; packaging; close",
+      "releasable": true
+    },
+    {
+      "sessionNumber": 49,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-30T18:08:06.752000-04:00",
+      "description": "Register; declare **`--releasable`**.",
+      "status": "in-progress"
     }
   ]
 }

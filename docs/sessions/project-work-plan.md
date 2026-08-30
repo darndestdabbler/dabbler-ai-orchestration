@@ -84,7 +84,7 @@ it.
 | 46 | Packaging declared for the ecosystem it is | no | 2026-08-30 |
 | 47 | The Solution Explorer goes cross-repo | no | 2026-08-30 |
 | 48 | The generated workspace | no | 2026-08-30 |
-| 49 | The thing becomes installable | — | not declared |
+| 49 | The thing becomes installable | yes | 2026-08-30 |
 | 50 | The field trial, and the exercise reported back | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
@@ -1472,3 +1472,9 @@ Affected; verify; full suite as final-full; close
 **Releasable: no.**
 
 Affected; verify; full suite as final-full; close
+
+### Session 49 — The thing becomes installable
+
+**Releasable: yes.**
+
+Affected; verify; full suite as final-full; packaging; close

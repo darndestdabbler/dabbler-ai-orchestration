@@ -745,3 +745,91 @@ export function raisePackagingDecisions(
   if (secret !== null) raised.push(secret);
   return raised;
 }
+
+export const ID_PUBLICATION = "publication";
+
+/**
+ * Ask whether to publish, with the whole of what a wrong answer costs.
+ *
+ * The one decision in this framework that cannot be taken back. A version
+ * pushed to a public registry is downloadable by everyone from that moment,
+ * `npm unpublish` is refused after 72 hours and is a courtesy before it, and
+ * a Marketplace version slot is never reusable. So the brief states the
+ * versions, the registries and the order, and the framework does not move
+ * until there is an answer.
+ *
+ * `external-consequence`, and the class is the point: it does not block a
+ * close -- an unpublished product is not an unverified one -- and it is
+ * absolutely not the working AI's to take.
+ */
+export function raisePublicationDecision(
+  repoRoot: string,
+  options: {
+    readonly routerVersion: string;
+    readonly extensionVersion: string;
+    readonly sessionNumber?: number | null;
+  },
+): Row | null {
+  return raiseOwed(repoRoot, {
+    id: ID_PUBLICATION,
+    decisionClass: CLASS_EXTERNAL_CONSEQUENCE,
+    question:
+      `Publish dabbler-ai-router ${options.routerVersion} to npm and ` +
+      `dabbler-ai-orchestration ${options.extensionVersion} to the VS Code ` +
+      "Marketplace?",
+    file: "(git tags)",
+    determined:
+      "Both are built, tested and unpublished, and `npm i -g " +
+      "dabbler-ai-router` returns 404 today -- which is why a new project " +
+      "cannot install the thing it is being asked to adopt. What ships is " +
+      `the router at ${options.routerVersion} (npm, \`latest\`) and the ` +
+      `extension at ${options.extensionVersion} (Marketplace), in that ` +
+      "order: the extension bundles the router, so a Marketplace version " +
+      "whose npm half is missing is the broken half-release. The framework " +
+      "waits for npm to actually serve the router before it tags the " +
+      "extension. Both publish through OIDC or a stored PAT in CI; no " +
+      "credential is read or written here.\n\nWhat a wrong answer costs: a " +
+      "published version is public from that moment and cannot be recalled " +
+      "-- npm refuses `unpublish` after 72 hours, and a Marketplace version " +
+      "slot is never reusable.",
+    options: [
+      {
+        label: "publish",
+        consequence:
+          `Pushes \`v${options.routerVersion}\`, waits for npm to serve it, ` +
+          `and then pushes \`vsix-v${options.extensionVersion}\`. Both become ` +
+          "public and neither can be recalled. `npm i -g dabbler-ai-router` " +
+          "starts working, which is the only outcome that closes this.",
+      },
+      {
+        label: "release-candidate",
+        consequence:
+          `Pushes \`v${options.routerVersion}-rc1\` only. It exercises the ` +
+          "NPM half of the path -- the build, the OIDC publish, the registry " +
+          "-- and touches neither `latest` nor the Marketplace. `npm i -g " +
+          "dabbler-ai-router` still returns 404 afterwards, so this does not " +
+          "make the product installable; it is a rehearsal, and `publish` " +
+          "still has to follow it.",
+      },
+      {
+        label: "not yet",
+        consequence:
+          "Nothing is tagged and nothing is published. The build stays where " +
+          "it is, and `npm i -g dabbler-ai-router` keeps returning 404.",
+      },
+    ],
+    // The session exists BECAUSE the product is uninstallable, so the answer
+    // that leaves it uninstallable cannot be the recommended one. An earlier
+    // draft recommended the release candidate and called it "the whole path",
+    // which was both false -- it never touches the Marketplace -- and a
+    // recommendation to not do the thing.
+    recommendation: "publish",
+    confidence: null,
+    onNoAnswer:
+      "Nothing is published. This session closes either way -- an unpublished " +
+      "product is not an unverified one -- but `npm i -g dabbler-ai-router` " +
+      "keeps returning 404, so every adoption walkthrough still stops at its " +
+      "first step and the item stays open.",
+    sessionNumber: options.sessionNumber ?? null,
+  });
+}

@@ -85,6 +85,15 @@ export const VERBS: readonly VerbSpec[] = [
     summary: "a VS Code workspace over every repository in this solution",
   },
   {
+    // The one act that cannot be taken back, and the reason it is a verb at
+    // all: the operator decides and the FRAMEWORK types. Not
+    // extension-facing -- a button that publishes is a button somebody
+    // presses to see what it does.
+    verb: "release",
+    extensionFacing: false,
+    summary: "tag the release the operator authorised, router before extension",
+  },
+  {
     verb: "discovery",
     extensionFacing: false,
     summary: "what exists: enumerate a vendor, date the records, diff the roles",

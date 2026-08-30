@@ -755,9 +755,9 @@
     {
       "number": 39,
       "title": "Verification stops lying, and an unanswered gap stops the close",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-30T14:10:23.811000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-08-30T14:53:44.856000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

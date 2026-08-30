@@ -1,0 +1,375 @@
+{
+  "name": "dabbler-ai-orchestration",
+  "displayName": "Dabbler AI Orchestration",
+  "description": "Organize AI-led development like work: modules, session sets and step-by-step session plans in a native tree — plus routed verification before every close, normally cross-provider, recorded as evidence you can check.",
+  "version": "2.0.0",
+  "publisher": "DarndestDabbler",
+  "private": true,
+  "engines": {
+    "vscode": "^1.135.0"
+  },
+  "categories": [
+    "Other",
+    "AI"
+  ],
+  "keywords": [
+    "ai",
+    "ai agent",
+    "agent workflow",
+    "orchestration",
+    "verification",
+    "session sets",
+    "planning",
+    "dabbler"
+  ],
+  "icon": "media/darndest-dabbler-icon.png",
+  "galleryBanner": {
+    "color": "#5DADE2",
+    "theme": "dark"
+  },
+  "homepage": "https://darndestdabbler.org",
+  "bugs": {
+    "url": "https://github.com/darndestdabbler/dabbler-ai-orchestration/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/darndestdabbler/dabbler-ai-orchestration.git"
+  },
+  "license": "MIT",
+  "main": "./dist/extension.js",
+  "activationEvents": [],
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "dabblerSessionSetsContainer",
+          "title": "AI Orchestration",
+          "icon": "media/activity-bar-icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "dabblerSessionSetsContainer": [
+        {
+          "id": "dabblerSolutionTree",
+          "name": "Solution Explorer",
+          "contextualTitle": "Solution Explorer"
+        },
+        {
+          "id": "dabblerWorkExplorerTree",
+          "name": "Work Explorer",
+          "contextualTitle": "Work Explorer"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "dabblerSessionSets.refresh",
+        "title": "Refresh Work Explorer",
+        "category": "Dabbler",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "dabblerSessionSets.openSpec",
+        "title": "Open Session Plan",
+        "category": "Dabbler"
+      },
+      {
+        "command": "dabblerSessionSets.openActivityLog",
+        "title": "Open Activity Log",
+        "category": "Dabbler"
+      },
+      {
+        "command": "dabblerSessionSets.openChangeLog",
+        "title": "Open Change Log",
+        "category": "Dabbler"
+      },
+      {
+        "command": "dabblerSessionSets.openSessionState",
+        "title": "Open Sessions Ledger",
+        "category": "Dabbler"
+      },
+      {
+        "command": "dabbler.copyStartNextSessionPrompt",
+        "title": "Copy Start the next session",
+        "category": "Dabbler"
+      },
+      {
+        "command": "dabbler.copySessionRunPrompt",
+        "title": "Copy Run Prompt",
+        "category": "Dabbler"
+      },
+      {
+        "command": "dabbler.copySendBackPrompt",
+        "title": "Send Back to Engine",
+        "category": "Dabbler"
+      },
+      {
+        "command": "dabbler.respecifySession",
+        "title": "Respecify Session",
+        "category": "Dabbler"
+      },
+      {
+        "command": "dabblerSessionSets.startSession",
+        "title": "Start Session",
+        "category": "Dabbler"
+      },
+      {
+        "command": "dabblerSessionSets.closeSession",
+        "title": "Close Session",
+        "category": "Dabbler"
+      },
+      {
+        "command": "dabbler.newModule",
+        "title": "New Module",
+        "category": "Dabbler",
+        "icon": "$(add)"
+      },
+      {
+        "command": "dabblerSessionSets.cancel",
+        "title": "Cancel Session",
+        "category": "Dabbler"
+      },
+      {
+        "command": "dabblerSessionSets.restore",
+        "title": "Restore Session",
+        "category": "Dabbler"
+      },
+      {
+        "command": "dabbler.setupNewProject",
+        "title": "Set Up New Project",
+        "category": "Dabbler",
+        "icon": "$(add)"
+      },
+      {
+        "command": "dabbler.troubleshoot",
+        "title": "Troubleshoot",
+        "category": "Dabbler",
+        "icon": "$(debug)"
+      },
+      {
+        "command": "dabblerWorkExplorer.activateRepository",
+        "title": "Open Session Plan",
+        "category": "Dabbler"
+      },
+      {
+        "command": "dabblerWorkExplorer.activateSession",
+        "title": "Open Session Plan",
+        "category": "Dabbler"
+      }
+    ],
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "dabblerWorkExplorer.activateRepository",
+          "when": "false"
+        },
+        {
+          "command": "dabblerWorkExplorer.activateSession",
+          "when": "false"
+        },
+        {
+          "command": "dabbler.copySessionRunPrompt",
+          "when": "false"
+        },
+        {
+          "command": "dabbler.copySendBackPrompt",
+          "when": "false"
+        },
+        {
+          "command": "dabbler.respecifySession",
+          "when": "false"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "dabblerSessionSets.refresh",
+          "when": "view == dabblerWorkExplorerTree",
+          "group": "navigation@1"
+        },
+        {
+          "command": "dabbler.newModule",
+          "when": "view == dabblerWorkExplorerTree",
+          "group": "navigation@2"
+        }
+      ],
+      "view/item/context": [
+        {
+          "submenu": "dabblerWorkExplorer.openFile",
+          "when": "view == dabblerWorkExplorerTree && viewItem =~ /;dabblerRepository;/",
+          "group": "1_open@1"
+        },
+        {
+          "submenu": "dabblerWorkExplorer.copyPrompt",
+          "when": "view == dabblerWorkExplorerTree && viewItem =~ /;dabblerRepository;/",
+          "group": "1_open@2"
+        },
+        {
+          "command": "dabblerSessionSets.startSession",
+          "when": "view == dabblerWorkExplorerTree && viewItem =~ /;act-startSession;/",
+          "group": "6_session@601"
+        },
+        {
+          "command": "dabblerSessionSets.closeSession",
+          "when": "view == dabblerWorkExplorerTree && viewItem =~ /;act-closeSession;/",
+          "group": "6_session@602"
+        },
+        {
+          "command": "dabblerSessionSets.cancel",
+          "when": "view == dabblerWorkExplorerTree && viewItem =~ /;act-cancel;/",
+          "group": "9_lifecycle@901"
+        },
+        {
+          "command": "dabblerSessionSets.restore",
+          "when": "view == dabblerWorkExplorerTree && viewItem =~ /;act-restore;/",
+          "group": "9_lifecycle@902"
+        },
+        {
+          "command": "dabbler.copySessionRunPrompt",
+          "when": "view == dabblerWorkExplorerTree && viewItem =~ /;act-copySessionRunPrompt;/",
+          "group": "6_session@603"
+        },
+        {
+          "command": "dabbler.copySendBackPrompt",
+          "when": "view == dabblerWorkExplorerTree && viewItem =~ /;act-copySendBackPrompt;/",
+          "group": "6_session@604"
+        },
+        {
+          "command": "dabbler.respecifySession",
+          "when": "view == dabblerWorkExplorerTree && viewItem =~ /;act-respecifySession;/",
+          "group": "6_session@605"
+        }
+      ],
+      "dabblerWorkExplorer.openFile": [
+        {
+          "command": "dabblerSessionSets.openSpec",
+          "when": "view == dabblerWorkExplorerTree && viewItem =~ /;act-openSpec;/",
+          "group": "1@101"
+        },
+        {
+          "command": "dabblerSessionSets.openActivityLog",
+          "when": "view == dabblerWorkExplorerTree && viewItem =~ /;act-openActivityLog;/",
+          "group": "1@102"
+        },
+        {
+          "command": "dabblerSessionSets.openChangeLog",
+          "when": "view == dabblerWorkExplorerTree && viewItem =~ /;act-openChangeLog;/",
+          "group": "1@103"
+        },
+        {
+          "command": "dabblerSessionSets.openSessionState",
+          "when": "view == dabblerWorkExplorerTree && viewItem =~ /;act-openSessionState;/",
+          "group": "1@104"
+        }
+      ],
+      "dabblerWorkExplorer.copyPrompt": [
+        {
+          "command": "dabbler.copyStartNextSessionPrompt",
+          "when": "view == dabblerWorkExplorerTree && viewItem =~ /;act-copyStartNextSessionPrompt;/",
+          "group": "1@304"
+        }
+      ],
+      "file/newFile": [
+        {
+          "command": "dabbler.setupNewProject",
+          "group": "file"
+        }
+      ]
+    },
+    "submenus": [
+      {
+        "id": "dabblerWorkExplorer.openFile",
+        "label": "Open File"
+      },
+      {
+        "id": "dabblerWorkExplorer.copyPrompt",
+        "label": "Copy Prompt"
+      }
+    ],
+    "walkthroughs": [
+      {
+        "id": "dabblerGetStarted",
+        "title": "Set up an AI-led project",
+        "description": "Prepare a repository for the Dabbler session workflow. Nothing is installed, and you are not asked to run any commands.",
+        "steps": [
+          {
+            "id": "setUp",
+            "title": "Set the project up",
+            "description": "Writes the guidance files, the ignore rule for the router's machine state, the project's own declaration and the first two sessions -- then commits them, because session 1 is refused while they sit uncommitted.\n[Set Up New Project](command:dabbler.setupNewProject)",
+            "media": {
+              "markdown": "media/walkthrough-setup.md"
+            },
+            "completionEvents": [
+              "onCommand:dabbler.setupNewProject"
+            ]
+          },
+          {
+            "id": "answerOwed",
+            "title": "Answer what the framework cannot decide",
+            "description": "Setup asks where the repository pushes, and a later session asks how its tests run. Each arrives as one question with its options, a recommendation and what happens if you leave it -- and the framework writes the answer.\n[Open the Work Explorer](command:workbench.view.extension.dabblerSessionSetsContainer)",
+            "media": {
+              "markdown": "media/walkthrough-owed.md"
+            }
+          },
+          {
+            "id": "startSession",
+            "title": "Start session 1",
+            "description": "Session 1 authors the project plan; session 2 breaks it into numbered sessions. Neither waits on anyone.\n[Open the Work Explorer](command:workbench.view.extension.dabblerSessionSetsContainer)",
+            "media": {
+              "markdown": "media/walkthrough-session.md"
+            }
+          }
+        ]
+      }
+    ],
+    "viewsWelcome": [
+      {
+        "view": "dabblerSolutionTree",
+        "contents": "This shows what the project is being built FROM: its components, what each one promises, and who breaks when one of them changes.\n\nIt fills in once the repository declares a solution.\n[Set Up New Project](command:dabbler.setupNewProject)",
+        "when": "true"
+      },
+      {
+        "view": "dabblerWorkExplorerTree",
+        "contents": "This shows the work: which session is running, which step it is on, and anything waiting on you.\n\nNothing has run here yet.\n[Set Up New Project](command:dabbler.setupNewProject)",
+        "when": "true"
+      }
+    ],
+    "configuration": {
+      "title": "AI Orchestration",
+      "properties": {
+        "dabbler.refreshSeconds": {
+          "type": "number",
+          "default": 30,
+          "minimum": 5,
+          "markdownDescription": "How often the Work Explorer re-reads a repository whose files have not changed. File watchers do most of the work; this is the backstop for changes they miss."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "node esbuild.js",
+    "watch": "node esbuild.js --watch",
+    "test:unit": "mocha --require ts-node/register --require ./src/test/vscode-stub.js --ui tdd --timeout 120000 'src/test/suite/**/*.test.ts'",
+    "test:playwright": "npm run compile && npx tsc --noEmit && npx playwright test",
+    "package": "npm run compile && npx vsce package --no-dependencies",
+    "lint": "eslint src --ext ts"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.60.0",
+    "@types/mocha": "^10.0.6",
+    "@types/node": "^22.0.0",
+    "@types/vscode": "^1.85.0",
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
+    "@vscode/test-electron": "^2.3.9",
+    "esbuild": "^0.20.0",
+    "eslint": "^8.56.0",
+    "mocha": "^10.3.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.0"
+  },
+  "dependencies": {
+    "dabbler-ai-router": "^2.0.0",
+    "yaml": "^2.7.0"
+  }
+}

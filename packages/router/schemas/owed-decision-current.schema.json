@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "one owed decision, as its consumers read it (the fold of owed-decisions.jsonl)",
+  "description": "The current state of one decision, which is a different shape from the rows it is folded from and therefore a different schema. `owed-decisions.jsonl` is an append-only log of EVENTS -- 'raised' is a thing that happened, and a decision is not raised twice -- so the log cannot carry a state token without describing states it can never hold. This is what every consumer of the record actually wants: the question, its severity, and the state it is in right now, with `state` and `severity` required because a reader that has to infer either one is a reader writing its own copy of a rule this file exists to state once.",
+  "type": "object",
+  "required": ["id", "state", "severity", "class", "question", "options"],
+  "additionalProperties": true,
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "state": {
+      "type": "string",
+      "enum": ["open", "answered", "superseded"],
+      "description": "Where the decision stands. 'open' is waiting on a person; the log's corresponding event is 'raised', and translating between them is this projection's job rather than every consumer's."
+    },
+    "severity": {
+      "type": "string",
+      "enum": ["blocking", "advisory"],
+      "description": "Whether an unanswered decision refuses the close. Derived from the class when the decision is raised and never settable per call: a severity a caller could set is a severity a caller could lower, and the class that blocks is the one no caller may opt out of."
+    },
+    "class": {
+      "type": "string",
+      "enum": [
+        "verification-reduction",
+        "external-consequence",
+        "value-tradeoff",
+        "accountability-signoff"
+      ]
+    },
+    "question": { "type": "string", "minLength": 1 },
+    "file": { "type": ["string", "null"] },
+    "determined": { "type": "string" },
+    "options": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "required": ["label", "consequence"],
+        "additionalProperties": false,
+        "properties": {
+          "label": { "type": "string", "minLength": 1 },
+          "consequence": { "type": "string" }
+        }
+      },
+      "description": "Two or more, always: a question with one answer is a notification."
+    },
+    "recommendation": { "type": ["string", "null"] },
+    "confidence": { "type": ["string", "null"], "enum": ["high", "medium", "low", null] },
+    "onNoAnswer": { "type": ["string", "null"] },
+    "answer": { "type": ["string", "null"] },
+    "answeredBy": { "type": ["string", "null"], "enum": ["operator", null] },
+    "value": { "type": ["string", "null"] },
+    "note": { "type": ["string", "null"] },
+    "sessionNumber": { "type": ["integer", "null"] },
+    "recordedAt": { "type": "string" },
+    "event": {
+      "type": "string",
+      "enum": ["raised", "answered", "superseded"],
+      "description": "The last event folded into this record. Carried so a reader can trace the state back to the row that produced it; `state` is what a reader should branch on."
+    }
+  }
+}

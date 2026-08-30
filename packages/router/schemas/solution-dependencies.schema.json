@@ -41,6 +41,10 @@
         },
         "kind": { "type": "string", "enum": ["nuget", "maven"] },
         "producedBy": { "$ref": "#/$defs/producer" },
+        "feed": {
+          "type": ["string", "null"],
+          "description": "The name of the package source expected to serve this dependency. A NAME and never a URL: the URL is machine configuration and belongs where that machine keeps it, and a name is checkable against what is configured without the declaration carrying a credential. A feed nobody registered is one of the two failures that cost the most time and is invisible until a restore fails."
+        },
         "resolve": {
           "type": "string",
           "enum": ["feed", "source"],

@@ -10,6 +10,10 @@ export type SolutionDependenciesEdge = {
   kind: "nuget" | "maven";
   producedBy: SolutionDependenciesProducer;
   /**
+   * The name of the package source expected to serve this dependency. A NAME and never a URL: the URL is machine configuration and belongs where that machine keeps it, and a name is checkable against what is configured without the declaration carrying a credential. A feed nobody registered is one of the two failures that cost the most time and is invisible until a restore fails.
+   */
+  feed?: string | null;
+  /**
    * Where the dependency comes from right now. `feed` is the ordinary state. `source` is the troubleshooting mode -- the sibling checkout compiled directly -- and it is recorded here rather than left implicit in a build file, because a green build against a sibling checkout proves nothing about the published package and the record has to be able to say so.
    */
   resolve: "feed" | "source";

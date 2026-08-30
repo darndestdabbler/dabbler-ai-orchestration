@@ -62,6 +62,15 @@ export interface Edge {
   readonly kind: string;
   readonly producedBy: Producer;
   readonly resolve: string;
+  /**
+   * The package source expected to serve this, when one is named.
+   *
+   * A name and never a URL: the URL is machine configuration and belongs
+   * where that machine keeps it. What the declaration is entitled to say is
+   * "this comes from the source you call `dabbler-local`", which is checkable
+   * against what is configured and carries no credential.
+   */
+  readonly feed: string | null;
 }
 
 export interface SolutionDeps {
@@ -138,6 +147,7 @@ export function loadDeps(repoRoot: string): SolutionDeps | null {
           path: (producer["path"] as string | null) ?? null,
         },
         resolve: String(row["resolve"]),
+        feed: row["feed"] === undefined ? null : String(row["feed"]),
       } satisfies Edge;
     },
   );
@@ -450,7 +460,10 @@ export interface Reconciliation {
     | "version-disagreement"
     | "unsanctioned-source"
     | "cannot-determine"
-    | "duplicate-checkout";
+    | "duplicate-checkout"
+    | "behind-producer"
+    | "feed-not-configured"
+    | "producer-source-ahead";
   readonly id: string;
   readonly detail: string;
 }

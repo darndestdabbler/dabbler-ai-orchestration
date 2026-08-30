@@ -133,6 +133,7 @@ describe("what the two readings disagree about", () => {
         kind: "nuget",
         producedBy: { id: "csv-model", remote: null, path: null },
         resolve: "feed",
+        feed: null,
       },
     ],
   };

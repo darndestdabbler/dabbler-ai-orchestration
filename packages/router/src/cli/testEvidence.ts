@@ -7,11 +7,15 @@
 // against the selector here rather than trusted, because the command IS the
 // evidence.
 
+import { spawnSync } from "node:child_process";
+
+import { nowIso } from "../journal.ts";
 import { loadConfig } from "../config.ts";
 import { SessionsRootNotFoundError, repoRootFor, resolveSessionsDir } from "../evidence.ts";
 import { loadSelectionConfig, selectTests, targetedCommand } from "../checks.ts";
 import {
   OUTCOME_PASSED,
+  OUTCOME_FAILED,
   OUTCOMES,
   OUTCOME_NONE_SELECTED,
   POLICY_NONE_SELECTED,
@@ -215,19 +219,184 @@ function judgePreverifyCommand(
   };
 }
 
+/**
+ * Run a declared suite here, and record it with a start this framework saw.
+ *
+ * The reason it exists is provenance, not convenience. A caller that runs the
+ * suite and then reports how long it took has described a window rather than
+ * evidenced one -- restore a reference, read the output, record a minute
+ * later, and the inferred start lands after the restore for a run that
+ * happened before it. Spawning the command here makes the start a fact, which
+ * is the only thing that lets a run of record be accepted in a repository
+ * that has used source mode at all.
+ *
+ * It also removes a step the operator should never have been doing by hand:
+ * the command is the one the repository declares, so there is nothing to
+ * mistype.
+ */
+function runSuite(argv: readonly string[]): number {
+  if (argv.includes("--help") || argv.includes("-h")) {
+    writeOut(runUsage());
+    return EXIT_OK;
+  }
+  const parsed = parseArgs(argv);
+  if (typeof parsed === "string") {
+    writeErr(`dabbler test-evidence run: ${parsed}\n`);
+    return EXIT_USAGE;
+  }
+  const { values } = parsed;
+  const missing = ["--suite", "--stage"].filter((flag) => !values.has(flag));
+  if (missing.length > 0) {
+    writeErr(
+      "dabbler test-evidence run: the following arguments are required: " +
+        `${missing.join(", ")}\n`,
+    );
+    return EXIT_USAGE;
+  }
+  const stage = values.get("--stage") as string;
+  if (!STAGES.includes(stage)) {
+    writeErr(
+      "dabbler test-evidence run: argument --stage: invalid choice: " +
+        `'${stage}' (choose from ${STAGES.map((entry) => `'${entry}'`).join(", ")})\n`,
+    );
+    return EXIT_USAGE;
+  }
+
+  let sessionsDir: string;
+  try {
+    sessionsDir = resolveSessionsDir(values.get("--sessions-dir"));
+  } catch (error) {
+    if (!(error instanceof SessionsRootNotFoundError)) throw error;
+    writeErr(`test_evidence: ${error.message}\n`);
+    return EXIT_USAGE;
+  }
+  const loaded = loadSuitesChecked(loadConfig());
+  if (loaded.errors.length > 0) {
+    writeErr(`test_evidence: testing.suites is malformed: ${loaded.errors.join("; ")}\n`);
+    return EXIT_USAGE;
+  }
+  const suiteName = values.get("--suite") as string;
+  const suite = loaded.suites.find((entry) => entry.name === suiteName);
+  if (suite === undefined) {
+    writeErr(
+      `test_evidence: unknown suite '${suiteName}'; declared: ` +
+        `${loaded.suites.map((entry) => `'${entry.name}'`).join(", ") || "(none)"}\n`,
+    );
+    return EXIT_USAGE;
+  }
+  const root = repoRootFor(sessionsDir);
+  if (root === null) {
+    writeErr(`test_evidence: no git repository found above ${sessionsDir}\n`);
+    return EXIT_USAGE;
+  }
+
+  // The declared command, and the caller's only when they named one -- a
+  // targeted pre-verification run is a subset of the suite, and refusing to
+  // run it here would send the operator back to typing it by hand.
+  // A run of record is the DECLARED command and nothing else. A caller-named
+  // command is how a wrapper, a filtered run or a single test file comes to
+  // be recorded as "the full suite passed", and a `final-full` row is what
+  // the close and packaging both read.
+  const given = values.get("--command");
+  if (given !== undefined && stage !== STAGE_PREVERIFY_TARGETED) {
+    writeErr(
+      "dabbler test-evidence run: --command describes a pre-verification " +
+        `run; a ${stage} run is the declared suite command (${suite.command}) ` +
+        "against the final verified tree.\n",
+    );
+    return EXIT_USAGE;
+  }
+  const command = given ?? suite.command;
+  // The same policy judgement `record` makes, from the same inputs. A run
+  // that spawns the suite here does not get a different vocabulary from one
+  // the operator ran -- that would be two rules for one question.
+  const overrideReason = values.get("--allow-full-preverify");
+  if (overrideReason !== undefined && stage !== STAGE_PREVERIFY_TARGETED) {
+    writeErr(
+      "dabbler test-evidence run: --allow-full-preverify describes a " +
+        "pre-verification run.\n",
+    );
+    return EXIT_USAGE;
+  }
+  let policy = "";
+  let policyReason = "";
+  let selected: ReadonlyArray<readonly [string, string]> = [];
+  if (stage === STAGE_PREVERIFY_TARGETED) {
+    const judged = judgePreverifyCommand(
+      loadConfig(),
+      suite,
+      sessionsDir,
+      command,
+      overrideReason,
+    );
+    if (typeof judged === "number") return judged;
+    ({ policy, reason: policyReason, selected } = judged);
+  }
+  const observedStart = nowIso("microseconds");
+  writeOut(`running ${suiteName}: ${command}\n`);
+  const started = Date.now();
+  const proc = spawnSync(command, {
+    cwd: root,
+    shell: true,
+    stdio: "inherit",
+    encoding: "utf8",
+  });
+  const durationSeconds = Math.max(1, Math.round((Date.now() - started) / 1000));
+  const outcome = proc.status === 0 ? OUTCOME_PASSED : OUTCOME_FAILED;
+
+  try {
+    const record = recordRun(sessionsDir, suite, outcome, {
+      stage,
+      durationSeconds,
+      command: stage === STAGE_PREVERIFY_TARGETED ? command : null,
+      policy,
+      policyReason,
+      selectedTests: selected,
+      sessionNumber: currentSessionNumber(sessionsDir),
+      observedStart,
+      repoRoot: root,
+    });
+    writeOut(
+      `recorded ${record.suite} [${record.stage}]: ${record.outcome} ` +
+        `in ${durationSeconds}s (timed here)\n`,
+    );
+  } catch (error) {
+    if (!(error instanceof RecordError)) throw error;
+    writeErr(`test_evidence: ${error.message}\n`);
+    return EXIT_USAGE;
+  }
+  return outcome === OUTCOME_PASSED ? EXIT_OK : 1;
+}
+
+function runUsage(): string {
+  return [
+    "usage: dabbler test-evidence run [-h] [--sessions-dir SESSIONS_DIR]",
+    "                                 --suite SUITE",
+    `                                 --stage {${STAGES.join(",")}}`,
+    "                                 [--command COMMAND]",
+    "                                 [--allow-full-preverify REASON]",
+    "",
+    "  Runs the suite here and records it with a start this framework saw.",
+    "  A run of record in a repository that has used source mode needs that:",
+    "  a duration reported after the fact cannot show when the run happened.",
+    "",
+  ].join("\n");
+}
+
 export async function testEvidenceVerb(argv: string[]): Promise<number> {
   const [subcommand, ...rest] = argv;
   if (subcommand === undefined || subcommand === "--help" || subcommand === "-h") {
     writeOut(usage());
     return subcommand === undefined ? EXIT_USAGE : EXIT_OK;
   }
-  if (subcommand !== "record") {
+  if (subcommand !== "record" && subcommand !== "run") {
     writeErr(
       `dabbler test-evidence: argument command: invalid choice: '${subcommand}' ` +
-        "(choose from 'record')\n",
+        "(choose from 'record', 'run')\n",
     );
     return EXIT_USAGE;
   }
+  if (subcommand === "run") return runSuite(rest);
 
   // Before the option parser, for the reason `session` needs the same guard:
   // `--help` otherwise reaches a parser that reads it as an unrecognized

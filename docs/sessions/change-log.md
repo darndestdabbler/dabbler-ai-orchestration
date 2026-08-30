@@ -345,3 +345,9 @@
 - Fixed, unreviewed: [major] Cross-repository reconciliation still cannot assemble the distributed edge-set outside one immediate-parent directory**
 - Fixed, unreviewed: [major] Stable repository identity and duplicate-checkout behavior remain unenforced**
 - This work lands UNREVIEWED. It is not a waiver: nothing was accepted over a standing finding — what is unproved is the repair.
+
+## Session 45 verification — REMEDIATED AT THE CAP after 3 round(s)
+
+- Every blocking finding of round 3 was fixed; the cap left the fix unreviewed.
+- Fixed, unreviewed: [major] `final-full` can record an arbitrary command instead of the declared full suite
+- This work lands UNREVIEWED. It is not a waiver: nothing was accepted over a standing finding — what is unproved is the repair.

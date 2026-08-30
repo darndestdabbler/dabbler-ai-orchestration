@@ -7,7 +7,22 @@
 // build files on a guess about which side was right.
 
 import { repoRootFor, resolveSessionsDir, SessionsRootNotFoundError } from "../evidence.ts";
-import { raiseOwnershipDecision } from "../owedDecisions.ts";
+import {
+  ID_FEED_SOURCE,
+  currentDecisions,
+  raiseFeedDecision,
+  raiseOwnershipDecision,
+} from "../owedDecisions.ts";
+import {
+  ResolutionError,
+  configuredFeeds,
+  declareFeed,
+  localSourceCandidates,
+  reconcileResolution,
+  restoreFromSource,
+  sourceModeActive,
+  switchToSource,
+} from "../resolution.ts";
 import {
   DEPS_FILENAME,
   UNREADABLE_ID,
@@ -27,16 +42,22 @@ const EXIT_OK = 0;
 const EXIT_REFUSED = 1;
 const EXIT_USAGE = 2;
 
-const COMMANDS = ["check", "show"] as const;
+const COMMANDS = ["check", "show", "feeds", "source", "restore"] as const;
 
 function usage(): string {
   return [
-    "usage: dabbler deps [-h] [--sessions-dir SESSIONS_DIR] {check,show}",
+    "usage: dabbler deps [-h] [--sessions-dir SESSIONS_DIR]",
+    "                    {check,show,feeds,source,restore} [--package ID] [--apply]",
     "",
     "  check     compare the declaration against the build files",
     "  show      print the declared edges as JSON",
+    "  feeds     what this machine has configured, against what is declared",
+    "  source    resolve one dependency from a sibling checkout, reversibly",
+    "  restore   put a source-resolved reference back exactly",
     "",
     "options:",
+    "  --package ID             the package `source` and `restore` act on",
+    "  --apply                  write an answered feed decision into this repository",
     "  --sessions-dir PATH      the sessions root; derived from the cwd when absent",
     "  -h, --help               show this message",
     "",
@@ -54,11 +75,22 @@ function run(argv: string[]): number {
   }
   let command: string | null = null;
   let sessionsDirArg: string | undefined;
+  let packageId: string | null = null;
+  let apply = false;
   for (let index = 0; index < argv.length; index += 1) {
     const token = argv[index];
     if (token === "--sessions-dir") {
       sessionsDirArg = argv[index + 1];
       index += 1;
+      continue;
+    }
+    if (token === "--package") {
+      packageId = argv[index + 1] ?? null;
+      index += 1;
+      continue;
+    }
+    if (token === "--apply") {
+      apply = true;
       continue;
     }
     if (!token.startsWith("--") && command === null) {
@@ -87,6 +119,15 @@ function run(argv: string[]): number {
   if (root === null) {
     writeErr("deps: not inside a git repository\n");
     return EXIT_USAGE;
+  }
+
+  if (command === "feeds") return feeds(root, apply);
+  if (command === "source" || command === "restore") {
+    if (command === "source" && packageId === null) {
+      writeErr("deps source: --package is required\n");
+      return EXIT_USAGE;
+    }
+    return command === "source" ? toSource(root, packageId as string) : fromSource(root, packageId);
   }
 
   let deps;
@@ -121,6 +162,7 @@ function run(argv: string[]): number {
   const findings = [
     ...reconcile(deps, self.refs, known),
     ...reconcileAcrossRepositories(members, known),
+    ...reconcileResolution(members, configuredFeeds(root)),
   ];
 
   if (deps === null) {
@@ -218,4 +260,163 @@ function reportFindings(findings: readonly { kind: string; detail: string }[]): 
     "\nReported, not repaired. Each of these has a legitimate reading, and " +
       "which side is right is not derivable from here.\n",
   );
+}
+
+/**
+ * What this machine has configured, and what the declaration expects of it.
+ *
+ * Reading is not writing. The user-level configuration is inspected so the
+ * operator can be told what is already there; only the repository-scoped file
+ * is ever written, and only as the execution of an answered decision.
+ */
+function feeds(root: string, apply: boolean): number {
+  const deps = loadDeps(root);
+  const configured = configuredFeeds(root);
+  writeOut(`${configured.length} package source(s) configured\n`);
+  for (const feed of configured) {
+    const state = feed.unusable ? `unusable: ${feed.unusable}` : feed.enabled ? "enabled" : "disabled";
+    writeOut(`  ${feed.key.padEnd(24)} ${feed.value}  (${state})\n`);
+  }
+
+  const wanted = new Map<string, string>();
+  for (const edge of deps?.consumes ?? []) {
+    if (edge.feed && !wanted.has(edge.feed)) wanted.set(edge.feed, edge.id);
+  }
+  if (wanted.size === 0) {
+    writeOut(`\n${DEPS_FILENAME} names no feed, so there is nothing to reconcile.\n`);
+    return EXIT_OK;
+  }
+
+  let unresolved = 0;
+  for (const [feed, packageId] of wanted) {
+    const found = configured.find((candidate) => candidate.key === feed);
+    if (found && found.enabled && !found.unusable) {
+      writeOut(`\n'${feed}' serves ${packageId} from ${found.value}\n`);
+      continue;
+    }
+    unresolved += 1;
+    const answer = answeredFeed(root, feed);
+    if (answer === null) {
+      // Asked, not guessed. What is behind a feed name is a URL or a
+      // directory on this machine, and picking one wrong sends a restore at
+      // somebody else's server.
+      const raised = raiseFeedDecision(root, {
+        feed,
+        packageId,
+        candidates: localSourceCandidates(root),
+      });
+      writeOut(
+        `\n'${feed}' is not a package source on this machine` +
+          (raised === null ? " (already asked)" : "") +
+          " — `dabbler owed list` reads the question.\n",
+      );
+      continue;
+    }
+    if (!apply) {
+      writeOut(
+        `\n'${feed}' was answered: ${answer}. ` +
+          "`dabbler deps feeds --apply` writes it into this repository.\n",
+      );
+      continue;
+    }
+    // The execution of the answer, not a second asking. The operator decided;
+    // the framework does the typing, which is the whole point of asking.
+    try {
+      const path = declareFeed(root, { key: feed, value: answer });
+      writeOut(`\nwrote '${feed}' = ${answer} to ${path}\n`);
+      unresolved -= 1;
+    } catch (error) {
+      writeErr(
+        `deps: could not declare '${feed}': ${
+          error instanceof Error ? error.message : String(error)
+        }\n`,
+      );
+    }
+  }
+  return unresolved === 0 ? EXIT_OK : EXIT_OK;
+}
+
+/** The operator's answer to a feed question, when they have given one. */
+function answeredFeed(root: string, feed: string): string | null {
+  for (const row of currentDecisions(root)) {
+    if (String(row["id"]) !== `${ID_FEED_SOURCE}:${feed}`) continue;
+    const answer = row["answer"];
+    if (typeof answer !== "string" || !answer) return null;
+    return answer === "leave it unconfigured" ? null : answer;
+  }
+  return null;
+}
+
+/**
+ * Step into a dependency's source, reversibly.
+ *
+ * This is what git submodules were being considered for, and it delivers the
+ * same thing without changing what git tracks: the producer is already on
+ * this machine as a sibling checkout, and the reference points at it for as
+ * long as the debugging lasts. The record makes it impossible to forget --
+ * the run of record, packaging and the close all refuse until it is put back.
+ */
+function toSource(root: string, packageId: string): number {
+  const deps = loadDeps(root);
+  const edge = (deps?.consumes ?? []).find((candidate) => candidate.id === packageId);
+  if (edge === undefined) {
+    writeErr(
+      `deps: ${DEPS_FILENAME} declares no edge for ${packageId}. Source mode ` +
+        "switches a declared edge; an undeclared reference has no producer to " +
+        "point at.\n",
+    );
+    return EXIT_REFUSED;
+  }
+  if (edge.kind !== "nuget") {
+    // Maven's mechanism is install-to-local-repository, which is a build.
+    writeErr(
+      `deps: source mode is .NET only. Maven resolves a sibling by installing ` +
+        "it into the local repository, and that is a build -- which this " +
+        "framework declares and checks but never runs.\n",
+    );
+    return EXIT_REFUSED;
+  }
+  const where = locateProducer(root, edge.producedBy, deps?.solution ?? null);
+  if (where.path === null) {
+    writeErr(`deps: ${where.reason}\n`);
+    return EXIT_REFUSED;
+  }
+  try {
+    const swap = switchToSource(root, { packageId, producerRoot: where.path });
+    writeOut(
+      `${packageId} now resolves from source: ${swap.file} points at ` +
+        `${swap.producerProject}\n` +
+        "The original reference is recorded. The run of record, packaging and " +
+        "the close refuse until `dabbler deps restore --package " +
+        `${packageId}` +
+        "` puts it back.\n",
+    );
+    return EXIT_OK;
+  } catch (error) {
+    if (!(error instanceof ResolutionError)) throw error;
+    writeErr(`deps: refused -- ${error.message}\n`);
+    return EXIT_REFUSED;
+  }
+}
+
+/** Put a reference back exactly, or say why it cannot be. */
+function fromSource(root: string, packageId: string | null): number {
+  const active = sourceModeActive(root);
+  if (active.length === 0) {
+    writeOut("nothing is resolving from source\n");
+    return EXIT_OK;
+  }
+  const wanted = packageId === null ? active.map((swap) => swap.packageId) : [packageId];
+  let failed = 0;
+  for (const id of wanted) {
+    try {
+      const swap = restoreFromSource(root, id);
+      writeOut(`${id} restored in ${swap.file}\n`);
+    } catch (error) {
+      if (!(error instanceof ResolutionError)) throw error;
+      failed += 1;
+      writeErr(`deps: ${error.message}\n`);
+    }
+  }
+  return failed === 0 ? EXIT_OK : EXIT_REFUSED;
 }

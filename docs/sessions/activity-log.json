@@ -9066,6 +9066,75 @@
       "dateTime": "2026-08-30T16:53:56.927000-04:00",
       "description": "Affected; verify; full suite as `final-full`; close.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 45,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-30T16:54:31.147000-04:00",
+      "description": "Register; declare `--not-releasable`.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 45,
+      "stepNumber": 2,
+      "stepKey": "two-further-reconciliations-both-of-which",
+      "dateTime": "2026-08-30T16:54:31.147000-04:00",
+      "description": "Two further reconciliations, both of which cost `csv-model` time: the pinned version is behind what the producer published, and the named feed is not registered on this machine \u2014 its Phase 3 flagged that the one local source configured points at an unrelated project and is disabled.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 45,
+      "stepNumber": 3,
+      "stepKey": "read-and-reconcile-feed-configuration",
+      "dateTime": "2026-08-30T16:54:31.147000-04:00",
+      "description": "**Read and reconcile feed configuration; write only a repository-scoped declaration, and only as the execution of an answered decision.** Never machine-global state, never a credential. Writing a repo-scoped `NuGet.config` is declaring; running an install is orchestrating.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 45,
+      "stepNumber": 4,
+      "stepKey": "resolve",
+      "dateTime": "2026-08-30T16:54:31.147000-04:00",
+      "description": "`resolve: source` for .NET only: a reversible `PackageReference` \u21c4 `ProjectReference` swap with crash recovery and an exact restoration check. **Maven source-switching is not in this plan** \u2014 its mechanism is install-to-local-repository, which is a build.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 45,
+      "stepNumber": 5,
+      "stepKey": "final-full-packaging-and-session-close",
+      "dateTime": "2026-08-30T16:54:31.147000-04:00",
+      "description": "**`final-full`, `packaging` and `session close` refuse while any dependency resolves from source.** A green build against a sibling checkout says nothing about the published package, so the record never gets to claim it did.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 45,
+      "stepNumber": 6,
+      "stepKey": "affected",
+      "dateTime": "2026-08-30T16:54:31.147000-04:00",
+      "description": "Affected; verify; full suite as `final-full`; close.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 45,
+      "dateTime": "2026-08-30T16:54:37.077000-04:00",
+      "task": "Affected; verify; full suite as final-full; close",
+      "releasable": false
+    },
+    {
+      "sessionNumber": 45,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-30T16:54:37.103000-04:00",
+      "description": "Register; declare `--not-releasable`.",
+      "status": "in-progress"
     }
   ]
 }

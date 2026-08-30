@@ -27,6 +27,8 @@ import { LIFECYCLE_WRITTEN_FILES, RUNS_DIRNAME } from "./ledger.ts";
 import { PythonFloat, dumps, pythonFloatRepr, pythonRepr } from "./pythonJson.ts";
 
 export { matchingPrefixes } from "./checks.ts";
+import { refuseIfResolvingFromSource } from "./resolution.ts";
+
 
 export const OUTCOME_PASSED = "passed";
 export const OUTCOME_FAILED = "failed";
@@ -472,6 +474,15 @@ export interface RecordRunOptions {
   readonly sessionNumber?: number | null;
   readonly detail?: string;
   readonly repoRoot?: string | null;
+  /**
+   * When the framework watched this run start, for callers that ran it.
+   *
+   * Set only by `test-evidence run`, which spawns the suite here. A caller
+   * that ran the suite itself has nothing trustworthy to put here, and the
+   * source-mode refusal treats its absence as an unproven window rather than
+   * a clear one.
+   */
+  readonly observedStart?: string | null;
 }
 
 /**
@@ -566,6 +577,32 @@ export function recordRun(
   if (digest === null) throw new RecordError("could not digest the covered surfaces");
   let wholeTree = "";
   if (stage === STAGE_FINAL_FULL) {
+    // The run of record is the claim that this tree is proved. A tree with a
+    // dependency resolving from a sibling checkout is not the tree that
+    // ships, and a green suite against it proves something about a
+    // repository nobody published.
+    // Only a start this framework watched counts. `options.observedStart` is
+    // set by `test-evidence run`, which spawns the suite itself; a caller
+    // reporting a duration after the fact supplies none, and an unproven
+    // window is then refused rather than inferred.
+    // A PASSING run only. A failed run of record proves nothing and is not
+    // reusable evidence, so letting one move the cutoff would hide the swaps
+    // before it from the next recording.
+    const previous = readRecords(root)
+      .filter(
+        (row) =>
+          row.suite === suite.name &&
+          row.stage === STAGE_FINAL_FULL &&
+          row.outcome === OUTCOME_PASSED,
+      )
+      .map((row) => row.recordedAt)
+      .sort()
+      .pop();
+    const switched = refuseIfResolvingFromSource(root, "the run of record", {
+      observedStart: options.observedStart ?? null,
+      since: previous ?? null,
+    });
+    if (switched !== null) throw new RecordError(switched);
     wholeTree = treeDigest(root, { sessionsDir }) ?? "";
     if (!wholeTree) throw new RecordError("could not digest the tree");
   }

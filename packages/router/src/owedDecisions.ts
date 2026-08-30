@@ -571,3 +571,63 @@ export function raiseOwnershipDecision(
     sessionNumber: options.sessionNumber ?? null,
   });
 }
+
+export const ID_FEED_SOURCE = "feed-source";
+
+/**
+ * Ask which package source serves a feed the declaration names.
+ *
+ * Not derivable, and not the framework's to pick. The declaration says a
+ * dependency comes from `dabbler-local`; what is behind that name is a URL
+ * or a directory on this machine, and choosing one wrong sends a restore at
+ * somebody else's server. The answer is executed rather than handed back as
+ * an instruction -- the operator picks the source, and the framework writes
+ * the repository-scoped declaration.
+ *
+ * `external-consequence` and not a value trade-off: what gets written
+ * changes where this repository fetches code from.
+ */
+export function raiseFeedDecision(
+  repoRoot: string,
+  options: {
+    readonly feed: string;
+    readonly packageId: string;
+    readonly candidates: readonly string[];
+    readonly sessionNumber?: number | null;
+  },
+): Row | null {
+  const candidates = options.candidates.map((value) => ({
+    label: value,
+    consequence:
+      `A repository-scoped ${"NuGet.config"} declares '${options.feed}' as ` +
+      `${value}. Nothing machine-global is touched and no credential is written.`,
+  }));
+  return raiseOwed(repoRoot, {
+    id: `${ID_FEED_SOURCE}:${options.feed}`,
+    decisionClass: CLASS_EXTERNAL_CONSEQUENCE,
+    question: `What package source is '${options.feed}'?`,
+    file: "NuGet.config",
+    determined:
+      `solution-dependencies.json says ${options.packageId} comes from a ` +
+      `source named ` +
+      `'${options.feed}', and no package source on this machine has that ` +
+      "name. A restore will look in the sources that are configured, not " +
+      "find it, and fail with a message about the package rather than the " +
+      "feed.",
+    options: [
+      ...candidates,
+      {
+        label: "leave it unconfigured",
+        consequence:
+          "Nothing is written. The restore keeps failing, and the check keeps " +
+          "reporting the feed as unconfigured until some source has that name.",
+      },
+    ],
+    recommendation: null,
+    confidence: null,
+    onNoAnswer:
+      "Nothing is written and nothing breaks that is not already broken: the " +
+      "dependency cannot be restored from a feed until a source has this name.",
+    sessionNumber: options.sessionNumber ?? null,
+  });
+}

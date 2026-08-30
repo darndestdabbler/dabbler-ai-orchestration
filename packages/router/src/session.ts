@@ -46,6 +46,7 @@ import {
   upstreamRemote,
 } from "./evidence.ts";
 import { SET_BOOKKEEPING_COMMIT_BASENAMES, governingConfig, runGates } from "./gates.ts";
+import { refuseIfResolvingFromSource } from "./resolution.ts";
 import { detectEcosystems } from "./bootstrap/detect.ts";
 import { PROJECT_CONFIG_FILENAME } from "./config.ts";
 import { refreshOwedDecisions } from "./owedDecisions.ts";
@@ -1144,6 +1145,15 @@ export function close(sessionsDir: string, options: CloseCliOptions = {}): numbe
     } catch {
       // A close must not fail because a brief could not be written; the gate
       // below reads whatever is on disk.
+    }
+    // Before the gates and not as one of them. A gate answers a question
+    // about evidence that exists; this is a refusal to produce evidence at
+    // all, and `--force` bypasses bookkeeping gates -- it must not become a
+    // way past this.
+    const switched = refuseIfResolvingFromSource(repoRootFor(sessionsDir), "the close");
+    if (switched !== null) {
+      writeErr(`close: refused -- ${switched}\n`);
+      return EXIT_GATE_FAILED;
     }
     const results = runGates(sessionsDir, { forced });
     const width = Math.max(...results.map((row) => row.name.length));

@@ -80,7 +80,7 @@ it.
 | 42 | The panes say what they are, and the Solution Explorer lights up | no | 2026-08-30 |
 | 43 | Liveness, and one place the operator looks | no | 2026-08-30 |
 | 44 | `solution-dependencies.json` — the edge, never the pin | no | 2026-08-30 |
-| 45 | Resolution modes, inside the declare-and-check line | — | not declared |
+| 45 | Resolution modes, inside the declare-and-check line | no | 2026-08-30 |
 | 46 | Packaging declared for the ecosystem it is | — | not declared |
 | 47 | The Solution Explorer goes cross-repo | — | not declared |
 | 48 | The generated workspace | — | not declared |
@@ -1448,3 +1448,9 @@ What this session does:
    repository boundary.
 
 Not releasable: it publishes nothing.
+
+### Session 45 — Resolution modes, inside the declare-and-check line
+
+**Releasable: no.**
+
+Affected; verify; full suite as final-full; close

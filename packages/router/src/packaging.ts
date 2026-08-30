@@ -21,6 +21,7 @@ import { join, relative, sep } from "node:path";
 import { childEnv } from "./checks.ts";
 import { type RouterConfig, loadConfig } from "./config.ts";
 import { type GateResult, runGates } from "./gates.ts";
+import { refuseIfResolvingFromSource } from "./resolution.ts";
 import { repoRootFor, snapshotWorktreeTree } from "./journal.ts";
 import { type Row, appendPackaging, packageOutputDir } from "./ledger.ts";
 import { readSessionState } from "./progress.ts";
@@ -649,6 +650,9 @@ export function packageSession(
         "model deciding in hindsight what may reach a feed.",
     );
   }
+
+  const switched = refuseIfResolvingFromSource(repoRootFor(sessionsDir), "packaging");
+  if (switched !== null) return refusal(sessionNumber, true, switched);
 
   const declaration = loadDeclaration(config);
   if (declaration === null) {

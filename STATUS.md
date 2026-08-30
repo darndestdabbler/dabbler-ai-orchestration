@@ -39,11 +39,41 @@ installs **nothing**: the extension bundles the router, calls it in-process,
 and puts `dabbler` on the integrated terminal's PATH run on the editor's own
 Node.
 
-- **Session 36 is closed `VERIFIED`** — see the round count below — Claude
-  Code / claude-opus-5[1m] orchestrator. **The whole set's acceptance test is
-  that this paragraph is true**: the round, the run of record, the gates and
-  the close were performed by the TypeScript router, in a tree with no
-  Python in it.
+- **Session 36 is closed `VERIFIED`** — **3 rounds** (gpt-5-6-sol over the
+  API), Claude Code / claude-opus-5[1m] orchestrator, all five gates green at
+  the first attempt, nothing forced. **The whole set's acceptance test is
+  that this paragraph is true**: the rounds, the disputes, the run of record,
+  the gates and the close were all performed by the TypeScript router, in a
+  tree with no Python in it. The ledger reads **36 of 36 complete**.
+- **Rounds 1 and 2 raised the same two Majors and round 2 is the one that
+  mattered.** Both rounds said `dabbler packaging` cannot publish this
+  repository and that the round row spells the stamp `framework_version`.
+  Two evidence-backed disputes were filed and **both were upheld** — and the
+  verifier did not contradict a fact in either. What it said is that
+  establishing why a requirement cannot be met *proves the missing capability
+  rather than satisfying the requirement*, and that a unilateral substitution
+  is not an amendment. **That is right, and it is the lesson of this
+  session**: a session that cannot follow its plan must amend the plan on the
+  record, not argue with the finding. Round 3 verified.
+- **Round 1's most valuable finding was a nit, and it was a defect this
+  session introduced.** Rewriting the release workflow dropped `!vsix-v*`
+  from its tag trigger. GitHub's `v*` glob matches `vsix-v2.0.0`, so every
+  Marketplace tag push would have started the router's npm workflow and
+  failed its classify job. No control could see it — the YAML parses and the
+  workflow is syntactically fine — and the old file's own comment had
+  explained the exclusion, which is exactly the comment a rewrite drops.
+  **A rewrite of a working file inherits its constraints or loses them
+  silently.**
+- **Round 3 verified with two nits, both about the amendment's own wording,
+  and both were corrected AFTER the close.** One said the amendment credited
+  "a third round" with upholding the findings when round 2 did; the other
+  said the step-6 amendment left the supporting acceptance check ("seat cost
+  is recorded for every session 22–36") contradicting it. Both are fair and
+  both are fixed. **They could not be fixed before the close**:
+  `session-plan.md` is not a lifecycle-written file, and `verification_clean`
+  compares the worktree to the verified tree — a session editing the plan it
+  is running against is drift, which is what that exclusion list exists to
+  say.
 - **The parity control's last run is D231, and it is recorded with the trees
   it ran against.** 5 shapes, 48 verb cases, 402 paths, all identical, exit
   0 — the same figures as session 35, which is the second thing it records:
@@ -142,6 +172,17 @@ Node.
   millisecond precision and wrote `.000` where the reference omitted the
   fraction; nothing compared it then and this is the commit where the
   record's timestamp format changes for anybody.
+- **Three vendor calls, 139,326 tokens, no seat** (D239) — 125,632 in /
+  13,694 out, all `gpt-5-6-sol` over the direct API. Second most expensive
+  session of the port behind session 35's 147,120, and a different shape: the
+  three rounds are comparable in size because rounds 2 and 3 carried
+  file-backed disputes and then a plan amendment into an otherwise small fix
+  delta. **Disputing is not free** — a rebuttal rides the prompt whole.
+- **Session 36's own ledger row carries no `frameworkVersion`, and that is
+  correct.** `session start` ran through the Python router at 18:42, before
+  the stamp existed; the three round rows, written after it, all carry
+  `framework_version: 2.0.0`. The one session that spans the cutover records
+  it by the absence, which is what the field was designed to mean.
 - **The Playwright layer was ported and is NOT exercised by this session.**
   It built its fixtures by running Python snippets and pinned a
   `dabblerSessionSets.pythonPath` that no longer exists as a setting; it now

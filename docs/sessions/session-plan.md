@@ -1462,10 +1462,11 @@ run must be recorded before the deletion, or the set's central claim rests
 on memory.
 
 > **Amended in session 36, 2026-08-29, on the record.** Two of the steps
-> above ask for something the implementation cannot do, and a third session-36
-> verification round upheld that leaving the prose unchanged was itself the
-> defect: a plan and a record that disagree are two records of one decision,
-> which is D224's lesson from session 35. The amendment is here rather than
+> above ask for something the implementation cannot do. Session 36's round 2
+> upheld both, and both of its acceptance criteria named the same resolution:
+> the governing plan must be formally amended rather than substituted against.
+> A plan and a record that disagree are two records of one decision, which is
+> D224's lesson from session 35. The amendment is here rather than
 > in a decision alone so that a reader of the plan meets it. **It changes
 > what this session was required to deliver, so it is the operator's to
 > reverse** — D237 and D234 carry the full reasoning, and the verifier's two
@@ -1502,10 +1503,12 @@ on memory.
 > intact, the `Test` workflow's Python job removed, and the tag push left to
 > the operator because it is irreversible and goes to two public registries.
 >
-> **Step 6 — there is no seat cost to measure.** No call this session went
-> through a Copilot seat; the verification rounds were bought over the direct
-> API. The cost is recorded as tokens per round instead, which is what the
-> metrics ledger carries.
+> **Step 6 — there is no seat cost to measure, and the supporting acceptance
+> check below is amended with it.** No call this session went through a
+> Copilot seat; all three verification rounds were bought over the direct API,
+> so `seat_cost` has no conversation id to price. The cost is recorded as
+> tokens per round (D239), which is what the metrics ledger carries. Filing a
+> zero would read as a measurement of a seat that was never used.
 
 
 ---
@@ -1527,7 +1530,11 @@ Four supporting checks, each answerable from the record:
   behavior; the ported count equals the Python count for every kept module,
   and the deleted count equals the retired modules' tests. No Python test
   remains.
-- **Seat cost is recorded for every session 22–36.**
+- **Seat cost is recorded for every session 22–36 that used a seat.**
+  *(Amended in session 36 with step 6 above: sessions 33–36 ran on the direct
+  API, where there is no conversation id to price. Their cost is recorded as
+  tokens per round in the metrics ledger. A zero filed against a seat nobody
+  used would read as a measurement rather than as an absence.)*
 
 ## Test budget for sessions 22–36
 

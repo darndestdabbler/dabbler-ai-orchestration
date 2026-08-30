@@ -424,7 +424,9 @@ describe("the record", () => {
       dryRun: true,
     });
     expect(run.ready).toBe(true);
-    expect(run.gates.map((g) => g.passed)).toEqual([true, true, true, true, true]);
+    expect(run.gates.map((g) => g.passed)).toEqual([
+      true, true, true, true, true, true,
+    ]);
     expect(existsSync(pushLog)).toBe(false);
     expect(existsSync(packagingPath(repo, 1))).toBe(false);
   });

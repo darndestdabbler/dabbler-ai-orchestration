@@ -78,7 +78,9 @@ function parseArgs(argv: readonly string[]): Parsed | string {
 function render(run: PackagingRun): string {
   const lines = [`packaging: ${run.ready ? "ready (dry run)" : run.outcome}`];
   for (const gate of run.gates) {
-    const mark = gate.passed ? "PASS" : "FAIL";
+    // The same three marks the close prints. A gate reads the same wherever
+    // it is shown, or the two screens disagree about the same fact.
+    const mark = gate.inapplicable ? "SKIP" : gate.passed ? "PASS" : "FAIL";
     const note = gate.remediation ? ` — ${gate.remediation}` : "";
     lines.push(`  [${mark}] ${gate.name}${note}`);
   }

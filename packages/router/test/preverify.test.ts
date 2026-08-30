@@ -42,6 +42,8 @@ import {
   evaluateFreshness,
   loadSuitesChecked,
   readRecords,
+  OUTCOME_NONE_SELECTED,
+  POLICY_NONE_SELECTED,
   recordRun,
   runOfRecordRecipe,
   surfaceDigest,
@@ -574,6 +576,44 @@ describe("recording a run", () => {
       outcome: "failed", stage: "final-full", durationSeconds: 2.5,
     }) as { outcome: string };
     expect(record.outcome).toBe("failed");
+  });
+
+  it("records that the selector ran and chose nothing, without claiming a run", () => {
+    // The three outcomes before this one are all claims about a suite that
+    // RAN, so a docs-only change had nothing honest to write: `passed`
+    // asserts a green run that never happened, and recording nothing leaves
+    // the ledger silent about a step that did happen.
+    const { repo, sessionsDir } = sandbox();
+    const record = recordRun(sessionsDir, SUITE, OUTCOME_NONE_SELECTED, {
+      stage: STAGE_PREVERIFY_TARGETED,
+      durationSeconds: 0.1,
+      policy: POLICY_NONE_SELECTED,
+      repoRoot: repo,
+    }) as { outcome: string; command: string };
+    expect(record.outcome).toBe(OUTCOME_NONE_SELECTED);
+    expect(record.command).toBe("");
+  });
+
+  it("refuses a none-selected record that names a command", () => {
+    const { repo, sessionsDir } = sandbox();
+    expect(() =>
+      recordRun(sessionsDir, SUITE, OUTCOME_NONE_SELECTED, {
+        stage: STAGE_PREVERIFY_TARGETED,
+        durationSeconds: 0.1,
+        policy: POLICY_NONE_SELECTED,
+        command: "pytest",
+        repoRoot: repo,
+      }),
+    ).toThrow(RecordError);
+  });
+
+  it("refuses none-selected as a run of record, which cannot be a run that did not happen", () => {
+    const { repo, sessionsDir } = sandbox();
+    expect(() =>
+      recordRun(sessionsDir, SUITE, OUTCOME_NONE_SELECTED, {
+        stage: STAGE_FINAL_FULL, durationSeconds: 0.1, repoRoot: repo,
+      }),
+    ).toThrow(RecordError);
   });
 
   it("requires a targeted record to name its command and its policy", () => {

@@ -42,6 +42,83 @@ const SUMMARY: Record<string, string> = {
 
 const IMPLEMENTED = Object.keys(SUMMARY);
 
+/**
+ * What each subcommand takes, required first.
+ *
+ * It exists because `--help` did not: the flag was parsed as an option
+ * expecting a value, so the only way to discover a subcommand's arguments was
+ * to run it bare and read the refusal -- which names what is required and
+ * never what is optional. A table beside the parser is the smallest thing that
+ * answers the question the operator was actually asking.
+ */
+const OPTIONS: Record<string, readonly string[]> = {
+  start: [
+    "  --engine ENGINE          required: claude-code | codex | gemini | copilot",
+    "  --provider PROVIDER      required: anthropic | openai | google",
+    "  --model MODEL            required for a Copilot seat; identity resolves through",
+    "                           the model registry rather than the seat label",
+    "  --effort EFFORT          optional reasoning effort, recorded with the identity",
+    "  --total-sessions N       optional; the ledger otherwise grows to the plan",
+  ],
+  log: [
+    "  --step STEP              required: the stepKey `start` printed, or its number",
+    "  --status STATUS          required: not-started | in-progress | complete",
+  ],
+  decision: [
+    "  --decider WHO            required: operator | orchestrator | verifier | framework",
+    "  --headline TEXT          required: one line, the decision itself",
+    "  --body TEXT              the reasoning; mutually exclusive with --body-file",
+    "  --body-file PATH         the reasoning, read from a file",
+    "  --model MODEL            who decided, when a model did",
+    "  --provider PROVIDER      the provider behind that model",
+    "  --decided-on DATE        for a decision recorded after the fact",
+    "  --backfill-reason TEXT   why it is being recorded late; required with --decided-on",
+  ],
+  declare: [
+    "  --task TEXT              the task list; mutually exclusive with --task-file",
+    "  --task-file PATH         the task list, read from a file",
+    "  --releasable             this session may publish",
+    "  --not-releasable         it may not; one of the two is required",
+  ],
+  plan: [
+    "  --body TEXT              the plan prose; mutually exclusive with --body-file",
+    "  --body-file PATH         the plan prose, read from a file",
+  ],
+  close: [
+    "  --dry-run                print the gate rows and write nothing",
+    "  --force                  bypass bookkeeping gates, never evidence ones.",
+    "                           It promotes EVERY open session and stamps",
+    "                           forceClosed at the repository level -- it is how a",
+    "                           whole plan is abandoned, never how one gate is passed",
+  ],
+  cancel: [
+    "  --reason TEXT            required: why the session is being cancelled",
+    "  --force                  cancel a session that is in flight",
+  ],
+  restore: ["  --reason TEXT            required: why it is coming back"],
+  migrate: ["  --from PATH              required: the legacy session-set directory"],
+};
+
+/** Every subcommand also accepts these. */
+const COMMON_OPTIONS: readonly string[] = [
+  "  --sessions-dir PATH      the sessions root; derived from the cwd when absent",
+  "  --session-number N       act on a session other than the one in flight",
+  "  -h, --help               show this message",
+];
+
+function subcommandUsage(subcommand: string): string {
+  return [
+    `usage: dabbler session ${subcommand} [options]`,
+    "",
+    `  ${SUMMARY[subcommand]}`,
+    "",
+    "options:",
+    ...(OPTIONS[subcommand] ?? []),
+    ...COMMON_OPTIONS,
+    "",
+  ].join("\n");
+}
+
 function usage(): string {
   const width = Math.max(...IMPLEMENTED.map((name) => name.length));
   const rows = IMPLEMENTED.map((name) => `  ${name.padEnd(width)}  ${SUMMARY[name]}`);
@@ -105,6 +182,14 @@ export async function sessionVerb(argv: string[]): Promise<number> {
   if (!IMPLEMENTED.includes(subcommand)) {
     writeErr(`dabbler session: '${subcommand}' is not a subcommand\n\n${usage()}`);
     return EXIT_USAGE;
+  }
+
+  // Before the option parser, which would otherwise read `--help` as a flag
+  // expecting a value -- the refusal csv-model filed, and the reason the only
+  // way to discover a subcommand's arguments was to run it bare.
+  if (rest.includes("--help") || rest.includes("-h")) {
+    writeOut(subcommandUsage(subcommand));
+    return 0;
   }
 
   const parsed = parseArgs(rest);

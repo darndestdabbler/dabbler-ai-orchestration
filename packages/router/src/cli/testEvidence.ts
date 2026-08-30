@@ -13,6 +13,8 @@ import { loadSelectionConfig, selectTests, targetedCommand } from "../checks.ts"
 import {
   OUTCOME_PASSED,
   OUTCOMES,
+  OUTCOME_NONE_SELECTED,
+  POLICY_NONE_SELECTED,
   POLICY_VIOLATION,
   RecordError,
   STAGES,
@@ -92,6 +94,67 @@ interface Judged {
   readonly sanctioned: string;
 }
 
+/**
+ * Verify the claim that the selector chose nothing, rather than trust it.
+ *
+ * The row this produces is the only honest thing to write for a change that
+ * affects no test, and the reason it cannot simply be asserted is the same
+ * reason no verdict is hand-written anywhere else: an outcome a caller can
+ * state without the framework checking is an outcome a caller can be wrong
+ * about. Re-running the selection is a file scan, so checking costs less than
+ * trusting.
+ */
+function judgeNoneSelected(
+  config: unknown,
+  suite: SuiteSpec,
+  sessionsDir: string,
+  command: string | undefined,
+): Judged | number {
+  if (command !== undefined) {
+    writeErr(
+      `test_evidence: --command does not apply to ${OUTCOME_NONE_SELECTED}; ` +
+        "nothing ran, which is what the outcome records.\n",
+    );
+    return EXIT_USAGE;
+  }
+  const root = repoRootFor(sessionsDir);
+  if (root === null) {
+    writeErr(`test_evidence: no git repository found above ${sessionsDir}\n`);
+    return EXIT_USAGE;
+  }
+  const loaded = loadSelectionConfig(config);
+  if (!loaded.ok) {
+    writeErr(
+      "test_evidence: testing.selection is malformed: " + loaded.errors.join("; ") + "\n",
+    );
+    return EXIT_USAGE;
+  }
+  const changed = workingTreeChanges(root, preverifyBaseline(root, sessionsDir));
+  if (changed === null) {
+    writeErr(
+      "test_evidence: could not determine the change set, so " +
+        `${OUTCOME_NONE_SELECTED} cannot be proved against it.\n`,
+    );
+    return EXIT_USAGE;
+  }
+  const mine = selectTests(root, changed, loaded.config).forSuite(suite.name);
+  if (mine.allTestsAffected || mine.testPaths.length > 0) {
+    const count = mine.allTestsAffected ? "every" : String(mine.testPaths.length);
+    writeErr(
+      `test_evidence: the selector chose ${count} test(s) of ${suite.name}, so ` +
+        `${OUTCOME_NONE_SELECTED} is not what happened. Run them and record ` +
+        "the run.\n",
+    );
+    return EXIT_USAGE;
+  }
+  return {
+    policy: POLICY_NONE_SELECTED,
+    reason: `the selector ran and named no test of ${suite.name}`,
+    selected: [],
+    sanctioned: "",
+  };
+}
+
 function judgePreverifyCommand(
   config: unknown,
   suite: SuiteSpec,
@@ -155,6 +218,14 @@ export async function testEvidenceVerb(argv: string[]): Promise<number> {
         "(choose from 'record')\n",
     );
     return EXIT_USAGE;
+  }
+
+  // Before the option parser, for the reason `session` needs the same guard:
+  // `--help` otherwise reaches a parser that reads it as an unrecognized
+  // argument, so the flag that documents the command refuses it instead.
+  if (rest.includes("--help") || rest.includes("-h")) {
+    writeOut(usage());
+    return EXIT_OK;
   }
 
   const parsed = parseArgs(rest);
@@ -246,7 +317,11 @@ export async function testEvidenceVerb(argv: string[]): Promise<number> {
   let policyReason = "";
   let sanctioned = "";
   let selected: ReadonlyArray<readonly [string, string]> = [];
-  if (stage === STAGE_PREVERIFY_TARGETED) {
+  if (stage === STAGE_PREVERIFY_TARGETED && outcome === OUTCOME_NONE_SELECTED) {
+    const judged = judgeNoneSelected(config, suite, sessionsDir, command);
+    if (typeof judged === "number") return judged;
+    ({ policy, reason: policyReason, selected, sanctioned } = judged);
+  } else if (stage === STAGE_PREVERIFY_TARGETED) {
     const judged = judgePreverifyCommand(
       config,
       suite,

@@ -8226,6 +8226,191 @@
       "dateTime": "2026-08-30T13:57:55.218000-04:00",
       "description": "The Work Explorer renders `planned` rows greyed, from the projection alone.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 39,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-30T14:10:23.871000-04:00",
+      "description": "Register; declare `--not-releasable`.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 39,
+      "stepNumber": 2,
+      "stepKey": "checktestrunfresh-reports-skip-no-suite-declared",
+      "dateTime": "2026-08-30T14:10:23.871000-04:00",
+      "description": "`checkTestRunFresh` reports **`SKIP (no suite declared)`** and never `PASS`. A gate that cannot see its own precondition must not report success.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 39,
+      "stepNumber": 3,
+      "stepKey": "an-owed-decision-record-under-the",
+      "dateTime": "2026-08-30T14:10:23.871000-04:00",
+      "description": "An **owed-decision record** under the run ledger, machine-written: what is missing, which file it belongs in, what the framework determined on its own, options with consequences, a recommendation with confidence, and the default on no answer. Stable id, severity, and `open | answered | superseded`, surviving across sessions.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 39,
+      "stepNumber": 4,
+      "stepKey": "an-owed-decision-in-the-verification",
+      "dateTime": "2026-08-30T14:10:23.871000-04:00",
+      "description": "**An owed decision in the verification-reduction class refuses the close.** Work continues and no engine is held open; the session simply cannot record itself verified while the thing that would have verified it is undeclared. Every other class proceeds on the stated default with the wait recorded.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 39,
+      "stepNumber": 5,
+      "stepKey": "three-named-consumers-so-this-is",
+      "dateTime": "2026-08-30T14:10:23.871000-04:00",
+      "description": "Three named consumers, so this is a mechanism and not a subsystem: `testing.suites` at the first session that writes code; the remote question at setup (session 41); and the ours/producer assertion (session 44).",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 39,
+      "stepNumber": 6,
+      "stepKey": "the-operator-answers-once-and-the",
+      "dateTime": "2026-08-30T14:10:23.871000-04:00",
+      "description": "The operator answers once and **the framework writes the file.**",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 39,
+      "stepNumber": 7,
+      "stepKey": "a-none-selected-evidence-outcome-recorded",
+      "dateTime": "2026-08-30T14:10:23.871000-04:00",
+      "description": "**A `none-selected` evidence outcome**, recorded through `test-evidence record` \u2014 not written by `dabbler affected`, which is a query and must not mutate the ledger. The row binds to the selector's own invocation and surface digest, so it cannot be hand-authored.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 39,
+      "stepNumber": 8,
+      "stepKey": "the-malformed-suite-message-names-dabbler",
+      "dateTime": "2026-08-30T14:10:23.871000-04:00",
+      "description": "The malformed-suite message names `dabbler.yaml`, not `router-config.yaml`. `--help` is accepted after a subcommand on every verb.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 39,
+      "stepNumber": 9,
+      "stepKey": "declare-the-extension-as-a-suite",
+      "dateTime": "2026-08-30T14:10:23.871000-04:00",
+      "description": "**Declare the extension as a suite in `dabbler.yaml` (D242, from session 37).** `tools/` is covered by nothing today, so `dabbler affected` selects zero tests for an extension-only change and the session closes green having run nothing \u2014 `csv-model` item 3's defect on this repository. Session 37 hit it live. **This must land before session 41**, because 41, 42, 43 and 47 are all extension-heavy and would each run zero tests. Note the cost being accepted: a second expensive suite enters every later session's selection. If this session decides against declaring it, the decision must say what makes four sessions of untested extension work acceptable.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 39,
+      "stepNumber": 10,
+      "stepKey": "affected",
+      "dateTime": "2026-08-30T14:10:23.871000-04:00",
+      "description": "Affected; verify; full suite as `final-full`; close.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 39,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-30T14:10:23.892000-04:00",
+      "description": "Registered session 39 (claude-code).",
+      "status": "complete"
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 39,
+      "dateTime": "2026-08-30T14:10:41.608000-04:00",
+      "task": "Session 39 of 50 \u2014 Verification stops lying, and an unanswered gap stops\nthe close.\n\n`checkTestRunFresh` returns `[true, \"\"]` when no declared suite is\n`expensive`. csv-model closed session 1 at a clean 5/5 with nothing\nrunnable, and would close the session that writes its entire model the\nsame way. Relabelling PASS as SKIP fixes the label and not the defect,\nwhich is what both reviewers of this plan said about the first draft.\n\nWhat this session does:\n\n1. `checkTestRunFresh` reports SKIP (no suite declared) and never PASS. A\n   gate that cannot see its own precondition must not report success.\n2. An owed-decision record under the run ledger, machine-written: what is\n   missing, which file it belongs in, what the framework determined on its\n   own, the options with their consequences, a recommendation with\n   confidence, and the default if nobody answers. Stable id, severity, and\n   an open/answered/superseded state that survives across sessions.\n3. An owed decision in the verification-reduction class refuses the CLOSE.\n   Work continues and no engine is held open; the session simply cannot\n   record itself verified while the thing that would have verified it is\n   undeclared. Every other class proceeds on its stated default with the\n   wait recorded.\n4. Three named consumers, so this is a mechanism and not a subsystem:\n   testing.suites at the first session that writes code, the remote\n   question at setup (session 41), and the ours/producer assertion\n   (session 44).\n5. The operator answers once and the framework writes the file.\n6. A `none-selected` evidence outcome, recorded through\n   `test-evidence record` and never written by `dabbler affected`, which is\n   a query. The row binds to the selector's own invocation so it cannot be\n   hand-authored.\n7. The malformed-suite message names dabbler.yaml, the file the operator\n   edits, rather than router-config.yaml. `--help` is accepted after a\n   subcommand on every verb.\n8. Declare the extension as a suite in dabbler.yaml (D242, from session\n   37): `tools/` is covered by nothing today, so `dabbler affected` selects\n   zero tests for an extension-only change and a session closes green\n   having run nothing. This must land before session 41, because 41, 42, 43\n   and 47 are all extension-heavy.\n\nNot releasable: it publishes nothing.",
+      "releasable": false
+    },
+    {
+      "sessionNumber": 39,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-30T14:10:41.847000-04:00",
+      "description": "Register; declare `--not-releasable`.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 39,
+      "stepNumber": 2,
+      "stepKey": "checktestrunfresh-reports-skip-no-suite-declared",
+      "dateTime": "2026-08-30T14:13:26.519000-04:00",
+      "description": "`checkTestRunFresh` reports **`SKIP (no suite declared)`** and never `PASS`. A gate that cannot see its own precondition must not report success.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 39,
+      "stepNumber": 8,
+      "stepKey": "the-malformed-suite-message-names-dabbler",
+      "dateTime": "2026-08-30T14:13:26.721000-04:00",
+      "description": "The malformed-suite message names `dabbler.yaml`, not `router-config.yaml`. `--help` is accepted after a subcommand on every verb.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 39,
+      "stepNumber": 7,
+      "stepKey": "a-none-selected-evidence-outcome-recorded",
+      "dateTime": "2026-08-30T14:17:50.204000-04:00",
+      "description": "**A `none-selected` evidence outcome**, recorded through `test-evidence record` \u2014 not written by `dabbler affected`, which is a query and must not mutate the ledger. The row binds to the selector's own invocation and surface digest, so it cannot be hand-authored.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 39,
+      "stepNumber": 9,
+      "stepKey": "declare-the-extension-as-a-suite",
+      "dateTime": "2026-08-30T14:17:50.417000-04:00",
+      "description": "**Declare the extension as a suite in `dabbler.yaml` (D242, from session 37).** `tools/` is covered by nothing today, so `dabbler affected` selects zero tests for an extension-only change and the session closes green having run nothing \u2014 `csv-model` item 3's defect on this repository. Session 37 hit it live. **This must land before session 41**, because 41, 42, 43 and 47 are all extension-heavy and would each run zero tests. Note the cost being accepted: a second expensive suite enters every later session's selection. If this session decides against declaring it, the decision must say what makes four sessions of untested extension work acceptable.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 39,
+      "stepNumber": 3,
+      "stepKey": "an-owed-decision-record-under-the",
+      "dateTime": "2026-08-30T14:25:33.833000-04:00",
+      "description": "An **owed-decision record** under the run ledger, machine-written: what is missing, which file it belongs in, what the framework determined on its own, options with consequences, a recommendation with confidence, and the default on no answer. Stable id, severity, and `open | answered | superseded`, surviving across sessions.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 39,
+      "stepNumber": 4,
+      "stepKey": "an-owed-decision-in-the-verification",
+      "dateTime": "2026-08-30T14:25:34.008000-04:00",
+      "description": "**An owed decision in the verification-reduction class refuses the close.** Work continues and no engine is held open; the session simply cannot record itself verified while the thing that would have verified it is undeclared. Every other class proceeds on the stated default with the wait recorded.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 39,
+      "stepNumber": 5,
+      "stepKey": "three-named-consumers-so-this-is",
+      "dateTime": "2026-08-30T14:25:34.204000-04:00",
+      "description": "Three named consumers, so this is a mechanism and not a subsystem: `testing.suites` at the first session that writes code; the remote question at setup (session 41); and the ours/producer assertion (session 44).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 39,
+      "stepNumber": 6,
+      "stepKey": "the-operator-answers-once-and-the",
+      "dateTime": "2026-08-30T14:25:34.400000-04:00",
+      "description": "The operator answers once and **the framework writes the file.**",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 39,
+      "stepNumber": 10,
+      "stepKey": "affected",
+      "dateTime": "2026-08-30T14:53:18.694000-04:00",
+      "description": "Affected; verify; full suite as `final-full`; close.",
+      "status": "complete"
     }
   ]
 }

@@ -242,6 +242,116 @@ function suiteBlock(eco: Ecosystem): string {
 }
 
 /**
+ * Insert a `testing.suites` block into a `dabbler.yaml` that has none.
+ *
+ * The narrow half of scaffolding: `scaffoldProjectConfig` writes a whole file
+ * and refuses an existing one, which is right at setup and useless later --
+ * a repository that grew code after setup has a config file and no suite, and
+ * that is the case an answered owed decision has to be able to act on.
+ *
+ * Returns null when there is nothing to do or the file already declares
+ * `testing:` -- appending a second mapping key would produce a document whose
+ * later key silently wins, which is a worse outcome than declining.
+ */
+export function appendSuitesToProjectConfig(
+  projectDir: string,
+  ecosystems: readonly Ecosystem[],
+): string | null {
+  if (ecosystems.length === 0) return null;
+  const path = join(projectDir, PROJECT_CONFIG_FILENAME);
+  if (!existsSync(path)) return null;
+  let existing: string;
+  try {
+    existing = readText(path);
+  } catch {
+    return null;
+  }
+  const suites = ecosystems.map(suiteBlock).join("\n") + "\n";
+  let next: string;
+  const suitesKey = existing
+    .split(/\r?\n/)
+    .findIndex((line) => /^\s+suites:\s*$/.test(line));
+  if (suitesKey !== -1) {
+    // A list somebody authored, gaining one more entry. Refusing here was the
+    // obvious safe-looking choice and it was wrong: a repository whose suites
+    // are all cheap raises the blocking question and then has no way through
+    // it, so "safe" meant "the operator edits the file by hand forever",
+    // which is the thing this record exists to stop.
+    //
+    // Appended rather than merged. Nothing here reads the existing entries or
+    // decides what they mean; the new suite goes after them, and YAML's own
+    // list semantics do the rest.
+    const lines = existing.split(/\r?\n/);
+    // The list's OWN indentation, read from its first item rather than
+    // assumed from the key. YAML allows a sequence at the same indent as the
+    // key it belongs to (`suites:` then `  - name:` at the key's own column),
+    // and treating the key's indent as the boundary would insert the new item
+    // before the existing ones at the wrong depth.
+    const firstItem = lines.findIndex(
+      (line, index) => index > suitesKey && /^\s*- /.test(line),
+    );
+    if (firstItem === -1) return null;
+    const itemIndent = (lines[firstItem].match(/^\s*/) ?? [""])[0].length;
+    let end = lines.length;
+    for (let index = firstItem + 1; index < lines.length; index += 1) {
+      const line = lines[index];
+      if (line.trim() === "") continue;
+      const width = (line.match(/^\s*/) ?? [""])[0].length;
+      if (width < itemIndent) {
+        end = index;
+        break;
+      }
+    }
+    // `suiteBlock` renders at four spaces; shift it onto the list's column so
+    // the file keeps one shape rather than gaining a second.
+    const shift = itemIndent - 4;
+    const body = suites
+      .replace(/\n$/, "")
+      .split("\n")
+      .map((line) =>
+        shift >= 0 ? " ".repeat(shift) + line : line.slice(Math.min(-shift, line.length - line.trimStart().length)),
+      )
+      .join("\n");
+    lines.splice(end, 0, body);
+    next = lines.join("\n");
+    // The splice can land after the trailing empty field `split` leaves for a
+    // file that ended in a newline, which would otherwise emit a file that
+    // does not.
+    if (!next.endsWith("\n")) next += "\n";
+    try {
+      writeFileSync(path, next, "utf8");
+    } catch {
+      return null;
+    }
+    return path;
+  }
+  if (/^testing:/m.test(existing)) {
+    // The ordinary shape for a repository configured at setup and grown
+    // since: `testing:` exists carrying controls or selection, and the one
+    // thing missing is the suites. Insert into the mapping rather than
+    // appending a second `testing:` key, whose later copy would silently win.
+    const lines = existing.split(/\r?\n/);
+    const index = lines.findIndex((line) => /^testing:/.test(line));
+    lines.splice(index + 1, 0, "  suites:", suites.replace(/\n$/, ""));
+    next = lines.join("\n");
+  } else {
+    const separator = existing.endsWith("\n") ? "" : "\n";
+    next =
+      existing +
+      separator +
+      PROJECT_CONFIG_TESTING_HEADER +
+      suites +
+      PROJECT_CONFIG_SELECTION;
+  }
+  try {
+    writeFileSync(path, next, "utf8");
+  } catch {
+    return null;
+  }
+  return path;
+}
+
+/**
  * The scaffolded `dabbler.yaml` for a repository of these ecosystems. One
  * suite per ecosystem, in detection order.
  */

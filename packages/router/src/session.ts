@@ -45,9 +45,13 @@ import {
   pushRoundRefs,
   upstreamRemote,
 } from "./evidence.ts";
-import { SET_BOOKKEEPING_COMMIT_BASENAMES, runGates } from "./gates.ts";
+import { SET_BOOKKEEPING_COMMIT_BASENAMES, governingConfig, runGates } from "./gates.ts";
+import { detectEcosystems } from "./bootstrap/detect.ts";
+import { PROJECT_CONFIG_FILENAME } from "./config.ts";
+import { refreshOwedDecisions } from "./owedDecisions.ts";
+import { loadSuitesChecked } from "./testEvidence.ts";
 import { nowIso, platformNewlines, repoRootFor, runGit } from "./journal.ts";
-import { RUNS_DIRNAME, latestRound } from "./ledger.ts";
+import { RUNS_DIRNAME, type Row, latestRound } from "./ledger.ts";
 import {
   SCHEMA_VERSION,
   STATUS_CANCELLED,
@@ -635,6 +639,21 @@ export function start(sessionsDir: string, options: StartOptions): number {
         `${seeded} plan step(s) seeded.\n`,
     );
     for (const line of discoveryWarnings()) writeOut(`${line}\n`);
+    // Raised before the work, so the question is standing before the session
+    // that would trip over it begins. Idempotent, and best-effort: a
+    // registration must not fail because a brief could not be written.
+    try {
+      const raised = raiseSuiteDecisionIfOwed(sessionsDir, requested);
+      if (raised !== null) {
+        writeOut(
+          `start: raised owed decision '${String(raised["id"])}' -- ` +
+            "`dabbler owed list` reads it. The work is not blocked; the close " +
+            "is, until it is answered.\n",
+        );
+      }
+    } catch {
+      // Deliberately silent: see above.
+    }
     if (planRows.length > 0) {
       // The engine cannot guess these derived slugs; a step logged under any
       // other key (and no stepNumber) lands as a NEW row instead of ticking
@@ -1107,10 +1126,24 @@ export function close(sessionsDir: string, options: CloseCliOptions = {}): numbe
       return EXIT_BOUNDARY;
     }
 
+    // Refreshed against the tree the session actually produced, not the one
+    // it started with. A repository that had no build files at `start` and
+    // grew them during the session is the greenfield transition this whole
+    // mechanism exists for -- raising only at registration would miss the
+    // first code-writing session every time.
+    try {
+      raiseSuiteDecisionIfOwed(sessionsDir, current as number);
+    } catch {
+      // A close must not fail because a brief could not be written; the gate
+      // below reads whatever is on disk.
+    }
     const results = runGates(sessionsDir, { forced });
     const width = Math.max(...results.map((row) => row.name.length));
     for (const row of results) {
-      const mark = row.passed ? "PASS" : "FAIL";
+      // Three marks, not two. A gate that could not see its own precondition
+      // reports SKIP: it does not block, and it does not claim to have proved
+      // anything either.
+      const mark = row.inapplicable ? "SKIP" : row.passed ? "PASS" : "FAIL";
       let line = `  ${row.name.padEnd(width)}  ${mark}`;
       if (row.remediation) line += `  ${row.remediation}`;
       writeOut(`${line}\n`);
@@ -1582,3 +1615,38 @@ export function restore(
 }
 
 export { DECIDERS, STEP_STATUSES, SESSION_PLAN_FILENAME };
+
+/**
+ * Raise the suite-declaration question when this repository owes it.
+ *
+ * The two facts it needs come from opposite places on purpose: what the
+ * repository BUILDS is read from its build files, and what it DECLARES is read
+ * from its configuration. A question is owed only when those disagree -- there
+ * is code here and no way to test it -- which is why a repository of documents
+ * is never asked.
+ */
+function raiseSuiteDecisionIfOwed(
+  sessionsDir: string,
+  sessionNumber: number,
+): Row | null {
+  const root = repoRootFor(sessionsDir);
+  if (root === null) return null;
+  const loaded = loadSuitesChecked(governingConfig(sessionsDir));
+  // A malformed declaration is `test_run_fresh`'s to refuse, not a gap to
+  // ask about: the operator declared something, and telling them they
+  // declared nothing would be wrong.
+  if (!loaded.ok) return null;
+  const ecosystems = detectEcosystems(root);
+  return refreshOwedDecisions(root, {
+    ecosystems: ecosystems.map((eco) => eco.key),
+    hasExpensiveSuite: loaded.suites.some((suite) => suite.expensive),
+    configFilename: PROJECT_CONFIG_FILENAME,
+    // Whether the repository has grown somewhere for tests to live. The
+    // detected roots are the ecosystem's conventional ones, so this asks the
+    // question in the ecosystem's own terms rather than guessing at a name.
+    hasTestRoot: ecosystems.some((eco) =>
+      eco.testRoots.some((relative) => existsSync(join(root, relative))),
+    ),
+    sessionNumber,
+  });
+}

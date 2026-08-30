@@ -1,6 +1,6 @@
-// The five close gates, and the driver that runs them.
+// The six close gates, and the driver that runs them.
 //
-// Each gate is here because a v1 incident is, so each test names the state
+// Each gate is here because an incident is, so each test names the state
 // the gate refuses rather than the code path it takes. The parity control
 // proves the two routers word these identically; what these prove is the
 // answer itself -- including the states the corpus never reaches, which is
@@ -104,21 +104,25 @@ const CONFIG = {
 };
 
 describe("a close with nothing wrong with it", () => {
-  it("passes all five gates", () => {
+  it("passes all six gates", () => {
     const { sessionsDir } = closeReady();
     const results = runGates(sessionsDir, { config: CONFIG });
-    expect(results).toHaveLength(5);
+    expect(results).toHaveLength(6);
     for (const row of results) {
       expect(`${row.name}: ${row.remediation}`).toBe(`${row.name}: `);
     }
   });
 
-  it("runs the five in the order the close prints them", () => {
+  it("runs the six in the order the close prints them", () => {
+    // `owed_decisions` sits after `test_run_fresh` on purpose: the operator
+    // reads "nothing was measured" and then reads why that is not allowed to
+    // stand, in that order.
     expect(GATE_CHECKS.map(([name]) => name)).toEqual([
       "verification_clean",
       "working_tree_clean",
       "pushed_to_remote",
       "test_run_fresh",
+      "owed_decisions",
       "verdict_vocabulary",
     ]);
   });
@@ -214,8 +218,25 @@ describe("verification_clean", () => {
     git(repo, "commit", "-q", "-m", "work");
     git(repo, "push", "-q");
     for (const row of runGates(sessionsDir)) {
+      expect(row.passed).toBe(true);
+      // An inapplicable gate carries the reason it judged nothing. Only the
+      // gates that actually measured something are silent.
+      if (row.inapplicable) continue;
       expect(`${row.name}: ${row.remediation}`).toBe(`${row.name}: `);
     }
+  });
+
+  it("reports SKIP rather than PASS when no suite is declared", () => {
+    // The sandbox declares a suite; a repository that declares none is the
+    // state csv-model closed session 1 in, at a clean 5/5 with nothing
+    // runnable. A gate that cannot see its own precondition must not report
+    // success -- it grows quieter as the work grows more consequential.
+    const { sessionsDir } = makeSandboxRepo();
+    const row = runGates(sessionsDir, {
+      config: { testing: { suites: [] } } as never,
+    }).find((entry) => entry.name === "test_run_fresh");
+    expect(row?.inapplicable).toBe(true);
+    expect(row?.remediation).toContain("no suite is declared");
   });
 });
 
@@ -349,9 +370,9 @@ describe("verdict_vocabulary", () => {
 describe("the driver", () => {
   it("turns a gate that throws into a failed row rather than wedging the close", () => {
     // A repository path that is not a repository at all reaches the first
-    // guard of every gate; the point is that five rows still come back.
+    // guard of every gate; the point is that six rows still come back.
     const results = runGates(join(makeSandboxRepo().repo, "nowhere"));
-    expect(results).toHaveLength(5);
+    expect(results).toHaveLength(6);
     expect(results.every((row) => typeof row.remediation === "string")).toBe(true);
   });
 

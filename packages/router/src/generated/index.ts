@@ -6,6 +6,8 @@ export * from "./check-ir.ts";
 export * from "./dabbler.ts";
 export * from "./dispositions.ts";
 export * from "./disputes.ts";
+export * from "./owed-decision-current.ts";
+export * from "./owed-decisions.ts";
 export * from "./packaging.ts";
 export * from "./plan-review.ts";
 export * from "./progress-projection.ts";

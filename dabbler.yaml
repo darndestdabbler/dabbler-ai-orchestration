@@ -65,6 +65,33 @@ testing:
         - packages/router/test
       test_glob: "*.test.ts"
 
+    # The VS Code extension. Declared in session 39 against D242, which
+    # session 37 found by being the first session in a long while to change
+    # only extension files: `tools/` was covered by nothing, so `dabbler
+    # affected` selected zero tests, no preverification evidence could
+    # honestly be recorded, and the session could have closed with every gate
+    # green having run nothing. That is `csv-model` feedback item 3's defect
+    # on this repository, and sessions 41, 42, 43 and 47 are all
+    # extension-heavy.
+    #
+    # `runs_whole` because the runner is an npm script with its spec glob
+    # baked in: naming a file after it ADDS to the glob rather than narrowing
+    # it, so there is no targeted form to invent. The complete run is the
+    # smallest honest evidence, and at roughly three seconds that costs
+    # nothing worth optimising.
+    - name: extension
+      command: npm run test:unit -w dabbler-ai-orchestration
+      expensive: true
+      runs_whole: true
+      covers:
+        - tools/dabbler-ai-orchestration/
+        - package.json
+        - package-lock.json
+        - dabbler.yaml
+      test_roots:
+        - tools/dabbler-ai-orchestration/src/test/suite
+      test_glob: "*.test.ts"
+
   # Deterministic controls — one entry per kind, from compile, typecheck,
   # lint, analyzer. A declared control runs before verification and its
   # exit code is the fact; `required` sends a red result back to the
@@ -98,6 +125,12 @@ testing:
       - package.json
       - package-lock.json
       - packages/router/tsconfig.json
+      # This file DECLARES the suites, their commands and their surfaces, so a
+      # change to it changes what every suite does. It was mapped to nothing
+      # and fell through to the smoke test -- the selector reported
+      # `selection_unknown: dabbler.yaml` while the operator was editing the
+      # declaration the selector reads.
+      - dabbler.yaml
 
     # Run when a changed path maps to nothing. Cheap, broad, and enough to
     # notice a structural break -- not a substitute for a real mapping.
@@ -105,6 +138,26 @@ testing:
       - packages/router/test/contracts.test.ts
 
     rules:
+      # The extension's own sources. The suite `runs_whole`, so this list
+      # decides what the record NAMES, never what actually runs -- a test file
+      # added and not listed here still runs, and the failure direction is
+      # therefore under-naming rather than under-running.
+      - when: tools/dabbler-ai-orchestration/src/
+        select:
+          - tools/dabbler-ai-orchestration/src/test/suite/actionRegistry.test.ts
+          - tools/dabbler-ai-orchestration/src/test/suite/commandFlows.test.ts
+          - tools/dabbler-ai-orchestration/src/test/suite/fileSystem.test.ts
+          - tools/dabbler-ai-orchestration/src/test/suite/sessionsModel.test.ts
+          - tools/dabbler-ai-orchestration/src/test/suite/solutionTreeModel.test.ts
+          - tools/dabbler-ai-orchestration/src/test/suite/specSectionLocator.test.ts
+          - tools/dabbler-ai-orchestration/src/test/suite/terminalShim.test.ts
+          - tools/dabbler-ai-orchestration/src/test/suite/workExplorerTreeModel.test.ts
+      # The extension manifest decides which commands, views and menus exist,
+      # which is what half the extension suite asserts.
+      - when: tools/dabbler-ai-orchestration/package.json
+        select:
+          - tools/dabbler-ai-orchestration/src/test/suite/actionRegistry.test.ts
+          - tools/dabbler-ai-orchestration/src/test/suite/commandFlows.test.ts
       # The scripts under `packages/router/scripts` are the declared
       # controls' own entry points — the controls run them, so they map
       # to no test rather than to an unknown.

@@ -31,8 +31,23 @@ export { matchingPrefixes } from "./checks.ts";
 export const OUTCOME_PASSED = "passed";
 export const OUTCOME_FAILED = "failed";
 export const OUTCOME_ABORTED = "aborted";
+/**
+ * The selector ran and correctly chose nothing.
+ *
+ * The three outcomes above are all claims about a suite that RAN, so a
+ * docs-only change had no honest row to write: `passed` asserts a green run
+ * that never happened, and recording nothing leaves the ledger silent about a
+ * step that did happen and reached a legitimate conclusion. Evidence that the
+ * selector ran is worth more than an absent row, because it distinguishes "no
+ * tests were needed" from "nobody looked".
+ *
+ * It is not a claim a caller can simply make: `recordRun` re-runs the
+ * selection and refuses the row if anything is in fact selected. The check is
+ * a file scan, so verifying the claim costs less than trusting it.
+ */
+export const OUTCOME_NONE_SELECTED = "none-selected";
 export const OUTCOMES: readonly string[] = [
-  OUTCOME_PASSED, OUTCOME_FAILED, OUTCOME_ABORTED,
+  OUTCOME_PASSED, OUTCOME_FAILED, OUTCOME_ABORTED, OUTCOME_NONE_SELECTED,
 ];
 
 /**
@@ -64,10 +79,19 @@ export const POLICY_OPERATOR_OVERRIDE = "operator-override";
  * narrowed to the selected tests from one that could not be narrowed.
  */
 export const POLICY_SUITE_WHOLE = "suite-runs-whole";
+/**
+ * The selector ran and named no test of this suite.
+ *
+ * A policy, not a violation: the row records that selection happened and
+ * reached a legitimate conclusion. It is only ever written beside
+ * `OUTCOME_NONE_SELECTED`, and the framework re-runs the selection before
+ * accepting either.
+ */
+export const POLICY_NONE_SELECTED = "none-selected";
 export const POLICY_VIOLATION = "policy_violation";
 export const POLICIES: readonly string[] = [
   POLICY_TARGETED, POLICY_ALL_TESTS_AFFECTED, POLICY_OPERATOR_OVERRIDE,
-  POLICY_SUITE_WHOLE, POLICY_VIOLATION,
+  POLICY_SUITE_WHOLE, POLICY_NONE_SELECTED, POLICY_VIOLATION,
 ];
 /**
  * The four that make a run count as pre-verification evidence. A violation is
@@ -485,7 +509,19 @@ export function recordRun(
       `stage must be one of ${pyTuple(STAGES)}, got ${pythonRepr(stage)}`,
     );
   }
-  if (stage === STAGE_PREVERIFY_TARGETED) {
+  if (outcome === OUTCOME_NONE_SELECTED && stage !== STAGE_PREVERIFY_TARGETED) {
+    throw new RecordError(
+      `${OUTCOME_NONE_SELECTED} is a pre-verification outcome; a final-full run ` +
+        "is the run of record and cannot be a run that did not happen",
+    );
+  }
+  if (stage === STAGE_PREVERIFY_TARGETED && outcome === OUTCOME_NONE_SELECTED) {
+    if (command !== null) {
+      throw new RecordError(
+        `a ${OUTCOME_NONE_SELECTED} record names no command, because nothing ran`,
+      );
+    }
+  } else if (stage === STAGE_PREVERIFY_TARGETED) {
     if (String(command ?? "").trim() === "") {
       throw new RecordError(
         "a preverify-targeted record must name the command that ran",
@@ -535,7 +571,11 @@ export function recordRun(
   }
   const record: TestRunRecord = {
     suite: suite.name,
-    command: String(command || suite.command),
+    // Empty for a run that did not happen. Falling back to the declared
+    // command would put a command in the record beside an outcome saying
+    // nothing ran, and a reader would have every reason to believe the first.
+    command:
+      outcome === OUTCOME_NONE_SELECTED ? "" : String(command || suite.command),
     outcome,
     surfaceDigest: digest,
     recordedAt: nowIso("microseconds"),

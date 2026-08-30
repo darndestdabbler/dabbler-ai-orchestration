@@ -74,7 +74,7 @@ it.
 | 36 | Cutover — the extension calls in-process, and Python leaves | yes | 2026-08-29 |
 | 37 | The extension surveyed against the principles | no | 2026-08-30 |
 | 38 | The projection stops withholding the plan | no | 2026-08-30 |
-| 39 | Verification stops lying, and an unanswered gap stops the close | — | not declared |
+| 39 | Verification stops lying, and an unanswered gap stops the close | no | 2026-08-30 |
 | 40 | Task rows — a structured declaration, a framework-owned state machine | — | not declared |
 | 41 | Setup owns the runway | — | not declared |
 | 42 | The panes say what they are, and the Solution Explorer lights up | — | not declared |
@@ -1187,5 +1187,52 @@ What this session does:
 
 Tests: one per behaviour, in the router suite, plus the extension's own
 rendering test for the new row state.
+
+Not releasable: it publishes nothing.
+
+### Session 39 — Verification stops lying, and an unanswered gap stops the close
+
+**Releasable: no.**
+
+Session 39 of 50 — Verification stops lying, and an unanswered gap stops
+the close.
+
+`checkTestRunFresh` returns `[true, ""]` when no declared suite is
+`expensive`. csv-model closed session 1 at a clean 5/5 with nothing
+runnable, and would close the session that writes its entire model the
+same way. Relabelling PASS as SKIP fixes the label and not the defect,
+which is what both reviewers of this plan said about the first draft.
+
+What this session does:
+
+1. `checkTestRunFresh` reports SKIP (no suite declared) and never PASS. A
+   gate that cannot see its own precondition must not report success.
+2. An owed-decision record under the run ledger, machine-written: what is
+   missing, which file it belongs in, what the framework determined on its
+   own, the options with their consequences, a recommendation with
+   confidence, and the default if nobody answers. Stable id, severity, and
+   an open/answered/superseded state that survives across sessions.
+3. An owed decision in the verification-reduction class refuses the CLOSE.
+   Work continues and no engine is held open; the session simply cannot
+   record itself verified while the thing that would have verified it is
+   undeclared. Every other class proceeds on its stated default with the
+   wait recorded.
+4. Three named consumers, so this is a mechanism and not a subsystem:
+   testing.suites at the first session that writes code, the remote
+   question at setup (session 41), and the ours/producer assertion
+   (session 44).
+5. The operator answers once and the framework writes the file.
+6. A `none-selected` evidence outcome, recorded through
+   `test-evidence record` and never written by `dabbler affected`, which is
+   a query. The row binds to the selector's own invocation so it cannot be
+   hand-authored.
+7. The malformed-suite message names dabbler.yaml, the file the operator
+   edits, rather than router-config.yaml. `--help` is accepted after a
+   subcommand on every verb.
+8. Declare the extension as a suite in dabbler.yaml (D242, from session
+   37): `tools/` is covered by nothing today, so `dabbler affected` selects
+   zero tests for an extension-only change and a session closes green
+   having run nothing. This must land before session 41, because 41, 42, 43
+   and 47 are all extension-heavy.
 
 Not releasable: it publishes nothing.

@@ -107,6 +107,15 @@ export const VERBS: readonly VerbSpec[] = [
     summary: "the six-step driver: enter, review, approve, test, suite, fix",
   },
   {
+    // The operator's inbox. Extension-facing because the answer is a
+    // decision, and a decision reserved to a person should not require a
+    // terminal -- the Explorer renders these rows and the framework acts on
+    // the answer.
+    verb: "owed",
+    extensionFacing: true,
+    summary: "what the framework is waiting on a person for; list and answer",
+  },
+  {
     verb: "solution",
     extensionFacing: false,
     summary: "the solution view over a workspace's modules",

@@ -113,7 +113,7 @@ describe("closing a session", () => {
     const before = readFileSync(join(sessionsDir, "sessions.json"), "utf8");
     const result = captured(() => close(sessionsDir, { dryRun: true }));
     expect(result.code).toBe(EXIT_OK);
-    expect(result.out).toContain("5/5 gates pass; nothing written.");
+    expect(result.out).toContain("6/6 gates pass; nothing written.");
     expect(readFileSync(join(sessionsDir, "sessions.json"), "utf8")).toBe(before);
     expect(porcelain(repo)).toBe("");
   });

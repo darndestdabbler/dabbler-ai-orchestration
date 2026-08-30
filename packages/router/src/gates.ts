@@ -1,5 +1,5 @@
-// The five close gates. Exactly five -- each one paid for by a concrete v1
-// incident, and no gate guards another gate:
+// The six close gates. Each one paid for by a concrete incident, and no gate
+// guards another gate:
 //
 // - `verification_clean`: the 2026-07-06 bypass (a hand-written `manual`
 //   method plus a self-attested VERIFIED closed a session with no real
@@ -8,6 +8,16 @@
 // - `working_tree_clean`: 41 real firings -- "forgot to git add".
 // - `pushed_to_remote`: 29 real firings -- work stranded local.
 // - `test_run_fresh`: 5 firings -- a close on code the suite never saw.
+// - `owed_decisions`: csv-model, 2026-08-30 -- session 1 closed at a clean
+//   5/5 in a repository that declared no suite, and nothing would have
+//   changed when the work became code. It does NOT guard `test_run_fresh`:
+//   that gate answers "did the declared suite run against this tree", and
+//   this one answers "is something unanswered that would make the answer
+//   meaningless". A gate cannot see its own missing precondition, which is
+//   why the sixth exists and why the fifth now reports SKIP instead of
+//   claiming a pass. It is also not suite-specific -- every
+//   verification-reducing question routes through it, including the
+//   source-resolution switch a later session adds.
 // - `verdict_vocabulary`: the 2026-07-08 incident -- a confabulated
 //   `manual-override-development` persisted and every reader rendered it.
 //
@@ -23,7 +33,7 @@ import { existsSync, realpathSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
 import type { RouterConfig } from "./config.ts";
-import { loadConfig, projectRoot } from "./config.ts";
+import { PROJECT_CONFIG_FILENAME, loadConfig, projectRoot } from "./config.ts";
 import { changedPathsBetween, detectOutOfBandWrite } from "./evidence.ts";
 import {
   isMachineStatePath,
@@ -39,6 +49,7 @@ import {
 } from "./ledger.ts";
 import { readSessionState } from "./progress.ts";
 import { pythonRepr, pythonStr } from "./pythonJson.ts";
+import { blockingDecisions } from "./owedDecisions.ts";
 import { evaluateFreshness, loadSuitesChecked } from "./testEvidence.ts";
 import { SESSION_VERDICTS } from "./verdict.ts";
 
@@ -81,10 +92,25 @@ export interface GateResult {
   readonly name: string;
   readonly passed: boolean;
   readonly remediation: string;
+  /**
+   * The gate could not see its own precondition, so it judged nothing.
+   *
+   * Distinct from passing, and the distinction is the point: a gate that
+   * reports PASS for a check it never performed grows quieter as the work
+   * grows more consequential, which is how a repository with no declared
+   * suite closed a clean 5/5 having run nothing. An inapplicable gate does
+   * not block -- what blocks is an owed decision in the verification-reduction
+   * class -- but it never claims to have proved anything.
+   */
+  readonly inapplicable: boolean;
 }
 
 /** A predicate's answer, before it becomes a row. */
-export type Check = readonly [passed: boolean, remediation: string];
+export type Check = readonly [
+  passed: boolean,
+  remediation: string,
+  inapplicable?: boolean,
+];
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -403,7 +429,7 @@ export function checkPushedToRemote(sessionsDir: string): Check {
  * suites that repository does not have. Only the alternative is worse: a
  * repository silently gated by another's testing policy.
  */
-function governingConfig(sessionsDir: string): RouterConfig | null {
+export function governingConfig(sessionsDir: string): RouterConfig | null {
   const setRoot = repoRootFor(sessionsDir);
   const ambient = projectRoot();
   if (setRoot === null || ambient === null) return null;
@@ -428,15 +454,64 @@ export function checkTestRunFresh(
       false,
       "the test-suite declaration is malformed, so the suites this " +
         "session owes cannot be determined; fix testing.suites in " +
-        "router-config.yaml — " +
+        // The repository's own file, which is the one the operator edits. It
+        // named `router-config.yaml` -- the packaged layer beneath it in the
+        // precedence chain, and a file no project should be opening.
+        `${PROJECT_CONFIG_FILENAME} - ` +
         loaded.errors.join("; "),
     ];
   }
-  if (!loaded.suites.some((suite) => suite.expensive)) return [true, ""];
+  if (!loaded.suites.some((suite) => suite.expensive)) {
+    // Inapplicable, not passed. Nothing here can be proved and nothing here is
+    // claimed. What refuses the close is the owed decision that says a suite
+    // is undeclared, not this row.
+    return [true, "no suite is declared, so nothing was measured", true];
+  }
   const verdicts = evaluateFreshness(sessionsDir, null, loaded.suites);
   const failures = verdicts.filter((verdict) => verdict.required && !verdict.passed);
   if (failures.length === 0) return [true, ""];
   return [false, failures.map((v) => `${v.suite}: ${v.reason}`).join("; ")];
+}
+
+/**
+ * No unanswered question is standing that would make this close a lie.
+ *
+ * Only the verification-reduction class refuses, and the refusal is the
+ * resolution of two rules that look contradictory until they are ordered:
+ * nothing in this framework blocks on a person, AND anything that reduces
+ * verification is reserved to one. Both hold, because the first is about
+ * judgment calls and verification reduction is not a judgment call. So the
+ * work proceeds, the session runs to the end, and what stops is the record
+ * claiming to be verified.
+ *
+ * A repository with no owed record has nothing owed, which is the ordinary
+ * case and must stay free.
+ */
+export function checkOwedDecisions(sessionsDir: string): Check {
+  const root = repoRootFor(sessionsDir);
+  if (root === null) return [true, ""];
+  let blocking;
+  try {
+    blocking = blockingDecisions(root);
+  } catch (error) {
+    // An unreadable record is a fault, not an absence: answering it with
+    // "nothing is owed" is how a corrupt file becomes a clean close.
+    return [
+      false,
+      `the owed-decision record could not be read: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    ];
+  }
+  if (blocking.length === 0) return [true, ""];
+  const names = blocking.map((row) => String(row["id"])).join(", ");
+  return [
+    false,
+    `${blocking.length} unanswered decision(s) would reduce what verification ` +
+      `proves: ${names}. The work is done and the record cannot call it ` +
+      "verified until they are answered -- run `dabbler owed list` to read " +
+      "them, and `dabbler owed answer` to settle one.",
+  ];
 }
 
 /**
@@ -497,6 +572,7 @@ export const GATE_CHECKS: readonly (readonly [string, Predicate])[] = [
   ["working_tree_clean", checkWorkingTreeClean],
   ["pushed_to_remote", checkPushedToRemote],
   ["test_run_fresh", checkTestRunFresh],
+  ["owed_decisions", checkOwedDecisions],
   ["verdict_vocabulary", checkVerdictVocabulary],
 ];
 
@@ -523,6 +599,7 @@ export function runGates(
         name,
         passed: true,
         remediation: "skipped by --force (bookkeeping gate)",
+        inapplicable: false,
       });
       continue;
     }
@@ -538,7 +615,12 @@ export function runGates(
       const text = error instanceof Error ? error.message : String(error);
       row = [false, `gate crashed (${kind}: ${text}); failing closed`];
     }
-    results.push({ name, passed: Boolean(row[0]), remediation: row[1] });
+    results.push({
+      name,
+      passed: Boolean(row[0]),
+      remediation: row[1],
+      inapplicable: row[2] === true,
+    });
   }
   return results;
 }

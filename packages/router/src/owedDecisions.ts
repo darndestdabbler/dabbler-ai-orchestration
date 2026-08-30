@@ -514,3 +514,60 @@ export function raiseRemoteDecision(
     sessionNumber: options.sessionNumber ?? null,
   });
 }
+
+/** Whether a package this repository consumes is one the solution produces. */
+export const ID_DEPENDENCY_OWNERSHIP = "dependency-ownership";
+
+/**
+ * Ask whether a package this repository consumes is one of ours.
+ *
+ * The framework cannot derive it. A `.csproj` naming `Dabbler.Csv.Model`
+ * looks exactly like one naming `Newtonsoft.Json`: both are package ids from
+ * a feed, and nothing in either build file says which of them a sibling
+ * repository builds. That is the whole reason `solution-dependencies.json`
+ * exists, and the whole reason its first entry has to be told to it.
+ *
+ * Asked once per package, and `external` is a real answer rather than a
+ * deferral -- most dependencies ARE external, and a question that only
+ * accepts "ours" would be a leading one.
+ */
+export function raiseOwnershipDecision(
+  repoRoot: string,
+  options: {
+    readonly packageId: string;
+    readonly seenIn: string;
+    readonly sessionNumber?: number | null;
+  },
+): Row | null {
+  return raiseOwed(repoRoot, {
+    id: `${ID_DEPENDENCY_OWNERSHIP}:${options.packageId}`,
+    decisionClass: CLASS_VALUE_TRADEOFF,
+    question: `Does one of your own repositories build ${options.packageId}?`,
+    file: "solution-dependencies.json",
+    determined:
+      `${options.seenIn} references ${options.packageId}, and nothing in a ` +
+      "build file says where a package comes from. A dependency your team " +
+      "builds and one from a public feed are written identically.",
+    options: [
+      {
+        label: "ours",
+        consequence:
+          "Recorded as an edge in this solution, so the graph knows the two " +
+          "repositories are connected and a pin behind the producer's " +
+          "release is something the framework can tell you about.",
+      },
+      {
+        label: "external",
+        consequence:
+          "Recorded as third-party. It stays the build file's business, and " +
+          "you are not asked about it again.",
+      },
+    ],
+    recommendation: null,
+    confidence: null,
+    onNoAnswer:
+      "Nothing. The dependency keeps working; the solution graph simply does " +
+      "not know whether this edge is one of its own.",
+    sessionNumber: options.sessionNumber ?? null,
+  });
+}

@@ -8932,6 +8932,140 @@
       "dateTime": "2026-08-30T16:20:35.370000-04:00",
       "description": "Affected; verify; full suite as `final-full`; close.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 44,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-30T16:20:47.878000-04:00",
+      "description": "Register; declare `--not-releasable`.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 44,
+      "stepNumber": 2,
+      "stepKey": "a-tracked-versioned-schema-file-at",
+      "dateTime": "2026-08-30T16:20:47.878000-04:00",
+      "description": "A tracked, versioned-schema file at each repository root declaring what this repository **consumes** from its own solution: package id, kind, the producing repository, and how it resolves. **No versions** \u2014 the pin lives in the `.csproj` or POM and is never copied. **No `produces` block** \u2014 that is `dabbler.yaml`'s `packaging`, and restating it would fork it.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 44,
+      "stepNumber": 3,
+      "stepKey": "repository-identity-is-settled-here",
+      "dateTime": "2026-08-30T16:20:47.878000-04:00",
+      "description": "**Repository identity is settled here**: a stable id plus an optional remote URL and an optional relative checkout path, with defined behaviour when a sibling is absent, moved, offline, or cloned twice. A missing sibling is a reported state, never an error that stops work.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 44,
+      "stepNumber": 4,
+      "stepKey": "the-this-package-is-ours-assertion",
+      "dateTime": "2026-08-30T16:20:47.878000-04:00",
+      "description": "The \"this package is ours\" assertion is supplied once through session 39's mechanism and validated thereafter.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 44,
+      "stepNumber": 5,
+      "stepKey": "direct-dependencies-are-read-from",
+      "dateTime": "2026-08-30T16:20:47.878000-04:00",
+      "description": "Direct dependencies are read from `.csproj` and `pom.xml` as XML \u2014 manifest reading, not building. **The parser fails loudly rather than guessing:** a version or id that resolves through an MSBuild property, `Directory.Build. props`, or Maven dependency management is reported as *cannot determine*, never as drift. A false drift report is worse than no report.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 44,
+      "stepNumber": 6,
+      "stepKey": "four-reconciliations-reported-and-never-silently",
+      "dateTime": "2026-08-30T16:20:47.878000-04:00",
+      "description": "Four reconciliations, reported and never silently repaired: referenced-but-not-declared; declared-but-not-referenced; two repositories pinning different versions of one package; and an unsanctioned source reference crossing a repository boundary.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 44,
+      "stepNumber": 7,
+      "stepKey": "affected",
+      "dateTime": "2026-08-30T16:20:47.878000-04:00",
+      "description": "Affected; verify; full suite as `final-full`; close.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 44,
+      "dateTime": "2026-08-30T16:21:03.412000-04:00",
+      "task": "Session 44 of 50 \u2014 `solution-dependencies.json`: the edge, never the pin.\n\nA `.csproj` saying it needs `Dabbler.Csv.Model >= 1.0.0` is authoritative.\nWhat no build file can say is WHICH REPOSITORY PRODUCES IT. That single\nmissing fact is this file's entire content, and it is why the\ncross-repository record can live distributed -- one edge-set per repository,\nin git -- rather than in a superproject nobody has.\n\nWhat this session does:\n\n1. A tracked, versioned-schema file at each repository root declaring what\n   this repository CONSUMES from its own solution: package id, kind, the\n   producing repository, and how it resolves. No versions -- the pin lives\n   in the .csproj or the POM and is never copied. No `produces` block --\n   that is dabbler.yaml's `packaging`, and restating it would fork it.\n2. Repository identity settled here: a stable id plus an optional remote URL\n   and an optional relative checkout path, with defined behaviour when a\n   sibling is absent, moved, offline, or cloned twice. A missing sibling is\n   a reported state, never an error that stops work.\n3. The \"this package is ours\" assertion is supplied once through session\n   39's owed-decision mechanism and validated thereafter.\n4. Direct dependencies read from .csproj and pom.xml as XML -- manifest\n   reading, not building, which keeps this inside the declare-and-check\n   line. The parser FAILS LOUDLY rather than guessing: a version or id that\n   resolves through an MSBuild property, Directory.Build.props or Maven\n   dependency management is reported as \"cannot determine\", never as drift.\n   A false drift report is worse than no report.\n5. Four reconciliations, reported and never silently repaired:\n   referenced-but-not-declared (an edge nobody knows about -- the dangerous\n   one); declared-but-not-referenced; two repositories pinning different\n   versions of one package; and an unsanctioned source reference crossing a\n   repository boundary.\n\nNot releasable: it publishes nothing.",
+      "releasable": false
+    },
+    {
+      "sessionNumber": 44,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-30T16:21:03.437000-04:00",
+      "description": "Register; declare `--not-releasable`.",
+      "status": "in-progress"
+    },
+    {
+      "sessionNumber": 44,
+      "stepNumber": 2,
+      "stepKey": "a-tracked-versioned-schema-file-at",
+      "dateTime": "2026-08-30T16:24:37.537000-04:00",
+      "description": "A tracked, versioned-schema file at each repository root declaring what this repository **consumes** from its own solution: package id, kind, the producing repository, and how it resolves. **No versions** \u2014 the pin lives in the `.csproj` or POM and is never copied. **No `produces` block** \u2014 that is `dabbler.yaml`'s `packaging`, and restating it would fork it.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 44,
+      "stepNumber": 3,
+      "stepKey": "repository-identity-is-settled-here",
+      "dateTime": "2026-08-30T16:24:37.746000-04:00",
+      "description": "**Repository identity is settled here**: a stable id plus an optional remote URL and an optional relative checkout path, with defined behaviour when a sibling is absent, moved, offline, or cloned twice. A missing sibling is a reported state, never an error that stops work.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 44,
+      "stepNumber": 4,
+      "stepKey": "the-this-package-is-ours-assertion",
+      "dateTime": "2026-08-30T16:24:37.942000-04:00",
+      "description": "The \"this package is ours\" assertion is supplied once through session 39's mechanism and validated thereafter.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 44,
+      "stepNumber": 5,
+      "stepKey": "direct-dependencies-are-read-from",
+      "dateTime": "2026-08-30T16:24:38.147000-04:00",
+      "description": "Direct dependencies are read from `.csproj` and `pom.xml` as XML \u2014 manifest reading, not building. **The parser fails loudly rather than guessing:** a version or id that resolves through an MSBuild property, `Directory.Build. props`, or Maven dependency management is reported as *cannot determine*, never as drift. A false drift report is worse than no report.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 44,
+      "stepNumber": 6,
+      "stepKey": "four-reconciliations-reported-and-never-silently",
+      "dateTime": "2026-08-30T16:24:38.344000-04:00",
+      "description": "Four reconciliations, reported and never silently repaired: referenced-but-not-declared; declared-but-not-referenced; two repositories pinning different versions of one package; and an unsanctioned source reference crossing a repository boundary.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 44,
+      "stepNumber": 7,
+      "stepKey": "affected",
+      "dateTime": "2026-08-30T16:53:56.489000-04:00",
+      "description": "Affected; verify; full suite as `final-full`; close.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 44,
+      "stepNumber": 7,
+      "stepKey": "affected",
+      "dateTime": "2026-08-30T16:53:56.927000-04:00",
+      "description": "Affected; verify; full suite as `final-full`; close.",
+      "status": "complete"
     }
   ]
 }

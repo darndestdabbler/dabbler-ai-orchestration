@@ -79,7 +79,7 @@ it.
 | 41 | Setup owns the runway | no | 2026-08-30 |
 | 42 | The panes say what they are, and the Solution Explorer lights up | no | 2026-08-30 |
 | 43 | Liveness, and one place the operator looks | no | 2026-08-30 |
-| 44 | `solution-dependencies.json` — the edge, never the pin | — | not declared |
+| 44 | `solution-dependencies.json` — the edge, never the pin | no | 2026-08-30 |
 | 45 | Resolution modes, inside the declare-and-check line | — | not declared |
 | 46 | Packaging declared for the ecosystem it is | — | not declared |
 | 47 | The Solution Explorer goes cross-repo | — | not declared |
@@ -1407,5 +1407,44 @@ What this session does:
      for minutes and the UI is indistinguishable from hung.
    - F13: the extension contributes no configuration at all, so the stall
      threshold has nowhere to live. This session establishes one.
+
+Not releasable: it publishes nothing.
+
+### Session 44 — `solution-dependencies.json` — the edge, never the pin
+
+**Releasable: no.**
+
+Session 44 of 50 — `solution-dependencies.json`: the edge, never the pin.
+
+A `.csproj` saying it needs `Dabbler.Csv.Model >= 1.0.0` is authoritative.
+What no build file can say is WHICH REPOSITORY PRODUCES IT. That single
+missing fact is this file's entire content, and it is why the
+cross-repository record can live distributed -- one edge-set per repository,
+in git -- rather than in a superproject nobody has.
+
+What this session does:
+
+1. A tracked, versioned-schema file at each repository root declaring what
+   this repository CONSUMES from its own solution: package id, kind, the
+   producing repository, and how it resolves. No versions -- the pin lives
+   in the .csproj or the POM and is never copied. No `produces` block --
+   that is dabbler.yaml's `packaging`, and restating it would fork it.
+2. Repository identity settled here: a stable id plus an optional remote URL
+   and an optional relative checkout path, with defined behaviour when a
+   sibling is absent, moved, offline, or cloned twice. A missing sibling is
+   a reported state, never an error that stops work.
+3. The "this package is ours" assertion is supplied once through session
+   39's owed-decision mechanism and validated thereafter.
+4. Direct dependencies read from .csproj and pom.xml as XML -- manifest
+   reading, not building, which keeps this inside the declare-and-check
+   line. The parser FAILS LOUDLY rather than guessing: a version or id that
+   resolves through an MSBuild property, Directory.Build.props or Maven
+   dependency management is reported as "cannot determine", never as drift.
+   A false drift report is worse than no report.
+5. Four reconciliations, reported and never silently repaired:
+   referenced-but-not-declared (an edge nobody knows about -- the dangerous
+   one); declared-but-not-referenced; two repositories pinning different
+   versions of one package; and an unsanctioned source reference crossing a
+   repository boundary.
 
 Not releasable: it publishes nothing.

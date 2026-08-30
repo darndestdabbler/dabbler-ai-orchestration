@@ -68,6 +68,15 @@ export const VERBS: readonly VerbSpec[] = [
     summary: "one cross-provider round; dispute, adjudicate, reanchor, step",
   },
   {
+    // The cross-repository graph, one edge-set per repository. Not
+    // extension-facing yet: session 47 assembles the union and gives the
+    // Solution Explorer rows to render, and a verb advertised to a caller
+    // before there is a view for it is a promise made early.
+    verb: "deps",
+    extensionFacing: false,
+    summary: "what this repository takes from its solution, and what disagrees",
+  },
+  {
     verb: "discovery",
     extensionFacing: false,
     summary: "what exists: enumerate a vendor, date the records, diff the roles",

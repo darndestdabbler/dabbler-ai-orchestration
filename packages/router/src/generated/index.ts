@@ -19,6 +19,7 @@ export * from "./run-event.ts";
 export * from "./run-projection.ts";
 export * from "./session-organization.ts";
 export * from "./sessions.ts";
+export * from "./solution-dependencies.ts";
 export * from "./step-execution.ts";
 export * from "./verification-request.ts";
 export * from "./verification-result.ts";

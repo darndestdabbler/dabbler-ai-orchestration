@@ -338,3 +338,10 @@
 - Orchestrator provider (excluded): anthropic
 - Verifier's read surface: agency: none — this round's verifier could not look at the tree
 - Raw round output: `.dabbler/runs/s43/`
+
+## Session 44 verification — REMEDIATED AT THE CAP after 3 round(s)
+
+- Every blocking finding of round 3 was fixed; the cap left the fix unreviewed.
+- Fixed, unreviewed: [major] Cross-repository reconciliation still cannot assemble the distributed edge-set outside one immediate-parent directory**
+- Fixed, unreviewed: [major] Stable repository identity and duplicate-checkout behavior remain unenforced**
+- This work lands UNREVIEWED. It is not a waiver: nothing was accepted over a standing finding — what is unproved is the repair.

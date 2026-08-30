@@ -919,9 +919,9 @@
     {
       "number": 47,
       "title": "The Solution Explorer goes cross-repo",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-30T17:43:34.825000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-08-30T17:58:05.294000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

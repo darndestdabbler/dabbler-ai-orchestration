@@ -6,17 +6,15 @@
 // its verification, and -- the part a projection gets wrong most easily --
 // how it says it could not tell.
 
-import { mkdirSync, writeFileSync } from "node:fs";
+import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { afterAll, afterEach, describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it } from "vitest";
 
 import { snapshotWorktreeTree } from "../src/journal.ts";
 import {
   appendRound,
-  appendStepEvent,
   roundsPath,
-  sessionRunDir,
 } from "../src/ledger.ts";
 import {
   SESSION_STATUSES,
@@ -35,60 +33,29 @@ import {
   readRawLegacyState,
   sessionsFromPlan,
   synthesizeV3FromV2,
-  useApprovedPlanReader,
   verificationCap,
 } from "../src/progress.ts";
-import { flipStateToClosed, registerSessionStart } from "../src/writers.ts";
+import { flipStateToClosed, logStep, registerSessionStart, seedSessionPlan } from "../src/writers.ts";
+// `session.ts` registers the plan parser `seedSessionPlan` needs; importing it
+// for that registration is what `cli/status.ts` does for the same reason.
+import { advanceStepsAtDeclare, closeLastStep } from "../src/session.ts";
 import { git, makeSandboxRepo, makeTempDir, removeTempDirs } from "./support/fixtures.ts";
 
 afterAll(removeTempDirs);
 
-/** The reader session 32 registers; here it is a stand-in with no integrity check. */
-let plannedSteps: Record<string, unknown>[] | null = null;
-let planThrows: string | null = null;
-
-useApprovedPlanReader({
-  planFilename: "approved-plan.json",
-  effectivePlan: () => {
-    if (planThrows !== null) throw new Error(planThrows);
-    return { steps: plannedSteps ?? [] };
-  },
-});
-
-afterEach(() => {
-  plannedSteps = null;
-  planThrows = null;
-});
-
-function writePlanFile(repo: string, sessionNumber: number): string {
-  const runDir = sessionRunDir(repo, sessionNumber);
-  mkdirSync(runDir, { recursive: true });
-  writeFileSync(join(runDir, "approved-plan.json"), "{}", "utf8");
-  return runDir;
+/**
+ * Register session 1 and seed its steps, which is what `dabbler session start`
+ * does in two calls. Seeding is what puts a session's steps on the record, and
+ * the task rows are the fold of those.
+ */
+function start(sessionsDir: string): void {
+  registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
+  seedSessionPlan(sessionsDir, 1);
+  // `start` logs nothing against step 1: the plan assigns its opening to
+  // `declare`, and a step `start` had moved is a step `declare` cannot open.
 }
 
 /** A schema-valid step event; the fold is what the tests are about. */
-function stepEvent(
-  event: "opened" | "closed",
-  stepId: string,
-  minute: number,
-): Record<string, unknown> {
-  const row: Record<string, unknown> = {
-    schema_version: 1,
-    event,
-    step_id: stepId,
-    session_number: 1,
-    recorded_at: `2026-01-01T00:0${minute}:00+00:00`,
-    base_commit: "c".repeat(40),
-  };
-  if (event === "closed") {
-    row["closed_tree"] = "d".repeat(40);
-    row["envelope"] = { inside: ["src/widget.py"] };
-    row["deterministic"] = [{ kind: "lint", status: "pass", required: true }];
-  }
-  return row;
-}
-
 function recordRound(
   repo: string,
   row: Record<string, unknown>,
@@ -252,7 +219,7 @@ describe("the source of a projection's sessions", () => {
 
   it("reads the ledger once one exists", () => {
     const { sessionsDir } = makeSandboxRepo();
-    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
+    start(sessionsDir);
     const repository = buildProjection(sessionsDir)["repository"] as Record<
       string,
       unknown
@@ -297,7 +264,7 @@ describe("the source of a projection's sessions", () => {
 
   it("renders a moved session under the plan's title", () => {
     const { sessionsDir } = makeSandboxRepo();
-    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
+    start(sessionsDir);
     writeFileSync(
       join(sessionsDir, "session-plan.md"),
       "### Session 1 of 2: Renamed after the recut\n1. Register.\n\n" +
@@ -314,7 +281,7 @@ describe("the source of a projection's sessions", () => {
 
   it("names each session beside its number and gives it an icon key", () => {
     const { sessionsDir } = makeSandboxRepo();
-    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
+    start(sessionsDir);
     const sessions = buildProjection(sessionsDir)["sessions"] as Record<
       string,
       unknown
@@ -329,34 +296,95 @@ describe("the source of a projection's sessions", () => {
 // --- The task level -----------------------------------------------------------
 
 describe("the task rows", () => {
-  it("has no tasks and no refusal when the session has no plan", () => {
-    const { repo, sessionsDir } = makeSandboxRepo();
-    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
-    expect(buildTaskRows(repo, 1)).toEqual([]);
-    const sessions = buildProjection(sessionsDir)["sessions"] as Record<
-      string,
-      unknown
-    >[];
-    expect(sessions[0]["tasks"]).toEqual([]);
-    expect(sessions[0]["tasksRefused"]).toBeNull();
+  /** Move a seeded step, the way `dabbler session log` does. */
+  function log(
+    sessionsDir: string,
+    key: string,
+    status: string,
+    stepNumber: number,
+  ): void {
+    logStep(sessionsDir, 1, key, `logged ${key}`, status, stepNumber);
+  }
+
+  function keysOf(sessionsDir: string): string[] {
+    return buildTaskRows(sessionsDir, 1).map((row) => String(row["stepId"]));
+  }
+
+  it("opens step 1 at declare, and moves nothing else", () => {
+    // The bookend is one transition. `start` leaves every step pending --
+    // a step it had already moved is a step `declare` could not open -- and
+    // completing step 1 or opening step 2 are MIDDLE transitions the plan
+    // assigns to `session log`. A bookend that moved those too would be the
+    // framework running a different state machine from its own plan.
+    const { sessionsDir } = makeSandboxRepo();
+    start(sessionsDir);
+    expect(
+      buildTaskRows(sessionsDir, 1).every((row) => row["state"] === "pending"),
+    ).toBe(true);
+
+    advanceStepsAtDeclare(sessionsDir, 1);
+    const rows = buildTaskRows(sessionsDir, 1);
+    expect(rows[0]["state"]).toBe("in flight");
+    expect(rows[0]["isOpen"]).toBe(true);
+    expect(rows.slice(1).every((row) => row["state"] === "pending")).toBe(true);
   });
 
-  it("folds plan order against the execution record", () => {
-    const { repo } = makeSandboxRepo();
-    writePlanFile(repo, 1);
-    plannedSteps = [
-      { step_id: "s1", intent: "First" },
-      { step_id: "s2", intent: "Second" },
-      { step_id: "s3", intent: "Third" },
-    ];
-    appendStepEvent(repo, 1, stepEvent("opened", "s1", 0));
-    appendStepEvent(repo, 1, stepEvent("closed", "s1", 1));
-    appendStepEvent(repo, 1, stepEvent("opened", "s2", 2));
-    const rows = buildTaskRows(repo, 1);
-    expect(rows.map((row) => row["state"])).toEqual(["done", "in flight", "pending"]);
+  it("opens nothing on a second declare, because step 1 is already open", () => {
+    const { sessionsDir } = makeSandboxRepo();
+    start(sessionsDir);
+    advanceStepsAtDeclare(sessionsDir, 1);
+    expect(advanceStepsAtDeclare(sessionsDir, 1).opened).toBeNull();
+  });
+
+  it("keeps at most one step open when two are logged in flight", () => {
+    const { sessionsDir } = makeSandboxRepo();
+    start(sessionsDir);
+    const keys = keysOf(sessionsDir);
+    log(sessionsDir, keys[1], "in-progress", 2);
+    log(sessionsDir, keys[2], "in-progress", 3);
+    const rows = buildTaskRows(sessionsDir, 1);
+    expect(rows.filter((row) => row["isOpen"]).length).toBe(1);
+    expect(rows[2]["isOpen"]).toBe(true);
+  });
+
+  it("closes the last step when the run of record lands", () => {
+    const { sessionsDir } = makeSandboxRepo();
+    start(sessionsDir);
+    const before = buildTaskRows(sessionsDir, 1);
+    expect(before[before.length - 1]["state"]).toBe("pending");
+    expect(closeLastStep(sessionsDir, 1).error).toBe("");
+    const after = buildTaskRows(sessionsDir, 1);
+    expect(after[after.length - 1]["state"]).toBe("done");
+  });
+
+  it("renders the steps the plan declares, in the plan's order", () => {
+    // The sandbox plan's session 1 has four numbered steps. `session start`
+    // seeds them; nothing else has to be written for a task to exist.
+    const { sessionsDir } = makeSandboxRepo();
+    start(sessionsDir);
+    const rows = buildTaskRows(sessionsDir, 1);
+    expect(rows.length).toBe(4);
+    expect(rows.map((row) => row["position"])).toEqual([0, 1, 2, 3]);
+    expect(String(rows[1]["intent"])).toContain("widget");
+  });
+
+  it("folds the last status logged against each step", () => {
+    const { sessionsDir } = makeSandboxRepo();
+    start(sessionsDir);
+    const keys = keysOf(sessionsDir);
+    log(sessionsDir, keys[0], "complete", 1);
+    log(sessionsDir, keys[1], "in-progress", 2);
+    const rows = buildTaskRows(sessionsDir, 1);
+    expect(rows.map((row) => row["state"])).toEqual([
+      "done",
+      "in flight",
+      "pending",
+      "pending",
+    ]);
     expect(rows.map((row) => row["iconKey"])).toEqual([
       "complete",
       "in-progress",
+      "not-started",
       "not-started",
     ]);
     expect(rows[1]["isOpen"]).toBe(true);
@@ -364,41 +392,76 @@ describe("the task rows", () => {
     expect(rows[2]["startedAt"]).toBeNull();
   });
 
+  it("takes the later row when a step is logged twice", () => {
+    // `session start` logs `register` complete itself, and an orchestrator
+    // that logs it again must not produce two truths about one step.
+    const { sessionsDir } = makeSandboxRepo();
+    start(sessionsDir);
+    const keys = keysOf(sessionsDir);
+    log(sessionsDir, keys[1], "in-progress", 2);
+    log(sessionsDir, keys[1], "complete", 2);
+    expect(buildTaskRows(sessionsDir, 1)[1]["state"]).toBe("done");
+    expect(buildTaskRows(sessionsDir, 1)[1]["isOpen"]).toBe(false);
+  });
+
   it("leaves nothing in flight once the open step is closed", () => {
-    const { repo } = makeSandboxRepo();
-    writePlanFile(repo, 1);
-    plannedSteps = [{ step_id: "s1", intent: "Only" }];
-    appendStepEvent(repo, 1, stepEvent("opened", "s1", 0));
-    appendStepEvent(repo, 1, stepEvent("closed", "s1", 1));
-    expect(buildTaskRows(repo, 1).every((row) => row["isOpen"] === false)).toBe(true);
+    const { sessionsDir } = makeSandboxRepo();
+    start(sessionsDir);
+    const keys = keysOf(sessionsDir);
+    log(sessionsDir, keys[0], "in-progress", 1);
+    log(sessionsDir, keys[0], "complete", 1);
+    expect(
+      buildTaskRows(sessionsDir, 1).every((row) => row["isOpen"] === false),
+    ).toBe(true);
   });
 
-  it("refuses rather than rendering a plan it could not read", () => {
-    const { repo } = makeSandboxRepo();
-    writePlanFile(repo, 1);
-    planThrows = "content is not backed by a sanctioned write";
-    expect(() => buildTaskRows(repo, 1)).toThrow(TaskRowsRefused);
+  it("gives a blocked step the cancelled glyph and its own word", () => {
+    // There is no fifth icon asset, and a step that stopped reads closer to
+    // cancelled than to any of the other three. The word is what separates
+    // them.
+    const { sessionsDir } = makeSandboxRepo();
+    start(sessionsDir);
+    log(sessionsDir, keysOf(sessionsDir)[2], "blocked", 3);
+    const row = buildTaskRows(sessionsDir, 1)[2];
+    expect(row["state"]).toBe("blocked");
+    expect(row["iconKey"]).toBe("cancelled");
   });
 
-  it("refuses rather than rendering an unreadable execution record", () => {
-    const { repo } = makeSandboxRepo();
-    const runDir = writePlanFile(repo, 1);
-    plannedSteps = [{ step_id: "s1", intent: "Only" }];
-    writeFileSync(join(runDir, "step-execution.jsonl"), "{ not json\n", "utf8");
-    expect(() => buildTaskRows(repo, 1)).toThrow(TaskRowsRefused);
+  it("has no tasks and no refusal in a repository nothing has run in", () => {
+    const { sessionsDir } = makeSandboxRepo();
+    expect(buildTaskRows(sessionsDir, 1)).toEqual([]);
   });
 
-  it("carries the refusal on the session rather than as an empty task list", () => {
-    const { repo, sessionsDir } = makeSandboxRepo();
-    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
-    writePlanFile(repo, 1);
-    planThrows = "unreadable";
+  it("reaches the projection, which is where the tree reads them", () => {
+    const { sessionsDir } = makeSandboxRepo();
+    start(sessionsDir);
     const sessions = buildProjection(sessionsDir)["sessions"] as Record<
       string,
       unknown
     >[];
-    expect(sessions[0]["tasks"]).toEqual([]);
-    expect(String(sessions[0]["tasksRefused"])).toContain("approved plan");
+    const inFlight = sessions.find((session) => session["inFlight"]);
+    expect((inFlight?.["tasks"] as unknown[]).length).toBe(4);
+    expect(inFlight?.["tasksRefused"]).toBeNull();
+  });
+
+  it("refuses rather than rendering an activity log it could not read", () => {
+    const { sessionsDir } = makeSandboxRepo();
+    start(sessionsDir);
+    writeFileSync(join(sessionsDir, "activity-log.json"), "{ not json\n", "utf8");
+    expect(() => buildTaskRows(sessionsDir, 1)).toThrow(TaskRowsRefused);
+  });
+
+  it("carries the refusal on the session rather than as an empty task list", () => {
+    const { sessionsDir } = makeSandboxRepo();
+    start(sessionsDir);
+    writeFileSync(join(sessionsDir, "activity-log.json"), "{ not json\n", "utf8");
+    const sessions = buildProjection(sessionsDir)["sessions"] as Record<
+      string,
+      unknown
+    >[];
+    const inFlight = sessions.find((session) => session["inFlight"]);
+    expect(inFlight?.["tasks"]).toEqual([]);
+    expect(String(inFlight?.["tasksRefused"])).toContain("activity-log.json");
   });
 });
 
@@ -591,7 +654,7 @@ function sessions(sessionsDir: string): Record<string, unknown>[] {
 describe("a session the plan declares and the ledger has not reached", () => {
   it("projects as 'planned', which the ledger's own vocabulary does not contain", () => {
     const { sessionsDir } = makeSandboxRepo();
-    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
+    start(sessionsDir);
     writePlan(sessionsDir, [
       [1, "First things"],
       [2, "Second things"],
@@ -604,7 +667,7 @@ describe("a session the plan declares and the ledger has not reached", () => {
 
   it("keeps the not-started glyph, so only the row's words separate the two", () => {
     const { sessionsDir } = makeSandboxRepo();
-    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
+    start(sessionsDir);
     writePlan(sessionsDir, [
       [1, "First"],
       [9, "Much later"],
@@ -635,7 +698,7 @@ describe("a session the plan declares and the ledger has not reached", () => {
 
   it("carries no run artifacts, because it has never been registered", () => {
     const { sessionsDir } = makeSandboxRepo();
-    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
+    start(sessionsDir);
     writePlan(sessionsDir, [
       [1, "First"],
       [5, "Never registered"],
@@ -652,7 +715,7 @@ describe("a session the plan declares and the ledger has not reached", () => {
 describe("reconciling a hand-edited plan against the ledger", () => {
   it("never re-emits a number the ledger already holds", () => {
     const { sessionsDir } = makeSandboxRepo();
-    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
+    start(sessionsDir);
     writePlan(sessionsDir, [
       [1, "A title the plan changed its mind about"],
       [2, "Second"],
@@ -664,7 +727,7 @@ describe("reconciling a hand-edited plan against the ledger", () => {
 
   it("contributes a duplicated number once", () => {
     const { sessionsDir } = makeSandboxRepo();
-    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
+    start(sessionsDir);
     writePlan(sessionsDir, [
       [1, "First"],
       [7, "Alpha"],
@@ -675,7 +738,7 @@ describe("reconciling a hand-edited plan against the ledger", () => {
 
   it("leaves a gap alone rather than inventing the missing number", () => {
     const { sessionsDir } = makeSandboxRepo();
-    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
+    start(sessionsDir);
     writePlan(sessionsDir, [
       [1, "First"],
       [4, "Fourth"],
@@ -689,7 +752,7 @@ describe("reconciling a hand-edited plan against the ledger", () => {
 
   it("yields nothing when the plan is shorter than the ledger", () => {
     const { sessionsDir } = makeSandboxRepo();
-    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
+    start(sessionsDir);
     registerSessionStart(sessionsDir, 2, { engine: "claude-code" });
     writePlan(sessionsDir, [[1, "The only one left in the plan"]]);
     const repo = repository(sessionsDir);
@@ -699,7 +762,7 @@ describe("reconciling a hand-edited plan against the ledger", () => {
 
   it("takes nothing from a heading the parser cannot read", () => {
     const { sessionsDir } = makeSandboxRepo();
-    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
+    start(sessionsDir);
     writePlan(sessionsDir, [[1, "First"]], "\n## Session eleven: not a heading\n");
     expect(repository(sessionsDir)["plannedSessions"]).toBe(0);
   });
@@ -708,13 +771,13 @@ describe("reconciling a hand-edited plan against the ledger", () => {
 describe("what registers on the next session start", () => {
   it("is the session in flight, whatever its number", () => {
     const { sessionsDir } = makeSandboxRepo();
-    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
+    start(sessionsDir);
     expect(repository(sessionsDir)["nextSession"]).toBe(1);
   });
 
   it("is the lowest session that has not run, planned ones included", () => {
     const { sessionsDir } = makeSandboxRepo();
-    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
+    start(sessionsDir);
     closeSessionForTest(sessionsDir);
     writePlan(sessionsDir, [
       [1, "First"],
@@ -726,7 +789,7 @@ describe("what registers on the next session start", () => {
 
   it("is null when the plan declares nothing further", () => {
     const { sessionsDir } = makeSandboxRepo();
-    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
+    start(sessionsDir);
     closeSessionForTest(sessionsDir);
     registerSessionStart(sessionsDir, 2, { engine: "claude-code" });
     closeSessionForTest(sessionsDir);

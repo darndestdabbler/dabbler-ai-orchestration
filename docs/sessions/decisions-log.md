@@ -7798,3 +7798,40 @@ What this session did: cleared the stray variable and re-ran the declared suite
 command verbatim, so the recorded command is the command that ran. The run of
 record for session 37 is that run, not the contaminated one. A failed run of
 record is not reusable proof and was not reused.
+
+## Session 40 — Task rows — a structured declaration, a framework-owned state machine
+
+### D244 · 2026-08-30 · Orchestrator · session start no longer logs the register step; the plan assigns step 1's opening to declare
+
+`dabbler session start` no longer logs the register step, and that is a
+change to behaviour older than this session.
+
+It used to write `register` as `complete`, with the reasoning that the call
+IS the register step and the machine should record what it did rather than
+ask an engine to report it -- which is principle (g), and is right in
+general. Session 40 first changed `complete` to `in-progress`, on the ground
+that step 1 of every session reads "Register; declare" and registration is
+half of it.
+
+Both pre-empt the opening bookend. The plan assigns step 1's opening to
+`session declare`, and a step `start` has already moved is a step `declare`
+cannot open. A verifier upheld that against this session's rebuttal, and the
+adjudication is the part worth keeping: **semantic desirability cannot
+override an explicit transition requirement -- if the requirement is
+undesirable, amend the plan rather than implement a different state machine
+quietly.** This session had already amended its plan once and then built
+something its own amended text did not describe, which is a unilateral
+substitution, not an amendment.
+
+What is lost is small and was never the register step's only record:
+`registerSessionStart` writes the registration into `sessions.json`, which
+is where a reader looks for whether a session started. What `start` stops
+doing is participating in the task-row state machine, which belongs to the
+plan.
+
+The (g) tension is real and is recorded rather than resolved: the framework
+still owns the two bookends -- `declare` opens the first step, the run of
+record closes the last -- and the middle transitions remain `session log`,
+which an orchestrator calls. Whether the framework should infer more of the
+middle is a live question, and it is not answered by having one command
+quietly move a step another command was specified to move.

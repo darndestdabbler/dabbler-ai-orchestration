@@ -30,7 +30,16 @@ import {
   preverifyRecipe,
   workingTreeChanges,
 } from "../affected.ts";
+import { closeLastStep } from "../session.ts";
+import { readSessionState } from "../progress.ts";
 import { writeErr, writeOut } from "./output.ts";
+
+/** The session in flight, for the bookend when no `--session-number` is given. */
+function currentSessionNumber(sessionsDir: string): number | null {
+  const state = readSessionState(sessionsDir);
+  const current = state ? state["currentSession"] : null;
+  return typeof current === "number" ? current : null;
+}
 
 const EXIT_OK = 0;
 const EXIT_USAGE = 2;
@@ -390,6 +399,27 @@ export async function testEvidenceVerb(argv: string[]): Promise<number> {
         "Next: git commit, then git push -- once -- then\n" +
           `  dabbler session close --sessions-dir ${sessionsDir}\n`,
       );
+    }
+  }
+
+  // The second bookend, and deliberately AFTER the policy refusal above: a
+  // run recorded and then refused is not an accepted run of record, and
+  // marking the last task done on the strength of one would say the session
+  // finished something it did not.
+  if (
+    record.stage === STAGE_FINAL_FULL &&
+    record.outcome === OUTCOME_PASSED &&
+    record.policy !== POLICY_VIOLATION
+  ) {
+    const number =
+      typeof sessionNumber === "number"
+        ? sessionNumber
+        : currentSessionNumber(sessionsDir);
+    if (number !== null) {
+      const { error } = closeLastStep(sessionsDir, number);
+      if (error) {
+        writeErr(`test_evidence: the last task row could not be moved -- ${error}\n`);
+      }
     }
   }
   return EXIT_OK;

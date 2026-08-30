@@ -31,7 +31,6 @@ import {
   sessionRunDir,
 } from "./ledger.ts";
 import { loadEntries } from "./modules.ts";
-import { useApprovedPlanReader } from "./progress.ts";
 import { dumps } from "./pythonJson.ts";
 import { loadSchemaFile, schemaFailure } from "./schema/validate.ts";
 import { readText } from "./textfile.ts";
@@ -670,7 +669,3 @@ export function deriveRiskFlags(
   return order.filter((flag) => flags.has(flag));
 }
 
-useApprovedPlanReader({
-  planFilename: PLAN_FILENAME,
-  effectivePlan: (runDir: string) => effectivePlan(readPlan(runDir)),
-});

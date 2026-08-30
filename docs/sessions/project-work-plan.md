@@ -75,7 +75,7 @@ it.
 | 37 | The extension surveyed against the principles | no | 2026-08-30 |
 | 38 | The projection stops withholding the plan | no | 2026-08-30 |
 | 39 | Verification stops lying, and an unanswered gap stops the close | no | 2026-08-30 |
-| 40 | Task rows — a structured declaration, a framework-owned state machine | — | not declared |
+| 40 | Task rows — a structured declaration, a framework-owned state machine | no | 2026-08-30 |
 | 41 | Setup owns the runway | — | not declared |
 | 42 | The panes say what they are, and the Solution Explorer lights up | — | not declared |
 | 43 | Liveness, and one place the operator looks | — | not declared |
@@ -1234,5 +1234,59 @@ What this session does:
    zero tests for an extension-only change and a session closes green
    having run nothing. This must land before session 41, because 41, 42, 43
    and 47 are all extension-heavy.
+
+Not releasable: it publishes nothing.
+
+### Session 40 — Task rows — a structured declaration, a framework-owned state machine
+
+**Releasable: no.**
+
+Session 40 of 50 — Task rows, rendered from the steps that already exist.
+
+**This session amends its own plan, on the record, before doing the work.**
+D240 (session 37) found the plan's premise half wrong, and reading both
+mechanisms confirms it.
+
+What is actually true:
+
+- `dabbler session start` ALREADY seeds a session's steps. It parses the
+  numbered step list under the session's heading in `session-plan.md` and
+  writes one `plan-step` row per step into `activity-log.json`, carrying
+  `stepNumber`, a stable `stepKey`, the description, and a status from
+  `pending | in-progress | complete | blocked`. `dabbler session log --step
+  <key> --status <s>` moves them. Every session in this block has been
+  ticking those rows.
+- `progress.buildTaskRows` folds a DIFFERENT artifact:
+  `.dabbler/runs/s<N>/approved-plan.json` against `step-execution.jsonl`.
+  Neither is written by anything in the lifecycle, so the fold returns an
+  empty list at its first line and no session has ever rendered a task.
+
+Two mechanisms, one purpose, and the tree reads the one nobody writes.
+
+So the plan's step list — give the task file a schema, have `declare` write
+an approved plan from it, add a `session step --done` verb — was designed
+against the belief that a session's steps did not exist in machine-readable
+form. They do, they come from the plan, and they already have a transition
+verb that journals. Building a second declaration grammar beside a working
+one is precisely what "one implementation of any rule" exists to prevent.
+
+What this session does instead:
+
+1. Amend session 40 in `session-plan.md` on the record, with the evidence.
+2. `buildTaskRows` folds the seeded `plan-step` rows: position from
+   `stepNumber`, stable id from `stepKey`, intent from the description, and
+   state from the status.
+3. The framework owns the bookends rather than asking anyone to remember
+   them: step 1 opens at `session declare`, and the last step closes when
+   the run of record is recorded. The middle transitions stay `session log`,
+   which already exists, already refuses an unknown step, and already
+   journals — which is the explicit, framework-validated transition both
+   reviewers of this block's plan asked for.
+4. `approved-plan.json` keeps its own job — the file envelope, the risk
+   flags, the hash and the amendment ledger that verification scope reads —
+   and stops being the tree's source. It is a public contract surface
+   (`Router.approvedPlan`, `planReview`) and is not touched.
+5. Task rows render Not Started / In Progress / Done with the operator's
+   icons, and the session tooltip's `N/M tasks done` becomes true.
 
 Not releasable: it publishes nothing.

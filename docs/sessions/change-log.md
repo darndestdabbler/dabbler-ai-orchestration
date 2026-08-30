@@ -311,3 +311,9 @@
 - Every blocking finding of round 3 was fixed; the cap left the fix unreviewed.
 - Fixed, unreviewed: [major] The persisted owed-decision wire record still lacks the required state contract**
 - This work lands UNREVIEWED. It is not a waiver: nothing was accepted over a standing finding — what is unproved is the repair.
+
+## Session 40 verification — REMEDIATED AT THE CAP after 3 round(s)
+
+- Every blocking finding of round 3 was fixed; the cap left the fix unreviewed.
+- Fixed, unreviewed: [major] The declaration bookend still performs the wrong state transitions
+- This work lands UNREVIEWED. It is not a waiver: nothing was accepted over a standing finding — what is unproved is the repair.

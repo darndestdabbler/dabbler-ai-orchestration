@@ -1780,25 +1780,46 @@ it cannot say which task is *done*. Principle (g) asks the framework to own
 what is decidable by rule — it does not ask it to manufacture a deterministic
 answer where none exists.
 
+> **AMENDED in session 40, before the work, on the evidence of D240.** The
+> steps below were designed against the belief that a session's steps do not
+> exist in machine-readable form. **They do.** `dabbler session start` already
+> parses the numbered step list under a session's heading and writes one
+> `plan-step` row per step into `activity-log.json` — `stepNumber`, a stable
+> `stepKey`, the description, and a status from `pending | in-progress |
+> complete | blocked` — and `dabbler session log` already moves them, refusing
+> a step it does not know. Every session in this block has been ticking those
+> rows while the tree rendered nothing.
+>
+> What `buildTaskRows` folds is a different artifact,
+> `.dabbler/runs/s<N>/approved-plan.json`, which nothing in the lifecycle
+> writes. **Two mechanisms, one purpose, and the tree reads the one nobody
+> writes.** A task-file schema and a `session step` verb would be a second
+> declaration grammar beside a working one, which is what "one implementation
+> of any rule" exists to prevent. Steps 2, 3 and 5 are withdrawn; step 4's
+> requirement is met by the verb that already exists.
+
 1. Register; declare `--not-releasable`.
-2. **The task file gets a schema**: an ordered list of steps with stable ids,
-   each with a title and a file envelope. Prose that does not parse is
-   **refused**, not guessed at.
-3. `session declare` writes the approved plan from it.
-4. The framework opens step 1 at `declare` and closes the last at the run of
-   record. One verb — `dabbler session step --done <id>` — moves the rest. The
-   framework owns legality: an out-of-order, unknown or repeated transition is
-   refused, and every transition is journaled with the tree digest and the plan
-   hash.
-5. **Envelopes are used only as a scope check on a transition** — a step
-   claiming completion whose declared files were never touched is refused. The
-   framework never infers `done`; it may mark `in-progress` from the first
-   matching change.
+2. **`buildTaskRows` folds the seeded `plan-step` rows**: position from
+   `stepNumber`, stable id from `stepKey`, intent from the description, state
+   from the status. The steps are declared once, in the plan, and read once.
+3. **The framework owns the bookends**, which are the two transitions nobody
+   should have to remember: step 1 opens at `session declare`, and the last
+   step closes when the run of record is recorded.
+4. The middle transitions stay `dabbler session log`. It already exists, it
+   already refuses a step it cannot resolve, and it already journals — which
+   is the explicit, framework-validated transition both reviewers of this plan
+   asked for, and it needs no second verb beside it.
+5. **`approved-plan.json` keeps its own job and stops being the tree's
+   source.** The envelope, the risk flags, the content hash and the amendment
+   ledger are what verification scope reads; it is a public contract surface
+   (`Router.approvedPlan`, `planReview`) and is not touched here.
 6. Task rows render Not Started / In Progress / Done, and the session tooltip's
    `N/M tasks done` becomes true.
 7. Affected; verify; full suite as `final-full`; close.
 
-**Creates:** the Work Explorer's third level, first rendered. Est. 18 tests.
+**Creates:** the Work Explorer's third level, first rendered. Est. 10 tests —
+down from 18, because most of the original estimate was the grammar this
+amendment withdrew.
 
 ---
 

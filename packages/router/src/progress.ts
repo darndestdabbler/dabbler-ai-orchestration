@@ -12,8 +12,9 @@
 // Three vocabularies, deliberately distinct:
 // - session lifecycle: `not-started` / `in-progress` / `complete` /
 //   `cancelled`;
-// - task state, folded from the execution record: `pending` / `in flight` /
-//   `done`, and no fourth -- a step was opened, or closed, or neither;
+// - task state, folded from what was logged against a declared step:
+//   `pending` / `in flight` / `done` / `blocked`, which is the writer's
+//   vocabulary rendered in the reader's words;
 // - the icon key the extension maps to its four SVG assets: `complete` /
 //   `in-progress` / `not-started` / `cancelled`.
 
@@ -31,12 +32,7 @@ import { nowIso } from "./journal.ts";
 import {
   LedgerError,
   ROW_REMEDIATED_AT_CAP,
-  STEP_EVENT_OPENED,
-  closedStepIds,
-  openStep,
   readRounds,
-  readStepEvents,
-  sessionRunDir,
 } from "./ledger.ts";
 import { pythonRepr, pythonStr } from "./pythonJson.ts";
 import { readText } from "./textfile.ts";
@@ -865,6 +861,42 @@ export function plannedSessions(
 export const STEP_STATE_PENDING = "pending";
 export const STEP_STATE_IN_FLIGHT = "in flight";
 export const STEP_STATE_DONE = "done";
+export const STEP_STATE_BLOCKED = "blocked";
+
+/** The activity-log row kind `session start` seeds one of per planned step. */
+export const KIND_PLAN_STEP = "plan-step";
+
+/**
+ * The statuses `session log` accepts, which are the writer's vocabulary and
+ * not this reader's. Imported as constants rather than restated as strings so
+ * a status the writer gains cannot silently render as its own name.
+ */
+export const STEP_STATUS_PENDING = "pending";
+export const STEP_STATUS_IN_PROGRESS = "in-progress";
+export const STEP_STATUS_COMPLETE = "complete";
+export const STEP_STATUS_BLOCKED = "blocked";
+
+/** The logged status, in the words a task row says. */
+export const TASK_STATE_OF_STATUS: Readonly<Record<string, string>> = {
+  [STEP_STATUS_PENDING]: STEP_STATE_PENDING,
+  [STEP_STATUS_IN_PROGRESS]: STEP_STATE_IN_FLIGHT,
+  [STEP_STATUS_COMPLETE]: STEP_STATE_DONE,
+  [STEP_STATUS_BLOCKED]: STEP_STATE_BLOCKED,
+};
+
+/**
+ * The logged status, as one of the four glyphs the extension ships.
+ *
+ * `blocked` takes the cancelled glyph: there is no fifth asset, and a step
+ * that stopped reads far closer to cancelled than to any of the other three.
+ * The row's own word is what distinguishes them.
+ */
+export const TASK_ICON_OF_STATUS: Readonly<Record<string, string>> = {
+  [STEP_STATUS_PENDING]: STATUS_NOT_STARTED,
+  [STEP_STATUS_IN_PROGRESS]: STATUS_IN_PROGRESS,
+  [STEP_STATUS_COMPLETE]: STATUS_COMPLETE,
+  [STEP_STATUS_BLOCKED]: STATUS_CANCELLED,
+};
 
 /**
  * The plan or the execution record could not be read.
@@ -880,113 +912,93 @@ export class TaskRowsRefused extends Error {
   }
 }
 
-/** What `buildTaskRows` needs from the approved plan, and nothing more. */
-export interface ApprovedPlanReader {
-  readonly planFilename: string;
-  /** The plan as its amendments leave it, or a throw the caller reports. */
-  readonly effectivePlan: (runDir: string) => Record<string, unknown>;
-}
-
-let approvedPlanReader: ApprovedPlanReader | null = null;
-
 /**
- * Register the approved-plan reader the task rows fold against.
+ * The session's declared steps, folded against what was logged against them.
  *
- * The same seam `writers.usePlanParser` uses, for the same reason: the
- * projection is ported before the plan artifact it reads, and a reader that
- * returned an empty step list until then would render "this session has no
- * tasks" over a session that has seven. Unregistered, the fold refuses and
- * the projection says so out loud.
- */
-export function useApprovedPlanReader(reader: ApprovedPlanReader): void {
-  approvedPlanReader = reader;
-}
-
-/**
- * The session's approved-plan steps, in plan order, each folded against the
- * execution record.
+ * Both halves come from `activity-log.json` and both are already written by
+ * the lifecycle. `session start` seeds one `plan-step` row per step in the
+ * plan -- number, stable key, description -- and `session log` appends a
+ * kind-less row naming the same step with a new status. So the declared list
+ * is the plan's, the execution is the log's, and the fold takes the last
+ * status logged against each step.
  *
- * The invariant that at most one step is open is the fold's, not this
- * function's: `ledger.openStep` returns the last `opened` row with no
- * `closed` row after it, and there is nothing here to disagree with it. Two
- * rows in flight would be a defect in that fold rather than a state this
- * record can hold.
+ * It used to fold `approved-plan.json` against `step-execution.jsonl`, and
+ * nothing in the lifecycle writes either, so it returned an empty list at its
+ * first line and no session ever rendered a task. Two mechanisms existed for
+ * one purpose and the tree read the one nobody wrote. `approved-plan.json`
+ * keeps its own job -- the file envelope, the risk flags and the amendment
+ * ledger that verification scope reads -- and stops being this projection's
+ * source.
  *
- * Throws `TaskRowsRefused` when either artifact is unreadable. A session
- * with no plan at all has no tasks and is not a refusal -- the lifecycle
- * does not require one.
+ * At most one step is in flight, and that is the log's invariant rather than
+ * this function's: a second step logged `in-progress` supersedes the first,
+ * because the last row logged against a step is the one that is true.
  */
 export function buildTaskRows(
-  repoRoot: string,
+  sessionsDir: string,
   sessionNumber: number,
 ): Record<string, unknown>[] {
-  const runDir = sessionRunDir(repoRoot, sessionNumber);
-  const reader = approvedPlanReader;
-  const filename = reader?.planFilename ?? "approved-plan.json";
-  if (!existsSync(join(runDir, filename))) return [];
-  if (reader === null) {
+  const log = readActivityLog(sessionsDir);
+  if (log === null) {
+    // Absent is a legitimate state -- a repository nothing has run in yet has
+    // no tasks. Present-but-unreadable is a fault, and rendering it as "no
+    // tasks" would say the same thing as a session that has none.
+    if (!existsSync(join(sessionsDir, ACTIVITY_LOG_FILENAME))) return [];
     throw new TaskRowsRefused(
-      "approved plan: no reader is registered, so the plan on disk cannot " +
-        "be folded; the projection will not guess at a session's steps",
+      `${ACTIVITY_LOG_FILENAME} is present but could not be read; no steps ` +
+        "can be folded until it parses",
     );
   }
-  let plan: Record<string, unknown>;
-  try {
-    plan = reader.effectivePlan(runDir);
-  } catch (error) {
-    throw new TaskRowsRefused(
-      `approved plan: ${error instanceof Error ? error.message : String(error)}`,
-    );
-  }
+  const entries = (Array.isArray(log["entries"]) ? log["entries"] : []).filter(
+    isRecord,
+  );
 
-  let events: Record<string, unknown>[];
-  let openRow: Record<string, unknown> | null;
-  let closed: Set<unknown>;
-  try {
-    events = readStepEvents(repoRoot, sessionNumber);
-    openRow = openStep(repoRoot, sessionNumber);
-    closed = new Set(closedStepIds(repoRoot, sessionNumber));
-  } catch (error) {
-    if (!(error instanceof LedgerError)) throw error;
-    throw new TaskRowsRefused(`execution record: ${error.message}`);
-  }
+  const mine = entries.filter(
+    (entry) => entry["sessionNumber"] === sessionNumber,
+  );
+  const declared = mine
+    .filter((entry) => entry["kind"] === KIND_PLAN_STEP)
+    .sort((left, right) => Number(left["stepNumber"]) - Number(right["stepNumber"]));
+  if (declared.length === 0) return [];
 
-  const openedAt = new Map<unknown, unknown>();
-  for (const event of events) {
-    if (event["event"] === STEP_EVENT_OPENED) {
-      openedAt.set(event["step_id"], event["recorded_at"] ?? null);
+  // The last status logged against each step. Keyed on the step key where
+  // there is one and the number otherwise, because `session log --step 3`
+  // is as legitimate as `--step affected` and both name the same row.
+  const logged = new Map<string, string>();
+  const startedAt = new Map<string, unknown>();
+  // At most one step is open, and it is the one most recently logged
+  // `in-progress` that has not since moved. Two steps left sitting at
+  // `in-progress` is a bookkeeping artifact rather than two steps in flight,
+  // so the later one is the open one and the earlier merely says so.
+  let openKey: string | null = null;
+  for (const entry of mine) {
+    if (!isLoggedStep(entry)) continue;
+    const key = pyStr(entry["stepKey"]) || pythonStr(entry["stepNumber"]);
+    const status = pyStr(entry["status"]);
+    if (!status) continue;
+    logged.set(key, status);
+    if (status === STEP_STATUS_IN_PROGRESS) {
+      openKey = key;
+      if (!startedAt.has(key)) startedAt.set(key, entry["dateTime"] ?? null);
+    } else if (openKey === key) {
+      openKey = null;
     }
   }
-  const openId = openRow ? openRow["step_id"] : null;
 
-  const rows: Record<string, unknown>[] = [];
-  const steps = Array.isArray(plan["steps"]) ? plan["steps"] : [];
-  for (const [position, step] of steps.entries()) {
-    const record = isRecord(step) ? step : {};
-    const stepId = record["step_id"];
-    let state: string;
-    let icon: string;
-    if (closed.has(stepId)) {
-      state = STEP_STATE_DONE;
-      icon = STATUS_COMPLETE;
-    } else if (openRow !== null && stepId === openId) {
-      state = STEP_STATE_IN_FLIGHT;
-      icon = STATUS_IN_PROGRESS;
-    } else {
-      state = STEP_STATE_PENDING;
-      icon = STATUS_NOT_STARTED;
-    }
-    rows.push({
+  return declared.map((step, position) => {
+    const key = pyStr(step["stepKey"]) || pythonStr(step["stepNumber"]);
+    const status = logged.get(key) ?? STEP_STATUS_PENDING;
+    const state = TASK_STATE_OF_STATUS[status] ?? status;
+    return {
       position,
-      stepId,
-      intent: pyStr(record["intent"]),
+      stepId: pyStr(step["stepKey"]) || null,
+      intent: pyStr(step["description"]),
       state,
-      iconKey: icon,
-      isOpen: openRow !== null && stepId === openId,
-      startedAt: openedAt.get(stepId) ?? null,
-    });
-  }
-  return rows;
+      iconKey: TASK_ICON_OF_STATUS[status] ?? STATUS_NOT_STARTED,
+      isOpen: key === openKey,
+      startedAt: startedAt.get(key) ?? null,
+    };
+  });
 }
 
 // --- The verification view ----------------------------------------------------
@@ -1303,7 +1315,7 @@ export function buildProjection(sessionsDir: string): Record<string, unknown> {
     };
     if (inFlight && Number.isInteger(number)) {
       try {
-        sessionOut["tasks"] = buildTaskRows(repoRoot, number as number);
+        sessionOut["tasks"] = buildTaskRows(sessionsDir, number as number);
       } catch (error) {
         if (!(error instanceof TaskRowsRefused)) throw error;
         sessionOut["tasksRefused"] = error.message;

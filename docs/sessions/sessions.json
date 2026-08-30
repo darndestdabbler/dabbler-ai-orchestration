@@ -735,9 +735,9 @@
     {
       "number": 38,
       "title": "The projection stops withholding the plan",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-30T13:47:42.920000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-08-30T14:06:50.945000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

@@ -776,9 +776,9 @@
     {
       "number": 40,
       "title": "Task rows \u2014 a structured declaration, a framework-owned state machine",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-30T14:57:09.144000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-08-30T15:25:38.383000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

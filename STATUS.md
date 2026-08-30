@@ -1,4 +1,4 @@
-# STATUS — the operator block is running: 38 of 50 closed, and the record no longer says a planned project is finished
+# STATUS — 39 of 50 closed: the gates stop claiming what they did not check, and one session hit the cap
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
 `experiment/verification-pipeline-v3` and `design/solution-decomposition`
@@ -38,6 +38,62 @@ are merged and finished. Earlier handoff text is in `docs/status-archive.md`.
 > and is now 36.
 
 ## Where things are
+
+**Session 39 closed `REMEDIATED_AT_CAP`, not `VERIFIED`, and that is the first
+thing to know about it.** Four rounds; round 3's repair was made and the cap
+left it unreviewed. Every gate passes and `verification_clean` says so out
+loud: *no verifier saw the repair.* It is not a waiver — nothing was accepted
+over a standing finding — but **the round-3 delta is unreviewed code and
+session 40 should read it first.** That delta is: `state` and `severity`
+persisted on every owed-decision row, and the YAML list-indentation fix in
+`appendSuitesToProjectConfig`.
+
+- **Verification stops claiming things it did not check.** `checkTestRunFresh`
+  returned a pass whenever no declared suite was expensive, which is how
+  csv-model closed session 1 at a clean 5/5 with nothing runnable. A gate that
+  cannot see its own precondition now reports **SKIP**, and a **sixth gate**,
+  `owed_decisions`, does the refusing. Two rules that read as a contradiction
+  are ordered as the rubric already orders them: nothing blocks on a person for
+  a *judgment call*, and verification reduction is not a judgment call. Work
+  runs to the end; what stops is the record calling itself verified.
+- **`.dabbler/runs/owed-decisions.jsonl` is the new record**, append-only and
+  repository-scoped because an unanswered question outlives the session that
+  raised it. `dabbler owed list` prints the brief; `dabbler owed answer`
+  settles one and **the framework writes the file** — for the suite question it
+  writes `testing.suites` itself. Severity is derived from the class and never
+  settable per call.
+- **D242 is closed.** The extension is a declared suite (`runs_whole`: the npm
+  script's glob is baked in, so naming a file would *add* to it). `dabbler.yaml`
+  was also mapped to nothing and fell through to the smoke test while being the
+  file that declares the suites; it is `repo_wide` now.
+- Also: `--help` works after a subcommand on `session` and `test-evidence`, with
+  a real per-subcommand options table; the malformed-suite message names
+  `dabbler.yaml`; and a `none-selected` evidence outcome the framework
+  **verifies by re-running the selection** rather than trusting.
+
+> **The lesson of this session is about the second and third rounds, not the
+> first.** Round 1's four Majors were all real and all cheaply fixed. Rounds 2
+> and 3 were the same finding twice, and both times the defence was an
+> interpretation rather than a delivery. Round 2: refusing to touch an existing
+> suites list looked like a safe refusal and was a **deadlock** — the blocking
+> question could be raised and never answered through the framework. Round 3:
+> the record should carry `state` and `severity` on its rows, which this
+> session's own plan says in plain words; two rounds were spent arguing that a
+> state token does not belong in an event log. The design argument was
+> reasonable and it was not the point. **Two of four rounds bought nothing but
+> a concession that should have been made in round 2, and that is what spent
+> the cap.**
+
+**Owed to session 40 (D240, still standing):** `session start` already seeds a
+session's plan steps and `session log` ticks them; what is missing is the join
+to the projection the tree renders. Session 40 must re-derive its approach from
+both mechanisms before writing code — it is likely much cheaper than planned.
+
+**Both suites are now measured.** A session that changes only `tools/` selects
+the extension suite and owes it a run of record. Every close from here records
+two.
+
+## Where things were at session 38
 
 **Sessions 37 and 38 of 50 are closed VERIFIED.** The ledger reads 38 of 50,
 and `dabbler status` now says so for the right reason rather than by accident.

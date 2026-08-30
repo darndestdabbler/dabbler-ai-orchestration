@@ -5,8 +5,10 @@ import {
   contractTarget,
   descriptorFor,
   orderedComponents,
+  repositoryPathOf,
   rootNodes,
 } from "../../providers/solutionTreeModel";
+import { repositoryTarget } from "../../commands/openRepository";
 
 function projection(over: Partial<Projection> = {}): Projection {
   return {
@@ -160,5 +162,140 @@ suite("the contract row's target", () => {
       contractTarget({ ...c, contractDoc: null }),
       "c/model.yaml",
     );
+  });
+});
+
+
+suite("solutionTreeModel: what other repositories build", () => {
+  const external = (over: Record<string, unknown> = {}) => ({
+    id: "Dabbler.Csv.Model",
+    producedBy: "csv-model",
+    pinned: "1.0.0",
+    published: "2.0.0",
+    resolve: "feed",
+    root: "C:/repos/csv-model",
+    reason: "",
+    drift: "csv-model has published 2.0.0",
+    driftKind: "behind" as const,
+    ...over,
+  });
+
+  test("does not render a folder for a solution that consumes nothing", () => {
+    // An empty folder is a row the reader has to open to learn nothing.
+    const p = projection();
+    const kinds = childrenOf({ kind: "solution" }, p).map((n) => n.kind);
+    assert.ok(!kinds.includes("externalGroup"));
+  });
+
+  test("renders the drift line nothing has rendered before", () => {
+    const p = projection({ external: [external()] } as Partial<Projection>);
+    const row = descriptorFor({ kind: "external", id: "Dabbler.Csv.Model" }, p);
+    assert.ok(row.description?.includes("v1.0.0"));
+    assert.ok(row.description?.includes("2.0.0 is out"));
+  });
+
+  test("says a producer's checkout is ahead without calling it an upgrade", () => {
+    // A version bumped while preparing a release is not something anyone can
+    // move to yet.
+    const p = projection({
+      external: [external({ driftKind: "ahead", published: null })],
+    } as Partial<Projection>);
+    const row = descriptorFor({ kind: "external", id: "Dabbler.Csv.Model" }, p);
+    assert.ok(row.description?.includes("ahead"));
+    assert.ok(!row.description?.includes("is out"));
+  });
+
+  test("offers navigation only for a repository that is on this machine", () => {
+    // A menu entry that fails when it is used costs more trust than one that
+    // is not there.
+    const here = projection({ external: [external()] } as Partial<Projection>);
+    const away = projection({
+      external: [external({ root: null, reason: "not on this machine" })],
+    } as Partial<Projection>);
+    const node = { kind: "external" as const, id: "Dabbler.Csv.Model" };
+    assert.strictEqual(descriptorFor(node, here).contextValue, "dabblerExternalHere");
+    assert.strictEqual(descriptorFor(node, away).contextValue, "dabblerExternalAbsent");
+  });
+
+  test("resolves the path through the row the operator clicked", () => {
+    const p = projection({ external: [external()] } as Partial<Projection>);
+    const node = { kind: "external" as const, id: "Dabbler.Csv.Model" };
+    assert.strictEqual(repositoryPathOf(node, p), "C:/repos/csv-model");
+    assert.strictEqual(repositoryPathOf({ kind: "solution" }, p), null);
+  });
+
+  test("explains an absent sibling rather than failing at it", () => {
+    // The graph is a declaration about a solution, not about one laptop.
+    const p = projection({
+      external: [external({ root: null })],
+    } as Partial<Projection>);
+    const target = repositoryTarget({
+      node: { kind: "external", id: "Dabbler.Csv.Model" },
+      projection: p,
+    });
+    assert.strictEqual(target.path, null);
+    assert.ok(target.reason.includes("not on this machine"));
+  });
+
+  test("renders the consumers of a package as derived rows", () => {
+    // `usedBy` is a reading of who declares what, and it is why nothing is
+    // allowed to state it in a file.
+    const p = projection({
+      external: [
+        external({
+          usedBy: ["csv-app", "csv-report"],
+          pins: [
+            { repository: "csv-app", version: "1.0.0" },
+            { repository: "csv-report", version: "2.0.0" },
+          ],
+        }),
+      ],
+    } as Partial<Projection>);
+    const kids = childrenOf({ kind: "external", id: "Dabbler.Csv.Model" }, p);
+    assert.deepStrictEqual(kids, [
+      { kind: "externalUsedBy", id: "Dabbler.Csv.Model" },
+    ]);
+    const consumers = childrenOf({ kind: "externalUsedBy", id: "Dabbler.Csv.Model" }, p);
+    assert.strictEqual(consumers.length, 2);
+    const row = descriptorFor(
+      { kind: "externalConsumer", id: "Dabbler.Csv.Model", repository: "csv-report" },
+      p,
+    );
+    assert.strictEqual(row.description, "v2.0.0");
+  });
+
+  test("flags two repositories on two versions of one package", () => {
+    // The diamond that makes an upgrade a negotiation, and one repository
+    // cannot see it.
+    const p = projection({
+      external: [
+        external({
+          usedBy: ["csv-app", "csv-report"],
+          pins: [
+            { repository: "csv-app", version: "1.0.0" },
+            { repository: "csv-report", version: "2.0.0" },
+          ],
+        }),
+      ],
+    } as Partial<Projection>);
+    const row = descriptorFor({ kind: "externalUsedBy", id: "Dabbler.Csv.Model" }, p);
+    assert.strictEqual(row.icon?.tone, "attention");
+  });
+
+  test("does not open a package only this repository takes", () => {
+    // One consumer is what the row already says.
+    const p = projection({
+      external: [external({ usedBy: ["csv-app"] })],
+    } as Partial<Projection>);
+    assert.strictEqual(
+      descriptorFor({ kind: "external", id: "Dabbler.Csv.Model" }, p).expandable,
+      false,
+    );
+  });
+
+  test("asks for a row when it was given none", () => {
+    const target = repositoryTarget({});
+    assert.strictEqual(target.path, null);
+    assert.ok(target.reason.includes("Solution Explorer"));
   });
 });

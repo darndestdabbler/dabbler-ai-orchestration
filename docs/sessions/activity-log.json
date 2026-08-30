@@ -9204,6 +9204,84 @@
       "dateTime": "2026-08-30T17:27:03.759000-04:00",
       "description": "Register; declare `--not-releasable`.",
       "status": "in-progress"
+    },
+    {
+      "sessionNumber": 47,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-30T17:43:34.888000-04:00",
+      "description": "Register; declare `--not-releasable`.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 47,
+      "stepNumber": 2,
+      "stepKey": "external-component-rows-are-derived-from",
+      "dateTime": "2026-08-30T17:43:34.888000-04:00",
+      "description": "**External component rows are derived from `solution-dependencies.json`, and `solution.yaml` gains no vocabulary for them.** Review caught the draft proposing both: two tracked homes for one edge is the drift this codebase already refuses for `usedBy`.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 47,
+      "stepNumber": 3,
+      "stepKey": "the-graph-is-assembled-by-union",
+      "dateTime": "2026-08-30T17:43:34.888000-04:00",
+      "description": "The graph is assembled by union across the repositories the dependency files name. Each repository owns its own edges; `usedBy` stays derived.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 47,
+      "stepNumber": 4,
+      "stepKey": "rows-for-an-external-component",
+      "dateTime": "2026-08-30T17:43:34.888000-04:00",
+      "description": "Rows for an external component: the producing repository, the pinned version, and drift against the feed \u2014 the `\u26a0 you're pinned to 0.8.1` row the 2026-08-23 direction sketched and nothing has rendered.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 47,
+      "stepNumber": 5,
+      "stepKey": "navigation",
+      "dateTime": "2026-08-30T17:43:34.888000-04:00",
+      "description": "Navigation: **Open Repository**, **Open in New Window**, **Reveal in File Explorer**. The tree has no context menu at all today.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 47,
+      "stepNumber": 6,
+      "stepKey": "amended-by-session-37-s-survey",
+      "dateTime": "2026-08-30T17:43:34.888000-04:00",
+      "description": "**Amended by session 37's survey** (`docs/extension-dx-survey.md`): the \"navigate to a related repository\" journey was found to **not exist at all** \u2014 the Solution Explorer contributes no `view/item/context` menu and no command opens or reveals a repository. Step 5 is therefore net-new surface rather than a change to existing behaviour, and it is the whole of that journey.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 47,
+      "stepNumber": 7,
+      "stepKey": "affected",
+      "dateTime": "2026-08-30T17:43:34.888000-04:00",
+      "description": "Affected; verify; full suite as `final-full`; close.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 47,
+      "dateTime": "2026-08-30T17:43:35.269000-04:00",
+      "task": "Affected; verify; full suite as final-full; close",
+      "releasable": false
+    },
+    {
+      "sessionNumber": 47,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-30T17:43:35.296000-04:00",
+      "description": "Register; declare `--not-releasable`.",
+      "status": "in-progress"
     }
   ]
 }

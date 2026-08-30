@@ -18,6 +18,18 @@ import {
   STEPS,
 } from "../solution.ts";
 import {
+  assembleSolution,
+  locateProducer,
+  type Edge,
+  type SolutionMember,
+} from "../solutionDeps.ts";
+import {
+  comparePins,
+  configuredFeeds,
+  publishedVersions,
+  reconcileResolution,
+} from "../resolution.ts";
+import {
   fold,
   projectionPath,
   read,
@@ -145,6 +157,7 @@ export function project(root: string): Record<string, unknown> {
     .map((c) => c.name);
   if (head.waitingOn === "developer") waiting.unshift(head.name);
   doc.needsYou = waiting;
+  doc.external = externalComponents(root);
   return doc;
 }
 
@@ -173,4 +186,156 @@ export function tryWriteProjection(root: string): void {
     if (error instanceof WorkflowError || error instanceof ManifestError) return;
     throw error;
   }
+}
+
+/**
+ * The components this solution consumes from OTHER repositories.
+ *
+ * Derived from `solution-dependencies.json` and from nowhere else. The draft
+ * had `solution.yaml` gaining vocabulary for external components too, and two
+ * tracked homes for one edge is the drift this codebase already refuses for
+ * `usedBy`: the manifest says what this repository builds, the dependency
+ * file says what it takes, and neither restates the other.
+ *
+ * The union spans every repository the declarations reach, each owning only
+ * its own edges. A→B declared in A and B→C declared in B are two facts in two
+ * files, and both are projected -- reading only this repository's edges would
+ * show A→B and lose C, which is the cross-repository half of the point.
+ *
+ * The graph is the UNION of the dependency files across the repositories they
+ * name, so a row can say things one repository cannot know alone -- that the
+ * pin is behind a release, or that the producer is not on this machine.
+ * Nothing here is authored; every field is read.
+ */
+export function externalComponents(root: string): Node[] {
+  const members = assembleSolution(root);
+  const self = members[0];
+  // Every member's OWN edges, and only its own. A→B declared in A and B→C
+  // declared in B are two owner-specific facts, and the graph is the union of
+  // them: projecting only this repository's edges shows A→B and discards C,
+  // which is the cross-repository half of the feature missing entirely.
+  // Nothing is copied between declarations to make this work -- the union is
+  // computed on every projection, so there is still one home per edge.
+  const owned: Array<{ owner: string; edge: Edge; from: SolutionMember }> = [];
+  for (const member of members) {
+    if (member.duplicateOf !== null) continue;
+    const owner =
+      member === self ? (self.deps?.repositoryId ?? "(this repository)") : member.id;
+    for (const edge of member.deps?.consumes ?? []) {
+      owned.push({ owner, edge, from: member });
+    }
+  }
+  if (owned.length === 0) return [];
+
+  const feeds = configuredFeeds(root);
+  const findings = reconcileResolution(members, feeds);
+  const consumed = [...new Set(owned.map((entry) => entry.edge.id))];
+
+  // Pins per repository, read from build files on every projection rather
+  // than copied into any declaration.
+  const pins = new Map<string, Map<string, string>>();
+  for (const member of members) {
+    if (member.duplicateOf !== null) continue;
+    const owner =
+      member === self ? (self.deps?.repositoryId ?? "(this repository)") : member.id;
+    for (const ref of member.refs) {
+      const byRepo = pins.get(ref.id) ?? new Map<string, string>();
+      if (ref.version !== null && !byRepo.has(owner)) byRepo.set(owner, ref.version);
+      pins.set(ref.id, byRepo);
+    }
+  }
+
+  const published = new Map<string, string>();
+  for (const member of members.slice(1)) {
+    if (member.root === null || member.duplicateOf !== null) continue;
+    for (const artifact of publishedVersions(member.root, consumed)) {
+      const seen = published.get(artifact.packageId);
+      if (seen === undefined || (comparePins(seen, artifact.version) ?? 0) < 0) {
+        published.set(artifact.packageId, artifact.version);
+      }
+    }
+  }
+
+  const rows: Node[] = [];
+  const me = self.deps?.repositoryId ?? "(this repository)";
+  for (const id of consumed) {
+    const entries = owned.filter((entry) => entry.edge.id === id);
+    const edge = entries[0].edge;
+    const where = locateProducer(root, edge.producedBy, self.deps?.solution ?? null);
+    const release = published.get(id) ?? null;
+    const byRepo = pins.get(id) ?? new Map<string, string>();
+
+    // Pin AND drift live on the consumer that owns them. A sibling's pin
+    // rendered beside this repository's name, or a sibling's upgrade shown
+    // as this repository's, is worse than no row: it is upgrade guidance
+    // pointing at the wrong repository.
+    const consumers = entries.map((entry) => {
+      const version = byRepo.get(entry.owner) ?? null;
+      const behind =
+        version !== null && release !== null && (comparePins(version, release) ?? 0) < 0;
+      return {
+        repository: entry.owner,
+        version,
+        drift: behind
+          ? `${entry.owner} pins ${id} at ${version}, and ${release} is published.`
+          : null,
+        driftKind: behind ? "behind" : null,
+      };
+    });
+
+    // Only this repository's declaration can be checked against this
+    // machine's feeds, so a feed finding is attributed to it and to nothing
+    // else.
+    const mine = findings.filter((finding) => finding.id === id);
+    const feed = entries.some((entry) => entry.owner === me)
+      ? mine.find((finding) => finding.kind === "feed-not-configured")
+      : undefined;
+    const ahead = mine.find((finding) => finding.kind === "producer-source-ahead");
+
+    // The row states a pin only when every consumer agrees on it. Where they
+    // disagree, the row says so and the consumer rows carry the versions --
+    // collapsing two pins into one number is how a reader is told to upgrade
+    // a repository that is already there.
+    const versions = new Set(consumers.map((c) => c.version).filter((v) => v !== null));
+    const agreed = versions.size === 1 ? [...versions][0] : null;
+    const shared = agreed !== null && consumers.every((c) => c.driftKind === "behind");
+
+    rows.push({
+      id,
+      producedBy: edge.producedBy.id,
+      // DERIVED, never declared. `usedBy` has one implementation in this
+      // codebase and it is a reading of who consumes what, which is exactly
+      // why no declaration is allowed to state it.
+      usedBy: entries.map((entry) => entry.owner),
+      pins: consumers,
+      pinned: agreed,
+      published: release,
+      resolve: edge.resolve,
+      feed: edge.feed ?? null,
+      // Where it is on THIS machine, which is what makes the row navigable.
+      // Null is a reported state and not a defect in the declaration.
+      root: where.path,
+      reason: where.path === null ? where.reason : where.warning,
+      // At most one, ordered by what it costs the reader: a pin behind a
+      // release is an upgrade to do, a producer ahead of its releases is not
+      // one yet, and a feed nobody registered is why a restore is about to
+      // fail. Stated at row level only when it is true of every consumer.
+      drift: shared
+        ? (consumers[0].drift ?? null)
+        : versions.size > 1
+          ? `${id} is pinned ${[...versions].sort().join(" and ")} across ` +
+            `${consumers.length} repositories in this solution.`
+          : (ahead?.detail ?? feed?.detail ?? null),
+      driftKind: shared
+        ? "behind"
+        : versions.size > 1
+          ? "split"
+          : ahead
+            ? "ahead"
+            : feed
+              ? "feed"
+              : null,
+    } satisfies Node);
+  }
+  return rows;
 }

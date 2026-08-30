@@ -12,6 +12,12 @@ import { registerWorkExplorerTreeCommands } from "./commands/workExplorerTreeCom
 import { SESSIONS_REL, discoverRoots, hasSessionsRoot } from "./utils/fileSystem";
 import { RUNS_REL } from "./utils/projection";
 import { SolutionTreeProvider } from "./providers/SolutionTreeProvider";
+import type { SolutionNode } from "./providers/solutionTreeModel";
+import {
+  openRepository,
+  openRepositoryInNewWindow,
+  revealRepository,
+} from "./commands/openRepository";
 import { WorkExplorerTreeProvider } from "./providers/WorkExplorerTreeProvider";
 
 export function activate(context: vscode.ExtensionContext): void {
@@ -168,6 +174,24 @@ export function activate(context: vscode.ExtensionContext): void {
     // projection cache, so it recovers from anything (a projection
     // failure cached against an unchanged set, a python install that
     // just finished).
+    vscode.commands.registerCommand(
+      "dabblerSolution.openRepository",
+      (node?: SolutionNode) =>
+        openRepository({ node, projection: solutionProvider.currentProjection() }),
+    ),
+    vscode.commands.registerCommand(
+      "dabblerSolution.openRepositoryInNewWindow",
+      (node?: SolutionNode) =>
+        openRepositoryInNewWindow({
+          node,
+          projection: solutionProvider.currentProjection(),
+        }),
+    ),
+    vscode.commands.registerCommand(
+      "dabblerSolution.revealRepository",
+      (node?: SolutionNode) =>
+        revealRepository({ node, projection: solutionProvider.currentProjection() }),
+    ),
     vscode.commands.registerCommand("dabblerSessionSets.refresh", () => {
       bindWatchers();
       treeProvider.refresh(true);

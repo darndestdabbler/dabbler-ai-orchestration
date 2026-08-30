@@ -34,10 +34,58 @@ export interface ProjectionComponent {
   returns?: number;
 }
 
+/**
+ * A component this solution consumes from another repository.
+ *
+ * Derived by the router from `solution-dependencies.json`, and the manifest
+ * gains no vocabulary for it: the manifest says what this repository builds,
+ * the dependency file says what it takes, and two tracked homes for one edge
+ * is the drift `usedBy` is derived to avoid.
+ *
+ * `root` is where the producing repository is on THIS machine, or null. That
+ * is what makes the row navigable, and its absence is a reported state rather
+ * than a defect in the declaration.
+ */
+export interface ProjectionExternal {
+  id: string;
+  producedBy: string;
+  /**
+   * The repositories that consume it, derived and never declared.
+   *
+   * A→B declared in A and B→C declared in B are two owner-specific facts, and
+   * the row is the union of them. `usedBy` has one implementation in this
+   * codebase and it is a reading of who consumes what -- which is exactly why
+   * no declaration is allowed to state it.
+   */
+  usedBy?: string[];
+  /**
+   * What each consuming repository pins it to, and whose upgrade it is.
+   *
+   * Pin and drift live on the CONSUMER that owns them. A sibling's pin shown
+   * beside this repository's name is upgrade guidance pointing at the wrong
+   * repository, which is worse than no row.
+   */
+  pins?: {
+    repository: string;
+    version: string | null;
+    drift?: string | null;
+    driftKind?: "behind" | null;
+  }[];
+  pinned?: string | null;
+  published?: string | null;
+  resolve: string;
+  feed?: string | null;
+  root?: string | null;
+  reason?: string | null;
+  drift?: string | null;
+  driftKind?: "behind" | "ahead" | "feed" | "split" | null;
+}
+
 export interface Projection {
   solution: ProjectionSolution;
   components: ProjectionComponent[];
   needsYou: string[];
+  external?: ProjectionExternal[];
 }
 
 /**
@@ -61,7 +109,11 @@ export type SolutionNode =
   | { kind: "contract"; name: string }
   | { kind: "usedBy"; name: string }
   | { kind: "consumer"; name: string; consumer: string }
-  | { kind: "progress"; name: string };
+  | { kind: "progress"; name: string }
+  | { kind: "externalGroup" }
+  | { kind: "external"; id: string }
+  | { kind: "externalUsedBy"; id: string }
+  | { kind: "externalConsumer"; id: string; repository: string };
 
 export interface RowDescriptor {
   id: string;
@@ -89,13 +141,45 @@ export function rootNodes(): SolutionNode[] {
   return [{ kind: "solution" }];
 }
 
+function externals(p: Projection): ProjectionExternal[] {
+  return p.external ?? [];
+}
+
 export function childrenOf(node: SolutionNode, p: Projection): SolutionNode[] {
   switch (node.kind) {
-    case "solution":
-      return orderedComponents(p).map((c) => ({
+    case "solution": {
+      const own: SolutionNode[] = orderedComponents(p).map((c) => ({
         kind: "component" as const,
         name: c.name,
       }));
+      // Only when there is something to say. An empty folder is a row the
+      // reader has to open to learn nothing.
+      if (externals(p).length > 0) own.push({ kind: "externalGroup" });
+      return own;
+    }
+    case "externalGroup":
+      return externals(p).map((e) => ({ kind: "external" as const, id: e.id }));
+    case "external": {
+      const e = externals(p).find((row) => row.id === node.id);
+      // Whenever there is a pin to show. A sibling-owned edge has one
+      // consumer and a version that belongs to it, and hiding the row was
+      // how that version stopped being rendered at all.
+      return (e?.pins?.length ?? 0) > 0 || (e?.usedBy?.length ?? 0) > 1
+        ? [{ kind: "externalUsedBy" as const, id: node.id }]
+        : [];
+    }
+    case "externalUsedBy": {
+      const e = externals(p).find((row) => row.id === node.id);
+      return (e?.pins ?? []).map((pin) => ({
+        kind: "externalConsumer" as const,
+        id: node.id,
+        repository: pin.repository,
+      })).concat((e?.pins?.length ?? 0) > 0 ? [] : (e?.usedBy ?? []).map((repository) => ({
+        kind: "externalConsumer" as const,
+        id: node.id,
+        repository,
+      })));
+    }
     case "component": {
       const c = find(p, node.name);
       if (!c) return [];
@@ -206,6 +290,100 @@ export function descriptorFor(
         icon: { id: "arrow-small-right", tone: "muted" },
         expandable: false,
       };
+    case "externalGroup": {
+      const rows = externals(p);
+      const drifting = rows.filter((e) => e.driftKind !== null && e.driftKind !== undefined);
+      return {
+        id: "external",
+        label: "From other repositories",
+        description: `${rows.length}`,
+        tooltip:
+          drifting.length > 0
+            ? `${drifting.length} of them has something worth knowing about it.`
+            : "What this repository takes from the rest of your solution.",
+        icon: { id: "repo", tone: drifting.length > 0 ? "attention" : undefined },
+        expandable: rows.length > 0,
+      };
+    }
+    case "external": {
+      const e = externals(p).find((row) => row.id === node.id);
+      if (!e) return { id: `external:${node.id}`, label: node.id, expandable: false };
+      const bits: string[] = [];
+      // A pin only when every consumer agrees on it. Collapsing two pins into
+      // one number tells a reader to upgrade a repository already there.
+      if (e.pinned) bits.push(`v${e.pinned}`);
+      else if (e.driftKind === "split") bits.push("split versions");
+      bits.push(e.producedBy);
+      if (e.resolve === "source") bits.push("from source");
+      // The line the 2026-08-23 direction sketched and nothing has rendered.
+      if (e.driftKind === "behind" && e.published) {
+        bits.push(`⚠ ${e.published} is out`);
+      } else if (e.driftKind === "split") {
+        bits.push("⚠ two versions in this solution");
+      } else if (e.driftKind === "feed") {
+        bits.push("⚠ feed not configured");
+      } else if (e.driftKind === "ahead") {
+        bits.push("their checkout is ahead");
+      }
+      const consumers = e.usedBy ?? [];
+      if (consumers.length > 1) bits.push(`${consumers.length} consumers`);
+      const hasPins = (e.pins?.length ?? 0) > 0;
+      const reachable = Boolean(e.root);
+      return {
+        id: `external:${e.id}`,
+        label: e.id,
+        description: bits.join(" · "),
+        tooltip: e.drift || e.reason || `Built by ${e.producedBy}.`,
+        icon: {
+          id: "package",
+          tone: e.driftKind === "behind" || e.driftKind === "feed" || e.driftKind === "split"
+            ? "attention"
+            : reachable
+              ? undefined
+              : "muted",
+        },
+        expandable: hasPins || consumers.length > 1,
+        // The context value gates the navigation: a repository nobody has
+        // cloned has nowhere to open, and offering the command anyway is a
+        // menu entry that fails when it is used.
+        contextValue: reachable ? "dabblerExternalHere" : "dabblerExternalAbsent",
+      };
+    }
+    case "externalUsedBy": {
+      const e = externals(p).find((row) => row.id === node.id);
+      const versions = new Set(
+        (e?.pins ?? []).map((pin) => pin.version).filter((v) => v !== null),
+      );
+      return {
+        id: `externalUsedBy:${node.id}`,
+        label: "Used by",
+        description: `${(e?.pins ?? e?.usedBy ?? []).length}`,
+        tooltip:
+          versions.size > 1
+            ? "Two repositories in this solution are on different versions of " +
+              "it, which is the upgrade that becomes a negotiation."
+            : "Derived from what each repository declares, not stated anywhere.",
+        icon: { id: "references", tone: versions.size > 1 ? "attention" : undefined },
+        expandable: (e?.pins ?? e?.usedBy ?? []).length > 0,
+      };
+    }
+    case "externalConsumer": {
+      const e = externals(p).find((row) => row.id === node.id);
+      const pin = (e?.pins ?? []).find((entry) => entry.repository === node.repository);
+      const behind = pin?.driftKind === "behind";
+      return {
+        id: `externalConsumer:${node.id}:${node.repository}`,
+        label: node.repository,
+        description: pin?.version
+          ? `v${pin.version}${behind ? " ⚠" : ""}`
+          : "no pin readable here",
+        // The upgrade belongs to the repository that holds the pin, and the
+        // tooltip says which one that is.
+        tooltip: pin?.drift ?? undefined,
+        icon: { id: "arrow-small-right", tone: behind ? "attention" : "muted" },
+        expandable: false,
+      };
+    }
     case "progress": {
       const c = find(p, node.name);
       const step = c ? c.stepNumber : 1;
@@ -219,4 +397,21 @@ export function descriptorFor(
       };
     }
   }
+}
+
+/**
+ * Where a row's repository is on disk, for the navigation commands.
+ *
+ * One place decides it. A command that recomputed the path from its own
+ * reading of the declaration would eventually disagree with the row the
+ * operator clicked, and "Open Repository" opening a different repository than
+ * the one named is worse than the command not existing.
+ */
+export function repositoryPathOf(
+  node: SolutionNode,
+  p: Projection,
+): string | null {
+  if (node.kind !== "external") return null;
+  const row = externals(p).find((e) => e.id === node.id);
+  return row?.root ?? null;
 }

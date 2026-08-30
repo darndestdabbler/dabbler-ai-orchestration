@@ -538,6 +538,287 @@ describe("the projection", () => {
   it("refuses a missing manifest", () => {
     expect(() => project(makeTempDir())).toThrow(/no solution manifest/);
   });
+
+  it("says nothing about other repositories when none is declared", () => {
+    // The manifest gains no vocabulary for an external component, so a
+    // repository that declares no dependencies has no external rows -- not an
+    // empty guess derived from what it builds.
+    expect(project(makeRoot()).external).toEqual([]);
+  });
+
+  it("derives an external row from the dependency file and nowhere else", () => {
+    const root = makeRoot();
+    writeFileSync(
+      join(root, "solution-dependencies.json"),
+      JSON.stringify({
+        schemaVersion: 1,
+        solution: "csv-pipeline",
+        consumes: [
+          {
+            id: "Dabbler.Csv.Model",
+            kind: "nuget",
+            producedBy: { id: "csv-model", remote: null, path: "../nowhere" },
+            resolve: "feed",
+          },
+        ],
+      }),
+      "utf8",
+    );
+    mkdirSync(join(root, "src"), { recursive: true });
+    writeFileSync(
+      join(root, "src", "app.csproj"),
+      '<Project><ItemGroup><PackageReference Include="Dabbler.Csv.Model" ' +
+        'Version="1.0.0" /></ItemGroup></Project>',
+      "utf8",
+    );
+    const [row] = project(root).external as Array<Record<string, unknown>>;
+    expect(row.id).toBe("Dabbler.Csv.Model");
+    expect(row.producedBy).toBe("csv-model");
+    // Read from the build file on every projection rather than copied into
+    // the declaration: two homes for one fact is the drift this avoids.
+    expect(row.pinned).toBe("1.0.0");
+  });
+
+  it("reports a producer nobody has cloned rather than omitting the row", () => {
+    // The graph is a declaration about a solution, not about one laptop, and
+    // a row that vanished would read as an edge that does not exist.
+    const root = makeRoot();
+    writeFileSync(
+      join(root, "solution-dependencies.json"),
+      JSON.stringify({
+        schemaVersion: 1,
+        solution: "csv-pipeline",
+        consumes: [
+          {
+            id: "Dabbler.Csv.Model",
+            kind: "nuget",
+            producedBy: { id: "csv-model", remote: null, path: "../nowhere" },
+            resolve: "feed",
+          },
+        ],
+      }),
+      "utf8",
+    );
+    const [row] = project(root).external as Array<Record<string, unknown>>;
+    expect(row.root).toBeNull();
+    expect(String(row.reason)).toContain("not on this machine");
+  });
+
+  it("projects an edge a SIBLING owns, which this repository cannot know alone", () => {
+    // A consumes from B, and B's own declaration names C. Both are
+    // owner-specific facts in two files, and reading only this repository's
+    // edges shows A->B and loses C -- which is the cross-repository half of
+    // the point. Nothing is copied between declarations to make it work.
+    const parent = makeTempDir();
+    const b = join(parent, "csv-model");
+    mkdirSync(join(b, ".git"), { recursive: true });
+    mkdirSync(join(b, "src"), { recursive: true });
+    writeFileSync(
+      join(b, "src", "model.csproj"),
+      '<Project><ItemGroup><PackageReference Include="Dabbler.Csv.Core" ' +
+        'Version="0.8.1" /></ItemGroup></Project>',
+      "utf8",
+    );
+    writeFileSync(
+      join(b, "solution-dependencies.json"),
+      JSON.stringify({
+        schemaVersion: 1,
+        solution: "csv-pipeline",
+        repositoryId: "csv-model",
+        consumes: [
+          {
+            id: "Dabbler.Csv.Core",
+            kind: "nuget",
+            producedBy: { id: "csv-core", remote: null, path: null },
+            resolve: "feed",
+          },
+        ],
+      }),
+      "utf8",
+    );
+
+    const a = makeRoot();
+    writeFileSync(
+      join(a, "solution-dependencies.json"),
+      JSON.stringify({
+        schemaVersion: 1,
+        solution: "csv-pipeline",
+        repositoryId: "csv-app",
+        searchPaths: [parent],
+        consumes: [
+          {
+            id: "Dabbler.Csv.Model",
+            kind: "nuget",
+            producedBy: { id: "csv-model", remote: null, path: b },
+            resolve: "feed",
+          },
+        ],
+      }),
+      "utf8",
+    );
+    const rows = project(a).external as Array<Record<string, unknown>>;
+    const ids = rows.map((row) => String(row.id));
+    expect(ids).toContain("Dabbler.Csv.Model");
+    expect(ids).toContain("Dabbler.Csv.Core");
+    // Derived from who declares what, and stated in no file.
+    const core = rows.find((row) => row.id === "Dabbler.Csv.Core");
+    expect(core?.usedBy).toEqual(["csv-model"]);
+    // And it keeps ITS pin, which belongs to the sibling that consumes it.
+    // A recovered edge rendered without the version is the row's own point
+    // missing.
+    expect(core?.pins).toEqual([
+      { repository: "csv-model", version: "0.8.1", drift: null, driftKind: null },
+    ]);
+  });
+
+  it("derives every consumer of one package rather than only this one", () => {
+    // Two repositories on two versions of a package their own team builds is
+    // the diamond that makes an upgrade a negotiation, and one repository
+    // cannot see it.
+    const parent = makeTempDir();
+    const other = join(parent, "csv-report");
+    mkdirSync(join(other, ".git"), { recursive: true });
+    mkdirSync(join(other, "src"), { recursive: true });
+    writeFileSync(
+      join(other, "solution-dependencies.json"),
+      JSON.stringify({
+        schemaVersion: 1,
+        solution: "csv-pipeline",
+        repositoryId: "csv-report",
+        consumes: [
+          {
+            id: "Dabbler.Csv.Model",
+            kind: "nuget",
+            producedBy: { id: "csv-model", remote: null, path: null },
+            resolve: "feed",
+          },
+        ],
+      }),
+      "utf8",
+    );
+    writeFileSync(
+      join(other, "src", "report.csproj"),
+      '<Project><ItemGroup><PackageReference Include="Dabbler.Csv.Model" ' +
+        'Version="2.0.0" /></ItemGroup></Project>',
+      "utf8",
+    );
+
+    const a = makeRoot();
+    writeFileSync(
+      join(a, "solution-dependencies.json"),
+      JSON.stringify({
+        schemaVersion: 1,
+        solution: "csv-pipeline",
+        repositoryId: "csv-app",
+        searchPaths: [parent],
+        consumes: [
+          {
+            id: "Dabbler.Csv.Model",
+            kind: "nuget",
+            producedBy: { id: "csv-model", remote: null, path: null },
+            resolve: "feed",
+          },
+        ],
+      }),
+      "utf8",
+    );
+    mkdirSync(join(a, "src"), { recursive: true });
+    writeFileSync(
+      join(a, "src", "app.csproj"),
+      '<Project><ItemGroup><PackageReference Include="Dabbler.Csv.Model" ' +
+        'Version="1.0.0" /></ItemGroup></Project>',
+      "utf8",
+    );
+    const [row] = project(a).external as Array<Record<string, unknown>>;
+    expect((row.usedBy as string[]).sort()).toEqual(["csv-app", "csv-report"]);
+    const pins = row.pins as Array<{ repository: string; version: string }>;
+    expect(new Set(pins.map((pin) => pin.version))).toEqual(new Set(["1.0.0", "2.0.0"]));
+    // No single number at row level. Collapsing two pins into one tells a
+    // reader to upgrade a repository that is already there.
+    expect(row.pinned).toBeNull();
+    expect(row.driftKind).toBe("split");
+  });
+
+  it("attributes an upgrade to the repository holding the pin", () => {
+    // A sibling's drift shown as this repository's is upgrade guidance
+    // pointing at the wrong repository, which is worse than no row.
+    const parent = makeTempDir();
+    const producer = join(parent, "csv-model");
+    mkdirSync(join(producer, ".git"), { recursive: true });
+    mkdirSync(join(producer, ".dabbler", "runs", "s001"), { recursive: true });
+    writeFileSync(
+      join(producer, ".dabbler", "runs", "s001", "packaging.jsonl"),
+      `${JSON.stringify({
+        outcome: "published",
+        artifacts: ["Dabbler.Csv.Model.2.0.0.nupkg"],
+      })}\n`,
+      "utf8",
+    );
+    writeFileSync(
+      join(producer, "solution-dependencies.json"),
+      JSON.stringify({
+        schemaVersion: 1,
+        solution: "csv-pipeline",
+        repositoryId: "csv-model",
+        consumes: [],
+      }),
+      "utf8",
+    );
+
+    const behind = join(parent, "csv-report");
+    mkdirSync(join(behind, ".git"), { recursive: true });
+    mkdirSync(join(behind, "src"), { recursive: true });
+    writeFileSync(
+      join(behind, "solution-dependencies.json"),
+      JSON.stringify({
+        schemaVersion: 1,
+        solution: "csv-pipeline",
+        repositoryId: "csv-report",
+        consumes: [
+          {
+            id: "Dabbler.Csv.Model",
+            kind: "nuget",
+            producedBy: { id: "csv-model", remote: null, path: producer },
+            resolve: "feed",
+          },
+        ],
+      }),
+      "utf8",
+    );
+    writeFileSync(
+      join(behind, "src", "report.csproj"),
+      '<Project><ItemGroup><PackageReference Include="Dabbler.Csv.Model" ' +
+        'Version="1.0.0" /></ItemGroup></Project>',
+      "utf8",
+    );
+
+    const a = makeRoot();
+    writeFileSync(
+      join(a, "solution-dependencies.json"),
+      JSON.stringify({
+        schemaVersion: 1,
+        solution: "csv-pipeline",
+        repositoryId: "csv-app",
+        searchPaths: [parent],
+        consumes: [],
+      }),
+      "utf8",
+    );
+    const [row] = project(a).external as Array<Record<string, unknown>>;
+    const pins = row.pins as Array<Record<string, unknown>>;
+    expect(pins).toHaveLength(1);
+    expect(pins[0].repository).toBe("csv-report");
+    expect(pins[0].driftKind).toBe("behind");
+    expect(String(pins[0].drift)).toContain("csv-report");
+  });
+
+  it("does not crash the Explorer over a declaration that will not parse", () => {
+    // A file that is present and wrong is `dabbler deps`' finding to report.
+    // An Explorer that threw here would take the whole tree down over it.
+    const root = makeRoot();
+    writeFileSync(join(root, "solution-dependencies.json"), "{ nope", "utf8");
+    expect(project(root).external).toEqual([]);
+  });
 });
 
 describe("the command line", () => {

@@ -79,6 +79,18 @@ export class SolutionTreeProvider
     return this.cached;
   }
 
+  /**
+   * The projection a command should resolve a row against.
+   *
+   * Exposed so the navigation commands read the same document the rows were
+   * rendered from. A command reading the file again could get a newer one,
+   * and opening a different repository than the row named is worse than the
+   * command not existing.
+   */
+  public currentProjection(): Projection | null {
+    return this.projection() ?? null;
+  }
+
   public getChildren(element?: SolutionNode): SolutionNode[] {
     const p = this.projection();
     if (!p) return [];

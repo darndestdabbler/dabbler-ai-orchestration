@@ -353,6 +353,15 @@ export interface Router {
   readonly approvedPlan: ApprovedPlanVerbs;
   /** The Work Explorer's whole view of one repository, computed fresh. */
   progress(options: RepositoryTarget): Promise<RouterResult<ProgressProjection>>;
+  /**
+   * A VS Code workspace over every repository in this solution.
+   *
+   * Derived local state: it carries the sibling paths this machine has, and
+   * it is written under `.dabbler/` where nothing tracks it. A shared copy
+   * would point at folders somebody else does not have.
+   */
+  workspace(options: RepositoryTarget): Promise<RouterResult<RouterText>>;
+
   bootstrap(options: BootstrapOptions): Promise<RouterResult<RouterText>>;
   /** The selected tests, why each was selected, and the command to run. */
   affected(options: AffectedOptions): Promise<RouterResult<RouterText>>;

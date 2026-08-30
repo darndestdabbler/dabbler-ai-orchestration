@@ -8,7 +8,10 @@ import {
   repositoryPathOf,
   rootNodes,
 } from "../../providers/solutionTreeModel";
-import { repositoryTarget } from "../../commands/openRepository";
+import {
+  repositoryTarget,
+  workspaceFileIn,
+} from "../../commands/openRepository";
 
 function projection(over: Partial<Projection> = {}): Projection {
   return {
@@ -297,5 +300,44 @@ suite("solutionTreeModel: what other repositories build", () => {
     const target = repositoryTarget({});
     assert.strictEqual(target.path, null);
     assert.ok(target.reason.includes("Solution Explorer"));
+  });
+});
+
+suite("openSolutionWorkspace: one window over the solution", () => {
+  test("opens the file the router reported writing, not one it recomputed", () => {
+    // A second derivation eventually disagrees with the first, and opening a
+    // workspace other than the one just written is a near-miss nobody debugs
+    // quickly.
+    const said = [
+      "  csv-app                  .",
+      "  csv-model                ../csv-model",
+      "",
+      "wrote C:/repos/csv-app/.dabbler/solution.code-workspace",
+      "It is derived from the graph and lives under `.dabbler/`.",
+    ].join("\n");
+    assert.strictEqual(
+      workspaceFileIn(said),
+      "C:/repos/csv-app/.dabbler/solution.code-workspace",
+    );
+  });
+
+  test("opens nothing when the router wrote nothing", () => {
+    // "This repository reaches no other repository here" is an answer, and
+    // opening something anyway would contradict it.
+    assert.strictEqual(
+      workspaceFileIn(
+        "workspace: this repository reaches no other repository on this machine",
+      ),
+      null,
+    );
+  });
+
+  test("does not read a path out of prose that merely mentions one", () => {
+    // The line the router prints is the contract; a sentence describing the
+    // file is not the router saying it wrote it.
+    assert.strictEqual(
+      workspaceFileIn("it would go to C:/repos/x/.dabbler/solution.code-workspace"),
+      null,
+    );
   });
 });

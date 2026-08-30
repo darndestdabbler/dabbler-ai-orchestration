@@ -77,6 +77,14 @@ export const VERBS: readonly VerbSpec[] = [
     summary: "what this repository takes from its solution, and what disagrees",
   },
   {
+    // One VS Code window over the whole solution. Extension-facing: the
+    // Solution Explorer offers it, and the file it writes is derived local
+    // state that a developer should never have to author.
+    verb: "workspace",
+    extensionFacing: true,
+    summary: "a VS Code workspace over every repository in this solution",
+  },
+  {
     verb: "discovery",
     extensionFacing: false,
     summary: "what exists: enumerate a vendor, date the records, diff the roles",

@@ -9282,6 +9282,57 @@
       "dateTime": "2026-08-30T17:43:35.296000-04:00",
       "description": "Register; declare `--not-releasable`.",
       "status": "in-progress"
+    },
+    {
+      "sessionNumber": 48,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-30T17:58:17.313000-04:00",
+      "description": "Register; declare `--not-releasable`.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 48,
+      "stepNumber": 2,
+      "stepKey": "a",
+      "dateTime": "2026-08-30T17:58:17.313000-04:00",
+      "description": "A `.code-workspace` generated from the graph, so one window shows the whole solution. Multi-root is a VS Code default, not a limit.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 48,
+      "stepNumber": 3,
+      "stepKey": "it-is-derived-local-state-and",
+      "dateTime": "2026-08-30T17:58:17.313000-04:00",
+      "description": "**It is derived local state and is never tracked.** It carries machine-specific sibling paths, and a tracked copy would be wrong on the second machine that opened it.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 48,
+      "stepNumber": 4,
+      "stepKey": "affected",
+      "dateTime": "2026-08-30T17:58:17.313000-04:00",
+      "description": "Affected; verify; full suite as `final-full`; close.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 48,
+      "dateTime": "2026-08-30T17:58:17.694000-04:00",
+      "task": "Affected; verify; full suite as final-full; close",
+      "releasable": false
+    },
+    {
+      "sessionNumber": 48,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-30T17:58:17.721000-04:00",
+      "description": "Register; declare `--not-releasable`.",
+      "status": "in-progress"
     }
   ]
 }

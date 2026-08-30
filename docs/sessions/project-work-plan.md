@@ -83,7 +83,7 @@ it.
 | 45 | Resolution modes, inside the declare-and-check line | no | 2026-08-30 |
 | 46 | Packaging declared for the ecosystem it is | no | 2026-08-30 |
 | 47 | The Solution Explorer goes cross-repo | no | 2026-08-30 |
-| 48 | The generated workspace | — | not declared |
+| 48 | The generated workspace | no | 2026-08-30 |
 | 49 | The thing becomes installable | — | not declared |
 | 50 | The field trial, and the exercise reported back | — | not declared |
 
@@ -1462,6 +1462,12 @@ Affected; verify; full suite as final-full; close
 Affected; verify; full suite as final-full; close
 
 ### Session 47 — The Solution Explorer goes cross-repo
+
+**Releasable: no.**
+
+Affected; verify; full suite as final-full; close
+
+### Session 48 — The generated workspace
 
 **Releasable: no.**
 

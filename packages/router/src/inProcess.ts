@@ -527,6 +527,17 @@ export class InProcessRouter implements Router {
     );
   }
 
+  /**
+   * Write a VS Code workspace over every repository in this solution.
+   *
+   * Extension-facing because the operator should never author it: it is
+   * derived from the graph, it carries paths only this machine has, and it
+   * lives under `.dabbler/` where it cannot be committed by accident.
+   */
+  public workspace(o: RepositoryTarget): Promise<RouterResult<RouterText>> {
+    return this.text("workspace", targetArgs(o), o.repoRoot);
+  }
+
   public bootstrap(o: BootstrapOptions): Promise<RouterResult<RouterText>> {
     const args = ["--project-dir", o.projectDir];
     optional(args, "--repo-name", o.repoName);

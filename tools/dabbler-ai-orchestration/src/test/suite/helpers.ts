@@ -245,6 +245,7 @@ export function fakeRouter(
         read: () => answer("approved-plan read", {} as never),
       },
       progress: () => answer("progress", makeProjection()),
+      workspace: text("workspace"),
       bootstrap: text("bootstrap"),
       affected: text("affected"),
     },

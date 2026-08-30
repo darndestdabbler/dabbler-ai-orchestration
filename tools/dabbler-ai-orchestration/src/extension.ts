@@ -16,9 +16,11 @@ import type { SolutionNode } from "./providers/solutionTreeModel";
 import {
   openRepository,
   openRepositoryInNewWindow,
+  openSolutionWorkspace,
   revealRepository,
 } from "./commands/openRepository";
 import { WorkExplorerTreeProvider } from "./providers/WorkExplorerTreeProvider";
+import { productionRouter } from "./router/host";
 
 export function activate(context: vscode.ExtensionContext): void {
   // Activation must NOT bail when no folder is open: the bootstrap and
@@ -174,6 +176,12 @@ export function activate(context: vscode.ExtensionContext): void {
     // projection cache, so it recovers from anything (a projection
     // failure cached against an unchanged set, a python install that
     // just finished).
+    vscode.commands.registerCommand("dabblerSolution.openWorkspace", () =>
+      openSolutionWorkspace(
+        productionRouter(),
+        vscode.workspace.workspaceFolders?.[0]?.uri.fsPath,
+      ),
+    ),
     vscode.commands.registerCommand(
       "dabblerSolution.openRepository",
       (node?: SolutionNode) =>

@@ -10,6 +10,7 @@ import { bootstrapVerb } from "./bootstrap.ts";
 import { contractdocVerb } from "./contractdoc.ts";
 import { copilotVerb } from "./copilot.ts";
 import { depsVerb } from "./deps.ts";
+import { workspaceVerb } from "./workspace.ts";
 import { discoveryVerb } from "./discovery.ts";
 import { factsVerb } from "./facts.ts";
 import { metricsVerb } from "./metrics.ts";
@@ -33,6 +34,7 @@ export const HANDLERS: Readonly<Record<string, VerbHandler>> = {
   contractdoc: contractdocVerb,
   copilot: copilotVerb,
   deps: depsVerb,
+  workspace: workspaceVerb,
   discovery: discoveryVerb,
   facts: factsVerb,
   metrics: metricsVerb,

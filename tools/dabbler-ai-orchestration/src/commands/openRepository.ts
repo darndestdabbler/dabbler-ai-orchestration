@@ -12,6 +12,7 @@
 // menu entry that is not there.
 
 import * as vscode from "vscode";
+import type { Router } from "dabbler-ai-router";
 
 import type { Projection, SolutionNode } from "../providers/solutionTreeModel.ts";
 import { repositoryPathOf } from "../providers/solutionTreeModel.ts";
@@ -97,4 +98,64 @@ export function openRepositoryInNewWindow(
  */
 export function revealRepository(source: RepositoryTargetSource): Promise<void> {
   return act(source, (uri) => vscode.commands.executeCommand("revealFileInOS", uri));
+}
+
+/**
+ * Generate a workspace over the whole solution and open it.
+ *
+ * Multi-root is a VS Code default rather than a limit, and the graph already
+ * knows which folders belong together. The framework writes the file: it is
+ * derived from the declarations, it carries paths only this machine has, and
+ * asking a developer to author one by hand is asking them to maintain a
+ * derived artifact.
+ *
+ * The window it opens replaces this one, which is what `openFolder` does and
+ * the reason the operator is told before it happens rather than after.
+ */
+export async function openSolutionWorkspace(
+  router: Pick<Router, "workspace">,
+  repoRoot: string | undefined,
+): Promise<void> {
+  if (!repoRoot) {
+    void vscode.window.showWarningMessage(
+      "Open a repository first — a solution workspace is built from the " +
+        "declarations in the one you have open.",
+    );
+    return;
+  }
+  const result = await router.workspace({ repoRoot });
+  if (!result.ok) {
+    void vscode.window.showWarningMessage(
+      `Dabbler could not build the workspace: ${result.message ?? result.outcome}`,
+    );
+    return;
+  }
+  const file = workspaceFileIn(result.value.stdout ?? "");
+  if (file === null) {
+    // The router says what it did, including "there is nothing to build
+    // here". Passing its own sentence through is better than inventing one.
+    void vscode.window.showInformationMessage(
+      (result.value.stdout ?? "").trim() ||
+        "Nothing to open: this repository reaches no other repository here.",
+    );
+    return;
+  }
+  await vscode.commands.executeCommand(
+    "vscode.openFolder",
+    vscode.Uri.file(file),
+    false,
+  );
+}
+
+/**
+ * The workspace file the router reported writing, or null when it wrote none.
+ *
+ * The path comes from the router's own answer and is never recomputed here.
+ * A second derivation would eventually disagree with the first, and opening a
+ * workspace other than the one just written is the kind of near-miss nobody
+ * debugs quickly.
+ */
+export function workspaceFileIn(stdout: string): string | null {
+  const found = /^wrote (.+\.code-workspace)\s*$/m.exec(stdout);
+  return found ? found[1].trim() : null;
 }

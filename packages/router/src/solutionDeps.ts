@@ -20,10 +20,10 @@
 // say "cannot determine" rather than to guess: a false drift report costs
 // more than a missing one, because someone acts on it.
 
-import { existsSync, readdirSync, statSync } from "node:fs";
-import { basename, join, relative, resolve } from "node:path";
+import { existsSync, mkdirSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 
-import { runGit } from "./journal.ts";
+import { MACHINE_DIRNAME, runGit } from "./journal.ts";
 import { loadSchemaFile, schemaFailure } from "./schema/validate.ts";
 import { readText } from "./textfile.ts";
 
@@ -919,4 +919,98 @@ export function reconcileAcrossRepositories(
     });
   }
   return out;
+}
+
+// --- One window over the whole solution ---------------------------------------
+
+/**
+ * Where the generated workspace file lives, and why it lives there.
+ *
+ * Under `.dabbler/`, which is machine state and gitignored whole. That is not
+ * tidiness: the file carries the sibling paths THIS machine has, and a
+ * tracked copy is wrong on the second machine that opens it -- pointing at
+ * folders that are not there, or worse, at folders that are there and are
+ * somebody else's checkout. Derived local state is regenerated, never shared.
+ */
+export function workspaceFilePath(repoRoot: string): string {
+  return join(repoRoot, MACHINE_DIRNAME, "solution.code-workspace");
+}
+
+/** One folder entry in the generated workspace. */
+export interface WorkspaceFolder {
+  readonly name: string;
+  readonly path: string;
+}
+
+/**
+ * The folders a workspace over this solution would carry.
+ *
+ * This repository first -- it is the one the developer already has open --
+ * and then every member the graph reaches that is actually on this machine.
+ * A member nobody has cloned is omitted rather than added as a broken entry:
+ * VS Code renders a missing folder as an error row, and a window that opens
+ * with three errors in it teaches people to distrust the button.
+ *
+ * Paths are relative to the WORKSPACE FILE, which is where VS Code resolves
+ * them from -- the file lives in `.dabbler/`, one level below the repository,
+ * so a path computed from the repository root opens the wrong folder every
+ * time. Relative where it can be, so moving the whole set of checkouts
+ * together keeps the file working.
+ */
+export function workspaceFolders(repoRoot: string): WorkspaceFolder[] {
+  // Relative to the FILE, not to the repository. VS Code resolves a folder
+  // path from the directory holding the `.code-workspace`, and this file
+  // lives one level down in `.dabbler/` -- so `"."` would open `.dabbler`
+  // itself and `"../csv-model"` would land inside this repository instead of
+  // beside it. Every path here is computed from where the file actually sits.
+  const base = dirname(workspaceFilePath(repoRoot));
+  const from = (target: string): string => {
+    const relative_ = relative(base, target).replace(/\\/g, "/");
+    // An empty relative path means the file's own directory, and a path that
+    // crosses drives comes back absolute -- both are answered by the
+    // absolute form, which VS Code accepts.
+    return relative_ && !isAbsolute(relative_) ? relative_ : resolve(target);
+  };
+
+  const members = assembleSolution(repoRoot);
+  const out: WorkspaceFolder[] = [
+    { name: basename(resolve(repoRoot)), path: from(resolve(repoRoot)) },
+  ];
+  const seen = new Set([resolve(repoRoot)]);
+  for (const member of members.slice(1)) {
+    if (member.root === null || member.duplicateOf !== null) continue;
+    const full = resolve(member.root);
+    if (seen.has(full)) continue;
+    seen.add(full);
+    out.push({ name: member.id, path: from(full) });
+  }
+  return out;
+}
+
+/**
+ * Write the workspace file, and return its path.
+ *
+ * Regenerated on every call rather than merged. It is derived from the graph,
+ * so the graph is what it should say -- and a merge would preserve a folder
+ * whose repository has since left the solution, which is the one thing a
+ * derived file must not do.
+ */
+export function writeWorkspaceFile(repoRoot: string): string {
+  const path = workspaceFilePath(repoRoot);
+  mkdirSync(dirname(path), { recursive: true });
+  const document = {
+    folders: workspaceFolders(repoRoot).map((folder) => ({
+      name: folder.name,
+      path: folder.path,
+    })),
+    settings: {
+      // The generated file is not a place to keep preferences: it is
+      // rewritten whenever the graph changes, and anything hand-added here
+      // disappears the next time. Saying so in the file is cheaper than
+      // someone discovering it.
+      "dabbler.generated": true,
+    },
+  };
+  writeFileSync(path, `${JSON.stringify(document, null, 2)}\n`, "utf8");
+  return path;
 }

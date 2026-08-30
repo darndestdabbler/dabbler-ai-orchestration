@@ -878,9 +878,9 @@
     {
       "number": 45,
       "title": "Resolution modes, inside the declare-and-check line",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-30T16:54:31.082000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-08-30T17:26:50.751000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

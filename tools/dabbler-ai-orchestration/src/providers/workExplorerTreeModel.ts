@@ -450,9 +450,17 @@ export function sessionDescriptor(node: SessionNode): RowDescriptor {
   return {
     id: `session:${repository.root}/${session.number}`,
     label: sessionRowLabel(session),
-    // Short labels, so a description survives truncation here. Only the
-    // in-flight session says anything — quiet is the default state.
-    description: session.status === "in-progress" ? "in flight" : undefined,
+    // Short labels, so a description survives truncation here. Two states
+    // say anything at all — quiet is the default. "planned" is a session the
+    // plan declares that the ledger has not reached: it shares the
+    // not-started glyph deliberately, so the word is the only thing that
+    // distinguishes the two and it has to be on the row.
+    description:
+      session.status === "in-progress"
+        ? "in flight"
+        : session.status === "planned"
+          ? "planned"
+          : undefined,
     tooltip: sessionTooltip(node),
     icon: sessionIcon(session.iconKey),
     contextValue: tokenString(tokens),

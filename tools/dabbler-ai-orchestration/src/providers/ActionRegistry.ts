@@ -23,7 +23,16 @@ export interface RepositoryAction {
 
 /** A repository with work left to start. */
 const hasNextSession = (r: SessionsRepository): boolean =>
-  r.sessions.some((s) => s.status === "in-progress" || s.status === "not-started");
+  r.sessions.some(
+    (s) =>
+      s.status === "in-progress" ||
+      s.status === "not-started" ||
+      // A session the plan declares and the ledger has not reached is still
+      // work left to start — it is exactly what `session start` registers
+      // next. Omitting it would hide the launcher on the repository that
+      // most needs it: one whose planning session just added the sessions.
+      s.status === "planned",
+  );
 
 // Ordered list; `group` bands: 1xx Open File submenu, 3xx Copy Prompt
 // submenu, 9xx lifecycle.

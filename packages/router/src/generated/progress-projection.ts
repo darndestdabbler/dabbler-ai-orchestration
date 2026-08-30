@@ -3,9 +3,14 @@
 // when this file no longer matches it.
 
 /**
- * The one status vocabulary, shared by sessions and tasks.
+ * The one status vocabulary, shared by sessions and tasks. It is the LEDGER's vocabulary: every value here is one a writer may put on disk, which is why 'planned' is not among them.
  */
 export type ProgressProjectionSessionStatus = "not-started" | "in-progress" | "complete" | "cancelled";
+
+/**
+ * What a session row may say, which is one more thing than the ledger may hold. 'planned' is a session the plan declares and the ledger has not reached -- distinct from 'not-started', which already means 'registered, and not begun'. It exists only in a projection: no writer accepts it, and the ledger schema does not list it, so a projected state can never become a recorded one. A planned row's iconKey stays 'not-started' because the two share a glyph; what separates them is the row's words, not its picture.
+ */
+export type ProgressProjectionProjectedSessionStatus = "not-started" | "in-progress" | "complete" | "cancelled" | "planned";
 
 /**
  * Who ran the sessions, passed through from the ledger's orchestrator block rather than re-shaped. Open, because the block carries more than a reader needs and a closed copy here would be a second declaration of it.
@@ -30,6 +35,14 @@ export type ProgressProjectionRepository = {
   totalSessions: number | null;
   sessionsCompleted: number;
   currentSession: number | null;
+  /**
+   * How many sessions the plan declares that the ledger has not reached. Zero for a repository whose ledger has caught up. It is published rather than left to be counted from the rows because 'is this project finished' is the question the count answers, and a reader that re-derived it would be a second implementation of the rule.
+   */
+  plannedSessions: number;
+  /**
+   * The number that registers on the next `session start`: the lowest open session, whether the ledger already holds a row for it or the plan alone declares it. Null when nothing is left to run. Derived here so the close and the Explorer answer 'what now' identically.
+   */
+  nextSession: number | null;
   forceClosed: boolean;
   orchestrator: ProgressProjectionOrchestrator | null;
   /**
@@ -131,7 +144,7 @@ export type ProgressProjectionSession = {
    */
   displayNumber: string;
   title: string;
-  status: ProgressProjectionSessionStatus;
+  status: ProgressProjectionProjectedSessionStatus;
   iconKey: ProgressProjectionSessionStatus;
   inFlight: boolean;
   startedAt: string | null;

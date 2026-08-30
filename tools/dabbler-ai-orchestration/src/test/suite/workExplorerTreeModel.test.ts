@@ -204,6 +204,22 @@ suite("workExplorerTreeModel: session descriptor", () => {
     sessions: [makeSession({ number: 1, status: "complete" })],
   });
 
+  test("a planned session says so, since it shares the not-started glyph", () => {
+    // The projection gives a plan-declared session `status: "planned"` and
+    // `iconKey: "not-started"` deliberately: the two share a picture, so the
+    // word on the row is the only thing that tells them apart.
+    const d = sessionDescriptor({
+      kind: "session",
+      repository,
+      session: makeSession({
+        number: 9,
+        status: "planned",
+        iconKey: "not-started",
+      }),
+    });
+    assert.strictEqual(d.description, "planned");
+  });
+
   test("the label leads with the zero-padded number", () => {
     const d = sessionDescriptor({
       kind: "session",

@@ -139,6 +139,8 @@ export function makeProjection(
       totalSessions: 2,
       sessionsCompleted: 2,
       currentSession: null,
+      plannedSessions: 0,
+      nextSession: null,
       forceClosed: false,
       orchestrator: null,
       invariantViolation: null,

@@ -73,7 +73,7 @@ it.
 | 35 | The six-step workflow ported, the run core retired | no | 2026-08-29 |
 | 36 | Cutover — the extension calls in-process, and Python leaves | yes | 2026-08-29 |
 | 37 | The extension surveyed against the principles | no | 2026-08-30 |
-| 38 | The projection stops withholding the plan | — | not declared |
+| 38 | The projection stops withholding the plan | no | 2026-08-30 |
 | 39 | Verification stops lying, and an unanswered gap stops the close | — | not declared |
 | 40 | Task rows — a structured declaration, a framework-owned state machine | — | not declared |
 | 41 | Setup owns the runway | — | not declared |
@@ -1149,5 +1149,43 @@ What this session does:
 This session is a survey. It does not refactor the extension, and it does
 not implement any finding that needs a design decision — those are filed
 with an owning session and left.
+
+Not releasable: it publishes nothing.
+
+### Session 38 — The projection stops withholding the plan
+
+**Releasable: no.**
+
+Session 38 of 50 — The projection stops withholding the plan.
+
+`progress.ts` consults `session-plan.md` only when the ledger is absent, so
+once `sessions.json` exists the plan is never read again. csv-model closed
+session 2 of a nine-session plan and every indicator it has said the project
+was finished. The ledger does grow to the plan at the next `session start`,
+so the framework is right — but nothing surfaces that, and the reassurance
+lives in a source comment.
+
+What this session does:
+
+1. Read the plan's `### Session <N>:` headings on every projection, not only
+   when the ledger is missing, using the exact parser `session start`
+   already uses. A second heading interpretation would be one rule stated
+   twice.
+2. Project a session the plan declares and the ledger has not reached as a
+   distinct `planned` state — never `not-started`, which already means
+   "registered but not begun".
+3. Never report a repository complete while its plan declares sessions the
+   ledger has not reached.
+4. Specify reconciliation rather than assume it: duplicate numbers, gaps,
+   renamed headings, a plan shorter than the ledger, and malformed headings
+   each get a defined projection, and "which session registers next" is
+   derived under those cases rather than assuming a contiguous plan.
+5. Have `session close` print what comes next — how many planned sessions
+   remain and which registers on the next `session start`.
+6. Render `planned` rows in the Work Explorer from the projection alone, so
+   the extension gains no new reader.
+
+Tests: one per behaviour, in the router suite, plus the extension's own
+rendering test for the new row state.
 
 Not releasable: it publishes nothing.

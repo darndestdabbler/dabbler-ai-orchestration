@@ -24,9 +24,14 @@
   },
   "$defs": {
     "sessionStatus": {
-      "description": "The one status vocabulary, shared by sessions and tasks.",
+      "description": "The one status vocabulary, shared by sessions and tasks. It is the LEDGER's vocabulary: every value here is one a writer may put on disk, which is why 'planned' is not among them.",
       "type": "string",
       "enum": ["not-started", "in-progress", "complete", "cancelled"]
+    },
+    "projectedSessionStatus": {
+      "description": "What a session row may say, which is one more thing than the ledger may hold. 'planned' is a session the plan declares and the ledger has not reached -- distinct from 'not-started', which already means 'registered, and not begun'. It exists only in a projection: no writer accepts it, and the ledger schema does not list it, so a projected state can never become a recorded one. A planned row's iconKey stays 'not-started' because the two share a glyph; what separates them is the row's words, not its picture.",
+      "type": "string",
+      "enum": ["not-started", "in-progress", "complete", "cancelled", "planned"]
     },
     "orchestrator": {
       "description": "Who ran the sessions, passed through from the ledger's orchestrator block rather than re-shaped. Open, because the block carries more than a reader needs and a closed copy here would be a second declaration of it.",
@@ -48,6 +53,8 @@
         "totalSessions",
         "sessionsCompleted",
         "currentSession",
+        "plannedSessions",
+        "nextSession",
         "forceClosed",
         "orchestrator",
         "invariantViolation"
@@ -63,6 +70,15 @@
         "totalSessions": { "type": ["integer", "null"] },
         "sessionsCompleted": { "type": "integer", "minimum": 0 },
         "currentSession": { "type": ["integer", "null"] },
+        "plannedSessions": {
+          "description": "How many sessions the plan declares that the ledger has not reached. Zero for a repository whose ledger has caught up. It is published rather than left to be counted from the rows because 'is this project finished' is the question the count answers, and a reader that re-derived it would be a second implementation of the rule.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "nextSession": {
+          "description": "The number that registers on the next `session start`: the lowest open session, whether the ledger already holds a row for it or the plan alone declares it. Null when nothing is left to run. Derived here so the close and the Explorer answer 'what now' identically.",
+          "type": ["integer", "null"]
+        },
         "forceClosed": { "type": "boolean" },
         "orchestrator": {
           "oneOf": [{ "$ref": "#/$defs/orchestrator" }, { "type": "null" }]
@@ -232,7 +248,7 @@
           "description": "The number as the projection wrote it -- '015'. Python owns the padding rule; this is its result, not a shape a reader re-derives. Empty when an older router sent no name."
         },
         "title": { "type": "string" },
-        "status": { "$ref": "#/$defs/sessionStatus" },
+        "status": { "$ref": "#/$defs/projectedSessionStatus" },
         "iconKey": { "$ref": "#/$defs/sessionStatus" },
         "inFlight": { "type": "boolean" },
         "startedAt": { "type": ["string", "null"] },

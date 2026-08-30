@@ -19,8 +19,10 @@ import {
   sessionRunDir,
 } from "../src/ledger.ts";
 import {
+  SESSION_STATUSES,
   SOURCE_LEDGER,
   SOURCE_PLAN,
+  STATUS_PLANNED,
   TaskRowsRefused,
   VerificationRefused,
   buildProjection,
@@ -36,7 +38,7 @@ import {
   useApprovedPlanReader,
   verificationCap,
 } from "../src/progress.ts";
-import { registerSessionStart } from "../src/writers.ts";
+import { flipStateToClosed, registerSessionStart } from "../src/writers.ts";
 import { git, makeSandboxRepo, makeTempDir, removeTempDirs } from "./support/fixtures.ts";
 
 afterAll(removeTempDirs);
@@ -553,5 +555,215 @@ describe("the round cap the view is judged against", () => {
     const { repo } = makeSandboxRepo();
     git(repo, "status", "--porcelain");
     expect(verificationCap(repo)).toBeGreaterThan(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The plan, on every projection
+// ---------------------------------------------------------------------------
+
+/** Overwrite the sandbox's plan with the given `[number, title]` headings. */
+function writePlan(
+  sessionsDir: string,
+  headings: ReadonlyArray<readonly [number, string]>,
+  extra = "",
+): void {
+  const total = headings.length;
+  const body = headings
+    .map(([n, t]) => `### Session ${n} of ${total}: ${t}\n1. Register.\n`)
+    .join("\n");
+  writeFileSync(join(sessionsDir, "session-plan.md"), body + extra, "utf8");
+}
+
+/** Close whatever is in flight, so the next-session rule has something to skip. */
+function closeSessionForTest(sessionsDir: string): void {
+  flipStateToClosed(sessionsDir, { verdict: "VERIFIED" });
+}
+
+function repository(sessionsDir: string): Record<string, unknown> {
+  return buildProjection(sessionsDir)["repository"] as Record<string, unknown>;
+}
+
+function sessions(sessionsDir: string): Record<string, unknown>[] {
+  return buildProjection(sessionsDir)["sessions"] as Record<string, unknown>[];
+}
+
+describe("a session the plan declares and the ledger has not reached", () => {
+  it("projects as 'planned', which the ledger's own vocabulary does not contain", () => {
+    const { sessionsDir } = makeSandboxRepo();
+    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
+    writePlan(sessionsDir, [
+      [1, "First things"],
+      [2, "Second things"],
+      [3, "Added after the last start"],
+    ]);
+    const row = sessions(sessionsDir).find((s) => s["number"] === 3);
+    expect(row?.["status"]).toBe(STATUS_PLANNED);
+    expect(SESSION_STATUSES).not.toContain(STATUS_PLANNED);
+  });
+
+  it("keeps the not-started glyph, so only the row's words separate the two", () => {
+    const { sessionsDir } = makeSandboxRepo();
+    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
+    writePlan(sessionsDir, [
+      [1, "First"],
+      [9, "Much later"],
+    ]);
+    const row = sessions(sessionsDir).find((s) => s["number"] === 9);
+    expect(row?.["iconKey"]).toBe("not-started");
+    expect(row?.["status"]).toBe(STATUS_PLANNED);
+  });
+
+  it("counts toward the total, so a caught-up ledger is not reported finished", () => {
+    // csv-model's item 9, reproduced: a planning session's whole deliverable
+    // is new headings, and until this the record said 2 of 2 complete.
+    const { sessionsDir } = makeSandboxRepo();
+    // `session start` grows the ledger to the plan as it stood then -- the
+    // seed declares two -- so the ledger looks caught up and complete.
+    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
+    expect(repository(sessionsDir)["totalSessions"]).toBe(2);
+    writePlan(sessionsDir, [
+      [1, "First"],
+      [2, "Second"],
+      [3, "Third"],
+      [4, "Fourth"],
+    ]);
+    const after = repository(sessionsDir);
+    expect(after["totalSessions"]).toBe(4);
+    expect(after["plannedSessions"]).toBe(2);
+  });
+
+  it("carries no run artifacts, because it has never been registered", () => {
+    const { sessionsDir } = makeSandboxRepo();
+    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
+    writePlan(sessionsDir, [
+      [1, "First"],
+      [5, "Never registered"],
+    ]);
+    const row = sessions(sessionsDir).find((s) => s["number"] === 5);
+    expect(row?.["tasks"]).toEqual([]);
+    expect(row?.["tasksRefused"]).toBeNull();
+    expect(row?.["verification"]).toBeNull();
+    expect(row?.["verificationRefused"]).toBeNull();
+    expect(row?.["inFlight"]).toBe(false);
+  });
+});
+
+describe("reconciling a hand-edited plan against the ledger", () => {
+  it("never re-emits a number the ledger already holds", () => {
+    const { sessionsDir } = makeSandboxRepo();
+    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
+    writePlan(sessionsDir, [
+      [1, "A title the plan changed its mind about"],
+      [2, "Second"],
+    ]);
+    const ones = sessions(sessionsDir).filter((s) => s["number"] === 1);
+    expect(ones).toHaveLength(1);
+    expect(ones[0]!["status"]).not.toBe(STATUS_PLANNED);
+  });
+
+  it("contributes a duplicated number once", () => {
+    const { sessionsDir } = makeSandboxRepo();
+    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
+    writePlan(sessionsDir, [
+      [1, "First"],
+      [7, "Alpha"],
+      [7, "Beta"],
+    ]);
+    expect(sessions(sessionsDir).filter((s) => s["number"] === 7)).toHaveLength(1);
+  });
+
+  it("leaves a gap alone rather than inventing the missing number", () => {
+    const { sessionsDir } = makeSandboxRepo();
+    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
+    writePlan(sessionsDir, [
+      [1, "First"],
+      [4, "Fourth"],
+      [6, "Sixth"],
+    ]);
+    const numbers = sessions(sessionsDir).map((s) => s["number"]);
+    expect(numbers).toContain(4);
+    expect(numbers).toContain(6);
+    expect(numbers).not.toContain(5);
+  });
+
+  it("yields nothing when the plan is shorter than the ledger", () => {
+    const { sessionsDir } = makeSandboxRepo();
+    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
+    registerSessionStart(sessionsDir, 2, { engine: "claude-code" });
+    writePlan(sessionsDir, [[1, "The only one left in the plan"]]);
+    const repo = repository(sessionsDir);
+    expect(repo["plannedSessions"]).toBe(0);
+    expect(repo["totalSessions"]).toBe(2);
+  });
+
+  it("takes nothing from a heading the parser cannot read", () => {
+    const { sessionsDir } = makeSandboxRepo();
+    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
+    writePlan(sessionsDir, [[1, "First"]], "\n## Session eleven: not a heading\n");
+    expect(repository(sessionsDir)["plannedSessions"]).toBe(0);
+  });
+});
+
+describe("what registers on the next session start", () => {
+  it("is the session in flight, whatever its number", () => {
+    const { sessionsDir } = makeSandboxRepo();
+    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
+    expect(repository(sessionsDir)["nextSession"]).toBe(1);
+  });
+
+  it("is the lowest session that has not run, planned ones included", () => {
+    const { sessionsDir } = makeSandboxRepo();
+    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
+    closeSessionForTest(sessionsDir);
+    writePlan(sessionsDir, [
+      [1, "First"],
+      [2, "Second"],
+      [3, "Third"],
+    ]);
+    expect(repository(sessionsDir)["nextSession"]).toBe(2);
+  });
+
+  it("is null when the plan declares nothing further", () => {
+    const { sessionsDir } = makeSandboxRepo();
+    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
+    closeSessionForTest(sessionsDir);
+    registerSessionStart(sessionsDir, 2, { engine: "claude-code" });
+    closeSessionForTest(sessionsDir);
+    writePlan(sessionsDir, [
+      [1, "First"],
+      [2, "Second"],
+    ]);
+    expect(repository(sessionsDir)["nextSession"]).toBeNull();
+  });
+});
+
+describe("a repository whose plan is its only record", () => {
+  it("calls every row planned, because the ledger has reached none of them", () => {
+    // Round 1 of this session's verification found the gap: `not-started`
+    // means "registered, and not begun", and nothing here is registered.
+    const { sessionsDir } = makeSandboxRepo();
+    expect(ledgerExists(sessionsDir)).toBe(false);
+    const projection = buildProjection(sessionsDir);
+    const rows = projection["sessions"] as Record<string, unknown>[];
+    expect(rows.length).toBeGreaterThan(0);
+    for (const row of rows) expect(row["status"]).toBe(STATUS_PLANNED);
+  });
+
+  it("counts them once, so the planned count is not the total twice over", () => {
+    const { sessionsDir } = makeSandboxRepo();
+    const repo = repository(sessionsDir);
+    expect(repo["plannedSessions"]).toBe(2);
+    expect(repo["totalSessions"]).toBe(2);
+    expect(repo["sessionsCompleted"]).toBe(0);
+    expect(repo["nextSession"]).toBe(1);
+  });
+
+  it("keeps the invariants readable, because the state is set after they run", () => {
+    // `validateInvariants` accepts only the ledger's four statuses, and it
+    // runs over the derived view. Stamping 'planned' any earlier would make a
+    // fresh repository report an invariant violation instead of its sessions.
+    const { sessionsDir } = makeSandboxRepo();
+    expect(repository(sessionsDir)["invariantViolation"]).toBeNull();
   });
 });

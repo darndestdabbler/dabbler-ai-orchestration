@@ -81,10 +81,26 @@ export function nextRunnableSessionNumber(
   const ordered = [...(sessions ?? [])].sort((a, b) => a.number - b.number);
   let expected = 1;
   for (const session of ordered) {
+    // A gap the PLAN declares is legitimate and a gap in the LEDGER is not.
+    // Contiguity is the ledger's invariant -- sanctioned writers number it
+    // 1..N, and the projection refuses a gapped one outright -- but a plan is
+    // hand-edited and may declare 1, 4, 6 on purpose. Counting planned rows
+    // toward contiguity would make this disagree with the projection's own
+    // `nextSession` on exactly the case the plan calls legitimate.
+    if (session.status === "planned") {
+      if (session.number < expected) continue;
+      return session.number;
+    }
     if (session.number !== expected) return null;
     expected += 1;
     if (session.status === "complete" || session.status === "cancelled") continue;
-    if (session.status === "in-progress" || session.status === "not-started") {
+    if (
+      session.status === "in-progress" ||
+      session.status === "not-started" ||
+      // Declared by the plan, not yet registered. It is the next runnable
+      // session in every sense the caller cares about.
+      session.status === "planned"
+    ) {
       return session.number;
     }
     return null;

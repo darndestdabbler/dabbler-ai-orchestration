@@ -803,6 +803,63 @@ export function sessionsFromPlan(sessionsDir: string): Record<string, unknown>[]
   );
 }
 
+/**
+ * A session the plan declares and the ledger has not reached.
+ *
+ * Deliberately absent from `SESSION_STATUSES`, which is the vocabulary a
+ * writer may put on disk. `not-started` already means "registered, and not
+ * begun"; this means "declared, and not registered", and the difference is
+ * the whole of what this state exists to say. A projected state that a writer
+ * accepted would stop being a projection.
+ */
+export const STATUS_PLANNED = "planned";
+
+/**
+ * The sessions the plan declares beyond the ledger, in plan order.
+ *
+ * `session start` grows the ledger to the plan, so this is empty for most of
+ * a session's life. The window it exists for is the one that cost `csv-model`
+ * its bearings: a planning session whose whole deliverable is new headings
+ * closes, and until the NEXT registration the ledger knows nothing about
+ * them. The projection read the plan only when the ledger was absent, so for
+ * that whole window every indicator said the project was finished.
+ *
+ * Reconciliation is defined rather than assumed, because a plan is
+ * hand-edited and the interesting cases are all reachable:
+ *
+ * - **A number the ledger already holds is never re-emitted.** The ledger is
+ *   the record; a heading is a declaration, and a declaration does not get to
+ *   restate a registered session. Title drift is already healed elsewhere.
+ * - **A duplicate number in the plan contributes once.** The parser sorts
+ *   `(number, title)`, so the first is taken and the rest are dropped -- the
+ *   same tie-break `session start` reads them with.
+ * - **Gaps are not errors.** A plan that declares 37 and 39 and no 38 yields
+ *   exactly those two rows. Nothing here invents the missing number, because
+ *   a projection that filled gaps would be asserting sessions nobody wrote.
+ * - **A plan shorter than the ledger yields nothing.** The ledger never
+ *   shrinks, and a heading deleted after its session ran does not un-run it.
+ * - **A malformed heading contributes nothing at all**, because the parser
+ *   does not match it. That is a silence rather than a refusal: titles were
+ *   always "a nicety, never a gate", and a repository whose plan will not
+ *   parse still has a ledger worth rendering.
+ */
+export function plannedSessions(
+  sessionsDir: string,
+  ledgerNumbers: ReadonlySet<number>,
+): Record<string, unknown>[] {
+  const seen = new Set<number>();
+  const rows: Record<string, unknown>[] = [];
+  for (const [number, title] of extractSessionTitlesFromPlan(
+    sessionPlanPath(sessionsDir),
+  )) {
+    if (!Number.isInteger(number)) continue;
+    if (ledgerNumbers.has(number) || seen.has(number)) continue;
+    seen.add(number);
+    rows.push({ number, title, status: STATUS_PLANNED });
+  }
+  return rows;
+}
+
 // --- The task level -----------------------------------------------------------
 
 export const STEP_STATE_PENDING = "pending";
@@ -1221,7 +1278,12 @@ export function buildProjection(sessionsDir: string): Record<string, unknown> {
       // languages.
       displayNumber: sessionDisplayNumber(number),
       title: entry["title"] || `Session ${pythonStr(number)}`,
-      status: sessionStatus ?? null,
+      // A plan-sourced row is BY DEFINITION one the ledger has not reached:
+      // there is no ledger. `sessionsFromPlan` stamps `not-started` because
+      // that is the only status the invariants accept, and the invariants run
+      // over the derived view above -- so the projected state is set here,
+      // after validation, where a value the ledger may not hold is legal.
+      status: source === SOURCE_PLAN ? STATUS_PLANNED : sessionStatus ?? null,
       iconKey:
         typeof sessionStatus === "string" && SESSION_STATUSES.includes(sessionStatus)
           ? sessionStatus
@@ -1262,6 +1324,70 @@ export function buildProjection(sessionsDir: string): Record<string, unknown> {
     sessionsOut.push(sessionOut);
   }
 
+  // The plan, on every projection rather than only when the ledger is absent.
+  // A row here has no run artifacts to fold by definition -- it has never been
+  // registered -- so tasks and verification are empty rather than refused, and
+  // `iconKey` is the glyph `not-started` already owns. What separates the two
+  // states is the row's words.
+  const ledgerNumbers = new Set<number>(
+    sessionsOut
+      .map((s) => s["number"])
+      .filter((n): n is number => Number.isInteger(n)),
+  );
+  // Merged only over a ledger that actually read. The plan already IS the
+  // sessions when there is no ledger, and a ledger that is present and
+  // unparseable is a fault: answering it with the plan would replace a broken
+  // record with a cheerful guess, which is the distinction `ledgerExists`
+  // was introduced to keep.
+  const planned =
+    source === SOURCE_LEDGER && raw !== null
+      ? plannedSessions(sessionsDir, ledgerNumbers)
+      : [];
+  for (const row of planned) {
+    sessionsOut.push({
+      number: row["number"],
+      displayNumber: sessionDisplayNumber(row["number"]),
+      title: row["title"] || `Session ${pythonStr(row["number"])}`,
+      status: STATUS_PLANNED,
+      iconKey: STATUS_NOT_STARTED,
+      inFlight: false,
+      startedAt: null,
+      completedAt: null,
+      verificationVerdict: null,
+      tasks: [] as unknown[],
+      tasksRefused: null,
+      verification: null,
+      verificationRefused: null,
+    });
+  }
+
+  // "Is this project finished" is answered here or it is answered wrongly.
+  // `derivedView` counts the ledger's rows, which is the true size of the
+  // record and NOT the size of the work: a repository whose plan declares
+  // more is not complete, however tidy its ledger looks.
+  const ledgerTotal = view["totalSessions"];
+  const totalSessions =
+    typeof ledgerTotal === "number" ? ledgerTotal + planned.length : ledgerTotal ?? null;
+
+  // What registers on the next `session start`, resolved by the rule the
+  // lifecycle already states: the session in flight if there is one, and
+  // otherwise the lowest-numbered session that has not run. This is NOT
+  // `getProgress().nextSession`, which answers the same question over the
+  // ledger alone and is used for the ledger's own invariants; the difference
+  // is the planned rows, and it is the difference this session exists for.
+  const openNumbers = sessionsOut
+    .filter(
+      (s) =>
+        Number.isInteger(s["number"]) &&
+        (s["status"] === STATUS_NOT_STARTED || s["status"] === STATUS_PLANNED),
+    )
+    .map((s) => s["number"] as number)
+    .sort((a, b) => a - b);
+  const inFlightNumber = sessionsOut.find(
+    (s) => s["status"] === STATUS_IN_PROGRESS && Number.isInteger(s["number"]),
+  )?.["number"] as number | undefined;
+  const nextSession = inFlightNumber ?? openNumbers[0] ?? null;
+
   return {
     schemaVersion: 1,
     generatedAt: nowIso("microseconds"),
@@ -1270,9 +1396,15 @@ export function buildProjection(sessionsDir: string): Record<string, unknown> {
       // run here rather than implying that it has.
       sessionsSource: source,
       schemaVersionOnDisk: raw?.["schemaVersion"] ?? null,
-      totalSessions: view["totalSessions"] ?? null,
+      totalSessions,
       sessionsCompleted: (view["completedSessions"] as unknown[] | null)?.length ?? 0,
       currentSession: view["currentSession"] ?? null,
+      // Counted off the rows rather than off `planned`, so the two ways a row
+      // can be planned -- merged over a ledger, or sourced from the plan
+      // because there is no ledger -- are counted once each and by one rule.
+      plannedSessions: sessionsOut.filter((s) => s["status"] === STATUS_PLANNED)
+        .length,
+      nextSession,
       forceClosed: Boolean(view["forceClosed"]),
       orchestrator: view["orchestrator"] ?? null,
       invariantViolation,

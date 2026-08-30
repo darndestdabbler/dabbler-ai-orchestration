@@ -55,6 +55,7 @@ import {
   STATUS_IN_PROGRESS,
   STATUS_NOT_STARTED,
   SessionStateInvariantError,
+  buildProjection,
   canonicalizeStatus,
   derivedView,
   isLoggedStep,
@@ -1196,10 +1197,64 @@ export function close(sessionsDir: string, options: CloseCliOptions = {}): numbe
         }
       }
     }
+    writeWhatComesNext(sessionsDir);
     return EXIT_OK;
   } finally {
     releaseLock(lock);
   }
+}
+
+/**
+ * What comes next, printed at the close.
+ *
+ * The close is the exact moment the operator asks "what now", and until this
+ * existed the answer lived in a source comment: the ledger grows to the plan
+ * at the next registration, so a planning session whose whole deliverable was
+ * new headings closed on a record that said the project was finished. Reading
+ * the projection rather than re-deriving keeps one answer to the question --
+ * the Explorer renders the same two numbers.
+ *
+ * Best-effort by construction. A close that has already flipped the state and
+ * pushed its bookkeeping must not fail because a courtesy line could not be
+ * computed, so an unreadable plan or projection prints nothing at all.
+ */
+function writeWhatComesNext(sessionsDir: string): void {
+  let repository: Record<string, unknown>;
+  let rows: unknown;
+  try {
+    const projection = buildProjection(sessionsDir);
+    repository = (projection["repository"] ?? {}) as Record<string, unknown>;
+    rows = projection["sessions"];
+  } catch {
+    return;
+  }
+  const next = repository["nextSession"];
+  if (!Number.isInteger(next)) {
+    writeOut("close: no session is left to run; the plan declares no more.\n");
+    return;
+  }
+  const planned = Number(repository["plannedSessions"] ?? 0);
+  const total = repository["totalSessions"];
+  const completed = Number(repository["sessionsCompleted"] ?? 0);
+  const remaining =
+    typeof total === "number" ? Math.max(total - completed, 0) : null;
+  // "Registers" and "starts" are not the same act under the vocabulary this
+  // projection now uses: a `not-started` row is already in the ledger, and
+  // only a `planned` one is written by the next start. Saying "registers" for
+  // both would contradict the distinction one line above it.
+  const sessions = Array.isArray(rows) ? rows : [];
+  const nextIsPlanned =
+    sessions.find((s) => isRecord(s) && s["number"] === next)?.["status"] ===
+    "planned";
+  writeOut(
+    `close: next is session ${sessionDisplayNumber(next)}` +
+      (remaining === null ? "" : ` -- ${remaining} of ${total} left to run`) +
+      (planned > 0
+        ? `, ${planned} of them declared by the plan and not yet registered`
+        : "") +
+      `. It ${nextIsPlanned ? "registers" : "starts"} on the next ` +
+      "`dabbler session start`.\n",
+  );
 }
 
 // --- migrate (a set-scoped repository, carried forward exactly once) ----------

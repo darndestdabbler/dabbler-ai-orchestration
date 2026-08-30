@@ -139,6 +139,20 @@ suite("rowMenuHelpers", () => {
     );
   });
 
+  test("a gap the PLAN declares is legitimate, unlike a gap in the ledger", () => {
+    // The projection publishes `nextSession` over the same rows; counting a
+    // planned row toward ledger contiguity made the two disagree on exactly
+    // the case the plan calls legitimate.
+    assert.strictEqual(
+      nextRunnableSessionNumber([
+        makeSession({ number: 1, status: "complete" }),
+        makeSession({ number: 2, status: "complete" }),
+        makeSession({ number: 4, status: "planned" }),
+      ]),
+      4,
+    );
+  });
+
   test("nextRunnableSessionNumber returns the first non-terminal session", () => {
     assert.strictEqual(
       nextRunnableSessionNumber([

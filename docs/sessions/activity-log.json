@@ -8083,6 +8083,149 @@
       "decider": "orchestrator",
       "headline": "Three config tests read a real env var, so the run of record measured the shell",
       "body": "The run of record for this session came back RED on the first attempt -- three\nfailures in `test/config.test.ts`, all of them asserting that\n`resolveTransport` returns the value an overlay declares. Nothing in this\nsession touched transport code, config, or the router at all.\n\nThe cause is the environment. `DABBLER_TRANSPORT=api` was set in the shell the\nsuite ran in, and the documented precedence is `--transport` flag, then the\n`DABBLER_TRANSPORT` environment variable, then `transport.profile` in\nconfiguration, then the `api` default. The environment variable outranks the\noverlay the test declares, so the test measured the shell rather than the code.\nRe-running the same file with the variable cleared: 47 passed, 0 failed.\n\n**Three tests in this suite pass or fail according to a variable nobody\ndeclared.** That is a defect in a framework whose entire claim is that the\nrecord is honest. A run of record is supposed to bind a verdict to a tree;\nthese three bind it to a shell. CI is green because CI happens not to set the\nvariable -- not because the tests are correct.\n\nIt is worse than an ordinary flake for two reasons. It is silent: the failure\nnames an assertion about configuration precedence, and nothing in the output\nsuggests the environment is the cause, so the honest reading of a red run is\n\"my change broke transport resolution\". And it is reachable by ordinary use --\n`dabbler bootstrap` persists `DABBLER_TRANSPORT=copilot-cli` at user scope as a\ndocumented side effect, so any operator who has run bootstrap has ambient state\nthat these tests read.\n\nAssigned to session 39, which owns verification that reports something other\nthan what is true. The fix is to make the resolution's inputs explicit to the\ntest rather than ambient -- the test declares an overlay and should be able to\ndeclare the environment beside it. Widening the suite command to scrub\nvariables would be the wrong repair: it hides the coupling instead of removing\nit, and the next ambient input would land the same way.\n\nWhat this session did: cleared the stray variable and re-ran the declared suite\ncommand verbatim, so the recorded command is the command that ran. The run of\nrecord for session 37 is that run, not the contaminated one. A failed run of\nrecord is not reusable proof and was not reused."
+    },
+    {
+      "sessionNumber": 38,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-30T13:47:42.990000-04:00",
+      "description": "Register; declare `--not-releasable`.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 38,
+      "stepNumber": 2,
+      "stepKey": "read-the-plan-s-headings-on",
+      "dateTime": "2026-08-30T13:47:42.990000-04:00",
+      "description": "Read the plan's headings on every projection **using the exact parser `session start` already uses**. A second heading interpretation would be the same rule stated twice.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 38,
+      "stepNumber": 3,
+      "stepKey": "a-session-the-plan-declares-and",
+      "dateTime": "2026-08-30T13:47:42.990000-04:00",
+      "description": "A session the plan declares and the ledger has not reached projects as **`planned`** \u2014 never `not-started`, which already means \"registered, not begun\".",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 38,
+      "stepNumber": 4,
+      "stepKey": "never-report-a-repository-complete-while",
+      "dateTime": "2026-08-30T13:47:42.990000-04:00",
+      "description": "Never report a repository complete while the plan declares sessions the ledger has not reached.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 38,
+      "stepNumber": 5,
+      "stepKey": "reconciliation-is-specified-not-assumed",
+      "dateTime": "2026-08-30T13:47:42.990000-04:00",
+      "description": "**Reconciliation is specified, not assumed:** duplicate numbers, gaps, renamed headings, a plan shorter than the ledger, and malformed headings each have a defined projection. \"Which session registers next\" is derived under those cases rather than assuming a contiguous plan.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 38,
+      "stepNumber": 6,
+      "stepKey": "session-close-prints-what-comes-next",
+      "dateTime": "2026-08-30T13:47:42.990000-04:00",
+      "description": "`session close` prints what comes next. The close is the moment the operator asks \"what now?\"",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 38,
+      "stepNumber": 7,
+      "stepKey": "the-work-explorer-renders-planned-rows",
+      "dateTime": "2026-08-30T13:47:42.990000-04:00",
+      "description": "The Work Explorer renders `planned` rows greyed, from the projection alone.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 38,
+      "stepNumber": 8,
+      "stepKey": "affected",
+      "dateTime": "2026-08-30T13:47:42.990000-04:00",
+      "description": "Affected; verify; full suite as `final-full`; close.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 38,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-30T13:47:43.014000-04:00",
+      "description": "Registered session 38 (claude-code).",
+      "status": "complete"
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 38,
+      "dateTime": "2026-08-30T13:47:58.746000-04:00",
+      "task": "Session 38 of 50 \u2014 The projection stops withholding the plan.\n\n`progress.ts` consults `session-plan.md` only when the ledger is absent, so\nonce `sessions.json` exists the plan is never read again. csv-model closed\nsession 2 of a nine-session plan and every indicator it has said the project\nwas finished. The ledger does grow to the plan at the next `session start`,\nso the framework is right \u2014 but nothing surfaces that, and the reassurance\nlives in a source comment.\n\nWhat this session does:\n\n1. Read the plan's `### Session <N>:` headings on every projection, not only\n   when the ledger is missing, using the exact parser `session start`\n   already uses. A second heading interpretation would be one rule stated\n   twice.\n2. Project a session the plan declares and the ledger has not reached as a\n   distinct `planned` state \u2014 never `not-started`, which already means\n   \"registered but not begun\".\n3. Never report a repository complete while its plan declares sessions the\n   ledger has not reached.\n4. Specify reconciliation rather than assume it: duplicate numbers, gaps,\n   renamed headings, a plan shorter than the ledger, and malformed headings\n   each get a defined projection, and \"which session registers next\" is\n   derived under those cases rather than assuming a contiguous plan.\n5. Have `session close` print what comes next \u2014 how many planned sessions\n   remain and which registers on the next `session start`.\n6. Render `planned` rows in the Work Explorer from the projection alone, so\n   the extension gains no new reader.\n\nTests: one per behaviour, in the router suite, plus the extension's own\nrendering test for the new row state.\n\nNot releasable: it publishes nothing.",
+      "releasable": false
+    },
+    {
+      "sessionNumber": 38,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-30T13:47:58.931000-04:00",
+      "description": "Register; declare `--not-releasable`.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 38,
+      "stepNumber": 2,
+      "stepKey": "read-the-plan-s-headings-on",
+      "dateTime": "2026-08-30T13:57:54.257000-04:00",
+      "description": "Read the plan's headings on every projection **using the exact parser `session start` already uses**. A second heading interpretation would be the same rule stated twice.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 38,
+      "stepNumber": 3,
+      "stepKey": "a-session-the-plan-declares-and",
+      "dateTime": "2026-08-30T13:57:54.455000-04:00",
+      "description": "A session the plan declares and the ledger has not reached projects as **`planned`** \u2014 never `not-started`, which already means \"registered, not begun\".",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 38,
+      "stepNumber": 4,
+      "stepKey": "never-report-a-repository-complete-while",
+      "dateTime": "2026-08-30T13:57:54.647000-04:00",
+      "description": "Never report a repository complete while the plan declares sessions the ledger has not reached.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 38,
+      "stepNumber": 5,
+      "stepKey": "reconciliation-is-specified-not-assumed",
+      "dateTime": "2026-08-30T13:57:54.811000-04:00",
+      "description": "**Reconciliation is specified, not assumed:** duplicate numbers, gaps, renamed headings, a plan shorter than the ledger, and malformed headings each have a defined projection. \"Which session registers next\" is derived under those cases rather than assuming a contiguous plan.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 38,
+      "stepNumber": 6,
+      "stepKey": "session-close-prints-what-comes-next",
+      "dateTime": "2026-08-30T13:57:55.005000-04:00",
+      "description": "`session close` prints what comes next. The close is the moment the operator asks \"what now?\"",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 38,
+      "stepNumber": 7,
+      "stepKey": "the-work-explorer-renders-planned-rows",
+      "dateTime": "2026-08-30T13:57:55.218000-04:00",
+      "description": "The Work Explorer renders `planned` rows greyed, from the projection alone.",
+      "status": "complete"
     }
   ]
 }

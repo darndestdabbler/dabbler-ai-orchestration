@@ -1,4 +1,4 @@
-# STATUS — 39 of 50 closed: the gates stop claiming what they did not check, and one session hit the cap
+# STATUS — 40 of 50 closed: task rows render at last, and two sessions in a row hit the round cap
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
 `experiment/verification-pipeline-v3` and `design/solution-decomposition`
@@ -38,6 +38,59 @@ are merged and finished. Earlier handoff text is in `docs/status-archive.md`.
 > and is now 36.
 
 ## Where things are
+
+**40 of 50 closed. Task rows render for the first time** — the Work Explorer's
+third level has been built and unexercised since the port, and the reason was
+not a missing feature.
+
+**Session 40 closed `REMEDIATED_AT_CAP`, the second in a row.** The round-3
+repair is unreviewed code: `declare` opening only step 1, and `start` no
+longer logging the register step. Session 41 should read that before building
+on it.
+
+- **The plan was wrong and was amended before any code was written.** D240 was
+  right: `dabbler session start` has always seeded a session's steps into
+  `activity-log.json` — one `plan-step` row per numbered step, with a stable
+  key — and `session log` moves them. `buildTaskRows` folded
+  `approved-plan.json` against `step-execution.jsonl` instead, and nothing in
+  the lifecycle writes either. **Two mechanisms for one purpose, and the tree
+  read the one nobody wrote.** The planned task-file schema and `session step`
+  verb were withdrawn on the record; the estimate went from 18 tests to 10.
+- **The framework owns two bookends and no more.** `declare` opens the first
+  step; recording the run of record closes the last. Everything between is
+  `session log`, which already exists, already refuses a step it cannot
+  resolve, and already journals.
+- **`approved-plan.json` keeps its own job** — envelope, risk flags, amendment
+  ledger for verification scope — and stops being the tree's source. The
+  `ApprovedPlanReader` seam that reached it is retired.
+- **D244:** `session start` no longer logs the register step. It used to write
+  it complete, on the reasoning that the call IS the register step and the
+  machine should record what it did — principle (g), and right in general. But
+  a step `start` has moved is a step `declare` cannot open. Registration is
+  still recorded in `sessions.json`, which is where a reader looks for it.
+
+> **A dispute was filed and UPHELD against it, and the adjudication is the
+> thing to carry.** `declare` had been completing step 1 and opening step 2,
+> because step 1 reads "Register; declare" and is genuinely finished once
+> declare returns. The verifier's answer: *semantic desirability cannot
+> override an explicit transition requirement — if the requirement is
+> undesirable, amend the plan rather than implement a different state machine
+> quietly.* This session had already amended its plan once and then built
+> something its own amended text did not describe, which is a unilateral
+> substitution. Session 36 learned the same thing and it did not transfer.
+>
+> **The dispute also cost the round that would have reviewed the fix.** Filing
+> it changed no code, so round 3's delta-only review had nothing to look at
+> and re-raised three nits that round 2 had already confirmed resolved. Two
+> sessions have now landed unreviewed in a row.
+
+**Two sessions at the cap is worth the operator's attention.** The cap is
+repository policy (`verificationRoundCap`), not a session's to change, and
+nothing here suggests changing it — but sessions 39 and 40 both spent rounds
+on the same shape of mistake: defending an interpretation instead of either
+delivering the stated requirement or amending it first.
+
+## Where things were at session 39
 
 **Session 39 closed `REMEDIATED_AT_CAP`, not `VERIFIED`, and that is the first
 thing to know about it.** Four rounds; round 3's repair was made and the cap

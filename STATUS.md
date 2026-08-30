@@ -1,10 +1,12 @@
-# STATUS — sessions 37–50 are planned and the first is closed: the framework turns toward the operator
+# STATUS — the operator block is running: 38 of 50 closed, and the record no longer says a planned project is finished
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
 `experiment/verification-pipeline-v3` and `design/solution-decomposition`
 are merged and finished. Earlier handoff text is in `docs/status-archive.md`.
 
-> **Recorded, 2026-08-30.** Session 37's deliverables are decisions
+> **Recorded, 2026-08-30.** Session 38's deliverable is the planned-session
+> projection; it recorded no decisions, and its three lessons are in the
+> section below. Session 37's deliverables are decisions
 > **D240–D243** in `docs/sessions/decisions-log.md`, and its survey is
 > `docs/extension-dx-survey.md`. Three of the four were found by *running*
 > the session rather than by planning it, and each one changes a later
@@ -36,6 +38,60 @@ are merged and finished. Earlier handoff text is in `docs/status-archive.md`.
 > and is now 36.
 
 ## Where things are
+
+**Sessions 37 and 38 of 50 are closed VERIFIED.** The ledger reads 38 of 50,
+and `dabbler status` now says so for the right reason rather than by accident.
+
+- **Session 38 closed the defect `csv-model` found and the framework could not
+  see.** `progress.ts` consulted `session-plan.md` only when the ledger was
+  absent, so a planning session whose whole deliverable was new headings closed
+  on a record that said the project was finished. The plan is now read on every
+  projection; a session it declares that the ledger has not reached projects as
+  **`planned`**, `totalSessions` counts those rows, and the close prints what
+  comes next. Two rounds: round 1 raised one Major and two nits and **all three
+  were correct**.
+- **The Major is the one to remember.** This session defined `not-started` as
+  "registered, and not begun" and then left plan-only repositories — the state
+  every project is in before its first `session start` — still saying exactly
+  that for sessions nothing had registered. All twelve new tests called
+  `registerSessionStart` first, so the path was uncovered. The verifier had
+  `agency: none` and could not read the tree; it inferred the gap from the
+  guard condition and the shape of the tests.
+- **`planned` cannot be stamped where it would seem natural.**
+  `validateInvariants` accepts only the ledger's four statuses *and* requires
+  contiguous numbering, and it runs over the derived view — so the state is set
+  in the projection loop, after validation. Stamping it in `sessionsFromPlan`
+  makes a fresh repository report an invariant violation instead of its
+  sessions. The schema gained a separate `projectedSessionStatus` rather than
+  widening the vocabulary shared with tasks.
+- **The existing suite caught a regression this session introduced.** The first
+  implementation appended plan rows over a ledger that was present and
+  unparseable — replacing a broken record with a cheerful guess, which is the
+  distinction `ledgerExists` exists to keep. The test that names it failed and
+  was right.
+
+> **A trap this session hit and the next one should not.** `dabbler` runs from
+> `packages/router/dist/`, which is gitignored and rebuilt only on demand. A
+> session that edits router source and then runs a `dabbler` verb **runs the
+> previous build**. Session 38's own close printed a line from pre-remediation
+> code and looked like a defect in work that was already committed and correct.
+> It was harmless here because the stale code was a message. It would not be
+> harmless if the change were to a gate: the close would have judged the
+> session with the logic the session had just replaced. **Run `npm run build -w
+> dabbler-ai-router` after touching router source and before running any verb
+> that reads it.**
+
+**Owed before session 41, from session 37 (D242):** `tools/` is covered by no
+declared suite, so `dabbler affected` selects zero tests for an extension-only
+change. Sessions 41, 42, 43 and 47 are all extension-heavy. Session 39 owes the
+declaration.
+
+**Also owed to session 40 (D240):** `session start` already seeds a session's
+plan steps and `session log` ticks them; what is missing is the join to the
+projection the tree renders. Session 40 must re-derive its approach from both
+mechanisms before writing code.
+
+## Where things were at session 37
 
 **Session 37 of 50 is closed, and the block it opens is the operator's.**
 Sessions 37–50 turn the framework toward the person operating it, planned

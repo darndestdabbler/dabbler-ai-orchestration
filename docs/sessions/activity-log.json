@@ -8698,6 +8698,123 @@
       "dateTime": "2026-08-30T15:52:04.140000-04:00",
       "description": "Affected; verify; full suite as `final-full`; close.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 42,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-30T15:52:31.960000-04:00",
+      "description": "Register; declare `--not-releasable`.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 42,
+      "stepNumber": 2,
+      "stepKey": "the-container-becomes-ai-orchestration",
+      "dateTime": "2026-08-30T15:52:31.960000-04:00",
+      "description": "The container becomes **`AI Orchestration`**; the views become **`Solution Explorer`** and **`Work Explorer`**. Today a container called AI Work Explorer holds a view of the same name.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 42,
+      "stepNumber": 3,
+      "stepKey": "viewswelcome-on-the-solution-explorer",
+      "dateTime": "2026-08-30T15:52:31.960000-04:00",
+      "description": "`viewsWelcome` on the Solution Explorer: what it will show once there is something to show, and a button that scaffolds it.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 42,
+      "stepNumber": 4,
+      "stepKey": "bootstrap-scaffolds-a-solution",
+      "dateTime": "2026-08-30T15:52:31.960000-04:00",
+      "description": "`bootstrap` scaffolds a `solution.yaml` \u2014 one component, named for the repository \u2014 and writes the first projection, so the view has content from the first minute rather than after a verb nobody knew to run.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 42,
+      "stepNumber": 5,
+      "stepKey": "amended-by-session-37-s-survey",
+      "dateTime": "2026-08-30T15:52:31.960000-04:00",
+      "description": "**Amended by session 37's survey** (`docs/extension-dx-survey.md`): - **F5** \u2014 neither view has a `viewsWelcome`, so a new project shows two blank panels and no explanation. This is `csv-model` item 4, and step 3 above is its fix; the Work Explorer needs one too. - **F9** \u2014 a projection failure reaches the operator as `projection failed: <raw error>` (`utils/projection.ts:104-112`). It says what broke and never what to do about it.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 42,
+      "stepNumber": 6,
+      "stepKey": "affected",
+      "dateTime": "2026-08-30T15:52:31.960000-04:00",
+      "description": "Affected; verify; full suite as `final-full`; close.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 42,
+      "dateTime": "2026-08-30T15:52:46.447000-04:00",
+      "task": "Session 42 of 50 \u2014 The panes say what they are, and the Solution Explorer\nlights up.\n\nToday a container called \"AI Work Explorer\" holds a view of the same name\nbeside one called \"Solution Explorer\", which reads as a bug. And the\nSolution Explorer is empty in every new project with nothing to explain\nwhy: session 37's survey found no `viewsWelcome` on either view, which is\ncsv-model's item 4.\n\nThe RACI marks that row a live defect on the grounds that the projection\nhas had no writer since the Python deletion. That is not the case --\n`writeProjection` is TypeScript and six sites call it. The tree is empty\nfor three cheaper reasons, and this session addresses all three.\n\nWhat this session does:\n\n1. The container becomes \"AI Orchestration\"; the views become \"Solution\n   Explorer\" and \"Work Explorer\".\n2. `viewsWelcome` on both views: a sentence on what the view will show once\n   there is something to show, and a button that scaffolds it.\n3. `bootstrap` scaffolds a `solution.yaml` for the repository it is setting\n   up -- one component, named for the repository -- and writes the first\n   projection, so the view has content from the first minute rather than\n   after a verb nobody knew to run.\n4. The two findings session 37's survey assigned here:\n   - F5: neither view has an empty state.\n   - F9: a projection failure reaches the operator as `projection failed:\n     <raw error>`, which says what broke and never what to do.\n\nNot releasable: it publishes nothing.",
+      "releasable": false
+    },
+    {
+      "sessionNumber": 42,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-30T15:52:46.474000-04:00",
+      "description": "Register; declare `--not-releasable`.",
+      "status": "in-progress"
+    },
+    {
+      "sessionNumber": 42,
+      "stepNumber": 2,
+      "stepKey": "the-container-becomes-ai-orchestration",
+      "dateTime": "2026-08-30T15:54:10.580000-04:00",
+      "description": "The container becomes **`AI Orchestration`**; the views become **`Solution Explorer`** and **`Work Explorer`**. Today a container called AI Work Explorer holds a view of the same name.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 42,
+      "stepNumber": 3,
+      "stepKey": "viewswelcome-on-the-solution-explorer",
+      "dateTime": "2026-08-30T15:54:10.775000-04:00",
+      "description": "`viewsWelcome` on the Solution Explorer: what it will show once there is something to show, and a button that scaffolds it.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 42,
+      "stepNumber": 4,
+      "stepKey": "bootstrap-scaffolds-a-solution",
+      "dateTime": "2026-08-30T15:54:10.970000-04:00",
+      "description": "`bootstrap` scaffolds a `solution.yaml` \u2014 one component, named for the repository \u2014 and writes the first projection, so the view has content from the first minute rather than after a verb nobody knew to run.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 42,
+      "stepNumber": 5,
+      "stepKey": "amended-by-session-37-s-survey",
+      "dateTime": "2026-08-30T15:54:11.172000-04:00",
+      "description": "**Amended by session 37's survey** (`docs/extension-dx-survey.md`): - **F5** \u2014 neither view has a `viewsWelcome`, so a new project shows two blank panels and no explanation. This is `csv-model` item 4, and step 3 above is its fix; the Work Explorer needs one too. - **F9** \u2014 a projection failure reaches the operator as `projection failed: <raw error>` (`utils/projection.ts:104-112`). It says what broke and never what to do about it.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 42,
+      "stepNumber": 6,
+      "stepKey": "affected",
+      "dateTime": "2026-08-30T15:58:34.139000-04:00",
+      "description": "Affected; verify; full suite as `final-full`; close.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 42,
+      "stepNumber": 6,
+      "stepKey": "affected",
+      "dateTime": "2026-08-30T15:58:34.579000-04:00",
+      "description": "Affected; verify; full suite as `final-full`; close.",
+      "status": "complete"
     }
   ]
 }

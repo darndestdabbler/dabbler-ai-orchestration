@@ -43,7 +43,7 @@
       "activitybar": [
         {
           "id": "dabblerSessionSetsContainer",
-          "title": "AI Work Explorer",
+          "title": "AI Orchestration",
           "icon": "media/activity-bar-icon.svg"
         }
       ]
@@ -57,8 +57,8 @@
         },
         {
           "id": "dabblerWorkExplorerTree",
-          "name": "AI Work Explorer",
-          "contextualTitle": "AI Work Explorer"
+          "name": "Work Explorer",
+          "contextualTitle": "Work Explorer"
         }
       ]
     },
@@ -320,6 +320,18 @@
             }
           }
         ]
+      }
+    ],
+    "viewsWelcome": [
+      {
+        "view": "dabblerSolutionTree",
+        "contents": "This shows what the project is being built FROM: its components, what each one promises, and who breaks when one of them changes.\n\nIt fills in once the repository declares a solution.\n[Set Up New Project](command:dabbler.setupNewProject)",
+        "when": "true"
+      },
+      {
+        "view": "dabblerWorkExplorerTree",
+        "contents": "This shows the work: which session is running, which step it is on, and anything waiting on you.\n\nNothing has run here yet.\n[Set Up New Project](command:dabbler.setupNewProject)",
+        "when": "true"
       }
     ]
   },

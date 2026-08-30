@@ -100,16 +100,52 @@ export async function projectRepository(
     const result = await router.progress({ repoRoot, sessionsDir });
     return result.ok
       ? { payload: result.value, error: null }
-      : { payload: null, error: result.message.trim() || "projection failed" };
+      : { payload: null, error: actionable(result.message.trim()) };
   } catch (err) {
     return {
       payload: null,
       error:
         err instanceof RouterUnavailableError
           ? err.message
-          : `projection failed: ${err instanceof Error ? err.message : String(err)}`,
+          : actionable(err instanceof Error ? err.message : String(err)),
     };
   }
+}
+
+/**
+ * A failure the operator can act on, rather than the exception's own words.
+ *
+ * Survey finding F9: this row read `projection failed: <raw error>`, which
+ * says what broke and never what to do -- and it is rendered above the tree,
+ * where the operator is already looking for what to do next. The mapping is
+ * deliberately small: three states a repository actually reaches, and
+ * everything else keeps the underlying sentence, because a message invented
+ * for a fault nobody has seen is worse than the fault's own words.
+ */
+function actionable(message: string): string {
+  const text = message.trim();
+  if (!text) return "The session record could not be read. Nothing was changed.";
+  if (/sessions\.json/i.test(text) && /parse|read|json/i.test(text)) {
+    return (
+      "The sessions ledger is present but will not parse, so no sessions can " +
+      "be listed. Open it from the repository row and fix the JSON, or " +
+      "restore it from git -- restore sessions.json ONLY, never the activity " +
+      `log. (${text})`
+    );
+  }
+  if (/not (inside )?a git repository/i.test(text)) {
+    return (
+      "This folder is not a git repository, so there is no record to read. " +
+      "Run Set Up New Project, which initialises one."
+    );
+  }
+  if (/no such file|enoent/i.test(text)) {
+    return (
+      "This repository has not been set up yet. Run Set Up New Project; " +
+      `nothing is installed. (${text})`
+    );
+  }
+  return `The session record could not be read: ${text}`;
 }
 
 export type ProjectRepositoryFn = (

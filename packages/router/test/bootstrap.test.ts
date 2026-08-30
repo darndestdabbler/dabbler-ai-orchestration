@@ -24,12 +24,14 @@ import {
   renderProjectConfig,
   resolveBootstrapTransport,
   scaffoldBootstrapSessions,
+  scaffoldSolutionManifest,
   scaffoldProjectConfig,
   writeInstructionFiles,
 } from "../src/bootstrap/index.ts";
 import { TRANSPORT_COPILOT_CLI, TRANSPORT_ENV_VAR } from "../src/config.ts";
 import { makeProject, makeSandboxRepo, makeTempDir, removeTempDirs } from "./support/fixtures.ts";
 import { bootstrapVerb } from "../src/cli/bootstrap.ts";
+import { load } from "../src/solution.ts";
 import {
   ID_GIT_REMOTE,
   blockingDecisions,
@@ -486,5 +488,39 @@ describe("the remote question", () => {
     const row = raiseRemoteDecision(repo, { hasRemote: false });
     expect(row?.["severity"]).toBe("advisory");
     expect(blockingDecisions(repo)).toHaveLength(0);
+  });
+});
+
+describe("what the Solution Explorer has to render", () => {
+  it("scaffolds a one-component manifest, which is what a fresh repo IS", () => {
+    // The view was empty in every new project and explained nothing --
+    // csv-model item 4. Three things caused that and none was a missing
+    // writer; this is the manifest half.
+    const repo = makeProject();
+    execFileSync("git", ["init", "-q", "-b", "main"], { cwd: repo });
+    execFileSync("git", ["config", "user.email", "t@t"], { cwd: repo });
+    execFileSync("git", ["config", "user.name", "t"], { cwd: repo });
+    expect(scaffoldSolutionManifest(repo)).toBe(join(repo, "solution.yaml"));
+    const solution = load(repo);
+    expect(solution.components).toHaveLength(1);
+    expect(solution.components[0].kind).toBe("integration");
+  });
+
+  it("leaves a manifest the project already wrote alone", () => {
+    const repo = makeProject();
+    writeFileSync(join(repo, "solution.yaml"), "# mine\n", "utf8");
+    expect(scaffoldSolutionManifest(repo)).toBeNull();
+    expect(readFileSync(join(repo, "solution.yaml"), "utf8")).toBe("# mine\n");
+  });
+
+  it("writes the first projection, so the tree has content before any verb", async () => {
+    const repo = makeProject();
+    execFileSync("git", ["init", "-q", "-b", "main"], { cwd: repo });
+    execFileSync("git", ["config", "user.email", "t@t"], { cwd: repo });
+    execFileSync("git", ["config", "user.name", "t"], { cwd: repo });
+    await bootstrapVerb(["--project-dir", repo, "--no-transport-detect"]);
+    expect(existsSync(join(repo, ".dabbler", "solution", "projection.json"))).toBe(
+      true,
+    );
   });
 });

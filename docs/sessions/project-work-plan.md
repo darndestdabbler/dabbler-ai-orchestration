@@ -77,7 +77,7 @@ it.
 | 39 | Verification stops lying, and an unanswered gap stops the close | no | 2026-08-30 |
 | 40 | Task rows — a structured declaration, a framework-owned state machine | no | 2026-08-30 |
 | 41 | Setup owns the runway | no | 2026-08-30 |
-| 42 | The panes say what they are, and the Solution Explorer lights up | — | not declared |
+| 42 | The panes say what they are, and the Solution Explorer lights up | no | 2026-08-30 |
 | 43 | Liveness, and one place the operator looks | — | not declared |
 | 44 | `solution-dependencies.json` — the edge, never the pin | — | not declared |
 | 45 | Resolution modes, inside the declare-and-check line | — | not declared |
@@ -1335,5 +1335,40 @@ What this session does:
      not it; Close carries no decision at all.
 
 Both suites are declared now, so this session owes a run of record for each.
+
+Not releasable: it publishes nothing.
+
+### Session 42 — The panes say what they are, and the Solution Explorer lights up
+
+**Releasable: no.**
+
+Session 42 of 50 — The panes say what they are, and the Solution Explorer
+lights up.
+
+Today a container called "AI Work Explorer" holds a view of the same name
+beside one called "Solution Explorer", which reads as a bug. And the
+Solution Explorer is empty in every new project with nothing to explain
+why: session 37's survey found no `viewsWelcome` on either view, which is
+csv-model's item 4.
+
+The RACI marks that row a live defect on the grounds that the projection
+has had no writer since the Python deletion. That is not the case --
+`writeProjection` is TypeScript and six sites call it. The tree is empty
+for three cheaper reasons, and this session addresses all three.
+
+What this session does:
+
+1. The container becomes "AI Orchestration"; the views become "Solution
+   Explorer" and "Work Explorer".
+2. `viewsWelcome` on both views: a sentence on what the view will show once
+   there is something to show, and a button that scaffolds it.
+3. `bootstrap` scaffolds a `solution.yaml` for the repository it is setting
+   up -- one component, named for the repository -- and writes the first
+   projection, so the view has content from the first minute rather than
+   after a verb nobody knew to run.
+4. The two findings session 37's survey assigned here:
+   - F5: neither view has an empty state.
+   - F9: a projection failure reaches the operator as `projection failed:
+     <raw error>`, which says what broke and never what to do.
 
 Not releasable: it publishes nothing.

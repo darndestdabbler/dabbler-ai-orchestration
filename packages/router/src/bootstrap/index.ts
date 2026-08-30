@@ -46,6 +46,8 @@ import {
   SHARED_BODY,
 } from "./templates.ts";
 
+import { MANIFEST_RELPATH } from "../solution.ts";
+
 export * from "./templates.ts";
 export * from "./detect.ts";
 export * from "./env.ts";
@@ -247,4 +249,55 @@ export function writeInstructionFiles(
     written.push(path);
   }
   return written;
+}
+
+/**
+ * The one-component solution a fresh repository is, written so the Solution
+ * Explorer has something true to show from the first minute.
+ *
+ * The view was empty in every new project and explained nothing, which is
+ * `csv-model`'s item 4. Three things caused that and none of them was a
+ * missing writer: nothing scaffolded a manifest, no extension-facing path
+ * triggered a projection write, and the view had no welcome state. This is
+ * the first.
+ *
+ * One component, named for the repository, at step 1. It is a real
+ * declaration rather than a placeholder -- a repository that has not been
+ * decomposed yet IS one component -- so the first thing an operator does to
+ * it is split it, not delete it.
+ */
+export function scaffoldSolutionManifest(projectDir: string): string | null {
+  const path = join(projectDir, MANIFEST_RELPATH);
+  if (existsSync(path)) return null;
+  const name = basename(resolve(projectDir)) || "solution";
+  const text = [
+    "# What this project is built FROM, as opposed to the work of building",
+    "# it. The Solution Explorer renders this joined to live state.",
+    "#",
+    "# One component to start with, because a repository nobody has",
+    "# decomposed yet IS one component. Step 2 of the six-step workflow is",
+    "# where it becomes several; until then this is true rather than a",
+    "# placeholder.",
+    "#",
+    "# `dependsOn` is the only direction anyone writes. Who depends on a",
+    "# component is derived from it -- two directions kept by hand disagree",
+    "# eventually, and the disagreement is silent.",
+    "solution:",
+    `  name: ${name}`,
+    `  title: ${name}`,
+    "  step: plan",
+    "",
+    "components:",
+    `  - name: ${name}`,
+    "    kind: integration",
+    `    title: ${name}`,
+    "    step: plan",
+    "",
+  ].join("\n");
+  try {
+    writeFileSync(path, text, "utf8");
+  } catch {
+    return null;
+  }
+  return path;
 }

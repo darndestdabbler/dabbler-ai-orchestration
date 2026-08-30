@@ -217,8 +217,26 @@ export function raiseOwed(repoRoot: string, options: RaiseOptions): Row | null {
     );
   }
   const current = foldOwed(readOwed(repoRoot)).get(options.id);
-  if (current !== undefined && current["event"] === EVENT_RAISED) return null;
+  // Answered is settled: a different answer is a new question, and rewriting
+  // the brief under one that has been decided would change what the operator
+  // is recorded as having agreed to.
   if (current !== undefined && current["event"] === EVENT_ANSWERED) return null;
+  if (current !== undefined && current["event"] === EVENT_RAISED) {
+    // Idempotent on the QUESTION, not on the id. A brief corrected in code
+    // never reached a decision already on disk, so the operator kept reading
+    // the wrong one -- including, in the session that found this, a
+    // recommendation the code had since reversed. An open decision whose
+    // brief has changed is superseded and re-raised, which leaves both on
+    // the record and puts the current one in front of the reader.
+    if (sameBrief(current, options)) return null;
+    supersedeOwed(
+      repoRoot,
+      options.id,
+      "the brief changed; re-raised so the question on the record is the " +
+        "one the framework is actually asking",
+      options.sessionNumber ?? null,
+    );
+  }
   return append(repoRoot, {
     id: options.id,
     event: EVENT_RAISED,
@@ -298,6 +316,38 @@ export function answerOwed(
 }
 
 /** Retire a question the repository outgrew before anyone answered it. */
+/**
+ * Whether a raised row asks what this brief asks.
+ *
+ * The parts a reader acts on: the question, what is known, the options and
+ * their consequences, and the recommendation. Not the timestamp, and not the
+ * session that happened to raise it.
+ */
+function sameBrief(current: Row, options: RaiseOptions): boolean {
+  const shape = (
+    question: unknown,
+    determined: unknown,
+    recommendation: unknown,
+    choices: readonly { label: string; consequence: string }[],
+  ): string =>
+    JSON.stringify([
+      String(question ?? ""),
+      String(determined ?? ""),
+      String(recommendation ?? ""),
+      choices.map((choice) => [choice.label, choice.consequence]),
+    ]);
+  const raised = (Array.isArray(current["options"]) ? current["options"] : []).map(
+    (entry) => ({
+      label: String((entry as Row)["label"]),
+      consequence: String((entry as Row)["consequence"]),
+    }),
+  );
+  return (
+    shape(current["question"], current["determined"], current["recommendation"], raised) ===
+    shape(options.question, options.determined, options.recommendation ?? "", options.options)
+  );
+}
+
 export function supersedeOwed(
   repoRoot: string,
   id: string,

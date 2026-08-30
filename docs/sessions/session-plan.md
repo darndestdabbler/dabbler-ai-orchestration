@@ -2166,6 +2166,60 @@ the plan.*
 
 ---
 
+### Session 51 of 52: What the field trial found, and nothing else
+
+*Amended into the plan by session 50, which is the session that found them.
+Bounded deliberately: a remediation session that grows is a second feature
+session wearing a bug fix's name.*
+
+The trial's full record is `docs/field-trial-50.md`. Two of its four findings
+were fixed where they were found, because both were live defects in what the
+operator reads: a corrected brief that never replaced the one on disk, and a
+verb missing from its own help. These two remain.
+
+1. Register; declare `--not-releasable`.
+2. **F-50-3: an owed row does not show its state.** `dabbler owed list` prints
+   the question, the options and the recommendation, and not whether the
+   decision is open, answered or superseded. A reader cannot tell which rows
+   are still waiting on them, which is what the list is for.
+3. **F-50-4: `dabbler status` carries no planned sessions.** Session 38 put
+   `plannedSessions` and `nextSession` in the projection the extension reads;
+   the CLI reading of the same repository has neither, so `csv-model` item 9 is
+   closed in one surface and open in the other. One fact, two readings, and
+   only one of them true — which is the shape this codebase refuses everywhere
+   else.
+4. Affected; verify; full suite as `final-full`; close.
+
+Est. 6 tests. **Nothing else.** Anything the trial found that is not F-50-3 or
+F-50-4 is a new session, not a widening of this one.
+
+---
+
+### Session 52 of 52: The half of the trial that needs a published router
+
+*Blocked on the operator, and that is the correct state rather than a delay to
+apologise for. It runs after the publication decision is answered and CI is
+green; until then it cannot start, and session 50 did not pretend otherwise.*
+
+1. Register; declare `--not-releasable`.
+2. `dabbler release --verify-install` against the public registry, recorded as
+   evidence.
+3. Acceptance criteria **1, 2 and 5** from a clean VS Code profile and a fresh
+   clone: the Solution Explorer rendering the csv pipeline's repositories from
+   their declarations with drift shown, the Work Explorer showing completed,
+   current and planned sessions with the current session's tasks moving, and
+   every `csv-model` feedback item carrying a linked test, a recorded release
+   verification, or a dated deferred issue with an owner.
+4. **Amend the plan again with what it finds.** The same rule as session 50:
+   a trial with no route to fix what it finds is a demonstration.
+5. Affected; verify; full suite as `final-full`; close.
+
+**Precondition:** `dabbler owed list` shows `publication` answered, and
+`dabbler release --verify-install` passes. Neither is this session's to
+arrange.
+
+---
+
 ## Acceptance criterion for sessions 37–50
 
 **Mechanical, and checked in session 50.** From a clean VS Code profile, with

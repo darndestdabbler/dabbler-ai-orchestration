@@ -9393,6 +9393,138 @@
       "dateTime": "2026-08-30T18:08:06.752000-04:00",
       "description": "Register; declare **`--releasable`**.",
       "status": "in-progress"
+    },
+    {
+      "sessionNumber": 50,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-30T18:22:31.898000-04:00",
+      "description": "Register; declare `--not-releasable`.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 50,
+      "stepNumber": 2,
+      "stepKey": "walk-csv-model-and-its-two",
+      "dateTime": "2026-08-30T18:22:31.898000-04:00",
+      "description": "Walk `csv-model` and its two downstream repositories end to end, from a clean profile and a registry install.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 50,
+      "stepNumber": 3,
+      "stepKey": "run-the-acceptance-exercise-below-and",
+      "dateTime": "2026-08-30T18:22:31.898000-04:00",
+      "description": "Run the acceptance exercise below and record every observed failure.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 50,
+      "stepNumber": 4,
+      "stepKey": "amend-the-plan-with-bounded-remediation",
+      "dateTime": "2026-08-30T18:22:31.898000-04:00",
+      "description": "**Amend the plan with bounded remediation sessions for what it finds.** A trial with no route to fix what it finds is a demonstration, not a trial.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 50,
+      "stepNumber": 5,
+      "stepKey": "consolidate-csv-model-s-docs-feedback",
+      "dateTime": "2026-08-30T18:22:31.898000-04:00",
+      "description": "Consolidate `csv-model`'s `docs/feedback/`: which items closed, which remain with a dated owner, which turned out to be right about something else.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 50,
+      "stepNumber": 6,
+      "stepKey": "affected",
+      "dateTime": "2026-08-30T18:22:31.898000-04:00",
+      "description": "Affected; verify; full suite as `final-full`; close.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 50,
+      "stepNumber": 7,
+      "stepKey": "the-solution-explorer-renders-all-three",
+      "dateTime": "2026-08-30T18:22:31.898000-04:00",
+      "description": "The Solution Explorer renders all three repositories of the csv pipeline from `solution-dependencies.json`, with every declared edge resolved and any drift shown.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 50,
+      "stepNumber": 8,
+      "stepKey": "the-work-explorer-shows-the-repository",
+      "dateTime": "2026-08-30T18:22:31.898000-04:00",
+      "description": "The Work Explorer shows the repository's completed, current and planned sessions, and the current session's tasks moving through Not Started / In Progress / Done.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 50,
+      "stepNumber": 9,
+      "stepKey": "every-owed-decision-is-visible-with",
+      "dateTime": "2026-08-30T18:22:31.898000-04:00",
+      "description": "Every owed decision is visible with its default and its state, in the same place that shows what is in flight and how long since it moved.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 50,
+      "stepNumber": 10,
+      "stepKey": "no-gate-reports-pass-for-a",
+      "dateTime": "2026-08-30T18:22:31.898000-04:00",
+      "description": "No gate reports `PASS` for a precondition it cannot see, and a repository with no declared suite cannot close a code-changing session.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 50,
+      "stepNumber": 11,
+      "stepKey": "all-nine-csv-model-feedback-items",
+      "dateTime": "2026-08-30T18:22:31.898000-04:00",
+      "description": "**All nine `csv-model` feedback items have a linked test, a recorded release verification, or a dated deferred issue with an owner.** Prose classification does not satisfy this.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 50,
+      "stepNumber": 12,
+      "stepKey": "nothing-in-the-block-asked-the",
+      "dateTime": "2026-08-30T18:22:31.898000-04:00",
+      "description": "**Nothing in the block asked the operator to run a command.** Every git operation, config write and publication was executed by the framework; where a decision was required it arrived as a brief and the framework executed the answer.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 50,
+      "stepNumber": 13,
+      "stepKey": "a-repository-that-publishes-had-its",
+      "dateTime": "2026-08-30T18:22:31.898000-04:00",
+      "description": "A repository that publishes had its `packaging` block written for it, and the credential appears nowhere but as a name.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 50,
+      "dateTime": "2026-08-30T18:22:32.293000-04:00",
+      "task": "Affected; verify; full suite as final-full; close",
+      "releasable": false
+    },
+    {
+      "sessionNumber": 50,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-30T18:22:32.320000-04:00",
+      "description": "Register; declare `--not-releasable`.",
+      "status": "in-progress"
     }
   ]
 }

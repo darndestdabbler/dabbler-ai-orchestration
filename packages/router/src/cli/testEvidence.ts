@@ -50,6 +50,14 @@ const EXIT_USAGE = 2;
 
 function usage(): string {
   return [
+    "usage: dabbler test-evidence {record,run} [-h] [--sessions-dir SESSIONS_DIR]",
+    "",
+    "  run     run the declared suite HERE and record it, timed by the",
+    "          framework. A run of record in a repository that has used",
+    "          source mode needs that: a duration reported after the fact",
+    "          cannot show when the run happened.",
+    "  record  file a run you executed yourself.",
+    "",
     "usage: dabbler test-evidence record [-h] [--sessions-dir SESSIONS_DIR]",
     "                                    --suite SUITE",
     `                                    --stage {${STAGES.join(",")}}`,

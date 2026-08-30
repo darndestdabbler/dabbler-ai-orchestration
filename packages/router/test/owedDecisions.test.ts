@@ -409,6 +409,44 @@ describe("a suites list that sits at its key's own column", () => {
   });
 });
 
+describe("a brief that changed after it was raised", () => {
+  it("re-raises it, so the reader sees the question actually being asked", () => {
+    // Idempotence on the ID meant a brief corrected in code never replaced
+    // one already on disk. It was live: a recommendation was reversed and
+    // the list went on printing the old one, advising the operator against
+    // the thing the session existed to do.
+    const { repo } = makeSandboxRepo();
+    raiseOwed(repo, BRIEF);
+    const again = raiseOwed(repo, {
+      ...BRIEF,
+      recommendation: "local-only",
+    });
+    expect(again).not.toBeNull();
+    const current = currentDecisions(repo).find((row) => row["id"] === BRIEF.id);
+    expect(current?.["recommendation"]).toBe("local-only");
+    expect(current?.["state"]).toBe(STATE_OPEN);
+  });
+
+  it("stays silent when the brief is the same one", () => {
+    // Otherwise every run of a verb that raises would append a row, which is
+    // the per-session re-ask this record exists to end.
+    const { repo } = makeSandboxRepo();
+    raiseOwed(repo, BRIEF);
+    expect(raiseOwed(repo, BRIEF)).toBeNull();
+  });
+
+  it("leaves an answered decision alone, however the brief changes", () => {
+    // Rewriting a brief under a decision somebody made changes what they are
+    // recorded as having agreed to.
+    const { repo } = makeSandboxRepo();
+    raiseOwed(repo, BRIEF);
+    answerOwed(repo, BRIEF.id, "attach");
+    expect(raiseOwed(repo, { ...BRIEF, question: "Something else entirely?" })).toBeNull();
+    const current = currentDecisions(repo).find((row) => row["id"] === BRIEF.id);
+    expect(current?.["question"]).toBe(BRIEF.question);
+  });
+});
+
 describe("asking how a repository publishes", () => {
   it("asks the feed and the credential's name as two questions", () => {
     // They fail differently: a wrong feed sends a release somewhere real, a

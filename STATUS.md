@@ -1,8 +1,26 @@
-# STATUS — 55 of 57 closed. The task rows move themselves
+# STATUS — 55 of 61 closed. Next: the driver set (56–59)
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
 `experiment/verification-pipeline-v3` and `design/solution-decomposition`
 are merged and finished. Earlier handoff text is in `docs/status-archive.md`.
+
+> **Recorded, 2026-08-31, evening.** The long-haul direction below was
+> **proven the same day** in a standalone spike (`D:\Projects\dabbler-driver-spike`):
+> a scripted five-step session driven by the framework, with Haiku on Claude
+> Code and Luna on the Copilot seat, in an *await* variant (the engine blocks
+> on a signal file) and a *resume* variant (the driver invokes the engine per
+> step with `--continue`). All four trials passed with no human nudge; one
+> seat session per Copilot run; ~5 premium requests per driven run. The
+> operator chose **resume**, saw the engine's live output preserved
+> (`--engine-output stream|quiet`, identical transcripts), and agreed the
+> interrupt is the driver ending the invocation and re-invoking with
+> `--continue` and the reason. **The plan is reordered:** sessions **56–59**
+> are the driver set (schemas and the report verb; `session drive`; the
+> engine adapter with stream and interrupt; Start becomes the launch plus the
+> developer's guide), the deck is **60** and the publication trial **61**. The
+> spike found two things worth carrying: an engine CLI must be spawned as an
+> `.exe` with no shell or with quoted arguments for a `.cmd` shim, and only
+> Claude Code's `init` system event is worth showing.
 
 > **Recorded, 2026-08-31, latest.** Session 55 was inserted from the
 > operator's screenshot of session 54 and closed `VERIFIED` in one round.
@@ -125,12 +143,10 @@ are merged and finished. Earlier handoff text is in `docs/status-archive.md`.
 
 **Nothing that blocks work.** The next sessions run from the `.vsix`.
 **Taken, 2026-08-31, as session 55 (D247).** The task rows now move
-themselves; `session log` is gone. Next is **56, the onboarding deck** —
-install the 2.3.0 `.vsix` first if this is a fresh machine, so slide 3's
-screenshot shows rows that move — then **57, the publication trial**, when
-you publish. The long-haul direction (the framework drives the lifecycle
-and calls AI as a service, structured answers only) is recorded above and
-is the block after 57; it is not planned yet.
+themselves; `session log` is gone. **Next is 56, the first of the driver
+set** (56–59), planned from the spike; then **60, the onboarding deck** —
+install the current `.vsix` first on a fresh machine — and **61, the
+publication trial**, when you publish.
 
 
 One decision is open, and it is yours to take when testing is finished,

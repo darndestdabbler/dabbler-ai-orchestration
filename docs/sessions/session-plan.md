@@ -2166,7 +2166,7 @@ the plan.*
 
 ---
 
-### Session 51 of 57: What the field trial found, and nothing else
+### Session 51 of 61: What the field trial found, and nothing else
 
 *Amended into the plan by session 50, which is the session that found them.
 Bounded deliberately: a remediation session that grows is a second feature
@@ -2194,7 +2194,7 @@ F-50-4 is a new session, not a widening of this one.
 
 ---
 
-### Session 52 of 57: The startup experience, walked before it ships
+### Session 52 of 61: The startup experience, walked before it ships
 
 *Inserted 2026-08-30, at the operator's request: "I want the startup
 experience to have a good DX before release." Two defects found by reading the
@@ -2223,7 +2223,7 @@ session that never ships.
 
 ---
 
-### Session 53 of 57: The Work Explorer reads at a glance, and session 1 asks
+### Session 53 of 61: The Work Explorer reads at a glance, and session 1 asks
 
 *Inserted 2026-08-31, at the operator's request, from three pieces of feedback
 given while looking at this repository's own Work Explorer and after restarting
@@ -2260,7 +2260,7 @@ Est. 5 tests net. Extension to 2.2.0.
 
 ---
 
-### Session 54 of 57: The router suite stops taxing the host
+### Session 54 of 61: The router suite stops taxing the host
 
 *Planned 2026-08-31. Running the router suite pins the host: `packages/router`
 declares no vitest configuration, so the pool is one worker per logical core —
@@ -2288,7 +2288,7 @@ Est. 1 test net. Nothing else.
 
 ---
 
-### Session 55 of 57: The task rows move themselves
+### Session 55 of 61: The task rows move themselves
 
 *Planned 2026-08-31, from the operator's screenshot of session 54: Register
 "in progress" three minutes after `session start` had registered the
@@ -2346,10 +2346,170 @@ refusals that stay.
 
 ---
 
-### Session 56 of 57: The operator onboarding deck
+## Why sessions 56–59 exist: the framework drives, the engine is a service
+
+*Planned 2026-08-31, from the operator's long-haul direction and the spike that
+proved it the same day (`D:\Projects\dabbler-driver-spike`, standalone). Less
+capable engines wander off a lifecycle they are asked to follow in prose;
+the fix is for the framework to own the control flow and call the engine
+per step. The spike ran a five-step scripted session with Haiku on Claude
+Code and Luna on the Copilot seat, in two variants, and all four trials
+passed with no human nudge. The variant to build is **resume**: the driver
+invokes the engine once per step (`claude -p … --continue`, `copilot -p …
+--continue`), the engine's own session store carries one context for the
+whole session, and the driver validates every report mechanically and
+rejects with reasons. What the operator wanted to see before committing —
+that the engine's live output survives the change of driver, and that an
+engine mid-step can be interrupted — is settled: `--engine-output
+stream|quiet` tees the engine's stream to the terminal and the transcript
+identically, and an interrupt is the driver ending the child and re-invoking
+it with `--continue` and the reason. Three rules carried from the spike:
+every answer the framework acts on is JSON against a schema and is refused
+mechanically when it does not validate; prose the engine writes is for
+people and the framework never reads it; code and tests are compiled and
+run, never interpreted. One more, from a bug: an engine CLI is spawned as an
+`.exe` with no shell, or with every argument quoted for a `.cmd` shim —
+the shell's unquoted join shattered the first Copilot prompt.*
+
+The deck (60) follows the set so that its slides show the driven lifecycle
+— Start, watch, interrupt — rather than the typed one; the publication
+trial stays last.
+
+---
+
+### Session 56 of 61: The driver's contract — the schemas and the report verb
+
+1. Register; declare `--not-releasable`.
+2. **Four schemas** under `packages/router/src/schema/`, validated with the
+   same `ajv` path the round rows use: `driver-instruction` (seq, kind ∈
+   step | rejection | interrupt | done, step id, ask, reasons, the report
+   schema by reference, the report command), `driver-report` (seq, step,
+   status ∈ done | blocked, filesChanged, testsRun, notes),
+   `driver-work-plan` (the engine's answer to "plan this session": ordered
+   steps, each with an id, the files it expects to touch, the check that
+   proves it) and `driver-disposition` (the engine's answer to a
+   verifier's findings: per finding, fix | reject with a reason). The
+   spike's `REPORT_SCHEMA` is the seed; nothing here is prose.
+3. **The driver's ledger.** `.dabbler/runs/s<N>/driver/` holds
+   `instruction.json`, `report.json`, `plan.json`, `dispositions.json`
+   and one transcript per invocation. Machine-owned like the rest of
+   `.dabbler/runs/`: never hand-edited, never a place a verdict can be typed.
+4. **`dabbler session report`** — the engine's one verb: `--seq --step
+   --status --files --tests --notes`, shaping and validating the report the
+   way the spike's `report.mjs` did. The engine never writes the ledger
+   directly.
+5. Affected; verify; full suite as `final-full`; close.
+
+Est. 6 tests: one refusal per schema, one for the report verb, one for a
+hand-written report the ledger reader refuses.
+
+---
+
+### Session 57 of 61: `dabbler session drive` — the framework runs the session
+
+1. Register; declare `--not-releasable`.
+2. **The loop**, as a router verb that owns the process from register to
+   close: resolve the session (the same rule `session start` applies);
+   register; ask the engine for a work plan against `driver-work-plan` and
+   declare from it (the declaration precedes the edits, as today); for each
+   step, write the instruction, invoke the engine, validate the report —
+   seq, step, every listed file exists, the listed files match what the tree
+   changed since the previous step, the step's own check passes — and either
+   accept or issue a `rejection` with the reasons, three times at most;
+   then `affected` and the pre-verify evidence record; then `verify`;
+   blocking findings go back to the engine as a `rejection` carrying the
+   findings, its `driver-disposition` is validated, fixes re-enter the
+   loop and rejected findings become disputes; then the run of record;
+   then the close. The task rows of session 55 move by themselves
+   throughout, because every phase is a verb this loop calls.
+3. **Engine-agnostic here.** The engine is reached through one interface
+   (`invoke(instruction) → transcript`) that session 58 implements for
+   real CLIs; this session ships it with the spike's fake engine, so the
+   whole loop is tested without a model and without a seat.
+4. **Bounded.** `driver.maxInvocations` in `dabbler.yaml` (default 24)
+   stops the loop and closes nothing; a stopped loop is an attention row.
+5. Affected; verify; full suite as `final-full`; close.
+
+Est. 9 tests: one per transition (plan, step accepted, step rejected,
+rejected thrice, findings dispositioned, fix re-entered, run of record,
+close, budget stop).
+
+---
+
+### Session 58 of 61: The engine adapter — Claude Code, Copilot, Codex; stream; interrupt
+
+1. Register; declare `--not-releasable`.
+2. **Spawn without shattering.** `resolveProgram` prefers an `.exe` and
+   spawns it with no shell; a `.cmd` shim gets the shell with every
+   argument quoted; both branches tested with fake shims, as in the spike.
+   The prompt passed with `-p` is one sentence; the instruction travels by
+   file.
+3. **Three argv shapes**, one per engine: Claude Code (`-p --model
+   --dangerously-skip-permissions --continue`, `--output-format stream-json
+   --verbose` when streaming and `text` when quiet), Copilot CLI (`-p
+   --model --allow-all-tools --allow-all-paths --no-ask-user --continue`,
+   `-s` when quiet; the model is the seat's own id, `--model` required as
+   it is at `session start`), Codex (measured in the session, not assumed).
+4. **`engineOutput: stream | quiet`** in `dabbler.yaml`, `--show-engine`
+   on `drive`: `stream` renders the engine's live output — Claude's
+   stream-json as thinking / tool / text / result lines, only the `init`
+   system event shown; Copilot's own progress lines — and writes the
+   transcript; `quiet` writes the transcript only. Identical bytes on the
+   ledger either way.
+5. **Interrupt, defined once.** `dabbler session interrupt --reason "<text>"`
+   (and the extension's Stop / Send in 59): the driver ends the running
+   invocation, records it on the ledger as interrupted with the reason,
+   and re-invokes the engine with `--continue` and a `kind: interrupt`
+   instruction carrying the reason — so the engine keeps everything up to
+   its last completed step and reads what changed. This is the one path for
+   every interrupter: a person at the keyboard, a gate that tripped, a
+   verifier finding that arrived mid-step. Measured in this session and
+   kept only if the CLI honours it: Claude Code's single-process variant
+   (`-p --input-format stream-json`, instructions written to stdin, a
+   control message to interrupt a turn without killing it). Copilot has no
+   equivalent, so the design never depends on it.
+6. **Seat cost per step.** Each resume invocation is one premium request;
+   the driver reports the count as it goes and stops at
+   `driver.maxInvocations`.
+7. Affected; verify; full suite as `final-full`; close.
+
+Est. 7 tests: exe and cmd spawn branches, the three argv shapes, the stream
+renderer's system-event rule, the interrupt re-invocation.
+
+---
+
+### Session 59 of 61: Start is the launch, and the developer's guide
+
+1. Register; declare `--not-releasable`.
+2. **Start Session runs `session drive`.** The extension launches the driver
+   in-process, streams the engine into an Output channel ("Dabbler:
+   Engine") when `engineOutput` is `stream`, and shows the task rows
+   moving. A **Stop** button and a **Send to engine** box call `session
+   interrupt` with the person's text as the reason. The copy-prompt
+   commands (Start the next session, Run Prompt, Send Back) retire: the
+   framework now sends, so nobody pastes.
+3. **`docs/driving-a-session.md`** — the developer's guide, written for
+   the person who has never seen the framework and reads before the deck:
+   what happens when you press Start, what you will see (and what `quiet`
+   hides), how to interrupt and how to send an instruction between steps,
+   what a rejection looks like and what the engine does with it, what each
+   step costs on a seat, and what to do when the loop stops at its budget.
+   Every command copy-pasteable; no decision ID without saying what it is.
+4. **Walked, not described.** From a clean VS Code profile with the built
+   `.vsix`: Start on this repository's next session with Haiku, watch it
+   run a step, interrupt it with a sentence, watch it continue. Recorded
+   as evidence; what it finds amends the plan.
+5. Affected; verify; full suite as `final-full`; close.
+
+Est. 4 tests in the extension suite (the launch, the channel, Stop, Send),
+1 in the router (the retired commands are gone from the manifest).
+
+---
+
+### Session 60 of 61: The operator onboarding deck
 
 *Planned 2026-08-31 at the operator's request: a PowerPoint deck that onboards a
-human operator to the framework. Runs after 55, the task rows. Slides as the operator laid
+human operator to the framework. Runs after 59, the driver set, so the slides show the driven lifecycle: Start, watch, interrupt. Slides as the operator laid
 them out; the deck is a committed artifact, and it is built by a script so a
 later session can rebuild it when a screen changes.*
 
@@ -2363,7 +2523,7 @@ later session can rebuild it when a screen changes.*
    solution.
 3. **Slides 1–6.**
    - *1 — What is Dabbler AI Orchestration?* The VS Code extension, how to
-     install it (Marketplace once 57 has published; the `.vsix` until then),
+     install it (Marketplace once 61 has published; the `.vsix` until then),
      the GitHub repository.
    - *2 — Why use Dabbler?* Automatic cross-provider verification with further
      rounds when a round finds something; one lifecycle for every session
@@ -2406,7 +2566,7 @@ count). No extension change.
 
 ---
 
-### Session 57 of 57: The half of the trial that needs a published router
+### Session 61 of 61: The half of the trial that needs a published router
 
 *Runs when the operator decides to publish, at whatever version is current
 then — and not before. It is not blocked and nothing waits on it: the

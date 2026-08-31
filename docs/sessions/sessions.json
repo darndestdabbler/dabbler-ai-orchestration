@@ -1180,7 +1180,7 @@
     {
       "number": 60,
       "title": "The engine channel reads at a glance",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-31T07:45:14.822000-04:00",
       "orchestrator": {
         "engine": "claude-code",
@@ -1189,7 +1189,7 @@
         "identityProvenance": "direct"
       },
       "frameworkVersion": "2.0.0",
-      "completedAt": null,
+      "completedAt": "2026-08-31T09:58:35.768000-04:00",
       "verificationVerdict": "VERIFIED",
       "verification": {
         "rounds": 3,

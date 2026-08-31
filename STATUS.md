@@ -1,8 +1,32 @@
-# STATUS — 51 of 52 closed. One thing is waiting, and it is yours
+# STATUS — 53 of 54 closed. One thing is waiting, and it is yours
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
 `experiment/verification-pipeline-v3` and `design/solution-decomposition`
 are merged and finished. Earlier handoff text is in `docs/status-archive.md`.
+
+> **Recorded, 2026-08-31.** Session 53 was inserted ahead of the blocked
+> publication trial (now **54**) from three pieces of operator feedback, and
+> closed `VERIFIED` in one round. Its deliverable is **D245**, which
+> supersedes D104: the Work Explorer groups sessions under status buckets
+> again — In Progress and Not Started ascending, Complete and Cancelled
+> descending, empty buckets not rendered, counts dimmed on the headers, In
+> Progress expanded and the rest collapsed, a close date on every finished
+> row. Closed sessions that stopped at the cap are no longer attention rows;
+> they sit under a collapsed *Information* bucket. The scaffolded session 1,
+> `PLAN_PROMPT`, the bootstrap hand-off line and the extension walkthrough
+> now tell the engine to **ask the operator what the project is** instead of
+> guessing it from the folder (an engine did exactly that on a fresh
+> project). `solution.yaml` declares this repository a one-component
+> solution, so the Solution Explorer renders here. Extension **2.2.0**, built
+> and unpublished like 2.0.0 and 2.1.0 before it.
+>
+> Two things noted and not built. (1) `packages/router/test/config.test.ts`
+> is not hermetic against `DABBLER_TRANSPORT`: with the variable set in the
+> shell, three `resolveTransport` tests fail; the run of record was taken
+> with it cleared for the process. Clear it before the suite, or fix the
+> test to. (2) The operator floated an Information bucket that also lists
+> work done outside any session; nothing records such work today, so it
+> needs a data source before it needs a row.
 
 > **Recorded, 2026-08-30.** Session 38's deliverable is the planned-session
 > projection; it recorded no decisions, and its three lessons are in the
@@ -64,14 +88,17 @@ You do not run a git command either way. Answer, and the framework tags.
 unqualified package from `registry.npmjs.org` into a throwaway prefix, which
 is the check that a green workflow and a working `npm i` are the same fact.
 
-**Session 52 cannot start until that is answered.** It is the half of the
+**Session 54 cannot start until that is answered.** It is the half of the
 acceptance exercise that needs a published router, and it is the only session
-left.
+left. (It was 52, then 53; sessions 52 and 53 were inserted ahead of it, and
+it moved each time. Nothing about it changed.)
 
 ## Where things are
 
-**51 of 52 closed.** Sessions 37–50 were the DX block; 51 was the bounded
-remediation the field trial mandated; 52 is blocked on you. The trial's full
+**53 of 54 closed.** Sessions 37–50 were the DX block; 51 was the bounded
+remediation the field trial mandated; 52 walked the startup experience; 53
+brought the Work Explorer's buckets back and made session 1 ask; 54 is
+blocked on you. The trial's full
 record is `docs/field-trial-50.md`.
 
 **Eight of `csv-model`'s nine feedback items are closed, with the code that

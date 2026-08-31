@@ -44,9 +44,9 @@ export type DriverRun = {
    */
   stop: {
     /**
-     * Which bound the loop met: the invocation budget; a step refused three times; the engine reporting `blocked`; the engine failing to run; a test run the framework could not hand back; a verification round that neither passed nor produced findings to dispose; the commit or push; the close's gates.
+     * Which bound the loop met: the invocation budget; a step refused three times; the engine reporting `blocked`; the engine failing to run; a test run the framework could not hand back; a verification round that neither passed nor produced findings to dispose; the commit or push; the close's gates; a person asking it to stop (`session interrupt --stop`, with their reason).
      */
-    kind: "budget" | "rejected-thrice" | "blocked" | "engine" | "tests" | "verification" | "land" | "close";
+    kind: "budget" | "rejected-thrice" | "blocked" | "engine" | "tests" | "verification" | "land" | "close" | "interrupted";
     reason: string;
     at: string;
   } | null;

@@ -126,8 +126,7 @@ export class WorkExplorerTreeProvider
     }
     if (descriptor.icon) item.iconPath = this.toIconPath(descriptor.icon);
     if (node.kind === "repository") {
-      // Activating a repository row opens the session plan, and while
-      // work remains also copies the start-next-session prompt.
+      // Activating a repository row opens the session plan.
       item.command = {
         command: "dabblerWorkExplorer.activateRepository",
         title: "Open Session Plan",

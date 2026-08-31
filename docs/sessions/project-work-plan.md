@@ -94,7 +94,7 @@ it.
 | 56 | The driver's contract — the schemas and the report verb | no | 2026-08-31 |
 | 57 | `dabbler session drive` — the framework runs the session | no | 2026-08-31 |
 | 58 | The engine adapter — Claude Code, Copilot, Codex; stream; interrupt | no | 2026-08-31 |
-| 59 | Start is the launch, and the developer's guide | — | not declared |
+| 59 | Start is the launch, and the developer's guide | no | 2026-08-31 |
 | 60 | The operator onboarding deck | — | not declared |
 | 61 | The half of the trial that needs a published router | — | not declared |
 
@@ -1601,3 +1601,43 @@ Session 58 of 61: The engine adapter -- Claude Code, Copilot, Codex; stream; int
 5. Seat cost per step: every invocation is reported against
    `driver.max_invocations` as it is spent.
 6. Affected; verify; full suite as `final-full`; close.
+
+### Session 59 — Start is the launch, and the developer's guide
+
+**Releasable: no.**
+
+Session 59 of 61: Start is the launch, and the developer's guide.
+
+1. Start Session launches `session drive`. The extension runs the bundled
+   router (`dabbler.cjs`) on the editor's own Node as a child process of the
+   extension host, with the chosen engine, provider and model, standing at
+   the repository root, and everything the driver prints lands live in an
+   Output channel "Dabbler: Engine". Not inside the in-process router: it
+   stands in one directory at a time, serialises verbs and buffers a verb's
+   output until it returns, and a drive is one verb that lasts the session --
+   in-process it would queue Stop behind itself. One drive per repository at
+   a time; a Copilot seat is asked for its model before anything is launched.
+2. Stop and Send are `session interrupt`, as status bar buttons shown while a
+   drive runs. Send asks for the text and interrupts with it; the driver
+   re-invokes the engine with the reason. Stop asks for a reason and
+   interrupts with `--stop`: the driver ends the invocation and halts the
+   loop, recording `interrupted` on `run.json` so the task rows show it, and
+   the same Start resumes from the phase reached. `--stop` is new on the verb,
+   on the in-process contract and among `driver-run`'s stop kinds; a stop
+   request that arrives between invocations is honoured at the next boundary
+   rather than discarded.
+3. The copy-prompt commands retire -- Start the next session, Run Prompt,
+   Send Back, Respecify, the repository row's left-click clipboard half and
+   the Copy Prompt submenu: the framework sends, so nobody pastes.
+4. `docs/driving-a-session.md`, the developer's guide: what happens when
+   Start is pressed, what is shown and what `quiet` hides, how to send an
+   instruction and how to stop, what a rejection is and what the engine does
+   with it, what each step costs on a seat, what a budget stop looks like and
+   what to do; linked from README and quick-start. Every command
+   copy-pasteable; no decision ID without saying what it is.
+5. Walked: the `.vsix` built and installed; a session driven on a scratch
+   repository with Haiku on Claude Code through the same command line the
+   extension launches, interrupted mid-step with a sentence and watched
+   continuing, then stopped; recorded as evidence, with the UI press stated
+   for what it is.
+6. Affected; verify; full suite as `final-full` for both suites; close.

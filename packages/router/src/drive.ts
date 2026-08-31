@@ -137,6 +137,8 @@ export interface DriveOptions {
 export const MAX_REJECTIONS = 3;
 /** How often a running invocation looks for an interrupt request. */
 const INTERRUPT_POLL_MS = 500;
+/** What a deferred Send reads as, first among the next instruction's reasons. */
+const SENT_PREFIX = "sent: ";
 
 type StopKind = NonNullable<DriverRun["stop"]>["kind"];
 
@@ -187,6 +189,8 @@ class Driver {
   private sessionNumber = 0;
   private run!: DriverRun;
   private plan: DriverWorkPlan | null = null;
+  /** Sends that arrived with no invocation to end; the next instruction carries them. */
+  private deferred: string[] = [];
 
   constructor(
     private readonly sessionsDir: string,
@@ -343,13 +347,6 @@ class Driver {
     }
     const invocation = this.run.invocations + 1;
     const first = this.run.invocations === 0;
-    // A request that arrived while no invocation was running had nothing to
-    // end; it is discarded here rather than ending this one on its first
-    // tick, and the log says so.
-    const stale = takeInterrupt(this.repoRoot, this.sessionNumber);
-    if (stale !== null) {
-      this.log("interrupt-discarded", { reason: stale.reason, why: "no invocation was running" });
-    }
     this.run = { ...this.run, invocations: invocation };
     this.save();
 
@@ -372,12 +369,18 @@ class Driver {
 
     const controller = new AbortController();
     let reason: string | null = null;
+    let stopRequested = false;
     const poll = setInterval(() => {
       if (reason !== null) return;
       const request = takeInterrupt(this.repoRoot, this.sessionNumber);
       if (request === null) return;
       reason = request.reason;
-      this.log("engine-interrupting", { seq: instruction.seq, invocation, reason });
+      stopRequested = request.stop;
+      this.log(request.stop ? "engine-stopping" : "engine-interrupting", {
+        seq: instruction.seq,
+        invocation,
+        reason,
+      });
       controller.abort(reason);
     }, INTERRUPT_POLL_MS);
     let outcome;
@@ -418,7 +421,22 @@ class Driver {
     if (outcome.error) {
       throw new Stop("engine", `the engine could not be run: ${outcome.error}`);
     }
+    if (stopRequested) throw new Stop("interrupted", String(reason));
+    // Taken by the poll, but the engine returned on its own before the
+    // abort reached it: the request still travels with the next instruction.
+    if (reason !== null && !interrupted) this.defer(reason);
     return interrupted ? reason : null;
+  }
+
+  /**
+   * A request that arrived at a phase boundary. A stop halts the loop here;
+   * a plain one is kept for the next instruction (`withPendingRequest`).
+   */
+  private honourPendingStop(): void {
+    const pending = takeInterrupt(this.repoRoot, this.sessionNumber);
+    if (pending === null) return;
+    if (pending.stop) throw new Stop("interrupted", pending.reason);
+    this.defer(pending.reason);
   }
 
   private engineOutput(): EngineOutput {
@@ -434,17 +452,45 @@ class Driver {
    * the one the answer must name.
    */
   private async converse(fields: Record<string, unknown>): Promise<DriverInstruction> {
-    let instruction = this.issue(fields);
+    let instruction = this.issue(this.withPendingRequest(fields));
     for (;;) {
       const reason = await this.invoke(instruction);
       if (reason === null) return instruction;
       const previous = Array.isArray(fields["reasons"]) ? (fields["reasons"] as string[]) : [];
-      instruction = this.issue({
-        ...fields,
-        kind: "interrupt",
-        reasons: [`interrupted: ${reason}`, ...previous],
-      });
+      instruction = this.issue(
+        this.withPendingRequest({
+          ...fields,
+          kind: "interrupt",
+          reasons: [`interrupted: ${reason}`, ...previous],
+        }),
+      );
     }
+  }
+
+  /**
+   * A request that arrived while no invocation was running -- a Send made
+   * between steps, or while the tests or a verification round ran. A stop
+   * halts the loop here. A plain one had nothing to end, and it is not
+   * lost: it travels with the next instruction, first among its `reasons`
+   * as `sent: <text>`, so the engine reads it exactly as it would have
+   * after an interrupt. The person was told "Sent", and it is.
+   */
+  private withPendingRequest(fields: Record<string, unknown>): Record<string, unknown> {
+    const pending = takeInterrupt(this.repoRoot, this.sessionNumber);
+    if (pending !== null) {
+      if (pending.stop) throw new Stop("interrupted", pending.reason);
+      this.defer(pending.reason);
+    }
+    if (this.deferred.length === 0) return fields;
+    const sent = this.deferred.map((reason) => `${SENT_PREFIX}${reason}`);
+    this.deferred = [];
+    const previous = Array.isArray(fields["reasons"]) ? (fields["reasons"] as string[]) : [];
+    return { ...fields, reasons: [...sent, ...previous] };
+  }
+
+  private defer(reason: string): void {
+    this.deferred.push(reason);
+    this.log("interrupt-deferred", { reason, why: "no invocation was running; it travels with the next instruction" });
   }
 
   // --- plan ------------------------------------------------------------------
@@ -967,6 +1013,9 @@ class Driver {
   async drive(): Promise<number> {
     try {
       for (;;) {
+        // A stop asked for while the framework's own phase was running (a
+        // verification round, the suite) takes effect at this boundary.
+        if (this.run.phase !== "complete") this.honourPendingStop();
         switch (this.run.phase) {
           case "plan":
             await this.phasePlan();

@@ -1029,6 +1029,8 @@ export function report(sessionsDir: string, options: ReportCliOptions): number {
 export interface InterruptCliOptions {
   readonly reason: string;
   readonly sessionNumber?: number | null;
+  /** Halt the loop as well: `interrupted` on `run.json`, and a re-run continues. */
+  readonly stop?: boolean;
 }
 
 /**
@@ -1080,10 +1082,14 @@ export function interrupt(sessionsDir: string, options: InterruptCliOptions): nu
     );
     return EXIT_BOUNDARY;
   }
-  requestInterrupt(repoRoot, target, reason, nowIso());
+  const stop = options.stop === true;
+  requestInterrupt(repoRoot, target, reason, nowIso(), stop);
   writeOut(
-    `interrupt: requested for session ${number} (instruction ${run.seq}); the driver ends the ` +
-      "running invocation and re-invokes the engine with the reason.\n",
+    stop
+      ? `interrupt: stop requested for session ${number} (instruction ${run.seq}); the driver ends the ` +
+          "running invocation and halts -- the session stays in flight, and `session drive` re-runs it.\n"
+      : `interrupt: requested for session ${number} (instruction ${run.seq}); the driver ends the ` +
+          "running invocation and re-invokes the engine with the reason.\n",
   );
   return EXIT_OK;
 }

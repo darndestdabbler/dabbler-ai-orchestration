@@ -8272,3 +8272,128 @@ three refusals; the loop interrupted mid-step and closing anyway; and the
 verb refusing a session nothing is driving. **1179 router tests.** The
 extension changes only where its test stub implements the widened contract;
 Start, Stop and Send are 59's.
+
+## Session 59 — Start is the launch, and the developer's guide
+
+### D251 · 2026-08-31 · Orchestrator · Start is the launch: the Work Explorer runs session drive as a child process on the editor's Node (the plan's in-process amended with evidence), Stop is session interrupt --stop (a ninth stop kind, interrupted), Send is session interrupt, the copy-prompt commands retire, docs/driving-a-session.md is the guide; walked live with Haiku (interrupt, continue, accept, stop; the engine prompt now says RUN the command); one misdirected reset cost this machine's untracked ledger
+
+**Start is the launch.** The Work Explorer's Start Session runs `dabbler
+session drive` with the engine the person picks (and the model: optional
+for Claude Code and Codex, required for a Copilot seat, refused by name
+before anything spawns), and the copy-prompt commands retire -- Start the
+next session, Run Prompt, Send Back, Respecify, the repository row's
+left-click clipboard half and the Copy Prompt submenu -- because the
+framework sends and nobody pastes. What the driver prints lands in a
+"Dabbler: Engine" output channel as it happens; the task rows move by
+themselves because every phase is a verb the loop calls; the status bar
+carries Stop and Send while a drive runs, with the same two on the
+command palette under `dabbler.driving`.
+
+**The plan's word "in-process" is amended, with the evidence.** The plan
+(session 59, step 2) says the extension launches the driver in-process.
+It does not, and the reason is three lines of the in-process router's own
+design: `workdir.ts` `standIn` holds ONE root and throws
+`WorkingDirectoryConflictError` for a second caller; `inProcess.ts`
+`serialize` runs verbs one after another; `cli/output.ts` `capture`
+collects a verb's output until the verb returns. A drive is one verb that
+lasts the whole session. Run in-process it would hold the stand-in for an
+hour, queue Stop's `session interrupt` behind itself -- the one verb that
+could end the invocation the drive is waiting on -- and deliver its output
+when it ended. Rebuilding those three seams to keep a word would have been
+the wrong direction: the driver already talks to the world through files
+and processes. So the extension runs the same bundled `dabbler.cjs` on the
+editor's own Node (`ELECTRON_RUN_AS_NODE=1`, exactly as the terminal shim
+does) as a child of the extension host, standing at the repository root,
+through the router's own `spawnProgram` and `terminateTree` (exported
+from the package for exactly this caller), reading both streams line by
+line into the channel. Stop and Send stay in-process: `session interrupt`
+writes a file the driver polls, which is how the verb was built to reach a
+driver in another process. A driver this window started dies with the
+window (the registry is a subscription); the session stays in flight and
+the same Start continues it. Everything else the plan asked for is built
+as written.
+
+**Stop needed `--stop`.** Session 58 said Stop and Send are `session
+interrupt` and nothing else. Send is: the driver ends the invocation and
+re-invokes the engine with the text. A Stop built on that would not stop
+-- it would cost one more invocation and carry on -- so the verb grows
+`--stop`: the request carries `stop: true`, the driver ends the invocation
+the same way and then halts with `interrupted` on `run.json` (a ninth stop
+kind, with the person's reason), the session stays in flight, and
+`session drive` re-runs from the phase it reached. A stop that arrives
+while no invocation is running is honoured at the next boundary (before
+the next invocation, or at the next phase) where a plain request is
+discarded. `stop` is on the in-process contract and the CLI; 58's nit
+(the verb cannot tell whether an invocation is running) stays open and is
+narrower now: a Stop between invocations is never lost, only a Send.
+
+**Walked, live, with Haiku on Claude Code**, on a two-step scratch
+repository (`C:\temp\dabbler-drive-walk`), through the exact command line
+the extension launches (`session drive --engine claude-code --provider
+anthropic --model haiku`, `driver.max_invocations: 12`), with Send and
+Stop typed as the verb from a second shell; the built 2.4.0 `.vsix` is
+installed here, and the press of the button itself is the operator's --
+this session cannot click a quick pick. What the walk showed, in order:
+(1) Haiku wrote `plan.json` and then PRINTED the answer command as its
+reply instead of running it -- `plan-rejected ... no work plan was
+written`, twice across two invocations, and once more for a step report.
+The driver refused each on the record and re-issued with the command; the
+next turn ran it. The one-sentence prompt (`engines.ts enginePrompt`) now
+says "RUN the shell command ... running it is the answer; printing it is
+not", because a less capable engine reads it literally and that is the
+engine the loop exists for. (2) A report naming a stale seq was refused by
+the report verb in Haiku's own shell (`the answer names seq 4;
+instruction 5 is outstanding`) and Haiku corrected it unprompted;
+`plan-accepted steps=["implement-greet","add-greeting-docs"]`. (3) Send,
+mid-step: `engine-interrupting seq=6 ... reason=Keep greet() a one-line
+return; do not add a JSDoc block`, `engine-interrupted ... exit=1
+seconds=10` (the tree-kill fallback, ten seconds after the control
+message), `instruction-issued seq=7 kind=interrupt step=implement-greet
+reasons=1`, re-invoked with `--continue`; the step came back as a one-line
+return with no comment block, `check-passed ... argv=["node","tests/run.mjs"]`,
+`report-accepted seq=8 step=implement-greet files=["src/greet.mjs"]`.
+(4) Stop, during the next step: `engine-stopping seq=9`,
+`engine-interrupted ... seconds=6`, `STOPPED (interrupted) in phase
+'steps' after 8 invocation(s)`, `run.json` carrying the reason, the
+session in flight, and the projection's Work row reading `Driver stopped
+(interrupted): ...`. An earlier stop, sent between invocations, was
+honoured at the next boundary as designed. Eight invocations, about
+$0.06 each by Claude Code's own accounting. (5) A third walk on a fresh
+copy of the same scratch session, with the reworded prompt: `plan-accepted
+steps=["implement-greet","add-documentation"]` on the FIRST invocation,
+29 seconds, where the old wording had taken three; stopped there.
+
+**An incident, recorded because the ledger cannot say it.** Resetting the
+scratch repository for a further walk, this orchestrator ran `git checkout
+-- .` and `rm -rf .dabbler docs/sessions/{activity-log,sessions}.json ...`
+in a command chain that began with `cd` into THIS repository. Every
+uncommitted edit of the session was reverted and this machine's untracked
+`.dabbler/` was deleted -- the machine-owned round records, test-run rows
+and driver ledgers of sessions 22-58 on this machine (tracked history and
+state were restored from HEAD; the session was re-registered and
+re-declared with the same task file on a clean tree, and every edit was
+redone from this session's own record). Nothing under the tracked tree was
+lost; what is gone is evidence the closes already consumed, and the
+`interrupt`/`.dabbler` paths in the task list are unaffected. The lesson
+is a rule for every session after this one: a destructive git or `rm`
+command for a scratch checkout runs in its own command with the scratch
+path spelled absolutely, never after a `cd` to the repository under work.
+A second, smaller misfire followed from the same habit: a `session drive`
+meant for the scratch repository was launched from this repository's
+directory (a `&` put the `cd` in the wrong half of the command) and drove
+session 59 itself with Haiku for one invocation before `session interrupt
+--stop` ended it. That invocation was the plan ask, which changes nothing
+and changed nothing -- its transcript shows reads only -- and it left
+`.dabbler/runs/s59/driver/` with `run.json` saying `interrupted:
+Misdirected launch`, which is the truth and stays; the Work row shows it
+until this session closes. From here on every `session` verb in a walk
+carries `--sessions-dir` spelled absolutely.
+
+Five extension tests (the launch and the channel, the seat and the
+dismissed pick, Stop, Send, the driver process on the editor's Node) and
+one manifest assertion (no command hands anyone a prompt; Stop and Send
+gated on `dabbler.driving`); one router test (`--stop` halts with
+`interrupted`, the task row says so, a re-run closes). The rowMenuHelpers
+tests went with the helpers they tested. 1180 router tests, 148
+extension tests. Extension **2.4.0** built and installed here, unpublished
+like 2.0.0-2.3.0.

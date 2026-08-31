@@ -621,6 +621,75 @@ describe("dabbler session drive", { timeout: 120_000 }, () => {
     expect(err).toContain("completed");
   });
 
+  it("halts the loop on `session interrupt --stop`, records `interrupted` with the reason, and a re-run continues", async () => {
+    const { repo, sessionsDir } = drivenRepo();
+    configure([VERIFIED]);
+    const inner = scripted(wellBehaved);
+    let stopped = false;
+    const engine: Engine = {
+      name: "stoppable",
+      async invoke(invocation: EngineInvocation) {
+        const { instruction } = invocation;
+        if (instruction.kind === "step" && instruction.step_id === "widget" && !stopped) {
+          stopped = true;
+          expect(interrupt(sessionsDir, { reason: "wrong file", stop: true })).toBe(EXIT_OK);
+          await new Promise<void>((resolve) =>
+            invocation.signal.addEventListener("abort", () => resolve(), { once: true }),
+          );
+          return { exitCode: null, interrupted: true };
+        }
+        return inner.invoke(invocation);
+      },
+    };
+
+    const { code } = await drive(sessionsDir, engine);
+    expect(code).not.toBe(EXIT_OK);
+    // The invocation ended and nothing was re-invoked: plan, then the step.
+    const run = readRun(repo, 1);
+    expect(run?.invocations).toBe(2);
+    expect(run?.phase).toBe("steps");
+    expect(run?.stop).toEqual(expect.objectContaining({ kind: "interrupted", reason: "wrong file" }));
+    expect(sessionStatus(sessionsDir)).toBe("in-progress");
+    expect(buildTaskRows(sessionsDir, 1).map((row) => row.intent).join("\n")).toContain(
+      "Driver stopped (interrupted): wrong file",
+    );
+    // A stop with nothing running is refused, like any interrupt.
+    const refused = await captured(async () => interrupt(sessionsDir, { reason: "again", stop: true }));
+    expect(refused.code).toBe(EXIT_BOUNDARY);
+    // The same command picks the step up again and runs the session to a close.
+    const { code: resumed } = await drive(sessionsDir, engine);
+    expect(resumed).toBe(EXIT_OK);
+    expect(sessionStatus(sessionsDir)).toBe("complete");
+  });
+
+  it("carries a Send made between invocations into the next instruction instead of discarding it", async () => {
+    const { sessionsDir } = drivenRepo();
+    configure([VERIFIED]);
+    const inner = scripted(wellBehaved);
+    const seen: DriverInstruction[] = [];
+    const engine: Engine = {
+      name: "sent-between",
+      async invoke(invocation: EngineInvocation) {
+        seen.push(invocation.instruction);
+        const outcome = await inner.invoke(invocation);
+        if (invocation.instruction.answer_schema === WORK_PLAN_SCHEMA) {
+          // The plan is answered and this invocation is about to return:
+          // what the operator sends now has no invocation to end.
+          expect(interrupt(sessionsDir, { reason: "mind the widget" })).toBe(EXIT_OK);
+        }
+        return outcome;
+      },
+    };
+    const { code, out } = await drive(sessionsDir, engine);
+    expect(code).toBe(EXIT_OK);
+    expect(out).toContain("interrupt-deferred");
+    // Not re-invoked, not lost: the step instruction carries it, first.
+    const step = seen.find((row) => row.kind === "step" && row.step_id === "widget");
+    expect(step?.reasons).toEqual(["sent: mind the widget"]);
+    expect(seen.filter((row) => row.kind === "interrupt")).toHaveLength(0);
+    expect(sessionStatus(sessionsDir)).toBe("complete");
+  });
+
   it("refuses an interrupt for a session nothing is driving", async () => {
     const { sessionsDir } = drivenRepo();
     configure([VERIFIED]);

@@ -10,6 +10,7 @@ import type {
   BootstrapOptions,
   Router,
   RouterResult,
+  SessionInterruptOptions,
   ProgressProjection as ProjectionPayload,
   ProgressProjectionSession as SessionRecord,
   ProgressProjectionVerification as SessionVerification,
@@ -195,12 +196,19 @@ export function rmrf(dir: string): void {
 export function fakeRouter(
   exitCode: number,
   message = "",
-): { router: Router; asked: string[]; bootstrapOptions: BootstrapOptions[] } {
+): {
+  router: Router;
+  asked: string[];
+  bootstrapOptions: BootstrapOptions[];
+  interruptOptions: SessionInterruptOptions[];
+} {
   const asked: string[] = [];
   // Recorded, because what bootstrap is ASKED to do is the behaviour some
   // callers care about: setting up one project must not carry a machine-wide
-  // side effect, and only the options say whether it does.
+  // side effect, and only the options say whether it does. The same for an
+  // interrupt: Stop and Send are one verb apart by an option.
   const bootstrapOptions: BootstrapOptions[] = [];
+  const interruptOptions: SessionInterruptOptions[] = [];
   const answer = <T,>(verb: string, value: T): Promise<RouterResult<T>> => {
     asked.push(verb);
     const outcome = outcomeForExitCode(exitCode);
@@ -213,6 +221,7 @@ export function fakeRouter(
   const text = (verb: string) => () => answer(verb, { stdout: message });
   return {
     bootstrapOptions,
+    interruptOptions,
     router: {
       session: {
         start: text("session start"),
@@ -221,7 +230,10 @@ export function fakeRouter(
         cancel: text("session cancel"),
         restore: text("session restore"),
         decision: text("session decision"),
-        interrupt: text("session interrupt"),
+        interrupt: (options: SessionInterruptOptions) => {
+          interruptOptions.push(options);
+          return answer("session interrupt", { stdout: message });
+        },
       },
       modules: { create: text("modules create") },
       verify: {

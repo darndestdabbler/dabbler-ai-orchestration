@@ -25,7 +25,12 @@ import * as vscode from "vscode";
 import type { Router } from "dabbler-ai-router";
 import type { SessionsRepository } from "../utils/fileSystem";
 import { productionRouter } from "../router/host";
-import { defaultSessionRunUi, runStartSession } from "./sessionTerminalCommands";
+import {
+  defaultDriveLauncher,
+  defaultSessionRunUi,
+  runStartSession,
+  sharedDrives,
+} from "./sessionCommands";
 
 export interface SetUpProjectUi {
   showInformationMessage: (message: string) => unknown;
@@ -308,9 +313,11 @@ async function startSessionIn(root: string): Promise<unknown> {
   return runStartSession(
     {
       root,
+      label: path.basename(root),
       sessionsDir: path.join(root, "docs", "sessions"),
     } as SessionsRepository,
     defaultSessionRunUi(),
-    productionRouter(),
+    defaultDriveLauncher(),
+    sharedDrives(),
   );
 }

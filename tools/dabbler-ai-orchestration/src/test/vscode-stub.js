@@ -33,6 +33,7 @@ const vscodeStub = {
   // Set 079 S2: the Copilot seat-setup progress wrapper reads
   // ProgressLocation and constructs vscode.Disposable teardown hooks.
   ProgressLocation: { SourceControl: 1, Window: 10, Notification: 15 },
+  StatusBarAlignment: { Left: 1, Right: 2 },
   Disposable: class Disposable {
     constructor(fn) { this._fn = fn; this._disposed = false; }
     dispose() {
@@ -176,6 +177,14 @@ const vscodeStub = {
         },
       ),
     createTreeView: () => ({ dispose: () => {} }),
+    createStatusBarItem: () => ({
+      text: "",
+      tooltip: "",
+      command: undefined,
+      show: () => {},
+      hide: () => {},
+      dispose: () => {},
+    }),
     registerTreeDataProvider: () => ({ dispose: () => {} }),
     // Set 122 S2: the router-CLI launcher echoes every command it runs to a
     // shared output channel BEFORE spawning. The channel is created lazily

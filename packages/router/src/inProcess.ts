@@ -306,6 +306,7 @@ export class InProcessRouter implements Router {
     },
     interrupt: (o: SessionInterruptOptions) => {
       const args = ["interrupt", "--reason", o.reason];
+      if (o.stop === true) args.push("--stop");
       optional(args, "--session-number", o.sessionNumber?.toString());
       return this.text("session", [...args, ...targetArgs(o)], o.repoRoot);
     },

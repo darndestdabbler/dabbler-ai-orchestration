@@ -184,12 +184,12 @@ suite("workExplorerTreeModel: tokens", () => {
     );
     assert.strictEqual(
       actionToken({
-        id: "dabbler.copySessionRunPrompt",
+        id: "dabbler.stopDrive",
         label: "",
         group: 0,
         when: () => true,
       }),
-      "act-copySessionRunPrompt",
+      "act-stopDrive",
     );
   });
 });

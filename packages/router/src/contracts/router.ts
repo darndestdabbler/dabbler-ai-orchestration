@@ -156,6 +156,13 @@ export interface SessionDecisionOptions extends RepositoryTarget {
 export interface SessionInterruptOptions extends RepositoryTarget {
   readonly reason: string;
   readonly sessionNumber?: number;
+  /**
+   * Halt the loop as well as the invocation. Without it the driver ends the
+   * invocation and re-invokes the engine with the reason (Send); with it,
+   * `interrupted` lands on `run.json` with the reason and the session stays
+   * in flight for a re-run (Stop).
+   */
+  readonly stop?: boolean;
 }
 
 export interface SessionVerbs {

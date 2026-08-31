@@ -402,7 +402,11 @@ repository whose projection cannot run shows no sessions and says so;
 it never guesses a status from which files exist.
 
 Row actions: the repository row opens the four sessions-root artifacts
-(plan, activity log, change log, ledger), copies the start-next-session
-prompt, and pre-types `session start` / `session close` into a
-terminal. A session row opens the plan at its own section, and carries
-cancel or restore — a cancellation is a decision about one session.
+(plan, activity log, change log, ledger) and carries **Start Session** and
+**Close Session**. Start launches `dabbler session drive` — the framework
+runs the session and calls the engine you pick once per step; nothing is
+copied for you to paste anywhere — and while it runs the status bar shows
+**Stop** and **Send to engine**. That whole flow, what you will see and
+what each button does, is in [driving-a-session.md](driving-a-session.md).
+A session row opens the plan at its own section, and carries cancel or
+restore — a cancellation is a decision about one session.

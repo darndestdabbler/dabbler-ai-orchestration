@@ -91,16 +91,25 @@ export function interruptPath(repoRoot: string, sessionNumber: number): string {
 export interface InterruptRequest {
   readonly reason: string;
   readonly requested_at: string;
+  /**
+   * End the loop as well as the invocation. A plain request is answered by
+   * re-invoking the engine with the reason; a stop is answered by halting
+   * with `interrupted` on `run.json`, which is what a person pressing Stop
+   * means -- and it is honoured wherever the driver next looks, so one that
+   * arrives between invocations stops the loop rather than being discarded.
+   */
+  readonly stop: boolean;
 }
 
-/** Ask the driver to end the running invocation; it re-invokes with the reason. */
+/** Ask the driver to end the running invocation; it re-invokes with the reason, or stops. */
 export function requestInterrupt(
   repoRoot: string,
   sessionNumber: number,
   reason: string,
   requestedAt: string,
+  stop = false,
 ): InterruptRequest {
-  const request: InterruptRequest = { reason, requested_at: requestedAt };
+  const request: InterruptRequest = { reason, requested_at: requestedAt, stop };
   atomicWriteJsonIndented(interruptPath(repoRoot, sessionNumber), request);
   return request;
 }
@@ -126,9 +135,10 @@ export function takeInterrupt(repoRoot: string, sessionNumber: number): Interrup
     return {
       reason: reason === "" ? "no reason was given" : reason,
       requested_at: typeof row["requested_at"] === "string" ? row["requested_at"] : "",
+      stop: row["stop"] === true,
     };
   } catch {
-    return { reason: "an interrupt request that could not be read", requested_at: "" };
+    return { reason: "an interrupt request that could not be read", requested_at: "", stop: false };
   }
 }
 

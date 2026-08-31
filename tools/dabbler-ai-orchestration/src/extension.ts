@@ -1,11 +1,10 @@
 import * as vscode from "vscode";
 import * as path from "path";
 import { registerOpenFileCommands } from "./commands/openFile";
-import { registerCopyPromptCommands } from "./commands/copyPromptCommands";
 import { registerTroubleshootCommand } from "./commands/troubleshoot";
 import { registerCancelLifecycleCommands } from "./commands/cancelLifecycleCommands";
 import { registerNewModuleCommand } from "./commands/newModule";
-import { registerSessionTerminalCommands } from "./commands/sessionTerminalCommands";
+import { registerSessionCommands } from "./commands/sessionCommands";
 import { registerBootstrapProjectCommand } from "./commands/bootstrapProject";
 import { installTerminalShim } from "./router/terminalShim";
 import { registerWorkExplorerTreeCommands } from "./commands/workExplorerTreeCommands";
@@ -125,6 +124,9 @@ export function activate(context: vscode.ExtensionContext): void {
           path.join(root, RUNS_REL),
           "*/{step-execution.jsonl,approved-plan.json,rounds.jsonl}",
         ),
+        // A driven session's stop lands on run.json and is the attention
+        // row; a step being accepted moves the same file.
+        new vscode.RelativePattern(path.join(root, RUNS_REL), "*/driver/run.json"),
       ];
       const onEvent = () => {
         treeProvider.refresh();
@@ -225,10 +227,12 @@ export function activate(context: vscode.ExtensionContext): void {
     registerWorkExplorerTreeCommands(context),
   );
   safeRegister("openFileCommands", () => registerOpenFileCommands(context));
-  safeRegister("copyPromptCommands", () => registerCopyPromptCommands(context));
-  safeRegister("sessionTerminalCommands", () =>
-    registerSessionTerminalCommands(context),
-  );
+  // Start launches the driver, Stop and Send interrupt it, Close runs the
+  // gates. The drives registry is a subscription, so a driver this window
+  // started dies with the window rather than running on unseen.
+  safeRegister("sessionCommands", () => {
+    registerSessionCommands(context);
+  });
   safeRegister("cancelLifecycleCommands", () =>
     registerCancelLifecycleCommands(context, { refreshView: refreshAll }),
   );

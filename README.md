@@ -44,7 +44,11 @@ There is one implementation, in TypeScript, and it runs two ways:
    flips the state. The verification gate reads the ledger; there is no
    stamp, no override, no hand-writable record.
 
-See [docs/quick-start.md](docs/quick-start.md) for the full walkthrough.
+See [docs/quick-start.md](docs/quick-start.md) for the full walkthrough of
+the typed lifecycle, and [docs/driving-a-session.md](docs/driving-a-session.md)
+for the driven one — what happens when you press **Start Session** in the
+Work Explorer and the framework runs the session itself, calling the engine
+once per step.
 
 ## Install
 

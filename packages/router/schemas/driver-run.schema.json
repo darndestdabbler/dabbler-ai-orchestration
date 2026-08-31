@@ -84,9 +84,10 @@
             "tests",
             "verification",
             "land",
-            "close"
+            "close",
+            "interrupted"
           ],
-          "description": "Which bound the loop met: the invocation budget; a step refused three times; the engine reporting `blocked`; the engine failing to run; a test run the framework could not hand back; a verification round that neither passed nor produced findings to dispose; the commit or push; the close's gates."
+          "description": "Which bound the loop met: the invocation budget; a step refused three times; the engine reporting `blocked`; the engine failing to run; a test run the framework could not hand back; a verification round that neither passed nor produced findings to dispose; the commit or push; the close's gates; a person asking it to stop (`session interrupt --stop`, with their reason)."
         },
         "reason": { "type": "string", "minLength": 1 },
         "at": { "type": "string", "minLength": 1 }

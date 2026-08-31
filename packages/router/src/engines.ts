@@ -81,11 +81,20 @@ export { DEFAULT_ENGINE_OUTPUT, ENGINE_OUTPUT_MODES, type EngineOutput } from ".
 /** The engines `session start` registers that have a built-in argv here. */
 export const BUILT_IN_ENGINES = ["claude-code", "copilot", "codex"] as const;
 
-/** The one sentence on the command line; everything else is in the file. */
+/**
+ * The one sentence on the command line; everything else is in the file.
+ *
+ * "Run", not "answer with": walked with Haiku, "answer with the command"
+ * ended two turns in a row with the command printed as the reply and never
+ * executed, and the driver refused both for want of an answer. A less
+ * capable engine reads the sentence literally, which is the engine this
+ * loop exists for.
+ */
 export function enginePrompt(instructionPath: string): string {
   return (
-    `Read ${instructionPath} and do exactly what its "ask" says, then answer ` +
-    'with the command it names as "answer_command", and stop.'
+    `Read ${instructionPath} and do exactly what its "ask" says, then RUN the shell ` +
+    'command it names as "answer_command" -- running it is the answer; printing it ' +
+    "is not -- and stop."
   );
 }
 

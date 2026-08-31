@@ -12,12 +12,17 @@ import {
   runSetUpProjectFlow,
 } from "../../commands/bootstrapProject";
 import {
-  planRespecifyPrompt,
-  planSendBackPrompt,
-  planSessionRunPrompt,
-} from "../../commands/copyPromptCommands";
+  DEFAULT_STOP_REASON,
+  Drives,
+  ENGINES,
+  type DriveLauncher,
+  type SessionRunUi,
+  runSendToEngine,
+  runStartSession,
+  runStopDrive,
+} from "../../commands/sessionCommands";
+import type { DriveHandle } from "../../router/driveProcess";
 import { cancellableSessionOf } from "../../commands/cancelLifecycleCommands";
-import { START_NEXT_SESSION_PROMPT } from "../../providers/rowMenuHelpers";
 import { sessionNumberOf, specSectionTargetFor } from "../../commands/openFile";
 import {
   asRepositoryNode,
@@ -373,17 +378,141 @@ suite("set up new project", () => {
   });
 });
 
-suite("copy prompts", () => {
-  test("the start prompt is the framework's trigger phrase, naming no repository", () => {
-    assert.strictEqual(START_NEXT_SESSION_PROMPT, "Start the next session.");
+// --- the driven session: Start launches, Stop and Send interrupt -----------
+
+interface FakeDrive {
+  handle: DriveHandle;
+  exit: (code: number | null) => void;
+}
+
+function fakeDrive(root: string): FakeDrive {
+  let exit: (code: number | null) => void = () => undefined;
+  const exited = new Promise<number | null>((resolve) => {
+    exit = resolve;
+  });
+  return { handle: { root, exited, kill: () => exit(null) }, exit };
+}
+
+function driveUi(overrides: Partial<SessionRunUi> = {}): {
+  ui: SessionRunUi;
+  errors: string[];
+  infos: string[];
+  engine: string[];
+} {
+  const errors: string[] = [];
+  const infos: string[] = [];
+  const engine: string[] = [];
+  const ui: SessionRunUi = {
+    pickEngine: async () => ENGINES[0],
+    askModel: async () => "haiku",
+    askText: async (_title, _prompt, value) => value ?? "look at src/widget.py again",
+    pickDrive: async (roots) => roots[0],
+    report: () => undefined,
+    showErrorMessage: (m: string) => errors.push(m),
+    showInformationMessage: (m: string) => infos.push(m),
+    engineLine: (line) => engine.push(line),
+    withProgress: (_title, work) => work(),
+    ...overrides,
+  };
+  return { ui, errors, infos, engine };
+}
+
+function launcherOf(drives: Map<string, FakeDrive>): DriveLauncher & { launched: Array<{ root: string; args: string[] }> } {
+  const launched: Array<{ root: string; args: string[] }> = [];
+  return {
+    launched,
+    launch: (root, args, onLine) => {
+      launched.push({ root, args: [...args] });
+      const drive = fakeDrive(root);
+      drives.set(root, drive);
+      onLine("drive [00:00:00] engine-invoked seq=1 invocation=1/24");
+      return drive.handle;
+    },
+  };
+}
+
+suite("the driven session", () => {
+  test("Start launches `session drive` for the chosen engine at the repository root and shows what the driver prints", async () => {
+    const repository = makeRepository();
+    const spawned = new Map<string, FakeDrive>();
+    const launcher = launcherOf(spawned);
+    const { ui, engine, infos } = driveUi();
+    const drives = new Drives();
+
+    assert.strictEqual(await runStartSession(repository, ui, launcher, drives), true);
+    assert.deepStrictEqual(launcher.launched, [
+      {
+        root: repository.root,
+        args: ["session", "drive", "--engine", "claude-code", "--provider", "anthropic", "--model", "haiku"],
+      },
+    ]);
+    // The driver's line reached the engine channel as it was printed.
+    assert.ok(engine.some((line) => line.includes("engine-invoked")));
+    assert.ok(drives.running(repository.root));
+
+    // A second Start on the same repository launches nothing.
+    const again = driveUi();
+    assert.strictEqual(await runStartSession(repository, again.ui, launcher, drives), false);
+    assert.strictEqual(launcher.launched.length, 1);
+    assert.ok(again.errors[0].includes("already being driven"));
+
+    // When the driver exits, the drive is over and the person is told.
+    spawned.get(repository.root)!.exit(0);
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.strictEqual(drives.running(repository.root), undefined);
+    assert.ok(infos.some((m) => m.includes("closed")));
   });
 
-  test("planSessionRunPrompt re-checks the gate on dispatch", () => {
-    const runnable = makeSession({ number: 1, status: "not-started" });
-    const stale = makeSession({ number: 2, status: "not-started" });
-    const repository = makeRepository({ sessions: [runnable, stale] });
-    assert.ok(planSessionRunPrompt(repository, runnable));
-    assert.strictEqual(planSessionRunPrompt(repository, stale), null);
+  test("a seat without a model launches nothing, and a dismissed pick launches nothing", async () => {
+    const repository = makeRepository();
+    const launcher = launcherOf(new Map());
+    const copilot = ENGINES.find((e) => e.engine === "copilot")!;
+    const seat = driveUi({ pickEngine: async () => copilot, askModel: async () => "" });
+    assert.strictEqual(await runStartSession(repository, seat.ui, launcher, new Drives()), false);
+    assert.ok(seat.errors[0].includes("needs a model"));
+    const dismissed = driveUi({ pickEngine: async () => undefined });
+    assert.strictEqual(await runStartSession(repository, dismissed.ui, launcher, new Drives()), false);
+    assert.deepStrictEqual(launcher.launched, []);
+  });
+
+  test("Stop is `session interrupt --stop` with the person's reason, and only while something is driven", async () => {
+    const repository = makeRepository();
+    const { router, interruptOptions } = fakeRouter(0, "interrupt: stop requested");
+    const drives = new Drives();
+    const idle = driveUi();
+    assert.strictEqual(await runStopDrive(repository, idle.ui, router, drives), false);
+    assert.strictEqual(interruptOptions.length, 0);
+    assert.ok(idle.infos[0].includes("Nothing is being driven"));
+
+    drives.add(fakeDrive(repository.root).handle);
+    const { ui } = driveUi();
+    assert.strictEqual(await runStopDrive(repository, ui, router, drives), true);
+    assert.strictEqual(interruptOptions.length, 1);
+    assert.strictEqual(interruptOptions[0].stop, true);
+    assert.strictEqual(interruptOptions[0].reason, DEFAULT_STOP_REASON);
+    assert.strictEqual(interruptOptions[0].repoRoot, repository.root);
+    assert.strictEqual(interruptOptions[0].sessionsDir, repository.sessionsDir);
+  });
+
+  test("Send is `session interrupt` with the text, and an empty box sends nothing", async () => {
+    const repository = makeRepository();
+    const { router, interruptOptions } = fakeRouter(0, "interrupt: requested");
+    const drives = new Drives();
+    drives.add(fakeDrive(repository.root).handle);
+    const { ui } = driveUi();
+    assert.strictEqual(await runSendToEngine(undefined, ui, router, drives), true);
+    assert.deepStrictEqual(
+      interruptOptions.map((o) => [o.reason, o.stop]),
+      [["look at src/widget.py again", false]],
+    );
+    const empty = driveUi({ askText: async () => "   " });
+    assert.strictEqual(await runSendToEngine(repository, empty.ui, router, drives), false);
+    assert.strictEqual(interruptOptions.length, 1);
+    // A refusal from the verb is shown, not swallowed.
+    const refused = fakeRouter(3, "interrupt: refused -- session 001 is not being driven");
+    const shown = driveUi();
+    assert.strictEqual(await runSendToEngine(repository, shown.ui, refused.router, drives), false);
+    assert.ok(shown.errors[0].includes("not being driven"));
   });
 });
 
@@ -434,7 +563,7 @@ suite("tree command argument narrowing", () => {
   });
 });
 
-suite("commandFlows: the three planning-time actions", () => {
+suite("commandFlows: cancel at planning time", () => {
   const nodeFor = (session: ReturnType<typeof makeSession>) => ({
     kind: "session" as const,
     repository: makeRepository({ sessions: [session] }),
@@ -464,79 +593,4 @@ suite("commandFlows: the three planning-time actions", () => {
     assert.strictEqual(live?.force, false);
   });
 
-  test("the send-back prompt names the record by path and reads differently per terminal state", () => {
-    const repository = makeRepository();
-    const unresolved = planSendBackPrompt(
-      repository,
-      makeSession({ number: 3, verification: makeVerification() }),
-    );
-    assert.ok(unresolved);
-    assert.ok(unresolved!.text.includes(".dabbler/runs/s3/rounds.jsonl"));
-    assert.ok(unresolved!.text.includes("unresolved at the cap"));
-    assert.ok(unresolved!.text.includes("dabbler verify"));
-    // Never the finding text itself: the engine reads the record.
-    assert.ok(!unresolved!.text.includes("suite command is guessed"));
-
-    const remediated = planSendBackPrompt(
-      repository,
-      makeSession({
-        number: 3,
-        verification: makeVerification({
-          terminal: "REMEDIATED_AT_CAP",
-          headline: "remediated at the cap",
-          fixPaths: ["ai_router/affected.py"],
-        }),
-      }),
-    );
-    assert.ok(remediated!.text.includes("no verifier reviewed it"));
-    // No command re-opens review on a closed session; the prompt says so
-    // and hands the engine the next session's start and declare.
-    assert.ok(remediated!.text.includes("No command re-opens review"));
-    assert.ok(remediated!.text.includes("dabbler session start --engine"));
-    assert.ok(remediated!.text.includes("dabbler session declare --task"));
-
-    const verified = planSendBackPrompt(
-      repository,
-      makeSession({
-        number: 3,
-        verification: makeVerification({ terminal: "VERIFIED", headline: "verified", clean: true }),
-      }),
-    );
-    assert.strictEqual(verified, null);
-  });
-
-  test("the respecify prompt hands the engine cancel, the new plan block, and start — in that order", () => {
-    const repository = makeRepository({
-      totalSessions: 20,
-      orchestrator: { engine: "claude-code", provider: "anthropic" },
-    });
-    const unresolved = planRespecifyPrompt(
-      repository,
-      makeSession({ number: 19, status: "in-progress", verification: makeVerification() }),
-    )!;
-    const cancelAt = unresolved.text.indexOf(
-      'dabbler session cancel 19 --reason "respecified as session 21" --force',
-    );
-    const blockAt = unresolved.text.indexOf("### Session 21 of 21");
-    // The plan is named by the scan's own path for it, relative to the
-    // root, not by a filename typed into the prompt.
-    assert.ok(unresolved.text.includes("in docs/sessions/session-plan.md"), unresolved.text);
-    const startAt = unresolved.text.indexOf(
-      "dabbler session start --engine claude-code --provider anthropic",
-    );
-    assert.ok(cancelAt >= 0 && blockAt > cancelAt && startAt > blockAt, unresolved.text);
-    assert.ok(unresolved.toast.includes("session 21"));
-
-    // A session already closed at the cap needs no cancel: two steps.
-    const landed = planRespecifyPrompt(
-      repository,
-      makeSession({
-        number: 17,
-        status: "complete",
-        verification: makeVerification({ terminal: "REMEDIATED_AT_CAP", headline: "remediated at the cap" }),
-      }),
-    )!;
-    assert.ok(!landed.text.includes("session cancel"));
-    assert.ok(landed.text.includes("(2) dabbler session start"));
-  });
 });

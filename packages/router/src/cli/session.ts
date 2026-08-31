@@ -111,6 +111,9 @@ const OPTIONS: Record<string, readonly string[]> = {
   interrupt: [
     "  --reason TEXT            required: what the engine reads next -- the driver ends the",
     "                           running invocation and re-invokes with it",
+    "  --stop                   halt the loop instead of re-invoking: `interrupted` lands on",
+    "                           run.json with the reason, the session stays in flight, and",
+    "                           `session drive` re-runs from the phase it reached",
   ],
   report: [
     "  --seq N                  required: the seq of the instruction being answered",
@@ -177,7 +180,7 @@ interface Parsed {
   readonly positional: string[];
 }
 
-const SWITCHES = new Set(["--releasable", "--not-releasable", "--dry-run", "--force"]);
+const SWITCHES = new Set(["--releasable", "--not-releasable", "--dry-run", "--force", "--stop"]);
 
 function parseArgs(argv: readonly string[]): Parsed | string {
   const values = new Map<string, string>();
@@ -400,7 +403,7 @@ export async function sessionVerb(argv: string[]): Promise<number> {
       writeErr("dabbler session interrupt: the following arguments are required: --reason\n");
       return EXIT_USAGE;
     }
-    return interrupt(sessionsDir, { reason, sessionNumber });
+    return interrupt(sessionsDir, { reason, sessionNumber, stop: switches.has("--stop") });
   }
 
   if (subcommand === "report") {

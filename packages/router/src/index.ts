@@ -22,3 +22,9 @@ export {
   type RouterEcho,
   type VerbRun,
 } from "./inProcess.ts";
+// The one spawn and the one tree kill. A host that runs `dabbler` as a
+// child process -- the extension launching `session drive` -- reaches the
+// same rule the router applies to its own children (an `.exe` with no
+// shell, a `.cmd` shim quoted, its own process group on POSIX) rather than
+// restating it.
+export { spawnProgram, terminateTree } from "./checks.ts";

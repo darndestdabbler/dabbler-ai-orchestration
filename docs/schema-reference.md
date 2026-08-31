@@ -288,7 +288,14 @@ none), writes `# interrupted (<reason>)` on the transcript, and re-issues
 the same instruction as `kind: interrupt` under a new seq with
 `interrupted: <reason>` first among its `reasons` and the answer still
 owed. The engine is re-invoked with its own `--continue`, so it keeps
-everything up to its last completed step and reads what changed. A person
+everything up to its last completed step and reads what changed. With
+`--stop` the request carries `stop: true` and the driver halts instead of
+re-invoking: the invocation ends the same way, `run.json` gets
+`stop: {kind: "interrupted", reason}`, the session stays in flight, and
+`session drive` re-runs from the phase it reached. A request that arrives
+while no invocation is running is not lost either way: a stop halts the
+loop at the next boundary, and a plain one travels with the next
+instruction as `sent: <text>`, first among its `reasons`. A person
 at the keyboard, the extension's Stop and a gate that tripped all go
 through this one verb.
 
@@ -369,7 +376,7 @@ under `max_invocations` (`driver.max_invocations` in `dabbler.yaml`, default
 nothing. `stop` is null while the loop runs and after it completed, and
 otherwise `{kind, reason, at}` with `kind` one of `budget` \|
 `rejected-thrice` \| `blocked` \| `engine` \| `tests` \| `verification` \|
-`land` \| `close` — the one field written for a person, and a re-run
+`land` \| `close` \| `interrupted` — the one field written for a person, and a re-run
 clears it. `engine` names the adapter — `claude-code`, `copilot` or `codex`
 for the built-in command, `command:<program>` for `--engine-argv` — and a
 re-run through a different one is refused, because one engine's session

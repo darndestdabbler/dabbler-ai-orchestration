@@ -8,7 +8,6 @@
 // unmodified.
 
 import * as vscode from "vscode";
-import { planLeftClickActivation } from "../providers/rowMenuHelpers";
 import { RepositoryNode, SessionNode } from "../providers/workExplorerTreeModel";
 
 /** Narrow an untrusted command argument to a repository tree node. */
@@ -37,26 +36,15 @@ export function asSessionNode(arg: unknown): SessionNode | undefined {
 }
 
 /**
- * Left-click on a repository row: the session plan always opens, and a
- * repository with work left also writes the start-next-session prompt to
- * the clipboard and toasts.
+ * Left-click on a repository row opens the session plan. It used to also
+ * copy a "start the next session" prompt for the operator to paste into an
+ * engine; the framework launches the engine itself now (Start Session), so
+ * there is nothing to paste.
  */
 export async function activateRepositoryRow(arg: unknown): Promise<void> {
   const node = asRepositoryNode(arg);
   if (!node) return;
-  const plan = planLeftClickActivation(node.repository);
-  await vscode.commands.executeCommand(plan.openCommand.commandId, node);
-  if (!plan.clipboardWrite) return;
-  try {
-    await vscode.env.clipboard.writeText(plan.clipboardWrite.text);
-    vscode.window.showInformationMessage(plan.clipboardWrite.toast);
-  } catch (err) {
-    console.warn(
-      `[WorkExplorerTree] left-click clipboard write failed for ` +
-        `"${node.repository.label}"`,
-      err,
-    );
-  }
+  await vscode.commands.executeCommand("dabblerSessionSets.openSpec", node);
 }
 
 /**

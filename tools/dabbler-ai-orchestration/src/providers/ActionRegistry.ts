@@ -12,7 +12,6 @@ import type {
   ProgressProjectionSession as SessionRecord,
 } from "dabbler-ai-router";
 import type { SessionsRepository } from "../utils/fileSystem";
-import { sessionNeedsReading, sessionOffersRunPrompt } from "./rowMenuHelpers";
 
 export interface RepositoryAction {
   id: string;
@@ -41,7 +40,6 @@ export const REPOSITORY_ACTIONS: RepositoryAction[] = [
   { id: "dabblerSessionSets.openActivityLog", label: "Activity Log", group: 102, when: () => true },
   { id: "dabblerSessionSets.openChangeLog", label: "Change Log", group: 103, when: () => true },
   { id: "dabblerSessionSets.openSessionState", label: "Sessions Ledger", group: 104, when: () => true },
-  { id: "dabbler.copyStartNextSessionPrompt", label: "Start Next Session", group: 304, when: hasNextSession },
   { id: "dabblerSessionSets.startSession", label: "Start Session", group: 905, when: hasNextSession },
   { id: "dabblerSessionSets.closeSession", label: "Close Session", group: 906,
     when: (r) => r.currentSession !== null },
@@ -73,26 +71,6 @@ export interface SessionAction {
 }
 
 export const SESSION_ACTIONS: SessionAction[] = [
-  {
-    id: "dabbler.copySessionRunPrompt",
-    label: "Copy Run Prompt",
-    group: 601,
-    when: (repository, session) => sessionOffersRunPrompt(repository, session),
-  },
-  {
-    id: "dabbler.copySendBackPrompt",
-    label: "Send Back to Engine",
-    group: 602,
-    // The record goes back to an engine, never to a person: the copied
-    // prompt names the ledger and the engine reads it.
-    when: (_repository, session) => sessionNeedsReading(session),
-  },
-  {
-    id: "dabbler.respecifySession",
-    label: "Respecify Session",
-    group: 603,
-    when: (_repository, session) => sessionNeedsReading(session),
-  },
   {
     id: "dabblerSessionSets.cancel",
     label: "Cancel Session",

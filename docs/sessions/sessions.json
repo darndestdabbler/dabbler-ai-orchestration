@@ -1148,22 +1148,34 @@
         "identityProvenance": "direct"
       },
       "verificationVerdict": "VERIFIED",
+      "verification": {
+        "rounds": 2,
+        "verifierModel": "gpt-5-6-sol",
+        "verifierProvider": "openai",
+        "transport": "api"
+      },
+      "frameworkVersion": "2.0.0"
+    },
+    {
+      "number": 59,
+      "title": "Start is the launch, and the developer's guide",
+      "status": "in-progress",
+      "startedAt": "2026-08-31T06:55:51.687000-04:00",
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "model": "haiku",
+        "identityProvenance": "direct"
+      },
       "frameworkVersion": "2.0.0",
+      "completedAt": null,
+      "verificationVerdict": "VERIFIED",
       "verification": {
         "rounds": 2,
         "verifierModel": "gpt-5-6-sol",
         "verifierProvider": "openai",
         "transport": "api"
       }
-    },
-    {
-      "number": 59,
-      "title": "Start is the launch, and the developer's guide",
-      "status": "not-started",
-      "startedAt": null,
-      "completedAt": null,
-      "orchestrator": null,
-      "verificationVerdict": null
     },
     {
       "number": 60,

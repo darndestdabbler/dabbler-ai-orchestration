@@ -1,8 +1,54 @@
-# STATUS — 60 of 64 closed. Next: 61, `dabbler session next` — the loop as a verb the engine calls
+# STATUS — 61 of 64 closed. Next: 62, the entry — one sentence in the CLI, and Dabbler's own terminal
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
 `experiment/verification-pipeline-v3` and `design/solution-decomposition`
 are merged and finished. Earlier handoff text is in `docs/status-archive.md`.
+
+> **Recorded, 2026-08-31, after session 61.** Session 61 — the pull —
+> closed `VERIFIED` in three rounds, driven by `session drive` with Opus.
+> What landed: **`dabbler session next`** advances the session one move
+> per call and prints the instruction JSON as the only thing on stdout
+> (`divertOut` sends every inner verb's chatter to stderr, so a parser
+> reads clean JSON and a person still sees it all); `drive` and `next`
+> are **one loop with the seam at `converse`** — push invokes the engine
+> there, pull returns the outstanding instruction — same `advance`, same
+> `judge`, same phases. The framework's long work (a verify round, the
+> complete suite, the close) runs as a **detached job** (`jobs.ts`): the
+> runner writes its exit to a status file by write-then-rename, the pid
+> answers only "is anything still running", and a job with no process and
+> no status is a **stop**, not a silent re-run — a machine that restarts
+> mid-round does not spend a second round unrecorded. `next` answers a
+> running job with `kind: wait` and `retry_after_seconds` — a tool call,
+> not a sleep. **Resuming by recency is gone**: Claude Code takes
+> `--resume <session_id>` from the first invocation's `init` event, Codex
+> `exec resume <thread>` from `thread.started`, and the Copilot seat —
+> which reports no conversation id at all — now runs **every invocation
+> as a fresh conversation** carrying the instruction file's context and
+> no other: a re-read is a price, the wrong conversation is a wrong
+> answer. **D252**: `drive` stays as the unattended half (CI, overnight,
+> the extension's Start today); retiring it would have deleted a measured
+> capability and left Start with nothing to call. The guide is re-cut
+> pull-first, `drive` one section at the end. Round 1 raised three
+> Majors, all remediated (Copilot still resumed by recency; `next` lost
+> `--max-rounds`/`--transport` between calls; a `rejected-thrice` stop
+> re-judged the same answer and stopped again); rounds 2 and 3 were
+> fix-delta `VERIFIED` with two nits on the record. No extension change;
+> still 2.5.0.
+>
+> **Owed to 62, from the operator watching 61 run:** colour bleeds in a
+> real terminal — a green ✓ (or red text) at a line's end stays on for
+> the lines after. Diagnosed: the engine's tool results carry the test
+> runners' ANSI, and `clip` in `engines.ts` truncates at a character
+> count, which can cut a colour's reset off while keeping its opener;
+> `clip` also collapses whitespace but strips no escapes. The renderers
+> must strip CSI/OSC from engine-derived text before speaking it — in the
+> terminal it bleeds, and in the "Dabbler: Engine" channel a raw escape
+> would land inside the grammar's scopes as garbage. The Dabbler
+> terminal's job-log passthrough (62, step 4) stays raw on purpose: there
+> the runners' colours arrive whole, resets included. Also owed: the
+> Start split — Start opens the person's CLI (the staff-facing default),
+> a separate command keeps launching headless `drive`, and Stop/Send
+> survive only for that. 62 is the extension session; it is on the plan.
 
 > **Recorded, 2026-08-31, after session 60 — the first session this
 > repository drove itself, and the plan re-cut for the pull.** Session 60

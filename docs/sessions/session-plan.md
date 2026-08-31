@@ -2698,8 +2698,11 @@ session, `drive` over `next`). No extension change.
    picks the engine as now, then opens a VS Code terminal at the
    repository root with that CLI launched interactively and the opening
    sentence supplied where the CLI's argv takes one, typed by the person
-   otherwise. Stop and Send retire from the status bar: interrupt is the
-   CLI's own Esc and chat. Nothing is copied to a clipboard.
+   otherwise. A separate *Start Unattended Session* command keeps
+   launching headless `session drive` (D252's other half), and Stop and
+   Send survive only for a drive the extension launched; for the
+   interactive default they retire — interrupt is the CLI's own Esc and
+   chat. Nothing is copied to a clipboard.
 4. **The Dabbler terminal.** A Pseudoterminal the extension owns
    (`window.createTerminal({ pty })`, named *Dabbler*) shows the
    framework's background work: the `dabbler [time] event` lines, every
@@ -2710,7 +2713,8 @@ session, `drive` over `next`). No extension change.
    operator still wants it once the runners' output is seen beside it.
    Theme kind from `window.activeColorTheme`, re-read on change. The
    "Dabbler: Engine" channel and its grammar stay for the engine stream
-   under headless `drive`, if 61 kept it.
+   under headless `drive`, which 61 kept (D252: push and pull are one
+   loop with the seam at `converse`).
 5. **A framework stop is loud.** When `run.json` gains a `stop`, or an
    owed decision is raised: an attention row above the buckets with a
    themed icon (`$(warning)` for a stop, `$(question)` for a decision,
@@ -2724,15 +2728,27 @@ session, `drive` over `next`). No extension change.
    again* / *Cancel the session*) so one kind of row serves every "waiting
    on you". The liveness row becomes the working/waiting indicator
    instead of "last written N ago" alone.
-6. **Walked** from the installed extension on a scratch repository with
+6. **Engine text is stripped of escapes before it is spoken.** Watching 61
+   run showed colour bleeding in a real terminal: a green ✓ (or red text)
+   at a line's end stayed on for the lines after. The engine's tool
+   results carry the test runners' ANSI, and `clip` in `engines.ts`
+   truncates at a character count — which can cut a colour's reset off
+   while keeping its opener — and collapses whitespace while stripping no
+   escapes. The renderers strip CSI/OSC sequences from engine-derived
+   text (`clip` is the seam), with a test that a truncated coloured line
+   leaves no escape behind. The Dabbler terminal's job-log passthrough
+   (step 4) is untouched: there the runners' colours arrive whole, resets
+   included, and stripping them would undo the point of the terminal.
+7. **Walked** from the installed extension on a scratch repository with
    Copilot: Start, the sentence, the two terminals side by side, a stop
    seen as a toast and answered from the row. Recorded.
-7. Affected; verify; full suite as `final-full`; close.
+8. Affected; verify; full suite as `final-full`; close.
 
 Est. 8 extension tests (the terminal opened with the CLI, the pty and
 its indicator states, the row, the toast, the QuickPick answer, the badge),
-2 router tests (a driver stop raises an owed decision; the bootstrap body
-carries the one sentence). Extension 2.6.0, unpublished like the rest.
+3 router tests (a driver stop raises an owed decision; the bootstrap body
+carries the one sentence; a clipped coloured line leaves no escape
+behind). Extension 2.6.0, unpublished like the rest.
 
 ---
 

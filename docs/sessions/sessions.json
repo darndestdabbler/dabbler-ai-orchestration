@@ -1222,7 +1222,7 @@
     {
       "number": 62,
       "title": "The entry \u2014 one sentence in the CLI, and Dabbler's own terminal",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-31T12:56:21.375000-04:00",
       "orchestrator": {
         "engine": "claude-code",
@@ -1231,7 +1231,7 @@
         "identityProvenance": "direct"
       },
       "frameworkVersion": "2.0.0",
-      "completedAt": null,
+      "completedAt": "2026-08-31T15:13:37.606000-04:00",
       "verificationVerdict": "REMEDIATED_AT_CAP",
       "verification": {
         "rounds": 3,

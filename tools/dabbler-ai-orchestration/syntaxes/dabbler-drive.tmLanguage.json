@@ -1,0 +1,116 @@
+{
+  "name": "Dabbler drive",
+  "scopeName": "source.dabbler-drive",
+  "patterns": [
+    { "include": "#driver-fault" },
+    { "include": "#driver-event" },
+    { "include": "#session-complete" },
+    { "include": "#diagnostic" },
+    { "include": "#verify-verified" },
+    { "include": "#verify-unreviewed" },
+    { "include": "#verify-fault" },
+    { "include": "#stderr" },
+    { "include": "#engine" }
+  ],
+  "repository": {
+    "driver-fault": {
+      "comment": "The events that report a refusal, a failure or an ending invocation. The list is the log call sites in drive.ts, not the plan's prose.",
+      "begin": "^(dabbler \\[[0-9:]+\\])\\s+(plan-rejected|report-rejected|dispositions-rejected|check-failed|tests-failed|engine-stopping|engine-interrupting|engine-interrupted)\\b",
+      "beginCaptures": {
+        "1": { "name": "comment.line.stamp.dabbler-drive" },
+        "2": { "name": "invalid.illegal.event.dabbler-drive" }
+      },
+      "end": "$",
+      "patterns": [{ "include": "#field" }]
+    },
+    "driver-event": {
+      "comment": "Every other event the loop logs: phase, run-started, run-resumed, instruction-issued, engine-invoked, engine-returned, interrupt-deferred, plan-accepted, report-accepted, check-passed, preverify, dispositions-accepted, dispute-recorded, run-of-record, landed. Matched by shape so a new event name is coloured the day it is added.",
+      "begin": "^(dabbler \\[[0-9:]+\\])\\s+([a-z][a-z0-9-]*)",
+      "beginCaptures": {
+        "1": { "name": "comment.line.stamp.dabbler-drive" },
+        "2": { "name": "keyword.control.event.dabbler-drive" }
+      },
+      "end": "$",
+      "patterns": [{ "include": "#field" }]
+    },
+    "field": {
+      "comment": "The name and its equals sign recede; the value keeps the plain foreground, so 1/12 reads and invocation= does not.",
+      "match": "([A-Za-z_][A-Za-z0-9_]*)(=)",
+      "captures": {
+        "1": { "name": "comment.line.field.dabbler-drive" },
+        "2": { "name": "comment.line.field.dabbler-drive" }
+      }
+    },
+    "session-complete": {
+      "comment": "The one dabbler: line that is not a fault -- the run finishing. Painting the happy ending in the error colour would teach the reader to ignore the colour.",
+      "match": "^dabbler: session .+ complete after .*$",
+      "name": "keyword.control.complete.dabbler-drive"
+    },
+    "diagnostic": {
+      "comment": "dabbler: refused ..., dabbler: STOPPED (...), dabbler: not inside a git repository, a bare dabbler: message, and the extension's own launch failure.",
+      "match": "^(?:dabbler: |driver: could not be started).*$",
+      "name": "invalid.illegal.diagnostic.dabbler-drive"
+    },
+    "verify-verified": {
+      "comment": "The clean round. `dabbler verify` runs inside the drive and prints through this channel, so its verdict is one of the channel's line kinds -- and the most consequential one in the session.",
+      "match": "^verify: round \\d+ — VERIFIED\\b.*$",
+      "name": "keyword.control.verdict.dabbler-drive"
+    },
+    "verify-unreviewed": {
+      "comment": "Landed, and no verifier saw the repair. Neither a refusal nor a clean pass, and a reader who skims past it has missed the one line that says so.",
+      "match": "^verify: (?:round \\d+ — REMEDIATED_AT_CAP|REMEDIATED AT THE CAP)\\b.*$",
+      "name": "invalid.deprecated.verdict.dabbler-drive"
+    },
+    "verify-fault": {
+      "comment": "Everything else the verb prints: a blocking round, the cap reached unresolved, a refusal, a routed call that failed, a config or ledger error. The two lines above are the only benign ones it has, so this is a blanket rule after them rather than a list that would go stale -- the same shape the `dabbler:` diagnostics take.",
+      "match": "^verify: .*$",
+      "name": "invalid.illegal.verdict.dabbler-drive"
+    },
+    "stderr": {
+      "match": "^stderr: .*$",
+      "name": "invalid.illegal.stderr.dabbler-drive"
+    },
+    "engine": {
+      "comment": "The engine's own output, under the gutter the driver prints for it.",
+      "begin": "^(\\s*\u2502)",
+      "beginCaptures": { "1": { "name": "comment.line.gutter.dabbler-drive" } },
+      "end": "$",
+      "patterns": [
+        { "include": "#engine-fault" },
+        { "include": "#engine-aside" },
+        { "include": "#engine-tool" },
+        { "include": "#engine-edit" },
+        { "include": "#engine-keyword" }
+      ]
+    },
+    "engine-fault": {
+      "match": "\\s*(?:stderr:|error:).*$",
+      "name": "invalid.illegal.engine.dabbler-drive"
+    },
+    "engine-aside": {
+      "comment": "Reasoning and tool results: the noisiest lines, and the ones a person skims past.",
+      "match": "\\s*(?:thinking:|\u2190).*$",
+      "name": "comment.line.aside.dabbler-drive"
+    },
+    "engine-tool": {
+      "match": "\\s*(tool)\\s+([A-Za-z_][A-Za-z0-9_-]*)\\s+(.*)$",
+      "captures": {
+        "1": { "name": "comment.line.aside.dabbler-drive" },
+        "2": { "name": "entity.name.function.tool.dabbler-drive" },
+        "3": { "name": "string.unquoted.argument.dabbler-drive" }
+      }
+    },
+    "engine-edit": {
+      "match": "\\s*(edit)\\s+(.*)$",
+      "captures": {
+        "1": { "name": "entity.name.function.tool.dabbler-drive" },
+        "2": { "name": "string.unquoted.argument.dabbler-drive" }
+      }
+    },
+    "engine-keyword": {
+      "comment": "The invocation's own boundaries. `engine:` is deliberately absent: with no scope it keeps the plain foreground and is the brightest text in the block, which is where the engine speaks to a person.",
+      "match": "\\s*(?:engine session started|result:|interrupt acknowledged)",
+      "name": "keyword.control.engine.dabbler-drive"
+    }
+  }
+}

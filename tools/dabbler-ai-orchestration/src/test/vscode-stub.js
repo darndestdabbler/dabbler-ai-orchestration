@@ -190,10 +190,16 @@ const vscodeStub = {
     // shared output channel BEFORE spawning. The channel is created lazily
     // on first use, so any flow that shells out to the router reaches this.
     // Lines are retained on the fake so a test can assert what was echoed.
-    createOutputChannel: (name) => {
+    // The second argument is a language id (a grammar to colour the channel
+    // by) or `{ log: true }`. Only the string form is recorded: a test that
+    // asserts the id has to be able to tell "created plain" from "created
+    // under a language", and `{ log: true }` is neither.
+    createOutputChannel: (name, languageIdOrOptions) => {
       const lines = [];
       return {
         name,
+        languageId:
+          typeof languageIdOrOptions === "string" ? languageIdOrOptions : undefined,
         lines,
         appendLine: (line) => lines.push(line),
         append: (text) => lines.push(text),

@@ -62,7 +62,7 @@ const spawnDefault: SpawnLike = (argv, options) =>
 
 /**
  * Start the driver and hand every line it prints, on either stream, to
- * `onLine` as it arrives. The driver's own lines (`drive [time] event`) and
+ * `onLine` as it arrives. The driver's own lines (`dabbler [time] event`) and
  * the engine's (`  │ ...` when `driver.engine_output` is `stream`) come
  * through the same sink in the order they were written.
  */

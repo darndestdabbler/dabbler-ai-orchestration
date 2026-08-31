@@ -28,6 +28,7 @@ import {
   normaliseRel,
   resolveProgram,
   shlexSplit,
+  spawnProgram,
 } from "../src/checks.ts";
 import { snapshotWorktreeTree } from "../src/journal.ts";
 import { makeSeededRepo, makeTempDir, removeTempDirs } from "./support/fixtures.ts";
@@ -337,13 +338,13 @@ describe("finding the program a name means", () => {
     return [one, two];
   }
 
-  function withPath(directories: string[], body: () => void): void {
+  function withPath<T>(directories: string[], body: () => T): T {
     const previous = process.env["PATH"];
     const previousExt = process.env["PATHEXT"];
     process.env["PATH"] = directories.join(";");
     process.env["PATHEXT"] = ".COM;.EXE;.BAT;.CMD";
     try {
-      body();
+      return body();
     } finally {
       if (previous === undefined) delete process.env["PATH"];
       else process.env["PATH"] = previous;
@@ -382,5 +383,26 @@ describe("finding the program a name means", () => {
       expect(resolved.path).toBe(join(one, "tool.CMD"));
       expect(resolved.isBatch).toBe(true);
     });
+  });
+
+  it.runIf(onWindows)("reaches a shim whose path holds a space", async () => {
+    // `npm` ships as `C:\Program Files\nodejs\npm.cmd`, so this is the
+    // ordinary case and not an exotic one. Quoting the path alone is not
+    // enough: `cmd /s` strips the outer quote pair of the whole line, which
+    // takes the ones around the path with it and cuts the program at the
+    // space.
+    const directory = join(makeTempDir(), "Program Files");
+    mkdirSync(directory, { recursive: true });
+    writeFileSync(join(directory, "tool.cmd"), "@echo reached %1\r\n", "utf8");
+    const child = withPath([directory], () =>
+      spawnProgram(["tool", "an argument"], { stdio: ["ignore", "pipe", "pipe"] }),
+    );
+    let seen = "";
+    child.stdout?.on("data", (chunk: Buffer) => {
+      seen += chunk.toString();
+    });
+    const code = await new Promise<number | null>((resolve) => child.on("close", resolve));
+    expect(code).toBe(0);
+    expect(seen).toContain("reached");
   });
 });

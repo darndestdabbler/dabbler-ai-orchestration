@@ -2565,11 +2565,21 @@ out of it: the framework speaks in a word, the engine under a glyph.*
    an engine block. Each is a Pseudoterminal's to give and is decided after
    the operator has watched drives under the grammar.
 6. **`docs/driving-a-session.md`** re-cut: every example line carries the
-   `dabbler` prefix (they are copied from a walk, so a fresh walk supplies
-   them); the line-kind list names what the renders print — `engine:` for
+   `dabbler` prefix; the line-kind list names what the renders print — `engine:` for
    the engine's words, which the guide currently calls `text` — and one
    paragraph says how the colours read. README and quick-start link the
    guide and show no lines; they do not change.
+
+   > **Amended during the session, round 2.** This step first said the
+   > examples "are copied from a walk, so a fresh walk supplies them",
+   > and the walk did not supply all of them: it produced the streaming
+   > block, the Stop block and the resume line, and it stopped at verify
+   > before it could produce a rejection, a budget stop or a landing.
+   > Those three blocks stay as the earlier two-step walk recorded them,
+   > with the prefix swapped, and the guide now says which walk each came
+   > from and why their clocks do not line up. The requirement that holds
+   > is the one above it — every example is a line some walk really
+   > printed, and none is invented.
 7. **Walked**: Start on a scratch repository with Haiku — its own command,
    absolute paths, `--sessions-dir` on every verb (the D251 rule) — and the
    channel seen coloured under one dark and one light theme. What it finds

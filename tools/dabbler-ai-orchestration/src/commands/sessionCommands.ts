@@ -137,8 +137,15 @@ function channel(): vscode.OutputChannel {
   return vscode.window.createOutputChannel(CHANNEL_NAME);
 }
 
+/**
+ * The channel the driver streams into, under the language whose grammar
+ * colours it: `dabbler [time] event` in one class, the engine's `│` lines in
+ * another. A plain `OutputChannel` and not a `LogOutputChannel` -- that one
+ * stamps a clock of its own beside the driver's and offers levels instead of
+ * a palette, so the two line kinds would still read alike.
+ */
 export function engineOutputChannel(): vscode.OutputChannel {
-  if (!engineChannel) engineChannel = vscode.window.createOutputChannel(ENGINE_CHANNEL_NAME);
+  if (!engineChannel) engineChannel = vscode.window.createOutputChannel(ENGINE_CHANNEL_NAME, "dabbler-drive");
   return engineChannel;
 }
 

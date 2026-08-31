@@ -419,7 +419,7 @@ describe("dabbler session drive", { timeout: 120_000 }, () => {
       await wellBehaved(invocation, tools);
     });
 
-    const { code } = await drive(sessionsDir, engine);
+    const { code, out } = await drive(sessionsDir, engine);
     expect(code).toBe(0);
     const kinds = engine.seen.map((entry) => [entry.kind, entry.step_id ?? entry.round]);
     expect(kinds).toEqual([
@@ -437,6 +437,11 @@ describe("dabbler session drive", { timeout: 120_000 }, () => {
     expect(engine.seen[4]?.ask).toContain("[0] major, blocking");
     expect(engine.seen[4]?.ask).not.toContain("[1]");
 
+    // The loop says which way each round went in its own voice, so a reader
+    // of the channel is not left to infer a blocking round from the phase it
+    // moved to -- `phase phase=dispositions` reads like any other phase line.
+    expect(out).toContain("verification-blocking");
+    expect(out).toContain("verification-passed");
     expect(readDispositions(repo, 1)).toMatchObject({ seq: 4, round: 1 });
     expect(readDisputes(repo, 1).map((row) => [row["round"], row["finding_index"]])).toEqual([[1, 1]]);
     expect(readRounds(repo, 1).map((row) => [row["round"], row["verdict"], row["phase"]])).toEqual([
@@ -488,6 +493,40 @@ describe("dabbler session drive", { timeout: 120_000 }, () => {
     });
     expect(sessionStatus(sessionsDir)).toBe("complete");
     expect(buildTaskRows(sessionsDir, 1).map((row) => row["state"])).toEqual(Array(6).fill("done"));
+  });
+
+  it("reads its config from the repository under --sessions-dir, not the one it was run from", async () => {
+    // `--sessions-dir` may name a repository the command was not typed in,
+    // which is how a walk is driven. Resolving the overlay from the working
+    // directory instead took the cap, the engine_output and -- the one that
+    // does damage -- the `testing.suites` from whichever repository the
+    // person happened to be standing in.
+    //
+    // No `configure()` here on purpose: it sets the config env var, and that
+    // switches the project overlay off altogether, so the layer under test
+    // would never be read. The driven repository asks for a budget of one;
+    // the repository this suite runs from declares no budget at all, so a
+    // config resolved from the working directory answers with the default.
+    const { repo, sessionsDir } = drivenRepo();
+    writeFileSync(
+      join(repo, "dabbler.yaml"),
+      "schema_version: 1\ndriver:\n  max_invocations: 1\n",
+      "utf8",
+    );
+    // Committed, not merely written: the declaration is refused once the tree
+    // carries work, and a dirty config would stop the run before the budget.
+    git(repo, "add", "-A");
+    git(repo, "commit", "-q", "-m", "a budget of one");
+    const engine = scripted(({ instruction }, tools) => {
+      if (instruction.answer_schema === WORK_PLAN_SCHEMA) return void tools.answer(PLAN);
+      tools.report({ step: "widget", files: [] });
+    });
+
+    const { code, out } = await drive(sessionsDir, engine);
+
+    expect(code).toBe(1);
+    expect(out).toContain("max_invocations=1");
+    expect(readRun(repo, 1)).toMatchObject({ max_invocations: 1, stop: { kind: "budget" } });
   });
 
   it("stops when the engine reports a step blocked, with its notes", async () => {

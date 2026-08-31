@@ -81,34 +81,64 @@ Everything the driver prints goes to **Dabbler: Engine** as it happens.
 Two kinds of line:
 
 ```
-drive [06:49:17] run-started session=001 engine=claude-code max_invocations=12
-drive [06:49:17] instruction-issued seq=1 kind=step step=plan
-drive [06:49:17] engine-invoked seq=1 invocation=1/12 first=true output=stream
+dabbler [09:23:17] run-started session=001 engine=claude-code max_invocations=24
+dabbler [09:23:17] instruction-issued seq=1 kind=step step=plan
+dabbler [09:23:17] engine-invoked seq=1 invocation=1/24 first=true output=stream
   │ engine session started (claude-haiku-4-5-20251001)
-  │ thinking: The user is asking me to: 1. Read a file at ...\driver\instruction.json 2. Do exactly what its "ask" says ...
-  │ tool Read  {"file_path":"C:\\temp\\dabbler-drive-walk\\.dabbler\\runs\\s1\\driver\\instruction.json"}
-  │   ← 1 { 2 "schema_version": 1, 3 "seq": 1, 4 "session_number": 1, ...
-  │ tool Write  {"file_path":"C:\\temp\\dabbler-drive-walk\\.dabbler\\scratch\\plan.json","content":"{\n  \"task\": ...
-  │ tool Bash  {"command":"dabbler session report --sessions-dir C:\\temp\\dabbler-drive-walk\\docs\\sessions --seq 1 --answer-file ...
-drive [06:51:56] engine-returned seq=5 exit=0 seconds=65 transcript=.dabbler/runs/s1/driver/engine-04.log
-drive [06:51:56] plan-accepted steps=["implement-greet","add-greeting-docs"] releasable=false
-drive [06:51:56] phase phase=steps
-drive [06:51:57] instruction-issued seq=6 kind=step step=implement-greet
-drive [06:51:57] engine-invoked seq=6 invocation=5/12 first=false output=stream
+  │ thinking: The user is asking me to: 1. Read a specific JSON file from a path 2. Do exactly what its "ask" says ...
+  │ tool Read  {"file_path":"C:\\temp\\dabbler-guide-walk\\.dabbler\\runs\\s1\\driver\\instruction.json"}
+  │   ← 1 { 2 "schema_version": 1, 3 "seq": 1, 4 "session_number": 1, 5 "issued_at": "2026-08-31T09:23:17.890 ...
+  │ engine: I'll read the repository to understand its structure, create a work plan, write it to a JSON file, ...
+  │ tool Glob  {"pattern":"**","path":"C:\\temp\\dabbler-guide-walk"}
+  │   ← dabbler.yaml tests\run.mjs .gitignore src\greet.mjs docs\sessions\session-plan.md ...
+dabbler [09:23:49] engine-returned seq=1 exit=0 seconds=31 transcript=.dabbler/runs/s1/driver/engine-01.log
+dabbler [09:23:49] plan-accepted steps=["implement-greet"] releasable=false
+dabbler [09:23:49] phase phase=steps
+dabbler [09:23:49] instruction-issued seq=2 kind=step step=implement-greet
+dabbler [09:23:49] engine-invoked seq=2 invocation=2/24 first=false output=stream
+dabbler [09:24:06] check-passed step=implement-greet argv=["node","tests/run.mjs"]
+dabbler [09:24:07] report-accepted seq=2 step=implement-greet files=["src/greet.mjs"]
 ```
 
-(Those are lines from a real walk of a two-step scratch session with Haiku
-on Claude Code, lightly cut for width; every example in this guide is.)
+(Those are lines from a real walk of a one-step scratch session with Haiku
+on Claude Code, lightly cut for width. Every example in this guide is from
+a real walk, but not all from the same one: this block, the Stop block and
+the resume line are from that walk, and the rejection, budget and landing
+examples are from an earlier two-step walk of the same scratch repository —
+which is why their clocks, paths and sequence numbers do not line up with
+these. Nothing here is invented, and nothing is a mock-up.)
 
-- `drive [time] event …` lines are the loop's own: which phase it is in,
+- `dabbler [time] event …` lines are the loop's own: which phase it is in,
   which instruction it issued, whether a report was accepted or refused
   and why, what the tests did, what the verifier said. They are always
-  shown.
+  shown. The framework speaks in a word; the engine speaks under a glyph.
 - `  │ …` lines are the engine's live output, rendered per engine: Claude
-  Code's stream as `thinking` / `tool` / `text` / `result` lines (and its
-  first `init` system event, nothing else from that stream), Copilot's own
-  progress lines as they are, Codex's completed items. These appear only
-  when `driver.engine_output` is `stream` (the default).
+  Code's stream as `thinking:` (its reasoning), `engine:` (its own words
+  to a person), `tool <name>` with the call's argument, `  ← ` for what
+  the tool returned, and `result:` when the turn ends — plus its first
+  `init` system event as `engine session started`, and nothing else from
+  that stream. Copilot's own progress lines appear as they are; Codex's
+  completed items render the same way, with `edit <paths>` for a file
+  change. These appear only when `driver.engine_output` is `stream` (the
+  default).
+
+**How it reads in colour.** The channel is created under a language of
+its own, and the extension contributes a grammar for it, so the classes
+above are told apart at a glance: the driver's clock and its `key=` names
+recede into the theme's dimmed comment colour while their values stay
+plain — `1/24` reads, `invocation=` does not — and event names take the
+keyword colour. Anything that refused or stopped — `plan-rejected`,
+`report-rejected`, `check-failed`, `tests-failed`,
+`verification-blocking`, the `dabbler:` diagnostics, every line the
+verifier prints that is not `VERIFIED`, `stderr:` and `error:` — takes
+the theme's error colour, so a refusal in two hundred lines is seen
+rather than found. On the engine's
+lines `thinking:` and the `←` results are dimmed, a tool's name is
+picked out from its argument, and `engine:` is given no colour at all,
+which leaves the engine's own words the brightest text in the block.
+Every one of those is a scope the themes already paint: the extension
+chooses no colours, so a light theme and a dark one each look like
+themselves.
 
 **What `quiet` hides.** With `engine_output: quiet` the `│` lines are
 not shown; you see the driver's lines and nothing between an
@@ -145,10 +175,10 @@ own `--continue`, so it keeps its context and reads what changed. In the
 channel:
 
 ```
-drive [06:52:06] engine-interrupting seq=6 invocation=5 reason=Keep greet() a one-line return; do not add a JSDoc block to src/greet.mjs.
-drive [06:52:07] engine-interrupted seq=6 exit=1 seconds=10 transcript=.dabbler/runs/s1/driver/engine-05.log
-drive [06:52:07] instruction-issued seq=7 kind=interrupt step=implement-greet reasons=1
-drive [06:52:07] engine-invoked seq=7 invocation=6/12 first=false output=stream
+dabbler [06:52:06] engine-interrupting seq=6 invocation=5 reason=Keep greet() a one-line return; do not add a JSDoc block to src/greet.mjs.
+dabbler [06:52:07] engine-interrupted seq=6 exit=1 seconds=10 transcript=.dabbler/runs/s1/driver/engine-05.log
+dabbler [06:52:07] instruction-issued seq=7 kind=interrupt step=implement-greet reasons=1
+dabbler [06:52:07] engine-invoked seq=7 invocation=6/12 first=false output=stream
 ```
 
 (In that walk the engine did as it was told: `greet` came back as a
@@ -171,11 +201,19 @@ Stop ends the invocation the same way and then halts the loop instead of
 re-invoking:
 
 ```
-drive [06:54:14] engine-stopping seq=9 invocation=8 reason=Walk done: a step was accepted after an interrupt; stopping before verification.
-drive [06:54:15] engine-interrupted seq=9 exit=1 seconds=6 transcript=.dabbler/runs/s1/driver/engine-08.log
-drive: STOPPED (interrupted) in phase 'steps' after 8 invocation(s) -- Walk done: a step was accepted after an interrupt; stopping before verification.
+dabbler [09:24:36] engine-stopping seq=3 invocation=3 reason=The driver read the invoking repository's dabbler.yaml, not this one's ...
+  │ interrupt acknowledged
+  │ result: error_during_execution in 24831 ms, $0.0499
+dabbler [09:24:37] engine-interrupted seq=3 exit=1 seconds=28 transcript=.dabbler/runs/s1/driver/engine-03.log
+dabbler: STOPPED (interrupted) in phase 'preverify' after 3 invocation(s) -- The driver read the invoking repository's ...
 Session 001 stays in flight; the same command re-runs from this phase.
 ```
+
+`interrupt acknowledged` is Claude Code answering the driver's own
+control message: the engine ended its turn when asked, rather than being
+killed. Where a CLI has no such message — or does not answer within ten
+seconds — the driver ends the process tree instead, and the only
+difference you see is that no acknowledgement is printed.
 
 The stop is recorded on the session's run state with your reason, the
 session stays in flight, the driver process exits, and the Work Explorer
@@ -183,7 +221,7 @@ shows the reason on the first task row not yet done — in that walk, the
 Work row:
 
 ```
-Driver stopped (interrupted): Walk done: a step was accepted after an interrupt; stopping before verification. -- `dabbler session drive` re-runs from this phase.
+Driver stopped (interrupted): The driver read the invoking repository's dabbler.yaml, not this one's ... -- `dabbler session drive` re-runs from this phase.
 ```
 
 A Stop asked for while nothing is running is honoured at the next
@@ -191,10 +229,16 @@ boundary (before the next invocation, or when the phase it is in — a
 verification round, the suite — ends); nothing is invoked in between.
 
 To continue, press **Start Session** again with the same engine, or type
-the same `session drive` line. The loop re-enters the phase it reached,
-skips the steps already accepted, and carries the invocation count on. A
-different engine is refused: one engine's own session store holds the
-context for the run.
+the same `session drive` line. Its first line says where it is picking
+up, and after what:
+
+```
+dabbler [09:24:59] run-resumed session=001 phase=preverify invocations=3 max_invocations=24 after=interrupted
+```
+
+The loop re-enters the phase it reached, skips the steps already
+accepted, and carries the invocation count on. A different engine is
+refused: one engine's own session store holds the context for the run.
 
 Closing the VS Code window ends a driver it started, the same way, minus
 the recorded reason: the session stays in flight and the same Start
@@ -210,11 +254,11 @@ plan, at least one per step) must pass. A report that fails any of these is
 refused with every reason:
 
 ```
-drive [06:49:58] plan-rejected seq=1 rejection=1 reasons=["no work plan was written for instruction 1; the answer is `dabbler session report --sessions-dir C:\\temp\\dabbler-drive-walk\\docs\\sessions --seq 1 --answer-file <path to the JSON you wrote>`"]
-drive [06:49:58] instruction-issued seq=2 kind=rejection step=plan reasons=1
+dabbler [06:49:58] plan-rejected seq=1 rejection=1 reasons=["no work plan was written for instruction 1; the answer is `dabbler session report --sessions-dir C:\\temp\\dabbler-drive-walk\\docs\\sessions --seq 1 --answer-file <path to the JSON you wrote>`"]
+dabbler [06:49:58] instruction-issued seq=2 kind=rejection step=plan reasons=1
 ...
-drive [06:52:21] report-rejected seq=7 step=implement-greet rejection=1 reasons=["no report was written for instruction 7; the answer is `dabbler session report ... --seq 7 --step implement-greet --status done --files <every file you created or changed, comma-separated, repository-relative> --notes \"<one line>\" [--tests \"<the test command you ran>\"]`"]
-drive [06:52:21] instruction-issued seq=8 kind=rejection step=implement-greet reasons=1
+dabbler [06:52:21] report-rejected seq=7 step=implement-greet rejection=1 reasons=["no report was written for instruction 7; the answer is `dabbler session report ... --seq 7 --step implement-greet --status done --files <every file you created or changed, comma-separated, repository-relative> --notes \"<one line>\" [--tests \"<the test command you ran>\"]`"]
+dabbler [06:52:21] instruction-issued seq=8 kind=rejection step=implement-greet reasons=1
 ```
 
 Both of those are from the walk: Haiku wrote the plan and then *printed*
@@ -258,7 +302,7 @@ would buy nothing.
 ## When the loop stops at its budget
 
 ```
-drive: STOPPED (budget) in phase 'steps' after 24 invocation(s) -- the engine has been invoked 24 times, the limit set by driver.max_invocations (24); re-run with --max-invocations <larger> to continue, which is a decision to spend more
+dabbler: STOPPED (budget) in phase 'steps' after 24 invocation(s) -- the engine has been invoked 24 times, the limit set by driver.max_invocations (24); re-run with --max-invocations <larger> to continue, which is a decision to spend more
 Session 059 stays in flight; the same command re-runs from this phase.
 ```
 

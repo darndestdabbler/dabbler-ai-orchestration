@@ -14,9 +14,9 @@ suite("the driver process", () => {
       // streams, then exits with a code the caller must see.
       writeFileTree(dir, {
         "cli.cjs":
-          "process.stdout.write('drive [t] engine-invoked seq=1\\n  \\u2502 thinking');\n" +
+          "process.stdout.write('dabbler [t] engine-invoked seq=1\\n  \\u2502 thinking');\n" +
           "process.stdout.write(' about it\\n');\n" +
-          "process.stderr.write('drive: STOPPED (interrupted)\\n');\n" +
+          "process.stderr.write('dabbler: STOPPED (interrupted)\\n');\n" +
           "process.stdout.write('tail without newline');\n" +
           "process.exit(3);\n",
       });
@@ -38,10 +38,10 @@ suite("the driver process", () => {
       // One stream's lines keep their order; the two streams are not
       // ordered against each other, and no reader should depend on it.
       assert.deepStrictEqual(
-        lines.filter((line) => !line.startsWith("drive: ")),
-        ["drive [t] engine-invoked seq=1", "  │ thinking about it", "tail without newline"],
+        lines.filter((line) => !line.startsWith("dabbler: ")),
+        ["dabbler [t] engine-invoked seq=1", "  │ thinking about it", "tail without newline"],
       );
-      assert.ok(lines.includes("drive: STOPPED (interrupted)"));
+      assert.ok(lines.includes("dabbler: STOPPED (interrupted)"));
     } finally {
       rmrf(dir);
     }

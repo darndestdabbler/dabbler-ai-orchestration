@@ -209,7 +209,7 @@ class Driver {
       .filter(([, value]) => value !== undefined)
       .map(([key, value]) => `${key}=${typeof value === "string" ? value : JSON.stringify(value)}`)
       .join(" ");
-    writeOut(`drive [${clock()}] ${event}${extra ? ` ${extra}` : ""}\n`);
+    writeOut(`dabbler [${clock()}] ${event}${extra ? ` ${extra}` : ""}\n`);
   }
 
   private save(): void {
@@ -239,7 +239,7 @@ class Driver {
     const state = readSessionState(this.sessionsDir);
     const current = state ? state["currentSession"] : null;
     if (typeof current !== "number") {
-      writeErr("drive: refused -- no session is in flight after registration.\n");
+      writeErr("dabbler: refused -- no session is in flight after registration.\n");
       return EXIT_BOUNDARY;
     }
     this.sessionNumber = current;
@@ -270,7 +270,7 @@ class Driver {
     }
     if (existing.engine !== this.options.adapter.name) {
       writeErr(
-        `drive: refused -- session ${sessionDisplayNumber(current)} is being driven ` +
+        `dabbler: refused -- session ${sessionDisplayNumber(current)} is being driven ` +
           `through '${existing.engine}', and this run names '${this.options.adapter.name}'. ` +
           "One engine's session store carries a run; finish it with the engine it started with.\n",
       );
@@ -808,10 +808,17 @@ class Driver {
       transport: this.options.transport ?? null,
     });
     if (code === VERIFY_OK) {
+      this.log("verification-passed");
       this.setPhase("run-of-record");
       return;
     }
     if (code === EXIT_BLOCKING) {
+      // The loop's own word for the round that did not pass. Without it the
+      // only thing the channel says here is `phase phase=dispositions`, which
+      // reads exactly like `phase phase=steps` -- the worst outcome a session
+      // has, in the colour of ordinary progress. The verb's own verdict line
+      // is above this one, and it is the verb's; this is the driver's.
+      this.log("verification-blocking");
       this.setPhase("dispositions");
       return;
     }
@@ -1046,7 +1053,7 @@ class Driver {
             break;
           case "complete":
             writeOut(
-              `drive: session ${sessionDisplayNumber(this.sessionNumber)} complete after ` +
+              `dabbler: session ${sessionDisplayNumber(this.sessionNumber)} complete after ` +
                 `${this.run.invocations} engine invocation(s).\n`,
             );
             return EXIT_OK;
@@ -1060,7 +1067,7 @@ class Driver {
       };
       this.save();
       writeErr(
-        `drive: STOPPED (${error.kind}) in phase '${this.run.phase}' after ` +
+        `dabbler: STOPPED (${error.kind}) in phase '${this.run.phase}' after ` +
           `${this.run.invocations} invocation(s) -- ${error.message}\n` +
           `Session ${sessionDisplayNumber(this.sessionNumber)} stays in flight; ` +
           "the same command re-runs from this phase.\n",
@@ -1078,15 +1085,21 @@ class Driver {
 export async function driveSession(sessionsDir: string, options: DriveOptions): Promise<number> {
   const repoRoot = repoRootFor(sessionsDir);
   if (repoRoot === null) {
-    writeErr(`drive: not inside a git repository: ${sessionsDir}\n`);
+    writeErr(`dabbler: not inside a git repository: ${sessionsDir}\n`);
     return EXIT_USAGE;
   }
   let config: RouterConfig;
   try {
-    config = loadConfig();
+    // The repository under `--sessions-dir`, never the one the command was
+    // typed in. The driver reads its invocation cap, its engine_output, its
+    // check timeouts and -- the one that does damage -- its `testing.suites`
+    // from this: a config resolved from the working directory would run
+    // another repository's suite against this tree and record it as this
+    // session's evidence.
+    config = loadConfig(undefined, repoRoot);
   } catch (error) {
     if (!(error instanceof ConfigError)) throw error;
-    writeErr(`drive: ${error.message}\n`);
+    writeErr(`dabbler: ${error.message}\n`);
     return EXIT_USAGE;
   }
   const driver = new Driver(sessionsDir, options, repoRoot, config);
@@ -1096,7 +1109,7 @@ export async function driveSession(sessionsDir: string, options: DriveOptions): 
     return await driver.drive();
   } catch (error) {
     if (!(error instanceof LedgerError)) throw error;
-    writeErr(`drive: refused -- ${error.message}\n`);
+    writeErr(`dabbler: refused -- ${error.message}\n`);
     return EXIT_BOUNDARY;
   }
 }

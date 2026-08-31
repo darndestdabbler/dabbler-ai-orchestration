@@ -95,8 +95,9 @@ it.
 | 57 | `dabbler session drive` — the framework runs the session | no | 2026-08-31 |
 | 58 | The engine adapter — Claude Code, Copilot, Codex; stream; interrupt | no | 2026-08-31 |
 | 59 | Start is the launch, and the developer's guide | no | 2026-08-31 |
-| 60 | The operator onboarding deck | — | not declared |
-| 61 | The half of the trial that needs a published router | — | not declared |
+| 60 | The engine channel reads at a glance | no | 2026-08-31 |
+| 61 | The operator onboarding deck | — | not declared |
+| 62 | The half of the trial that needs a published router | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -1641,3 +1642,9 @@ Session 59 of 61: Start is the launch, and the developer's guide.
    continuing, then stopped; recorded as evidence, with the UI press stated
    for what it is.
 6. Affected; verify; full suite as `final-full` for both suites; close.
+
+### Session 60 — The engine channel reads at a glance
+
+**Releasable: no.**
+
+Session 60 makes the engine channel read at a glance. The driver's own lines take the word `dabbler` as their prefix in place of `drive` -- written in one place, the `log` method in `packages/router/src/drive.ts`, and its `drive:` diagnostics with it, so the framework speaks in one word and the engine stays under its `│` glyph. The extension then creates the "Dabbler: Engine" output channel with a `dabbler-drive` language id and contributes that language and a TextMate grammar under `syntaxes/`, colouring each line class through standard scopes: the clock and the `key=` names dimmed as comment, event names as keyword, refusals and stops and `stderr:`/`error:` in the theme's error colour, tool names and their arguments as function and string, and the engine's own `engine:` words left in the plain foreground as the brightest text in the block. Nothing is contributed under `colors`, so both theme kinds come free. The router keeps emitting plain text on the pipe -- one classifier, one owner, no ANSI for the extension's line reader to meet. `docs/driving-a-session.md` is re-cut from a fresh scratch-repository walk with Haiku so every example line carries the new prefix, its line-kind list names `engine:` for the engine's words where it now says `text`, and one paragraph says how the colours read; README and quick-start show no lines and do not change. The background band, a level filter and collapsing an engine block are deliberately not in this session -- each is a Pseudoterminal's to give, and the operator decides them after watching drives under the grammar. Extension 2.5.0, unpublished like the rest; this session publishes nothing.

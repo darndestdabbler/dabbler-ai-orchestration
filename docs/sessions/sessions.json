@@ -1161,24 +1161,45 @@
       "title": "Start is the launch, and the developer's guide",
       "status": "complete",
       "startedAt": "2026-08-31T06:55:51.687000-04:00",
+      "completedAt": "2026-08-31T07:22:47.932000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",
         "model": "haiku",
         "identityProvenance": "direct"
       },
-      "frameworkVersion": "2.0.0",
-      "completedAt": "2026-08-31T07:22:47.932000-04:00",
       "verificationVerdict": "VERIFIED",
       "verification": {
         "rounds": 2,
         "verifierModel": "gpt-5-6-sol",
         "verifierProvider": "openai",
         "transport": "api"
-      }
+      },
+      "frameworkVersion": "2.0.0"
     },
     {
       "number": 60,
+      "title": "The engine channel reads at a glance",
+      "status": "in-progress",
+      "startedAt": "2026-08-31T07:45:14.822000-04:00",
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "model": "opus",
+        "identityProvenance": "direct"
+      },
+      "frameworkVersion": "2.0.0",
+      "completedAt": null,
+      "verificationVerdict": "VERIFIED",
+      "verification": {
+        "rounds": 3,
+        "verifierModel": "gpt-5-6-sol",
+        "verifierProvider": "openai",
+        "transport": "api"
+      }
+    },
+    {
+      "number": 61,
       "title": "The operator onboarding deck",
       "status": "not-started",
       "startedAt": null,
@@ -1187,7 +1208,7 @@
       "verificationVerdict": null
     },
     {
-      "number": 61,
+      "number": 62,
       "title": "The half of the trial that needs a published router",
       "status": "not-started",
       "startedAt": null,

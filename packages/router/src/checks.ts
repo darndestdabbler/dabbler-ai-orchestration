@@ -1247,7 +1247,12 @@ export function spawnProgram(argv: readonly string[], options: SpawnOptions): Ch
     ...(process.platform === "win32" ? {} : { detached: true }),
   };
   if (resolved.isBatch) {
-    const line = [resolved.path, ...rest].map(quoteForCmd).join(" ");
+    // The outer pair is `/s`'s own rule and not decoration: cmd strips the
+    // first and last quote of everything after `/c` when the first character
+    // is a quote. Without it a shim under `C:\Program Files` loses the quotes
+    // that hold its path together and cmd answers `'C:\Program' is not
+    // recognized`, which reads as a missing program rather than as quoting.
+    const line = `"${[resolved.path, ...rest].map(quoteForCmd).join(" ")}"`;
     return spawn(process.env["COMSPEC"] ?? "cmd.exe", ["/d", "/s", "/v:off", "/c", line], {
       ...grouped,
       windowsVerbatimArguments: true,

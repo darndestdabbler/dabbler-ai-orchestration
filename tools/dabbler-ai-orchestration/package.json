@@ -2,7 +2,7 @@
   "name": "dabbler-ai-orchestration",
   "displayName": "Dabbler AI Orchestration",
   "description": "Organize AI-led development like work: modules, session sets and step-by-step session plans in a native tree — plus routed verification before every close, normally cross-provider, recorded as evidence you can check.",
-  "version": "2.4.0",
+  "version": "2.5.0",
   "publisher": "DarndestDabbler",
   "private": true,
   "engines": {
@@ -356,7 +356,22 @@
           "markdownDescription": "How long an in-flight session's record may sit still before the Work Explorer says nothing has been written for a while. It is a heartbeat, not a judgment: it reports that the record stopped moving, never that the work stopped being useful. Verification rounds routinely take ten minutes, so a short threshold calls every ordinary round a stall — and a signal that cries wolf is one people stop reading.\n\nThis wins over `verification.stalled_after_seconds` in the repository's `dabbler.yaml`, which wins over the built-in default."
         }
       }
-    }
+    },
+    "languages": [
+      {
+        "id": "dabbler-drive",
+        "aliases": [
+          "Dabbler drive"
+        ]
+      }
+    ],
+    "grammars": [
+      {
+        "language": "dabbler-drive",
+        "scopeName": "source.dabbler-drive",
+        "path": "./syntaxes/dabbler-drive.tmLanguage.json"
+      }
+    ]
   },
   "scripts": {
     "compile": "node esbuild.js",

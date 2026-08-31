@@ -17,6 +17,7 @@ import {
   ENGINES,
   type DriveLauncher,
   type SessionRunUi,
+  engineOutputChannel,
   runSendToEngine,
   runStartSession,
   runStopDrive,
@@ -425,7 +426,7 @@ function launcherOf(drives: Map<string, FakeDrive>): DriveLauncher & { launched:
       launched.push({ root, args: [...args] });
       const drive = fakeDrive(root);
       drives.set(root, drive);
-      onLine("drive [00:00:00] engine-invoked seq=1 invocation=1/24");
+      onLine("dabbler [00:00:00] engine-invoked seq=1 invocation=1/24");
       return drive.handle;
     },
   };
@@ -513,6 +514,14 @@ suite("the driven session", () => {
     const shown = driveUi();
     assert.strictEqual(await runSendToEngine(repository, shown.ui, refused.router, drives), false);
     assert.ok(shown.errors[0].includes("not being driven"));
+  });
+
+  test("the engine channel is created under the language its grammar colours", () => {
+    // The contributed grammar reaches the channel by language id and no
+    // other way: without it the driver's lines and the engine's arrive in
+    // one undifferentiated colour. A channel created plain records none.
+    const created = engineOutputChannel() as unknown as { languageId?: string };
+    assert.strictEqual(created.languageId, "dabbler-drive");
   });
 });
 

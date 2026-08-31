@@ -1,8 +1,40 @@
-# STATUS — 54 of 56 closed. One design question is yours to take
+# STATUS — 55 of 57 closed. The task rows move themselves
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
 `experiment/verification-pipeline-v3` and `design/solution-decomposition`
 are merged and finished. Earlier handoff text is in `docs/status-archive.md`.
+
+> **Recorded, 2026-08-31, latest.** Session 55 was inserted from the
+> operator's screenshot of session 54 and closed `VERIFIED` in one round.
+> Its deliverable is **D247**: the Work Explorer's task rows are **derived
+> from the lifecycle's own records** — *Register* from `startedAt`,
+> *Declare* from the declaration, *Work* from the pre-verify evidence,
+> *Verify* from the rounds ledger, *Run of record* from the `final-full`
+> row, *Close* from the status — and the seeding, the two bookends and
+> `dabbler session log` (CLI, in-process router, contract) are **deleted**.
+> Nothing an engine types moves a row; the open row is the first not done.
+> `test-evidence record` now stamps the session on the row. Proven on the
+> session's own rows before its verdict. The plan was renumbered: the deck
+> is **56**, the publication trial **57**. Extension **2.3.0** is built and
+> installed here, unpublished like 2.0.0–2.2.0; 1155 router tests.
+>
+> **The operator's long-haul direction, recorded for the block after 57.**
+> The framework drives the lifecycle and calls AI as a service: an engine
+> asked to "start the next session" resolves it and launches the framework;
+> the framework asks the authoring AI for a work plan, hands back each step,
+> calls the verifier (which `dabbler verify` already does, with a schema-
+> validated round), routes findings back for disposition, runs the suite,
+> and closes. Every answer the framework acts on is **structured against a
+> schema** and refused mechanically when it does not validate; prose the AI
+> writes (decisions, change log, close-out) is markdown for people and the
+> framework never interprets it; code and tests the framework compiles and
+> runs but never reads. `dabbler workflow` (session 35) is the seam to grow.
+> Plan it as a set: the ask/answer schemas first, then the driver, then an
+> authoring adapter per engine, then the extension's Start becomes the
+> launch. Two cautions to decide up front: per-step calls need the prior
+> step reports, not the transcript, or later steps degrade; and a verifier
+> that writes tests against its own findings needs the authored-tests
+> envelope kept.
 
 > **Recorded, 2026-08-31, later.** Session 54 closed `VERIFIED` in one
 > round. Its deliverable is **D246**: `packages/router/vitest.config.ts`
@@ -92,27 +124,13 @@ are merged and finished. Earlier handoff text is in `docs/status-archive.md`.
 ## What is waiting on you
 
 **Nothing that blocks work.** The next sessions run from the `.vsix`.
-**One design question, raised 2026-08-31, that changes session 55 if you
-take it.** Task rows that the framework moves itself, and none that a
-model narrates. Every lifecycle verb already writes its record through the
-framework, so the row *is* the verb: `session start` completes *Register*;
-`session declare` completes *Declare* and opens *Work*; the pre-verify
-evidence record closes *Work* and completes *Affected tests*; each
-`dabbler verify` round moves *Verify* (the row shows the round, and
-`VERIFIED` completes it); the `final-full` record completes *Run of
-record*; the close completes *Close*, whose gates already observe the
-commit and the push. *Work* is the one row nothing can observe from
-inside, so it is one row, opened and closed by its neighbours, and the
-plan's prose steps stay in the plan as instructions rather than becoming
-rows. `session log` leaves the engine-facing surface — a row a model
-cannot tick is a row it cannot tick wrong. Two things this is *not*: the
-framework does not launch verification, the suite or the close today (the
-engine types each verb; the extension's commands are Start, Close, Cancel,
-Restore and Set Up), and the rows above do not need it to — they need only
-that each verb flips its own row when it writes. Making the framework
-launch them is a separate, larger question. If taken, it inserts as
-**session 55** ahead of the onboarding deck, whose slide 3 should show rows
-that move by themselves.
+**Taken, 2026-08-31, as session 55 (D247).** The task rows now move
+themselves; `session log` is gone. Next is **56, the onboarding deck** —
+install the 2.3.0 `.vsix` first if this is a fresh machine, so slide 3's
+screenshot shows rows that move — then **57, the publication trial**, when
+you publish. The long-haul direction (the framework drives the lifecycle
+and calls AI as a service, structured answers only) is recorded above and
+is the block after 57; it is not planned yet.
 
 
 One decision is open, and it is yours to take when testing is finished,

@@ -2166,7 +2166,7 @@ the plan.*
 
 ---
 
-### Session 51 of 62: What the field trial found, and nothing else
+### Session 51 of 64: What the field trial found, and nothing else
 
 *Amended into the plan by session 50, which is the session that found them.
 Bounded deliberately: a remediation session that grows is a second feature
@@ -2194,7 +2194,7 @@ F-50-4 is a new session, not a widening of this one.
 
 ---
 
-### Session 52 of 62: The startup experience, walked before it ships
+### Session 52 of 64: The startup experience, walked before it ships
 
 *Inserted 2026-08-30, at the operator's request: "I want the startup
 experience to have a good DX before release." Two defects found by reading the
@@ -2223,7 +2223,7 @@ session that never ships.
 
 ---
 
-### Session 53 of 62: The Work Explorer reads at a glance, and session 1 asks
+### Session 53 of 64: The Work Explorer reads at a glance, and session 1 asks
 
 *Inserted 2026-08-31, at the operator's request, from three pieces of feedback
 given while looking at this repository's own Work Explorer and after restarting
@@ -2260,7 +2260,7 @@ Est. 5 tests net. Extension to 2.2.0.
 
 ---
 
-### Session 54 of 62: The router suite stops taxing the host
+### Session 54 of 64: The router suite stops taxing the host
 
 *Planned 2026-08-31. Running the router suite pins the host: `packages/router`
 declares no vitest configuration, so the pool is one worker per logical core —
@@ -2288,7 +2288,7 @@ Est. 1 test net. Nothing else.
 
 ---
 
-### Session 55 of 62: The task rows move themselves
+### Session 55 of 64: The task rows move themselves
 
 *Planned 2026-08-31, from the operator's screenshot of session 54: Register
 "in progress" three minutes after `session start` had registered the
@@ -2374,12 +2374,14 @@ the shell's unquoted join shattered the first Copilot prompt.*
 The deck follows the set so that its slides show the driven lifecycle
 — Start, watch, interrupt — rather than the typed one; the publication
 trial stays last. Session 60 — the engine channel made readable — was
-inserted after 59 on 2026-08-31 from watching the first driven sessions,
-so the deck is 61 and the trial 62.
+inserted after 59 on 2026-08-31 from watching the first driven sessions.
+After 60 the shape changed again: sessions 61–62 move the engine back
+into the person's own CLI (see the section before them), so the deck is
+63 and the trial 64.
 
 ---
 
-### Session 56 of 62: The driver's contract — the schemas and the report verb
+### Session 56 of 64: The driver's contract — the schemas and the report verb
 
 1. Register; declare `--not-releasable`.
 2. **Four schemas** under `packages/router/src/schema/`, validated with the
@@ -2407,7 +2409,7 @@ hand-written report the ledger reader refuses.
 
 ---
 
-### Session 57 of 62: `dabbler session drive` — the framework runs the session
+### Session 57 of 64: `dabbler session drive` — the framework runs the session
 
 1. Register; declare `--not-releasable`.
 2. **The loop**, as a router verb that owns the process from register to
@@ -2438,7 +2440,7 @@ close, budget stop).
 
 ---
 
-### Session 58 of 62: The engine adapter — Claude Code, Copilot, Codex; stream; interrupt
+### Session 58 of 64: The engine adapter — Claude Code, Copilot, Codex; stream; interrupt
 
 1. Register; declare `--not-releasable`.
 2. **Spawn without shattering.** `resolveProgram` prefers an `.exe` and
@@ -2480,7 +2482,7 @@ renderer's system-event rule, the interrupt re-invocation.
 
 ---
 
-### Session 59 of 62: Start is the launch, and the developer's guide
+### Session 59 of 64: Start is the launch, and the developer's guide
 
 1. Register; declare `--not-releasable`.
 2. **Start Session runs `session drive`.** The extension launches the driver
@@ -2508,7 +2510,7 @@ Est. 4 tests in the extension suite (the launch, the channel, Stop, Send),
 
 ---
 
-### Session 60 of 62: The engine channel reads at a glance
+### Session 60 of 64: The engine channel reads at a glance
 
 *Planned 2026-08-31 after session 59, from the operator watching the first
 driven sessions in "Dabbler: Engine": one block of default-coloured text,
@@ -2593,12 +2595,154 @@ rest.
 
 ---
 
-### Session 61 of 62: The operator onboarding deck
+## Why sessions 61–62 exist: the engine stays in the person's own CLI
+
+*Planned 2026-08-31 after session 60, on the operator's adoption call. The
+staff who will use this already trust the Copilot CLI and Claude Code as
+they are, and an earlier extension was rejected for seeming to do too
+much. A driven session that replaced their CLI with an Output channel — no
+spinner, no chat, clipped lines, a stop nobody was told about — reads as
+"a home-made CLI that is worse than Copilot's", and the operator judged
+it would be rejected on sight. The spike's* await *variant lost to*
+resume *on two counts, the idle failure mode (an engine that had to wait
+correctly, background on one CLI and foreground on the other) and
+headlessness. What is planned here is neither: a* pull. *There is no
+driver process. One verb, `dabbler session next`, advances the state
+machine on disk each time it is called and returns the next instruction;
+nothing waits, nothing can be orphaned, and the engine is the person's
+own interactive session — its spinner, its chat, its ask-user tool, its
+Esc. The framework is what runs in the background, which is the
+impression the staff should have.*
+
+*Two facts from session 60's own run shaped the cut. First, `claude -p
+--continue` resumes the most recent conversation in the directory:
+after the resume from the `blocked` stop, the driver's invocations 4–8
+ran on top of an unrelated interactive Claude Code session that happened
+to be newer, and appended their turns to it (`engine-01..03.log` carry
+session `7a3a4490…`, `engine-04..08.log` another). Under a pull there is
+nothing to resume — the person's session is the session — and the
+headless path, if it stays, resumes by id. Second, what the operator
+liked in the terminal — colour, a ✓ per file, a spinner — was vitest and
+mocha drawing on a real TTY through `test-evidence run`'s `stdio:
+"inherit"`. An Output channel can never show that and a terminal always
+will, which settles where the framework's work is shown.*
+
+The deck (63) follows so that its slides show this shape — the person's
+CLI in one terminal, Dabbler's in the other, the Explorer moving — and
+the publication trial stays last.
+
+---
+
+### Session 61 of 64: `dabbler session next` — the loop as a verb the engine calls
+
+1. Register; declare `--not-releasable`.
+2. **The verb.** `dabbler session next` re-hosts the loop in `drive.ts`
+   without rewriting it. Each call judges the outstanding report exactly
+   as `runStep` does today — schema, seq, step, files against the
+   baseline, the step's checks — and then advances one move: plan →
+   declare → steps → affected tests → verify and dispositions → run of
+   record → commit, push, close — and prints the next instruction on
+   stdout as the same `driver-instruction` JSON the engine already answers
+   with `session report`. `run.json` carries the phase between calls as it
+   does now; a call after a stop resumes from the phase, and a refusal
+   comes back as `kind: rejection` with the reasons, as it does now. The
+   engine's whole instruction is one sentence: call `next` and do what it
+   says until it says `done`.
+3. **Long work is backgrounded, never awaited inside a call.** A verify
+   round, the complete suite and the close outlast an engine's tool
+   timeout (`verify_session` outlasted Bash's in v1; the spike's foreground
+   poll died the same way). `next` starts such work detached, records its
+   pid, its start and a log path on `run.json`, and returns `kind: wait`
+   with `retry_after_seconds` and the log path; the following call reports
+   progress or the result. A `wait` is a tool call, not a sleep, so the
+   Claude Code classifier that killed the spike's poll does not apply and
+   Copilot's foreground is fine.
+4. **`session drive` becomes a thin loop over `next`** with a headless
+   engine — the built adapter keeps its one real use, CI and unattended
+   runs — or is retired for now under the "does too much" rule. Decided in
+   the session and recorded either way. If it stays: the framework never
+   resumes an engine by recency again. Claude Code's `session_id` is read
+   from the first invocation's `init` event and passed as `--resume <id>`;
+   Codex's thread id from `thread.started`, never `resume --last`; with a
+   test that a newer session in the same directory is not picked up.
+5. **`docs/driving-a-session.md`** re-cut for the pull: what to type in
+   your own CLI, what each `next` returns, how to interrupt (your CLI's own
+   Esc or Ctrl+C, then talk to it), what a `wait` means, what to do when
+   `next` says the framework stopped and why. Every example line printed
+   by a real walk, and the guide says which.
+6. **Walked** on a scratch repository — own command, absolute paths,
+   `--sessions-dir` on every verb — with the Copilot CLI interactive (the
+   seat the staff use) and with Claude Code interactive: the person types
+   one sentence, the engine calls `next` through to `done`, the person
+   interrupts once mid-step from their own CLI. Recorded; what it finds
+   amends the plan.
+7. Affected; verify; full suite as `final-full`; close.
+
+Est. 6 router tests (the phase advance per call, `wait` and its
+background job, a call after a stop, the resume-by-id refusal of a newer
+session, `drive` over `next`). No extension change.
+
+---
+
+### Session 62 of 64: The entry — one sentence in the CLI, and Dabbler's own terminal
+
+1. Register; declare `--not-releasable`.
+2. **The managed body says one thing.** `AGENTS.md`'s nine typed steps
+   retire from the body `dabbler bootstrap` writes; what remains is how to
+   run a session — call `dabbler session next` and do what it says until
+   it says `done` — plus the hard rules that are still the engine's
+   (keys in the environment, the record is the machine's). The engine
+   tails stay. This repository's own `AGENTS.md` is re-bootstrapped from
+   it, and the operator's superseded ground-rules block is kept as is.
+3. **Start Session opens the person's CLI.** The Work Explorer's Start
+   picks the engine as now, then opens a VS Code terminal at the
+   repository root with that CLI launched interactively and the opening
+   sentence supplied where the CLI's argv takes one, typed by the person
+   otherwise. Stop and Send retire from the status bar: interrupt is the
+   CLI's own Esc and chat. Nothing is copied to a clipboard.
+4. **The Dabbler terminal.** A Pseudoterminal the extension owns
+   (`window.createTerminal({ pty })`, named *Dabbler*) shows the
+   framework's background work: the `dabbler [time] event` lines, every
+   background job's log as it runs — the test runners' own colours, ✓ and
+   spinner passing through untouched — a working indicator while a job
+   runs and a waiting one while the engine is between calls, and the band
+   (#165044 dark / #87decd light) behind the framework's own lines if the
+   operator still wants it once the runners' output is seen beside it.
+   Theme kind from `window.activeColorTheme`, re-read on change. The
+   "Dabbler: Engine" channel and its grammar stay for the engine stream
+   under headless `drive`, if 61 kept it.
+5. **A framework stop is loud.** When `run.json` gains a `stop`, or an
+   owed decision is raised: an attention row above the buckets with a
+   themed icon (`$(warning)` for a stop, `$(question)` for a decision,
+   coloured through `ThemeColor`), its tooltip the whole brief — question,
+   recommendation, each option with its consequence; a toast with the
+   recommended option, *Other…* and *Later*; the activity-bar badge with
+   the count. *Other…* and a click on the row open a QuickPick whose
+   items carry each option's consequence as `detail` (context-menu items
+   cannot carry tooltips), and choosing calls `dabbler owed answer`
+   in-process. A driver stop is raised as an owed decision (*Run `next`
+   again* / *Cancel the session*) so one kind of row serves every "waiting
+   on you". The liveness row becomes the working/waiting indicator
+   instead of "last written N ago" alone.
+6. **Walked** from the installed extension on a scratch repository with
+   Copilot: Start, the sentence, the two terminals side by side, a stop
+   seen as a toast and answered from the row. Recorded.
+7. Affected; verify; full suite as `final-full`; close.
+
+Est. 8 extension tests (the terminal opened with the CLI, the pty and
+its indicator states, the row, the toast, the QuickPick answer, the badge),
+2 router tests (a driver stop raises an owed decision; the bootstrap body
+carries the one sentence). Extension 2.6.0, unpublished like the rest.
+
+---
+
+### Session 63 of 64: The operator onboarding deck
 
 *Planned 2026-08-31 at the operator's request: a PowerPoint deck that onboards a
-human operator to the framework. Runs after 60, so the slides show the driven
-lifecycle — Start, watch, Send, Stop — as the channel renders it once 60 has
-landed, never as 59's plain block. Slides as the operator laid
+human operator to the framework. Runs after 62, so the slides show the driven
+lifecycle as the staff will meet it: their own CLI in one terminal, Dabbler's
+in the other, the Explorer moving — never the Output-channel shape of 59–60.
+Slides as the operator laid
 them out; the deck is a committed artifact, and it is built by a script so a
 later session can rebuild it when a screen changes.*
 
@@ -2612,7 +2756,7 @@ later session can rebuild it when a screen changes.*
    solution.
 3. **Slides 1–6.**
    - *1 — What is Dabbler AI Orchestration?* The VS Code extension, how to
-     install it (Marketplace once 62 has published; the `.vsix` until then),
+     install it (Marketplace once 64 has published; the `.vsix` until then),
      the GitHub repository.
    - *2 — Why use Dabbler?* Automatic cross-provider verification with further
      rounds when a round finds something; one lifecycle for every session
@@ -2633,14 +2777,15 @@ later session can rebuild it when a screen changes.*
      it writes and commits, the two owed questions it may raise, then session
      1 — which asks you what the project is — and session 2.
    - *Between 6 and 7 — Driving a session* (the operator numbers it). Start
-     on the Work Explorer picks the engine; then the "Dabbler: Engine"
-     channel as session 60 renders it — a screenshot, with the two line
-     kinds called out: `dabbler [time] event k=v` is the framework, `  │ …`
-     is the engine; thinking dimmed, tool names bold, the engine's own
-     words brightest, a refusal in the error colour. Send and Stop, and
-     what `quiet` hides. The screenshot is taken after 60 lands — never
-     from 59's plain block — and every example line on a slide carries the
-     `dabbler` prefix, as `docs/driving-a-session.md` does after 60.
+     on the Work Explorer picks the engine and opens your CLI; you type one
+     sentence. A screenshot of the two terminals side by side — your CLI
+     working as it always does, and the *Dabbler* terminal showing the
+     framework's `dabbler [time] event` lines and the test runners' own
+     output — with the Explorer's rows moving. Interrupting is your CLI's
+     own Esc; a framework stop arrives as a toast and a row you answer
+     from. The screenshots are taken after 62 lands, never from the
+     Output-channel shape of 59–60, and every example line on a slide
+     carries the `dabbler` prefix, as `docs/driving-a-session.md` does.
 4. **Slides 7–x: a four-repository CSV solution**, as the operator specified:
    *csv-model* (First Name, Last Name, DOB); *csv-deserializer* (populates the
    model from a CSV string or stream); *csv-persistence* (Entity Framework
@@ -2664,7 +2809,7 @@ count). No extension change.
 
 ---
 
-### Session 62 of 62: The half of the trial that needs a published router
+### Session 64 of 64: The half of the trial that needs a published router
 
 *Runs when the operator decides to publish, at whatever version is current
 then — and not before. It is not blocked and nothing waits on it: the

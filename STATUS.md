@@ -1,8 +1,70 @@
-# STATUS — 59 of 62 closed. Next: 60, the engine channel reads at a glance
+# STATUS — 60 of 64 closed. Next: 61, `dabbler session next` — the loop as a verb the engine calls
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
 `experiment/verification-pipeline-v3` and `design/solution-decomposition`
 are merged and finished. Earlier handoff text is in `docs/status-archive.md`.
+
+> **Recorded, 2026-08-31, after session 60 — the first session this
+> repository drove itself, and the plan re-cut for the pull.** Session 60
+> closed `VERIFIED` in three rounds, driven end to end by `dabbler session
+> drive` with Opus on Claude Code: plan accepted, four steps, eight
+> invocations, verification with dispositions, run of record, commit,
+> push, close. It stopped once — the engine reported step `prefix`
+> `blocked` after finding a real bug in `spawnProgram`'s `.cmd` branch
+> (`cmd /s` strips the first and last quote of the line, so a shim under
+> `C:\Program Files` became `'C:\Program' is not recognized`; 58's shim
+> test had no space in its path) — fixed it in `checks.ts` with a
+> falsifying test, and said truthfully that the running bundle could not
+> load the fix. The resume was one command from a terminal on the rebuilt
+> `dist`, since Start and the PATH shim both run the installed bundle.
+> Round 1 raised three findings (the driver loading configuration from
+> the invoking repository rather than the driven one; the grammar missing
+> the error scope on a blocking verdict; the guide's provenance claim),
+> round 2 one Major and the nit, round 3 the nit only; the guide step was
+> amended on the record in round 2 (not every example could come from the
+> fresh walk, and the guide now says which walk each came from). What
+> landed: `drive` → `dabbler` on every line the driver speaks; the
+> "Dabbler: Engine" channel under a `dabbler-drive` language with a
+> TextMate grammar on standard scopes; `docs/driving-a-session.md`
+> re-cut; extension **2.5.0**, unpublished. The driven close writes
+> `project-work-plan.md` and the change-log, not this file — this block
+> is the operator-side record.
+>
+> **Two findings from the run, both on the plan now.** (1) `claude -p
+> --continue` resumes the most recent conversation in the directory: after
+> the resume, the driver's invocations 4–8 ran on top of an unrelated
+> interactive Claude Code session that was newer (`engine-01..03.log`
+> carry session `7a3a4490…`, `engine-04..08.log` another) and appended
+> their turns to it. Any interactive session in the same directory
+> hijacks a driven run; the fix is `--resume <id>` from the first `init`
+> event (Codex: the thread id, never `resume --last`). (2) The colour, ✓
+> and spinner the operator liked in the terminal were vitest and mocha on
+> a real TTY through `test-evidence run`'s `stdio: "inherit"` — the router
+> styles nothing. An Output channel can never show that; a terminal
+> always will.
+>
+> **The direction: the engine stays in the person's own CLI.** The
+> operator's adoption call: the staff trust the Copilot CLI and Claude
+> Code as they are, rejected an earlier extension for doing too much, and
+> would read a driven session that replaces their CLI with an Output
+> channel as a home-made CLI worse than Copilot's. So the framework goes
+> to the background as a **pull** — no driver process; `dabbler session
+> next` advances the state machine on disk each call and returns the next
+> instruction, long work backgrounded with `kind: wait` — and the engine
+> is the person's interactive session, with its own spinner, chat, ask-user
+> and Esc. It is not the spike's *await*: nothing waits and nothing can be
+> orphaned. **Sessions 61 and 62 are that work** (61 the verb, the
+> background jobs, `drive` over `next` or retired, resume-by-id if kept,
+> the guide; 62 the entry — the managed body reduced to one sentence,
+> Start opens the CLI in a terminal, a *Dabbler* pseudoterminal for the
+> framework's work with the runners' output passing through, loud stops
+> as attention rows, toasts, the badge, answered from a QuickPick);
+> **the deck is 63 and the publication trial 64.** The ledger was not
+> hand-edited: 61 and 62 were historyless rows, the projection heals
+> titles on read, and the next `session start` grows the ledger to 64.
+> Start on 61 from the installed 2.5.0, or the terminal command in
+> `docs/driving-a-session.md`, is how it begins — and 61 changes the
+> driver, so expect the same rebuild-and-resume from `dist` if it stops.
 
 > **Recorded, 2026-08-31, after session 59: the plan is re-cut once more.**
 > Watching the first driven sessions in "Dabbler: Engine" showed one
@@ -103,10 +165,10 @@ are merged and finished. Earlier handoff text is in `docs/status-archive.md`.
 > pushed under `refs/dabbler/rounds/` by each close survive on the
 > remote); the closes that consumed that evidence are unaffected.
 >
-> **Owed to 61, the deck (it was 60 until the re-cut above).** The deck
-> shows the driven lifecycle — Start, watch, Send, Stop — from
-> `docs/driving-a-session.md`; pressing Start on the next session from
-> the installed 2.4.0 is the walk the verifier still wants. **Left
+> **Owed to 63, the deck (60, then 61, until the re-cuts above).** The
+> deck shows the driven lifecycle as 61–62 reshape it; pressing Start on
+> the next session from the installed extension is the walk the verifier
+> still wants. **Left
 > open:** 58's nit stands, narrower — `run.json` does not say whether an
 > invocation is in flight, though nothing sent is lost any more. The
 > interrupted invocations in the walk ended by the ten-second tree-kill

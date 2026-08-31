@@ -1,8 +1,37 @@
-# STATUS — 59 of 61 closed. Next: 60, the operator onboarding deck
+# STATUS — 59 of 62 closed. Next: 60, the engine channel reads at a glance
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
 `experiment/verification-pipeline-v3` and `design/solution-decomposition`
 are merged and finished. Earlier handoff text is in `docs/status-archive.md`.
+
+> **Recorded, 2026-08-31, after session 59: the plan is re-cut once more.**
+> Watching the first driven sessions in "Dabbler: Engine" showed one
+> block of default-coloured text, the driver's lines and the engine's
+> told apart only by the `│`. Three surfaces were weighed — a
+> LogOutputChannel (level colours and a filter; a doubled clock, no
+> palette), a language and TextMate grammar on the existing channel
+> (every line class coloured through the theme's own scopes; no
+> background, no router change), and a Pseudoterminal (full ANSI, a
+> background band on the engine block, a typed Send) — and the operator
+> chose the grammar now, with the band (#165044 dark / #87decd light, on
+> the engine block only) deferred until a few drives have been watched
+> under it. The prefix `drive` becomes `dabbler`: the operator weighed
+> `📢` and `ⓓ` and took the word — typeable, greppable, one width in
+> every font, and a dimmed word costs nothing once the grammar lands.
+> **Session 60 is that work**, inserted after 59; **the deck is 61 and
+> the publication trial 62.** The ledger was not hand-edited: 60 and 61
+> are historyless rows, so the next `session start` re-titles them from
+> the plan's headings and grows the ledger to 62 (`buildSessionsArray`
+> in `writers.ts`, `healTitle` in `progress.ts`), and the projection
+> heals titles on read, so `dabbler status` and the Work Explorer already
+> show the new names on 60, 61 and 62. **The deck (61)
+> knows:** its screenshots of the channel are taken after 60 lands,
+> never from 59's plain block; its example lines carry the `dabbler`
+> prefix; and it gets a slide between 6 and 7 for driving a session.
+> **Owed to 60:** the walk the verifier keeps asking for — Start pressed
+> from the installed extension — is 60's as much as 61's, and
+> `docs/driving-a-session.md`'s line-kind list should say `engine:`
+> (what `engines.ts` prints for the engine's words), not `text`.
 
 > **Recorded, 2026-08-31, after session 59.** Session 59 — the last of the
 > driver set — closed `VERIFIED` in two rounds. Round 1 raised two
@@ -74,9 +103,10 @@ are merged and finished. Earlier handoff text is in `docs/status-archive.md`.
 > pushed under `refs/dabbler/rounds/` by each close survive on the
 > remote); the closes that consumed that evidence are unaffected.
 >
-> **Owed to 60.** The deck shows the driven lifecycle — Start, watch,
-> Send, Stop — from `docs/driving-a-session.md`; pressing Start on 60
-> from the installed 2.4.0 is the walk the verifier still wants. **Left
+> **Owed to 61, the deck (it was 60 until the re-cut above).** The deck
+> shows the driven lifecycle — Start, watch, Send, Stop — from
+> `docs/driving-a-session.md`; pressing Start on the next session from
+> the installed 2.4.0 is the walk the verifier still wants. **Left
 > open:** 58's nit stands, narrower — `run.json` does not say whether an
 > invocation is in flight, though nothing sent is lost any more. The
 > interrupted invocations in the walk ended by the ten-second tree-kill

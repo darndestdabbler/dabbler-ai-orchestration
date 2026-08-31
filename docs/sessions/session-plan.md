@@ -2166,7 +2166,7 @@ the plan.*
 
 ---
 
-### Session 51 of 61: What the field trial found, and nothing else
+### Session 51 of 62: What the field trial found, and nothing else
 
 *Amended into the plan by session 50, which is the session that found them.
 Bounded deliberately: a remediation session that grows is a second feature
@@ -2194,7 +2194,7 @@ F-50-4 is a new session, not a widening of this one.
 
 ---
 
-### Session 52 of 61: The startup experience, walked before it ships
+### Session 52 of 62: The startup experience, walked before it ships
 
 *Inserted 2026-08-30, at the operator's request: "I want the startup
 experience to have a good DX before release." Two defects found by reading the
@@ -2223,7 +2223,7 @@ session that never ships.
 
 ---
 
-### Session 53 of 61: The Work Explorer reads at a glance, and session 1 asks
+### Session 53 of 62: The Work Explorer reads at a glance, and session 1 asks
 
 *Inserted 2026-08-31, at the operator's request, from three pieces of feedback
 given while looking at this repository's own Work Explorer and after restarting
@@ -2260,7 +2260,7 @@ Est. 5 tests net. Extension to 2.2.0.
 
 ---
 
-### Session 54 of 61: The router suite stops taxing the host
+### Session 54 of 62: The router suite stops taxing the host
 
 *Planned 2026-08-31. Running the router suite pins the host: `packages/router`
 declares no vitest configuration, so the pool is one worker per logical core —
@@ -2288,7 +2288,7 @@ Est. 1 test net. Nothing else.
 
 ---
 
-### Session 55 of 61: The task rows move themselves
+### Session 55 of 62: The task rows move themselves
 
 *Planned 2026-08-31, from the operator's screenshot of session 54: Register
 "in progress" three minutes after `session start` had registered the
@@ -2371,13 +2371,15 @@ run, never interpreted. One more, from a bug: an engine CLI is spawned as an
 `.exe` with no shell, or with every argument quoted for a `.cmd` shim —
 the shell's unquoted join shattered the first Copilot prompt.*
 
-The deck (60) follows the set so that its slides show the driven lifecycle
+The deck follows the set so that its slides show the driven lifecycle
 — Start, watch, interrupt — rather than the typed one; the publication
-trial stays last.
+trial stays last. Session 60 — the engine channel made readable — was
+inserted after 59 on 2026-08-31 from watching the first driven sessions,
+so the deck is 61 and the trial 62.
 
 ---
 
-### Session 56 of 61: The driver's contract — the schemas and the report verb
+### Session 56 of 62: The driver's contract — the schemas and the report verb
 
 1. Register; declare `--not-releasable`.
 2. **Four schemas** under `packages/router/src/schema/`, validated with the
@@ -2405,7 +2407,7 @@ hand-written report the ledger reader refuses.
 
 ---
 
-### Session 57 of 61: `dabbler session drive` — the framework runs the session
+### Session 57 of 62: `dabbler session drive` — the framework runs the session
 
 1. Register; declare `--not-releasable`.
 2. **The loop**, as a router verb that owns the process from register to
@@ -2436,7 +2438,7 @@ close, budget stop).
 
 ---
 
-### Session 58 of 61: The engine adapter — Claude Code, Copilot, Codex; stream; interrupt
+### Session 58 of 62: The engine adapter — Claude Code, Copilot, Codex; stream; interrupt
 
 1. Register; declare `--not-releasable`.
 2. **Spawn without shattering.** `resolveProgram` prefers an `.exe` and
@@ -2478,7 +2480,7 @@ renderer's system-event rule, the interrupt re-invocation.
 
 ---
 
-### Session 59 of 61: Start is the launch, and the developer's guide
+### Session 59 of 62: Start is the launch, and the developer's guide
 
 1. Register; declare `--not-releasable`.
 2. **Start Session runs `session drive`.** The extension launches the driver
@@ -2506,10 +2508,87 @@ Est. 4 tests in the extension suite (the launch, the channel, Stop, Send),
 
 ---
 
-### Session 60 of 61: The operator onboarding deck
+### Session 60 of 62: The engine channel reads at a glance
+
+*Planned 2026-08-31 after session 59, from the operator watching the first
+driven sessions in "Dabbler: Engine": one block of default-coloured text,
+the driver's lines and the engine's told apart only by the `│`. Three
+surfaces were weighed. A LogOutputChannel gives level colours and a filter
+but doubles the clock and has no palette. A language and TextMate grammar
+on the existing channel colours every line class through the theme's own
+scopes — light and dark for free, no background, no router change. A
+Pseudoterminal gives full ANSI: a background band on the engine block
+(#165044 in dark themes, #87decd in light), a typed Send. The operator
+chose the grammar now, with the band deferred until a few drives have been
+watched in it. For the prefix the operator weighed `📢` and `ⓓ` against a
+word and took `dabbler`: typeable, greppable, one width in every font, a
+colour the theme can dim — an emoji is a bitmap no scope can style, and an
+enclosed letter is ambiguous-width and reads as ©. The rule that comes
+out of it: the framework speaks in a word, the engine under a glyph.*
+
+1. Register; declare `--not-releasable`.
+2. **The prefix.** `drive [time] event k=v` becomes `dabbler [time] event
+   k=v`. It is written in one place (`drive.ts`, the `log` method) and
+   parsed back nowhere: `driveProcess.ts` forwards lines verbatim, and its
+   tests print their own fixtures. The engine's `  │` indent still hangs
+   off the line above. The bare shell is the reason for a word: with no
+   colour at all, `dabbler [..]` against `│` says who spoke.
+3. **The grammar.** "Dabbler: Engine" is created with a language id
+   (`createOutputChannel(name, "dabbler-drive")`), and the extension
+   contributes that language and a TextMate grammar under `syntaxes/`.
+   Scopes are the standard ones every theme colours, so nothing is
+   contributed under `colors` and both theme kinds come free. What the
+   operator asked to see, by line class:
+   - `dabbler [06:49:17]` — the comment scope, dimmed; the event name
+     (`run-started`, `instruction-issued`, `engine-invoked`,
+     `engine-returned`, `plan-accepted`, `phase`, `check-passed`,
+     `report-accepted`) — the keyword scope; `key=` dimmed, the value in
+     the plain foreground, so `1/12` reads and `invocation=` does not.
+   - Refusals and stops (`report-refused`, `plan-refused`, `check-failed`,
+     `run-stopped`, `interrupted`, `stderr:`, `error:`, a blocking
+     verdict) — the invalid scope, the theme's error colour: a refusal in
+     the middle of two hundred lines is seen, not found.
+   - `│ thinking:` and the `│   ←` tool-result lines — dimmed like the
+     prefix. `│ tool Read` / `tool command` / `edit …` — the tool name in
+     the function scope, its argument in the string scope. `│ engine:` —
+     the engine's own words to a person — left in the plain foreground,
+     the brightest text in the block. `engine session started`, `result:`
+     and `interrupt acknowledged` — keyword.
+   The vocabulary is read from `drive.ts` and `engines.ts` when the grammar
+   is written, not from this list; this list is the intent.
+4. **No ANSI.** The router's output stays plain text on a pipe. If a later
+   session colours a real terminal it does so only when
+   `process.stdout.isTTY` and `NO_COLOR` is unset, so the line reader in
+   `driveProcess.ts` never meets an escape. One classifier, one owner: the
+   extension styles, the router does not.
+5. **Not in this session:** the background band, a level filter, collapsing
+   an engine block. Each is a Pseudoterminal's to give and is decided after
+   the operator has watched drives under the grammar.
+6. **`docs/driving-a-session.md`** re-cut: every example line carries the
+   `dabbler` prefix (they are copied from a walk, so a fresh walk supplies
+   them); the line-kind list names what the renders print — `engine:` for
+   the engine's words, which the guide currently calls `text` — and one
+   paragraph says how the colours read. README and quick-start link the
+   guide and show no lines; they do not change.
+7. **Walked**: Start on a scratch repository with Haiku — its own command,
+   absolute paths, `--sessions-dir` on every verb (the D251 rule) — and the
+   channel seen coloured under one dark and one light theme. What it finds
+   amends the plan.
+8. Affected; verify; full suite as `final-full`; close.
+
+Est. 1 extension test (the channel is created with the language id; the
+grammar is declarative and is not tested). No new router test: the drive
+tests read the event, not the word. Extension 2.5.0, unpublished like the
+rest.
+
+---
+
+### Session 61 of 62: The operator onboarding deck
 
 *Planned 2026-08-31 at the operator's request: a PowerPoint deck that onboards a
-human operator to the framework. Runs after 59, the driver set, so the slides show the driven lifecycle: Start, watch, interrupt. Slides as the operator laid
+human operator to the framework. Runs after 60, so the slides show the driven
+lifecycle — Start, watch, Send, Stop — as the channel renders it once 60 has
+landed, never as 59's plain block. Slides as the operator laid
 them out; the deck is a committed artifact, and it is built by a script so a
 later session can rebuild it when a screen changes.*
 
@@ -2523,7 +2602,7 @@ later session can rebuild it when a screen changes.*
    solution.
 3. **Slides 1–6.**
    - *1 — What is Dabbler AI Orchestration?* The VS Code extension, how to
-     install it (Marketplace once 61 has published; the `.vsix` until then),
+     install it (Marketplace once 62 has published; the `.vsix` until then),
      the GitHub repository.
    - *2 — Why use Dabbler?* Automatic cross-provider verification with further
      rounds when a round finds something; one lifecycle for every session
@@ -2543,6 +2622,15 @@ later session can rebuild it when a screen changes.*
    - *6 — Project setup.* Set Up New Project (or `dabbler bootstrap`), what
      it writes and commits, the two owed questions it may raise, then session
      1 — which asks you what the project is — and session 2.
+   - *Between 6 and 7 — Driving a session* (the operator numbers it). Start
+     on the Work Explorer picks the engine; then the "Dabbler: Engine"
+     channel as session 60 renders it — a screenshot, with the two line
+     kinds called out: `dabbler [time] event k=v` is the framework, `  │ …`
+     is the engine; thinking dimmed, tool names bold, the engine's own
+     words brightest, a refusal in the error colour. Send and Stop, and
+     what `quiet` hides. The screenshot is taken after 60 lands — never
+     from 59's plain block — and every example line on a slide carries the
+     `dabbler` prefix, as `docs/driving-a-session.md` does after 60.
 4. **Slides 7–x: a four-repository CSV solution**, as the operator specified:
    *csv-model* (First Name, Last Name, DOB); *csv-deserializer* (populates the
    model from a CSV string or stream); *csv-persistence* (Entity Framework
@@ -2566,7 +2654,7 @@ count). No extension change.
 
 ---
 
-### Session 61 of 61: The half of the trial that needs a published router
+### Session 62 of 62: The half of the trial that needs a published router
 
 *Runs when the operator decides to publish, at whatever version is current
 then — and not before. It is not blocked and nothing waits on it: the

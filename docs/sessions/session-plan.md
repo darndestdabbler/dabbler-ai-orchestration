@@ -2166,7 +2166,7 @@ the plan.*
 
 ---
 
-### Session 51 of 64: What the field trial found, and nothing else
+### Session 51 of 65: What the field trial found, and nothing else
 
 *Amended into the plan by session 50, which is the session that found them.
 Bounded deliberately: a remediation session that grows is a second feature
@@ -2194,7 +2194,7 @@ F-50-4 is a new session, not a widening of this one.
 
 ---
 
-### Session 52 of 64: The startup experience, walked before it ships
+### Session 52 of 65: The startup experience, walked before it ships
 
 *Inserted 2026-08-30, at the operator's request: "I want the startup
 experience to have a good DX before release." Two defects found by reading the
@@ -2223,7 +2223,7 @@ session that never ships.
 
 ---
 
-### Session 53 of 64: The Work Explorer reads at a glance, and session 1 asks
+### Session 53 of 65: The Work Explorer reads at a glance, and session 1 asks
 
 *Inserted 2026-08-31, at the operator's request, from three pieces of feedback
 given while looking at this repository's own Work Explorer and after restarting
@@ -2260,7 +2260,7 @@ Est. 5 tests net. Extension to 2.2.0.
 
 ---
 
-### Session 54 of 64: The router suite stops taxing the host
+### Session 54 of 65: The router suite stops taxing the host
 
 *Planned 2026-08-31. Running the router suite pins the host: `packages/router`
 declares no vitest configuration, so the pool is one worker per logical core —
@@ -2288,7 +2288,7 @@ Est. 1 test net. Nothing else.
 
 ---
 
-### Session 55 of 64: The task rows move themselves
+### Session 55 of 65: The task rows move themselves
 
 *Planned 2026-08-31, from the operator's screenshot of session 54: Register
 "in progress" three minutes after `session start` had registered the
@@ -2381,7 +2381,7 @@ into the person's own CLI (see the section before them), so the deck is
 
 ---
 
-### Session 56 of 64: The driver's contract — the schemas and the report verb
+### Session 56 of 65: The driver's contract — the schemas and the report verb
 
 1. Register; declare `--not-releasable`.
 2. **Four schemas** under `packages/router/src/schema/`, validated with the
@@ -2409,7 +2409,7 @@ hand-written report the ledger reader refuses.
 
 ---
 
-### Session 57 of 64: `dabbler session drive` — the framework runs the session
+### Session 57 of 65: `dabbler session drive` — the framework runs the session
 
 1. Register; declare `--not-releasable`.
 2. **The loop**, as a router verb that owns the process from register to
@@ -2440,7 +2440,7 @@ close, budget stop).
 
 ---
 
-### Session 58 of 64: The engine adapter — Claude Code, Copilot, Codex; stream; interrupt
+### Session 58 of 65: The engine adapter — Claude Code, Copilot, Codex; stream; interrupt
 
 1. Register; declare `--not-releasable`.
 2. **Spawn without shattering.** `resolveProgram` prefers an `.exe` and
@@ -2482,7 +2482,7 @@ renderer's system-event rule, the interrupt re-invocation.
 
 ---
 
-### Session 59 of 64: Start is the launch, and the developer's guide
+### Session 59 of 65: Start is the launch, and the developer's guide
 
 1. Register; declare `--not-releasable`.
 2. **Start Session runs `session drive`.** The extension launches the driver
@@ -2510,7 +2510,7 @@ Est. 4 tests in the extension suite (the launch, the channel, Stop, Send),
 
 ---
 
-### Session 60 of 64: The engine channel reads at a glance
+### Session 60 of 65: The engine channel reads at a glance
 
 *Planned 2026-08-31 after session 59, from the operator watching the first
 driven sessions in "Dabbler: Engine": one block of default-coloured text,
@@ -2633,7 +2633,7 @@ the publication trial stays last.
 
 ---
 
-### Session 61 of 64: `dabbler session next` — the loop as a verb the engine calls
+### Session 61 of 65: `dabbler session next` — the loop as a verb the engine calls
 
 1. Register; declare `--not-releasable`.
 2. **The verb.** `dabbler session next` re-hosts the loop in `drive.ts`
@@ -2684,7 +2684,7 @@ session, `drive` over `next`). No extension change.
 
 ---
 
-### Session 62 of 64: The entry — one sentence in the CLI, and Dabbler's own terminal
+### Session 62 of 65: The entry — one sentence in the CLI, and Dabbler's own terminal
 
 1. Register; declare `--not-releasable`.
 2. **The managed body says one thing.** `AGENTS.md`'s nine typed steps
@@ -2758,10 +2758,89 @@ behind). Extension 2.6.0, unpublished like the rest.
 
 ---
 
-### Session 63 of 64: The operator onboarding deck
+### Session 63 of 65: The escape route — when the framework stops, it asks
+
+*Planned 2026-08-31 after session 62, from a day that produced three stops
+with three different causes: 60 blocked on a stale binary, 62 deadlocked on
+an unanswerable gate (the step-files must-include against the unchanged
+rule — fixed mid-session on the operator's direct order), and a
+rejected-thrice near-miss between. Every stop was detected — a `Stop` is a
+detected impasse — but none was classified, and 62's had no route out at
+all: `session interrupt` is refused against a stopped run, so nobody could
+even coach the resume, and the engine that had written a perfect diagnosis
+believed the amendment was someone else's to make. The operator's design,
+recorded across the day: the attended path is the staff's own engine,
+guided; the automatic ladder is for unattended runs; the second opinion is
+one verb both can call; every rung terminates at the human; and the
+framework never relaxes a gate on its own authority.*
+
+1. Register; declare `--not-releasable`.
+2. **Stops are classified.** `run.json` keeps a short stop history; a stop
+   on the same step with the same reasons twice running is class
+   `deadlock`, said in the stop itself. A stop reason that a judge rule
+   produced cites the rule by name — a legible stop is the raw material of
+   every path below.
+3. **The attended path: the diagnosis protocol, one copy.** The guide's
+   "When the framework stops" section grows the protocol the staff's
+   engine follows when a person types help: read the framework's own
+   account first (`dabbler status`, `run.json`'s stop, the instruction's
+   `reasons`, the transcripts) — never the scrollback; verify the claim
+   against the code before acting on it; on THIS repository the engine may
+   fix framework source in the tree — the fix rides in the session's
+   verified diff, the 60/62 precedent, and saying so matters because 62's
+   engine did not know it could; on a CONSUMER repository the framework is
+   an installed package — report `blocked` with the diagnosis and raise an
+   owed item pointing at dabbler, the fix ships as a release; never touch
+   `.dabbler/runs/`, `sessions.json`, a verdict or a gate; and "stop"
+   costs nothing — stop calling `next`, the session resumes by design.
+   The managed `AGENTS.md` body points at the section in three lines. No
+   skill: a Claude-Code-only skill would be a second copy of the rule.
+4. **`dabbler triage` — one verb, both modes.** It assembles the stop's
+   artifacts (the instruction, the report, the reasons, the rules they
+   cite, `run.json`, the transcript tail) and asks a provider that is NOT
+   the working engine for a schema-validated classification —
+   `engine-error | framework-defect | plan-defect` — with the minimal
+   amendment and one recommendation. An attended engine calls it when it
+   is stuck; unattended `drive` calls it on a deadlock-class stop.
+5. **The ladder, with a floor.** Unattended: triage on a second provider —
+   one attempt plus one schema retry — then the third provider, then the
+   stop lands as an owed decision carrying the raw artifacts and no
+   recommendation: "the framework stopped and its advisers could not
+   classify it" is an honest brief. No rung may loop, and the ladder
+   always terminates at the human. A gate-relaxing amendment is never
+   applied by the framework: it arrives as an option on the owed decision
+   and is recorded as a decision when a person chooses it.
+6. **A Send reaches a stopped run.** `session interrupt` queues against a
+   run whose stop is set — refused only when nothing was ever driven — and
+   the resume drains it into the next instruction's `reasons` as
+   `sent: <text>`. The push relaunch stops clearing the request file it
+   has not read.
+7. **`plan amend`.** A machine-written amendment of a step's files or
+   checks, with the reason and the approver on the record — raised from a
+   triage proposal or typed by the operator. 62's engine asked to "amend
+   this step's files" and nothing in the framework could; the judge fix
+   removed that one deadlock, not the missing affordance.
+8. **The reader tolerates unknown fields** (operator-approved after 62's
+   skew). The extension's readers of driver records accept unknown
+   properties — the writer stays strict — so an installed extension
+   survives a newer driver's fields instead of refusing every row for the
+   length of a driver-changing session. Test: a `run.json` carrying an
+   unknown field still yields task rows. "Execution record unreadable" is
+   reserved for damage.
+9. Affected; verify; full suite as `final-full`; close.
+
+Est. 7 router tests (the deadlock class, the triage shape, the ladder's
+fallback and its floor, a queued Send against a stopped run, `plan amend`
+on the record, the relaunch keeping an unread request), 2 extension tests
+(unknown-field tolerance; the attention row unchanged). Extension 2.7.0,
+unpublished like the rest.
+
+---
+
+### Session 64 of 65: The operator onboarding deck
 
 *Planned 2026-08-31 at the operator's request: a PowerPoint deck that onboards a
-human operator to the framework. Runs after 62, so the slides show the driven
+human operator to the framework. Runs after 63, so the slides show the driven
 lifecycle as the staff will meet it: their own CLI in one terminal, Dabbler's
 in the other, the Explorer moving — never the Output-channel shape of 59–60.
 Slides as the operator laid
@@ -2778,7 +2857,7 @@ later session can rebuild it when a screen changes.*
    solution.
 3. **Slides 1–6.**
    - *1 — What is Dabbler AI Orchestration?* The VS Code extension, how to
-     install it (Marketplace once 64 has published; the `.vsix` until then),
+     install it (Marketplace once 65 has published; the `.vsix` until then),
      the GitHub repository.
    - *2 — Why use Dabbler?* Automatic cross-provider verification with further
      rounds when a round finds something; one lifecycle for every session
@@ -2808,6 +2887,15 @@ later session can rebuild it when a screen changes.*
      from. The screenshots are taken after 62 lands, never from the
      Output-channel shape of 59–60, and every example line on a slide
      carries the `dabbler` prefix, as `docs/driving-a-session.md` does.
+     The screenshots' several Starts in one window also exercise the
+     terminal placement 62 repaired at the cap, which is this walk's
+     second job: that repair closed unreviewed.
+   - *When it stops.* The stop as the staff meet it: the toast with the
+     recommended option, the attention row, the QuickPick brief with each
+     option's consequence; the engine in the chat following the guide's
+     diagnosis protocol; `dabbler triage` asked for a second opinion. The
+     engine alone does not know when it is stuck — this slide is why the
+     framework is in the room.
 4. **Slides 7–x: a four-repository CSV solution**, as the operator specified:
    *csv-model* (First Name, Last Name, DOB); *csv-deserializer* (populates the
    model from a CSV string or stream); *csv-persistence* (Entity Framework
@@ -2831,7 +2919,7 @@ count). No extension change.
 
 ---
 
-### Session 64 of 64: The half of the trial that needs a published router
+### Session 65 of 65: The half of the trial that needs a published router
 
 *Runs when the operator decides to publish, at whatever version is current
 then — and not before. It is not blocked and nothing waits on it: the

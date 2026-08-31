@@ -1,8 +1,55 @@
-# STATUS — 61 of 64 closed. Next: 62, the entry — one sentence in the CLI, and Dabbler's own terminal
+# STATUS — 62 of 65 closed. Next: 63, the escape route — when the framework stops, it asks
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
 `experiment/verification-pipeline-v3` and `design/solution-decomposition`
 are merged and finished. Earlier handoff text is in `docs/status-archive.md`.
+
+> **Recorded, 2026-08-31, after session 62 — the entry is built, and the
+> plan gains the escape route.** Session 62 closed **`REMEDIATED_AT_CAP`**
+> at four rounds: round 1 (full) two Majors and two nits, rounds 2 and 3
+> fix-delta each finding a terminal-placement Major, and the round-3
+> repair — a cached split Dabbler terminal is now moved beside the CLI a
+> later Start creates — landed at the cap **unreviewed**. The deck's walk
+> (64) exercises exactly that workflow (several Starts in one window) and
+> doubles as the review. What landed: the managed body says one thing —
+> call `dabbler session next` and do what it says until `done` — and this
+> repository's `AGENTS.md` is re-cut from it; **Start opens the person's
+> own CLI** in a terminal at the root (opening sentence in argv where the
+> CLI takes one), *Start Unattended Session* keeps headless `drive`, and
+> Stop/Send survive only for extension-launched drives; the **Dabbler
+> pseudoterminal** shows the framework's work and nothing else — phase
+> lines, job logs byte-for-byte (the runners' colours and ✓ arrive whole),
+> working/waiting indicator, the band, theme-aware — and carries **no
+> engine chat, ever**; a **framework stop or owed decision is loud**: the
+> attention row with the brief in its tooltip, the toast with the
+> recommended option, the badge, the QuickPick whose items carry each
+> option's consequence, answered through `owed answer` in-process; engine
+> renders **strip CSI/OSC** so the colour bleed is dead code from the next
+> build. Extension **2.6.0**, walked on a scratch repository from the
+> installed build. Mid-session history worth keeping: the judge deadlock
+> (step-files must-include vs the unchanged rule made `managed-body`
+> unanswerable; fixed by the operator's direct order, outside the session,
+> riding in its verified diff — and `session interrupt` proved to be
+> refused against a stopped run, so there was no way to coach the resume),
+> and a poll-timer leak in the new pseudoterminal that held the test
+> process open, caught by the hanging suite and fixed with `unref` +
+> `clearInterval` in the same remediation.
+>
+> **The re-cut: session 63 is the escape route; the deck is 64 and the
+> trial 65.** Designed with the operator across the day's three stops:
+> stops classified (`deadlock` = same step, same reasons, twice running;
+> rules cited by name); the attended path as a diagnosis protocol in the
+> guide with three pointer lines in the managed body (fix framework
+> source in the tree on THIS repo — 60/62 precedent; `blocked` + an owed
+> item on a consumer repo, where dabbler is an installed package); one
+> `dabbler triage` verb both modes call (cross-provider, schema-validated
+> classification with a minimal amendment); the unattended ladder with a
+> floor (second provider, third provider, then an owed decision with the
+> raw artifacts — no rung loops, every path ends at a human, and the
+> framework never relaxes a gate on its own authority); a Send that
+> queues against a stopped run; `plan amend` with reason and approver on
+> the record; and the reader-tolerance fix for the installed-extension
+> schema skew. The ledger heals at the next `session start`, as before.
 
 > **Recorded, 2026-08-31, after session 61.** Session 61 — the pull —
 > closed `VERIFIED` in three rounds, driven by `session drive` with Opus.
@@ -211,10 +258,11 @@ are merged and finished. Earlier handoff text is in `docs/status-archive.md`.
 > pushed under `refs/dabbler/rounds/` by each close survive on the
 > remote); the closes that consumed that evidence are unaffected.
 >
-> **Owed to 63, the deck (60, then 61, until the re-cuts above).** The
-> deck shows the driven lifecycle as 61–62 reshape it; pressing Start on
-> the next session from the installed extension is the walk the verifier
-> still wants. **Left
+> **Owed to 64, the deck (60, 61, then 63, across the re-cuts above).**
+> The deck shows the driven lifecycle as 61–63 reshape it; its walk's
+> several Starts in one window review 62's at-cap terminal repair; and
+> pressing Start on the next session from the installed extension is the
+> walk the verifier still wants. **Left
 > open:** 58's nit stands, narrower — `run.json` does not say whether an
 > invocation is in flight, though nothing sent is lost any more. The
 > interrupted invocations in the walk ended by the ten-second tree-kill

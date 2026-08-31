@@ -2166,7 +2166,7 @@ the plan.*
 
 ---
 
-### Session 51 of 56: What the field trial found, and nothing else
+### Session 51 of 57: What the field trial found, and nothing else
 
 *Amended into the plan by session 50, which is the session that found them.
 Bounded deliberately: a remediation session that grows is a second feature
@@ -2194,7 +2194,7 @@ F-50-4 is a new session, not a widening of this one.
 
 ---
 
-### Session 52 of 56: The startup experience, walked before it ships
+### Session 52 of 57: The startup experience, walked before it ships
 
 *Inserted 2026-08-30, at the operator's request: "I want the startup
 experience to have a good DX before release." Two defects found by reading the
@@ -2223,7 +2223,7 @@ session that never ships.
 
 ---
 
-### Session 53 of 56: The Work Explorer reads at a glance, and session 1 asks
+### Session 53 of 57: The Work Explorer reads at a glance, and session 1 asks
 
 *Inserted 2026-08-31, at the operator's request, from three pieces of feedback
 given while looking at this repository's own Work Explorer and after restarting
@@ -2260,7 +2260,7 @@ Est. 5 tests net. Extension to 2.2.0.
 
 ---
 
-### Session 54 of 56: The router suite stops taxing the host
+### Session 54 of 57: The router suite stops taxing the host
 
 *Planned 2026-08-31. Running the router suite pins the host: `packages/router`
 declares no vitest configuration, so the pool is one worker per logical core —
@@ -2288,10 +2288,68 @@ Est. 1 test net. Nothing else.
 
 ---
 
-### Session 55 of 56: The operator onboarding deck
+### Session 55 of 57: The task rows move themselves
+
+*Planned 2026-08-31, from the operator's screenshot of session 54: Register
+"in progress" three minutes after `session start` had registered the
+session, a step labelled "Make config" that no one planned, and rows that
+moved only when the engine typed `dabbler session log`. The operator's
+reading: confusing, and the thing that never worked before — an engine
+asked to narrate its own progress narrates late, by hand, or not at all,
+and the Explorer renders the narration as state. The fix is a deletion.
+Every lifecycle verb already writes its record through the framework, so
+the framework knows the moment each phase happened; the rows are derived
+from those records and nothing else. Inserted ahead of the onboarding deck,
+whose slide 3 should show rows that move by themselves.*
+
+1. Register; declare `--not-releasable`.
+2. **Six rows, derived.** `buildTaskRows` in `progress.ts` stops folding
+   `plan-step` entries against logged statuses and reads the records the
+   lifecycle writes: *Register* is done when the ledger carries
+   `startedAt`; *Declare* when the activity log carries the session's
+   `task-declaration`; *Work* when a passed `preverify-targeted` evidence
+   row exists for the session (the affected tests recorded passing is the
+   observable end of the work); *Verify* when the rounds ledger's terminal
+   verdict is `VERIFIED` — a blocking round leaves it in flight with the
+   round and the cap in its words, and a cap terminal renders it blocked
+   on the cancelled glyph; *Run of record* when a passed `final-full` row
+   lands after the verdict; *Close* when the session's status is
+   `complete`. The open row is the first not done, and only while the
+   session is in flight; a row's start is the previous row's end, which is
+   what the extension's time slot already means. The row shape the
+   extension reads (`stepId`, `intent`, `state`, `iconKey`, `isOpen`,
+   `startedAt`) does not change, and `taskRowLabel` already turns
+   `run-of-record` into *Run of record*, so the extension is not touched.
+3. **Attribute evidence to the session.** `test-evidence record` stamps
+   the session in flight on the row, as `test-evidence run` already does;
+   rows written before this carry none and are attributed by the
+   session's own window (`startedAt` to `completedAt`).
+4. **Delete the narration.** `seedSessionPlan`, `planStepKey`, `logStep`,
+   the plan-parser registration and `STEP_STATUSES` leave `writers.ts`;
+   `advanceStepsAtDeclare`, `closeLastStep`, `log` and the plan-row
+   resolvers leave `session.ts`; the `log` subcommand leaves the CLI, the
+   in-process router and the contract; `session start` stops printing
+   step keys to tick. `splitSlugMarker` stays: the plan review reads it.
+   A `plan-step` or logged-step entry already in an activity log is
+   ignored, not migrated — the record is append-only and the rows no
+   longer read it.
+5. **Docs say what is true.** `docs/quick-start.md` §3 and the
+   activity-log section of `docs/schema-reference.md` describe the derived
+   rows; `session log` appears in neither.
+6. Extension **2.3.0**, built as a `.vsix` and installed here, so the
+   operator's Explorer shows the rows moving in the next session.
+7. Affected; verify; full suite as `final-full`; close.
+
+Est. **−4 tests net**: the twelve tests of the fold and the bookends go,
+and about eight take their place, one per row transition plus the two
+refusals that stay.
+
+---
+
+### Session 56 of 57: The operator onboarding deck
 
 *Planned 2026-08-31 at the operator's request: a PowerPoint deck that onboards a
-human operator to the framework. Runs after 54, the worker cap. Slides as the operator laid
+human operator to the framework. Runs after 55, the task rows. Slides as the operator laid
 them out; the deck is a committed artifact, and it is built by a script so a
 later session can rebuild it when a screen changes.*
 
@@ -2305,7 +2363,7 @@ later session can rebuild it when a screen changes.*
    solution.
 3. **Slides 1–6.**
    - *1 — What is Dabbler AI Orchestration?* The VS Code extension, how to
-     install it (Marketplace once 56 has published; the `.vsix` until then),
+     install it (Marketplace once 57 has published; the `.vsix` until then),
      the GitHub repository.
    - *2 — Why use Dabbler?* Automatic cross-provider verification with further
      rounds when a round finds something; one lifecycle for every session
@@ -2348,7 +2406,7 @@ count). No extension change.
 
 ---
 
-### Session 56 of 56: The half of the trial that needs a published router
+### Session 57 of 57: The half of the trial that needs a published router
 
 *Runs when the operator decides to publish, at whatever version is current
 then — and not before. It is not blocked and nothing waits on it: the

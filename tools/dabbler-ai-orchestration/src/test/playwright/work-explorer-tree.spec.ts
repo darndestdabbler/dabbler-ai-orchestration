@@ -62,13 +62,23 @@ test("the repository row renders with its progress fraction", async () => {
   await expect(row).toContainText("session 003 in flight");
 });
 
-test("sessions render as one ordered list, never bucketed by status", async () => {
+test("sessions render under status buckets, In Progress open and the rest collapsed", async () => {
   await expandTreeRow(pane, repository);
-  await expect(treeRow(pane, "001 · Ship the thing")).toBeVisible();
-  await expect(treeRow(pane, "005 · Close the set")).toBeVisible();
-  for (const bucket of ["In Progress", "Not Started", "Complete"]) {
-    await expect(treeRows(pane).filter({ hasText: new RegExp(`^${bucket}$`) })).toHaveCount(0);
+  // Every bucket with a member renders, with its count dimmed after it.
+  for (const [bucket, count] of [
+    ["In Progress", "1"],
+    ["Not Started", "2"],
+    ["Complete", "1"],
+    ["Cancelled", "1"],
+  ]) {
+    const header = treeRows(pane).filter({ hasText: new RegExp(`^${bucket}\\s*${count}$`) });
+    await expect(header).toHaveCount(1);
   }
+  // Only In Progress opened by itself.
+  await expect(treeRow(pane, "003 · Build the thing")).toBeVisible();
+  await expect(treeRows(pane).filter({ hasText: "001 · Ship the thing" })).toHaveCount(0);
+  await revealSessionRow(pane, { repository, session: "001 · Ship the thing" });
+  await expect(treeRow(pane, "005 · Close the set")).toBeVisible();
 });
 
 test("each session row carries the operator's authored status glyph", async () => {

@@ -175,7 +175,8 @@ export async function runSetUpProjectFlow(
   const choice = await (ui.offer
     ? ui.offer(
         "Dabbler: project set up and committed. Session 1 authors the " +
-          "project plan; session 2 breaks it into numbered sessions.",
+          "project plan and will ask you what the project is; session 2 " +
+          "breaks it into numbered sessions.",
         start,
         "Later",
       )

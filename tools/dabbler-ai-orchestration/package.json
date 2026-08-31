@@ -2,7 +2,7 @@
   "name": "dabbler-ai-orchestration",
   "displayName": "Dabbler AI Orchestration",
   "description": "Organize AI-led development like work: modules, session sets and step-by-step session plans in a native tree \u2014 plus routed verification before every close, normally cross-provider, recorded as evidence you can check.",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "publisher": "DarndestDabbler",
   "private": true,
   "engines": {
@@ -358,7 +358,7 @@
           {
             "id": "startSession",
             "title": "Start session 1",
-            "description": "Session 1 authors the project plan; session 2 breaks it into numbered sessions. Neither waits on anyone.\n[Open the Work Explorer](command:workbench.view.extension.dabblerSessionSetsContainer)",
+            "description": "Session 1 authors the project plan; session 2 breaks it into numbered sessions. Session 1 asks you what the project is -- the plan's substance is yours, and it does not guess it.\n[Open the Work Explorer](command:workbench.view.extension.dabblerSessionSetsContainer)",
             "media": {
               "markdown": "media/walkthrough-session.md"
             }

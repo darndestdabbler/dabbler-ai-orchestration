@@ -220,14 +220,23 @@ export const PLAN_PROMPT =
   "Create — or import — `docs/planning/project-plan.md`, the stable artifact\n" +
   "the decomposition session reads from.\n" +
   "\n" +
-  "- **Create:** draft the plan directly: overview, goals and success\n" +
-  "  criteria, high-level phases or feature areas, and each phase's key\n" +
-  "  deliverables. Keep it concise — the decomposition session turns each\n" +
-  "  phase into numbered sessions, so scope each phase to a handful of\n" +
-  "  focused AI sessions.\n" +
-  "- **Import:** if a plan already exists outside this repo (a doc, a ticket,\n" +
-  "  notes), bring its content into that path in this same shape, preserving\n" +
-  "  intent while conforming to the structure above.\n" +
+  "The plan's substance is the operator's, not yours. Before writing\n" +
+  "anything, ask them what the project is: its purpose, what success looks\n" +
+  "like, the phases or feature areas they have in mind, and whether a plan,\n" +
+  "brief or notes already exist that should be imported. Ask when the\n" +
+  "repository and your prompt do not already answer those questions. Do not\n" +
+  "search neighbouring directories for a plan, and do not draft one from the\n" +
+  "folder name — a guessed plan is decomposed by the next session into\n" +
+  "sessions nobody asked for.\n" +
+  "\n" +
+  "- **Create:** from the operator's answers, draft the plan: overview, goals\n" +
+  "  and success criteria, high-level phases or feature areas, and each\n" +
+  "  phase's key deliverables. Keep it concise — the decomposition session\n" +
+  "  turns each phase into numbered sessions, so scope each phase to a\n" +
+  "  handful of focused AI sessions.\n" +
+  "- **Import:** if the operator points you at an existing plan (a doc, a\n" +
+  "  ticket, notes), bring its content into that path in this same shape,\n" +
+  "  preserving intent while conforming to the structure above.\n" +
   "\n" +
   "A later revision is just another plan session that amends the same file.\n";
 
@@ -287,13 +296,16 @@ export const BOOTSTRAP_PLAN =
   "### Session 1: Author or import the project plan\n" +
   "\n" +
   "1. Register.\n" +
-  "2. Create — or import — `docs/planning/project-plan.md`: overview, goals\n" +
-  "   and success criteria, high-level phases or feature areas, and each\n" +
-  "   phase's key deliverables. Keep it concise — session 2 turns each phase\n" +
-  "   into numbered sessions, so scope each phase to a handful of focused AI\n" +
-  "   sessions. If a plan already exists outside this repo (a doc, a ticket,\n" +
-  "   notes), bring its content into that path in this same shape, preserving\n" +
-  "   intent.\n" +
+  "2. Ask the operator what the project is — its purpose, what success looks\n" +
+  "   like, the phases or feature areas they have in mind, and whether a\n" +
+  "   plan, brief or notes already exist — unless the repository or your\n" +
+  "   prompt already says. The plan's substance is theirs: do not search\n" +
+  "   neighbouring directories for one, and do not draft one from the folder\n" +
+  "   name. Then create — or import — `docs/planning/project-plan.md`:\n" +
+  "   overview, goals and success criteria, high-level phases or feature\n" +
+  "   areas, and each phase's key deliverables. Keep it concise — session 2\n" +
+  "   turns each phase into numbered sessions, so scope each phase to a\n" +
+  "   handful of focused AI sessions.\n" +
   "3. Affected tests as preverify.\n" +
   "4. Cross-provider verification.\n" +
   "5. Full test suite, recorded as the run of record.\n" +

@@ -88,7 +88,8 @@ it.
 | 50 | The field trial, and the exercise reported back | no | 2026-08-30 |
 | 51 | What the field trial found, and nothing else | no | 2026-08-30 |
 | 52 | The startup experience, walked before it ships | no | 2026-08-30 |
-| 53 | The half of the trial that needs a published router | — | not declared |
+| 53 | The Work Explorer reads at a glance, and session 1 asks | no | 2026-08-31 |
+| 54 | The half of the trial that needs a published router | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -1499,3 +1500,14 @@ Affected; verify; full suite as final-full; close
 **Releasable: no.**
 
 Affected; verify; full suite as final-full; close
+
+### Session 53 — The Work Explorer reads at a glance, and session 1 asks
+
+**Releasable: no.**
+
+Session 53: the Work Explorer reads at a glance, and session 1 asks.
+1. Work Explorer: sessions grouped under status buckets (In Progress, Not Started ascending; Complete, Cancelled descending; empty buckets omitted; counts in the description slot; In Progress expanded, others collapsed; finished rows carry a compact close date). Supersedes D104.
+2. Closed sessions that stopped at the cap move from the attention rows into a collapsed Information bucket; the in-flight case stays at the top.
+3. Bootstrap templates, the bootstrap hand-off line and the extension walkthrough tell session 1 to ask the operator for the plan when it is not in the repository, instead of "Neither waits on anyone".
+4. solution.yaml for this repository as a one-component solution.
+5. Tests for the above; extension bumped to 2.2.0; decision recorded superseding D104.

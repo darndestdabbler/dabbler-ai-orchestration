@@ -479,6 +479,19 @@ export async function revealSessionRow(
   opts: { repository: string; session: string | RegExp },
 ): Promise<import("@playwright/test").Locator> {
   await expandTreeRow(pane, opts.repository);
+  // Sessions sit under status buckets; In Progress opens expanded and the
+  // rest collapsed, so every bucket that rendered is opened before the
+  // session row is looked for.
+  for (const bucket of ["In Progress", "Not Started", "Complete", "Cancelled"]) {
+    const header = pane
+      .locator(".monaco-list-row")
+      .filter({ has: pane.page().locator(".label-name", { hasText: new RegExp(`^${bucket}$`) }) })
+      .first();
+    if ((await header.count()) > 0 && (await header.getAttribute("aria-expanded")) === "false") {
+      await header.locator(".monaco-tl-twistie").click();
+      await pane.page().waitForTimeout(200);
+    }
+  }
   const row = treeRow(pane, opts.session);
   await row.waitFor({ state: "visible", timeout: 15_000 });
   return row;

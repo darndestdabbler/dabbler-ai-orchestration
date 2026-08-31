@@ -334,7 +334,9 @@ export async function bootstrapVerb(argv: string[]): Promise<number> {
     writeOut(
       'bootstrap: now tell your AI agent to "start the next ' +
         'session" — session 1 authors the project plan, then session 2 ' +
-        "breaks it into numbered sessions. Neither waits on anyone.\n",
+        "breaks it into numbered sessions. Session 1 will ask you what " +
+        "the project is; the plan's substance is yours, and it does not " +
+        "guess it.\n",
     );
   } else {
     writeOut(

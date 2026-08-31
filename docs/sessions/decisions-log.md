@@ -7835,3 +7835,52 @@ record closes the last -- and the middle transitions remain `session log`,
 which an orchestrator calls. Whether the framework should infer more of the
 middle is a live question, and it is not answered by having one command
 quietly move a step another command was specified to move.
+
+## Session 53 — The Work Explorer reads at a glance, and session 1 asks
+
+### D245 · 2026-08-31 · Operator · The status buckets return to the Work Explorer, refined: live work ascending, finished work descending, empty buckets unrendered, closed cap-stops filed under Information — supersedes D104
+
+**Supersedes D104.** The Work Explorer groups a repository's sessions under
+status buckets again, on the operator's ruling of 2026-08-31, made while
+reading this repository's own explorer at 53 sessions.
+
+D104 removed the buckets with the set level and argued that a strictly
+sequential numbered list needs no grouping: bucketing it yields three
+contiguous ranges the order already carries, at the cost of the numeric
+order itself. It also named what it gave up — "on a repository with
+hundreds of sessions, finding the live one means reading down a long
+list" — and at 53 sessions that list is the operator's daily view. The
+scroll is the cost, and the operator has paid it enough to rule.
+
+The ruling refines the old design rather than restoring it:
+
+- **In Progress** and **Not Started** run ascending, the order the work
+  runs; a `planned` session (declared by the plan, not yet in the ledger)
+  sits in Not Started, where it sorts last by number.
+- **Complete** and **Cancelled** run descending, so the latest close is one
+  row under its header — the bucket is a "what just finished" view, not a
+  scroll.
+- **An empty bucket is not rendered.** A fresh project shows only Not
+  Started; Complete appears when the first session closes. (The pre-D104
+  tree rendered empty buckets as leaves.)
+- Each header carries its **count in the description slot**, which VS Code
+  dims; **In Progress opens expanded**, the rest collapsed.
+- A finished session's row carries its **close date** in the same slot, so
+  "when was that done" is read at a glance.
+- **Information.** The attention rows above the sessions named every
+  closed `REMEDIATED_AT_CAP` session — six of them on this repository — at
+  the top of the tree, permanently. The operator's reading: that presents
+  finished work as a standing fault and invites reopening a session that
+  later sessions have already built on, which is not advisable. Those notes
+  move under a collapsed *Information* bucket with a count. The in-flight
+  case stays an attention row, because that one is a decision. Nothing is
+  lost: each closed session's verification row and tooltip are unchanged.
+
+D104's structural point stands inside each bucket: the zero-padded number
+still reads down the left edge, in one direction, and no status information
+was moved off the session rows to make the headers work.
+
+Follow-up the operator raised and this session did not build: an
+Information bucket could also surface work done outside any session. There
+is no record of such work for the projection to read today, so it needs a
+data source before it needs a row.

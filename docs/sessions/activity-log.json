@@ -9681,6 +9681,96 @@
       "description": "Affected; verify; full suite as `final-full`; close.",
       "status": "pending",
       "kind": "plan-step"
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 53,
+      "dateTime": "2026-08-31T01:32:30.837000-04:00",
+      "task": "Session 53: the Work Explorer reads at a glance, and session 1 asks.\n1. Work Explorer: sessions grouped under status buckets (In Progress, Not Started ascending; Complete, Cancelled descending; empty buckets omitted; counts in the description slot; In Progress expanded, others collapsed; finished rows carry a compact close date). Supersedes D104.\n2. Closed sessions that stopped at the cap move from the attention rows into a collapsed Information bucket; the in-flight case stays at the top.\n3. Bootstrap templates, the bootstrap hand-off line and the extension walkthrough tell session 1 to ask the operator for the plan when it is not in the repository, instead of \"Neither waits on anyone\".\n4. solution.yaml for this repository as a one-component solution.\n5. Tests for the above; extension bumped to 2.2.0; decision recorded superseding D104.",
+      "releasable": false
+    },
+    {
+      "sessionNumber": 53,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-31T01:32:30.871000-04:00",
+      "description": "Register; declare `--not-releasable`.",
+      "status": "in-progress"
+    },
+    {
+      "sessionNumber": 53,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-31T01:33:35.084000-04:00",
+      "description": "Register; declare `--not-releasable`.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 53,
+      "stepNumber": 2,
+      "stepKey": "sessions-render-under-status-buckets-again",
+      "dateTime": "2026-08-31T01:33:35.326000-04:00",
+      "description": "**Sessions render under status buckets again, superseding D104.** At 53 sessions the flat list has become the long scroll D104 said it would; the operator ruled buckets back, refined: *In Progress* and *Not Started* ascending, *Complete* and *Cancelled* descending so the latest finished session sits under its header, an empty bucket not rendered at all, each header carrying its count in the description slot, *In Progress* expanded and the rest collapsed. A finished session's row carries a compact close date in the same slot.",
+      "status": "in-progress"
+    },
+    {
+      "sessionNumber": 53,
+      "stepNumber": 2,
+      "stepKey": "sessions-render-under-status-buckets-again",
+      "dateTime": "2026-08-31T01:38:55.394000-04:00",
+      "description": "**Sessions render under status buckets again, superseding D104.** At 53 sessions the flat list has become the long scroll D104 said it would; the operator ruled buckets back, refined: *In Progress* and *Not Started* ascending, *Complete* and *Cancelled* descending so the latest finished session sits under its header, an empty bucket not rendered at all, each header carrying its count in the description slot, *In Progress* expanded and the rest collapsed. A finished session's row carries a compact close date in the same slot.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 53,
+      "stepNumber": 3,
+      "stepKey": "a-closed-session-that-stopped-at",
+      "dateTime": "2026-08-31T01:38:55.625000-04:00",
+      "description": "**A closed session that stopped at the cap is a note, not a flag.** The attention rows over the sessions kept naming every closed `REMEDIATED_AT_CAP` session at the top of the tree, which invites reopening work that later sessions have already built on. Those notes move under an *Information* bucket, collapsed, with a count; the in-flight case stays where it is, because that one is a decision.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 53,
+      "stepNumber": 4,
+      "stepKey": "session-1-asks-for-the-plan",
+      "dateTime": "2026-08-31T01:38:55.867000-04:00",
+      "description": "**Session 1 asks for the plan instead of guessing it.** The scaffolded session 1, `PLAN_PROMPT`, the bootstrap hand-off line and the extension walkthrough all say \"Neither waits on anyone\", and an engine took that literally: with no plan in the repository it searched sibling directories and drafted one. The templates now say the plan's substance is the operator's, and to ask for it when it is not in the repository or the prompt.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 53,
+      "stepNumber": 5,
+      "stepKey": "this-repository-declares-itself-a-one",
+      "dateTime": "2026-08-31T01:38:56.112000-04:00",
+      "description": "**This repository declares itself a one-component solution.** `solution.yaml` as `bootstrap` would scaffold it, so the Solution Explorer stops showing its welcome text here.",
+      "status": "complete"
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D245",
+      "ordinal": 245,
+      "sessionNumber": 53,
+      "decidedOn": "2026-08-31",
+      "recordedAt": "2026-08-31T01:40:21.618000-04:00",
+      "decider": "operator",
+      "headline": "The status buckets return to the Work Explorer, refined: live work ascending, finished work descending, empty buckets unrendered, closed cap-stops filed under Information \u2014 supersedes D104",
+      "body": "**Supersedes D104.** The Work Explorer groups a repository's sessions under\nstatus buckets again, on the operator's ruling of 2026-08-31, made while\nreading this repository's own explorer at 53 sessions.\n\nD104 removed the buckets with the set level and argued that a strictly\nsequential numbered list needs no grouping: bucketing it yields three\ncontiguous ranges the order already carries, at the cost of the numeric\norder itself. It also named what it gave up \u2014 \"on a repository with\nhundreds of sessions, finding the live one means reading down a long\nlist\" \u2014 and at 53 sessions that list is the operator's daily view. The\nscroll is the cost, and the operator has paid it enough to rule.\n\nThe ruling refines the old design rather than restoring it:\n\n- **In Progress** and **Not Started** run ascending, the order the work\n  runs; a `planned` session (declared by the plan, not yet in the ledger)\n  sits in Not Started, where it sorts last by number.\n- **Complete** and **Cancelled** run descending, so the latest close is one\n  row under its header \u2014 the bucket is a \"what just finished\" view, not a\n  scroll.\n- **An empty bucket is not rendered.** A fresh project shows only Not\n  Started; Complete appears when the first session closes. (The pre-D104\n  tree rendered empty buckets as leaves.)\n- Each header carries its **count in the description slot**, which VS Code\n  dims; **In Progress opens expanded**, the rest collapsed.\n- A finished session's row carries its **close date** in the same slot, so\n  \"when was that done\" is read at a glance.\n- **Information.** The attention rows above the sessions named every\n  closed `REMEDIATED_AT_CAP` session \u2014 six of them on this repository \u2014 at\n  the top of the tree, permanently. The operator's reading: that presents\n  finished work as a standing fault and invites reopening a session that\n  later sessions have already built on, which is not advisable. Those notes\n  move under a collapsed *Information* bucket with a count. The in-flight\n  case stays an attention row, because that one is a decision. Nothing is\n  lost: each closed session's verification row and tooltip are unchanged.\n\nD104's structural point stands inside each bucket: the zero-padded number\nstill reads down the left edge, in one direction, and no status information\nwas moved off the session rows to make the headers work.\n\nFollow-up the operator raised and this session did not build: an\nInformation bucket could also surface work done outside any session. There\nis no record of such work for the projection to read today, so it needs a\ndata source before it needs a row."
+    },
+    {
+      "sessionNumber": 53,
+      "stepNumber": 6,
+      "stepKey": "affected",
+      "dateTime": "2026-08-31T01:46:15.292000-04:00",
+      "description": "Affected; verify; full suite as `final-full`; close.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 53,
+      "stepNumber": 6,
+      "stepKey": "affected",
+      "dateTime": "2026-08-31T01:46:15.829000-04:00",
+      "description": "Affected; verify; full suite as `final-full`; close.",
+      "status": "complete"
     }
   ]
 }

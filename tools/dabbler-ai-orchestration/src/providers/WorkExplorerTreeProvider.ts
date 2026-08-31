@@ -111,7 +111,9 @@ export class WorkExplorerTreeProvider
       descriptor.label,
       descriptor.collapsible === "collapsed"
         ? vscode.TreeItemCollapsibleState.Collapsed
-        : vscode.TreeItemCollapsibleState.None,
+        : descriptor.collapsible === "expanded"
+          ? vscode.TreeItemCollapsibleState.Expanded
+          : vscode.TreeItemCollapsibleState.None,
     );
     // Stable identity, so an expanded repository survives a watcher tick
     // and the 30-second poll.

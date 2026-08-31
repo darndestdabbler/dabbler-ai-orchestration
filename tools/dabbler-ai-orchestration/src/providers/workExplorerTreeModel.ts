@@ -7,10 +7,14 @@
 // arranges them and never re-derives them.
 //
 // Three load-bearing display constraints:
-//   1. Sessions render as ONE ordered list, never bucketed by status.
-//      They are a numbered sequence, and the zero-padded number down the
-//      left edge is how the operator reads it; grouping by status would
-//      put session 015 above session 001 and destroy exactly that.
+//   1. Sessions render under STATUS BUCKETS, and each bucket is a numbered
+//      sequence. In Progress and Not Started run ascending — the order the
+//      work runs; Complete and Cancelled run descending, so the latest
+//      finished session sits under its header instead of at the bottom of
+//      a scroll. An empty bucket is not rendered. The operator ruled the
+//      buckets back once the flat list of D104 became the long scroll D104
+//      itself predicted; the zero-padded number still reads down the left
+//      edge, within each bucket.
 //   2. Row icons consistently communicate lifecycle status; severity (an
 //      unclean verdict, an invariant violation) lives in the tooltip and
 //      contextValue.
@@ -41,7 +45,7 @@ import {
 import { isRecognizedVerdictToken } from "../utils/verdictTokens";
 
 // ---------------------------------------------------------------------------
-// Nodes: repository -> session -> step
+// Nodes: repository -> bucket -> session -> step
 // ---------------------------------------------------------------------------
 
 /**
@@ -51,6 +55,7 @@ import { isRecognizedVerdictToken } from "../utils/verdictTokens";
  */
 export type WorkExplorerNode =
   | RepositoryNode
+  | BucketNode
   | SessionNode
   | VerificationNode
   | FindingNode
@@ -61,6 +66,25 @@ export type WorkExplorerNode =
 export interface RepositoryNode {
   readonly kind: "repository";
   readonly repository: SessionsRepository;
+}
+
+/**
+ * The four lifecycle buckets, plus Information — the closed-session notes
+ * that used to sit above the sessions as attention rows.
+ */
+export type BucketKey = SessionStatus | "information";
+
+/**
+ * A bucket holds either sessions (the lifecycle buckets) or notes
+ * (Information); the other list is empty. Members are computed once, when
+ * the repository expands, so the header's count and its children agree.
+ */
+export interface BucketNode {
+  readonly kind: "bucket";
+  readonly repository: SessionsRepository;
+  readonly bucket: BucketKey;
+  readonly sessions: readonly SessionRecord[];
+  readonly notes: readonly AttentionNode[];
 }
 
 export interface SessionNode {
@@ -130,13 +154,68 @@ export function repositoryNodes(
 }
 
 /**
- * The second level, ordered by session number ascending — the order the
- * ledger is written and the order the work runs. A repository whose
- * projection was unavailable yields no session rows, which is why
- * RepositoryNode reports itself collapsible only when it has sessions.
+ * The bucket order, top to bottom, and each one's sort. The live work
+ * reads first and runs ascending — the order it runs; the finished work
+ * runs descending so the most recent close is one row under its header.
+ * `planned` sessions (declared by the plan, not yet in the ledger) share
+ * Not Started with the registered ones; they sort last there by number.
  */
-export function sessionNodes(node: RepositoryNode): SessionNode[] {
-  return sessionsInOrder(node.repository.sessions).map((session) => ({
+export const BUCKETS: readonly {
+  key: BucketKey;
+  label: string;
+  order: "ascending" | "descending";
+}[] = [
+  { key: "in-progress", label: "In Progress", order: "ascending" },
+  { key: "not-started", label: "Not Started", order: "ascending" },
+  { key: "complete", label: "Complete", order: "descending" },
+  { key: "cancelled", label: "Cancelled", order: "descending" },
+  { key: "information", label: "Information", order: "ascending" },
+];
+
+function bucketFor(session: SessionRecord): SessionStatus {
+  return session.status === "planned" ? "not-started" : session.status;
+}
+
+/**
+ * The second level: one row per NON-EMPTY bucket. A fresh repository shows
+ * only Not Started; Complete appears when the first session closes. A
+ * repository whose projection was unavailable yields no buckets, which is
+ * why RepositoryNode reports itself collapsible only when it has sessions.
+ */
+export function bucketNodes(node: RepositoryNode): BucketNode[] {
+  const ordered = sessionsInOrder(node.repository.sessions);
+  const notes = informationNodes(node);
+  const buckets: BucketNode[] = [];
+  for (const spec of BUCKETS) {
+    if (spec.key === "information") {
+      if (notes.length > 0) {
+        buckets.push({
+          kind: "bucket",
+          repository: node.repository,
+          bucket: spec.key,
+          sessions: [],
+          notes,
+        });
+      }
+      continue;
+    }
+    const members = ordered.filter((session) => bucketFor(session) === spec.key);
+    if (members.length === 0) continue;
+    if (spec.order === "descending") members.reverse();
+    buckets.push({
+      kind: "bucket",
+      repository: node.repository,
+      bucket: spec.key,
+      sessions: members,
+      notes: [],
+    });
+  }
+  return buckets;
+}
+
+/** The third level: a lifecycle bucket's sessions, in the bucket's order. */
+export function sessionNodes(node: BucketNode): SessionNode[] {
+  return node.sessions.map((session) => ({
     kind: "session",
     repository: node.repository,
     session,
@@ -212,7 +291,9 @@ export function childrenOf(node: WorkExplorerNode): WorkExplorerNode[] {
     case "repository":
       // Attention above the work: what is waiting on the operator is the
       // reason they opened the view, and it reads first.
-      return [...attentionNodes(node), ...sessionNodes(node)];
+      return [...attentionNodes(node), ...bucketNodes(node)];
+    case "bucket":
+      return node.bucket === "information" ? [...node.notes] : sessionNodes(node);
     case "session":
       // What stopped the session reads above what it was doing: the
       // verification row first, then the tasks.
@@ -254,7 +335,12 @@ export interface RowDescriptor {
   tooltip?: string;
   icon?: IconSpec;
   contextValue: string;
-  collapsible: "none" | "collapsed";
+  /**
+   * `expanded` is reserved for the In Progress bucket: the row the operator
+   * came to see should not be behind a twisty. Everything else that has
+   * children starts collapsed.
+   */
+  collapsible: "none" | "collapsed" | "expanded";
 }
 
 // Tokens are `;`-wrapped on both sides so a `when` clause can match
@@ -277,6 +363,7 @@ export function hasToken(contextValue: string, token: string): boolean {
 /** Node-kind discriminators. Every menu contribution matches one. */
 export const NODE_TOKEN = {
   repository: "dabblerRepository",
+  bucket: "dabblerBucket",
   session: "dabblerSession",
   verification: "dabblerVerification",
   finding: "dabblerFinding",
@@ -455,17 +542,19 @@ export function sessionDescriptor(node: SessionNode): RowDescriptor {
   return {
     id: `session:${repository.root}/${session.number}`,
     label: sessionRowLabel(session),
-    // Short labels, so a description survives truncation here. Two states
+    // Short labels, so a description survives truncation here. Three states
     // say anything at all — quiet is the default. "planned" is a session the
     // plan declares that the ledger has not reached: it shares the
     // not-started glyph deliberately, so the word is the only thing that
-    // distinguishes the two and it has to be on the row.
+    // distinguishes the two and it has to be on the row. A finished session
+    // carries the date it closed, so "when was that done" is read at a
+    // glance rather than from the tooltip.
     description:
       session.status === "in-progress"
         ? "in flight"
         : session.status === "planned"
           ? "planned"
-          : undefined,
+          : closeDateLabel(session.completedAt),
     tooltip: sessionTooltip(node),
     icon: sessionIcon(session.iconKey),
     contextValue: tokenString(tokens),
@@ -788,6 +877,8 @@ export function descriptorFor(node: WorkExplorerNode): RowDescriptor {
   switch (node.kind) {
     case "repository":
       return repositoryDescriptor(node);
+    case "bucket":
+      return bucketDescriptor(node);
     case "attention":
       return attentionDescriptor(node);
     case "session":
@@ -878,26 +969,96 @@ export function attentionNodes(node: RepositoryNode): AttentionNode[] {
     });
   }
 
+  // Only the in-flight case is an attention row. It is the one where the
+  // operator has to decide what happens next, and suppressing it once hid
+  // exactly that. A CLOSED session that stopped at the cap is a note, and
+  // notes live under Information (see informationNodes): flagging every
+  // closed REMEDIATED_AT_CAP session at the top of the tree read as a
+  // standing fault and invited reopening work that later sessions had
+  // already built on.
   for (const session of repository.sessions) {
     const view = session.verification;
     if (!view || view.clean || !view.terminal) continue;
-    // An in-flight session that stopped at the cap is the MOST worth saying:
-    // suppressing it hid the one case where the operator has to decide what
-    // happens next.
+    if (session.status !== "in-progress") continue;
     rows.push({
       kind: "attention",
       repository,
       subject: "unresolved",
       label: `Session ${session.displayNumber} — ${view.headline}`,
-      detail:
-        session.status === "in-progress"
-          ? "Still in flight, and its verification stopped. Read it before it closes."
-          : "Planning input, not an interruption: read it between sessions.",
-      urgent: session.status === "in-progress",
+      detail: "Still in flight, and its verification stopped. Read it before it closes.",
+      urgent: true,
     });
   }
 
   return rows;
+}
+
+/**
+ * The Information bucket's rows: closed sessions whose verification stopped
+ * short of clean. Planning input, read between sessions — never a flag, and
+ * never rendered when there are none.
+ */
+export function informationNodes(node: RepositoryNode): AttentionNode[] {
+  const repository = node.repository;
+  const rows: AttentionNode[] = [];
+  for (const session of sessionsInOrder(repository.sessions).reverse()) {
+    const view = session.verification;
+    if (!view || view.clean || !view.terminal) continue;
+    if (session.status === "in-progress") continue;
+    rows.push({
+      kind: "attention",
+      repository,
+      subject: "unresolved",
+      label: `Session ${session.displayNumber} — ${view.headline}`,
+      detail: "Planning input, not an interruption: read it between sessions.",
+      urgent: false,
+    });
+  }
+  return rows;
+}
+
+/**
+ * The date a finished session closed, as the row shows it: the local
+ * calendar date, nothing more. The full timestamp is in the tooltip; a
+ * time of day in a few-characters-wide slot would be noise. Empty when
+ * there is no parseable close — a not-started session has nothing to say.
+ */
+export function closeDateLabel(completedAt: string | null): string | undefined {
+  if (!completedAt) return undefined;
+  const when = new Date(completedAt);
+  if (Number.isNaN(when.getTime())) return undefined;
+  const yyyy = when.getFullYear();
+  const mm = String(when.getMonth() + 1).padStart(2, "0");
+  const dd = String(when.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+/**
+ * A bucket row: the label, the count in the description slot (VS Code
+ * renders it dimmed, after the label), and the lifecycle glyph the bucket's
+ * sessions share. In Progress opens expanded — it is what the operator came
+ * to see; the rest open collapsed, which is the whole reason the buckets
+ * came back.
+ */
+export function bucketDescriptor(node: BucketNode): RowDescriptor {
+  const spec = BUCKETS.find((b) => b.key === node.bucket);
+  const label = spec ? spec.label : node.bucket;
+  const count =
+    node.bucket === "information" ? node.notes.length : node.sessions.length;
+  const noun = node.bucket === "information" ? "note" : "session";
+  return {
+    id: `bucket:${node.repository.root}/${node.bucket}`,
+    label,
+    description: String(count),
+    tooltip: `**${label}**\n\n${count} ${noun}${count === 1 ? "" : "s"}`,
+    icon:
+      node.bucket === "information"
+        ? { kind: "theme", id: "info" }
+        : { kind: "file", slug: ICON_FILES[node.bucket] },
+    contextValue: tokenString([NODE_TOKEN.bucket, `bucket-${node.bucket}`]),
+    // Never a leaf: an empty bucket is not rendered at all (bucketNodes).
+    collapsible: node.bucket === "in-progress" ? "expanded" : "collapsed",
+  };
 }
 
 /** An attention row, which is a leaf and carries no menu of its own. */

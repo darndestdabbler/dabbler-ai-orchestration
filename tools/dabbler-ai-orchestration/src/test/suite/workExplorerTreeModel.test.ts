@@ -2,6 +2,7 @@ import * as assert from "assert";
 import {
   NODE_TOKEN,
   actionToken,
+  bucketNodes,
   childrenOf,
   descriptorFor,
   findingDescriptor,
@@ -32,19 +33,77 @@ import {
 } from "./helpers";
 
 suite("workExplorerTreeModel: nodes", () => {
-  test("sessions render as one list in ledger order, never bucketed by status", () => {
+  test("sessions group under non-empty status buckets: live work ascending, finished work descending", () => {
+    // The operator's ruling, superseding D104: the live buckets read in run
+    // order, the finished ones put the latest close under the header, a
+    // planned session shares Not Started, and an empty bucket (Cancelled
+    // here) is not a row at all.
     const repository = makeRepository({
       sessions: [
-        makeSession({ number: 3, status: "not-started" }),
-        makeSession({ number: 1, status: "complete" }),
-        makeSession({ number: 2, status: "in-progress" }),
+        makeSession({ number: 5, status: "planned", iconKey: "not-started" }),
+        makeSession({ number: 4, status: "not-started", iconKey: "not-started" }),
+        makeSession({ number: 1, status: "complete", completedAt: "2026-08-01T10:00:00Z" }),
+        makeSession({ number: 3, status: "in-progress", iconKey: "in-progress" }),
+        makeSession({ number: 2, status: "complete", completedAt: "2026-08-02T10:00:00Z" }),
       ],
     });
     const [node] = repositoryNodes([repository]);
+    const buckets = bucketNodes(node);
     assert.deepStrictEqual(
-      sessionNodes(node).map((n) => n.session.number),
-      [1, 2, 3],
+      buckets.map((b) => [b.bucket, sessionNodes(b).map((n) => n.session.number)]),
+      [
+        ["in-progress", [3]],
+        ["not-started", [4, 5]],
+        ["complete", [2, 1]],
+      ],
     );
+    const [live, queued, done] = buckets.map((b) => descriptorFor(b));
+    // The count sits in the description slot, which VS Code dims.
+    assert.strictEqual(done.description, "2");
+    assert.strictEqual(live.collapsible, "expanded");
+    assert.strictEqual(queued.collapsible, "collapsed");
+    assert.strictEqual(done.collapsible, "collapsed");
+    assert.deepStrictEqual(done.icon, { kind: "file", slug: "done.svg" });
+    assert.ok(hasToken(done.contextValue, NODE_TOKEN.bucket));
+  });
+
+  test("a closed session that stopped at the cap is an Information note, not an attention row", () => {
+    // Flagging every closed REMEDIATED_AT_CAP session at the top of the tree
+    // read as a standing fault and invited reopening work that later
+    // sessions had built on. The in-flight case stays an attention row,
+    // because that one is a decision.
+    const repository = makeRepository({
+      currentSession: 3,
+      sessions: [
+        makeSession({
+          number: 1,
+          status: "complete",
+          verification: makeVerification({ terminal: "REMEDIATED_AT_CAP" }),
+        }),
+        makeSession({ number: 2, status: "complete" }),
+        makeSession({
+          number: 3,
+          status: "in-progress",
+          inFlight: true,
+          verification: makeVerification(),
+        }),
+      ],
+    });
+    const [node] = repositoryNodes([repository]);
+    const attention = attentionNodes(node).filter((r) => r.subject === "unresolved");
+    assert.deepStrictEqual(attention.map((r) => r.label.slice(0, 11)), ["Session 003"]);
+    const information = bucketNodes(node).find((b) => b.bucket === "information");
+    assert.ok(information, "the Information bucket renders when there is a note");
+    assert.deepStrictEqual(
+      childrenOf(information).map((r) => (r.kind === "attention" ? r.label.slice(0, 11) : r.kind)),
+      ["Session 001"],
+    );
+    assert.strictEqual(descriptorFor(information).collapsible, "collapsed");
+    // No notes, no bucket.
+    const quiet = repositoryNodes([
+      makeRepository({ sessions: [makeSession({ number: 1, status: "complete" })] }),
+    ])[0];
+    assert.strictEqual(bucketNodes(quiet).some((b) => b.bucket === "information"), false);
   });
 
   test("taskNodes mirrors the projection's task list verbatim", () => {
@@ -92,7 +151,9 @@ suite("workExplorerTreeModel: nodes", () => {
     const [repositoryNode] = repositoryNodes([
       makeRepository({ sessions: [session] }),
     ]);
-    const sessionNode = childrenOf(repositoryNode)[0];
+    const bucketNode = childrenOf(repositoryNode)[0];
+    assert.strictEqual(bucketNode.kind, "bucket");
+    const sessionNode = childrenOf(bucketNode)[0];
     assert.strictEqual(sessionNode.kind, "session");
     const taskNode = childrenOf(sessionNode)[0];
     assert.strictEqual(taskNode.kind, "task");
@@ -188,7 +249,7 @@ suite("workExplorerTreeModel: repository descriptor", () => {
     const d = repositoryDescriptor(node);
     assert.strictEqual(d.collapsible, "collapsed");
     assert.ok(d.tooltip!.includes("has not written a ledger here yet"));
-    assert.strictEqual(sessionNodes(node).length, 2);
+    assert.strictEqual(sessionNodes(bucketNodes(node)[0]).length, 2);
   });
 
   test("tooltip surfaces the forced-close bypass and an invariant violation", () => {
@@ -297,19 +358,27 @@ suite("workExplorerTreeModel: session descriptor", () => {
     assert.ok(d.label.includes("The sessions view"));
   });
 
-  test("only the in-flight session carries a description", () => {
+  test("the in-flight row says so; a finished row carries its close date; a queued row is quiet", () => {
     const inFlight = sessionDescriptor({
       kind: "session",
       repository,
       session: makeSession({ status: "in-progress", iconKey: "in-progress" }),
     });
+    const closed = new Date(2026, 7, 30, 20, 19, 5);
     const done = sessionDescriptor({
       kind: "session",
       repository,
-      session: makeSession(),
+      session: makeSession({ completedAt: closed.toISOString() }),
+    });
+    const queued = sessionDescriptor({
+      kind: "session",
+      repository,
+      session: makeSession({ status: "not-started", iconKey: "not-started" }),
     });
     assert.strictEqual(inFlight.description, "in flight");
-    assert.strictEqual(done.description, undefined);
+    // The local calendar date only; the full timestamp is the tooltip's.
+    assert.strictEqual(done.description, "2026-08-30");
+    assert.strictEqual(queued.description, undefined);
   });
 
   test("a session with tasks is collapsible; without, a leaf", () => {

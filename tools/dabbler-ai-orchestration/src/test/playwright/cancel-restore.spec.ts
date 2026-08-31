@@ -10,7 +10,7 @@ import {
   DABBLER_CLI,
   cleanupTmpDir,
   closeVSCode,
-  expandTreeRow,
+  revealSessionRow,
   expectFileIcon,
   launchVSCode,
   makeTmpDir,
@@ -73,21 +73,18 @@ test.afterAll(async () => {
 });
 
 test("the fresh session renders not started", async () => {
-  await expandTreeRow(pane, repository);
-  await expectFileIcon(treeRow(pane, "001 · Cancel me"), "not-started.svg");
+  await expectFileIcon(await revealSessionRow(pane, { repository, session: "001 · Cancel me" }),"not-started.svg");
 });
 
 test("cancelling via the CLI flips the row's glyph after refresh", async () => {
   runSessionCli(["cancel", "1", "--reason", "playwright round-trip"]);
   await triggerRefresh(vscode.page);
-  await expandTreeRow(pane, repository);
-  await expectFileIcon(treeRow(pane, "001 · Cancel me"), "cancelled.svg");
+  await expectFileIcon(await revealSessionRow(pane, { repository, session: "001 · Cancel me" }),"cancelled.svg");
 });
 
 test("restoring via the CLI returns the row to not started", async () => {
   runSessionCli(["restore", "1"]);
   await triggerRefresh(vscode.page);
-  await expandTreeRow(pane, repository);
-  await expectFileIcon(treeRow(pane, "001 · Cancel me"), "not-started.svg");
+  await expectFileIcon(await revealSessionRow(pane, { repository, session: "001 · Cancel me" }),"not-started.svg");
   await expect(treeRow(pane, "001 · Cancel me")).toBeVisible();
 });

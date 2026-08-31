@@ -1,8 +1,40 @@
-# STATUS — 62 of 65 closed. Next: 63, the escape route — when the framework stops, it asks
+# STATUS — 63 of 65 closed. Next: 64, the operator onboarding deck
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
 `experiment/verification-pipeline-v3` and `design/solution-decomposition`
 are merged and finished. Earlier handoff text is in `docs/status-archive.md`.
+
+> **Recorded, 2026-08-31, after session 63 — the escape route is built.**
+> Closed `VERIFIED` in two rounds. What landed, from the session's own
+> close-out: stops are **classified** — a stop on the same step with the
+> same reasons twice running says `deadlock`, and a judge-produced reason
+> cites its rule by name; the guide's "When the framework stops" section
+> carries the **diagnosis protocol** (read the framework's account first;
+> verify the claim against code; fix framework source in the tree on THIS
+> repository — the 60/62 precedent — and report `blocked` with an owed
+> item on a consumer repository, where dabbler is an installed package;
+> never touch the records) with three pointer lines in the managed body,
+> re-bootstrapped here; **`dabbler triage`** assembles a stop's artifacts
+> and asks a provider that is not the working engine for a
+> schema-validated classification with a minimal amendment; the
+> **unattended ladder** runs second provider → third provider → an owed
+> decision carrying the raw artifacts, no rung loops, every rung
+> terminates at the human, and a gate-relaxing amendment is only ever a
+> recorded human choice; **`session interrupt` queues against a stopped
+> run** and the resume drains it as `sent: <text>`; **`session plan
+> amend`** is the affordance 62 lacked, reason and approver on the
+> record; and the **readers of driver records accept unknown properties**
+> while writers stay strict — "Execution record unreadable" is reserved
+> for damage, and the installed-extension schema skew class is dead.
+> Round 1 raised two Majors, both telling: adviser routing failures
+> **bypassed the ladder's human floor**, and triage amendments were
+> discarded — the owed "Amend step" choice wasn't wired to `plan amend`;
+> both fixed and re-verified in round 2 (two nits stand on the record:
+> `stopArtifacts()` trims what "raw artifacts" promises, and the generated
+> amendment command isn't directly executable as printed). Extension
+> **2.7.0**, installed; unpublished like the rest. The deck (64) and the
+> trial (65) stand as re-cut — the deck's walk still owes the review of
+> 62's at-cap terminal repair.
 
 > **Recorded, 2026-08-31, after session 62 — the entry is built, and the
 > plan gains the escape route.** Session 62 closed **`REMEDIATED_AT_CAP`**

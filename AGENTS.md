@@ -123,6 +123,8 @@ it was restored from the later commit and re-rendered with
   `DABBLER_OPENAI_API_KEY`, `DABBLER_GEMINI_API_KEY`. Never in config or logs.
 - Transport preference: CLI flag `--transport` > `DABBLER_TRANSPORT` env >
   `transport.profile` in router-config.yaml > default `api`.
+- Git Bash heredocs mangle backslashes on this host — write files with
+  your editing tools, never with a heredoc.
 
 <!-- dabbler:managed:start -->
 # AI orchestrator instructions — `dabbler-ai-orchestration`

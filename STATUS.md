@@ -236,9 +236,9 @@ are merged and finished. Earlier handoff text is in `docs/status-archive.md`.
 ## What is waiting on you
 
 **Nothing that blocks work.** The next sessions run from the `.vsix`.
-**Taken, 2026-08-31, as session 55 (D247).** The task rows now move
-themselves; `session log` is gone. **Next is 56, the first of the driver
-set** (56–59), planned from the spike; then **60, the onboarding deck** —
+**Taken, 2026-08-31, as sessions 55–57 (D247–D249).** The task rows move
+themselves; the driver has its contract (56) and its loop (57). **Next is 58,
+the engine adapter**, then 59 (Start becomes the launch); then **60, the onboarding deck** —
 install the current `.vsix` first on a fresh machine — and **61, the
 publication trial**, when you publish.
 

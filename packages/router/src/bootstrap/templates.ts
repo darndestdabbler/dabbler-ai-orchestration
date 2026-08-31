@@ -49,126 +49,64 @@ export const SHARED_BODY =
   "\n" +
   "You are the **orchestrator** for `{repo_name}`, running AI-led work one\n" +
   "session at a time under the Dabbler session workflow. You do the mechanics\n" +
-  "(file edits, shell, git) and follow the per-session plan in\n" +
-  "`docs/sessions/session-plan.md`.\n" +
+  "— file edits, shell, git — and the framework owns the lifecycle: it tells\n" +
+  "you what to do next, one move at a time, and you do that and ask again.\n" +
   "\n" +
-  "## The session lifecycle\n" +
+  "## How to run a session\n" +
   "\n" +
   "Sessions are numbered directly in this repository, under one sessions root\n" +
   "(`docs/sessions/`), so no command takes a handle to one.\n" +
   "\n" +
-  "1. **Resolve the session to run.** The session in flight is the single\n" +
-  "   entry in `docs/sessions/sessions.json` whose `status` is\n" +
-  "   `\"in-progress\"`; there is at most one. If none is in flight, the next\n" +
-  "   is the lowest-numbered `not-started` one; `complete` and `cancelled`\n" +
-  "   are skipped. Never infer state from file presence; read the `status`\n" +
-  "   field. Two in flight is a drift error — stop and surface it.\n" +
+  "    dabbler session next --sessions-dir docs/sessions\n" +
   "\n" +
-  "2. **Register the session (state first, work second).**\n" +
+  "One call, one move: it judges whatever answer is outstanding, advances the\n" +
+  "session, and prints the next instruction as JSON on stdout. Do what the\n" +
+  "instruction says, run the command it names as `answer_command` — running\n" +
+  "it is the answer — and call `next` again, until it says `done`. That is\n" +
+  "the whole loop, and there is nothing to remember between calls: the\n" +
+  "framework holds the state.\n" +
   "\n" +
-  "       dabbler session start \\\n" +
-  "           --engine <claude-code|codex|gemini|copilot> --provider <anthropic|openai|google>\n" +
+  "**The first call registers the session**, so it is the one that carries\n" +
+  "who is working:\n" +
   "\n" +
-  "   Copilot seats must also pass `--model` (the seat label is not trusted;\n" +
-  "   identity resolves through the model registry). Idempotent — safe to\n" +
-  "   re-run after a context reset.\n" +
+  "    dabbler session next --sessions-dir docs/sessions \\\n" +
+  "        --engine <claude-code|codex|gemini|copilot> --provider <anthropic|openai|google>\n" +
   "\n" +
-  "   **Then declare the task list, before you edit anything.**\n" +
+  "A Copilot seat adds `--model` (the seat label is not trusted; identity\n" +
+  "resolves through the model registry). Every later call carries none of\n" +
+  "them — the session is in flight and its identity is on the record.\n" +
   "\n" +
-  "       dabbler session declare \\\n" +
-  "           --task-file <path> --releasable|--not-releasable\n" +
+  "## What comes back\n" +
   "\n" +
-  "   The declaration says what this session will do and whether it produces a\n" +
-  "   releasable artifact. It is refused once the tree carries the session's\n" +
-  "   work, refused a second time, and refused after the close — a session\n" +
-  "   that declares itself releasable after building is a model deciding in\n" +
-  "   hindsight what may be published. Step 8 reads it and fails closed: an\n" +
-  "   undeclared session cannot publish.\n" +
+  "Four kinds of instruction, and no fifth:\n" +
   "\n" +
-  "3. **Do the work.** Follow the session plan's step list for the current\n" +
-  "   session. Log progress and make the edits. Do NOT commit yet —\n" +
-  "   verification reviews the working tree, and an already-committed tree\n" +
-  "   presents an empty diff.\n" +
+  "- **`step`** — work to do. Its `ask` says what; do it, then report with\n" +
+  "  the `answer_command`, naming every file you changed and nothing else.\n" +
+  "- **`rejection`** — the answer was refused, and `reasons` says why. Fix\n" +
+  "  it and answer again; three refusals of one step stop the session.\n" +
+  "- **`wait`** — the framework is running something that outlasts a tool\n" +
+  "  call. Nothing is owed but another `next`, after the seconds\n" +
+  "  `retry_after_seconds` names; `log` is where the work is being written.\n" +
+  "  It is a call you make later, never a sleep you hold.\n" +
+  "- **`done`** — the session is over and closed. Stop.\n" +
   "\n" +
-  "4. **Run the tests this change makes necessary — only those.**\n" +
-  "\n" +
-  "       dabbler affected\n" +
-  "\n" +
-  "   prints the selected tests, the reason each was selected, and the exact\n" +
-  "   command to run. Once a verification round exists, selection is measured\n" +
-  "   against that round's snapshot, so a remediation runs what the fix\n" +
-  "   touched rather than what the session touched. Run it, then record it:\n" +
-  "\n" +
-  "       dabbler test-evidence record \\\n" +
-  "           --suite <name> --stage preverify-targeted \\\n" +
-  "           --command \"<the command you ran>\" --outcome passed \\\n" +
-  "           --duration-seconds <elapsed>\n" +
-  "\n" +
-  "   The complete suite is neither required nor accepted here. A command\n" +
-  "   that does not name the selected tests is recorded as a\n" +
-  "   `policy_violation` and verification refuses to start. Two exceptions\n" +
-  "   exist and both are auditable: the selector proving every test affected\n" +
-  "   (it says so, and the bare suite command is then correct), or\n" +
-  "   `--allow-full-preverify \"<reason>\"`, whose reason is mandatory.\n" +
-  "\n" +
-  "5. **Run cross-provider verification (mandatory — there is no skip).**\n" +
-  "\n" +
-  "       dabbler verify\n" +
-  "\n" +
-  "   The verifier is a different provider than you, on either transport.\n" +
-  "   Round outcomes land in `.dabbler/runs/` (machine-written; never edit).\n" +
-  "   Blocking findings: remediate, rerun step 4 for the fix, then re-run the\n" +
-  "   same command — rounds ≥2 review only your fix delta. The loop suspends\n" +
-  "   at the round cap.\n" +
-  "\n" +
-  "6. **Run the complete suite once, against the final verified tree**, and\n" +
-  "   record it as the run of record. The command is the `command` the suite\n" +
-  "   declares under `testing.suites` in this repository's `dabbler.yaml` —\n" +
-  "   the same one `--suite <name>` names here:\n" +
-  "\n" +
-  "       dabbler test-evidence record \\\n" +
-  "           --suite <name> --stage final-full --outcome passed \\\n" +
-  "           --duration-seconds <elapsed>\n" +
-  "\n" +
-  "   This is the only stage the close accepts, and it binds to the tree it\n" +
-  "   ran against. A failed run of record is not reusable proof: fix, rerun\n" +
-  "   the affected tests, re-verify, then run the suite again.\n" +
-  "\n" +
-  "7. **Commit the verified work, then push — once.** Commit as often as the\n" +
-  "   work wants; push exactly once, here, immediately before close. CI runs\n" +
-  "   on push, so a mid-session push buys a full matrix run of work that is\n" +
-  "   not finished.\n" +
-  "\n" +
-  "8. **Package — only if step 2 declared this session releasable.**\n" +
-  "\n" +
-  "       dabbler packaging\n" +
-  "\n" +
-  "   Packs, then pushes to the declared feed. It refuses an undeclared or\n" +
-  "   not-releasable session, refuses a repository that declares no\n" +
-  "   `packaging` block, and refuses until the same gates the close reads all\n" +
-  "   pass. The feed credential is named in configuration, never held there:\n" +
-  "   it resolves at spawn into one argv element and is placed in no\n" +
-  "   environment. `--dry-run` previews the gates and runs nothing.\n" +
-  "\n" +
-  "9. **Close via the gate.**\n" +
-  "\n" +
-  "       dabbler session close\n" +
-  "\n" +
-  "   Five gates run (verification clean, tree clean, pushed, tests fresh,\n" +
-  "   verdict vocabulary); use `--dry-run` any time to preview the rows.\n" +
-  "   The close flips the state, then commits and pushes its bookkeeping.\n" +
+  "Everything the framework now does for itself happens inside those calls:\n" +
+  "declaring the work, selecting and running the tests a change makes\n" +
+  "necessary, cross-provider verification and its remediation rounds, the\n" +
+  "complete suite as the run of record, the commit, the push, publishing and\n" +
+  "the close. None of them is yours to run, and none of them is yours to\n" +
+  "skip ahead to — the instruction in hand is the whole of what is asked.\n" +
   "\n" +
   "## Hard rules\n" +
   "\n" +
   "- State files (`docs/sessions/sessions.json`) and everything under\n" +
   "  `.dabbler/runs/`\n" +
   "  are written by the router only — never by hand, never \"fixed up\".\n" +
-  "- Verification verdicts come from the verifier. A verdict token you did\n" +
-  "  not receive from `dabbler verify` does not exist.\n" +
+  "- Verification verdicts come from the verifier. A verdict token the\n" +
+  "  framework did not hand you does not exist.\n" +
   "- API keys live in env vars (`DABBLER_ANTHROPIC_API_KEY`,\n" +
   "  `DABBLER_OPENAI_API_KEY`, `DABBLER_GEMINI_API_KEY`), never in files. The\n" +
-  "  same rule covers a feed PAT: `packaging.push.secret` names it and never\n" +
-  "  holds it.\n" +
+  "  same rule covers a feed PAT: configuration names it and never holds it.\n" +
   "- The router is one command, `dabbler <verb>` — no interpreter, no virtual\n" +
   "  environment. A VS Code terminal has it on `PATH`; anywhere else, run\n" +
   "  `npm i -g dabbler-ai-router` once. \"dabbler: command not found\" is a\n" +
@@ -196,9 +134,10 @@ export const AGENTS_TAIL =
   "exists. GitHub Copilot loads all three files at once and de-duplicates\n" +
   "nothing, which is exactly why only this one carries the body.\n" +
   "\n" +
-  "Copilot seats: declare `--model` at session start and prefer\n" +
-  "`DABBLER_TRANSPORT=copilot-cli` when routing through the seat. Cross-\n" +
-  "provider verification stays cross-provider on every transport.\n";
+  "Copilot seats: declare `--model` on the first call, the one that\n" +
+  "registers, and prefer `DABBLER_TRANSPORT=copilot-cli` when routing\n" +
+  "through the seat. Cross-provider verification stays cross-provider on\n" +
+  "every transport.\n";
 
 /**
  * Gemini CLI reads `GEMINI.md` unless `context.fileName` says otherwise.

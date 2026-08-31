@@ -6,7 +6,15 @@ import { registerCancelLifecycleCommands } from "./commands/cancelLifecycleComma
 import { registerNewModuleCommand } from "./commands/newModule";
 import { registerSessionCommands } from "./commands/sessionCommands";
 import { registerBootstrapProjectCommand } from "./commands/bootstrapProject";
+import {
+  DecisionAnnouncer,
+  badgeFor,
+  defaultOwedDecisionUi,
+  offerDecision,
+  registerOwedDecisionCommands,
+} from "./commands/owedDecisionCommands";
 import { installTerminalShim } from "./router/terminalShim";
+import { disposeDabblerTerminals, openDabblerTerminal } from "./router/dabblerTerminal";
 import { registerWorkExplorerTreeCommands } from "./commands/workExplorerTreeCommands";
 import { SESSIONS_REL, discoverRoots, hasSessionsRoot } from "./utils/fileSystem";
 import { RUNS_REL } from "./utils/projection";
@@ -54,6 +62,22 @@ export function activate(context: vscode.ExtensionContext): void {
   // repaired workspace clears the message.
   treeProvider.onDiagnostic((message) => {
     treeView.message = message;
+  });
+  // What the framework is waiting on a person for, said in the three places
+  // a person might be looking: the badge on the activity bar, a toast for
+  // one that is newly open, and the row itself (which carries the brief and
+  // the command to answer it).
+  registerOwedDecisionCommands(context);
+  const announcer = new DecisionAnnouncer();
+  treeProvider.onScan((repositories) => {
+    treeView.badge = badgeFor(repositories);
+    for (const target of announcer.fresh(repositories)) {
+      void offerDecision(target, defaultOwedDecisionUi(), productionRouter()).then(
+        (answered) => {
+          if (answered) treeProvider.refresh();
+        },
+      );
+    }
   });
 
   // First-run on-ramp: the first time the view becomes visible in a
@@ -140,6 +164,19 @@ export function activate(context: vscode.ExtensionContext): void {
         context.subscriptions.push(watcher);
       }
     }
+  }
+
+  // The *Dabbler* terminal, for the repository this window is showing: the
+  // framework's background work, beside the engine's own CLI and never
+  // carrying a word of what it says. One per window, disposed with the
+  // extension, and not shown on creation -- it is something the operator
+  // looks at, not something that takes focus while they are typing.
+  // Start opens (and shows) one for the repository it was pressed on, so a
+  // repository bootstrapped after activation, a second folder or a worktree
+  // is not left without one.
+  context.subscriptions.push(disposeDabblerTerminals());
+  for (const root of discoverRoots()) {
+    if (hasSessionsRoot(root)) openDabblerTerminal(root);
   }
 
   const refreshAll = () => {

@@ -1,13 +1,22 @@
-// Start, Stop, Send, Close -- the framework runs the session; nobody pastes.
+// Start, Stop, Send, Close -- the engine stays in the person's own CLI.
 //
-// Start used to register the session and hand the operator a prompt to
-// paste into an engine's chat. Now it launches `dabbler session drive`:
-// the framework registers, asks the engine for a plan, hands it each step,
-// verifies, runs the suite, lands and closes, and the engine answers per
-// step. What the person keeps is the two things only a person decides --
-// which engine runs it (asked once, here) and when to stop or redirect it
-// (`session interrupt`, behind Stop and Send). Everything the driver prints
-// lands in the "Dabbler: Engine" output channel as it happens.
+// Start opens a terminal running the engine's own CLI, interactively, at
+// the repository root, and gives it the one sentence a session needs: call
+// `dabbler session next` and do what it says until it says `done`. Nothing
+// is spawned on the person's behalf and nothing is pasted anywhere: they
+// keep their own spinner, their own scrollback, their own chat and their
+// own interrupt key, which is what the staff already trust.
+//
+// Beside it, split off the same panel, is the *Dabbler* terminal: what the
+// framework is doing while they type. Two terminals is the arrangement,
+// not one -- Start shows both, and shows them without taking the caret.
+//
+// **Start Unattended Session is the other half** (D252): headless `session
+// drive` as a child process, streaming into "Dabbler: Engine", for CI and
+// overnight runs. It is the only thing Stop and Send apply to -- they are
+// `session interrupt`, which ends an invocation the FRAMEWORK made, and
+// under the interactive default the framework never invokes anybody. Both
+// stay gated on `dabbler.driving`, which only an unattended drive sets.
 //
 // The driver is a child process rather than an in-process call, and the
 // reason is stated once in `router/driveProcess.ts`.
@@ -20,6 +29,7 @@ import { productionRouter } from "../router/host";
 import { routerOutputChannel } from "../router/commandLog";
 import { type DriveHandle, launchDriver } from "../router/driveProcess";
 import { resolveRouterCli } from "../router/terminalShim";
+import { ensureDabblerTerminal } from "../router/dabblerTerminal";
 import { asRepositoryNode } from "./workExplorerTreeCommands";
 
 const CHANNEL_NAME = "Dabbler Session";
@@ -57,6 +67,82 @@ export const ENGINES: readonly EngineChoice[] = [
   },
 ];
 
+/**
+ * How each engine's own CLI is launched interactively, and whether it has
+ * an argv slot for the opening sentence.
+ *
+ * **Measured against the installed CLIs' own `--help` on 2026-08-31, not
+ * assumed.**
+ *
+ * - `claude`: `Usage: claude [options] [command] [prompt]`, and "starts an
+ *   interactive session by default, use -p/--print for non-interactive
+ *   output". The positional IS the opening prompt, so it goes in argv.
+ * - `copilot`: `Usage: copilot [options] [command]` -- no positional, and
+ *   its `-p, --prompt <text>` is documented as "Execute a prompt in
+ *   non-interactive mode", which is the opposite of what Start wants.
+ * - `codex`: NOT installed on the machine this was written on, so its help
+ *   was not read and nothing here claims to know it. It opens with no
+ *   prompt: an argv a CLI does not take is a launch that fails in front of
+ *   the person, and the sentence costs them one keypress instead.
+ */
+const ENGINE_CLI: Readonly<Record<string, { program: string; carriesPrompt: boolean }>> = {
+  "claude-code": { program: "claude", carriesPrompt: true },
+  copilot: { program: "copilot", carriesPrompt: false },
+  codex: { program: "codex", carriesPrompt: false },
+};
+
+/** What Start asks the editor to open: one CLI, interactively, in one repository. */
+export interface EngineTerminal {
+  readonly name: string;
+  readonly cwd: string;
+  readonly program: string;
+  readonly args: readonly string[];
+  /**
+   * Typed at the CLI's prompt and NOT sent, for a CLI whose argv has no
+   * slot for it. The person presses Enter, which is the one keypress that
+   * replaces copying and pasting a prompt.
+   */
+  readonly typed: string | null;
+}
+
+/**
+ * The whole instruction an engine needs, as the guide states it.
+ *
+ * The sessions root is repository-relative because the terminal opens at
+ * the repository root; the identity flags are on it because the first call
+ * is the one that registers, and a seat's `--model` with it because the
+ * seat label is not trusted.
+ */
+export function openingSentence(choice: EngineChoice, model: string): string {
+  const seat = choice.modelRequired && model.trim() !== "" ? ` --model ${model.trim()}` : "";
+  return (
+    `Call \`dabbler session next --sessions-dir ${SESSIONS_REL.replace(/\\/g, "/")} ` +
+    `--engine ${choice.engine} --provider ${choice.provider}${seat}\` ` +
+    "and do what it says until it says `done`."
+  );
+}
+
+/** The terminal Start opens for a choice, or the refusal when a seat has no model. */
+export function engineTerminalFor(
+  repository: SessionsRepository,
+  choice: EngineChoice,
+  model: string,
+): EngineTerminal | string {
+  const cli = ENGINE_CLI[choice.engine];
+  if (!cli) return `${choice.label} has no known CLI to open; nothing was launched.`;
+  if (choice.modelRequired && model.trim() === "") {
+    return `${choice.label} is a seat and needs a model; nothing was launched.`;
+  }
+  const sentence = openingSentence(choice, model);
+  return {
+    name: choice.label,
+    cwd: repository.root,
+    program: cli.program,
+    args: cli.carriesPrompt ? [sentence] : [],
+    typed: cli.carriesPrompt ? null : sentence,
+  };
+}
+
 export interface SessionRunUi {
   pickEngine: () => Thenable<EngineChoice | undefined>;
   /** The model to drive with; empty for the engine's default; undefined when the box was dismissed. */
@@ -70,6 +156,18 @@ export interface SessionRunUi {
   showInformationMessage: (message: string) => unknown;
   /** One line the driver printed, shown as it arrives. */
   engineLine: (line: string) => void;
+  /** Open the person's own CLI, interactively, and show it. */
+  openTerminal: (terminal: EngineTerminal) => unknown;
+  /**
+   * Show the framework's own terminal for this repository, split off the
+   * one just opened.
+   *
+   * Start's whole arrangement is the two of them side by side -- the chat
+   * on one side, what the framework is doing on the other -- and a
+   * terminal that existed but was never shown left the operator with only
+   * half of it.
+   */
+  showFrameworkTerminal: (repoRoot: string, beside: unknown) => void;
   /**
    * Run something slow where the operator can see it is running.
    *
@@ -188,6 +286,23 @@ export function defaultSessionRunUi(): SessionRunUi {
     showErrorMessage: (m) => vscode.window.showErrorMessage(m),
     showInformationMessage: (m) => vscode.window.showInformationMessage(m),
     engineLine: (line) => engineOutputChannel().appendLine(line),
+    openTerminal: (spec) => {
+      const terminal = vscode.window.createTerminal({
+        name: spec.name,
+        cwd: spec.cwd,
+        shellPath: spec.program,
+        shellArgs: [...spec.args],
+      });
+      terminal.show();
+      // Typed, never sent: the person reads it and presses Enter. Whether a
+      // CLI that is still starting keeps what it was handed is a thing to
+      // watch on the walk -- the pty takes it either way, and the sentence
+      // is one line to retype if it does not.
+      if (spec.typed !== null) terminal.sendText(spec.typed, false);
+      return terminal;
+    },
+    showFrameworkTerminal: (repoRoot, beside) =>
+      ensureDabblerTerminal(repoRoot, beside as vscode.Terminal | undefined),
     withProgress: <T,>(title: string, work: () => Promise<T>): Promise<T> =>
       Promise.resolve(
         vscode.window.withProgress(
@@ -224,11 +339,43 @@ export function driveArguments(choice: EngineChoice, model: string): string[] | 
 }
 
 /**
- * Start is the launch. The engine is the decision -- asked as one, in a
- * pick -- and the framework runs the session from there. A cancelled pick
- * cancels the command, which is what cancelling a decision should do.
+ * Start is the launch, and what it launches is the person's own CLI.
+ *
+ * The engine is the decision -- asked as one, in a pick -- and everything
+ * after it belongs to the person: their terminal, their chat, their Esc.
+ * A cancelled pick cancels the command, which is what cancelling a
+ * decision should do.
  */
 export async function runStartSession(
+  repository: SessionsRepository,
+  ui: SessionRunUi,
+): Promise<boolean> {
+  const picked = await ui.pickEngine();
+  if (!picked) return false;
+  const model = await ui.askModel(picked);
+  if (model === undefined) return false;
+  const terminal = engineTerminalFor(repository, picked, model);
+  if (typeof terminal === "string") {
+    ui.showErrorMessage(terminal);
+    return false;
+  }
+  const opened = ui.openTerminal(terminal);
+  // The framework's own terminal, beside it. Both, or the person is
+  // watching their engine work with no sight of what the framework is
+  // doing -- which is the arrangement this session exists to build.
+  ui.showFrameworkTerminal(repository.root, opened);
+  return true;
+}
+
+/**
+ * The unattended half: headless `session drive`, for CI and overnight runs.
+ *
+ * It is the same command Start used to be, kept because a driven engine is
+ * a measured capability and retiring it would leave nothing for a run
+ * nobody is sitting in front of (D252). Stop and Send belong to this and
+ * to nothing else.
+ */
+export async function runStartUnattendedSession(
   repository: SessionsRepository,
   ui: SessionRunUi,
   launcher: DriveLauncher,
@@ -439,7 +586,18 @@ export function registerSessionCommands(
       async (arg: unknown) => {
         const node = asRepositoryNode(arg);
         if (!node) return;
-        if (await runStartSession(node.repository, ui, launcher, drives)) {
+        // No channel is shown: the engine is in the terminal that just
+        // opened, and the framework's own work goes to the Dabbler
+        // terminal rather than here.
+        await runStartSession(node.repository, ui);
+      },
+    ),
+    vscode.commands.registerCommand(
+      "dabbler.startUnattendedSession",
+      async (arg: unknown) => {
+        const node = asRepositoryNode(arg);
+        if (!node) return;
+        if (await runStartUnattendedSession(node.repository, ui, launcher, drives)) {
           engineOutputChannel().show(true);
         }
       },

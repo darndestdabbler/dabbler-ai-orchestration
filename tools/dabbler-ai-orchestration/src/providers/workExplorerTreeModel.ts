@@ -341,6 +341,12 @@ export interface RowDescriptor {
    * children starts collapsed.
    */
   collapsible: "none" | "collapsed" | "expanded";
+  /**
+   * What activating the row does, for a row whose whole purpose is to be
+   * acted on. Repository and session rows get theirs in the provider,
+   * which knows the node; this is for rows that carry their own argument.
+   */
+  command?: { command: string; title: string; arguments: unknown[] };
 }
 
 // Tokens are `;`-wrapped on both sides so a `when` clause can match
@@ -912,6 +918,45 @@ export interface AttentionNode {
   readonly detail: string;
   /** Blocking work, as opposed to merely worth knowing. */
   readonly urgent: boolean;
+  /**
+   * The whole brief, for a row that is a decision.
+   *
+   * Carried rather than flattened into the tooltip here, because the same
+   * row is what the answer flow is opened with: one object says what to
+   * show and what to offer, so the two cannot describe different options.
+   */
+  readonly decision?: OwedDecision;
+}
+
+/** One open decision, exactly as the projection publishes it. */
+export type OwedDecision = SessionsRepository["owedDecisions"][number];
+
+/**
+ * A stop and a question look different at a glance.
+ *
+ * The framework raises its own stops as decisions (`driver-stop-s<N>`), so
+ * they arrive through the same list as everything else -- and an operator
+ * scanning several projects needs "this one halted" to survive peripheral
+ * vision, which is what the warning glyph is for.
+ */
+export function isDriverStop(decision: OwedDecision): boolean {
+  return decision.id.startsWith("driver-stop-");
+}
+
+/** The brief as markdown: the question, what is known, and what each answer costs. */
+export function decisionTooltip(decision: OwedDecision): string {
+  const lines = [`**${decision.question}**`];
+  if (decision.determined) lines.push("", decision.determined);
+  const options = decision.options ?? [];
+  if (options.length > 0) {
+    lines.push("");
+    for (const option of options) {
+      const recommended = option.label === decision.recommendation ? " — *recommended*" : "";
+      lines.push(`- **${option.label}**${recommended}: ${option.consequence}`);
+    }
+  }
+  if (decision.onNoAnswer) lines.push("", `If nobody answers: ${decision.onNoAnswer}`);
+  return lines.join("\n");
 }
 
 /**
@@ -937,6 +982,7 @@ export function attentionNodes(node: RepositoryNode): AttentionNode[] {
         ? "Holds the close until you answer it"
         : owed.onNoAnswer || "Waiting on you",
       urgent: owed.blocking,
+      decision: owed,
     });
   }
 
@@ -952,19 +998,30 @@ export function attentionNodes(node: RepositoryNode): AttentionNode[] {
       ? `Session ${inFlight.displayNumber} is in flight`
       : `Session ${repository.currentSession} is in flight`;
     const age = elapsedSince(repository.lastActivityAt);
+    // Working or waiting, from the run record: the framework running a
+    // verification round or a suite is a fact the row can state, and "last
+    // written N ago" alone made a ten-minute round look like a silence.
+    // What it still does NOT claim is anything about the thinking -- a
+    // waiting session is one the framework is not running, not one that
+    // has stopped being useful.
+    const working = repository.activity === "working";
     rows.push({
       kind: "attention",
       repository,
       subject: "stalled",
       label: repository.possiblyStalled
         ? `${named} — nothing written for ${age ?? "a while"}`
-        : named,
+        : `${named} — ${working ? "working" : "waiting"}`,
       // Deliberately never "stalled" or "stuck". It reports that the record
       // stopped moving; it cannot see whether the thinking is still useful,
       // and a row that implied it could would be making that judgment.
-      detail: age
-        ? `Last written ${age} ago. This is the record moving, not the work.`
-        : "Nothing has been written yet.",
+      detail:
+        (working
+          ? "The framework is running something. "
+          : "Nothing is running; the session is between calls. ") +
+        (age
+          ? `Last written ${age} ago. This is the record moving, not the work.`
+          : "Nothing has been written yet."),
       urgent: false,
     });
   }
@@ -1063,20 +1120,41 @@ export function bucketDescriptor(node: BucketNode): RowDescriptor {
 
 /** An attention row, which is a leaf and carries no menu of its own. */
 export function attentionDescriptor(node: AttentionNode): RowDescriptor {
+  const decision = node.decision;
   return {
     id: `attention:${node.repository.root}/${node.subject}/${node.label}`,
     label: node.label,
     description: node.detail,
-    tooltip: `**${node.label}**\n\n${node.detail}`,
+    // A decision's tooltip is the whole brief. It is the one surface with
+    // room for the consequences, and an operator deciding from labels
+    // alone is choosing from a menu with no prices.
+    tooltip: decision ? decisionTooltip(decision) : `**${node.label}**\n\n${node.detail}`,
     icon: {
       kind: "theme",
       // Urgency is the icon's whole job here: an operator scanning several
       // projects needs "this one is blocked" to survive peripheral vision.
-      id: node.urgent ? "error" : "info",
-      color: node.urgent ? "charts.yellow" : undefined,
+      // A halted framework and a question it is asking are different
+      // things and read as different glyphs.
+      id: decision ? (isDriverStop(decision) ? "warning" : "question") : node.urgent ? "error" : "info",
+      color: decision
+        ? isDriverStop(decision)
+          ? "charts.yellow"
+          : "charts.blue"
+        : node.urgent
+          ? "charts.yellow"
+          : undefined,
     },
     contextValue: tokenString([NODE_TOKEN.attention, `attention-${node.subject}`]),
     collapsible: "none",
+    // Clicking the row is how it is answered, because it is where the
+    // operator is already looking when they decide to.
+    command: decision
+      ? {
+          command: "dabbler.answerOwedDecision",
+          title: "Answer",
+          arguments: [{ repository: node.repository, decision }],
+        }
+      : undefined,
   };
 }
 

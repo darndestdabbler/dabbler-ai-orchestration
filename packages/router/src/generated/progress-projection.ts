@@ -59,6 +59,19 @@ export type ProgressProjectionRepository = {
      */
     blocking: boolean;
     onNoAnswer?: string | null;
+    /**
+     * What the framework established on its own before asking, carried so a reader can judge the question without opening the ledger behind it.
+     */
+    determined?: string | null;
+    /**
+     * Each choice with what follows from it, as the brief states them. A surface that offered the labels alone would be asking the operator to decide from a menu with no prices.
+     */
+    options?: {
+      label: string;
+      consequence: string;
+    }[];
+    recommendation?: string | null;
+    confidence?: "high" | "medium" | "low" | null;
   }>;
   /**
    * How many sessions the plan declares that the ledger has not reached. Zero for a repository whose ledger has caught up. It is published rather than left to be counted from the rows because 'is this project finished' is the question the count answers, and a reader that re-derived it would be a second implementation of the rule.

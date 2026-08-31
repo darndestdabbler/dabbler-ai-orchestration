@@ -87,6 +87,12 @@ import {
   snapshotWorktreeTree,
 } from "./journal.ts";
 import { LedgerError, type Row, latestRound, readDisputes } from "./ledger.ts";
+import {
+  CLASS_VALUE_TRADEOFF,
+  openDecisions,
+  raiseOwed,
+  supersedeOwed,
+} from "./owedDecisions.ts";
 import { readSessionState, sessionDisplayNumber } from "./progress.ts";
 import {
   EXIT_BOUNDARY,
@@ -168,6 +174,22 @@ const INTERRUPT_POLL_MS = 500;
 const SENT_PREFIX = "sent: ";
 
 type StopKind = NonNullable<DriverRun["stop"]>["kind"];
+
+/** The two answers a stopped loop has, in the words the operator is offered. */
+const RESUME_CHOICE = "Run `next` again";
+const CANCEL_CHOICE = "Cancel the session";
+
+/**
+ * The one decision a stop raises, per session.
+ *
+ * Keyed on the session rather than on the stop, because `raiseOwed` folds by
+ * id: a second stop of the same kind and reason leaves one row, and a stop
+ * whose reason has changed supersedes the stale brief instead of stacking a
+ * second question about the same session.
+ */
+function stopDecisionId(sessionNumber: number): string {
+  return `driver-stop-s${sessionNumber}`;
+}
 
 /**
  * The loop halting short of the close, with the reason a person reads.
@@ -413,6 +435,7 @@ class Driver {
       stop: null,
     };
     this.save();
+    if (existing.stop) this.settleStopDecision(existing.stop.kind);
     this.log("run-resumed", {
       session: sessionDisplayNumber(current),
       phase: this.run.phase,
@@ -438,6 +461,77 @@ class Driver {
     const transport = this.options.transport ?? existing?.transport ?? null;
     if (maxRounds === null && transport === null) return null;
     return { max_rounds: maxRounds, transport };
+  }
+
+  /**
+   * The stop, as a question the operator can answer where they answer
+   * everything else.
+   *
+   * A halted loop is a decision -- run it again, or give this session up --
+   * and until now it was answerable only by whoever thought to read
+   * `run.json`. It is raised in a class that does NOT refuse a close: a
+   * driver that stopped is not a verification reduction, and a bookkeeping
+   * question that could block a close would hold work the verifier passed.
+   *
+   * A failure to write the question is never allowed to swallow the stop.
+   * The reason is on `run.json` and on stderr either way, and a stop
+   * reported as a crash would cost more than the row it failed to write.
+   */
+  private raiseStopDecision(kind: StopKind, reason: string): void {
+    try {
+      raiseOwed(this.repoRoot, {
+        id: stopDecisionId(this.sessionNumber),
+        decisionClass: CLASS_VALUE_TRADEOFF,
+        question:
+          `Session ${sessionDisplayNumber(this.sessionNumber)} stopped ` +
+          `(${kind}) in phase '${this.run.phase}'. Run it again, or cancel it?`,
+        determined: reason,
+        options: [
+          {
+            label: RESUME_CHOICE,
+            consequence:
+              `The session resumes from '${this.run.phase}'. The steps it has ` +
+              "already accepted are not asked for again.",
+          },
+          {
+            label: CANCEL_CHOICE,
+            consequence:
+              "`dabbler session cancel` ends it with a reason on the record. " +
+              "What the working tree already carries stays where it is.",
+          },
+        ],
+        recommendation: RESUME_CHOICE,
+        onNoAnswer:
+          "Nothing happens. The session stays in flight and its record stops " +
+          "moving until someone resumes it or cancels it.",
+        sessionNumber: this.sessionNumber,
+      });
+    } catch (error) {
+      this.log("owed-not-raised", { reason: (error as Error).message });
+    }
+  }
+
+  /**
+   * The question a stop raised, retired the moment it is answered by acting.
+   *
+   * Resuming IS the answer to "run it again, or cancel it?", and this is the
+   * only path that can know it was given -- nobody types `owed answer` to
+   * say what they have just done. An answered decision is left alone: it is
+   * settled, and superseding it would rewrite what the operator agreed to.
+   */
+  private settleStopDecision(kind: StopKind): void {
+    const id = stopDecisionId(this.sessionNumber);
+    try {
+      if (!openDecisions(this.repoRoot).some((row) => row["id"] === id)) return;
+      supersedeOwed(
+        this.repoRoot,
+        id,
+        `the session was resumed after its '${kind}' stop`,
+        this.sessionNumber,
+      );
+    } catch (error) {
+      this.log("owed-not-superseded", { reason: (error as Error).message });
+    }
   }
 
   // --- the conversation ------------------------------------------------------
@@ -931,9 +1025,15 @@ class Driver {
       }
     }
     for (const file of spec.files) {
-      if (!report.files_changed.includes(file)) {
-        reasons.push(`files_changed must include '${file}', which the step expected to change`);
-      }
+      if (report.files_changed.includes(file) || changed.includes(file)) continue;
+      // A step file the tree left byte-identical is not a refusal: the work
+      // can be done and the diff empty (session 62's managed body -- bootstrap
+      // rewrote CLAUDE.md and GEMINI.md with content identical to what stood).
+      // Refusing made the step unanswerable: omitting the file failed a
+      // must-include while naming it failed the unchanged rule. A declared
+      // file that DID change and is missing from the report is still refused
+      // above, and the step's checks remain the gate on the work itself.
+      this.log("step-file-unchanged", { step: spec.id, file });
     }
     if (reasons.length > 0) return reasons;
 
@@ -1445,6 +1545,7 @@ class Driver {
         stop: { kind: error.kind, reason: error.message, at: nowIso() },
       };
       this.save();
+      this.raiseStopDecision(error.kind, error.message);
       writeErr(
         `dabbler: STOPPED (${error.kind}) in phase '${this.run.phase}' after ` +
           `${this.run.invocations} invocation(s) -- ${error.message}\n` +

@@ -1,4 +1,5 @@
 import * as assert from "assert";
+import * as vscode from "vscode";
 import {
   CancellableSession,
   CancelLifecycleUi,
@@ -17,12 +18,15 @@ import {
   ENGINES,
   type DriveLauncher,
   type SessionRunUi,
+  defaultSessionRunUi,
   engineOutputChannel,
   runSendToEngine,
   runStartSession,
+  runStartUnattendedSession,
   runStopDrive,
 } from "../../commands/sessionCommands";
 import type { DriveHandle } from "../../router/driveProcess";
+import { openDabblerTerminal } from "../../router/dabblerTerminal";
 import { cancellableSessionOf } from "../../commands/cancelLifecycleCommands";
 import { sessionNumberOf, specSectionTargetFor } from "../../commands/openFile";
 import {
@@ -412,6 +416,8 @@ function driveUi(overrides: Partial<SessionRunUi> = {}): {
     showErrorMessage: (m: string) => errors.push(m),
     showInformationMessage: (m: string) => infos.push(m),
     engineLine: (line) => engine.push(line),
+    openTerminal: () => undefined,
+    showFrameworkTerminal: () => undefined,
     withProgress: (_title, work) => work(),
     ...overrides,
   };
@@ -432,15 +438,121 @@ function launcherOf(drives: Map<string, FakeDrive>): DriveLauncher & { launched:
   };
 }
 
+/** What the stub records of one `window.createTerminal` call. */
+interface FakeTerminal {
+  options: {
+    name: string;
+    cwd: string;
+    shellPath: string;
+    shellArgs: string[];
+    location?: { parentTerminal?: unknown };
+    pty?: unknown;
+  };
+  shown: number;
+  disposed: number;
+  sent: Array<{ text: string; addNewLine: boolean }>;
+}
+
+suite("Start opens the person's own CLI", () => {
+  test("opens the picked engine's CLI at the repository root, with the sentence, and launches no driver", async () => {
+    const repository = makeRepository();
+    const launcher = launcherOf(new Map());
+    const terminals = (vscode.window as unknown as { __terminals: FakeTerminal[] }).__terminals;
+    terminals.length = 0;
+
+    // The real UI over the stub: what matters is what the EDITOR was asked
+    // to open, not what a fake recorded.
+    const claude = { ...defaultSessionRunUi(), pickEngine: async () => ENGINES[0], askModel: async () => "" };
+    assert.strictEqual(await runStartSession(repository, claude), true);
+    // Two terminals, because two is the arrangement: the engine's CLI and
+    // the framework's own work beside it.
+    assert.strictEqual(terminals.length, 2);
+    const cli = terminals[0];
+    assert.strictEqual(cli.options.shellPath, "claude");
+    assert.strictEqual(cli.options.cwd, repository.root);
+    assert.strictEqual(cli.shown, 1);
+    // Claude Code takes a positional prompt for an interactive session, so
+    // the sentence is argv and nothing is typed.
+    assert.match(cli.options.shellArgs[0], /dabbler session next .*--engine claude-code/);
+    assert.deepStrictEqual(cli.sent, []);
+    assert.deepStrictEqual(launcher.launched, []);
+
+    // The Dabbler terminal, split off the CLI and shown -- created once
+    // per repository, however many times Start is pressed.
+    const dabbler = terminals[1];
+    assert.ok(dabbler.options.name.startsWith("Dabbler"));
+    assert.ok(dabbler.options.pty);
+    assert.strictEqual(dabbler.options.location?.parentTerminal, cli);
+    assert.strictEqual(dabbler.shown, 1);
+
+    // The seat's CLI has no argv slot for it, so it is typed at the prompt
+    // and not sent -- one keypress, and nothing copied anywhere.
+    const copilot = ENGINES.find((e) => e.engine === "copilot")!;
+    const seat = { ...defaultSessionRunUi(), pickEngine: async () => copilot, askModel: async () => "gpt-5-6-luna" };
+    assert.strictEqual(await runStartSession(repository, seat), true);
+    assert.strictEqual(terminals.length, 4);
+    assert.strictEqual(terminals[2].options.shellPath, "copilot");
+    assert.deepStrictEqual(terminals[2].options.shellArgs, []);
+    assert.strictEqual(terminals[2].sent.length, 1);
+    assert.strictEqual(terminals[2].sent[0].addNewLine, false);
+    assert.match(terminals[2].sent[0].text, /--model gpt-5-6-luna/);
+
+    // A second session in the same window opens a second CLI, and the
+    // terminal beside the FIRST one is not the arrangement Start promised
+    // for this one. A location cannot be changed after creation, so the
+    // Dabbler terminal is built again beside the CLI that was just opened.
+    assert.ok(terminals[3].options.name.startsWith("Dabbler"));
+    assert.strictEqual(terminals[3].options.location?.parentTerminal, terminals[2]);
+    assert.strictEqual(terminals[3].shown, 1);
+    // And the one it replaced is gone rather than left behind.
+    assert.strictEqual(dabbler.disposed, 1);
+    assert.strictEqual(dabbler.shown, 1);
+    assert.deepStrictEqual(launcher.launched, []);
+  });
+
+  test("splits the terminal activation already made, rather than showing it as its own tab", async () => {
+    // The ordinary path, and the one the first fix missed: an existing
+    // repository is open when the window starts, so a Dabbler terminal
+    // exists before there is any CLI to sit beside it. A terminal's
+    // location is fixed at creation, so showing that one produces a
+    // separate tab and no arrangement at all.
+    const repository = makeRepository({ root: path.join("D:", "already-open") });
+    const terminals = (vscode.window as unknown as { __terminals: FakeTerminal[] }).__terminals;
+    terminals.length = 0;
+    openDabblerTerminal(repository.root);
+    assert.strictEqual(terminals.length, 1);
+    assert.strictEqual(terminals[0].options.location, undefined);
+
+    const ui = { ...defaultSessionRunUi(), pickEngine: async () => ENGINES[0], askModel: async () => "" };
+    assert.strictEqual(await runStartSession(repository, ui), true);
+    // The CLI, then a Dabbler terminal built beside it -- the unsplit one
+    // is replaced, not merely shown.
+    assert.strictEqual(terminals.length, 3);
+    assert.strictEqual(terminals[2].options.location?.parentTerminal, terminals[1]);
+    assert.strictEqual(terminals[2].shown, 1);
+    assert.strictEqual(terminals[0].shown, 0);
+  });
+
+  test("a seat without a model opens nothing, and a dismissed pick opens nothing", async () => {
+    const repository = makeRepository();
+    const copilot = ENGINES.find((e) => e.engine === "copilot")!;
+    const seat = driveUi({ pickEngine: async () => copilot, askModel: async () => "" });
+    assert.strictEqual(await runStartSession(repository, seat.ui), false);
+    assert.ok(seat.errors[0].includes("needs a model"));
+    const dismissed = driveUi({ pickEngine: async () => undefined });
+    assert.strictEqual(await runStartSession(repository, dismissed.ui), false);
+  });
+});
+
 suite("the driven session", () => {
-  test("Start launches `session drive` for the chosen engine at the repository root and shows what the driver prints", async () => {
+  test("Start Unattended launches `session drive` for the chosen engine at the repository root and shows what the driver prints", async () => {
     const repository = makeRepository();
     const spawned = new Map<string, FakeDrive>();
     const launcher = launcherOf(spawned);
     const { ui, engine, infos } = driveUi();
     const drives = new Drives();
 
-    assert.strictEqual(await runStartSession(repository, ui, launcher, drives), true);
+    assert.strictEqual(await runStartUnattendedSession(repository, ui, launcher, drives), true);
     assert.deepStrictEqual(launcher.launched, [
       {
         root: repository.root,
@@ -453,7 +565,7 @@ suite("the driven session", () => {
 
     // A second Start on the same repository launches nothing.
     const again = driveUi();
-    assert.strictEqual(await runStartSession(repository, again.ui, launcher, drives), false);
+    assert.strictEqual(await runStartUnattendedSession(repository, again.ui, launcher, drives), false);
     assert.strictEqual(launcher.launched.length, 1);
     assert.ok(again.errors[0].includes("already being driven"));
 
@@ -469,10 +581,16 @@ suite("the driven session", () => {
     const launcher = launcherOf(new Map());
     const copilot = ENGINES.find((e) => e.engine === "copilot")!;
     const seat = driveUi({ pickEngine: async () => copilot, askModel: async () => "" });
-    assert.strictEqual(await runStartSession(repository, seat.ui, launcher, new Drives()), false);
+    assert.strictEqual(
+      await runStartUnattendedSession(repository, seat.ui, launcher, new Drives()),
+      false,
+    );
     assert.ok(seat.errors[0].includes("needs a model"));
     const dismissed = driveUi({ pickEngine: async () => undefined });
-    assert.strictEqual(await runStartSession(repository, dismissed.ui, launcher, new Drives()), false);
+    assert.strictEqual(
+      await runStartUnattendedSession(repository, dismissed.ui, launcher, new Drives()),
+      false,
+    );
     assert.deepStrictEqual(launcher.launched, []);
   });
 

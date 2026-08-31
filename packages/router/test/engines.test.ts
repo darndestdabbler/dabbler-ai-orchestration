@@ -207,6 +207,34 @@ describe("the engine adapters", () => {
     expect(renderCodexEvent('{"type":"turn.completed","usage":{}}')).toBe("result: turn completed");
   });
 
+  it("leaves no escape behind in a coloured line the renderer has to truncate", () => {
+    // Session 61, watched in a real terminal: a green checkmark at the end
+    // of a tool result left every line after it green. The result is quoted
+    // at 120 characters, so the reset was cut away and the opener was not.
+    const ESC = "\u001b";
+    const green = `${ESC}[32m`;
+    const reset = `${ESC}[0m`;
+    const line = renderClaudeCodeEvent(
+      JSON.stringify({
+        type: "user",
+        message: {
+          content: [
+            {
+              type: "tool_result",
+              content: `${ESC}]0;vitest${ESC}\\${green}✓ ${"tests passed ".repeat(20)}${reset}`,
+            },
+          ],
+        },
+      }),
+    );
+    expect(line).not.toBeNull();
+    expect(line).not.toContain(ESC);
+    // What the engine actually said survives, cut to the same length it
+    // would have been cut to with the escapes still counted against it.
+    expect(line).toContain("✓ tests passed");
+    expect(line).toContain("  ← ");
+  });
+
   it("speaks Claude Code's stream-json: the prompt on stdin, --resume after the first, and an interrupt as the control message that ends the turn", async () => {
     const dir = makeTempDir();
     const fake = join(dir, "claude.cjs");

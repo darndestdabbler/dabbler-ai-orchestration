@@ -101,7 +101,26 @@
                 "type": "boolean",
                 "description": "Whether leaving this unanswered refuses the close."
               },
-              "onNoAnswer": { "type": ["string", "null"] }
+              "onNoAnswer": { "type": ["string", "null"] },
+              "determined": {
+                "type": ["string", "null"],
+                "description": "What the framework established on its own before asking, carried so a reader can judge the question without opening the ledger behind it."
+              },
+              "options": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["label", "consequence"],
+                  "additionalProperties": false,
+                  "properties": {
+                    "label": { "type": "string" },
+                    "consequence": { "type": "string" }
+                  }
+                },
+                "description": "Each choice with what follows from it, as the brief states them. A surface that offered the labels alone would be asking the operator to decide from a menu with no prices."
+              },
+              "recommendation": { "type": ["string", "null"] },
+              "confidence": { "type": ["string", "null"], "enum": ["high", "medium", "low", null] }
             }
           }
         },

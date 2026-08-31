@@ -1693,6 +1693,19 @@ function owedForProjection(repoRoot: string | null): Record<string, unknown>[] {
       severity: String(row["severity"] ?? "advisory"),
       blocking: row["severity"] === "blocking",
       onNoAnswer: (row["onNoAnswer"] as string | null) ?? null,
+      // The rest of the brief travels with the question. A surface that had
+      // the labels but not their consequences would be asking the operator
+      // to choose from a menu with no prices, and one that had to open the
+      // ledger for them would be the second place they look.
+      determined: (row["determined"] as string | null) ?? null,
+      options: Array.isArray(row["options"])
+        ? (row["options"] as Array<Record<string, unknown>>).map((option) => ({
+            label: String(option["label"] ?? ""),
+            consequence: String(option["consequence"] ?? ""),
+          }))
+        : [],
+      recommendation: (row["recommendation"] as string | null) ?? null,
+      confidence: (row["confidence"] as string | null) ?? null,
     }));
   } catch {
     return [];

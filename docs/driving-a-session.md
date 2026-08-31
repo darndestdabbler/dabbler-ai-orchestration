@@ -9,6 +9,13 @@ Every example line below came from one walk on a scratch repository on
 `done`, with one refused report, one message sent mid-session and one halt
 — and the lines are as they were printed. Nothing here is illustrative.
 
+**"Starting from the Work Explorer" below came from a second walk**, on
+2026-08-31 after session 62, on a scratch repository at `C:\temp\s62-walk`
+with the Copilot seat named as the engine: a session registered, one step
+done, a `wait` while the affected tests ran, a halt from `session
+interrupt --stop`, and the decision that halt raised — answered, after
+which the session resumed. Its lines are as they were printed too.
+
 ## The shape of it
 
 A session is a numbered block of work in `docs/sessions/session-plan.md`
@@ -320,6 +327,165 @@ Behind that, in the close's own log:
   verdict_vocabulary  PASS
 close: session 001 of sessions closed (VERIFIED).
 ```
+
+## Starting from the Work Explorer
+
+Everything above is what you type. The extension's job is to open the
+right things and to be loud when the framework needs you — it does not
+run the session for you, and it never stands between you and your engine.
+
+### What Start opens
+
+**Start Session** on a repository row asks which engine, then opens a VS
+Code terminal at the repository root running *that engine's own CLI*,
+interactively. Where the CLI takes an opening prompt in its arguments the
+sentence is already there; where it does not, the sentence is typed at the
+prompt for you to press Enter on. From the walk, the three engines:
+
+```
+TERMINAL Claude Code
+  cwd:      C:\temp\s62-walk
+  command:  claude "Call `dabbler session next --sessions-dir docs/sessions --engine claude-code --provider anthropic` and do what it says until it says `done`."
+  typed:    (nothing; the sentence is in argv)
+
+TERMINAL GitHub Copilot
+  cwd:      C:\temp\s62-walk
+  command:  copilot
+  typed:    Call `dabbler session next --sessions-dir docs/sessions --engine copilot --provider openai --model gpt-5-6-luna` and do what it says until it says `done`.
+```
+
+Claude Code takes a positional prompt and starts interactive by default.
+The Copilot CLI has no positional prompt — its `-p` is documented as
+non-interactive — so the sentence is typed and left for you. Codex is
+treated the same way, and for a plainer reason: its help was not read on
+the machine this was built on, and an argument a CLI does not take is a
+launch that fails in front of you.
+
+**What Start does not do.** It spawns no driver. It copies nothing to the
+clipboard and pastes nothing into a chat. After it opens the terminal, the
+session is yours: your scrollback, your chat, your Esc.
+
+### The Dabbler terminal
+
+Start opens a second terminal beside your CLI, named *Dabbler*, split off
+the same panel and shown without taking the caret from what you are
+typing. It shows what the framework is doing — the phase the run moved to,
+the background job it started, and that job's own output as it arrives.
+This is what that terminal printed on the walk:
+
+```
+dabbler [14:21:30] terminal-opened repository=s62-walk
+dabbler [14:21:30] phase session=001 phase=preverify
+dabbler [14:21:30] job-started name=affected tests: unit log=.dabbler/runs/s1/driver/jobs/affected-tests-unit.log
+running unit: node tests/run.mjs tests/test_widget.mjs
+recorded unit [preverify-targeted]: passed in 1s (timed here)
+dabbler [14:21:30] working
+```
+
+The framework's own lines carry a band behind them; the job's lines do
+not, because they arrive exactly as the runner wrote them — colours,
+checkmarks and spinner included. That is the whole reason it is a terminal
+and not an output channel.
+
+`working` and `waiting` are the indicator: it says `working` while a
+background job is running and `waiting` when there is none and the session
+is between your calls. It says each of them once, when the state changes.
+
+The two surfaces name the same events differently, and it is worth knowing
+which you are reading. The Dabbler terminal says `job-started` and
+`job-collected`; `dabbler session next` in your own CLI says `job-started`
+and `job-finished … exit=0`, because the CLI is the side that collected the
+exit code. Every block in this section says which of the two it came from.
+
+**It never carries engine chat.** Not one line of it, ever. Under `session
+next` the framework does not see your chat at all — you are reading it in
+your own CLI — and under unattended `drive` the engine's stream goes to
+the "Dabbler: Engine" output channel instead. Chat in the CLI, work in the
+Dabbler terminal; there is no setting to get this wrong.
+
+### Start Unattended Session
+
+**Start Unattended Session** is the other launcher: headless `session
+drive`, as a child process, streaming into "Dabbler: Engine". It is for CI
+and overnight runs — the case where nobody is at a keyboard.
+
+**Stop** and **Send** belong to that and to nothing else. They are
+`session interrupt`, which ends an invocation the *framework* made; when
+your own CLI is the engine there is no such invocation, and the interrupt
+is your own Esc.
+
+### When the framework stops, it says so
+
+A halt is raised as a decision, so one kind of row serves every "waiting
+on you". It appears above the session buckets with a warning glyph, a
+toast offers the recommended answer, and the activity-bar badge carries
+the count. After `session interrupt --stop` on the walk, this is the row
+and the badge the Explorer built — printed here as the model carries them,
+since a screenshot cannot be pasted into a text file:
+
+```
+ROW  Session 001 stopped (interrupted) in phase 'preverify'. Run it again, or cancel it?
+     Nothing happens. The session stays in flight and its record stops moving until someone resumes it or cancels it.
+     icon={"kind":"theme","id":"warning","color":"charts.yellow"} command=dabbler.answerOwedDecision
+
+BADGE {"value":1,"tooltip":"Dabbler is waiting on you: Session 001 stopped (interrupted) in phase 'preverify'. Run it again, or cancel it?"}
+```
+
+The row's tooltip is the whole brief — the question, what the framework
+already established, and each option with what follows from it:
+
+```
+**Session 001 stopped (interrupted) in phase 'preverify'. Run it again, or cancel it?**
+
+the widget needs a rethink
+
+- **Run `next` again** — *recommended*: The session resumes from 'preverify'. The steps it has already accepted are not asked for again.
+- **Cancel the session**: `dabbler session cancel` ends it with a reason on the record. What the working tree already carries stays where it is.
+
+If nobody answers: Nothing happens. The session stays in flight and its record stops moving until someone resumes it or cancels it.
+```
+
+The toast offers the recommended option by its own label, *Other…* and
+*Later*. **Later records nothing** — dismissing a toast is not a decision,
+and the row stays. *Other…*, or a click on the row, opens a picker whose
+items carry each consequence:
+
+```
+Run `next` again  ◀ default
+  detail: The session resumes from 'preverify'. The steps it has already accepted are not asked for again. (recommended)
+Cancel the session
+  detail: `dabbler session cancel` ends it with a reason on the record. What the working tree already carries stays where it is.
+```
+
+Choosing records the answer through `dabbler owed answer`, which is the
+same one writer the command line uses:
+
+```
+owed: 'driver-stop-s1' answered 'Run `next` again'.
+```
+
+Answering does not itself resume the session — the next `session next`
+does, from the phase it stopped in, and nothing already accepted is asked
+for again. That call is the one you make in your own CLI, and this is what
+it printed there:
+
+```
+dabbler [14:22:18] run-resumed session=001 phase=preverify invocations=0 max_invocations=24 after=interrupted
+dabbler [14:22:19] job-finished name=affected tests: unit exit=0 log=.dabbler/runs/s1/driver/jobs/affected-tests-unit.log
+dabbler [14:22:19] phase phase=verify
+```
+
+The liveness row beside it says which of the two states the session is in
+— `working` while a job is running, `waiting` between calls:
+
+```
+ROW  Session 001 is in flight — waiting
+     Nothing is running; the session is between calls. Last written less than 2 minutes ago. This is the record moving, not the work.
+```
+
+It reports the record moving, not the thinking. A `waiting` session is one
+the framework is not running something for; it is not a judgment about
+whether the work is going well.
 
 ## `session drive`: the same loop, unattended
 

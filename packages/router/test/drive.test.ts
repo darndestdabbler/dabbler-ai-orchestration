@@ -30,6 +30,7 @@ import {
 import type { DriverInstruction } from "../src/generated/index.ts";
 import { runGit } from "../src/journal.ts";
 import { readDisputes, readRounds } from "../src/ledger.ts";
+import { openDecisions } from "../src/owedDecisions.ts";
 import { buildTaskRows, readSessionState } from "../src/progress.ts";
 import { resetForTests } from "../src/route.ts";
 import { resetForTests as resetRuntimeMode } from "../src/runtimeMode.ts";
@@ -330,6 +331,33 @@ describe("dabbler session drive", { timeout: 120_000 }, () => {
     expect(existsSync(transcriptPath(repo, 1, 3))).toBe(false);
   });
 
+  it("accepts a report that omits a step-declared file the tree did not change", async () => {
+    const { repo, sessionsDir } = drivenRepo();
+    configure([VERIFIED]);
+    // The plan promises a file the work leaves byte-identical -- session 62's
+    // managed-body deadlock: omitting it was refused as a must-include while
+    // naming it was refused as unchanged, and no report could be accepted.
+    const plan = {
+      ...PLAN,
+      steps: [{ ...PLAN.steps[0], files: ["src/widget.py", "tests/test_widget.py"] }],
+    };
+    const engine = scripted(({ instruction }, tools) => {
+      if (instruction.answer_schema === WORK_PLAN_SCHEMA) return void tools.answer(plan);
+      tools.write("src/widget.py", WIDGET_V2);
+      tools.report({ step: "widget", files: ["src/widget.py"] });
+    });
+
+    const { code, out } = await drive(sessionsDir, engine);
+    expect(code).toBe(0);
+    expect(engine.seen.map((entry) => entry.kind)).toEqual(["step", "step"]);
+    expect(out).toContain("step-file-unchanged");
+    expect(readRun(repo, 1)).toMatchObject({
+      phase: "complete",
+      accepted_steps: ["widget"],
+      stop: null,
+    });
+  });
+
   it("rejects a report that omits a file the tree changed, and accepts the corrected one", async () => {
     const { repo, sessionsDir } = drivenRepo();
     configure([VERIFIED]);
@@ -529,6 +557,32 @@ describe("dabbler session drive", { timeout: 120_000 }, () => {
     expect(code).toBe(1);
     expect(out).toContain("max_invocations=1");
     expect(readRun(repo, 1)).toMatchObject({ max_invocations: 1, stop: { kind: "budget" } });
+  });
+
+  it("raises a stop as an owed decision, and retires it when the run resumes", async () => {
+    const { repo, sessionsDir } = drivenRepo();
+    configure([VERIFIED], { max_invocations: 1 });
+    const stopped = await drive(sessionsDir, scripted(wellBehaved));
+    expect(stopped.code).toBe(1);
+
+    // One kind of row serves every "waiting on you": the stop is a question
+    // with two answers, not a field somebody has to know to read.
+    const raised = openDecisions(repo).find((row) =>
+      String(row["id"]).startsWith("driver-stop-"),
+    );
+    expect(raised).toMatchObject({ severity: "advisory", recommendation: "Run `next` again" });
+    expect(String(raised?.["question"])).toContain("Session 001 stopped (budget)");
+    expect(String(raised?.["determined"])).toContain("driver.max_invocations (1)");
+    expect(
+      (raised?.["options"] as Array<Record<string, unknown>>).map((option) => option["label"]),
+    ).toEqual(["Run `next` again", "Cancel the session"]);
+
+    // Resuming IS the answer, so the question does not outlive the stop.
+    const resumed = await drive(sessionsDir, scripted(wellBehaved), 6);
+    expect(resumed.code).toBe(0);
+    expect(
+      openDecisions(repo).some((row) => String(row["id"]).startsWith("driver-stop-")),
+    ).toBe(false);
   });
 
   it("stops when the engine reports a step blocked, with its notes", async () => {

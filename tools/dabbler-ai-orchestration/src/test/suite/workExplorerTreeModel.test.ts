@@ -11,6 +11,7 @@ import {
   repositoryDescriptor,
   repositoryNodes,
   repositoryTooltip,
+  attentionDescriptor,
   attentionNodes,
   sessionDescriptor,
   sessionNodes,
@@ -295,6 +296,81 @@ suite("workExplorerTreeModel: session descriptor", () => {
     assert.strictEqual(rows[1].subject, "stalled");
     // Never urgent: a quiet record is worth saying and is not an alarm.
     assert.strictEqual(rows[1].urgent, false);
+  });
+
+  test("a stop and a question read differently, and each carries its whole brief", () => {
+    const waiting = makeRepository({
+      owedDecisions: [
+        {
+          id: "driver-stop-s62",
+          question: "Session 062 stopped (budget) in phase 'steps'. Run it again, or cancel it?",
+          severity: "advisory",
+          blocking: false,
+          determined: "the loop met driver.max_invocations (24)",
+          recommendation: "Run `next` again",
+          onNoAnswer: "The session stays in flight until someone resumes it or cancels it.",
+          options: [
+            { label: "Run `next` again", consequence: "It resumes from 'steps'." },
+            { label: "Cancel the session", consequence: "It ends with a reason on the record." },
+          ],
+        },
+        {
+          id: "git-remote",
+          question: "Where should this repository push?",
+          severity: "advisory",
+          blocking: false,
+          options: [
+            { label: "attach", consequence: "The close pushes there." },
+            { label: "stay-local", consequence: "Nothing is ever pushed." },
+          ],
+        },
+      ],
+    });
+    const rows = attentionNodes({ kind: "repository", repository: waiting });
+    const stop = attentionDescriptor(rows[0]);
+    const question = attentionDescriptor(rows[1]);
+
+    // A halted framework and a question it is asking are different things.
+    assert.deepStrictEqual(stop.icon, { kind: "theme", id: "warning", color: "charts.yellow" });
+    assert.deepStrictEqual(question.icon, { kind: "theme", id: "question", color: "charts.blue" });
+
+    // The tooltip is the whole brief: choosing from labels alone is
+    // choosing from a menu with no prices.
+    assert.ok(stop.tooltip?.includes("driver.max_invocations (24)"));
+    assert.ok(stop.tooltip?.includes("It resumes from 'steps'."));
+    assert.ok(stop.tooltip?.includes("It ends with a reason on the record."));
+    assert.ok(stop.tooltip?.includes("recommended"));
+    assert.ok(stop.tooltip?.includes("stays in flight"));
+
+    // Clicking the row is how it gets answered.
+    assert.strictEqual(stop.command?.command, "dabbler.answerOwedDecision");
+    assert.deepStrictEqual(stop.command?.arguments, [
+      { repository: waiting, decision: waiting.owedDecisions[0] },
+    ]);
+  });
+
+  test("the liveness row says working while the framework runs something, waiting between calls", () => {
+    const inFlight = {
+      currentSession: 3,
+      lastActivityAt: new Date(Date.now() - 45 * 60 * 1000).toISOString(),
+      sessions: [makeSession({ number: 3, status: "in-progress", inFlight: true })],
+    };
+    const working = attentionNodes({
+      kind: "repository",
+      repository: makeRepository({ ...inFlight, activity: "working" }),
+    })[0];
+    assert.ok(working.label.includes("working"));
+    assert.ok(working.detail.includes("The framework is running something"));
+
+    const waiting = attentionNodes({
+      kind: "repository",
+      repository: makeRepository({ ...inFlight, activity: "waiting" }),
+    })[0];
+    assert.ok(waiting.label.includes("waiting"));
+    assert.ok(waiting.detail.includes("between calls"));
+    // Still never a claim about the thinking, only about the record.
+    assert.ok(waiting.detail.includes("the record moving, not the work"));
+    assert.strictEqual(waiting.urgent, false);
   });
 
   test("says how long since the record moved, whether or not it looks stalled", () => {

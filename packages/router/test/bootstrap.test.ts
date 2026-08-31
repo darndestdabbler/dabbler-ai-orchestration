@@ -212,12 +212,35 @@ describe("the instruction files", () => {
     writeInstructionFiles(project, "acme-app");
     const agents = readFileSync(join(project, "AGENTS.md"), "utf8");
     expect(agents).toContain("`acme-app`");
-    expect(agents).toContain("dabbler verify");
+    expect(agents).toContain("dabbler session next");
     for (const name of ["CLAUDE.md", "GEMINI.md"]) {
       const text = readFileSync(join(project, name), "utf8");
       expect(text).toContain("@AGENTS.md");
-      expect(text).not.toContain("dabbler verify");
+      expect(text).not.toContain("dabbler session next");
     }
+  });
+
+  it("tells the engine to call the framework rather than typing the lifecycle out", () => {
+    // The engine used to read nine numbered steps and execute them. It now
+    // reads one verb, because a list an engine can follow is a list it will
+    // follow whether or not the framework is already doing the work.
+    const project = makeTempDir();
+    writeInstructionFiles(project, "acme-app");
+    const agents = readFileSync(join(project, "AGENTS.md"), "utf8");
+    expect(agents).toContain("dabbler session next");
+    for (const verb of [
+      "session declare",
+      "dabbler affected",
+      "test-evidence record",
+      "dabbler verify",
+      "dabbler packaging",
+      "session close",
+    ]) {
+      expect(agents).not.toContain(verb);
+    }
+    // What stays is what is still the engine's to honour.
+    expect(agents).toContain("DABBLER_ANTHROPIC_API_KEY");
+    expect(agents).toContain("never by hand");
   });
 
   it("gives each engine its own tail", () => {

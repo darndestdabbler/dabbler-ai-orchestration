@@ -2,7 +2,7 @@
   "name": "dabbler-ai-orchestration",
   "displayName": "Dabbler AI Orchestration",
   "description": "Organize AI-led development like work: modules, session sets and step-by-step session plans in a native tree — plus routed verification before every close, normally cross-provider, recorded as evidence you can check.",
-  "version": "2.5.0",
+  "version": "2.6.0",
   "publisher": "DarndestDabbler",
   "private": true,
   "engines": {
@@ -95,6 +95,11 @@
         "category": "Dabbler"
       },
       {
+        "command": "dabbler.startUnattendedSession",
+        "title": "Start Unattended Session",
+        "category": "Dabbler"
+      },
+      {
         "command": "dabblerSessionSets.closeSession",
         "title": "Close Session",
         "category": "Dabbler"
@@ -177,6 +182,11 @@
         "command": "dabbler.showEngineOutput",
         "title": "Show Engine Output",
         "category": "Dabbler"
+      },
+      {
+        "command": "dabbler.answerOwedDecision",
+        "title": "Answer Owed Decision",
+        "category": "Dabbler"
       }
     ],
     "menus": {
@@ -187,6 +197,10 @@
         },
         {
           "command": "dabblerWorkExplorer.activateSession",
+          "when": "false"
+        },
+        {
+          "command": "dabbler.answerOwedDecision",
           "when": "false"
         },
         {
@@ -225,6 +239,11 @@
           "command": "dabblerSessionSets.startSession",
           "when": "view == dabblerWorkExplorerTree && viewItem =~ /;act-startSession;/",
           "group": "6_session@601"
+        },
+        {
+          "command": "dabbler.startUnattendedSession",
+          "when": "view == dabblerWorkExplorerTree && viewItem =~ /;act-startUnattendedSession;/",
+          "group": "6_session@603"
         },
         {
           "command": "dabblerSessionSets.closeSession",

@@ -249,8 +249,49 @@ export function engineShape(engine: string, model: string | null): EngineShape |
 
 // --- Rendering ---------------------------------------------------------------
 
+/**
+ * The escape sequences a terminal ACTS on: CSI (`ESC [ … final byte`) and
+ * OSC (`ESC ] … BEL`, or `ESC \`).
+ *
+ * The final byte is optional in both, so an unterminated sequence goes too.
+ * That is not defensiveness: a tool result arrives already cut to whatever
+ * length the engine chose, so a dangling opener is a real input -- and a
+ * colour opener with no reset is exactly what bleeds.
+ */
+// eslint-disable-next-line no-control-regex -- ESC is the byte being removed
+const ESCAPE_SEQUENCE = /\x1b\[[0-?]*[ -/]*[@-~]?|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)?/g;
+
+/**
+ * Engine-derived text with the terminal's own instructions taken out.
+ *
+ * Only CSI and OSC go. The words, the punctuation and any other control
+ * character the engine chose to print stay: a renderer is showing what the
+ * engine said, not editing it.
+ */
+function stripEscapes(text: string): string {
+  return text.replace(ESCAPE_SEQUENCE, "");
+}
+
+/**
+ * One line of engine-derived text, as a renderer may speak it.
+ *
+ * It strips before it truncates, and that order is the whole fix: cutting
+ * at a character count can take a colour's reset away while leaving its
+ * opener, and session 61 showed what that does in a real terminal -- a
+ * green checkmark at a line's end left every line after it green. Doing it
+ * here rather than in each renderer means the terminal and the
+ * `dabbler-drive` grammar's scopes both get clean text by construction,
+ * instead of by each of them remembering.
+ *
+ * The Dabbler terminal's job-log passthrough is deliberately not this seam:
+ * there the runners' colours arrive whole, resets included, which is the
+ * point of a terminal.
+ */
 function clip(text: unknown, limit: number): string {
-  return String(text ?? "").replace(/\s+/g, " ").trim().slice(0, limit);
+  return stripEscapes(String(text ?? ""))
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, limit);
 }
 
 function parseJson(line: string): Record<string, unknown> | null {

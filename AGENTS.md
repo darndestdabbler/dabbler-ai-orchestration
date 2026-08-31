@@ -135,126 +135,64 @@ it was restored from the later commit and re-rendered with
 
 You are the **orchestrator** for `dabbler-ai-orchestration`, running AI-led work one
 session at a time under the Dabbler session workflow. You do the mechanics
-(file edits, shell, git) and follow the per-session plan in
-`docs/sessions/session-plan.md`.
+— file edits, shell, git — and the framework owns the lifecycle: it tells
+you what to do next, one move at a time, and you do that and ask again.
 
-## The session lifecycle
+## How to run a session
 
 Sessions are numbered directly in this repository, under one sessions root
 (`docs/sessions/`), so no command takes a handle to one.
 
-1. **Resolve the session to run.** The session in flight is the single
-   entry in `docs/sessions/sessions.json` whose `status` is
-   `"in-progress"`; there is at most one. If none is in flight, the next
-   is the lowest-numbered `not-started` one; `complete` and `cancelled`
-   are skipped. Never infer state from file presence; read the `status`
-   field. Two in flight is a drift error — stop and surface it.
+    dabbler session next --sessions-dir docs/sessions
 
-2. **Register the session (state first, work second).**
+One call, one move: it judges whatever answer is outstanding, advances the
+session, and prints the next instruction as JSON on stdout. Do what the
+instruction says, run the command it names as `answer_command` — running
+it is the answer — and call `next` again, until it says `done`. That is
+the whole loop, and there is nothing to remember between calls: the
+framework holds the state.
 
-       dabbler session start \
-           --engine <claude-code|codex|gemini|copilot> --provider <anthropic|openai|google>
+**The first call registers the session**, so it is the one that carries
+who is working:
 
-   Copilot seats must also pass `--model` (the seat label is not trusted;
-   identity resolves through the model registry). Idempotent — safe to
-   re-run after a context reset.
+    dabbler session next --sessions-dir docs/sessions \
+        --engine <claude-code|codex|gemini|copilot> --provider <anthropic|openai|google>
 
-   **Then declare the task list, before you edit anything.**
+A Copilot seat adds `--model` (the seat label is not trusted; identity
+resolves through the model registry). Every later call carries none of
+them — the session is in flight and its identity is on the record.
 
-       dabbler session declare \
-           --task-file <path> --releasable|--not-releasable
+## What comes back
 
-   The declaration says what this session will do and whether it produces a
-   releasable artifact. It is refused once the tree carries the session's
-   work, refused a second time, and refused after the close — a session
-   that declares itself releasable after building is a model deciding in
-   hindsight what may be published. Step 8 reads it and fails closed: an
-   undeclared session cannot publish.
+Four kinds of instruction, and no fifth:
 
-3. **Do the work.** Follow the session plan's step list for the current
-   session. Log progress and make the edits. Do NOT commit yet —
-   verification reviews the working tree, and an already-committed tree
-   presents an empty diff.
+- **`step`** — work to do. Its `ask` says what; do it, then report with
+  the `answer_command`, naming every file you changed and nothing else.
+- **`rejection`** — the answer was refused, and `reasons` says why. Fix
+  it and answer again; three refusals of one step stop the session.
+- **`wait`** — the framework is running something that outlasts a tool
+  call. Nothing is owed but another `next`, after the seconds
+  `retry_after_seconds` names; `log` is where the work is being written.
+  It is a call you make later, never a sleep you hold.
+- **`done`** — the session is over and closed. Stop.
 
-4. **Run the tests this change makes necessary — only those.**
-
-       dabbler affected
-
-   prints the selected tests, the reason each was selected, and the exact
-   command to run. Once a verification round exists, selection is measured
-   against that round's snapshot, so a remediation runs what the fix
-   touched rather than what the session touched. Run it, then record it:
-
-       dabbler test-evidence record \
-           --suite <name> --stage preverify-targeted \
-           --command "<the command you ran>" --outcome passed \
-           --duration-seconds <elapsed>
-
-   The complete suite is neither required nor accepted here. A command
-   that does not name the selected tests is recorded as a
-   `policy_violation` and verification refuses to start. Two exceptions
-   exist and both are auditable: the selector proving every test affected
-   (it says so, and the bare suite command is then correct), or
-   `--allow-full-preverify "<reason>"`, whose reason is mandatory.
-
-5. **Run cross-provider verification (mandatory — there is no skip).**
-
-       dabbler verify
-
-   The verifier is a different provider than you, on either transport.
-   Round outcomes land in `.dabbler/runs/` (machine-written; never edit).
-   Blocking findings: remediate, rerun step 4 for the fix, then re-run the
-   same command — rounds ≥2 review only your fix delta. The loop suspends
-   at the round cap.
-
-6. **Run the complete suite once, against the final verified tree**, and
-   record it as the run of record. The command is the `command` the suite
-   declares under `testing.suites` in this repository's `dabbler.yaml` —
-   the same one `--suite <name>` names here:
-
-       dabbler test-evidence record \
-           --suite <name> --stage final-full --outcome passed \
-           --duration-seconds <elapsed>
-
-   This is the only stage the close accepts, and it binds to the tree it
-   ran against. A failed run of record is not reusable proof: fix, rerun
-   the affected tests, re-verify, then run the suite again.
-
-7. **Commit the verified work, then push — once.** Commit as often as the
-   work wants; push exactly once, here, immediately before close. CI runs
-   on push, so a mid-session push buys a full matrix run of work that is
-   not finished.
-
-8. **Package — only if step 2 declared this session releasable.**
-
-       dabbler packaging
-
-   Packs, then pushes to the declared feed. It refuses an undeclared or
-   not-releasable session, refuses a repository that declares no
-   `packaging` block, and refuses until the same gates the close reads all
-   pass. The feed credential is named in configuration, never held there:
-   it resolves at spawn into one argv element and is placed in no
-   environment. `--dry-run` previews the gates and runs nothing.
-
-9. **Close via the gate.**
-
-       dabbler session close
-
-   Five gates run (verification clean, tree clean, pushed, tests fresh,
-   verdict vocabulary); use `--dry-run` any time to preview the rows.
-   The close flips the state, then commits and pushes its bookkeeping.
+Everything the framework now does for itself happens inside those calls:
+declaring the work, selecting and running the tests a change makes
+necessary, cross-provider verification and its remediation rounds, the
+complete suite as the run of record, the commit, the push, publishing and
+the close. None of them is yours to run, and none of them is yours to
+skip ahead to — the instruction in hand is the whole of what is asked.
 
 ## Hard rules
 
 - State files (`docs/sessions/sessions.json`) and everything under
   `.dabbler/runs/`
   are written by the router only — never by hand, never "fixed up".
-- Verification verdicts come from the verifier. A verdict token you did
-  not receive from `dabbler verify` does not exist.
+- Verification verdicts come from the verifier. A verdict token the
+  framework did not hand you does not exist.
 - API keys live in env vars (`DABBLER_ANTHROPIC_API_KEY`,
   `DABBLER_OPENAI_API_KEY`, `DABBLER_GEMINI_API_KEY`), never in files. The
-  same rule covers a feed PAT: `packaging.push.secret` names it and never
-  holds it.
+  same rule covers a feed PAT: configuration names it and never holds it.
 - The router is one command, `dabbler <verb>` — no interpreter, no virtual
   environment. A VS Code terminal has it on `PATH`; anywhere else, run
   `npm i -g dabbler-ai-router` once. "dabbler: command not found" is a
@@ -269,8 +207,9 @@ it rather than repeating it, so this file is the one place the body
 exists. GitHub Copilot loads all three files at once and de-duplicates
 nothing, which is exactly why only this one carries the body.
 
-Copilot seats: declare `--model` at session start and prefer
-`DABBLER_TRANSPORT=copilot-cli` when routing through the seat. Cross-
-provider verification stays cross-provider on every transport.
+Copilot seats: declare `--model` on the first call, the one that
+registers, and prefer `DABBLER_TRANSPORT=copilot-cli` when routing
+through the seat. Cross-provider verification stays cross-provider on
+every transport.
 
 <!-- dabbler:managed:end -->

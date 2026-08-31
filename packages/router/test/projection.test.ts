@@ -16,6 +16,7 @@ import {
   appendRound,
   roundsPath,
 } from "../src/ledger.ts";
+import { CLASS_VALUE_TRADEOFF, raiseOwed } from "../src/owedDecisions.ts";
 import {
   SESSION_STATUSES,
   SOURCE_LEDGER,
@@ -208,6 +209,41 @@ describe("the source of a projection's sessions", () => {
       (projection["repository"] as Record<string, unknown>)["sessionsSource"],
     ).toBe(SOURCE_PLAN);
     expect((projection["sessions"] as unknown[]).length).toBe(2);
+  });
+
+  it("carries an open decision's whole brief, options and consequences included", () => {
+    const { repo, sessionsDir } = makeSandboxRepo();
+    raiseOwed(repo, {
+      id: "driver-stop-s1",
+      decisionClass: CLASS_VALUE_TRADEOFF,
+      question: "Session 001 stopped (budget). Run it again, or cancel it?",
+      determined: "the loop met driver.max_invocations (1)",
+      options: [
+        { label: "Run `next` again", consequence: "It resumes from 'steps'." },
+        { label: "Cancel the session", consequence: "It ends with a reason on the record." },
+      ],
+      recommendation: "Run `next` again",
+      confidence: "high",
+      onNoAnswer: "The session stays in flight and its record stops moving.",
+    });
+    const repository = buildProjection(sessionsDir)["repository"] as Record<
+      string,
+      unknown
+    >;
+    // A surface that had the labels but not their consequences would be
+    // asking the operator to choose from a menu with no prices, and one
+    // that had to open the ledger for them would be a second place to look.
+    expect((repository["owedDecisions"] as unknown[])[0]).toMatchObject({
+      id: "driver-stop-s1",
+      blocking: false,
+      determined: "the loop met driver.max_invocations (1)",
+      recommendation: "Run `next` again",
+      confidence: "high",
+      options: [
+        { label: "Run `next` again", consequence: "It resumes from 'steps'." },
+        { label: "Cancel the session", consequence: "It ends with a reason on the record." },
+      ],
+    });
   });
 
   it("reads the ledger once one exists", () => {

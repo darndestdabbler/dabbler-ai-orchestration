@@ -41,6 +41,16 @@ export const REPOSITORY_ACTIONS: RepositoryAction[] = [
   { id: "dabblerSessionSets.openChangeLog", label: "Change Log", group: 103, when: () => true },
   { id: "dabblerSessionSets.openSessionState", label: "Sessions Ledger", group: 104, when: () => true },
   { id: "dabblerSessionSets.startSession", label: "Start Session", group: 905, when: hasNextSession },
+  // The unattended half sits beside Start rather than replacing it: one
+  // opens the person's own CLI, the other runs the session with nobody
+  // watching, and which of those you want is not something a flag on one
+  // launcher can ask.
+  {
+    id: "dabbler.startUnattendedSession",
+    label: "Start Unattended Session",
+    group: 907,
+    when: hasNextSession,
+  },
   { id: "dabblerSessionSets.closeSession", label: "Close Session", group: 906,
     when: (r) => r.currentSession !== null },
 ];

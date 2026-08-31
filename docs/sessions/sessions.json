@@ -1211,22 +1211,35 @@
         "identityProvenance": "direct"
       },
       "verificationVerdict": "VERIFIED",
-      "frameworkVersion": "2.0.0",
       "verification": {
         "rounds": 3,
         "verifierModel": "gpt-5-6-sol",
         "verifierProvider": "openai",
         "transport": "api"
-      }
+      },
+      "frameworkVersion": "2.0.0"
     },
     {
       "number": 62,
       "title": "The entry \u2014 one sentence in the CLI, and Dabbler's own terminal",
-      "status": "not-started",
-      "startedAt": null,
+      "status": "in-progress",
+      "startedAt": "2026-08-31T12:56:21.375000-04:00",
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "model": "opus",
+        "identityProvenance": "direct"
+      },
+      "frameworkVersion": "2.0.0",
       "completedAt": null,
-      "orchestrator": null,
-      "verificationVerdict": null
+      "verificationVerdict": "REMEDIATED_AT_CAP",
+      "verification": {
+        "rounds": 3,
+        "verifierModel": "gpt-5-6-sol",
+        "verifierProvider": "openai",
+        "transport": "api",
+        "unreviewedFindings": 1
+      }
     },
     {
       "number": 63,

@@ -19,6 +19,7 @@ import type {
   ProgressProjectionSession as SessionRecord,
 } from "dabbler-ai-router";
 import { ProjectionCache, ProjectionResult } from "./projection";
+import { type Activity, currentActivity } from "../router/dabblerTerminal";
 
 /**
  * Where a repository's sessions came from. `ledger` is the
@@ -67,6 +68,15 @@ export interface SessionsRepository {
   possiblyStalled: boolean;
   /** What the repository is waiting on a person for, as the attention view reads it. */
   owedDecisions: ProgressProjectionRepository["owedDecisions"];
+  /**
+   * Whether the framework is running something right now.
+   *
+   * Read from the driven run record through the one rule that answers it,
+   * so the Explorer's liveness row and the Dabbler terminal's indicator
+   * cannot disagree. Optional because a repository built by hand -- a test,
+   * a fixture -- has no run to read.
+   */
+  activity?: Activity;
   orchestrator: OrchestratorInfo | null;
   /**
    * The projection's sessions, with tasks populated on the in-flight
@@ -201,6 +211,7 @@ function buildRepository(
     lastActivityAt: p ? p.repository.lastActivityAt : null,
     possiblyStalled: p ? p.repository.possiblyStalled : false,
     owedDecisions: p ? p.repository.owedDecisions : [],
+    activity: currentActivity(root),
     forceClosed: p ? p.repository.forceClosed : false,
     schemaVersionOnDisk: p ? p.repository.schemaVersionOnDisk : null,
     // A failed projection is not a fresh repository. "ledger" is what a

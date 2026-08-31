@@ -8,6 +8,7 @@ import * as path from "path";
 import { outcomeForExitCode } from "dabbler-ai-router";
 import type {
   BootstrapOptions,
+  OwedAnswerOptions,
   Router,
   RouterResult,
   SessionInterruptOptions,
@@ -201,6 +202,7 @@ export function fakeRouter(
   asked: string[];
   bootstrapOptions: BootstrapOptions[];
   interruptOptions: SessionInterruptOptions[];
+  owedAnswers: OwedAnswerOptions[];
 } {
   const asked: string[] = [];
   // Recorded, because what bootstrap is ASKED to do is the behaviour some
@@ -209,6 +211,9 @@ export function fakeRouter(
   // interrupt: Stop and Send are one verb apart by an option.
   const bootstrapOptions: BootstrapOptions[] = [];
   const interruptOptions: SessionInterruptOptions[] = [];
+  // And the same for an answered decision: which option the operator chose
+  // is the whole behaviour a surface that offers them has.
+  const owedAnswers: OwedAnswerOptions[] = [];
   const answer = <T,>(verb: string, value: T): Promise<RouterResult<T>> => {
     asked.push(verb);
     const outcome = outcomeForExitCode(exitCode);
@@ -222,6 +227,7 @@ export function fakeRouter(
   return {
     bootstrapOptions,
     interruptOptions,
+    owedAnswers,
     router: {
       session: {
         start: text("session start"),
@@ -256,6 +262,12 @@ export function fakeRouter(
         fix: text("workflow fix"),
         sendBack: text("workflow send-back"),
         status: text("workflow status"),
+      },
+      owed: {
+        answer: (options: OwedAnswerOptions) => {
+          owedAnswers.push(options);
+          return answer("owed answer", { stdout: message });
+        },
       },
       ledger: { latestRound: () => answer("ledger latestRound", null) },
       testEvidence: { record: text("test-evidence record") },

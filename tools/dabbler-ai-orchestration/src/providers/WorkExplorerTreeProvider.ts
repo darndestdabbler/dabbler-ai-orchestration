@@ -48,10 +48,25 @@ export class WorkExplorerTreeProvider
    */
   private diagnostic: ((message: string | undefined) => void) | undefined;
 
+  /** Told what the scan found, for the badge and the toast. See `onScan`. */
+  private scanned: ((repositories: readonly SessionsRepository[]) => void) | undefined;
+
   constructor(private readonly extensionUri: vscode.Uri) {}
 
   public onDiagnostic(sink: (message: string | undefined) => void): void {
     this.diagnostic = sink;
+  }
+
+  /**
+   * Every recompute, to whoever owns something outside the rows.
+   *
+   * The badge and the toast are both view-level, and the view belongs to
+   * `extension.ts` -- the same reason `onDiagnostic` exists. Reported on
+   * the clean recompute too, so a badge clears when the last decision is
+   * answered.
+   */
+  public onScan(sink: (repositories: readonly SessionsRepository[]) => void): void {
+    this.scanned = sink;
   }
 
   public dispose(): void {
@@ -82,6 +97,7 @@ export class WorkExplorerTreeProvider
       // Report on every recompute, INCLUDING the clean case — the
       // message has to disappear when the operator fixes the fault.
       this.diagnostic?.(describeScanFaults(scan));
+      this.scanned?.(scan.repositories);
       return repositoryNodes(scan.repositories);
     }
     const children = childrenOf(node);
@@ -125,6 +141,10 @@ export class WorkExplorerTreeProvider
       item.tooltip = new vscode.MarkdownString(descriptor.tooltip, true);
     }
     if (descriptor.icon) item.iconPath = this.toIconPath(descriptor.icon);
+    // A row that carries its own command carries its own argument with it,
+    // which is how an attention row can be answered without the provider
+    // knowing anything about decisions.
+    if (descriptor.command) item.command = descriptor.command;
     if (node.kind === "repository") {
       // Activating a repository row opens the session plan.
       item.command = {

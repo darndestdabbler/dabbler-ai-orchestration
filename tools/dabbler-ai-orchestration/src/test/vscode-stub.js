@@ -15,6 +15,9 @@
 
 const Module = require("module");
 
+/** Everything listening for a theme change, so `__setColorTheme` can fire. */
+const themeListeners = [];
+
 const vscodeStub = {
   Uri: {
     file: (p) => ({ fsPath: p, scheme: "file", path: p }),
@@ -75,6 +78,9 @@ const vscodeStub = {
   TreeItemCollapsibleState: { None: 0, Collapsed: 1, Expanded: 2 },
   MarkdownString: class MarkdownString { constructor(s) { this.value = s; } },
   ThemeIcon: class ThemeIcon { constructor(id) { this.id = id; } },
+  // The editor's own numbering: 1 light, 2 dark, 3 high-contrast (dark),
+  // 4 high-contrast light.
+  ColorThemeKind: { Light: 1, Dark: 2, HighContrast: 3, HighContrastLight: 4 },
   workspace: (() => {
     // Set 027 Session 3: e2e tree-provider tests mutate workspace
     // folders to point at fixture session sets, then build a
@@ -177,6 +183,56 @@ const vscodeStub = {
         },
       ),
     createTreeView: () => ({ dispose: () => {} }),
+    // Session 62: Start opens the person's own CLI in a terminal rather
+    // than spawning a driver, so what the editor was ASKED to open is the
+    // behaviour -- the shell path, its arguments, the directory, and
+    // anything typed at its prompt without being sent.
+    createTerminal: (options) => {
+      const terminal = {
+        options,
+        // A Pseudoterminal terminal is opened by the editor, which is what
+        // starts the pty. The stub does the same so a test drives the real
+        // lifecycle rather than poking at internals.
+        pty: options && options.pty,
+        shown: 0,
+        // Counted because "the one it replaced is gone" is a behaviour: a
+        // terminal that cannot be moved has to be disposed to be replaced,
+        // and one left behind would accumulate per session.
+        disposed: 0,
+        sent: [],
+        show: () => {
+          terminal.shown += 1;
+        },
+        sendText: (text, addNewLine) => terminal.sent.push({ text, addNewLine }),
+        dispose: () => {
+          terminal.disposed += 1;
+          if (terminal.pty && terminal.pty.close) terminal.pty.close();
+        },
+      };
+      if (terminal.pty && terminal.pty.open) terminal.pty.open();
+      vscodeStub.window.__terminals.push(terminal);
+      return terminal;
+    },
+    /** Every terminal created, in order. Test-only, hence the `__` prefix. */
+    __terminals: [],
+    // Session 62: the Dabbler terminal paints its band from the editor's
+    // theme kind and re-reads it when the theme changes, so both the value
+    // and the event have to exist here.
+    activeColorTheme: { kind: 2 },
+    onDidChangeActiveColorTheme: (listener) => {
+      themeListeners.push(listener);
+      return {
+        dispose: () => {
+          const at = themeListeners.indexOf(listener);
+          if (at >= 0) themeListeners.splice(at, 1);
+        },
+      };
+    },
+    /** Switch the theme and notify, as the editor would. Test-only. */
+    __setColorTheme: (kind) => {
+      vscodeStub.window.activeColorTheme = { kind };
+      for (const listener of [...themeListeners]) listener({ kind });
+    },
     createStatusBarItem: () => ({
       text: "",
       tooltip: "",

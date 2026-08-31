@@ -1,8 +1,61 @@
-# STATUS — 56 of 61 closed. Next: 57, `dabbler session drive`
+# STATUS — 57 of 61 closed. Next: 58, the engine adapter
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
 `experiment/verification-pipeline-v3` and `design/solution-decomposition`
 are merged and finished. Earlier handoff text is in `docs/status-archive.md`.
+
+> **Recorded, 2026-08-31, after session 57.** Session 57 — the second of the
+> driver set — closed `VERIFIED` in two rounds. Round 1 raised three Majors:
+> one was fair and is built (a stopped loop is now an **attention row** —
+> `buildTaskRows` reads `run.json` and blocks the first phase not done with
+> the stop's kind and reason); two were disputed with line-cited evidence
+> and **withdrawn** in round 2 (the verb holds a disposition set against the
+> round *before* writing, so an incomplete set never reaches disk — now a
+> test case; and `driver.max_invocations` is snake_case like every key in
+> `dabbler.yaml`, the D248 precedent). Its deliverable is **D249**: **`dabbler
+> session drive`**, the loop in `packages/router/src/drive.ts` that runs a
+> session from registration to close by calling the lifecycle's own verbs
+> — `session start`, `session declare` from the engine's plan, `test-evidence
+> run` for the affected tests and the run of record, `verify`, `verify
+> dispute` for a rejected finding, one commit and one push, `session close`
+> — so a driven session leaves exactly the record a typed one leaves and the
+> task rows move for the same reasons. Every report is judged in one place
+> (seq, step, files exactly what the tree changed since the last accepted
+> step, the step's `argv` checks green through the controls' executor) and
+> refused with every reason; three refusals stop the loop. Blocking findings
+> go back as a `rejection` carrying every finding; a `fix` becomes a
+> `fix-round-N` step checked by every plan step's check, a `reject` becomes
+> a dispute; red affected tests and a red run of record go back the same
+> way. The plan and the dispositions travel through **`session report
+> --answer-file`** (56's owed item 1): the verb stamps the framework's
+> members, refuses one the engine typed differently, and refuses a file
+> inside the ledger. **`driver.max_invocations`** in `dabbler.yaml` (snake_case;
+> repository-owned; default 24) bounds the engine; a stopped loop closes
+> nothing, writes why to the ledger's fifth file **`run.json`** (`driver-run`:
+> phase, accepted steps, baseline tree, counters, `stop`), and the same
+> command re-runs from the phase it reached — a different engine name is
+> refused. One adapter ships: `commandEngine(argv)`, spawned per instruction
+> with no shell, `{instruction}` substituted; **`--engine-argv` is required
+> on the CLI until 58** adds the built-in argv per engine. Nine tests, a
+> scripted engine in-process against the offline verifier. 56's owed nit (2)
+> is taken (`[\s\S]*` in the path patterns). No extension change.
+> **A lesson bought by the first run of record, which was red:** the drive
+> tests each run a whole session (5–8 s alone) and vitest's default test
+> timeout is 5 s; under the four-worker full suite three of them timed out,
+> and a timed-out drive keeps running against a torn-down config. The
+> `describe` now carries `{ timeout: 120_000 }`; a third round verified the
+> change and the run of record was taken again. A test that spawns real
+> work needs its own bound, and the bound is not a sign the work is slow.
+>
+> **Owed to 58.** The adapter proper: `resolveProgram` preferring an `.exe`,
+> the quoted `.cmd` branch, the three argv shapes, `--continue` from
+> `EngineInvocation.first`, stream/quiet with the stream-json renderer over
+> `emit`, and the interrupt. **For 59.** The attention row already exists in
+> the task rows (blocked, "Driver stopped (kind): reason"); Start becoming
+> the launch needs no new projection field for it. **Noted.** A driven session's `done`
+> instruction is written but the engine is not invoked to read it — on a
+> seat that is a premium request that buys nothing; 58 decides whether a
+> CLI needs the closing turn.
 
 > **Recorded, 2026-08-31, after session 56.** Session 56 — the first of the
 > driver set — closed `VERIFIED` in two rounds. Its deliverable is **D248**:

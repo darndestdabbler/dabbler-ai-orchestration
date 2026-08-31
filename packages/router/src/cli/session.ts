@@ -21,6 +21,7 @@ import {
   decision,
   migrate,
   plan,
+  report,
   restore,
   start,
 } from "../session.ts";
@@ -31,6 +32,7 @@ const SUMMARY: Record<string, string> = {
   start: "register a session start",
   decision: "append a decision to decisions-log.md",
   declare: "declare the session's task list and releasability",
+  report: "answer the driver's outstanding step instruction",
   plan: "record the plan prose in project-work-plan.md",
   close: "run gates and close the session",
   cancel: "cancel one session",
@@ -73,6 +75,15 @@ const OPTIONS: Record<string, readonly string[]> = {
     "  --task-file PATH         the task list, read from a file",
     "  --releasable             this session may publish",
     "  --not-releasable         it may not; one of the two is required",
+  ],
+  report: [
+    "  --seq N                  required: the seq of the instruction being answered",
+    "  --step ID                required: the step id the instruction named",
+    "  --status STATUS          required: done | blocked",
+    "  --files A,B,...          required: every file created or changed, repo-relative;",
+    "                           an empty string when none",
+    "  --notes TEXT             required: one line for the log",
+    "  --tests COMMAND          the test command run, when one was",
   ],
   plan: [
     "  --body TEXT              the plan prose; mutually exclusive with --body-file",
@@ -283,6 +294,31 @@ export async function sessionVerb(argv: string[]): Promise<number> {
       effort: values.get("--effort") ?? null,
       sessionNumber,
       totalSessions,
+    });
+  }
+
+  if (subcommand === "report") {
+    const required = ["--seq", "--step", "--status", "--files", "--notes"];
+    const missing = required.filter((flag) => !values.has(flag));
+    if (missing.length > 0) {
+      writeErr(
+        `dabbler session report: the following arguments are required: ${missing.join(", ")}\n`,
+      );
+      return EXIT_USAGE;
+    }
+    const seq = integer(values.get("--seq"), "--seq");
+    if (typeof seq === "string") {
+      writeErr(`dabbler session report: ${seq}\n`);
+      return EXIT_USAGE;
+    }
+    return report(sessionsDir, {
+      seq: seq!,
+      stepId: values.get("--step")!,
+      status: values.get("--status")!,
+      files: values.get("--files")!.split(","),
+      testsRun: values.get("--tests") ?? null,
+      notes: values.get("--notes")!,
+      sessionNumber,
     });
   }
 

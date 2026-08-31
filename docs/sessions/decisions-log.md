@@ -8005,3 +8005,76 @@ and installed on the operator's machine so the next session shows the
 rows moving. Proven on this session's own rows before the verdict:
 Register, Declare and Work done, Verify open from the moment the
 pre-verify record landed, nobody having typed anything.
+
+## Session 56 — The driver's contract — the schemas and the report verb
+
+### D248 · 2026-08-31 · Orchestrator (claude-fable-5/anthropic) · The driver's contract: four answer schemas, a whole-file driver ledger under .dabbler/runs/s<N>/driver/, and `session report` as the engine's one verb -- shape judged at the verb, substance at the driver
+
+Session 56 is the first of the driver set (56–59): the framework runs the
+lifecycle and calls the engine per step, the way `dabbler verify` already
+calls the verifier. Before a loop can run, the things it exchanges with the
+engine have to have a shape, and this session gives them one.
+
+**Four schemas, under `packages/router/schemas/` with the other twenty-four**,
+each generating a type in `src/generated/` and each validated on read and
+on write through the same `ajv` path the round rows use:
+
+- `driver-instruction` — what the framework is asking for now. `seq`
+  (monotonic per session), `kind` ∈ `step | rejection | interrupt | done`,
+  and per kind what it must carry: a step its `step_id` and `ask`; a
+  rejection its `reasons` (one mechanical reason per entry, and `round` when
+  they are a verifier's findings); an interrupt its `reasons`. Every kind but
+  `done` names `answer_schema` and `answer_command`.
+- `driver-report` — the engine's answer to a step. `status` ∈ `done |
+  blocked`; `files_changed` repository-relative, forward slashes, no `.`/`..`
+  segment, never absolute; `tests_run` string or null; `notes` one line.
+- `driver-work-plan` — the engine's answer to "plan this session": `task`
+  and `releasable` (the driver declares from them, before any edit), and
+  ordered `steps`, each an `id`, an `ask`, the `files` it expects to touch
+  and `checks` that are `argv`, never a shell string. The reader refuses a
+  duplicate id.
+- `driver-disposition` — the engine's answer to a round's blocking findings:
+  per `finding_index`, `fix` or `reject`. A reject carries `reason` and
+  `evidence_paths`, because it becomes a dispute and a prose-only dispute is
+  already refused. There is no `accept`.
+
+**The driver's ledger is `.dabbler/runs/s<N>/driver/`**: `instruction.json`,
+`report.json`, `plan.json`, `dispositions.json`, and `engine-<NN>.log`, one
+transcript per invocation. `driver.ts` owns the paths, the validators, the
+readers and the atomic writers. Each artifact is whole-file and is the
+CURRENT answer — a rejected step is answered again into the same
+`report.json` — and the history of a run is its transcripts and the
+lifecycle's own records. A file that fails validation on read is a
+`LedgerError`, never a skip: nothing but the framework writes here, so a
+bad file is a hand in the record.
+
+**`dabbler session report` is the engine's one verb** — `--seq --step
+--status --files --notes [--tests]` — and it judges SHAPE only. It
+normalises what an engine types (backslashes, a leading `./`, blanks,
+repeats), shapes the record, validates it and replaces `report.json`. It
+refuses a report nobody asked for (no instruction outstanding) and a report
+where the instruction asked for a different answer. Whether the seq is the
+one outstanding, the step the one asked for, the files the ones the tree
+changed and the check green is the driver's judgment, in one place, and
+session 57 writes it. A verb that judged half of that would be the same rule
+stated twice.
+
+Three departures from the plan's wording, each on purpose. The field names
+are `snake_case` (`files_changed`, `tests_run`), not the spike's
+`filesChanged`: the spike seeded the content, and the neighbours in
+`.dabbler/runs/` are all snake_case. The instruction's "report schema by
+reference" is `answer_schema`, an enum of the three answer schemas, because
+the plan and the dispositions arrive through the same instruction file and
+the driver has to be able to say which answer it expects. And the schema
+JSON lives in `schemas/`, where `SCHEMA_DIR` reads and the generator
+enumerates; the plan's `src/schema/` is the machinery's home, not the data's.
+
+Not decided here, and owed to session 57: how the work plan and the
+dispositions travel from the engine into the ledger — the report verb's
+flags carry a step report only, so 57 either widens the verb (an
+`--answer-file` the verb validates and copies) or adds a sibling. The
+instruction schema already accommodates either: `answer_command` is
+whatever line 57 chooses.
+
+The verb table's summary for `session` said `log` — deleted in session 55
+— and now says `report`.

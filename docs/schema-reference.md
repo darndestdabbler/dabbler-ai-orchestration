@@ -255,6 +255,70 @@ intermediates in the repository fails the attempt whatever its exit code
 said, and nothing is pushed. The schema enforces the same thing from the
 other side — a row cannot be `published` and `tree_mutated` at once.
 
+## Driver ledger — `.dabbler/runs/s<N>/driver/`
+
+The conversation of a *driven* session — the framework running the
+lifecycle and calling the engine per step — as files. Four whole-file
+artifacts, each replaced atomically and each the **current** answer
+(history is the transcripts, `engine-<NN>.log`, one per invocation, and
+the lifecycle's own records), plus the schema each is validated against
+(`packages/router/schemas/driver-*.schema.json`). A file that fails
+validation on read is refused, never skipped: nothing but the framework
+writes here, so a bad file is a hand in the record. Every answer the
+framework acts on is JSON against one of these; prose the engine writes is
+for people and the framework never reads it.
+
+| File | Written by | Schema | What it is |
+|---|---|---|---|
+| `instruction.json` | the driver | `driver-instruction` | the one thing being asked for now |
+| `report.json` | `dabbler session report` | `driver-report` | the engine's answer to a step |
+| `plan.json` | the driver, from the engine's answer | `driver-work-plan` | the session's ordered steps |
+| `dispositions.json` | the driver, from the engine's answer | `driver-disposition` | what the engine will do about a round's findings |
+
+**`instruction.json`** (required: `schema_version` `1`, `seq`, `kind`,
+`session_number`, `issued_at`): `seq` is monotonic per session and every
+answer names the seq it answers; `kind` is `step` \| `rejection` \|
+`interrupt` \| `done` and there is no fifth. A `step` carries `step_id`
+and `ask`; a `rejection` carries `reasons` (one mechanical reason per
+entry) and, when they are a verifier's findings, `round`; an `interrupt`
+carries `reasons` — the driver ended the invocation and this is why. Every
+kind but `done` names `answer_schema` (one of the three answer schemas) and
+`answer_command` (the `dabbler session …` line that writes the answer —
+the engine never writes the ledger directly); `done` may name neither, so
+a closed conversation cannot be answered.
+
+**`report.json`** (required: `schema_version`, `seq`, `session_number`,
+`step_id`, `status`, `files_changed`, `tests_run`, `notes`,
+`reported_at`): `status` is `done` \| `blocked` — there is no word for a
+verdict, because the engine has none to give. `files_changed` paths are
+repository-relative with forward slashes, no `.`/`..` segments, never
+absolute; the verb normalises what an engine types (backslashes, a leading
+`./`, blanks, repeats) and the schema refuses what is left. The verb checks
+the **shape**; the driver checks the **substance** (the outstanding seq,
+the step it asked for, the files the tree actually changed, the step's own
+check) and answers with a `rejection` when it disagrees.
+
+**`plan.json`** (required: `schema_version`, `session_number`, `task`,
+`releasable`, `steps`, `recorded_at`): the driver declares the session
+from `task` and `releasable` before any edit — the same rule `session
+declare` enforces on a typed session. Each step has a unique slug `id`, an
+`ask`, the `files` it expects to touch (a report for the step must list
+each) and `checks` — at least one, each an `argv` spawned with no shell; a
+check is run, never read, and a step with none would be closed on the
+engine's word. The reader refuses a duplicate `id`, which the schema cannot.
+
+**`dispositions.json`** (required: `schema_version`, `session_number`,
+`seq`, `round`, `dispositions`, `recorded_at`): one entry per blocking
+finding, `finding_index` into that round's `findings` and `action` `fix`
+\| `reject`. A `reject` must carry `reason` and `evidence_paths`, because
+it becomes a dispute and a prose-only dispute is refused — so it is refused
+here first. There is no `accept`: the engine fixes or it argues, and the
+verifier judges. The reader holds the set against the recorded round, which
+is more than the schema can say: a repeated `finding_index`, an index the
+round has no finding for, a round the ledger has not recorded, or a
+blocking finding left unanswered is refused — an unanswered finding is how
+one disappears.
+
 ## Metrics ledger — `router-metrics.jsonl`
 
 Append-only JSONL, one object per routed or verification call, additive

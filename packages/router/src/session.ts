@@ -43,8 +43,10 @@ import {
   ROUND_REF_NAMESPACE,
   SESSION_PLAN_FILENAME,
   pushRoundRefs,
+  repoRootFromSessionsDir,
   upstreamRemote,
 } from "./evidence.ts";
+import { REPORT_SCHEMA, readInstruction, reportPath, shapeReport, writeReport } from "./driver.ts";
 import { SET_BOOKKEEPING_COMMIT_BASENAMES, governingConfig, runGates } from "./gates.ts";
 import { refuseIfResolvingFromSource } from "./resolution.ts";
 import { detectEcosystems } from "./bootstrap/detect.ts";
@@ -52,7 +54,7 @@ import { PROJECT_CONFIG_FILENAME } from "./config.ts";
 import { refreshOwedDecisions } from "./owedDecisions.ts";
 import { loadSuitesChecked } from "./testEvidence.ts";
 import { nowIso, platformNewlines, repoRootFor, runGit } from "./journal.ts";
-import { RUNS_DIRNAME, type Row, latestRound } from "./ledger.ts";
+import { LedgerError, RUNS_DIRNAME, type Row, latestRound } from "./ledger.ts";
 import {
   SCHEMA_VERSION,
   STATUS_CANCELLED,
@@ -810,6 +812,102 @@ export function declare(sessionsDir: string, options: DeclareCliOptions): number
   writeOut(
     `declare: session ${sessionDisplayNumber(target)} declared; releasable=` +
       `${options.releasable ? "yes" : "no"}.\n`,
+  );
+  return EXIT_OK;
+}
+
+// --- report ------------------------------------------------------------------
+
+export interface ReportCliOptions {
+  readonly seq: number;
+  readonly stepId: string;
+  readonly status: string;
+  readonly files: readonly string[];
+  readonly testsRun: string | null;
+  readonly notes: string;
+  readonly sessionNumber?: number | null;
+}
+
+/**
+ * The engine's one verb under a driven session: answer the outstanding
+ * step instruction.
+ *
+ * It shapes the flags into the report record, validates the shape, and
+ * replaces `driver/report.json` whole. That is all it judges. Whether the
+ * seq is the one outstanding, the step the one asked for, the files the
+ * ones the tree changed and the check green is the driver's to decide, in
+ * one place, with a rejection carrying the reasons -- a verb that judged
+ * half of that would be a second implementation of the rule.
+ *
+ * What it does refuse is a report nobody asked for: no instruction is
+ * outstanding, or the one that is asks for a different answer. A report
+ * written into a session the driver is not running would be a file the
+ * engine chose to put in the ledger, which is what this verb exists to
+ * prevent.
+ */
+export function report(sessionsDir: string, options: ReportCliOptions): number {
+  if (!isDirectory(sessionsDir)) {
+    writeErr(`report: not a directory: ${sessionsDir}\n`);
+    return EXIT_USAGE;
+  }
+  const target = resolveTargetSession(sessionsDir, options.sessionNumber);
+  if (target === null) {
+    writeErr(
+      `report: refused -- no session has been started under ${sessionsDir}. ` +
+        "Run `session start` first.\n",
+    );
+    return EXIT_BOUNDARY;
+  }
+  const repoRoot = repoRootFromSessionsDir(sessionsDir);
+  let instruction;
+  try {
+    instruction = readInstruction(repoRoot, target);
+  } catch (error) {
+    if (!(error instanceof LedgerError)) throw error;
+    writeErr(`report: refused -- ${error.message}\n`);
+    return EXIT_BOUNDARY;
+  }
+  if (instruction === null) {
+    writeErr(
+      `report: refused -- no instruction is outstanding for session ` +
+        `${sessionDisplayNumber(target)}; a report answers one, and only the driver issues them.\n`,
+    );
+    return EXIT_BOUNDARY;
+  }
+  if (instruction.answer_schema !== REPORT_SCHEMA) {
+    const asks =
+      instruction.kind === "done"
+        ? "says the session is over and expects nothing"
+        : `asks for ${String(instruction.answer_schema)}, not a step report`;
+    writeErr(`report: refused -- instruction ${instruction.seq} ${asks}.\n`);
+    return EXIT_BOUNDARY;
+  }
+
+  const record = shapeReport(
+    {
+      sessionNumber: target,
+      seq: options.seq,
+      stepId: options.stepId,
+      status: options.status,
+      files: options.files,
+      testsRun: options.testsRun,
+      notes: options.notes,
+    },
+    nowIso(),
+  );
+  let written;
+  try {
+    written = writeReport(repoRoot, target, record);
+  } catch (error) {
+    if (!(error instanceof LedgerError)) throw error;
+    writeErr(`report: refused -- ${error.message}\n`);
+    return EXIT_USAGE;
+  }
+  writeOut(
+    `report: session ${sessionDisplayNumber(target)} seq ${written.seq} ` +
+      `(${written.step_id}, ${written.status}; ${written.files_changed.length} file(s)) written to ` +
+      `${relative(repoRoot, reportPath(repoRoot, target)).replace(/\\/g, "/")}; ` +
+      "the driver validates it next.\n",
   );
   return EXIT_OK;
 }

@@ -1088,16 +1088,63 @@
         "identityProvenance": "direct"
       },
       "verificationVerdict": "VERIFIED",
-      "frameworkVersion": "2.0.0",
       "verification": {
         "rounds": 1,
+        "verifierModel": "gpt-5-6-sol",
+        "verifierProvider": "openai",
+        "transport": "api"
+      },
+      "frameworkVersion": "2.0.0"
+    },
+    {
+      "number": 56,
+      "title": "The driver's contract \u2014 the schemas and the report verb",
+      "status": "in-progress",
+      "startedAt": "2026-08-31T04:37:58.373000-04:00",
+      "completedAt": null,
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": "VERIFIED",
+      "frameworkVersion": "2.0.0",
+      "verification": {
+        "rounds": 2,
         "verifierModel": "gpt-5-6-sol",
         "verifierProvider": "openai",
         "transport": "api"
       }
     },
     {
-      "number": 56,
+      "number": 57,
+      "title": "`dabbler session drive` \u2014 the framework runs the session",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    },
+    {
+      "number": 58,
+      "title": "The engine adapter \u2014 Claude Code, Copilot, Codex; stream; interrupt",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    },
+    {
+      "number": 59,
+      "title": "Start is the launch, and the developer's guide",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    },
+    {
+      "number": 60,
       "title": "The operator onboarding deck",
       "status": "not-started",
       "startedAt": null,
@@ -1106,7 +1153,7 @@
       "verificationVerdict": null
     },
     {
-      "number": 57,
+      "number": 61,
       "title": "The half of the trial that needs a published router",
       "status": "not-started",
       "startedAt": null,

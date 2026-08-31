@@ -91,8 +91,12 @@ it.
 | 53 | The Work Explorer reads at a glance, and session 1 asks | no | 2026-08-31 |
 | 54 | The router suite stops taxing the host | no | 2026-08-31 |
 | 55 | The task rows move themselves | no | 2026-08-31 |
-| 56 | The operator onboarding deck | — | not declared |
-| 57 | The half of the trial that needs a published router | — | not declared |
+| 56 | The driver's contract — the schemas and the report verb | no | 2026-08-31 |
+| 57 | `dabbler session drive` — the framework runs the session | — | not declared |
+| 58 | The engine adapter — Claude Code, Copilot, Codex; stream; interrupt | — | not declared |
+| 59 | Start is the launch, and the developer's guide | — | not declared |
+| 60 | The operator onboarding deck | — | not declared |
+| 61 | The half of the trial that needs a published router | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -1526,3 +1530,9 @@ Cap vitest workers for packages/router (vitest.config.ts: small fixed local pool
 **Releasable: no.**
 
 Task rows derived from the lifecycle's own records (Register, Declare, Work, Verify, Run of record, Close); test-evidence record stamps the session; seedSessionPlan/logStep/advanceStepsAtDeclare/closeLastStep/session log deleted; docs updated; extension 2.3.0 built and installed.
+
+### Session 56 — The driver's contract — the schemas and the report verb
+
+**Releasable: no.**
+
+Session 56: the driver's contract. Four schemas under packages/router/schemas/ (driver-instruction, driver-report, driver-work-plan, driver-disposition), generated types for each, a driver.ts module owning .dabbler/runs/s<N>/driver/ (paths, validated readers that refuse a row the schema rejects, atomic writers), and `dabbler session report` as the engine's one verb that shapes and validates a report into that ledger. Docs: the schema reference gains the driver ledger; the verb table stops naming the deleted `session log`. Six tests. Not releasable.

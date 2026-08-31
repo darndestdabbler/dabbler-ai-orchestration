@@ -183,6 +183,18 @@ complete suite as the run of record, the commit, the push, publishing and
 the close. None of them is yours to run, and none of them is yours to
 skip ahead to — the instruction in hand is the whole of what is asked.
 
+## When the framework stops
+
+- Read the framework's own account before the scrollback: `dabbler status`,
+  the `stop` on `.dabbler/runs/s<N>/driver/run.json` with its kind and its
+  class, the outstanding instruction's `reasons`, and the transcripts.
+- Where the framework is source in this tree you may fix it, and the fix
+  rides in this session's own diff; where it is an installed package,
+  report the step `blocked` with the diagnosis and raise an owed item.
+- Never touch the record, a verdict or a gate to get past a stop. The whole
+  protocol is the *When the framework stops* section of dabbler's
+  `docs/driving-a-session.md`.
+
 ## Hard rules
 
 - State files (`docs/sessions/sessions.json`) and everything under

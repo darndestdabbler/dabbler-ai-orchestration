@@ -1,12 +1,16 @@
-# STATUS — 53 of 54 closed. One thing is waiting, and it is yours
+# STATUS — 53 of 56 closed. Nothing blocks the next session
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
 `experiment/verification-pipeline-v3` and `design/solution-decomposition`
 are merged and finished. Earlier handoff text is in `docs/status-archive.md`.
 
-> **Recorded, 2026-08-31.** Session 53 was inserted ahead of the blocked
-> publication trial (now **54**) from three pieces of operator feedback, and
-> closed `VERIFIED` in one round. Its deliverable is **D245**, which
+> **Recorded, 2026-08-31.** Session 53 was inserted ahead of the publication
+> trial from three pieces of operator feedback, and closed `VERIFIED` in one
+> round. Later the same day the plan was reordered so the trial is **last
+> (56)**: 54 caps the router suite's workers, 55 is the operator onboarding
+> deck, and the trial runs when the operator decides to publish. Until the
+> next `session start`, the ledger's row 54 still carries the trial's old
+> title; `session start` re-syncs titles from the plan. Its deliverable is **D245**, which
 > supersedes D104: the Work Explorer groups sessions under status buckets
 > again — In Progress and Not Started ascending, Complete and Cancelled
 > descending, empty buckets not rendered, counts dimmed on the headers, In
@@ -63,42 +67,42 @@ are merged and finished. Earlier handoff text is in `docs/status-archive.md`.
 
 ## What is waiting on you
 
-**Nothing is published, and nothing will be until you answer one question.**
+**Nothing that blocks work.** The next sessions run from the `.vsix`.
+
+One decision is open, and it is yours to take when testing is finished,
+not before: whether to publish `dabbler-ai-router` to npm and the extension
+to the Marketplace.
 
     dabbler owed list          # read the brief
-    dabbler owed answer --id publication --choice publish
+    dabbler owed answer --id publication --choice publish   # when you are ready
 
-`dabbler-ai-router 2.0.0` and `dabbler-ai-orchestration 2.0.0` are built,
-tested and unpublished, which is why `npm i -g dabbler-ai-router` returns 404
-and why every adoption walkthrough stops at its first step. Session 49 built
-the whole release path and then stopped, because publishing is the one act
-here that cannot be taken back: npm refuses `unpublish` after 72 hours and a
-Marketplace version slot is never reusable.
+The extension bundles the router and calls it in-process, and the `dabbler`
+command in a VS Code terminal is the extension's own shim, so nothing you
+are testing waits on npm: session 53 ran on an unpublished router, and
+`tools/dabbler-ai-orchestration/dabbler-ai-orchestration-2.2.0.vsix` installs
+with `code --install-extension`. What a publish buys is people who are not
+you, outside VS Code — a Codex or Copilot CLI user in a plain terminal, and
+a consumer repository's pre-commit hook run from one — and it buys session
+56, whose `dabbler release --verify-install` can only ask the public
+registry.
 
-The brief names three answers. **`publish`** is the recommendation and the
-only one that closes the item: it pushes `v2.0.0`, waits for npm to actually
-serve it, and only then pushes `vsix-v2.0.0` — the order matters because the
-extension bundles the router, and a Marketplace version whose npm half is
-missing is a broken half-release. **`release-candidate`** rehearses the npm
-half onto the `next` dist-tag and leaves the 404 in place. **`not yet`**
-changes nothing.
-
-You do not run a git command either way. Answer, and the framework tags.
-`dabbler release --verify-install` then performs a real global install of the
-unqualified package from `registry.npmjs.org` into a throwaway prefix, which
-is the check that a green workflow and a working `npm i` are the same fact.
-
-**Session 54 cannot start until that is answered.** It is the half of the
-acceptance exercise that needs a published router, and it is the only session
-left. (It was 52, then 53; sessions 52 and 53 were inserted ahead of it, and
-it moved each time. Nothing about it changed.)
+Publishing is the one act here that cannot be taken back — npm refuses
+`unpublish` after 72 hours and a Marketplace version slot is never reusable —
+which is exactly why it waits for the end of testing rather than the start.
+When you do publish, it is router first and then the extension, at whatever
+version is current then; the brief's `publish` answer does both in that
+order and you run no git command. Earlier text in this file and in the
+brief called this "the one thing waiting on you"; that framing came from
+how sessions 49–50 phrased the acceptance criterion, and it overstated the
+case.
 
 ## Where things are
 
-**53 of 54 closed.** Sessions 37–50 were the DX block; 51 was the bounded
+**53 of 56 closed.** Sessions 37–50 were the DX block; 51 was the bounded
 remediation the field trial mandated; 52 walked the startup experience; 53
-brought the Work Explorer's buckets back and made session 1 ask; 54 is
-blocked on you. The trial's full
+brought the Work Explorer's buckets back and made session 1 ask. Next: 54
+caps the router suite's workers, 55 is the operator onboarding deck, 56 is
+the publication half of the trial and runs when you publish. The trial's full
 record is `docs/field-trial-50.md`.
 
 **Eight of `csv-model`'s nine feedback items are closed, with the code that

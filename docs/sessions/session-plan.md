@@ -2260,35 +2260,38 @@ Est. 5 tests net. Extension to 2.2.0.
 
 ---
 
-### Session 54 of 56: The half of the trial that needs a published router
+### Session 54 of 56: The router suite stops taxing the host
 
-*Blocked on the operator, and that is the correct state rather than a delay to
-apologise for. It runs after the publication decision is answered and CI is
-green; until then it cannot start, and session 50 did not pretend otherwise.*
+*Planned 2026-08-31. Running the router suite pins the host: `packages/router`
+declares no vitest configuration, so the pool is one worker per logical core —
+twenty here — and ten of the test files fork real `git` and `node`
+processes. The run of record for session 53 packed 784 seconds of test time
+into 86 seconds of wall clock. The pytest suite learned this once already
+(`-n 2` locally, sequential in CI); the TypeScript suite has to learn it
+too. It runs first, so the deck session's full suite does not pin the host.*
 
 1. Register; declare `--not-releasable`.
-2. `dabbler release --verify-install` against the public registry, recorded as
-   evidence.
-3. Acceptance criteria **1, 2 and 5** from a clean VS Code profile and a fresh
-   clone: the Solution Explorer rendering the csv pipeline's repositories from
-   their declarations with drift shown, the Work Explorer showing completed,
-   current and planned sessions with the current session's tasks moving, and
-   every `csv-model` feedback item carrying a linked test, a recorded release
-   verification, or a dated deferred issue with an owner.
-4. **Amend the plan again with what it finds.** The same rule as session 50:
-   a trial with no route to fix what it finds is a demonstration.
-5. Affected; verify; full suite as `final-full`; close.
+2. **Cap the workers.** A `vitest.config.ts` in `packages/router` that sets
+   the pool to a small fixed number of workers locally (measure 2 and 4
+   against the 86-second baseline and record both) and one in CI, where the
+   runner is smaller than this machine and a fork storm is a timeout. The
+   suite command in `dabbler.yaml` does not change; the cap lives in the
+   config the command already reads.
+3. **Make `config.test.ts` hermetic against `DABBLER_TRANSPORT`.** With the
+   variable set in the shell, three `resolveTransport` tests fail; the
+   describe blocks restore the variable afterwards but never clear it first.
+   Clear it in a `beforeEach` and restore it after, so the suite's result
+   does not depend on which terminal it ran from.
+4. Affected; verify; full suite as `final-full`; close.
 
-**Precondition:** `dabbler owed list` shows `publication` answered, and
-`dabbler release --verify-install` passes. Neither is this session's to
-arrange.
+Est. 1 test net. Nothing else.
 
 ---
 
 ### Session 55 of 56: The operator onboarding deck
 
 *Planned 2026-08-31 at the operator's request: a PowerPoint deck that onboards a
-human operator to the framework. Runs after 54. Slides as the operator laid
+human operator to the framework. Runs after 54, the worker cap. Slides as the operator laid
 them out; the deck is a committed artifact, and it is built by a script so a
 later session can rebuild it when a screen changes.*
 
@@ -2302,7 +2305,7 @@ later session can rebuild it when a screen changes.*
    solution.
 3. **Slides 1–6.**
    - *1 — What is Dabbler AI Orchestration?* The VS Code extension, how to
-     install it (Marketplace once 54 has published; the `.vsix` until then),
+     install it (Marketplace once 56 has published; the `.vsix` until then),
      the GitHub repository.
    - *2 — Why use Dabbler?* Automatic cross-provider verification with further
      rounds when a round finds something; one lifecycle for every session
@@ -2345,31 +2348,34 @@ count). No extension change.
 
 ---
 
-### Session 56 of 56: The router suite stops taxing the host
+### Session 56 of 56: The half of the trial that needs a published router
 
-*Planned 2026-08-31. Running the router suite pins the host: `packages/router`
-declares no vitest configuration, so the pool is one worker per logical core —
-twenty here — and ten of the test files fork real `git` and `node`
-processes. The run of record for session 53 packed 784 seconds of test time
-into 86 seconds of wall clock. The pytest suite learned this once already
-(`-n 2` locally, sequential in CI); the TypeScript suite has to learn it
-too. The operator may run this before 55 if the load is in the way.*
+*Runs when the operator decides to publish, at whatever version is current
+then — and not before. It is not blocked and nothing waits on it: the
+extension bundles the router, so everything being tested runs from the
+`.vsix`. What needs the public registry is this session's own check, which
+asks `registry.npmjs.org` what it serves and cannot ask anything else. It
+was 52, then 53, then 54, moving back a number each time a session was
+inserted ahead of it; placing it last ends that.*
 
 1. Register; declare `--not-releasable`.
-2. **Cap the workers.** A `vitest.config.ts` in `packages/router` that sets
-   the pool to a small fixed number of workers locally (measure 2 and 4
-   against the 86-second baseline and record both) and one in CI, where the
-   runner is smaller than this machine and a fork storm is a timeout. The
-   suite command in `dabbler.yaml` does not change; the cap lives in the
-   config the command already reads.
-3. **Make `config.test.ts` hermetic against `DABBLER_TRANSPORT`.** With the
-   variable set in the shell, three `resolveTransport` tests fail; the
-   describe blocks restore the variable afterwards but never clear it first.
-   Clear it in a `beforeEach` and restore it after, so the suite's result
-   does not depend on which terminal it ran from.
-4. Affected; verify; full suite as `final-full`; close.
+2. `dabbler release --verify-install` against the public registry, recorded as
+   evidence.
+3. Acceptance criteria **1, 2 and 5** from a clean VS Code profile and a fresh
+   clone: the Solution Explorer rendering the csv pipeline's repositories from
+   their declarations with drift shown, the Work Explorer showing completed,
+   current and planned sessions with the current session's tasks moving, and
+   every `csv-model` feedback item carrying a linked test, a recorded release
+   verification, or a dated deferred issue with an owner.
+4. **Amend the plan again with what it finds.** The same rule as session 50:
+   a trial with no route to fix what it finds is a demonstration.
+5. Affected; verify; full suite as `final-full`; close.
 
-Est. 1 test net. Nothing else.
+**Precondition:** the operator has answered `publication` with `publish`,
+CI has published the tagged versions, and `dabbler release
+--verify-install` passes. Neither is this session's to arrange, and the
+first is the operator's alone — publishing cannot be recalled, which is
+the reason to do it once testing is finished rather than to unblock a row.
 
 ---
 

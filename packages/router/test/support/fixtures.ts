@@ -123,7 +123,17 @@ const TEMP_DIRS: string[] = [];
 
 export function removeTempDirs(): void {
   while (TEMP_DIRS.length > 0) {
-    rmSync(TEMP_DIRS.pop() as string, { recursive: true, force: true });
+    const path = TEMP_DIRS.pop() as string;
+    try {
+      rmSync(path, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+    } catch {
+      // A directory something still holds. On Windows a process's working
+      // directory cannot be removed, and this suite starts detached
+      // children that outlive the test that started them by a moment
+      // (`jobs.ts`). Leaving a temp directory behind is untidy; failing the
+      // whole file in `afterAll` -- every test in it green -- is a red run
+      // of record for a housekeeping race, which is worse.
+    }
   }
 }
 

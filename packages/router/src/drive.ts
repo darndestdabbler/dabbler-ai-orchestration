@@ -45,8 +45,7 @@ import {
   timeoutFor,
   execute as executeCheck,
 } from "./checks.ts";
-import { testEvidenceVerb } from "./cli/testEvidence.ts";
-import { writeErr, writeOut } from "./cli/output.ts";
+import { divertOut, writeErr, writeOut } from "./cli/output.ts";
 import {
   ConfigError,
   type RouterConfig,
@@ -61,6 +60,7 @@ import {
   WORK_PLAN_SCHEMA,
   instructionPath,
   readDispositions,
+  readInstruction,
   readReport,
   readRun,
   readWorkPlan,
@@ -78,6 +78,7 @@ import type {
   DriverRun,
   DriverWorkPlan,
 } from "./generated/index.ts";
+import { type Job, pollJob, selfArgv, startJob } from "./jobs.ts";
 import {
   changedPathsBetween,
   nowIso,
@@ -92,7 +93,6 @@ import {
   EXIT_GATE_FAILED,
   EXIT_OK,
   EXIT_USAGE,
-  close,
   declare,
   extractSpecExcerpt,
   start,
@@ -100,7 +100,6 @@ import {
 import { loadSuitesChecked } from "./testEvidence.ts";
 import { recordDispute, resolveRepoRelative } from "./verify/disputes.ts";
 import { EXIT_BLOCKING, EXIT_OK as VERIFY_OK } from "./verify/errors.ts";
-import { runRound } from "./verify/rounds.ts";
 import { readTaskDeclaration } from "./writers.ts";
 
 // --- The engine --------------------------------------------------------------
@@ -134,7 +133,35 @@ export interface DriveOptions {
   readonly transport?: string | null;
 }
 
+/** What `dabbler session next` takes: no adapter, because there is no engine to invoke. */
+export interface NextOptions {
+  /** Required only when no session is in flight yet; `next` then registers one. */
+  readonly engine?: string | null;
+  readonly provider?: string | null;
+  readonly model?: string | null;
+  readonly effort?: string | null;
+  readonly maxRounds?: number | null;
+  readonly transport?: string | null;
+}
+
+/**
+ * The loop's own options. `push` invokes an engine between moves; `pull`
+ * returns the instruction and lets the person's own CLI be the engine.
+ * There is one loop under both.
+ */
+interface DriverOptions extends Omit<DriveOptions, "engine" | "adapter"> {
+  readonly engine: string | null;
+  readonly adapter: Engine | null;
+  readonly mode: "push" | "pull";
+}
+
 export const MAX_REJECTIONS = 3;
+/** How often the push loop looks at a running job; a pull call never waits. */
+const JOB_POLL_MS = 250;
+/** What a `wait` tells the engine to leave the framework's work alone for. */
+const VERIFY_RETRY_SECONDS = 60;
+const SUITE_RETRY_SECONDS = 60;
+const CLOSE_RETRY_SECONDS = 15;
 /** How often a running invocation looks for an interrupt request. */
 const INTERRUPT_POLL_MS = 500;
 /** What a deferred Send reads as, first among the next instruction's reasons. */
@@ -142,14 +169,40 @@ const SENT_PREFIX = "sent: ";
 
 type StopKind = NonNullable<DriverRun["stop"]>["kind"];
 
-/** The loop halting short of the close, with the reason a person reads. */
+/**
+ * The loop halting short of the close, with the reason a person reads.
+ *
+ * Written out longhand rather than as a parameter property, and so is the
+ * driver below: `selfArgv` re-enters this router on a bare `node`, whose
+ * type stripping refuses a parameter property outright. A file the CLI
+ * imports may not use one, or the framework cannot start its own work.
+ */
 class Stop extends Error {
-  constructor(
-    readonly kind: StopKind,
-    reason: string,
-  ) {
+  readonly kind: StopKind;
+
+  constructor(kind: StopKind, reason: string) {
     super(reason);
+    this.kind = kind;
     this.name = "Stop";
+  }
+}
+
+/**
+ * The pull's unwind: an instruction has been issued and this call is over.
+ *
+ * `dabbler session next` advances one move. When a phase reaches the point
+ * where it would wait -- for the engine's answer, or for the framework's own
+ * long work -- it throws this instead, and the verb prints the instruction
+ * it carries. `run.json` holds everything the next call needs to re-enter
+ * the same phase at the same place.
+ */
+class Awaiting extends Error {
+  readonly instruction: DriverInstruction;
+
+  constructor(instruction: DriverInstruction) {
+    super(`awaiting the answer to instruction ${instruction.seq}`);
+    this.instruction = instruction;
+    this.name = "Awaiting";
   }
 }
 
@@ -184,6 +237,8 @@ function describeFinding(index: number, finding: Row): string {
 }
 
 class Driver {
+  private readonly sessionsDir: string;
+  private readonly options: DriverOptions;
   private readonly repoRoot: string;
   private readonly config: RouterConfig;
   private sessionNumber = 0;
@@ -191,15 +246,27 @@ class Driver {
   private plan: DriverWorkPlan | null = null;
   /** Sends that arrived with no invocation to end; the next instruction carries them. */
   private deferred: string[] = [];
+  /**
+   * Pull mode only: whether the outstanding answer has been judged in this
+   * call. One call judges one answer; every later call site in the same
+   * call issues rather than reading the same answer twice.
+   */
+  private answered = false;
 
   constructor(
-    private readonly sessionsDir: string,
-    private readonly options: DriveOptions,
+    sessionsDir: string,
+    options: DriverOptions,
     repoRoot: string,
     config: RouterConfig,
   ) {
+    this.sessionsDir = sessionsDir;
+    this.options = options;
     this.repoRoot = repoRoot;
     this.config = config;
+  }
+
+  private get pull(): boolean {
+    return this.options.mode === "pull";
   }
 
   // --- output and state ------------------------------------------------------
@@ -227,24 +294,76 @@ class Driver {
 
   // --- register --------------------------------------------------------------
 
+  /** The name `run.json` records the engine under, and resumes are held to. */
+  private engineName(): string | null {
+    return this.options.adapter?.name ?? this.options.engine ?? null;
+  }
+
+  /**
+   * The session whose close ran but whose result nobody has collected.
+   *
+   * Only the close takes a session out of flight, and under the pull it does
+   * so from a job the call that started it did not wait for. The call that
+   * comes back therefore finds nothing in flight and a run still standing at
+   * `close`: that run is this session, and it is owed its `done`.
+   */
+  private uncollectedClose(): number | null {
+    const rows = readSessionState(this.sessionsDir)?.["sessions"];
+    if (!Array.isArray(rows)) return null;
+    const numbers = rows
+      .map((row) => (row as Row)["number"])
+      .filter((value): value is number => typeof value === "number")
+      .sort((left, right) => right - left);
+    for (const number of numbers) {
+      try {
+        if (readRun(this.repoRoot, number)?.phase === "close") return number;
+      } catch (error) {
+        // A run this reader refuses is not the one being collected here;
+        // the refusal belongs to whoever opens it deliberately.
+        if (!(error instanceof LedgerError)) throw error;
+      }
+    }
+    return null;
+  }
+
   /** Register (or re-register) and load or open the run's state. */
   register(): number {
-    const code = start(this.sessionsDir, {
-      engine: this.options.engine,
-      provider: this.options.provider ?? null,
-      model: this.options.model ?? null,
-      effort: this.options.effort ?? null,
-    });
-    if (code !== EXIT_OK) return code;
+    // A pull call that names no engine is a person continuing a session
+    // already in flight: its identity is on the record, and re-registering
+    // would only ask them to repeat it.
+    const inFlight = readSessionState(this.sessionsDir)?.["currentSession"];
+    const closing = typeof inFlight === "number" || !this.pull ? null : this.uncollectedClose();
+    if (this.options.engine === null && typeof inFlight !== "number" && closing === null) {
+      writeErr(
+        "dabbler: refused -- no session is in flight, and none can be started " +
+          "without --engine (and --provider).\n",
+      );
+      return EXIT_USAGE;
+    }
+    // Registering here would start the NEXT session while this one's close
+    // is still being collected.
+    if (this.options.engine !== null && closing === null) {
+      const code = start(this.sessionsDir, {
+        engine: this.options.engine,
+        provider: this.options.provider ?? null,
+        model: this.options.model ?? null,
+        effort: this.options.effort ?? null,
+      });
+      if (code !== EXIT_OK) return code;
+    }
     const state = readSessionState(this.sessionsDir);
-    const current = state ? state["currentSession"] : null;
+    const current = closing ?? (state ? state["currentSession"] : null);
     if (typeof current !== "number") {
       writeErr("dabbler: refused -- no session is in flight after registration.\n");
       return EXIT_BOUNDARY;
     }
     this.sessionNumber = current;
-    // A request left over from before this run has nothing to interrupt.
-    takeInterrupt(this.repoRoot, current);
+    // A request left over from before this run has nothing to interrupt --
+    // but under the pull every call IS a new run, and a request written
+    // between two of them is exactly the one meant for the next. Dropping it
+    // here would make `session interrupt --stop` unusable against a pulled
+    // session, which is the one place a person has nothing else to press.
+    if (!this.pull) takeInterrupt(this.repoRoot, current);
 
     const existing = readRun(this.repoRoot, current);
     const cap = this.options.maxInvocations ?? driverInvocationCap(this.config);
@@ -253,7 +372,7 @@ class Driver {
       this.run = {
         schema_version: DRIVER_SCHEMA_VERSION,
         session_number: current,
-        engine: this.options.adapter.name,
+        engine: this.engineName() ?? "cli",
         phase: "plan",
         seq: 0,
         invocations: 0,
@@ -261,6 +380,7 @@ class Driver {
         accepted_steps: [],
         baseline_tree: null,
         stop: null,
+        verification: this.verificationSettings(null),
         started_at: now,
         updated_at: now,
       };
@@ -268,17 +388,28 @@ class Driver {
       this.log("run-started", { session: sessionDisplayNumber(current), engine: this.run.engine, max_invocations: cap });
       return EXIT_OK;
     }
-    if (existing.engine !== this.options.adapter.name) {
+    const named = this.engineName();
+    if (named !== null && existing.engine !== named) {
       writeErr(
         `dabbler: refused -- session ${sessionDisplayNumber(current)} is being driven ` +
-          `through '${existing.engine}', and this run names '${this.options.adapter.name}'. ` +
+          `through '${existing.engine}', and this run names '${named}'. ` +
           "One engine's session store carries a run; finish it with the engine it started with.\n",
       );
       return EXIT_BOUNDARY;
     }
+    // Three refusals of one answer stopped the loop, and a person asking
+    // again is the intervention the bound existed to force. The failed
+    // answer is not judged a fourth time: it is left behind, the count
+    // starts over, and the phase issues its instruction afresh. Without
+    // this the pull cannot resume a `rejected-thrice` stop at all -- every
+    // call would rejudge the same answer and stop again on the spot.
+    const afterRefusals = existing.stop?.kind === "rejected-thrice";
+    if (afterRefusals) this.answered = true;
     this.run = {
       ...existing,
       max_invocations: this.options.maxInvocations ?? existing.max_invocations,
+      verification: this.verificationSettings(existing.verification ?? null),
+      ...(afterRefusals ? { rejections: 0 } : {}),
       stop: null,
     };
     this.save();
@@ -288,8 +419,25 @@ class Driver {
       invocations: this.run.invocations,
       max_invocations: this.run.max_invocations,
       ...(existing.stop ? { after: existing.stop.kind } : {}),
+      ...(afterRefusals ? { refusals: "reset; the step is asked afresh" } : {}),
     });
     return EXIT_OK;
+  }
+
+  /**
+   * The round cap and transport this run verifies under: what this call
+   * named, or what the run already carries.
+   *
+   * They are the run's, not a call's. Under the pull the call that reaches
+   * verification is whichever `next` happens to get there, following an
+   * `answer_command` that names neither -- so a cap or a transport typed
+   * once would otherwise be silently dropped for the round it was typed for.
+   */
+  private verificationSettings(existing: DriverRun["verification"]): DriverRun["verification"] {
+    const maxRounds = this.options.maxRounds ?? existing?.max_rounds ?? null;
+    const transport = this.options.transport ?? existing?.transport ?? null;
+    if (maxRounds === null && transport === null) return null;
+    return { max_rounds: maxRounds, transport };
   }
 
   // --- the conversation ------------------------------------------------------
@@ -305,6 +453,28 @@ class Driver {
         '--notes "<one line>" [--tests "<the test command you ran>"]'
       );
     };
+  }
+
+  /** What a `wait` tells the engine to run when the time is up. */
+  private nextCommand(): string {
+    return `dabbler session next --sessions-dir ${this.sessionsDir}`;
+  }
+
+  /**
+   * The refusals the outstanding answer has had, out of `MAX_REJECTIONS`.
+   *
+   * On `run.json` rather than in a phase's local, because a pull call ends
+   * between the refusal and the answer to it: a count this process held
+   * would start again at zero every time the person's CLI came back, and
+   * "refused three times" would never be reached.
+   */
+  private get rejections(): number {
+    return this.run.rejections ?? 0;
+  }
+
+  private setRejections(count: number): void {
+    this.run = { ...this.run, rejections: count };
+    this.save();
   }
 
   private issue(fields: Record<string, unknown>): DriverInstruction {
@@ -383,9 +553,16 @@ class Driver {
       });
       controller.abort(reason);
     }, INTERRUPT_POLL_MS);
+    const adapter = this.options.adapter;
+    if (adapter === null) {
+      // Unreachable: the pull never invokes anybody. It is here so that a
+      // future caller which forgets an adapter is told, rather than
+      // silently taking the push path with nothing on the other end.
+      throw new Stop("engine", "this run has no engine adapter to invoke");
+    }
     let outcome;
     try {
-      outcome = await this.options.adapter.invoke({
+      outcome = await adapter.invoke({
         instruction,
         instructionPath: instructionPath(this.repoRoot, this.sessionNumber),
         repoRoot: this.repoRoot,
@@ -393,6 +570,7 @@ class Driver {
         sessionNumber: this.sessionNumber,
         invocation,
         first,
+        resumeId: this.run.engine_session_id ?? null,
         signal: controller.signal,
         emit: (line: string, display?: string | null) => {
           appendFileSync(transcript, `${line}\n`, "utf8");
@@ -404,6 +582,14 @@ class Driver {
       clearInterval(poll);
     }
     const seconds = Math.round((Date.now() - started) / 1000);
+    // The conversation the engine opened, kept so every later invocation --
+    // including one after a stop, in another process on another day --
+    // names it rather than asking for whatever ran here most recently.
+    if (outcome.sessionId && this.run.engine_session_id !== outcome.sessionId) {
+      this.run = { ...this.run, engine_session_id: outcome.sessionId };
+      this.save();
+      this.log("engine-session", { id: outcome.sessionId });
+    }
     const interrupted = reason !== null && outcome.interrupted === true;
     appendFileSync(
       transcript,
@@ -452,6 +638,7 @@ class Driver {
    * the one the answer must name.
    */
   private async converse(fields: Record<string, unknown>): Promise<DriverInstruction> {
+    if (this.pull) return this.pullConverse(fields);
     let instruction = this.issue(this.withPendingRequest(fields));
     for (;;) {
       const reason = await this.invoke(instruction);
@@ -465,6 +652,40 @@ class Driver {
         }),
       );
     }
+  }
+
+  /**
+   * The same exchange with nobody to invoke: the engine is the person's own
+   * CLI, and it has already had its turn.
+   *
+   * Two answers and no third. The instruction the ledger holds is the one
+   * this call site issued -- its seq is the one last issued, and it names
+   * the same step and round -- so the answer to it is on disk and the phase
+   * judges it exactly as the push loop does. Otherwise there is nothing to
+   * judge here yet: issue, and unwind. One call judges one answer, so every
+   * later call site in the same call issues, which is what makes `next`
+   * advance one move rather than replay the same one.
+   */
+  private pullConverse(fields: Record<string, unknown>): DriverInstruction {
+    const outstanding = readInstruction(this.repoRoot, this.sessionNumber);
+    if (!this.answered && outstanding !== null && this.isOutstandingFor(outstanding, fields)) {
+      this.answered = true;
+      return outstanding;
+    }
+    throw new Awaiting(this.issue(this.withPendingRequest(fields)));
+  }
+
+  /** Whether the ledger's instruction is the one this call site issued. */
+  private isOutstandingFor(
+    instruction: DriverInstruction,
+    fields: Record<string, unknown>,
+  ): boolean {
+    if (instruction.seq !== this.run.seq) return false;
+    // A `wait` owes no written answer and a `done` owes nothing at all.
+    if (instruction.kind === "wait" || instruction.kind === "done") return false;
+    const step = (fields["step_id"] as string | undefined) ?? null;
+    const round = (fields["round"] as number | undefined) ?? null;
+    return (instruction.step_id ?? null) === step && (instruction.round ?? null) === round;
   }
 
   /**
@@ -532,13 +753,13 @@ class Driver {
   private async phasePlan(): Promise<void> {
     let plan = readWorkPlan(this.repoRoot, this.sessionNumber);
     let reasons: string[] = [];
-    let rejections = 0;
     while (plan === null) {
       const instruction = await this.converse({
-        kind: rejections === 0 ? "step" : "rejection",
+        // An instruction is a rejection exactly when it carries reasons.
+        kind: reasons.length > 0 ? "rejection" : "step",
         step_id: "plan",
         ask: this.planAsk(),
-        ...(rejections > 0 ? { reasons } : {}),
+        ...(reasons.length > 0 ? { reasons } : {}),
         answer_schema: WORK_PLAN_SCHEMA,
         answer_command: this.answerCommand("file"),
       });
@@ -548,9 +769,9 @@ class Driver {
         `no work plan was written for instruction ${instruction.seq}; the answer is ` +
           `\`${instruction.answer_command}\``,
       ];
-      rejections += 1;
-      this.log("plan-rejected", { seq: instruction.seq, rejection: rejections, reasons });
-      if (rejections >= MAX_REJECTIONS) {
+      this.setRejections(this.rejections + 1);
+      this.log("plan-rejected", { seq: instruction.seq, rejection: this.rejections, reasons });
+      if (this.rejections >= MAX_REJECTIONS) {
         throw new Stop(
           "rejected-thrice",
           `no work plan was written after ${MAX_REJECTIONS} instructions`,
@@ -558,6 +779,7 @@ class Driver {
       }
     }
     this.plan = plan;
+    this.setRejections(0);
     this.log("plan-accepted", { steps: plan.steps.map((step) => step.id), releasable: plan.releasable });
 
     if (readTaskDeclaration(this.sessionsDir, this.sessionNumber) === null) {
@@ -619,14 +841,13 @@ class Driver {
       this.run = { ...this.run, baseline_tree: tree };
       this.save();
     }
-    let rejections = 0;
     let reasons: string[] = [];
     for (;;) {
       const instruction = await this.converse({
-        kind: rejections === 0 ? "step" : "rejection",
+        kind: reasons.length > 0 ? "rejection" : "step",
         step_id: spec.id,
-        ask: this.stepAsk(spec, rejections > 0),
-        ...(rejections > 0 ? { reasons } : {}),
+        ask: this.stepAsk(spec, reasons.length > 0),
+        ...(reasons.length > 0 ? { reasons } : {}),
         answer_schema: REPORT_SCHEMA,
         answer_command: this.answerCommand("step", spec.id),
       });
@@ -648,14 +869,14 @@ class Driver {
             ? [...this.run.accepted_steps, spec.id]
             : this.run.accepted_steps,
         };
-        this.save();
+        this.setRejections(0);
         this.log("report-accepted", { seq: instruction.seq, step: spec.id, files: report?.files_changed });
         return;
       }
       reasons = judged;
-      rejections += 1;
-      this.log("report-rejected", { seq: instruction.seq, step: spec.id, rejection: rejections, reasons });
-      if (rejections >= MAX_REJECTIONS) {
+      this.setRejections(this.rejections + 1);
+      this.log("report-rejected", { seq: instruction.seq, step: spec.id, rejection: this.rejections, reasons });
+      if (this.rejections >= MAX_REJECTIONS) {
         throw new Stop(
           "rejected-thrice",
           `step '${spec.id}' was refused ${MAX_REJECTIONS} times; the last reasons: ` +
@@ -765,10 +986,28 @@ class Driver {
       });
       if (command === "") continue;
       this.log("preverify", { suite: suite.name, command });
-      const code = await testEvidenceVerb([
-        "run", "--sessions-dir", this.sessionsDir, "--suite", suite.name,
-        "--stage", "preverify-targeted", "--command", command,
-      ]);
+      // Behind a job like the rest of the framework's own work. A targeted
+      // run is short until the day it is not, and `test-evidence run` hands
+      // the suite this process's own stdout -- which under the pull is the
+      // one channel the instruction has to itself.
+      const code = await this.longWork({
+        name: `affected tests: ${suite.name}`,
+        argv: [
+          ...selfArgv(),
+          "test-evidence",
+          "run",
+          "--sessions-dir",
+          this.sessionsDir,
+          "--suite",
+          suite.name,
+          "--stage",
+          "preverify-targeted",
+          "--command",
+          command,
+        ],
+        retryAfterSeconds: SUITE_RETRY_SECONDS,
+        stopKind: "tests",
+      });
       if (code === 1) return command;
       if (code !== EXIT_OK) {
         throw new Stop("tests", `the pre-verification run for ${suite.name} could not be recorded (exit ${code})`);
@@ -800,12 +1039,109 @@ class Driver {
     this.setPhase("verify");
   }
 
+  // --- the framework's own long work -----------------------------------------
+
+  /**
+   * Run one of the framework's own verbs and hand back its exit code, from
+   * a call that does not wait for it.
+   *
+   * A verification round, the complete suite and the close each outlast an
+   * engine's tool timeout, so none of them may run inside the call that
+   * starts them. The job is started detached, its record goes on `run.json`,
+   * and the phase is re-entered later: in pull mode by the engine's next
+   * `dabbler session next`, in push mode by this loop's own poll, which is
+   * free to sit here because nothing is timing it. One mechanism, two
+   * cadences.
+   *
+   * The verb is spawned rather than called: it is the same code either way
+   * (`selfArgv` re-enters this router), and a spawned verb can be waited on
+   * from a process that has already exited.
+   */
+  private async longWork(options: {
+    readonly name: string;
+    readonly argv: readonly string[];
+    readonly retryAfterSeconds: number;
+    readonly stopKind: StopKind;
+  }): Promise<number> {
+    // A job outstanding under ANOTHER name means this call site is behind
+    // the one that unwound: a phase re-entered from the top walks its suites
+    // in the same order, and a call site reached before the outstanding job
+    // is one that already finished -- had it failed, the phase would have
+    // branched away instead of reaching here.
+    if (this.run.job !== null && this.run.job !== undefined && this.run.job.name !== options.name) {
+      return EXIT_OK;
+    }
+    let job: Job | null = this.run.job ?? null;
+    if (job === null) {
+      job = startJob(this.repoRoot, this.sessionNumber, {
+        name: options.name,
+        argv: options.argv,
+        retryAfterSeconds: options.retryAfterSeconds,
+      });
+      this.run = { ...this.run, job };
+      this.save();
+      this.log("job-started", { name: job.name, pid: job.pid, log: job.log });
+    }
+    for (;;) {
+      const state = pollJob(this.repoRoot, job);
+      if (state.state === "exited") {
+        this.run = { ...this.run, job: null };
+        this.save();
+        this.log("job-finished", { name: job.name, exit: state.exitCode, log: job.log });
+        if (state.exitCode === null) {
+          throw new Stop(
+            options.stopKind,
+            `${options.name} ended without an exit code; its log is ${job.log}`,
+          );
+        }
+        return state.exitCode;
+      }
+      if (state.state === "vanished") {
+        this.run = { ...this.run, job: null };
+        this.save();
+        throw new Stop(
+          options.stopKind,
+          `${options.name} vanished: nothing is running under pid ${job.pid} and it ` +
+            `recorded no result. Its log is ${job.log}; re-run to start it again`,
+        );
+      }
+      if (this.pull) {
+        throw new Awaiting(
+          this.issue(
+            this.withPendingRequest({
+              kind: "wait",
+              retry_after_seconds: options.retryAfterSeconds,
+              log: job.log,
+              answer_command: () => this.nextCommand(),
+            }),
+          ),
+        );
+      }
+      await new Promise((resolve) => setTimeout(resolve, JOB_POLL_MS));
+    }
+  }
+
   // --- verification ----------------------------------------------------------
 
   private async phaseVerify(): Promise<void> {
-    const code = await runRound(this.sessionsDir, {
-      maxRounds: this.options.maxRounds ?? null,
-      transport: this.options.transport ?? null,
+    const code = await this.longWork({
+      name: "verification",
+      argv: [
+        ...selfArgv(),
+        "verify",
+        "--sessions-dir",
+        this.sessionsDir,
+        // Off the run, not off this call: the call that reaches this phase
+        // is rarely the one the person typed the flags on.
+        ...(this.run.verification?.max_rounds != null
+          ? ["--max-rounds", String(this.run.verification.max_rounds)]
+          : []),
+        ...(this.run.verification?.transport
+          ? ["--transport", this.run.verification.transport]
+          : []),
+      ],
+      retryAfterSeconds: VERIFY_RETRY_SECONDS,
+      stopKind: "verification",
     });
     if (code === VERIFY_OK) {
       this.log("verification-passed");
@@ -852,7 +1188,6 @@ class Driver {
     let set = readDispositions(this.repoRoot, this.sessionNumber);
     if (set !== null && set.round !== roundNumber) set = null;
 
-    let rejections = 0;
     let refusals: string[] = [];
     while (set === null) {
       const instruction = await this.converse({
@@ -890,15 +1225,16 @@ class Driver {
         if (refusals.length === 0) set = answered;
       }
       if (set !== null) break;
-      rejections += 1;
-      this.log("dispositions-rejected", { seq: instruction.seq, rejection: rejections, reasons: refusals });
-      if (rejections >= MAX_REJECTIONS) {
+      this.setRejections(this.rejections + 1);
+      this.log("dispositions-rejected", { seq: instruction.seq, rejection: this.rejections, reasons: refusals });
+      if (this.rejections >= MAX_REJECTIONS) {
         throw new Stop(
           "rejected-thrice",
           `round ${roundNumber}'s findings were not dispositioned after ${MAX_REJECTIONS} instructions`,
         );
       }
     }
+    this.setRejections(0);
     this.log("dispositions-accepted", {
       round: roundNumber,
       fix: set.dispositions.filter((entry) => entry.action === "fix").map((entry) => entry.finding_index),
@@ -958,9 +1294,22 @@ class Driver {
   private async phaseRunOfRecord(): Promise<void> {
     for (const suite of this.expensiveSuites()) {
       this.log("run-of-record", { suite: suite.name, command: suite.command });
-      const code = await testEvidenceVerb([
-        "run", "--sessions-dir", this.sessionsDir, "--suite", suite.name, "--stage", "final-full",
-      ]);
+      const code = await this.longWork({
+        name: `run of record: ${suite.name}`,
+        argv: [
+          ...selfArgv(),
+          "test-evidence",
+          "run",
+          "--sessions-dir",
+          this.sessionsDir,
+          "--suite",
+          suite.name,
+          "--stage",
+          "final-full",
+        ],
+        retryAfterSeconds: SUITE_RETRY_SECONDS,
+        stopKind: "tests",
+      });
       if (code === EXIT_OK) continue;
       if (code !== 1) {
         throw new Stop("tests", `the run of record for ${suite.name} could not be recorded (exit ${code})`);
@@ -1006,10 +1355,19 @@ class Driver {
     this.setPhase("close");
   }
 
-  private phaseClose(): void {
-    const code = close(this.sessionsDir);
+  private async phaseClose(): Promise<void> {
+    const code = await this.longWork({
+      name: "close",
+      argv: [...selfArgv(), "session", "close", "--sessions-dir", this.sessionsDir],
+      retryAfterSeconds: CLOSE_RETRY_SECONDS,
+      stopKind: "close",
+    });
     if (code !== EXIT_OK) {
-      throw new Stop("close", "the close refused (its gate rows are above); nothing here can answer it");
+      throw new Stop(
+        "close",
+        "the close refused; its gate rows are in the close's own log, and nothing " +
+          "here can answer them",
+      );
     }
     this.issue({ kind: "done" });
     this.setPhase("complete");
@@ -1017,7 +1375,12 @@ class Driver {
 
   // --- the loop --------------------------------------------------------------
 
-  async drive(): Promise<number> {
+  /**
+   * The one loop, under both modes. It runs phase by phase and ends when
+   * the session is over, when a Stop lands, or -- under the pull only --
+   * when a phase unwinds with something to ask for.
+   */
+  private async loop(): Promise<number> {
     try {
       for (;;) {
         // A stop asked for while the framework's own phase was running (a
@@ -1049,13 +1412,29 @@ class Driver {
             this.phaseLand();
             break;
           case "close":
-            this.phaseClose();
+            await this.phaseClose();
             break;
           case "complete":
+            this.log("session-complete", {
+              session: sessionDisplayNumber(this.sessionNumber),
+              invocations: this.run.invocations,
+            });
+            // The invocation count is the framework's own spending, and
+            // under the pull it spent none: the engine was the person's CLI
+            // and its bill is theirs. Saying "0 engine invocations" there
+            // would read as a session that did nothing.
             writeOut(
-              `dabbler: session ${sessionDisplayNumber(this.sessionNumber)} complete after ` +
-                `${this.run.invocations} engine invocation(s).\n`,
+              `dabbler: session ${sessionDisplayNumber(this.sessionNumber)} complete` +
+                (this.pull ? ".\n" : ` after ${this.run.invocations} engine invocation(s).\n`),
             );
+            // Nothing more is expected, and the pull says so in the one
+            // shape it says everything: the `done` the close issued.
+            if (this.pull) {
+              const done =
+                readInstruction(this.repoRoot, this.sessionNumber) ??
+                this.issue({ kind: "done" });
+              throw new Awaiting(done.kind === "done" ? done : this.issue({ kind: "done" }));
+            }
             return EXIT_OK;
         }
       }
@@ -1075,14 +1454,41 @@ class Driver {
       return EXIT_GATE_FAILED;
     }
   }
+
+  /**
+   * One move: the loop, run until it has something to ask for, handing back
+   * the instruction rather than invoking anybody with it.
+   */
+  async advance(): Promise<{ code: number; instruction: DriverInstruction | null }> {
+    try {
+      return { code: await this.loop(), instruction: null };
+    } catch (error) {
+      if (!(error instanceof Awaiting)) throw error;
+      return { code: EXIT_OK, instruction: error.instruction };
+    }
+  }
+
+  /**
+   * Push: the same move, with the engine invoked between phases instead of
+   * a person's CLI calling back.
+   *
+   * There is deliberately nothing to iterate here. The engine's invocation
+   * is inside `converse` and a job's poll is inside `longWork`, so under
+   * the push a move only ends when the session does -- `drive` is one call
+   * of exactly what `next` calls, and that is what makes them one loop
+   * rather than two that agree.
+   */
+  async drive(): Promise<number> {
+    return (await this.advance()).code;
+  }
 }
 
-/**
- * Drive the session that is next, from registration to close. The exit
- * code is the close's when the loop reaches it, and a gate failure when it
- * stops short -- the stop is on `run.json`, in words.
- */
-export async function driveSession(sessionsDir: string, options: DriveOptions): Promise<number> {
+/** Everything both entry points do before the loop: the repository and its config. */
+async function withDriver(
+  sessionsDir: string,
+  options: DriverOptions,
+  run: (driver: Driver) => Promise<number>,
+): Promise<number> {
   const repoRoot = repoRootFor(sessionsDir);
   if (repoRoot === null) {
     writeErr(`dabbler: not inside a git repository: ${sessionsDir}\n`);
@@ -1106,10 +1512,60 @@ export async function driveSession(sessionsDir: string, options: DriveOptions): 
   try {
     const registered = driver.register();
     if (registered !== EXIT_OK) return registered;
-    return await driver.drive();
+    return await run(driver);
   } catch (error) {
     if (!(error instanceof LedgerError)) throw error;
     writeErr(`dabbler: refused -- ${error.message}\n`);
     return EXIT_BOUNDARY;
   }
+}
+
+/**
+ * Drive the session that is next, from registration to close. The exit
+ * code is the close's when the loop reaches it, and a gate failure when it
+ * stops short -- the stop is on `run.json`, in words.
+ */
+export async function driveSession(sessionsDir: string, options: DriveOptions): Promise<number> {
+  return withDriver(sessionsDir, { ...options, mode: "push" }, (driver) => driver.drive());
+}
+
+/**
+ * Advance the session one move and print the instruction to answer.
+ *
+ * The same loop `driveSession` runs, with the engine on the other side of
+ * the call: this returns as soon as it has something to ask for, and the
+ * person's own CLI does the work and calls it again. Stdout carries exactly
+ * one thing -- the instruction, as `driver-instruction` JSON -- so a
+ * parser reads it; everything the verbs on the way there would have printed
+ * is diverted to stderr, where the person still sees it.
+ *
+ * The invocation budget is not counted here. `driver.max_invocations`
+ * bounds what the FRAMEWORK spends invoking an engine, and under the pull
+ * it is the person's own CLI spending. The three-rejection bound stays:
+ * that one is about an answer that is not getting better.
+ */
+export async function sessionNext(sessionsDir: string, options: NextOptions): Promise<number> {
+  let instruction: DriverInstruction | null = null;
+  const code = await divertOut(() =>
+    withDriver(
+      sessionsDir,
+      {
+        engine: options.engine ?? null,
+        provider: options.provider ?? null,
+        model: options.model ?? null,
+        effort: options.effort ?? null,
+        adapter: null,
+        maxRounds: options.maxRounds ?? null,
+        transport: options.transport ?? null,
+        mode: "pull",
+      },
+      async (driver) => {
+        const outcome = await driver.advance();
+        instruction = outcome.instruction;
+        return outcome.code;
+      },
+    ),
+  );
+  if (instruction !== null) writeOut(`${JSON.stringify(instruction, null, 2)}\n`);
+  return code;
 }

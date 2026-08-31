@@ -14,7 +14,7 @@ export type DriverInstruction = {
    * Monotonic per session. An answer names the seq it answers, so a stale answer cannot be mistaken for the current one.
    */
   seq: number;
-  kind: "step" | "rejection" | "interrupt" | "done";
+  kind: "step" | "rejection" | "interrupt" | "wait" | "done";
   session_number: number;
   issued_at: string;
   /**
@@ -34,11 +34,19 @@ export type DriverInstruction = {
    */
   round?: number;
   /**
-   * Which answer this instruction expects, by the schema it must validate against. Required on every kind but `done`, and refused on `done`: an instruction that expects nothing names nothing.
+   * On a `wait`: how long to leave the framework's work alone before calling `next` again. It is a tool call and not a sleep -- the engine does something else, or nothing, and comes back.
+   */
+  retry_after_seconds?: number;
+  /**
+   * On a `wait`: the repository-relative path of the running job's log, so a person watching can read what the framework is doing while it does it.
+   */
+  log?: string;
+  /**
+   * Which answer this instruction expects, by the schema it must validate against. Required on `step`, `rejection` and `interrupt`, and refused on `wait` and `done`: an instruction that expects no written answer names no schema.
    */
   answer_schema?: "driver-report.schema.json" | "driver-work-plan.schema.json" | "driver-disposition.schema.json";
   /**
-   * The `dabbler session ...` command line that writes the answer -- the engine never writes the ledger directly. Required on every kind but `done`, and refused on `done`.
+   * The `dabbler session ...` command line that writes the answer -- the engine never writes the ledger directly. Required on every kind but `done`, and refused on `done`. On a `wait` there is nothing to write, and it is the `next` call that collects the framework's work.
    */
   answer_command?: string;
 };

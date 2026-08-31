@@ -23,8 +23,17 @@
 // invocation's `signal`. An adapter honours the abort with the CLI's own
 // interrupt where it has one (Claude Code's stream-json control message,
 // measured to end the turn and keep the process and its context) and with
-// a tree kill where it has none; the driver then re-invokes with the
-// engine's `--continue` and says why. The driver never knows which.
+// a tree kill where it has none; the driver then re-invokes into the same
+// conversation and says why. The driver never knows which.
+//
+// A conversation is resumed BY ITS ID. The engine reports one while it runs
+// (`session_id`, `thread_id`), the outcome hands it back, the driver keeps
+// it on `run.json`, and the next invocation names it. Resuming by recency
+// -- `--continue`, `resume --last` -- is what session 60 did, and what it
+// resumed was an interactive session somebody had opened in the same
+// working directory since. The Copilot seat still does it, because it
+// reports no id and nothing else has been measured; that is said where the
+// shape is, not hidden.
 
 import type { ChildProcess } from "node:child_process";
 import { basename } from "node:path";
@@ -49,6 +58,13 @@ export interface EngineInvocation {
    * so one context carries the whole run.
    */
   readonly first: boolean;
+  /**
+   * The engine's own conversation, by the id it reported on its first
+   * invocation, or null when there is none to resume. An adapter NAMES it;
+   * nothing here asks for the most recent conversation in this directory,
+   * because the most recent one can be somebody else's.
+   */
+  readonly resumeId: string | null;
   /** Aborted by the driver to end the invocation; the reason is the interrupt's. */
   readonly signal: AbortSignal;
   /**
@@ -61,6 +77,11 @@ export interface EngineInvocation {
 
 export interface EngineOutcome {
   readonly exitCode: number | null;
+  /**
+   * The conversation id the engine reported while it ran, for the next
+   * invocation to name. Null for an engine that reports none.
+   */
+  readonly sessionId?: string | null;
   /** Set when the engine could not be run at all, as opposed to ran and failed. */
   readonly error?: string | null;
   /** The driver ended the invocation through `signal`. */
@@ -100,6 +121,19 @@ export function enginePrompt(instructionPath: string): string {
 
 // --- The shapes --------------------------------------------------------------
 
+/**
+ * Which conversation this invocation continues.
+ *
+ * `first` is deliberately not here. It was, and it was what a shape reached
+ * for to decide "continue whatever ran last" -- which is the one thing no
+ * shape may do. A conversation is continued by naming it, and an adapter
+ * with no id to name starts a fresh one.
+ */
+export interface ArgvContext {
+  /** The id the engine reported earlier, or null: start a fresh conversation. */
+  readonly resumeId: string | null;
+}
+
 /** How a CLI is invoked once per instruction, measured rather than assumed. */
 export interface EngineShape {
   readonly program: string;
@@ -109,10 +143,16 @@ export interface EngineShape {
    * interrupt available.
    */
   readonly input: "argv" | "stdin";
-  /** The arguments after the program, for the first invocation or a continuation. */
-  argv(first: boolean, prompt: string): string[];
+  /** The arguments after the program, for a fresh conversation or a named one. */
+  argv(context: ArgvContext, prompt: string): string[];
   /** One output line as a person should see it, or null for one not worth showing. */
   render(line: string): string | null;
+  /**
+   * The conversation id this line reports, or null. Read once per
+   * invocation, off the engine's own first event, and handed back so the
+   * next invocation can name it.
+   */
+  sessionId(line: string): string | null;
 }
 
 /**
@@ -128,59 +168,79 @@ export function engineShape(engine: string, model: string | null): EngineShape |
       // reads user messages from stdin and answers a `control_request`
       // interrupt mid-turn with a `control_response` and a `result`, the
       // process and its context intact. `stream-json` output needs
-      // `--verbose`. `--continue` resumes the most recent conversation in
-      // this directory.
+      // `--verbose`. A continuation is `--resume <id>`, and the id is the
+      // `session_id` the first invocation's `init` event reported.
+      //
+      // It was `--continue`, which resumes the most recent conversation in
+      // this directory -- and in session 60 that was an interactive session
+      // somebody had opened in the same working directory since, so the
+      // driver spent its invocation talking to the wrong conversation. With
+      // no id to name, this starts a fresh one rather than guessing: a lost
+      // context costs a re-read, and the wrong context costs the session.
       return {
         program: "claude",
         input: "stdin",
-        argv: (first) => [
+        argv: ({ resumeId }) => [
           "-p",
           "--input-format", "stream-json",
           "--output-format", "stream-json",
           "--verbose",
           "--dangerously-skip-permissions",
           ...modelArgs("--model"),
-          ...(first ? [] : ["--continue"]),
+          ...(resumeId ? ["--resume", resumeId] : []),
         ],
         render: renderClaudeCodeEvent,
+        sessionId: claudeCodeSessionId,
       };
     case "copilot":
-      // Measured on the Copilot CLI: `-p` runs one prompt and exits;
-      // `--continue` resumes the most recent session. The seat exposes no
-      // reasoning and has no interrupt, so its own progress lines are what
-      // is shown and a tree kill is how an invocation ends early. The model
-      // is the seat's own id, required as it is at `session start`.
+      // Measured on the Copilot CLI: `-p` runs one prompt and exits. The
+      // seat exposes no reasoning and has no interrupt, so its own progress
+      // lines are what is shown and a tree kill is how an invocation ends
+      // early. The model is the seat's own id, required as it is at
+      // `session start`.
+      //
+      // Every invocation is a FRESH conversation. The seat has a
+      // `--continue`, and it resumes the most recent session in this
+      // directory -- the hazard that cost session 60, and worse here than
+      // anywhere because an interactive seat in the working repository is
+      // the staff's normal day. It reports no conversation id on its
+      // output, so there is nothing to name instead; until a resume-by-id
+      // is measured against the seat, each instruction arrives with the
+      // context the instruction file carries and no other. A re-read is the
+      // price; the wrong conversation is not a price, it is a wrong answer.
       if (!model) return "a Copilot seat names its model: pass --model";
       return {
         program: "copilot",
         input: "argv",
-        argv: (first, prompt) => [
+        argv: (_context, prompt) => [
           "-p", prompt,
           "--model", model,
           "--allow-all-tools",
           "--allow-all-paths",
           "--no-ask-user",
-          ...(first ? [] : ["--continue"]),
         ],
         render: (line) => line,
+        sessionId: () => null,
       };
     case "codex":
       // Measured on Codex 0.151.0 (`codex exec --help`): the prompt is
       // positional, `--json` prints events as JSONL, and a continuation is
-      // `exec resume --last`, which picks the most recent session recorded
-      // for this directory.
+      // `exec resume <thread>` -- the thread id `thread.started` reports,
+      // rather than `resume --last`, which picks whatever ran most recently
+      // in this directory and carries the same hazard `--continue` did.
       return {
         program: "codex",
         input: "argv",
-        argv: (first, prompt) => [
+        argv: ({ resumeId }, prompt) => [
           "exec",
-          ...(first ? [] : ["resume", "--last"]),
+          ...(resumeId ? ["resume", resumeId] : []),
           "--json",
           ...modelArgs("-m"),
           "--dangerously-bypass-approvals-and-sandbox",
           prompt,
         ],
         render: renderCodexEvent,
+        sessionId: codexThreadId,
       };
     default:
       return `no built-in command for '${engine}'; pass --engine-argv`;
@@ -296,6 +356,26 @@ export function renderCodexEvent(line: string): string | null {
   }
 }
 
+/**
+ * Claude Code's conversation id, off any event that carries one.
+ *
+ * The `init` event is the first, and the `result` event carries it again;
+ * reading it off whichever comes first means the id survives a stream that
+ * starts with something else.
+ */
+export function claudeCodeSessionId(line: string): string | null {
+  const id = parseJson(line)?.["session_id"];
+  return typeof id === "string" && id !== "" ? id : null;
+}
+
+/** Codex's thread id, off `thread.started` and nowhere else. */
+export function codexThreadId(line: string): string | null {
+  const event = parseJson(line);
+  if (event === null || event["type"] !== "thread.started") return null;
+  const id = event["thread_id"];
+  return typeof id === "string" && id !== "" ? id : null;
+}
+
 // --- Running a child ---------------------------------------------------------
 
 interface ChildRun {
@@ -403,11 +483,25 @@ export function builtInEngine(
     name: engine,
     invoke(invocation: EngineInvocation): Promise<EngineOutcome> {
       const prompt = enginePrompt(invocation.instructionPath);
-      const argv = [program, ...leading, ...shape.argv(invocation.first, prompt)];
+      const argv = [program, ...leading, ...shape.argv({ resumeId: invocation.resumeId }, prompt)];
       const spawned = spawnOrFail(argv, invocation, shape.input === "stdin" ? "pipe" : "ignore");
       if (typeof spawned === "string") return Promise.resolve({ exitCode: null, error: spawned });
+      // The id the engine reports for the conversation it just opened. It
+      // is read once -- the first line that carries one -- so a later event
+      // repeating it cannot move the run onto a different conversation.
+      let sessionId: string | null = null;
+      const watch = (line: string): void => {
+        if (sessionId === null) sessionId = shape.sessionId(line);
+      };
+      const reported = (outcome: EngineOutcome): EngineOutcome => ({ ...outcome, sessionId });
       if (shape.input === "argv") {
-        return runChild({ child: spawned, invocation, render: shape.render, interrupt: terminateTree });
+        return runChild({
+          child: spawned,
+          invocation,
+          render: shape.render,
+          interrupt: terminateTree,
+          onLine: watch,
+        }).then(reported);
       }
       // The stream-json conversation: the prompt is a user message, the
       // turn ends with a `result` event, and stdin is closed then so the
@@ -428,9 +522,10 @@ export function builtInEngine(
             request: { subtype: "interrupt" },
           }),
         onLine: (line) => {
+          watch(line);
           if (parseJson(line)?.["type"] === "result") spawned.stdin?.end();
         },
-      });
+      }).then(reported);
     },
   };
 }

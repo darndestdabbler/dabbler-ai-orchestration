@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "driver/run.json (where a driven session's loop is, and why it stopped)",
-  "description": "The current state of one driven session, under .dabbler/runs/s<N>/driver/run.json. Written only by `dabbler session drive`, replaced whole after every transition, and read by a re-run to continue where the last one left off: the phase, the steps already accepted, the tree the next report is measured against, the seq last issued and the invocations spent. It is state, not history -- the history of a run is its transcripts and the lifecycle's own records. `stop` is the one field a person is meant to read: when the loop halts short of the close it says which bound it met, in words, and a re-run clears it. A file that fails validation on read is refused, never skipped.",
+  "description": "The current state of one driven session, under .dabbler/runs/s<N>/driver/run.json. Written only by `dabbler session drive`, replaced whole after every transition, and read by a re-run to continue where the last one left off: the phase, the steps already accepted, the tree the next report is measured against, the seq last issued and the invocations spent. It is state, not history -- the history of a run is its transcripts and the lifecycle's own records. `stop` is the one field a person is meant to read: when the loop halts short of the close it says which bound it met, in words, and a re-run clears it. A file that fails validation on read is refused, never skipped. `rejections`, `job`, `verification` and `engine_session_id` are optional for exactly that reason: they arrived with the pull, and a run written before them is still a run this reader must open.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -93,6 +93,56 @@
         "at": { "type": "string", "minLength": 1 }
       },
       "description": "Null while the loop runs or after it completed. Set when it halted short of the close, with the reason in words; the session stays in flight and this is what the operator reads."
+    },
+    "rejections": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "How many times the outstanding answer has been refused, out of the three a step is allowed. It is here rather than in a local because a pull-mode call -- `dabbler session next` -- ends between the refusal and the answer, and a count a process holds is a count that resets every time the person's CLI comes back."
+    },
+    "job": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["name", "argv", "pid", "log", "status", "started_at", "retry_after_seconds"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "What the framework is running, in the words the instruction shows: a verification round, a suite's run of record, the close."
+        },
+        "argv": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 },
+          "description": "The program and its arguments, spawned with no shell."
+        },
+        "pid": { "type": "integer", "minimum": 1 },
+        "log": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Where the job's output is being appended, repository-relative -- the path a `wait` hands back."
+        },
+        "status": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The file the runner writes the exit code into when the job ends, repository-relative. Its presence is what tells a finished job from a running one; a pid alone cannot, because pids are reused."
+        },
+        "started_at": { "type": "string", "minLength": 1 },
+        "retry_after_seconds": { "type": "integer", "minimum": 1 }
+      },
+      "description": "The one long-running thing the framework has started and has not yet collected, or null. Long work is never awaited inside a call: a verification round, the complete suite and the close each outlast an engine's tool timeout, so they are started detached and the following call reports progress or the result."
+    },
+    "verification": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "properties": {
+        "max_rounds": { "type": ["integer", "null"], "minimum": 1 },
+        "transport": { "type": ["string", "null"], "minLength": 1 }
+      },
+      "description": "The round cap and transport this session verifies under, as the call that opened the run named them. They belong to the run rather than to a call: under the pull the call that eventually starts verification is not the one the person typed them on -- it is whichever `dabbler session next` happens to reach that phase, following an `answer_command` that names neither. A later call may name them again to change them."
+    },
+    "engine_session_id": {
+      "type": ["string", "null"],
+      "description": "The engine's own conversation, by the id it reported on its first invocation. A resume names it; nothing here asks an engine for its most recent session, because the most recent one in a directory can be somebody else's."
     },
     "started_at": { "type": "string", "minLength": 1 },
     "updated_at": { "type": "string", "minLength": 1 }

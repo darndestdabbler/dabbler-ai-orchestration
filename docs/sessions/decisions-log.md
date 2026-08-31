@@ -8397,3 +8397,15 @@ gated on `dabbler.driving`); one router test (`--stop` halts with
 tests went with the helpers they tested. 1180 router tests, 148
 extension tests. Extension **2.4.0** built and installed here, unpublished
 like 2.0.0-2.3.0.
+
+## Session 61 — `dabbler session next` — the loop as a verb the engine calls
+
+### D252 · 2026-08-31 · Orchestrator (claude-opus-5/anthropic) · session drive stays, as the unattended half of one loop: session next is the pull for a person's own CLI, session drive the push for a headless engine
+
+Session 61 moves the engine into the person's own CLI: `dabbler session next` advances the session one move and prints the instruction to answer, and the person -- or the CLI they are already sitting in -- does the work and calls it again. That raised the question of whether `session drive`, which invokes an engine itself, still has a job.
+
+It does, and it stays. A headless engine driven end to end is what the built adapters in `engines.ts` are for, and it is the only shape that works unattended: CI, an overnight run, anything with nobody at a keyboard. Retiring it in the same session that moves the interactive case out of the framework would also leave the extension's Start button with nothing to call, and would delete a measured capability to avoid maintaining a code path that turns out not to exist.
+
+There is no second code path. The seam is at `converse`: push invokes the engine there, pull returns the outstanding instruction or unwinds with the instruction it just issued. `drive` and `next` call the same `advance`, over the same phases, judging with the same `judge`, and the framework's own long work -- a verification round, the complete suite, the close -- runs as the same detached job under both, polled by the loop in push and answered with a `wait` instruction in pull. The push mode is the pull mode with an engine invoked between calls.
+
+What each is for, in one line apiece. `dabbler session next`: a person, or the engine they are already talking to, works the session from their own CLI and keeps their own context, their own interrupt, and their own bill. `dabbler session drive`: nobody is watching, and the framework invokes a headless engine per instruction under an invocation budget.

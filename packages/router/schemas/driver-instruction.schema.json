@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "driver/instruction.json (what the framework is asking the engine to do now)",
-  "description": "The one outstanding instruction for a driven session, under .dabbler/runs/s<N>/driver/instruction.json. Written only by the driver and replaced whole each time it issues the next one; the engine reads it and answers with the file `answer_schema` names, through the verb `answer_command` spells out. Four kinds and no fifth: `step` asks for work, `rejection` sends an answer back with the reasons it was refused, `interrupt` is the driver having ended an invocation and saying why, `done` says the session is over and nothing more is expected. Every answer the driver acts on is JSON against a schema; the prose an engine writes is for people and the driver never reads it.",
+  "description": "The one outstanding instruction for a driven session, under .dabbler/runs/s<N>/driver/instruction.json. Written only by the driver and replaced whole each time it issues the next one; the engine reads it and answers with the file `answer_schema` names, through the verb `answer_command` spells out. Five kinds and no sixth: `step` asks for work, `rejection` sends an answer back with the reasons it was refused, `interrupt` is the driver having ended an invocation and saying why, `wait` is the framework running work that outlasts a tool call -- a verification round, the complete suite, the close -- where nothing is owed by the engine but another `dabbler session next` once `retry_after_seconds` have passed, and `done` says the session is over and nothing more is expected. Every answer the driver acts on is JSON against a schema; the prose an engine writes is for people and the driver never reads it.",
   "type": "object",
   "additionalProperties": false,
   "required": ["schema_version", "seq", "kind", "session_number", "issued_at"],
@@ -15,7 +15,7 @@
       "minimum": 1,
       "description": "Monotonic per session. An answer names the seq it answers, so a stale answer cannot be mistaken for the current one."
     },
-    "kind": { "enum": ["step", "rejection", "interrupt", "done"] },
+    "kind": { "enum": ["step", "rejection", "interrupt", "wait", "done"] },
     "session_number": { "type": "integer", "minimum": 1 },
     "issued_at": { "type": "string", "minLength": 1 },
     "step_id": {
@@ -39,18 +39,28 @@
       "minimum": 1,
       "description": "On a `rejection` that carries a verifier's findings: the round they came from, so the disposition can name it."
     },
+    "retry_after_seconds": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "On a `wait`: how long to leave the framework's work alone before calling `next` again. It is a tool call and not a sleep -- the engine does something else, or nothing, and comes back."
+    },
+    "log": {
+      "type": "string",
+      "minLength": 1,
+      "description": "On a `wait`: the repository-relative path of the running job's log, so a person watching can read what the framework is doing while it does it."
+    },
     "answer_schema": {
       "enum": [
         "driver-report.schema.json",
         "driver-work-plan.schema.json",
         "driver-disposition.schema.json"
       ],
-      "description": "Which answer this instruction expects, by the schema it must validate against. Required on every kind but `done`, and refused on `done`: an instruction that expects nothing names nothing."
+      "description": "Which answer this instruction expects, by the schema it must validate against. Required on `step`, `rejection` and `interrupt`, and refused on `wait` and `done`: an instruction that expects no written answer names no schema."
     },
     "answer_command": {
       "type": "string",
       "minLength": 1,
-      "description": "The `dabbler session ...` command line that writes the answer -- the engine never writes the ledger directly. Required on every kind but `done`, and refused on `done`."
+      "description": "The `dabbler session ...` command line that writes the answer -- the engine never writes the ledger directly. Required on every kind but `done`, and refused on `done`. On a `wait` there is nothing to write, and it is the `next` call that collects the framework's work."
     }
   },
   "allOf": [
@@ -65,6 +75,13 @@
     {
       "if": { "properties": { "kind": { "const": "interrupt" } } },
       "then": { "required": ["reasons", "answer_schema", "answer_command"] }
+    },
+    {
+      "if": { "properties": { "kind": { "const": "wait" } } },
+      "then": {
+        "required": ["retry_after_seconds", "log", "answer_command"],
+        "not": { "required": ["answer_schema"] }
+      }
     },
     {
       "if": { "properties": { "kind": { "const": "done" } } },

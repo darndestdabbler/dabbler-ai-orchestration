@@ -13,7 +13,7 @@
 // `--not-releasable` that parsed as nothing would publish.
 
 import { shlexSplit } from "../checks.ts";
-import { driveSession } from "../drive.ts";
+import { driveSession, sessionNext } from "../drive.ts";
 import {
   ENGINE_OUTPUT_MODES,
   type Engine,
@@ -44,6 +44,7 @@ const SUMMARY: Record<string, string> = {
   start: "register a session start",
   decision: "append a decision to decisions-log.md",
   declare: "declare the session's task list and releasability",
+  next: "advance the session one move and print the instruction to answer",
   drive: "run the next session end to end: the framework drives, the engine answers",
   interrupt: "end the engine's running invocation under a driven session, with a reason",
   report: "answer the driver's outstanding instruction",
@@ -89,6 +90,20 @@ const OPTIONS: Record<string, readonly string[]> = {
     "  --task-file PATH         the task list, read from a file",
     "  --releasable             this session may publish",
     "  --not-releasable         it may not; one of the two is required",
+  ],
+  next: [
+    "  --engine ENGINE          claude-code | codex | gemini | copilot -- required only to",
+    "                           REGISTER a session; omit it once one is in flight",
+    "  --provider PROVIDER      anthropic | openai | google; required with --engine",
+    "  --model MODEL            required for a Copilot seat",
+    "  --effort EFFORT          optional reasoning effort, recorded with the identity",
+    "  --max-rounds N           the verification round cap, as `dabbler verify` takes it",
+    "  --transport T            the verification transport, as `dabbler verify` takes it",
+    "",
+    "  Stdout carries one thing: the instruction, as driver-instruction JSON. Do what",
+    "  its `ask` says, run its `answer_command`, then call this again -- until it says",
+    "  `done`. A `wait` means the framework is running something long: leave it",
+    "  `retry_after_seconds`, read its `log` if you like, and call this again.",
   ],
   drive: [
     "  --engine ENGINE          required: claude-code | codex | gemini | copilot -- who",
@@ -337,6 +352,22 @@ export async function sessionVerb(argv: string[]): Promise<number> {
       effort: values.get("--effort") ?? null,
       sessionNumber,
       totalSessions,
+    });
+  }
+
+  if (subcommand === "next") {
+    const maxRounds = integer(values.get("--max-rounds"), "--max-rounds");
+    if (typeof maxRounds === "string") {
+      writeErr(`dabbler session next: ${maxRounds}\n`);
+      return EXIT_USAGE;
+    }
+    return sessionNext(sessionsDir, {
+      engine: values.get("--engine") ?? null,
+      provider: values.get("--provider") ?? null,
+      model: values.get("--model") ?? null,
+      effort: values.get("--effort") ?? null,
+      maxRounds,
+      transport: values.get("--transport") ?? null,
     });
   }
 

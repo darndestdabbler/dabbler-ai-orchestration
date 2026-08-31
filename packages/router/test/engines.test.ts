@@ -66,6 +66,7 @@ function invocation(
     sessionNumber: 1,
     invocation: 1,
     first: true,
+    resumeId: null,
     signal: new AbortController().signal,
     emit: (line, display) => emitted.push({ line, display }),
     ...overrides,
@@ -99,7 +100,7 @@ process.stdin.on("data", (chunk) => {
     const m = JSON.parse(line);
     if (m.type === "user") {
       fs.writeFileSync(process.env.FAKE_SEEN, JSON.stringify({ argv: process.argv.slice(2), prompt: m.message.content }));
-      out({ type: "system", subtype: "init", model: "fake-model" });
+      out({ type: "system", subtype: "init", model: "fake-model", session_id: process.env.FAKE_SESSION_ID || "conv-first" });
       timer = setInterval(() => {
         ticks += 1;
         out({ type: "system", subtype: "thinking_tokens" });
@@ -137,12 +138,14 @@ describe("the engine adapters", () => {
 
   it("has one measured argv per engine, continues after the first invocation, and refuses an engine it has none for", () => {
     const prompt = "read the file";
+    const fresh = { resumeId: null };
+    const again = { resumeId: "conv-1" };
     const claude = engineShape("claude-code", "claude-haiku-4-5-20251001");
     expect(typeof claude).not.toBe("string");
     if (typeof claude === "string") return;
     expect(claude.program).toBe("claude");
     expect(claude.input).toBe("stdin");
-    expect(claude.argv(true, prompt)).toEqual([
+    expect(claude.argv(fresh, prompt)).toEqual([
       "-p",
       "--input-format", "stream-json",
       "--output-format", "stream-json",
@@ -150,26 +153,32 @@ describe("the engine adapters", () => {
       "--dangerously-skip-permissions",
       "--model", "claude-haiku-4-5-20251001",
     ]);
-    expect(claude.argv(false, prompt)).toContain("--continue");
+    expect(claude.argv(again, prompt).slice(-2)).toEqual(["--resume", "conv-1"]);
 
     const copilot = engineShape("copilot", "gpt-5.6-luna");
     if (typeof copilot === "string") throw new Error(copilot);
-    expect(copilot.argv(true, prompt)).toEqual([
+    expect(copilot.argv(fresh, prompt)).toEqual([
       "-p", prompt,
       "--model", "gpt-5.6-luna",
       "--allow-all-tools",
       "--allow-all-paths",
       "--no-ask-user",
     ]);
-    expect(copilot.argv(false, prompt).at(-1)).toBe("--continue");
+    // The seat reports no id, so it has none to name and starts fresh every
+    // time. What it must never do is continue whatever ran here last.
+    expect(copilot.argv(again, prompt)).toEqual(copilot.argv(fresh, prompt));
+    expect(copilot.argv(again, prompt)).not.toContain("--continue");
+    expect(copilot.sessionId('{"session_id":"anything"}')).toBeNull();
     expect(engineShape("copilot", null)).toMatch(/--model/);
 
     const codex = engineShape("codex", null);
     if (typeof codex === "string") throw new Error(codex);
-    expect(codex.argv(true, prompt)).toEqual([
+    expect(codex.argv(fresh, prompt)).toEqual([
       "exec", "--json", "--dangerously-bypass-approvals-and-sandbox", prompt,
     ]);
-    expect(codex.argv(false, prompt).slice(0, 3)).toEqual(["exec", "resume", "--last"]);
+    expect(codex.argv(again, prompt).slice(0, 3)).toEqual(["exec", "resume", "conv-1"]);
+    expect(codex.sessionId('{"type":"thread.started","thread_id":"t-9"}')).toBe("t-9");
+    expect(codex.sessionId('{"type":"turn.completed","thread_id":"t-later"}')).toBeNull();
 
     expect(engineShape("gemini", null)).toMatch(/--engine-argv/);
     expect(enginePrompt("D:/repo/.dabbler/runs/s1/driver/instruction.json")).toMatch(/^Read D:\/repo.*answer_command.*stop\.$/);
@@ -198,21 +207,22 @@ describe("the engine adapters", () => {
     expect(renderCodexEvent('{"type":"turn.completed","usage":{}}')).toBe("result: turn completed");
   });
 
-  it("speaks Claude Code's stream-json: the prompt on stdin, --continue after the first, and an interrupt as the control message that ends the turn", async () => {
+  it("speaks Claude Code's stream-json: the prompt on stdin, --resume after the first, and an interrupt as the control message that ends the turn", async () => {
     const dir = makeTempDir();
     const fake = join(dir, "claude.cjs");
     writeFileSync(fake, FAKE_CLAUDE, "utf8");
     const seenPath = join(dir, "seen.json");
     process.env["FAKE_SEEN"] = seenPath;
     delete process.env["FAKE_TICKS"];
+    delete process.env["FAKE_SESSION_ID"];
     const engine = builtInEngine("claude-code", "fake-model", { program: NODE, leadingArgs: [fake] });
     if (typeof engine === "string") throw new Error(engine);
     try {
       const first: Emitted[] = [];
       const outcome = await engine.invoke(invocation({ first: true }, first));
-      expect(outcome).toEqual({ exitCode: 0, interrupted: false });
+      expect(outcome).toEqual({ exitCode: 0, interrupted: false, sessionId: "conv-first" });
       const seen = JSON.parse(readFileSync(seenPath, "utf8")) as { argv: string[]; prompt: string };
-      expect(seen.argv).not.toContain("--continue");
+      expect(seen.argv).not.toContain("--resume");
       expect(seen.prompt).toMatch(/^Read .*instruction\.json and do exactly/);
       // Every event is on the transcript; the display drops what is not worth showing.
       expect(first.map((entry) => entry.line)).toContain('{"type":"system","subtype":"thinking_tokens"}');
@@ -225,15 +235,58 @@ describe("the engine adapters", () => {
       const second: Emitted[] = [];
       const started = Date.now();
       setTimeout(() => controller.abort("the plan changed"), 250);
-      const ended = await engine.invoke(invocation({ first: false, invocation: 2, signal: controller.signal }, second));
-      expect(ended).toEqual({ exitCode: 0, interrupted: true });
+      const ended = await engine.invoke(
+        invocation(
+          { first: false, invocation: 2, resumeId: "conv-first", signal: controller.signal },
+          second,
+        ),
+      );
+      expect(ended).toMatchObject({ exitCode: 0, interrupted: true });
       expect(Date.now() - started).toBeLessThan(5_000);
-      expect(JSON.parse(readFileSync(seenPath, "utf8")).argv).toContain("--continue");
+      expect(JSON.parse(readFileSync(seenPath, "utf8")).argv).toContain("--resume");
       expect(second.map((entry) => entry.display)).toContain("interrupt acknowledged");
       expect(second.map((entry) => entry.display)).toContain("result: error_during_execution in 5 ms, $0.0123");
     } finally {
       delete process.env["FAKE_SEEN"];
       delete process.env["FAKE_TICKS"];
+      delete process.env["FAKE_SESSION_ID"];
+    }
+  });
+
+  it("resumes the conversation the engine reported, not whatever ran most recently in the directory", async () => {
+    const dir = makeTempDir();
+    const fake = join(dir, "claude.cjs");
+    writeFileSync(fake, FAKE_CLAUDE, "utf8");
+    const seenPath = join(dir, "seen.json");
+    process.env["FAKE_SEEN"] = seenPath;
+    delete process.env["FAKE_TICKS"];
+    delete process.env["FAKE_SESSION_ID"];
+    const engine = builtInEngine("claude-code", "fake-model", { program: NODE, leadingArgs: [fake] });
+    if (typeof engine === "string") throw new Error(engine);
+    const argvOf = () => (JSON.parse(readFileSync(seenPath, "utf8")) as { argv: string[] }).argv;
+    try {
+      // The first invocation opens a conversation and says which one.
+      const opened = await engine.invoke(invocation({ first: true, resumeId: null }, []));
+      expect(opened.sessionId).toBe("conv-first");
+      expect(argvOf()).not.toContain("--resume");
+
+      // Session 60's incident: somebody opens a newer conversation in the
+      // same working directory. The driver holds an id, so the second
+      // invocation names that one -- the newer one is not picked up, and
+      // there is no `--continue` left to pick it up with.
+      process.env["FAKE_SESSION_ID"] = "conv-newer-interactive";
+      const resumed = await engine.invoke(
+        invocation({ first: false, invocation: 2, resumeId: opened.sessionId ?? null }, []),
+      );
+      const argv = argvOf();
+      expect(argv[argv.indexOf("--resume") + 1]).toBe("conv-first");
+      expect(argv).not.toContain("--continue");
+      expect(argv).not.toContain("conv-newer-interactive");
+      expect(resumed.exitCode).toBe(0);
+    } finally {
+      delete process.env["FAKE_SEEN"];
+      delete process.env["FAKE_TICKS"];
+      delete process.env["FAKE_SESSION_ID"];
     }
   });
 

@@ -50,6 +50,45 @@ export type DriverRun = {
     reason: string;
     at: string;
   } | null;
+  /**
+   * How many times the outstanding answer has been refused, out of the three a step is allowed. It is here rather than in a local because a pull-mode call -- `dabbler session next` -- ends between the refusal and the answer, and a count a process holds is a count that resets every time the person's CLI comes back.
+   */
+  rejections?: number;
+  /**
+   * The one long-running thing the framework has started and has not yet collected, or null. Long work is never awaited inside a call: a verification round, the complete suite and the close each outlast an engine's tool timeout, so they are started detached and the following call reports progress or the result.
+   */
+  job?: {
+    /**
+     * What the framework is running, in the words the instruction shows: a verification round, a suite's run of record, the close.
+     */
+    name: string;
+    /**
+     * The program and its arguments, spawned with no shell.
+     */
+    argv: string[];
+    pid: number;
+    /**
+     * Where the job's output is being appended, repository-relative -- the path a `wait` hands back.
+     */
+    log: string;
+    /**
+     * The file the runner writes the exit code into when the job ends, repository-relative. Its presence is what tells a finished job from a running one; a pid alone cannot, because pids are reused.
+     */
+    status: string;
+    started_at: string;
+    retry_after_seconds: number;
+  } | null;
+  /**
+   * The round cap and transport this session verifies under, as the call that opened the run named them. They belong to the run rather than to a call: under the pull the call that eventually starts verification is not the one the person typed them on -- it is whichever `dabbler session next` happens to reach that phase, following an `answer_command` that names neither. A later call may name them again to change them.
+   */
+  verification?: {
+    max_rounds?: number | null;
+    transport?: string | null;
+  } | null;
+  /**
+   * The engine's own conversation, by the id it reported on its first invocation. A resume names it; nothing here asks an engine for its most recent session, because the most recent one in a directory can be somebody else's.
+   */
+  engine_session_id?: string | null;
   started_at: string;
   updated_at: string;
 };

@@ -14,8 +14,10 @@ import { CONFIG_ENV_VAR } from "../src/config.ts";
 import {
   type Engine,
   type EngineInvocation,
+  type NextOptions,
   commandEngine,
   driveSession,
+  sessionNext,
 } from "../src/drive.ts";
 import {
   DISPOSITION_SCHEMA,
@@ -737,5 +739,279 @@ describe("dabbler session drive", { timeout: 120_000 }, () => {
     const { code, err } = await captured(async () => interrupt(sessionsDir, { reason: "stop" }));
     expect(code).toBe(EXIT_BOUNDARY);
     expect(err).toContain("is not being driven");
+  });
+});
+
+// --- the same loop, pulled -----------------------------------------------------
+
+// `dabbler session next` is the loop with the engine on the other side of the
+// call: it advances one move and hands back the instruction instead of
+// invoking anybody with it. The person's own CLI is the engine, and so is
+// this describe -- it answers through the same `session report` verb.
+describe("dabbler session next", { timeout: 120_000 }, () => {
+  beforeEach(() => {
+    setProviderKeys();
+    delete process.env["DABBLER_TRANSPORT"];
+    resetForTests();
+    resetRuntimeMode();
+  });
+
+  afterEach(() => {
+    clearProviderKeys();
+    delete process.env[CONFIG_ENV_VAR];
+    delete process.env["DABBLER_TRANSPORT"];
+    resetForTests();
+    resetRuntimeMode();
+    vi.restoreAllMocks();
+  });
+
+  /** One call, and the instruction it printed on stdout. */
+  async function next(sessionsDir: string, options: NextOptions = {}) {
+    const result = await captured(() => sessionNext(sessionsDir, options));
+    return {
+      ...result,
+      instruction:
+        result.out.trim() === "" ? null : (JSON.parse(result.out) as DriverInstruction),
+    };
+  }
+
+  const REGISTER: NextOptions = { engine: "claude-code", provider: "anthropic" };
+
+  async function answerFile(sessionsDir: string, seq: number, body: unknown) {
+    const path = join(makeTempDir(), "answer.json");
+    writeFileSync(path, JSON.stringify(body), "utf8");
+    return (await captured(async () => report(sessionsDir, { seq, answerFile: path }))).code;
+  }
+
+  async function answerStep(
+    sessionsDir: string,
+    seq: number,
+    stepId: string,
+    files: readonly string[],
+  ) {
+    const done = await captured(async () =>
+      report(sessionsDir, {
+        seq,
+        stepId,
+        status: "done",
+        files,
+        testsRun: null,
+        notes: "pulled",
+      }),
+    );
+    return done.code;
+  }
+
+  /** Plan, then do the one step, leaving the session at the framework's own work. */
+  async function throughTheStep(repo: string, sessionsDir: string) {
+    const plan = await next(sessionsDir, REGISTER);
+    expect(await answerFile(sessionsDir, plan.instruction?.seq ?? 0, PLAN)).toBe(0);
+    const step = await next(sessionsDir);
+    expect(step.instruction).toMatchObject({ kind: "step", step_id: "widget" });
+    writeFileSync(join(repo, "src", "widget.py"), WIDGET_V2, "utf8");
+    expect(
+      await answerStep(sessionsDir, step.instruction?.seq ?? 0, "widget", ["src/widget.py"]),
+    ).toBe(0);
+  }
+
+  it("advances one move per call and prints the instruction for the next one", async () => {
+    const { repo, sessionsDir } = drivenRepo();
+    configure([VERIFIED]);
+
+    const first = await next(sessionsDir, REGISTER);
+    expect(first.code).toBe(EXIT_OK);
+    expect(first.instruction).toMatchObject({ seq: 1, kind: "step", step_id: "plan" });
+    expect(first.instruction?.ask).toContain("Make `widget()` return 2.");
+    // Stdout is the instruction and nothing else -- a parser reads it -- and
+    // everything the verbs said on the way is on stderr, where the person is.
+    expect(first.out.trimStart().startsWith("{")).toBe(true);
+    expect(first.err).toContain("dabbler [");
+    expect(readRun(repo, 1)).toMatchObject({ phase: "plan", seq: 1, invocations: 0 });
+
+    expect(await answerFile(sessionsDir, 1, PLAN)).toBe(0);
+
+    const second = await next(sessionsDir);
+    expect(second.instruction).toMatchObject({ seq: 2, kind: "step", step_id: "widget" });
+    expect(readTaskDeclaration(sessionsDir, 1)).toMatchObject({
+      task: "Make widget() return 2.",
+      releasable: false,
+    });
+    expect(readRun(repo, 1)).toMatchObject({ phase: "steps", seq: 2 });
+  });
+
+  it("hands back a `wait` while the framework's own work runs, and the call after collects the result", async () => {
+    const { repo, sessionsDir } = drivenRepo();
+    configure([VERIFIED]);
+    await throughTheStep(repo, sessionsDir);
+
+    const waited = await next(sessionsDir);
+    expect(waited.instruction).toMatchObject({ kind: "wait", retry_after_seconds: 60 });
+    // A wait owes no written answer, so it names no schema: the answer is
+    // another call.
+    expect(waited.instruction?.answer_schema).toBeUndefined();
+    expect(waited.instruction?.answer_command).toContain("session next");
+    expect(existsSync(join(repo, String(waited.instruction?.log)))).toBe(true);
+    // The affected tests are the first of the framework's own long work.
+    expect(readRun(repo, 1)?.job).toMatchObject({ name: "affected tests: unit" });
+
+    let result = waited;
+    for (let call = 0; call < 200 && result.instruction?.kind === "wait"; call += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      result = await next(sessionsDir);
+    }
+
+    // A stop prints no instruction; say why rather than assert on an absence.
+    if (result.instruction === null) throw new Error(`the loop stopped: ${result.err}`);
+    expect(result.instruction.kind).toBe("done");
+    expect(readRun(repo, 1)).toMatchObject({ phase: "complete", job: null, stop: null });
+    expect(sessionStatus(sessionsDir)).toBe("complete");
+    expect(readRounds(repo, 1).map((row) => row["verdict"])).toEqual(["VERIFIED"]);
+    expect(readRecords(repo).map((row) => `${row.stage}:${row.outcome}`)).toEqual([
+      "preverify-targeted:passed",
+      "final-full:passed",
+    ]);
+  });
+
+  it("resumes from the phase it stopped in when the call after a stop asks again", async () => {
+    const { repo, sessionsDir } = drivenRepo();
+    configure([VERIFIED]);
+
+    const plan = await next(sessionsDir, REGISTER);
+    expect(await answerFile(sessionsDir, plan.instruction?.seq ?? 0, PLAN)).toBe(0);
+
+    // A person asks it to stop between calls: there is no invocation to end,
+    // and the next call is where it takes effect.
+    const asked = await captured(async () =>
+      interrupt(sessionsDir, { reason: "hold on", stop: true }),
+    );
+    expect(asked.code).toBe(EXIT_OK);
+
+    const stopped = await next(sessionsDir);
+    expect(stopped.code).toBe(1);
+    expect(stopped.instruction).toBeNull();
+    expect(stopped.err).toContain("STOPPED (interrupted)");
+    // It stopped before the phase's own work: the plan is answered but not
+    // yet judged, and that is where the next call picks it up.
+    expect(readRun(repo, 1)).toMatchObject({
+      phase: "plan",
+      stop: { kind: "interrupted", reason: "hold on" },
+    });
+    expect(sessionStatus(sessionsDir)).toBe("in-progress");
+
+    const resumed = await next(sessionsDir);
+    expect(resumed.code).toBe(EXIT_OK);
+    expect(resumed.instruction).toMatchObject({ kind: "step", step_id: "widget" });
+    expect(readRun(repo, 1)).toMatchObject({ phase: "steps", stop: null });
+  });
+
+  it("asks the step afresh after a rejected-thrice stop instead of rejudging the answer that failed", async () => {
+    const { repo, sessionsDir } = drivenRepo();
+    configure([VERIFIED]);
+
+    const plan = await next(sessionsDir, REGISTER);
+    expect(await answerFile(sessionsDir, plan.instruction?.seq ?? 0, PLAN)).toBe(0);
+
+    // Three reports naming a file the tree never changed. The third refusal
+    // stops the loop and issues nothing.
+    let step = await next(sessionsDir);
+    for (let refusal = 1; refusal <= 3; refusal += 1) {
+      expect(
+        await answerStep(sessionsDir, step.instruction?.seq ?? 0, "widget", ["dabbler.yaml"]),
+      ).toBe(0);
+      step = await next(sessionsDir);
+      if (refusal < 3) expect(step.instruction).toMatchObject({ kind: "rejection" });
+    }
+    expect(step.code).toBe(1);
+    expect(step.instruction).toBeNull();
+    expect(step.err).toContain("STOPPED (rejected-thrice)");
+    const stopped = readRun(repo, 1);
+    expect(stopped).toMatchObject({ rejections: 3, stop: { kind: "rejected-thrice" } });
+
+    // The call after it hands back a fresh instruction under a new seq --
+    // it does not judge the same failed report a fourth time and stop again.
+    const afresh = await next(sessionsDir);
+    expect(afresh.code).toBe(EXIT_OK);
+    expect(afresh.instruction).toMatchObject({ kind: "step", step_id: "widget" });
+    expect(afresh.instruction?.seq).toBeGreaterThan(stopped?.seq ?? 0);
+    expect(readRun(repo, 1)).toMatchObject({ rejections: 0, stop: null });
+
+    // And the session goes on: answer this one properly and it is accepted.
+    writeFileSync(join(repo, "src", "widget.py"), WIDGET_V2, "utf8");
+    expect(
+      await answerStep(sessionsDir, afresh.instruction?.seq ?? 0, "widget", ["src/widget.py"]),
+    ).toBe(0);
+    expect((await next(sessionsDir)).instruction?.kind).toBe("wait");
+    expect(readRun(repo, 1)?.accepted_steps).toEqual(["widget"]);
+  });
+
+  it("carries the round cap and the transport on the run, for the call that reaches verification", async () => {
+    const { repo, sessionsDir } = drivenRepo();
+    configure([VERIFIED]);
+
+    // Named once, on the call that opens the run.
+    const plan = await next(sessionsDir, { ...REGISTER, maxRounds: 1, transport: "offline" });
+    expect(readRun(repo, 1)?.verification).toEqual({ max_rounds: 1, transport: "offline" });
+    expect(await answerFile(sessionsDir, plan.instruction?.seq ?? 0, PLAN)).toBe(0);
+
+    // Every later call follows the printed answer_command, which names
+    // neither -- and they survive it.
+    const step = await next(sessionsDir);
+    writeFileSync(join(repo, "src", "widget.py"), WIDGET_V2, "utf8");
+    expect(
+      await answerStep(sessionsDir, step.instruction?.seq ?? 0, "widget", ["src/widget.py"]),
+    ).toBe(0);
+    await next(sessionsDir);
+    let job = readRun(repo, 1)?.job;
+    for (let call = 0; call < 200 && job?.name !== "verification"; call += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      await next(sessionsDir);
+      job = readRun(repo, 1)?.job;
+    }
+    expect(job?.argv.join(" ")).toContain("--max-rounds 1");
+    expect(job?.argv.join(" ")).toContain("--transport offline");
+  });
+
+  it("returns from every call that starts a job rather than waiting for it", async () => {
+    const { repo, sessionsDir } = drivenRepo();
+    // A suite slow enough that each job is still running when the call that
+    // started it comes back.
+    writeFileSync(
+      join(repo, "tests", "run.mjs"),
+      "import { readFileSync } from 'node:fs';\n" +
+        "const red = readFileSync('src/widget.py', 'utf8').includes('broken');\n" +
+        "setTimeout(() => process.exit(red ? 1 : 0), 2000);\n",
+      "utf8",
+    );
+    git(repo, "add", "-A");
+    git(repo, "commit", "-q", "-m", "a slower suite");
+    configure([VERIFIED]);
+    await throughTheStep(repo, sessionsDir);
+
+    const waitedOn = new Set<string>();
+    let last: DriverInstruction | null = null;
+    for (let call = 0; call < 200; call += 1) {
+      last = (await next(sessionsDir)).instruction;
+      if (last?.kind !== "wait") break;
+      waitedOn.add(String(last.log));
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+
+    expect(last?.kind).toBe("done");
+    // Every long thing the framework runs was handed back as a `wait` while
+    // it ran. That is the whole claim, and it is a fact about the exchange
+    // rather than about the clock: a call that sat on a job would collect
+    // its result and never issue a `wait` naming it. A wall-time bound here
+    // would say the same thing on an idle machine and something else on a
+    // busy one.
+    expect([...waitedOn].map((log) => log.split("/").pop()).sort()).toEqual([
+      "affected-tests-unit.log",
+      "close.log",
+      "run-of-record-unit.log",
+      "verification.log",
+    ]);
+    expect(readRecords(repo).map((row) => `${row.stage}:${row.outcome}`)).toEqual([
+      "preverify-targeted:passed",
+      "final-full:passed",
+    ]);
   });
 });

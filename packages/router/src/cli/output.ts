@@ -30,10 +30,12 @@ interface Buffers {
 }
 
 let collecting: Buffers | null = null;
+let diverting = false;
 
 export function writeOut(text: string): void {
   const bytes = withPlatformNewlines(text);
-  if (collecting) collecting.out += bytes;
+  if (diverting) writeErr(text);
+  else if (collecting) collecting.out += bytes;
   else process.stdout.write(bytes);
 }
 
@@ -41,6 +43,26 @@ export function writeErr(text: string): void {
   const bytes = withPlatformNewlines(text);
   if (collecting) collecting.err += bytes;
   else process.stderr.write(bytes);
+}
+
+/**
+ * Run `fn` with everything bound for stdout going to stderr instead.
+ *
+ * `dabbler session next` prints one thing on stdout -- the instruction JSON
+ * the engine reads -- and every verb it calls on the way there (the
+ * registration, the declaration, the driver's own progress lines) would
+ * otherwise land in the middle of it. Diverting is the seam rather than
+ * silencing: the person watching their own CLI still sees all of it, and a
+ * parser reading stdout sees only the instruction.
+ */
+export async function divertOut<T>(fn: () => Promise<T>): Promise<T> {
+  const previous = diverting;
+  diverting = true;
+  try {
+    return await fn();
+  } finally {
+    diverting = previous;
+  }
 }
 
 /** Everything one verb wrote, as the two streams it wrote them to. */

@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "driver/run.json (where a driven session's loop is, and why it stopped)",
+  "description": "The current state of one driven session, under .dabbler/runs/s<N>/driver/run.json. Written only by `dabbler session drive`, replaced whole after every transition, and read by a re-run to continue where the last one left off: the phase, the steps already accepted, the tree the next report is measured against, the seq last issued and the invocations spent. It is state, not history -- the history of a run is its transcripts and the lifecycle's own records. `stop` is the one field a person is meant to read: when the loop halts short of the close it says which bound it met, in words, and a re-run clears it. A file that fails validation on read is refused, never skipped.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "session_number",
+    "engine",
+    "phase",
+    "seq",
+    "invocations",
+    "max_invocations",
+    "accepted_steps",
+    "baseline_tree",
+    "stop",
+    "started_at",
+    "updated_at"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1,
+      "description": "Frozen at v1. A reader that finds any other value refuses the file rather than interpreting it."
+    },
+    "session_number": { "type": "integer", "minimum": 1 },
+    "engine": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The adapter the engine is reached through, by name. A re-run with a different one is refused: one engine's session store carries the run."
+    },
+    "phase": {
+      "enum": [
+        "plan",
+        "steps",
+        "preverify",
+        "verify",
+        "dispositions",
+        "fix",
+        "run-of-record",
+        "land",
+        "close",
+        "complete"
+      ],
+      "description": "Where the loop is. A re-run enters here; `complete` means the close ran and nothing is left to do."
+    },
+    "seq": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "The seq of the instruction last issued, so the next one is monotonic across re-runs."
+    },
+    "invocations": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "How many times the engine has been invoked for this session, across re-runs. On a seat each one is a premium request."
+    },
+    "max_invocations": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "The bound `invocations` is held under. Reaching it stops the loop and closes nothing; continuing is a re-run with a larger bound, which is a decision to spend more."
+    },
+    "accepted_steps": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+      "description": "The work-plan steps whose reports were accepted, in order. A re-run skips them."
+    },
+    "baseline_tree": {
+      "type": ["string", "null"],
+      "pattern": "^[0-9a-f]{40}$",
+      "description": "The tree object the working tree was at after the last accepted step, which is what the next report's `files_changed` is measured against. Null before the first step."
+    },
+    "stop": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["kind", "reason", "at"],
+      "properties": {
+        "kind": {
+          "enum": [
+            "budget",
+            "rejected-thrice",
+            "blocked",
+            "engine",
+            "tests",
+            "verification",
+            "land",
+            "close"
+          ],
+          "description": "Which bound the loop met: the invocation budget; a step refused three times; the engine reporting `blocked`; the engine failing to run; a test run the framework could not hand back; a verification round that neither passed nor produced findings to dispose; the commit or push; the close's gates."
+        },
+        "reason": { "type": "string", "minLength": 1 },
+        "at": { "type": "string", "minLength": 1 }
+      },
+      "description": "Null while the loop runs or after it completed. Set when it halted short of the close, with the reason in words; the session stays in flight and this is what the operator reads."
+    },
+    "started_at": { "type": "string", "minLength": 1 },
+    "updated_at": { "type": "string", "minLength": 1 }
+  }
+}

@@ -1,8 +1,49 @@
-# STATUS — 55 of 61 closed. Next: the driver set (56–59)
+# STATUS — 56 of 61 closed. Next: 57, `dabbler session drive`
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
 `experiment/verification-pipeline-v3` and `design/solution-decomposition`
 are merged and finished. Earlier handoff text is in `docs/status-archive.md`.
+
+> **Recorded, 2026-08-31, after session 56.** Session 56 — the first of the
+> driver set — closed `VERIFIED` in two rounds. Its deliverable is **D248**:
+> the driver's contract. Four schemas under `packages/router/schemas/` with
+> generated types — `driver-instruction` (`seq`, `kind` ∈ step | rejection
+> | interrupt | done, per-kind required members, `answer_schema` +
+> `answer_command` on every kind but `done`, refused on `done`),
+> `driver-report` (`status` ∈ done | blocked, repository-relative
+> `files_changed`, `tests_run`, `notes`), `driver-work-plan` (`task`,
+> `releasable`, ordered steps with unique ids, expected files and **at least
+> one** `argv` check each) and `driver-disposition` (per finding `fix` |
+> `reject`; a reject carries `reason` and `evidence_paths` so it can become
+> a dispute; the reader **holds the set against the recorded round** and
+> refuses a repeated index, an index the round lacks, or a blocking finding
+> left unanswered). Round 1 bought both bolded tightenings: the verifier's
+> two Majors were `checks: []` closing a step on the engine's word, and a
+> disposition set that could omit a finding. The driver's ledger is
+> `.dabbler/runs/s<N>/driver/` — `instruction.json`, `report.json`,
+> `plan.json`, `dispositions.json`, `engine-<NN>.log` per invocation —
+> owned by the new `driver.ts`: whole-file, atomic, the CURRENT answer, and
+> a `LedgerError` on read when a file does not validate.
+> **`dabbler session report`** (`--seq --step --status --files --notes
+> [--tests]`) is the engine's one verb: it normalises paths, shapes,
+> validates and writes; it refuses a report no instruction asked for and
+> one where the instruction asked for a different answer; it judges shape
+> only. Substance — the outstanding seq, the step asked for, the files the
+> tree changed, the check — is session 57's driver, in one place. Field
+> names are snake_case (not the spike's camelCase) to match the ledger's
+> neighbours. Seven tests; **1162 router tests**. No extension change.
+>
+> **Owed to 57.** (1) How the work plan and the dispositions travel from
+> the engine into the ledger — the report verb carries a step report only,
+> so 57 widens the verb (an `--answer-file` it validates and copies) or
+> adds a sibling; `answer_command` on the instruction is whatever line 57
+> picks. (2) Round 2's nit, left because the tree was verified: the path
+> pattern's `.*` does not span a literal newline, so `src\n/../widget.py`
+> passes the `..` lookahead — use `[\s\S]*` when the schema is next
+> touched. (3) A lesson for every session, not just this one: the
+> `extension` suite's `final-full` binds to the **whole** tree, so it must
+> be run and recorded each session even when no extension file changed —
+> the close refused once here for exactly that.
 
 > **Recorded, 2026-08-31, evening.** The long-haul direction below was
 > **proven the same day** in a standalone spike (`D:\Projects\dabbler-driver-spike`):

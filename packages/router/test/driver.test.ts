@@ -12,8 +12,10 @@ import { afterAll, describe, expect, it } from "vitest";
 
 import { sessionVerb } from "../src/cli/session.ts";
 import {
+  readAmendments,
   readDispositions,
   readReport,
+  readWorkPlan,
   reportPath,
   validateDispositions,
   validateInstruction,
@@ -21,6 +23,8 @@ import {
   validateWorkPlan,
   writeDispositions,
   writeInstruction,
+  writeRun,
+  writeWorkPlan,
 } from "../src/driver.ts";
 import { LedgerError, appendRound } from "../src/ledger.ts";
 import { registerSessionStart } from "../src/writers.ts";
@@ -61,6 +65,22 @@ const PLAN = {
     { id: "widget", ask: "Make it.", files: ["src/widget.py"], checks: [{ argv: ["python", "-m", "pytest"] }] },
   ],
   recorded_at: "2026-08-31T10:00:00-04:00",
+};
+
+/** A run that has accepted nothing, so a step is still amendable. */
+const RUN = {
+  schema_version: 1,
+  session_number: 1,
+  engine: "claude-code",
+  phase: "steps",
+  seq: 1,
+  invocations: 0,
+  max_invocations: 24,
+  accepted_steps: [] as string[],
+  baseline_tree: null,
+  stop: null,
+  started_at: "2026-08-31T10:00:00-04:00",
+  updated_at: "2026-08-31T10:00:00-04:00",
 };
 
 const DISPOSITIONS = {
@@ -261,12 +281,72 @@ describe("dabbler session report", () => {
     );
     expect(() => readReport(repo, 1)).toThrow(LedgerError);
 
-    // A well-formed report with a verdict smuggled in beside it.
+    // A member this build has never heard of is READ PAST, and a verdict
+    // smuggled in beside a well-formed report is one of them. It buys the
+    // smuggler nothing: a verdict is what the verifier recorded in the
+    // rounds ledger, and no reader of a report has ever looked here for
+    // one. What still catches a typed answer is the shape above -- and the
+    // writer, which validates strictly and would never have written this.
     writeFileSync(path, JSON.stringify({ ...REPORT, verdict: "VERIFIED" }), "utf8");
+    expect(readReport(repo, 1)).toMatchObject({ status: "done", step_id: "widget" });
+    // A member the schema DOES know, with the wrong value, is still refused.
+    writeFileSync(path, JSON.stringify({ ...REPORT, status: "verified" }), "utf8");
     expect(() => readReport(repo, 1)).toThrow(/driver report failed schema validation/);
 
     // Not JSON at all.
     writeFileSync(path, "done\n", "utf8");
     expect(() => readReport(repo, 1)).toThrow(/is not valid JSON/);
+  });
+});
+
+describe("dabbler session plan amend", () => {
+  it("moves what a step is measured against, with the reason and the approver, and never after it was accepted", async () => {
+    const { repo, sessionsDir } = makeSandboxRepo();
+    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
+    writeWorkPlan(repo, 1, PLAN);
+    const flags = [
+      "plan", "amend", "--sessions-dir", sessionsDir,
+      "--step", "widget",
+      "--files", "src/widget.py,tests/test_widget.py",
+      "--reason", "the step's own check reads the test the plan never named",
+      "--approver", "operator",
+    ];
+
+    const amended = await captured(() => sessionVerb(flags));
+    expect(amended.code).toBe(0);
+    // The plan on disk is what the next instruction for the step measures
+    // against, and it is still a plan the reader accepts.
+    expect(readWorkPlan(repo, 1)?.steps[0]).toMatchObject({
+      id: "widget",
+      files: ["src/widget.py", "tests/test_widget.py"],
+      ask: "Make it.",
+      checks: [{ argv: ["python", "-m", "pytest"] }],
+    });
+    // What changed, why and who said so, where nothing overwrites it.
+    const record = readAmendments(repo, 1);
+    expect(record).toHaveLength(1);
+    expect(record[0]).toMatchObject({
+      step_id: "widget",
+      approver: "operator",
+      reason: "the step's own check reads the test the plan never named",
+      before: { files: ["src/widget.py"] },
+      after: { files: ["src/widget.py", "tests/test_widget.py"] },
+    });
+
+    // Unsigned is refused: an amendment nobody stands behind is a bar moved
+    // by nobody.
+    const unsigned = await captured(() =>
+      sessionVerb(flags.filter((flag, index) => flag !== "--approver" && flags[index - 1] !== "--approver")),
+    );
+    expect(unsigned.code).toBe(2);
+    expect(unsigned.err).toContain("--approver");
+
+    // Accepted is settled: the report was measured against the step as it
+    // stood, and this would move that bar afterwards.
+    writeRun(repo, 1, { ...RUN, accepted_steps: ["widget"] });
+    const late = await captured(() => sessionVerb(flags));
+    expect(late.code).toBe(3);
+    expect(late.err).toContain("has already been accepted");
+    expect(readAmendments(repo, 1)).toHaveLength(1);
   });
 });

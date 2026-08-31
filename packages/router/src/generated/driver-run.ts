@@ -2,6 +2,13 @@
 // Do not edit: the schema is the source, and `npm run check:types` fails
 // when this file no longer matches it.
 
+export type DriverRunStopKind = "budget" | "rejected-thrice" | "blocked" | "engine" | "tests" | "verification" | "land" | "close" | "interrupted";
+
+/**
+ * The work-plan step the loop was on when it halted, or null when it was not on one -- a verification round, the suite, the close. Two stops on different steps are not the same stop however alike their reasons read.
+ */
+export type DriverRunStopStepId = string | null;
+
 /**
  * driver/run.json (where a driven session's loop is, and why it stopped)
  */
@@ -46,8 +53,60 @@ export type DriverRun = {
     /**
      * Which bound the loop met: the invocation budget; a step refused three times; the engine reporting `blocked`; the engine failing to run; a test run the framework could not hand back; a verification round that neither passed nor produced findings to dispose; the commit or push; the close's gates; a person asking it to stop (`session interrupt --stop`, with their reason).
      */
-    kind: "budget" | "rejected-thrice" | "blocked" | "engine" | "tests" | "verification" | "land" | "close" | "interrupted";
+    kind: DriverRunStopKind;
     reason: string;
+    at: string;
+    step_id?: DriverRunStopStepId;
+    /**
+     * Whether this bound has been met like this before. `deadlock` is the same kind, the same step and the same reason as the stop immediately before it -- the loop is not making progress, and no number of re-runs will change that by itself. It is optional so that a run written before this field is still a run this reader opens; its absence means nothing was classified, not that the stop was a first.
+     */
+    class?: "first" | "deadlock";
+  } | null;
+  /**
+   * The stops this run has already met, oldest first and capped -- the oldest is dropped rather than the newest, because what a deadlock is read from is the recent end. It is here, and short, because `run.json` is state: the history of a run is its transcripts, and this is only enough of it to see the loop going nowhere.
+   */
+  stop_history?: {
+    kind: DriverRunStopKind;
+    /**
+     * The stop's own reason as the loop raised it, undecorated. What `stop.reason` shows a person may say more; this is what the next stop is compared against, and a comparison against a decorated reason would never match twice running.
+     */
+    reason: string;
+    at: string;
+    step_id?: DriverRunStopStepId;
+  }[];
+  /**
+   * What the unattended ladder found, once per impasse. Optional and absent under the pull: an attended engine calls `dabbler triage` itself, and the framework does not spend a provider call on behalf of somebody who is sitting right there.
+   */
+  triage?: {
+    /**
+     * The stop reason the ladder was climbed for, undecorated. A re-run that reaches the same impasse does not ask again: the answer would be the same one, and the second call is spent for nothing.
+     */
+    for_reason: string;
+    for_step?: DriverRunStopStepId;
+    /**
+     * How many advisers were asked before the ladder ended, one per rung. It ends at a classification or at the human; no rung loops.
+     */
+    rungs: number;
+    /**
+     * What the adviser called it, or null when none could say -- which is a fact about the ladder and not a missing value.
+     */
+    classification?: string | null;
+    /**
+     * The model that classified it and the provider it answered on, for a person deciding how much weight to give the opinion.
+     */
+    adviser?: string | null;
+    /**
+     * The change an adviser proposed, kept whole because the option on the owed decision is otherwise a menu item with nothing behind it: the proposal lives in one process and the person who answers is in another. Nothing here is applied by the framework -- it is what a person needs in order to type `dabbler session plan amend` themselves, or to decide not to.
+     */
+    amendment?: {
+      step_id: string;
+      files?: string[];
+      checks?: {
+        argv: string[];
+      }[];
+      reason: string;
+      relaxes_a_gate: boolean;
+    } | null;
     at: string;
   } | null;
   /**

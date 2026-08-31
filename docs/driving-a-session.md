@@ -149,12 +149,17 @@ step's own check, and the next `next` hands the step back:
   "step_id": "widget",
   "ask": "Change `widget()` in src/widget.mjs to return 2.\n\n...The previous report for this step was refused for the reasons listed under `reasons`. Put them right and report again, with THIS instruction's seq.",
   "reasons": [
-    "files_changed names 'tests/test_widget.mjs', which the tree did not change since the last accepted step"
+    "[files-changed-unchanged] files_changed names 'tests/test_widget.mjs', which the tree did not change since the last accepted step"
   ],
   "answer_schema": "driver-report.schema.json",
   "answer_command": "dabbler session report --sessions-dir C:\\temp\\pull-walk-61\\repo\\docs\\sessions --seq 3 --step widget --status done --files ... "
 }
 ```
+
+The slug in brackets is the rule that refused it, and it is stable: the
+same name reaches the `reasons` here, the `rejected-thrice` stop that
+quotes the last reasons, and anyone — a person or `dabbler triage` — asked
+to say what went wrong.
 
 Answer it with the new seq. **Three refusals of one step stop the
 session** (`rejected-thrice`) — the last reasons are on the run state.
@@ -269,6 +274,13 @@ dabbler: STOPPED (interrupted) in phase 'verify' after 0 invocation(s) -- I want
 Session 001 stays in flight; the same command re-runs from this phase.
 ```
 
+**A Send reaches a stopped run too.** There is no invocation to end, so
+the request is held and handed to the instruction that resumes the
+session — which is exactly where you want a "and while you're at it"
+to land. Only two things are refused: a session nothing ever drove, and
+one whose drive completed, because a message queued for a closed session
+would never be read and "Sent" would be a promise the framework broke.
+
 ## When the framework stops
 
 A stop closes nothing and loses nothing. The phase, the accepted steps,
@@ -293,10 +305,72 @@ was reported as impossible, with its notes), `tests`, `verification`,
 close's log), `interrupted` (you asked), `budget` (the invocation bound,
 which only `session drive` below can meet), `engine`.
 
+Beside the kind, `stop.class` says whether this has happened before.
+`deadlock` means the same kind, on the same step, for the same reason as
+the stop immediately before it — the loop is not moving, and running it
+again unchanged arrives back here. The stop says so in its own words too,
+so you do not have to know the field exists. `stop_history` keeps the last
+few stops, oldest first, if you want to see the shape of it.
+
 If a job **vanished** — no process and no recorded result, which is what a
 machine restart leaves — that is a stop too, and deliberately: re-running
 a verification round nobody recorded would spend another round's worth of
 provider calls on a fact that was never written down.
+
+### When you ask your engine for help
+
+Sooner or later you will type "it's stuck — sort it out" into your CLI.
+This is the protocol the engine should follow, in this order, because the
+order is what keeps it honest.
+
+**1. Read the framework's own account first, and never the scrollback.**
+There are four places and they are all files:
+
+```
+dabbler status --sessions-dir docs/sessions
+```
+
+`status` says where the session is. `.dabbler/runs/s<N>/driver/run.json`
+carries the `stop` — its `kind`, its `reason` in words, the step it was on
+and its `class`. The outstanding `instruction.json` carries `reasons` when
+the last answer was refused, each one opening with the rule that refused
+it in brackets. The transcripts, `engine-NN.log` beside them, are what the
+engine actually did. The scrollback is what the engine *remembers*; these
+are what happened, and the two differ exactly when it matters most.
+
+**2. Verify the claim before acting on it.** A stop's reason is a
+symptom. The rule slug it carries — `[files-changed-omits]`,
+`[check-failed]`, `[no-work-plan]` — names a rule that is a readable line
+of code, and the condition it describes can be reproduced. An engine that
+skips this fixes the story it told itself about the failure. Nothing below
+is worth doing until the diagnosis survives being checked.
+
+**3. Then work out whose it is to fix**, because that is the question
+that stalls a session:
+
+- **On this repository, the framework is source in the tree.** The engine
+  may fix it. The fix is ordinary work — it rides in the session's own
+  diff and the verifier reviews it with everything else. Sessions 60 and
+  62 both did exactly that on the operator's word. This is written down
+  because session 62's engine wrote a correct diagnosis of a framework
+  defect and then waited, believing the change was somebody else's to
+  make; the session deadlocked on a gate that one edit would have moved.
+- **On a consumer repository, the framework is an installed package** the
+  session did not write, and editing it there is a fix that vanishes at
+  the next `npm i`. Report the step `blocked` with the diagnosis in
+  `--notes`, and raise an owed item pointing at dabbler. The fix ships as
+  a release, and the session says plainly what it is waiting for.
+
+**4. Four things are never touched, on either.** Anything under
+`.dabbler/runs/`; `sessions.json`; a verification verdict; a gate. These
+are the record and the judgment over it, and a session that edits them has
+stopped being evidence of anything. If a gate is wrong, prove it is wrong
+and say so — do not step around it.
+
+**5. And stopping costs nothing.** If it is late, or the diagnosis needs
+someone who is not at the keyboard, stop calling `next`. Nothing expires.
+The session resumes from the phase it is in, and nothing already accepted
+is asked for again.
 
 ## The end
 

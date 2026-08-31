@@ -641,6 +641,35 @@ suite("workExplorerTreeModel: the unresolved-session view", () => {
   const sessionNode = (session: ReturnType<typeof makeSession>) =>
     ({ kind: "session", repository, session }) as const;
 
+  test("`Execution record unreadable` is reserved for damage, not for a record this build did not write", () => {
+    // The router's readers stopped refusing a driver record over a member
+    // they have never heard of, so a session driven by a newer build than
+    // the installed extension arrives here as ordinary rows. What that has
+    // to look like from this side is nothing at all: no refusal child, no
+    // record severity, the stop reading as the stop it is. Damage still
+    // arrives as a refusal, and that is the whole distinction.
+    const newer = makeSession({
+      status: "in-progress",
+      tasks: [makeTask({ state: "blocked", intent: "Driver stopped (blocked): it is load-bearing" })],
+    });
+    assert.strictEqual(severityOf(newer), null);
+    const children = childrenOf(sessionNode(newer));
+    assert.deepStrictEqual(children.map((n) => n.kind), ["task"]);
+    assert.ok(
+      (descriptorFor(children[0]).tooltip ?? "").includes("Driver stopped (blocked)"),
+    );
+
+    const damaged = makeSession({
+      status: "in-progress",
+      tasksRefused: "execution record: row 2 is not valid JSON",
+    });
+    assert.strictEqual(severityOf(damaged), "record");
+    assert.strictEqual(
+      descriptorFor(childrenOf(sessionNode(damaged))[0]).label,
+      "Execution record unreadable",
+    );
+  });
+
   test("a session that stopped at the cap reads first, then its tasks; a verified one has nothing to read", () => {
     const stopped = makeSession({
       status: "in-progress",

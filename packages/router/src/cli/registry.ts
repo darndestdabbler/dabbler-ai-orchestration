@@ -23,6 +23,7 @@ import { seatCostVerb } from "./seatCost.ts";
 import { sessionVerb } from "./session.ts";
 import { solutionVerb } from "./solution.ts";
 import { testEvidenceVerb } from "./testEvidence.ts";
+import { triageVerb } from "./triage.ts";
 import { verifyVerb } from "./verify.ts";
 import { workflowVerb } from "./workflow.ts";
 
@@ -48,6 +49,7 @@ export const HANDLERS: Readonly<Record<string, VerbHandler>> = {
   solution: solutionVerb,
   status: statusVerb,
   "test-evidence": testEvidenceVerb,
+  triage: triageVerb,
   verify: verifyVerb,
   workflow: workflowVerb,
 };

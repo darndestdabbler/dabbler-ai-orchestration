@@ -25,6 +25,7 @@ import {
   readDispositions,
   readInstruction,
   readRun,
+  requestInterrupt,
   transcriptPath,
 } from "../src/driver.ts";
 import type { DriverInstruction } from "../src/generated/index.ts";
@@ -49,6 +50,52 @@ import {
 } from "./support/fixtures.ts";
 
 afterAll(removeTempDirs);
+
+/**
+ * The router, replaced for triage calls and for nothing else.
+ *
+ * The ladder is the only thing in this file that asks a provider something
+ * the offline transport cannot script -- a verification round is scripted by
+ * `configure`, and intercepting that here would replace the very thing the
+ * rest of these tests are about. So the fake answers `session-triage` and
+ * hands every other call straight back to the real router.
+ */
+const advisers = vi.hoisted(() => ({
+  replies: [] as Array<readonly [string, string]>,
+  calls: [] as Array<{ exclude: string[] }>,
+}));
+
+vi.mock("../src/route.ts", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../src/route.ts")>();
+  return {
+    ...actual,
+    route: (content: string, options: Record<string, unknown> = {}) => {
+      if (options.taskType !== "session-triage") return actual.route(content, options);
+      const exclude = (options.excludeProviders as string[]) ?? [];
+      advisers.calls.push({ exclude: [...exclude] });
+      const next = advisers.replies.shift();
+      if (next === undefined) throw new actual.NoCandidateError("no adviser is left");
+      const [provider, body] = next;
+      if (exclude.includes(provider)) throw new actual.NoCandidateError(`${provider} is excluded`);
+      return Promise.resolve({
+        content: body,
+        model_name: `${provider}-model`,
+        model_id: "x",
+        provider,
+        input_tokens: 1,
+        output_tokens: 1,
+        escalated: false,
+        escalation_history: [],
+        elapsed_seconds: 0.1,
+        transport: "offline",
+        truncated: false,
+        transport_session_id: null,
+        served_model_id: null,
+        metadata: {},
+      });
+    },
+  };
+});
 
 // --- the repository under drive ----------------------------------------------
 
@@ -235,6 +282,19 @@ function sessionStatus(sessionsDir: string): unknown {
 
 const VERIFIED = "VERIFIED\n\nThe widget is real.\n";
 
+/** One adviser's answer, in the shape `triage.schema.json` asks for. */
+const TRIAGE_ANSWER = JSON.stringify({
+  classification: "plan-defect",
+  reasoning: "The step cannot be done as written; its own notes say the widget is load-bearing.",
+  recommendation: "Amend the step and run it again.",
+  amendment: {
+    step_id: "widget",
+    checks: [{ argv: ["node", "-e", "process.exit(0)"] }],
+    reason: "The check the step declares cannot pass while the widget must keep returning 1.",
+    relaxes_a_gate: true,
+  },
+});
+
 // --- the transitions ---------------------------------------------------------
 
 // Each test drives a whole session -- dozens of git calls, two spawned
@@ -247,6 +307,8 @@ describe("dabbler session drive", { timeout: 120_000 }, () => {
   beforeEach(() => {
     setProviderKeys();
     delete process.env["DABBLER_TRANSPORT"];
+    advisers.replies = [];
+    advisers.calls = [];
     resetForTests();
     resetRuntimeMode();
   });
@@ -279,7 +341,11 @@ describe("dabbler session drive", { timeout: 120_000 }, () => {
     // budget of two invocations.
     expect(codes).toEqual([2, 0]);
     expect(engine.seen.map((entry) => entry.kind)).toEqual(["step", "rejection"]);
-    expect(engine.seen[1]?.reasons?.[0]).toContain("no work plan was written");
+    expect(engine.seen[1]?.reasons?.[0]).toBe(
+      `[no-work-plan] no work plan was written for instruction 1; the answer is \`${
+        engine.seen[0]?.answer_command ?? ""
+      }\``,
+    );
     expect(engine.seen[0]?.ask).toContain("Make `widget()` return 2.");
     expect(readTaskDeclaration(sessionsDir, 1)).toMatchObject({
       task: "Make widget() return 2.",
@@ -376,7 +442,7 @@ describe("dabbler session drive", { timeout: 120_000 }, () => {
     expect(code).toBe(0);
     expect(engine.seen.map((entry) => entry.kind)).toEqual(["step", "step", "rejection"]);
     expect(engine.seen[2]?.reasons).toEqual([
-      "files_changed omits 'tests/test_widget.py', which the tree changed",
+      "[files-changed-omits] files_changed omits 'tests/test_widget.py', which the tree changed",
     ]);
     expect(engine.seen[2]?.ask).toContain("refused for the reasons listed");
     expect(readRun(repo, 1)).toMatchObject({ phase: "complete", accepted_steps: ["widget"] });
@@ -601,6 +667,182 @@ describe("dabbler session drive", { timeout: 120_000 }, () => {
     expect(engine.seen).toHaveLength(2);
   });
 
+  it("calls the second stop on a step a deadlock when its reason has not changed", async () => {
+    const { repo, sessionsDir } = drivenRepo();
+    configure([VERIFIED]);
+    const blocking = (notes: string) =>
+      scripted(({ instruction }, tools) => {
+        if (instruction.answer_schema === WORK_PLAN_SCHEMA) return void tools.answer(PLAN);
+        tools.report({ step: "widget", files: [], status: "blocked", notes });
+      });
+
+    const first = await drive(sessionsDir, blocking("the widget is load-bearing"));
+    expect(first.code).toBe(1);
+    expect(readRun(repo, 1)?.stop).toMatchObject({
+      kind: "blocked",
+      class: "first",
+      step_id: "widget",
+    });
+
+    // The same bound, the same step, the same reason: a re-run reaches this
+    // exact point again, and the record says so rather than leaving whoever
+    // reads it to notice they have seen this before.
+    const again = await drive(sessionsDir, blocking("the widget is load-bearing"));
+    expect(again.code).toBe(1);
+    expect(again.err).toContain("STOPPED (blocked, deadlock)");
+    expect(readRun(repo, 1)?.stop).toMatchObject({ kind: "blocked", class: "deadlock" });
+    expect(readRun(repo, 1)?.stop?.reason).toContain("DEADLOCK");
+
+    // A different reason is a loop that moved, however little.
+    const moved = await drive(sessionsDir, blocking("the widget belongs to another module"));
+    expect(moved.code).toBe(1);
+    expect(readRun(repo, 1)?.stop).toMatchObject({ kind: "blocked", class: "first" });
+    expect(readRun(repo, 1)?.stop?.reason).not.toContain("DEADLOCK");
+
+    // Three stops, oldest first, each remembered with the reason it was
+    // raised with -- which is what the next comparison is made against.
+    const history = readRun(repo, 1)?.stop_history ?? [];
+    expect(history.map((row) => row.step_id)).toEqual(["widget", "widget", "widget"]);
+    expect(history.map((row) => row.reason.includes("DEADLOCK"))).toEqual([false, false, false]);
+  });
+
+  it("takes a deadlock to a second adviser when the first cannot answer in the shape asked for", async () => {
+    const { repo, sessionsDir } = drivenRepo();
+    configure([VERIFIED]);
+    const blocking = () =>
+      scripted(({ instruction }, tools) => {
+        if (instruction.answer_schema === WORK_PLAN_SCHEMA) return void tools.answer(PLAN);
+        tools.report({ step: "widget", files: [], status: "blocked", notes: "the widget is load-bearing" });
+      });
+
+    // The first stop is not a deadlock, so nobody is asked about it.
+    expect((await drive(sessionsDir, blocking())).code).toBe(1);
+    expect(advisers.calls).toEqual([]);
+
+    // The second is. openai answers twice and neither answer fits, so that
+    // rung is spent and google is asked -- with openai excluded as well.
+    advisers.replies = [
+      ["openai", "I think it is fine, actually."],
+      ["openai", "Still fine."],
+      ["google", TRIAGE_ANSWER],
+    ];
+    expect((await drive(sessionsDir, blocking())).code).toBe(1);
+    expect(advisers.calls.map((call) => call.exclude)).toEqual([
+      ["anthropic"],
+      ["anthropic"],
+      ["anthropic", "openai"],
+    ]);
+    expect(readRun(repo, 1)?.triage).toMatchObject({
+      rungs: 2,
+      classification: "plan-defect",
+      for_step: "widget",
+    });
+
+    // What it found reaches the operator's own row as an option and never as
+    // an act: the plan is not amended by anybody but a person.
+    const raised = openDecisions(repo).find((row) => String(row["id"]).startsWith("driver-stop-"));
+    expect(String(raised?.["determined"])).toContain("plan-defect");
+    expect(
+      (raised?.["options"] as Array<Record<string, unknown>>).map((option) => option["label"]),
+    ).toEqual(["Run `next` again", "Cancel the session", "Amend step 'widget'"]);
+    expect(raised?.["recommendation"]).toBe("Amend step 'widget'");
+    const amend = (raised?.["options"] as Array<Record<string, unknown>>)[2];
+    expect(String(amend?.["consequence"])).toContain("IT RELAXES A GATE");
+  });
+
+  it("lands a deadlock nobody could classify as an owed decision with the artifacts and no recommendation", async () => {
+    const { repo, sessionsDir } = drivenRepo();
+    configure([VERIFIED]);
+    const engine = () =>
+      scripted(({ instruction }, tools) => {
+        if (instruction.answer_schema === WORK_PLAN_SCHEMA) return void tools.answer(PLAN);
+        tools.write("src/widget.py", WIDGET_V2);
+        tools.report({ step: "widget", files: [] });
+      });
+
+    expect((await drive(sessionsDir, engine())).code).toBe(1);
+    // Every adviser answers, and none of them answers the question.
+    advisers.replies = [
+      ["openai", "no"],
+      ["openai", "no"],
+      ["google", "no"],
+      ["google", "no"],
+    ];
+    expect((await drive(sessionsDir, engine())).code).toBe(1);
+    expect(advisers.calls).toHaveLength(4);
+    expect(readRun(repo, 1)?.triage).toMatchObject({ rungs: 2, classification: null });
+
+    // The honest brief: the framework's own artifacts, and no recommendation
+    // invented to fill the field.
+    const raised = openDecisions(repo).find((row) => String(row["id"]).startsWith("driver-stop-"));
+    expect(raised?.["recommendation"]).toBeNull();
+    const determined = String(raised?.["determined"]);
+    expect(determined).toContain("No adviser could classify this");
+    expect(determined).toContain("[files-changed-omits]");
+    expect(determined).toContain(".dabbler/runs/s1/driver/");
+    // The artifacts are the record's own, not a summary of it: the run's
+    // stop, the outstanding instruction and the report that was refused.
+    expect(determined).toContain("run.json: phase 'steps', stop 'rejected-thrice'");
+    expect(determined).toContain("instruction.json: seq");
+    expect(determined).toContain("report.json: seq");
+    expect(
+      (raised?.["options"] as Array<Record<string, unknown>>).map((option) => option["label"]),
+    ).toEqual(["Run `next` again", "Cancel the session"]);
+  });
+
+  it("reaches the human floor when the adviser cannot be reached at all", async () => {
+    const { repo, sessionsDir } = drivenRepo();
+    configure([VERIFIED]);
+    const blocking = () =>
+      scripted(({ instruction }, tools) => {
+        if (instruction.answer_schema === WORK_PLAN_SCHEMA) return void tools.answer(PLAN);
+        tools.report({ step: "widget", files: [], status: "blocked", notes: "load-bearing" });
+      });
+    expect((await drive(sessionsDir, blocking())).code).toBe(1);
+
+    // An outage, an expired key, a rate limit: routine, and none of them may
+    // cost the operator the row that says the session stopped. Leaving the
+    // reply queue empty is how the fake refuses to answer at all.
+    advisers.replies = [];
+    expect((await drive(sessionsDir, blocking())).code).toBe(1);
+    const raised = openDecisions(repo).find((row) => String(row["id"]).startsWith("driver-stop-"));
+    expect(raised?.["recommendation"]).toBeNull();
+    expect(String(raised?.["determined"])).toContain("No adviser could classify this");
+    expect(readRun(repo, 1)?.triage).toMatchObject({ classification: null });
+  });
+
+  it("keeps an adviser's proposal whole, so the amend option is something a person can act on", async () => {
+    const { repo, sessionsDir } = drivenRepo();
+    configure([VERIFIED]);
+    const blocking = () =>
+      scripted(({ instruction }, tools) => {
+        if (instruction.answer_schema === WORK_PLAN_SCHEMA) return void tools.answer(PLAN);
+        tools.report({ step: "widget", files: [], status: "blocked", notes: "load-bearing" });
+      });
+    expect((await drive(sessionsDir, blocking())).code).toBe(1);
+    advisers.replies = [["openai", TRIAGE_ANSWER]];
+    expect((await drive(sessionsDir, blocking())).code).toBe(1);
+
+    // On the record rather than in the process that heard it: the person who
+    // answers the decision is not the process that asked the adviser.
+    expect(readRun(repo, 1)?.triage?.amendment).toMatchObject({
+      step_id: "widget",
+      relaxes_a_gate: true,
+      checks: [{ argv: ["node", "-e", "process.exit(0)"] }],
+    });
+
+    // And in the brief, as the command a person would type -- an option to
+    // amend a step without saying what the amendment is asks somebody to
+    // agree to a change nobody has shown them.
+    const raised = openDecisions(repo).find((row) => String(row["id"]).startsWith("driver-stop-"));
+    const amend = (raised?.["options"] as Array<Record<string, unknown>>)[2];
+    const consequence = String(amend?.["consequence"]);
+    expect(consequence).toContain("IT RELAXES A GATE");
+    expect(consequence).toContain("dabbler session plan amend");
+    expect(consequence).toContain("--step widget");
+    expect(consequence).toContain("process.exit(0)");
+  });
+
   it("runs the affected tests itself and sends a red run back as a fix step before any verifier sees the tree", async () => {
     const { repo, sessionsDir } = drivenRepo();
     configure([VERIFIED]);
@@ -748,9 +990,6 @@ describe("dabbler session drive", { timeout: 120_000 }, () => {
     expect(buildTaskRows(sessionsDir, 1).map((row) => row.intent).join("\n")).toContain(
       "Driver stopped (interrupted): wrong file",
     );
-    // A stop with nothing running is refused, like any interrupt.
-    const refused = await captured(async () => interrupt(sessionsDir, { reason: "again", stop: true }));
-    expect(refused.code).toBe(EXIT_BOUNDARY);
     // The same command picks the step up again and runs the session to a close.
     const { code: resumed } = await drive(sessionsDir, engine);
     expect(resumed).toBe(EXIT_OK);
@@ -792,7 +1031,45 @@ describe("dabbler session drive", { timeout: 120_000 }, () => {
     expect(registered.code).toBe(EXIT_OK);
     const { code, err } = await captured(async () => interrupt(sessionsDir, { reason: "stop" }));
     expect(code).toBe(EXIT_BOUNDARY);
-    expect(err).toContain("is not being driven");
+    expect(err).toContain("was never driven");
+  });
+
+  it("holds a Send made against a stopped run and hands it to the instruction that resumes it", async () => {
+    const { repo, sessionsDir } = drivenRepo();
+    configure([VERIFIED], { max_invocations: 1 });
+    const engine = scripted(wellBehaved);
+    expect((await drive(sessionsDir, engine)).code).toBe(1);
+    expect(readRun(repo, 1)?.stop?.kind).toBe("budget");
+
+    // There is no invocation to end, and that is not a reason to refuse:
+    // this is exactly the coaching a person leaves for the resume, and
+    // until now there was no way to give it.
+    const sent = await captured(async () => interrupt(sessionsDir, { reason: "mind the widget" }));
+    expect(sent.code).toBe(EXIT_OK);
+    expect(sent.out).toContain("held for session 001");
+
+    const resumed = scripted(wellBehaved);
+    expect((await drive(sessionsDir, resumed, 6)).code).toBe(EXIT_OK);
+    expect(resumed.seen[0]?.reasons).toEqual(["sent: mind the widget"]);
+    expect(sessionStatus(sessionsDir)).toBe("complete");
+  });
+
+  it("delivers a request the driver never read instead of discarding it at the start of a run", async () => {
+    const { repo, sessionsDir } = drivenRepo();
+    configure([VERIFIED]);
+    const registered = await captured(async () =>
+      start(sessionsDir, { engine: "claude-code", provider: "anthropic" }),
+    );
+    expect(registered.code).toBe(EXIT_OK);
+    // Written before the run exists at all -- the case the push relaunch
+    // used to clear on the way in. What decides is whether it has been
+    // READ, not which mode is starting.
+    requestInterrupt(repo, 1, "check the tests too", "2026-08-31T12:00:00-04:00");
+
+    const engine = scripted(wellBehaved);
+    expect((await drive(sessionsDir, engine)).code).toBe(EXIT_OK);
+    expect(engine.seen[0]?.reasons).toEqual(["sent: check the tests too"]);
+    expect(engine.seen.filter((row) => row.kind === "interrupt")).toHaveLength(0);
   });
 });
 
@@ -806,6 +1083,8 @@ describe("dabbler session next", { timeout: 120_000 }, () => {
   beforeEach(() => {
     setProviderKeys();
     delete process.env["DABBLER_TRANSPORT"];
+    advisers.replies = [];
+    advisers.calls = [];
     resetForTests();
     resetRuntimeMode();
   });

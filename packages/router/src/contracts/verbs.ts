@@ -142,6 +142,16 @@ export const VERBS: readonly VerbSpec[] = [
     summary: "what the framework is waiting on a person for; list and answer",
   },
   {
+    // The second opinion on a stopped session, and the one verb both modes
+    // call: an attended engine when it is stuck, the unattended loop on a
+    // deadlock. Not extension-facing -- it spends a provider call, and a
+    // button that spends one is a button somebody presses to see what it
+    // does.
+    verb: "triage",
+    extensionFacing: false,
+    summary: "classify a stopped session on a provider that is not the engine's",
+  },
+  {
     verb: "solution",
     extensionFacing: false,
     summary: "the solution view over a workspace's modules",

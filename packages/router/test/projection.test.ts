@@ -476,6 +476,53 @@ describe("the task rows", () => {
     expect(buildTaskRows(sessionsDir, 1)).toEqual([]);
   });
 
+  it("reads a run record carrying a member it has never heard of, and still refuses a damaged one", () => {
+    const { repo, sessionsDir } = makeSandboxRepo();
+    start(sessionsDir);
+    declareSessionTask(sessionsDir, { sessionNumber: 1, task: "Do it.", releasable: false });
+    const run = {
+      schema_version: 1,
+      session_number: 1,
+      engine: "claude-code",
+      phase: "steps",
+      seq: 3,
+      invocations: 1,
+      max_invocations: 24,
+      accepted_steps: [],
+      baseline_tree: null,
+      stop: { kind: "blocked", reason: "the widget is load-bearing", at: "2026-08-31T12:00:00-04:00" },
+      started_at: "2026-08-31T11:00:00-04:00",
+      updated_at: "2026-08-31T12:00:00-04:00",
+    };
+    const path = join(repo, ".dabbler", "runs", "s1", "driver", "run.json");
+    mkdirSync(dirname(path), { recursive: true });
+
+    // What a newer driver writes: everything this build knows, plus what it
+    // does not. The rows are what the file does say, and the stop still
+    // reaches the attention row.
+    writeFileSync(
+      path,
+      JSON.stringify({
+        ...run,
+        stop: { ...run.stop, class: "deadlock", provenance: "from a later build" },
+        weather: "unseasonable",
+      }),
+      "utf8",
+    );
+    const rows = buildTaskRows(sessionsDir, 1);
+    expect(rows).toHaveLength(6);
+    expect(rows.map((row) => String(row["intent"])).join("\n")).toContain(
+      "Driver stopped (blocked): the widget is load-bearing",
+    );
+
+    // Damage is still damage: an added member is read past, a member of the
+    // wrong type is not.
+    writeFileSync(path, JSON.stringify({ ...run, phase: 7 }), "utf8");
+    expect(() => buildTaskRows(sessionsDir, 1)).toThrow(TaskRowsRefused);
+    writeFileSync(path, JSON.stringify({ ...run, engine: undefined }), "utf8");
+    expect(() => buildTaskRows(sessionsDir, 1)).toThrow(TaskRowsRefused);
+  });
+
   it("reaches the projection, which is where the tree reads them", () => {
     const { sessionsDir } = makeSandboxRepo();
     start(sessionsDir);

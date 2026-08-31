@@ -55,6 +55,61 @@ export function validatorFor(
   return validate;
 }
 
+const relaxedCache = new Map<Record<string, unknown>, Record<string, unknown>>();
+
+/**
+ * The same schema with every `additionalProperties: false` dropped, all the
+ * way down.
+ *
+ * For READERS only. A record written by a newer build carries members this
+ * one has never heard of, and refusing the whole file for them costs a
+ * reader everything the file does say -- which is what session 62 watched
+ * an installed extension do, refusing every row for the length of a
+ * driver-changing session. Everything else the schema states still holds:
+ * a wrong type, a missing required member and a file that is not JSON are
+ * all still refusals, because those are damage and an added field is not.
+ *
+ * Nothing that WRITES may use this. What this build writes is held to the
+ * schema exactly, or the tolerance would be a licence to be sloppy rather
+ * than a reader's forbearance.
+ */
+export function relaxUnknownProperties(
+  schema: Record<string, unknown>,
+): Record<string, unknown> {
+  let relaxed = relaxedCache.get(schema);
+  if (!relaxed) {
+    relaxed = strip(schema) as Record<string, unknown>;
+    relaxedCache.set(schema, relaxed);
+  }
+  return relaxed;
+}
+
+function strip(node: unknown): unknown {
+  if (Array.isArray(node)) return node.map(strip);
+  if (node === null || typeof node !== "object") return node;
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(node as Record<string, unknown>)) {
+    // Only the closed form is opened. `additionalProperties` carrying a
+    // SCHEMA says what the extra members must look like, which is a rule
+    // about content rather than a refusal to hear of them at all.
+    if (key === "additionalProperties" && value === false) continue;
+    out[key] = strip(value);
+  }
+  return out;
+}
+
+/**
+ * `schemaFailure`, for a reader: unknown members are read past, and
+ * everything else the schema says still refuses.
+ */
+export function tolerantSchemaFailure(
+  data: unknown,
+  schema: Record<string, unknown>,
+  subject: string,
+): string | null {
+  return schemaFailure(data, relaxUnknownProperties(schema), subject);
+}
+
 /**
  * `providers/anthropic`, or `(root)` -- the location Python names.
  *

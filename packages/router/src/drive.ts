@@ -55,6 +55,7 @@ import {
 } from "./config.ts";
 import {
   DISPOSITION_SCHEMA,
+  DRIVER_DIRNAME,
   DRIVER_SCHEMA_VERSION,
   REPORT_SCHEMA,
   WORK_PLAN_SCHEMA,
@@ -70,6 +71,7 @@ import {
   writeRun,
 } from "./driver.ts";
 import type { Engine, EngineOutput } from "./engines.ts";
+import { clip, stripEscapes } from "./engines.ts";
 import { SESSION_PLAN_FILENAME } from "./evidence.ts";
 import { SET_BOOKKEEPING_COMMIT_BASENAMES } from "./gates.ts";
 import type {
@@ -77,6 +79,7 @@ import type {
   DriverReport,
   DriverRun,
   DriverWorkPlan,
+  Triage,
 } from "./generated/index.ts";
 import { type Job, pollJob, selfArgv, startJob } from "./jobs.ts";
 import {
@@ -86,7 +89,7 @@ import {
   runGit,
   snapshotWorktreeTree,
 } from "./journal.ts";
-import { LedgerError, type Row, latestRound, readDisputes } from "./ledger.ts";
+import { LedgerError, RUNS_DIRNAME, type Row, latestRound, readDisputes } from "./ledger.ts";
 import {
   CLASS_VALUE_TRADEOFF,
   openDecisions,
@@ -94,6 +97,7 @@ import {
   supersedeOwed,
 } from "./owedDecisions.ts";
 import { readSessionState, sessionDisplayNumber } from "./progress.ts";
+import { TriageError, type TriageOutcome, collectArtifacts, triage } from "./triage.ts";
 import {
   EXIT_BOUNDARY,
   EXIT_GATE_FAILED,
@@ -172,6 +176,83 @@ const CLOSE_RETRY_SECONDS = 15;
 const INTERRUPT_POLL_MS = 500;
 /** What a deferred Send reads as, first among the next instruction's reasons. */
 const SENT_PREFIX = "sent: ";
+
+/**
+ * How many stops `run.json` remembers. Enough to see a loop going nowhere
+ * and no more: this is state, and the history of a run is its transcripts.
+ */
+const STOP_HISTORY_CAP = 8;
+
+/**
+ * The rules a refusal can come from, by name.
+ *
+ * Every reason a judge produces says which rule produced it, and the slug
+ * is what a person, `dabbler triage` and the `rejected-thrice` stop that
+ * quotes the last reasons all work from. They are here, written once each,
+ * because a name typed at its use site is a name that drifts from the rule
+ * it belongs to -- and a rule nobody can cite is one nobody can dispute.
+ */
+const RULE = {
+  noReport: "no-report",
+  reportSeq: "report-seq",
+  reportStep: "report-step",
+  filesChangedUnchanged: "files-changed-unchanged",
+  filesChangedMissingFile: "files-changed-missing-file",
+  filesChangedOmits: "files-changed-omits",
+  checkFailed: "check-failed",
+  noWorkPlan: "no-work-plan",
+} as const;
+
+/** One refusal, carrying the name of the rule that refused it. */
+function refusal(rule: string, reason: string): string {
+  return `[${rule}] ${reason}`;
+}
+
+/** How many advisers a deadlock is taken to before it is taken to a person. */
+const TRIAGE_RUNGS = 2;
+
+/** The third answer a stopped loop has, when an adviser proposed one. */
+const AMEND_CHOICE = "Amend step";
+
+/** One stop, as the history remembers it and the ladder compares against it. */
+interface StopEntry {
+  readonly kind: StopKind;
+  readonly reason: string;
+  readonly at: string;
+  readonly step_id: string | null;
+}
+
+/** How far the ladder got. Null where none was climbed at all. */
+interface Ladder {
+  readonly advice: Advice | null;
+}
+
+/** What an adviser said, ready for the brief a person reads. */
+interface Advice {
+  readonly answer: Triage;
+  readonly adviser: string;
+  readonly brief: string;
+}
+
+/** The adviser's opinion, marked as one. */
+function adviceBrief(outcome: TriageOutcome): string {
+  return (
+    `A second opinion, from ${outcome.adviser.model} (${outcome.adviser.provider}) -- ` +
+    `${outcome.excluded.join(", ")} excluded` +
+    (outcome.simulated ? ", SIMULATED (served by a script, not a vendor)" : "") +
+    `.
+It calls this a ${outcome.answer.classification}: ${outcome.answer.reasoning}
+` +
+    `It recommends: ${outcome.answer.recommendation}
+` +
+    "It is an opinion. The framework has applied none of it."
+  );
+}
+
+/** What a `deadlock` adds to the stop's reason, for a reader who knows no field names. */
+const DEADLOCK_NOTE =
+  " -- DEADLOCK: the same stop, on the same step, for the same reason as the one before it. " +
+  "Running it again unchanged reaches this exact point again.";
 
 type StopKind = NonNullable<DriverRun["stop"]>["kind"];
 
@@ -268,6 +349,16 @@ class Driver {
   private plan: DriverWorkPlan | null = null;
   /** Sends that arrived with no invocation to end; the next instruction carries them. */
   private deferred: string[] = [];
+  /**
+   * The step the loop is on, or null between steps.
+   *
+   * Tracked here rather than passed to `Stop`, because a stop raised inside
+   * a step is not always raised by the step's own code: a tree that cannot
+   * be snapshotted, an engine that will not run and an interrupt all unwind
+   * from underneath it, and each of them is still "the loop was on this
+   * step" to whoever reads the record.
+   */
+  private currentStep: string | null = null;
   /**
    * Pull mode only: whether the outstanding answer has been judged in this
    * call. One call judges one answer; every later call site in the same
@@ -380,12 +471,13 @@ class Driver {
       return EXIT_BOUNDARY;
     }
     this.sessionNumber = current;
-    // A request left over from before this run has nothing to interrupt --
-    // but under the pull every call IS a new run, and a request written
-    // between two of them is exactly the one meant for the next. Dropping it
-    // here would make `session interrupt --stop` unusable against a pulled
-    // session, which is the one place a person has nothing else to press.
-    if (!this.pull) takeInterrupt(this.repoRoot, current);
+    // Nothing is cleared here, in either mode. What this guard was reaching
+    // for is a request written for a run that has already ended, and the
+    // right test for that is whether the request has been READ -- which is
+    // what `takeInterrupt` answers wherever the driver next looks. Dropping
+    // it on the way in made `session interrupt --stop` unusable against a
+    // pulled session and, exactly as much, threw away a Send made between
+    // two of a push run's own invocations: one bug, in two modes.
 
     const existing = readRun(this.repoRoot, current);
     const cap = this.options.maxInvocations ?? driverInvocationCap(this.config);
@@ -477,7 +569,38 @@ class Driver {
    * The reason is on `run.json` and on stderr either way, and a stop
    * reported as a crash would cost more than the row it failed to write.
    */
-  private raiseStopDecision(kind: StopKind, reason: string): void {
+  private raiseStopDecision(kind: StopKind, reason: string, ladder: Ladder | null = null): void {
+    const advice = ladder?.advice ?? null;
+    const options = [
+      {
+        label: RESUME_CHOICE,
+        consequence:
+          `The session resumes from '${this.run.phase}'. The steps it has ` +
+          "already accepted are not asked for again.",
+      },
+      {
+        label: CANCEL_CHOICE,
+        consequence:
+          "`dabbler session cancel` ends it with a reason on the record. " +
+          "What the working tree already carries stays where it is.",
+      },
+    ];
+    // An amendment is an OPTION and never an act. The framework applies
+    // nothing an adviser proposed; choosing it is what records it, and where
+    // it relaxes a gate that is the first thing the chooser is told.
+    const amendment = advice?.answer.amendment ?? null;
+    if (amendment) {
+      options.push({
+        label: `${AMEND_CHOICE} '${amendment.step_id}'`,
+        consequence:
+          (amendment.relaxes_a_gate
+            ? "IT RELAXES A GATE: this weakens what the framework checks. "
+            : "It relaxes no gate. ") +
+          `${amendment.reason}\n\n${this.amendmentProposal(amendment)}\n\n` +
+          "The framework applies no adviser's proposal on its own authority. " +
+          "Choosing this records the decision; the command above is how it is made.",
+      });
+    }
     try {
       raiseOwed(this.repoRoot, {
         id: stopDecisionId(this.sessionNumber),
@@ -485,22 +608,32 @@ class Driver {
         question:
           `Session ${sessionDisplayNumber(this.sessionNumber)} stopped ` +
           `(${kind}) in phase '${this.run.phase}'. Run it again, or cancel it?`,
-        determined: reason,
-        options: [
-          {
-            label: RESUME_CHOICE,
-            consequence:
-              `The session resumes from '${this.run.phase}'. The steps it has ` +
-              "already accepted are not asked for again.",
-          },
-          {
-            label: CANCEL_CHOICE,
-            consequence:
-              "`dabbler session cancel` ends it with a reason on the record. " +
-              "What the working tree already carries stays where it is.",
-          },
-        ],
-        recommendation: RESUME_CHOICE,
+        // Three briefs, and which one this is says how much is known. No
+        // ladder was climbed: the stop's own reason, which is what an
+        // attended session reads. An adviser answered: its opinion, marked
+        // as one. Nobody could: the raw artifacts, because "the framework
+        // stopped and its advisers could not classify it" is honest and an
+        // invented recommendation is not.
+        determined:
+          ladder === null
+            ? reason
+            : advice !== null
+              ? `${reason}
+
+${advice.brief}`
+              : `${reason}
+
+No adviser could classify this. The raw artifacts:
+${this.stopArtifacts()}`,
+        options,
+        recommendation:
+          ladder === null
+            ? RESUME_CHOICE
+            : advice === null
+              ? null
+              : amendment
+                ? `${AMEND_CHOICE} '${amendment.step_id}'`
+                : RESUME_CHOICE,
         onNoAnswer:
           "Nothing happens. The session stays in flight and its record stops " +
           "moving until someone resumes it or cancels it.",
@@ -509,6 +642,163 @@ class Driver {
     } catch (error) {
       this.log("owed-not-raised", { reason: (error as Error).message });
     }
+  }
+
+  /**
+   * The ladder a deadlock climbs, unattended, and its floor.
+   *
+   * Under the PUSH mode only: an attended engine calls `dabbler triage`
+   * itself when it is stuck, and spending a provider call on behalf of
+   * somebody sitting at the keyboard is the framework deciding for them.
+   *
+   * Two rungs and then a person. Rung one asks an adviser outside the
+   * working engine's provider; rung two asks somebody outside that one too.
+   * No rung loops, no rung re-enters a phase, and the run record says what
+   * it found -- so a re-run that reaches the same impasse does not pay for
+   * the same answer twice.
+   */
+  private async climbLadder(entry: StopEntry): Promise<Ladder | null> {
+    const already = this.run.triage ?? null;
+    if (already && already.for_reason === entry.reason && (already.for_step ?? null) === entry.step_id) {
+      this.log("triage-skipped", { why: "this impasse has already been triaged", rungs: already.rungs });
+      return null;
+    }
+    const excluded: string[] = [];
+    let rungs = 0;
+    let advice: Advice | null = null;
+    for (let rung = 0; rung < TRIAGE_RUNGS; rung += 1) {
+      rungs += 1;
+      this.log("triage-asking", { rung: rungs, also_excluding: excluded });
+      try {
+        const outcome = await triage(this.sessionsDir, {
+          sessionNumber: this.sessionNumber,
+          alsoExclude: excluded,
+          transport: this.options.transport ?? null,
+        });
+        advice = {
+          answer: outcome.answer,
+          adviser: `${outcome.adviser.model} (${outcome.adviser.provider})`,
+          brief: adviceBrief(outcome),
+        };
+        this.log("triage-classified", {
+          rung: rungs,
+          classification: outcome.answer.classification,
+          adviser: `${outcome.adviser.model} (${outcome.adviser.provider})`,
+        });
+        break;
+      } catch (error) {
+        if (!(error instanceof TriageError)) throw error;
+        this.log("triage-failed", { rung: rungs, reason: error.message });
+        // An adviser that answered badly has still been asked; the next rung
+        // is somebody else. One that never answered leaves nobody to exclude,
+        // and asking again would be the same rung twice.
+        if (error.provider === null) break;
+        excluded.push(error.provider);
+      }
+    }
+    this.run = {
+      ...this.run,
+      triage: {
+        for_reason: entry.reason,
+        for_step: entry.step_id,
+        rungs,
+        classification: advice?.answer.classification ?? null,
+        adviser: advice?.adviser ?? null,
+        // Kept whole. The proposal lives in this process and the person who
+        // answers the decision is in another, so an option offering to amend
+        // a step without saying what the amendment is would be a menu item
+        // with nothing behind it.
+        amendment: advice?.answer.amendment ?? null,
+        at: nowIso(),
+      },
+    };
+    return { advice };
+  }
+
+  /**
+   * What the framework itself knows about the stop, unsummarised.
+   *
+   * The floor's brief, and deliberately the framework's own facts rather
+   * than a model's account of them: the refusals as they were written, the
+   * step they were written against, and where the rest of it is on disk.
+   */
+  private stopArtifacts(): string {
+    let artifacts;
+    try {
+      artifacts = collectArtifacts(this.repoRoot, this.sessionNumber);
+    } catch (error) {
+      return `(the record could not be read: ${(error as Error).message})`;
+    }
+    const lines: string[] = [];
+    const stop = artifacts.run?.stop ?? null;
+    if (stop !== null) {
+      lines.push(
+        `run.json: phase '${artifacts.run?.phase}', stop '${stop.kind}'` +
+          `${stop.class ? ` (${stop.class})` : ""} on step '${stop.step_id ?? "-"}'`,
+        `  ${stop.reason}`,
+      );
+    }
+    const history = artifacts.run?.stop_history ?? [];
+    if (history.length > 1) {
+      lines.push(`the ${history.length} stops before this one, oldest first:`);
+      lines.push(...history.map((row) => `  ${row.kind} on ${row.step_id ?? "-"}: ${clip(row.reason, 200)}`));
+    }
+    const instruction = artifacts.instruction;
+    if (instruction !== null) {
+      lines.push(
+        `instruction.json: seq ${instruction.seq}, ${instruction.kind}` +
+          `${instruction.step_id ? ` for step '${instruction.step_id}'` : ""}`,
+        `  asked: ${clip(instruction.ask ?? "", 400)}`,
+      );
+    }
+    if (artifacts.reasons.length > 0) {
+      lines.push("the refusals, as written:", ...artifacts.reasons.map((row) => `  ${clip(row, 400)}`));
+    }
+    const report = artifacts.report;
+    if (report !== null) {
+      lines.push(
+        `report.json: seq ${report.seq}, step '${report.step_id}', ${report.status}` +
+          `; files ${report.files_changed.join(", ") || "(none)"}`,
+        `  notes: ${clip(report.notes, 300)}`,
+      );
+    }
+    if (artifacts.step !== null) {
+      lines.push(`the step the plan declares: '${artifacts.step.id}', files ${artifacts.step.files.join(", ")}`);
+    }
+    if (artifacts.transcriptTail.trim() !== "") {
+      // The transcript is engine-derived, so the escapes come out before it
+      // is cut: a truncation that takes a colour's reset and leaves its
+      // opener is what session 61 watched turn a whole brief green.
+      lines.push(
+        "the end of the engine's transcript:",
+        tail(stripEscapes(artifacts.transcriptTail), 1200),
+      );
+    }
+    const dir = `${RUNS_DIRNAME}/s${this.sessionNumber}/${DRIVER_DIRNAME}`;
+    lines.push(`All of it, whole and unclipped, is under ${dir}/.`);
+    return lines.join("\n");
+  }
+
+  /**
+   * An adviser's proposal, as the thing a person would actually type.
+   *
+   * The framework applies nothing, so the option has to hand over what it
+   * would have applied -- otherwise "Amend step 'widget'" asks somebody to
+   * agree to a change nobody has shown them.
+   */
+  private amendmentProposal(amendment: NonNullable<Triage["amendment"]>): string {
+    const parts = [
+      `dabbler session plan amend --sessions-dir ${relative(this.repoRoot, this.sessionsDir).replace(/\\/g, "/")}`,
+      `    --step ${amendment.step_id}`,
+    ];
+    if (amendment.files) parts.push(`    --files ${amendment.files.join(",")}`);
+    if (amendment.checks) {
+      parts.push(
+        `    --checks-file <a file holding> ${JSON.stringify(amendment.checks)}`,
+      );
+    }
+    parts.push('    --reason "<why>" --approver "<you>"');
+    return `The proposal, which is yours to make or to refuse:\n${parts.join("\n")}`;
   }
 
   /**
@@ -860,15 +1150,18 @@ class Driver {
       plan = readWorkPlan(this.repoRoot, this.sessionNumber);
       if (plan !== null) break;
       reasons = [
-        `no work plan was written for instruction ${instruction.seq}; the answer is ` +
-          `\`${instruction.answer_command}\``,
+        refusal(
+          RULE.noWorkPlan,
+          `no work plan was written for instruction ${instruction.seq}; the answer is ` +
+            `\`${instruction.answer_command}\``,
+        ),
       ];
       this.setRejections(this.rejections + 1);
       this.log("plan-rejected", { seq: instruction.seq, rejection: this.rejections, reasons });
       if (this.rejections >= MAX_REJECTIONS) {
         throw new Stop(
           "rejected-thrice",
-          `no work plan was written after ${MAX_REJECTIONS} instructions`,
+          refusal(RULE.noWorkPlan, `no work plan was written after ${MAX_REJECTIONS} instructions`),
         );
       }
     }
@@ -929,6 +1222,16 @@ class Driver {
 
   /** Ask for a step until its report is accepted, refused three times, or blocked. */
   private async runStep(spec: StepSpec): Promise<void> {
+    // Cleared on the way out and NOT in a `finally`: a `finally` runs while
+    // a `Stop` is still unwinding, so the loop's own handler would read null
+    // for every stop raised inside a step -- which is every stop that most
+    // wants a step's name on it.
+    this.currentStep = spec.id;
+    await this.askForStep(spec);
+    this.currentStep = null;
+  }
+
+  private async askForStep(spec: StepSpec): Promise<void> {
     if (this.run.baseline_tree === null) {
       const tree = snapshotWorktreeTree(this.repoRoot);
       if (tree === null) throw new Stop("engine", "could not snapshot the working tree");
@@ -988,16 +1291,29 @@ class Driver {
   ): Promise<string[] | "blocked"> {
     if (report === null) {
       return [
-        `no report was written for instruction ${instruction.seq}; the answer is ` +
-          `\`${instruction.answer_command}\``,
+        refusal(
+          RULE.noReport,
+          `no report was written for instruction ${instruction.seq}; the answer is ` +
+            `\`${instruction.answer_command}\``,
+        ),
       ];
     }
     const reasons: string[] = [];
     if (report.seq !== instruction.seq) {
-      reasons.push(`the report answers seq ${report.seq}; instruction ${instruction.seq} is outstanding`);
+      reasons.push(
+        refusal(
+          RULE.reportSeq,
+          `the report answers seq ${report.seq}; instruction ${instruction.seq} is outstanding`,
+        ),
+      );
     }
     if (report.step_id !== spec.id) {
-      reasons.push(`the report is for step '${report.step_id}'; the instruction asked for '${spec.id}'`);
+      reasons.push(
+        refusal(
+          RULE.reportStep,
+          `the report is for step '${report.step_id}'; the instruction asked for '${spec.id}'`,
+        ),
+      );
     }
     if (reasons.length > 0) return reasons;
     if (report.status === "blocked") return "blocked";
@@ -1015,13 +1331,18 @@ class Driver {
       if (changed.includes(file)) continue;
       reasons.push(
         existsSync(join(this.repoRoot, file))
-          ? `files_changed names '${file}', which the tree did not change since the last accepted step`
-          : `files_changed names '${file}', which does not exist`,
+          ? refusal(
+              RULE.filesChangedUnchanged,
+              `files_changed names '${file}', which the tree did not change since the last accepted step`,
+            )
+          : refusal(RULE.filesChangedMissingFile, `files_changed names '${file}', which does not exist`),
       );
     }
     for (const file of changed) {
       if (!report.files_changed.includes(file)) {
-        reasons.push(`files_changed omits '${file}', which the tree changed`);
+        reasons.push(
+          refusal(RULE.filesChangedOmits, `files_changed omits '${file}', which the tree changed`),
+        );
       }
     }
     for (const file of spec.files) {
@@ -1046,12 +1367,18 @@ class Driver {
         timeoutSeconds: timeoutFor(declared, this.config),
       });
       const green = checkRunGreen(run);
-      this.log(green ? "check-passed" : "check-failed", { step: spec.id, argv });
+      // The log event and the rule are the same fact, so they are the same
+      // string: a log line saying one thing while the refusal says another
+      // is two names for one failure.
+      this.log(green ? "check-passed" : RULE.checkFailed, { step: spec.id, argv });
       if (!green) {
         reasons.push(
-          `check failed: ${argv.join(" ")} -> exit ${run.exitCode === null ? "none (timed out)" : run.exitCode}` +
-            (run.treeMutated ? " (the check changed the tree)" : "") +
-            (run.output.trim() ? `\n${tail(run.output)}` : ""),
+          refusal(
+            RULE.checkFailed,
+            `check failed: ${argv.join(" ")} -> exit ${run.exitCode === null ? "none (timed out)" : run.exitCode}` +
+              (run.treeMutated ? " (the check changed the tree)" : "") +
+              (run.output.trim() ? `\n${tail(run.output)}` : ""),
+          ),
         );
       }
     }
@@ -1540,15 +1867,64 @@ class Driver {
       }
     } catch (error) {
       if (!(error instanceof Stop)) throw error;
+      const entry = {
+        kind: error.kind,
+        reason: error.message,
+        at: nowIso(),
+        step_id: this.currentStep,
+      };
+      const history = this.run.stop_history ?? [];
+      const previous = history.length > 0 ? history[history.length - 1] : null;
+      // The same bound, on the same step, for the same reason as last time:
+      // the loop is not making progress, and the next re-run reaches here
+      // again. The comparison is against the UNDECORATED reason the history
+      // keeps, so a third identical stop is recognised as readily as this
+      // one -- a reason that carried its own note would never match again.
+      const deadlock =
+        previous !== undefined &&
+        previous !== null &&
+        previous.kind === entry.kind &&
+        (previous.step_id ?? null) === entry.step_id &&
+        previous.reason === entry.reason;
+      const reason = deadlock ? `${error.message}${DEADLOCK_NOTE}` : error.message;
       this.run = {
         ...this.run,
-        stop: { kind: error.kind, reason: error.message, at: nowIso() },
+        stop: {
+          kind: entry.kind,
+          reason,
+          at: entry.at,
+          step_id: entry.step_id,
+          class: deadlock ? "deadlock" : "first",
+        },
+        stop_history: [...history, entry].slice(-STOP_HISTORY_CAP),
       };
       this.save();
-      this.raiseStopDecision(error.kind, error.message);
+      // A loop going nowhere is asked about before a person is. Only a
+      // deadlock, only unattended, and only once per impasse.
+      //
+      // Whatever happens in there, the human floor is reached: the try is
+      // what makes "the ladder always terminates at the human" true rather
+      // than aspirational. An outage, an expired key, a bug in the rung
+      // itself -- none of them may cost the operator the row that says the
+      // session stopped, because that row is the only thing standing
+      // between a halted session and nobody finding out.
+      let ladder: Ladder | null = null;
+      if (deadlock && !this.pull) {
+        try {
+          ladder = await this.climbLadder(entry);
+        } catch (failure) {
+          // A ladder that fell over classified nothing, which is the floor's
+          // own brief -- not the confident "run it again" that no ladder at
+          // all would have earned.
+          this.log("triage-abandoned", { reason: (failure as Error).message });
+          ladder = { advice: null };
+        }
+        this.save();
+      }
+      this.raiseStopDecision(error.kind, reason, ladder);
       writeErr(
-        `dabbler: STOPPED (${error.kind}) in phase '${this.run.phase}' after ` +
-          `${this.run.invocations} invocation(s) -- ${error.message}\n` +
+        `dabbler: STOPPED (${error.kind}${deadlock ? ", deadlock" : ""}) in phase ` +
+          `'${this.run.phase}' after ${this.run.invocations} invocation(s) -- ${reason}\n` +
           `Session ${sessionDisplayNumber(this.sessionNumber)} stays in flight; ` +
           "the same command re-runs from this phase.\n",
       );

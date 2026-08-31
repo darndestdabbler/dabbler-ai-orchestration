@@ -51,6 +51,7 @@ import {
   DRIVER_SCHEMA_VERSION,
   REPORT_SCHEMA,
   WORK_PLAN_SCHEMA,
+  amendPlanStep,
   dispositionsPath,
   driverDir,
   planPath,
@@ -1072,24 +1073,35 @@ export function interrupt(sessionsDir: string, options: InterruptCliOptions): nu
   }
   const number = sessionDisplayNumber(target);
   if (run === null) {
-    writeErr(`interrupt: refused -- session ${number} is not being driven; there is no invocation to end.\n`);
+    writeErr(`interrupt: refused -- session ${number} was never driven; there is no run to reach.\n`);
     return EXIT_BOUNDARY;
   }
-  if (run.phase === "complete" || run.stop !== null) {
+  if (run.phase === "complete") {
     writeErr(
-      `interrupt: refused -- session ${number}'s drive ${run.phase === "complete" ? "completed" : `stopped (${run.stop?.kind})`}; ` +
-        "nothing is running to interrupt.\n",
+      `interrupt: refused -- session ${number}'s drive completed and the session is closed; ` +
+        "a message queued for it would never be read.\n",
     );
     return EXIT_BOUNDARY;
   }
   const stop = options.stop === true;
+  // A stopped run is queued against rather than refused. There is no
+  // invocation to end, but the request is exactly the coaching a person
+  // wants to leave for the resume, and session 62 had no way to give it:
+  // the engine was told to stop and nobody could tell it anything else.
+  const waitsBehind = run.stop;
   requestInterrupt(repoRoot, target, reason, nowIso(), stop);
   writeOut(
-    stop
-      ? `interrupt: stop requested for session ${number} (instruction ${run.seq}); the driver ends the ` +
-          "running invocation and halts -- the session stays in flight, and `session drive` re-runs it.\n"
-      : `interrupt: requested for session ${number} (instruction ${run.seq}); the driver ends the ` +
-          "running invocation and re-invokes the engine with the reason.\n",
+    waitsBehind
+      ? stop
+        ? `interrupt: session ${number} has already stopped (${waitsBehind.kind}); the request is held, and ` +
+            "stopping a stopped loop changes nothing.\n"
+        : `interrupt: held for session ${number}, which stopped (${waitsBehind.kind}); nothing is running to ` +
+            "end, and the next `session next` hands it to the engine with the instruction.\n"
+      : stop
+        ? `interrupt: stop requested for session ${number} (instruction ${run.seq}); the driver ends the ` +
+            "running invocation and halts -- the session stays in flight, and `session drive` re-runs it.\n"
+        : `interrupt: requested for session ${number} (instruction ${run.seq}); the driver ends the ` +
+            "running invocation and re-invokes the engine with the reason.\n",
   );
   return EXIT_OK;
 }
@@ -1140,6 +1152,98 @@ export function plan(sessionsDir: string, options: PlanCliOptions): number {
     releaseLock(lock);
   }
   writeOut(`plan: recorded; ${basename(sessionsDir)}/${WORK_PLAN_FILENAME} rewritten.\n`);
+  return EXIT_OK;
+}
+
+// --- plan amend --------------------------------------------------------------
+
+export interface PlanAmendCliOptions {
+  readonly stepId: string;
+  readonly files: readonly string[] | null;
+  /** A JSON file holding the step's checks, whole: `[{"argv": [...]}]`. */
+  readonly checksFile: string | null;
+  readonly reason: string;
+  readonly approver: string;
+  readonly sessionNumber?: number | null;
+}
+
+/**
+ * Amend what one not-yet-accepted step of the driven plan is measured
+ * against, with the reason and the approver on the record.
+ *
+ * The plan under `.dabbler/runs/` is machine-owned like everything else
+ * there, and this is the one writer for it -- which is the point. Session 62
+ * had an engine that knew exactly which step's files were wrong and no verb
+ * that could change them, so the choice was to fail the step three times or
+ * to edit the record by hand. Neither is a change anybody signed.
+ */
+export function planAmend(sessionsDir: string, options: PlanAmendCliOptions): number {
+  if (!isDirectory(sessionsDir)) {
+    writeErr(`plan amend: not a directory: ${sessionsDir}\n`);
+    return EXIT_USAGE;
+  }
+  const target = resolveTargetSession(sessionsDir, options.sessionNumber ?? null);
+  if (target === null) {
+    writeErr(`plan amend: refused -- no session has been started under ${sessionsDir}.\n`);
+    return EXIT_BOUNDARY;
+  }
+  const repoRoot = repoRootFromSessionsDir(sessionsDir);
+
+  let checks: { argv: string[] }[] | null = null;
+  if (options.checksFile !== null) {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(readFileSync(options.checksFile, "utf8"));
+    } catch (error) {
+      writeErr(
+        `plan amend: refused -- ${options.checksFile} could not be read as JSON: ` +
+          `${error instanceof Error ? error.message : String(error)}\n`,
+      );
+      return EXIT_USAGE;
+    }
+    if (!Array.isArray(parsed)) {
+      writeErr(
+        `plan amend: refused -- ${options.checksFile} must hold a list of checks, ` +
+          'each `{"argv": ["<program>", "<argument>", ...]}`.\n',
+      );
+      return EXIT_USAGE;
+    }
+    checks = parsed as { argv: string[] }[];
+  }
+
+  let run;
+  try {
+    run = readRun(repoRoot, target);
+  } catch (error) {
+    if (!(error instanceof LedgerError)) throw error;
+    writeErr(`plan amend: refused -- ${error.message}\n`);
+    return EXIT_BOUNDARY;
+  }
+
+  try {
+    amendPlanStep(
+      repoRoot,
+      target,
+      {
+        stepId: options.stepId,
+        files: options.files,
+        checks,
+        reason: options.reason,
+        approver: options.approver,
+      },
+      run?.accepted_steps ?? [],
+      nowIso(),
+    );
+  } catch (error) {
+    if (!(error instanceof LedgerError)) throw error;
+    writeErr(`plan amend: refused -- ${error.message}\n`);
+    return EXIT_BOUNDARY;
+  }
+  writeOut(
+    `plan amend: step '${options.stepId}' of session ${sessionDisplayNumber(target)} amended by ` +
+      `${options.approver.trim()}; the next instruction for it is measured against the new ` +
+      "step, and what changed is on the record.\n",
+  );
   return EXIT_OK;
 }
 

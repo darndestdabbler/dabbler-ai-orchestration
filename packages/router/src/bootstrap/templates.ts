@@ -97,6 +97,18 @@ export const SHARED_BODY =
   "the close. None of them is yours to run, and none of them is yours to\n" +
   "skip ahead to — the instruction in hand is the whole of what is asked.\n" +
   "\n" +
+  "## When the framework stops\n" +
+  "\n" +
+  "- Read the framework's own account before the scrollback: `dabbler status`,\n" +
+  "  the `stop` on `.dabbler/runs/s<N>/driver/run.json` with its kind and its\n" +
+  "  class, the outstanding instruction's `reasons`, and the transcripts.\n" +
+  "- Where the framework is source in this tree you may fix it, and the fix\n" +
+  "  rides in this session's own diff; where it is an installed package,\n" +
+  "  report the step `blocked` with the diagnosis and raise an owed item.\n" +
+  "- Never touch the record, a verdict or a gate to get past a stop. The whole\n" +
+  "  protocol is the *When the framework stops* section of dabbler's\n" +
+  "  `docs/driving-a-session.md`.\n" +
+  "\n" +
   "## Hard rules\n" +
   "\n" +
   "- State files (`docs/sessions/sessions.json`) and everything under\n" +

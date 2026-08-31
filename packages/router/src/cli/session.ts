@@ -33,6 +33,7 @@ import {
   interrupt,
   migrate,
   plan,
+  planAmend,
   report,
   restore,
   start,
@@ -48,7 +49,7 @@ const SUMMARY: Record<string, string> = {
   drive: "run the next session end to end: the framework drives, the engine answers",
   interrupt: "end the engine's running invocation under a driven session, with a reason",
   report: "answer the driver's outstanding instruction",
-  plan: "record the plan prose in project-work-plan.md",
+  plan: "record the plan prose in project-work-plan.md; `plan amend` changes a driven step",
   close: "run gates and close the session",
   cancel: "cancel one session",
   restore: "restore a cancelled session",
@@ -146,6 +147,14 @@ const OPTIONS: Record<string, readonly string[]> = {
   plan: [
     "  --body TEXT              the plan prose; mutually exclusive with --body-file",
     "  --body-file PATH         the plan prose, read from a file",
+    "",
+    "  `dabbler session plan amend` instead amends ONE not-yet-accepted step of the",
+    "  driven work plan -- what the next instruction for it is measured against:",
+    "  --step ID                required: the step to amend",
+    "  --files A,B              the step's files as they should now read, whole",
+    "  --checks-file PATH       the step's checks, whole, as JSON: [{\"argv\": [...]}]",
+    "  --reason TEXT            required: why this is the minimal change",
+    "  --approver WHO           required: who is answerable for it",
   ],
   close: [
     "  --dry-run                print the gate rows and write nothing",
@@ -275,6 +284,38 @@ export async function sessionVerb(argv: string[]): Promise<number> {
   if (typeof sessionNumber === "string") {
     writeErr(`dabbler session ${subcommand}: ${sessionNumber}\n`);
     return EXIT_USAGE;
+  }
+
+  if (subcommand === "plan" && parsed.positional[0] === "amend") {
+    const stepId = values.get("--step");
+    const reason = values.get("--reason");
+    const approver = values.get("--approver");
+    const missing = [
+      stepId === undefined ? "--step" : null,
+      reason === undefined ? "--reason" : null,
+      approver === undefined ? "--approver" : null,
+    ].filter((flag): flag is string => flag !== null);
+    if (missing.length > 0) {
+      // An amendment nobody signed, for no stated reason, is a bar moved by
+      // nobody -- so none of the three is optional.
+      writeErr(
+        `dabbler session plan amend: the following arguments are required: ${missing.join(", ")}
+`,
+      );
+      return EXIT_USAGE;
+    }
+    const files = values.get("--files");
+    return planAmend(sessionsDir, {
+      stepId: stepId as string,
+      files:
+        files === undefined
+          ? null
+          : files.split(",").map((entry) => entry.trim()).filter((entry) => entry !== ""),
+      checksFile: values.get("--checks-file") ?? null,
+      reason: reason as string,
+      approver: approver as string,
+      sessionNumber,
+    });
   }
 
   if (subcommand === "plan") {

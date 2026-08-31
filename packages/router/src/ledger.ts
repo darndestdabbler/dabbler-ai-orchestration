@@ -178,7 +178,13 @@ export function readJsonl(path: string, validate: Validator): Row[] {
   return records;
 }
 
-function appendJsonl(path: string, record: Row): void {
+/**
+ * One record on the end of a machine-owned log. Exported because the
+ * driver's own append-only records live beside the run rather than here,
+ * and a second implementation of "how this repository writes a JSONL line"
+ * is how two logs end up with two newline conventions.
+ */
+export function appendJsonl(path: string, record: Row): void {
   mkdirSync(dirname(path), { recursive: true });
   appendFileSync(path, platformNewlines(dumps(record) + "\n"), { encoding: "utf8" });
 }

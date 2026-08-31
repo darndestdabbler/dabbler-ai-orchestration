@@ -268,7 +268,7 @@ const ESCAPE_SEQUENCE = /\x1b\[[0-?]*[ -/]*[@-~]?|\x1b\][^\x07\x1b]*(?:\x07|\x1b
  * character the engine chose to print stay: a renderer is showing what the
  * engine said, not editing it.
  */
-function stripEscapes(text: string): string {
+export function stripEscapes(text: string): string {
   return text.replace(ESCAPE_SEQUENCE, "");
 }
 
@@ -287,7 +287,7 @@ function stripEscapes(text: string): string {
  * there the runners' colours arrive whole, resets included, which is the
  * point of a terminal.
  */
-function clip(text: unknown, limit: number): string {
+export function clip(text: unknown, limit: number): string {
   return stripEscapes(String(text ?? ""))
     .replace(/\s+/g, " ")
     .trim()

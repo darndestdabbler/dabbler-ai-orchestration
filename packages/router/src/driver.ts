@@ -13,7 +13,11 @@
 // directory through `dabbler session report` and never writes it by hand;
 // a file that fails schema validation on read is a refusal, not a skip,
 // because a hand-written answer is exactly what validation exists to
-// catch. What is validated here is the SHAPE. The substance -- is this the
+// catch. A reader is forgiving about ONE thing -- a member it has never
+// heard of, which is what a record written by a newer build looks like and
+// is not damage. Everything else still refuses, and an unknown member buys
+// a smuggler nothing: no reader here looks for one. What is validated here
+// is the SHAPE. The substance -- is this the
 // outstanding seq, the step that was asked for, do the files exist, does
 // the check pass -- is the driver's judgment, and it lives in one place.
 
@@ -30,11 +34,13 @@ import type {
 import {
   LedgerError,
   type Row,
+  appendJsonl,
   atomicWriteJsonIndented,
+  readJsonl,
   readRounds,
   sessionRunDir,
 } from "./ledger.ts";
-import { loadSchemaFile, schemaFailure } from "./schema/validate.ts";
+import { loadSchemaFile, schemaFailure, tolerantSchemaFailure } from "./schema/validate.ts";
 
 export const DRIVER_DIRNAME = "driver";
 export const DRIVER_SCHEMA_VERSION = 1;
@@ -45,6 +51,15 @@ export const PLAN_FILENAME = "plan.json";
 export const DISPOSITIONS_FILENAME = "dispositions.json";
 
 export const RUN_FILENAME = "run.json";
+/**
+ * Every amendment ever made to this session's work plan, in order.
+ *
+ * `plan.json` carries the plan as it now stands, because that is what the
+ * driver measures the next report against. What changed, why, and who said
+ * so belongs where nothing overwrites it -- an amendment whose only trace
+ * was the amended plan would be a bar moved by nobody.
+ */
+export const AMENDMENTS_FILENAME = "amendments.jsonl";
 /**
  * A request to end the running invocation, written by `session interrupt`
  * and consumed by the driver -- the one file here that is a message rather
@@ -82,6 +97,10 @@ export function dispositionsPath(repoRoot: string, sessionNumber: number): strin
 
 export function runPath(repoRoot: string, sessionNumber: number): string {
   return join(driverDir(repoRoot, sessionNumber), RUN_FILENAME);
+}
+
+export function amendmentsPath(repoRoot: string, sessionNumber: number): string {
+  return join(driverDir(repoRoot, sessionNumber), AMENDMENTS_FILENAME);
 }
 
 export function interruptPath(repoRoot: string, sessionNumber: number): string {
@@ -161,18 +180,48 @@ export function transcriptPath(
 
 // --- Validation --------------------------------------------------------------
 
-function validateAgainst<T>(record: unknown, schemaName: string, noun: string): T {
-  const failure = schemaFailure(record, loadSchemaFile(schemaName), noun);
+/**
+ * How hard a schema is held to, and which side of the record is asking.
+ *
+ * `strict` is every WRITER: what this build writes fits the schema exactly,
+ * or the reader's forbearance below would be a licence to be sloppy.
+ * `tolerant` is every READER: a member this build has never heard of is
+ * read past, because a record written by a newer build is not damage and
+ * refusing it costs the reader everything the file does say. Nothing else
+ * is relaxed -- a wrong type, a missing required member and a file that is
+ * not JSON are refusals either way.
+ */
+export type Strictness = "strict" | "tolerant";
+
+function validateAgainst<T>(
+  record: unknown,
+  schemaName: string,
+  noun: string,
+  strictness: Strictness = "strict",
+): T {
+  const schema = loadSchemaFile(schemaName);
+  const failure =
+    strictness === "tolerant"
+      ? tolerantSchemaFailure(record, schema, noun)
+      : schemaFailure(record, schema, noun);
   if (failure) throw new LedgerError(failure);
   return record as T;
 }
 
-export function validateInstruction(record: unknown): DriverInstruction {
-  return validateAgainst<DriverInstruction>(record, INSTRUCTION_SCHEMA, "driver instruction");
+export function validateInstruction(
+  record: unknown,
+  strictness: Strictness = "strict",
+): DriverInstruction {
+  return validateAgainst<DriverInstruction>(
+    record,
+    INSTRUCTION_SCHEMA,
+    "driver instruction",
+    strictness,
+  );
 }
 
-export function validateReport(record: unknown): DriverReport {
-  return validateAgainst<DriverReport>(record, REPORT_SCHEMA, "driver report");
+export function validateReport(record: unknown, strictness: Strictness = "strict"): DriverReport {
+  return validateAgainst<DriverReport>(record, REPORT_SCHEMA, "driver report", strictness);
 }
 
 /**
@@ -180,8 +229,16 @@ export function validateReport(record: unknown): DriverReport {
  * member across items: two steps with one id would make a report for
  * either one a report for both.
  */
-export function validateWorkPlan(record: unknown): DriverWorkPlan {
-  const plan = validateAgainst<DriverWorkPlan>(record, WORK_PLAN_SCHEMA, "driver work plan");
+export function validateWorkPlan(
+  record: unknown,
+  strictness: Strictness = "strict",
+): DriverWorkPlan {
+  const plan = validateAgainst<DriverWorkPlan>(
+    record,
+    WORK_PLAN_SCHEMA,
+    "driver work plan",
+    strictness,
+  );
   const seen = new Set<string>();
   for (const step of plan.steps) {
     if (seen.has(step.id)) {
@@ -199,8 +256,16 @@ export function validateWorkPlan(record: unknown): DriverWorkPlan {
  * one member across items; two entries for one finding would leave the
  * driver to choose which the engine meant.
  */
-export function validateDispositions(record: unknown): DriverDisposition {
-  const set = validateAgainst<DriverDisposition>(record, DISPOSITION_SCHEMA, "driver disposition");
+export function validateDispositions(
+  record: unknown,
+  strictness: Strictness = "strict",
+): DriverDisposition {
+  const set = validateAgainst<DriverDisposition>(
+    record,
+    DISPOSITION_SCHEMA,
+    "driver disposition",
+    strictness,
+  );
   const seen = new Set<number>();
   for (const entry of set.dispositions) {
     if (seen.has(entry.finding_index)) {
@@ -214,8 +279,8 @@ export function validateDispositions(record: unknown): DriverDisposition {
   return set;
 }
 
-export function validateRun(record: unknown): DriverRun {
-  return validateAgainst<DriverRun>(record, RUN_SCHEMA, "driver run");
+export function validateRun(record: unknown, strictness: Strictness = "strict"): DriverRun {
+  return validateAgainst<DriverRun>(record, RUN_SCHEMA, "driver run", strictness);
 }
 
 /**
@@ -263,8 +328,18 @@ export function holdDispositionsAgainstRound(
  * One artifact, validated. Absent is null -- a legitimate state, before the
  * answer exists. Unparseable or invalid is a refusal: nothing but the
  * framework writes here, so a bad file is a hand in the record.
+ *
+ * Read TOLERANTLY, and this is the one place that decides it: every
+ * whole-file read goes through here, and every writer is elsewhere. A
+ * record carrying a member this build does not know is read for what it
+ * does carry, which is what an installed extension needs to survive a
+ * newer driver -- and it pays from the next driver-changing session on,
+ * because the reader it repairs is the reader that ships.
  */
-function readArtifact<T>(path: string, validate: (record: unknown) => T): T | null {
+function readArtifact<T>(
+  path: string,
+  validate: (record: unknown, strictness: Strictness) => T,
+): T | null {
   if (!existsSync(path)) return null;
   let record: unknown;
   try {
@@ -274,7 +349,7 @@ function readArtifact<T>(path: string, validate: (record: unknown) => T): T | nu
       `${path} is not valid JSON: ${error instanceof Error ? error.message : String(error)}`,
     );
   }
-  return validate(record);
+  return validate(record, "tolerant");
 }
 
 export function readInstruction(repoRoot: string, sessionNumber: number): DriverInstruction | null {
@@ -350,6 +425,105 @@ export function writeRun(repoRoot: string, sessionNumber: number, record: unknow
   const valid = validateRun(record);
   atomicWriteJsonIndented(runPath(repoRoot, sessionNumber), valid);
   return valid;
+}
+
+// --- Amending a step ---------------------------------------------------------
+
+export interface AmendInput {
+  readonly stepId: string;
+  /** The step's files as they should now read, whole. Null leaves them alone. */
+  readonly files: readonly string[] | null;
+  /** The step's checks as they should now read, whole. Null leaves them alone. */
+  readonly checks: readonly { readonly argv: readonly string[] }[] | null;
+  readonly reason: string;
+  readonly approver: string;
+}
+
+/**
+ * Every amendment made to this session's plan, oldest first.
+ *
+ * There is no schema over these rows and deliberately not: what an
+ * amendment records is the step as it stood and as it now stands, and both
+ * halves are already validated -- the before by the reader that accepted
+ * the plan, the after by `writeWorkPlan` on the way out.
+ */
+export function readAmendments(repoRoot: string, sessionNumber: number): Row[] {
+  return readJsonl(amendmentsPath(repoRoot, sessionNumber), (record) => record);
+}
+
+/**
+ * Change what ONE not-yet-accepted step is measured against.
+ *
+ * Session 62 asked for exactly this and nothing in the framework could do
+ * it: an engine that had correctly diagnosed a step it could not satisfy
+ * had no way to say so except by failing three times. So the step's `files`
+ * and its `checks` are amendable, with a reason and an approver, and the
+ * amended plan goes back through `writeWorkPlan` -- an amendment that could
+ * write a plan the reader refuses would break the session it meant to save.
+ *
+ * What is NOT amendable is deliberate. An accepted step's report has been
+ * measured; moving its bar afterwards changes what the record says was
+ * judged. `task` and `releasable` are the declaration, and a step's `id`
+ * and `ask` are the work itself -- a session that wants to do different
+ * work replans, and replanning is a thing the record can show.
+ */
+export function amendPlanStep(
+  repoRoot: string,
+  sessionNumber: number,
+  input: AmendInput,
+  acceptedSteps: readonly string[],
+  amendedAt: string,
+): DriverWorkPlan {
+  const reason = input.reason.trim();
+  const approver = input.approver.trim();
+  if (reason === "" || approver === "") {
+    throw new LedgerError(
+      "an amendment carries a reason and an approver; a bar moved by nobody, for no " +
+        "stated reason, is a bar nobody can hold anyone to",
+    );
+  }
+  if (input.files === null && input.checks === null) {
+    throw new LedgerError("an amendment changes the step's files, its checks, or both");
+  }
+  const plan = readWorkPlan(repoRoot, sessionNumber);
+  if (plan === null) {
+    throw new LedgerError(
+      `session ${sessionNumber} has no work plan; there is no step here to amend`,
+    );
+  }
+  const before = plan.steps.find((step) => step.id === input.stepId);
+  if (before === undefined) {
+    throw new LedgerError(
+      `the work plan declares no step '${input.stepId}'; its steps are ` +
+        plan.steps.map((step) => `'${step.id}'`).join(", "),
+    );
+  }
+  if (acceptedSteps.includes(input.stepId)) {
+    throw new LedgerError(
+      `step '${input.stepId}' has already been accepted; its report was measured against ` +
+        "the step as it stood, and amending it now would move that bar afterwards",
+    );
+  }
+  const after = {
+    ...before,
+    ...(input.files === null ? {} : { files: [...input.files] }),
+    ...(input.checks === null ? {} : { checks: input.checks.map((check) => ({ argv: [...check.argv] })) }),
+  };
+  const amended = writeWorkPlan(repoRoot, sessionNumber, {
+    ...plan,
+    steps: plan.steps.map((step) => (step.id === input.stepId ? after : step)),
+  });
+  appendJsonl(amendmentsPath(repoRoot, sessionNumber), {
+    schema_version: DRIVER_SCHEMA_VERSION,
+    session_number: sessionNumber,
+    step_id: input.stepId,
+    reason,
+    approver,
+    amended_at: amendedAt,
+    before: { files: [...before.files], checks: before.checks },
+    after: { files: after.files, checks: after.checks },
+  });
+  return amended;
 }
 
 // --- Shaping a report --------------------------------------------------------

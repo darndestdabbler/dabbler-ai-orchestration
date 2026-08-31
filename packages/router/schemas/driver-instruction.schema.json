@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "driver/instruction.json (what the framework is asking the engine to do now)",
+  "description": "The one outstanding instruction for a driven session, under .dabbler/runs/s<N>/driver/instruction.json. Written only by the driver and replaced whole each time it issues the next one; the engine reads it and answers with the file `answer_schema` names, through the verb `answer_command` spells out. Four kinds and no fifth: `step` asks for work, `rejection` sends an answer back with the reasons it was refused, `interrupt` is the driver having ended an invocation and saying why, `done` says the session is over and nothing more is expected. Every answer the driver acts on is JSON against a schema; the prose an engine writes is for people and the driver never reads it.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "seq", "kind", "session_number", "issued_at"],
+  "properties": {
+    "schema_version": {
+      "const": 1,
+      "description": "Frozen at v1. A reader that finds any other value refuses the file rather than interpreting it."
+    },
+    "seq": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Monotonic per session. An answer names the seq it answers, so a stale answer cannot be mistaken for the current one."
+    },
+    "kind": { "enum": ["step", "rejection", "interrupt", "done"] },
+    "session_number": { "type": "integer", "minimum": 1 },
+    "issued_at": { "type": "string", "minLength": 1 },
+    "step_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9-]+$",
+      "description": "The work-plan step this instruction is about. Required on `step` and `rejection`; an `interrupt` carries it when the engine is being pointed back at a step."
+    },
+    "ask": {
+      "type": "string",
+      "minLength": 1,
+      "description": "What to do, in words for the engine. Required on `step`."
+    },
+    "reasons": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1 },
+      "description": "Why the previous answer was refused, or why the invocation was ended. Required on `rejection` and `interrupt`; each entry is one mechanical reason, never a summary."
+    },
+    "round": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "On a `rejection` that carries a verifier's findings: the round they came from, so the disposition can name it."
+    },
+    "answer_schema": {
+      "enum": [
+        "driver-report.schema.json",
+        "driver-work-plan.schema.json",
+        "driver-disposition.schema.json"
+      ],
+      "description": "Which answer this instruction expects, by the schema it must validate against. Required on every kind but `done`."
+    },
+    "answer_command": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The `dabbler session ...` command line that writes the answer -- the engine never writes the ledger directly. Required on every kind but `done`."
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "kind": { "const": "step" } } },
+      "then": { "required": ["step_id", "ask", "answer_schema", "answer_command"] }
+    },
+    {
+      "if": { "properties": { "kind": { "const": "rejection" } } },
+      "then": { "required": ["reasons", "answer_schema", "answer_command"] }
+    },
+    {
+      "if": { "properties": { "kind": { "const": "interrupt" } } },
+      "then": { "required": ["reasons", "answer_schema", "answer_command"] }
+    }
+  ]
+}

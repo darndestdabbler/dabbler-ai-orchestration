@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "driver/dispositions.json (the engine's answer to a verifier's findings)",
+  "description": "What the engine will do about each blocking finding of one verification round, under .dabbler/runs/s<N>/driver/dispositions.json. Two actions and no third: `fix` re-enters the loop as work the next round reviews; `reject` becomes a dispute, and a dispute is refused without grounds and evidence, so a rejection here carries both or is refused before it is written. There is no word for accepting a finding without fixing it and no word for a verdict -- the engine argues or it fixes, and the verifier judges. Validated before it is written; a file that fails validation on read is refused.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "session_number", "seq", "round", "dispositions", "recorded_at"],
+  "properties": {
+    "schema_version": {
+      "const": 1,
+      "description": "Frozen at v1. A reader that finds any other value refuses the file rather than interpreting it."
+    },
+    "session_number": { "type": "integer", "minimum": 1 },
+    "seq": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "The seq of the rejection instruction that carried the findings."
+    },
+    "round": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "The recorded round the findings belong to."
+    },
+    "dispositions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["finding_index", "action"],
+        "properties": {
+          "finding_index": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "0-based index into that round's `findings`."
+          },
+          "action": { "enum": ["fix", "reject"] },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The rebuttal's argument on `reject` -- it becomes the dispute's grounds. Optional on `fix`."
+          },
+          "evidence_paths": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "type": "string", "minLength": 1 },
+            "description": "Repository-relative cites, optionally `path:START-END`. Required on `reject`: a prose-only dispute is refused, so a prose-only rejection is refused here first."
+          }
+        },
+        "allOf": [
+          {
+            "if": { "properties": { "action": { "const": "reject" } } },
+            "then": { "required": ["reason", "evidence_paths"] }
+          }
+        ]
+      }
+    },
+    "recorded_at": { "type": "string", "minLength": 1 }
+  }
+}

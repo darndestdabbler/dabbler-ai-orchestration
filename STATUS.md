@@ -1,8 +1,70 @@
-# STATUS — 57 of 61 closed. Next: 58, the engine adapter
+# STATUS — 58 of 61 closed. Next: 59, Start is the launch
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
 `experiment/verification-pipeline-v3` and `design/solution-decomposition`
 are merged and finished. Earlier handoff text is in `docs/status-archive.md`.
+
+> **Recorded, 2026-08-31, after session 58.** Session 58 — the third of the
+> driver set — closed `VERIFIED` in two rounds. Round 1 raised two Majors:
+> one was fair and is built (engine children had no POSIX process group, so
+> a tree kill would have orphaned the tool the engine was running — the
+> `detached` rule now lives inside `spawnProgram` for every caller, proven
+> by a test that kills a real grandchild); the other asked for the plan's
+> `text`/`-s`-when-quiet argv and was **disputed with line-cited evidence
+> and withdrawn** in round 2, because D250 had already recorded that the
+> plan's step 4 ("identical bytes on the ledger") forbids it. Its deliverable is
+> **D250**: the engine adapter. **One spawn**, `checks.spawnProgram`: an
+> `.exe` with no shell, a `.cmd` shim through `cmd.exe` with every argument
+> quoted, and the declared checks, the Copilot seat and the engines all go
+> through it — both branches proven with a real shim in the suite. **Three
+> argv shapes, measured** off the installed CLIs' `--help` (`engines.ts`):
+> Claude Code `-p --input-format stream-json --output-format stream-json
+> --verbose --dangerously-skip-permissions [--model] [--continue]` with the
+> prompt as a stdin user message; Copilot `-p <prompt> --model M
+> --allow-all-tools --allow-all-paths --no-ask-user [--continue]` (model
+> required, refused by name without it); Codex 0.151.0 `exec --json [-m]
+> --dangerously-bypass-approvals-and-sandbox <prompt>`, then `exec resume
+> --last …` (cwd-scoped). `--engine-argv` is now optional and overrides;
+> gemini has no shape and is refused by name. **`driver.engine_output:
+> stream | quiet`** (`dabbler.yaml`; `--show-engine` overrides one run)
+> decides what the terminal shows and never what `engine-<NN>.log`
+> records — the plan's `text`/`-s` when quiet was dropped because it
+> contradicted the plan's own "identical bytes on the ledger"; `stream`
+> shows Claude's thinking / tool / text / result lines and only the `init`
+> system event, Copilot's own lines, Codex's completed JSONL items. **The
+> interrupt, one path:** `dabbler session interrupt --reason "<text>"`
+> writes `interrupt.json` (refused when nothing is being driven; cleared at
+> registration); the driver polls it every half second, ends the
+> invocation, writes `# interrupted (<reason>)` on the transcript, and
+> re-issues the same instruction as `kind: interrupt` under a new seq with
+> the reason first among `reasons`, then re-invokes with `--continue`.
+> **Measured:** Claude Code's single-process variant honours a
+> `control_request{interrupt}` on stream-json stdin — `control_response`,
+> `result: error_during_execution`, process alive, context kept (it knew it
+> had reached 4) — so the Claude Code adapter ends an invocation through
+> that message and closes stdin at the `result`; Copilot and Codex get a
+> tree kill, which is also the fallback ten seconds after a control message
+> that ended nothing. `session.interrupt` is on the in-process contract for
+> 59's Stop. Every `engine-invoked` line reports `invocation=N/max`. 57's
+> `done` question: no CLI is invoked to read it, on any engine. Eight
+> tests; **1179 router tests**; the extension changed only where its test
+> stub implements the widened contract.
+> **Round 2's nit, left because the tree was verified:** `session interrupt`
+> cannot tell whether an invocation is running — a request made between
+> invocations succeeds and is then discarded (logged as
+> `interrupt-discarded`), and one written in the instant between the
+> driver's discard and the spawn still ends the new invocation. Closing it
+> means `run.json` saying an invocation is in flight, which is a schema
+> change for 59 to take if Stop needs the truth rather than the log.
+>
+> **Owed to 59.** Start becomes the launch: `session drive` with the
+> registered engine and no `--engine-argv`; Stop and Send are `session
+> interrupt`; the attention row exists already. The developer's guide
+> documents the driven lifecycle, `driver.engine_output`, the interrupt,
+> and what a stopped loop looks like. **Noted.** The Codex renderer follows
+> Codex's documented JSONL item shapes; the CLI is not installed here and
+> its output was not measured live — the first driven Codex session should
+> read its transcript against the rendered lines.
 
 > **Recorded, 2026-08-31, after session 57.** Session 57 — the second of the
 > driver set — closed `VERIFIED` in two rounds. Round 1 raised three Majors:

@@ -1,0 +1,304 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "python -m ai_router.progress --json (the Work Explorer's projection)",
+  "description": "Everything the extension renders for one repository, in one pass, as ai_router.progress.build_projection returns it. It is a read, not a record: nothing on disk is written in this shape, and it is recomputed on every call. The schema exists because the extension's view of it was a hand-kept TypeScript mirror, which is the drift this file removes -- from here the mirror is generated from this. Nothing here is derived on the reading side: the padding of a number, the words of a state, and the headline of a terminal round are all decided in Python, and a reader that recomputed one of them would be a second implementation of a rule.",
+  "type": "object",
+  "required": ["schemaVersion", "generatedAt", "repository", "sessions"],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "type": "integer",
+      "const": 1,
+      "description": "The shape this payload is written in."
+    },
+    "generatedAt": {
+      "type": "string",
+      "minLength": 1,
+      "description": "When the projection was computed, local time with offset."
+    },
+    "repository": { "$ref": "#/$defs/repository" },
+    "sessions": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/session" }
+    }
+  },
+  "$defs": {
+    "sessionStatus": {
+      "description": "The one status vocabulary, shared by sessions and tasks. It is the LEDGER's vocabulary: every value here is one a writer may put on disk, which is why 'planned' is not among them.",
+      "type": "string",
+      "enum": ["not-started", "in-progress", "complete", "cancelled"]
+    },
+    "projectedSessionStatus": {
+      "description": "What a session row may say, which is one more thing than the ledger may hold. 'planned' is a session the plan declares and the ledger has not reached -- distinct from 'not-started', which already means 'registered, and not begun'. It exists only in a projection: no writer accepts it, and the ledger schema does not list it, so a projected state can never become a recorded one. A planned row's iconKey stays 'not-started' because the two share a glyph; what separates them is the row's words, not its picture.",
+      "type": "string",
+      "enum": ["not-started", "in-progress", "complete", "cancelled", "planned"]
+    },
+    "orchestrator": {
+      "description": "Who ran the sessions, passed through from the ledger's orchestrator block rather than re-shaped. Open, because the block carries more than a reader needs and a closed copy here would be a second declaration of it.",
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "engine": { "type": "string" },
+        "provider": { "type": "string" },
+        "model": { "type": "string" },
+        "effort": { "type": "string" }
+      }
+    },
+    "repository": {
+      "description": "The repository-level half. There is no status: nothing above a session carries a lifecycle state, so a repository has a progress fraction and nothing else.",
+      "type": "object",
+      "required": [
+        "sessionsSource",
+        "schemaVersionOnDisk",
+        "totalSessions",
+        "sessionsCompleted",
+        "currentSession",
+        "lastActivityAt",
+        "possiblyStalled",
+        "stalledAfterSeconds",
+        "owedDecisions",
+        "plannedSessions",
+        "nextSession",
+        "forceClosed",
+        "orchestrator",
+        "invariantViolation"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "sessionsSource": {
+          "description": "Where these sessions came from. 'ledger' is the machine-written record; 'plan' is a repository that has been set up and never run, whose sessions are the ones its plan declares.",
+          "type": "string",
+          "enum": ["ledger", "plan"]
+        },
+        "schemaVersionOnDisk": { "type": ["integer", "null"] },
+        "totalSessions": { "type": ["integer", "null"] },
+        "sessionsCompleted": { "type": "integer", "minimum": 0 },
+        "currentSession": { "type": ["integer", "null"] },
+        "lastActivityAt": {
+          "type": ["string", "null"],
+          "description": "When this repository's record last moved: the latest timestamp across the activity log and the verification rounds. DERIVED, never stamped -- the framework already timestamps every row it writes, and a field written beside them would be a second statement of one fact. Null when nothing has been written yet."
+        },
+        "possiblyStalled": {
+          "type": "boolean",
+          "description": "A session is in flight and its record has not moved for longer than the declared threshold. It proves the process has stopped WRITING, never that the thinking has stopped being useful, and the row that renders it must say which -- a heartbeat that implied the second would be a liveness signal making a judgment it cannot make."
+        },
+        "stalledAfterSeconds": {
+          "type": ["integer", "null"],
+          "description": "The threshold `possiblyStalled` was judged against, published so a reader never has to guess which number produced the answer. Null when nothing is in flight."
+        },
+        "owedDecisions": {
+          "type": "array",
+          "description": "What this repository is waiting on a person for, folded from the owed-decision ledger. Carried on the projection because the Explorer's attention view is meant to be ONE place the operator looks -- a view that had to read a second file to answer half its rows would be the second place.",
+          "items": {
+            "type": "object",
+            "required": ["id", "question", "severity", "blocking"],
+            "additionalProperties": false,
+            "properties": {
+              "id": { "type": "string" },
+              "question": { "type": "string" },
+              "severity": { "type": "string", "enum": ["blocking", "advisory"] },
+              "blocking": {
+                "type": "boolean",
+                "description": "Whether leaving this unanswered refuses the close."
+              },
+              "onNoAnswer": { "type": ["string", "null"] }
+            }
+          }
+        },
+        "plannedSessions": {
+          "description": "How many sessions the plan declares that the ledger has not reached. Zero for a repository whose ledger has caught up. It is published rather than left to be counted from the rows because 'is this project finished' is the question the count answers, and a reader that re-derived it would be a second implementation of the rule.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "nextSession": {
+          "description": "The number that registers on the next `session start`: the lowest open session, whether the ledger already holds a row for it or the plan alone declares it. Null when nothing is left to run. Derived here so the close and the Explorer answer 'what now' identically.",
+          "type": ["integer", "null"]
+        },
+        "forceClosed": { "type": "boolean" },
+        "orchestrator": {
+          "oneOf": [{ "$ref": "#/$defs/orchestrator" }, { "type": "null" }]
+        },
+        "invariantViolation": {
+          "type": ["string", "null"],
+          "description": "Two sessions in flight, or another state the ledger may not be in. Rendered, never repaired."
+        }
+      }
+    },
+    "task": {
+      "description": "One step of an in-flight session's approved plan, folded with its execution record. Identity and order are the plan's; state and iconKey come from step-execution.jsonl.",
+      "type": "object",
+      "required": ["position", "stepId", "intent", "state", "iconKey", "isOpen", "startedAt"],
+      "additionalProperties": false,
+      "properties": {
+        "position": { "type": "integer", "minimum": 1 },
+        "stepId": { "type": ["string", "null"] },
+        "intent": { "type": "string" },
+        "state": {
+          "type": "string",
+          "description": "The fold's own words: 'pending', 'in flight', 'done'."
+        },
+        "iconKey": { "$ref": "#/$defs/sessionStatus" },
+        "isOpen": {
+          "type": "boolean",
+          "description": "The one step in flight, if this is it. At most one per session."
+        },
+        "startedAt": { "type": ["string", "null"] }
+      }
+    },
+    "agencyOperation": {
+      "type": "object",
+      "required": ["kind", "target", "fidelity", "inScope"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "type": "string" },
+        "target": { "type": "string" },
+        "fidelity": {
+          "type": ["string", "null"],
+          "description": "'verbatim' / 'transformed' / 'unverified', or null when the row was written before fidelity was recorded."
+        },
+        "inScope": { "type": "boolean" }
+      }
+    },
+    "agency": {
+      "description": "What the verifier looked at in the round that stopped a session, and how faithfully. mode is null for a round recorded before the agency log existed -- unknown, which is not the same as 'none'.",
+      "type": "object",
+      "required": [
+        "mode",
+        "reads",
+        "searches",
+        "listings",
+        "transformedReads",
+        "outOfScope",
+        "overBudget",
+        "reason",
+        "operations"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "mode": { "type": ["string", "null"], "enum": ["tools", "none", null] },
+        "reads": { "type": "integer", "minimum": 0 },
+        "searches": { "type": "integer", "minimum": 0 },
+        "listings": { "type": "integer", "minimum": 0 },
+        "transformedReads": { "type": "integer", "minimum": 0 },
+        "outOfScope": { "type": "integer", "minimum": 0 },
+        "overBudget": { "type": "integer", "minimum": 0 },
+        "reason": { "type": ["string", "null"] },
+        "operations": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/agencyOperation" }
+        }
+      }
+    },
+    "finding": {
+      "description": "One finding as the record carries it, with the record's own word for how it stands.",
+      "type": "object",
+      "required": [
+        "round",
+        "description",
+        "severity",
+        "category",
+        "failureScenario",
+        "evidencePaths",
+        "blocking",
+        "disposition"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "round": { "type": ["integer", "null"] },
+        "description": { "type": "string" },
+        "severity": { "type": "string" },
+        "category": { "type": "string" },
+        "failureScenario": { "type": "string" },
+        "evidencePaths": { "type": "array", "items": { "type": "string" } },
+        "blocking": { "type": "boolean" },
+        "disposition": {
+          "type": "string",
+          "description": "'outstanding' / 'fixed, unreviewed' / 'noted' -- the fold's words, not a reader's."
+        }
+      }
+    },
+    "verification": {
+      "description": "A session's rounds ledger folded for reading at planning time: which terminal state was reached, how it reads, and whether the row is clean. Carried for every session that has rounds, not only the in-flight one.",
+      "type": "object",
+      "required": [
+        "terminal",
+        "headline",
+        "clean",
+        "verdict",
+        "rounds",
+        "stoppedAtRound",
+        "cap",
+        "verifierModel",
+        "verifierProvider",
+        "transport",
+        "agency",
+        "findings",
+        "fixPaths"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "terminal": {
+          "type": ["string", "null"],
+          "description": "VERIFIED, ISSUES_FOUND (unresolved at the cap) or REMEDIATED_AT_CAP; null while the loop is still open."
+        },
+        "headline": {
+          "type": "string",
+          "description": "The one sentence every loop reports its state in, written in Python."
+        },
+        "clean": { "type": "boolean" },
+        "verdict": { "type": ["string", "null"] },
+        "rounds": { "type": "integer", "minimum": 0 },
+        "stoppedAtRound": { "type": ["integer", "null"] },
+        "cap": { "type": ["integer", "null"] },
+        "verifierModel": { "type": ["string", "null"] },
+        "verifierProvider": { "type": ["string", "null"] },
+        "transport": { "type": ["string", "null"] },
+        "agency": { "$ref": "#/$defs/agency" },
+        "findings": { "type": "array", "items": { "$ref": "#/$defs/finding" } },
+        "fixPaths": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "session": {
+      "type": "object",
+      "required": [
+        "number",
+        "displayNumber",
+        "title",
+        "status",
+        "iconKey",
+        "inFlight",
+        "startedAt",
+        "completedAt",
+        "verificationVerdict",
+        "tasks",
+        "tasksRefused",
+        "verification",
+        "verificationRefused"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "number": { "type": "integer" },
+        "displayNumber": {
+          "type": "string",
+          "description": "The number as the projection wrote it -- '015'. Python owns the padding rule; this is its result, not a shape a reader re-derives. Empty when an older router sent no name."
+        },
+        "title": { "type": "string" },
+        "status": { "$ref": "#/$defs/projectedSessionStatus" },
+        "iconKey": { "$ref": "#/$defs/sessionStatus" },
+        "inFlight": { "type": "boolean" },
+        "startedAt": { "type": ["string", "null"] },
+        "completedAt": { "type": ["string", "null"] },
+        "verificationVerdict": { "type": ["string", "null"] },
+        "tasks": { "type": "array", "items": { "$ref": "#/$defs/task" } },
+        "tasksRefused": {
+          "type": ["string", "null"],
+          "description": "Why the execution record could not be read. A refusal is not an empty task list: the view must say it cannot tell which step is open rather than render the last row it could read."
+        },
+        "verification": {
+          "oneOf": [{ "$ref": "#/$defs/verification" }, { "type": "null" }]
+        },
+        "verificationRefused": { "type": ["string", "null"] }
+      }
+    }
+  }
+}

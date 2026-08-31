@@ -90,8 +90,9 @@ it.
 | 52 | The startup experience, walked before it ships | no | 2026-08-30 |
 | 53 | The Work Explorer reads at a glance, and session 1 asks | no | 2026-08-31 |
 | 54 | The router suite stops taxing the host | no | 2026-08-31 |
-| 55 | The operator onboarding deck | — | not declared |
-| 56 | The half of the trial that needs a published router | — | not declared |
+| 55 | The task rows move themselves | no | 2026-08-31 |
+| 56 | The operator onboarding deck | — | not declared |
+| 57 | The half of the trial that needs a published router | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -1519,3 +1520,9 @@ Session 53: the Work Explorer reads at a glance, and session 1 asks.
 **Releasable: no.**
 
 Cap vitest workers for packages/router (vitest.config.ts: small fixed local pool, measured at 2 and 4 against the 86 s baseline, one worker in CI); make config.test.ts hermetic against DABBLER_TRANSPORT (clear in beforeEach, restore after); affected, verify, final-full, close.
+
+### Session 55 — The task rows move themselves
+
+**Releasable: no.**
+
+Task rows derived from the lifecycle's own records (Register, Declare, Work, Verify, Run of record, Close); test-evidence record stamps the session; seedSessionPlan/logStep/advanceStepsAtDeclare/closeLastStep/session log deleted; docs updated; extension 2.3.0 built and installed.

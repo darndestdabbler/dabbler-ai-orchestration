@@ -138,13 +138,6 @@ export interface SessionRestoreOptions extends RepositoryTarget {
   readonly reason: string;
 }
 
-export interface SessionLogOptions extends RepositoryTarget {
-  readonly sessionNumber?: number;
-  readonly step?: string;
-  readonly status?: string;
-  readonly note?: string;
-}
-
 export interface SessionDecisionOptions extends RepositoryTarget {
   readonly sessionNumber?: number;
   readonly decider: string;
@@ -161,7 +154,6 @@ export interface SessionVerbs {
   close(options: SessionCloseOptions): Promise<RouterResult<RouterText>>;
   cancel(options: SessionCancelOptions): Promise<RouterResult<RouterText>>;
   restore(options: SessionRestoreOptions): Promise<RouterResult<RouterText>>;
-  log(options: SessionLogOptions): Promise<RouterResult<RouterText>>;
   decision(options: SessionDecisionOptions): Promise<RouterResult<RouterText>>;
 }
 

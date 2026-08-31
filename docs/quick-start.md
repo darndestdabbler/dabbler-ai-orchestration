@@ -94,26 +94,19 @@ ahead.
 
 ## 3. Work the steps
 
-Follow the spec's step list for the current session: make the edits,
-run the tests, log progress. **Do not commit yet** — verification
-reviews the working tree, and an already-committed tree presents an
-empty diff.
+Follow the spec's step list for the current session: make the edits and
+run the tests. **Do not commit yet** — verification reviews the working
+tree, and an already-committed tree presents an empty diff.
 
-Log each step against the rows the start seeded:
-
-```
-dabbler session log \
-    --step <stepKey|stepNumber> --status <pending|in-progress|complete|blocked>
-```
-
-`start` prints the addressable `stepKey`s; either the key or its number
-resolves the same row. A step that resolves to nothing is **refused**
-with the valid addresses printed — it never lands as an orphan row
-nobody planned. Re-logging the same status is a noop, so the command is
-safe to repeat after a context reset. `--note` records your own wording
-instead of the spec's; `--session-number` addresses a session other than
-the one in flight (with none in flight it defaults to the last closed
-one, which is where a close-out step belongs).
+There is nothing to log. The Work Explorer's task rows are the
+lifecycle's six phases — *Register*, *Declare*, *Work*, *Verify*, *Run of
+record*, *Close* — and each one is done the moment the verb that is that
+phase writes its record: `session start` the first, `session declare`
+the second, the pre-verification evidence record the third, a clean
+`verify` round the fourth, the `final-full` record the fifth, and the
+close the last. The open row is the first not done. No command moves a
+row by hand, so a row that reads "in flight" is one whose record does not
+exist yet, never one an engine forgot to tick.
 
 ### Executing an approved plan, one step at a time
 

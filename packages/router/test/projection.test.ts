@@ -6,8 +6,8 @@
 // its verification, and -- the part a projection gets wrong most easily --
 // how it says it could not tell.
 
-import { writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 
 import { afterAll, describe, expect, it } from "vitest";
 
@@ -38,24 +38,14 @@ import {
   synthesizeV3FromV2,
   verificationCap,
 } from "../src/progress.ts";
-import { flipStateToClosed, logStep, registerSessionStart, seedSessionPlan } from "../src/writers.ts";
-// `session.ts` registers the plan parser `seedSessionPlan` needs; importing it
-// for that registration is what `cli/status.ts` does for the same reason.
-import { advanceStepsAtDeclare, closeLastStep } from "../src/session.ts";
+import { declareSessionTask, flipStateToClosed, registerSessionStart } from "../src/writers.ts";
 import { git, makeSandboxRepo, makeTempDir, removeTempDirs } from "./support/fixtures.ts";
 
 afterAll(removeTempDirs);
 
-/**
- * Register session 1 and seed its steps, which is what `dabbler session start`
- * does in two calls. Seeding is what puts a session's steps on the record, and
- * the task rows are the fold of those.
- */
+/** Register session 1, which is the whole of what `dabbler session start` writes. */
 function start(sessionsDir: string): void {
   registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
-  seedSessionPlan(sessionsDir, 1);
-  // `start` logs nothing against step 1: the plan assigns its opening to
-  // `declare`, and a step `start` had moved is a step `declare` cannot open.
 }
 
 /** A schema-valid step event; the fold is what the tests are about. */
@@ -299,135 +289,150 @@ describe("the source of a projection's sessions", () => {
 // --- The task level -----------------------------------------------------------
 
 describe("the task rows", () => {
-  /** Move a seeded step, the way `dabbler session log` does. */
-  function log(
-    sessionsDir: string,
-    key: string,
-    status: string,
-    stepNumber: number,
+  /** File a test run the way `test-evidence record` does, minus the digests. */
+  function fileRun(
+    repo: string,
+    stage: string,
+    extra: Record<string, unknown> = {},
   ): void {
-    logStep(sessionsDir, 1, key, `logged ${key}`, status, stepNumber);
+    const path = join(repo, ".dabbler", "runs", "test-runs.jsonl");
+    mkdirSync(dirname(path), { recursive: true });
+    appendFileSync(
+      path,
+      JSON.stringify({
+        suite: "unit",
+        command: "python -m pytest",
+        outcome: "passed",
+        surfaceDigest: "0".repeat(12),
+        recordedAt: new Date().toISOString(),
+        stage,
+        ...extra,
+      }) + "\n",
+      "utf8",
+    );
   }
 
-  function keysOf(sessionsDir: string): string[] {
-    return buildTaskRows(sessionsDir, 1).map((row) => String(row["stepId"]));
+  function states(sessionsDir: string): string[] {
+    return buildTaskRows(sessionsDir, 1).map((row) => String(row["state"]));
   }
 
-  it("opens step 1 at declare, and moves nothing else", () => {
-    // The bookend is one transition. `start` leaves every step pending --
-    // a step it had already moved is a step `declare` could not open -- and
-    // completing step 1 or opening step 2 are MIDDLE transitions the plan
-    // assigns to `session log`. A bookend that moved those too would be the
-    // framework running a different state machine from its own plan.
-    const { sessionsDir } = makeSandboxRepo();
-    start(sessionsDir);
-    expect(
-      buildTaskRows(sessionsDir, 1).every((row) => row["state"] === "pending"),
-    ).toBe(true);
+  function openId(sessionsDir: string): string | null {
+    const open = buildTaskRows(sessionsDir, 1).find((row) => row["isOpen"]);
+    return open ? String(open["stepId"]) : null;
+  }
 
-    advanceStepsAtDeclare(sessionsDir, 1);
-    const rows = buildTaskRows(sessionsDir, 1);
-    expect(rows[0]["state"]).toBe("in flight");
-    expect(rows[0]["isOpen"]).toBe(true);
-    expect(rows.slice(1).every((row) => row["state"] === "pending")).toBe(true);
-  });
-
-  it("opens nothing on a second declare, because step 1 is already open", () => {
-    const { sessionsDir } = makeSandboxRepo();
-    start(sessionsDir);
-    advanceStepsAtDeclare(sessionsDir, 1);
-    expect(advanceStepsAtDeclare(sessionsDir, 1).opened).toBeNull();
-  });
-
-  it("keeps at most one step open when two are logged in flight", () => {
-    const { sessionsDir } = makeSandboxRepo();
-    start(sessionsDir);
-    const keys = keysOf(sessionsDir);
-    log(sessionsDir, keys[1], "in-progress", 2);
-    log(sessionsDir, keys[2], "in-progress", 3);
-    const rows = buildTaskRows(sessionsDir, 1);
-    expect(rows.filter((row) => row["isOpen"]).length).toBe(1);
-    expect(rows[2]["isOpen"]).toBe(true);
-  });
-
-  it("closes the last step when the run of record lands", () => {
-    const { sessionsDir } = makeSandboxRepo();
-    start(sessionsDir);
-    const before = buildTaskRows(sessionsDir, 1);
-    expect(before[before.length - 1]["state"]).toBe("pending");
-    expect(closeLastStep(sessionsDir, 1).error).toBe("");
-    const after = buildTaskRows(sessionsDir, 1);
-    expect(after[after.length - 1]["state"]).toBe("done");
-  });
-
-  it("renders the steps the plan declares, in the plan's order", () => {
-    // The sandbox plan's session 1 has four numbered steps. `session start`
-    // seeds them; nothing else has to be written for a task to exist.
+  it("has six phases, and registering is the first of them done", () => {
+    // The rows are the lifecycle's, not the plan's: nothing is seeded from
+    // prose, and `session start` writing `startedAt` is what finishes the
+    // first one. The second is open because it is the first not done.
     const { sessionsDir } = makeSandboxRepo();
     start(sessionsDir);
     const rows = buildTaskRows(sessionsDir, 1);
-    expect(rows.length).toBe(4);
-    expect(rows.map((row) => row["position"])).toEqual([0, 1, 2, 3]);
-    expect(String(rows[1]["intent"])).toContain("widget");
-  });
-
-  it("folds the last status logged against each step", () => {
-    const { sessionsDir } = makeSandboxRepo();
-    start(sessionsDir);
-    const keys = keysOf(sessionsDir);
-    log(sessionsDir, keys[0], "complete", 1);
-    log(sessionsDir, keys[1], "in-progress", 2);
-    const rows = buildTaskRows(sessionsDir, 1);
+    expect(rows.map((row) => row["stepId"])).toEqual([
+      "register",
+      "declare",
+      "work",
+      "verify",
+      "run-of-record",
+      "close",
+    ]);
     expect(rows.map((row) => row["state"])).toEqual([
       "done",
       "in flight",
       "pending",
       "pending",
-    ]);
-    expect(rows.map((row) => row["iconKey"])).toEqual([
-      "complete",
-      "in-progress",
-      "not-started",
-      "not-started",
+      "pending",
+      "pending",
     ]);
     expect(rows[1]["isOpen"]).toBe(true);
+    expect(typeof rows[0]["startedAt"]).toBe("string");
     expect(typeof rows[1]["startedAt"]).toBe("string");
     expect(rows[2]["startedAt"]).toBeNull();
   });
 
-  it("takes the later row when a step is logged twice", () => {
-    // `session start` logs `register` complete itself, and an orchestrator
-    // that logs it again must not produce two truths about one step.
+  it("the declaration ends Declare and opens Work", () => {
     const { sessionsDir } = makeSandboxRepo();
     start(sessionsDir);
-    const keys = keysOf(sessionsDir);
-    log(sessionsDir, keys[1], "in-progress", 2);
-    log(sessionsDir, keys[1], "complete", 2);
-    expect(buildTaskRows(sessionsDir, 1)[1]["state"]).toBe("done");
-    expect(buildTaskRows(sessionsDir, 1)[1]["isOpen"]).toBe(false);
+    declareSessionTask(sessionsDir, { sessionNumber: 1, task: "Do it.", releasable: false });
+    expect(states(sessionsDir).slice(0, 3)).toEqual(["done", "done", "in flight"]);
+    expect(openId(sessionsDir)).toBe("work");
+    expect(String(buildTaskRows(sessionsDir, 1)[1]["intent"])).toContain("Do it.");
   });
 
-  it("leaves nothing in flight once the open step is closed", () => {
-    const { sessionsDir } = makeSandboxRepo();
+  it("the affected tests recorded passing end Work, for this session's rows only", () => {
+    // A row stamped with another session is not this one's; a row stamped
+    // with none is attributed by the session's window, which is where every
+    // row written before the stamp existed lands.
+    const { repo, sessionsDir } = makeSandboxRepo();
     start(sessionsDir);
-    const keys = keysOf(sessionsDir);
-    log(sessionsDir, keys[0], "in-progress", 1);
-    log(sessionsDir, keys[0], "complete", 1);
-    expect(
-      buildTaskRows(sessionsDir, 1).every((row) => row["isOpen"] === false),
-    ).toBe(true);
+    declareSessionTask(sessionsDir, { sessionNumber: 1, task: "Do it.", releasable: false });
+    fileRun(repo, "preverify-targeted", { sessionNumber: 2 });
+    expect(openId(sessionsDir)).toBe("work");
+    fileRun(repo, "preverify-targeted");
+    expect(openId(sessionsDir)).toBe("verify");
+    expect(states(sessionsDir)[2]).toBe("done");
   });
 
-  it("gives a blocked step the cancelled glyph and its own word", () => {
-    // There is no fifth icon asset, and a step that stopped reads closer to
-    // cancelled than to any of the other three. The word is what separates
-    // them.
-    const { sessionsDir } = makeSandboxRepo();
+  it("a blocking round keeps Verify open with the round in its words; a clean one ends it", () => {
+    const { repo, sessionsDir } = makeSandboxRepo();
     start(sessionsDir);
-    log(sessionsDir, keysOf(sessionsDir)[2], "blocked", 3);
-    const row = buildTaskRows(sessionsDir, 1)[2];
-    expect(row["state"]).toBe("blocked");
-    expect(row["iconKey"]).toBe("cancelled");
+    declareSessionTask(sessionsDir, { sessionNumber: 1, task: "Do it.", releasable: false });
+    fileRun(repo, "preverify-targeted");
+    recordRound(repo, { round: 1, verdict: "ISSUES_FOUND", blocking: true });
+    let rows = buildTaskRows(sessionsDir, 1);
+    expect(rows[3]["state"]).toBe("in flight");
+    expect(String(rows[3]["intent"])).toContain("round 1");
+    recordRound(repo, {
+      round: 2,
+      verdict: "VERIFIED",
+      blocking: false,
+      previous_tree: snapshotWorktreeTree(repo),
+    });
+    rows = buildTaskRows(sessionsDir, 1);
+    expect(rows[3]["state"]).toBe("done");
+    expect(rows[4]["isOpen"]).toBe(true);
+  });
+
+  it("verification that stopped at the cap is blocked on the cancelled glyph, and nothing is open", () => {
+    const { repo, sessionsDir } = makeSandboxRepo();
+    start(sessionsDir);
+    declareSessionTask(sessionsDir, { sessionNumber: 1, task: "Do it.", releasable: false });
+    fileRun(repo, "preverify-targeted");
+    recordRound(repo, { round: 1, verdict: "ISSUES_FOUND", blocking: true });
+    recordRound(repo, {
+      round: 2,
+      verdict: "REMEDIATED_AT_CAP",
+      blocking: false,
+      type: "remediated_at_cap",
+      previous_tree: snapshotWorktreeTree(repo),
+      remediated: {
+        reviewed_round: 1,
+        findings: [{ description: "fixed", severity: "major" }],
+        fix_paths: [],
+      },
+    });
+    const rows = buildTaskRows(sessionsDir, 1);
+    expect(rows[3]["state"]).toBe("blocked");
+    expect(rows[3]["iconKey"]).toBe("cancelled");
+    expect(rows.every((row) => row["isOpen"] === false)).toBe(true);
+    expect(rows[4]["state"]).toBe("pending");
+  });
+
+  it("the run of record counts only after the verdict, and the close ends the list", () => {
+    const { repo, sessionsDir } = makeSandboxRepo();
+    start(sessionsDir);
+    declareSessionTask(sessionsDir, { sessionNumber: 1, task: "Do it.", releasable: false });
+    fileRun(repo, "preverify-targeted");
+    fileRun(repo, "final-full");
+    expect(states(sessionsDir)[4]).toBe("pending");
+    recordRound(repo, { round: 1, verdict: "VERIFIED", blocking: false });
+    expect(states(sessionsDir)[4]).toBe("in flight");
+    fileRun(repo, "final-full");
+    expect(states(sessionsDir)[4]).toBe("done");
+    expect(openId(sessionsDir)).toBe("close");
+    flipStateToClosed(sessionsDir, { verdict: "VERIFIED", forced: false });
+    expect(states(sessionsDir)).toEqual(["done", "done", "done", "done", "done", "done"]);
+    expect(openId(sessionsDir)).toBeNull();
   });
 
   it("has no tasks and no refusal in a repository nothing has run in", () => {
@@ -443,7 +448,7 @@ describe("the task rows", () => {
       unknown
     >[];
     const inFlight = sessions.find((session) => session["inFlight"]);
-    expect((inFlight?.["tasks"] as unknown[]).length).toBe(4);
+    expect((inFlight?.["tasks"] as unknown[]).length).toBe(6);
     expect(inFlight?.["tasksRefused"]).toBeNull();
   });
 
@@ -467,8 +472,6 @@ describe("the task rows", () => {
     expect(String(inFlight?.["tasksRefused"])).toContain("activity-log.json");
   });
 });
-
-// --- The verification view ----------------------------------------------------
 
 describe("the verification view", () => {
   it("answers null for a session with no rounds", () => {

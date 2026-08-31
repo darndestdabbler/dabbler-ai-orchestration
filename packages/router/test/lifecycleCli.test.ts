@@ -47,7 +47,6 @@ describe("dabbler session, the whole surface", () => {
     const result = await captured(() => sessionVerb(["--help"]));
     for (const name of [
       "start",
-      "log",
       "decision",
       "declare",
       "plan",

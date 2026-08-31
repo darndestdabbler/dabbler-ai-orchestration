@@ -7929,3 +7929,79 @@ clearing it first, so with the variable set in the shell — which
 `bootstrap` does at user scope on a seat machine — three tests failed.
 The clear-then-restore now sits at file scope, once, and the file passes
 with the variable set to either value.
+
+## Session 55 — The task rows move themselves
+
+### D247 · 2026-08-31 · Operator · Task rows are derived from the lifecycle's own records — six phases, no session log, nothing an engine ticks — with one Work row in the middle
+
+The Work Explorer's task rows used to be seeded from the session plan's
+numbered prose by `session start` (one `plan-step` entry each, keyed by a
+slug of the step's first clause) and moved by `dabbler session log`, which
+the engine was told to type. Session 40 made that a framework-owned state
+machine with two bookends — `declare` opened step 1, the run of record
+closed the last — and a verifier upheld that the middle transitions belong
+to the engine. The operator's screenshot of session 54 showed what that
+produces: *Register* "in progress" three minutes after `session start` had
+registered the session; a row labelled *Make config* because the slug cut
+"Make `config.test.ts` hermetic" at its first `.`; *Cap the workers*
+in flight because the engine said so. The operator's ruling: confusing, and
+"having AI update the task list NEVER worked and it just looked really
+bad." An engine asked to narrate its own progress narrates late, by hand,
+or not at all, and the Explorer rendered the narration as state.
+
+**Decided.** The rows are derived from the records the lifecycle already
+writes, and nothing else. Six phases, in lifecycle order, each done the
+moment its verb's record exists:
+
+| Row | Done when | Written by |
+|---|---|---|
+| Register | `startedAt` on the ledger | `session start` |
+| Declare | the `task-declaration` entry | `session declare` |
+| Work | a passed `preverify-targeted` row for the session | `test-evidence record` |
+| Verify | the rounds ledger's terminal verdict is `VERIFIED` | `dabbler verify` |
+| Run of record | a passed `final-full` row after that verdict | `test-evidence record` |
+| Close | the session's status is `complete` | `session close` |
+
+The open row is the first not done, while the session is in flight. A
+blocking round leaves *Verify* open with the round and the cap in its
+words; a cap terminal (`REMEDIATED_AT_CAP`, `ISSUES_FOUND`) renders it
+blocked on the cancelled glyph with nothing open. A row's start is the
+previous row's end, which is what the tree's time slot already means.
+
+**Deleted, not repaired:** `seedSessionPlan`, `logStep`, `STEP_STATUSES`
+and the plan-parser registration in `writers.ts`; `advanceStepsAtDeclare`,
+`closeLastStep`, `log` and the plan-row resolvers in `session.ts`; the
+`log` subcommand from the CLI, the in-process router and the contract; the
+step-key list `session start` printed. `planStepKey` stays: the plan
+review's step ids use it. A `plan-step` or logged-step entry already in an
+activity log is history the rows no longer read — the record is
+append-only and nothing migrates it.
+
+**One row is unobservable from inside, and it is one row.** *Work* ends
+when the affected tests are recorded passing; the plan's numbered steps
+stay in the plan as instructions and never become rows. The operator chose
+this over per-step work rows, and over an earlier idea of a task id on the
+sanctioned writer, because an id the model chooses is the model narrating
+again.
+
+**Evidence rows are stamped.** `test-evidence record` now writes the
+session in flight on the row as `test-evidence run` already did; rows
+written before this carry none and are attributed by the session's own
+window (`startedAt` to `completedAt`). `lastActivityAt` reads the ledger's
+own `startedAt`/`completedAt` as well, since the seeding used to supply
+the first stamp and a session that has only just registered has moved.
+
+**What this is not.** The framework does not launch verification, the
+suite or the close; the engine still types each verb and the rows flip
+when the verb writes. Making the framework drive the lifecycle — the
+authoring AI called per step with schema-validated answers, the way
+`verify` already calls the verifier — is the operator's long-haul
+direction, recorded in STATUS.md as the block after the deck and the
+publication trial, and is not this decision.
+
+The extension is untouched: `taskRowLabel` already turns `run-of-record`
+into *Run of record*. Extension **2.3.0** bundles the router and was built
+and installed on the operator's machine so the next session shows the
+rows moving. Proven on this session's own rows before the verdict:
+Register, Declare and Work done, Verify open from the moment the
+pre-verify record landed, nobody having typed anything.

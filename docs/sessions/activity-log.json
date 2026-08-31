@@ -9891,6 +9891,95 @@
       "dateTime": "2026-08-31T02:21:52.938000-04:00",
       "description": "Affected; verify; full suite as `final-full`; close.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 55,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-31T02:49:35.754000-04:00",
+      "description": "Register; declare `--not-releasable`.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 55,
+      "stepNumber": 2,
+      "stepKey": "six-rows-derived",
+      "dateTime": "2026-08-31T02:49:35.754000-04:00",
+      "description": "**Six rows, derived.** `buildTaskRows` in `progress.ts` stops folding `plan-step` entries against logged statuses and reads the records the lifecycle writes: *Register* is done when the ledger carries `startedAt`; *Declare* when the activity log carries the session's `task-declaration`; *Work* when a passed `preverify-targeted` evidence row exists for the session (the affected tests recorded passing is the observable end of the work); *Verify* when the rounds ledger's terminal verdict is `VERIFIED` \u2014 a blocking round leaves it in flight with the round and the cap in its words, and a cap terminal renders it blocked on the cancelled glyph; *Run of record* when a passed `final-full` row lands after the verdict; *Close* when the session's status is `complete`. The open row is the first not done, and only while the session is in flight; a row's start is the previous row's end, which is what the extension's time slot already means. The row shape the extension reads (`stepId`, `intent`, `state`, `iconKey`, `isOpen`, `startedAt`) does not change, and `taskRowLabel` already turns `run-of-record` into *Run of record*, so the extension is not touched.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 55,
+      "stepNumber": 3,
+      "stepKey": "attribute-evidence-to-the-session",
+      "dateTime": "2026-08-31T02:49:35.754000-04:00",
+      "description": "**Attribute evidence to the session.** `test-evidence record` stamps the session in flight on the row, as `test-evidence run` already does; rows written before this carry none and are attributed by the session's own window (`startedAt` to `completedAt`).",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 55,
+      "stepNumber": 4,
+      "stepKey": "delete-the-narration",
+      "dateTime": "2026-08-31T02:49:35.754000-04:00",
+      "description": "**Delete the narration.** `seedSessionPlan`, `planStepKey`, `logStep`, the plan-parser registration and `STEP_STATUSES` leave `writers.ts`; `advanceStepsAtDeclare`, `closeLastStep`, `log` and the plan-row resolvers leave `session.ts`; the `log` subcommand leaves the CLI, the in-process router and the contract; `session start` stops printing step keys to tick. `splitSlugMarker` stays: the plan review reads it. A `plan-step` or logged-step entry already in an activity log is ignored, not migrated \u2014 the record is append-only and the rows no longer read it.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 55,
+      "stepNumber": 5,
+      "stepKey": "docs-say-what-is-true",
+      "dateTime": "2026-08-31T02:49:35.754000-04:00",
+      "description": "**Docs say what is true.** `docs/quick-start.md` \u00a73 and the activity-log section of `docs/schema-reference.md` describe the derived rows; `session log` appears in neither.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 55,
+      "stepNumber": 6,
+      "stepKey": "extension-2",
+      "dateTime": "2026-08-31T02:49:35.754000-04:00",
+      "description": "Extension **2.3.0**, built as a `.vsix` and installed here, so the operator's Explorer shows the rows moving in the next session.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 55,
+      "stepNumber": 7,
+      "stepKey": "affected",
+      "dateTime": "2026-08-31T02:49:35.754000-04:00",
+      "description": "Affected; verify; full suite as `final-full`; close.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 55,
+      "dateTime": "2026-08-31T02:49:36.448000-04:00",
+      "task": "Task rows derived from the lifecycle's own records (Register, Declare, Work, Verify, Run of record, Close); test-evidence record stamps the session; seedSessionPlan/logStep/advanceStepsAtDeclare/closeLastStep/session log deleted; docs updated; extension 2.3.0 built and installed.",
+      "releasable": false
+    },
+    {
+      "sessionNumber": 55,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-31T02:49:36.476000-04:00",
+      "description": "Register; declare `--not-releasable`.",
+      "status": "in-progress"
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D247",
+      "ordinal": 247,
+      "sessionNumber": 55,
+      "decidedOn": "2026-08-31",
+      "recordedAt": "2026-08-31T03:08:43.554000-04:00",
+      "decider": "operator",
+      "headline": "Task rows are derived from the lifecycle's own records \u2014 six phases, no session log, nothing an engine ticks \u2014 with one Work row in the middle",
+      "body": "The Work Explorer's task rows used to be seeded from the session plan's\nnumbered prose by `session start` (one `plan-step` entry each, keyed by a\nslug of the step's first clause) and moved by `dabbler session log`, which\nthe engine was told to type. Session 40 made that a framework-owned state\nmachine with two bookends \u2014 `declare` opened step 1, the run of record\nclosed the last \u2014 and a verifier upheld that the middle transitions belong\nto the engine. The operator's screenshot of session 54 showed what that\nproduces: *Register* \"in progress\" three minutes after `session start` had\nregistered the session; a row labelled *Make config* because the slug cut\n\"Make `config.test.ts` hermetic\" at its first `.`; *Cap the workers*\nin flight because the engine said so. The operator's ruling: confusing, and\n\"having AI update the task list NEVER worked and it just looked really\nbad.\" An engine asked to narrate its own progress narrates late, by hand,\nor not at all, and the Explorer rendered the narration as state.\n\n**Decided.** The rows are derived from the records the lifecycle already\nwrites, and nothing else. Six phases, in lifecycle order, each done the\nmoment its verb's record exists:\n\n| Row | Done when | Written by |\n|---|---|---|\n| Register | `startedAt` on the ledger | `session start` |\n| Declare | the `task-declaration` entry | `session declare` |\n| Work | a passed `preverify-targeted` row for the session | `test-evidence record` |\n| Verify | the rounds ledger's terminal verdict is `VERIFIED` | `dabbler verify` |\n| Run of record | a passed `final-full` row after that verdict | `test-evidence record` |\n| Close | the session's status is `complete` | `session close` |\n\nThe open row is the first not done, while the session is in flight. A\nblocking round leaves *Verify* open with the round and the cap in its\nwords; a cap terminal (`REMEDIATED_AT_CAP`, `ISSUES_FOUND`) renders it\nblocked on the cancelled glyph with nothing open. A row's start is the\nprevious row's end, which is what the tree's time slot already means.\n\n**Deleted, not repaired:** `seedSessionPlan`, `logStep`, `STEP_STATUSES`\nand the plan-parser registration in `writers.ts`; `advanceStepsAtDeclare`,\n`closeLastStep`, `log` and the plan-row resolvers in `session.ts`; the\n`log` subcommand from the CLI, the in-process router and the contract; the\nstep-key list `session start` printed. `planStepKey` stays: the plan\nreview's step ids use it. A `plan-step` or logged-step entry already in an\nactivity log is history the rows no longer read \u2014 the record is\nappend-only and nothing migrates it.\n\n**One row is unobservable from inside, and it is one row.** *Work* ends\nwhen the affected tests are recorded passing; the plan's numbered steps\nstay in the plan as instructions and never become rows. The operator chose\nthis over per-step work rows, and over an earlier idea of a task id on the\nsanctioned writer, because an id the model chooses is the model narrating\nagain.\n\n**Evidence rows are stamped.** `test-evidence record` now writes the\nsession in flight on the row as `test-evidence run` already did; rows\nwritten before this carry none and are attributed by the session's own\nwindow (`startedAt` to `completedAt`). `lastActivityAt` reads the ledger's\nown `startedAt`/`completedAt` as well, since the seeding used to supply\nthe first stamp and a session that has only just registered has moved.\n\n**What this is not.** The framework does not launch verification, the\nsuite or the close; the engine still types each verb and the rows flip\nwhen the verb writes. Making the framework drive the lifecycle \u2014 the\nauthoring AI called per step with schema-validated answers, the way\n`verify` already calls the verifier \u2014 is the operator's long-haul\ndirection, recorded in STATUS.md as the block after the deck and the\npublication trial, and is not this decision.\n\nThe extension is untouched: `taskRowLabel` already turns `run-of-record`\ninto *Run of record*. Extension **2.3.0** bundles the router and was built\nand installed on the operator's machine so the next session shows the\nrows moving. Proven on this session's own rows before the verdict:\nRegister, Declare and Work done, Verify open from the moment the\npre-verify record landed, nobody having typed anything."
     }
   ]
 }

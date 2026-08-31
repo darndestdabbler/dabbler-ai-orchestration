@@ -1,7 +1,7 @@
 // `dabbler session <subcommand>` -- the lifecycle's command line.
 //
-// All nine subcommands are real. Session 26 landed the four that WRITE the
-// record (`start`, `declare`, `log`, `decision`); session 31 lands the five
+// All eight subcommands are real. Session 26 landed the three that WRITE the
+// record (`start`, `declare`, `decision`); session 31 lands the five
 // that judge it -- `close` and its gates, `cancel`, `restore`, `plan` and
 // the legacy `migrate` -- so nothing here is refused for not existing yet.
 //
@@ -11,7 +11,7 @@
 // `--not-releasable` that parsed as nothing would publish.
 
 import { SessionsRootNotFoundError, resolveSessionsDir } from "../evidence.ts";
-import { DECIDERS, STEP_STATUSES } from "../writers.ts";
+import { DECIDERS } from "../writers.ts";
 import {
   EXIT_BOUNDARY,
   EXIT_USAGE,
@@ -19,7 +19,6 @@ import {
   close,
   declare,
   decision,
-  log,
   migrate,
   plan,
   restore,
@@ -30,7 +29,6 @@ import { writeErr, writeOut } from "./output.ts";
 /** Every subcommand, in the order the usage text lists them. */
 const SUMMARY: Record<string, string> = {
   start: "register a session start",
-  log: "record a plan step's status in activity-log.json",
   decision: "append a decision to decisions-log.md",
   declare: "declare the session's task list and releasability",
   plan: "record the plan prose in project-work-plan.md",
@@ -59,10 +57,6 @@ const OPTIONS: Record<string, readonly string[]> = {
     "                           the model registry rather than the seat label",
     "  --effort EFFORT          optional reasoning effort, recorded with the identity",
     "  --total-sessions N       optional; the ledger otherwise grows to the plan",
-  ],
-  log: [
-    "  --step STEP              required: the stepKey `start` printed, or its number",
-    "  --status STATUS          required: not-started | in-progress | complete",
   ],
   decision: [
     "  --decider WHO            required: operator | orchestrator | verifier | framework",
@@ -289,34 +283,6 @@ export async function sessionVerb(argv: string[]): Promise<number> {
       effort: values.get("--effort") ?? null,
       sessionNumber,
       totalSessions,
-    });
-  }
-
-  if (subcommand === "log") {
-    const step = values.get("--step");
-    const status = values.get("--status");
-    const missing = [
-      step === undefined ? "--step" : null,
-      status === undefined ? "--status" : null,
-    ].filter((name): name is string => name !== null);
-    if (missing.length > 0) {
-      writeErr(
-        `dabbler session log: the following arguments are required: ${missing.join(", ")}\n`,
-      );
-      return EXIT_USAGE;
-    }
-    if (!STEP_STATUSES.includes(status!)) {
-      writeErr(
-        `dabbler session log: argument --status: invalid choice: '${status}' ` +
-          `(choose from ${STEP_STATUSES.map((s) => `'${s}'`).join(", ")})\n`,
-      );
-      return EXIT_USAGE;
-    }
-    return log(sessionsDir, {
-      step: step!,
-      status: status!,
-      note: values.get("--note") ?? null,
-      sessionNumber,
     });
   }
 

@@ -220,7 +220,6 @@ export function fakeRouter(
         close: text("session close"),
         cancel: text("session cancel"),
         restore: text("session restore"),
-        log: text("session log"),
         decision: text("session decision"),
       },
       modules: { create: text("modules create") },

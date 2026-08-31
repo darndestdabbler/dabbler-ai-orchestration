@@ -34,11 +34,10 @@ import {
   preverifyRecipe,
   workingTreeChanges,
 } from "../affected.ts";
-import { closeLastStep } from "../session.ts";
 import { readSessionState } from "../progress.ts";
 import { writeErr, writeOut } from "./output.ts";
 
-/** The session in flight, for the bookend when no `--session-number` is given. */
+/** The session in flight, stamped on the row unless `--session-number` says otherwise. */
 function currentSessionNumber(sessionsDir: string): number | null {
   const state = readSessionState(sessionsDir);
   const current = state ? state["currentSession"] : null;
@@ -538,7 +537,7 @@ export async function testEvidenceVerb(argv: string[]): Promise<number> {
       policy,
       policyReason,
       selectedTests: selected,
-      sessionNumber,
+      sessionNumber: sessionNumber ?? currentSessionNumber(sessionsDir),
       detail: values.get("--detail") ?? "",
     });
   } catch (error) {
@@ -579,25 +578,5 @@ export async function testEvidenceVerb(argv: string[]): Promise<number> {
     }
   }
 
-  // The second bookend, and deliberately AFTER the policy refusal above: a
-  // run recorded and then refused is not an accepted run of record, and
-  // marking the last task done on the strength of one would say the session
-  // finished something it did not.
-  if (
-    record.stage === STAGE_FINAL_FULL &&
-    record.outcome === OUTCOME_PASSED &&
-    record.policy !== POLICY_VIOLATION
-  ) {
-    const number =
-      typeof sessionNumber === "number"
-        ? sessionNumber
-        : currentSessionNumber(sessionsDir);
-    if (number !== null) {
-      const { error } = closeLastStep(sessionsDir, number);
-      if (error) {
-        writeErr(`test_evidence: the last task row could not be moved -- ${error}\n`);
-      }
-    }
-  }
   return EXIT_OK;
 }

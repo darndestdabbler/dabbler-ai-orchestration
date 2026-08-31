@@ -63,10 +63,8 @@ import {
   buildProjection,
   canonicalizeStatus,
   derivedView,
-  isLoggedStep,
   isRecord,
   normalizeLegacyState,
-  readActivityLog,
   readRawLegacyState,
   readRawSessionState,
   sessionDisplayNumber,
@@ -75,22 +73,18 @@ import { dumps, pythonRepr, pythonStr } from "./pythonJson.ts";
 import {
   DECIDERS,
   SanctionedWriteError,
-  STEP_STATUSES,
   appendDecision,
   buildOrchestratorBlock,
   completedNumbers,
   cancelledNumbers,
   declareSessionTask,
   flipStateToClosed,
-  logStep,
   nowIsoSeconds,
   onDiskState,
   readTaskDeclaration,
   recordProjectPlan,
   WORK_PLAN_FILENAME,
   registerSessionStart,
-  seedSessionPlan,
-  usePlanParser,
   validateAndWriteState,
 } from "./writers.ts";
 import { writeErr, writeOut } from "./cli/output.ts";
@@ -474,11 +468,6 @@ export function extractSpecExcerpt(specText: string, sessionNumber: number): str
   return specText.trim();
 }
 
-// The writers seed plan rows and must not import this module to do it: the
-// grammar lives here and the write discipline lives there, and an import
-// edge either way would make one depend on the other's load order.
-usePlanParser({ parseSessionPlans, splitSlugMarker, DuplicateSlugError });
-
 // --- start -------------------------------------------------------------------
 
 function isDirectory(path: string): boolean {
@@ -599,42 +588,16 @@ export function start(sessionsDir: string, options: StartOptions): number {
       }
     }
 
-    const state = registerSessionStart(sessionsDir, requested, {
+    registerSessionStart(sessionsDir, requested, {
       engine: options.engine,
       provider: options.provider,
       model: options.model,
       effort: options.effort,
       totalSessions: options.totalSessions,
     });
-    const seeded = seedSessionPlan(
-      sessionsDir,
-      requested,
-      ((state["sessions"] as unknown[]) ?? []).length,
-    );
-
-    const log = readActivityLog(sessionsDir) ?? {};
-    const mine = (Array.isArray(log["entries"]) ? log["entries"] : [])
-      .filter(isRecord)
-      .filter((entry) => entry["sessionNumber"] === requested);
-    const planRows = mine.filter((entry) => entry["kind"] === "plan-step");
-    const loggedKeys = new Set(
-      mine.filter(isLoggedStep).map((entry) => entry["stepKey"]),
-    );
-    // `start` deliberately logs NOTHING against step 1.
-    //
-    // It used to log it complete, and this session first changed that to
-    // `in-progress`. Both pre-empt the opening bookend: the plan assigns
-    // step 1's opening to `session declare`, and a step `start` has already
-    // moved is a step `declare` cannot open. Registration is recorded in
-    // `sessions.json` by `registerSessionStart`, which is where a reader
-    // looks for it; the task row is the plan's state machine and this
-    // command is not a participant in it.
-    void loggedKeys;
-
     writeOut(
       `start: session ${sessionDisplayNumber(requested)} of ` +
-        `${basename(sessionsDir)} registered (${options.engine}); ` +
-        `${seeded} plan step(s) seeded.\n`,
+        `${basename(sessionsDir)} registered (${options.engine}).\n`,
     );
     for (const line of discoveryWarnings()) writeOut(`${line}\n`);
     // Raised before the work, so the question is standing before the session
@@ -651,18 +614,6 @@ export function start(sessionsDir: string, options: StartOptions): number {
       }
     } catch {
       // Deliberately silent: see above.
-    }
-    if (planRows.length > 0) {
-      // The engine cannot guess these derived slugs; a step logged under any
-      // other key (and no stepNumber) lands as a NEW row instead of ticking
-      // the planned one.
-      writeOut(
-        "plan steps -- log each with this stepKey (or at least its " +
-          "stepNumber) to tick the planned row:\n",
-      );
-      for (const row of planRows) {
-        writeOut(`  ${String(row["stepNumber"])}. ${String(row["stepKey"])}\n`);
-      }
     }
     if (readTaskDeclaration(sessionsDir, requested) === null) {
       // Step (a) of the lifecycle. Said here because the declaration has to
@@ -681,168 +632,6 @@ export function start(sessionsDir: string, options: StartOptions): number {
         "It prints the tests this change makes necessary and the exact command " +
         "to run. The complete suite is not accepted before verification -- it " +
         "is the run of record, and it comes after the final verified tree.\n",
-    );
-    return EXIT_OK;
-  } finally {
-    releaseLock(lock);
-  }
-}
-
-// --- log ---------------------------------------------------------------------
-
-function planRowsFor(
-  entries: readonly Record<string, unknown>[],
-  sessionNumber: number,
-): Array<Record<string, unknown>> {
-  return entries.filter(
-    (entry) =>
-      entry["sessionNumber"] === sessionNumber && entry["kind"] === "plan-step",
-  );
-}
-
-/**
- * The planned row `step` addresses, by exact stepKey or by stepNumber.
- *
- * Exact only: a near-miss that resolved by similarity would tick a row the
- * caller did not mean, which is worse than refusing.
- */
-function resolvePlanRow(
-  step: string,
-  planRows: readonly Record<string, unknown>[],
-): Record<string, unknown> | null {
-  const token = (step || "").trim();
-  if (!token) return null;
-  for (const row of planRows) {
-    if (row["stepKey"] === token) return row;
-  }
-  if (/^\d+$/.test(token)) {
-    const number = Number.parseInt(token, 10);
-    for (const row of planRows) {
-      if (row["stepNumber"] === number) return row;
-    }
-  }
-  return null;
-}
-
-export interface LogOptions {
-  readonly step: string;
-  readonly status: string;
-  readonly note?: string | null;
-  readonly sessionNumber?: number | null;
-}
-
-/**
- * Record one plan step's status.
- *
- * The step must resolve against the rows `start` seeded: an unresolvable
- * key refuses rather than appending an orphan row nobody planned, and the
- * closed status vocabulary is enforced here as well as at the writer.
- */
-export function log(sessionsDir: string, options: LogOptions): number {
-  if (!isDirectory(sessionsDir)) {
-    writeErr(`log: not a directory: ${sessionsDir}\n`);
-    return EXIT_USAGE;
-  }
-  if (!STEP_STATUSES.includes(options.status)) {
-    writeErr(
-      `log: refused -- status must be one of ${STEP_STATUSES.join(", ")}; ` +
-        `got '${options.status}'.\n`,
-    );
-    return EXIT_USAGE;
-  }
-
-  let lock: string;
-  try {
-    lock = acquireLockWithTimeout(sessionsDir, `log_step/${process.pid}`);
-  } catch (error) {
-    if (!(error instanceof LockContentionError)) throw error;
-    writeErr(`log: refused -- lifecycle lock contention: ${error.message}\n`);
-    return EXIT_LOCK_CONTENTION;
-  }
-  try {
-    const raw = readRawSessionState(sessionsDir);
-    const normalized = raw ? derivedView(raw) : null;
-    let target = options.sessionNumber ?? null;
-    if (target === null) {
-      const current = (normalized?.["currentSession"] ?? null) as number | null;
-      const completed = [...completedNumbers(normalized)].sort((a, b) => a - b);
-      // The close-out step is logged after `close`, when nothing is in
-      // flight; the last closed session is still the right home for it.
-      target =
-        current !== null
-          ? current
-          : completed.length > 0
-            ? Math.max(...completed)
-            : null;
-    }
-    if (target === null) {
-      writeErr(
-        `log: refused -- no session has been started under ${sessionsDir}. ` +
-          "Run `session start` first.\n",
-      );
-      return EXIT_BOUNDARY;
-    }
-
-    const activity = readActivityLog(sessionsDir) ?? {};
-    const entries = (Array.isArray(activity["entries"]) ? activity["entries"] : [])
-      .filter(isRecord);
-    const planRows = planRowsFor(entries, target);
-    if (planRows.length === 0) {
-      writeErr(
-        `log: refused -- session ${sessionDisplayNumber(target)} of ` +
-          `${basename(sessionsDir)} has no seeded plan rows to log against. ` +
-          "Run `session start` first.\n",
-      );
-      return EXIT_BOUNDARY;
-    }
-
-    const row = resolvePlanRow(options.step, planRows);
-    if (row === null) {
-      const known = planRows
-        .map((entry) => `  ${String(entry["stepNumber"])}. ${String(entry["stepKey"])}`)
-        .join("\n");
-      writeErr(
-        `log: refused -- '${options.step}' is not a plan step of session ` +
-          `${target}. Use one of these stepKeys or its number (no orphan row ` +
-          `was written):\n${known}\n`,
-      );
-      return EXIT_USAGE;
-    }
-
-    const key = String(row["stepKey"]);
-    const description = options.note
-      ? options.note
-      : String(row["description"] || key);
-    const prior = entries.filter(
-      (entry) =>
-        entry["sessionNumber"] === target &&
-        entry["stepKey"] === key &&
-        isLoggedStep(entry),
-    );
-    const last = prior.length > 0 ? prior[prior.length - 1] : null;
-    if (
-      last !== null &&
-      last["status"] === options.status &&
-      (last["description"] || "") === description
-    ) {
-      writeOut(
-        `log: step ${key} of session ${sessionDisplayNumber(target)} is already ` +
-          `${options.status} (noop).\n`,
-      );
-      return EXIT_OK;
-    }
-
-    logStep(
-      sessionsDir,
-      target,
-      key,
-      description,
-      options.status,
-      row["stepNumber"] as number | null,
-    );
-    writeOut(
-      `log: session ${sessionDisplayNumber(target)} step ` +
-        `${String(row["stepNumber"])} (${key}) -> ${options.status}.\n`,
     );
     return EXIT_OK;
   } finally {
@@ -1022,17 +811,6 @@ export function declare(sessionsDir: string, options: DeclareCliOptions): number
     `declare: session ${sessionDisplayNumber(target)} declared; releasable=` +
       `${options.releasable ? "yes" : "no"}.\n`,
   );
-  // The opening bookend, and the whole of it: `declare` opens step 1 and
-  // moves nothing else. What closes it, and what opens step 2, is `session
-  // log` -- the explicit middle transition the plan assigns to it.
-  const moved = advanceStepsAtDeclare(sessionsDir, target);
-  if (moved.closed !== null) writeOut(`declare: step '${moved.closed}' is done.\n`);
-  if (moved.opened !== null) {
-    writeOut(`declare: step '${moved.opened}' is in flight.\n`);
-  }
-  if (moved.error) {
-    writeErr(`declare: the task rows could not be moved -- ${moved.error}\n`);
-  }
   return EXIT_OK;
 }
 
@@ -1632,7 +1410,7 @@ export function restore(
   }
 }
 
-export { DECIDERS, STEP_STATUSES, SESSION_PLAN_FILENAME };
+export { DECIDERS, SESSION_PLAN_FILENAME };
 
 /**
  * Raise the suite-declaration question when this repository owes it.
@@ -1667,125 +1445,4 @@ function raiseSuiteDecisionIfOwed(
     ),
     sessionNumber,
   });
-}
-
-/**
- * Open the first step that is not already done, and say which.
- *
- * The framework owns the two transitions nobody should have to remember. This
- * is the first: a session that has declared its task list has begun, and the
- * step it has begun is the first one still outstanding -- which is step 2 in
- * practice, because `start` logs `register` complete itself.
- *
- * Best-effort and idempotent. A step already in flight is left alone, and a
- * declaration must not fail because a courtesy transition could not be
- * written.
- */
-export function advanceStepsAtDeclare(
-  sessionsDir: string,
-  sessionNumber: number,
-): { readonly closed: string | null; readonly opened: string | null; readonly error: string } {
-  const nothing = { closed: null, opened: null, error: "" };
-  const log = readActivityLog(sessionsDir);
-  if (log === null) return nothing;
-  const entries = (Array.isArray(log["entries"]) ? log["entries"] : []).filter(
-    isRecord,
-  );
-  const mine = entries.filter((entry) => entry["sessionNumber"] === sessionNumber);
-  const planRows = planRowsFor(mine, sessionNumber).slice().sort(
-    (left, right) => Number(left["stepNumber"]) - Number(right["stepNumber"]),
-  );
-  if (planRows.length === 0) return nothing;
-
-  const latest = new Map<string, string>();
-  for (const entry of mine) {
-    if (!isLoggedStep(entry)) continue;
-    const key = String(entry["stepKey"] ?? "");
-    const status = String(entry["status"] ?? "");
-    if (key && status) latest.set(key, status);
-  }
-
-  const move = (row: Record<string, unknown>, status: string): string => {
-    logStep(
-      sessionsDir,
-      sessionNumber,
-      String(row["stepKey"]),
-      String(row["description"] ?? row["stepKey"]),
-      status,
-      row["stepNumber"] as number | null,
-    );
-    return String(row["stepKey"]);
-  };
-
-  const closed: string | null = null;
-  let opened: string | null = null;
-  try {
-    // One transition, and only one: the first step that has not run is
-    // opened. Completing it and opening the next are MIDDLE transitions, and
-    // the plan assigns those to `session log`. A bookend that also moved the
-    // middle would be the framework quietly running a different state machine
-    // from the one its plan describes -- which is what a verifier upheld
-    // against this session, correctly.
-    const next = planRows.find(
-      (row) => latest.get(String(row["stepKey"])) !== "complete",
-    );
-    if (
-      next !== undefined &&
-      latest.get(String(next["stepKey"])) !== "in-progress"
-    ) {
-      opened = move(next, "in-progress");
-    }
-  } catch (error) {
-    // Reported, not swallowed. A declaration must not FAIL because a
-    // transition could not be written -- but an operator told the declaration
-    // succeeded, while the task rows stayed still, has no way to know the two
-    // disagree.
-    return {
-      closed,
-      opened,
-      error: error instanceof Error ? error.message : String(error),
-    };
-  }
-  return { closed, opened, error: "" };
-}
-
-/**
- * Close the last declared step when the run of record lands.
- *
- * The second bookend, and the last transition anyone can observe: the tasks
- * of a session are rendered while it is in flight, and the close ends that.
- * So the complete suite passing against the final tree is the moment the last
- * step is done in any sense a watcher can see.
- */
-export function closeLastStep(
-  sessionsDir: string,
-  sessionNumber: number,
-): { readonly closed: string | null; readonly error: string } {
-  const log = readActivityLog(sessionsDir);
-  if (log === null) return { closed: null, error: "" };
-  const entries = (Array.isArray(log["entries"]) ? log["entries"] : []).filter(
-    isRecord,
-  );
-  const planRows = planRowsFor(entries, sessionNumber).slice().sort(
-    (left, right) => Number(left["stepNumber"]) - Number(right["stepNumber"]),
-  );
-  const last = planRows[planRows.length - 1];
-  if (!last) return { closed: null, error: "" };
-  const key = String(last["stepKey"]);
-  try {
-    logStep(
-      sessionsDir,
-      sessionNumber,
-      key,
-      String(last["description"] ?? key),
-      "complete",
-      last["stepNumber"] as number | null,
-    );
-  } catch (error) {
-    return {
-      closed: null,
-      error: error instanceof Error ? error.message : String(error),
-    };
-  }
-  return { closed: key, error: "" };
 }

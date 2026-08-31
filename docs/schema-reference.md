@@ -68,52 +68,43 @@ are valid, `null` values are not):
 
 ## activity-log.json
 
-Machine-written step log. Shape:
+Machine-written, append-only. Shape:
 
 ```json
 {
-  "sessionSetName": "<slug>",
   "createdDate": "<ISO timestamp>",
   "totalSessions": 3,
   "entries": [
     {
+      "kind": "task-declaration",
       "sessionNumber": 1,
-      "stepNumber": 2,
-      "stepKey": "run-the-tests",
       "dateTime": "<ISO timestamp>",
-      "description": "Run the tests ...",
-      "status": "pending",
-      "kind": "plan-step"
-    }
+      "task": "What this session will do.",
+      "releasable": false
+    },
+    { "kind": "decision", "sessionNumber": 1, "...": "..." },
+    { "kind": "project-plan", "dateTime": "<ISO timestamp>", "body": "..." }
   ]
 }
 ```
 
-- Session start seeds one `"kind": "plan-step"` entry per spec step,
-  status `pending`, exactly once per session (never re-applied).
-- Progress entries append with the same fields minus `kind`. The writer
-  enforces the closed status vocabulary `pending` / `in-progress` /
-  `complete` / `blocked`; drifted synonyms are read-tolerated.
-- `stepKey` is a slug derived from the step's first clause; a logged
-  entry claims a planned row by exact `stepKey` match, or failing that
-  by `stepNumber` (latest entry wins). Unclaimed logged steps append,
-  unclaimed planned rows stay pending. Nothing is dropped either way.
-  `session start` prints the seeded keys and numbers so the logger
-  never has to re-derive the slug.
-- Progress entries are written by `dabbler session log
-  --step <stepKey|stepNumber> --status <s>`,
-  the only sanctioned writer. The step must resolve against a seeded
-  `plan-step` row: an unresolvable `--step` is **refused**, listing the
-  valid addresses, rather than appending an orphan row nobody planned.
-  The status vocabulary is enforced at the CLI boundary as well as at
-  the writer, and re-logging an identical status and description is a
-  noop, so the command is safe to repeat after a context reset.
-  `--session-number` overrides the target; with no session in flight it
-  defaults to the last closed one, which is where a close-out step
-  belongs.
-- Session start also logs the `register` plan step complete itself —
-  registration is the fact the start call established, not something
-  the engine reports afterward.
+- Every entry names its `kind`. `task-declaration` is written once per
+  session by `dabbler session declare`, before the work; `decision` by
+  `dabbler session decision`; `project-plan` by `dabbler session plan`.
+- Decision numbering is derived from this file (`ordinal = decision
+  entries + 1`) and `decisions-log.md` is rendered from it, which is why
+  it is never rewound: restore `sessions.json` alone when a ledger has to
+  be recovered.
+- The Work Explorer's task rows are **not** read from here. They are the
+  lifecycle's six phases, derived from the records the verbs write:
+  *Register* from `startedAt` in `sessions.json`, *Declare* from the
+  `task-declaration` entry above, *Work* from a passed
+  `preverify-targeted` row in `.dabbler/runs/test-runs.jsonl`, *Verify*
+  from the rounds ledger's terminal verdict, *Run of record* from a passed
+  `final-full` row after that verdict, and *Close* from the session's
+  status. Older logs carry `plan-step` and status entries from the
+  seeded-and-logged rows that preceded this; they are history the rows no
+  longer read.
 
 ## change-log.md
 

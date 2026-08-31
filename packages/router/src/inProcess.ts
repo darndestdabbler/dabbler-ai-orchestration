@@ -50,7 +50,6 @@ import {
   type SessionCloseOptions,
   type SessionDeclareOptions,
   type SessionDecisionOptions,
-  type SessionLogOptions,
   type SessionRestoreOptions,
   type SessionStartOptions,
   type SessionVerbs,
@@ -293,19 +292,6 @@ export class InProcessRouter implements Router {
         ["restore", String(o.sessionNumber), "--reason", o.reason, ...targetArgs(o)],
         o.repoRoot,
       ),
-    // `--step` and `--status` are required by the verb and optional in the
-    // contract, so an options object without them produces a usage error
-    // rather than a silent half-log. That is the right failure: the router
-    // says which argument is missing, and this file does not second-guess
-    // a parser it can quote.
-    log: (o: SessionLogOptions) => {
-      const args = ["log", ...targetArgs(o)];
-      optional(args, "--step", o.step);
-      optional(args, "--status", o.status);
-      optional(args, "--note", o.note);
-      optional(args, "--session-number", o.sessionNumber?.toString());
-      return this.text("session", args, o.repoRoot);
-    },
     decision: (o: SessionDecisionOptions) => {
       const args = ["decision", "--decider", o.decider, "--headline", o.headline];
       // The verb takes exactly one of the two, so the file wins when both

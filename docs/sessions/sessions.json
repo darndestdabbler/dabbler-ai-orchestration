@@ -1068,6 +1068,26 @@
         "identityProvenance": "direct"
       },
       "verificationVerdict": "VERIFIED",
+      "verification": {
+        "rounds": 1,
+        "verifierModel": "gpt-5-6-sol",
+        "verifierProvider": "openai",
+        "transport": "api"
+      },
+      "frameworkVersion": "2.0.0"
+    },
+    {
+      "number": 55,
+      "title": "The task rows move themselves",
+      "status": "in-progress",
+      "startedAt": "2026-08-31T02:49:35.687000-04:00",
+      "completedAt": null,
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": "VERIFIED",
       "frameworkVersion": "2.0.0",
       "verification": {
         "rounds": 1,
@@ -1077,7 +1097,7 @@
       }
     },
     {
-      "number": 55,
+      "number": 56,
       "title": "The operator onboarding deck",
       "status": "not-started",
       "startedAt": null,
@@ -1086,7 +1106,7 @@
       "verificationVerdict": null
     },
     {
-      "number": 56,
+      "number": 57,
       "title": "The half of the trial that needs a published router",
       "status": "not-started",
       "startedAt": null,

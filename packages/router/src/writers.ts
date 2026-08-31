@@ -27,6 +27,7 @@ import {
 import { materialWorktreeChanges, previewPaths } from "./gates.ts";
 import { nowIso, platformNewlines } from "./journal.ts";
 import {
+  KIND_TASK_DECLARATION,
   SCHEMA_VERSION,
   STATUS_CANCELLED,
   STATUS_COMPLETE,
@@ -50,13 +51,6 @@ import { VERSION } from "./version.ts";
 
 export { SCHEMA_VERSION } from "./progress.ts";
 
-export const STEP_STATUSES: readonly string[] = [
-  "pending",
-  "in-progress",
-  "complete",
-  "blocked",
-];
-
 /**
  * The two files of the specification. The names are constants because the
  * model that supplies their content never chooses where it lands.
@@ -65,11 +59,12 @@ export const DECISIONS_LOG_FILENAME = "decisions-log.md";
 export const WORK_PLAN_FILENAME = "project-work-plan.md";
 
 /**
- * Activity-log row kinds. `plan-step` predates these three and is written
- * by `seedSessionPlan` / `logStep`.
+ * Activity-log row kinds. The declaration's kind is named with its reader in
+ * `progress.ts`, which folds it into the task rows and must not import this
+ * module to do so.
  */
 export const KIND_DECISION = "decision";
-export const KIND_TASK_DECLARATION = "task-declaration";
+export { KIND_TASK_DECLARATION };
 export const KIND_PROJECT_PLAN = "project-plan";
 
 /**
@@ -536,6 +531,11 @@ export function onDiskState(raw: Record<string, unknown>): Record<string, unknow
 const PLAN_KEY_MAX_WORDS = 6;
 const PLAN_KEY_MAX_CHARS = 48;
 
+/**
+ * A step's identity for the plan review, when the plan authors none: its first
+ * clause, slugged. The task rows do not use it -- they are the lifecycle's
+ * phases, not the plan's prose.
+ */
 export function planStepKey(text: string, ordinal: number): string {
   let head = text.split(/[.:;]/, 1)[0];
   head = head.replace(/[*`_]/g, "").toLowerCase();
@@ -577,143 +577,6 @@ function entriesOfKind(log: Log, kind: string): Entry[] {
 function pushEntry(log: Log, entry: Entry): void {
   if (!Array.isArray(log["entries"])) log["entries"] = [];
   (log["entries"] as unknown[]).push(entry);
-}
-
-/**
- * Seed plan steps as rows -- once per session, never re-applied. A plan
- * edited mid-flight shows new work only when it is logged.
- */
-export function seedSessionPlan(
-  sessionsDir: string,
-  sessionNumber: number,
-  totalSessions?: number | null,
-  parse?: PlanParser,
-): number {
-  const parser = parse ?? requirePlanParser();
-  let planText: string;
-  try {
-    planText = readFileSync(join(sessionsDir, SESSION_PLAN_FILENAME), "utf8").replace(
-      /\r\n?/g,
-      "\n",
-    );
-  } catch {
-    return 0;
-  }
-  const plan = parser
-    .parseSessionPlans(planText)
-    .find((entry) => entry.number === sessionNumber);
-  if (!plan || plan.steps.length === 0) return 0;
-
-  const log = readOrCreateActivityLog(sessionsDir, totalSessions);
-  const already = entriesOf(log).some(
-    (entry) => entry["sessionNumber"] === sessionNumber && entry["kind"] === "plan-step",
-  );
-  if (already) return 0;
-
-  // Resolve every step's key before writing anything: an authored
-  // `(slug: xxx)` marker is the step's one identity, shared with the plan's
-  // step_id, and declaring the same one twice is refused rather than
-  // silently renamed. The six-word truncation is only the fallback for a
-  // step that declares none.
-  const resolved: Array<[string, string]> = [];
-  const seenAuthored = new Set<string>();
-  const seenKeys = new Set<string>();
-  plan.steps.forEach((text, index) => {
-    const ordinal = index + 1;
-    const [cleanText, slug] = parser.splitSlugMarker(text);
-    let key: string;
-    if (slug !== null) {
-      if (seenAuthored.has(slug)) {
-        throw new parser.DuplicateSlugError(
-          `${sessionsDir}: step slug '${slug}' is declared more than once in ` +
-            `session ${sessionNumber}`,
-        );
-      }
-      seenAuthored.add(slug);
-      key = slug;
-    } else {
-      key = planStepKey(cleanText, ordinal);
-      if (seenKeys.has(key)) key = `${key}-${ordinal}`;
-    }
-    seenKeys.add(key);
-    resolved.push([key, cleanText]);
-  });
-
-  const now = nowIsoFull();
-  resolved.forEach(([key, cleanText], index) => {
-    pushEntry(log, {
-      sessionNumber,
-      stepNumber: index + 1,
-      stepKey: key,
-      dateTime: now,
-      description: cleanText,
-      status: "pending",
-      kind: "plan-step",
-    });
-  });
-  writeActivityLog(sessionsDir, log);
-  return plan.steps.length;
-}
-
-/**
- * The plan parser this module needs, supplied by its caller.
- *
- * `session.ts` owns the plan grammar, and `session.ts` calls these writers:
- * taking the parser as an argument is how the cycle stays a call rather
- * than an import edge. The Python twin imports it lazily inside the
- * function for exactly the same reason.
- */
-export interface PlanParser {
-  parseSessionPlans(text: string): Array<{ number: number; steps: string[] }>;
-  splitSlugMarker(text: string): [string, string | null];
-  DuplicateSlugError: new (message: string) => Error;
-}
-
-let planParser: PlanParser | null = null;
-
-/** Registered once by `session.ts` when it loads. */
-export function usePlanParser(parser: PlanParser): void {
-  planParser = parser;
-}
-
-function requirePlanParser(): PlanParser {
-  if (!planParser) {
-    throw new SanctionedWriteError(
-      "no plan parser is registered; the session module supplies it, and " +
-        "seeding a plan without one would invent the step identities the " +
-        "plan declares",
-    );
-  }
-  return planParser;
-}
-
-/**
- * Closed step vocabulary at the writer; drifted synonyms are read-tolerated
- * but never written.
- */
-export function logStep(
-  sessionsDir: string,
-  sessionNumber: number,
-  stepKey: string,
-  description: string,
-  status: string,
-  stepNumber?: number | null,
-): void {
-  if (!STEP_STATUSES.includes(status)) {
-    throw new Error(
-      `step status must be one of ('${STEP_STATUSES.join("', '")}'), got '${status}'`,
-    );
-  }
-  const log = readOrCreateActivityLog(sessionsDir);
-  pushEntry(log, {
-    sessionNumber,
-    stepNumber: stepNumber ?? null,
-    stepKey,
-    dateTime: nowIsoFull(),
-    description,
-    status,
-  });
-  writeActivityLog(sessionsDir, log);
 }
 
 // --- change-log.md -----------------------------------------------------------

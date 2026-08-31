@@ -12,7 +12,7 @@
 // Three vocabularies, deliberately distinct:
 // - session lifecycle: `not-started` / `in-progress` / `complete` /
 //   `cancelled`;
-// - task state, folded from what was logged against a declared step:
+// - task state, derived from the records the lifecycle verbs write:
 //   `pending` / `in flight` / `done` / `blocked`, which is the writer's
 //   vocabulary rendered in the reader's words;
 // - the icon key the extension maps to its four SVG assets: `complete` /
@@ -36,6 +36,13 @@ import {
 } from "./ledger.ts";
 import { openDecisions } from "./owedDecisions.ts";
 import { pythonRepr, pythonStr } from "./pythonJson.ts";
+import {
+  OUTCOME_PASSED,
+  STAGE_FINAL_FULL,
+  STAGE_PREVERIFY_TARGETED,
+  type TestRunRecord,
+  readRecords,
+} from "./testEvidence.ts";
 import { readText } from "./textfile.ts";
 import {
   BLOCKING_SEVERITIES,
@@ -293,14 +300,6 @@ export function readActivityLog(
   } catch {
     return null;
   }
-}
-
-/**
- * A real logged step carries no `kind` at all; plan rows and bookkeeping
- * records always name theirs.
- */
-export function isLoggedStep(entry: Record<string, unknown>): boolean {
-  return !pyStr(entry["kind"]);
 }
 
 /** The session-plan path a sessions directory implies. */
@@ -864,45 +863,24 @@ export const STEP_STATE_IN_FLIGHT = "in flight";
 export const STEP_STATE_DONE = "done";
 export const STEP_STATE_BLOCKED = "blocked";
 
-/** The activity-log row kind `session start` seeds one of per planned step. */
-export const KIND_PLAN_STEP = "plan-step";
+/** The activity-log row kind `session declare` writes, once per session. */
+export const KIND_TASK_DECLARATION = "task-declaration";
 
 /**
- * The statuses `session log` accepts, which are the writer's vocabulary and
- * not this reader's. Imported as constants rather than restated as strings so
- * a status the writer gains cannot silently render as its own name.
+ * The six rows of a session, in lifecycle order. The id is what the tree
+ * labels, and there is no command by which anything adds to or moves one.
  */
-export const STEP_STATUS_PENDING = "pending";
-export const STEP_STATUS_IN_PROGRESS = "in-progress";
-export const STEP_STATUS_COMPLETE = "complete";
-export const STEP_STATUS_BLOCKED = "blocked";
-
-/** The logged status, in the words a task row says. */
-export const TASK_STATE_OF_STATUS: Readonly<Record<string, string>> = {
-  [STEP_STATUS_PENDING]: STEP_STATE_PENDING,
-  [STEP_STATUS_IN_PROGRESS]: STEP_STATE_IN_FLIGHT,
-  [STEP_STATUS_COMPLETE]: STEP_STATE_DONE,
-  [STEP_STATUS_BLOCKED]: STEP_STATE_BLOCKED,
-};
+export const TASK_REGISTER = "register";
+export const TASK_DECLARE = "declare";
+export const TASK_WORK = "work";
+export const TASK_VERIFY = "verify";
+export const TASK_RUN_OF_RECORD = "run-of-record";
+export const TASK_CLOSE = "close";
 
 /**
- * The logged status, as one of the four glyphs the extension ships.
+ * A record the rows depend on could not be read.
  *
- * `blocked` takes the cancelled glyph: there is no fifth asset, and a step
- * that stopped reads far closer to cancelled than to any of the other three.
- * The row's own word is what distinguishes them.
- */
-export const TASK_ICON_OF_STATUS: Readonly<Record<string, string>> = {
-  [STEP_STATUS_PENDING]: STATUS_NOT_STARTED,
-  [STEP_STATUS_IN_PROGRESS]: STATUS_IN_PROGRESS,
-  [STEP_STATUS_COMPLETE]: STATUS_COMPLETE,
-  [STEP_STATUS_BLOCKED]: STATUS_CANCELLED,
-};
-
-/**
- * The plan or the execution record could not be read.
- *
- * A refusal is not a skip: a framework that cannot tell which step is open
+ * A refusal is not a skip: a framework that cannot tell which phase is open
  * must say so, never render the last row it could read as if it were
  * current.
  */
@@ -913,91 +891,199 @@ export class TaskRowsRefused extends Error {
   }
 }
 
+interface Phase {
+  readonly id: string;
+  readonly intent: string;
+  /** When the record that ends this phase was written; null until it is. */
+  readonly doneAt: string | null;
+  /** The phase stopped rather than ended -- verification at its cap. */
+  readonly blocked: boolean;
+}
+
+function epoch(value: unknown): number | null {
+  if (typeof value !== "string" || !value) return null;
+  const at = Date.parse(value);
+  return Number.isNaN(at) ? null : at;
+}
+
 /**
- * The session's declared steps, folded against what was logged against them.
+ * The session's task rows, derived from the records the lifecycle writes.
  *
- * Both halves come from `activity-log.json` and both are already written by
- * the lifecycle. `session start` seeds one `plan-step` row per step in the
- * plan -- number, stable key, description -- and `session log` appends a
- * kind-less row naming the same step with a new status. So the declared list
- * is the plan's, the execution is the log's, and the fold takes the last
- * status logged against each step.
+ * Every row is a phase whose end is a record some verb wrote: `session
+ * start` puts `startedAt` on the ledger, `session declare` appends the
+ * declaration, `test-evidence record` files the affected tests passing and
+ * later the run of record, `verify` appends rounds, and `session close`
+ * flips the status. A row is done exactly when its record exists, the open
+ * row is the first that is not, and nothing an engine types moves one. The
+ * rows used to fold `plan-step` entries against statuses an engine logged
+ * by hand, and an engine logs late, by hand, or not at all -- the Explorer
+ * then rendered the narration as state. A `plan-step` or logged-step entry
+ * still in an activity log is history the rows no longer read.
  *
- * It used to fold `approved-plan.json` against `step-execution.jsonl`, and
- * nothing in the lifecycle writes either, so it returned an empty list at its
- * first line and no session ever rendered a task. Two mechanisms existed for
- * one purpose and the tree read the one nobody wrote. `approved-plan.json`
- * keeps its own job -- the file envelope, the risk flags and the amendment
- * ledger that verification scope reads -- and stops being this projection's
- * source.
- *
- * At most one step is in flight, and that is the log's invariant rather than
- * this function's: a second step logged `in-progress` supersedes the first,
- * because the last row logged against a step is the one that is true.
+ * A row's start is the previous row's end, which is what the tree's time
+ * slot means. Evidence rows are the session's when they carry its number;
+ * rows written before the number was stamped are attributed by the
+ * session's own window.
  */
 export function buildTaskRows(
   sessionsDir: string,
   sessionNumber: number,
 ): Record<string, unknown>[] {
+  const state = readSessionState(sessionsDir);
+  const sessions = state && Array.isArray(state["sessions"]) ? state["sessions"] : [];
+  const session = sessions
+    .filter(isRecord)
+    .find((entry) => entry["number"] === sessionNumber);
+  if (!session) return [];
+
   const log = readActivityLog(sessionsDir);
-  if (log === null) {
-    // Absent is a legitimate state -- a repository nothing has run in yet has
-    // no tasks. Present-but-unreadable is a fault, and rendering it as "no
-    // tasks" would say the same thing as a session that has none.
-    if (!existsSync(join(sessionsDir, ACTIVITY_LOG_FILENAME))) return [];
+  if (log === null && existsSync(join(sessionsDir, ACTIVITY_LOG_FILENAME))) {
     throw new TaskRowsRefused(
-      `${ACTIVITY_LOG_FILENAME} is present but could not be read; no steps ` +
-        "can be folded until it parses",
+      `${ACTIVITY_LOG_FILENAME} is present but could not be read; no ` +
+        "declaration can be folded until it parses",
     );
   }
-  const entries = (Array.isArray(log["entries"]) ? log["entries"] : []).filter(
+  const entries = (log && Array.isArray(log["entries"]) ? log["entries"] : []).filter(
     isRecord,
   );
+  const declaration =
+    entries.find(
+      (entry) =>
+        entry["kind"] === KIND_TASK_DECLARATION &&
+        entry["sessionNumber"] === sessionNumber,
+    ) ?? null;
 
-  const mine = entries.filter(
-    (entry) => entry["sessionNumber"] === sessionNumber,
-  );
-  const declared = mine
-    .filter((entry) => entry["kind"] === KIND_PLAN_STEP)
-    .sort((left, right) => Number(left["stepNumber"]) - Number(right["stepNumber"]));
-  if (declared.length === 0) return [];
+  const startedAt = pyStr(session["startedAt"]) || null;
+  const completedAt = pyStr(session["completedAt"]) || null;
+  const status = session["status"];
 
-  // The last status logged against each step. Keyed on the step key where
-  // there is one and the number otherwise, because `session log --step 3`
-  // is as legitimate as `--step affected` and both name the same row.
-  const logged = new Map<string, string>();
-  const startedAt = new Map<string, unknown>();
-  // At most one step is open, and it is the one most recently logged
-  // `in-progress` that has not since moved. Two steps left sitting at
-  // `in-progress` is a bookkeeping artifact rather than two steps in flight,
-  // so the later one is the open one and the earlier merely says so.
-  let openKey: string | null = null;
-  for (const entry of mine) {
-    if (!isLoggedStep(entry)) continue;
-    const key = pyStr(entry["stepKey"]) || pythonStr(entry["stepNumber"]);
-    const status = pyStr(entry["status"]);
-    if (!status) continue;
-    logged.set(key, status);
-    if (status === STEP_STATUS_IN_PROGRESS) {
-      openKey = key;
-      if (!startedAt.has(key)) startedAt.set(key, entry["dateTime"] ?? null);
-    } else if (openKey === key) {
-      openKey = null;
-    }
+  const repoRoot = repoRootFromSessionsDir(sessionsDir);
+  const windowFrom = epoch(startedAt);
+  const windowTo = epoch(completedAt);
+  const evidence = readRecords(repoRoot).filter((record) => {
+    if (record.sessionNumber !== null) return record.sessionNumber === sessionNumber;
+    const at = epoch(record.recordedAt);
+    return (
+      windowFrom !== null &&
+      at !== null &&
+      at >= windowFrom &&
+      (windowTo === null || at <= windowTo)
+    );
+  });
+  const passedRun = (stage: string, notBefore: number | null): TestRunRecord | null =>
+    evidence.find(
+      (record) =>
+        record.stage === stage &&
+        record.outcome === OUTCOME_PASSED &&
+        (notBefore === null || (epoch(record.recordedAt) ?? -1) >= notBefore),
+    ) ?? null;
+
+  let rounds: Record<string, unknown>[];
+  try {
+    rounds = readRounds(repoRoot, sessionNumber);
+  } catch (error) {
+    if (!(error instanceof LedgerError)) throw error;
+    throw new TaskRowsRefused(`rounds ledger: ${error.message}`);
   }
+  const latestRoundAt =
+    rounds.length > 0 ? pyStr(rounds[rounds.length - 1]["recorded_at"]) || null : null;
+  const view =
+    rounds.length > 0
+      ? buildVerificationView(repoRoot, sessionNumber, verificationCap(repoRoot))
+      : null;
+  const verified = view !== null && view["terminal"] === VERDICT_VERIFIED;
+  const stoppedShort = view !== null && view["terminal"] !== null && !verified;
 
-  return declared.map((step, position) => {
-    const key = pyStr(step["stepKey"]) || pythonStr(step["stepNumber"]);
-    const status = logged.get(key) ?? STEP_STATUS_PENDING;
-    const state = TASK_STATE_OF_STATUS[status] ?? status;
+  const preverify = passedRun(STAGE_PREVERIFY_TARGETED, null);
+  const runOfRecord = verified ? passedRun(STAGE_FINAL_FULL, epoch(latestRoundAt)) : null;
+
+  const phases: Phase[] = [
+    {
+      id: TASK_REGISTER,
+      intent: "Registered on the ledger by `session start`.",
+      doneAt: startedAt,
+      blocked: false,
+    },
+    {
+      id: TASK_DECLARE,
+      intent: declaration
+        ? `Declared: ${pyStr(declaration["task"])}`
+        : "The task list and releasability, declared before the edits.",
+      doneAt: declaration ? pyStr(declaration["dateTime"]) || null : null,
+      blocked: false,
+    },
+    {
+      id: TASK_WORK,
+      intent: preverify
+        ? `The edits, with the affected tests recorded passing (${preverify.suite}).`
+        : "The edits; done when the affected tests are recorded passing.",
+      doneAt: preverify ? preverify.recordedAt : null,
+      blocked: false,
+    },
+    {
+      id: TASK_VERIFY,
+      intent: view
+        ? `${pyStr(view["headline"])} (${pythonStr(view["rounds"])} round(s) reviewed)`
+        : "Cross-provider verification, one round at a time.",
+      doneAt: verified ? latestRoundAt : null,
+      blocked: stoppedShort,
+    },
+    {
+      id: TASK_RUN_OF_RECORD,
+      intent: runOfRecord
+        ? `The complete suite against the verified tree (${runOfRecord.suite}).`
+        : "The complete suite, run once against the verified tree.",
+      doneAt: runOfRecord ? runOfRecord.recordedAt : null,
+      blocked: false,
+    },
+    {
+      id: TASK_CLOSE,
+      intent: "The gates, then the state flip, commit and push.",
+      doneAt: status === STATUS_COMPLETE ? completedAt : null,
+      blocked: false,
+    },
+  ];
+
+  // The fold: done rows in order, then the first row not done is open (while
+  // the session is in flight) or blocked (when verification stopped short),
+  // and everything after it is pending. A record for a later phase written
+  // before an earlier one exists is not a state the lifecycle can reach, and
+  // the fold does not invent one for it.
+  const inFlight = status === STATUS_IN_PROGRESS;
+  let previousEnd: string | null = startedAt;
+  let halted = false;
+  return phases.map((phase, position) => {
+    let stateWord = STEP_STATE_PENDING;
+    let iconKey = STATUS_NOT_STARTED;
+    let isOpen = false;
+    let rowStartedAt: string | null = null;
+    if (!halted && phase.doneAt !== null) {
+      stateWord = STEP_STATE_DONE;
+      iconKey = STATUS_COMPLETE;
+      rowStartedAt = previousEnd;
+      previousEnd = phase.doneAt;
+    } else if (!halted && phase.blocked) {
+      stateWord = STEP_STATE_BLOCKED;
+      iconKey = STATUS_CANCELLED;
+      rowStartedAt = previousEnd;
+      halted = true;
+    } else if (!halted && inFlight) {
+      stateWord = STEP_STATE_IN_FLIGHT;
+      iconKey = STATUS_IN_PROGRESS;
+      isOpen = true;
+      rowStartedAt = previousEnd;
+      halted = true;
+    } else {
+      halted = true;
+    }
     return {
       position,
-      stepId: pyStr(step["stepKey"]) || null,
-      intent: pyStr(step["description"]),
-      state,
-      iconKey: TASK_ICON_OF_STATUS[status] ?? STATUS_NOT_STARTED,
-      isOpen: key === openKey,
-      startedAt: startedAt.get(key) ?? null,
+      stepId: phase.id,
+      intent: phase.intent,
+      state: stateWord,
+      iconKey,
+      isOpen,
+      startedAt: rowStartedAt,
     };
   });
 }
@@ -1481,6 +1567,16 @@ export function lastActivityAt(
   sessionNumber: unknown,
 ): string | null {
   const stamps: string[] = [];
+  // The ledger is a framework write too: registration and the close stamp
+  // the session, and a session that has only just registered has moved.
+  const state = readSessionState(sessionsDir);
+  for (const session of state && Array.isArray(state["sessions"]) ? state["sessions"] : []) {
+    if (!isRecord(session)) continue;
+    for (const field of ["startedAt", "completedAt"]) {
+      const at = session[field];
+      if (typeof at === "string" && at) stamps.push(at);
+    }
+  }
   const log = readActivityLog(sessionsDir);
   const entries = log && Array.isArray(log["entries"]) ? log["entries"] : [];
   for (const entry of entries) {

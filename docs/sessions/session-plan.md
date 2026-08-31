@@ -2166,7 +2166,7 @@ the plan.*
 
 ---
 
-### Session 51 of 52: What the field trial found, and nothing else
+### Session 51 of 53: What the field trial found, and nothing else
 
 *Amended into the plan by session 50, which is the session that found them.
 Bounded deliberately: a remediation session that grows is a second feature
@@ -2194,7 +2194,36 @@ F-50-4 is a new session, not a widening of this one.
 
 ---
 
-### Session 52 of 52: The half of the trial that needs a published router
+### Session 52 of 53: The startup experience, walked before it ships
+
+*Inserted 2026-08-30, at the operator's request: "I want the startup
+experience to have a good DX before release." Two defects found by reading the
+first-run path end to end, both on the primary journey — `File > New > Dabbler
+Project` in a window with no folder open. The publication trial that was
+session 52 becomes 53; it is blocked either way, so nothing is delayed by
+going in front of it.*
+
+1. Register; declare `--not-releasable`.
+2. **The window is replaced out from under the offer.** On the create-a-folder
+   path, `runSetUpProjectFlow` offers "Start session 1", runs it, and only then
+   calls `openFolder` — which discards the window and restarts the extension
+   host. So session 1's engine pick appears in a window about to be thrown
+   away, about a project the operator cannot see yet, and the start races the
+   reload. The folder must open first, and the offer must be made in the
+   window that survives.
+3. **Setting up one project changes a machine-wide setting.** The extension
+   calls `bootstrap` with no `--no-transport-detect`, so a new project
+   persists `DABBLER_TRANSPORT` at user scope on any machine where the
+   detector fires. A per-project action does not get to change how every other
+   project on the machine routes.
+4. Affected; verify; full suite as `final-full`; close.
+
+Est. 6 tests. **Nothing else** — a startup review that grows is the DX
+session that never ships.
+
+---
+
+### Session 53 of 53: The half of the trial that needs a published router
 
 *Blocked on the operator, and that is the correct state rather than a delay to
 apologise for. It runs after the publication decision is answered and CI is

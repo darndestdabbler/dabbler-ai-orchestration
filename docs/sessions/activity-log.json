@@ -9576,6 +9576,42 @@
       "dateTime": "2026-08-30T18:31:42.933000-04:00",
       "description": "Register; declare `--not-releasable`.",
       "status": "in-progress"
+    },
+    {
+      "sessionNumber": 52,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-30T20:12:23.993000-04:00",
+      "description": "Register; declare `--not-releasable`.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 52,
+      "stepNumber": 2,
+      "stepKey": "the-window-is-replaced-out-from",
+      "dateTime": "2026-08-30T20:12:23.993000-04:00",
+      "description": "**The window is replaced out from under the offer.** On the create-a-folder path, `runSetUpProjectFlow` offers \"Start session 1\", runs it, and only then calls `openFolder` \u2014 which discards the window and restarts the extension host. So session 1's engine pick appears in a window about to be thrown away, about a project the operator cannot see yet, and the start races the reload. The folder must open first, and the offer must be made in the window that survives.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 52,
+      "stepNumber": 3,
+      "stepKey": "setting-up-one-project-changes-a",
+      "dateTime": "2026-08-30T20:12:23.993000-04:00",
+      "description": "**Setting up one project changes a machine-wide setting.** The extension calls `bootstrap` with no `--no-transport-detect`, so a new project persists `DABBLER_TRANSPORT` at user scope on any machine where the detector fires. A per-project action does not get to change how every other project on the machine routes.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 52,
+      "stepNumber": 4,
+      "stepKey": "affected",
+      "dateTime": "2026-08-30T20:12:23.993000-04:00",
+      "description": "Affected; verify; full suite as `final-full`; close.",
+      "status": "pending",
+      "kind": "plan-step"
     }
   ]
 }

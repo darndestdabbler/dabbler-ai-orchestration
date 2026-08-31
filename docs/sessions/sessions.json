@@ -1119,9 +1119,9 @@
     {
       "number": 57,
       "title": "`dabbler session drive` \u2014 the framework runs the session",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-31T05:00:56.491000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-08-31T05:46:20.826000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

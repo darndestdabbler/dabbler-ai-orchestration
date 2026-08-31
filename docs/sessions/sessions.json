@@ -1099,9 +1099,9 @@
     {
       "number": 56,
       "title": "The driver's contract \u2014 the schemas and the report verb",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-31T04:37:58.373000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-08-31T04:56:06.509000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

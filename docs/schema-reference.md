@@ -275,6 +275,29 @@ for people and the framework never reads it.
 | `plan.json` | `dabbler session report --answer-file` | `driver-work-plan` | the session's ordered steps |
 | `dispositions.json` | `dabbler session report --answer-file` | `driver-disposition` | what the engine will do about a round's findings |
 | `run.json` | `dabbler session drive` | `driver-run` | where the loop is, and why it stopped |
+| `interrupt.json` | `dabbler session interrupt` | — | a request to end the running invocation; consumed by the driver as it is read |
+| `engine-<NN>.log` | the driver | — | the engine's output for invocation NN, line by line (stderr prefixed `stderr: `), whether or not it was shown |
+
+`interrupt.json` is the one file here that is a message rather than a
+record: `session interrupt --reason "<text>"` writes it (refused when
+nothing is being driven — no run, a completed one, a stopped one), the
+driver polls for it while an invocation runs, removes it the moment it is
+read, ends the invocation (through the CLI's own interrupt where it has one
+— Claude Code's stream-json control message — and a tree kill where it has
+none), writes `# interrupted (<reason>)` on the transcript, and re-issues
+the same instruction as `kind: interrupt` under a new seq with
+`interrupted: <reason>` first among its `reasons` and the answer still
+owed. The engine is re-invoked with its own `--continue`, so it keeps
+everything up to its last completed step and reads what changed. A person
+at the keyboard, the extension's Stop and a gate that tripped all go
+through this one verb.
+
+The transcript is the same whether `driver.engine_output` (in
+`dabbler.yaml`; `--show-engine` overrides for one run) is `stream` or
+`quiet`: the mode decides what the terminal shows — Claude Code's
+stream-json as thinking / tool / text / result lines with only the `init`
+system event, Copilot's own progress lines, Codex's completed JSONL items —
+never what is recorded.
 
 All three answers travel through the one engine verb. A step is answered
 with the flags (`--step --status --files --notes [--tests]`); a plan or a
@@ -292,7 +315,9 @@ answer names the seq it answers; `kind` is `step` \| `rejection` \|
 `interrupt` \| `done` and there is no fifth. A `step` carries `step_id`
 and `ask`; a `rejection` carries `reasons` (one mechanical reason per
 entry) and, when they are a verifier's findings, `round`; an `interrupt`
-carries `reasons` — the driver ended the invocation and this is why. Every
+is the instruction the driver ended re-issued under a new seq — the same
+`step_id`, `ask`, `answer_schema` and `answer_command`, with `interrupted:
+<reason>` first among its `reasons`. Every
 kind but `done` names `answer_schema` (one of the three answer schemas) and
 `answer_command` (the `dabbler session …` line that writes the answer —
 the engine never writes the ledger directly); `done` may name neither, so
@@ -345,8 +370,10 @@ nothing. `stop` is null while the loop runs and after it completed, and
 otherwise `{kind, reason, at}` with `kind` one of `budget` \|
 `rejected-thrice` \| `blocked` \| `engine` \| `tests` \| `verification` \|
 `land` \| `close` — the one field written for a person, and a re-run
-clears it. `engine` names the adapter; a re-run through a different one is
-refused, because one engine's session store carries the run.
+clears it. `engine` names the adapter — `claude-code`, `copilot` or `codex`
+for the built-in command, `command:<program>` for `--engine-argv` — and a
+re-run through a different one is refused, because one engine's session
+store carries the run.
 
 ## Metrics ledger — `router-metrics.jsonl`
 

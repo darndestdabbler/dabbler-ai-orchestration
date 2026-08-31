@@ -8178,3 +8178,97 @@ recorded; budget stop and resume; blocked; red affected tests sent back as
 a fix step; the command adapter's spawn and transcript), driven by a
 scripted in-process engine against the offline verifier -- no model, no
 seat.
+
+## Session 58 — The engine adapter — Claude Code, Copilot, Codex; stream; interrupt
+
+### D250 · 2026-08-31 · Orchestrator (claude-fable-5/anthropic) · The engine adapter: one spawn in checks.spawnProgram (.exe with no shell, .cmd through cmd.exe quoted); measured argv shapes for Claude Code, Copilot and Codex with --engine-argv optional; driver.engine_output and --show-engine change what is shown and never the transcript; session interrupt is the one interrupt path, ending the invocation through Claude Code's measured control message or a tree kill and re-issuing the instruction as kind interrupt
+
+Session 58 is the third of the driver set. Session 57 gave the loop one
+adapter and required `--engine-argv`; this session gives it the engines the
+lifecycle registers, reached the way the driver spike found they must be,
+and the interrupt the operator asked to see.
+
+**One spawn, in `checks.ts`.** `spawnProgram(argv, options)` is how every
+argv the router runs is now reached: `resolveProgram` prefers an `.exe` on
+PATH and it is spawned with no shell; a `.cmd` shim is handed to `cmd.exe`
+with every argument quoted here (`/d /s /v:off /c`, verbatim arguments). The
+declared checks, the Copilot seat's `defaultSpawner` and the engine adapters
+all call it, so the rule that a shell's unquoted join shattered the first
+Copilot prompt in the spike is encoded once. Both branches are proven with a
+real `.cmd` shim in the router's own suite -- CI runs on Windows, so the
+branch that matters runs there.
+
+**Three argv shapes, measured.** `engines.ts` carries one shape per engine,
+each read off the installed CLI's `--help` on 2026-08-31 rather than
+assumed. Claude Code: `-p --input-format stream-json --output-format
+stream-json --verbose --dangerously-skip-permissions [--model M]
+[--continue]`, the prompt written to stdin as a user message. Copilot CLI:
+`-p <prompt> --model M --allow-all-tools --allow-all-paths --no-ask-user
+[--continue]`, the model required as it is at `session start` (a seat with
+no model is refused by name). Codex 0.151.0 (fetched, not installed here):
+`exec --json [-m M] --dangerously-bypass-approvals-and-sandbox <prompt>` for
+the first invocation and `exec resume --last …` afterwards -- `--last` picks
+the most recent session recorded for this directory, which is the scoping
+the spike worried about. Gemini has no shape and `--engine-argv` is required
+for it, by name. The prompt is one sentence -- read the instruction file, do
+what its `ask` says, answer with its `answer_command`, stop -- and
+`--engine-argv` is optional: given, it overrides; absent, the engine's own
+command runs. Session 57's `done` question is answered: no CLI is invoked to
+read it, on any engine, because a closing turn buys nothing the record does
+not already have.
+
+**Stream and quiet change what is shown, never what is recorded.** The
+plan's step 3 asked for `text` when quiet on Claude Code and `-s` when quiet
+on Copilot, and its step 4 asked for identical bytes on the ledger either
+way; those cannot both hold, because the argv decides the bytes. The
+property wins: the argv is the same in both modes, the transcript
+`engine-<NN>.log` is every line the engine printed, and
+`driver.engine_output` (`dabbler.yaml`, default `stream`; `--show-engine
+stream|quiet` overrides one run) decides only whether the terminal shows
+it. `stream` renders Claude Code's stream-json as thinking / tool / text /
+result lines and shows only the `init` system event -- the measurement
+printed a `thinking_tokens` system event after every assistant turn, which
+is exactly the noise the spike's rule excludes -- Copilot's own progress
+lines as they are, and Codex's completed JSONL items (the item format is
+Codex's documented one; the Codex CLI is not installed on this machine and
+its output was not measured live).
+
+**The interrupt, one path.** `dabbler session interrupt --reason "<text>"`
+writes `interrupt.json` into the driver's ledger -- a message, not a record:
+refused when nothing is being driven (no run, a completed one, a stopped
+one), consumed by the driver the moment it is read, and cleared at
+registration so a stale request cannot end the first invocation of a
+re-run. The driver polls for it every half second while an invocation runs,
+aborts the invocation's signal with the reason, writes `# interrupted
+(<reason>)` on the transcript, and re-issues the same instruction under a
+new seq as `kind: interrupt` -- `interrupted: <reason>` first among its
+`reasons`, the `ask`, `answer_schema` and `answer_command` carried, the
+answer command rendered for the new seq -- then invokes the engine again
+with its `--continue`. The adapter decides how the abort ends the child.
+**Measured:** Claude Code's single-process variant honours it. With
+`--input-format stream-json`, a `control_request {subtype: interrupt}`
+written mid-turn was answered by a `control_response` (`still_queued: []`),
+the turn ended with a `result` of `error_during_execution`, the process
+stayed alive, and the next user message was answered with the context kept
+(asked which number it had reached counting under `sleep 2`, it said `4`,
+which was right). So the Claude Code adapter ends an invocation through
+that control message and closes stdin when the `result` arrives; Copilot
+and Codex have no equivalent and their trees are killed; a tree kill is
+also the fallback ten seconds after a control message that ended nothing.
+The driver never knows which happened. The extension's Stop and Send (59)
+are this verb and nothing else, and it is on the in-process contract
+(`session.interrupt`) for that reason.
+
+**Seat cost per step.** Every `engine-invoked` line reports
+`invocation=N/max` against `driver.max_invocations`, so on a seat the
+premium requests spent are read off the log as they go.
+
+Eight tests: the two spawn branches; the three argv shapes with their
+continuations and the two refusals; the renderers' rule; the stream-json
+adapter against a script that speaks the protocol (prompt on stdin,
+`--continue` on the second invocation, the control message ending the
+turn); a command engine's tree ended by the signal; the command line's
+three refusals; the loop interrupted mid-step and closing anyway; and the
+verb refusing a session nothing is driving. **1179 router tests.** The
+extension changes only where its test stub implements the widened contract;
+Start, Stop and Send are 59's.

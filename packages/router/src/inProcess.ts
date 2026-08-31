@@ -50,6 +50,7 @@ import {
   type SessionCloseOptions,
   type SessionDeclareOptions,
   type SessionDecisionOptions,
+  type SessionInterruptOptions,
   type SessionRestoreOptions,
   type SessionStartOptions,
   type SessionVerbs,
@@ -300,6 +301,11 @@ export class InProcessRouter implements Router {
       else optional(args, "--body", o.body);
       optional(args, "--model", o.model);
       optional(args, "--provider", o.provider);
+      optional(args, "--session-number", o.sessionNumber?.toString());
+      return this.text("session", [...args, ...targetArgs(o)], o.repoRoot);
+    },
+    interrupt: (o: SessionInterruptOptions) => {
+      const args = ["interrupt", "--reason", o.reason];
       optional(args, "--session-number", o.sessionNumber?.toString());
       return this.text("session", [...args, ...targetArgs(o)], o.repoRoot);
     },

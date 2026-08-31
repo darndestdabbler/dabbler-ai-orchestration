@@ -13,7 +13,14 @@
 // `--not-releasable` that parsed as nothing would publish.
 
 import { shlexSplit } from "../checks.ts";
-import { commandEngine, driveSession } from "../drive.ts";
+import { driveSession } from "../drive.ts";
+import {
+  ENGINE_OUTPUT_MODES,
+  type Engine,
+  type EngineOutput,
+  builtInEngine,
+  commandEngine,
+} from "../engines.ts";
 import { SessionsRootNotFoundError, resolveSessionsDir } from "../evidence.ts";
 import { DECIDERS } from "../writers.ts";
 import {
@@ -23,6 +30,7 @@ import {
   close,
   declare,
   decision,
+  interrupt,
   migrate,
   plan,
   report,
@@ -37,6 +45,7 @@ const SUMMARY: Record<string, string> = {
   decision: "append a decision to decisions-log.md",
   declare: "declare the session's task list and releasability",
   drive: "run the next session end to end: the framework drives, the engine answers",
+  interrupt: "end the engine's running invocation under a driven session, with a reason",
   report: "answer the driver's outstanding instruction",
   plan: "record the plan prose in project-work-plan.md",
   close: "run gates and close the session",
@@ -87,14 +96,21 @@ const OPTIONS: Record<string, readonly string[]> = {
     "  --provider PROVIDER      anthropic | openai | google; required for a fresh registration",
     "  --model MODEL            required for a Copilot seat",
     "  --effort EFFORT          optional reasoning effort, recorded with the identity",
-    '  --engine-argv "PROG A B" required: the command invoked once per instruction, with no',
-    "                           shell, in the repository root; {instruction} in any element",
-    "                           is the instruction's path, and DABBLER_DRIVER_INSTRUCTION",
-    "                           carries it too",
+    '  --engine-argv "PROG A B" the command invoked once per instruction instead of the',
+    "                           engine's own CLI; {instruction} in any element is the",
+    "                           instruction's path, and DABBLER_DRIVER_INSTRUCTION carries",
+    "                           it too. Required for an engine with no built-in command",
+    "                           (claude-code, copilot and codex have one)",
+    "  --show-engine MODE       stream | quiet: show the engine's output as it runs, or",
+    "                           only record it; overrides driver.engine_output",
     "  --max-invocations N      overrides driver.max_invocations for this run; a re-run",
     "                           past a budget stop passes a larger one",
     "  --max-rounds N           the verification round cap, as `dabbler verify` takes it",
     "  --transport T            the verification transport, as `dabbler verify` takes it",
+  ],
+  interrupt: [
+    "  --reason TEXT            required: what the engine reads next -- the driver ends the",
+    "                           running invocation and re-invokes with it",
   ],
   report: [
     "  --seq N                  required: the seq of the instruction being answered",
@@ -323,15 +339,8 @@ export async function sessionVerb(argv: string[]): Promise<number> {
 
   if (subcommand === "drive") {
     const engine = values.get("--engine");
-    const engineArgv = values.get("--engine-argv");
-    const missing = [
-      engine === undefined ? "--engine" : null,
-      engineArgv === undefined ? "--engine-argv" : null,
-    ].filter((name): name is string => name !== null);
-    if (missing.length > 0) {
-      writeErr(
-        `dabbler session drive: the following arguments are required: ${missing.join(", ")}\n`,
-      );
+    if (engine === undefined) {
+      writeErr("dabbler session drive: the following arguments are required: --engine\n");
       return EXIT_USAGE;
     }
     const maxInvocations = integer(values.get("--max-invocations"), "--max-invocations");
@@ -344,25 +353,54 @@ export async function sessionVerb(argv: string[]): Promise<number> {
       writeErr(`dabbler session drive: ${maxRounds}\n`);
       return EXIT_USAGE;
     }
-    let adapter;
-    try {
-      adapter = commandEngine(shlexSplit(engineArgv!));
-    } catch (error) {
+    const showEngine = values.get("--show-engine");
+    if (showEngine !== undefined && !(ENGINE_OUTPUT_MODES as readonly string[]).includes(showEngine)) {
       writeErr(
-        `dabbler session drive: --engine-argv: ${error instanceof Error ? error.message : String(error)}\n`,
+        `dabbler session drive: argument --show-engine: invalid choice: '${showEngine}' ` +
+          `(choose from ${ENGINE_OUTPUT_MODES.join(", ")})\n`,
       );
       return EXIT_USAGE;
     }
+    const model = values.get("--model") ?? null;
+    const engineArgv = values.get("--engine-argv");
+    let adapter: Engine;
+    if (engineArgv !== undefined) {
+      try {
+        adapter = commandEngine(shlexSplit(engineArgv));
+      } catch (error) {
+        writeErr(
+          `dabbler session drive: --engine-argv: ${error instanceof Error ? error.message : String(error)}\n`,
+        );
+        return EXIT_USAGE;
+      }
+    } else {
+      const built = builtInEngine(engine, model);
+      if (typeof built === "string") {
+        writeErr(`dabbler session drive: ${built}\n`);
+        return EXIT_USAGE;
+      }
+      adapter = built;
+    }
     return driveSession(sessionsDir, {
-      engine: engine!,
+      engine,
       provider: values.get("--provider") ?? null,
-      model: values.get("--model") ?? null,
+      model,
       effort: values.get("--effort") ?? null,
       adapter,
+      engineOutput: (showEngine as EngineOutput | undefined) ?? null,
       maxInvocations,
       maxRounds,
       transport: values.get("--transport") ?? null,
     });
+  }
+
+  if (subcommand === "interrupt") {
+    const reason = values.get("--reason");
+    if (reason === undefined) {
+      writeErr("dabbler session interrupt: the following arguments are required: --reason\n");
+      return EXIT_USAGE;
+    }
+    return interrupt(sessionsDir, { reason, sessionNumber });
   }
 
   if (subcommand === "report") {

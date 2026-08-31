@@ -50,7 +50,7 @@
 // `list2cmdline` is ported rather than approximated -- a different number
 // there would put the two routers on different branches for the same prompt.
 
-import { spawn, spawnSync, type ChildProcess, type SpawnOptions } from "node:child_process";
+import { spawnSync, type ChildProcess } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
 import {
   closeSync,
@@ -66,7 +66,7 @@ import { dirname, isAbsolute, join, resolve } from "node:path";
 
 import { parse as parseToml } from "smol-toml";
 
-import { isArgvTooLarge, quoteForCmd, resolveProgram, terminateTree } from "../checks.ts";
+import { isArgvTooLarge, quoteForCmd, resolveProgram, spawnProgram, terminateTree } from "../checks.ts";
 import {
   PROVENANCE_HAND_EDITED,
   PROVENANCE_UNSTAMPED,
@@ -600,25 +600,10 @@ export function defaultSpawner(
   argv: readonly string[],
   env: Record<string, string> | null,
 ): ProcessHandle {
-  const [program, ...rest] = argv;
   const merged: NodeJS.ProcessEnv = env ? { ...process.env, ...env } : { ...process.env };
-  const options: SpawnOptions = {
-    stdio: ["ignore", "pipe", "pipe"],
-    env: merged,
-    shell: false,
-    // Its own process group, so a timeout's tree kill reaches the seat and
-    // not the router that spawned it. Windows gets the same reach from
-    // `taskkill /T` and needs no flag.
-    ...(process.platform === "win32" ? {} : { detached: true }),
-  };
-  const resolved = resolveProgram(String(program));
-  const child = resolved.isBatch
-    ? spawn(
-        process.env["COMSPEC"] ?? "cmd.exe",
-        ["/d", "/s", "/v:off", "/c", [resolved.path, ...rest].map(quoteForCmd).join(" ")],
-        { ...options, windowsVerbatimArguments: true },
-      )
-    : spawn(resolved.path, rest, options);
+  // `spawnProgram` gives the seat its own process group, so a timeout's
+  // tree kill reaches the seat and not the router that spawned it.
+  const child = spawnProgram(argv, { stdio: ["ignore", "pipe", "pipe"], env: merged });
   child.stdout?.setEncoding("utf8");
   child.stderr?.setEncoding("utf8");
   return handleFor(child);

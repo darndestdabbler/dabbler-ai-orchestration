@@ -1204,25 +1204,56 @@ function spawnCheck(
     cwd,
     env,
     stdio: ["ignore", "pipe", "pipe"],
-    ...(process.platform === "win32" ? {} : { detached: true }),
   };
   if (check.command) {
     // A declared shell string is trusted repository configuration and keeps
-    // working byte-for-byte; nothing here infers shell mode.
-    return spawn(command, { ...options, shell: true });
+    // working byte-for-byte; nothing here infers shell mode. Its own
+    // process group on POSIX, as `spawnProgram` gives the argv form.
+    return spawn(command, {
+      ...options,
+      shell: true,
+      ...(process.platform === "win32" ? {} : { detached: true }),
+    });
   }
   const argv =
     command === check.argv.join(" ") ? [...check.argv] : shlexSplit(command);
+  return spawnProgram(argv, options);
+}
+
+/**
+ * Spawn an argv the way `resolveProgram` says it must be reached: an
+ * executable with no shell, or a batch shim through `cmd.exe` with every
+ * argument quoted here. The one implementation for every argv the router
+ * spawns -- a declared check, the Copilot seat, an engine under `session
+ * drive` -- because the first Copilot prompt the driver spike sent through
+ * a shell arrived shattered into its words, and the CLI exited 0 without
+ * calling a model. `shell` in the options is ignored: which branch runs is
+ * the program's to decide, never the caller's.
+ *
+ * On POSIX the child gets its own process group (`detached`), so that
+ * `terminateTree` reaches the grandchildren -- a tool the engine was
+ * running when it was interrupted, a seat's helper -- and not the router
+ * that spawned it. Windows gets the same reach from `taskkill /T` and
+ * needs no flag. That belongs here rather than at each call site because a
+ * caller that forgot it would hand `terminateTree` a child it cannot fully
+ * end.
+ */
+export function spawnProgram(argv: readonly string[], options: SpawnOptions): ChildProcess {
   const [program, ...rest] = argv;
   const resolved = resolveProgram(String(program));
+  const grouped: SpawnOptions = {
+    ...options,
+    shell: false,
+    ...(process.platform === "win32" ? {} : { detached: true }),
+  };
   if (resolved.isBatch) {
     const line = [resolved.path, ...rest].map(quoteForCmd).join(" ");
     return spawn(process.env["COMSPEC"] ?? "cmd.exe", ["/d", "/s", "/v:off", "/c", line], {
-      ...options,
+      ...grouped,
       windowsVerbatimArguments: true,
     });
   }
-  return spawn(resolved.path, rest, options);
+  return spawn(resolved.path, rest, grouped);
 }
 
 export function emptySelection(): Record<string, unknown> {

@@ -148,6 +148,7 @@ export type RouterConfig = {
    */
   driver?: {
     max_invocations?: number;
+    engine_output?: "stream" | "quiet";
   };
   worktree?: {
     root?: string | null;

@@ -148,6 +148,16 @@ export interface SessionDecisionOptions extends RepositoryTarget {
   readonly provider?: string;
 }
 
+/**
+ * End the engine's running invocation under a driven session. The driver
+ * re-invokes the engine with the reason; the extension's Stop is this verb
+ * and nothing else.
+ */
+export interface SessionInterruptOptions extends RepositoryTarget {
+  readonly reason: string;
+  readonly sessionNumber?: number;
+}
+
 export interface SessionVerbs {
   start(options: SessionStartOptions): Promise<RouterResult<RouterText>>;
   declare(options: SessionDeclareOptions): Promise<RouterResult<RouterText>>;
@@ -155,6 +165,7 @@ export interface SessionVerbs {
   cancel(options: SessionCancelOptions): Promise<RouterResult<RouterText>>;
   restore(options: SessionRestoreOptions): Promise<RouterResult<RouterText>>;
   decision(options: SessionDecisionOptions): Promise<RouterResult<RouterText>>;
+  interrupt(options: SessionInterruptOptions): Promise<RouterResult<RouterText>>;
 }
 
 export interface ModuleCreateOptions {

@@ -457,6 +457,9 @@
         "max_invocations": {
           "type": "integer",
           "minimum": 1
+        },
+        "engine_output": {
+          "enum": ["stream", "quiet"]
         }
       }
     },

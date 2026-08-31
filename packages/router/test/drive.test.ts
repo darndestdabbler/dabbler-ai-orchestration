@@ -31,7 +31,7 @@ import { readDisputes, readRounds } from "../src/ledger.ts";
 import { buildTaskRows, readSessionState } from "../src/progress.ts";
 import { resetForTests } from "../src/route.ts";
 import { resetForTests as resetRuntimeMode } from "../src/runtimeMode.ts";
-import { report } from "../src/session.ts";
+import { EXIT_BOUNDARY, EXIT_OK, interrupt, report, start } from "../src/session.ts";
 import { readRecords } from "../src/testEvidence.ts";
 import { readTaskDeclaration } from "../src/writers.ts";
 import {
@@ -566,5 +566,68 @@ describe("dabbler session drive", { timeout: 120_000 }, () => {
       .filter((line) => line.trim() !== "")
       .map((line) => line.slice(3));
     expect(dirty).toEqual(["docs/sessions/sessions.json"]);
+  });
+
+  it("ends the running invocation on `session interrupt`, re-issues the instruction as an interrupt carrying the reason, and the session still closes", async () => {
+    const { repo, sessionsDir } = drivenRepo();
+    configure([VERIFIED]);
+    const inner = scripted(wellBehaved);
+    const seen: DriverInstruction[] = [];
+    let interruptVerb: number | null = null;
+    const engine: Engine = {
+      name: "interruptible",
+      async invoke(invocation: EngineInvocation) {
+        seen.push(invocation.instruction);
+        const { instruction } = invocation;
+        if (instruction.kind === "step" && instruction.step_id === "widget") {
+          // Mid-step, the operator asks the engine to stop -- through the
+          // verb, from another process's point of view -- and this
+          // invocation ends when the driver's signal reaches it.
+          interruptVerb = interrupt(sessionsDir, { reason: "the plan changed" });
+          await new Promise<void>((resolve) =>
+            invocation.signal.addEventListener("abort", () => resolve(), { once: true }),
+          );
+          invocation.emit("stopped mid-step");
+          return { exitCode: null, interrupted: true };
+        }
+        return inner.invoke(invocation);
+      },
+    };
+
+    const { code } = await drive(sessionsDir, engine);
+    expect(code).toBe(EXIT_OK);
+    expect(interruptVerb).toBe(EXIT_OK);
+    expect(sessionStatus(sessionsDir)).toBe("complete");
+    const stepSeq = seen.find((row) => row.kind === "step" && row.step_id === "widget")?.seq;
+    expect(seen).toContainEqual(
+      expect.objectContaining({
+        kind: "interrupt",
+        seq: Number(stepSeq) + 1,
+        step_id: "widget",
+        reasons: ["interrupted: the plan changed"],
+        answer_schema: "driver-report.schema.json",
+        answer_command: expect.stringContaining(`--seq ${Number(stepSeq) + 1} --step widget`),
+      }),
+    );
+    // Plan, the interrupted step, the step again: three invocations, and
+    // the interrupted one's transcript says so.
+    expect(readRun(repo, 1)?.invocations).toBe(3);
+    const transcript = readFileSync(transcriptPath(repo, 1, 2), "utf8");
+    expect(transcript).toContain("stopped mid-step");
+    expect(transcript).toMatch(/# interrupted \(the plan changed\); exit none after \d+s/);
+    // The drive completed, so there is nothing left to interrupt.
+    const { code: after, err } = await captured(async () => interrupt(sessionsDir, { reason: "again" }));
+    expect(after).toBe(EXIT_BOUNDARY);
+    expect(err).toContain("completed");
+  });
+
+  it("refuses an interrupt for a session nothing is driving", async () => {
+    const { sessionsDir } = drivenRepo();
+    configure([VERIFIED]);
+    const registered = await captured(async () => start(sessionsDir, { engine: "claude-code", provider: "anthropic" }));
+    expect(registered.code).toBe(EXIT_OK);
+    const { code, err } = await captured(async () => interrupt(sessionsDir, { reason: "stop" }));
+    expect(code).toBe(EXIT_BOUNDARY);
+    expect(err).toContain("is not being driven");
   });
 });

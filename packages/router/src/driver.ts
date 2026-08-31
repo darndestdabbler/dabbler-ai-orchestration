@@ -17,7 +17,7 @@
 // outstanding seq, the step that was asked for, do the files exist, does
 // the check pass -- is the driver's judgment, and it lives in one place.
 
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 
 import type {
@@ -45,6 +45,12 @@ export const PLAN_FILENAME = "plan.json";
 export const DISPOSITIONS_FILENAME = "dispositions.json";
 
 export const RUN_FILENAME = "run.json";
+/**
+ * A request to end the running invocation, written by `session interrupt`
+ * and consumed by the driver -- the one file here that is a message rather
+ * than a record, which is why it is removed the moment it is read.
+ */
+export const INTERRUPT_FILENAME = "interrupt.json";
 
 export const INSTRUCTION_SCHEMA = "driver-instruction.schema.json";
 export const REPORT_SCHEMA = "driver-report.schema.json";
@@ -78,11 +84,59 @@ export function runPath(repoRoot: string, sessionNumber: number): string {
   return join(driverDir(repoRoot, sessionNumber), RUN_FILENAME);
 }
 
+export function interruptPath(repoRoot: string, sessionNumber: number): string {
+  return join(driverDir(repoRoot, sessionNumber), INTERRUPT_FILENAME);
+}
+
+export interface InterruptRequest {
+  readonly reason: string;
+  readonly requested_at: string;
+}
+
+/** Ask the driver to end the running invocation; it re-invokes with the reason. */
+export function requestInterrupt(
+  repoRoot: string,
+  sessionNumber: number,
+  reason: string,
+  requestedAt: string,
+): InterruptRequest {
+  const request: InterruptRequest = { reason, requested_at: requestedAt };
+  atomicWriteJsonIndented(interruptPath(repoRoot, sessionNumber), request);
+  return request;
+}
+
+/** The pending request, removed as it is read; null when there is none. */
+export function takeInterrupt(repoRoot: string, sessionNumber: number): InterruptRequest | null {
+  const path = interruptPath(repoRoot, sessionNumber);
+  let raw: string;
+  try {
+    raw = readFileSync(path, "utf8");
+  } catch {
+    return null;
+  }
+  try {
+    unlinkSync(path);
+  } catch {
+    /* removed between the read and here; the request was still read once */
+  }
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    const row = parsed && typeof parsed === "object" ? (parsed as Record<string, unknown>) : {};
+    const reason = typeof row["reason"] === "string" ? row["reason"].trim() : "";
+    return {
+      reason: reason === "" ? "no reason was given" : reason,
+      requested_at: typeof row["requested_at"] === "string" ? row["requested_at"] : "",
+    };
+  } catch {
+    return { reason: "an interrupt request that could not be read", requested_at: "" };
+  }
+}
+
 /**
  * One transcript per engine invocation, numbered by invocation rather than
- * by seq: a rejected step is re-invoked under a new seq, and an interrupt
- * re-invokes under the same one, so neither number is the count of times
- * the engine ran.
+ * by seq: a rejected step and an interrupted one are each re-invoked under
+ * a new seq, and a re-run continues the count, so the seq is not the number
+ * of times the engine ran.
  */
 export function transcriptPath(
   repoRoot: string,

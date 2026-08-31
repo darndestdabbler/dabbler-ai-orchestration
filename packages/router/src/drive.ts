@@ -14,20 +14,26 @@
 // the record a typed one leaves, and the task rows move for the same
 // reasons.
 //
-// The engine is reached through one interface, `Engine.invoke`, and this
-// module ships one adapter: a command spawned per invocation with no shell.
-// The argv shapes of the real CLIs, their streamed output and the interrupt
-// are the adapter's own concern and arrive with it.
+// The engine is reached through one interface, `Engine.invoke`, and the
+// adapters behind it -- the three CLIs' measured argv shapes, the operator's
+// own command -- are `engines.ts`. What this module owns of the exchange
+// is the transcript (every line the engine prints, verbatim, whether or not
+// `driver.engine_output` shows it) and the interrupt: a request written to
+// the ledger by `session interrupt` ends the running invocation, and the
+// same instruction is re-issued as `kind: interrupt` carrying the reason, so
+// the engine keeps everything up to its last completed step and reads what
+// changed. One path for every interrupter -- a person, a gate, a finding
+// that arrived mid-step.
 //
 // Bounded twice. A step is refused at most three times before the loop
 // stops, and the engine is invoked at most `driver.max_invocations` times
-// per session -- on a seat every invocation is a premium request. A stopped
-// loop closes nothing: the session stays in flight, `run.json` says why, and
-// a re-run continues from the phase it reached.
+// per session -- on a seat every invocation is a premium request, and each
+// is reported against the bound as it is spent. A stopped loop closes
+// nothing: the session stays in flight, `run.json` says why, and a re-run
+// continues from the phase it reached.
 
-import { spawn } from "node:child_process";
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
-import { basename, dirname, join, relative } from "node:path";
+import { dirname, join, relative } from "node:path";
 
 import { preverifyBaseline, workingTreeChanges } from "./affected.ts";
 import {
@@ -44,6 +50,7 @@ import { writeErr, writeOut } from "./cli/output.ts";
 import {
   ConfigError,
   type RouterConfig,
+  driverEngineOutput,
   driverInvocationCap,
   loadConfig,
 } from "./config.ts";
@@ -57,10 +64,12 @@ import {
   readReport,
   readRun,
   readWorkPlan,
+  takeInterrupt,
   transcriptPath,
   writeInstruction,
   writeRun,
 } from "./driver.ts";
+import type { Engine, EngineOutput } from "./engines.ts";
 import { SESSION_PLAN_FILENAME } from "./evidence.ts";
 import { SET_BOOKKEEPING_COMMIT_BASENAMES } from "./gates.ts";
 import type {
@@ -96,104 +105,18 @@ import { readTaskDeclaration } from "./writers.ts";
 
 // --- The engine --------------------------------------------------------------
 
-export interface EngineInvocation {
-  readonly instruction: DriverInstruction;
-  /** Absolute path of `instruction.json`, which the engine reads. */
-  readonly instructionPath: string;
-  readonly repoRoot: string;
-  readonly sessionsDir: string;
-  readonly sessionNumber: number;
-  /** 1-based, and cumulative across re-runs of the same session. */
-  readonly invocation: number;
-  /**
-   * The first invocation of this session. An engine with a session store
-   * of its own starts a session here and continues it on every later one,
-   * so one context carries the whole run.
-   */
-  readonly first: boolean;
-  /** One line of the engine's output: appended to the transcript and shown. */
-  readonly emit: (line: string) => void;
-}
-
-export interface EngineOutcome {
-  readonly exitCode: number | null;
-  /** Set when the engine could not be run at all, as opposed to ran and failed. */
-  readonly error?: string | null;
-}
-
-/** One engine, reached one way. */
-export interface Engine {
-  readonly name: string;
-  invoke(invocation: EngineInvocation): Promise<EngineOutcome>;
-}
-
-export const INSTRUCTION_PLACEHOLDER = "{instruction}";
-export const INSTRUCTION_ENV_VAR = "DABBLER_DRIVER_INSTRUCTION";
-
-/**
- * The one adapter shipped here: an argv spawned once per instruction, with
- * no shell, in the repository root. `{instruction}` in any element is the
- * instruction's path, which the child also finds in `DABBLER_DRIVER_INSTRUCTION`.
- *
- * No shell is the point, and it is the limit: the program is an executable
- * or a script a program runs, never a `.cmd` shim -- the shell's unquoted
- * join is what shattered the first Copilot prompt in the spike, and the
- * quoted branch belongs with the CLIs it serves.
- */
-export function commandEngine(argv: readonly string[]): Engine {
-  if (argv.length === 0 || argv[0] === "") {
-    throw new Error("an engine command names a program");
-  }
-  return {
-    name: `command:${basename(argv[0] as string)}`,
-    invoke(invocation: EngineInvocation): Promise<EngineOutcome> {
-      const rendered = argv.map((element) =>
-        element.replaceAll(INSTRUCTION_PLACEHOLDER, invocation.instructionPath),
-      );
-      const [program, ...rest] = rendered as [string, ...string[]];
-      return new Promise((settle) => {
-        let child: ReturnType<typeof spawn>;
-        try {
-          child = spawn(program, rest, {
-            cwd: invocation.repoRoot,
-            shell: false,
-            stdio: ["ignore", "pipe", "pipe"],
-            env: { ...process.env, [INSTRUCTION_ENV_VAR]: invocation.instructionPath },
-          });
-        } catch (error) {
-          settle({ exitCode: null, error: error instanceof Error ? error.message : String(error) });
-          return;
-        }
-        const pending = { out: "", err: "" };
-        const consume = (key: "out" | "err", chunk: Buffer, prefix: string): void => {
-          pending[key] += chunk.toString("utf8");
-          let newline: number;
-          while ((newline = pending[key].indexOf("\n")) >= 0) {
-            const line = pending[key].slice(0, newline).replace(/\r$/, "");
-            pending[key] = pending[key].slice(newline + 1);
-            invocation.emit(prefix + line);
-          }
-        };
-        child.stdout?.on("data", (chunk: Buffer) => consume("out", chunk, ""));
-        child.stderr?.on("data", (chunk: Buffer) => consume("err", chunk, "stderr: "));
-        let settled = false;
-        child.on("error", (error) => {
-          if (settled) return;
-          settled = true;
-          settle({ exitCode: null, error: error.message });
-        });
-        child.on("close", (code) => {
-          if (settled) return;
-          settled = true;
-          for (const key of ["out", "err"] as const) {
-            if (pending[key].trim()) invocation.emit((key === "err" ? "stderr: " : "") + pending[key]);
-          }
-          settle({ exitCode: code });
-        });
-      });
-    },
-  };
-}
+// The interface and the adapters live in `engines.ts`; they are re-exported
+// here because the loop is what a caller holds.
+export {
+  type Engine,
+  type EngineInvocation,
+  type EngineOutcome,
+  type EngineOutput,
+  INSTRUCTION_ENV_VAR,
+  INSTRUCTION_PLACEHOLDER,
+  builtInEngine,
+  commandEngine,
+} from "./engines.ts";
 
 // --- The run -----------------------------------------------------------------
 
@@ -203,6 +126,8 @@ export interface DriveOptions {
   readonly model?: string | null;
   readonly effort?: string | null;
   readonly adapter: Engine;
+  /** Overrides `driver.engine_output`: show the engine's output as it runs, or only record it. */
+  readonly engineOutput?: EngineOutput | null;
   /** Overrides `driver.max_invocations`; a re-run past a budget stop passes a larger one. */
   readonly maxInvocations?: number | null;
   readonly maxRounds?: number | null;
@@ -210,6 +135,8 @@ export interface DriveOptions {
 }
 
 export const MAX_REJECTIONS = 3;
+/** How often a running invocation looks for an interrupt request. */
+const INTERRUPT_POLL_MS = 500;
 
 type StopKind = NonNullable<DriverRun["stop"]>["kind"];
 
@@ -312,6 +239,8 @@ class Driver {
       return EXIT_BOUNDARY;
     }
     this.sessionNumber = current;
+    // A request left over from before this run has nothing to interrupt.
+    takeInterrupt(this.repoRoot, current);
 
     const existing = readRun(this.repoRoot, current);
     const cap = this.options.maxInvocations ?? driverInvocationCap(this.config);
@@ -361,24 +290,29 @@ class Driver {
 
   // --- the conversation ------------------------------------------------------
 
-  private answerCommand(seq: number, kind: "step" | "file", stepId?: string): string {
-    const head = `dabbler session report --sessions-dir ${this.sessionsDir} --seq ${seq}`;
-    if (kind === "file") return `${head} --answer-file <path to the JSON you wrote>`;
-    return (
-      `${head} --step ${stepId} --status done ` +
-      "--files <every file you created or changed, comma-separated, repository-relative> " +
-      '--notes "<one line>" [--tests "<the test command you ran>"]'
-    );
+  /** The answer command, rendered for the seq an instruction is issued under. */
+  private answerCommand(kind: "step" | "file", stepId?: string): (seq: number) => string {
+    return (seq) => {
+      const head = `dabbler session report --sessions-dir ${this.sessionsDir} --seq ${seq}`;
+      if (kind === "file") return `${head} --answer-file <path to the JSON you wrote>`;
+      return (
+        `${head} --step ${stepId} --status done ` +
+        "--files <every file you created or changed, comma-separated, repository-relative> " +
+        '--notes "<one line>" [--tests "<the test command you ran>"]'
+      );
+    };
   }
 
   private issue(fields: Record<string, unknown>): DriverInstruction {
     const seq = this.run.seq + 1;
+    const command = fields["answer_command"];
     const instruction = writeInstruction(this.repoRoot, this.sessionNumber, {
       schema_version: DRIVER_SCHEMA_VERSION,
       seq,
       session_number: this.sessionNumber,
       issued_at: nowIso(),
       ...fields,
+      ...(typeof command === "function" ? { answer_command: command(seq) } : {}),
     });
     this.run = { ...this.run, seq };
     this.save();
@@ -391,7 +325,14 @@ class Driver {
     return instruction;
   }
 
-  private async invoke(instruction: DriverInstruction): Promise<void> {
+  /**
+   * One invocation of the engine on `instruction`. Returns null when the
+   * engine returned on its own, and the interrupt's reason when the driver
+   * ended it -- polled from the ledger while the engine runs, because the
+   * request is written by another process (`session interrupt`, or the
+   * extension's Stop) and this one holds the child.
+   */
+  private async invoke(instruction: DriverInstruction): Promise<string | null> {
     if (this.run.invocations >= this.run.max_invocations) {
       throw new Stop(
         "budget",
@@ -402,6 +343,13 @@ class Driver {
     }
     const invocation = this.run.invocations + 1;
     const first = this.run.invocations === 0;
+    // A request that arrived while no invocation was running had nothing to
+    // end; it is discarded here rather than ending this one on its first
+    // tick, and the log says so.
+    const stale = takeInterrupt(this.repoRoot, this.sessionNumber);
+    if (stale !== null) {
+      this.log("interrupt-discarded", { reason: stale.reason, why: "no invocation was running" });
+    }
     this.run = { ...this.run, invocations: invocation };
     this.save();
 
@@ -414,28 +362,54 @@ class Driver {
         `${instruction.step_id ? `, ${instruction.step_id}` : ""}); invocation ${invocation}; ${nowIso()}\n`,
       "utf8",
     );
-    this.log("engine-invoked", { seq: instruction.seq, invocation, first });
-    const outcome = await this.options.adapter.invoke({
-      instruction,
-      instructionPath: instructionPath(this.repoRoot, this.sessionNumber),
-      repoRoot: this.repoRoot,
-      sessionsDir: this.sessionsDir,
-      sessionNumber: this.sessionNumber,
-      invocation,
+    const streaming = this.engineOutput() === "stream";
+    this.log("engine-invoked", {
+      seq: instruction.seq,
+      invocation: `${invocation}/${this.run.max_invocations}`,
       first,
-      emit: (line: string) => {
-        appendFileSync(transcript, `${line}\n`, "utf8");
-        writeOut(`  │ ${line}\n`);
-      },
+      output: this.engineOutput(),
     });
+
+    const controller = new AbortController();
+    let reason: string | null = null;
+    const poll = setInterval(() => {
+      if (reason !== null) return;
+      const request = takeInterrupt(this.repoRoot, this.sessionNumber);
+      if (request === null) return;
+      reason = request.reason;
+      this.log("engine-interrupting", { seq: instruction.seq, invocation, reason });
+      controller.abort(reason);
+    }, INTERRUPT_POLL_MS);
+    let outcome;
+    try {
+      outcome = await this.options.adapter.invoke({
+        instruction,
+        instructionPath: instructionPath(this.repoRoot, this.sessionNumber),
+        repoRoot: this.repoRoot,
+        sessionsDir: this.sessionsDir,
+        sessionNumber: this.sessionNumber,
+        invocation,
+        first,
+        signal: controller.signal,
+        emit: (line: string, display?: string | null) => {
+          appendFileSync(transcript, `${line}\n`, "utf8");
+          const shown = display === undefined ? line : display;
+          if (streaming && shown !== null) writeOut(`  │ ${shown}\n`);
+        },
+      });
+    } finally {
+      clearInterval(poll);
+    }
     const seconds = Math.round((Date.now() - started) / 1000);
+    const interrupted = reason !== null && outcome.interrupted === true;
     appendFileSync(
       transcript,
-      `# exit ${outcome.exitCode === null ? "none" : outcome.exitCode}` +
+      (interrupted ? `# interrupted (${reason}); ` : "# ") +
+        `exit ${outcome.exitCode === null ? "none" : outcome.exitCode}` +
         `${outcome.error ? ` (${outcome.error})` : ""} after ${seconds}s\n`,
       "utf8",
     );
-    this.log("engine-returned", {
+    this.log(interrupted ? "engine-interrupted" : "engine-returned", {
       seq: instruction.seq,
       exit: outcome.exitCode,
       seconds,
@@ -443,6 +417,33 @@ class Driver {
     });
     if (outcome.error) {
       throw new Stop("engine", `the engine could not be run: ${outcome.error}`);
+    }
+    return interrupted ? reason : null;
+  }
+
+  private engineOutput(): EngineOutput {
+    return this.options.engineOutput ?? driverEngineOutput(this.config);
+  }
+
+  /**
+   * Issue an instruction and invoke the engine on it until the engine
+   * returns on its own. An interrupted invocation is followed by the same
+   * instruction re-issued as `kind: interrupt` -- a new seq, the reason
+   * first among its `reasons`, the answer still owed -- and the engine is
+   * invoked again, continuing its own session. The instruction returned is
+   * the one the answer must name.
+   */
+  private async converse(fields: Record<string, unknown>): Promise<DriverInstruction> {
+    let instruction = this.issue(fields);
+    for (;;) {
+      const reason = await this.invoke(instruction);
+      if (reason === null) return instruction;
+      const previous = Array.isArray(fields["reasons"]) ? (fields["reasons"] as string[]) : [];
+      instruction = this.issue({
+        ...fields,
+        kind: "interrupt",
+        reasons: [`interrupted: ${reason}`, ...previous],
+      });
     }
   }
 
@@ -487,15 +488,14 @@ class Driver {
     let reasons: string[] = [];
     let rejections = 0;
     while (plan === null) {
-      const instruction = this.issue({
+      const instruction = await this.converse({
         kind: rejections === 0 ? "step" : "rejection",
         step_id: "plan",
         ask: this.planAsk(),
         ...(rejections > 0 ? { reasons } : {}),
         answer_schema: WORK_PLAN_SCHEMA,
-        answer_command: this.answerCommand(this.run.seq + 1, "file"),
+        answer_command: this.answerCommand("file"),
       });
-      await this.invoke(instruction);
       plan = readWorkPlan(this.repoRoot, this.sessionNumber);
       if (plan !== null) break;
       reasons = [
@@ -576,15 +576,14 @@ class Driver {
     let rejections = 0;
     let reasons: string[] = [];
     for (;;) {
-      const instruction = this.issue({
+      const instruction = await this.converse({
         kind: rejections === 0 ? "step" : "rejection",
         step_id: spec.id,
         ask: this.stepAsk(spec, rejections > 0),
         ...(rejections > 0 ? { reasons } : {}),
         answer_schema: REPORT_SCHEMA,
-        answer_command: this.answerCommand(this.run.seq + 1, "step", spec.id),
+        answer_command: this.answerCommand("step", spec.id),
       });
-      await this.invoke(instruction);
       const report = readReport(this.repoRoot, this.sessionNumber);
       const judged = await this.judge(report, instruction, spec);
       if (judged === "blocked") {
@@ -803,7 +802,7 @@ class Driver {
     let rejections = 0;
     let refusals: string[] = [];
     while (set === null) {
-      const instruction = this.issue({
+      const instruction = await this.converse({
         kind: "rejection",
         round: roundNumber,
         ask: this.dispositionAsk(roundNumber),
@@ -812,9 +811,8 @@ class Driver {
           ...refusals,
         ],
         answer_schema: DISPOSITION_SCHEMA,
-        answer_command: this.answerCommand(this.run.seq + 1, "file"),
+        answer_command: this.answerCommand("file"),
       });
-      await this.invoke(instruction);
       const answered = readDispositions(this.repoRoot, this.sessionNumber);
       refusals = [];
       if (answered === null || answered.round !== roundNumber || answered.seq !== instruction.seq) {

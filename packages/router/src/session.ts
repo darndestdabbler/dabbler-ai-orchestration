@@ -55,7 +55,9 @@ import {
   driverDir,
   planPath,
   readInstruction,
+  readRun,
   reportPath,
+  requestInterrupt,
   shapeReport,
   stampAnswer,
   writeDispositions,
@@ -1018,6 +1020,70 @@ export function report(sessionsDir: string, options: ReportCliOptions): number {
   writeOut(
     `report: session ${sessionDisplayNumber(target)} seq ${instruction.seq} answered; ` +
       `${summary}; the driver reads it next.\n`,
+  );
+  return EXIT_OK;
+}
+
+// --- interrupt ---------------------------------------------------------------
+
+export interface InterruptCliOptions {
+  readonly reason: string;
+  readonly sessionNumber?: number | null;
+}
+
+/**
+ * End the engine's running invocation under a driven session. The one path
+ * for every interrupter -- a person at the keyboard, the extension's Stop,
+ * a gate that tripped -- and what it does is write a request the driver
+ * polls: the driver ends the invocation, records it on the transcript, and
+ * re-invokes the engine with the same instruction as `kind: interrupt`
+ * carrying the reason. Nothing here touches the engine; only the process
+ * that holds the child can end it, and the request is how it is told.
+ *
+ * Refused when nothing is being driven: no run, a run that completed, or
+ * one that stopped -- an interrupt then has nothing to end, and a request
+ * left lying would end the first invocation of the next re-run instead.
+ */
+export function interrupt(sessionsDir: string, options: InterruptCliOptions): number {
+  if (!isDirectory(sessionsDir)) {
+    writeErr(`interrupt: not a directory: ${sessionsDir}\n`);
+    return EXIT_USAGE;
+  }
+  const reason = options.reason.trim();
+  if (reason === "") {
+    writeErr("interrupt: refused -- --reason is what the engine reads next; give one.\n");
+    return EXIT_USAGE;
+  }
+  const target = resolveTargetSession(sessionsDir, options.sessionNumber);
+  if (target === null) {
+    writeErr(`interrupt: refused -- no session has been started under ${sessionsDir}.\n`);
+    return EXIT_BOUNDARY;
+  }
+  const repoRoot = repoRootFromSessionsDir(sessionsDir);
+  let run;
+  try {
+    run = readRun(repoRoot, target);
+  } catch (error) {
+    if (!(error instanceof LedgerError)) throw error;
+    writeErr(`interrupt: refused -- ${error.message}\n`);
+    return EXIT_BOUNDARY;
+  }
+  const number = sessionDisplayNumber(target);
+  if (run === null) {
+    writeErr(`interrupt: refused -- session ${number} is not being driven; there is no invocation to end.\n`);
+    return EXIT_BOUNDARY;
+  }
+  if (run.phase === "complete" || run.stop !== null) {
+    writeErr(
+      `interrupt: refused -- session ${number}'s drive ${run.phase === "complete" ? "completed" : `stopped (${run.stop?.kind})`}; ` +
+        "nothing is running to interrupt.\n",
+    );
+    return EXIT_BOUNDARY;
+  }
+  requestInterrupt(repoRoot, target, reason, nowIso());
+  writeOut(
+    `interrupt: requested for session ${number} (instruction ${run.seq}); the driver ends the ` +
+      "running invocation and re-invokes the engine with the reason.\n",
   );
   return EXIT_OK;
 }

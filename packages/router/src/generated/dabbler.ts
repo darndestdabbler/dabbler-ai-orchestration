@@ -26,6 +26,10 @@ export type Dabbler = {
      * How many times one driven session may invoke the engine before the loop stops and closes nothing (default 24). On a Copilot seat every invocation is a premium request, so this is a spend ceiling as much as a loop bound; continuing past it is a re-run with a larger --max-invocations, which is a person deciding to spend more.
      */
     max_invocations?: number;
+    /**
+     * What a person sees of the engine while `session drive` runs it (default stream): `stream` renders the engine's live output -- Claude Code's stream-json as thinking / tool / text / result lines with only the `init` system event, Copilot's own progress lines, Codex's JSONL items -- and `quiet` shows nothing until the driver's next line. The engine's argv and the transcript under the driver's ledger are identical either way; `--show-engine` on `drive` overrides for one run.
+     */
+    engine_output?: "stream" | "quiet";
   };
   /**
    * Path facts about this repository.

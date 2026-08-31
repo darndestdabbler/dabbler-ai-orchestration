@@ -673,6 +673,25 @@ export function driverInvocationCap(config: RouterConfig): number {
   return cap >= 1 ? cap : DEFAULT_DRIVER_INVOCATIONS;
 }
 
+export const ENGINE_OUTPUT_MODES = ["stream", "quiet"] as const;
+export type EngineOutput = (typeof ENGINE_OUTPUT_MODES)[number];
+export const DEFAULT_ENGINE_OUTPUT: EngineOutput = "stream";
+
+/**
+ * What a person sees of the engine while `session drive` runs it, from
+ * `driver.engine_output`: `stream` renders its output as it happens,
+ * `quiet` records it only. The transcript is the same either way -- this
+ * is a knob about the terminal, never about the record -- which is why an
+ * unrecognised value falls to `stream` rather than refusing the run.
+ */
+export function driverEngineOutput(config: RouterConfig): EngineOutput {
+  const block = record(config["driver"]);
+  const value = block["engine_output"];
+  return typeof value === "string" && (ENGINE_OUTPUT_MODES as readonly string[]).includes(value)
+    ? (value as EngineOutput)
+    : DEFAULT_ENGINE_OUTPUT;
+}
+
 // --- Transport and generation params -----------------------------------------
 
 /**

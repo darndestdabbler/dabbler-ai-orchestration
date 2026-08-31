@@ -25,7 +25,7 @@ export const VERBS: readonly VerbSpec[] = [
   {
     verb: "session",
     extensionFacing: true,
-    summary: "start, declare, drive, report, decision, close, cancel, restore",
+    summary: "start, declare, drive, interrupt, report, decision, close, cancel, restore",
   },
   {
     // The name D88 and D130 promised the operator when the run core was

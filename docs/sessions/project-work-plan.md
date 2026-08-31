@@ -93,7 +93,7 @@ it.
 | 55 | The task rows move themselves | no | 2026-08-31 |
 | 56 | The driver's contract — the schemas and the report verb | no | 2026-08-31 |
 | 57 | `dabbler session drive` — the framework runs the session | no | 2026-08-31 |
-| 58 | The engine adapter — Claude Code, Copilot, Codex; stream; interrupt | — | not declared |
+| 58 | The engine adapter — Claude Code, Copilot, Codex; stream; interrupt | no | 2026-08-31 |
 | 59 | Start is the launch, and the developer's guide | — | not declared |
 | 60 | The operator onboarding deck | — | not declared |
 | 61 | The half of the trial that needs a published router | — | not declared |
@@ -1565,3 +1565,39 @@ Session 57 of 61: `dabbler session drive` -- the framework runs the session.
 4. Bounded: `driver.max_invocations` in `dabbler.yaml` (default 24) stops the
    loop and closes nothing; the run's state (`driver/run.json`) records why.
 5. Affected; verify; full suite as `final-full`; close.
+
+### Session 58 — The engine adapter — Claude Code, Copilot, Codex; stream; interrupt
+
+**Releasable: no.**
+
+Session 58 of 61: The engine adapter -- Claude Code, Copilot, Codex; stream; interrupt.
+
+1. Spawn without shattering: one spawn helper in `checks.ts` that prefers an
+   `.exe` through `resolveProgram` and spawns it with no shell, and gives a
+   `.cmd` shim the shell with every argument quoted; the seat transport and
+   the engine adapters both go through it, so the router has one answer.
+2. Three argv shapes, one per engine, in `src/engines.ts`, measured against the
+   CLIs rather than assumed: Claude Code (`-p --model
+   --dangerously-skip-permissions --output-format stream-json --verbose`,
+   `--continue` after the first invocation), Copilot CLI (`-p --model
+   --allow-all-tools --allow-all-paths --no-ask-user`, `--continue`; the model
+   required as it is at `session start`), Codex (`exec --json -m
+   --dangerously-bypass-approvals-and-sandbox <prompt>`, `exec resume --last`
+   after the first). The prompt is one sentence; the instruction travels by
+   file. `--engine-argv` becomes optional: given, it overrides; absent, the
+   engine's built-in argv runs, and an engine with none is refused by name.
+3. `driver.engine_output: stream | quiet` in `dabbler.yaml` and `--show-engine
+   stream|quiet` on `drive`: `stream` renders the engine's live output
+   (Claude's stream-json as thinking / tool / text / result lines with only the
+   `init` system event; Copilot's own lines; Codex's JSONL items); `quiet`
+   shows nothing. The engine's argv and the transcript are identical either
+   way.
+4. Interrupt, defined once: `dabbler session interrupt --reason "<text>"`
+   writes a request into the driver's ledger; the driver ends the running
+   invocation, records it on the transcript as interrupted with the reason,
+   and re-invokes the engine with `--continue` and a `kind: interrupt`
+   instruction carrying the reason and the answer still owed. Claude Code's
+   single-process variant is measured and the result recorded.
+5. Seat cost per step: every invocation is reported against
+   `driver.max_invocations` as it is spent.
+6. Affected; verify; full suite as `final-full`; close.

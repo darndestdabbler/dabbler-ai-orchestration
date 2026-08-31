@@ -221,6 +221,7 @@ export function fakeRouter(
         cancel: text("session cancel"),
         restore: text("session restore"),
         decision: text("session decision"),
+        interrupt: text("session interrupt"),
       },
       modules: { create: text("modules create") },
       verify: {

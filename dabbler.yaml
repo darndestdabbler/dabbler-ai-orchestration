@@ -185,6 +185,7 @@ testing:
           # loop by a scripted engine.
           - packages/router/test/driver.test.ts
           - packages/router/test/drive.test.ts
+          - packages/router/test/engines.test.ts
       # The driver's ledger (the four answers and the run's state) and the
       # loop that fills it. The loop's test drives a whole session through
       # every verb the typed lifecycle has, so a change to either file is a
@@ -195,6 +196,13 @@ testing:
           - packages/router/test/drive.test.ts
       - when: packages/router/src/drive.ts
         select:
+          - packages/router/test/drive.test.ts
+      # How the loop reaches an engine: the measured argv shapes, the
+      # renderers and the adapters are their own file; the loop's test
+      # drives through the command adapter and the interrupt.
+      - when: packages/router/src/engines.ts
+        select:
+          - packages/router/test/engines.test.ts
           - packages/router/test/drive.test.ts
       - when: packages/router/src/index.ts
         select:
@@ -289,6 +297,9 @@ testing:
         select:
           - packages/router/test/checks.test.ts
           - packages/router/test/preverify.test.ts
+          # The seat and the engines spawn through `checks.spawnProgram`.
+          - packages/router/test/copilot.test.ts
+          - packages/router/test/engines.test.ts
       - when: packages/router/src/testEvidence.ts
         select:
           - packages/router/test/preverify.test.ts

@@ -2714,7 +2714,13 @@ session, `drive` over `next`). No extension change.
    Theme kind from `window.activeColorTheme`, re-read on change. The
    "Dabbler: Engine" channel and its grammar stay for the engine stream
    under headless `drive`, which 61 kept (D252: push and pull are one
-   loop with the seam at `converse`).
+   loop with the seam at `converse`). The terminal carries **no engine
+   chat, ever** — the operator's rule, 2026-08-31: under the pull the
+   framework never sees the chat (the person reads it in their own CLI),
+   and under headless `drive` the channel, not the terminal, is where the
+   stream goes, with `engine_output: quiet` to silence it. Chat in the
+   CLI, work in the Dabbler terminal; no configuration needed to keep
+   them apart.
 5. **A framework stop is loud.** When `run.json` gains a `stop`, or an
    owed decision is raised: an attention row above the buckets with a
    themed icon (`$(warning)` for a stop, `$(question)` for a decision,

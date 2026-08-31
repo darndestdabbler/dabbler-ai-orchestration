@@ -44,6 +44,14 @@ export interface SetUpProjectUi {
   /** Start session 1 in the project just prepared. */
   startSession?: (root: string) => Promise<unknown>;
   openFolder?: (root: string) => Thenable<unknown>;
+  /**
+   * Carry the "start session 1" offer across a window replacement.
+   *
+   * `openFolder` discards this window and restarts the extension host, so an
+   * offer made before it cannot be acted on. This records that one is owed;
+   * the window that opens makes it.
+   */
+  rememberPendingStart?: (root: string) => Thenable<void>;
 }
 
 /**
@@ -71,12 +79,14 @@ async function initWithVsCodeGit(root: string): Promise<string> {
   }
 }
 
-function defaultUi(): SetUpProjectUi {
+function defaultUi(pending?: PendingStartStore): SetUpProjectUi {
   return {
     showInformationMessage: (m) => vscode.window.showInformationMessage(m),
     showErrorMessage: (m) => vscode.window.showErrorMessage(m),
     offer: (message, ...actions) =>
       vscode.window.showInformationMessage(message, ...actions),
+    rememberPendingStart: (root) =>
+      pending ? pending.set(root) : Promise.resolve(),
     workspaceRoot: () => vscode.workspace.workspaceFolders?.[0]?.uri.fsPath,
     initRepository: initWithVsCodeGit,
     chooseNewProjectFolder: chooseNewProjectFolder,
@@ -114,7 +124,13 @@ export async function runSetUpProjectFlow(
     created = true;
   }
 
-  let result = await router.bootstrap({ projectDir: root });
+  // `noTransportDetect`, deliberately. Setting up one project is not a
+  // statement about how this machine routes every other one, and a click
+  // that quietly persisted a user-scoped environment variable is the kind of
+  // side effect somebody finds weeks later while debugging a different repo.
+  // A person who wants the preference changed runs `dabbler bootstrap
+  // --transport <x>` and means it.
+  let result = await router.bootstrap({ projectDir: root, noTransportDetect: true });
   if (!result.ok && ui.initRepository) {
     // `bootstrap` refuses a directory that is not a git repository. That is
     // a thing the framework can fix, so it fixes it and tries once more
@@ -127,13 +143,29 @@ export async function runSetUpProjectFlow(
       );
       return false;
     }
-    result = await router.bootstrap({ projectDir: root });
+    result = await router.bootstrap({ projectDir: root, noTransportDetect: true });
   }
   if (!result.ok) {
     ui.showErrorMessage(
       `Set Up New Project failed: ${result.message.trim() || `exit ${result.exitCode}`}`,
     );
     return false;
+  }
+
+  // A folder this command CREATED is not open yet, and everything below
+  // depends on which window it happens in. `openFolder` replaces the window
+  // and restarts the extension host, so an offer made before it appears over
+  // a project the operator cannot see, in a window about to be discarded,
+  // and the session start it triggers races the reload.
+  //
+  // So the folder opens first and the offer is left for the window that
+  // survives: `rememberPendingStart` records it, and activation there makes
+  // it. Nothing is lost -- the offer is the same offer, made where it can be
+  // acted on.
+  if (created && ui.openFolder) {
+    if (ui.rememberPendingStart) await ui.rememberPendingStart(root);
+    await ui.openFolder(root);
+    return true;
   }
 
   // It used to end here with "Open a terminal and run `dabbler session
@@ -157,19 +189,73 @@ export async function runSetUpProjectFlow(
   } else if (!ui.offer) {
     ui.showInformationMessage("Dabbler: project set up and committed.");
   }
-  // A folder this command created is not open yet, and a project nobody can
-  // see is not set up in any sense the operator cares about.
-  if (created && ui.openFolder) await ui.openFolder(root);
   return true;
+}
+
+/**
+ * Make the offer a window replacement had to defer, once.
+ *
+ * Called on activation. The flag is cleared BEFORE the offer is shown, so a
+ * window closed while the question is on screen does not ask it again on the
+ * next launch -- a prompt that reappears until you answer it the way it wants
+ * is not an offer.
+ */
+export async function offerDeferredStart(
+  root: string | undefined,
+  pending: PendingStartStore,
+  ui: Pick<SetUpProjectUi, "offer" | "startSession">,
+): Promise<boolean> {
+  if (!root || !ui.offer) return false;
+  const remembered = pending.get();
+  if (!remembered || path.resolve(remembered) !== path.resolve(root)) return false;
+  await pending.clear();
+  const start = "Start session 1";
+  const choice = await ui.offer(
+    "Dabbler: project set up and committed. Session 1 authors the project " +
+      "plan; session 2 breaks it into numbered sessions.",
+    start,
+    "Later",
+  );
+  if (choice === start && ui.startSession) await ui.startSession(root);
+  return true;
+}
+
+/** Where the deferred offer is kept across the window replacement. */
+export interface PendingStartStore {
+  get: () => string | undefined;
+  set: (root: string) => Thenable<void>;
+  clear: () => Thenable<void>;
+}
+
+const PENDING_START_KEY = "dabbler.pendingSessionStart";
+
+/** The store backed by the extension's own global state. */
+export function pendingStartStore(
+  context: Pick<vscode.ExtensionContext, "globalState">,
+): PendingStartStore {
+  return {
+    get: () => context.globalState.get<string>(PENDING_START_KEY),
+    set: (root) => context.globalState.update(PENDING_START_KEY, root),
+    clear: () => context.globalState.update(PENDING_START_KEY, undefined),
+  };
 }
 
 export function registerBootstrapProjectCommand(
   context: vscode.ExtensionContext,
 ): void {
+  const pending = pendingStartStore(context);
   context.subscriptions.push(
     vscode.commands.registerCommand("dabbler.setupNewProject", () =>
-      runSetUpProjectFlow(),
+      runSetUpProjectFlow(defaultUi(pending)),
     ),
+  );
+  // The other half of the create-a-folder path. This window may BE the one
+  // that replaced the one that ran the command, and if it is, it owes the
+  // operator the offer that could not be made there.
+  void offerDeferredStart(
+    vscode.workspace.workspaceFolders?.[0]?.uri.fsPath,
+    pending,
+    defaultUi(pending),
   );
 }
 

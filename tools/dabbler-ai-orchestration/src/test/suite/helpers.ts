@@ -7,6 +7,7 @@ import * as os from "os";
 import * as path from "path";
 import { outcomeForExitCode } from "dabbler-ai-router";
 import type {
+  BootstrapOptions,
   Router,
   RouterResult,
   ProgressProjection as ProjectionPayload,
@@ -194,8 +195,12 @@ export function rmrf(dir: string): void {
 export function fakeRouter(
   exitCode: number,
   message = "",
-): { router: Router; asked: string[] } {
+): { router: Router; asked: string[]; bootstrapOptions: BootstrapOptions[] } {
   const asked: string[] = [];
+  // Recorded, because what bootstrap is ASKED to do is the behaviour some
+  // callers care about: setting up one project must not carry a machine-wide
+  // side effect, and only the options say whether it does.
+  const bootstrapOptions: BootstrapOptions[] = [];
   const answer = <T,>(verb: string, value: T): Promise<RouterResult<T>> => {
     asked.push(verb);
     const outcome = outcomeForExitCode(exitCode);
@@ -207,6 +212,7 @@ export function fakeRouter(
   };
   const text = (verb: string) => () => answer(verb, { stdout: message });
   return {
+    bootstrapOptions,
     router: {
       session: {
         start: text("session start"),
@@ -246,7 +252,10 @@ export function fakeRouter(
       },
       progress: () => answer("progress", makeProjection()),
       workspace: text("workspace"),
-      bootstrap: text("bootstrap"),
+      bootstrap: (options: BootstrapOptions) => {
+        bootstrapOptions.push(options);
+        return answer("bootstrap", { stdout: message });
+      },
       affected: text("affected"),
     },
     asked,

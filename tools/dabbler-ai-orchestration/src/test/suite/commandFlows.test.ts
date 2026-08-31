@@ -8,6 +8,7 @@ import {
 import { NewModuleUi, runNewModuleFlow } from "../../commands/newModule";
 import {
   SetUpProjectUi,
+  offerDeferredStart,
   runSetUpProjectFlow,
 } from "../../commands/bootstrapProject";
 import {
@@ -156,12 +157,16 @@ suite("set up new project", () => {
     infos: string[];
     offers: string[];
     ran: string[];
+    opened: string[];
+    remembered: string[];
     inits: number;
   } {
     const errors: string[] = [];
     const infos: string[] = [];
     const offers: string[] = [];
     const ran: string[] = [];
+    const opened: string[] = [];
+    const remembered: string[] = [];
     let inits = 0;
     const ui: SetUpProjectUi = {
       showInformationMessage: (m: string) => infos.push(m),
@@ -174,6 +179,14 @@ suite("set up new project", () => {
       startSession: (root: string) => {
         ran.push(root);
         return Promise.resolve(undefined);
+      },
+      openFolder: (root: string) => {
+        opened.push(root);
+        return Promise.resolve(undefined);
+      },
+      rememberPendingStart: (root: string) => {
+        remembered.push(root);
+        return Promise.resolve();
       },
     };
     if (options.newFolder !== undefined || options.offerFolder) {
@@ -191,6 +204,8 @@ suite("set up new project", () => {
       infos,
       offers,
       ran,
+      opened,
+      remembered,
       get inits() {
         return inits;
       },
@@ -222,6 +237,96 @@ suite("set up new project", () => {
     // to refuse outright.
     const { ui } = setUpUi(undefined, { newFolder: "D:\\fresh" });
     assert.strictEqual(await runSetUpProjectFlow(ui, fakeRouter(0).router), true);
+  });
+
+  test("opens a folder it created before offering anything about it", async () => {
+    // `openFolder` replaces the window and restarts the extension host. An
+    // offer made first appears over a project the operator cannot see, in a
+    // window about to be discarded, and the session start it triggers races
+    // the reload.
+    const { ui, opened, offers, ran, remembered } = setUpUi(undefined, {
+      newFolder: "D:\\fresh",
+      choose: "Start session 1",
+    });
+    assert.strictEqual(await runSetUpProjectFlow(ui, fakeRouter(0).router), true);
+    assert.deepStrictEqual(opened, ["D:\\fresh"]);
+    // Neither happened here, because neither could be acted on here.
+    assert.strictEqual(offers.length, 0);
+    assert.strictEqual(ran.length, 0);
+    // The offer is owed to the window that survives.
+    assert.deepStrictEqual(remembered, ["D:\\fresh"]);
+  });
+
+  test("still offers in place when the folder was already open", async () => {
+    // No window replacement, nothing to defer: the ordinary path is
+    // unchanged, and the offer happens where the operator is looking.
+    const { ui, opened, offers, remembered } = setUpUi("D:\\ws");
+    await runSetUpProjectFlow(ui, fakeRouter(0).router);
+    assert.strictEqual(opened.length, 0);
+    assert.strictEqual(offers.length, 1);
+    assert.strictEqual(remembered.length, 0);
+  });
+
+  test("makes the deferred offer once, in the window that opened", async () => {
+    let stored: string | undefined = "D:\\fresh";
+    const offers: string[] = [];
+    const ran: string[] = [];
+    const pending = {
+      get: () => stored,
+      set: (root: string) => {
+        stored = root;
+        return Promise.resolve();
+      },
+      clear: () => {
+        stored = undefined;
+        return Promise.resolve();
+      },
+    };
+    const ui = {
+      offer: (message: string) => {
+        offers.push(message);
+        return Promise.resolve("Start session 1");
+      },
+      startSession: (root: string) => {
+        ran.push(root);
+        return Promise.resolve(undefined);
+      },
+    };
+    assert.strictEqual(await offerDeferredStart("D:\\fresh", pending, ui), true);
+    assert.deepStrictEqual(ran, ["D:\\fresh"]);
+    // Cleared before the offer, so a window closed on the question does not
+    // ask it again on the next launch.
+    assert.strictEqual(stored, undefined);
+    assert.strictEqual(await offerDeferredStart("D:\\fresh", pending, ui), false);
+  });
+
+  test("does not make it in a window that is a different project", async () => {
+    // The flag names the project it was recorded for; opening something else
+    // in the meantime is not consent to start a session in it.
+    const offers: string[] = [];
+    const pending = {
+      get: () => "D:\\fresh",
+      set: () => Promise.resolve(),
+      clear: () => Promise.resolve(),
+    };
+    const acted = await offerDeferredStart("D:\\somewhere-else", pending, {
+      offer: (message: string) => {
+        offers.push(message);
+        return Promise.resolve(undefined);
+      },
+    });
+    assert.strictEqual(acted, false);
+    assert.strictEqual(offers.length, 0);
+  });
+
+  test("does not change how this machine routes, to set up one project", async () => {
+    // `bootstrap` otherwise persists DABBLER_TRANSPORT at USER scope. That is
+    // right for a person running it at a terminal and wrong for a click: a
+    // side effect somebody finds weeks later debugging a different repo.
+    const fake = fakeRouter(0);
+    const { ui } = setUpUi("D:\\ws");
+    await runSetUpProjectFlow(ui, fake.router);
+    assert.strictEqual(fake.bootstrapOptions[0]?.noTransportDetect, true);
   });
 
   test("cancelling the folder question cancels the command", async () => {

@@ -87,7 +87,8 @@ it.
 | 49 | The thing becomes installable | yes | 2026-08-30 |
 | 50 | The field trial, and the exercise reported back | no | 2026-08-30 |
 | 51 | What the field trial found, and nothing else | no | 2026-08-30 |
-| 52 | The half of the trial that needs a published router | — | not declared |
+| 52 | The startup experience, walked before it ships | no | 2026-08-30 |
+| 53 | The half of the trial that needs a published router | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -1488,6 +1489,12 @@ Affected; verify; full suite as final-full; packaging; close
 Affected; verify; full suite as final-full; close
 
 ### Session 51 — What the field trial found, and nothing else
+
+**Releasable: no.**
+
+Affected; verify; full suite as final-full; close
+
+### Session 52 — The startup experience, walked before it ships
 
 **Releasable: no.**
 

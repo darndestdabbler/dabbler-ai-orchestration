@@ -541,6 +541,7 @@ export class InProcessRouter implements Router {
   public bootstrap(o: BootstrapOptions): Promise<RouterResult<RouterText>> {
     const args = ["--project-dir", o.projectDir];
     optional(args, "--repo-name", o.repoName);
+    if (o.noTransportDetect === true) args.push("--no-transport-detect");
     return this.text("bootstrap", args, o.projectDir);
   }
 }

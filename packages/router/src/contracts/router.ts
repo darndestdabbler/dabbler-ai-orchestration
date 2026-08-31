@@ -254,6 +254,16 @@ export interface VerifyVerbs {
 export interface BootstrapOptions {
   readonly projectDir: string;
   readonly repoName?: string;
+  /**
+   * Leave the machine's transport preference exactly as it is.
+   *
+   * `bootstrap` otherwise detects a transport and persists
+   * `DABBLER_TRANSPORT` at USER scope -- which is right for a person running
+   * it deliberately at a terminal, and wrong for a click that sets up one
+   * project: a per-project action does not get to change how every other
+   * project on the machine routes.
+   */
+  readonly noTransportDetect?: boolean;
 }
 
 export interface WorkflowOptions {

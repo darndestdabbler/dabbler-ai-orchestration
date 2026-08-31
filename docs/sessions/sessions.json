@@ -1027,8 +1027,14 @@
         "provider": "anthropic",
         "identityProvenance": "direct"
       },
-      "verificationVerdict": null,
-      "frameworkVersion": "2.0.0"
+      "verificationVerdict": "VERIFIED",
+      "frameworkVersion": "2.0.0",
+      "verification": {
+        "rounds": 1,
+        "verifierModel": "gpt-5-6-sol",
+        "verifierProvider": "openai",
+        "transport": "api"
+      }
     },
     {
       "number": 53,

@@ -9627,6 +9627,60 @@
       "dateTime": "2026-08-30T20:12:44.221000-04:00",
       "description": "Register; declare `--not-releasable`.",
       "status": "in-progress"
+    },
+    {
+      "sessionNumber": 53,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-31T01:32:10.907000-04:00",
+      "description": "Register; declare `--not-releasable`.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 53,
+      "stepNumber": 2,
+      "stepKey": "sessions-render-under-status-buckets-again",
+      "dateTime": "2026-08-31T01:32:10.907000-04:00",
+      "description": "**Sessions render under status buckets again, superseding D104.** At 53 sessions the flat list has become the long scroll D104 said it would; the operator ruled buckets back, refined: *In Progress* and *Not Started* ascending, *Complete* and *Cancelled* descending so the latest finished session sits under its header, an empty bucket not rendered at all, each header carrying its count in the description slot, *In Progress* expanded and the rest collapsed. A finished session's row carries a compact close date in the same slot.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 53,
+      "stepNumber": 3,
+      "stepKey": "a-closed-session-that-stopped-at",
+      "dateTime": "2026-08-31T01:32:10.907000-04:00",
+      "description": "**A closed session that stopped at the cap is a note, not a flag.** The attention rows over the sessions kept naming every closed `REMEDIATED_AT_CAP` session at the top of the tree, which invites reopening work that later sessions have already built on. Those notes move under an *Information* bucket, collapsed, with a count; the in-flight case stays where it is, because that one is a decision.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 53,
+      "stepNumber": 4,
+      "stepKey": "session-1-asks-for-the-plan",
+      "dateTime": "2026-08-31T01:32:10.907000-04:00",
+      "description": "**Session 1 asks for the plan instead of guessing it.** The scaffolded session 1, `PLAN_PROMPT`, the bootstrap hand-off line and the extension walkthrough all say \"Neither waits on anyone\", and an engine took that literally: with no plan in the repository it searched sibling directories and drafted one. The templates now say the plan's substance is the operator's, and to ask for it when it is not in the repository or the prompt.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 53,
+      "stepNumber": 5,
+      "stepKey": "this-repository-declares-itself-a-one",
+      "dateTime": "2026-08-31T01:32:10.907000-04:00",
+      "description": "**This repository declares itself a one-component solution.** `solution.yaml` as `bootstrap` would scaffold it, so the Solution Explorer stops showing its welcome text here.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 53,
+      "stepNumber": 6,
+      "stepKey": "affected",
+      "dateTime": "2026-08-31T01:32:10.907000-04:00",
+      "description": "Affected; verify; full suite as `final-full`; close.",
+      "status": "pending",
+      "kind": "plan-step"
     }
   ]
 }

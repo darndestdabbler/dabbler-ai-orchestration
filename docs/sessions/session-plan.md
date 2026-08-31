@@ -2166,7 +2166,7 @@ the plan.*
 
 ---
 
-### Session 51 of 53: What the field trial found, and nothing else
+### Session 51 of 54: What the field trial found, and nothing else
 
 *Amended into the plan by session 50, which is the session that found them.
 Bounded deliberately: a remediation session that grows is a second feature
@@ -2194,7 +2194,7 @@ F-50-4 is a new session, not a widening of this one.
 
 ---
 
-### Session 52 of 53: The startup experience, walked before it ships
+### Session 52 of 54: The startup experience, walked before it ships
 
 *Inserted 2026-08-30, at the operator's request: "I want the startup
 experience to have a good DX before release." Two defects found by reading the
@@ -2223,7 +2223,44 @@ session that never ships.
 
 ---
 
-### Session 53 of 53: The half of the trial that needs a published router
+### Session 53 of 54: The Work Explorer reads at a glance, and session 1 asks
+
+*Inserted 2026-08-31, at the operator's request, from three pieces of feedback
+given while looking at this repository's own Work Explorer and after restarting
+a project. The publication trial that was session 53 becomes 54; it is blocked
+either way, so nothing is delayed by going in front of it.*
+
+1. Register; declare `--not-releasable`.
+2. **Sessions render under status buckets again, superseding D104.** At 53
+   sessions the flat list has become the long scroll D104 said it would; the
+   operator ruled buckets back, refined: *In Progress* and *Not Started*
+   ascending, *Complete* and *Cancelled* descending so the latest finished
+   session sits under its header, an empty bucket not rendered at all, each
+   header carrying its count in the description slot, *In Progress* expanded
+   and the rest collapsed. A finished session's row carries a compact close
+   date in the same slot.
+3. **A closed session that stopped at the cap is a note, not a flag.** The
+   attention rows over the sessions kept naming every closed
+   `REMEDIATED_AT_CAP` session at the top of the tree, which invites reopening
+   work that later sessions have already built on. Those notes move under an
+   *Information* bucket, collapsed, with a count; the in-flight case stays
+   where it is, because that one is a decision.
+4. **Session 1 asks for the plan instead of guessing it.** The scaffolded
+   session 1, `PLAN_PROMPT`, the bootstrap hand-off line and the extension
+   walkthrough all say "Neither waits on anyone", and an engine took that
+   literally: with no plan in the repository it searched sibling directories
+   and drafted one. The templates now say the plan's substance is the
+   operator's, and to ask for it when it is not in the repository or the prompt.
+5. **This repository declares itself a one-component solution.**
+   `solution.yaml` as `bootstrap` would scaffold it, so the Solution Explorer
+   stops showing its welcome text here.
+6. Affected; verify; full suite as `final-full`; close.
+
+Est. 5 tests net. Extension to 2.2.0.
+
+---
+
+### Session 54 of 54: The half of the trial that needs a published router
 
 *Blocked on the operator, and that is the correct state rather than a delay to
 apologise for. It runs after the publication decision is answered and CI is

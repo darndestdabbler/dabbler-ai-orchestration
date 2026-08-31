@@ -1244,7 +1244,7 @@
     {
       "number": 63,
       "title": "The escape route \u2014 when the framework stops, it asks",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-31T15:41:34.814000-04:00",
       "orchestrator": {
         "engine": "claude-code",
@@ -1253,7 +1253,7 @@
         "identityProvenance": "direct"
       },
       "frameworkVersion": "2.0.0",
-      "completedAt": null,
+      "completedAt": "2026-08-31T17:40:05.160000-04:00",
       "verificationVerdict": "VERIFIED",
       "verification": {
         "rounds": 2,

@@ -9771,6 +9771,126 @@
       "dateTime": "2026-08-31T01:46:15.829000-04:00",
       "description": "Affected; verify; full suite as `final-full`; close.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 54,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-31T02:06:26.677000-04:00",
+      "description": "Register; declare `--not-releasable`.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 54,
+      "stepNumber": 2,
+      "stepKey": "cap-the-workers",
+      "dateTime": "2026-08-31T02:06:26.677000-04:00",
+      "description": "**Cap the workers.** A `vitest.config.ts` in `packages/router` that sets the pool to a small fixed number of workers locally (measure 2 and 4 against the 86-second baseline and record both) and one in CI, where the runner is smaller than this machine and a fork storm is a timeout. The suite command in `dabbler.yaml` does not change; the cap lives in the config the command already reads.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 54,
+      "stepNumber": 3,
+      "stepKey": "make-config",
+      "dateTime": "2026-08-31T02:06:26.677000-04:00",
+      "description": "**Make `config.test.ts` hermetic against `DABBLER_TRANSPORT`.** With the variable set in the shell, three `resolveTransport` tests fail; the describe blocks restore the variable afterwards but never clear it first. Clear it in a `beforeEach` and restore it after, so the suite's result does not depend on which terminal it ran from.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 54,
+      "stepNumber": 4,
+      "stepKey": "affected",
+      "dateTime": "2026-08-31T02:06:26.677000-04:00",
+      "description": "Affected; verify; full suite as `final-full`; close.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 54,
+      "dateTime": "2026-08-31T02:06:40.236000-04:00",
+      "task": "Cap vitest workers for packages/router (vitest.config.ts: small fixed local pool, measured at 2 and 4 against the 86 s baseline, one worker in CI); make config.test.ts hermetic against DABBLER_TRANSPORT (clear in beforeEach, restore after); affected, verify, final-full, close.",
+      "releasable": false
+    },
+    {
+      "sessionNumber": 54,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-31T02:06:40.263000-04:00",
+      "description": "Register; declare `--not-releasable`.",
+      "status": "in-progress"
+    },
+    {
+      "sessionNumber": 54,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-31T02:09:53.022000-04:00",
+      "description": "Register; declare `--not-releasable`.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 54,
+      "stepNumber": 3,
+      "stepKey": "make-config",
+      "dateTime": "2026-08-31T02:09:53.505000-04:00",
+      "description": "**Make `config.test.ts` hermetic against `DABBLER_TRANSPORT`.** With the variable set in the shell, three `resolveTransport` tests fail; the describe blocks restore the variable afterwards but never clear it first. Clear it in a `beforeEach` and restore it after, so the suite's result does not depend on which terminal it ran from.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 54,
+      "stepNumber": 2,
+      "stepKey": "cap-the-workers",
+      "dateTime": "2026-08-31T02:09:54.092000-04:00",
+      "description": "**Cap the workers.** A `vitest.config.ts` in `packages/router` that sets the pool to a small fixed number of workers locally (measure 2 and 4 against the 86-second baseline and record both) and one in CI, where the runner is smaller than this machine and a fork storm is a timeout. The suite command in `dabbler.yaml` does not change; the cap lives in the config the command already reads.",
+      "status": "in-progress"
+    },
+    {
+      "sessionNumber": 54,
+      "stepNumber": 2,
+      "stepKey": "cap-the-workers",
+      "dateTime": "2026-08-31T02:18:13.205000-04:00",
+      "description": "**Cap the workers.** A `vitest.config.ts` in `packages/router` that sets the pool to a small fixed number of workers locally (measure 2 and 4 against the 86-second baseline and record both) and one in CI, where the runner is smaller than this machine and a fork storm is a timeout. The suite command in `dabbler.yaml` does not change; the cap lives in the config the command already reads.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 54,
+      "stepNumber": 4,
+      "stepKey": "affected",
+      "dateTime": "2026-08-31T02:18:13.674000-04:00",
+      "description": "Affected; verify; full suite as `final-full`; close.",
+      "status": "in-progress"
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D246",
+      "ordinal": 246,
+      "sessionNumber": 54,
+      "decidedOn": "2026-08-31",
+      "recordedAt": "2026-08-31T02:18:46.875000-04:00",
+      "decider": "orchestrator",
+      "headline": "The router suite runs on four workers locally and one in CI, set in packages/router/vitest.config.ts; twenty was contention, not speed",
+      "body": "`packages/router` declared no vitest configuration, so the pool was one\nworker per logical core: twenty on this host, and ten of the suite's\nforty-four files fork real `git` and `node` processes. The run of record\nfor session 53 packed 784 seconds of test time into 86 seconds of wall\nclock and pinned the host for the duration. The pytest suite learned this\nin Set 117 (`-n 2` locally, sequential in CI); this is the TypeScript\nsuite learning it.\n\nMeasured on the twenty-core host, whole suite, one run each:\n\n| workers | wall clock | test time (sum) |\n|---|---|---|\n| 20 (the old default) | 94 s | 873 s |\n| 4 | 106 s | 352 s |\n| 2 | 138 s | 262 s |\n\nTwenty workers is contention, not speed: the same tests take two and a\nhalf times longer each, and the wall-clock difference against four is\ntwelve seconds. Four is the cap locally. In CI the cap is **one**: the\nrunner is `windows-latest`, two to four vCPUs, and a fork per core there\nis the timeout the job's twenty-minute limit exists for.\n\nWhere it lives: `packages/router/vitest.config.ts`, which the suite command\nin `dabbler.yaml` already reads \u2014 the command does not change, and `vitest\nrun` in the CI job picks it up the same way. Both `minWorkers` and\n`maxWorkers` are set, because vitest defaults the minimum to the core count\nand a minimum above the maximum is not a smaller pool. `CI` is the switch:\nGitHub Actions sets it, and a developer's shell does not.\n\nThe file is covered by the typecheck (`tsconfig.json` include) and by lint\n(both the package script and `workspace-check.ts` name it), and one test\nasserts the two values \u2014 one in CI, at most four elsewhere.\n\nRecorded in the same session: `test/config.test.ts` was not hermetic\nagainst `DABBLER_TRANSPORT`. Four of its describe blocks resolve the\ntransport and one of them restored the variable after each test without\nclearing it first, so with the variable set in the shell \u2014 which\n`bootstrap` does at user scope on a seat machine \u2014 three tests failed.\nThe clear-then-restore now sits at file scope, once, and the file passes\nwith the variable set to either value.",
+      "model": "claude-fable-5",
+      "provider": "anthropic"
+    },
+    {
+      "sessionNumber": 54,
+      "stepNumber": 4,
+      "stepKey": "affected",
+      "dateTime": "2026-08-31T02:21:52.119000-04:00",
+      "description": "Affected; verify; full suite as `final-full`; close.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 54,
+      "stepNumber": 4,
+      "stepKey": "affected",
+      "dateTime": "2026-08-31T02:21:52.938000-04:00",
+      "description": "Affected; verify; full suite as `final-full`; close.",
+      "status": "complete"
     }
   ]
 }

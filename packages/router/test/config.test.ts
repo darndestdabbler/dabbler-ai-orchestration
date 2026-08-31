@@ -31,6 +31,19 @@ afterAll(removeTempDirs);
 // from the test before it.
 beforeEach(resetProjectRootCache);
 
+// Hermetic against the shell: `bootstrap` persists DABBLER_TRANSPORT at user
+// scope on a seat machine, and four of the blocks below resolve the transport,
+// so the variable is cleared before every test and the shell's value put
+// back after.
+const savedTransport = process.env[TRANSPORT_ENV_VAR];
+beforeEach(() => {
+  delete process.env[TRANSPORT_ENV_VAR];
+});
+afterEach(() => {
+  if (savedTransport === undefined) delete process.env[TRANSPORT_ENV_VAR];
+  else process.env[TRANSPORT_ENV_VAR] = savedTransport;
+});
+
 const overlayIn = (project: string, body: unknown): string =>
   writeYaml(join(project, "local-overrides.yaml"), body);
 const declareIn = (project: string, body: unknown): string =>
@@ -160,12 +173,6 @@ describe("loading a config", () => {
 });
 
 describe("resolving the transport", () => {
-  const saved = process.env[TRANSPORT_ENV_VAR];
-  afterEach(() => {
-    if (saved === undefined) delete process.env[TRANSPORT_ENV_VAR];
-    else process.env[TRANSPORT_ENV_VAR] = saved;
-  });
-
   it("defaults to the API", () => {
     expect(resolveTransport(makeConfig())).toBe("api");
   });

@@ -7884,3 +7884,48 @@ Follow-up the operator raised and this session did not build: an
 Information bucket could also surface work done outside any session. There
 is no record of such work for the projection to read today, so it needs a
 data source before it needs a row.
+
+## Session 54 — The router suite stops taxing the host
+
+### D246 · 2026-08-31 · Orchestrator (claude-fable-5/anthropic) · The router suite runs on four workers locally and one in CI, set in packages/router/vitest.config.ts; twenty was contention, not speed
+
+`packages/router` declared no vitest configuration, so the pool was one
+worker per logical core: twenty on this host, and ten of the suite's
+forty-four files fork real `git` and `node` processes. The run of record
+for session 53 packed 784 seconds of test time into 86 seconds of wall
+clock and pinned the host for the duration. The pytest suite learned this
+in Set 117 (`-n 2` locally, sequential in CI); this is the TypeScript
+suite learning it.
+
+Measured on the twenty-core host, whole suite, one run each:
+
+| workers | wall clock | test time (sum) |
+|---|---|---|
+| 20 (the old default) | 94 s | 873 s |
+| 4 | 106 s | 352 s |
+| 2 | 138 s | 262 s |
+
+Twenty workers is contention, not speed: the same tests take two and a
+half times longer each, and the wall-clock difference against four is
+twelve seconds. Four is the cap locally. In CI the cap is **one**: the
+runner is `windows-latest`, two to four vCPUs, and a fork per core there
+is the timeout the job's twenty-minute limit exists for.
+
+Where it lives: `packages/router/vitest.config.ts`, which the suite command
+in `dabbler.yaml` already reads — the command does not change, and `vitest
+run` in the CI job picks it up the same way. Both `minWorkers` and
+`maxWorkers` are set, because vitest defaults the minimum to the core count
+and a minimum above the maximum is not a smaller pool. `CI` is the switch:
+GitHub Actions sets it, and a developer's shell does not.
+
+The file is covered by the typecheck (`tsconfig.json` include) and by lint
+(both the package script and `workspace-check.ts` name it), and one test
+asserts the two values — one in CI, at most four elsewhere.
+
+Recorded in the same session: `test/config.test.ts` was not hermetic
+against `DABBLER_TRANSPORT`. Four of its describe blocks resolve the
+transport and one of them restored the variable after each test without
+clearing it first, so with the variable set in the shell — which
+`bootstrap` does at user scope on a seat machine — three tests failed.
+The clear-then-restore now sits at file scope, once, and the file passes
+with the variable set to either value.

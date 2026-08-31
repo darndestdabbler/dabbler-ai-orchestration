@@ -24,7 +24,7 @@
     "prepare": "node build.mjs",
     "build": "node build.mjs",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint src scripts test build.mjs --ext .ts,.mjs",
+    "lint": "eslint src scripts test build.mjs vitest.config.ts --ext .ts,.mjs",
     "test:unit": "vitest run",
     "generate:types": "node scripts/run-ts.mjs scripts/generate-types.ts",
     "check:types": "node scripts/run-ts.mjs scripts/check-types-fresh.ts"

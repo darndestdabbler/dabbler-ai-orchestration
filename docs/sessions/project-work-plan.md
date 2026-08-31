@@ -89,7 +89,9 @@ it.
 | 51 | What the field trial found, and nothing else | no | 2026-08-30 |
 | 52 | The startup experience, walked before it ships | no | 2026-08-30 |
 | 53 | The Work Explorer reads at a glance, and session 1 asks | no | 2026-08-31 |
-| 54 | The half of the trial that needs a published router | — | not declared |
+| 54 | The router suite stops taxing the host | no | 2026-08-31 |
+| 55 | The operator onboarding deck | — | not declared |
+| 56 | The half of the trial that needs a published router | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -1511,3 +1513,9 @@ Session 53: the Work Explorer reads at a glance, and session 1 asks.
 3. Bootstrap templates, the bootstrap hand-off line and the extension walkthrough tell session 1 to ask the operator for the plan when it is not in the repository, instead of "Neither waits on anyone".
 4. solution.yaml for this repository as a one-component solution.
 5. Tests for the above; extension bumped to 2.2.0; decision recorded superseding D104.
+
+### Session 54 — The router suite stops taxing the host
+
+**Releasable: no.**
+
+Cap vitest workers for packages/router (vitest.config.ts: small fixed local pool, measured at 2 and 4 against the 86 s baseline, one worker in CI); make config.test.ts hermetic against DABBLER_TRANSPORT (clear in beforeEach, restore after); affected, verify, final-full, close.

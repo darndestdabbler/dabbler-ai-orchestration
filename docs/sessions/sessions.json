@@ -1201,9 +1201,9 @@
     {
       "number": 61,
       "title": "`dabbler session next` \u2014 the loop as a verb the engine calls",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-31T10:33:17.941000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-08-31T12:44:41.040000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

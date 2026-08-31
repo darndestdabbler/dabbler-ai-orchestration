@@ -31,7 +31,7 @@ import {
   utimesSync,
   writeSync,
 } from "node:fs";
-import { basename, dirname, join, relative } from "node:path";
+import { basename, dirname, join, relative, resolve } from "node:path";
 
 import {
   IdentityResolutionError,
@@ -46,7 +46,22 @@ import {
   repoRootFromSessionsDir,
   upstreamRemote,
 } from "./evidence.ts";
-import { REPORT_SCHEMA, readInstruction, reportPath, shapeReport, writeReport } from "./driver.ts";
+import {
+  DISPOSITION_SCHEMA,
+  DRIVER_SCHEMA_VERSION,
+  REPORT_SCHEMA,
+  WORK_PLAN_SCHEMA,
+  dispositionsPath,
+  driverDir,
+  planPath,
+  readInstruction,
+  reportPath,
+  shapeReport,
+  stampAnswer,
+  writeDispositions,
+  writeReport,
+  writeWorkPlan,
+} from "./driver.ts";
 import { SET_BOOKKEEPING_COMMIT_BASENAMES, governingConfig, runGates } from "./gates.ts";
 import { refuseIfResolvingFromSource } from "./resolution.ts";
 import { detectEcosystems } from "./bootstrap/detect.ts";
@@ -820,11 +835,14 @@ export function declare(sessionsDir: string, options: DeclareCliOptions): number
 
 export interface ReportCliOptions {
   readonly seq: number;
-  readonly stepId: string;
-  readonly status: string;
-  readonly files: readonly string[];
-  readonly testsRun: string | null;
-  readonly notes: string;
+  /** A step report: the four flags. Absent when the answer travels by file. */
+  readonly stepId?: string | null;
+  readonly status?: string | null;
+  readonly files?: readonly string[] | null;
+  readonly testsRun?: string | null;
+  readonly notes?: string | null;
+  /** A plan or a disposition: the JSON the engine wrote, validated and copied in. */
+  readonly answerFile?: string | null;
   readonly sessionNumber?: number | null;
 }
 
@@ -874,40 +892,132 @@ export function report(sessionsDir: string, options: ReportCliOptions): number {
     );
     return EXIT_BOUNDARY;
   }
-  if (instruction.answer_schema !== REPORT_SCHEMA) {
-    const asks =
-      instruction.kind === "done"
-        ? "says the session is over and expects nothing"
-        : `asks for ${String(instruction.answer_schema)}, not a step report`;
-    writeErr(`report: refused -- instruction ${instruction.seq} ${asks}.\n`);
+  if (instruction.kind === "done") {
+    writeErr(
+      `report: refused -- instruction ${instruction.seq} says the session is over and ` +
+        "expects nothing.\n",
+    );
     return EXIT_BOUNDARY;
   }
+  const answerFile = options.answerFile ?? null;
+  if (answerFile === null) {
+    if (instruction.answer_schema !== REPORT_SCHEMA) {
+      writeErr(
+        `report: refused -- instruction ${instruction.seq} asks for ` +
+          `${String(instruction.answer_schema)}, not a step report; answer it with ` +
+          "--answer-file <path to the JSON you wrote>.\n",
+      );
+      return EXIT_BOUNDARY;
+    }
+    const record = shapeReport(
+      {
+        sessionNumber: target,
+        seq: options.seq,
+        stepId: options.stepId ?? "",
+        status: options.status ?? "",
+        files: options.files ?? [],
+        testsRun: options.testsRun ?? null,
+        notes: options.notes ?? "",
+      },
+      nowIso(),
+    );
+    let written;
+    try {
+      written = writeReport(repoRoot, target, record);
+    } catch (error) {
+      if (!(error instanceof LedgerError)) throw error;
+      writeErr(`report: refused -- ${error.message}\n`);
+      return EXIT_USAGE;
+    }
+    writeOut(
+      `report: session ${sessionDisplayNumber(target)} seq ${written.seq} ` +
+        `(${written.step_id}, ${written.status}; ${written.files_changed.length} file(s)) written to ` +
+        `${relative(repoRoot, reportPath(repoRoot, target)).replace(/\\/g, "/")}; ` +
+        "the driver validates it next.\n",
+    );
+    return EXIT_OK;
+  }
 
-  const record = shapeReport(
-    {
-      sessionNumber: target,
-      seq: options.seq,
-      stepId: options.stepId,
-      status: options.status,
-      files: options.files,
-      testsRun: options.testsRun,
-      notes: options.notes,
-    },
-    nowIso(),
-  );
-  let written;
+  // The plan and the dispositions travel by file: their substance is a
+  // structure no flag grammar should try to spell, and the framework stamps
+  // the members that are its own. The seq is judged here rather than by the
+  // driver because a plan carries none for the driver to judge later.
+  if (instruction.answer_schema === REPORT_SCHEMA) {
+    writeErr(
+      `report: refused -- instruction ${instruction.seq} asks for a step report; answer ` +
+        "it with --step, --status, --files and --notes, not an answer file.\n",
+    );
+    return EXIT_BOUNDARY;
+  }
+  if (options.seq !== instruction.seq) {
+    writeErr(
+      `report: refused -- the answer names seq ${options.seq}; instruction ` +
+        `${instruction.seq} is outstanding.\n`,
+    );
+    return EXIT_BOUNDARY;
+  }
+  const source = resolve(answerFile);
+  const ledger = resolve(driverDir(repoRoot, target));
+  if (source === ledger || source.startsWith(ledger + "\\") || source.startsWith(ledger + "/")) {
+    writeErr(
+      "report: refused -- the answer file is inside the driver's ledger, which only the " +
+        "framework writes; write it elsewhere (for example .dabbler/scratch/) and name it here.\n",
+    );
+    return EXIT_BOUNDARY;
+  }
+  let answer: unknown;
   try {
-    written = writeReport(repoRoot, target, record);
+    answer = JSON.parse(readFileSync(source, "utf8"));
+  } catch (error) {
+    writeErr(
+      `report: cannot read the answer file -- ${
+        error instanceof Error ? error.message : String(error)
+      }\n`,
+    );
+    return EXIT_USAGE;
+  }
+  const isPlan = instruction.answer_schema === WORK_PLAN_SCHEMA;
+  if (!isPlan && instruction.answer_schema !== DISPOSITION_SCHEMA) {
+    writeErr(`report: refused -- instruction ${instruction.seq} names no answer this verb writes.\n`);
+    return EXIT_BOUNDARY;
+  }
+  if (!isPlan && typeof instruction.round !== "number") {
+    writeErr(
+      `report: refused -- instruction ${instruction.seq} asks for dispositions but names ` +
+        "no round; the driver issues that instruction, and this one was not its.\n",
+    );
+    return EXIT_BOUNDARY;
+  }
+  const stamps: Record<string, unknown> = isPlan
+    ? { schema_version: DRIVER_SCHEMA_VERSION, session_number: target, recorded_at: nowIso() }
+    : {
+        schema_version: DRIVER_SCHEMA_VERSION,
+        session_number: target,
+        seq: instruction.seq,
+        round: instruction.round,
+        recorded_at: nowIso(),
+      };
+  let summary: string;
+  try {
+    if (isPlan) {
+      const plan = writeWorkPlan(repoRoot, target, stampAnswer(answer, stamps, "the work plan"));
+      summary =
+        `work plan (${plan.steps.length} step(s), releasable=${plan.releasable ? "yes" : "no"}) ` +
+        `written to ${relative(repoRoot, planPath(repoRoot, target)).replace(/\\/g, "/")}`;
+    } else {
+      const set = writeDispositions(repoRoot, target, stampAnswer(answer, stamps, "the disposition"));
+      summary =
+        `dispositions of round ${set.round} (${set.dispositions.length} finding(s)) written to ` +
+        `${relative(repoRoot, dispositionsPath(repoRoot, target)).replace(/\\/g, "/")}`;
+    }
   } catch (error) {
     if (!(error instanceof LedgerError)) throw error;
     writeErr(`report: refused -- ${error.message}\n`);
     return EXIT_USAGE;
   }
   writeOut(
-    `report: session ${sessionDisplayNumber(target)} seq ${written.seq} ` +
-      `(${written.step_id}, ${written.status}; ${written.files_changed.length} file(s)) written to ` +
-      `${relative(repoRoot, reportPath(repoRoot, target)).replace(/\\/g, "/")}; ` +
-      "the driver validates it next.\n",
+    `report: session ${sessionDisplayNumber(target)} seq ${instruction.seq} answered; ` +
+      `${summary}; the driver reads it next.\n`,
   );
   return EXIT_OK;
 }

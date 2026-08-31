@@ -44,7 +44,7 @@
             "uniqueItems": true,
             "items": {
               "type": "string",
-              "pattern": "^(?![A-Za-z]:)(?!/)(?!.*(^|/)\\.\\.?(/|$))[^\\\\]+$"
+              "pattern": "^(?![A-Za-z]:)(?!/)(?![\\s\\S]*(^|/)\\.\\.?(/|$))[^\\\\]+$"
             },
             "description": "The files the step expects to create or change, repository-relative. A report for the step must list each of them."
           },

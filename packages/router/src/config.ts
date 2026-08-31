@@ -72,6 +72,10 @@ export const REPOSITORY_OWNED_BLOCKS: ReadonlySet<string> = new Set([
   "testing",
   "packaging",
   "paths",
+  // The driver's invocation budget is a spend ceiling, and a ceiling an
+  // untracked overlay could raise would be a machine deciding how much of
+  // a seat a repository's session may consume.
+  "driver",
 ]);
 
 export const TRANSPORT_API = "api";
@@ -646,6 +650,27 @@ export function verificationRoundCap(config: RouterConfig): number {
  */
 export function runRoundCap(config: RouterConfig): number {
   return roundCap(config, "max_test_rounds", DEFAULT_TEST_ROUNDS);
+}
+
+export const DEFAULT_DRIVER_INVOCATIONS = 24;
+
+/**
+ * How many times one driven session may invoke the engine, from
+ * `driver.max_invocations` in the repository's `dabbler.yaml`, or the
+ * shipped default.
+ *
+ * Its own bound rather than a third key under `verification.settings`: a
+ * verification round buys a verifier's opinion and an invocation buys an
+ * authoring engine's turn -- on a seat, one premium request each -- and
+ * the two are spent by different loops. The fallback rule is the round
+ * caps' own: a malformed or non-positive value is the default, never no
+ * bound at all.
+ */
+export function driverInvocationCap(config: RouterConfig): number {
+  const block = record(config["driver"]);
+  const cap = toInteger("max_invocations" in block ? block["max_invocations"] : null);
+  if (cap === null) return DEFAULT_DRIVER_INVOCATIONS;
+  return cap >= 1 ? cap : DEFAULT_DRIVER_INVOCATIONS;
 }
 
 // --- Transport and generation params -----------------------------------------

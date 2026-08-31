@@ -1,15 +1,19 @@
 // `dabbler session <subcommand>` -- the lifecycle's command line.
 //
-// All eight subcommands are real. Session 26 landed the three that WRITE the
-// record (`start`, `declare`, `decision`); session 31 lands the five
+// Every subcommand is real. Session 26 landed the three that WRITE the
+// record (`start`, `declare`, `decision`); session 31 landed the five
 // that judge it -- `close` and its gates, `cancel`, `restore`, `plan` and
-// the legacy `migrate` -- so nothing here is refused for not existing yet.
+// the legacy `migrate`; the driver set added `report`, the engine's one
+// answer, and `drive`, the loop that asks -- so nothing here is refused for
+// not existing yet.
 //
 // The argument grammar is deliberately small: argparse's whole grammar is
 // not the contract, the flags the lifecycle documents are. An unknown flag
 // is a usage error rather than a silent no-op, because a misspelled
 // `--not-releasable` that parsed as nothing would publish.
 
+import { shlexSplit } from "../checks.ts";
+import { commandEngine, driveSession } from "../drive.ts";
 import { SessionsRootNotFoundError, resolveSessionsDir } from "../evidence.ts";
 import { DECIDERS } from "../writers.ts";
 import {
@@ -32,7 +36,8 @@ const SUMMARY: Record<string, string> = {
   start: "register a session start",
   decision: "append a decision to decisions-log.md",
   declare: "declare the session's task list and releasability",
-  report: "answer the driver's outstanding step instruction",
+  drive: "run the next session end to end: the framework drives, the engine answers",
+  report: "answer the driver's outstanding instruction",
   plan: "record the plan prose in project-work-plan.md",
   close: "run gates and close the session",
   cancel: "cancel one session",
@@ -76,14 +81,33 @@ const OPTIONS: Record<string, readonly string[]> = {
     "  --releasable             this session may publish",
     "  --not-releasable         it may not; one of the two is required",
   ],
+  drive: [
+    "  --engine ENGINE          required: claude-code | codex | gemini | copilot -- who",
+    "                           is registered as the session's orchestrator",
+    "  --provider PROVIDER      anthropic | openai | google; required for a fresh registration",
+    "  --model MODEL            required for a Copilot seat",
+    "  --effort EFFORT          optional reasoning effort, recorded with the identity",
+    '  --engine-argv "PROG A B" required: the command invoked once per instruction, with no',
+    "                           shell, in the repository root; {instruction} in any element",
+    "                           is the instruction's path, and DABBLER_DRIVER_INSTRUCTION",
+    "                           carries it too",
+    "  --max-invocations N      overrides driver.max_invocations for this run; a re-run",
+    "                           past a budget stop passes a larger one",
+    "  --max-rounds N           the verification round cap, as `dabbler verify` takes it",
+    "  --transport T            the verification transport, as `dabbler verify` takes it",
+  ],
   report: [
     "  --seq N                  required: the seq of the instruction being answered",
-    "  --step ID                required: the step id the instruction named",
-    "  --status STATUS          required: done | blocked",
-    "  --files A,B,...          required: every file created or changed, repo-relative;",
-    "                           an empty string when none",
-    "  --notes TEXT             required: one line for the log",
+    "  a step report, when the instruction asked for one:",
+    "  --step ID                the step id the instruction named",
+    "  --status STATUS          done | blocked",
+    "  --files A,B,...          every file created or changed, repo-relative; an empty",
+    "                           string when none",
+    "  --notes TEXT             one line for the log",
     "  --tests COMMAND          the test command run, when one was",
+    "  a work plan or a disposition, when the instruction asked for one:",
+    "  --answer-file PATH       the JSON you wrote, outside the driver's ledger; the",
+    "                           framework validates it and stamps its own members",
   ],
   plan: [
     "  --body TEXT              the plan prose; mutually exclusive with --body-file",
@@ -297,12 +321,62 @@ export async function sessionVerb(argv: string[]): Promise<number> {
     });
   }
 
+  if (subcommand === "drive") {
+    const engine = values.get("--engine");
+    const engineArgv = values.get("--engine-argv");
+    const missing = [
+      engine === undefined ? "--engine" : null,
+      engineArgv === undefined ? "--engine-argv" : null,
+    ].filter((name): name is string => name !== null);
+    if (missing.length > 0) {
+      writeErr(
+        `dabbler session drive: the following arguments are required: ${missing.join(", ")}\n`,
+      );
+      return EXIT_USAGE;
+    }
+    const maxInvocations = integer(values.get("--max-invocations"), "--max-invocations");
+    if (typeof maxInvocations === "string") {
+      writeErr(`dabbler session drive: ${maxInvocations}\n`);
+      return EXIT_USAGE;
+    }
+    const maxRounds = integer(values.get("--max-rounds"), "--max-rounds");
+    if (typeof maxRounds === "string") {
+      writeErr(`dabbler session drive: ${maxRounds}\n`);
+      return EXIT_USAGE;
+    }
+    let adapter;
+    try {
+      adapter = commandEngine(shlexSplit(engineArgv!));
+    } catch (error) {
+      writeErr(
+        `dabbler session drive: --engine-argv: ${error instanceof Error ? error.message : String(error)}\n`,
+      );
+      return EXIT_USAGE;
+    }
+    return driveSession(sessionsDir, {
+      engine: engine!,
+      provider: values.get("--provider") ?? null,
+      model: values.get("--model") ?? null,
+      effort: values.get("--effort") ?? null,
+      adapter,
+      maxInvocations,
+      maxRounds,
+      transport: values.get("--transport") ?? null,
+    });
+  }
+
   if (subcommand === "report") {
-    const required = ["--seq", "--step", "--status", "--files", "--notes"];
+    const answerFile = values.get("--answer-file");
+    const required =
+      answerFile === undefined
+        ? ["--seq", "--step", "--status", "--files", "--notes"]
+        : ["--seq"];
     const missing = required.filter((flag) => !values.has(flag));
     if (missing.length > 0) {
       writeErr(
-        `dabbler session report: the following arguments are required: ${missing.join(", ")}\n`,
+        `dabbler session report: the following arguments are required: ${missing.join(", ")}` +
+          (answerFile === undefined ? " (or --answer-file, for a plan or a disposition)" : "") +
+          "\n",
       );
       return EXIT_USAGE;
     }
@@ -310,6 +384,18 @@ export async function sessionVerb(argv: string[]): Promise<number> {
     if (typeof seq === "string") {
       writeErr(`dabbler session report: ${seq}\n`);
       return EXIT_USAGE;
+    }
+    if (answerFile !== undefined) {
+      const stepFlags = ["--step", "--status", "--files", "--notes", "--tests"].filter((flag) =>
+        values.has(flag),
+      );
+      if (stepFlags.length > 0) {
+        writeErr(
+          `dabbler session report: argument --answer-file: not allowed with ${stepFlags.join(", ")}\n`,
+        );
+        return EXIT_USAGE;
+      }
+      return report(sessionsDir, { seq: seq!, answerFile, sessionNumber });
     }
     return report(sessionsDir, {
       seq: seq!,

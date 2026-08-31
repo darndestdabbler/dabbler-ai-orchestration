@@ -180,6 +180,22 @@ testing:
           - packages/router/test/contracts.test.ts
           - packages/router/test/metrics.test.ts
           - packages/router/test/lifecycleCli.test.ts
+          # `session report` and `session drive` are parsed here and proven
+          # there: the driver's contract by the report verb's refusals, the
+          # loop by a scripted engine.
+          - packages/router/test/driver.test.ts
+          - packages/router/test/drive.test.ts
+      # The driver's ledger (the four answers and the run's state) and the
+      # loop that fills it. The loop's test drives a whole session through
+      # every verb the typed lifecycle has, so a change to either file is a
+      # change to what a driven session leaves behind.
+      - when: packages/router/src/driver.ts
+        select:
+          - packages/router/test/driver.test.ts
+          - packages/router/test/drive.test.ts
+      - when: packages/router/src/drive.ts
+        select:
+          - packages/router/test/drive.test.ts
       - when: packages/router/src/index.ts
         select:
           - packages/router/test/contracts.test.ts

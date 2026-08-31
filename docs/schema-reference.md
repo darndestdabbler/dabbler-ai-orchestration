@@ -272,8 +272,19 @@ for people and the framework never reads it.
 |---|---|---|---|
 | `instruction.json` | the driver | `driver-instruction` | the one thing being asked for now |
 | `report.json` | `dabbler session report` | `driver-report` | the engine's answer to a step |
-| `plan.json` | the driver, from the engine's answer | `driver-work-plan` | the session's ordered steps |
-| `dispositions.json` | the driver, from the engine's answer | `driver-disposition` | what the engine will do about a round's findings |
+| `plan.json` | `dabbler session report --answer-file` | `driver-work-plan` | the session's ordered steps |
+| `dispositions.json` | `dabbler session report --answer-file` | `driver-disposition` | what the engine will do about a round's findings |
+| `run.json` | `dabbler session drive` | `driver-run` | where the loop is, and why it stopped |
+
+All three answers travel through the one engine verb. A step is answered
+with the flags (`--step --status --files --notes [--tests]`); a plan or a
+disposition is answered with `--answer-file <path>`, a JSON file the engine
+writes anywhere *outside* the driver's ledger (`.dabbler/scratch/` is the
+suggested place) carrying the substance only — the verb validates it
+against the schema the outstanding instruction names, stamps the members
+that are the framework's to say (`schema_version`, `session_number`, the
+`seq` and `round` answered, `recorded_at`), refuses a stamped member the
+engine typed with a different value, and copies it in whole.
 
 **`instruction.json`** (required: `schema_version` `1`, `seq`, `kind`,
 `session_number`, `issued_at`): `seq` is monotonic per session and every
@@ -318,6 +329,24 @@ is more than the schema can say: a repeated `finding_index`, an index the
 round has no finding for, a round the ledger has not recorded, or a
 blocking finding left unanswered is refused — an unanswered finding is how
 one disappears.
+
+**`run.json`** (required: `schema_version`, `session_number`, `engine`,
+`phase`, `seq`, `invocations`, `max_invocations`, `accepted_steps`,
+`baseline_tree`, `stop`, `started_at`, `updated_at`): the loop's state,
+replaced whole after every transition. `phase` is `plan` \| `steps` \|
+`preverify` \| `verify` \| `dispositions` \| `fix` \| `run-of-record` \|
+`land` \| `close` \| `complete`, and a re-run of `session drive` enters
+there — skipping the `accepted_steps`, measuring the next report against
+`baseline_tree` (the tree after the last accepted step), continuing `seq`
+and counting `invocations` on from where they were. `invocations` is held
+under `max_invocations` (`driver.max_invocations` in `dabbler.yaml`, default
+24; `--max-invocations` overrides); reaching it stops the loop and closes
+nothing. `stop` is null while the loop runs and after it completed, and
+otherwise `{kind, reason, at}` with `kind` one of `budget` \|
+`rejected-thrice` \| `blocked` \| `engine` \| `tests` \| `verification` \|
+`land` \| `close` — the one field written for a person, and a re-run
+clears it. `engine` names the adapter; a re-run through a different one is
+refused, because one engine's session store carries the run.
 
 ## Metrics ledger — `router-metrics.jsonl`
 

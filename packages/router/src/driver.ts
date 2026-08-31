@@ -24,6 +24,7 @@ import type {
   DriverDisposition,
   DriverInstruction,
   DriverReport,
+  DriverRun,
   DriverWorkPlan,
 } from "./generated/index.ts";
 import {
@@ -43,10 +44,13 @@ export const REPORT_FILENAME = "report.json";
 export const PLAN_FILENAME = "plan.json";
 export const DISPOSITIONS_FILENAME = "dispositions.json";
 
+export const RUN_FILENAME = "run.json";
+
 export const INSTRUCTION_SCHEMA = "driver-instruction.schema.json";
 export const REPORT_SCHEMA = "driver-report.schema.json";
 export const WORK_PLAN_SCHEMA = "driver-work-plan.schema.json";
 export const DISPOSITION_SCHEMA = "driver-disposition.schema.json";
+export const RUN_SCHEMA = "driver-run.schema.json";
 
 // --- Paths -------------------------------------------------------------------
 
@@ -68,6 +72,10 @@ export function planPath(repoRoot: string, sessionNumber: number): string {
 
 export function dispositionsPath(repoRoot: string, sessionNumber: number): string {
   return join(driverDir(repoRoot, sessionNumber), DISPOSITIONS_FILENAME);
+}
+
+export function runPath(repoRoot: string, sessionNumber: number): string {
+  return join(driverDir(repoRoot, sessionNumber), RUN_FILENAME);
 }
 
 /**
@@ -140,6 +148,10 @@ export function validateDispositions(record: unknown): DriverDisposition {
     seen.add(entry.finding_index);
   }
   return set;
+}
+
+export function validateRun(record: unknown): DriverRun {
+  return validateAgainst<DriverRun>(record, RUN_SCHEMA, "driver run");
 }
 
 /**
@@ -221,6 +233,10 @@ export function readDispositions(
   return set === null ? null : holdDispositionsAgainstRound(set, readRounds(repoRoot, sessionNumber));
 }
 
+export function readRun(repoRoot: string, sessionNumber: number): DriverRun | null {
+  return readArtifact(runPath(repoRoot, sessionNumber), validateRun);
+}
+
 // --- Whole-file writes -------------------------------------------------------
 
 // Each writer validates before it writes, so the file on disk is by
@@ -263,6 +279,12 @@ export function writeDispositions(
     readRounds(repoRoot, sessionNumber),
   );
   atomicWriteJsonIndented(dispositionsPath(repoRoot, sessionNumber), valid);
+  return valid;
+}
+
+export function writeRun(repoRoot: string, sessionNumber: number, record: unknown): DriverRun {
+  const valid = validateRun(record);
+  atomicWriteJsonIndented(runPath(repoRoot, sessionNumber), valid);
   return valid;
 }
 
@@ -310,4 +332,35 @@ export function shapeReport(input: ReportInput, reportedAt: string): Record<stri
     notes: input.notes,
     reported_at: reportedAt,
   };
+}
+
+// --- Shaping an answer file --------------------------------------------------
+
+/**
+ * The engine's answer to a plan or a disposition instruction carries the
+ * substance -- the steps, the actions -- and the framework stamps what is its
+ * to say: the schema version, the session, the seq and round it answers, the
+ * time. An engine that typed one of those and disagreed is refused rather
+ * than corrected, because a stamp that can be argued with is not a stamp;
+ * one that typed it and agreed is let through, because the record ends up
+ * identical either way.
+ */
+export function stampAnswer(
+  answer: unknown,
+  stamps: Readonly<Record<string, unknown>>,
+  noun: string,
+): Record<string, unknown> {
+  if (answer === null || typeof answer !== "object" || Array.isArray(answer)) {
+    throw new LedgerError(`${noun} must be a JSON object`);
+  }
+  const record = answer as Record<string, unknown>;
+  for (const [key, value] of Object.entries(stamps)) {
+    if (key in record && JSON.stringify(record[key]) !== JSON.stringify(value)) {
+      throw new LedgerError(
+        `${noun} carries ${key}=${JSON.stringify(record[key])}, and this session's is ` +
+          `${JSON.stringify(value)}; the framework stamps it -- leave it out`,
+      );
+    }
+  }
+  return { ...record, ...stamps };
 }

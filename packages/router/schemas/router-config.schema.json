@@ -449,6 +449,17 @@
         }
       }
     },
+    "driver": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "How far `dabbler session drive` may go. Declared in the repository's dabbler.yaml (it is a repository-owned block) and read here after the merge.",
+      "properties": {
+        "max_invocations": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
     "worktree": {
       "type": "object",
       "additionalProperties": false,

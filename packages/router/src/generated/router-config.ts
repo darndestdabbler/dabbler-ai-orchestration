@@ -143,6 +143,12 @@ export type RouterConfig = {
     max_age_hours?: number;
     seat_max_age_hours?: number;
   };
+  /**
+   * How far `dabbler session drive` may go. Declared in the repository's dabbler.yaml (it is a repository-owned block) and read here after the merge.
+   */
+  driver?: {
+    max_invocations?: number;
+  };
   worktree?: {
     root?: string | null;
     init?: Array<{

@@ -8078,3 +8078,103 @@ whatever line 57 chooses.
 
 The verb table's summary for `session` said `log` — deleted in session 55
 — and now says `report`.
+
+## Session 57 — `dabbler session drive` — the framework runs the session
+
+### D249 · 2026-08-31 · Orchestrator (claude-fable-5/anthropic) · dabbler session drive: the framework runs the session by calling the lifecycle's own verbs, judges every report in one place, hands findings back for disposition, and is bounded by driver.max_invocations with its state in run.json; the plan and the dispositions travel through session report --answer-file
+
+Session 57 is the second of the driver set. Session 56 gave the exchange a
+shape; this session gives it a loop: `dabbler session drive`, in
+`packages/router/src/drive.ts`, runs a session from registration to close
+and calls the engine once per thing it needs.
+
+**The loop calls the verbs the typed lifecycle has, and no others.**
+Register is `session start` (the same resolution rule, idempotent, so a
+re-run re-registers the session in flight). The plan is asked for as a
+`step` instruction with `step_id: plan` and answered against
+`driver-work-plan`; the declaration is `session declare` from the plan's
+`task` and `releasable`, before any edit. Each step is issued, the engine
+invoked, and the report judged in one place: the seq is the outstanding
+one, the step is the one asked for, every listed file exists or is a path
+the tree removed, the listed files are exactly what the tree changed since
+the last accepted step (the session's own bookkeeping excluded), each of
+the step's expected files is listed, and each of the step's `argv` checks
+exits 0 through the same executor the declared controls use -- so a check
+that changes the tree fails like one that exits 1. A disagreement is a
+`rejection` carrying every reason; three refusals stop the loop. The
+affected tests are run and recorded by `test-evidence run` (the targeted
+command the selector builds, per expensive suite); a red run goes back as a
+fix step before any verifier sees the tree. Verification is `runRound`, and
+its exit code is the whole interface: `0` proceeds, blocking findings hand
+the round back as a `rejection` carrying every finding, and anything else
+stops the loop with that code in words. The engine's dispositions are held
+against the round by the ledger reader (D248); each `reject` becomes a
+dispute through `recordDispute`, after its evidence paths are checked to
+exist; if any finding was marked `fix`, a `fix-round-N` step is issued
+whose checks are every plan step's checks, and the loop returns to the
+affected tests and another round. The run of record is `test-evidence run
+--stage final-full` per expensive suite; a red suite goes back as
+`fix-run-of-record` and the loop returns to the affected tests. Landing is
+`git add -A`, one commit named for the session and its task, and one push
+(none on a `.dabbler/local-only` repository). The close is `session close`.
+A `done` instruction is written and the engine is NOT invoked to read it:
+on a seat that invocation is a premium request that buys nothing.
+
+**One engine interface, one adapter here.** `Engine.invoke(invocation)`
+receives the instruction, its path, the repository, the invocation count
+(cumulative across re-runs), whether this is the session's first
+invocation (an engine with a session store starts one here and continues
+it afterwards), and an `emit` sink; every line it emits is appended to
+`engine-<NN>.log` and shown. The adapter shipped is `commandEngine(argv)`:
+the argv spawned per invocation with no shell in the repository root,
+`{instruction}` substituted in any element and
+`DABBLER_DRIVER_INSTRUCTION` set. `--engine-argv` is REQUIRED on the CLI in
+this session: the built-in argv per engine, the `.cmd`-shim branch, the
+stream renderer and the interrupt are session 58's, and a default that
+pretended otherwise would be a promise the command breaks.
+
+**Bounded, and resumable.** `driver.max_invocations` (snake_case, like every
+other key in `dabbler.yaml`; the plan wrote `maxInvocations`) is a
+repository-owned block, because a spend ceiling a gitignored overlay could
+raise is not a ceiling; default 24; `--max-invocations` overrides per run.
+Reaching it stops the loop and closes nothing. The run's state is the
+FIFTH file in the driver's ledger, `run.json` against `driver-run` -- the
+phase, the accepted steps, the tree the next report is measured against,
+the seq and invocation counters, and `stop: {kind, reason, at}`. It is
+state, not history (the history stays the transcripts and the lifecycle's
+records, as D248 said); it exists because a stopped loop has to say why in
+a place the next reader can find, and because a re-run has to continue
+from the phase it reached rather than plan again. A re-run clears `stop`,
+keeps the invocation count (continuing past a budget is an explicit
+`--max-invocations`, which is a person deciding to spend more), re-issues an
+interrupted step under the next seq, and refuses a different engine name:
+one engine's session store carries a run.
+
+**The plan and the dispositions travel through the one verb** -- owed
+item (1) from session 56. `dabbler session report --seq N --answer-file
+<path>` reads the JSON the engine wrote (anywhere outside the driver's
+ledger; a file inside it is refused as the engine writing the record),
+stamps `schema_version`, `session_number`, and for a disposition the `seq`
+and `round` the instruction carries, plus `recorded_at`, refuses a stamped
+member the engine typed with a different value, validates against the
+schema the outstanding instruction names, and copies it in. The seq is
+judged at the verb for these two answers, not by the driver, because a
+plan carries no seq for the driver to judge later. The step flags and the
+answer file are mutually exclusive, and each is refused when the
+instruction asked for the other.
+
+**Also taken.** Owed item (2): the path pattern in `driver-report` and
+`driver-work-plan` now uses `[\s\S]*` before the `..` lookahead, so a
+newline no longer lets `src\n/../widget.py` through; the case is in the
+existing refusal test. What is NOT here, for session 59: the projection
+does not yet carry the stop, so the Explorer has no attention row for a
+stopped loop -- `run.json` carries it, `session drive` prints it, and the
+row is 59's when Start becomes the launch.
+
+Nine tests in `test/drive.test.ts`, one per transition (plan and declare;
+step accepted through to close; step rejected then accepted; refused
+thrice; findings dispositioned with a fix re-entered and a dispute
+recorded; budget stop and resume; blocked; red affected tests sent back as
+a fix step; the command adapter's spawn and transcript), driven by a
+scripted in-process engine against the offline verifier -- no model, no
+seat.

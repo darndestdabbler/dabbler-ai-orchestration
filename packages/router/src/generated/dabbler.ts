@@ -19,6 +19,15 @@ export type Dabbler = {
    */
   packaging?: Record<string, unknown>;
   /**
+   * How far `dabbler session drive` may go on this repository's behalf. Repository-owned like the testing block, and for the same reason: a bound a gitignored overlay could raise is not a bound.
+   */
+  driver?: {
+    /**
+     * How many times one driven session may invoke the engine before the loop stops and closes nothing (default 24). On a Copilot seat every invocation is a premium request, so this is a spend ceiling as much as a loop bound; continuing past it is a re-run with a larger --max-invocations, which is a person deciding to spend more.
+     */
+    max_invocations?: number;
+  };
+  /**
    * Path facts about this repository.
    */
   paths?: {

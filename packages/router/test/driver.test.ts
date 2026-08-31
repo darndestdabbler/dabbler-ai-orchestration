@@ -111,6 +111,8 @@ describe("the four answer schemas", () => {
       "src/./widget.py",
       "src/..",
       ".",
+      // A newline before the `..` segment: `.` does not span it, `[\s\S]` does.
+      "src\n/../widget.py",
     ]) {
       expect(() => validateReport({ ...REPORT, files_changed: [path] })).toThrow(
         /at files_changed\/0/,

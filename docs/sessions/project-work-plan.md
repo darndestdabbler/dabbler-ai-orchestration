@@ -92,7 +92,7 @@ it.
 | 54 | The router suite stops taxing the host | no | 2026-08-31 |
 | 55 | The task rows move themselves | no | 2026-08-31 |
 | 56 | The driver's contract — the schemas and the report verb | no | 2026-08-31 |
-| 57 | `dabbler session drive` — the framework runs the session | — | not declared |
+| 57 | `dabbler session drive` — the framework runs the session | no | 2026-08-31 |
 | 58 | The engine adapter — Claude Code, Copilot, Codex; stream; interrupt | — | not declared |
 | 59 | Start is the launch, and the developer's guide | — | not declared |
 | 60 | The operator onboarding deck | — | not declared |
@@ -1536,3 +1536,32 @@ Task rows derived from the lifecycle's own records (Register, Declare, Work, Ver
 **Releasable: no.**
 
 Session 56: the driver's contract. Four schemas under packages/router/schemas/ (driver-instruction, driver-report, driver-work-plan, driver-disposition), generated types for each, a driver.ts module owning .dabbler/runs/s<N>/driver/ (paths, validated readers that refuse a row the schema rejects, atomic writers), and `dabbler session report` as the engine's one verb that shapes and validates a report into that ledger. Docs: the schema reference gains the driver ledger; the verb table stops naming the deleted `session log`. Six tests. Not releasable.
+
+### Session 57 — `dabbler session drive` — the framework runs the session
+
+**Releasable: no.**
+
+Session 57 of 61: `dabbler session drive` -- the framework runs the session.
+
+1. The loop, as a router verb (`src/drive.ts`, `dabbler session drive`): resolve
+   and register the session (the rule `session start` applies); ask the engine
+   for a work plan against `driver-work-plan` and declare from it; issue each
+   step, invoke the engine, validate the report's substance (seq, step, every
+   listed file exists, the listed files match what the tree changed since the
+   previous accepted step, the step's own checks pass) and accept or issue a
+   `rejection` with the reasons, three times at most; then `affected` and the
+   pre-verify evidence, run and recorded by the framework; then `verify`;
+   blocking findings go back as a `rejection` carrying the findings, the
+   `driver-disposition` is validated and held against the round, fixes re-enter
+   the loop and rejected findings become disputes; then the run of record;
+   commit and push once; close.
+2. The work plan and the dispositions travel through the one engine verb:
+   `dabbler session report --seq N --answer-file <path>` validates the engine's
+   JSON against the schema the outstanding instruction names, stamps the
+   framework's fields, and copies it into the ledger.
+3. Engine-agnostic: one interface (`invoke(invocation)`), shipped with a command
+   adapter (an argv spawned per invocation with no shell) and tested with a
+   scripted engine, without a model and without a seat.
+4. Bounded: `driver.max_invocations` in `dabbler.yaml` (default 24) stops the
+   loop and closes nothing; the run's state (`driver/run.json`) records why.
+5. Affected; verify; full suite as `final-full`; close.

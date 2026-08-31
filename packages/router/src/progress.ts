@@ -28,6 +28,7 @@ import {
   STATE_FILENAME,
   repoRootFromSessionsDir,
 } from "./evidence.ts";
+import { readRun } from "./driver.ts";
 import { nowIso } from "./journal.ts";
 import {
   LedgerError,
@@ -997,6 +998,19 @@ export function buildTaskRows(
   const preverify = passedRun(STAGE_PREVERIFY_TARGETED, null);
   const runOfRecord = verified ? passedRun(STAGE_FINAL_FULL, epoch(latestRoundAt)) : null;
 
+  // A driven session that stopped short of the close is an attention row:
+  // the first phase not done is blocked, and its intent says which bound
+  // the loop met. Read from the driver's own state rather than inferred,
+  // and refused like the rounds ledger when that file does not parse.
+  let driverStop: { kind: string; reason: string } | null = null;
+  try {
+    const run = readRun(repoRoot, sessionNumber);
+    if (run !== null && run.stop !== null) driverStop = run.stop;
+  } catch (error) {
+    if (!(error instanceof LedgerError)) throw error;
+    throw new TaskRowsRefused(`driver run: ${error.message}`);
+  }
+
   const phases: Phase[] = [
     {
       id: TASK_REGISTER,
@@ -1044,11 +1058,25 @@ export function buildTaskRows(
     },
   ];
 
+  if (driverStop !== null && status === STATUS_IN_PROGRESS) {
+    const stop = driverStop;
+    const openIndex = phases.findIndex((phase) => phase.doneAt === null);
+    if (openIndex >= 0) {
+      phases[openIndex] = {
+        ...(phases[openIndex] as Phase),
+        blocked: true,
+        intent:
+          `Driver stopped (${stop.kind}): ${stop.reason} -- ` +
+          "`dabbler session drive` re-runs from this phase.",
+      };
+    }
+  }
+
   // The fold: done rows in order, then the first row not done is open (while
-  // the session is in flight) or blocked (when verification stopped short),
-  // and everything after it is pending. A record for a later phase written
-  // before an earlier one exists is not a state the lifecycle can reach, and
-  // the fold does not invent one for it.
+  // the session is in flight) or blocked (when verification stopped short or
+  // the driver did), and everything after it is pending. A record for a
+  // later phase written before an earlier one exists is not a state the
+  // lifecycle can reach, and the fold does not invent one for it.
   const inFlight = status === STATUS_IN_PROGRESS;
   let previousEnd: string | null = startedAt;
   let halted = false;

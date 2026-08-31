@@ -19,6 +19,18 @@
       "type": "object",
       "description": "Step (f) of the session lifecycle: pack, then push to the feed. Validated in full by ai_router.packaging. A repository that declares nothing here publishes nothing, which is a declaration rather than an omission."
     },
+    "driver": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "How far `dabbler session drive` may go on this repository's behalf. Repository-owned like the testing block, and for the same reason: a bound a gitignored overlay could raise is not a bound.",
+      "properties": {
+        "max_invocations": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "How many times one driven session may invoke the engine before the loop stops and closes nothing (default 24). On a Copilot seat every invocation is a premium request, so this is a spend ceiling as much as a loop bound; continuing past it is a re-run with a larger --max-invocations, which is a person deciding to spend more."
+        }
+      }
+    },
     "paths": {
       "type": "object",
       "additionalProperties": false,

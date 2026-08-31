@@ -40,7 +40,7 @@
       "uniqueItems": true,
       "items": {
         "type": "string",
-        "pattern": "^(?![A-Za-z]:)(?!/)(?!.*(^|/)\\.\\.?(/|$))[^\\\\]+$",
+        "pattern": "^(?![A-Za-z]:)(?!/)(?![\\s\\S]*(^|/)\\.\\.?(/|$))[^\\\\]+$",
         "description": "Repository-relative, forward slashes, no `.` or `..` segments, never absolute."
       },
       "description": "Every file the engine created or changed for this step."

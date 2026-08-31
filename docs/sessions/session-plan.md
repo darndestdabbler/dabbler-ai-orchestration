@@ -2166,7 +2166,7 @@ the plan.*
 
 ---
 
-### Session 51 of 54: What the field trial found, and nothing else
+### Session 51 of 56: What the field trial found, and nothing else
 
 *Amended into the plan by session 50, which is the session that found them.
 Bounded deliberately: a remediation session that grows is a second feature
@@ -2194,7 +2194,7 @@ F-50-4 is a new session, not a widening of this one.
 
 ---
 
-### Session 52 of 54: The startup experience, walked before it ships
+### Session 52 of 56: The startup experience, walked before it ships
 
 *Inserted 2026-08-30, at the operator's request: "I want the startup
 experience to have a good DX before release." Two defects found by reading the
@@ -2223,7 +2223,7 @@ session that never ships.
 
 ---
 
-### Session 53 of 54: The Work Explorer reads at a glance, and session 1 asks
+### Session 53 of 56: The Work Explorer reads at a glance, and session 1 asks
 
 *Inserted 2026-08-31, at the operator's request, from three pieces of feedback
 given while looking at this repository's own Work Explorer and after restarting
@@ -2260,7 +2260,7 @@ Est. 5 tests net. Extension to 2.2.0.
 
 ---
 
-### Session 54 of 54: The half of the trial that needs a published router
+### Session 54 of 56: The half of the trial that needs a published router
 
 *Blocked on the operator, and that is the correct state rather than a delay to
 apologise for. It runs after the publication decision is answered and CI is
@@ -2282,6 +2282,94 @@ green; until then it cannot start, and session 50 did not pretend otherwise.*
 **Precondition:** `dabbler owed list` shows `publication` answered, and
 `dabbler release --verify-install` passes. Neither is this session's to
 arrange.
+
+---
+
+### Session 55 of 56: The operator onboarding deck
+
+*Planned 2026-08-31 at the operator's request: a PowerPoint deck that onboards a
+human operator to the framework. Runs after 54. Slides as the operator laid
+them out; the deck is a committed artifact, and it is built by a script so a
+later session can rebuild it when a screen changes.*
+
+1. Register; declare `--not-releasable`.
+2. **The build.** `docs/onboarding/build-deck.mjs` generates
+   `docs/onboarding/dabbler-onboarding.pptx` with `pptxgenjs` (a
+   dev-dependency of the workspace root, nothing new under `packages/`).
+   Screenshots live beside it under `docs/onboarding/media/` and are taken
+   from the running extension, not drawn: slide 3 uses this repository's own
+   Work Explorer (buckets, D245) and a Solution Explorer over a multi-repository
+   solution.
+3. **Slides 1–6.**
+   - *1 — What is Dabbler AI Orchestration?* The VS Code extension, how to
+     install it (Marketplace once 54 has published; the `.vsix` until then),
+     the GitHub repository.
+   - *2 — Why use Dabbler?* Automatic cross-provider verification with further
+     rounds when a round finds something; one lifecycle for every session
+     (register, declare, work, affected tests, verify, run of record, close);
+     the cross-repository view of internal dependencies with drift shown;
+     decisions the framework cannot make arriving as one question with a
+     recommendation.
+   - *3 — The AI Orchestration Explorer.* Screenshot of the Solution Explorer
+     and the Work Explorer on the left; on the right, one bullet list per pane
+     saying what each row means and what clicking it does.
+   - *4 — Getting started with Copilot.* VS Code, Node.js 22+, the Copilot
+     CLI and a seat, `DABBLER_TRANSPORT=copilot-cli`, `--model` at session
+     start, what the seat costs.
+   - *5 — Getting started with Claude Code or Codex.* VS Code, Node.js 22+,
+     Claude Code or Codex, direct API accounts and the three
+     `DABBLER_*_API_KEY` variables — set where, never in files.
+   - *6 — Project setup.* Set Up New Project (or `dabbler bootstrap`), what
+     it writes and commits, the two owed questions it may raise, then session
+     1 — which asks you what the project is — and session 2.
+4. **Slides 7–x: a four-repository CSV solution**, as the operator specified:
+   *csv-model* (First Name, Last Name, DOB); *csv-deserializer* (populates the
+   model from a CSV string or stream); *csv-persistence* (Entity Framework
+   Core to SQLite); *csv-pipeline* (a Quartz.NET-scheduled file-system reader
+   that reads a file, invokes the deserializer, then the persistence
+   library). One slide per repository — its contract, what it depends on,
+   how its sessions were planned — plus one for the solution graph as the
+   Solution Explorer draws it and one for the day-to-day loop across the
+   four. **Open for the operator, decided before this session runs:**
+   whether these slides show the solution as designed (mockups of the
+   Explorer over the four declared repositories) or as built. Building four
+   .NET repositories through the lifecycle is its own session or set, and a
+   deck that shows real screens of it would follow that work, not precede it.
+5. **Readable by a person who has never seen the framework**: every command
+   on a slide is copy-pasteable, and no slide names a decision ID without
+   saying what it is.
+6. Affected; verify; full suite as `final-full`; close.
+
+Est. 1 test (the build script produces a deck with the declared slide
+count). No extension change.
+
+---
+
+### Session 56 of 56: The router suite stops taxing the host
+
+*Planned 2026-08-31. Running the router suite pins the host: `packages/router`
+declares no vitest configuration, so the pool is one worker per logical core —
+twenty here — and ten of the test files fork real `git` and `node`
+processes. The run of record for session 53 packed 784 seconds of test time
+into 86 seconds of wall clock. The pytest suite learned this once already
+(`-n 2` locally, sequential in CI); the TypeScript suite has to learn it
+too. The operator may run this before 55 if the load is in the way.*
+
+1. Register; declare `--not-releasable`.
+2. **Cap the workers.** A `vitest.config.ts` in `packages/router` that sets
+   the pool to a small fixed number of workers locally (measure 2 and 4
+   against the 86-second baseline and record both) and one in CI, where the
+   runner is smaller than this machine and a fork storm is a timeout. The
+   suite command in `dabbler.yaml` does not change; the cap lives in the
+   config the command already reads.
+3. **Make `config.test.ts` hermetic against `DABBLER_TRANSPORT`.** With the
+   variable set in the shell, three `resolveTransport` tests fail; the
+   describe blocks restore the variable afterwards but never clear it first.
+   Clear it in a `beforeEach` and restore it after, so the suite's result
+   does not depend on which terminal it ran from.
+4. Affected; verify; full suite as `final-full`; close.
+
+Est. 1 test net. Nothing else.
 
 ---
 

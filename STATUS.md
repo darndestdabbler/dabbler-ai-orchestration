@@ -1,8 +1,87 @@
-# STATUS — 58 of 61 closed. Next: 59, Start is the launch
+# STATUS — 59 of 61 closed. Next: 60, the operator onboarding deck
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
 `experiment/verification-pipeline-v3` and `design/solution-decomposition`
 are merged and finished. Earlier handoff text is in `docs/status-archive.md`.
+
+> **Recorded, 2026-08-31, after session 59.** Session 59 — the last of the
+> driver set — closed `VERIFIED` in two rounds. Round 1 raised two
+> Majors: one was fair and is built (a Send made while no invocation was
+> running was discarded at the next boundary while the extension said
+> "Sent" — the driver now **defers** it and the next instruction carries
+> it first among its `reasons` as `sent: <text>`, including the race
+> where the poll takes a request as the engine exits on its own; a Stop
+> halts wherever it is next seen); the other ("child process despite the
+> in-process requirement") was **disputed with line-cited evidence and
+> withdrawn** in round 2, because D251 had recorded the amendment and its
+> three reasons before the round. Its deliverable is **D251**: **Start is
+> the launch.** The Work Explorer's Start Session picks the engine (and
+> the model: optional for Claude Code and Codex, required for a Copilot
+> seat and refused by name before anything spawns) and runs `dabbler
+> session drive` — as a **child process of the extension host** on the
+> editor's own Node, the same bundled `dabbler.cjs` the terminal shim
+> runs, through the router's own `spawnProgram`/`terminateTree` (now
+> exported for exactly this caller). The plan's word "in-process" was
+> **amended with evidence**: `standIn` holds one root and throws for a
+> second caller, the in-process router serialises verbs, and `capture`
+> buffers a verb's output until it returns — a drive is one verb that
+> lasts the session, and in-process it would have queued Stop behind
+> itself and shown its output at the end. Everything the driver prints
+> lands live in the **"Dabbler: Engine"** output channel; the task rows
+> move by themselves; the status bar shows **Stop** and **Send to
+> engine** while a drive runs (also on the palette under
+> `dabbler.driving`). **Stop needed `--stop`**: a plain interrupt
+> re-invokes the engine, so `session interrupt --stop` is new — the driver
+> ends the invocation and halts with `interrupted` on `run.json` (a ninth
+> stop kind, with the person's reason); the session stays in flight and
+> the same Start resumes; a stop that arrives between invocations is
+> honoured at the next boundary. **Send** is the plain interrupt. The
+> copy-prompt commands (Start the next session, Run Prompt, Send Back,
+> Respecify, the left-click clipboard half, the Copy Prompt submenu) are
+> **gone**: the framework sends, nobody pastes.
+> **`docs/driving-a-session.md`** is the developer's guide, linked from
+> README and quick-start, its examples copied from a real walk.
+> **Walked live** with Haiku on Claude Code on a scratch repository
+> through the exact command line the extension launches: two plan
+> refusals (Haiku *printed* the answer command instead of running it —
+> `enginePrompt` now says "RUN the shell command … printing it is not
+> [the answer]", and a third walk had the plan accepted on the first
+> invocation), a stale-seq refusal from the report verb that Haiku fixed
+> itself, a Send mid-step honoured (one-line `greet`, no JSDoc, as told),
+> `check-passed`, `report-accepted`, then Stop landing as `interrupted`
+> with the Work row reading `Driver stopped (interrupted): …`. The press
+> of the button itself is the operator's (the verifier's standing nit):
+> extension **2.4.0** is built and installed here, unpublished like
+> 2.0.0–2.3.0. Six extension tests, two router tests; **1181 router
+> tests**, 148 extension tests.
+>
+> **An incident, on the record (D251).** A `git checkout -- .` and `rm -rf
+> .dabbler …` meant for the scratch repository ran in this repository
+> (the chain began with `cd` here): every uncommitted edit was reverted
+> and **this machine's untracked `.dabbler/` — the round records, test-run
+> rows and driver ledgers of sessions 22–58 — was deleted and is not in
+> git.** Tracked state and history were restored from HEAD, the session
+> was re-registered and re-declared on a clean tree with the same task
+> file, and every edit was redone from the session's own record; nothing
+> under the tracked tree was lost. A second, smaller misfire launched a
+> `session drive` in this repository (one read-only plan invocation,
+> stopped; `.dabbler/runs/s59/driver/run.json` says so). The rule is now
+> in memory and in D251: destructive commands for a scratch checkout run
+> in their own command with absolute paths, never after a `cd` here, and
+> every walk verb carries `--sessions-dir`. **The operator should know**
+> that the Work Explorer's verification detail for sessions 22–58 on this
+> machine is gone (the work computer's ledger is separate; the round refs
+> pushed under `refs/dabbler/rounds/` by each close survive on the
+> remote); the closes that consumed that evidence are unaffected.
+>
+> **Owed to 60.** The deck shows the driven lifecycle — Start, watch,
+> Send, Stop — from `docs/driving-a-session.md`; pressing Start on 60
+> from the installed 2.4.0 is the walk the verifier still wants. **Left
+> open:** 58's nit stands, narrower — `run.json` does not say whether an
+> invocation is in flight, though nothing sent is lost any more. The
+> interrupted invocations in the walk ended by the ten-second tree-kill
+> fallback as often as by Claude Code's control message (`exit=1
+> seconds=10`) — measure why before the deck promises "gentle".
 
 > **Recorded, 2026-08-31, after session 58.** Session 58 — the third of the
 > driver set — closed `VERIFIED` in two rounds. Round 1 raised two Majors:

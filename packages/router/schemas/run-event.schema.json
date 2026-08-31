@@ -1,0 +1,1243 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "run-event.schema.json",
+  "title": "Run journal event (.dabbler/journal.jsonl)",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "sequence",
+    "event_id",
+    "event_type",
+    "occurred_at",
+    "repository_id",
+    "worktree_id",
+    "run_id",
+    "attempt",
+    "actor",
+    "summary",
+    "artifact_refs",
+    "payload"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": 2
+    },
+    "sequence": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "event_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "event_type": {
+      "enum": [
+        "run.created",
+        "run.started",
+        "run.checkpoint",
+        "run.waiting",
+        "run.resumed",
+        "run.guidance",
+        "check.started",
+        "check.completed",
+        "verification.dispatched",
+        "verification.result",
+        "remediation.started",
+        "run.cost_updated",
+        "run.finished",
+        "organization.cancelled",
+        "organization.restored",
+        "worktree.created",
+        "worktree.ready",
+        "worktree.failed",
+        "escalation.triggered"
+      ]
+    },
+    "occurred_at": {
+      "type": "string",
+      "minLength": 20
+    },
+    "repository_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "worktree_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "run_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^r[0-9]{4}-[a-z0-9]+(-[a-z0-9]+)*$"
+    },
+    "attempt": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "actor": {
+      "$ref": "#/$defs/actor"
+    },
+    "summary": {
+      "type": "string",
+      "maxLength": 200
+    },
+    "artifact_refs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "payload": {
+      "type": "object"
+    }
+  },
+  "oneOf": [
+    {
+      "properties": {
+        "event_type": {
+          "const": "run.created"
+        },
+        "payload": {
+          "$ref": "#/$defs/runCreated"
+        }
+      }
+    },
+    {
+      "properties": {
+        "event_type": {
+          "const": "run.started"
+        },
+        "payload": {
+          "$ref": "#/$defs/runStarted"
+        }
+      }
+    },
+    {
+      "properties": {
+        "event_type": {
+          "const": "run.checkpoint"
+        },
+        "payload": {
+          "$ref": "#/$defs/runCheckpoint"
+        }
+      }
+    },
+    {
+      "properties": {
+        "event_type": {
+          "const": "run.waiting"
+        },
+        "payload": {
+          "$ref": "#/$defs/runWaiting"
+        }
+      }
+    },
+    {
+      "properties": {
+        "event_type": {
+          "const": "run.resumed"
+        },
+        "payload": {
+          "$ref": "#/$defs/runResumed"
+        }
+      }
+    },
+    {
+      "properties": {
+        "event_type": {
+          "const": "run.guidance"
+        },
+        "payload": {
+          "$ref": "#/$defs/runGuidance"
+        }
+      }
+    },
+    {
+      "properties": {
+        "event_type": {
+          "const": "check.started"
+        },
+        "payload": {
+          "$ref": "#/$defs/checkStarted"
+        }
+      }
+    },
+    {
+      "properties": {
+        "event_type": {
+          "const": "check.completed"
+        },
+        "payload": {
+          "$ref": "#/$defs/checkCompleted"
+        }
+      }
+    },
+    {
+      "properties": {
+        "event_type": {
+          "const": "verification.dispatched"
+        },
+        "payload": {
+          "$ref": "#/$defs/verificationDispatched"
+        }
+      }
+    },
+    {
+      "properties": {
+        "event_type": {
+          "const": "verification.result"
+        },
+        "payload": {
+          "$ref": "#/$defs/verificationResultPayload"
+        }
+      }
+    },
+    {
+      "properties": {
+        "event_type": {
+          "const": "remediation.started"
+        },
+        "payload": {
+          "$ref": "#/$defs/remediationStarted"
+        }
+      }
+    },
+    {
+      "properties": {
+        "event_type": {
+          "const": "run.cost_updated"
+        },
+        "payload": {
+          "$ref": "#/$defs/runCostUpdated"
+        }
+      }
+    },
+    {
+      "properties": {
+        "event_type": {
+          "const": "run.finished"
+        },
+        "payload": {
+          "$ref": "#/$defs/runFinished"
+        }
+      }
+    },
+    {
+      "properties": {
+        "event_type": {
+          "const": "organization.cancelled"
+        },
+        "payload": {
+          "$ref": "#/$defs/organizationChange"
+        }
+      }
+    },
+    {
+      "properties": {
+        "event_type": {
+          "const": "organization.restored"
+        },
+        "payload": {
+          "$ref": "#/$defs/organizationChange"
+        }
+      }
+    },
+    {
+      "properties": {
+        "event_type": {
+          "const": "worktree.created"
+        },
+        "payload": {
+          "$ref": "#/$defs/worktreeCreated"
+        }
+      }
+    },
+    {
+      "properties": {
+        "event_type": {
+          "const": "worktree.ready"
+        },
+        "payload": {
+          "$ref": "#/$defs/worktreeOutcome"
+        }
+      }
+    },
+    {
+      "properties": {
+        "event_type": {
+          "const": "worktree.failed"
+        },
+        "payload": {
+          "$ref": "#/$defs/worktreeFailure"
+        }
+      }
+    },
+    {
+      "properties": {
+        "event_type": {
+          "const": "escalation.triggered"
+        },
+        "payload": {
+          "$ref": "#/$defs/escalationTriggered"
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "actor": {
+      "type": "object",
+      "required": [
+        "kind",
+        "id",
+        "provider"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "enum": [
+            "agent",
+            "operator",
+            "framework"
+          ]
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "provider": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "policy": {
+      "enum": [
+        "fast",
+        "verified"
+      ]
+    },
+    "selection": {
+      "type": "object",
+      "required": [
+        "selected",
+        "risks",
+        "allTestsAffected",
+        "allAffectedReason"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "selected": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "path",
+              "reason",
+              "selectedBy"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "reason": {
+                "type": "string",
+                "minLength": 1
+              },
+              "selectedBy": {
+                "type": "string"
+              },
+              "suite": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The declared suite whose test_roots and test_glob claim this file. Absent when no suite's declaration claims it -- a path selected by a mapping rule alone, or a repository that declares no test locations. Optional rather than required because rows written before suites declared their own test locations carry no owner and must stay readable."
+              }
+            }
+          }
+        },
+        "risks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "kind",
+              "path",
+              "detail"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "type": "string",
+                "minLength": 1
+              },
+              "path": {
+                "type": "string"
+              },
+              "detail": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "allTestsAffected": {
+          "type": "boolean"
+        },
+        "allAffectedReason": {
+          "type": "string"
+        },
+        "policy": {
+          "type": "string"
+        },
+        "policyReason": {
+          "type": "string"
+        }
+      }
+    },
+    "runCreated": {
+      "type": "object",
+      "required": [
+        "policy",
+        "ask",
+        "base_commit",
+        "worktree_id",
+        "branch",
+        "session_number"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "policy": {
+          "$ref": "#/$defs/policy"
+        },
+        "ask": {
+          "type": "string",
+          "minLength": 1
+        },
+        "base_commit": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "worktree_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "branch": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "session_number": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "prepared": {
+          "type": "boolean"
+        },
+        "legacy_set": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Only ever set by the version 1 migration, and only on records that belong to a retired session set. Its presence means 'this run is history, not a session of this repository': the projection keeps it visible under runs and never joins it to a plan session, because that set numbered its sessions from 1 and so does this repository. Absent on everything the current machinery writes."
+        }
+      }
+    },
+    "runStarted": {
+      "type": "object",
+      "required": [
+        "mode",
+        "engine",
+        "provider",
+        "model",
+        "identity_provenance"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "enum": [
+            "wrapped",
+            "registered"
+          ]
+        },
+        "engine": {
+          "type": "string",
+          "minLength": 1
+        },
+        "provider": {
+          "type": "string",
+          "minLength": 1
+        },
+        "model": {
+          "type": "string",
+          "minLength": 1
+        },
+        "identity_provenance": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "identity_source": {
+          "type": "string"
+        }
+      }
+    },
+    "runCheckpoint": {
+      "type": "object",
+      "required": [
+        "note",
+        "ack_guidance_through"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "note": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "ack_guidance_through": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "uncertain": {
+          "type": "boolean"
+        }
+      }
+    },
+    "runWaiting": {
+      "type": "object",
+      "required": [
+        "reason"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "reason": {
+          "enum": [
+            "operator",
+            "dependency"
+          ]
+        },
+        "question": {
+          "type": "string",
+          "minLength": 1
+        },
+        "depends_on_run": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "oneOf": [
+        {
+          "properties": {
+            "reason": {
+              "const": "operator"
+            }
+          },
+          "required": [
+            "question"
+          ]
+        },
+        {
+          "properties": {
+            "reason": {
+              "const": "dependency"
+            }
+          },
+          "required": [
+            "depends_on_run"
+          ]
+        }
+      ]
+    },
+    "runResumed": {
+      "type": "object",
+      "required": [
+        "probe",
+        "answered_sequence"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "probe": {
+          "$ref": "#/$defs/probe"
+        },
+        "answered_sequence": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "round_limit": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "dispatch_limit": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "model_usd_budget": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "elapsed_minutes_budget": {
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      }
+    },
+    "probe": {
+      "type": "object",
+      "required": [
+        "ok",
+        "findings"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "ok": {
+          "type": "boolean"
+        },
+        "findings": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "worktree_present": {
+          "type": "boolean"
+        },
+        "head_commit": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "head_matches_base": {
+          "type": "boolean"
+        },
+        "last_check": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "second_heartbeat": {
+          "type": "boolean"
+        },
+        "orphan_commit": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "interrupted_check": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "interrupted_round": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      }
+    },
+    "runGuidance": {
+      "type": "object",
+      "required": [
+        "text",
+        "answers_sequence"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000
+        },
+        "answers_sequence": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        }
+      }
+    },
+    "checkStarted": {
+      "type": "object",
+      "required": [
+        "check_id",
+        "stage",
+        "command",
+        "tree_digest",
+        "selection"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "check_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "stage": {
+          "enum": [
+            "targeted",
+            "final-full"
+          ]
+        },
+        "command": {
+          "type": "string",
+          "minLength": 1
+        },
+        "tree_digest": {
+          "type": "string",
+          "minLength": 1
+        },
+        "selection": {
+          "$ref": "#/$defs/selection"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "required": {
+          "type": "boolean"
+        }
+      }
+    },
+    "checkCompleted": {
+      "type": "object",
+      "required": [
+        "check_id",
+        "stage",
+        "command",
+        "exit_code",
+        "duration_seconds",
+        "outcome",
+        "timed_out",
+        "tree_digest",
+        "post_tree_digest",
+        "tree_mutated",
+        "selection",
+        "report_ref"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "check_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "stage": {
+          "enum": [
+            "targeted",
+            "final-full"
+          ]
+        },
+        "command": {
+          "type": "string",
+          "minLength": 1
+        },
+        "exit_code": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "duration_seconds": {
+          "type": "number",
+          "minimum": 0
+        },
+        "outcome": {
+          "enum": [
+            "passed",
+            "failed"
+          ]
+        },
+        "timed_out": {
+          "type": "boolean"
+        },
+        "tree_digest": {
+          "type": "string",
+          "minLength": 1
+        },
+        "post_tree_digest": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tree_mutated": {
+          "type": "boolean"
+        },
+        "selection": {
+          "$ref": "#/$defs/selection"
+        },
+        "report_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "kind": {
+          "type": "string"
+        },
+        "required": {
+          "type": "boolean"
+        }
+      }
+    },
+    "verificationDispatched": {
+      "type": "object",
+      "required": [
+        "request_id",
+        "round",
+        "tree_digest",
+        "excluded_providers"
+      ],
+      "properties": {
+        "request_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "round": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "tree_digest": {
+          "type": "string",
+          "minLength": 1
+        },
+        "excluded_providers": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "verificationResultPayload": {
+      "type": "object",
+      "required": [
+        "request_id",
+        "attempt",
+        "tree_digest",
+        "verdict",
+        "error_class"
+      ],
+      "properties": {
+        "request_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "attempt": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "tree_digest": {
+          "type": "string",
+          "minLength": 1
+        },
+        "verdict": {
+          "enum": [
+            "VERIFIED",
+            "ISSUES_FOUND",
+            null
+          ]
+        },
+        "error_class": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "round": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "remediationStarted": {
+      "type": "object",
+      "required": [
+        "round",
+        "finding_count"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "round": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "finding_count": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "runCostUpdated": {
+      "type": "object",
+      "required": [
+        "dispatch_id",
+        "cost_usd",
+        "pricing_status",
+        "source"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "dispatch_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cost_usd": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "pricing_status": {
+          "enum": [
+            "priced",
+            "unpriced"
+          ]
+        },
+        "source": {
+          "type": "string",
+          "minLength": 1
+        },
+        "usage": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "input_tokens": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "output_tokens": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "credits": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0
+            }
+          }
+        }
+      }
+    },
+    "runFinished": {
+      "type": "object",
+      "required": [
+        "outcome",
+        "commit",
+        "tree_digest",
+        "verdict",
+        "checks_green"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "outcome": {
+          "enum": [
+            "completed",
+            "failed",
+            "cancelled"
+          ]
+        },
+        "commit": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tree_digest": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "verdict": {
+          "enum": [
+            "VERIFIED",
+            "ISSUES_FOUND",
+            "WAIVED",
+            "REMEDIATED_AT_CAP",
+            null
+          ]
+        },
+        "unreviewed_findings": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "checks_green": {
+          "type": "boolean"
+        },
+        "pushed": {
+          "type": "boolean"
+        }
+      },
+      "if": {
+        "properties": {
+          "verdict": {
+            "const": "REMEDIATED_AT_CAP"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "unreviewed_findings"
+        ],
+        "properties": {
+          "unreviewed_findings": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      }
+    },
+    "organizationChange": {
+      "type": "object",
+      "required": [
+        "reason"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "session_number": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        },
+        "legacy_set": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Only ever set by the version 1 migration, and only on records that belong to a retired session set. Its presence means 'this run is history, not a session of this repository': the projection keeps it visible under runs and never joins it to a plan session, because that set numbered its sessions from 1 and so does this repository. Absent on everything the current machinery writes."
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "not": {
+              "required": [
+                "legacy_set"
+              ]
+            }
+          },
+          "then": {
+            "required": [
+              "session_number"
+            ]
+          }
+        }
+      ]
+    },
+    "worktreeCreated": {
+      "type": "object",
+      "required": [
+        "worktree_id",
+        "branch",
+        "base_commit"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "worktree_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "branch": {
+          "type": "string",
+          "minLength": 1
+        },
+        "base_commit": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "worktreeTask": {
+      "type": "object",
+      "required": [
+        "id",
+        "argv",
+        "exit_code",
+        "duration_seconds",
+        "probe"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "argv": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "shell_command": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "exit_code": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "duration_seconds": {
+          "type": "number",
+          "minimum": 0
+        },
+        "timed_out": {
+          "type": "boolean"
+        },
+        "probe": {
+          "enum": [
+            "passed",
+            "failed",
+            "not_declared"
+          ]
+        },
+        "outcome": {
+          "enum": [
+            "passed",
+            "failed"
+          ]
+        }
+      }
+    },
+    "worktreeOutcome": {
+      "type": "object",
+      "required": [
+        "worktree_id",
+        "tasks"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "worktree_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "tasks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/worktreeTask"
+          }
+        }
+      }
+    },
+    "worktreeFailure": {
+      "type": "object",
+      "required": [
+        "worktree_id",
+        "tasks",
+        "failed_task"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "worktree_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "tasks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/worktreeTask"
+          }
+        },
+        "failed_task": {
+          "type": "string",
+          "minLength": 1
+        },
+        "detail": {
+          "type": "string"
+        }
+      }
+    },
+    "escalationTriggered": {
+      "type": "object",
+      "required": [
+        "trigger",
+        "from_policy",
+        "to_policy"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "trigger": {
+          "enum": [
+            "operator-request",
+            "sensitive-path",
+            "no-declared-check",
+            "selection-unknown",
+            "repeated-check-failure",
+            "agent-uncertain",
+            "diff-limit"
+          ]
+        },
+        "from_policy": {
+          "$ref": "#/$defs/policy"
+        },
+        "to_policy": {
+          "const": "verified"
+        },
+        "detail": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "$comment": "An organizational event is about a set or a session and may name no run; every other event names exactly one.",
+      "if": {
+        "properties": {
+          "event_type": {
+            "enum": [
+              "organization.cancelled",
+              "organization.restored"
+            ]
+          }
+        }
+      },
+      "then": {},
+      "else": {
+        "properties": {
+          "run_id": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  ]
+}

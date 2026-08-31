@@ -1,8 +1,32 @@
-# STATUS — 53 of 56 closed. Nothing blocks the next session
+# STATUS — 54 of 56 closed. One design question is yours to take
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
 `experiment/verification-pipeline-v3` and `design/solution-decomposition`
 are merged and finished. Earlier handoff text is in `docs/status-archive.md`.
+
+> **Recorded, 2026-08-31, later.** Session 54 closed `VERIFIED` in one
+> round. Its deliverable is **D246**: `packages/router/vitest.config.ts`
+> caps the suite at **four workers locally and one in CI** (both bounds —
+> vitest defaults the minimum to the core count). Measured whole-suite on
+> the twenty-core host: 20 workers 94 s wall for 873 s of test time, 4
+> workers 106 s for 352 s, 2 workers 138 s for 262 s; twenty was
+> contention, and four costs twelve seconds while leaving sixteen cores
+> free. The suite command in `dabbler.yaml` did not change. `config.test.ts`
+> is now hermetic against `DABBLER_TRANSPORT` — the clear-and-restore sits
+> at file scope, because four of its blocks resolve the transport, not one.
+> The run of record was taken with the variable set in the shell.
+>
+> **Found while running it, not built: the Work Explorer's task rows are
+> narration.** `session start` registers the session and leaves its own
+> *Register* row in progress until an engine types `dabbler session log`;
+> the *Affected* row waits for the same even though `affected` and
+> `test-evidence record` run inside the framework; the step keys truncate
+> at the first `.`, so "Make `config.test.ts` hermetic" rendered as *Make
+> config*. The declare bookend opens one row and deliberately moves nothing
+> else (`session.ts`, `advanceStepsAtDeclare`: a verifier upheld that the
+> middle belongs to `session log`). The operator's reading, from the
+> screenshot: confusing, and the same thing that never worked before. The
+> proposal is in the section below, and it is the operator's to take.
 
 > **Recorded, 2026-08-31.** Session 53 was inserted ahead of the publication
 > trial from three pieces of operator feedback, and closed `VERIFIED` in one
@@ -68,6 +92,28 @@ are merged and finished. Earlier handoff text is in `docs/status-archive.md`.
 ## What is waiting on you
 
 **Nothing that blocks work.** The next sessions run from the `.vsix`.
+**One design question, raised 2026-08-31, that changes session 55 if you
+take it.** Task rows that the framework moves itself, and none that a
+model narrates. Every lifecycle verb already writes its record through the
+framework, so the row *is* the verb: `session start` completes *Register*;
+`session declare` completes *Declare* and opens *Work*; the pre-verify
+evidence record closes *Work* and completes *Affected tests*; each
+`dabbler verify` round moves *Verify* (the row shows the round, and
+`VERIFIED` completes it); the `final-full` record completes *Run of
+record*; the close completes *Close*, whose gates already observe the
+commit and the push. *Work* is the one row nothing can observe from
+inside, so it is one row, opened and closed by its neighbours, and the
+plan's prose steps stay in the plan as instructions rather than becoming
+rows. `session log` leaves the engine-facing surface — a row a model
+cannot tick is a row it cannot tick wrong. Two things this is *not*: the
+framework does not launch verification, the suite or the close today (the
+engine types each verb; the extension's commands are Start, Close, Cancel,
+Restore and Set Up), and the rows above do not need it to — they need only
+that each verb flips its own row when it writes. Making the framework
+launch them is a separate, larger question. If taken, it inserts as
+**session 55** ahead of the onboarding deck, whose slide 3 should show rows
+that move by themselves.
+
 
 One decision is open, and it is yours to take when testing is finished,
 not before: whether to publish `dabbler-ai-router` to npm and the extension

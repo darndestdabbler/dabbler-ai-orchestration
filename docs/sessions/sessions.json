@@ -1139,9 +1139,9 @@
     {
       "number": 58,
       "title": "The engine adapter \u2014 Claude Code, Copilot, Codex; stream; interrupt",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-31T05:52:19.021000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-08-31T06:24:41.613000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

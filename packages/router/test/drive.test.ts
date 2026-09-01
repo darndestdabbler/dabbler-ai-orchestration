@@ -154,6 +154,16 @@ function drivenRepo(): { repo: string; sessionsDir: string } {
   return { repo, sessionsDir: join(repo, "docs", "sessions") };
 }
 
+/**
+ * The same repository with nothing to push to, which is the ordinary state
+ * of a repository on its first day and the one the csv-model trial met.
+ */
+function repoWithNoRemote(): { repo: string; sessionsDir: string } {
+  const made = drivenRepo();
+  git(made.repo, "remote", "remove", "origin");
+  return made;
+}
+
 /** The verifier's scripted responses and the driver's budget, as the config. */
 function configure(responses: readonly string[], driver: Record<string, unknown> = {}): void {
   const dir = makeTempDir();
@@ -395,6 +405,42 @@ describe("dabbler session drive", { timeout: 120_000 }, () => {
     expect(readFileSync(transcriptPath(repo, 1, 1), "utf8")).toContain("scripted: seq 1 step");
     expect(readFileSync(transcriptPath(repo, 1, 2), "utf8")).toContain("scripted: seq 2 step");
     expect(existsSync(transcriptPath(repo, 1, 3))).toBe(false);
+  });
+
+  it("stops a land with no remote by saying so, and never calls it fatal", async () => {
+    // git answers this with `fatal: No configuration push destination`, and
+    // both of those words are wrong: nothing terminated -- the commit is on
+    // disk and the session is intact -- and there is no configuration to
+    // fix, only a repository nobody has given anywhere to push to yet.
+    const { repo, sessionsDir } = repoWithNoRemote();
+    configure([VERIFIED]);
+
+    const { code } = await drive(sessionsDir, scripted(wellBehaved));
+    expect(code).not.toBe(0);
+    const run = readRun(repo, 1) as { phase: string; stop: { kind: string; reason: string } };
+    expect(run.phase).toBe("land");
+    expect(run.stop.kind).toBe("land");
+    expect(run.stop.reason).toContain("no remote");
+    expect(run.stop.reason).not.toContain("fatal");
+    // Both ways forward, so the operator is not left to guess which one
+    // this repository is.
+    expect(run.stop.reason).toContain("git remote add origin");
+    expect(run.stop.reason).toContain(".dabbler/local-only");
+    // The work is committed: what stopped is the push, not the session.
+    expect(runGit(repo, ["status", "--porcelain"]).stdout).toBe("");
+  });
+
+  it("commits and stops without a push when the repository says it is local-only", async () => {
+    // The other half of the sentence above: a repository that declares
+    // itself local reaches the close rather than the stop.
+    const { repo, sessionsDir } = repoWithNoRemote();
+    mkdirSync(join(repo, ".dabbler"), { recursive: true });
+    writeFileSync(join(repo, ".dabbler", "local-only"), "", "utf8");
+    configure([VERIFIED]);
+
+    const { code } = await drive(sessionsDir, scripted(wellBehaved));
+    expect(code).toBe(0);
+    expect(readRun(repo, 1)).toMatchObject({ phase: "complete", stop: null });
   });
 
   it("accepts a report that omits a step-declared file the tree did not change", async () => {

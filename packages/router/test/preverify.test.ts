@@ -232,6 +232,20 @@ describe("the command a selection sanctions", () => {
     expect(lines[0]).not.toContain("pytest");
     expect(lines[0]).toContain("testing.suites");
   });
+
+  it("says a declared suite is not expensive rather than saying none is declared", () => {
+    // The csv-model trial met this: a valid `testing.suites` entry without
+    // `expensive: true`, and `dabbler affected` answering that no suite was
+    // declared. The caller filters on `expensive` before this is reached, so
+    // the empty list arrives looking identical either way -- and an operator
+    // told their suite does not exist goes to write one that is already in
+    // the file. `declared` is the count before the filter, and it is the
+    // only thing that tells the two apart.
+    const lines = runnableCommands([], new SelectionResult(), 1);
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toContain("expensive");
+    expect(lines[0]).not.toContain("no suite is declared");
+  });
 });
 
 // --- The pre-verification policy --------------------------------------------------

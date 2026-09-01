@@ -243,6 +243,25 @@ describe("the instruction files", () => {
     expect(agents).toContain("never by hand");
   });
 
+  it("tells every project the two things that corrupt work silently", () => {
+    // Both were learned here and neither reached the body a project gets.
+    // A csv-model session lost JSON backslash escapes to a Git Bash
+    // heredoc and had to route around it, because the heredoc rule lived
+    // only in THIS repository's hand-written Environment section; and a
+    // report was refused for a tree that moved under its own check.
+    //
+    // Asserted by meaning rather than by wording: what matters is that the
+    // engine is told to use its editing tools and to leave the tree alone
+    // while a check runs, not the sentence either is said in.
+    const project = makeTempDir();
+    writeInstructionFiles(project, "acme-app");
+    const agents = readFileSync(join(project, "AGENTS.md"), "utf8");
+    expect(agents).toContain("heredoc");
+    expect(agents.toLowerCase()).toContain("backslash");
+    expect(agents).toContain("editing tools");
+    expect(agents.toLowerCase()).toContain("working tree");
+  });
+
   it("gives each engine its own tail", () => {
     const project = makeTempDir();
     writeInstructionFiles(project, "x");

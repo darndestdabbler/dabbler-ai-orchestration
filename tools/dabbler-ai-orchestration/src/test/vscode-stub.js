@@ -33,6 +33,10 @@ const vscodeStub = {
   // call time; without the enum the panel-lifecycle test dies on a
   // TypeError before reaching its assertions.
   ViewColumn: { One: 1, Two: 2, Three: 3, Active: -1, Beside: -2 },
+  // Session 65: `dabbler.terminalLocation: panel` asks for the panel BY NAME
+  // rather than leaving the location unsaid, because unsaid means whatever
+  // `terminal.integrated.defaultLocation` says -- which may be the editor.
+  TerminalLocation: { Panel: 1, Editor: 2 },
   // Set 079 S2: the Copilot seat-setup progress wrapper reads
   // ProgressLocation and constructs vscode.Disposable teardown hooks.
   ProgressLocation: { SourceControl: 1, Window: 10, Notification: 15 },

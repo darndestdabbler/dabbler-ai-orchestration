@@ -28,6 +28,7 @@ import {
   normaliseRel,
   resolveProgram,
   shlexSplit,
+  spawnOptionsFor,
   spawnProgram,
 } from "../src/checks.ts";
 import { snapshotWorktreeTree } from "../src/journal.ts";
@@ -404,5 +405,23 @@ describe("finding the program a name means", () => {
     const code = await new Promise<number | null>((resolve) => child.on("close", resolve));
     expect(code).toBe(0);
     expect(seen).toContain("reached");
+  });
+
+  it("hides the console window on every path a check is reached by", () => {
+    // The extension host has no console of its own, so a console child gets
+    // a window -- and Windows gives it the foreground, which took the
+    // operator's caret out of whatever they were typing every time a
+    // declared check ran. Both modes, because a repository declares its
+    // suite either way: `command` is a shell string, `argv` is the batch
+    // shim and the plain executable alike, and the shim is the one that
+    // reaches `cmd.exe` and would otherwise be the loudest.
+    for (const mode of ["shell", "argv"] as const) {
+      expect(spawnOptionsFor({ cwd: "." }, mode).windowsHide).toBe(true);
+    }
+    // And the one thing the two modes disagree about is still theirs to
+    // disagree about: an argv never gets a shell, because which branch runs
+    // is `resolveProgram`'s to decide.
+    expect(spawnOptionsFor({}, "shell").shell).toBe(true);
+    expect(spawnOptionsFor({}, "argv").shell).toBe(false);
   });
 });

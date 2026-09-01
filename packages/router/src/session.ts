@@ -128,7 +128,12 @@ import { writeErr, writeOut } from "./cli/output.ts";
  */
 function discoveryWarnings(): string[] {
   try {
-    return freshnessWarnings(loadConfig());
+    // A record that has gone stale, and never one that was never made. The
+    // second is a repository that has not run discovery, which `bootstrap`
+    // says once at setup; repeating it at every session start for the life
+    // of the repository is a warning nothing ever answers, and one of those
+    // teaches an operator to scroll past the ones that matter.
+    return freshnessWarnings(loadConfig(), Date.now(), false);
   } catch {
     return [];
   }
@@ -515,25 +520,106 @@ export interface StartOptions {
   readonly totalSessions?: number | null;
 }
 
+/** Who is working, as the four fields the orchestrator block carries. */
+interface OrchestratorIdentity {
+  readonly engine: string;
+  readonly provider: string | null;
+  readonly model: string | null;
+  readonly effort: string | null;
+}
+
+/** The orchestrator block on a session record, or null when it has none. */
+function recordedIdentity(
+  recorded: Record<string, unknown> | null,
+): Record<string, unknown> | null {
+  const block = recorded?.["orchestrator"];
+  return block && typeof block === "object" ? (block as Record<string, unknown>) : null;
+}
+
+/** One field of a recorded block as a trimmed string, or "" when unstated. */
+function statedField(block: Record<string, unknown> | null, field: string): string {
+  const value = block?.[field];
+  return typeof value === "string" ? value.trim() : "";
+}
+
+/**
+ * How the identity being asked for differs from the one on the record, in
+ * words, or null when it does not.
+ *
+ * Only the three that name WHO worked: engine, provider, model. `effort` is
+ * a dial on the same worker and is deliberately not here -- refusing a
+ * resumed session because a reasoning effort was omitted would make the
+ * guard fire on the ordinary case it exists to allow.
+ *
+ * An absent value on either side is "not stated" rather than a difference,
+ * so a call that omits `--model` continues a session that recorded one.
+ * What is refused is a value that CONTRADICTS the record. What an omission
+ * then MEANS is `carryForward`'s to say, and the two are written together
+ * because letting an omission through without preserving it is how the
+ * guard came to permit the erasure it was written to prevent.
+ */
+function identityClash(
+  recorded: Record<string, unknown> | null,
+  asking: OrchestratorIdentity,
+): string | null {
+  const block = recordedIdentity(recorded);
+  if (block === null) return null;
+  const asked: ReadonlyArray<readonly [string, string | null]> = [
+    ["engine", asking.engine],
+    ["provider", asking.provider],
+    ["model", asking.model],
+  ];
+  for (const [field, value] of asked) {
+    const want = typeof value === "string" ? value.trim() : "";
+    const have = statedField(block, field);
+    if (want === "" || have === "" || want === have) continue;
+    return `it was registered with ${field} '${have}', not '${want}'`;
+  }
+  return null;
+}
+
+/**
+ * The identity to register with: what the call stated, and what the record
+ * already holds wherever the call stated nothing.
+ *
+ * Called only after `identityClash` returned null, so there is nothing to
+ * choose between -- every field either agrees or was left unsaid, and an
+ * unsaid one keeps what the session was registered with. `effort` travels
+ * here too even though the guard ignores it: a dial the call does not
+ * mention is a dial nobody asked to change.
+ */
+function carryForward(
+  recorded: Record<string, unknown> | null,
+  asking: OrchestratorIdentity,
+): OrchestratorIdentity {
+  const block = recordedIdentity(recorded);
+  if (block === null) return asking;
+  const keep = (value: string | null, field: string): string | null => {
+    const stated = typeof value === "string" ? value.trim() : "";
+    return stated !== "" ? stated : statedField(block, field) || null;
+  };
+  return {
+    engine: keep(asking.engine, "engine") ?? asking.engine,
+    provider: keep(asking.provider, "provider"),
+    model: keep(asking.model, "model"),
+    effort: keep(asking.effort, "effort"),
+  };
+}
+
 export function start(sessionsDir: string, options: StartOptions): number {
   if (!isDirectory(sessionsDir)) {
     writeErr(`start: not a directory: ${sessionsDir}\n`);
     return EXIT_USAGE;
   }
-  try {
-    resolveOrchestratorIdentity(
-      buildOrchestratorBlock(
-        options.engine,
-        options.provider,
-        options.model,
-        options.effort,
-      ),
-    );
-  } catch (error) {
-    if (!(error instanceof IdentityResolutionError)) throw error;
-    writeErr(`start: refused -- ${error.message}\n`);
-    return EXIT_USAGE;
-  }
+  // Identity is resolved further down, AFTER the record has been read and
+  // an omitted field has been filled from it. It used to be the first thing
+  // this function did, on the ordering rule that the cheapest refusal comes
+  // first -- and that ordering was wrong for the one case it most needed to
+  // be right for. A Copilot seat's identity resolves only with a model, so
+  // continuing a seat's session without repeating `--model` was refused
+  // here for a model the record was holding the whole time. Reading the
+  // record costs one file, once, and it is the difference between resolving
+  // the identity being asked for and resolving the identity that exists.
 
   let lock: string;
   try {
@@ -608,11 +694,66 @@ export function start(sessionsDir: string, options: StartOptions): number {
       }
     }
 
-    registerSessionStart(sessionsDir, requested, {
+    // Re-registering the session in flight is the ordinary way a pull
+    // continues -- `dabbler session next --engine ...` called a second time
+    // in the same session lands here -- and under the SAME identity it is
+    // silent and idempotent. Under a different one it is not a continuation
+    // at all: `registerSessionStart` rewrites the orchestrator block whole,
+    // so a second Start under another engine would leave the record saying
+    // this session was run by an engine that ran only part of it. Nobody
+    // reading the ledger afterwards could tell which half.
+    let identity: OrchestratorIdentity = {
       engine: options.engine,
-      provider: options.provider,
-      model: options.model,
-      effort: options.effort,
+      provider: options.provider ?? null,
+      model: options.model ?? null,
+      effort: options.effort ?? null,
+    };
+    if (current !== null && requested === current && normalized !== null) {
+      const recorded = sessionRecord(normalized, current);
+      const clash = identityClash(recorded, identity);
+      if (clash !== null) {
+        writeErr(
+          `start: refused -- session ${sessionDisplayNumber(current)} is in ` +
+            `flight and ${clash}. Its identity is on the record and the work ` +
+            "already done was done under it. Continue with the same identity " +
+            "(or with none, which is what `dabbler session next` sends once a " +
+            "session is in flight), or close this session before starting one " +
+            "under another.\n",
+        );
+        return EXIT_BOUNDARY;
+      }
+      // An omitted field is "not stated", and that has to mean the same
+      // thing to the WRITE as it means to the guard above. It did not:
+      // `registerSessionStart` assigns the orchestrator block whole and
+      // `buildOrchestratorBlock` drops what it is not given, so continuing
+      // a seat's session with `--engine copilot --provider openai` and no
+      // `--model` passed the guard and then erased the model the seat was
+      // registered with. Carrying the record forward is what makes the two
+      // agree: the guard refuses a contradiction, and everything it lets
+      // through preserves rather than replaces.
+      identity = carryForward(recorded, identity);
+    }
+    // Resolved on the identity that will actually be written, which is the
+    // point of doing it here rather than on the way in.
+    try {
+      resolveOrchestratorIdentity(
+        buildOrchestratorBlock(
+          identity.engine,
+          identity.provider,
+          identity.model,
+          identity.effort,
+        ),
+      );
+    } catch (error) {
+      if (!(error instanceof IdentityResolutionError)) throw error;
+      writeErr(`start: refused -- ${error.message}\n`);
+      return EXIT_USAGE;
+    }
+    registerSessionStart(sessionsDir, requested, {
+      engine: identity.engine,
+      provider: identity.provider,
+      model: identity.model,
+      effort: identity.effort,
       totalSessions: options.totalSessions,
     });
     writeOut(

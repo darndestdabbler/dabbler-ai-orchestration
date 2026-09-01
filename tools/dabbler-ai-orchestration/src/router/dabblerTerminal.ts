@@ -10,19 +10,31 @@
 // nothing in this file ever opens a transcript.
 //
 // What it shows is what the framework is doing while nobody is typing: the
-// phase the run record moved to, the background job it started, the stop it
-// wrote -- and every one of that job's own bytes as they are appended. The
-// job log passes through unaltered on purpose. That is where the test
-// runners' colours, their checkmarks and their spinner live; session 60
-// established that only a real terminal can show them, and stripping them
-// here would undo the reason this exists. (`clip` in the router's
-// `engines.ts` strips escapes from ENGINE-derived text; that is a different
-// seam for a different reason, and neither is a precedent for the other.)
+// phase the run record moved to, the background job it started, the
+// verification rounds and test runs the machine recorded, the stop it wrote
+// -- and every one of that job's own bytes as they are appended. The job
+// log passes through unaltered on purpose. That is where the test runners'
+// colours, their checkmarks and their spinner live; session 60 established
+// that only a real terminal can show them, and stripping them here would
+// undo the reason this exists. (`clip` in the router's `engines.ts` strips
+// escapes from ENGINE-derived text; that is a different seam for a
+// different reason, and neither is a precedent for the other.)
+//
+// **A verdict and a test outcome are read from the records, never from the
+// bytes.** They appear in a job's log too, and repainting them there would
+// mean parsing a stream that also carries a runner's own escapes -- which
+// is how a spinner gets cut in half. `rounds.jsonl` and `test-runs.jsonl`
+// say the same things in a form that cannot be misread, so the framework's
+// line about a verdict sits BESIDE the job output rather than on top of it.
 //
 // One exception, and it is a rendering one rather than a content one: a
 // bare LF is written as CRLF, because a pseudoterminal that receives LF
 // alone moves down without returning to column 0 and staircases every line
 // after it. Every escape, every colour and every glyph survives untouched.
+//
+// Colour is this file's own, and it says what a line IS rather than naming
+// a colour: see `Tone`, `lineTone` and `fieldTone`. Two palettes, resolved
+// from the editor's theme kind and re-read when it changes.
 
 import * as fs from "fs";
 import * as path from "path";
@@ -30,14 +42,167 @@ import * as vscode from "vscode";
 
 import { RUNS_REL } from "../utils/projection";
 
-/** What the band is painted with. Read once here, used by both themes. */
-export const BAND_DARK = "#165044";
-export const BAND_LIGHT = "#87decd";
+/**
+ * What the band is painted with, and why it is gray.
+ *
+ * It was teal (`#165044` / `#87decd`) and the operator found it too loud to
+ * read a session through: a saturated band behind every framework line
+ * competes with the line itself, and what the band is FOR is separating the
+ * framework's own voice from a test runner's output -- which a neutral gray
+ * just off the terminal background does with a fraction of the noise.
+ *
+ * The dark value is slightly LIGHTER than a dark editor background rather
+ * than darker, which is the one place this departs from "a shade darker
+ * than the background". Darker than `#1e1e1e` reads as a hole punched in
+ * the terminal, not as a band. Lighter reads as a raised row, which is the
+ * intent. The light value is the shade darker it says it is.
+ *
+ * These are fixed per theme kind rather than sampled: a pseudoterminal is
+ * handed no colour from the editor and cannot ask what the terminal
+ * background actually is, so the two values are the best pair for the
+ * default light and dark backgrounds and are stated as such.
+ */
+export const BAND_DARK = "#2b2b2b";
+export const BAND_LIGHT = "#e6e6e6";
+
+/**
+ * The foreground the band restores to, explicitly, in both themes.
+ *
+ * The dark band used to take whatever foreground the theme happened to be
+ * using. That worked while nothing else was coloured; it stops working the
+ * moment a token inside the line has a colour of its own, because there is
+ * then no sequence that says "back to normal" without also dropping the
+ * band. Naming both ends makes the restore exact.
+ */
+export const TEXT_DARK = "#d4d4d4";
+export const TEXT_LIGHT = "#1a1a1a";
 
 export type ThemeKind = "dark" | "light";
 
+/**
+ * What a line, or a value inside one, IS -- which is the only thing that
+ * decides its colour. No event names a colour; it names what it is, and the
+ * palette answers in the theme at hand.
+ */
+export type Tone = "milestone" | "good" | "warn" | "bad" | "muted" | "plain";
+
+/**
+ * The two palettes, one per theme kind.
+ *
+ * They are the editor's own default token colours rather than invented
+ * ones, so a session read in either theme looks like the editor it is
+ * running in. `plain` is the restore target and is the same value the band
+ * opens with.
+ */
+export const TONES: Readonly<Record<ThemeKind, Readonly<Record<Tone, string>>>> = {
+  dark: {
+    milestone: "#4ec9b0",
+    good: "#6a9955",
+    warn: "#d7ba7d",
+    bad: "#f14c4c",
+    muted: "#8c8c8c",
+    plain: TEXT_DARK,
+  },
+  light: {
+    milestone: "#00695c",
+    good: "#256029",
+    warn: "#8a6100",
+    bad: "#a31515",
+    muted: "#6b6b6b",
+    plain: TEXT_LIGHT,
+  },
+};
+
+/**
+ * The phases that are a lifecycle milestone rather than a step of one.
+ *
+ * The operator reads this terminal to know where the session has GOT to,
+ * and these are the answers worth looking up for: the verification, the
+ * suite that is the run of record, the commit and push, the close, and the
+ * end. `steps`, `preverify`, `dispositions` and `fix` are the ordinary
+ * traffic between them.
+ */
+const MILESTONE_PHASES = new Set([
+  "verify",
+  "run-of-record",
+  "land",
+  "close",
+  "complete",
+]);
+
 /** Where `jobs.ts` writes a background job's log, under the run's driver dir. */
 const JOBS_DIRNAME = "jobs";
+
+/**
+ * The verification rounds of one session, as the machine wrote them.
+ *
+ * Per-session, under the run's own directory, so a rebuilt terminal replays
+ * every round this session has had -- which is what a terminal rebuilt
+ * mid-session should show.
+ */
+const ROUNDS_FILENAME = "rounds.jsonl";
+
+/**
+ * Every test run this repository has recorded, across every session.
+ *
+ * Repository-wide, which is why it is NOT replayed: a terminal opened today
+ * would otherwise recite months of other sessions' runs before saying
+ * anything about this one. It is read forward from wherever it stood when
+ * this terminal first looked.
+ */
+const TEST_RUNS_FILENAME = "test-runs.jsonl";
+
+/**
+ * A verdict's tone.
+ *
+ * `VERIFIED` is the only clean one and it is the only green one. Everything
+ * else is a verdict that asks for something -- findings to dispose, a round
+ * to run again -- and reads as such. An unknown token is warned rather than
+ * assumed good, because a verdict this does not recognise is exactly the
+ * case where guessing "fine" is worst.
+ */
+export function verdictTone(verdict: string): Tone {
+  const token = verdict.trim().toUpperCase();
+  if (token === "VERIFIED") return "good";
+  if (token === "ISSUES_FOUND" || token === "REJECTED" || token === "FAILED") return "bad";
+  return "warn";
+}
+
+/**
+ * What a whole line is, which decides the event word's colour.
+ *
+ * A stop is the one thing in this terminal that must not be scrolled past.
+ * A milestone phase, a verdict and a test run are the lifecycle reaching
+ * somewhere -- what the operator opened this terminal to see. Everything
+ * else is traffic, and traffic is muted so that the three above stand out
+ * of it rather than competing with it.
+ */
+export function lineTone(event: string, fields: Record<string, string> = {}): Tone {
+  if (event === "stopped") return "bad";
+  if (event === "verify") return verdictTone(fields["verdict"] ?? "");
+  if (event === "tests") return (fields["outcome"] ?? "") === "passed" ? "good" : "bad";
+  if (event === "phase") {
+    return MILESTONE_PHASES.has(fields["phase"] ?? "") ? "milestone" : "plain";
+  }
+  if (event === "session-closed") return "milestone";
+  return "muted";
+}
+
+/**
+ * What one field's VALUE is, independent of the line it sits on.
+ *
+ * Keyed on the key rather than on the event, so a verdict is green wherever
+ * it appears and a phase is a milestone wherever it appears. The event is
+ * still passed because a `reason` on a stop is the diagnosis and a `reason`
+ * anywhere else would not be.
+ */
+export function fieldTone(event: string, key: string, value: string): Tone {
+  if (key === "verdict") return verdictTone(value);
+  if (key === "outcome") return value === "passed" ? "good" : "bad";
+  if (key === "phase") return MILESTONE_PHASES.has(value) ? "milestone" : "plain";
+  if (event === "stopped" && (key === "kind" || key === "reason")) return "bad";
+  return "plain";
+}
 
 /** A path as the record spells them: repository-relative, forward slashes. */
 function relativeToRoot(repoRoot: string, full: string): string {
@@ -79,18 +244,69 @@ function rgb(hex: string): [number, number, number] {
 }
 
 /**
+ * The two bytes every sequence here is built from, named rather than
+ * spelled. Nothing in this file writes an escape literal.
+ */
+const ESC = String.fromCharCode(27);
+const CRLF = String.fromCharCode(13, 10);
+
+/** An SGR truecolour foreground. */
+function fg(hex: string): string {
+  const [r, g, b] = rgb(hex);
+  return `${ESC}[38;2;${r};${g};${b}m`;
+}
+
+/**
+ * One token in a tone, and the exact restore that follows it.
+ *
+ * A full reset would end the band as well as the colour, so the restore is
+ * spelled out: weight off, foreground back to the band's own. Nothing here
+ * touches the background, which is what lets a coloured token sit inside a
+ * banded line without punching a hole in it.
+ */
+export function paint(
+  text: string,
+  tone: Tone,
+  kind: ThemeKind,
+  bold = false,
+): string {
+  const palette = TONES[kind];
+  return (
+    `${bold ? `${ESC}[1m` : ""}${fg(palette[tone])}${text}` +
+    `${ESC}[22m${fg(palette.plain)}`
+  );
+}
+
+/**
  * One of the framework's own lines, with the band behind it.
  *
  * The band goes here and only here: a job's own output keeps whatever
  * colours it came with, and painting a background behind it would fight
  * the runner for the same cells.
+ *
+ * **The band is re-opened on every physical line.** A background set once
+ * ends at the first newline, so a line whose text carries newlines of its
+ * own -- a stop reason holding git's multi-line stderr, which is the case
+ * that exposed this -- painted its first line and left the rest bare. The
+ * newline inside it was also a bare LF, and a pseudoterminal moves DOWN on
+ * LF without returning to column 0, so every following line started under
+ * the end of the one above it and the whole stop staircased across the
+ * terminal. Normalising and splitting here fixes both at once: each piece
+ * gets its own band and its own CRLF.
+ *
+ * A tone that spans a newline ends at it. That is deliberate -- the first
+ * line of a stop carries the colour that says what it is, and its
+ * continuation is the detail, which reads better plain than shouted.
  */
 export function bandedLine(text: string, kind: ThemeKind): string {
   const [r, g, b] = rgb(kind === "dark" ? BAND_DARK : BAND_LIGHT);
-  // The light band is pale, so the foreground is forced dark against it;
-  // the dark band takes the theme's own light foreground unchanged.
-  const foreground = kind === "light" ? "\u001b[38;2;0;0;0m" : "";
-  return `\u001b[48;2;${r};${g};${b}m${foreground}${text}\u001b[0m\r\n`;
+  const open = `${ESC}[48;2;${r};${g};${b}m${fg(TONES[kind].plain)}`;
+  return (
+    forTerminal(text)
+      .split(CRLF)
+      .map((line) => `${open}${line}${ESC}[0m`)
+      .join(CRLF) + CRLF
+  );
 }
 
 /** A pseudoterminal only accepts CRLF; nothing else about the bytes changes. */
@@ -187,6 +403,15 @@ export class DabblerTerminal implements vscode.Pseudoterminal {
   /** Log paths the record already announced, so nothing is announced twice. */
   private readonly announced = new Set<string>();
 
+  /**
+   * How many rows of each JSONL record have been said, by absolute path.
+   *
+   * Rows rather than bytes, because these are read whole and parsed rather
+   * than passed through -- and because a row that is still being written
+   * must not be counted as read. See `newRows`.
+   */
+  private readonly recordLines = new Map<string, number>();
+
   constructor(options: DabblerTerminalOptions) {
     this.repoRoot = options.repoRoot;
     this.now = options.now ?? (() => new Date());
@@ -250,6 +475,15 @@ export class DabblerTerminal implements vscode.Pseudoterminal {
     if (run.phase !== undefined && run.phase !== this.phase) {
       this.phase = run.phase;
       this.line("phase", { session: this.sessionLabel(run), phase: run.phase });
+      // The end of the session, said as the end rather than as one more
+      // phase. What the NEXT session's number is stays unsaid here: the
+      // sequence skips cancelled numbers, that rule lives in the router's
+      // projection, and a second implementation of it in a renderer is
+      // exactly the drift this file's own header forbids. The close's log
+      // says it, and it passes through.
+      if (run.phase === "complete") {
+        this.line("session-closed", { session: this.sessionLabel(run) });
+      }
     }
 
     const job = run.job ?? null;
@@ -265,6 +499,16 @@ export class DabblerTerminal implements vscode.Pseudoterminal {
     // the directory, so they are spoken whether or not the record still
     // names it.
     this.drainJobs(path.dirname(runPath));
+
+    // The verdict and the test outcome, from the records the machine owns
+    // rather than from the job bytes they also appear in. Reading them here
+    // is what lets this terminal say them in its own colours WITHOUT
+    // repainting a runner's output -- which the header forbids and session
+    // 60 is the reason for. The job log still passes through untouched;
+    // these lines sit beside it.
+    const runDir = path.dirname(path.dirname(runPath));
+    this.drainRounds(path.join(runDir, ROUNDS_FILENAME));
+    this.drainTestRuns(path.join(this.repoRoot, RUNS_REL, TEST_RUNS_FILENAME));
 
     if (collected !== null) {
       // What it exited with is the record's to say, not this terminal's to
@@ -322,6 +566,83 @@ export class DabblerTerminal implements vscode.Pseudoterminal {
     }
   }
 
+  /**
+   * This session's verification rounds, each said once.
+   *
+   * Replayed from the first row, because the file is this session's own and
+   * a terminal rebuilt mid-session should show the rounds it has already
+   * had -- the same reason the job logs are replayed.
+   */
+  private drainRounds(file: string): void {
+    for (const row of this.newRows(file, true)) {
+      this.line("verify", {
+        round: String(row["round"] ?? "?"),
+        verdict: String(row["verdict"] ?? "?"),
+        verifier: String(row["verifier_model"] ?? ""),
+      });
+    }
+  }
+
+  /**
+   * Test runs, from wherever the file stood when this terminal first looked.
+   *
+   * NOT replayed: the file is the repository's, not the session's, and it
+   * holds every run of every session. What a terminal opened now should say
+   * is what happens now.
+   */
+  private drainTestRuns(file: string): void {
+    for (const row of this.newRows(file, false)) {
+      this.line("tests", {
+        suite: String(row["suite"] ?? "?"),
+        stage: String(row["stage"] ?? ""),
+        outcome: String(row["outcome"] ?? "?"),
+      });
+    }
+  }
+
+  /**
+   * The rows one JSONL record has gained since the last look.
+   *
+   * `replay` decides only what the FIRST look does: from the beginning, or
+   * from the end. Every look after it is the same either way.
+   *
+   * **The count stops at the first row that will not parse, and does not
+   * step over it.** A file something else is appending to has a
+   * half-written last line as its ordinary state, and a reader that counted
+   * that line as read would drop the row for good the moment it was
+   * finished. Stopping there costs nothing -- the next tick reads it whole
+   * -- and it is the difference between a verdict said late and a verdict
+   * never said at all.
+   */
+  private newRows(file: string, replay: boolean): Record<string, unknown>[] {
+    let lines: string[];
+    try {
+      lines = fs
+        .readFileSync(file, "utf8")
+        .split("\n")
+        .filter((line) => line.trim() !== "");
+    } catch {
+      return [];
+    }
+    const seen = this.recordLines.get(file);
+    const from = seen ?? (replay ? 0 : lines.length);
+    const rows: Record<string, unknown>[] = [];
+    let consumed = from;
+    for (const line of lines.slice(from)) {
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(line);
+      } catch {
+        break;
+      }
+      if (parsed === null || typeof parsed !== "object") break;
+      rows.push(parsed as Record<string, unknown>);
+      consumed += 1;
+    }
+    this.recordLines.set(file, consumed);
+    return rows;
+  }
+
   /** Whatever one log has gained since the last look, byte for byte. */
   private drainFile(logPath: string): void {
     const from = this.logOffsets.get(logPath) ?? 0;
@@ -350,19 +671,37 @@ export class DabblerTerminal implements vscode.Pseudoterminal {
       : String(run.session_number).padStart(3, "0");
   }
 
-  /** One `dabbler [hh:mm:ss] event key=value` line, in the framework's shape. */
+  /**
+   * One `dabbler [hh:mm:ss] event key=value` line, in the framework's shape
+   * and in the colours that say what it is.
+   *
+   * The clock and the `key=` of every field are muted, because they are
+   * scaffolding: the operator is scanning for the event and for the values.
+   * The event takes the line's own tone, and each value takes whatever tone
+   * that key's value earns -- which is how a verdict and a test outcome
+   * come out green or red without this method knowing what either one is.
+   */
   private line(event: string, fields: Record<string, string> = {}): void {
     const at = this.now();
     const clock = [at.getHours(), at.getMinutes(), at.getSeconds()]
       .map((part) => String(part).padStart(2, "0"))
       .join(":");
-    const rendered = Object.entries(fields)
-      .filter(([, value]) => value !== "")
-      .map(([key, value]) => `${key}=${value}`)
-      .join(" ");
-    this.writer.fire(
-      bandedLine(`dabbler [${clock}] ${event}${rendered ? ` ${rendered}` : ""}`, this.theme),
-    );
+    const tone = lineTone(event, fields);
+    const parts = [
+      paint(`dabbler [${clock}]`, "muted", this.theme),
+      " ",
+      paint(event, tone, this.theme, tone !== "muted" && tone !== "plain"),
+    ];
+    for (const [key, value] of Object.entries(fields)) {
+      if (value === "") continue;
+      const valueTone = fieldTone(event, key, value);
+      parts.push(
+        " ",
+        paint(`${key}=`, "muted", this.theme),
+        paint(value, valueTone, this.theme, valueTone !== "muted" && valueTone !== "plain"),
+      );
+    }
+    this.writer.fire(bandedLine(parts.join(""), this.theme));
   }
 }
 
@@ -384,14 +723,66 @@ const open = new Map<
   }
 >();
 
+/** Where the pair Start opens lives. The setting's two values, and no third. */
+export type TerminalLocation = "editor" | "panel";
+
+/** The setting that says it, in the two halves `getConfiguration` takes. */
+export const SETTINGS_SECTION = "dabbler";
+export const TERMINAL_LOCATION_KEY = "terminalLocation";
+
+/**
+ * Where this window puts the CLI and the framework's terminal.
+ *
+ * `editor` is the default, on the operator's call: the pair is what a
+ * session is read through, and the editor area gives them the height a
+ * transcript and a job log both want, where the panel gives them a third of
+ * the window and a horizontal split. `panel` keeps the arrangement session
+ * 62 built, for anyone who wants their editors to stay editors.
+ *
+ * Anything else -- a typo in settings.json, a value from a newer version --
+ * reads as the default rather than throwing. A setting nobody can mistype
+ * into a broken window is worth the two lines.
+ */
+export function terminalLocation(): TerminalLocation {
+  const configured = vscode.workspace
+    .getConfiguration(SETTINGS_SECTION)
+    .get<string>(TERMINAL_LOCATION_KEY);
+  return configured === "panel" ? "panel" : "editor";
+}
+
+/**
+ * What `createTerminal` is told about where to put the framework's terminal.
+ *
+ * Under `editor` it is `Beside`, which is the second editor column -- the
+ * CLI having been opened in the first. Under `panel` it is split off the
+ * CLI itself, which is what `parentTerminal` means and the only way to get
+ * two terminals sharing one panel row.
+ *
+ * Separated from `build` so that both branches are one expression a test
+ * can read, rather than a shape only a running editor can show.
+ */
+export function frameworkTerminalLocation(
+  where: TerminalLocation,
+  beside: vscode.Terminal | undefined,
+): vscode.TerminalOptions["location"] {
+  if (where === "editor") return { viewColumn: vscode.ViewColumn.Beside };
+  return beside ? { parentTerminal: beside } : undefined;
+}
+
 function build(repoRoot: string, beside?: vscode.Terminal): void {
   const pty = new DabblerTerminal({ repoRoot });
+  const where = terminalLocation();
+  const location = frameworkTerminalLocation(where, beside);
   const terminal = vscode.window.createTerminal({
     name: `Dabbler — ${path.basename(repoRoot)}`,
     pty,
-    ...(beside ? { location: { parentTerminal: beside } } : {}),
+    ...(location ? { location } : {}),
   });
-  open.set(repoRoot, { terminal, pty, parent: beside });
+  // Under `editor` the terminal is not beside any ONE cli -- it is its own
+  // editor tab -- so nothing is remembered to compare against later, and
+  // the rebuild rule below has nothing to fire on. That is the whole
+  // difference between the two modes.
+  open.set(repoRoot, { terminal, pty, parent: where === "panel" ? beside : undefined });
 }
 
 /**
@@ -403,14 +794,20 @@ function build(repoRoot: string, beside?: vscode.Terminal): void {
  * the operator is typing to an engine, and a panel that stole the caret
  * mid-sentence would be worse than one they had to go looking for.
  *
- * **A terminal beside anything but THIS CLI is replaced rather than
- * shown.** VS Code fixes a terminal's location when it is created, so a
- * cached one cannot be moved; showing it puts the framework's work in a
- * tab of its own and leaves the operator with half the arrangement. Two
- * ways in: activation builds one before any CLI exists, and a second
- * session in the same window opens a second CLI that the first session's
- * terminal is not beside. Both are the same rule -- the terminal sits
- * beside the CLI Start just opened, or it is built again.
+ * **Under `panel`, a terminal beside anything but THIS CLI is replaced
+ * rather than shown.** VS Code fixes a terminal's location when it is
+ * created, so a cached one cannot be moved; showing it puts the framework's
+ * work in a tab of its own and leaves the operator with half the
+ * arrangement. Two ways in: activation builds one before any CLI exists,
+ * and a second session in the same window opens a second CLI that the first
+ * session's terminal is not beside. Both are the same rule -- the terminal
+ * sits beside the CLI Start just opened, or it is built again.
+ *
+ * **Under `editor` there is nothing to rebuild for.** The framework's
+ * terminal is an editor tab of its own rather than a split of one CLI, so
+ * a second session's CLI opening in the first column leaves it exactly
+ * where it should be. It is shown, and its scrollback survives -- which is
+ * the one thing the panel arrangement cannot offer.
  *
  * What a rebuild costs is the scrollback of the previous session's
  * terminal, and what it buys is a terminal showing THIS session: the new
@@ -425,9 +822,10 @@ export function ensureDabblerTerminal(
   beside?: vscode.Terminal,
 ): void {
   const entry = open.get(repoRoot);
+  const splitting = terminalLocation() === "panel";
   if (!entry) {
     build(repoRoot, beside);
-  } else if (beside !== undefined && entry.parent !== beside) {
+  } else if (splitting && beside !== undefined && entry.parent !== beside) {
     entry.pty.dispose();
     entry.terminal.dispose();
     build(repoRoot, beside);
@@ -446,6 +844,48 @@ export function ensureDabblerTerminal(
 export function openDabblerTerminal(repoRoot: string): void {
   if (open.has(repoRoot)) return;
   build(repoRoot);
+}
+
+/**
+ * A terminal the person closed, forgotten so the next request builds one.
+ *
+ * Without this the map holds a disposed terminal for the life of the
+ * window, and `show()` on a disposed terminal does nothing at all -- so a
+ * repository whose Dabbler terminal was closed once had no Dabbler terminal
+ * again until the window was reloaded. Activation creates one and never
+ * shows it, which makes closing it the easiest thing in the world to do by
+ * accident.
+ *
+ * The pty goes with it: its interval and its theme subscription are the
+ * only things in here that outlive a closed terminal, and a poll writing
+ * into an emitter nobody reads is a leak with no symptom.
+ */
+export function forgetClosedTerminal(closed: vscode.Terminal): void {
+  for (const [root, entry] of open) {
+    if (entry.terminal !== closed) continue;
+    entry.pty.dispose();
+    open.delete(root);
+    return;
+  }
+}
+
+/** The subscription that keeps the map honest. Activation holds it. */
+export function watchClosedTerminals(): vscode.Disposable {
+  return vscode.window.onDidCloseTerminal(forgetClosedTerminal);
+}
+
+/**
+ * The framework's terminal for one repository, shown -- built first if
+ * there is not one.
+ *
+ * What `dabbler.showFrameworkTerminal` runs, and the answer to a terminal
+ * closed by accident. It takes the focus, unlike every other path in this
+ * file: a person who asked for this terminal by name is asking to look at
+ * it, and preserving focus would answer a different question.
+ */
+export function revealDabblerTerminal(repoRoot: string): void {
+  if (!open.has(repoRoot)) build(repoRoot);
+  open.get(repoRoot)?.terminal.show(false);
 }
 
 /** Every one of them, when the extension goes away. */

@@ -122,7 +122,24 @@ export const SHARED_BODY =
   "- The router is one command, `dabbler <verb>` — no interpreter, no virtual\n" +
   "  environment. A VS Code terminal has it on `PATH`; anywhere else, run\n" +
   "  `npm i -g dabbler-ai-router` once. \"dabbler: command not found\" is a\n" +
-  "  PATH problem, not a missing-keys problem.\n";
+  "  PATH problem, not a missing-keys problem.\n" +
+  "\n" +
+  "## Writing files\n" +
+  "\n" +
+  "**Write files with your editing tools, never with a shell heredoc.** On a\n" +
+  "Windows host the shell is usually Git Bash, and a heredoc there eats\n" +
+  "backslashes: `\\n` arrives as a newline and `\\\\` as one backslash, so\n" +
+  "JSON escapes, regular expressions and Windows paths are silently\n" +
+  "corrupted on the way to disk. Nothing fails — the file is written, and\n" +
+  "it is wrong. The same goes for `echo` and for `printf` with a format\n" +
+  "string you did not escape twice.\n" +
+  "\n" +
+  "**Nothing may touch the working tree between a report and the `next`\n" +
+  "that judges it.** The framework hashes the tree before and after a\n" +
+  "step's checks, and an edit made while one is running refuses the report\n" +
+  "— correctly, because a check run against a tree that moved under it\n" +
+  "proves nothing about either version. Finish the step, report it, and\n" +
+  "wait for the answer before starting the next one.\n";
 
 /**
  * Claude Code reads `CLAUDE.md` only.

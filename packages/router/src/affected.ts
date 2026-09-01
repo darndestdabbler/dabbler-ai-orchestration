@@ -223,8 +223,24 @@ export function commandNamesTest(command: unknown, testPath: string): boolean {
 export function runnableCommands(
   suites: readonly SuiteSpec[],
   result: SelectionResult,
+  declared = suites.length,
 ): string[] {
   if (suites.length === 0) {
+    // Two different repositories reach this line and they need two
+    // different sentences. The caller filters on `expensive` before it gets
+    // here, so a repository that HAS declared a suite and merely not
+    // flagged it was being told its suite did not exist -- which sends an
+    // operator to write a declaration that is already in the file. What
+    // `declared` carries is the only thing this function cannot see for
+    // itself: how many there were before the filter.
+    if (declared > 0) {
+      return [
+        "no suite is marked expensive, so there is no command to run here. " +
+          `The suite is declared; add \`expensive: true\` to it under ` +
+          `testing.suites in ${PROJECT_CONFIG_FILENAME}. Only an expensive ` +
+          "suite is worth selecting a subset of -- a cheap one is run whole.",
+      ];
+    }
     return [
       "no suite is declared, so there is no command to run. Declare one under " +
         `testing.suites in ${PROJECT_CONFIG_FILENAME}: a name, the command ` +

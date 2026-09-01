@@ -22,6 +22,7 @@ import {
   emptyRecord,
   enumerateProvider,
   freshnessMessage,
+  freshnessWarnings,
   isStale,
   loadRecord,
   mergeRecord,
@@ -432,6 +433,23 @@ describe("dating the records", () => {
     expect(isStale(api)).toBe(true);
     expect(api.present).toBe(false);
     expect(freshnessMessage(api)).toContain(ENUMERATE_COMMAND);
+    // And what is lost while it is absent, so the command can be weighed
+    // rather than merely obeyed. A bare "run this" repeated at every
+    // session start is what an operator learns to scroll past.
+    expect(freshnessMessage(api)).toContain("drift");
+    expect(freshnessMessage(api)).toContain("Nothing is blocked");
+  });
+
+  it("keeps a record that was never made out of the per-session warnings", () => {
+    // The two callers want different halves. A record that exists and has
+    // aged is one command from current and is worth saying every time; one
+    // that was never made is a repository that has not run discovery, and
+    // saying so at every session start for the life of the repository is a
+    // warning nothing in the framework ever answers. `bootstrap` says that
+    // one, once, where a project is set up.
+    const config = freshnessConfig(makeTempDir());
+    expect(freshnessWarnings(config, NOW, true).length).toBeGreaterThan(0);
+    expect(freshnessWarnings(config, NOW, false)).toEqual([]);
   });
 
   it("ages each record against its own threshold", () => {

@@ -138,8 +138,14 @@ export async function affectedVerb(argv: string[]): Promise<number> {
   // and one measured against the last round look identical as a list of files,
   // and only one of them is what verification will require.
   const lines: string[] = [`scope: ${baseline ? "the last round" : "HEAD"}\n`];
-  const suites = loadSuitesChecked(config).suites.filter((suite) => suite.expensive);
-  const commands = (): string => "\n" + runnableCommands(suites, result).join("\n") + "\n";
+  // Both numbers, because the filter is what makes the two empty cases
+  // different: a repository with no suite at all and one whose suite is
+  // simply not expensive need opposite advice, and only the count before
+  // the filter can tell them apart.
+  const declared = loadSuitesChecked(config).suites;
+  const suites = declared.filter((suite) => suite.expensive);
+  const commands = (): string =>
+    "\n" + runnableCommands(suites, result, declared.length).join("\n") + "\n";
 
   if (result.allTestsAffected) {
     lines.push(`all tests affected: ${result.allAffectedReason}\n`, commands());

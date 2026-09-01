@@ -1194,6 +1194,39 @@ export function quoteForCmd(argument: string): string {
   return `"${argument.replace(/(\\*)"/g, '$1$1\\"').replace(/(\\*)$/, "$1$1")}"`;
 }
 
+/**
+ * What every child spawned on these paths gets, whichever way it is reached.
+ *
+ * `windowsHide` is the one that has to be here rather than at a call site.
+ * A console child of a parent that has no console -- which is what the
+ * extension host is -- gets a console window of its own, and Windows gives
+ * that window the foreground. Every declared check the extension ran
+ * therefore flashed a `cmd` window in front of the operator and took the
+ * caret out of whatever they were typing into. `jobs.ts` and `packaging.ts`
+ * already passed it; these paths did not, and they are the ones a
+ * repository's own suite runs through.
+ *
+ * `mode` is the only difference between the two. A declared `command`
+ * string is trusted repository configuration and keeps its shell; an argv
+ * never gets one, because which branch runs is `resolveProgram`'s to decide
+ * and a shell shatters an argument that holds spaces. On POSIX both get
+ * their own process group, so `terminateTree` reaches the grandchildren --
+ * a tool the engine was running, a seat's helper -- and not the router that
+ * spawned them. Windows needs no flag for that; `taskkill /T` has the same
+ * reach.
+ */
+export function spawnOptionsFor(
+  base: SpawnOptions,
+  mode: "shell" | "argv",
+): SpawnOptions {
+  return {
+    ...base,
+    shell: mode === "shell",
+    windowsHide: true,
+    ...(process.platform === "win32" ? {} : { detached: true }),
+  };
+}
+
 function spawnCheck(
   check: Check,
   command: string,
@@ -1206,14 +1239,7 @@ function spawnCheck(
     stdio: ["ignore", "pipe", "pipe"],
   };
   if (check.command) {
-    // A declared shell string is trusted repository configuration and keeps
-    // working byte-for-byte; nothing here infers shell mode. Its own
-    // process group on POSIX, as `spawnProgram` gives the argv form.
-    return spawn(command, {
-      ...options,
-      shell: true,
-      ...(process.platform === "win32" ? {} : { detached: true }),
-    });
+    return spawn(command, spawnOptionsFor(options, "shell"));
   }
   const argv =
     command === check.argv.join(" ") ? [...check.argv] : shlexSplit(command);
@@ -1230,22 +1256,17 @@ function spawnCheck(
  * calling a model. `shell` in the options is ignored: which branch runs is
  * the program's to decide, never the caller's.
  *
- * On POSIX the child gets its own process group (`detached`), so that
- * `terminateTree` reaches the grandchildren -- a tool the engine was
- * running when it was interrupted, a seat's helper -- and not the router
- * that spawned it. Windows gets the same reach from `taskkill /T` and
- * needs no flag. That belongs here rather than at each call site because a
- * caller that forgot it would hand `terminateTree` a child it cannot fully
- * end.
+ * The process group and the hidden window both come from
+ * `spawnOptionsFor`, which states why each is there. They belong in one
+ * place rather than at each call site because a caller that forgot the
+ * first would hand `terminateTree` a child it cannot fully end, and a
+ * caller that forgot the second would open a window in front of the
+ * operator.
  */
 export function spawnProgram(argv: readonly string[], options: SpawnOptions): ChildProcess {
   const [program, ...rest] = argv;
   const resolved = resolveProgram(String(program));
-  const grouped: SpawnOptions = {
-    ...options,
-    shell: false,
-    ...(process.platform === "win32" ? {} : { detached: true }),
-  };
+  const grouped: SpawnOptions = spawnOptionsFor(options, "argv");
   if (resolved.isBatch) {
     // The outer pair is `/s`'s own rule and not decoration: cmd strips the
     // first and last quote of everything after `/c` when the first character

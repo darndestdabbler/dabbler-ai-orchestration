@@ -7,9 +7,13 @@
 // keep their own spinner, their own scrollback, their own chat and their
 // own interrupt key, which is what the staff already trust.
 //
-// Beside it, split off the same panel, is the *Dabbler* terminal: what the
-// framework is doing while they type. Two terminals is the arrangement,
-// not one -- Start shows both, and shows them without taking the caret.
+// Beside it is the *Dabbler* terminal: what the framework is doing while
+// they type. Two terminals is the arrangement, not one -- Start shows
+// both, and shows them without taking the caret. WHERE the pair opens is
+// `dabbler.terminalLocation`: two editor tabs side by side by default, or
+// split in the bottom panel as session 62 built it. A terminal cannot be
+// moved after it is created, so the setting is read when each one opens
+// and never after.
 //
 // **Start Unattended Session is the other half** (D252): headless `session
 // drive` as a child process, streaming into "Dabbler: Engine", for CI and
@@ -29,7 +33,7 @@ import { productionRouter } from "../router/host";
 import { routerOutputChannel } from "../router/commandLog";
 import { type DriveHandle, launchDriver } from "../router/driveProcess";
 import { resolveRouterCli } from "../router/terminalShim";
-import { ensureDabblerTerminal } from "../router/dabblerTerminal";
+import { ensureDabblerTerminal, terminalLocation } from "../router/dabblerTerminal";
 import { asRepositoryNode } from "./workExplorerTreeCommands";
 
 const CHANNEL_NAME = "Dabbler Session";
@@ -287,11 +291,28 @@ export function defaultSessionRunUi(): SessionRunUi {
     showInformationMessage: (m) => vscode.window.showInformationMessage(m),
     engineLine: (line) => engineOutputChannel().appendLine(line),
     openTerminal: (spec) => {
+      // The first editor column under `editor`, so that the framework's
+      // terminal -- which asks for `Beside` -- lands in the second and the
+      // pair reads left to right.
+      //
+      // Under `panel` the panel is asked for BY NAME rather than left
+      // unsaid. Saying nothing means "wherever terminals open", and where
+      // terminals open is `terminal.integrated.defaultLocation` -- which
+      // an operator may well have set to `editor`. A setting called
+      // `panel` that puts the pair in the editor area because of another
+      // setting is a promise the name does not keep.
+      const location = {
+        location:
+          terminalLocation() === "editor"
+            ? { viewColumn: vscode.ViewColumn.One }
+            : vscode.TerminalLocation.Panel,
+      };
       const terminal = vscode.window.createTerminal({
         name: spec.name,
         cwd: spec.cwd,
         shellPath: spec.program,
         shellArgs: [...spec.args],
+        ...location,
       });
       terminal.show();
       // Typed, never sent: the person reads it and presses Enter. Whether a

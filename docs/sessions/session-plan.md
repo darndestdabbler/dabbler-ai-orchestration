@@ -2919,15 +2919,141 @@ count). No extension change.
 
 ---
 
-### Session 65 of 65: The half of the trial that needs a published router
+## Why sessions 65-66 exist: what the csv-model trial found
+
+*Planned 2026-09-01, from the operator's own run of `../csv-model` —
+sessions 3–6, driven through `dabbler session next` on the 2.7.0 bundle,
+with Claude Code orchestrating and `gpt-5-6-sol` verifying. It is the
+first time the pull was driven by someone other than the person who
+built it, and it found three things that source confirms.*
+
+*The first is a hole in the driven lifecycle:* **it never publishes.**
+*A session that declares itself releasable, passes every gate, lands and
+closes `VERIFIED` ships nothing. The driver's phases are `steps →
+preverify → verify/dispositions → run-of-record → land → close →
+complete`, and none of them calls `packageSession()`; `packaging` is a
+standalone verb that refuses once the session is closed, so under the
+pull its window never exists. The managed body `dabbler bootstrap`
+writes says the opposite — "publishing and the close" are listed among
+the things the framework does for itself — so an orchestrator that
+follows our own instructions exactly waits for a step that never comes,
+and the record shows no discrepancy. csv-model's package was pushed by
+hand, outside the ledger. That is session 66.*
+
+*The second is that `packaging.push.secret` is mandatory for a feed that
+takes no credential. `loadDeclaration()` requires the `{secret}`
+placeholder and a non-empty name without ever looking at what `feed` is,
+so a folder-based NuGet source needed a declared PAT and an exported
+placeholder value — which the redactor then blanked wherever its word
+appeared in the transcript. That rides with 66.*
+
+*The third is a set of papercuts, each confirmed against source, and it
+is session 65. They are small individually and together they are most of
+what the run felt like: console windows stealing the cursor, a terminal
+that staircases its own multi-line lines, a stop that says `fatal:` when
+nothing was fatal, a message that says no suite is declared when one is,
+and a warning at every session start that nothing ever answers.*
+
+*This session block is inserted ahead of the publication trial, which
+moves for the fourth time. That is the trial's own rule (session 50's,
+restated as its step 5): a trial with no route to fix what it finds is a
+demonstration.*
+
+---
+
+### Session 65 of 67: The papercuts the trial found
+
+1. Register; declare `--not-releasable`.
+2. **The cursor.** `spawnCheck` and `spawnProgram` in `checks.ts` — the
+   path every declared check and every batch shim takes — spawn without
+   `windowsHide`, unlike `jobs.ts` and `packaging.ts` which pass it. From
+   the extension host on Windows that opens a console window per check
+   and takes the caret with it.
+3. **The Dabbler terminal's own lines.** `bandedLine` appends CRLF and
+   never converts the newlines *inside* the text, so a stop carrying
+   git's multi-line stderr staircases. The teal band is replaced by a
+   neutral gray sitting just off the terminal background, with foreground
+   colour and weight layered over it by what the line is: the phase,
+   verify and its verdict, a test run and its results, close and the
+   session that comes next, and a stop. The job log's bytes still pass
+   through untouched — session 60's finding stands.
+4. **Placement, as a setting.** `dabbler.terminalLocation`, `editor` or
+   `panel`, default `editor`: the CLI as an editor tab and the framework's
+   terminal beside it. Both created at their location rather than moved,
+   because VS Code fixes a terminal's location when it is created — the
+   constraint session 62's split-beside design was built around.
+5. **A way back to the framework terminal.** Activation creates one and
+   never shows it, and nothing recreates it once it is closed.
+6. **The land stop says what happened.** A repository with no push
+   destination stops with git's `fatal: No configuration push
+   destination`, which reads as an unrecoverable error that terminated
+   something. Nothing terminated. Detect the absent remote before
+   pushing and name the two ways forward.
+7. **`affected` stops denying a declared suite.** It filters on
+   `expensive` and then reports that no suite is declared.
+8. **The heredoc rule reaches the projects that need it.** It lives in
+   this repository's own hand-written `AGENTS.md` Environment section and
+   never reached `SHARED_BODY`, which is why a csv-model session lost
+   JSON backslash escapes to a heredoc.
+9. **`api-models.lock` gets an owner.** The warning fires at every
+   session start and nothing ever creates the record. Whoever owns it,
+   `session start` must never call a vendor endpoint: it is a lifecycle
+   registration, and a start that blocks on a provider outage is worse
+   than the warning.
+10. **An in-flight session keeps its identity.** `start()` re-registers
+    the session in flight unconditionally, so Start Session picked a
+    second time under a different engine silently replaces the recorded
+    orchestrator — and the record then says a session was run by an
+    engine that ran only part of it. Continuing under the same identity
+    stays allowed and silent; a different one is refused.
+11. Affected; verify; full suite as `final-full`; close.
+
+---
+
+### Session 66 of 67: The publish phase
+
+1. Register; declare `--not-releasable`.
+2. **The phase.** A `publish` phase in the driver, **between `land` and
+   `close`** — not between `run-of-record` and `land`, as the field
+   report suggested. `packageSession()` runs the close gates, and
+   neither `working_tree_clean` nor `pushed_to_remote` passes before the
+   land; placing it earlier would refuse every time. It runs only for a
+   session declared releasable, as `wait` work with a job log, exactly as
+   verification and the run of record already are.
+3. **What the pack leaves behind.** The artifact directory is written
+   after the tree was declared clean, so it is ignored by name or the
+   phase's own check fails the gate it just passed. Decide it here rather
+   than discovering it in a trial.
+4. **`published_when_releasable`.** A close gate that fails when the
+   session declared `releasable=true` and no packaging run is on the
+   record. This is the half that matters: without it the same silence
+   returns the first time the phase is skipped for any reason.
+5. **A feed that takes no credential.** `secret` becomes optional when
+   `feed` is a filesystem path or a `file://` URL, and `{secret}` leaves
+   the required placeholders in that case. The ledger records
+   `secret_name: ""` explicitly, so it reads as "unauthenticated feed"
+   rather than as nothing.
+6. **The managed body stops lying.** `SHARED_BODY` lists publishing among
+   the things the framework does for itself. Whichever way 2 lands, the
+   sentence matches it.
+7. Affected; verify; full suite as `final-full`; close.
+
+---
+
+### Session 67 of 67: The half of the trial that needs a published router
 
 *Runs when the operator decides to publish, at whatever version is current
 then — and not before. It is not blocked and nothing waits on it: the
 extension bundles the router, so everything being tested runs from the
 `.vsix`. What needs the public registry is this session's own check, which
 asks `registry.npmjs.org` what it serves and cannot ask anything else. It
-was 52, then 53, then 54, moving back a number each time a session was
-inserted ahead of it; placing it last ends that.*
+was 52, then 53, then 54, then 65, moving back a number each time a
+session was inserted ahead of it. Placing it last was supposed to end
+that and did not: the csv-model trial found work that has to precede a
+publication, so it moved once more, to 67. That is the right reason to
+move it — the alternative was publishing a router whose driven lifecycle
+cannot publish — but the claim that the renumbering was over was wrong
+when it was written, and this says so rather than quietly restating it.*
 
 1. Register; declare `--not-releasable`.
 2. **One version** (the operator's directive, 2026-08-31, after an install

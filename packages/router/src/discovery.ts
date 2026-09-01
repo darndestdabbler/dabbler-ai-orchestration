@@ -946,7 +946,15 @@ function repr(value: string | null): string {
 export function freshnessMessage(row: FreshnessRow): string {
   let head: string;
   if (!row.present) {
-    head = `${row.record}: no record at ${row.path}.`;
+    // What is LOST, not just what is missing. A bare "no record, run this"
+    // told an operator to run a command without saying what it buys, at
+    // every session start of every session, forever -- and a warning
+    // nobody can weigh is a warning everybody learns to scroll past.
+    head =
+      `${row.record}: no record at ${row.path}, so drift cannot be ` +
+      "reported: nothing can tell you when a model your roles name stops " +
+      "being served, or when a vendor ships one worth naming. Nothing is " +
+      "blocked by this.";
   } else if (row.age_hours === null) {
     head =
       `${row.record}: ${row.path} carries no readable date ` +
@@ -1102,12 +1110,32 @@ export function checkFreshness(
 }
 
 /** The warning lines for the stale records, and nothing for the fresh ones. */
+/**
+ * The stale records, as lines, for whoever is reporting them.
+ *
+ * `includeAbsent` is what separates the two callers, and it is the whole of
+ * this record's ownership question. A record that EXISTS and has gone stale
+ * is a thing the operator once had and let age: worth saying every time,
+ * because it is one command away from being current. A record that was
+ * never made is a repository that has never run discovery, which is the
+ * ordinary state of a repository on its first day -- and saying so at every
+ * session start, forever, is a nag that nothing in the framework ever
+ * answers. It belongs where a project is set up, said once, and that is
+ * `dabbler bootstrap`.
+ *
+ * Neither caller reaches a vendor. Enumeration is a network call and a
+ * lifecycle registration is not the place for one: a `session start` that
+ * blocked on a provider outage would be worse than every warning this
+ * function has ever printed.
+ */
 export function freshnessWarnings(
   config: RouterConfig,
   now: number = Date.now(),
+  includeAbsent = true,
 ): string[] {
   return checkFreshness(config, now)
     .filter(isStale)
+    .filter((row) => includeAbsent || row.present)
     .map((row) => `discovery: ${freshnessMessage(row)}`);
 }
 

@@ -11,7 +11,8 @@
 import { statSync } from "node:fs";
 import { join, relative as relativeTo } from "node:path";
 
-import { TRANSPORT_ENV_VAR, VALID_TRANSPORTS } from "../config.ts";
+import { TRANSPORT_ENV_VAR, VALID_TRANSPORTS, loadConfig } from "../config.ts";
+import { freshnessWarnings } from "../discovery.ts";
 import { ensureRoundRefspecs, repoRootFor } from "../evidence.ts";
 import { runGit } from "../journal.ts";
 import { raisePackagingDecisions, raiseRemoteDecision } from "../owedDecisions.ts";
@@ -344,7 +345,36 @@ export async function bootstrapVerb(argv: string[]): Promise<number> {
         "(instruction files refreshed only).\n",
     );
   }
+  // The one place a record that was never made is worth mentioning: this is
+  // where a project is set up, and this is the verb that owns it. `session
+  // start` used to say it instead, at every start of every session, and
+  // nothing in the framework ever answered it -- so the sentence stayed
+  // there being scrolled past for the life of the repository.
+  //
+  // Said, not done: enumeration reads each vendor's models endpoint, and
+  // bootstrap is run on machines with no keys, behind proxies and in tests.
+  // A setup verb that fails, or hangs, because a provider is down would be
+  // a worse defect than the one this replaces.
+  for (const line of absentRecordNotices()) writeOut(`${line}\n`);
   return EXIT_OK;
+}
+
+/**
+ * The discovery records this project has never made, if any.
+ *
+ * Best-effort and silent on failure: a configuration this cannot read is
+ * not a reason to fail a setup, and there is nothing here a project needs
+ * in order to run a session.
+ */
+function absentRecordNotices(): string[] {
+  try {
+    const config = loadConfig();
+    const stale = freshnessWarnings(config, Date.now(), true);
+    const existing = new Set(freshnessWarnings(config, Date.now(), false));
+    return stale.filter((line) => !existing.has(line));
+  } catch {
+    return [];
+  }
 }
 
 /**

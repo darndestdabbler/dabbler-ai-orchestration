@@ -14,8 +14,16 @@ import {
   registerOwedDecisionCommands,
 } from "./commands/owedDecisionCommands";
 import { installTerminalShim } from "./router/terminalShim";
-import { disposeDabblerTerminals, openDabblerTerminal } from "./router/dabblerTerminal";
-import { registerWorkExplorerTreeCommands } from "./commands/workExplorerTreeCommands";
+import {
+  disposeDabblerTerminals,
+  openDabblerTerminal,
+  revealDabblerTerminal,
+  watchClosedTerminals,
+} from "./router/dabblerTerminal";
+import {
+  asRepositoryNode,
+  registerWorkExplorerTreeCommands,
+} from "./commands/workExplorerTreeCommands";
 import { SESSIONS_REL, discoverRoots, hasSessionsRoot } from "./utils/fileSystem";
 import { RUNS_REL } from "./utils/projection";
 import { SolutionTreeProvider } from "./providers/SolutionTreeProvider";
@@ -174,10 +182,32 @@ export function activate(context: vscode.ExtensionContext): void {
   // Start opens (and shows) one for the repository it was pressed on, so a
   // repository bootstrapped after activation, a second folder or a worktree
   // is not left without one.
-  context.subscriptions.push(disposeDabblerTerminals());
+  context.subscriptions.push(disposeDabblerTerminals(), watchClosedTerminals());
   for (const root of discoverRoots()) {
     if (hasSessionsRoot(root)) openDabblerTerminal(root);
   }
+
+  // The way back to it. Activation creates the terminal and does not show
+  // it, which makes closing it the easiest thing in the world to do by
+  // accident -- and until this there was nothing that opened another. A
+  // session driven from a CLI the person opened themselves could otherwise
+  // run with no sight of what the framework was doing at all.
+  context.subscriptions.push(
+    vscode.commands.registerCommand("dabbler.showFrameworkTerminal", async (arg: unknown) => {
+      const roots = discoverRoots().filter(hasSessionsRoot);
+      const asked = asRepositoryNode(arg)?.repository.root;
+      const root =
+        asked ??
+        (roots.length <= 1
+          ? roots[0]
+          : await vscode.window.showQuickPick(roots, {
+              title: "Which repository's Dabbler terminal?",
+              ignoreFocusOut: true,
+            }));
+      if (root === undefined) return;
+      revealDabblerTerminal(root);
+    }),
+  );
 
   const refreshAll = () => {
     bindWatchers();

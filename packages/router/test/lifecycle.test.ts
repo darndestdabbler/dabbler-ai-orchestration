@@ -36,6 +36,7 @@ import {
   migrate,
   plan,
   restore,
+  start,
 } from "../src/session.ts";
 import { registerSessionStart } from "../src/writers.ts";
 import { git, makeSandboxRepo, makeTempDir, removeTempDirs } from "./support/fixtures.ts";
@@ -152,6 +153,85 @@ describe("closing a session", () => {
 });
 
 // --- cancel and restore -------------------------------------------------------
+
+describe("who a session in flight belongs to", () => {
+  /** A session in flight, registered by one engine. */
+  function inFlight(): { repo: string; sessionsDir: string } {
+    const made = makeSandboxRepo();
+    registerSessionStart(made.sessionsDir, 1, {
+      engine: "claude-code",
+      provider: "anthropic",
+    });
+    return made;
+  }
+
+  it("continues silently when the identity asked for is the one on the record", () => {
+    // The ordinary case, and the one the pull depends on: `dabbler session
+    // next --engine ...` called again in the same session re-registers it,
+    // and must not become a refusal.
+    const { sessionsDir } = inFlight();
+    const again = (): number =>
+      captured(() => start(sessionsDir, { engine: "claude-code", provider: "anthropic" })).code;
+    // Twice, because a pull sends the identity on every registering call and
+    // an idempotent path has to stay idempotent.
+    expect(again()).toBe(EXIT_OK);
+    expect(again()).toBe(EXIT_OK);
+    const record = readRawSessionState(sessionsDir)!;
+    const session = (record["sessions"] as Record<string, unknown>[])[0]!;
+    expect(session["orchestrator"]).toMatchObject({
+      engine: "claude-code",
+      provider: "anthropic",
+    });
+  });
+
+  it("keeps a field the continuing call did not state instead of erasing it", () => {
+    // The other half of "an omitted value is not stated", and the half the
+    // guard alone got wrong: it let the omission THROUGH, and
+    // `registerSessionStart` then assigned the orchestrator block whole
+    // from what it was given. `buildOrchestratorBlock` drops what it is not
+    // given, so a seat's session continued without `--model` passed the
+    // guard and lost the model it was registered with -- the record then
+    // saying a seat ran the session with no seat.
+    const { sessionsDir } = makeSandboxRepo();
+    registerSessionStart(sessionsDir, 1, {
+      engine: "copilot",
+      provider: "openai",
+      model: "gpt-5-6-luna",
+      effort: "high",
+    });
+    const kept = captured(() =>
+      start(sessionsDir, { engine: "copilot", provider: "openai" }),
+    );
+    expect(kept.code).toBe(EXIT_OK);
+    const record = readRawSessionState(sessionsDir)!;
+    const session = (record["sessions"] as Record<string, unknown>[])[0]!;
+    expect(session["orchestrator"]).toMatchObject({
+      engine: "copilot",
+      provider: "openai",
+      model: "gpt-5-6-luna",
+      effort: "high",
+    });
+  });
+
+  it("refuses to re-register the session in flight under a different engine", () => {
+    // Start Session pressed a second time and a different engine picked.
+    // `registerSessionStart` rewrites the orchestrator block whole, so this
+    // used to succeed silently -- and the ledger then said the session was
+    // run by an engine that ran only part of it.
+    const { sessionsDir } = inFlight();
+    const other = captured(() =>
+      start(sessionsDir, { engine: "codex", provider: "openai" }),
+    );
+    expect(other.code).toBe(EXIT_BOUNDARY);
+    expect(other.err).toContain("claude-code");
+    expect(other.err).toContain("codex");
+    // The record is what it was: a refusal that half-wrote the identity
+    // would be worse than the overwrite it replaces.
+    const record = readRawSessionState(sessionsDir)!;
+    const session = (record["sessions"] as Record<string, unknown>[])[0]!;
+    expect(session["orchestrator"]).toMatchObject({ engine: "claude-code" });
+  });
+});
 
 describe("cancelling a session", () => {
   it("refuses one in flight without --force", () => {

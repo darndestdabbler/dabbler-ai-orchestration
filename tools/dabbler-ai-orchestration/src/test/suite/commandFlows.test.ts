@@ -454,7 +454,21 @@ interface FakeTerminal {
 }
 
 suite("Start opens the person's own CLI", () => {
+  const settings = vscode.workspace as unknown as {
+    __setConfig: (section: string, key: string, value: unknown) => void;
+    __clearConfig: () => void;
+  };
+
+  teardown(() => {
+    settings.__clearConfig();
+  });
+
   test("opens the picked engine's CLI at the repository root, with the sentence, and launches no driver", async () => {
+    // The panel arrangement, asked for by name. It is no longer the default
+    // -- `dabbler.terminalLocation` is `editor` now -- but it is still the
+    // arrangement for anyone who wants their editors to stay editors, and
+    // the rebuild-per-CLI rule below belongs to it alone.
+    settings.__setConfig("dabbler", "terminalLocation", "panel");
     const repository = makeRepository();
     const launcher = launcherOf(new Map());
     const terminals = (vscode.window as unknown as { __terminals: FakeTerminal[] }).__terminals;
@@ -471,6 +485,11 @@ suite("Start opens the person's own CLI", () => {
     assert.strictEqual(cli.options.shellPath, "claude");
     assert.strictEqual(cli.options.cwd, repository.root);
     assert.strictEqual(cli.shown, 1);
+    // The panel by name, not by omission. Saying nothing means "wherever
+    // terminals open", and that is terminal.integrated.defaultLocation --
+    // which an operator may have set to the editor area, leaving a setting
+    // called `panel` putting the pair in editor tabs.
+    assert.strictEqual(cli.options.location, vscode.TerminalLocation.Panel);
     // Claude Code takes a positional prompt for an interactive session, so
     // the sentence is argv and nothing is typed.
     assert.match(cli.options.shellArgs[0], /dabbler session next .*--engine claude-code/);
@@ -516,6 +535,7 @@ suite("Start opens the person's own CLI", () => {
     // exists before there is any CLI to sit beside it. A terminal's
     // location is fixed at creation, so showing that one produces a
     // separate tab and no arrangement at all.
+    settings.__setConfig("dabbler", "terminalLocation", "panel");
     const repository = makeRepository({ root: path.join("D:", "already-open") });
     const terminals = (vscode.window as unknown as { __terminals: FakeTerminal[] }).__terminals;
     terminals.length = 0;
@@ -531,6 +551,33 @@ suite("Start opens the person's own CLI", () => {
     assert.strictEqual(terminals[2].options.location?.parentTerminal, terminals[1]);
     assert.strictEqual(terminals[2].shown, 1);
     assert.strictEqual(terminals[0].shown, 0);
+  });
+
+  test("opens the pair as two editor tabs by default, left to right", async () => {
+    // The default the operator asked for: the CLI in the first editor
+    // column and the framework's terminal in the next, both with the full
+    // height of the window rather than a third of it.
+    const repository = makeRepository({ root: path.join("D:", "editor-pair") });
+    const terminals = (vscode.window as unknown as { __terminals: FakeTerminal[] }).__terminals;
+    terminals.length = 0;
+
+    const ui = { ...defaultSessionRunUi(), pickEngine: async () => ENGINES[0], askModel: async () => "" };
+    assert.strictEqual(await runStartSession(repository, ui), true);
+    assert.strictEqual(terminals.length, 2);
+    assert.deepStrictEqual(terminals[0].options.location, { viewColumn: vscode.ViewColumn.One });
+    assert.ok(terminals[1].options.name.startsWith("Dabbler"));
+    assert.deepStrictEqual(terminals[1].options.location, {
+      viewColumn: vscode.ViewColumn.Beside,
+    });
+    assert.strictEqual(terminals[1].shown, 1);
+
+    // A second Start in the same window costs no scrollback here: the
+    // framework's tab is already where it belongs, so it is shown rather
+    // than rebuilt -- which is the one thing the panel split cannot do.
+    assert.strictEqual(await runStartSession(repository, ui), true);
+    assert.strictEqual(terminals.length, 3);
+    assert.strictEqual(terminals[1].disposed, 0);
+    assert.strictEqual(terminals[1].shown, 2);
   });
 
   test("a seat without a model opens nothing, and a dismissed pick opens nothing", async () => {

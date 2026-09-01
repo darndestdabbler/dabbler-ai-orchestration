@@ -1798,9 +1798,33 @@ ${this.stopArtifacts()}`,
       }
     }
     if (!existsSync(join(this.repoRoot, ".dabbler", "local-only"))) {
+      // Asked before the push rather than read out of its failure. git
+      // answers a repository with no remote with `fatal: No configuration
+      // push destination`, and that is two wrong words in one line: nothing
+      // was fatal -- the commit landed and the session is intact -- and the
+      // problem is not a missing configuration but a repository nobody has
+      // given anywhere to push to, which is the ordinary state of a
+      // repository on its first day. A session stopped by it should be told
+      // what to do, not handed git's diagnosis of its own internals.
+      const remotes = runGit(this.repoRoot, ["remote"]);
+      if (remotes.code !== 0 || remotes.stdout.trim() === "") {
+        throw new Stop(
+          "land",
+          "this repository has no remote, so there is nowhere to push. The " +
+            "commit landed and nothing is lost. Either add a remote (`git " +
+            "remote add origin <url>` and push once to set the upstream), " +
+            "or say the repository is local by creating the empty file " +
+            "`.dabbler/local-only`, which makes the land commit and stop " +
+            "there.",
+        );
+      }
       const pushed = runGit(this.repoRoot, ["push"]);
       if (pushed.code !== 0) {
-        throw new Stop("land", `git push failed: ${tail(pushed.stderr, 300)}`);
+        // A push that reached a remote and was refused keeps git's own
+        // words: a rejected non-fast-forward, a credential, a protected
+        // branch. That text IS the diagnosis there, and rewriting it would
+        // cost the operator the one string worth searching for.
+        throw new Stop("land", `the push was refused: ${tail(pushed.stderr, 300)}`);
       }
     }
     this.log("landed", { commit: runGit(this.repoRoot, ["rev-parse", "--short", "HEAD"]).stdout });

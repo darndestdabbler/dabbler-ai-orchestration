@@ -1267,15 +1267,35 @@
       "title": "The operator onboarding deck",
       "status": "complete",
       "startedAt": "2026-08-31T17:44:30.434000-04:00",
+      "completedAt": "2026-08-31T20:10:20.177000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",
         "model": "opus",
         "identityProvenance": "direct"
       },
-      "frameworkVersion": "2.0.0",
-      "completedAt": "2026-08-31T20:10:20.177000-04:00",
       "verificationVerdict": "VERIFIED",
+      "verification": {
+        "rounds": 2,
+        "verifierModel": "gpt-5-6-sol",
+        "verifierProvider": "openai",
+        "transport": "api"
+      },
+      "frameworkVersion": "2.0.0"
+    },
+    {
+      "number": 65,
+      "title": "The half of the trial that needs a published router",
+      "status": "in-progress",
+      "startedAt": "2026-09-01T02:59:12.656000-04:00",
+      "completedAt": null,
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": "VERIFIED",
+      "frameworkVersion": "2.0.0",
       "verification": {
         "rounds": 2,
         "verifierModel": "gpt-5-6-sol",
@@ -1284,8 +1304,17 @@
       }
     },
     {
-      "number": 65,
-      "title": "The half of the trial that needs a published router",
+      "number": 66,
+      "title": "Session 66",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    },
+    {
+      "number": 67,
+      "title": "Session 67",
       "status": "not-started",
       "startedAt": null,
       "completedAt": null,

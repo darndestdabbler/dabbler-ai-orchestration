@@ -3010,33 +3010,75 @@ demonstration.*
 
 ---
 
-### Session 66 of 67: The publish phase
+### Session 66 of 67: The publish phase, CI's first clean run, and the spinner
+
+*Widened from "the publish phase" on the operator's call, 2026-09-01: a
+miscellaneous session, because three of the four things in it are small and
+the fourth has been red for weeks.*
 
 1. Register; declare `--not-releasable`.
-2. **The phase.** A `publish` phase in the driver, **between `land` and
+2. **CI, first, because it is one line.** `master` has not had a clean run
+   since before session 63. The failure reads
+   `31 generated module(s) no longer match the schemas`, which is not what
+   is wrong: the repository declares no line endings, every text file is
+   stored LF in the index (406 of them), and `core.autocrlf` is `true` on
+   `windows-latest` — so a fresh clone writes CRLF into the working tree,
+   the generator renders LF, and `staleFiles` compares strings exactly.
+   It passes on the machine it was written on only because those files
+   were *written* by the generator in place and never re-checked-out:
+   `git ls-files --eol` in the same repository shows `w/lf` for the
+   generated modules and `w/crlf` for `package.json`.
+
+   **`check:types` is the FIRST step of that job**, so `typecheck`, `lint`,
+   the 1218-test router suite and the CLI bundles have not run in CI at all
+   in that time. Measured before planning, in a fresh clone under
+   `C:/temp` with `core.autocrlf=true`: the failure reproduces exactly, and
+   with one `.gitattributes` line (`* text=auto eol=lf`) every one of those
+   steps passes — 31 modules match, typecheck clean, lint clean, 48 test
+   files and 1218 tests green, bundles built. **Nothing was hiding behind
+   it.** The control is also taught to compare with newlines normalised, so
+   it can never again blame the schemas for a checkout setting.
+3. **The phase.** A `publish` phase in the driver, **between `land` and
    `close`** — not between `run-of-record` and `land`, as the field
    report suggested. `packageSession()` runs the close gates, and
    neither `working_tree_clean` nor `pushed_to_remote` passes before the
    land; placing it earlier would refuse every time. It runs only for a
    session declared releasable, as `wait` work with a job log, exactly as
    verification and the run of record already are.
-3. **What the pack leaves behind.** The artifact directory is written
+4. **What the pack leaves behind.** The artifact directory is written
    after the tree was declared clean, so it is ignored by name or the
    phase's own check fails the gate it just passed. Decide it here rather
    than discovering it in a trial.
-4. **`published_when_releasable`.** A close gate that fails when the
+5. **`published_when_releasable`.** A close gate that fails when the
    session declared `releasable=true` and no packaging run is on the
    record. This is the half that matters: without it the same silence
    returns the first time the phase is skipped for any reason.
-5. **A feed that takes no credential.** `secret` becomes optional when
+6. **A feed that takes no credential.** `secret` becomes optional when
    `feed` is a filesystem path or a `file://` URL, and `{secret}` leaves
    the required placeholders in that case. The ledger records
    `secret_name: ""` explicitly, so it reads as "unauthenticated feed"
    rather than as nothing.
-6. **The managed body stops lying.** `SHARED_BODY` lists publishing among
-   the things the framework does for itself. Whichever way 2 lands, the
-   sentence matches it.
-7. Affected; verify; full suite as `final-full`; close.
+7. **The managed body stops lying.** `SHARED_BODY` lists publishing among
+   the things the framework does for itself. Whichever way 3 lands, the
+   sentence matches it — including which sessions it is true of, since it
+   is true of a releasable one and false of every other.
+8. **The rest of the console windows.** Session 65 gave `windowsHide` to
+   the two spawn paths in `checks.ts`; four `spawnSync` sites were left
+   without it, because no step
+   of that session declared their files, and they are the ones the
+   extension host reaches most — `journal.spawnGit` above all, which is
+   every git call the router makes. `facts.ts`, `cli/release.ts` and
+   `transports/copilot.ts` are the other three. One exported helper rather
+   than four literals: `checks.ts` imports `journal.ts`, so `journal.ts` is
+   the only module low enough to hold it without a cycle.
+9. **The spinner** (the operator's item 7, explicitly not a priority, and
+   cheap once the terminal has a tone vocabulary). An alternating `/` and
+   `\` at the bottom, animated only while the indicator is `working` — a
+   spinner that spins when nothing is running is worse than none, being the
+   one thing in that terminal that claims motion. On its own line, erased
+   before any passed-through job bytes and redrawn after, so it never
+   fights a runner for the same cells; its timer unref'd like the poll's.
+10. Affected; verify; full suite as `final-full`; close.
 
 ---
 

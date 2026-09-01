@@ -2,7 +2,7 @@
 // Do not edit: the schema is the source, and `npm run check:types` fails
 // when this file no longer matches it.
 
-export type DriverRunStopKind = "budget" | "rejected-thrice" | "blocked" | "engine" | "tests" | "verification" | "land" | "close" | "interrupted";
+export type DriverRunStopKind = "budget" | "rejected-thrice" | "blocked" | "engine" | "tests" | "verification" | "land" | "publish" | "close" | "interrupted";
 
 /**
  * The work-plan step the loop was on when it halted, or null when it was not on one -- a verification round, the suite, the close. Two stops on different steps are not the same stop however alike their reasons read.
@@ -23,9 +23,9 @@ export type DriverRun = {
    */
   engine: string;
   /**
-   * Where the loop is. A re-run enters here; `complete` means the close ran and nothing is left to do.
+   * Where the loop is. A re-run enters here; `complete` means the close ran and nothing is left to do. `publish` sits between the land and the close, and runs only for a session whose plan declared it releasable: packaging asks the close's own gates, and neither `working_tree_clean` nor `pushed_to_remote` passes before the commit and the push, so it cannot run earlier.
    */
-  phase: "plan" | "steps" | "preverify" | "verify" | "dispositions" | "fix" | "run-of-record" | "land" | "close" | "complete";
+  phase: "plan" | "steps" | "preverify" | "verify" | "dispositions" | "fix" | "run-of-record" | "land" | "publish" | "close" | "complete";
   /**
    * The seq of the instruction last issued, so the next one is monotonic across re-runs.
    */
@@ -51,7 +51,7 @@ export type DriverRun = {
    */
   stop: {
     /**
-     * Which bound the loop met: the invocation budget; a step refused three times; the engine reporting `blocked`; the engine failing to run; a test run the framework could not hand back; a verification round that neither passed nor produced findings to dispose; the commit or push; the close's gates; a person asking it to stop (`session interrupt --stop`, with their reason).
+     * Which bound the loop met: the invocation budget; a step refused three times; the engine reporting `blocked`; the engine failing to run; a test run the framework could not hand back; a verification round that neither passed nor produced findings to dispose; the commit or push; packaging refusing or failing to reach the feed; the close's gates; a person asking it to stop (`session interrupt --stop`, with their reason).
      */
     kind: DriverRunStopKind;
     reason: string;

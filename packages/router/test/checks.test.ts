@@ -31,7 +31,7 @@ import {
   spawnOptionsFor,
   spawnProgram,
 } from "../src/checks.ts";
-import { snapshotWorktreeTree } from "../src/journal.ts";
+import { hiddenSpawn, snapshotWorktreeTree } from "../src/journal.ts";
 import { makeSeededRepo, makeTempDir, removeTempDirs } from "./support/fixtures.ts";
 
 afterAll(removeTempDirs);
@@ -418,6 +418,12 @@ describe("finding the program a name means", () => {
     for (const mode of ["shell", "argv"] as const) {
       expect(spawnOptionsFor({ cwd: "." }, mode).windowsHide).toBe(true);
     }
+    // One answer, in one place. `spawnOptionsFor` composes `hiddenSpawn`
+    // rather than restating it, so the checks path and the four `spawnSync`
+    // sites -- git above all -- cannot drift into disagreeing about what
+    // this router does to a child process on Windows.
+    expect(hiddenSpawn({ cwd: "." }).windowsHide).toBe(true);
+    expect(hiddenSpawn({ cwd: "." }).cwd).toBe(".");
     // And the one thing the two modes disagree about is still theirs to
     // disagree about: an argv never gets a shell, because which branch runs
     // is `resolveProgram`'s to decide.

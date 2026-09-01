@@ -64,6 +64,26 @@ export interface StaleFile {
   state: "changed" | "missing" | "unexpected";
 }
 
+/**
+ * One module's text as this comparison judges it: its lines, and not the
+ * bytes a checkout chose to separate them with.
+ *
+ * The repository declares `eol=lf` in `.gitattributes`, and that is the
+ * FIX; this is the guard behind it. Without either, `core.autocrlf` -- the
+ * default on Windows and what `windows-latest` runs with -- wrote CRLF into
+ * the working tree while the generator rendered LF, and this control then
+ * reported all 31 modules as no longer matching the schemas. Not one of
+ * them had drifted. It was the first step of the router CI job, so the
+ * typecheck, the lint, the suite and the bundles behind it did not run for
+ * weeks, over a difference this control was never meant to be sensitive to.
+ *
+ * What it IS meant to be sensitive to is unaffected: a real regeneration
+ * changes tokens, not newlines.
+ */
+function comparable(text: string): string {
+  return text.split("\r\n").join("\n");
+}
+
 /** Which generated files no longer match the schemas. Empty means fresh. */
 export function staleFiles(
   expected: Map<string, string>,
@@ -73,7 +93,7 @@ export function staleFiles(
   for (const [name, text] of expected) {
     const found = actual.get(name);
     if (found === undefined) stale.push({ name, state: "missing" });
-    else if (found !== text) stale.push({ name, state: "changed" });
+    else if (comparable(found) !== comparable(text)) stale.push({ name, state: "changed" });
   }
   for (const name of actual.keys()) {
     if (!expected.has(name)) stale.push({ name, state: "unexpected" });

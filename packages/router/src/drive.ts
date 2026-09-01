@@ -172,6 +172,9 @@ const JOB_POLL_MS = 250;
 const VERIFY_RETRY_SECONDS = 60;
 const SUITE_RETRY_SECONDS = 60;
 const CLOSE_RETRY_SECONDS = 15;
+// A pack and a push to a feed are a build and a network call; the suite is
+// the nearest thing to either in this file, so this takes the suite's number.
+const PUBLISH_RETRY_SECONDS = 60;
 /** How often a running invocation looks for an interrupt request. */
 const INTERRUPT_POLL_MS = 500;
 /** What a deferred Send reads as, first among the next instruction's reasons. */
@@ -1828,6 +1831,62 @@ ${this.stopArtifacts()}`,
       }
     }
     this.log("landed", { commit: runGit(this.repoRoot, ["rev-parse", "--short", "HEAD"]).stdout });
+    this.setPhase("publish");
+  }
+
+  /**
+   * Step (f), for a session that declared it may publish.
+   *
+   * **Between the land and the close, and it cannot be anywhere else.**
+   * `packageSession` asks the close's own gates before it packs, and two of
+   * them -- `working_tree_clean` and `pushed_to_remote` -- are false until
+   * the commit and the push have happened. The field report from csv-model
+   * proposed putting this before the land; there it would refuse every
+   * time. After the close is no good either: `packaging` requires a session
+   * in flight, and the close ends the flight. One window exists, and this
+   * is it.
+   *
+   * Until now nothing occupied that window under the driven lifecycle. The
+   * verb existed, the declaration was accepted, the gates passed, and no
+   * phase ever called it -- so a session that declared itself releasable
+   * landed, closed `VERIFIED` and shipped nothing, while the guidance told
+   * the engine the framework had done the publishing. That is the defect
+   * this phase closes, and `published_when_releasable` is what stops it
+   * reopening quietly the next time this phase does not run.
+   *
+   * A session that is not releasable passes straight through, silently:
+   * there is nothing to say about a step that does not apply.
+   *
+   * What the pack writes lands in `.dabbler/runs/s<N>/package/`, which is
+   * inside the ignored run directory -- so the artifact cannot dirty the
+   * tree the gates just called clean. That is a property of where the
+   * output goes rather than of this phase, and it is stated here because
+   * this is the phase that would break if it ever changed.
+   */
+  private async phasePublish(): Promise<void> {
+    if (!this.requirePlan().releasable) {
+      this.setPhase("close");
+      return;
+    }
+    const code = await this.longWork({
+      name: "publish",
+      argv: [...selfArgv(), "packaging", "--sessions-dir", this.sessionsDir],
+      retryAfterSeconds: PUBLISH_RETRY_SECONDS,
+      stopKind: "publish",
+    });
+    if (code !== EXIT_OK) {
+      // Every refusal packaging can raise is already written to its own log
+      // and to the packaging record, in its own words -- a gate that did not
+      // pass, a credential that is not set, a feed that would not take the
+      // artifact. Restating it here would be a second, worse copy.
+      throw new Stop(
+        "publish",
+        "the packaging run did not publish; its reasons are in the publish " +
+          "job's own log and in the session's packaging record, and nothing " +
+          "here can answer them",
+      );
+    }
+    this.log("published", { session: sessionDisplayNumber(this.sessionNumber) });
     this.setPhase("close");
   }
 
@@ -1886,6 +1945,9 @@ ${this.stopArtifacts()}`,
             break;
           case "land":
             this.phaseLand();
+            break;
+          case "publish":
+            await this.phasePublish();
             break;
           case "close":
             await this.phaseClose();

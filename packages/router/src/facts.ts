@@ -28,6 +28,7 @@ import { dirname, join } from "node:path";
 
 import { shlexSplit } from "./checks.ts";
 import {
+  hiddenSpawn,
   nowIso,
   repoRootFor,
   runGit,
@@ -683,11 +684,11 @@ export function runControl(repoRoot: string, spec: ControlSpec): ControlFact {
     );
   }
   const resolved = resolveInterpreter(argv);
-  const proc = spawnSync(resolved[0] as string, resolved.slice(1), {
+  const proc = spawnSync(resolved[0] as string, resolved.slice(1), hiddenSpawn({
     cwd: repoRoot,
-    encoding: "buffer",
+    encoding: "buffer" as const,
     timeout: CONTROL_TIMEOUT_SECONDS * 1000,
-  });
+  }));
   if (proc.error !== undefined) {
     const code = (proc.error as NodeJS.ErrnoException).code;
     if (code === "ETIMEDOUT") {

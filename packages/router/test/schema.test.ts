@@ -86,4 +86,24 @@ describe("the staleness control", () => {
       { name: "c.ts", state: "missing" },
     ]);
   });
+
+  it("judges the lines and not the bytes between them", () => {
+    // What kept `master` red for weeks. The repository stores LF, the
+    // generator renders LF, and `core.autocrlf` -- the default on Windows
+    // and what `windows-latest` runs with -- checked the files out as CRLF.
+    // All 31 modules then compared unequal and the control announced a
+    // schema drift that had not happened, in the first step of the job, so
+    // the typecheck, the lint, the suite and the bundles behind it never
+    // ran. `.gitattributes` is the fix; this is the guard behind it.
+    const rendered = "export type A = {\n  a: string;\n};\n";
+    const checkedOut = rendered.split("\n").join("\r\n");
+    expect(staleFiles(new Map([["a.ts", rendered]]), new Map([["a.ts", checkedOut]]))).toEqual([]);
+
+    // And a real regeneration is still caught: what this control exists for
+    // is a token that changed, which no newline rule can disguise.
+    const drifted = "export type A = {\n  a: number;\n};\n";
+    expect(staleFiles(new Map([["a.ts", rendered]]), new Map([["a.ts", drifted]]))).toEqual([
+      { name: "a.ts", state: "changed" },
+    ]);
+  });
 });

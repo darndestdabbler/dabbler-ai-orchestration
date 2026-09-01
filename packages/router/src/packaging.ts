@@ -20,7 +20,7 @@ import { join, relative, sep } from "node:path";
 
 import { childEnv } from "./checks.ts";
 import { type RouterConfig, loadConfig } from "./config.ts";
-import { type GateResult, runGates } from "./gates.ts";
+import { GATE_PUBLISHED_WHEN_RELEASABLE, type GateResult, runGates } from "./gates.ts";
 import { refuseIfResolvingFromSource } from "./resolution.ts";
 import { repoRootFor, snapshotWorktreeTree } from "./journal.ts";
 import { type Row, appendPackaging, packageOutputDir } from "./ledger.ts";
@@ -180,7 +180,13 @@ export function runAsRecord(run: PackagingRun): Row {
   };
   if (run.refusal) record["refusal"] = run.refusal;
   if (run.feed) record["feed"] = run.feed;
-  if (run.secretName) record["secret_name"] = run.secretName;
+  // Keyed on the FEED, not on the name. A run that reached a feed always
+  // says which credential published it, and for an unauthenticated feed the
+  // answer is the empty string -- which is a claim ("nothing authenticated
+  // this") rather than the absence of one. Omitting it would also break the
+  // schema outright: a `published` row requires `secret_name`, so a folder
+  // feed would write a row nothing could read back.
+  if (run.feed) record["secret_name"] = run.secretName;
   if (run.treeDigest !== null) record["tree_digest"] = run.treeDigest;
   if (run.treeMutated) {
     record["tree_mutated"] = true;
@@ -279,6 +285,48 @@ function timeoutOf(block: Record<string, unknown>, label: string): number {
   return seconds;
 }
 
+/**
+ * Whether pushing to this feed needs a credential at all.
+ *
+ * A folder is a NuGet source, an npm `file:` target and a Maven local
+ * repository, and none of them authenticates anything -- `dotnet nuget push
+ * … --api-key x` to a directory ignores the key entirely. Demanding one
+ * anyway is what the csv-model trial hit: to satisfy this router the
+ * operator had to declare `DABBLER_FEED_PAT` and export a placeholder value
+ * for a folder on their own disk. It also had a second bite, because the
+ * redactor blanks the resolved value wherever it appears in captured
+ * output -- so an operator who picked a natural word watched every
+ * occurrence of it disappear from the transcript.
+ *
+ * **It fails safe.** A value this cannot positively identify as a path on
+ * disk is treated as a feed that needs a credential, so the only way to
+ * lose the requirement is to name something that is unmistakably local. A
+ * bare token with no scheme and no separator (`internal-feed`) is exactly
+ * the ambiguous case, and it keeps the requirement -- that is the only
+ * shape left ambiguous, because a network feed is named by a URL, a URL has
+ * a scheme, and anything with a separator and no scheme is a directory.
+ */
+export function feedTakesCredential(feed: string): boolean {
+  const value = feed.trim();
+  if (value === "") return true;
+  // `file://` is a filesystem path that happens to be spelled as a URL.
+  if (/^file:\/\//i.test(value)) return false;
+  // Any other scheme is a network feed: nuget.org, an Azure Artifacts URL,
+  // a GitHub Packages registry.
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(value)) return true;
+  // `C:\feed`, `D:/feed`, and the drive-RELATIVE `C:feed\local`, which is
+  // still unambiguously a path on disk -- it names a drive.
+  if (/^[A-Za-z]:/.test(value)) return false;
+  // A UNC share, and a POSIX absolute path.
+  if (value.startsWith("\\\\") || value.startsWith("/")) return false;
+  // Anything with a path separator and no scheme: `./feed`, `../feed`,
+  // `feeds/local`, `feeds\local`. A network feed is named by a URL and a URL
+  // has a scheme, which was ruled out above -- so a separator at this point
+  // is a directory and not a host.
+  if (/[\\/]/.test(value)) return false;
+  return true;
+}
+
 function requirePlaceholders(
   argv: readonly string[],
   required: readonly string[],
@@ -335,12 +383,9 @@ export function loadDeclaration(
   requirePlaceholders(packArgv, [PLACEHOLDER_OUTPUT], "packaging.pack");
 
   const pushArgv = argvOf(push, "packaging.push");
-  requirePlaceholders(
-    pushArgv,
-    [PLACEHOLDER_ARTIFACT, PLACEHOLDER_FEED, PLACEHOLDER_SECRET],
-    "packaging.push",
-  );
 
+  // The feed is read BEFORE the placeholders are required, because what the
+  // feed IS decides whether one of them is required at all.
   const feed = String(push["feed"] ?? "").trim();
   if (!feed) {
     throw new PackagingConfigError(
@@ -349,8 +394,17 @@ export function loadDeclaration(
         "about what happened rather than a caption beside it.",
     );
   }
+  const authenticated = feedTakesCredential(feed);
+  requirePlaceholders(
+    pushArgv,
+    authenticated
+      ? [PLACEHOLDER_ARTIFACT, PLACEHOLDER_FEED, PLACEHOLDER_SECRET]
+      : [PLACEHOLDER_ARTIFACT, PLACEHOLDER_FEED],
+    "packaging.push",
+  );
+
   const secret = String(push["secret"] ?? "").trim();
-  if (!secret) {
+  if (!secret && authenticated) {
     throw new PackagingConfigError(
       "packaging.push.secret must name the credential — the name, " +
         "never the value. Values live in the environment or a " +
@@ -669,7 +723,16 @@ export function packageSession(
   // passed, because the close passes none. Handing them a different one is
   // how packaging and the close come to disagree about whether the same
   // session was ready.
-  const gates = runGates(sessionsDir);
+  //
+  // One is left unasked, and it is the one that is about this:
+  // `published_when_releasable` fails a releasable session with no packaging
+  // run on its record, and this IS that run. Asked here it answers itself
+  // wrongly -- the first publication would be refused for not having
+  // happened yet, and no session could ever publish. It is omitted rather
+  // than passed, so no reader can mistake its absence for a question that
+  // was asked and answered; the close asks it, after this has written the
+  // record it looks for.
+  const gates = runGates(sessionsDir, { omit: [GATE_PUBLISHED_WHEN_RELEASABLE] });
   const failed = gates.filter((gate) => !gate.passed);
   if (failed.length > 0) {
     return refusal(
@@ -682,11 +745,15 @@ export function packageSession(
     );
   }
 
-  const secretValue = resolveSecret(
-    declaration.push.secret,
-    declaration.push.secretSource,
-  );
-  if (!secretValue) {
+  // An unauthenticated feed declares no credential, so there is none to
+  // resolve and nothing to redact. The empty string travels on rather than
+  // a null: `redact` already ignores anything shorter than its minimum, and
+  // substitution has no `{secret}` to fill because the declaration was not
+  // required to carry one.
+  const secretValue = declaration.push.secret
+    ? resolveSecret(declaration.push.secret, declaration.push.secretSource)
+    : "";
+  if (declaration.push.secret && !secretValue) {
     return refusal(
       sessionNumber,
       true,
@@ -712,7 +779,9 @@ export function packageSession(
     };
   }
 
-  return execute(root, sessionNumber, declaration, secretValue, gates);
+  // Narrowed here rather than above: the guard proves a declared credential
+  // resolved, and an undeclared one is the empty string by construction.
+  return execute(root, sessionNumber, declaration, secretValue ?? "", gates);
 }
 
 function execute(

@@ -31,7 +31,7 @@ import { existsSync, mkdtempSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { snapshotWorktreeTree } from "./journal.ts";
+import { hiddenSpawn, snapshotWorktreeTree } from "./journal.ts";
 import { pythonRepr } from "./pythonJson.ts";
 
 export const STAGE_TARGETED = "targeted";
@@ -1219,12 +1219,11 @@ export function spawnOptionsFor(
   base: SpawnOptions,
   mode: "shell" | "argv",
 ): SpawnOptions {
-  return {
+  return hiddenSpawn({
     ...base,
     shell: mode === "shell",
-    windowsHide: true,
     ...(process.platform === "win32" ? {} : { detached: true }),
-  };
+  });
 }
 
 function spawnCheck(

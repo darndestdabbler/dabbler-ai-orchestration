@@ -45,8 +45,10 @@ import {
   LIFECYCLE_WRITTEN_FILES,
   LedgerError,
   ROW_REMEDIATED_AT_CAP,
+  readPackaging,
   readRounds,
 } from "./ledger.ts";
+import { sessionIsReleasable } from "./writers.ts";
 import { readSessionState } from "./progress.ts";
 import { pythonRepr, pythonStr } from "./pythonJson.ts";
 import { blockingDecisions } from "./owedDecisions.ts";
@@ -80,6 +82,16 @@ const SET_BOOKKEEPING_BASENAMES: ReadonlySet<string> = new Set([
   ...SET_BOOKKEEPING_COMMIT_BASENAMES,
   ".lifecycle.lock",
 ]);
+
+/**
+ * The gate that asks whether packaging has run, named once.
+ *
+ * `packaging` omits it from its own precondition check and nothing else
+ * ever omits anything; the name is a constant so that the one caller does
+ * not spell it, and so that renaming the gate cannot leave a string behind
+ * that silently matches nothing and re-creates the circularity.
+ */
+export const GATE_PUBLISHED_WHEN_RELEASABLE = "published_when_releasable";
 
 /** The two gates `--force` may never skip. */
 export const EVIDENCE_GATES: ReadonlySet<string> = new Set([
@@ -515,6 +527,64 @@ export function checkOwedDecisions(sessionsDir: string): Check {
 }
 
 /**
+ * A session that declared it may publish has a packaging run on the record.
+ *
+ * csv-model, 2026-09-01: session 6 declared `releasable=true`, held a valid
+ * packaging declaration, passed all six gates, landed and closed `VERIFIED`
+ * -- and published nothing. The driven lifecycle had no publish phase, so
+ * nothing ever called packaging, and no gate asked. The one deliverable the
+ * session existed for was missing and the framework's own account showed no
+ * discrepancy anywhere.
+ *
+ * The phase is the fix; this is what stops the fix being quietly undone. A
+ * phase can be skipped, disabled, or fail to be reached by a path nobody
+ * anticipated, and without this gate every one of those returns to closing
+ * `VERIFIED` in silence.
+ *
+ * **It asks whether the framework tried and recorded it, not whether a feed
+ * said yes.** A feed that refuses the artifact has already stopped the
+ * session in the `publish` phase, so the close does not run at all; asking
+ * about the outcome here would make the close a second judge of one fact,
+ * and two judges of one fact disagree eventually. What this gate catches is
+ * the case with no judge: a releasable session reaching the close with no
+ * packaging run recorded at all, which is exactly what csv-model did.
+ *
+ * A session that declared `not-releasable` passes trivially -- there is
+ * nothing it was supposed to publish.
+ */
+export function checkPublishedWhenReleasable(sessionsDir: string): Check {
+  const root = repoRootFor(sessionsDir);
+  if (root === null) return [true, ""];
+  const current = currentSession(sessionsDir);
+  if (typeof current !== "number") return [true, ""];
+  if (!sessionIsReleasable(sessionsDir, current)) return [true, ""];
+  let rows;
+  try {
+    rows = readPackaging(root, current);
+  } catch (error) {
+    // Unreadable is a fault, not an absence -- the same rule the owed-decision
+    // gate applies, and for the same reason.
+    return [
+      false,
+      `the packaging record could not be read: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    ];
+  }
+  if (rows.length > 0) return [true, ""];
+  return [
+    false,
+    "this session declared itself releasable and no packaging run is on " +
+      "its record, so closing it would report a session that shipped its " +
+      "artifact when nothing was built or pushed. The publish phase runs " +
+      "between the land and the close and writes that record; if it did " +
+      "not run, find out why rather than closing past this. Declaring the " +
+      "session not-releasable is a change to what the session IS and is " +
+      "made at step (a), never here.",
+  ];
+}
+
+/**
  * Every persisted verdict token is exactly in the closed allowlist.
  *
  * Absence of rounds is `verification_clean`'s finding, not this gate's --
@@ -573,16 +643,33 @@ export const GATE_CHECKS: readonly (readonly [string, Predicate])[] = [
   ["pushed_to_remote", checkPushedToRemote],
   ["test_run_fresh", checkTestRunFresh],
   ["owed_decisions", checkOwedDecisions],
+  [GATE_PUBLISHED_WHEN_RELEASABLE, checkPublishedWhenReleasable],
   ["verdict_vocabulary", checkVerdictVocabulary],
 ];
 
 export interface RunGatesOptions {
   readonly forced?: boolean;
   readonly config?: RouterConfig | null;
+  /**
+   * Gates to leave unasked, by name.
+   *
+   * There is exactly one caller and one reason. `packaging` asks the close's
+   * gates as its own preconditions -- deliberately the same set, so the two
+   * can never disagree about whether a session was ready -- and
+   * `published_when_releasable` asks whether packaging has already run. Asked
+   * of packaging by packaging, it is a question that answers itself wrongly:
+   * the first run would be refused for not having run, and no session could
+   * ever publish.
+   *
+   * It is an omission and never a pass: the row is absent from the result
+   * rather than present and green, so nothing downstream can read it as
+   * evidence that the question was asked and answered.
+   */
+  readonly omit?: readonly string[];
 }
 
 /**
- * All five gate rows (or only the evidence gates under `forced` -- force
+ * Every gate's row (or only the evidence gates under `forced` -- force
  * bypasses bookkeeping, never evidence). A predicate that throws becomes a
  * failed row carrying the error text.
  */
@@ -592,8 +679,10 @@ export function runGates(
 ): GateResult[] {
   const forced = options.forced === true;
   const config = options.config ?? null;
+  const omit = new Set(options.omit ?? []);
   const results: GateResult[] = [];
   for (const [name, predicate] of GATE_CHECKS) {
+    if (omit.has(name)) continue;
     if (forced && !EVIDENCE_GATES.has(name)) {
       results.push({
         name,

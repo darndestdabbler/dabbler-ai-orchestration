@@ -16,6 +16,7 @@ import {
   OUTCOME_PUBLISHED,
   OUTCOME_REFUSED,
   PackagingConfigError,
+  feedTakesCredential,
   loadDeclaration,
   packageSession,
   redact,
@@ -195,6 +196,64 @@ describe("the declaration", () => {
       pack["timeout_seconds"] = value;
       expect(() => loadDeclaration(config)).toThrow(PackagingConfigError);
     }
+  });
+});
+
+describe("a feed that takes no credential", () => {
+  // csv-model, 2026-09-01: a folder-based NuGet source needs no PAT --
+  // `dotnet nuget push … --api-key x` to a directory ignores the key -- but
+  // the declaration demanded one anyway, so the operator declared
+  // DABBLER_FEED_PAT and exported a placeholder value for a folder on their
+  // own disk. The redactor then blanked that word wherever it appeared in
+  // captured output, which is the second bite: pick a natural word and
+  // watch every occurrence of it vanish from the transcript.
+
+  it("knows a path on disk from a feed on the network, and is unsure in the repository's favour", () => {
+    for (const local of [
+      "D:/Projects/dabbler-local-feed",
+      "C:\\feeds\\local",
+      "file:///d/feeds/local",
+      "/var/feeds/local",
+      "\\\\build\\artifacts",
+      "./feed",
+      "../shared-feed",
+      // Drive-relative, and plainly relative: both name a directory, and
+      // neither was recognised until the verifier asked why not.
+      "C:feeds\\local",
+      "feeds/local",
+      "feeds\\local",
+    ]) {
+      expect(feedTakesCredential(local), local).toBe(false);
+    }
+    for (const remote of [
+      "https://pkgs.dev.azure.test/org/_packaging/feed/nuget/v3/index.json",
+      "http://nuget.internal/v3/index.json",
+      // Ambiguous, and therefore treated as needing one: the only way to
+      // drop the requirement is to name something unmistakably local.
+      "internal-feed",
+      "",
+    ]) {
+      expect(feedTakesCredential(remote), remote).toBe(true);
+    }
+  });
+
+  it("loads a folder feed with no secret and no {secret} placeholder", () => {
+    const config = packagingConfig("log.json");
+    const push = (config["packaging"] as Record<string, Record<string, unknown>>)["push"];
+    push["feed"] = "D:/Projects/dabbler-local-feed";
+    delete push["secret"];
+    push["argv"] = (push["argv"] as string[]).filter((token) => token !== "{secret}");
+
+    const declaration = loadDeclaration(makeConfig(config));
+    expect(declaration?.push.secret).toBe("");
+  });
+
+  it("still refuses an http feed that names no credential", () => {
+    // The requirement is dropped for a folder and for nothing else.
+    const config = packagingConfig("log.json");
+    const push = (config["packaging"] as Record<string, Record<string, unknown>>)["push"];
+    delete push["secret"];
+    expect(() => loadDeclaration(makeConfig(config))).toThrow(/must name the credential/);
   });
 });
 

@@ -232,6 +232,14 @@ export interface DabblerTerminalOptions {
   readonly themeKind?: () => ThemeKind;
   /** How often the run record and the running job's log are looked at. */
   readonly pollMs?: number;
+  /**
+   * How often the indicator advances a frame.
+   *
+   * Separate from `pollMs`, and much shorter: 500ms is how often it is
+   * worth reading a file, and it is not a rate anything animates at. A
+   * test drives `tick` directly rather than waiting on either.
+   */
+  readonly spinMs?: number;
 }
 
 /** `#165044` as the three numbers an SGR truecolour sequence takes. */
@@ -249,6 +257,20 @@ function rgb(hex: string): [number, number, number] {
  */
 const ESC = String.fromCharCode(27);
 const CRLF = String.fromCharCode(13, 10);
+const CR = String.fromCharCode(13);
+
+/**
+ * The indicator, and the two frames the operator asked for.
+ *
+ * Two rather than the usual four: an alternating `/` and `\` is what they
+ * described, and it is also the shape that reads as motion at a glance
+ * without competing with a test runner's own spinner further up the
+ * scrollback.
+ */
+const SPINNER_FRAMES: readonly string[] = ["/", "\\"];
+
+/** Erase the line the spinner is on and put the cursor back at its start. */
+const ERASE_LINE = `${ESC}[2K${CR}`;
 
 /** An SGR truecolour foreground. */
 function fg(hex: string): string {
@@ -388,6 +410,33 @@ export class DabblerTerminal implements vscode.Pseudoterminal {
   private activity: Activity = "waiting";
   private spoken: Activity | null = null;
 
+  private readonly spinMs: number;
+  private spinTimer: ReturnType<typeof setInterval> | undefined;
+  private frame = 0;
+  /**
+   * Whether the indicator is currently occupying the last line.
+   *
+   * Tracked rather than inferred from `activity`, because what has to be
+   * erased is what was actually drawn: a write that arrives in the same
+   * tick as the transition to `waiting` would otherwise land on top of a
+   * frame nobody cleared.
+   */
+  private spinning = false;
+
+  /**
+   * Whether the last thing written ended a line.
+   *
+   * **The indicator is never drawn anywhere but column 0**, and this is how
+   * that is known. A job's log is drained as raw bytes, and a runner mid-line
+   * -- a progress counter, a test name being written before its result --
+   * leaves the cursor partway along. Drawing there would put the frame at the
+   * end of the runner's own text, and the next tick erases the WHOLE line to
+   * clear it: the runner's bytes would go with it. Losing a job's output is
+   * the one thing this file exists to prevent, so a partial line means no
+   * indicator until the line is finished.
+   */
+  private atLineStart = true;
+
   /**
    * How far into each job log this terminal has read, by absolute path.
    *
@@ -423,7 +472,66 @@ export class DabblerTerminal implements vscode.Pseudoterminal {
           ? "light"
           : "dark");
     this.pollMs = options.pollMs ?? 500;
+    this.spinMs = options.spinMs ?? 120;
     this.theme = this.readTheme();
+  }
+
+  /**
+   * Everything this terminal writes goes through here, and that is the whole
+   * of how the indicator stays out of the way.
+   *
+   * The spinner lives on the last line with no newline after it, so any
+   * write that arrived while it was drawn would land on top of it. Erasing
+   * first and redrawing after means a job's bytes reach the terminal exactly
+   * as the runner wrote them -- which is the rule this file exists under --
+   * and the indicator reappears below them.
+   */
+  private say(text: string): void {
+    this.erase();
+    this.writer.fire(text);
+    // Where the cursor is left, which is the only thing that decides
+    // whether the indicator may be drawn at all. See `atLineStart`.
+    this.atLineStart = text.endsWith(CRLF) || text.endsWith("\n");
+    this.draw();
+  }
+
+  /** Clear the indicator's line, if it is there. Idempotent. */
+  private erase(): void {
+    if (!this.spinning) return;
+    this.spinning = false;
+    this.writer.fire(ERASE_LINE);
+  }
+
+  /** Put the current frame back, if there is anything to indicate. */
+  private draw(): void {
+    if (this.activity !== "working") return;
+    // Never on a line something else is already using. See `atLineStart`.
+    if (!this.atLineStart) return;
+    this.spinning = true;
+    this.writer.fire(paint(SPINNER_FRAMES[this.frame] as string, "warn", this.theme));
+  }
+
+  /**
+   * One frame.
+   *
+   * Public for the same reason `poll` is: the interval is not the
+   * behaviour, and a test that had to wait 120ms per frame would be a test
+   * of `setInterval`.
+   *
+   * A tick while nothing is running erases rather than advancing. An
+   * indicator that spins when the framework is idle is worse than none at
+   * all -- it is the one thing in this terminal that claims motion, and a
+   * false claim there is what an operator would be reading when they
+   * decided whether to wait or to intervene.
+   */
+  tick(): void {
+    if (this.activity !== "working") {
+      this.erase();
+      return;
+    }
+    this.frame = (this.frame + 1) % SPINNER_FRAMES.length;
+    this.erase();
+    this.draw();
   }
 
   /** What the indicator says, which is a job running or the space between. */
@@ -445,6 +553,11 @@ export class DabblerTerminal implements vscode.Pseudoterminal {
     // the extension host that changes nothing, and it is the difference
     // between a test run that ends and one that hangs.
     (this.timer as { unref?: () => void }).unref?.();
+    // The indicator has its own, faster clock, and the same rule about
+    // keeping nothing alive: an animation is never a reason for the
+    // extension host to stay up.
+    this.spinTimer = setInterval(() => this.tick(), this.spinMs);
+    (this.spinTimer as { unref?: () => void }).unref?.();
     this.poll();
   }
 
@@ -455,6 +568,8 @@ export class DabblerTerminal implements vscode.Pseudoterminal {
   dispose(): void {
     if (this.timer !== undefined) clearInterval(this.timer);
     this.timer = undefined;
+    if (this.spinTimer !== undefined) clearInterval(this.spinTimer);
+    this.spinTimer = undefined;
     this.themeSubscription?.dispose();
     this.themeSubscription = undefined;
     this.writer.dispose();
@@ -533,6 +648,11 @@ export class DabblerTerminal implements vscode.Pseudoterminal {
       this.spoken = this.activity;
       this.line(this.activity);
     }
+    // The indicator follows the activity immediately rather than at the
+    // next animation tick: a framework that has just stopped should not
+    // still appear to be spinning, however briefly.
+    if (this.activity === "working") this.draw();
+    else this.erase();
   }
 
   /**
@@ -662,7 +782,7 @@ export class DabblerTerminal implements vscode.Pseudoterminal {
     } catch {
       return;
     }
-    if (appended !== "") this.writer.fire(forTerminal(appended));
+    if (appended !== "") this.say(forTerminal(appended));
   }
 
   private sessionLabel(run: RunRecord): string {
@@ -701,7 +821,7 @@ export class DabblerTerminal implements vscode.Pseudoterminal {
         paint(value, valueTone, this.theme, valueTone !== "muted" && valueTone !== "plain"),
       );
     }
-    this.writer.fire(bandedLine(parts.join(""), this.theme));
+    this.say(bandedLine(parts.join(""), this.theme));
   }
 }
 

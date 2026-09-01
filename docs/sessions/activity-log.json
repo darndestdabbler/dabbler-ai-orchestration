@@ -10113,6 +10113,13 @@
       "dateTime": "2026-09-01T02:59:22.104000-04:00",
       "task": "The csv-model papercuts: the console windows that steal the cursor (windowsHide on every check spawn), the Dabbler terminal's staircased multi-line lines and its band and per-event highlighting, terminal placement as a setting defaulting to the editor area, a command to reopen the framework terminal, git's 'fatal:' carried into a land stop where the real cause is no remote, the 'affected' message that says no suite is declared when one is declared but not expensive, the heredoc warning missing from the managed body every project gets, the api-models.lock warning with no owner, and re-registering an in-flight session with a different engine. Also amends the session plan: 65 is this, 66 is the publish phase, and the publish trial moves to 67 of 67.",
       "releasable": false
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 66,
+      "dateTime": "2026-09-01T04:24:46.989000-04:00",
+      "task": "A miscellaneous session, on the operator's call: the publish gap the csv-model trial found, the CI failure that has kept master red for weeks, the animated indicator the Dabbler terminal has never had, and the four spawn sites session 65 could not reach. CI first, because it is one line and it has been hiding a green router suite: the repository declares no line endings, every text file is stored LF, and core.autocrlf is true on windows-latest -- so a fresh clone writes CRLF, the generator renders LF, and all 31 generated modules compare unequal. Then publishing: a publish phase between land and close for a session declared releasable, a published_when_releasable close gate so a releasable session can never again close VERIFIED having shipped nothing, secret made optional for a feed that is a filesystem path, and the managed body's claim that the framework publishes made true. Then windowsHide on the git, facts, release and Copilot spawns. Then the spinner.",
+      "releasable": false
     }
   ]
 }

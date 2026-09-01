@@ -39,10 +39,11 @@
         "fix",
         "run-of-record",
         "land",
+        "publish",
         "close",
         "complete"
       ],
-      "description": "Where the loop is. A re-run enters here; `complete` means the close ran and nothing is left to do."
+      "description": "Where the loop is. A re-run enters here; `complete` means the close ran and nothing is left to do. `publish` sits between the land and the close, and runs only for a session whose plan declared it releasable: packaging asks the close's own gates, and neither `working_tree_clean` nor `pushed_to_remote` passes before the commit and the push, so it cannot run earlier."
     },
     "seq": {
       "type": "integer",
@@ -77,7 +78,7 @@
       "properties": {
         "kind": {
           "$ref": "#/$defs/stopKind",
-          "description": "Which bound the loop met: the invocation budget; a step refused three times; the engine reporting `blocked`; the engine failing to run; a test run the framework could not hand back; a verification round that neither passed nor produced findings to dispose; the commit or push; the close's gates; a person asking it to stop (`session interrupt --stop`, with their reason)."
+          "description": "Which bound the loop met: the invocation budget; a step refused three times; the engine reporting `blocked`; the engine failing to run; a test run the framework could not hand back; a verification round that neither passed nor produced findings to dispose; the commit or push; packaging refusing or failing to reach the feed; the close's gates; a person asking it to stop (`session interrupt --stop`, with their reason)."
         },
         "reason": { "type": "string", "minLength": 1 },
         "at": { "type": "string", "minLength": 1 },
@@ -227,6 +228,7 @@
         "tests",
         "verification",
         "land",
+        "publish",
         "close",
         "interrupted"
       ]

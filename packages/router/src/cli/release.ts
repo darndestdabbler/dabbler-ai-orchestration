@@ -20,7 +20,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { repoRootFor, resolveSessionsDir, SessionsRootNotFoundError } from "../evidence.ts";
-import { runGit } from "../journal.ts";
+import { hiddenSpawn, runGit } from "../journal.ts";
 import {
   ID_PUBLICATION,
   OwedDecisionError,
@@ -310,7 +310,7 @@ export function checkInstall(version: string): number {
     "npm install --global dabbler-ai-router " +
       `--registry=${PUBLIC_REGISTRY} --prefix="${prefix}" --cache="${cache}" ` +
       "--no-audit --no-fund",
-    { encoding: "utf8", shell: true, timeout: 300_000 },
+    hiddenSpawn({ encoding: "utf8" as const, shell: true, timeout: 300_000 }),
   );
   const noise = `${install.stdout ?? ""}${install.stderr ?? ""}`.trim();
   if (install.status !== 0) {
@@ -392,7 +392,7 @@ function registryServes(version: string): boolean {
   if (!/^[0-9][0-9A-Za-z.+-]*$/.test(version)) return false;
   const probe = spawnSync(
     `npm view dabbler-ai-router@${version} version --registry=${PUBLIC_REGISTRY}`,
-    { encoding: "utf8", shell: true, timeout: 60_000 },
+    hiddenSpawn({ encoding: "utf8" as const, shell: true, timeout: 60_000 }),
   );
   return probe.status === 0 && (probe.stdout ?? "").includes(version);
 }

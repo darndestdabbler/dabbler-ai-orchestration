@@ -93,9 +93,17 @@ export const SHARED_BODY =
   "Everything the framework now does for itself happens inside those calls:\n" +
   "declaring the work, selecting and running the tests a change makes\n" +
   "necessary, cross-provider verification and its remediation rounds, the\n" +
-  "complete suite as the run of record, the commit, the push, publishing and\n" +
-  "the close. None of them is yours to run, and none of them is yours to\n" +
-  "skip ahead to — the instruction in hand is the whole of what is asked.\n" +
+  "complete suite as the run of record, the commit, the push, and the close.\n" +
+  "None of them is yours to run, and none of them is yours to skip ahead to\n" +
+  "— the instruction in hand is the whole of what is asked.\n" +
+  "\n" +
+  "**A session that declared itself releasable also publishes**, between the\n" +
+  "push and the close, and the framework does that for itself too. A session\n" +
+  "that declared `--not-releasable` publishes nothing, which is most of them:\n" +
+  "releasability is declared at the start, before the work, and is never\n" +
+  "decided afterwards. If a releasable session reaches the close with no\n" +
+  "packaging run on its record, the close refuses — a session that was\n" +
+  "supposed to ship and did not must not read as one that shipped.\n" +
   "\n" +
   "## When the framework stops\n" +
   "\n" +

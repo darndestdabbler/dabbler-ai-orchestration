@@ -1295,6 +1295,26 @@
         "identityProvenance": "direct"
       },
       "verificationVerdict": "VERIFIED",
+      "verification": {
+        "rounds": 2,
+        "verifierModel": "gpt-5-6-sol",
+        "verifierProvider": "openai",
+        "transport": "api"
+      },
+      "frameworkVersion": "2.0.0"
+    },
+    {
+      "number": 66,
+      "title": "The publish phase",
+      "status": "in-progress",
+      "startedAt": "2026-09-01T04:24:09.113000-04:00",
+      "completedAt": null,
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": "VERIFIED",
       "frameworkVersion": "2.0.0",
       "verification": {
         "rounds": 2,
@@ -1304,17 +1324,8 @@
       }
     },
     {
-      "number": 66,
-      "title": "Session 66",
-      "status": "not-started",
-      "startedAt": null,
-      "completedAt": null,
-      "orchestrator": null,
-      "verificationVerdict": null
-    },
-    {
       "number": 67,
-      "title": "Session 67",
+      "title": "The half of the trial that needs a published router",
       "status": "not-started",
       "startedAt": null,
       "completedAt": null,

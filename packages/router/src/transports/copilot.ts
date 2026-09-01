@@ -67,6 +67,7 @@ import { dirname, isAbsolute, join, resolve } from "node:path";
 import { parse as parseToml } from "smol-toml";
 
 import { isArgvTooLarge, quoteForCmd, resolveProgram, spawnProgram, terminateTree } from "../checks.ts";
+import { hiddenSpawn } from "../journal.ts";
 import {
   PROVENANCE_HAND_EDITED,
   PROVENANCE_UNSTAMPED,
@@ -1277,11 +1278,11 @@ export function getCliVersion(options: { binary?: string } = {}): string | null 
         ["/d", "/s", "/v:off", "/c", [resolved.path, "--version"].map(quoteForCmd).join(" ")],
       ]
     : [resolved.path, ["--version"]];
-  const outcome = spawnSync(command, args, {
-    encoding: "utf8",
+  const outcome = spawnSync(command, args, hiddenSpawn({
+    encoding: "utf8" as const,
     timeout: 30_000,
     ...(resolved.isBatch ? { windowsVerbatimArguments: true } : {}),
-  });
+  }));
   if (outcome.error !== undefined || outcome.status !== 0) return null;
   const stripped = (outcome.stdout ?? "").trim();
   if (stripped === "") return null;

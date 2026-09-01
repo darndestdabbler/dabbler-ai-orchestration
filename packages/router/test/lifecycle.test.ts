@@ -114,7 +114,10 @@ describe("closing a session", () => {
     const before = readFileSync(join(sessionsDir, "sessions.json"), "utf8");
     const result = captured(() => close(sessionsDir, { dryRun: true }));
     expect(result.code).toBe(EXIT_OK);
-    expect(result.out).toContain("6/6 gates pass; nothing written.");
+    // Seven since `published_when_releasable` joined them. The count is
+    // asserted rather than the row list because what this test is about is
+    // the dry run writing nothing; which gates exist is `gates.test.ts`.
+    expect(result.out).toContain("7/7 gates pass; nothing written.");
     expect(readFileSync(join(sessionsDir, "sessions.json"), "utf8")).toBe(before);
     expect(porcelain(repo)).toBe("");
   });

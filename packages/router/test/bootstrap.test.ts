@@ -243,6 +243,23 @@ describe("the instruction files", () => {
     expect(agents).toContain("never by hand");
   });
 
+  it("says publishing is the framework's, and says which sessions it is true of", () => {
+    // The sentence claimed publishing happened inside the framework's own
+    // calls while nothing in the driven lifecycle called packaging, so a
+    // csv-model orchestrator following it exactly waited for a step that
+    // never came and the session shipped nothing. It is true now -- and
+    // true only of a session that declared itself releasable, which is the
+    // half an engine would otherwise have to infer.
+    const project = makeTempDir();
+    writeInstructionFiles(project, "acme-app");
+    const agents = readFileSync(join(project, "AGENTS.md"), "utf8");
+    expect(agents).toContain("releasable");
+    expect(agents).toContain("not-releasable");
+    // And what happens when it does not: the close refuses rather than
+    // reporting a session that shipped when nothing was built.
+    expect(agents.toLowerCase()).toContain("the close refuses");
+  });
+
   it("tells every project the two things that corrupt work silently", () => {
     // Both were learned here and neither reached the body a project gets.
     // A csv-model session lost JSON backslash escapes to a Git Bash

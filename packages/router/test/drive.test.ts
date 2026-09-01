@@ -407,6 +407,45 @@ describe("dabbler session drive", { timeout: 120_000 }, () => {
     expect(existsSync(transcriptPath(repo, 1, 3))).toBe(false);
   });
 
+  it("runs the publish between the land and the close, and only when the session may publish", async () => {
+    // The csv-model defect: a session declared releasable landed, closed
+    // VERIFIED and shipped nothing, because no phase ever called packaging
+    // -- while the managed body told the engine the framework had done it.
+    const { repo, sessionsDir } = drivenRepo();
+    configure([VERIFIED]);
+    const releasable: Script = ({ instruction }, tools) => {
+      if (instruction.answer_schema === WORK_PLAN_SCHEMA) {
+        tools.answer({ ...PLAN, releasable: true });
+        return;
+      }
+      wellBehaved({ instruction } as Parameters<Script>[0], tools);
+    };
+
+    const { code } = await drive(sessionsDir, scripted(releasable));
+    // This repository declares no packaging block, so the publish refuses
+    // and the loop stops in `publish` -- which is the point: the phase ran,
+    // it was reached after the land, and it did not silently do nothing.
+    expect(code).not.toBe(0);
+    const run = readRun(repo, 1) as { phase: string; stop: { kind: string } };
+    expect(run.phase).toBe("publish");
+    expect(run.stop.kind).toBe("publish");
+    // The land happened first: publishing an uncommitted tree is what the
+    // ordering exists to prevent, and packaging's own gates would refuse it.
+    expect(runGit(repo, ["log", "--format=%s", "-n", "1"]).stdout).toContain("Session 1:");
+    expect(runGit(repo, ["status", "--porcelain"]).stdout).toBe("");
+  });
+
+  it("passes a session that may not publish straight from land to close", async () => {
+    // Nothing to say about a step that does not apply. The default plan is
+    // `releasable: false`, which is every session this repository has run.
+    const { repo, sessionsDir } = drivenRepo();
+    configure([VERIFIED]);
+
+    const { code } = await drive(sessionsDir, scripted(wellBehaved));
+    expect(code).toBe(0);
+    expect(readRun(repo, 1)).toMatchObject({ phase: "complete", stop: null });
+  });
+
   it("stops a land with no remote by saying so, and never calls it fatal", async () => {
     // git answers this with `fatal: No configuration push destination`, and
     // both of those words are wrong: nothing terminated -- the commit is on

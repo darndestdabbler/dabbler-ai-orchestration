@@ -54,17 +54,37 @@ export interface RunGitOptions {
   readonly env?: Record<string, string>;
 }
 
+/**
+ * What every child this router spawns is given, wherever it is spawned from.
+ *
+ * One fact, and it belongs in one place. A console child of a parent that
+ * has no console of its own -- which is exactly what the VS Code extension
+ * host is -- gets a console window, and Windows gives that window the
+ * foreground. Every git call, every declared check, every probe therefore
+ * flashed a `cmd` window in front of the operator and took the caret out of
+ * whatever they were typing. Session 65 fixed the two paths in `checks.ts`;
+ * these are the rest, and `journal.ts` holds the answer because `checks.ts`
+ * imports this module and not the other way round.
+ *
+ * `checks.spawnOptionsFor` composes this rather than restating it, so there
+ * is one answer to "what does this router do to a child process" and not
+ * two that agree until the day they do not.
+ */
+export function hiddenSpawn<T extends object>(base: T): T & { windowsHide: true } {
+  return { ...base, windowsHide: true };
+}
+
 function spawnGit(
   repoRoot: string,
   args: readonly string[],
   options: RunGitOptions,
   encoding: "utf8" | "buffer",
 ): { code: number; stdout: string | Buffer; stderr: string } {
-  const result = spawnSync("git", ["-C", String(repoRoot), ...args], {
+  const result = spawnSync("git", ["-C", String(repoRoot), ...args], hiddenSpawn({
     encoding: encoding === "utf8" ? "utf8" : undefined,
     env: options.env ? { ...process.env, ...options.env } : process.env,
     maxBuffer: 256 * 1024 * 1024,
-  });
+  }));
   if (result.error) {
     return {
       code: EXIT_GIT_MISSING,

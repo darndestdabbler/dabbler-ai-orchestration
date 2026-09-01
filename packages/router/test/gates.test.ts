@@ -1,4 +1,4 @@
-// The six close gates, and the driver that runs them.
+// The close gates, and the driver that runs them.
 //
 // Each gate is here because an incident is, so each test names the state
 // the gate refuses rather than the code path it takes. The parity control
@@ -14,13 +14,14 @@ import { afterAll, describe, expect, it } from "vitest";
 import {
   EVIDENCE_GATES,
   GATE_CHECKS,
+  GATE_PUBLISHED_WHEN_RELEASABLE,
   type GateResult,
   runGates,
 } from "../src/gates.ts";
 import { snapshotWorktreeTree } from "../src/journal.ts";
-import { appendRound, roundsPath } from "../src/ledger.ts";
+import { appendPackaging, appendRound, roundsPath } from "../src/ledger.ts";
 import { recordRun } from "../src/testEvidence.ts";
-import { registerSessionStart } from "../src/writers.ts";
+import { declareSessionTask, registerSessionStart } from "../src/writers.ts";
 import { git, makeSandboxRepo, removeTempDirs } from "./support/fixtures.ts";
 
 afterAll(removeTempDirs);
@@ -104,16 +105,16 @@ const CONFIG = {
 };
 
 describe("a close with nothing wrong with it", () => {
-  it("passes all six gates", () => {
+  it("passes all seven gates", () => {
     const { sessionsDir } = closeReady();
     const results = runGates(sessionsDir, { config: CONFIG });
-    expect(results).toHaveLength(6);
+    expect(results).toHaveLength(7);
     for (const row of results) {
       expect(`${row.name}: ${row.remediation}`).toBe(`${row.name}: `);
     }
   });
 
-  it("runs the six in the order the close prints them", () => {
+  it("runs the seven in the order the close prints them", () => {
     // `owed_decisions` sits after `test_run_fresh` on purpose: the operator
     // reads "nothing was measured" and then reads why that is not allowed to
     // stand, in that order.
@@ -123,6 +124,11 @@ describe("a close with nothing wrong with it", () => {
       "pushed_to_remote",
       "test_run_fresh",
       "owed_decisions",
+      // Before `verdict_vocabulary` rather than after: a session that
+      // shipped nothing is a fact about the work, and the vocabulary check
+      // is a fact about how the record spells its verdicts. The operator
+      // reads what went wrong before how it was written down.
+      "published_when_releasable",
       "verdict_vocabulary",
     ]);
   });
@@ -342,6 +348,71 @@ describe("test_run_fresh", () => {
   });
 });
 
+describe("published_when_releasable", () => {
+  it("refuses a releasable session with no packaging run on its record", () => {
+    // csv-model session 6: declared releasable, held a valid packaging
+    // declaration, passed every gate, landed, closed VERIFIED -- and
+    // published nothing, because no phase ever called packaging and no gate
+    // ever asked. The phase is the fix; this is what keeps it fixed.
+    const { sessionsDir } = closeReady();
+    declareSessionTask(sessionsDir, { sessionNumber: 1, task: "ship it", releasable: true });
+    const row = byName(runGates(sessionsDir, { config: CONFIG }))["published_when_releasable"];
+    expect(row.passed).toBe(false);
+    expect(row.remediation).toContain("releasable");
+    // And it says where the record comes from, so the reader knows what did
+    // not happen rather than only that something is missing.
+    expect(row.remediation).toContain("publish phase");
+  });
+
+  it("passes a releasable session that has one, whatever the feed answered", () => {
+    // The gate asks whether the framework tried and wrote it down, never
+    // whether a feed said yes. A refusal from the feed already stopped the
+    // session in the publish phase, so the close does not run at all; making
+    // this a second judge of the same fact is how two judges come to
+    // disagree about one session.
+    const { repo, sessionsDir } = closeReady();
+    declareSessionTask(sessionsDir, { sessionNumber: 1, task: "ship it", releasable: true });
+    appendPackaging(repo, 1, {
+      outcome: "refused",
+      session_number: 1,
+      releasable: true,
+      refusal: "the feed would not take the artifact",
+      recorded_at: new Date().toISOString(),
+    });
+    expect(
+      byName(runGates(sessionsDir, { config: CONFIG }))["published_when_releasable"].passed,
+    ).toBe(true);
+  });
+
+  it("is omitted rather than passed for the run that is trying to publish", () => {
+    // packaging asks the close's gates as its own preconditions, and this
+    // one asks whether packaging has run. Asked of packaging by packaging it
+    // answers itself wrongly: the first publication would be refused for not
+    // having happened, and no session could ever publish. Omitted, not
+    // passed -- a green row nobody evaluated is worse than no row, because
+    // something downstream will read it as evidence.
+    const { sessionsDir } = closeReady();
+    declareSessionTask(sessionsDir, { sessionNumber: 1, task: "ship it", releasable: true });
+    const rows = runGates(sessionsDir, {
+      config: CONFIG,
+      omit: [GATE_PUBLISHED_WHEN_RELEASABLE],
+    });
+    expect(rows).toHaveLength(6);
+    expect(rows.map((row) => row.name)).not.toContain(GATE_PUBLISHED_WHEN_RELEASABLE);
+    // Every other gate still answered, so the omission is one gate and not
+    // a way past the set.
+    expect(rows.every((row) => row.passed)).toBe(true);
+  });
+
+  it("passes a session that was never going to publish", () => {
+    // The ordinary case, and every session this repository has ever run.
+    const { sessionsDir } = closeReady();
+    expect(
+      byName(runGates(sessionsDir, { config: CONFIG }))["published_when_releasable"].passed,
+    ).toBe(true);
+  });
+});
+
 describe("verdict_vocabulary", () => {
   it("refuses a token no writer of this router ever produced", () => {
     // Incident replay: a confabulated token must never survive to a close
@@ -370,9 +441,9 @@ describe("verdict_vocabulary", () => {
 describe("the driver", () => {
   it("turns a gate that throws into a failed row rather than wedging the close", () => {
     // A repository path that is not a repository at all reaches the first
-    // guard of every gate; the point is that six rows still come back.
+    // guard of every gate; the point is that every row still comes back.
     const results = runGates(join(makeSandboxRepo().repo, "nowhere"));
-    expect(results).toHaveLength(6);
+    expect(results).toHaveLength(7);
     expect(results.every((row) => typeof row.remediation === "string")).toBe(true);
   });
 

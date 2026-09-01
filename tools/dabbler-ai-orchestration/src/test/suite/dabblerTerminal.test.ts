@@ -325,6 +325,113 @@ function lastTerminal(): FakeTerminal {
   return all[all.length - 1];
 }
 
+suite("the indicator", () => {
+  test("advances while the framework is working, and is not drawn when it is not", () => {
+    useTheme(vscode.ColorThemeKind.Dark);
+    const { root, driver, terminal, written } = drivenRepo(RUNNING);
+    terminal.poll();
+
+    // A job is on the record, so there is something to indicate.
+    written.length = 0;
+    terminal.tick();
+    const first = written.join("");
+    terminal.tick();
+    const second = written.join("").slice(first.length);
+    // Two frames, and they are not the same one: what makes this an
+    // indicator rather than a character is that it moves.
+    assert.ok(plain(first).includes("/") || plain(first).includes("\\"));
+    assert.ok(plain(second).includes("/") || plain(second).includes("\\"));
+    assert.notStrictEqual(plain(first).trim(), plain(second).trim());
+
+    // Nothing running: the frame is cleared rather than left spinning. An
+    // indicator that claims motion while the framework is idle is the one
+    // thing in this terminal a person would act on wrongly.
+    writeRun(driver, { session_number: 62, phase: "land", stop: null, job: null });
+    terminal.poll();
+    written.length = 0;
+    terminal.tick();
+    assert.strictEqual(plain(written.join("")).replace(/[\r\n]/g, ""), "");
+
+    terminal.dispose();
+    rmrf(root);
+  });
+
+  test("gets out of the way of a job's bytes and comes back after them", () => {
+    // The spinner sits on the last line with no newline after it, so a
+    // write that arrived while it was drawn would land on top of it. The
+    // job's own bytes have to reach the terminal exactly as the runner
+    // wrote them -- that is the rule this whole file is under.
+    useTheme(vscode.ColorThemeKind.Dark);
+    const { root, driver, terminal, written } = drivenRepo(RUNNING);
+    terminal.poll();
+    terminal.tick();
+
+    written.length = 0;
+    const log = path.join(driver, "jobs", "verification-round.log");
+    fs.writeFileSync(log, `${ESC}[32m✓${ESC}[0m 214 passed\n`, "utf8");
+    terminal.poll();
+
+    const stream = written.join("");
+    // The runner's line survives whole, escapes included.
+    assert.ok(stream.includes(`${ESC}[32m`));
+    assert.ok(stream.includes("214 passed"));
+    // And the line was cleared before those bytes were written, so they did
+    // not land on a frame.
+    const cleared = stream.indexOf(`${ESC}[2K`);
+    assert.ok(cleared >= 0 && cleared < stream.indexOf("214 passed"));
+
+    terminal.dispose();
+    rmrf(root);
+  });
+
+  test("never shares a line with a runner mid-line, and so never erases its bytes", () => {
+    // A job's log is drained as raw bytes, and a runner writing a progress
+    // counter or a test name before its result leaves the cursor partway
+    // along a line. The indicator drawn THERE sits at the end of the
+    // runner's own text, and the next tick erases the whole line to clear
+    // the frame -- taking the runner's bytes with it. Losing a job's output
+    // is the one thing this file exists to prevent.
+    useTheme(vscode.ColorThemeKind.Dark);
+    const { root, driver, terminal, written } = drivenRepo(RUNNING);
+    terminal.poll();
+
+    written.length = 0;
+    const log = path.join(driver, "jobs", "verification-round.log");
+    // No trailing newline: the runner is still writing this line.
+    fs.writeFileSync(log, "  ✓ widget returns 2", "utf8");
+    terminal.poll();
+    assert.ok(written.join("").includes("widget returns 2"));
+
+    // Nothing is drawn while that line is open, so a tick has nothing to
+    // erase and the partial output survives untouched.
+    written.length = 0;
+    terminal.tick();
+    assert.strictEqual(written.join(""), "");
+
+    // The runner finishes the line, and the indicator returns.
+    fs.appendFileSync(log, "  (4ms)\n", "utf8");
+    terminal.poll();
+    written.length = 0;
+    terminal.tick();
+    assert.ok(plain(written.join("")).includes("/") || plain(written.join("")).includes("\\"));
+
+    terminal.dispose();
+    rmrf(root);
+  });
+
+  test("stops when the terminal goes away", () => {
+    // An animation is never a reason for the extension host to stay alive.
+    useTheme(vscode.ColorThemeKind.Dark);
+    const { root, terminal, written } = drivenRepo(RUNNING);
+    terminal.open();
+    terminal.dispose();
+    written.length = 0;
+    terminal.tick();
+    assert.strictEqual(written.join(""), "");
+    rmrf(root);
+  });
+});
+
 suite("where Start puts the two terminals", () => {
   const stub = vscode.workspace as unknown as {
     __setConfig: (section: string, key: string, value: unknown) => void;

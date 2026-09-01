@@ -1,0 +1,712 @@
+{
+  "$comment": "The driver's phase machine, as `drive.ts` implements it. A SOURCE, not a diagram: `drive.test.ts` drives whole sessions end to end and asserts that every edge taken is declared here and marked exercised, which is the same shape as `check:types` holding the generated modules to the schemas. Harvested 2026-09-01 (see docs/logic-harvest-68.md) and amended by the session that adopted it.",
+  "covers": {
+    "module": "packages/router/src/drive.ts",
+    "machine": "driver phases and the stops reachable from them",
+    "not_covered": [
+      "the verification-round machine (verify/rounds.ts)",
+      "the session-status machine (session.ts, writers.ts)",
+      "the packaging machine (packaging.ts)",
+      "the close gates (gates.ts)"
+    ],
+    "why": "Those four were summarised rather than harvested -- enough to find the edges the driver mis-reads, not enough to be a control's source. A model implying coverage it does not have is exactly the failure this file exists to avoid, so it says so here rather than leaving a reader to assume."
+  },
+  "reading": {
+    "from": "a driver phase, or `*` for any phase (never a wildcard `to`)",
+    "to": "a driver phase, or STOPPED(<stop kind>)",
+    "actor": "who must act for the edge to be taken",
+    "timeout": "what happens if that actor never acts; null means the state can be occupied forever",
+    "observed_by": "what evidence the transition is judged on; 'self-report' means self-attested",
+    "exercised": "whether the router's own suite drives this edge. The control asserts that every edge TAKEN is marked true -- so an edge that starts being exercised fails until it is recorded here, and a false is a claim about test coverage rather than about the code.",
+    "self_loops": "A transition whose `from` equals its `to` is a self-loop -- a refused answer, a retried step. The control observes phase CHANGES, so a self-loop is never in the observed set and its `exercised` says only what the suite is known to drive.",
+    "not_phase_edges": "Four movements the harvest modelled as transitions that do not move the phase: the two waits (a job still running, an interrupted invocation re-issued), the resume out of a stop (which RESTORES run.phase rather than changing it -- and whose actor is the operator, with no timeout, which is why a stopped session can be occupied forever), and the reclassification of a repeated stop as a deadlock. They are kept here so the notes survive, and out of `transitions` so nothing implies an edge the control could take."
+  },
+  "actors": {
+    "framework": "the router's own deterministic code; it can force this edge",
+    "engine": "the AI, push (adapter.invoke) or pull (the operator's own CLI)",
+    "operator": "a person, through a dabbler verb or a git action",
+    "verifier": "a cross-provider model reached through the router",
+    "job": "a detached child process the framework spawned (jobs.ts)",
+    "vendor": "a provider API the framework does not control"
+  },
+  "states": [
+    {
+      "id": "plan",
+      "records": [
+        "driver/run.json",
+        "driver/plan.json"
+      ],
+      "terminal": false,
+      "note": "entered on run creation; asks the engine for a work plan, then calls declare()"
+    },
+    {
+      "id": "steps",
+      "records": [
+        "driver/run.json",
+        "driver/report.json"
+      ],
+      "terminal": false,
+      "note": "iterates plan.steps, skipping run.accepted_steps"
+    },
+    {
+      "id": "preverify",
+      "records": [
+        "test-runs.jsonl"
+      ],
+      "terminal": false
+    },
+    {
+      "id": "verify",
+      "records": [
+        "rounds.jsonl"
+      ],
+      "terminal": false
+    },
+    {
+      "id": "dispositions",
+      "records": [
+        "driver/dispositions.json",
+        "disputes.jsonl"
+      ],
+      "terminal": false
+    },
+    {
+      "id": "fix",
+      "records": [
+        "driver/report.json"
+      ],
+      "terminal": false
+    },
+    {
+      "id": "run-of-record",
+      "records": [
+        "test-runs.jsonl"
+      ],
+      "terminal": false
+    },
+    {
+      "id": "land",
+      "records": [
+        "git commit",
+        "git push"
+      ],
+      "terminal": false
+    },
+    {
+      "id": "publish",
+      "records": [
+        "packaging.jsonl"
+      ],
+      "terminal": false
+    },
+    {
+      "id": "close",
+      "records": [
+        "sessions.json"
+      ],
+      "terminal": false
+    },
+    {
+      "id": "complete",
+      "records": [
+        "driver/instruction.json (kind=done)"
+      ],
+      "terminal": true
+    },
+    {
+      "id": "STOPPED",
+      "records": [
+        "driver/run.json .stop",
+        "owed-decisions.jsonl"
+      ],
+      "terminal": false,
+      "note": "NOT a phase. run.phase keeps its value; run.stop is set. A re-run clears stop and re-enters run.phase. Reachable from every phase."
+    }
+  ],
+  "unmodelled_states": [
+    {
+      "id": "halted-being-repaired",
+      "note": "DECLARED, session 68. While run.stop is set the operator edits files; no step owns those changes, so the next report's files_changed is measured against a baseline_tree that predates them and the tree diff refuses it (RULE.filesChangedOmits). Session 66 hit this. The edge out is `dabbler session rebaseline --reason \"<what was repaired>\"`, valid only while the run carries a stop: it records the absorbed paths to repairs.jsonl, moves baseline_tree, and raises an accountability-signoff decision. It is NOT a phase edge -- the phase and the stop are untouched -- which is why it is here rather than in `transitions`. `session interrupt` also queues against a stopped run (session 63), so the state has a Send channel as well.",
+      "witnesses": [
+        "session.ts rebaseline()",
+        "driver.ts recordRepair()",
+        "drive.ts judge()"
+      ]
+    }
+  ],
+  "transitions": [
+    {
+      "id": "D1",
+      "from": "plan",
+      "to": "plan",
+      "trigger": "work plan absent or unreadable",
+      "actor": "engine",
+      "observed_by": "driver/plan.json exists and validates",
+      "guard": "readWorkPlan() !== null",
+      "guard_owner": "engine",
+      "timeout": null,
+      "bound": "MAX_REJECTIONS=3 rejections then Stop(rejected-thrice)",
+      "writes": [
+        "driver/instruction.json",
+        "driver/run.json"
+      ],
+      "source": "drive.ts phasePlan",
+      "exercised": false
+    },
+    {
+      "id": "D2",
+      "from": "plan",
+      "to": "steps",
+      "trigger": "work plan accepted and declaration made",
+      "actor": "framework",
+      "observed_by": "driver/plan.json validated against driver-work-plan.schema.json; declare() exit 0",
+      "guard": "plan validates; declare() returns EXIT_OK",
+      "guard_owner": "framework",
+      "timeout": null,
+      "writes": [
+        "sessions.json (task declaration)",
+        "driver/run.json"
+      ],
+      "source": "drive.ts phasePlan -> setPhase('steps')",
+      "exercised": true
+    },
+    {
+      "id": "D3",
+      "from": "plan",
+      "to": "STOPPED(engine)",
+      "trigger": "declare() refused",
+      "actor": "framework",
+      "observed_by": "exit code of declare()",
+      "guard": null,
+      "timeout": null,
+      "source": "drive.ts phasePlan",
+      "exercised": false
+    },
+    {
+      "id": "D4",
+      "from": "steps",
+      "to": "steps",
+      "trigger": "a step's report is refused",
+      "actor": "engine",
+      "observed_by": "report.json + git tree diff + each check's exit code",
+      "guard": "report.seq==instruction.seq AND report.step_id==spec.id AND files_changed == tree diff (modulo session bookkeeping) AND every check exits 0",
+      "guard_owner": "framework (tree and checks) + engine (seq/step naming)",
+      "timeout": null,
+      "bound": "MAX_REJECTIONS=3 then Stop(rejected-thrice)",
+      "writes": [
+        "driver/report.json",
+        "driver/run.json"
+      ],
+      "source": "drive.ts askForStep/judge",
+      "exercised": false
+    },
+    {
+      "id": "D5",
+      "from": "steps",
+      "to": "steps",
+      "trigger": "a step's report is accepted",
+      "actor": "framework",
+      "observed_by": "snapshotWorktreeTree becomes the new baseline_tree",
+      "guard": "judge() returned []",
+      "guard_owner": "framework",
+      "timeout": null,
+      "writes": [
+        "driver/run.json accepted_steps, baseline_tree"
+      ],
+      "source": "drive.ts askForStep",
+      "exercised": false
+    },
+    {
+      "id": "D6",
+      "from": "steps",
+      "to": "STOPPED(blocked)",
+      "trigger": "report.status == 'blocked'",
+      "actor": "engine",
+      "observed_by": "self-report",
+      "guard": "none — the engine's word is taken",
+      "guard_owner": "engine",
+      "timeout": null,
+      "source": "drive.ts askForStep",
+      "exercised": true
+    },
+    {
+      "id": "D7",
+      "from": "steps",
+      "to": "preverify",
+      "trigger": "every plan step accepted",
+      "actor": "framework",
+      "observed_by": "loop over plan.steps exhausted",
+      "guard": null,
+      "timeout": null,
+      "source": "drive.ts phaseSteps -> setPhase('preverify')",
+      "exercised": true
+    },
+    {
+      "id": "D8",
+      "from": "preverify",
+      "to": "preverify",
+      "trigger": "targeted suite red; a synthesised 'fix-tests' step is asked and accepted",
+      "actor": "engine",
+      "observed_by": "the suite's own exit code via test-evidence run",
+      "guard": "the job exits 0 for every expensive suite",
+      "guard_owner": "framework",
+      "timeout": null,
+      "bound": "NONE — unbounded cycle; only driver.max_invocations bounds it, and only under push",
+      "source": "drive.ts phasePreverify for(;;)",
+      "exercised": false
+    },
+    {
+      "id": "D9",
+      "from": "preverify",
+      "to": "verify",
+      "trigger": "every expensive suite's targeted run is green and recorded",
+      "actor": "framework",
+      "observed_by": "test-runs.jsonl rows with stage=preverify-targeted, outcome=passed, surfaceDigest==current",
+      "guard": null,
+      "timeout": null,
+      "source": "drive.ts phasePreverify -> setPhase('verify')",
+      "exercised": true
+    },
+    {
+      "id": "D10",
+      "from": "preverify",
+      "to": "STOPPED(tests)",
+      "trigger": "testing.suites/selection malformed, change set unmeasurable, or the run could not be recorded (exit not in {0,1}) Also when the job vanished (a dead pid with no status file) or ended with no exit code.",
+      "actor": "framework",
+      "observed_by": "job exit code",
+      "timeout": null,
+      "source": "drive.ts preverify()",
+      "exercised": false
+    },
+    {
+      "id": "D11",
+      "from": "verify",
+      "to": "run-of-record",
+      "trigger": "dabbler verify exits 0",
+      "actor": "verifier",
+      "observed_by": "rounds.jsonl row with blocking=false",
+      "guard": "the verifier is outside the orchestrator's effective provider",
+      "guard_owner": "framework",
+      "timeout": null,
+      "source": "drive.ts phaseVerify",
+      "exercised": true,
+      "note": "Shares its (from, to) with D40 -- the route that spends no round at all. A phase line cannot tell them apart; the driver says which by logging `verification-passed` or `verification-settled`."
+    },
+    {
+      "id": "D12",
+      "from": "verify",
+      "to": "dispositions",
+      "trigger": "dabbler verify exits 4 (EXIT_BLOCKING)",
+      "actor": "verifier",
+      "observed_by": "exit code 4",
+      "guard": null,
+      "timeout": null,
+      "note": "EXIT_BLOCKING now has ONE producer: a recorded blocking round. terminateAtCap's UNRESOLVED path answers with EXIT_UNRESOLVED (session 68), because it records no round and there is nothing to dispose of -- sharing this code is what made that cap a cycle.",
+      "source": "drive.ts phaseVerify",
+      "exercised": true
+    },
+    {
+      "id": "D13",
+      "from": "verify",
+      "to": "STOPPED(verification)",
+      "trigger": "dabbler verify refuses (exit 2, 3, 6 or 7) for a reason the driver cannot answer, or terminates UNRESOLVED at the cap (exit 5); the stop carries verify's own words Also when the job vanished (a dead pid with no status file) or ended with no exit code.",
+      "actor": "framework",
+      "observed_by": "verify's exit code AND the tail of its job log",
+      "guard": null,
+      "timeout": null,
+      "note": "Reads verify's REASON, not only its exit code (sessions 67 and 68): the stop carries the tail of verify's own log, so two unlike refusals are two unlike stops and the deadlock classifier compares causes. Three of the causes the old single string collapsed now have edges of their own instead: stale preverify evidence heals (D41), a terminal row or a clean at-cap round advances (D40), and the cap-with-unresolvable-findings is exit 5.",
+      "source": "drive.ts phaseVerify (session 68)",
+      "exercised": true
+    },
+    {
+      "id": "D14",
+      "from": "dispositions",
+      "to": "verify",
+      "trigger": "latest round is null or non-blocking",
+      "actor": "framework",
+      "observed_by": "latestRound(repoRoot, session)",
+      "guard": null,
+      "timeout": null,
+      "source": "drive.ts phaseDispositions",
+      "exercised": false
+    },
+    {
+      "id": "D15",
+      "from": "dispositions",
+      "to": "dispositions",
+      "trigger": "the disposition set is refused",
+      "actor": "engine",
+      "observed_by": "driver/dispositions.json validated + evidence paths resolve inside the repo",
+      "guard": "every blocking finding answered (holdDispositionsAgainstRound); reject entries cite resolvable repo paths",
+      "guard_owner": "framework",
+      "timeout": null,
+      "bound": "MAX_REJECTIONS=3 then Stop(rejected-thrice)",
+      "source": "drive.ts phaseDispositions",
+      "exercised": false
+    },
+    {
+      "id": "D16",
+      "from": "dispositions",
+      "to": "fix",
+      "trigger": "at least one disposition is action=fix",
+      "actor": "engine",
+      "observed_by": "self-report (the engine chooses fix vs reject)",
+      "guard": "none on the CHOICE; only on the shape",
+      "guard_owner": "engine",
+      "timeout": null,
+      "source": "drive.ts phaseDispositions",
+      "exercised": true
+    },
+    {
+      "id": "D17",
+      "from": "dispositions",
+      "to": "verify",
+      "trigger": "every disposition is action=reject",
+      "actor": "engine",
+      "observed_by": "self-report",
+      "guard": "each reject cites evidence paths that resolve",
+      "guard_owner": "engine",
+      "timeout": null,
+      "writes": [
+        "disputes.jsonl"
+      ],
+      "source": "drive.ts phaseDispositions",
+      "exercised": false
+    },
+    {
+      "id": "D18",
+      "from": "dispositions",
+      "to": "STOPPED(verification)",
+      "trigger": "recordDispute refused",
+      "actor": "framework",
+      "observed_by": "exit code",
+      "timeout": null,
+      "source": "drive.ts phaseDispositions",
+      "exercised": false
+    },
+    {
+      "id": "D19",
+      "from": "fix",
+      "to": "dispositions",
+      "trigger": "round/disposition set out of step",
+      "actor": "framework",
+      "observed_by": "set.round !== latestRound.round",
+      "timeout": null,
+      "source": "drive.ts phaseFix",
+      "exercised": false
+    },
+    {
+      "id": "D20",
+      "from": "fix",
+      "to": "preverify",
+      "trigger": "the fix step's report is accepted",
+      "actor": "engine",
+      "observed_by": "report + tree diff + every plan step's checks re-run",
+      "guard": "judge() returns []",
+      "guard_owner": "framework",
+      "timeout": null,
+      "note": "The fix step declares files:[] so no must-include check applies; its checks are allPlanChecks().",
+      "source": "drive.ts phaseFix -> setPhase('preverify')",
+      "exercised": true
+    },
+    {
+      "id": "D21",
+      "from": "run-of-record",
+      "to": "land",
+      "trigger": "every expensive suite's full run exits 0",
+      "actor": "framework",
+      "observed_by": "test-runs.jsonl stage=final-full",
+      "timeout": null,
+      "source": "drive.ts phaseRunOfRecord",
+      "exercised": true
+    },
+    {
+      "id": "D22",
+      "from": "run-of-record",
+      "to": "preverify",
+      "trigger": "a full suite fails (exit 1); a 'fix-run-of-record' step is asked and accepted",
+      "actor": "engine",
+      "observed_by": "suite exit code",
+      "timeout": null,
+      "bound": "NONE — unbounded; re-enters verification which may already be at its round cap",
+      "source": "drive.ts phaseRunOfRecord",
+      "exercised": true
+    },
+    {
+      "id": "D23",
+      "from": "run-of-record",
+      "to": "STOPPED(tests)",
+      "trigger": "the run could not be recorded (exit not in {0,1}) Also when the job vanished (a dead pid with no status file) or ended with no exit code.",
+      "actor": "framework",
+      "observed_by": "job exit code",
+      "timeout": null,
+      "source": "drive.ts phaseRunOfRecord",
+      "exercised": false
+    },
+    {
+      "id": "D24",
+      "from": "land",
+      "to": "publish",
+      "trigger": "commit made (or nothing to commit) and push succeeded, or .dabbler/local-only present",
+      "actor": "framework",
+      "observed_by": "git exit codes",
+      "timeout": null,
+      "writes": [
+        "git"
+      ],
+      "source": "drive.ts phaseLand",
+      "exercised": true
+    },
+    {
+      "id": "D25",
+      "from": "land",
+      "to": "STOPPED(land)",
+      "trigger": "commit failed for a reason other than 'nothing to commit', no remote, or the push was refused",
+      "actor": "operator",
+      "observed_by": "git exit code + stderr",
+      "timeout": null,
+      "note": "Resolvable only by a person (add a remote, resolve a non-FF, get permission). No edge asks for one.",
+      "source": "drive.ts phaseLand",
+      "exercised": true
+    },
+    {
+      "id": "D26",
+      "from": "publish",
+      "to": "close",
+      "trigger": "the session's DECLARATION says it is not releasable",
+      "actor": "framework",
+      "observed_by": "sessions.json task declaration, never plan.releasable",
+      "guard": null,
+      "timeout": null,
+      "source": "drive.ts phasePublish (session 68)",
+      "exercised": true,
+      "note": "Reads the DECLARATION, never plan.releasable (session 68). The engine writes the plan and phasePlan turns it into a declaration only when there is not one already, so the two can disagree; one fact has one owner."
+    },
+    {
+      "id": "D27",
+      "from": "publish",
+      "to": "close",
+      "trigger": "dabbler packaging exits 0 (outcome=published)",
+      "actor": "framework+vendor",
+      "observed_by": "packaging.jsonl row with outcome=published",
+      "timeout": null,
+      "source": "drive.ts phasePublish",
+      "exercised": false
+    },
+    {
+      "id": "D28",
+      "from": "publish",
+      "to": "STOPPED(publish)",
+      "trigger": "packaging exits non-zero (refused OR failed) Also when the job vanished (a dead pid with no status file) or ended with no exit code.",
+      "actor": "framework",
+      "observed_by": "exit code only; the reason is not read here",
+      "timeout": null,
+      "note": "The refusal row IS still written to packaging.jsonl -- and since session 68 published_when_releasable demands a row whose outcome is `published`, so a refusal on the record no longer satisfies the gate that exists to prove something shipped. The gate is also an EVIDENCE gate now, which `--force` may not skip.",
+      "source": "drive.ts phasePublish",
+      "exercised": true
+    },
+    {
+      "id": "D29",
+      "from": "close",
+      "to": "complete",
+      "trigger": "dabbler session close exits 0",
+      "actor": "framework",
+      "observed_by": "sessions.json flipped to complete",
+      "guard": "seven close gates pass (see close-gates)",
+      "guard_owner": "framework",
+      "timeout": null,
+      "writes": [
+        "sessions.json",
+        "git commit",
+        "git push",
+        "round refs"
+      ],
+      "source": "drive.ts phaseClose",
+      "exercised": true
+    },
+    {
+      "id": "D30",
+      "from": "close",
+      "to": "STOPPED(close)",
+      "trigger": "the close exits non-zero Also when the job vanished (a dead pid with no status file) or ended with no exit code.",
+      "actor": "framework",
+      "observed_by": "exit code only",
+      "timeout": null,
+      "note": "session close can exit 1 AFTER flipStateToClosed has already run (commit or push failure). The session is then out of flight while run.phase is still 'close'.",
+      "source": "drive.ts phaseClose",
+      "exercised": false
+    },
+    {
+      "id": "D31",
+      "from": "*",
+      "to": "STOPPED(interrupted)",
+      "trigger": "an interrupt request with stop=true is read",
+      "actor": "operator",
+      "observed_by": "driver/interrupt.json",
+      "timeout": null,
+      "note": "Read at three points: the loop's phase boundary (honourPendingStop), withPendingRequest, and the invocation poll every 500ms. Refused by the CLI when the run has already stopped.",
+      "source": "drive.ts loop/withPendingRequest/invoke",
+      "exercised": true
+    },
+    {
+      "id": "D32",
+      "from": "*",
+      "to": "STOPPED(budget)",
+      "trigger": "run.invocations >= run.max_invocations",
+      "actor": "framework",
+      "observed_by": "run.json",
+      "timeout": null,
+      "note": "PUSH ONLY. Under the pull nothing counts, by design (the engine is the operator's own CLI).",
+      "source": "drive.ts invoke",
+      "exercised": true
+    },
+    {
+      "id": "D33",
+      "from": "*",
+      "to": "STOPPED(engine)",
+      "trigger": "the adapter could not run the engine, or the tree could not be snapshotted/diffed",
+      "actor": "framework",
+      "observed_by": "adapter outcome.error / git",
+      "timeout": null,
+      "source": "drive.ts invoke, askForStep, judge",
+      "exercised": false
+    },
+    {
+      "id": "D35",
+      "from": "complete",
+      "to": "complete",
+      "trigger": "pull: a further `next` after the close",
+      "actor": "engine",
+      "observed_by": "instruction.json kind=done",
+      "timeout": null,
+      "source": "drive.ts loop case 'complete'",
+      "exercised": false
+    },
+    {
+      "id": "D40",
+      "from": "verify",
+      "to": "run-of-record",
+      "trigger": "the rounds ledger says no further round may open -- a terminal row stands, or the cap is reached over a non-blocking round -- and the tree is still the verified one",
+      "actor": "framework",
+      "observed_by": "rounds.jsonl, and the close's own verification_clean gate",
+      "guard": "noRoundReason() is terminal-row or cap-clean; checkVerificationClean() passes",
+      "guard_owner": "framework",
+      "timeout": null,
+      "note": "Both of those refusals are instructions to ADVANCE, and reaching them through the job spends a verification round's worth of nothing. A moved tree is the other half: it stops instead, because a repair after the last reviewed round is unreviewed work. It shares its (from, to) with D11, which no phase line can separate, so `exercised` here is read from the driver's own `verification-settled reason=cap-clean` line, which the test that drives it asserts.",
+      "source": "drive.ts phaseVerify -> setPhase('run-of-record') (session 68)",
+      "exercised": true
+    },
+    {
+      "id": "D41",
+      "from": "verify",
+      "to": "preverify",
+      "trigger": "verify refused for want of targeted evidence matching this tree, and the pre-verification phase is what produces it",
+      "actor": "framework",
+      "observed_by": "affected.preverifyGate over the current tree",
+      "guard": "preverifyGate() is not ok, and run.preverify_heals < 2",
+      "guard_owner": "framework",
+      "timeout": null,
+      "bound": "PREVERIFY_HEAL_CAP=2, counted on run.json",
+      "note": "Session 67. Without it the driver stopped in front of its own next move and re-ran verify to the same point forever.",
+      "source": "drive.ts phaseVerify -> setPhase('preverify')",
+      "exercised": true
+    },
+    {
+      "id": "D42",
+      "from": "plan",
+      "to": "STOPPED(rejected-thrice)",
+      "trigger": "no work plan was written after three instructions",
+      "actor": "framework",
+      "observed_by": "run.rejections",
+      "guard": "rejections >= MAX_REJECTIONS",
+      "guard_owner": "framework",
+      "timeout": null,
+      "bound": "MAX_REJECTIONS=3",
+      "note": "Found by the control on its first run: the harvest modelled the three-refusal bound as an annotation on the self-loop and never as the edge it ends in, and the suite drives it. That gap is the whole argument for holding the model to the code.",
+      "source": "drive.ts phasePlan",
+      "exercised": false
+    },
+    {
+      "id": "D43",
+      "from": "steps",
+      "to": "STOPPED(rejected-thrice)",
+      "trigger": "one step's report was refused three times",
+      "actor": "framework",
+      "observed_by": "run.rejections",
+      "guard": "rejections >= MAX_REJECTIONS",
+      "guard_owner": "framework",
+      "timeout": null,
+      "bound": "MAX_REJECTIONS=3",
+      "note": "Found by the control on its first run: the harvest modelled the three-refusal bound as an annotation on the self-loop and never as the edge it ends in, and the suite drives it. That gap is the whole argument for holding the model to the code.",
+      "source": "drive.ts runStep",
+      "exercised": true
+    }
+  ],
+  "not_phase_edges": [
+    {
+      "id": "D36",
+      "from": "<any long-work phase>",
+      "to": "<itself>",
+      "trigger": "the framework's job is still running",
+      "actor": "job",
+      "observed_by": "the presence of <job>.status.json, else pid liveness",
+      "guard": "pollJob !== exited",
+      "guard_owner": "job",
+      "timeout": null,
+      "note": "NO WALL-CLOCK BOUND ANYWHERE. started_at is recorded and never compared to now, so a reused pid reads as 'running' forever: under the pull an infinite sequence of `wait` instructions, under the push an infinite 250ms poll. Session 68 did not close this -- what it added is the watcher's `job-outstanding` rule, which SAYS so (a job past the threshold whose log has stopped growing) without ending anything. The ceiling is carried, see docs/logic-harvest-68.md F7.",
+      "writes": [
+        "driver/instruction.json kind=wait (pull only)"
+      ],
+      "source": "drive.ts longWork, jobs.ts pollJob"
+    },
+    {
+      "id": "D38",
+      "from": "steps|fix",
+      "to": "<same>",
+      "trigger": "an interrupt without stop ends the invocation; the same ask is re-issued as kind=interrupt",
+      "actor": "operator",
+      "observed_by": "driver/interrupt.json",
+      "timeout": null,
+      "note": "PUSH ONLY (there is no invocation to end under the pull; the request is deferred onto the next instruction's reasons).",
+      "source": "drive.ts converse/invoke"
+    },
+    {
+      "id": "D34",
+      "from": "STOPPED",
+      "to": "<the phase it stopped in>",
+      "trigger": "the operator re-runs drive or next",
+      "actor": "operator",
+      "observed_by": "a new process starting",
+      "guard": "engine name on run.json matches, if one is named",
+      "guard_owner": "framework",
+      "timeout": null,
+      "writes": [
+        "run.json stop:=null",
+        "rejections:=0 if the stop was rejected-thrice"
+      ],
+      "note": "THE ONLY EDGE OUT OF STOPPED. Its actor is a person; there is no timer, no retry, no escalation that takes it. The owed decision raised is value-tradeoff class, which does NOT block a close.",
+      "source": "drive.ts register"
+    },
+    {
+      "id": "D39",
+      "from": "STOPPED(deadlock, push)",
+      "to": "STOPPED(deadlock, triaged)",
+      "trigger": "the same kind+step+reason as the previous stop",
+      "actor": "framework",
+      "observed_by": "stop_history[-1] compared field by field",
+      "guard": "previous.kind==kind AND previous.step_id==step_id AND previous.reason==reason",
+      "guard_owner": "framework",
+      "timeout": null,
+      "note": "PUSH ONLY, once per impasse. Two advisers, then the human floor. The comparison is on the UNDECORATED reason (fixed in 66), and since sessions 67 and 68 the reasons it compares are verify's own words rather than one wrapper -- so two different causes no longer read as one impasse.",
+      "writes": [
+        "run.json triage",
+        "owed-decisions.jsonl"
+      ],
+      "source": "drive.ts loop catch, climbLadder"
+    }
+  ],
+  "coverage": {
+    "how": "`exercised` is a fact the control proves in both directions, not a hand-maintained hope: on a full run of drive.test.ts the set of edges the driver actually took must equal the set marked true, exactly. An edge that starts being driven fails until it is recorded; an edge that stops being driven fails until it is un-recorded.",
+    "unexercised": "The edges marked false are this model's own finding about the SUITE rather than about the code: nothing drives them today. They are held all the same -- the equality above pins them as not-taken -- so none of them is merely trusted. Closing the gap is test work, and it is named here so it cannot be forgotten."
+  }
+}

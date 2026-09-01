@@ -2961,7 +2961,7 @@ demonstration.*
 
 ---
 
-### Session 65 of 67: The papercuts the trial found
+### Session 65 of 70: The papercuts the trial found
 
 1. Register; declare `--not-releasable`.
 2. **The cursor.** `spawnCheck` and `spawnProgram` in `checks.ts` — the
@@ -3010,7 +3010,7 @@ demonstration.*
 
 ---
 
-### Session 66 of 67: The publish phase, CI's first clean run, and the spinner
+### Session 66 of 70: The publish phase, CI's first clean run, and the spinner
 
 *Widened from "the publish phase" on the operator's call, 2026-09-01: a
 miscellaneous session, because three of the four things in it are small and
@@ -3082,20 +3082,290 @@ the fourth has been red for weeks.*
 
 ---
 
-### Session 67 of 67: The half of the trial that needs a published router
+## Why sessions 67-69 exist: what session 66's own conduct found
+
+*Planned 2026-09-01, between sessions, from three sources rather than one.*
+
+*The first is session 66 itself. Four of its findings were about the
+framework rather than about the work, and every one was found by walking
+into it: `possiblyStalled` reporting a stall through two hours of
+productive work; the driver stopping in `verify` and re-running it forever
+when `verify`'s refusal was "the tree moved, re-record"; a deadlock
+classifier comparing the driver's own wrapper text and so calling two
+unrelated refusals a deadlock; and repairs made during a stop belonging to
+no step, so the report that names them is refused. Three of those are one
+root — the driver treating an exit code as opaque when the process it ran
+printed a specific, routable reason — and they are session 67.*
+
+*The second is that all four are edge-conditions in a state machine nobody
+can currently see whole, which is the case for harvesting it. A logic-tree
+harvest runs beside this repository, outside it, serializing the decision
+machine and putting it to `gpt-5-6-sol` and `gemini-3-1-pro` for the gaps
+they can find without walking into them. Session 68 is what receives that:
+it reconciles the findings against source, fixes what survives, and writes
+the control that keeps the model honest. The fourth defect above is that
+session's, not 67's — "a repair in a state with no edge to record it" is
+the harvest's own question 7, and designing that edge twice is worse than
+designing it once with the critique in hand.*
+
+*The third is the largest csv-model item still unaddressed — the Solution
+Explorer's blindness to a repository that is declared but not on this
+machine, and the operator's own sentence, "once I completed the CSV model,
+I didn't know what to do next." That is session 69.*
+
+*The publication trial moves twice more, for the reason it has always
+moved. Three sessions are inserted ahead of it because each fixes
+something a published framework would otherwise ship with.*
+
+---
+
+### Session 67 of 70: The watcher, and the driver's blind spots
+
+*Planned 2026-09-01 from session 66's own conduct. Three of its four
+framework findings are the same root: the driver treating an exit code as
+opaque when the process it ran printed a specific, routable reason.*
+
+1. Register; declare `--not-releasable`.
+2. **Two workers, not four** (the operator's call, 2026-09-01, after a
+   4-worker run of record made the host unusable and had to be killed).
+   `WORKERS_LOCAL` drops to 2 in `packages/router/vitest.config.ts`, with
+   its test. Measured on the 20-core host, whole suite: 4 workers 106 s
+   wall / 352 s test time, 2 workers 138 s / 262 s. A third more wall
+   clock, and a machine the operator can still type on. `WORKERS_CI` stays
+   1.
+3. **`lastActivityAt` reads the driver's run record.** Measured mid-session
+   66, two hours in with eight steps accepted: `possiblyStalled: true` and
+   `lastActivityAt` frozen at the session registration. It reads the
+   ledger, the activity log and the verification rounds
+   (`packages/router/src/progress.ts`) and never the driver's own files, so
+   every instruction issued, answered and accepted moved nothing it looks
+   at. It reported a stall through the productive stretch and would have
+   looked identical during the forty minutes the engine actually was
+   stopped. It cannot discriminate at all. The threshold and config
+   plumbing around it — `stalled_after_seconds`, `dabbler.stalledAfterSeconds`
+   — are already in place and are reused rather than replaced.
+4. **The watcher line.** The rule that separates the two silences: *an
+   instruction issued, no report answering it, and no tree change since it
+   was issued, past the threshold.* Rendered in the terminal's existing
+   grammar and tone vocabulary — `warn`, the amber the spinner already
+   uses:
+
+       dabbler [06:41:12] watcher since=60s state=instruction-outstanding
+
+   Under the pull no separate process is needed: the terminal already polls
+   the driver directory every 500 ms and `driver/instruction.json` carries
+   `issued_at`, while `driver/report.json` and `run.json` carry the answer
+   side. So this is a new case in `lineTone`, not new rendering machinery
+   and not a new colour constant. A companion process is required only for
+   the headless case, where there is no terminal, and it writes into the
+   run's job stream rather than inventing a second channel — the terminal
+   drains the job directory already.
+
+   Direct observation of the engine's own terminal bytes is **not** a
+   prerequisite and is not in this session. `window.onDidWriteTerminalData`
+   is exactly right and is a proposed API unavailable to a published
+   extension; shell-integration events are stable but an interactive REPL
+   is not a series of shell executions; and owning the pty would cost the
+   "it is their own CLI" property session 62 was built for. Start with the
+   three signals that need no new plumbing.
+
+   **The pattern already exists for jobs.** When session 66's run of record
+   was killed, the driver answered "vanished: nothing is running under pid
+   53672 and it recorded no result" — it checks whether the pid it spawned
+   is alive. The engine is a counterparty it did not spawn, which is the
+   only reason it has no equivalent. This extends that idea; it does not
+   invent one.
+5. **The driver self-heals a stale precondition.** `verify` refuses when
+   the tree moved after the pre-verification evidence was recorded. The
+   driver stops in `verify` and re-runs `verify`, reaching the same point
+   forever, when `phaseRunOfRecord` already shows the move:
+   `setPhase("preverify")`. In session 66 this cost one entire 24-file,
+   687-test cycle and made the operator paste a command by hand — which
+   acceptance criterion 6 of the trial forbids outright.
+6. **The deadlock classifier compares the cause, not the wrapper.** Two
+   genuinely different refusals — a red control, then stale evidence — both
+   arrive inside the driver's identical text (`dabbler verify exited 2 (its
+   reason is above); nothing here can answer it`), so it declared a deadlock
+   between unrelated causes. A deadlock marker that fires on distinct causes
+   tells the operator "running this again changes nothing" when running it
+   again was exactly right. **5 and 6 are one fix**: the driver reading
+   `verify`'s reason instead of only its exit code.
+7. Affected; verify; full suite as `final-full`; close.
+
+**Not in this session:** the fourth finding — repairs made during a stop
+belonging to no step. It is session 68's, and the reason is recorded there.
+
+---
+
+### Session 68 of 70: The logic tree, harvested and held to the code
+
+*The harvest runs outside this repository, beside it, because a session
+was in flight when it started and this repository's close checks for a
+clean tree. This session is what receives it. It is planned before its
+input exists on purpose: the whole point of doing the critique proactively
+is that it lands ahead of the session that acts on it.*
+
+*What the harvest is: the framework's decision machine serialized into one
+model — the phase edges out of `drive.ts`, the stops, the session-status
+machine, rounds and dispositions, packaging's borrowed gates, evidence
+freshness, and the owed-decision classes — annotated with three fields
+that do the actual work. `actor`, who must act for an edge to be taken;
+`timeout`, what happens if that actor never acts, where a null on a
+non-framework actor is a state the machine can sit in forever; and
+`observed_by`, what evidence the transition is judged on, where "the
+actor's own report" means self-attested. That single timeout query would
+have found the stall gap in session 67 without anyone walking into it.*
+
+*What it will not catch, and this must be said to anyone who expects
+otherwise: implementation slips. A model review finds missing and wrong
+edges; it does not find a mistyped mock or an off-by-one count. Session 66
+produced three of those and the existing machinery caught all three
+cheaply — test selection, a deterministic control before a verifier was
+paid, and the cross-provider verifier. This complements preverify, the
+controls and the verifier. It replaces none of them.*
+
+1. Register; declare `--not-releasable`.
+2. **Reconcile the findings against source before acting on any of them.**
+   Both models will assert things about this codebase that are not true;
+   the harvest's own instructions say so. A finding that does not reproduce
+   is recorded as not reproducing and closed, not quietly dropped. A
+   reviewer that could not rediscover the four known gaps is not
+   calibrated, and its other findings are weighted accordingly.
+3. **The repair that belongs to no step.** Session 66's fourth framework
+   finding, and the harvest's own question 7 asked ahead of time: two files
+   were fixed while the driver was halted, outside any step's boundary; the
+   report omitted them and the driver refused it, correctly, by comparing
+   against the tree. There is a real state — *halted, being repaired* —
+   with real file changes and no reporting edge out of it. Give it one.
+   This is here rather than in 67 because designing that edge twice is
+   worse than designing it once with the critique in hand.
+4. **Whatever else survives review**, sized and ordered by the harvest's
+   own ranking rule: silent-and-plausible above loud-and-severe. The
+   publish gap session 66 closed was dangerous precisely because every gate
+   passed.
+5. **The control that keeps the model honest.** A hand-maintained diagram
+   of a state machine is worse than none: it is trusted and wrong. If the
+   model is adopted into this repository it is held to the code the way the
+   schemas already are — this repository's own `check:types` pattern, where
+   the schema is the source and a control fails when the generated code no
+   longer matches. The equivalent fails when the driver takes an edge the
+   model does not declare, or when a declared edge is never exercised.
+   `drive.test.ts` already drives whole sessions end to end, so the
+   observation point exists. **If the model is not adopted, it is deleted**
+   — there is no third option in which an unheld model stays in the tree.
+6. Affected; verify; full suite as `final-full`; close.
+
+---
+
+### Session 69 of 70: The Solution Explorer goes multi-repository
+
+*The largest unaddressed item from the csv-model feedback (item 8), and the
+answer to the operator's own sentence: "once I completed the CSV model, I
+didn't know what to do next." More of it is built than the feedback
+assumed, so this is an extension rather than a new surface.*
+
+**What exists.** `ProjectionExternal` already carries `root` (where the
+producing repository is on THIS machine, or null), `reason`, `feed`,
+`resolve`, `pins` and drift; `solutionDeps.ts` derives dependencies from
+build files; `usedBy` is derived and never declared, deliberately.
+
+1. Register; declare `--not-releasable`.
+2. **Three location states, not two.** The row renders a binary today —
+   `reachable = Boolean(e.root)`, giving `dabblerExternalHere` and
+   `dabblerExternalAbsent`. That collapses "in a remote that needs cloning"
+   and "nobody has said where this lives" into one word, and the operator
+   asked for both. A known remote that is not cloned is a different state
+   from an undetermined one, and only the second needs a person.
+3. **Actions on an absent one.** `openRepository`, `revealRepository` and
+   `openRepositoryInNewWindow` are all gated on `Here`; `Absent` has no
+   commands at all. Add: identify the remote, point at a local folder,
+   clone a known remote, create a new local repository.
+4. **The upstream direction, without a second declared one.** The operator
+   wants placemarkers in both directions — `this depends on these` and
+   `these depend on this`. `usedBy` is derived precisely because two
+   hand-kept directions disagree eventually and the disagreement is silent.
+   **This is the session's one real design decision**: how a repository that
+   nothing has yet declared a dependency on can appear, without
+   reintroducing the second declared direction. Do not assume it away.
+5. **Shell repositories at planning time.** A multi-repository plan
+   scaffolds the repositories it will need, so finishing one leaves the next
+   one visible rather than leaving the operator to remember it.
+6. Affected; verify; full suite as `final-full`; close.
+
+---
+
+### Session 70 of 70: The half of the trial that needs a published router
 
 *Runs when the operator decides to publish, at whatever version is current
 then — and not before. It is not blocked and nothing waits on it: the
 extension bundles the router, so everything being tested runs from the
 `.vsix`. What needs the public registry is this session's own check, which
 asks `registry.npmjs.org` what it serves and cannot ask anything else. It
-was 52, then 53, then 54, then 65, moving back a number each time a
-session was inserted ahead of it. Placing it last was supposed to end
-that and did not: the csv-model trial found work that has to precede a
-publication, so it moved once more, to 67. That is the right reason to
-move it — the alternative was publishing a router whose driven lifecycle
-cannot publish — but the claim that the renumbering was over was wrong
-when it was written, and this says so rather than quietly restating it.*
+was 52, then 53, then 54, then 65, then 67, moving back each time a
+session was inserted ahead of it, and it is now 70. Placing it last was
+supposed to end that and did not, and the section that claimed the
+renumbering was over was wrong when it was written. It will keep moving
+for as long as the reason keeps being true — each of 67, 68 and 69 fixes
+something a published framework would otherwise ship with — and that is
+the right trade, stated plainly rather than quietly restated.*
+
+---
+
+## Candidate: the run of record moves to CI
+
+*The operator's proposal, 2026-09-01, discussed while session 66's run of
+record executed. **Not scheduled**, and recorded here rather than in a
+scratch directory so it survives.*
+
+**Why it fits.** CI already runs exactly the two suites the run of record
+consists of (`npm run test:unit -w dabbler-ai-router` and the extension
+suite), so coverage is not the question.
+
+**The design, which resolves the trunk-based tension.** Two things that look
+like one: WHEN master receives the commit, and WHEN the record claims the
+session verified. The standing directive constrains only the first.
+
+- `land` pushes to master, unchanged.
+- `run-of-record` becomes a `wait` on the CI run for that exact SHA.
+- A new close gate `run_of_record_green` reads the CI conclusion —
+  structurally identical to `published_when_releasable` reading the
+  packaging record, which session 66 proved out.
+
+Master briefly holds a commit whose full suite has not finished, but the
+ledger never says `VERIFIED` until CI confirms, and a red CI leaves the
+session open on a failing gate rather than closing on a false claim.
+
+**Evidence anchoring is stronger, not weaker.** Today `test-evidence record`
+binds to `surfaceDigest`, a worktree hash, and trusts whatever command ran
+on the operator's machine. A CI result binds to `head_sha` and is checkable:
+the run's SHA, its conclusion, and that the workflow file is the committed
+one.
+
+**The wait is the engine-watcher problem again** — a counterparty the
+framework did not spawn, needing a timeout and a liveness rule. Whatever
+session 67 builds for the engine should be the same machinery.
+
+**Honest accounting, which sets the priority.** Session 66 ran roughly six
+full-ish suites; only ONE was the run of record. The other five were
+preverify cycles, and preverify cannot move to CI — it gates verification,
+which happens before the push, so shipping it there would mean pushing
+unverified work in progress. This proposal removes about a sixth of the
+local load. The other five-sixths came from three stops each invalidating
+the evidence, one of which was pure waste (the stale-evidence stop). That is
+session 67 item 5, and it is the bigger lever.
+
+**Costs to weigh.** `WORKERS_CI` is 1, so CI is slower in wall clock than a
+local run at 2 — it is simply not the operator's CPU. Windows runners bill
+at 2x on private repositories. A repository with no remote, or one marked
+`.dabbler/local-only`, cannot do this at all, so it must be configurable
+with a local fallback.
+
+**An extension of it, also unscheduled:** push a scratch branch for
+preverify too and observe the result, which defeats the "preverify gates
+verification, which precedes the push" objection above. Both this and the
+proposal need CI's trigger widened beyond `master`, both are
+per-repository escape hatches rather than defaults, and `--shard` is what
+would make CI faster than local rather than slower.
 
 1. Register; declare `--not-releasable`.
 2. **One version** (the operator's directive, 2026-08-31, after an install

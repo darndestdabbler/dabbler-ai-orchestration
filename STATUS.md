@@ -1,4 +1,4 @@
-# STATUS — 66 of 69 closed. Next: 67, the watcher and the driver blind spots
+# STATUS — 66 of 70 closed. Next: 67, the watcher and the driver blind spots
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
 `experiment/verification-pipeline-v3` and `design/solution-decomposition`
@@ -6,13 +6,26 @@ are merged and finished. Earlier handoff text is in `docs/status-archive.md`.
 
 > **Recorded, 2026-09-01, after sessions 65 and 66 — the csv-model
 > papercuts, the publish gap, and CI's first green run in weeks.** Both
-> closed `VERIFIED` in two rounds each. **The ledger still says 67 total and
-> `session-plan.md` still ends at 67.** Session 67 renumbers it: its first
-> step pastes the drafted sections for 67 and 68 and moves the publication
-> trial to 69. Those drafts are in
-> `C:	empdabbler-logic-harvestplan-67-68-69.md`, outside this repository
-> because a session was in flight when they were written. Register 67 with
-> `--total-sessions 69`.
+> closed `VERIFIED` in two rounds each. **The plan now runs to 70 and the
+> renumbering is landed**, as a doc-only commit between sessions on the
+> operator's call, 2026-09-01: 67 is the watcher and the driver's blind
+> spots, 68 is the logic-tree harvest and the control that holds it to the
+> code, 69 is the Solution Explorer going multi-repository, and the
+> publication trial is 70. **Register 67 with `--total-sessions 70`.**
+>
+> Landing it here rather than inside session 67 was deliberate, and it
+> avoids repeating a defect the ledger already carries: `healTitle` protects
+> the stored title of any session that has run, so a planning session that
+> renumbers its own plan registers under the *outgoing* title and keeps it
+> forever. That is why the ledger's row for session 65 reads "The half of
+> the trial that needs a published router" when 65 was the papercuts — it
+> registered before its own amendment landed. Session 67 will now register
+> under the title the plan already declares. The 65 row is wrong on the
+> record and is not hand-editable — `owed` has no `raise` verb, only `list`
+> and `answer`, so nothing outside a session can file it. **Session 68
+> records it as a decision**: whether a title frozen at registration should
+> follow a plan the same session renumbered, or whether the record is right
+> to keep what it stored and only the projection should say so.
 >
 > **Session 65 — the papercuts the csv-model trial found.** `windowsHide` on
 > the two spawn paths in `checks.ts` (the console windows that stole the
@@ -65,7 +78,8 @@ are merged and finished. Earlier handoff text is in `docs/status-archive.md`.
 > `--force` (same-version republish leaves seats stale) and the window
 > reloaded.
 >
-> **Four framework defects found by walking into them, all queued for 67.**
+> **Four framework defects found by walking into them; (1)–(3) are session
+> 67 and (4) is session 68.**
 > (1) `lastActivityAt` never reads the driver's run record, so
 > `possiblyStalled` was `true` through two hours of productive work and
 > would have looked identical during the forty minutes the engine actually
@@ -78,7 +92,10 @@ are merged and finished. Earlier handoff text is in `docs/status-archive.md`.
 > Repairs made during a stop belong to no step, so a report omits them and
 > is refused — there is a real state (halted, being repaired) with no
 > reporting edge out of it. (2) and (3) are one fix: the driver reading
-> `verify`'s reason rather than only its exit code.
+> `verify`'s reason rather than only its exit code. (4) is session 68's
+> rather than 67's because it is the harvest's own question 7 — a repair in
+> a state with no edge to record it — and designing that edge twice is
+> worse than designing it once with the critique in hand.
 >
 > **Test load is a live operator concern.** A 4-worker run of record made
 > the host unusable mid-session and had to be killed; the run was redone at
@@ -99,15 +116,20 @@ are merged and finished. Earlier handoff text is in `docs/status-archive.md`.
 > verification, which precedes the push" objection. Both need CI's trigger
 > widened beyond `master`, both are per-repository escape hatches rather
 > than defaults, and `--shard` is what makes CI faster than local rather
-> than slower. Full write-up, with the accounting, in
-> `C:\temp\dabbler-logic-harvest\plan-67-68-69.md`.
+> than slower. The write-up, with the accounting, is now in
+> `docs/sessions/session-plan.md` under "Candidate: the run of record moves
+> to CI", after session 70 — it was in a scratch directory and would have
+> gone with it.
 >
 > **Running in parallel, outside this repository.** A logic-tree harvest:
 > serialize the framework's decision machine and have `gpt-5-6-sol` and
 > `gemini-3-1-pro` critique it for gaps proactively. Plan and the watcher
-> specification are in `C:\temp\dabbler-logic-harvest\`. It targets the
-> state-machine gaps, not implementation slips — say so to anyone who
-> expects it to replace preverify or the verifier.
+> specification are in `C:\temp\dabbler-logic-harvest\`, driven by a second
+> engine beside this repository and read-only against it. **Session 68 is
+> what receives it**, and that session — not the harvest — decides whether
+> the model is adopted, and writes the control that holds it to the code if
+> it is. It targets the state-machine gaps, not implementation slips — say
+> so to anyone who expects it to replace preverify or the verifier.
 
 > **Recorded, 2026-09-01, after session 64 — the deck exists.** Closed
 > `VERIFIED` in two rounds. `docs/onboarding/dabbler-onboarding.pptx`,

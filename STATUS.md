@@ -1,8 +1,59 @@
-# STATUS — 69 of 70 closed. Next: 70, the publication trial
+# STATUS — 70 of 72 closed. Next: 71, green CI; then 72, the publication trial
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
 `experiment/verification-pipeline-v3` and `design/solution-decomposition`
 are merged and finished. Earlier handoff text is in `docs/status-archive.md`.
+
+> **Session 70 — one version, and the trial written down before it runs.
+> CLOSED `VERIFIED` in two rounds, 2026-09-01 (`e453bb58`).** Driven from my
+> own CLI; zero engine invocations.
+>
+> **READ THIS FIRST: `Test` is red and has been since session 66 — twelve
+> consecutive runs — and both release workflows are gated on a green `Test`
+> for the tagged commit, so NOTHING CAN BE PUBLISHED until it passes.** The
+> cause is one bug, and the runner's own log carries both halves of the
+> evidence: `os.tmpdir()` hands the fixtures the 8.3 short form
+> (`C:\Users\RUNNER~1\...`) while `git rev-parse --show-toplevel` answers with
+> the long one (`C:/Users/runneradmin/...`). `gates.ts:sessionsRel` computes
+> `relative(root, sessionsDir)` from those two unresolved spellings, so
+> `setRel` is nonsense, the bookkeeping exclusion never matches, and
+> `docs/sessions/sessions.json` counts as the session's own work — every test
+> that declares a task list fails with *the working tree already carries 1
+> change(s)*. It is green here because this machine's temp path has no short
+> form. **Session 71 is that fix**, and `resolvedPath` already exists in
+> `gates.ts` to expand it; check every other caller that compares a path
+> against git's answer.
+>
+> **The plan's precondition for the trial was not met and could not be met.**
+> Nothing is published: `registry.npmjs.org` has never served
+> `dabbler-ai-router`, there is no `v2.*` or `vsix-v2.*` tag, and no
+> `publication` brief had been raised. Nor could this session publish:
+> `dabbler release` refuses a tree that is not clean and a driven tree is
+> dirty until its land phase, **so the session that changes the version can
+> never be the session that tags it**. That is `dabbler.yaml`'s own model — a
+> session prepares a release, a tag push makes it — and the trial is now
+> session 72, after the fix and after the operator answers.
+>
+> **One version, 2.8.0, stamped from one source.** `version.json` is the
+> source; `npm run stamp:version` writes it into both manifests, the
+> extension's dependency on the router and the lock file; `npm run
+> check:version` fails on a stale one; and `releaseVersion` in `cli/release.ts`
+> refuses to tag against a stale manifest, naming the file and the command.
+> The first draft was one number in two manifests plus an equality check, and
+> the verifier was right to call that a merge nothing stamps: it would come
+> apart on the next bump. 2.8.0 rather than 2.7.0 because 65–69 landed after
+> 2.7.0 was set and nothing was ever published as 2.7.0.
+>
+> **`docs/field-trial-70.md` is the trial, written before it is run** —
+> criteria 1, 2 and 5 with their expected answers stated first, so the
+> acceptance run is a test rather than a demonstration. **Criterion 5 is
+> satisfied rather than restated**: all nine `csv-model` feedback items now
+> carry a linked test (four written here — the icon geometry, the Solution
+> Explorer's welcome, per-subcommand `--help`, and the file the freshness
+> gate's remediation names) or, for item 5 alone, a dated deferred issue
+> owned by the operator, closing on the recorded verification session 72 runs.
+>
+> The extension is **2.8.0** and unpublished, as is the router.
 
 > **Session 69 — the round cap, and the Solution Explorer across
 > repositories. CLOSED `VERIFIED` in two rounds, 2026-09-01 (`24e4fa5e`).**

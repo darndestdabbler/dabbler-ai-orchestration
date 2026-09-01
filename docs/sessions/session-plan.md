@@ -2961,7 +2961,7 @@ demonstration.*
 
 ---
 
-### Session 65 of 71: The papercuts the trial found
+### Session 65 of 72: The papercuts the trial found
 
 1. Register; declare `--not-releasable`.
 2. **The cursor.** `spawnCheck` and `spawnProgram` in `checks.ts` — the
@@ -3010,7 +3010,7 @@ demonstration.*
 
 ---
 
-### Session 66 of 71: The publish phase, CI's first clean run, and the spinner
+### Session 66 of 72: The publish phase, CI's first clean run, and the spinner
 
 *Widened from "the publish phase" on the operator's call, 2026-09-01: a
 miscellaneous session, because three of the four things in it are small and
@@ -3119,7 +3119,7 @@ something a published framework would otherwise ship with.*
 
 ---
 
-### Session 67 of 71: The watcher, and the driver's blind spots
+### Session 67 of 72: The watcher, and the driver's blind spots
 
 *Planned 2026-09-01 from session 66's own conduct. Three of its four
 framework findings are the same root: the driver treating an exit code as
@@ -3197,7 +3197,7 @@ belonging to no step. It is session 68's, and the reason is recorded there.
 
 ---
 
-### Session 68 of 71: The logic tree, harvested and held to the code
+### Session 68 of 72: The logic tree, harvested and held to the code
 
 *The harvest runs outside this repository, beside it, because a session
 was in flight when it started and this repository's close checks for a
@@ -3257,7 +3257,7 @@ controls and the verifier. It replaces none of them.*
 
 ---
 
-### Session 69 of 71: The round cap stops being typeable, and the Solution Explorer goes multi-repository
+### Session 69 of 72: The round cap stops being typeable, and the Solution Explorer goes multi-repository
 
 *Mostly the largest unaddressed item from the csv-model feedback (item 8),
 and the answer to the operator's own sentence: "once I completed the CSV
@@ -3328,7 +3328,7 @@ build files; `usedBy` is derived and never declared, deliberately.
 
 ---
 
-### Session 70 of 71: The half of the trial that needs a published router
+### Session 70 of 72: The half of the trial that needs a published router
 
 > **Amended by session 70 itself, 2026-09-01, and the section below is left
 > as it was written.** What it asks for could not run: nothing is published
@@ -3343,8 +3343,8 @@ build files; `usedBy` is derived and never declared, deliberately.
 > 2026-09-01 put the CI fix in front of them: `Test` has been red on every
 > run since session 66, which blocks publication outright because the release
 > workflows are gated on a green run for the tagged commit. **The CI fix runs
-> next**, described below; it becomes session 71 and the trial becomes 72 when
-> the amendment lands after this close.
+> next**, as session 71; the trial is session 72. Both were numbered by the
+> doc-only commit that followed this session's close.
 
 *Runs when the operator decides to publish, at whatever version is current
 then — and not before. It is not blocked and nothing waits on it: the
@@ -3445,13 +3445,12 @@ the reason to do it once testing is finished rather than to unblock a row.
 
 ---
 
-## Next, and ahead of the trial: green CI, because nothing can be published until it is
+### Session 71 of 72: Green CI, because nothing can be published until it is
 
-*Written by session 70 on the operator's call, 2026-09-01, and **numbered by
-the amendment that lands immediately after that session closes** — the same
-doc-only commit between sessions that renumbered 65–70, because a session
-that renumbers the plan it is running against registers under the outgoing
-title and keeps it. It becomes session 71 and the trial below becomes 72.*
+*Written by session 70 on the operator's call, 2026-09-01, and numbered by
+this doc-only commit immediately after that session closed — the same way
+65–70 were renumbered, because a session that renumbers the plan it is
+running against registers under the outgoing title and keeps it forever.*
 
 *`Test` has failed on every push since session 66 — twelve consecutive runs —
 and both release workflows are gated on a green `Test` for the tagged commit,
@@ -3487,7 +3486,7 @@ form and red on every runner.
 
 ---
 
-### Session 71 of 71: The trial against what the registry actually serves
+### Session 72 of 72: The trial against what the registry actually serves
 
 *Added by session 70, on the rule session 50 set: a trial with no route to
 fix what it finds is a demonstration. Session 70 found its own precondition

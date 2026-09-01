@@ -1,0 +1,163 @@
+name: Require green Test run
+description: >-
+  Release gate: refuses to proceed until the Test workflow
+  (.github/workflows/test.yml) has a SUCCESSFUL run for the given
+  commit. Waits while the newest run for the commit is queued or in
+  progress (the common case: the operator pushes master and tags
+  immediately, while Test is still running); fails on a completed
+  non-success conclusion or when no run appears before the deadline.
+  Operator-decided release prerequisite, 2026-06-12 — adopted the same
+  day the Test workflow reached its first-ever green run (27420899764)
+  after the Layer-3 repair; releases previously gated only on the
+  local suites + operator UAT, which let a permanently-red CI mask
+  regressions.
+
+  Set 110 S4 — the gate now separates an INFRASTRUCTURE failure from a
+  TEST failure. A GitHub Actions `major_outage` held a release whose
+  full suite had already run green locally: three distinct provider
+  faults ("Failed to resolve action download info / Service
+  Unavailable", "The job was not acquired by Runner of type hosted",
+  "The hosted runner lost communication with the server") each read to
+  this gate as an ordinary red, and a job that had been green an hour
+  earlier went red without a line of its code changing. Being unable to
+  ship because the provider is down is not a safety property. Genuine
+  test failures are still refused, with or without the override.
+inputs:
+  sha:
+    description: Commit SHA that must have a green Test run.
+    required: true
+  timeout-minutes:
+    description: >-
+      How long to keep waiting for an in-flight (or not-yet-visible)
+      Test run before failing. A full Test run takes ~12 minutes.
+    required: false
+    default: "25"
+  infra-override-sha:
+    description: >-
+      Operator authorization to tolerate INFRASTRUCTURE-ONLY failures for
+      exactly one commit. Must equal `sha` to take effect — it is a
+      per-release authorization, not a switch, so a repository variable
+      left set cannot silently disable the gate for every future release.
+      Genuine test failures are refused even when this matches.
+    required: false
+    default: ""
+  infra-override-reason:
+    description: >-
+      Why the override was authorized (e.g. a githubstatus.com incident
+      link). Required when infra-override-sha matches; recorded in the
+      job summary so the decision is auditable after the fact.
+    required: false
+    default: ""
+runs:
+  using: composite
+  steps:
+    - name: Wait for a successful Test run
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        SHA: ${{ inputs.sha }}
+        TIMEOUT_MINUTES: ${{ inputs.timeout-minutes }}
+        OVERRIDE_SHA: ${{ inputs.infra-override-sha }}
+        OVERRIDE_REASON: ${{ inputs.infra-override-reason }}
+      run: |
+        set -euo pipefail
+
+        # GitHub-generated messages that mean "the provider failed", not
+        # "your code failed". Matched against a job's failure annotations.
+        # This is a DENYLIST and the gate is fail-closed: a red job whose
+        # annotations match nothing here is treated as a real failure.
+        infra_signature='Failed to resolve action download info|Service Unavailable|was not acquired by Runner|lost communication with the server|received a shutdown signal'
+
+        classify_run() {
+          # Emits one line per non-success job: "<verdict>\t<name>\t<detail>"
+          local run_id="$1" jobs ids id name conclusion ann msg setup_failed
+          jobs="$(gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}/jobs?per_page=100")"
+          ids="$(jq -r '.jobs[]
+                        | select(.conclusion != null and .conclusion != "success" and .conclusion != "skipped")
+                        | "\(.id)\t\(.name)\t\(.conclusion)"' <<<"$jobs")"
+          [ -z "$ids" ] && return 0
+          while IFS=$'\t' read -r id name conclusion; do
+            [ -z "${id:-}" ] && continue
+            ann="$(gh api "repos/${GITHUB_REPOSITORY}/check-runs/${id}/annotations" 2>/dev/null || echo '[]')"
+            msg="$(jq -r '[.[] | select(.annotation_level=="failure") | .message] | join(" | ")' <<<"$ann")"
+            # A job that died before running a single step is infrastructure
+            # by construction, whatever it did or did not annotate.
+            setup_failed="$(jq -r --arg id "$id" '
+              .jobs[] | select((.id|tostring)==$id)
+              | [.steps[]? | select(.name=="Set up job" and .conclusion=="failure")] | length' <<<"$jobs")"
+            if [ "${setup_failed:-0}" != "0" ] || { [ -n "$msg" ] && grep -qE "$infra_signature" <<<"$msg"; }; then
+              printf 'INFRA\t%s\t%s\n' "$name" "${msg:-failed during job setup}"
+            else
+              printf 'REAL\t%s\t%s\n' "$name" "${msg:-see job log}"
+            fi
+          done <<<"$ids"
+        }
+
+        deadline=$(( SECONDS + 60 * TIMEOUT_MINUTES ))
+        echo "Release gate: requiring a successful 'Test' workflow run for commit ${SHA}."
+        while :; do
+          resp="$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/test.yml/runs?head_sha=${SHA}&per_page=5")"
+          total="$(jq -r '.total_count' <<<"$resp")"
+          if [ "$total" -eq 0 ]; then
+            echo "No Test run found for ${SHA} yet. (Test runs on pushes to master - is the tagged commit on master?)"
+          else
+            # Newest run first. A re-run of a failed Test flips the same
+            # run object back to in_progress, so a fix-in-flight is
+            # naturally waited on rather than read as the old failure.
+            status="$(jq -r '.workflow_runs[0].status' <<<"$resp")"
+            conclusion="$(jq -r '.workflow_runs[0].conclusion' <<<"$resp")"
+            url="$(jq -r '.workflow_runs[0].html_url' <<<"$resp")"
+            run_id="$(jq -r '.workflow_runs[0].id' <<<"$resp")"
+            echo "Latest Test run for ${SHA}: status=${status} conclusion=${conclusion:-n/a} (${url})"
+            if [ "$status" = "completed" ]; then
+              if [ "$conclusion" = "success" ]; then
+                echo "Gate satisfied: Test is green for ${SHA}."
+                exit 0
+              fi
+
+              echo "Test is red. Classifying each failed job as INFRA or REAL..."
+              verdicts="$(classify_run "$run_id" || true)"
+              echo "${verdicts:-<no non-success jobs found>}"
+              real_count="$(grep -c '^REAL' <<<"${verdicts:-}" || true)"
+
+              if [ "${real_count:-0}" -gt 0 ]; then
+                echo "::error::Test concluded '${conclusion}' for ${SHA} with ${real_count} GENUINE job failure(s) - refusing to publish. The infrastructure override does not apply to these. Fix (or re-run) Test to green for this commit, then RE-RUN THIS WORKFLOW RUN - no tag re-push needed."
+                exit 1
+              fi
+
+              # Every red job is a known provider fault from here down.
+              if [ "$OVERRIDE_SHA" != "$SHA" ]; then
+                echo "::error::Test concluded '${conclusion}' for ${SHA}, and every failed job looks like GitHub INFRASTRUCTURE rather than a test failure. Re-run Test once the provider recovers (https://www.githubstatus.com). If it must ship now, set repository variable RELEASE_INFRA_OVERRIDE_SHA='${SHA}' and RELEASE_INFRA_OVERRIDE_REASON='<incident link>', then re-run this workflow."
+                exit 1
+              fi
+              if [ -z "$OVERRIDE_REASON" ]; then
+                echo "::error::RELEASE_INFRA_OVERRIDE_SHA matches ${SHA} but RELEASE_INFRA_OVERRIDE_REASON is empty. An override without a recorded reason is not auditable; set the reason and re-run."
+                exit 1
+              fi
+
+              echo "::warning::RELEASE GATE OVERRIDDEN for ${SHA}: every failed Test job classified as GitHub infrastructure. Reason: ${OVERRIDE_REASON}"
+              {
+                echo "### :warning: Release gate overridden (infrastructure-only failures)"
+                echo ""
+                echo "- **Commit:** \`${SHA}\`"
+                echo "- **Test run:** ${url} (concluded \`${conclusion}\`)"
+                echo "- **Reason:** ${OVERRIDE_REASON}"
+                echo ""
+                echo "Jobs tolerated as infrastructure:"
+                echo ""
+                echo '```'
+                echo "${verdicts}"
+                echo '```'
+                echo ""
+                echo "No job was classified REAL - a genuine test failure is refused even with the override set."
+                echo "Clear \`RELEASE_INFRA_OVERRIDE_SHA\` after this release; it authorizes exactly this commit."
+              } >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+          fi
+          if [ "$SECONDS" -ge "$deadline" ]; then
+            echo "::error::Timed out after ${TIMEOUT_MINUTES} minutes waiting for a successful Test run for ${SHA}."
+            exit 1
+          fi
+          sleep 30
+        done

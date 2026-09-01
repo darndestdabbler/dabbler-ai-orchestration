@@ -14,7 +14,9 @@
     "lint": "node packages/router/scripts/run-ts.mjs packages/router/scripts/workspace-check.ts lint",
     "test": "npm run test:unit --workspaces --if-present",
     "generate:types": "npm run generate:types -w dabbler-ai-router",
-    "check:types": "node packages/router/scripts/run-ts.mjs packages/router/scripts/check-types-fresh.ts"
+    "check:types": "node packages/router/scripts/run-ts.mjs packages/router/scripts/check-types-fresh.ts",
+    "stamp:version": "node packages/router/scripts/run-ts.mjs packages/router/scripts/stamp-version.ts",
+    "check:version": "node packages/router/scripts/run-ts.mjs packages/router/scripts/stamp-version.ts --check"
   },
   "devDependencies": {
     "pptxgenjs": "^4.0.1"

@@ -1,4 +1,6 @@
 import * as assert from "assert";
+import * as fs from "fs";
+import * as path from "path";
 import {
   ICON_FILES,
   sessionDisplayNumber,
@@ -17,6 +19,30 @@ suite("sessionsModel: the operator's status icons", () => {
       "not-started": "not-started.svg",
       cancelled: "cancelled.svg",
     });
+  });
+
+  test("every status icon is sixteen PIXELS, which is what a tree row draws", () => {
+    // csv-model's first feedback item: the eight SVGs declared `width="16mm"`
+    // -- Inkscape's default unit -- and a tree row drew them at sixty pixels,
+    // cropped to a line through the row. The unit is the whole defect, and
+    // nothing downstream can notice it: the row asks for a 16px slot and the
+    // renderer scales whatever it is handed.
+    for (const theme of ["dark", "light"]) {
+      for (const file of Object.values(ICON_FILES)) {
+        const svg = fs.readFileSync(
+          path.resolve(__dirname, "..", "..", "..", "media", theme, file),
+          "utf8",
+        );
+        const width = /\bwidth="([^"]+)"/.exec(svg)?.[1];
+        const height = /\bheight="([^"]+)"/.exec(svg)?.[1];
+        assert.strictEqual(width, "16", `${theme}/${file} declares width="${width}"`);
+        assert.strictEqual(height, "16", `${theme}/${file} declares height="${height}"`);
+        assert.ok(
+          /viewBox="0 0 16 16"/.test(svg),
+          `${theme}/${file} has no 16x16 viewBox to scale from`,
+        );
+      }
+    }
   });
 });
 

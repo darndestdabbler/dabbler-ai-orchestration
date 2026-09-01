@@ -244,6 +244,20 @@ describe("verification_clean", () => {
     expect(row?.inapplicable).toBe(true);
     expect(row?.remediation).toContain("no suite is declared");
   });
+
+  it("names the file the operator edits, and never the packaged layer beneath it", () => {
+    // csv-model's seventh feedback item: the gate said to fix the suites in
+    // `router-config.yaml`, the packaged layer no project should be opening,
+    // so following the remediation led nowhere. The PATH is what is asserted
+    // here rather than the sentence around it -- the path is the whole use.
+    const { sessionsDir } = makeSandboxRepo();
+    const row = runGates(sessionsDir, {
+      config: { testing: { suites: [{ name: "typescript" }] } } as never,
+    }).find((entry) => entry.name === "test_run_fresh");
+    expect(row?.passed).toBe(false);
+    expect(row?.remediation).toContain("dabbler.yaml");
+    expect(row?.remediation).not.toContain("router-config.yaml");
+  });
 });
 
 describe("working_tree_clean", () => {

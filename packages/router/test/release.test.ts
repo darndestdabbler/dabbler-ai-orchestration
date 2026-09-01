@@ -11,7 +11,12 @@ import { join } from "node:path";
 
 import { afterAll, describe, expect, it } from "vitest";
 
-import { packageVersion, tagsFor } from "../src/cli/release.ts";
+import {
+  canonicalVersion,
+  packageVersion,
+  releaseVersion,
+  tagsFor,
+} from "../src/cli/release.ts";
 import {
   ID_PUBLICATION,
   answerOwed,
@@ -23,7 +28,7 @@ import { makeSandboxRepo, makeTempDir, removeTempDirs } from "./support/fixtures
 
 afterAll(removeTempDirs);
 
-const VERSIONS = { router: "2.0.0", extension: "2.0.0" } as const;
+const VERSION = "2.0.0";
 
 describe("what an answer means", () => {
   it("tags the router before the extension", () => {
@@ -31,23 +36,23 @@ describe("what an answer means", () => {
     // half is missing is the broken half-release: somebody installs the
     // extension, it cannot resolve what it wraps, and the failure looks like
     // the extension's.
-    expect(tagsFor("publish", VERSIONS)).toEqual(["v2.0.0", "vsix-v2.0.0"]);
+    expect(tagsFor("publish", VERSION)).toEqual(["v2.0.0", "vsix-v2.0.0"]);
   });
 
   it("rehearses the npm half only, and says so", () => {
     // NOT "the whole path": it never touches the Marketplace, and calling it
     // that is how an operator following the recommendation ends up with a
     // product still returning 404.
-    expect(tagsFor("release-candidate", VERSIONS)).toEqual(["v2.0.0-rc1"]);
+    expect(tagsFor("release-candidate", VERSION)).toEqual(["v2.0.0-rc1"]);
   });
 
   it("tags nothing at all for an answer that declines", () => {
-    expect(tagsFor("not yet", VERSIONS)).toEqual([]);
+    expect(tagsFor("not yet", VERSION)).toEqual([]);
   });
 
   it("tags nothing for an answer nobody offered", () => {
     // A vocabulary this does not know is not a licence to guess at a release.
-    expect(tagsFor("ship it", VERSIONS)).toEqual([]);
+    expect(tagsFor("ship it", VERSION)).toEqual([]);
   });
 });
 
@@ -65,6 +70,64 @@ describe("reading what would ship", () => {
 
   it("reports a package it cannot read rather than inventing a version", () => {
     expect(packageVersion(makeTempDir(), "packages/router/package.json")).toBeNull();
+  });
+
+  it("takes the version from version.json and refuses a manifest that is stale", () => {
+    // An install showed router 2.0.0 beside extension 2.7.0 -- two things
+    // where the operator has one. npm and the Marketplace each need a
+    // literal version in their own manifest, so ONE SOURCE means one file
+    // that declares it and a stamping step that writes it everywhere;
+    // `release` asks whether that stamping is current before it tags.
+    const root = makeTempDir();
+    const write = (rel: string, doc: unknown): void => {
+      const path = join(root, ...rel.split("/"));
+      mkdirSync(join(path, ".."), { recursive: true });
+      writeFileSync(path, JSON.stringify(doc), "utf8");
+    };
+    const stamped = (
+      canonical: string,
+      router: string,
+      extension: string,
+      dependency: string,
+    ): void => {
+      write("version.json", { version: canonical });
+      write("packages/router/package.json", { name: "dabbler-ai-router", version: router });
+      write("tools/dabbler-ai-orchestration/package.json", {
+        version: extension,
+        dependencies: { "dabbler-ai-router": dependency },
+      });
+    };
+
+    stamped("2.8.0", "2.8.0", "2.8.0", "2.8.0");
+    expect(releaseVersion(root)).toEqual({ version: "2.8.0", reason: "" });
+
+    // A manifest left behind by a bump: named, with the command that fixes it.
+    stamped("2.8.0", "2.0.0", "2.8.0", "2.8.0");
+    expect(releaseVersion(root).version).toBeNull();
+    expect(releaseVersion(root).reason).toContain("stamp:version");
+
+    // And the dependency, EXACTLY: the extension bundles the router, so a
+    // range that merely contains the number is not this version being named.
+    stamped("2.8.0", "2.8.0", "2.8.0", "^2.0.0");
+    expect(releaseVersion(root).version).toBeNull();
+    stamped("2.8.0", "2.8.0", "2.8.0", "12.8.0");
+    expect(releaseVersion(root).version).toBeNull();
+    write("tools/dabbler-ai-orchestration/package.json", { version: "2.8.0" });
+    expect(releaseVersion(root).version).toBeNull();
+  });
+
+  it("has one version in this repository, and every manifest carries it", () => {
+    // The control that keeps the merge merged after the session that made
+    // it: it reads the repository itself, so a half-stamped release is a red
+    // suite rather than two artifacts nobody can say the version of.
+    const here = join(import.meta.dirname, "..", "..", "..");
+    const agreed = releaseVersion(here);
+    expect(agreed.reason).toBe("");
+    expect(agreed.version).toBe(canonicalVersion(here));
+    expect(tagsFor("publish", agreed.version ?? "")).toEqual([
+      `v${agreed.version}`,
+      `vsix-v${agreed.version}`,
+    ]);
   });
 });
 

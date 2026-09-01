@@ -107,6 +107,35 @@ suite("ActionRegistry: package.json menu registry", () => {
     }
   });
 
+  test("the Solution Explorer says what it is for, and offers a way in", () => {
+    // csv-model's fourth feedback item: the view's purpose was unclear, and
+    // an empty tree said nothing at all. What answers it is a welcome the
+    // reader sees BEFORE there is anything to render -- so it is a
+    // contribution, and a contribution nothing asserts is one a refactor
+    // drops silently.
+    const welcomes = (
+      manifest.contributes as unknown as {
+        viewsWelcome?: Array<{ view: string; contents: string }>;
+      }
+    ).viewsWelcome ?? [];
+    const solution = welcomes.find((entry) => entry.view === "dabblerSolutionTree");
+    assert.ok(solution, "the Solution Explorer contributes no welcome");
+    // What it is FOR, in the terms the feedback item asked for: what the
+    // view shows, and who is affected when one of those things changes.
+    // "solution" alone would pass on the view's own name, which is the
+    // sentence the item called unclear in the first place.
+    for (const promise of [/built FROM/i, /components/i, /promises|breaks|changes/i]) {
+      assert.ok(
+        promise.test(solution.contents),
+        `the welcome does not say what the view is for (${promise})`,
+      );
+    }
+    assert.ok(
+      /\(command:[a-zA-Z.]+\)/.test(solution.contents),
+      "the welcome offers no command, so an empty view is a dead end",
+    );
+  });
+
   test("every act- token in package.json maps back to a registry action", () => {
     const known = new Set(
       [...REPOSITORY_ACTIONS, ...SESSION_ACTIONS].map((a) => actionToken(a)),

@@ -2961,7 +2961,7 @@ demonstration.*
 
 ---
 
-### Session 65 of 70: The papercuts the trial found
+### Session 65 of 71: The papercuts the trial found
 
 1. Register; declare `--not-releasable`.
 2. **The cursor.** `spawnCheck` and `spawnProgram` in `checks.ts` — the
@@ -3010,7 +3010,7 @@ demonstration.*
 
 ---
 
-### Session 66 of 70: The publish phase, CI's first clean run, and the spinner
+### Session 66 of 71: The publish phase, CI's first clean run, and the spinner
 
 *Widened from "the publish phase" on the operator's call, 2026-09-01: a
 miscellaneous session, because three of the four things in it are small and
@@ -3119,7 +3119,7 @@ something a published framework would otherwise ship with.*
 
 ---
 
-### Session 67 of 70: The watcher, and the driver's blind spots
+### Session 67 of 71: The watcher, and the driver's blind spots
 
 *Planned 2026-09-01 from session 66's own conduct. Three of its four
 framework findings are the same root: the driver treating an exit code as
@@ -3197,7 +3197,7 @@ belonging to no step. It is session 68's, and the reason is recorded there.
 
 ---
 
-### Session 68 of 70: The logic tree, harvested and held to the code
+### Session 68 of 71: The logic tree, harvested and held to the code
 
 *The harvest runs outside this repository, beside it, because a session
 was in flight when it started and this repository's close checks for a
@@ -3257,7 +3257,7 @@ controls and the verifier. It replaces none of them.*
 
 ---
 
-### Session 69 of 70: The round cap stops being typeable, and the Solution Explorer goes multi-repository
+### Session 69 of 71: The round cap stops being typeable, and the Solution Explorer goes multi-repository
 
 *Mostly the largest unaddressed item from the csv-model feedback (item 8),
 and the answer to the operator's own sentence: "once I completed the CSV
@@ -3328,7 +3328,23 @@ build files; `usedBy` is derived and never declared, deliberately.
 
 ---
 
-### Session 70 of 70: The half of the trial that needs a published router
+### Session 70 of 71: The half of the trial that needs a published router
+
+> **Amended by session 70 itself, 2026-09-01, and the section below is left
+> as it was written.** What it asks for could not run: nothing is published
+> — `registry.npmjs.org` has never served `dabbler-ai-router`, there is no
+> `v2.*` or `vsix-v2.*` tag, and no `publication` brief had been raised — and
+> the session that changes the version cannot be the session that tags it,
+> because `dabbler release` refuses a tree that is not clean and a driven
+> tree is dirty until its land phase. So 70 did item 2 (one version, 2.8.0,
+> stamped from `version.json`), wrote the trial down before it is run
+> (`docs/field-trial-70.md`), and satisfied criterion 5 with a control per
+> feedback item. **Items 3 and 4 moved**, and the operator's call on
+> 2026-09-01 put the CI fix in front of them: `Test` has been red on every
+> run since session 66, which blocks publication outright because the release
+> workflows are gated on a green run for the tagged commit. **The CI fix runs
+> next**, described below; it becomes session 71 and the trial becomes 72 when
+> the amendment lands after this close.
 
 *Runs when the operator decides to publish, at whatever version is current
 then — and not before. It is not blocked and nothing waits on it: the
@@ -3426,6 +3442,95 @@ CI has published the tagged versions, and `dabbler release
 --verify-install` passes. Neither is this session's to arrange, and the
 first is the operator's alone — publishing cannot be recalled, which is
 the reason to do it once testing is finished rather than to unblock a row.
+
+---
+
+## Next, and ahead of the trial: green CI, because nothing can be published until it is
+
+*Written by session 70 on the operator's call, 2026-09-01, and **numbered by
+the amendment that lands immediately after that session closes** — the same
+doc-only commit between sessions that renumbered 65–70, because a session
+that renumbers the plan it is running against registers under the outgoing
+title and keeps it. It becomes session 71 and the trial below becomes 72.*
+
+*`Test` has failed on every push since session 66 — twelve consecutive runs —
+and both release workflows are gated on a green `Test` for the tagged commit,
+so the publication cannot happen at all until this is fixed. It is one bug,
+and the evidence is in the runner's own log.*
+
+**What it is.** The Windows runner hands `os.tmpdir()` the 8.3 short form,
+`C:\Users\RUNNER~1\AppData\Local\Temp\…`, while `git rev-parse
+--show-toplevel` answers with the long form,
+`C:/Users/runneradmin/AppData/Local/Temp/…`. `gates.ts:sessionsRel` computes
+`relative(root, sessionsDir)` from those two unresolved spellings, so
+`setRel` is nonsense, the bookkeeping exclusion
+(`path.startsWith(setRel + "/")`) never matches, and `docs/sessions/
+sessions.json` counts as the session's own work. Every test that declares a
+task list then fails with *the working tree already carries 1 change(s)* —
+which is why the suite is green on a machine whose temp path has no short
+form and red on every runner.
+
+1. Register; declare `--not-releasable`. **Its precondition is the trial's
+   too:** the session below cannot run until this one has made `Test` green,
+   because a tag pushed against a red run publishes nothing.
+2. Resolve both sides before comparing them, in the one place that computes
+   a sessions-relative path, and check every other caller that compares a
+   path against `git`'s answer for the same mismatch. `resolvedPath` already
+   exists in `gates.ts` and expands the short form.
+3. A test that reproduces the mismatch without a runner: a sessions
+   directory spelled differently from git's own answer must still have its
+   bookkeeping excluded. A fix whose only proof is a green CI run is a fix
+   nothing holds afterwards.
+4. Push, watch `Test`, and do not close on a red run: the point of the
+   session is the green one.
+5. Affected; verify; full suite as `final-full`; close.
+
+---
+
+### Session 71 of 71: The trial against what the registry actually serves
+
+*Added by session 70, on the rule session 50 set: a trial with no route to
+fix what it finds is a demonstration. Session 70 found its own precondition
+unmet — `dabbler-ai-router` has never been served by `registry.npmjs.org`,
+there is no `v2.*` or `vsix-v2.*` tag, and no `publication` brief had been
+raised — and found that it could not meet it either. `dabbler release`
+refuses to tag a working tree that is not clean, and a driven session's tree
+carries its own uncommitted steps until the land phase, so **the session that
+changes the version can never be the session that tags it**. That is
+`dabbler.yaml`'s own model — a session prepares a release, a tag push makes
+it — rather than a defect, and this session is where the other half runs.*
+
+**Precondition, and the only one:** the operator has answered the
+`publication` brief on the tree session 70 landed, the framework has pushed
+`v2.8.0` and `vsix-v2.8.0`, and CI's tag-driven workflows have published
+both. The answer is the operator's alone; publishing cannot be recalled.
+
+1. Register; declare `--not-releasable`. This repository declares no
+   `packaging` block on purpose — its two artifacts go out through the
+   tag-driven pipelines, so a releasable session here would fail packaging
+   for a release it did not make.
+2. **The steps that touch the registry come FIRST, before any edit**, which
+   is the same constraint session 70 hit from the other side: a step that
+   writes a file dirties the tree, and `dabbler release` will not run
+   against a dirty one. `dabbler release --verify-install` is a step
+   **check** rather than something reported in prose — the real
+   `npm i -g dabbler-ai-router` from the public registry into a throwaway
+   prefix, exit 0 or the step fails. The install IS the record.
+3. **Acceptance criteria 1 and 2**, performed by the operator from a clean
+   VS Code profile with the extension installed from the Marketplace and a
+   fresh clone of `csv-model` open, answering from visible UI only. The
+   expected answers are written down in `docs/field-trial-70.md` before the
+   run, which is what makes it a test rather than a demonstration: the
+   Solution Explorer rendering the pipeline's repositories with drift and
+   the three location states, and the Work Explorer showing completed,
+   current and planned sessions with the in-flight session's tasks moving.
+4. **Close item 5 of the feedback audit on the verification**, not on a
+   session number: `npm i -g dabbler-ai-router` fails is the one of the nine
+   that no test can hold, and the recorded install is what closes it.
+5. Record what the trial found in `docs/field-trial-70.md`, and amend the
+   plan again with anything that needs a session of its own. A finding that
+   survives being acted on is worth more than one that was written down.
+6. Affected; verify; full suite as `final-full`; close.
 
 ---
 

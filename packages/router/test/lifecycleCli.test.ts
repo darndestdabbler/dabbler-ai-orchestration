@@ -66,6 +66,23 @@ describe("dabbler session, the whole surface", () => {
     expect(result.err).toContain("is not a subcommand");
   });
 
+  it("answers --help on a SUBCOMMAND with that subcommand's own arguments", async () => {
+    // csv-model's sixth feedback item. `--help` was read by the option
+    // parser as a flag expecting a value, so the one way to discover a
+    // subcommand's arguments was to run it bare and read a refusal -- which
+    // names what is required and never what is optional.
+    for (const [subcommand, flag, expected] of [
+      ["start", "--help", "--engine"],
+      ["declare", "-h", "--releasable"],
+      ["plan", "--help", "--max-rounds"],
+    ] as const) {
+      const result = await captured(() => sessionVerb([subcommand, flag]));
+      expect(result.code).toBe(0);
+      expect(result.out).toContain(expected);
+      expect(result.err).not.toContain("expected one argument");
+    }
+  });
+
   it("runs the close read-only under --dry-run", async () => {
     const { sessionsDir } = makeSandboxRepo();
     registerSessionStart(sessionsDir, 1, { engine: "claude-code" });

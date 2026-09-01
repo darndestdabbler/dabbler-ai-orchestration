@@ -167,6 +167,30 @@
         "icon": "$(multiple-windows)"
       },
       {
+        "command": "dabblerSolution.identifyRemote",
+        "title": "Say Where This Repository Is (Remote)",
+        "category": "Dabbler",
+        "icon": "$(link)"
+      },
+      {
+        "command": "dabblerSolution.locateRepository",
+        "title": "Point at a Local Folder",
+        "category": "Dabbler",
+        "icon": "$(folder)"
+      },
+      {
+        "command": "dabblerSolution.cloneRepository",
+        "title": "Clone This Repository",
+        "category": "Dabbler",
+        "icon": "$(cloud-download)"
+      },
+      {
+        "command": "dabblerSolution.createRepository",
+        "title": "Create This Repository",
+        "category": "Dabbler",
+        "icon": "$(new-folder)"
+      },
+      {
         "command": "dabbler.stopDrive",
         "title": "Stop Driven Session",
         "category": "Dabbler",
@@ -279,6 +303,26 @@
           "command": "dabblerSolution.revealRepository",
           "when": "view == dabblerSolutionTree && viewItem == dabblerExternalHere",
           "group": "1_open@3"
+        },
+        {
+          "command": "dabblerSolution.cloneRepository",
+          "when": "view == dabblerSolutionTree && viewItem == dabblerExternalRemote",
+          "group": "2_place@1"
+        },
+        {
+          "command": "dabblerSolution.locateRepository",
+          "when": "view == dabblerSolutionTree && viewItem =~ /^dabblerExternal(Remote|Unknown)$/",
+          "group": "2_place@2"
+        },
+        {
+          "command": "dabblerSolution.identifyRemote",
+          "when": "view == dabblerSolutionTree && viewItem == dabblerExternalUnknown",
+          "group": "2_place@3"
+        },
+        {
+          "command": "dabblerSolution.createRepository",
+          "when": "view == dabblerSolutionTree && viewItem == dabblerExternalUnknown",
+          "group": "2_place@4"
         }
       ],
       "dabblerWorkExplorer.openFile": [

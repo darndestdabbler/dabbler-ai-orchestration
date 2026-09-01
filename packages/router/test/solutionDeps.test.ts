@@ -4,7 +4,7 @@
 // EDGE and never the pin, it reads build files without building them, and
 // every disagreement it finds is reported rather than repaired.
 
-import { mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { afterAll, describe, expect, it } from "vitest";
@@ -14,7 +14,10 @@ import {
   SolutionDepsError,
   UNREADABLE_ID,
   assembleSolution,
+  declarablePath,
+  declareProducerLocation,
   producedBySolution,
+  scaffoldMember,
   loadDeps,
   locateProducer,
   readBuildReferences,
@@ -558,5 +561,70 @@ describe("the sibling a declaration cannot name", () => {
     const members = assembleSolution(app);
     const found = reconcileAcrossRepositories(members, producedBySolution(members));
     expect(found.some((f) => f.kind === "version-disagreement")).toBe(true);
+  });
+});
+
+describe("saying where a repository is", () => {
+  it("writes the location a person supplied onto every edge that names it", () => {
+    const root = repoWith({ [DEPS_FILENAME]: DECLARED });
+    const sibling = makeTempDir();
+
+    const after = declareProducerLocation(root, "csv-model", {
+      path: declarablePath(root, sibling),
+      remote: "git@github.com:dabbler/csv-model.git",
+    });
+    expect(after.consumes[0].producedBy.remote).toBe("git@github.com:dabbler/csv-model.git");
+    // Read back through the loader, so what is asserted is a document the
+    // reader accepts rather than the object the writer built.
+    expect(loadDeps(root)?.consumes[0].producedBy.path).toBe(
+      declarablePath(root, sibling),
+    );
+
+    // An id no edge declares is a refusal: writing it would put a producer
+    // in the graph that nothing consumes.
+    expect(() => declareProducerLocation(root, "nobody", { path: "../nobody" })).toThrow(
+      SolutionDepsError,
+    );
+  });
+
+  it("scaffolds a repository that declares only its membership", () => {
+    // The answer to "I finished the model and did not know what was next":
+    // the next repository is visible before it has any content, and it is
+    // visible because it says which solution it is in -- one home, owned by
+    // the repository it describes.
+    const parent = makeTempDir();
+    const created = scaffoldMember(join(parent, "csv-cli"), "csv-pipeline", "csv-cli");
+    const shell = loadDeps(created);
+    expect(shell).toMatchObject({
+      solution: "csv-pipeline",
+      repositoryId: "csv-cli",
+      consumes: [],
+    });
+    expect(existsSync(join(created, ".git"))).toBe(true);
+
+    // Never over a declaration somebody already made.
+    expect(() => scaffoldMember(created, "csv-pipeline", "csv-cli")).toThrow(SolutionDepsError);
+  });
+
+  it("brings a scaffolded member into the graph with nothing depending on it", () => {
+    // The upstream direction, without a second declared one. Nothing
+    // consumes this repository and nothing declares it as a producer; it is
+    // in the solution because it says it is.
+    const parent = makeTempDir();
+    const app = join(parent, "app");
+    mkdirSync(join(app, ".git"), { recursive: true });
+    writeFileSync(
+      join(app, DEPS_FILENAME),
+      JSON.stringify({
+        schemaVersion: 1,
+        solution: "csv-pipeline",
+        repositoryId: "app",
+        consumes: [],
+      }),
+      "utf8",
+    );
+    scaffoldMember(join(parent, "csv-cli"), "csv-pipeline", "csv-cli");
+
+    expect(assembleSolution(app).map((member) => member.id)).toContain("csv-cli");
   });
 });

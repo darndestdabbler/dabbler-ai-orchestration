@@ -630,6 +630,80 @@ export function amendPlanStep(
   return amended;
 }
 
+export interface RoundCapInput {
+  readonly cap: number;
+  readonly reason: string;
+  readonly approver: string;
+}
+
+/**
+ * Move the verification round cap this run verifies under.
+ *
+ * The cap used to come off any `next` call -- `--max-rounds` always won over
+ * the persisted value and recorded nothing -- and it moves in BOTH
+ * directions: a cap at or below the rounds already run ends the loop on the
+ * spot, which is a verification-reducing act. Reachable by anyone who typed
+ * a command, attributable to nobody.
+ *
+ * So it moves here, where the change carries a reason and a name. **This
+ * records a claim; it does not prove an authorisation.** The approver is
+ * whatever the engine writes, and no gate reads it -- a gate that trusted an
+ * engine-written approver would make the authorisation forgeable, which is
+ * worse than absent. What the row buys is that the claim EXISTS, next to the
+ * rounds already run, reviewable at the close, instead of a bare number
+ * appearing on `run.json` with no reason at all.
+ */
+export function amendRoundCap(
+  repoRoot: string,
+  sessionNumber: number,
+  input: RoundCapInput,
+  amendedAt: string,
+): DriverRun {
+  const reason = input.reason.trim();
+  const approver = input.approver.trim();
+  if (reason === "" || approver === "") {
+    throw new LedgerError(
+      "an amendment carries a reason and an approver; a cap moved by nobody, for no " +
+        "stated reason, is the bare number this replaces",
+    );
+  }
+  if (!Number.isInteger(input.cap) || input.cap < 1) {
+    throw new LedgerError(
+      `a round cap is a whole number of rounds, at least one; '${input.cap}' is not`,
+    );
+  }
+  const run = readRun(repoRoot, sessionNumber);
+  if (run === null) {
+    throw new LedgerError(
+      `session ${sessionNumber} was never driven; there is no run whose cap this could move`,
+    );
+  }
+  const before = run.verification?.max_rounds ?? null;
+  const amended = writeRun(repoRoot, sessionNumber, {
+    ...run,
+    verification: {
+      max_rounds: input.cap,
+      transport: run.verification?.transport ?? null,
+    },
+    updated_at: amendedAt,
+  });
+  appendJsonl(amendmentsPath(repoRoot, sessionNumber), {
+    schema_version: DRIVER_SCHEMA_VERSION,
+    session_number: sessionNumber,
+    step_id: null,
+    reason,
+    approver,
+    amended_at: amendedAt,
+    // Beside the change, because a cap is only readable against the rounds
+    // it is being moved past: 4 after three rounds buys a review, and 1
+    // after three ends one.
+    rounds_run: readRounds(repoRoot, sessionNumber).length,
+    before: { max_rounds: before },
+    after: { max_rounds: input.cap },
+  });
+  return amended;
+}
+
 // --- Shaping a report --------------------------------------------------------
 
 /**

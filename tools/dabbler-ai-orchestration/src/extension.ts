@@ -29,6 +29,10 @@ import { RUNS_REL } from "./utils/projection";
 import { SolutionTreeProvider } from "./providers/SolutionTreeProvider";
 import type { SolutionNode } from "./providers/solutionTreeModel";
 import {
+  cloneRepository,
+  createRepository,
+  identifyRemote,
+  locateRepository,
   openRepository,
   openRepositoryInNewWindow,
   openSolutionWorkspace,
@@ -268,6 +272,27 @@ export function activate(context: vscode.ExtensionContext): void {
       "dabblerSolution.revealRepository",
       (node?: SolutionNode) =>
         revealRepository({ node, projection: solutionProvider.currentProjection() }),
+    ),
+    // The four an ABSENT row has: a row that could only say "not on this
+    // machine" is where this journey used to end. Each writes through the
+    // router -- the extension never authors the declaration itself -- and
+    // each refreshes the tree, because the row the operator just acted on is
+    // the one they are looking at.
+    ...(
+      [
+        ["dabblerSolution.identifyRemote", identifyRemote],
+        ["dabblerSolution.locateRepository", locateRepository],
+        ["dabblerSolution.cloneRepository", cloneRepository],
+        ["dabblerSolution.createRepository", createRepository],
+      ] as const
+    ).map(([name, run]) =>
+      vscode.commands.registerCommand(name, (node?: SolutionNode) =>
+        run(
+          productionRouter(),
+          { node, projection: solutionProvider.currentProjection() },
+          () => solutionProvider.refresh(),
+        ),
+      ),
     ),
     vscode.commands.registerCommand("dabblerSessionSets.refresh", () => {
       bindWatchers();

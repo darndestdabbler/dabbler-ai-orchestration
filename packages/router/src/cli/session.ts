@@ -100,7 +100,6 @@ const OPTIONS: Record<string, readonly string[]> = {
     "  --provider PROVIDER      anthropic | openai | google; required with --engine",
     "  --model MODEL            required for a Copilot seat",
     "  --effort EFFORT          optional reasoning effort, recorded with the identity",
-    "  --max-rounds N           the verification round cap, as `dabbler verify` takes it",
     "  --transport T            the verification transport, as `dabbler verify` takes it",
     "",
     "  Stdout carries one thing: the instruction, as driver-instruction JSON. Do what",
@@ -123,7 +122,6 @@ const OPTIONS: Record<string, readonly string[]> = {
     "                           only record it; overrides driver.engine_output",
     "  --max-invocations N      overrides driver.max_invocations for this run; a re-run",
     "                           past a budget stop passes a larger one",
-    "  --max-rounds N           the verification round cap, as `dabbler verify` takes it",
     "  --transport T            the verification transport, as `dabbler verify` takes it",
   ],
   interrupt: [
@@ -156,9 +154,14 @@ const OPTIONS: Record<string, readonly string[]> = {
     "",
     "  `dabbler session plan amend` instead amends ONE not-yet-accepted step of the",
     "  driven work plan -- what the next instruction for it is measured against:",
-    "  --step ID                required: the step to amend",
+    "  --step ID                the step to amend; required unless --max-rounds is given",
     "  --files A,B              the step's files as they should now read, whole",
     "  --checks-file PATH       the step's checks, whole, as JSON: [{\"argv\": [...]}]",
+    "  --max-rounds N           instead of a step: the verification round cap this RUN",
+    "                           verifies under. It is not typeable on `next` or `drive`;",
+    "                           here the change carries a reason, a name and the rounds",
+    "                           already run. No gate reads the approver -- this records a",
+    "                           claim, it does not prove an authorisation",
     "  --reason TEXT            required: why this is the minimal change",
     "  --approver WHO           required: who is answerable for it",
   ],
@@ -211,6 +214,21 @@ interface Parsed {
 }
 
 const SWITCHES = new Set(["--releasable", "--not-releasable", "--dry-run", "--force", "--stop"]);
+
+/**
+ * Why a driving call refuses `--max-rounds` instead of accepting it.
+ *
+ * Refused and not ignored: the parser above takes any `--flag value` pair,
+ * so a removed flag would be dropped in silence, and a cap the operator
+ * believes they set is worse than one they were told they cannot.
+ */
+const CAP_NOT_TYPEABLE =
+  "the verification round cap is not typeable here. It is " +
+  "`verification.settings.max_rounds` in the configuration, and it moves for one run " +
+  'through `dabbler session plan amend --max-rounds <N> --reason "<why>" --approver ' +
+  "<who>` -- which records the claim, the rounds already run and who made it. Typed " +
+  "on a driving call it always won over the persisted value and recorded nothing, in " +
+  "either direction: a cap at or below the rounds already run ends verification.";
 
 function parseArgs(argv: readonly string[]): Parsed | string {
   const values = new Map<string, string>();
@@ -296,8 +314,22 @@ export async function sessionVerb(argv: string[]): Promise<number> {
     const stepId = values.get("--step");
     const reason = values.get("--reason");
     const approver = values.get("--approver");
+    const maxRounds = integer(values.get("--max-rounds"), "--max-rounds");
+    if (typeof maxRounds === "string") {
+      writeErr(`dabbler session plan amend: ${maxRounds}\n`);
+      return EXIT_USAGE;
+    }
+    // The cap belongs to the run, not to a step, and the two are separate
+    // amendments: one moves what a step is measured against, the other how
+    // many reviews the tree may still have.
+    if (maxRounds !== null && stepId !== undefined) {
+      writeErr(
+        "dabbler session plan amend: argument --max-rounds: not allowed with argument --step\n",
+      );
+      return EXIT_USAGE;
+    }
     const missing = [
-      stepId === undefined ? "--step" : null,
+      stepId === undefined && maxRounds === null ? "--step" : null,
       reason === undefined ? "--reason" : null,
       approver === undefined ? "--approver" : null,
     ].filter((flag): flag is string => flag !== null);
@@ -312,12 +344,13 @@ export async function sessionVerb(argv: string[]): Promise<number> {
     }
     const files = values.get("--files");
     return planAmend(sessionsDir, {
-      stepId: stepId as string,
+      stepId: stepId ?? null,
       files:
         files === undefined
           ? null
           : files.split(",").map((entry) => entry.trim()).filter((entry) => entry !== ""),
       checksFile: values.get("--checks-file") ?? null,
+      maxRounds,
       reason: reason as string,
       approver: approver as string,
       sessionNumber,
@@ -403,9 +436,8 @@ export async function sessionVerb(argv: string[]): Promise<number> {
   }
 
   if (subcommand === "next") {
-    const maxRounds = integer(values.get("--max-rounds"), "--max-rounds");
-    if (typeof maxRounds === "string") {
-      writeErr(`dabbler session next: ${maxRounds}\n`);
+    if (values.has("--max-rounds")) {
+      writeErr(`dabbler session next: ${CAP_NOT_TYPEABLE}\n`);
       return EXIT_USAGE;
     }
     return sessionNext(sessionsDir, {
@@ -413,12 +445,17 @@ export async function sessionVerb(argv: string[]): Promise<number> {
       provider: values.get("--provider") ?? null,
       model: values.get("--model") ?? null,
       effort: values.get("--effort") ?? null,
-      maxRounds,
       transport: values.get("--transport") ?? null,
     });
   }
 
   if (subcommand === "drive") {
+    // Before anything else this call requires: a flag that no longer works
+    // is what the person needs told, whatever else they left out.
+    if (values.has("--max-rounds")) {
+      writeErr(`dabbler session drive: ${CAP_NOT_TYPEABLE}\n`);
+      return EXIT_USAGE;
+    }
     const engine = values.get("--engine");
     if (engine === undefined) {
       writeErr("dabbler session drive: the following arguments are required: --engine\n");
@@ -427,11 +464,6 @@ export async function sessionVerb(argv: string[]): Promise<number> {
     const maxInvocations = integer(values.get("--max-invocations"), "--max-invocations");
     if (typeof maxInvocations === "string") {
       writeErr(`dabbler session drive: ${maxInvocations}\n`);
-      return EXIT_USAGE;
-    }
-    const maxRounds = integer(values.get("--max-rounds"), "--max-rounds");
-    if (typeof maxRounds === "string") {
-      writeErr(`dabbler session drive: ${maxRounds}\n`);
       return EXIT_USAGE;
     }
     const showEngine = values.get("--show-engine");
@@ -470,7 +502,6 @@ export async function sessionVerb(argv: string[]): Promise<number> {
       adapter,
       engineOutput: (showEngine as EngineOutput | undefined) ?? null,
       maxInvocations,
-      maxRounds,
       transport: values.get("--transport") ?? null,
     });
   }

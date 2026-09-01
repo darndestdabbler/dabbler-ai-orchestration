@@ -54,6 +54,7 @@ import {
   REPORT_SCHEMA,
   WORK_PLAN_SCHEMA,
   amendPlanStep,
+  amendRoundCap,
   dispositionsPath,
   driverDir,
   planPath,
@@ -1453,10 +1454,16 @@ export function plan(sessionsDir: string, options: PlanCliOptions): number {
 // --- plan amend --------------------------------------------------------------
 
 export interface PlanAmendCliOptions {
-  readonly stepId: string;
+  /** Null when the amendment moves the round cap rather than a step. */
+  readonly stepId: string | null;
   readonly files: readonly string[] | null;
   /** A JSON file holding the step's checks, whole: `[{"argv": [...]}]`. */
   readonly checksFile: string | null;
+  /**
+   * The verification round cap this run should verify under, when that is
+   * what is being amended. It is not typeable anywhere else.
+   */
+  readonly maxRounds: number | null;
   readonly reason: string;
   readonly approver: string;
   readonly sessionNumber?: number | null;
@@ -1483,6 +1490,36 @@ export function planAmend(sessionsDir: string, options: PlanAmendCliOptions): nu
     return EXIT_BOUNDARY;
   }
   const repoRoot = repoRootFromSessionsDir(sessionsDir);
+
+  // The round cap is the one amendable thing that belongs to the RUN rather
+  // than to a step: it is not a bar a step is measured against, it is how
+  // many reviews the tree may still have. Same verb, same reason and same
+  // approver, because it is the same kind of change -- and no gate reads
+  // either one.
+  if (options.maxRounds !== null) {
+    try {
+      const run = amendRoundCap(
+        repoRoot,
+        target,
+        {
+          cap: options.maxRounds,
+          reason: options.reason,
+          approver: options.approver,
+        },
+        nowIso(),
+      );
+      writeOut(
+        `plan amend: the verification round cap for session ${sessionDisplayNumber(target)} is ` +
+          `now ${run.verification?.max_rounds}, amended by ${options.approver.trim()}; the ` +
+          "claim is on the record with the rounds already run, and no gate reads it.\n",
+      );
+      return EXIT_OK;
+    } catch (error) {
+      if (!(error instanceof LedgerError)) throw error;
+      writeErr(`plan amend: refused -- ${error.message}\n`);
+      return EXIT_BOUNDARY;
+    }
+  }
 
   let checks: { argv: string[] }[] | null = null;
   if (options.checksFile !== null) {
@@ -1520,7 +1557,7 @@ export function planAmend(sessionsDir: string, options: PlanAmendCliOptions): nu
       repoRoot,
       target,
       {
-        stepId: options.stepId,
+        stepId: options.stepId as string,
         files: options.files,
         checks,
         reason: options.reason,

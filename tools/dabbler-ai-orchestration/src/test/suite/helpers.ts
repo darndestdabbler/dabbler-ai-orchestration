@@ -8,6 +8,7 @@ import * as path from "path";
 import { outcomeForExitCode } from "dabbler-ai-router";
 import type {
   BootstrapOptions,
+  DepsRepositoryOptions,
   OwedAnswerOptions,
   Router,
   RouterResult,
@@ -203,6 +204,8 @@ export function fakeRouter(
   bootstrapOptions: BootstrapOptions[];
   interruptOptions: SessionInterruptOptions[];
   owedAnswers: OwedAnswerOptions[];
+  /** Which repository each writing `deps` verb was asked about. */
+  depsCalls: { verb: string; options: DepsRepositoryOptions }[];
 } {
   const asked: string[] = [];
   // Recorded, because what bootstrap is ASKED to do is the behaviour some
@@ -214,6 +217,7 @@ export function fakeRouter(
   // And the same for an answered decision: which option the operator chose
   // is the whole behaviour a surface that offers them has.
   const owedAnswers: OwedAnswerOptions[] = [];
+  const depsCalls: { verb: string; options: DepsRepositoryOptions }[] = [];
   const answer = <T,>(verb: string, value: T): Promise<RouterResult<T>> => {
     asked.push(verb);
     const outcome = outcomeForExitCode(exitCode);
@@ -228,6 +232,7 @@ export function fakeRouter(
     bootstrapOptions,
     interruptOptions,
     owedAnswers,
+    depsCalls,
     router: {
       session: {
         start: text("session start"),
@@ -267,6 +272,20 @@ export function fakeRouter(
         answer: (options: OwedAnswerOptions) => {
           owedAnswers.push(options);
           return answer("owed answer", { stdout: message });
+        },
+      },
+      deps: {
+        locate: (options: DepsRepositoryOptions) => {
+          depsCalls.push({ verb: "deps locate", options });
+          return answer("deps locate", { stdout: message });
+        },
+        clone: (options: DepsRepositoryOptions) => {
+          depsCalls.push({ verb: "deps clone", options });
+          return answer("deps clone", { stdout: message });
+        },
+        scaffold: (options: DepsRepositoryOptions) => {
+          depsCalls.push({ verb: "deps scaffold", options });
+          return answer("deps scaffold", { stdout: message });
         },
       },
       ledger: { latestRound: () => answer("ledger latestRound", null) },

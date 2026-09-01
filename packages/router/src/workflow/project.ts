@@ -157,7 +157,13 @@ export function project(root: string): Record<string, unknown> {
     .map((c) => c.name);
   if (head.waitingOn === "developer") waiting.unshift(head.name);
   doc.needsYou = waiting;
-  doc.external = externalComponents(root);
+  // One assembly for both halves of the graph. It reads sibling directories
+  // and every member's build files, and the projection is written on every
+  // recorded event -- doing it twice to answer two questions about the same
+  // reading is a cost with nothing bought.
+  const members = assembleSolution(root);
+  doc.external = externalComponents(root, members);
+  doc.members = solutionMembers(members);
   return doc;
 }
 
@@ -207,8 +213,10 @@ export function tryWriteProjection(root: string): void {
  * pin is behind a release, or that the producer is not on this machine.
  * Nothing here is authored; every field is read.
  */
-export function externalComponents(root: string): Node[] {
-  const members = assembleSolution(root);
+export function externalComponents(
+  root: string,
+  members: SolutionMember[] = assembleSolution(root),
+): Node[] {
   const self = members[0];
   // Every member's OWN edges, and only its own. A→B declared in A and B→C
   // declared in B are two owner-specific facts, and the graph is the union of
@@ -315,6 +323,13 @@ export function externalComponents(root: string): Node[] {
       // Where it is on THIS machine, which is what makes the row navigable.
       // Null is a reported state and not a defect in the declaration.
       root: where.path,
+      // The two ways the declaration names the same repository, published
+      // beside `root` because "not here" is not one state. A known remote
+      // nobody has cloned is a command away; a producer nobody has said
+      // anything about needs a person to answer where it lives. Collapsing
+      // them into one word asks the person in both cases.
+      remote: edge.producedBy.remote ?? null,
+      declaredPath: edge.producedBy.path ?? null,
       reason: where.path === null ? where.reason : where.warning,
       // At most one, ordered by what it costs the reader: a pin behind a
       // release is an upgrade to do, a producer ahead of its releases is not
@@ -335,6 +350,79 @@ export function externalComponents(root: string): Node[] {
             : feed
               ? "feed"
               : null,
+    } satisfies Node);
+  }
+  return rows;
+}
+
+/**
+ * Every repository in this solution, including the ones nothing depends on.
+ *
+ * This is the upstream direction, and it arrives without a second declared
+ * one. The operator asked for placemarkers both ways -- "this depends on
+ * these" and "these depend on this" -- and the obvious way to get the second
+ * is a `usedBy` somebody writes down, which is exactly what this codebase
+ * refuses: two hand-kept directions disagree eventually and the disagreement
+ * is silent.
+ *
+ * So a repository appears here because it declares ITSELF a member: its own
+ * `solution-dependencies.json` names this solution. That is one home for one
+ * fact, owned by the repository the fact is about, and it needs no
+ * permission from anybody -- which is why a repository nothing consumes can
+ * appear at all, and why `dabbler deps scaffold` can put the next one in
+ * front of the operator before it has any content.
+ *
+ * Both dependency directions stay DERIVED from the same declarations:
+ * `provides` is what this repository's own edges take from that member, and
+ * `consumes` is what that member's own edges take from this one. Neither is
+ * stated anywhere; each is read from the repository that owns it.
+ */
+export function solutionMembers(members: SolutionMember[]): Node[] {
+  const self = members[0];
+  const me = self.deps?.repositoryId ?? null;
+  // A remote is declared by whoever names the repository as a producer, so
+  // it is read across every member's edges rather than off the member
+  // itself: a repository does not declare its own remote anywhere.
+  const remotes = new Map<string, string>();
+  for (const member of members) {
+    for (const edge of member.deps?.consumes ?? []) {
+      const remote = edge.producedBy.remote;
+      if (remote && !remotes.has(edge.producedBy.id)) remotes.set(edge.producedBy.id, remote);
+    }
+  }
+
+  const rows: Node[] = [];
+  for (const member of members) {
+    // A second checkout is one member on two branches, and counting it twice
+    // is how a stale clone invents a disagreement nobody has.
+    if (member.duplicateOf !== null) continue;
+    const id = member === self ? (me ?? "(this repository)") : member.id;
+    const theirs = member.deps?.consumes ?? [];
+    rows.push({
+      id,
+      self: member === self,
+      root: member.root,
+      remote: remotes.get(id) ?? null,
+      // What this repository takes from that member, off this repository's
+      // own declaration.
+      provides:
+        member === self
+          ? []
+          : (self.deps?.consumes ?? [])
+              .filter((edge) => edge.producedBy.id === id)
+              .map((edge) => edge.id),
+      // What that member takes from this repository, off ITS declaration.
+      // Empty when this repository states no `repositoryId`: nothing can
+      // name a repository that has not said what it is called.
+      consumes:
+        me === null || member === self
+          ? []
+          : theirs.filter((edge) => edge.producedBy.id === me).map((edge) => edge.id),
+      // A placemarker: it says which solution it is in and nothing else yet.
+      // The state `deps scaffold` leaves behind, and the state a repository
+      // is in for as long as the plan has not reached it.
+      shell: member.deps !== null && theirs.length === 0 && member.refs.length === 0,
+      reason: member.reason,
     } satisfies Node);
   }
   return rows;

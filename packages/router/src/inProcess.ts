@@ -38,6 +38,8 @@ import {
   outcomeForExitCode,
   type AffectedOptions,
   type ApprovedPlanVerbs,
+  type DepsRepositoryOptions,
+  type DepsVerbs,
   type BootstrapOptions,
   type LedgerVerbs,
   type ModuleCreateOptions,
@@ -512,6 +514,36 @@ export class InProcessRouter implements Router {
       optional(args, "--detail", o.detail);
       optional(args, "--allow-full-preverify", o.allowFullPreverify);
       return this.text("test-evidence", args, o.repoRoot);
+    },
+  };
+
+  // --- the solution's other repositories ---------------------------------------
+
+  /**
+   * The three `deps` verbs that WRITE, and the reason they are verbs at all.
+   *
+   * An Explorer row that says "not on this machine" and offers nothing is
+   * where this journey used to end. The alternative to these was the
+   * extension editing `solution-dependencies.json` itself -- a second writer
+   * for a tracked declaration, and the one that could not be schema-checked
+   * on the way out.
+   */
+  public readonly deps: DepsVerbs = {
+    locate: (o: DepsRepositoryOptions) => {
+      const args = ["locate", "--repository", o.repository, ...targetArgs(o)];
+      optional(args, "--path", o.path);
+      optional(args, "--remote", o.remote);
+      return this.text("deps", args, o.repoRoot);
+    },
+    clone: (o: DepsRepositoryOptions) => {
+      const args = ["clone", "--repository", o.repository, ...targetArgs(o)];
+      optional(args, "--path", o.path);
+      return this.text("deps", args, o.repoRoot);
+    },
+    scaffold: (o: DepsRepositoryOptions) => {
+      const args = ["scaffold", "--repository", o.repository, ...targetArgs(o)];
+      optional(args, "--path", o.path);
+      return this.text("deps", args, o.repoRoot);
     },
   };
 

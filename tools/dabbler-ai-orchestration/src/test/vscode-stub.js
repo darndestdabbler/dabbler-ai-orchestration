@@ -175,6 +175,10 @@ const vscodeStub = {
     showErrorMessage: async () => undefined,
     showWarningMessage: async () => undefined,
     showInputBox: async () => undefined,
+    // Session 69: pointing an absent Solution Explorer row at a folder that
+    // is already on this machine. Cancelled by default, like every other
+    // prompt here -- a test that wants an answer supplies one.
+    showOpenDialog: async () => undefined,
     showQuickPick: async () => undefined,
     // Set 079 S2: runs the task immediately with a no-op progress and a
     // never-cancelled token — the seat-setup wrapper's default UI path.

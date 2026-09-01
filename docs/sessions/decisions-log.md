@@ -8439,3 +8439,33 @@ form, and the reason is on the record rather than in an argument. Adopting it
 needs `setPhase` and the `Stop` constructor instrumented so self-loops are
 observable, plus tests for the seventeen driver edges nothing drives. That is a
 session, and it is named as one in `docs/logic-harvest-68.md`.
+
+## Session 69 — The round cap stops being typeable, and the Solution Explorer goes multi-repository
+
+### D254 · 2026-09-01 · Orchestrator (claude-opus-5/anthropic) · In the Solution Explorer, membership is self-declared: a repository appears because its own declaration names the solution, and both dependency directions stay derived
+
+The operator asked for placemarkers in both directions: "this depends on
+these", which the Explorer already renders, and "these depend on this",
+which it cannot. The obvious way to get the second is a declared `usedBy`,
+and this codebase refuses that deliberately -- two hand-kept directions
+disagree eventually and the disagreement is silent.
+
+The rule adopted instead: **a repository appears in the Explorer because it
+declares ITSELF a member of the solution.** Its own
+`solution-dependencies.json` names the solution; that is one home for one
+fact, owned by the repository the fact is about, and it needs nobody else's
+permission. So a repository nothing consumes can appear at all -- which is
+what the upstream direction needed -- without any second declared edge.
+
+Both dependency directions stay derived from the same declarations. A member
+row's `provides` is read from THIS repository's edges; its `consumes` is read
+from THAT member's edges. Neither is stated anywhere, and `usedBy` is
+unchanged.
+
+`dabbler deps scaffold` follows from the rule rather than extending it: a
+shell repository is a directory, a `git init` and the membership declaration,
+and nothing else. No edge, no `produces`, no version -- a scaffold that
+guessed at those would put a claim in the graph that nobody made. It is the
+answer to the operator's own sentence about finishing the CSV model and not
+knowing what came next: the repositories a plan will need are visible before
+they have any content.

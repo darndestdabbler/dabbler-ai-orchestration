@@ -683,6 +683,221 @@ export function sameRepository(left: string, right: string): boolean {
   return normalise(left) === normalise(right);
 }
 
+// --- Writing the declaration ---------------------------------------------------
+
+/**
+ * What `deps locate` says about a producing repository.
+ *
+ * Both fields name the same repository and neither has to be resolvable:
+ * `remote` survives a move and a second clone, `path` is a guess about one
+ * machine. Omitting one leaves what is declared alone; a null clears it.
+ */
+export interface DeclaredLocation {
+  readonly path?: string | null;
+  readonly remote?: string | null;
+}
+
+/**
+ * The one writer for `solution-dependencies.json`.
+ *
+ * The Explorer's answer to "that repository is not on this machine" used to
+ * be a sentence and nothing else -- the operator went to the file manager,
+ * found the checkout and then hand-edited a tracked declaration to say so.
+ * The extension must never author this file (two writers for one fact drift,
+ * and one of them cannot be schema-checked), so the writing happens here and
+ * the surfaces call it.
+ *
+ * Re-validated on the way out. A writer that could emit a document its own
+ * reader refuses would break the repository it meant to repair, and a
+ * declaration is refused whole rather than half-read.
+ */
+export function declareProducerLocation(
+  repoRoot: string,
+  repositoryId: string,
+  where: DeclaredLocation,
+): SolutionDeps {
+  const path = depsPath(repoRoot);
+  if (!existsSync(path)) {
+    throw new SolutionDepsError(
+      `${repoRoot} declares no ${DEPS_FILENAME}; there is no edge here to point anywhere`,
+    );
+  }
+  const document = JSON.parse(readText(path)) as Record<string, unknown>;
+  const consumes = Array.isArray(document["consumes"]) ? document["consumes"] : [];
+  let touched = 0;
+  for (const entry of consumes as Record<string, unknown>[]) {
+    const producer = entry["producedBy"] as Record<string, unknown>;
+    if (producer["id"] !== repositoryId) continue;
+    // Every edge naming this producer, because they are one repository: a
+    // path recorded on one of two edges is a graph that says the same
+    // checkout is both here and nowhere.
+    if (where.path !== undefined) producer["path"] = where.path;
+    if (where.remote !== undefined) producer["remote"] = where.remote;
+    touched += 1;
+  }
+  if (touched === 0) {
+    throw new SolutionDepsError(
+      `no declared edge is produced by '${repositoryId}'; ${DEPS_FILENAME} names ` +
+        ((consumes as Record<string, unknown>[])
+          .map((entry) => `'${String((entry["producedBy"] as Record<string, unknown>)["id"])}'`)
+          .join(", ") || "no producers at all"),
+    );
+  }
+  const failure = schemaFailure(
+    document,
+    loadSchemaFile("solution-dependencies.schema.json"),
+    DEPS_FILENAME,
+  );
+  if (failure) throw new SolutionDepsError(failure);
+  writeFileSync(path, `${JSON.stringify(document, null, 2)}\n`, "utf8");
+  return loadDeps(repoRoot) as SolutionDeps;
+}
+
+/**
+ * Where a path is recorded: relative to this repository, forward slashes.
+ *
+ * Relative because that is what survives moving the whole set of checkouts
+ * together, which is the ordinary thing that happens to them. A path on
+ * another drive has no relative form and is stored as it is.
+ */
+export function declarablePath(repoRoot: string, target: string): string {
+  const relPath = relative(resolve(repoRoot), resolve(target)).replace(/\\/g, "/");
+  return relPath && !isAbsolute(relPath) ? relPath : resolve(target).replace(/\\/g, "/");
+}
+
+/**
+ * Create a repository that only declares its membership.
+ *
+ * A multi-repository plan needs the repositories it has not written yet to be
+ * VISIBLE, or finishing one leaves the operator to remember the next from
+ * nothing. What a shell carries is the one thing membership is made of: the
+ * solution it belongs to and its own stable id. No edge, no `produces`, no
+ * version -- a scaffold that guessed at those would put a declaration in the
+ * graph that nobody made.
+ */
+export function scaffoldMember(
+  root: string,
+  solution: string,
+  repositoryId: string,
+): string {
+  const target = resolve(root);
+  const path = join(target, DEPS_FILENAME);
+  if (existsSync(path)) {
+    throw new SolutionDepsError(
+      `${target} already declares a ${DEPS_FILENAME}; a shell is written only where ` +
+        "there is no declaration to overwrite",
+    );
+  }
+  mkdirSync(target, { recursive: true });
+  if (!existsSync(join(target, ".git"))) {
+    const init = runGit(target, ["init"]);
+    if (init.code !== 0) {
+      throw new SolutionDepsError(
+        `${target} could not be made a git repository: ${init.stderr.trim() || "git init failed"}`,
+      );
+    }
+  }
+  const document = {
+    schemaVersion: 1,
+    solution,
+    repositoryId,
+    consumes: [] as unknown[],
+  };
+  const failure = schemaFailure(
+    document,
+    loadSchemaFile("solution-dependencies.schema.json"),
+    DEPS_FILENAME,
+  );
+  if (failure) throw new SolutionDepsError(failure);
+  writeFileSync(path, `${JSON.stringify(document, null, 2)}\n`, "utf8");
+  return target;
+}
+
+/**
+ * Where this solution's other repositories go on this machine.
+ *
+ * The first declared search path, because that is the first place the
+ * assembly looks: a repository created anywhere else is a checkout the
+ * graph cannot see, which is the state these verbs exist to end.
+ */
+export function memberHome(repoRoot: string, deps: SolutionDeps | null): string {
+  const paths = deps?.searchPaths ?? DEFAULT_SEARCH_PATHS;
+  return resolve(repoRoot, paths[0] ?? "..");
+}
+
+/** What placing a member did: where it is, and whether it was made here. */
+export interface PlacedMember {
+  readonly root: string;
+  /** False when a declaration was already there and was left alone. */
+  readonly created: boolean;
+  /** True when this repository declares an edge to it, now pointing there. */
+  readonly linked: boolean;
+}
+
+/**
+ * Put a repository of this solution on this machine, or find it already there.
+ *
+ * ONE implementation, because there are two callers and they must not
+ * disagree: `dabbler deps scaffold`, which an operator types, and the
+ * driver's own plan phase, which scaffolds the repositories a session's plan
+ * says it will need. A second copy of "where does it go, and does the edge
+ * point at it" would drift, and the drift would be a repository in the graph
+ * twice or in it nowhere.
+ *
+ * An existing declaration is never overwritten: placing a member that is
+ * already there points this repository's edge at it and changes nothing else.
+ */
+export function placeMember(
+  repoRoot: string,
+  repositoryId: string,
+  at: string | null,
+): PlacedMember {
+  const deps = loadDeps(repoRoot);
+  if (deps === null) {
+    throw new SolutionDepsError(
+      `this repository declares no ${DEPS_FILENAME}; there is no solution here to ` +
+        "place a repository in",
+    );
+  }
+  const target = at === null ? join(memberHome(repoRoot, deps), repositoryId) : resolve(repoRoot, at);
+  const created = !existsSync(join(target, DEPS_FILENAME));
+  if (created) scaffoldMember(target, deps.solution, repositoryId);
+  // Only when this repository already declares an edge to it. Placing a
+  // repository does not invent a dependency: what this one takes is declared
+  // by whoever added the edge, and read from the build files.
+  const linked = deps.consumes.some((edge) => edge.producedBy.id === repositoryId);
+  if (linked) {
+    declareProducerLocation(repoRoot, repositoryId, { path: declarablePath(repoRoot, target) });
+  }
+  return { root: resolve(target), created, linked };
+}
+
+/**
+ * Clone a producer's declared remote into the solution's own layout.
+ *
+ * `git clone` and nothing cleverer: the remote is the one way of naming a
+ * repository that survives both a move and a second checkout, so a row that
+ * carries one has everything the clone needs. Where it lands is the first
+ * declared search path, because that is where the assembly already looks.
+ */
+export function cloneMember(repoRoot: string, remote: string, target: string): string {
+  const full = resolve(target);
+  if (existsSync(full)) {
+    throw new SolutionDepsError(
+      `${full} already exists; a clone never writes into a directory that is already there`,
+    );
+  }
+  const parent = dirname(full);
+  mkdirSync(parent, { recursive: true });
+  const cloned = runGit(parent, ["clone", remote, full]);
+  if (cloned.code !== 0) {
+    throw new SolutionDepsError(
+      `${remote} could not be cloned: ${cloned.stderr.trim() || "git clone failed"}`,
+    );
+  }
+  return full;
+}
+
 // --- The solution, assembled ---------------------------------------------------
 
 /** One repository in the assembled graph, and whether it could be read. */

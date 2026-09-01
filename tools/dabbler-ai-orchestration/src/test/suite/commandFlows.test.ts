@@ -8,6 +8,13 @@ import {
 } from "../../commands/cancelLifecycleCommands";
 import { NewModuleUi, runNewModuleFlow } from "../../commands/newModule";
 import {
+  cloneRepository,
+  createRepository,
+  identifyRemote,
+  locateRepository,
+} from "../../commands/openRepository";
+import type { Projection } from "../../providers/solutionTreeModel";
+import {
   SetUpProjectUi,
   offerDeferredStart,
   runSetUpProjectFlow,
@@ -767,4 +774,118 @@ suite("commandFlows: cancel at planning time", () => {
     assert.strictEqual(live?.force, false);
   });
 
+});
+
+suite("placing a repository the Explorer cannot reach", () => {
+  const PROJECTION = {
+    solution: {
+      name: "csv", title: "CSV", step: "contracts", stepTitle: "Contracts",
+      stepNumber: 3, stepCount: 6,
+    },
+    components: [],
+    needsYou: [],
+    external: [
+      {
+        id: "Dabbler.Csv.Model",
+        producedBy: "csv-model",
+        resolve: "feed",
+        root: null,
+        remote: null,
+      },
+    ],
+  } as unknown as Projection;
+
+  const source = {
+    node: { kind: "external" as const, id: "Dabbler.Csv.Model" },
+    projection: PROJECTION,
+  };
+
+  /** The prompts these four ask, answered; restored by the caller. */
+  function answering(answers: {
+    input?: string;
+    folder?: string;
+    confirm?: string;
+  }): () => void {
+    const w = vscode.window as unknown as Record<string, unknown>;
+    const before = {
+      showInputBox: w.showInputBox,
+      showOpenDialog: w.showOpenDialog,
+      showInformationMessage: w.showInformationMessage,
+    };
+    w.showInputBox = async () => answers.input;
+    w.showOpenDialog = async () =>
+      answers.folder ? [{ fsPath: answers.folder }] : undefined;
+    w.showInformationMessage = async () => answers.confirm;
+    const ws = vscode.workspace as unknown as { workspaceFolders?: unknown };
+    const folders = ws.workspaceFolders;
+    ws.workspaceFolders = [{ uri: { fsPath: "D:/ws/csv-app" } }];
+    return () => {
+      Object.assign(w, before);
+      ws.workspaceFolders = folders;
+    };
+  }
+
+  test("each command writes through the router, naming the repository the row is about", async () => {
+    // The extension never authors `solution-dependencies.json` itself: two
+    // writers for one declaration drift, and only one of them can be
+    // schema-checked on the way out.
+    const restore = answering({
+      input: "git@github.com:dabbler/csv-model.git",
+      folder: "D:/repos/csv-model",
+      confirm: "Create",
+    });
+    try {
+      const fake = fakeRouter(0, "done");
+      let refreshed = 0;
+      const refresh = (): void => {
+        refreshed += 1;
+      };
+      await identifyRemote(fake.router, source, refresh);
+      await locateRepository(fake.router, source, refresh);
+      await cloneRepository(fake.router, source, refresh);
+      await createRepository(fake.router, source, refresh);
+
+      assert.deepStrictEqual(
+        fake.depsCalls.map((call) => call.verb),
+        ["deps locate", "deps locate", "deps clone", "deps scaffold"],
+      );
+      // The producer's id off the row, never a path -- the path is the
+      // thing that is missing.
+      assert.ok(fake.depsCalls.every((call) => call.options.repository === "csv-model"));
+      assert.strictEqual(
+        fake.depsCalls[0].options.remote,
+        "git@github.com:dabbler/csv-model.git",
+      );
+      assert.strictEqual(fake.depsCalls[1].options.path, "D:/repos/csv-model");
+      // The row the operator just acted on is the one they are looking at.
+      assert.strictEqual(refreshed, 4);
+    } finally {
+      restore();
+    }
+  });
+
+  test("a cancelled prompt writes nothing, and a refusal does not claim it did", async () => {
+    const restore = answering({});
+    try {
+      const cancelled = fakeRouter(0, "done");
+      await identifyRemote(cancelled.router, source, () => {});
+      await locateRepository(cancelled.router, source, () => {});
+      await createRepository(cancelled.router, source, () => {});
+      assert.deepStrictEqual(cancelled.depsCalls, []);
+
+      // A refusal refreshes nothing: the declaration did not move.
+      const refused = fakeRouter(1, "csv-model declares no remote");
+      let refreshed = 0;
+      await cloneRepository(refused.router, source, () => {
+        refreshed += 1;
+      });
+      assert.deepStrictEqual(
+        refused.depsCalls.map((call) => call.verb),
+        ["deps clone"],
+      );
+      assert.strictEqual(refreshed, 0);
+    } finally {
+      restore();
+    }
+  });
 });

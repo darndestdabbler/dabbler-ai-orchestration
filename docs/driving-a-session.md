@@ -61,12 +61,39 @@ session next` and do what it says until it says `done`.*
   Leave both off on every later call: the session is in flight and its
   identity is on the record.
 
-- `--max-rounds` and `--transport`, if you want them, go on that first
-  call too. They are the *run's*, not the call's: the call that eventually
-  starts verification is whichever `next` happens to reach that phase,
-  following an `answer_command` that names neither, so they are kept on
-  `run.json` and used when the round is finally started. Naming them again
-  on a later call changes them.
+- `--transport`, if you want it, goes on that first call too. It is the
+  *run's*, not the call's: the call that eventually starts verification is
+  whichever `next` happens to reach that phase, following an
+  `answer_command` that names it, so it is kept on `run.json` and used when
+  the round is finally started. Naming it again on a later call changes it.
+
+- **The round cap is not typeable on a driving call.** It is
+  `verification.settings.max_rounds` in the configuration, and `next` and
+  `drive` refuse `--max-rounds` rather than accepting it. It moved in both
+  directions and recorded nothing: a cap at or below the rounds already run
+  ends verification on the spot, which is a verification-reducing act
+  reachable by anyone who typed a command and attributable to nobody.
+
+  For one run it moves through one verb, `session plan amend --max-rounds`:
+
+  ```
+  dabbler session plan amend --sessions-dir docs/sessions \
+      --max-rounds 4 --reason "<why this tree is worth another round>" \
+      --approver <who>
+  ```
+
+  which writes the cap to `run.json` and appends the before, the after, the
+  rounds already run, the reason and the approver to `amendments.jsonl`.
+  **State what that buys and no more.** The approver is whatever the engine
+  writes, so the row is a CLAIM and not proof that anybody authorised
+  anything — and no gate reads it, because a gate that trusted an
+  engine-written approver would make the authorisation forgeable, which is
+  worse than absent. What it buys is that the claim exists, next to the
+  rounds it is being spent past, reviewable at the close, instead of a bare
+  number appearing on `run.json` with no reason at all.
+
+  `dabbler verify --max-rounds` is unchanged: that is the verb's own flag,
+  for a round run by hand outside a driven session.
 
 ## What comes back
 

@@ -76,9 +76,42 @@ export interface ProjectionExternal {
   resolve: string;
   feed?: string | null;
   root?: string | null;
+  /**
+   * The two ways the declaration names the same repository, beside `root`.
+   *
+   * "Not on this machine" is not one state. A known remote is a clone away
+   * and needs nobody; a producer nothing has said anything about needs a
+   * person to answer where it lives. A row that says only "absent" asks the
+   * person in both cases, and offers them nothing to do in either.
+   */
+  remote?: string | null;
+  declaredPath?: string | null;
   reason?: string | null;
   drift?: string | null;
   driftKind?: "behind" | "ahead" | "feed" | "split" | null;
+}
+
+/**
+ * One repository in this solution, whether or not anything depends on it.
+ *
+ * It is here because its own declaration names this solution -- one home for
+ * one fact, owned by the repository the fact is about. That is what makes
+ * the upstream direction renderable without a second declared one: `provides`
+ * is read from THIS repository's edges and `consumes` from that member's,
+ * and neither is stated anywhere (D254).
+ */
+export interface ProjectionMember {
+  id: string;
+  self: boolean;
+  root?: string | null;
+  remote?: string | null;
+  /** What this repository takes from that one. */
+  provides: string[];
+  /** What that one takes from this repository. */
+  consumes: string[];
+  /** It declares its membership and nothing else yet. */
+  shell: boolean;
+  reason?: string | null;
 }
 
 export interface Projection {
@@ -86,6 +119,7 @@ export interface Projection {
   components: ProjectionComponent[];
   needsYou: string[];
   external?: ProjectionExternal[];
+  members?: ProjectionMember[];
 }
 
 /**
@@ -113,7 +147,9 @@ export type SolutionNode =
   | { kind: "externalGroup" }
   | { kind: "external"; id: string }
   | { kind: "externalUsedBy"; id: string }
-  | { kind: "externalConsumer"; id: string; repository: string };
+  | { kind: "externalConsumer"; id: string; repository: string }
+  | { kind: "memberGroup" }
+  | { kind: "member"; id: string };
 
 export interface RowDescriptor {
   id: string;
@@ -145,6 +181,49 @@ function externals(p: Projection): ProjectionExternal[] {
   return p.external ?? [];
 }
 
+function members(p: Projection): ProjectionMember[] {
+  return p.members ?? [];
+}
+
+/** Where a producing repository is, as three states rather than two. */
+export type ExternalLocation = "here" | "remote" | "unknown";
+
+/**
+ * The one rule that decides it, and the one the context values follow.
+ *
+ * `root` is where the repository is on THIS machine. Without one, a declared
+ * remote is the difference between a clone away and a question for a person
+ * -- and only the second is something nobody can act on alone. A single
+ * "absent" collapsed the two and offered an action for neither.
+ */
+export function externalLocation(e: ProjectionExternal): ExternalLocation {
+  if (e.root) return "here";
+  return e.remote ? "remote" : "unknown";
+}
+
+const LOCATION_CONTEXT: Record<ExternalLocation, string> = {
+  here: "dabblerExternalHere",
+  remote: "dabblerExternalRemote",
+  unknown: "dabblerExternalUnknown",
+};
+
+/**
+ * What the row says about a state that is not `here`.
+ *
+ * `unknown` covers two shapes and must not claim more than it knows: a
+ * producer nothing has said anything about, and one whose declared path is
+ * not there. The second was DECLARED -- wrongly, or on another machine --
+ * and telling the reader nobody said where it lives sends them looking for
+ * a declaration that already exists.
+ */
+function locationNote(e: ProjectionExternal, at: ExternalLocation): string {
+  if (at === "here") return "";
+  if (at === "remote") return "not cloned here";
+  return e.declaredPath
+    ? `declared at ${e.declaredPath}, which is not there`
+    : "nobody has said where this lives";
+}
+
 export function childrenOf(node: SolutionNode, p: Projection): SolutionNode[] {
   switch (node.kind) {
     case "solution": {
@@ -155,10 +234,16 @@ export function childrenOf(node: SolutionNode, p: Projection): SolutionNode[] {
       // Only when there is something to say. An empty folder is a row the
       // reader has to open to learn nothing.
       if (externals(p).length > 0) own.push({ kind: "externalGroup" });
+      // The repositories, which is not the same list: a member nothing
+      // consumes has no external row at all, and it is the one the operator
+      // most needs to see -- the next repository the plan will need.
+      if (members(p).length > 1) own.push({ kind: "memberGroup" });
       return own;
     }
     case "externalGroup":
       return externals(p).map((e) => ({ kind: "external" as const, id: e.id }));
+    case "memberGroup":
+      return members(p).map((m) => ({ kind: "member" as const, id: m.id }));
     case "external": {
       const e = externals(p).find((row) => row.id === node.id);
       // Whenever there is a pin to show. A sibling-owned edge has one
@@ -328,25 +413,44 @@ export function descriptorFor(
       const consumers = e.usedBy ?? [];
       if (consumers.length > 1) bits.push(`${consumers.length} consumers`);
       const hasPins = (e.pins?.length ?? 0) > 0;
-      const reachable = Boolean(e.root);
+      const location = externalLocation(e);
+      if (location !== "here") bits.push(locationNote(e, location));
       return {
         id: `external:${e.id}`,
         label: e.id,
         description: bits.join(" · "),
-        tooltip: e.drift || e.reason || `Built by ${e.producedBy}.`,
+        tooltip:
+          e.drift ||
+          (location === "remote"
+            ? `${e.producedBy} is at ${e.remote}, and no checkout of it is on this machine.`
+            : location === "unknown"
+              ? e.declaredPath
+                ? `${e.producedBy} is declared at ${e.declaredPath}, and there is no ` +
+                  "repository there — point at the folder you do have, give it a remote, " +
+                  "or create it."
+                : `${e.producedBy} builds this, and nothing says where it lives — ` +
+                  "give it a remote, point at a folder, or create it."
+              : "") ||
+          e.reason ||
+          `Built by ${e.producedBy}.`,
         icon: {
           id: "package",
+          // Muted, not attention: a repository nobody has cloned is a state
+          // of this laptop and not a defect in the declaration. Attention is
+          // kept for the things somebody has to act on.
           tone: e.driftKind === "behind" || e.driftKind === "feed" || e.driftKind === "split"
             ? "attention"
-            : reachable
+            : location === "here"
               ? undefined
               : "muted",
         },
         expandable: hasPins || consumers.length > 1,
-        // The context value gates the navigation: a repository nobody has
-        // cloned has nowhere to open, and offering the command anyway is a
-        // menu entry that fails when it is used.
-        contextValue: reachable ? "dabblerExternalHere" : "dabblerExternalAbsent",
+        // The context value gates the menu, and it is three-valued for the
+        // same reason the state is: a repository nobody has cloned has
+        // nowhere to open, and one nobody has placed cannot even be cloned.
+        // A menu entry that fails when it is used costs more trust than one
+        // that is not there.
+        contextValue: LOCATION_CONTEXT[location],
       };
     }
     case "externalUsedBy": {
@@ -381,6 +485,48 @@ export function descriptorFor(
         // tooltip says which one that is.
         tooltip: pin?.drift ?? undefined,
         icon: { id: "arrow-small-right", tone: behind ? "attention" : "muted" },
+        expandable: false,
+      };
+    }
+    case "memberGroup": {
+      const rows = members(p);
+      const away = rows.filter((m) => !m.root).length;
+      return {
+        id: "members",
+        label: "Solution repositories",
+        description: `${rows.length}`,
+        tooltip:
+          away > 0
+            ? `${away} of them is not on this machine.`
+            : "Every repository that declares itself part of this solution.",
+        icon: { id: "repo" },
+        expandable: rows.length > 0,
+      };
+    }
+    case "member": {
+      const m = members(p).find((row) => row.id === node.id);
+      if (!m) return { id: `member:${node.id}`, label: node.id, expandable: false };
+      const bits: string[] = [];
+      if (m.self) bits.push("this repository");
+      // Both directions, each read from the declaration that owns it. The
+      // second is the one no single repository can state about itself.
+      if (m.provides.length > 0) bits.push(`you take ${m.provides.length}`);
+      if (m.consumes.length > 0) bits.push(`takes ${m.consumes.length} from here`);
+      if (m.shell) bits.push("placemarker — no edges yet");
+      if (!m.root && !m.self) bits.push(m.remote ? "not cloned here" : "location undeclared");
+      return {
+        id: `member:${m.id}`,
+        label: m.id,
+        description: bits.join(" · "),
+        tooltip:
+          m.reason ||
+          (m.shell
+            ? "It declares which solution it is in, and nothing else yet."
+            : "It is in this solution because its own declaration says so."),
+        icon: {
+          id: m.self ? "root-folder" : "repo",
+          tone: m.root ? undefined : "muted",
+        },
         expandable: false,
       };
     }

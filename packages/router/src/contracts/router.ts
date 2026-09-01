@@ -228,6 +228,38 @@ export interface VerifyAdjudicateOptions extends RepositoryTarget {
   readonly transport?: string;
 }
 
+/**
+ * What the three writing `deps` verbs act on: a producing REPOSITORY.
+ *
+ * The `producedBy` id and never a path -- a path is a guess about one
+ * machine, and these verbs exist because the guess was wrong or absent.
+ */
+export interface DepsRepositoryOptions extends RepositoryTarget {
+  readonly repository: string;
+  /** Where it is, or is to be created; relative to the repository root. */
+  readonly path?: string;
+  /** Its remote, for `locate`. `clone` reads the one already declared. */
+  readonly remote?: string;
+}
+
+/**
+ * Saying where a producing repository lives, and putting one there.
+ *
+ * The Explorer's answer to an absent row used to be a sentence, so the only
+ * way to act on it was to hand-edit a tracked declaration. These three write
+ * it instead -- and the extension calls them rather than authoring the file,
+ * because two writers for one declaration is drift, and only one of them
+ * could be schema-checked.
+ */
+export interface DepsVerbs {
+  /** Declare a folder on this machine, a remote, or both. */
+  locate(options: DepsRepositoryOptions): Promise<RouterResult<RouterText>>;
+  /** Clone the declared remote, and record where it landed. */
+  clone(options: DepsRepositoryOptions): Promise<RouterResult<RouterText>>;
+  /** Create a repository that declares only its membership in this solution. */
+  scaffold(options: DepsRepositoryOptions): Promise<RouterResult<RouterText>>;
+}
+
 export interface VerifyReanchorOptions extends RepositoryTarget {
   /** Only a commit at or before the round is legal; the router enforces it. */
   readonly commit: string;
@@ -393,6 +425,8 @@ export interface Router {
   readonly ledger: LedgerVerbs;
   readonly testEvidence: TestEvidenceVerbs;
   readonly approvedPlan: ApprovedPlanVerbs;
+  /** Where each producing repository is, and putting one there. */
+  readonly deps: DepsVerbs;
   /** The Work Explorer's whole view of one repository, computed fresh. */
   progress(options: RepositoryTarget): Promise<RouterResult<ProgressProjection>>;
   /**

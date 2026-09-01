@@ -819,6 +819,117 @@ describe("the projection", () => {
     writeFileSync(join(root, "solution-dependencies.json"), "{ nope", "utf8");
     expect(project(root).external).toEqual([]);
   });
+
+  it("separates a remote nobody has cloned from a producer nobody has placed", () => {
+    // Three states, not two. `root: null` is true of both of these, and only
+    // one of them needs a person: a known remote is a command away.
+    const root = makeRoot();
+    writeFileSync(
+      join(root, "solution-dependencies.json"),
+      JSON.stringify({
+        schemaVersion: 1,
+        solution: "csv-pipeline",
+        consumes: [
+          {
+            id: "Dabbler.Csv.Model",
+            kind: "nuget",
+            producedBy: {
+              id: "csv-model",
+              remote: "git@github.com:dabbler/csv-model.git",
+              path: null,
+            },
+            resolve: "feed",
+          },
+          {
+            id: "Dabbler.Csv.Report",
+            kind: "nuget",
+            producedBy: { id: "csv-report", remote: null, path: null },
+            resolve: "feed",
+          },
+        ],
+      }),
+      "utf8",
+    );
+    const rows = project(root).external as Array<Record<string, unknown>>;
+    const model = rows.find((row) => row.id === "Dabbler.Csv.Model");
+    const report = rows.find((row) => row.id === "Dabbler.Csv.Report");
+    expect(model).toMatchObject({ root: null, remote: "git@github.com:dabbler/csv-model.git" });
+    expect(report).toMatchObject({ root: null, remote: null, declaredPath: null });
+  });
+
+  it("shows a repository nothing depends on, because it declares itself a member", () => {
+    // The upstream direction without a second declared one. Nothing consumes
+    // csv-cli and no edge names it as a producer; it is in the solution
+    // because its own declaration says which solution it is in, which is a
+    // claim only that repository is entitled to make.
+    const parent = makeTempDir();
+    const app = join(parent, "csv-app");
+    mkdirSync(join(app, ".git"), { recursive: true });
+    writeFileSync(join(app, "solution.yaml"), MANIFEST, "utf8");
+    writeFileSync(
+      join(app, "solution-dependencies.json"),
+      JSON.stringify({
+        schemaVersion: 1,
+        solution: "csv-pipeline",
+        repositoryId: "csv-app",
+        searchPaths: [parent],
+        consumes: [],
+      }),
+      "utf8",
+    );
+    const cli = join(parent, "csv-cli");
+    mkdirSync(join(cli, ".git"), { recursive: true });
+    writeFileSync(
+      join(cli, "solution-dependencies.json"),
+      JSON.stringify({
+        schemaVersion: 1,
+        solution: "csv-pipeline",
+        repositoryId: "csv-cli",
+        consumes: [
+          {
+            id: "Dabbler.Csv.App",
+            kind: "nuget",
+            producedBy: { id: "csv-app", remote: null, path: null },
+            resolve: "feed",
+          },
+        ],
+      }),
+      "utf8",
+    );
+
+    // And one the plan has only named: `deps scaffold` leaves exactly this.
+    const shell = join(parent, "csv-docs");
+    mkdirSync(join(shell, ".git"), { recursive: true });
+    writeFileSync(
+      join(shell, "solution-dependencies.json"),
+      JSON.stringify({
+        schemaVersion: 1,
+        solution: "csv-pipeline",
+        repositoryId: "csv-docs",
+        consumes: [],
+      }),
+      "utf8",
+    );
+
+    const members = project(app).members as Array<Record<string, unknown>>;
+    expect(members[0]).toMatchObject({ id: "csv-app", self: true });
+    const other = members.find((member) => member.id === "csv-cli");
+    // Both directions derived, each from the declaration that owns it: this
+    // repository declares no edge to csv-cli, and csv-cli's own edge is what
+    // says it consumes from here.
+    expect(other).toMatchObject({
+      self: false,
+      shell: false,
+      provides: [],
+      consumes: ["Dabbler.Csv.App"],
+    });
+    // A placemarker: it says which solution it is in and nothing else yet.
+    expect(members.find((member) => member.id === "csv-docs")).toMatchObject({
+      shell: true,
+      provides: [],
+      consumes: [],
+    });
+  });
 });
 
 describe("the command line", () => {

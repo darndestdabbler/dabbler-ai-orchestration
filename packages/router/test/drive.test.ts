@@ -1603,6 +1603,7 @@ describe("dabbler session next", { timeout: 120_000 }, () => {
           stepId: "widget",
           files: null,
           checksFile: passing,
+          maxRounds: null,
           reason: "the declared check cannot pass",
           approver: "the test",
         });
@@ -1619,12 +1620,76 @@ describe("dabbler session next", { timeout: 120_000 }, () => {
     expect(readRun(repo, 1)).toMatchObject({ accepted_steps: ["widget"] });
   });
 
+  it("places the repositories the plan says it needs, when the plan is accepted", async () => {
+    // A multi-repository plan that named its next repository only in prose
+    // left the operator to remember it -- and the operator's own sentence
+    // was that finishing the first repository left them not knowing what
+    // came next. The plan names them; accepting it puts them there.
+    const { repo, sessionsDir } = drivenRepo();
+    configure([VERIFIED]);
+    writeFileSync(
+      join(repo, "solution-dependencies.json"),
+      JSON.stringify({
+        schemaVersion: 1,
+        solution: "csv-pipeline",
+        repositoryId: "csv-app",
+        consumes: [],
+      }),
+      "utf8",
+    );
+    // The projection is the manifest joined to live state, so the Explorer
+    // half of this needs a manifest to join to.
+    writeFileSync(
+      join(repo, "solution.yaml"),
+      "solution:\n  name: csv-pipeline\n  title: CSV\ncomponents:\n  - name: csv-app\n",
+      "utf8",
+    );
+
+    const plan = await next(sessionsDir, REGISTER);
+    expect(
+      await answerFile(sessionsDir, plan.instruction?.seq ?? 0, {
+        ...PLAN,
+        repositories: [{ id: "csv-cli" }],
+      }),
+    ).toBe(0);
+
+    // The call that reads the answer is the one that accepts the plan.
+    await next(sessionsDir);
+
+    // Beside this one, because that is where the assembly looks -- and
+    // carrying membership and nothing else: no edge, no version.
+    const shell = join(repo, "..", "csv-cli", "solution-dependencies.json");
+    expect(JSON.parse(readFileSync(shell, "utf8"))).toMatchObject({
+      solution: "csv-pipeline",
+      repositoryId: "csv-cli",
+      consumes: [],
+    });
+    // And it is in the graph the Explorer reads, which is the whole point:
+    // nothing depends on it, and it is there because it says it is.
+    const projection = JSON.parse(
+      readFileSync(join(repo, ".dabbler", "solution", "projection.json"), "utf8"),
+    ) as { members?: { id: string }[] };
+    expect((projection.members ?? []).map((member) => member.id)).toContain("csv-cli");
+  });
+
   it("carries the round cap and the transport on the run, for the call that reaches verification", async () => {
     const { repo, sessionsDir } = drivenRepo();
     configure([VERIFIED]);
 
-    // Named once, on the call that opens the run.
-    const plan = await next(sessionsDir, { ...REGISTER, maxRounds: 1, transport: "offline" });
+    // The transport is named once, on the call that opens the run. The CAP
+    // is not typeable on a driving call at all -- it moves through the one
+    // amendment that states a reason and a name.
+    const plan = await next(sessionsDir, { ...REGISTER, transport: "offline" });
+    expect(
+      planAmend(sessionsDir, {
+        stepId: null,
+        files: null,
+        checksFile: null,
+        maxRounds: 1,
+        reason: "one round is what this tree is worth",
+        approver: "the test",
+      }),
+    ).toBe(0);
     expect(readRun(repo, 1)?.verification).toEqual({ max_rounds: 1, transport: "offline" });
     expect(await answerFile(sessionsDir, plan.instruction?.seq ?? 0, PLAN)).toBe(0);
 

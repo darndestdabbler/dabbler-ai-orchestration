@@ -19,6 +19,19 @@ export type DriverWorkPlan = {
    * Whether the session may publish, decided here before any edit -- the same rule `session declare` enforces on a typed session.
    */
   releasable: boolean;
+  /**
+   * Other repositories of this SOLUTION that the plan needs to exist. Each is placed when the plan is accepted -- created beside this one with a `solution-dependencies.json` declaring which solution it is in and its own id, and nothing else -- so that finishing this repository leaves the next one visible in the Solution Explorer instead of leaving the operator to remember it. One that already declares itself is left exactly as it is. It declares no dependency: what this repository takes is declared on the edge that takes it, and placing a repository never invents one. Optional, and absent in the ordinary single-repository session.
+   */
+  repositories?: {
+    /**
+     * Its stable repository id -- the name a `producedBy` uses for it.
+     */
+    id: string;
+    /**
+     * Where to place it, relative to this repository's root. Defaults to the first declared search path, which is where the assembly already looks.
+     */
+    path?: string;
+  }[];
   steps: {
     /**
      * Unique within the plan; the reader refuses a duplicate.

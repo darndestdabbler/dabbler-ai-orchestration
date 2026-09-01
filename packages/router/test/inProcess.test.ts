@@ -124,6 +124,75 @@ describe("the in-process router", () => {
     expect(state.sessions[0].orchestrator.engine).toBe("claude-code");
   });
 
+  it("places a repository the Explorer cannot reach, and the declaration is what moved", async () => {
+    // The extension calls these rather than editing the tracked declaration
+    // itself: two writers for one file drift, and only one of them can be
+    // schema-checked on the way out.
+    const { repo, sessionsDir } = makeSandboxRepo();
+    const declaration = join(repo, "solution-dependencies.json");
+    writeFileSync(
+      declaration,
+      JSON.stringify({
+        schemaVersion: 1,
+        solution: "csv-pipeline",
+        repositoryId: "csv-app",
+        consumes: [
+          {
+            id: "Dabbler.Csv.Model",
+            kind: "nuget",
+            producedBy: { id: "csv-model", remote: null, path: null },
+            resolve: "feed",
+          },
+          {
+            id: "Dabbler.Csv.Report",
+            kind: "nuget",
+            producedBy: { id: "csv-report", remote: null, path: null },
+            resolve: "feed",
+          },
+        ],
+      }),
+      "utf8",
+    );
+    const router = createInProcessRouter();
+
+    const located = await router.deps.locate({
+      repoRoot: repo,
+      sessionsDir,
+      repository: "csv-model",
+      remote: "git@github.com:dabbler/csv-model.git",
+    });
+    expect(located.ok).toBe(true);
+    expect(JSON.parse(readFileSync(declaration, "utf8")).consumes[0].producedBy).toMatchObject({
+      remote: "git@github.com:dabbler/csv-model.git",
+    });
+
+    // The shell: membership and nothing else, which is what puts a
+    // repository nothing depends on into the graph at all.
+    const made = await router.deps.scaffold({
+      repoRoot: repo,
+      sessionsDir,
+      repository: "csv-cli",
+      path: "../csv-cli",
+    });
+    expect(made.ok).toBe(true);
+    const shell = JSON.parse(
+      readFileSync(join(repo, "..", "csv-cli", "solution-dependencies.json"), "utf8"),
+    );
+    expect(shell).toMatchObject({ solution: "csv-pipeline", repositoryId: "csv-cli", consumes: [] });
+
+    // And a refusal arrives as the contract's outcome, in the verb's own
+    // words rather than a sentence the caller invented. Nothing is cloned
+    // here: a producer nobody has named a remote for is refused before git
+    // is reached, which is also why this test touches no network.
+    const cannot = await router.deps.clone({
+      repoRoot: repo,
+      sessionsDir,
+      repository: "csv-report",
+    });
+    expect(cannot.ok).toBe(false);
+    expect(cannot.ok === false ? cannot.message : "").toContain("declares no remote");
+  });
+
   it("turns a verb's refusal into the contract's outcome, with its own words", async () => {
     const { repo, sessionsDir } = makeSandboxRepo();
     const router = createInProcessRouter();

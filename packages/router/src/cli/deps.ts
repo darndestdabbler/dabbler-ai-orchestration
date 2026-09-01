@@ -5,8 +5,17 @@
 // reading -- a dependency added this morning, a refactor that removed one, a
 // pin deliberately held back -- and a tool that "fixed" them would be editing
 // build files on a guess about which side was right.
+//
+// `locate`, `clone` and `scaffold` are the exception, and they are not
+// repairs: each one writes what a PERSON just said about where a repository
+// lives, or creates one they asked for. Nothing here guesses -- the
+// difference between the two is who supplied the fact.
+
+import { existsSync, statSync } from "node:fs";
+import { join, resolve } from "node:path";
 
 import { repoRootFor, resolveSessionsDir, SessionsRootNotFoundError } from "../evidence.ts";
+import { workingDirectory } from "../workdir.ts";
 import {
   ID_FEED_SOURCE,
   currentDecisions,
@@ -27,6 +36,11 @@ import {
   DEPS_FILENAME,
   UNREADABLE_ID,
   assembleSolution,
+  cloneMember,
+  declarablePath,
+  declareProducerLocation,
+  memberHome,
+  placeMember,
   producedBySolution,
   reconcileAcrossRepositories,
   SolutionDepsError,
@@ -36,27 +50,45 @@ import {
   reconcile,
 } from "../solutionDeps.ts";
 import { dumps } from "../pythonJson.ts";
+import { tryWriteProjection } from "../workflow/project.ts";
 import { writeErr, writeOut } from "./output.ts";
 
 const EXIT_OK = 0;
 const EXIT_REFUSED = 1;
 const EXIT_USAGE = 2;
 
-const COMMANDS = ["check", "show", "feeds", "source", "restore"] as const;
+const COMMANDS = [
+  "check",
+  "show",
+  "feeds",
+  "source",
+  "restore",
+  "locate",
+  "clone",
+  "scaffold",
+] as const;
 
 function usage(): string {
   return [
     "usage: dabbler deps [-h] [--sessions-dir SESSIONS_DIR]",
-    "                    {check,show,feeds,source,restore} [--package ID] [--apply]",
+    "                    {check,show,feeds,source,restore,locate,clone,scaffold}",
+    "                    [--package ID] [--repository ID] [--path DIR] [--remote URL] [--apply]",
     "",
     "  check     compare the declaration against the build files",
     "  show      print the declared edges as JSON",
     "  feeds     what this machine has configured, against what is declared",
     "  source    resolve one dependency from a sibling checkout, reversibly",
     "  restore   put a source-resolved reference back exactly",
+    "  locate    say where a producing repository is: a local folder, a remote, or both",
+    "  clone     clone a producer's declared remote and record where it landed",
+    "  scaffold  create a repository that declares only its membership in this solution",
     "",
     "options:",
     "  --package ID             the package `source` and `restore` act on",
+    "  --repository ID          the producing repository `locate`, `clone` and",
+    "                           `scaffold` act on -- the `producedBy` id, not a path",
+    "  --path DIR               where that repository is, or where to create it",
+    "  --remote URL             its remote, which survives a move and a second clone",
     "  --apply                  write an answered feed decision into this repository",
     "  --sessions-dir PATH      the sessions root; derived from the cwd when absent",
     "  -h, --help               show this message",
@@ -76,6 +108,9 @@ function run(argv: string[]): number {
   let command: string | null = null;
   let sessionsDirArg: string | undefined;
   let packageId: string | null = null;
+  let repositoryId: string | null = null;
+  let pathArg: string | null = null;
+  let remoteArg: string | null = null;
   let apply = false;
   for (let index = 0; index < argv.length; index += 1) {
     const token = argv[index];
@@ -86,6 +121,21 @@ function run(argv: string[]): number {
     }
     if (token === "--package") {
       packageId = argv[index + 1] ?? null;
+      index += 1;
+      continue;
+    }
+    if (token === "--repository") {
+      repositoryId = argv[index + 1] ?? null;
+      index += 1;
+      continue;
+    }
+    if (token === "--path" || token === "--into") {
+      pathArg = argv[index + 1] ?? null;
+      index += 1;
+      continue;
+    }
+    if (token === "--remote") {
+      remoteArg = argv[index + 1] ?? null;
       index += 1;
       continue;
     }
@@ -110,7 +160,14 @@ function run(argv: string[]): number {
 
   let root: string | null;
   try {
-    root = repoRootFor(resolveSessionsDir(sessionsDirArg));
+    // The sessions root when there is one, and the working directory when
+    // there is not. `deps` is about the SOLUTION and not about a session:
+    // asking git from `docs/sessions` in a repository that has never run one
+    // answers "not inside a git repository", which is both wrong and the
+    // most confusing thing to say to somebody standing in their repository
+    // -- and a repository `deps scaffold` has just created is exactly that.
+    const sessionsDir = resolveSessionsDir(sessionsDirArg);
+    root = repoRootFor(existsSync(sessionsDir) ? sessionsDir : workingDirectory());
   } catch (error) {
     if (!(error instanceof SessionsRootNotFoundError)) throw error;
     writeErr(`deps: ${error.message}\n`);
@@ -119,6 +176,31 @@ function run(argv: string[]): number {
   if (root === null) {
     writeErr("deps: not inside a git repository\n");
     return EXIT_USAGE;
+  }
+
+  if (command === "locate" || command === "clone" || command === "scaffold") {
+    if (repositoryId === null) {
+      writeErr(`deps ${command}: --repository is required\n`);
+      return EXIT_USAGE;
+    }
+    try {
+      const code =
+        command === "locate"
+          ? locate(root, repositoryId, pathArg, remoteArg)
+          : command === "clone"
+            ? clone(root, repositoryId, pathArg)
+            : scaffold(root, repositoryId, pathArg);
+      // The projection is derived from the declaration that just changed,
+      // and it is written on workflow events and nowhere else. Without this
+      // the Explorer row the operator just acted on keeps saying the thing
+      // they acted on -- which reads as the command having done nothing.
+      if (code === EXIT_OK) tryWriteProjection(root);
+      return code;
+    } catch (error) {
+      if (!(error instanceof SolutionDepsError)) throw error;
+      writeErr(`deps ${command}: refused -- ${error.message}\n`);
+      return EXIT_REFUSED;
+    }
   }
 
   if (command === "feeds") return feeds(root, apply);
@@ -209,6 +291,128 @@ function run(argv: string[]): number {
   );
   raiseOwnershipForUnclassified(root, self.refs, known);
   reportFindings(findings);
+  return EXIT_OK;
+}
+
+/** The declaration this repository must have before any of the three can write. */
+function ownDeclaration(repoRoot: string): NonNullable<ReturnType<typeof loadDeps>> {
+  const deps = loadDeps(repoRoot);
+  if (deps === null) {
+    throw new SolutionDepsError(
+      `this repository declares no ${DEPS_FILENAME}; there is no solution here to place ` +
+        "a repository in",
+    );
+  }
+  return deps;
+}
+
+/**
+ * Say where a producing repository is: a folder on this machine, a remote, or
+ * both.
+ *
+ * The Explorer's absent row had no action at all, so the only way to answer
+ * "where does this live" was to edit a tracked declaration by hand. Both
+ * fields are optional and neither is verified against the world -- a remote
+ * that is not reachable and a path that is not a checkout are REPORTED
+ * states, and refusing them here would refuse the ordinary case of writing
+ * down where something is going to be.
+ */
+function locate(
+  repoRoot: string,
+  repositoryId: string,
+  pathArg: string | null,
+  remoteArg: string | null,
+): number {
+  if (pathArg === null && remoteArg === null) {
+    writeErr("deps locate: one of --path or --remote is required\n");
+    return EXIT_USAGE;
+  }
+  let declaredPath: string | undefined;
+  if (pathArg !== null) {
+    const full = resolve(repoRoot, pathArg);
+    if (!existsSync(full) || !statSync(full).isDirectory()) {
+      writeErr(`deps locate: ${full} is not a directory on this machine\n`);
+      return EXIT_REFUSED;
+    }
+    declaredPath = declarablePath(repoRoot, full);
+  }
+  declareProducerLocation(repoRoot, repositoryId, {
+    ...(declaredPath === undefined ? {} : { path: declaredPath }),
+    ...(remoteArg === null ? {} : { remote: remoteArg }),
+  });
+  const said = [
+    declaredPath === undefined ? null : `at ${declaredPath} on this machine`,
+    remoteArg === null ? null : `with the remote ${remoteArg}`,
+  ].filter((part): part is string => part !== null);
+  writeOut(
+    `deps locate: ${repositoryId} is now declared ${said.join(" and ")}; ` +
+      `${DEPS_FILENAME} carries it and nothing else does.\n`,
+  );
+  return EXIT_OK;
+}
+
+/** Clone a producer's declared remote, and record where it landed. */
+function clone(repoRoot: string, repositoryId: string, into: string | null): number {
+  const deps = ownDeclaration(repoRoot);
+  const edge = deps.consumes.find((entry) => entry.producedBy.id === repositoryId);
+  if (edge === undefined) {
+    writeErr(`deps clone: no declared edge is produced by '${repositoryId}'\n`);
+    return EXIT_REFUSED;
+  }
+  if (!edge.producedBy.remote) {
+    writeErr(
+      `deps clone: ${repositoryId} declares no remote. \`dabbler deps locate ` +
+        `--repository ${repositoryId} --remote <url>\` says where it lives first.\n`,
+    );
+    return EXIT_REFUSED;
+  }
+  const where = locateProducer(repoRoot, edge.producedBy, deps.solution);
+  if (where.path !== null) {
+    writeErr(
+      `deps clone: ${repositoryId} is already at ${where.path}; a second clone of one ` +
+        "repository is one member on two branches, which is how a stale checkout " +
+        "invents a version disagreement nobody has.\n",
+    );
+    return EXIT_REFUSED;
+  }
+  const target =
+    into === null
+      ? join(memberHome(repoRoot, deps), repositoryId)
+      : resolve(repoRoot, into);
+  const cloned = cloneMember(repoRoot, edge.producedBy.remote, target);
+  const declared = declarablePath(repoRoot, cloned);
+  declareProducerLocation(repoRoot, repositoryId, { path: declared });
+  writeOut(
+    `deps clone: ${repositoryId} cloned to ${cloned}, and ${DEPS_FILENAME} now declares ` +
+      `it at ${declared}.\n`,
+  );
+  return EXIT_OK;
+}
+
+/**
+ * Create a repository that declares only its membership in this solution.
+ *
+ * The answer to "once I completed the CSV model, I didn't know what to do
+ * next": a multi-repository plan scaffolds the repositories it will need, so
+ * finishing one leaves the next VISIBLE instead of leaving the operator to
+ * remember it. What the shell carries is membership and nothing else -- it
+ * appears in the graph because it says which solution it belongs to, which
+ * is a claim only that repository is entitled to make.
+ */
+function scaffold(repoRoot: string, repositoryId: string, pathArg: string | null): number {
+  const deps = ownDeclaration(repoRoot);
+  // Through `placeMember`, which the driver's plan phase calls too: where a
+  // member goes and whether this repository's edge points at it is one rule
+  // with two callers, and a second copy of it would drift.
+  const placed = placeMember(repoRoot, repositoryId, pathArg);
+  writeOut(
+    (placed.created
+      ? `deps scaffold: ${placed.root} now declares that it is ${repositoryId} in ` +
+        `'${deps.solution}', and nothing else`
+      : `deps scaffold: ${placed.root} already declares itself, and was left alone`) +
+      (placed.linked ? "; this repository's edge to it points there." : ".") +
+      "\n",
+  );
   return EXIT_OK;
 }
 

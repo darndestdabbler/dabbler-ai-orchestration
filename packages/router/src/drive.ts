@@ -86,6 +86,8 @@ import type {
   Triage,
 } from "./generated/index.ts";
 import { type Job, jobLogTail, pollJob, selfArgv, startJob } from "./jobs.ts";
+import { SolutionDepsError, placeMember } from "./solutionDeps.ts";
+import { tryWriteProjection } from "./workflow/project.ts";
 import {
   changedPathsBetween,
   nowIso,
@@ -159,7 +161,6 @@ export interface DriveOptions {
   readonly engineOutput?: EngineOutput | null;
   /** Overrides `driver.max_invocations`; a re-run past a budget stop passes a larger one. */
   readonly maxInvocations?: number | null;
-  readonly maxRounds?: number | null;
   readonly transport?: string | null;
 }
 
@@ -170,7 +171,6 @@ export interface NextOptions {
   readonly provider?: string | null;
   readonly model?: string | null;
   readonly effort?: string | null;
-  readonly maxRounds?: number | null;
   readonly transport?: string | null;
 }
 
@@ -574,16 +574,24 @@ class Driver {
   }
 
   /**
-   * The round cap and transport this run verifies under: what this call
-   * named, or what the run already carries.
+   * The round cap and transport this run verifies under.
    *
-   * They are the run's, not a call's. Under the pull the call that reaches
-   * verification is whichever `next` happens to get there, following an
-   * `answer_command` that names neither -- so a cap or a transport typed
-   * once would otherwise be silently dropped for the round it was typed for.
+   * The transport is the run's, not a call's: under the pull the call that
+   * reaches verification is whichever `next` happens to get there, following
+   * an `answer_command` that names it, so a transport typed once would
+   * otherwise be dropped for the round it was typed for.
+   *
+   * The CAP is not typeable here at all. It came off any `next` call and
+   * always won -- so `--max-rounds 1` with four rounds run routed the tree
+   * straight to its at-cap branch, a verification-reducing act with no
+   * approver anywhere on the record and reachable by anyone who typed a
+   * command. It now comes from `verification.settings.max_rounds` and moves
+   * only through `dabbler session plan amend --max-rounds`, which states a
+   * reason and an approver. What is carried here is what the run already
+   * holds, and nothing else may set it.
    */
   private verificationSettings(existing: DriverRun["verification"]): DriverRun["verification"] {
-    const maxRounds = this.options.maxRounds ?? existing?.max_rounds ?? null;
+    const maxRounds = existing?.max_rounds ?? null;
     const transport = this.options.transport ?? existing?.transport ?? null;
     if (maxRounds === null && transport === null) return null;
     return { max_rounds: maxRounds, transport };
@@ -1189,8 +1197,15 @@ ${this.stopArtifacts()}`,
       "Every step has at least one check, and a check is argv the framework spawns with no " +
       "shell: exit 0 proves the step. A step whose product is prose still has a mechanical " +
       "check. Keep steps small, one concern each; the files a step lists are exactly the " +
-      "files it will touch, because its report is measured against them. Do not include " +
-      "schema_version, session_number or recorded_at: the framework stamps them."
+      "files it will touch, because its report is measured against them.\n" +
+      "One member is optional and is left out of a single-repository session:\n" +
+      '  repositories  other repositories of this SOLUTION the plan needs to exist: [{"id": ' +
+      '"<repository id>", "path": "<optional, relative to this root>"}]. Each is placed when ' +
+      "this plan is accepted -- created beside this one, declaring which solution it is in " +
+      "and nothing else -- so finishing this repository leaves the next one visible in the " +
+      "Solution Explorer. One that already declares itself is left alone, and placing a " +
+      "repository never declares a dependency on it.\n" +
+      "Do not include schema_version, session_number or recorded_at: the framework stamps them."
     );
   }
 
@@ -1228,6 +1243,7 @@ ${this.stopArtifacts()}`,
     this.plan = plan;
     this.setRejections(0);
     this.log("plan-accepted", { steps: plan.steps.map((step) => step.id), releasable: plan.releasable });
+    this.placePlannedRepositories(plan);
 
     if (readTaskDeclaration(this.sessionsDir, this.sessionNumber) === null) {
       const code = declare(this.sessionsDir, {
@@ -1244,6 +1260,48 @@ ${this.stopArtifacts()}`,
       }
     }
     this.setPhase("steps");
+  }
+
+  /**
+   * Put the repositories the plan says it needs on this machine.
+   *
+   * At plan acceptance, because that is the moment the plan exists and the
+   * work has not started: a multi-repository plan that names its next
+   * repository only in prose leaves the operator to remember it, which is
+   * the thing this answers. Each one is a directory, a `git init` and a
+   * declaration of which solution it is in -- no edge, no `produces`, no
+   * version -- so what appears in the Solution Explorer is a placemarker and
+   * never a claim nobody made.
+   *
+   * The rule for WHERE it goes and whether this repository's edge points at
+   * it is `placeMember`'s, shared with `dabbler deps scaffold`. One that is
+   * already declared is left exactly as it stands.
+   */
+  private placePlannedRepositories(plan: DriverWorkPlan): void {
+    const wanted = plan.repositories ?? [];
+    if (wanted.length === 0) return;
+    for (const entry of wanted) {
+      try {
+        const placed = placeMember(this.repoRoot, entry.id, entry.path ?? null);
+        this.log("repository-placed", {
+          repository: entry.id,
+          root: placed.root,
+          created: placed.created,
+          ...(placed.linked ? { edge: "this repository's edge now points there" } : {}),
+        });
+      } catch (error) {
+        if (!(error instanceof SolutionDepsError)) throw error;
+        // A plan naming repositories in a repository that declares no
+        // solution cannot be honoured, and going on would leave the
+        // Explorer saying nothing while the plan says otherwise.
+        throw new Stop(
+          "engine",
+          `the work plan asks for repository '${entry.id}', and it could not be ` +
+            `placed: ${error.message}`,
+        );
+      }
+    }
+    tryWriteProjection(this.repoRoot);
   }
 
   // --- steps -----------------------------------------------------------------
@@ -1682,9 +1740,10 @@ ${this.stopArtifacts()}`,
       throw new Stop(
         "verification",
         `no further verification round may open (${noRound}), and this is not the ` +
-          `tree that was verified: ${why} Raising the round cap (--max-rounds ` +
-          "<larger>) buys the review this change has not had, which is a decision " +
-          "to spend another round; putting the tree back is the other answer.",
+          `tree that was verified: ${why} Raising the round cap (\`dabbler session ` +
+          'plan amend --max-rounds <larger> --reason "<why>" --approver <who>`) buys ' +
+          "the review this change has not had, which is a decision to spend another " +
+          "round and is recorded as one; putting the tree back is the other answer.",
       );
     }
     const code = await this.longWork({
@@ -2312,7 +2371,6 @@ export async function sessionNext(sessionsDir: string, options: NextOptions): Pr
         model: options.model ?? null,
         effort: options.effort ?? null,
         adapter: null,
-        maxRounds: options.maxRounds ?? null,
         transport: options.transport ?? null,
         mode: "pull",
       },

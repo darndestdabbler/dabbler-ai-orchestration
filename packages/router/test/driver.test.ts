@@ -361,6 +361,64 @@ describe("dabbler session plan amend", () => {
     expect(late.err).toContain("has already been accepted");
     expect(readAmendments(repo, 1)).toHaveLength(1);
   });
+
+  it("is the only way the round cap moves, and records the claim beside the rounds already run", async () => {
+    const { repo, sessionsDir } = makeSandboxRepo();
+    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
+    writeRun(repo, 1, RUN);
+    appendRound(repo, 1, {
+      round: 1,
+      verdict: "ISSUES_FOUND",
+      blocking: true,
+      findings: [{ description: "a finding", severity: "major", blocking: true }],
+      completion_tree: "0".repeat(40),
+      recorded_at: "2026-09-01T10:00:00-04:00",
+      verifier_model: "gpt",
+      verifier_provider: "openai",
+    });
+    const flags = [
+      "plan", "amend", "--sessions-dir", sessionsDir,
+      "--max-rounds", "4",
+      "--reason", "the operator authorised a fourth round in the chat window",
+      "--approver", "operator",
+    ];
+
+    const amended = await captured(() => sessionVerb(flags));
+    expect(amended.code).toBe(0);
+    expect(readRun(repo, 1)?.verification).toEqual({ max_rounds: 4, transport: null });
+    // The claim, and what it is being read against: 4 after one round buys a
+    // review; 1 after one round would end verification, and the row says
+    // which of the two this was.
+    expect(readAmendments(repo, 1)[0]).toMatchObject({
+      step_id: null,
+      approver: "operator",
+      rounds_run: 1,
+      before: { max_rounds: null },
+      after: { max_rounds: 4 },
+    });
+
+    // Not a step and a cap at once: they are two different amendments.
+    const both = await captured(() => sessionVerb([...flags, "--step", "widget"]));
+    expect(both.code).toBe(2);
+    expect(both.err).toContain("--max-rounds");
+
+    // Not a cap that is not a number of rounds.
+    const zero = await captured(() =>
+      sessionVerb(flags.map((flag) => (flag === "4" ? "0" : flag))),
+    );
+    expect(zero.code).toBe(3);
+    expect(readRun(repo, 1)?.verification).toEqual({ max_rounds: 4, transport: null });
+
+    // And not on the call that drives the session, where it always won over
+    // the persisted value and recorded nothing at all.
+    for (const subcommand of ["next", "drive"]) {
+      const typed = await captured(() =>
+        sessionVerb([subcommand, "--sessions-dir", sessionsDir, "--max-rounds", "1"]),
+      );
+      expect(typed.code).toBe(2);
+      expect(typed.err).toContain("plan amend --max-rounds");
+    }
+  });
 });
 
 describe("the watcher, which separates a thinking engine from a stopped one", () => {

@@ -177,8 +177,11 @@ dabbler verify
   edit it — with the raw verifier output saved alongside.
 - On blocking findings (`critical`/`major`): remediate, then re-run the
   same command. The loop suspends at the round cap
-  (`verification.settings.max_rounds`, default 3; `--max-rounds`
-  overrides).
+  (`verification.settings.max_rounds`, default 3). `dabbler verify
+  --max-rounds` overrides it for a round you run by hand; inside a driven
+  session the cap is not typeable at all and moves only through `dabbler
+  session plan amend --max-rounds`, which records a reason and an approver
+  (see [driving-a-session.md](driving-a-session.md)).
 
 ### If a blocking finding is contested: dispute → adjudicate
 
@@ -410,3 +413,78 @@ copied for you to paste anywhere — and while it runs the status bar shows
 what each button does, is in [driving-a-session.md](driving-a-session.md).
 A session row opens the plan at its own section, and carries cancel or
 restore — a cancellation is a decision about one session.
+
+## The Solution Explorer, across repositories
+
+A solution is more than one repository, and each one declares only its own
+half of the graph in a tracked `solution-dependencies.json`: which of its
+dependencies are yours, and which repository builds each. The union of those
+files is the graph — no superproject, no shared mutable state — and the
+Solution Explorer renders it.
+
+### Three location states, not two
+
+A row for a package another repository builds says where that repository is
+on **this machine**, and there are three answers rather than two:
+
+| State | What it means | What you do |
+| --- | --- | --- |
+| here | a checkout is on this machine | **Open Repository**, **Open in New Window**, **Reveal in File Explorer** |
+| not cloned here | the declaration names a remote, and nobody has cloned it | **Clone This Repository** — or point at a folder you already have |
+| location undeclared | nothing says where it lives at all | **Say Where This Repository Is (Remote)**, **Point at a Local Folder**, or **Create This Repository** |
+
+Only the last one needs a person. A known remote is a command away, and
+collapsing the two into one word ("absent") asked a person in both cases and
+offered them nothing to do in either.
+
+Every action writes the declaration through the router, never by hand:
+
+```
+dabbler deps locate --repository csv-model --remote git@github.com:you/csv-model.git
+dabbler deps locate --repository csv-model --path ../csv-model
+dabbler deps clone  --repository csv-model
+```
+
+`locate` records a folder, a remote, or both, on every edge that names that
+producer. `clone` refuses unless a remote is declared and no checkout is
+already found, clones into the first declared search path, and records where
+it landed. Nothing here is verified against the world: a remote that is not
+reachable and a path that is not a checkout are reported states, and both are
+better than a graph that says nothing.
+
+### The repositories, including the ones nothing depends on
+
+Under **Solution repositories** is every repository in the solution — this
+one first — with what you take from it and what it takes from here. Both
+directions are *derived*: your edges say the first, its edges say the second,
+and neither is written down twice.
+
+A repository is in that list because **its own declaration names this
+solution**. That is the whole rule, and it is why a repository nothing yet
+depends on can appear at all (D254).
+
+### Scaffolding the next repository before it exists
+
+A plan that spans repositories can put the ones it will need in front of you
+now:
+
+```
+dabbler deps scaffold --repository csv-cli
+```
+
+It creates the directory beside this repository, runs `git init`, and writes
+a `solution-dependencies.json` that declares which solution it is in and its
+own id — no edge, no `produces`, no version, because a scaffold that guessed
+at those would put a claim in the graph nobody made. The row appears
+immediately, marked *placemarker — no edges yet*, so finishing one repository
+leaves the next one visible instead of leaving you to remember it.
+
+One VS Code window over all of them:
+
+```
+dabbler workspace
+```
+
+writes a multi-root `.code-workspace` under `.dabbler/` from the graph. It is
+derived local state carrying paths only this machine has; it is never
+committed.

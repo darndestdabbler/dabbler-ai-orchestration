@@ -4,6 +4,7 @@ import {
   childrenOf,
   contractTarget,
   descriptorFor,
+  externalLocation,
   orderedComponents,
   repositoryPathOf,
   rootNodes,
@@ -208,16 +209,83 @@ suite("solutionTreeModel: what other repositories build", () => {
     assert.ok(!row.description?.includes("is out"));
   });
 
-  test("offers navigation only for a repository that is on this machine", () => {
+  test("tells three location states apart, and gates each row's menu on which", () => {
     // A menu entry that fails when it is used costs more trust than one that
-    // is not there.
+    // is not there -- and "not here" is not one state: a known remote is a
+    // clone away, while a producer nobody has placed needs a person.
     const here = projection({ external: [external()] } as Partial<Projection>);
+    const cloneable = projection({
+      external: [
+        external({
+          root: null,
+          remote: "git@github.com:dabbler/csv-model.git",
+          reason: "not on this machine",
+        }),
+      ],
+    } as Partial<Projection>);
     const away = projection({
-      external: [external({ root: null, reason: "not on this machine" })],
+      external: [external({ root: null, remote: null, reason: "not on this machine" })],
     } as Partial<Projection>);
     const node = { kind: "external" as const, id: "Dabbler.Csv.Model" };
+    assert.strictEqual(externalLocation(here.external![0]), "here");
     assert.strictEqual(descriptorFor(node, here).contextValue, "dabblerExternalHere");
-    assert.strictEqual(descriptorFor(node, away).contextValue, "dabblerExternalAbsent");
+    assert.strictEqual(descriptorFor(node, cloneable).contextValue, "dabblerExternalRemote");
+    assert.strictEqual(descriptorFor(node, away).contextValue, "dabblerExternalUnknown");
+    // Muted, not attention: a checkout nobody made is a fact about this
+    // laptop and not a defect anyone has to answer for. Drift still wins,
+    // because that one IS something to do.
+    const quiet = projection({
+      external: [
+        external({ root: null, remote: null, drift: null, driftKind: null, published: null }),
+      ],
+    } as Partial<Projection>);
+    assert.strictEqual(descriptorFor(node, quiet).icon?.tone, "muted");
+    assert.strictEqual(descriptorFor(node, away).icon?.tone, "attention");
+
+    // A declared path that is not there was still DECLARED. Telling the
+    // reader nobody said where it lives sends them looking for a
+    // declaration that already exists and is simply wrong here.
+    const moved = projection({
+      external: [
+        external({ root: null, remote: null, declaredPath: "../csv-model" }),
+      ],
+    } as Partial<Projection>);
+    const row = descriptorFor(node, moved);
+    assert.strictEqual(row.contextValue, "dabblerExternalUnknown");
+    assert.ok(row.description?.includes("declared at ../csv-model"));
+    assert.ok(!row.description?.includes("nobody has said"));
+  });
+
+  test("renders a repository nothing depends on, and says which way each edge runs", () => {
+    // The upstream direction, without a second declared one: csv-cli is here
+    // because its own declaration names this solution (D254).
+    const p = projection({
+      external: [external()],
+      members: [
+        { id: "csv-app", self: true, root: "C:/repos/csv-app", provides: [], consumes: [], shell: false },
+        {
+          id: "csv-model",
+          self: false,
+          root: "C:/repos/csv-model",
+          provides: ["Dabbler.Csv.Model"],
+          consumes: [],
+          shell: false,
+        },
+        { id: "csv-cli", self: false, root: null, remote: null, provides: [], consumes: [], shell: true },
+      ],
+    } as Partial<Projection>);
+
+    const kinds = childrenOf({ kind: "solution" }, p).map((n) => n.kind);
+    assert.ok(kinds.includes("memberGroup"));
+    assert.deepStrictEqual(
+      childrenOf({ kind: "memberGroup" }, p).map((n) => (n as { id: string }).id),
+      ["csv-app", "csv-model", "csv-cli"],
+    );
+    const shell = descriptorFor({ kind: "member", id: "csv-cli" }, p);
+    assert.ok(shell.description?.includes("placemarker"));
+    assert.ok(shell.description?.includes("location undeclared"));
+    const producer = descriptorFor({ kind: "member", id: "csv-model" }, p);
+    assert.ok(producer.description?.includes("you take 1"));
   });
 
   test("resolves the path through the row the operator clicked", () => {

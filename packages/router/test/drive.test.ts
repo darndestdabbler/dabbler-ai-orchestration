@@ -165,7 +165,11 @@ function repoWithNoRemote(): { repo: string; sessionsDir: string } {
 }
 
 /** The verifier's scripted responses and the driver's budget, as the config. */
-function configure(responses: readonly string[], driver: Record<string, unknown> = {}): void {
+function configure(
+  responses: readonly string[],
+  driver: Record<string, unknown> = {},
+  extra: Record<string, unknown> = {},
+): void {
   const dir = makeTempDir();
   responses.forEach((text, index) => {
     writeFileSync(join(dir, `${String(index + 1).padStart(2, "0")}.md`), text, "utf8");
@@ -177,6 +181,7 @@ function configure(responses: readonly string[], driver: Record<string, unknown>
       transport: { profile: "offline" },
       testing: TESTING,
       driver,
+      ...extra,
     }),
   );
 }
@@ -635,6 +640,23 @@ describe("dabbler session drive", { timeout: 120_000 }, () => {
       "final-full:passed",
     ]);
     expect(sessionStatus(sessionsDir)).toBe("complete");
+  });
+
+  it("says an instruction is outstanding while a headless engine is quiet over it", async () => {
+    // The pull has a terminal to say it in; a driven run has its own stream,
+    // and the poll that watches for interrupts is the only thing awake while
+    // the engine holds the call. One threshold of a second, an engine that
+    // does nothing for two of them, and the rule -- the same one -- answers.
+    const { sessionsDir } = drivenRepo();
+    configure([VERIFIED], { max_invocations: 1 }, { verification: { stalled_after_seconds: 1 } });
+    const idle = scripted(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 2400));
+    });
+    const { out } = await drive(sessionsDir, idle);
+    const said = out.split("\n").filter((line) => line.includes("watcher "));
+    expect(said.length).toBeGreaterThanOrEqual(1);
+    expect(said[0]).toContain("state=instruction-outstanding");
+    expect(said[0]).toMatch(/since=\d+s/);
   });
 
   it("stops at the invocation budget and a re-run continues from the phase it reached", async () => {
@@ -1429,6 +1451,41 @@ describe("dabbler session next", { timeout: 120_000 }, () => {
     }
     expect(job?.argv.join(" ")).toContain("--max-rounds 1");
     expect(job?.argv.join(" ")).toContain("--transport offline");
+  });
+
+  it("answers verify's refusal by running the affected tests again, and stops with verify's own words when that cannot help", async () => {
+    const { repo, sessionsDir } = drivenRepo();
+    // No smoke fallback: a path the selector cannot map is a refusal the
+    // pre-verification phase can never satisfy, which is what proves the
+    // heal is BOUNDED. The honest case -- evidence the tree moved under --
+    // is answered by the same re-run, and would not stop at all.
+    configure([VERIFIED], {}, {
+      testing: { ...TESTING, selection: { ...TESTING.selection, smoke: [] } },
+    });
+    await throughTheStep(repo, sessionsDir);
+
+    let result = await next(sessionsDir);
+    writeFileSync(join(repo, "notes.txt"), "the selector maps this to nothing\n", "utf8");
+    // Every call's channel, because the heal is announced by the call that
+    // makes it and the stop is printed by a later one.
+    let said = result.err;
+    for (let call = 0; call < 400 && result.instruction?.kind === "wait"; call += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      result = await next(sessionsDir);
+      said += result.err;
+    }
+
+    const run = readRun(repo, 1);
+    // Twice round, then the operator: a loop that healed forever would be
+    // the deadlock this fix is about, wearing a different hat.
+    expect(run?.preverify_heals).toBe(2);
+    expect(run?.stop?.kind).toBe("verification");
+    // The refusal's OWN reason, which is what the deadlock classifier
+    // compares. The sentence it replaced was identical for every refusal
+    // verify has, so two unlike causes read as one impasse.
+    expect(run?.stop?.reason).toContain("notes.txt");
+    expect(run?.stop?.reason).not.toContain("nothing here can answer it");
+    expect(said).toContain("preverify-stale");
   });
 
   it("returns from every call that starts a job rather than waiting for it", async () => {

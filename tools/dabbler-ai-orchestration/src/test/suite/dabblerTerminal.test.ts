@@ -24,6 +24,8 @@ import {
   lineTone,
   paint,
   terminalLocation,
+  watcherLookMs,
+  watcherThreshold,
 } from "../../router/dabblerTerminal";
 import { makeTempDir, rmrf } from "./helpers";
 
@@ -537,3 +539,121 @@ function toneOf(tone: Tone, kind: "dark" | "light"): string {
 function bandOf(hex: string): string {
   return bandedLine("", hex === BAND_DARK ? "dark" : "light").split("m")[0] + "m";
 }
+
+/** The stub's configuration, set for one test and cleared after it. */
+function setConfig(key: string, value: unknown): void {
+  (vscode.workspace as unknown as {
+    __setConfig: (section: string, key: string, value: unknown) => void;
+  }).__setConfig("dabbler", key, value);
+}
+
+function clearConfig(): void {
+  (vscode.workspace as unknown as { __clearConfig: () => void }).__clearConfig();
+}
+
+suite("the watcher", () => {
+  const ISSUED = new Date(2026, 7, 31, 14, 28, 5).toISOString();
+
+  /** An instruction outstanding since `ISSUED`, which the fixture's clock is 120s past. */
+  function outstanding(driver: string, seq = 4): void {
+    fs.writeFileSync(
+      path.join(driver, "instruction.json"),
+      JSON.stringify({
+        schema_version: 1,
+        seq,
+        kind: "step",
+        session_number: 62,
+        issued_at: ISSUED,
+        step_id: "widget",
+        ask: "Make the widget real.",
+        answer_schema: "driver-report.schema.json",
+        answer_command: "dabbler session report --seq 4 --step widget ...",
+      }),
+      "utf8",
+    );
+  }
+
+  const WAITING = {
+    schema_version: 1,
+    session_number: 62,
+    engine: "claude-code",
+    phase: "steps",
+    seq: 4,
+    invocations: 0,
+    max_invocations: 24,
+    accepted_steps: [],
+    baseline_tree: null,
+    stop: null,
+    started_at: ISSUED,
+    updated_at: ISSUED,
+  };
+
+  test("says an instruction is outstanding once past the threshold, and not on every look", () => {
+    setConfig("stalledAfterSeconds", 60);
+    const { root, driver, written, terminal } = drivenRepo(WAITING);
+    outstanding(driver);
+
+    terminal.poll();
+    const said = written.filter((t) => plain(t).includes("watcher"));
+    assert.strictEqual(said.length, 1);
+    assert.ok(plain(said[0]).includes("since=120s state=instruction-outstanding"));
+    // Amber: a nudge, not a verdict, and the colour the indicator already uses.
+    assert.ok(said[0].includes(toneOf("warn", "dark")));
+
+    // The next look says nothing: the probe costs a git call, and one
+    // silence is one line.
+    written.length = 0;
+    terminal.poll();
+    assert.deepStrictEqual(written.filter((t) => plain(t).includes("watcher")), []);
+
+    terminal.dispose();
+    clearConfig();
+    rmrf(root);
+  });
+
+  test("stays quiet while the framework itself is working", () => {
+    setConfig("stalledAfterSeconds", 60);
+    // A job running is the framework doing something nobody is waiting on a
+    // person for -- the indicator's case, not the watcher's.
+    const { root, driver, written, terminal } = drivenRepo({
+      ...WAITING,
+      job: {
+        name: "verification",
+        argv: [],
+        pid: 1,
+        log: ".dabbler/runs/s62/driver/jobs/verification.log",
+        status: ".dabbler/runs/s62/driver/jobs/verification.status.json",
+        started_at: ISSUED,
+        retry_after_seconds: 30,
+      },
+    });
+    outstanding(driver);
+
+    terminal.poll();
+    assert.deepStrictEqual(written.filter((t) => plain(t).includes("watcher")), []);
+
+    terminal.dispose();
+    clearConfig();
+    rmrf(root);
+  });
+
+  test("is asked no more often than it can answer differently", () => {
+    // Half the threshold, bounded: at the default it is a git call a
+    // minute, never one per 500ms poll.
+    assert.strictEqual(watcherLookMs(1800), 60_000);
+    assert.strictEqual(watcherLookMs(60), 30_000);
+    assert.strictEqual(watcherLookMs(2), 5_000);
+  });
+
+  test("takes the operator's threshold over the repository's", () => {
+    const root = makeTempDir("dabbler-threshold-");
+    // No setting: the repository answers, and an unconfigured one answers
+    // with the framework's own default.
+    clearConfig();
+    assert.strictEqual(watcherThreshold(root), 1800);
+    setConfig("stalledAfterSeconds", 90);
+    assert.strictEqual(watcherThreshold(root), 90);
+    clearConfig();
+    rmrf(root);
+  });
+});

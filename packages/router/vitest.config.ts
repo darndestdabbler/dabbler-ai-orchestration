@@ -8,9 +8,14 @@ import { defineConfig } from "vitest/config";
 //
 // Measured on the twenty-core host, whole suite: 20 workers 94 s wall for
 // 873 s of test time, 4 workers 106 s for 352 s, 2 workers 138 s for 262 s.
-// Twenty is contention, not speed; four costs an eighth of the wall clock and
-// leaves the host usable.
-export const WORKERS_LOCAL = 4;
+// Twenty is contention, not speed.
+//
+// Two rather than four, on the operator's call: a four-worker run of record
+// during session 66 made the host unusable and had to be killed, which costs
+// the whole run rather than the difference between the two numbers. Two is a
+// third more wall clock -- 138 s against 106 s -- and that is what a machine
+// the operator can still type on costs.
+export const WORKERS_LOCAL = 2;
 export const WORKERS_CI = 1;
 
 /** The worker cap for the environment the suite runs in. */

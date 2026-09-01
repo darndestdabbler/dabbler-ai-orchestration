@@ -6,21 +6,28 @@
 // verb's own boundary, and the reader's refusal of a report somebody typed.
 
 import { mkdirSync, writeFileSync } from "node:fs";
-import { dirname } from "node:path";
+import { dirname, join } from "node:path";
 
 import { afterAll, describe, expect, it } from "vitest";
 
 import { sessionVerb } from "../src/cli/session.ts";
+import type { DriverInstruction, DriverRun } from "../src/generated/index.ts";
 import {
+  WATCHER_OUTSTANDING,
+  WATCHER_QUIET,
+  type WatcherInputs,
   readAmendments,
   readDispositions,
   readReport,
+  readWatcher,
   readWorkPlan,
   reportPath,
   validateDispositions,
   validateInstruction,
   validateReport,
+  treeTouchedAt,
   validateWorkPlan,
+  watcherReading,
   writeDispositions,
   writeInstruction,
   writeRun,
@@ -348,5 +355,125 @@ describe("dabbler session plan amend", () => {
     expect(late.code).toBe(3);
     expect(late.err).toContain("has already been accepted");
     expect(readAmendments(repo, 1)).toHaveLength(1);
+  });
+});
+
+describe("the watcher, which separates a thinking engine from a stopped one", () => {
+  const ISSUED = "2026-09-01T06:40:00-04:00";
+  const NOW = new Date("2026-09-01T06:41:12-04:00");
+  const INSTRUCTION = { ...STEP_INSTRUCTION, issued_at: ISSUED } as unknown as DriverInstruction;
+  const LIVE = { ...RUN, updated_at: ISSUED } as unknown as DriverRun;
+  const never = () => {
+    throw new Error("the tree was probed on a poll that could not use it");
+  };
+
+  it("stays quiet through every silence that is not the one it is for", () => {
+    // Each of these is a reason the engine owes nothing, or is known to be
+    // working. The probe throws, which is how "never run for nothing" is
+    // asserted rather than described.
+    const quiet = (inputs: Partial<WatcherInputs>) =>
+      watcherReading(
+        {
+          instruction: INSTRUCTION,
+          run: LIVE,
+          answeredAt: null,
+          treeTouchedAt: never,
+          ...inputs,
+        },
+        60,
+        NOW,
+      ).state;
+    expect(quiet({ instruction: null })).toBe(WATCHER_QUIET);
+    expect(quiet({ instruction: { ...INSTRUCTION, kind: "wait" } as DriverInstruction })).toBe(
+      WATCHER_QUIET,
+    );
+    expect(quiet({ instruction: { ...INSTRUCTION, kind: "done" } as DriverInstruction })).toBe(
+      WATCHER_QUIET,
+    );
+    expect(
+      quiet({
+        run: { ...LIVE, stop: { kind: "tests", reason: "red", at: ISSUED } } as DriverRun,
+      }),
+    ).toBe(WATCHER_QUIET);
+    expect(
+      quiet({
+        run: {
+          ...LIVE,
+          job: {
+            name: "verification",
+            argv: [],
+            pid: 1,
+            log: "l",
+            status: "s",
+            started_at: ISSUED,
+            retry_after_seconds: 30,
+          },
+        } as DriverRun,
+      }),
+    ).toBe(WATCHER_QUIET);
+    // An answer written after the instruction was issued -- whether or not
+    // the driver has read it yet.
+    expect(quiet({ answeredAt: "2026-09-01T06:41:00-04:00" })).toBe(WATCHER_QUIET);
+    // An answer to something EARLIER is not an answer to this, and the
+    // probe is reached for the first time here.
+    expect(
+      watcherReading(
+        {
+          instruction: INSTRUCTION,
+          run: LIVE,
+          answeredAt: "2026-09-01T06:39:00-04:00",
+          treeTouchedAt: () => null,
+        },
+        60,
+        NOW,
+      ).state,
+    ).toBe(WATCHER_OUTSTANDING);
+    // Inside the threshold, nothing is owed but patience.
+    expect(
+      watcherReading(
+        { instruction: INSTRUCTION, run: LIVE, answeredAt: null, treeTouchedAt: never },
+        600,
+        NOW,
+      ).state,
+    ).toBe(WATCHER_QUIET);
+    // Past it, but the engine is editing.
+    expect(
+      watcherReading(
+        {
+          instruction: INSTRUCTION,
+          run: LIVE,
+          answeredAt: null,
+          treeTouchedAt: () => "2026-09-01T06:41:05-04:00",
+        },
+        60,
+        NOW,
+      ).state,
+    ).toBe(WATCHER_QUIET);
+  });
+
+  it("says an instruction is outstanding over a tree that has not moved", () => {
+    const reading = watcherReading(
+      { instruction: INSTRUCTION, run: LIVE, answeredAt: null, treeTouchedAt: () => null },
+      60,
+      NOW,
+    );
+    expect(reading.state).toBe(WATCHER_OUTSTANDING);
+    expect(reading.sinceSeconds).toBe(72);
+  });
+
+  it("reads one session's directory, and the tree it is over", () => {
+    const repo = makeProject();
+    // Nothing asked for is nothing to say, before any file exists.
+    expect(readWatcher(repo, 1, 60, NOW).state).toBe(WATCHER_QUIET);
+    writeInstruction(repo, 1, { ...STEP_INSTRUCTION, issued_at: ISSUED });
+    writeRun(repo, 1, { ...RUN, updated_at: ISSUED });
+    // The driver's own files are under `.dabbler/`, which is ignored, so the
+    // probe sees an untouched tree and the watcher speaks.
+    expect(readWatcher(repo, 1, 60, NOW).state).toBe(WATCHER_OUTSTANDING);
+    // A file written now is newer than an instruction issued in the past,
+    // and the probe is what says so.
+    writeFileSync(join(repo, "widget.ts"), "export const widget = 1;\n");
+    expect(Date.parse(treeTouchedAt(repo) as string)).toBeGreaterThan(Date.parse(ISSUED));
+    expect(readWatcher(repo, 1, 60, NOW).state).toBe(WATCHER_QUIET);
   });
 });

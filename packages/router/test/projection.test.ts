@@ -11,6 +11,7 @@ import { dirname, join } from "node:path";
 
 import { afterAll, describe, expect, it } from "vitest";
 
+import { writeRun } from "../src/driver.ts";
 import { snapshotWorktreeTree } from "../src/journal.ts";
 import {
   appendRound,
@@ -929,6 +930,33 @@ describe("liveness, derived rather than stamped", () => {
     const at = lastActivityAt(sessionsDir, repo, 1);
     expect(typeof at).toBe("string");
     expect(Date.parse(at as string)).toBeGreaterThan(0);
+  });
+
+  it("reads the driven session's own directory, which is where its work is", () => {
+    // The gap session 66 was measured in: eight steps accepted over two
+    // hours moved the driver's three files and nothing in the ledger or the
+    // activity log, so liveness answered with the registration and called a
+    // working session stalled.
+    const { repo, sessionsDir } = makeSandboxRepo();
+    start(sessionsDir);
+    const registered = lastActivityAt(sessionsDir, repo, 1) as string;
+    const later = "2099-01-01T00:00:00-04:00";
+    writeRun(repo, 1, {
+      schema_version: 1,
+      session_number: 1,
+      engine: "claude-code",
+      phase: "steps",
+      seq: 1,
+      invocations: 0,
+      max_invocations: 24,
+      accepted_steps: [],
+      baseline_tree: null,
+      stop: null,
+      started_at: registered,
+      updated_at: later,
+    });
+    expect(lastActivityAt(sessionsDir, repo, 1)).toBe(later);
+    expect(possiblyStalled(later, 1, 60, new Date("2099-01-01T00:00:30-04:00"))).toBe(false);
   });
 
   it("says nothing about a repository nothing has run in", () => {

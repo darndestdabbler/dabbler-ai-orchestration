@@ -126,6 +126,40 @@ export function jobsDir(repoRoot: string, sessionNumber: number): string {
 }
 
 /**
+ * Where a job by that name writes, whether or not one is running.
+ *
+ * The name decides the path, so a job's output can be re-read after the
+ * record has let go of it -- which is the only way to read the REASON a
+ * finished verb refused with. Without it a caller has the exit code and
+ * nothing else, and two unlike refusals sharing a code are one refusal.
+ */
+export function jobLogPath(repoRoot: string, sessionNumber: number, name: string): string {
+  return join(jobsDir(repoRoot, sessionNumber), `${slug(name)}.log`);
+}
+
+/**
+ * The last `lines` lines a job wrote, trimmed; empty when there is no log.
+ *
+ * A tail rather than the whole thing: a verb's refusal is the last thing it
+ * says, and a suite's log is megabytes of somebody else's output.
+ */
+export function jobLogTail(repoRoot: string, sessionNumber: number, name: string, lines = 12): string {
+  let text: string;
+  try {
+    text = readFileSync(jobLogPath(repoRoot, sessionNumber, name), "utf8");
+  } catch {
+    return "";
+  }
+  return text
+    .split("\n")
+    .map((line) => line.trimEnd())
+    .filter((line) => line !== "")
+    .slice(-lines)
+    .join("\n")
+    .trim();
+}
+
+/**
  * Start `argv` detached and return the record that finds it again.
  *
  * The caller does not wait: the child is unrefd and its stdio ignored, so

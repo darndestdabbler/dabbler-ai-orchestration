@@ -35,7 +35,7 @@
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 
-import { preverifyBaseline, workingTreeChanges } from "./affected.ts";
+import { preverifyBaseline, preverifyGate, workingTreeChanges } from "./affected.ts";
 import {
   checkRunGreen,
   loadSelectionConfig,
@@ -58,12 +58,14 @@ import {
   DRIVER_DIRNAME,
   DRIVER_SCHEMA_VERSION,
   REPORT_SCHEMA,
+  WATCHER_OUTSTANDING,
   WORK_PLAN_SCHEMA,
   instructionPath,
   readDispositions,
   readInstruction,
   readReport,
   readRun,
+  readWatcher,
   readWorkPlan,
   takeInterrupt,
   transcriptPath,
@@ -81,7 +83,7 @@ import type {
   DriverWorkPlan,
   Triage,
 } from "./generated/index.ts";
-import { type Job, pollJob, selfArgv, startJob } from "./jobs.ts";
+import { type Job, jobLogTail, pollJob, selfArgv, startJob } from "./jobs.ts";
 import {
   changedPathsBetween,
   nowIso,
@@ -96,7 +98,7 @@ import {
   raiseOwed,
   supersedeOwed,
 } from "./owedDecisions.ts";
-import { readSessionState, sessionDisplayNumber } from "./progress.ts";
+import { readSessionState, sessionDisplayNumber, stalledAfterSeconds } from "./progress.ts";
 import { TriageError, type TriageOutcome, collectArtifacts, triage } from "./triage.ts";
 import {
   EXIT_BOUNDARY,
@@ -170,6 +172,17 @@ export const MAX_REJECTIONS = 3;
 const JOB_POLL_MS = 250;
 /** What a `wait` tells the engine to leave the framework's work alone for. */
 const VERIFY_RETRY_SECONDS = 60;
+/**
+ * How many times one run may answer a verify refusal by re-running the
+ * pre-verification phase.
+ *
+ * One heal is the honest case: the tree moved after the targeted run, the
+ * tests run again, verification proceeds. A gate the preverify phase cannot
+ * satisfy -- an unmapped path with no smoke fallback, a malformed selection
+ * -- would otherwise put the two phases in a loop, so the second refusal is
+ * the operator's, with verify's own words.
+ */
+const PREVERIFY_HEAL_CAP = 2;
 const SUITE_RETRY_SECONDS = 60;
 const CLOSE_RETRY_SECONDS = 15;
 // A pack and a push to a feed are a build and a network call; the suite is
@@ -927,7 +940,33 @@ ${this.stopArtifacts()}`,
     const controller = new AbortController();
     let reason: string | null = null;
     let stopRequested = false;
+    // The watcher, on the one channel a headless run has. Under the pull the
+    // terminal asks the rule itself; here the driver holds the child and
+    // this poll is the only thing awake while the engine runs, so it asks
+    // the same rule and says the answer in the same words.
+    //
+    // The elapsed test is done from the instruction in hand, and the rule --
+    // whose tree probe costs a git call -- is asked only when a further
+    // threshold has actually passed. So the probe runs once per threshold,
+    // not once per 500ms poll.
+    const threshold = stalledAfterSeconds(this.repoRoot);
+    const issued = Date.parse(instruction.issued_at);
+    let saidMultiple = 0;
     const poll = setInterval(() => {
+      if (reason === null && Number.isFinite(issued) && threshold > 0) {
+        const elapsed = Math.trunc((Date.now() - issued) / 1000);
+        const multiple = Math.trunc(elapsed / threshold);
+        // Strictly past the threshold, matching the rule itself: asking it
+        // at exactly the threshold would spend the probe on a `quiet` and
+        // then count that multiple as said.
+        if (elapsed > threshold && multiple > saidMultiple) {
+          saidMultiple = multiple;
+          const reading = readWatcher(this.repoRoot, this.sessionNumber, threshold);
+          if (reading.state === WATCHER_OUTSTANDING) {
+            this.log("watcher", { since: `${reading.sinceSeconds}s`, state: reading.state });
+          }
+        }
+      }
       if (reason !== null) return;
       const request = takeInterrupt(this.repoRoot, this.sessionNumber);
       if (request === null) return;
@@ -1613,9 +1652,45 @@ ${this.stopArtifacts()}`,
       this.setPhase("dispositions");
       return;
     }
+    // Neither passed nor found anything: verify REFUSED, and its reason is
+    // in the log it just wrote. Reading it is the whole of what follows --
+    // a refusal the driver can answer, and a stop that says which refusal
+    // it was.
+    const reason = jobLogTail(this.repoRoot, this.sessionNumber, "verification");
+
+    // The one refusal this loop can answer by itself. `verify` requires
+    // targeted evidence matching the tree it is about to review, and the
+    // pre-verification phase is what produces exactly that -- so a driver
+    // that stopped here would be stopping in front of its own next move,
+    // and re-running `verify` reaches this point forever. Session 66 spent
+    // a 24-file, 687-test cycle on it and the operator typed the command by
+    // hand.
+    let gate: { ok: boolean; reason: string } = { ok: true, reason: "" };
+    try {
+      gate = preverifyGate(this.repoRoot, this.sessionsDir, loadConfig(undefined, this.repoRoot));
+    } catch {
+      // A config this process cannot read is not a refusal this loop can
+      // answer. It stops, with verify's reason, which is where the fault
+      // will be described anyway.
+    }
+    const healed = this.run.preverify_heals ?? 0;
+    if (!gate.ok && healed < PREVERIFY_HEAL_CAP) {
+      this.log("preverify-stale", { reason: gate.reason, heal: `${healed + 1}/${PREVERIFY_HEAL_CAP}` });
+      this.run = { ...this.run, preverify_heals: healed + 1 };
+      this.save();
+      this.setPhase("preverify");
+      return;
+    }
+
+    // A stop, and it says WHICH refusal. The identical sentence two unlike
+    // refusals used to arrive in is what made the deadlock classifier -- it
+    // compares kind, step and reason -- call a red control and stale
+    // evidence the same impasse, and tell the operator that running it again
+    // would change nothing when running it again was exactly right.
     throw new Stop(
       "verification",
-      `dabbler verify exited ${code} (its reason is above); nothing here can answer it`,
+      `dabbler verify refused (exit ${code}): ` +
+        (reason || "it wrote no reason; its log is under the run's jobs directory"),
     );
   }
 

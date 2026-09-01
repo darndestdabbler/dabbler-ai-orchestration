@@ -21,7 +21,7 @@
 // outstanding seq, the step that was asked for, do the files exist, does
 // the check pass -- is the driver's judgment, and it lives in one place.
 
-import { existsSync, readFileSync, unlinkSync } from "node:fs";
+import { existsSync, readFileSync, statSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 
 import type {
@@ -31,6 +31,7 @@ import type {
   DriverRun,
   DriverWorkPlan,
 } from "./generated/index.ts";
+import { MACHINE_DIRNAME, runGit } from "./journal.ts";
 import {
   LedgerError,
   type Row,
@@ -570,6 +571,179 @@ export function shapeReport(input: ReportInput, reportedAt: string): Record<stri
     notes: input.notes,
     reported_at: reportedAt,
   };
+}
+
+// --- The watcher -------------------------------------------------------------
+//
+// Two silences look identical from outside: an engine thinking, and an
+// engine that has stopped. Nothing here observes the engine -- it is the
+// person's own CLI, which is the property the pull was built for -- so the
+// rule is read from the three things the conversation of files already
+// says: an instruction was issued, nothing answered it, and the tree has
+// not moved since. Past the threshold, that is the second silence.
+//
+// It is stated ONCE, here, and rendered by whoever is watching: the Dabbler
+// terminal under the pull, the driver's own log under the push. A second
+// statement of it in a renderer is the drift this file's own header
+// forbids.
+
+/** The engine is thinking, or nobody is owed anything. Nothing to say. */
+export const WATCHER_QUIET = "quiet";
+/** An instruction is outstanding, unanswered, over a tree that has not moved. */
+export const WATCHER_OUTSTANDING = "instruction-outstanding";
+
+export type WatcherState = typeof WATCHER_QUIET | typeof WATCHER_OUTSTANDING;
+
+export interface WatcherReading {
+  readonly state: WatcherState;
+  /** Seconds the instruction has been outstanding; zero when quiet. */
+  readonly sinceSeconds: number;
+}
+
+export interface WatcherInputs {
+  readonly instruction: DriverInstruction | null;
+  readonly run: DriverRun | null;
+  /**
+   * When this conversation was last answered, or null when it never was.
+   *
+   * The answer FILES, not the run record. `issue` writes the instruction and
+   * saves the run a millisecond later, so a run stamped after the issuing is
+   * every outstanding instruction there has ever been -- a signal that reads
+   * "answered" always is worse than none.
+   */
+  readonly answeredAt: string | null;
+  /**
+   * When the working tree was last touched, or null when that is unknown.
+   *
+   * A thunk rather than a value because it costs a `git status`, and the
+   * cheap tests above it settle most polls: a probe run on a poll that could
+   * not have used its answer is a git call per 500ms for nothing.
+   */
+  readonly treeTouchedAt: () => string | null;
+}
+
+/** The instruction kinds that expect an engine answer. `wait` and `done` do not. */
+const ANSWERABLE_KINDS: readonly string[] = ["step", "rejection", "interrupt"];
+
+const QUIET: WatcherReading = { state: WATCHER_QUIET, sinceSeconds: 0 };
+
+/**
+ * Which silence this is, from the records alone.
+ *
+ * Quiet through every one of the ordinary ones: nothing asked for; an
+ * instruction that expects no answer; a run that has stopped, which is a
+ * row of its own and not this one; a job running, which is the framework
+ * working rather than the engine; an answer written after the instruction
+ * was issued, whether or not the driver has read it yet; a tree touched
+ * since, which is the engine editing; and anything inside the threshold.
+ */
+export function watcherReading(
+  inputs: WatcherInputs,
+  thresholdSeconds: number,
+  now: Date = new Date(),
+): WatcherReading {
+  const instruction = inputs.instruction;
+  if (instruction === null) return QUIET;
+  if (!ANSWERABLE_KINDS.includes(instruction.kind)) return QUIET;
+  const issued = Date.parse(instruction.issued_at);
+  if (!Number.isFinite(issued)) return QUIET;
+  const run = inputs.run;
+  if (run !== null) {
+    if (run.stop) return QUIET;
+    if (run.job) return QUIET;
+  }
+  const answered = Date.parse(inputs.answeredAt ?? "");
+  if (Number.isFinite(answered) && answered > issued) return QUIET;
+  const elapsed = Math.trunc((now.getTime() - issued) / 1000);
+  if (elapsed <= thresholdSeconds) return QUIET;
+  const touched = Date.parse(inputs.treeTouchedAt() ?? "");
+  if (Number.isFinite(touched) && touched > issued) return QUIET;
+  return { state: WATCHER_OUTSTANDING, sinceSeconds: elapsed };
+}
+
+/**
+ * When the working tree was last touched, or null.
+ *
+ * The mtime of the newest path `git status --porcelain` names -- the files
+ * an engine's edits show up in. A tree with nothing changed answers null,
+ * which is not "long ago": it is "this signal has nothing to say", and the
+ * rule above treats it as such rather than as evidence of a stall.
+ *
+ * A path git had to quote is read as it was written, quotes and all, and
+ * fails to stat. That costs the probe one path and never the reverse: the
+ * watcher speaks one silence too many, it does not miss one.
+ *
+ * `.dabbler/` is skipped whatever the repository's ignore rules say. The
+ * question is whether the ENGINE is editing, and the framework's own record
+ * -- this very instruction, written a moment ago -- is not an answer to it.
+ * A project that has not ignored the machine directory would otherwise
+ * report a tree touched by the act of asking.
+ */
+export function treeTouchedAt(repoRoot: string): string | null {
+  const status = runGit(repoRoot, ["status", "--porcelain"]);
+  if (status.code !== 0) return null;
+  let newest = 0;
+  for (const line of status.stdout.split("\n")) {
+    if (line.length < 4) continue;
+    const named = line.slice(3);
+    // A rename reports `old -> new`; the new name is the one that was written.
+    const path = named.includes(" -> ") ? named.slice(named.indexOf(" -> ") + 4) : named;
+    if (path === MACHINE_DIRNAME || path.startsWith(`${MACHINE_DIRNAME}/`)) continue;
+    try {
+      const at = statSync(join(repoRoot, path)).mtimeMs;
+      if (at > newest) newest = at;
+    } catch {
+      // Gone between the status and the stat, or a name git quoted. Either
+      // way it contributes nothing rather than failing the probe.
+    }
+  }
+  return newest === 0 ? null : new Date(newest).toISOString();
+}
+
+/**
+ * The rule, applied to one session's driver directory.
+ *
+ * A record that will not parse is quiet: the watcher is a courtesy, and a
+ * courtesy that threw would take the terminal with it.
+ */
+export function readWatcher(
+  repoRoot: string,
+  sessionNumber: number,
+  thresholdSeconds: number,
+  now: Date = new Date(),
+): WatcherReading {
+  let instruction: DriverInstruction | null;
+  let run: DriverRun | null;
+  let answeredAt: string | null;
+  try {
+    instruction = readInstruction(repoRoot, sessionNumber);
+    run = readRun(repoRoot, sessionNumber);
+    answeredAt = lastAnsweredAt(repoRoot, sessionNumber);
+  } catch {
+    return QUIET;
+  }
+  return watcherReading(
+    { instruction, run, answeredAt, treeTouchedAt: () => treeTouchedAt(repoRoot) },
+    thresholdSeconds,
+    now,
+  );
+}
+
+/**
+ * The newest stamp on any of the three files an instruction is answered
+ * with, or null when none has been written.
+ *
+ * All three, because an instruction names one of them and the watcher does
+ * not care which: a work plan, a step report and a disposition set are the
+ * same event as far as "the engine came back" is concerned.
+ */
+function lastAnsweredAt(repoRoot: string, sessionNumber: number): string | null {
+  const stamps = [
+    readReport(repoRoot, sessionNumber)?.reported_at,
+    readWorkPlan(repoRoot, sessionNumber)?.recorded_at,
+    readDispositions(repoRoot, sessionNumber)?.recorded_at,
+  ].filter((at): at is string => typeof at === "string" && at !== "");
+  return stamps.length === 0 ? null : stamps.reduce((latest, at) => (at > latest ? at : latest));
 }
 
 // --- Shaping an answer file --------------------------------------------------

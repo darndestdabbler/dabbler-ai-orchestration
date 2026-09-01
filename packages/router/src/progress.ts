@@ -28,7 +28,7 @@ import {
   STATE_FILENAME,
   repoRootFromSessionsDir,
 } from "./evidence.ts";
-import { readRun } from "./driver.ts";
+import { readInstruction, readReport, readRun } from "./driver.ts";
 import { nowIso } from "./journal.ts";
 import {
   LedgerError,
@@ -1588,6 +1588,17 @@ export const DEFAULT_STALLED_AFTER_SECONDS = 1800;
  * The agent writes neither this nor the judgment below, which is the
  * property worth protecting: an engine that reports its own liveness reports
  * it right up until the moment it cannot.
+ *
+ * **The driver's own directory is one of those places.** It used to read the
+ * ledger, the activity log and the verification rounds and nothing else,
+ * which meant that a driven session's whole working stretch was invisible to
+ * it: measured mid-session 66, two hours in with eight steps accepted, this
+ * answered with the session's registration and the judgment below called it
+ * a stall. Every one of those eight moves was written to
+ * `driver/instruction.json`, `driver/report.json` and `driver/run.json`, and
+ * to nothing this function looked at -- so the signal read identically
+ * through the productive stretch and through the forty minutes the engine
+ * really was stopped, and could not discriminate at all.
  */
 export function lastActivityAt(
   sessionsDir: string,
@@ -1613,14 +1624,33 @@ export function lastActivityAt(
     if (typeof at === "string" && at) stamps.push(at);
   }
   if (repoRoot !== null && Number.isInteger(sessionNumber)) {
+    const number = sessionNumber as number;
     try {
-      for (const round of readRounds(repoRoot, sessionNumber as number)) {
+      for (const round of readRounds(repoRoot, number)) {
         const at = round["recorded_at"];
         if (typeof at === "string" && at) stamps.push(at);
       }
     } catch {
       // An unreadable ledger is `verification_clean`'s to refuse. Liveness
       // does not get to fail a projection over it.
+    }
+    try {
+      // The driven session's own three, through the readers that own their
+      // shapes rather than by statting the files: an mtime says when the
+      // disk was written, and these say when the framework and the engine
+      // each moved, which is the question.
+      for (const at of [
+        readRun(repoRoot, number)?.updated_at,
+        readInstruction(repoRoot, number)?.issued_at,
+        readReport(repoRoot, number)?.reported_at,
+      ]) {
+        // Empty is never pushed: "no stamp" and "the epoch" are different
+        // answers, and only the first may leave this function null.
+        if (typeof at === "string" && at) stamps.push(at);
+      }
+    } catch {
+      // Same rule as the rounds above: a driver record that will not parse
+      // is the driver's own refusal to raise, never a projection's.
     }
   }
   if (stamps.length === 0) return null;

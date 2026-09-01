@@ -40,6 +40,8 @@ import * as fs from "fs";
 import * as path from "path";
 import * as vscode from "vscode";
 
+import { WATCHER_OUTSTANDING, readWatcher, stalledAfterSeconds } from "dabbler-ai-router";
+
 import { RUNS_REL } from "../utils/projection";
 
 /**
@@ -179,6 +181,11 @@ export function verdictTone(verdict: string): Tone {
  */
 export function lineTone(event: string, fields: Record<string, string> = {}): Tone {
   if (event === "stopped") return "bad";
+  // The watcher is a nudge, not a verdict: nothing has gone wrong that the
+  // framework knows of, and the only thing being said is that the engine
+  // has been quiet over an unmoved tree. `warn` is the amber the indicator
+  // already spins in, which is exactly the weight it should carry.
+  if (event === "watcher") return "warn";
   if (event === "verify") return verdictTone(fields["verdict"] ?? "");
   if (event === "tests") return (fields["outcome"] ?? "") === "passed" ? "good" : "bad";
   if (event === "phase") {
@@ -216,6 +223,8 @@ export type Activity = "working" | "waiting";
 interface RunRecord {
   readonly session_number?: number;
   readonly phase?: string;
+  /** The seq of the instruction last issued: which silence is being watched. */
+  readonly seq?: number;
   readonly stop?: { kind?: string; reason?: string } | null;
   readonly job?: {
     name?: string;
@@ -381,6 +390,40 @@ export function currentActivity(repoRoot: string): Activity {
   return run.job ? "working" : "waiting";
 }
 
+/**
+ * The threshold the watcher is judged against, in the precedence the Work
+ * Explorer already publishes: the operator's editor setting, then the
+ * repository's own `verification.stalled_after_seconds`, then the default.
+ *
+ * The middle tier is asked of the router rather than restated here. A
+ * renderer that fell back to a number of its own would quietly ignore a
+ * threshold somebody set in `dabbler.yaml` on purpose.
+ */
+export function watcherThreshold(repoRoot: string): number {
+  try {
+    const configured = vscode.workspace
+      .getConfiguration(SETTINGS_SECTION)
+      .get<number>(STALLED_AFTER_KEY);
+    if (typeof configured === "number" && configured > 0) return Math.trunc(configured);
+  } catch {
+    // No configuration host, which is the unit suite. The repository answers.
+  }
+  return stalledAfterSeconds(repoRoot);
+}
+
+/**
+ * How often the watcher may be consulted at all.
+ *
+ * The rule's own tree probe costs a `git status`, and this terminal looks
+ * every 500 ms. Half the threshold, bounded, is often enough that the line
+ * lands within a poll of the crossing and rare enough that a session is not
+ * paying for a git call twice a second: at the default 1800 s it is one a
+ * minute, at a 60 s threshold one every thirty seconds.
+ */
+export function watcherLookMs(thresholdSeconds: number): number {
+  return Math.min(60, Math.max(5, Math.trunc(thresholdSeconds / 2))) * 1000;
+}
+
 function readRun(runPath: string): RunRecord | null {
   try {
     const parsed: unknown = JSON.parse(fs.readFileSync(runPath, "utf8"));
@@ -451,6 +494,12 @@ export class DabblerTerminal implements vscode.Pseudoterminal {
 
   /** Log paths the record already announced, so nothing is announced twice. */
   private readonly announced = new Set<string>();
+
+  /** When the watcher was last consulted, so its tree probe is not run per tick. */
+  private lastLook = 0;
+  /** The instruction being watched, and how many thresholds have been said of it. */
+  private watchedSeq: number | null = null;
+  private saidMultiple = 0;
 
   /**
    * How many rows of each JSONL record have been said, by absolute path.
@@ -653,6 +702,41 @@ export class DabblerTerminal implements vscode.Pseudoterminal {
     // still appear to be spinning, however briefly.
     if (this.activity === "working") this.draw();
     else this.erase();
+
+    this.watch(run);
+  }
+
+  /**
+   * The other silence: an instruction issued, nothing answering it, over a
+   * tree that has not moved.
+   *
+   * The rule is the router's -- this asks it and paints the answer. What is
+   * decided here is only how OFTEN to ask (the probe costs a git call) and
+   * how often to say it: once when the threshold is first crossed, and again
+   * at each further multiple of it, so a session left alone keeps saying so
+   * without saying it twice a second.
+   */
+  private watch(run: RunRecord): void {
+    const session = run.session_number;
+    if (session === undefined) return;
+    const threshold = watcherThreshold(this.repoRoot);
+    const now = this.now();
+    if (now.getTime() - this.lastLook < watcherLookMs(threshold)) return;
+    this.lastLook = now.getTime();
+
+    const seq = run.seq ?? null;
+    if (seq !== this.watchedSeq) {
+      // A new instruction is a new silence: whatever was said of the last
+      // one says nothing about this one.
+      this.watchedSeq = seq;
+      this.saidMultiple = 0;
+    }
+    const reading = readWatcher(this.repoRoot, session, threshold, now);
+    if (reading.state !== WATCHER_OUTSTANDING) return;
+    const multiple = Math.trunc(reading.sinceSeconds / threshold);
+    if (multiple <= this.saidMultiple) return;
+    this.saidMultiple = multiple;
+    this.line("watcher", { since: `${reading.sinceSeconds}s`, state: reading.state });
   }
 
   /**
@@ -849,6 +933,8 @@ export type TerminalLocation = "editor" | "panel";
 /** The setting that says it, in the two halves `getConfiguration` takes. */
 export const SETTINGS_SECTION = "dabbler";
 export const TERMINAL_LOCATION_KEY = "terminalLocation";
+/** The operator's stall threshold, which the watcher line is judged against too. */
+export const STALLED_AFTER_KEY = "stalledAfterSeconds";
 
 /**
  * Where this window puts the CLI and the framework's terminal.

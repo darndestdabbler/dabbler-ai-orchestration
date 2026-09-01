@@ -102,7 +102,10 @@ it.
 | 64 | The operator onboarding deck | no | 2026-08-31 |
 | 65 | The half of the trial that needs a published router | no | 2026-09-01 |
 | 66 | The publish phase | no | 2026-09-01 |
-| 67 | The half of the trial that needs a published router | — | not declared |
+| 67 | The watcher, and the driver's blind spots | no | 2026-09-01 |
+| 68 | The logic tree, harvested and held to the code | — | not declared |
+| 69 | The Solution Explorer goes multi-repository | — | not declared |
+| 70 | The half of the trial that needs a published router | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -1689,3 +1692,9 @@ The csv-model papercuts: the console windows that steal the cursor (windowsHide 
 **Releasable: no.**
 
 A miscellaneous session, on the operator's call: the publish gap the csv-model trial found, the CI failure that has kept master red for weeks, the animated indicator the Dabbler terminal has never had, and the four spawn sites session 65 could not reach. CI first, because it is one line and it has been hiding a green router suite: the repository declares no line endings, every text file is stored LF, and core.autocrlf is true on windows-latest -- so a fresh clone writes CRLF, the generator renders LF, and all 31 generated modules compare unequal. Then publishing: a publish phase between land and close for a session declared releasable, a published_when_releasable close gate so a releasable session can never again close VERIFIED having shipped nothing, secret made optional for a feed that is a filesystem path, and the managed body's claim that the framework publishes made true. Then windowsHide on the git, facts, release and Copilot spawns. Then the spinner.
+
+### Session 67 — The watcher, and the driver's blind spots
+
+**Releasable: no.**
+
+The watcher, and the driver's blind spots. Four of session 66's own findings, three of which share one root: the driver treating an exit code as opaque when the process it ran printed a specific, routable reason. First, two workers instead of four, on the operator's call after a 4-worker run of record made the host unusable and had to be killed -- 106 s wall / 352 s test time at four, 138 s / 262 s at two on the twenty-core host, so a third more wall clock buys a machine the operator can still type on; WORKERS_CI stays 1. Second, lastActivityAt reads the driver's own run record: measured mid-session 66, two hours in with eight steps accepted, it reported possiblyStalled with lastActivityAt frozen at registration, because it reads the ledger, the activity log and the verification rounds and never driver/run.json, driver/instruction.json or driver/report.json -- so every instruction issued, answered and accepted moved nothing it looks at, and it would have looked identical during the forty minutes the engine actually was stopped. Third, the watcher line: the rule that separates the two silences -- an instruction issued, no report answering it, and no tree change since it was issued, past the existing stalled_after_seconds threshold -- stated once in the router and rendered by the Dabbler terminal in its existing grammar as a warn-toned `watcher since=60s state=instruction-outstanding` line, a new case in lineTone rather than new rendering machinery, with the headless case carried on the driver's own log channel through the poll invoke already runs. Fourth, the driver reads verify's reason instead of only its exit code: it re-reads the refusal from the job log verify wrote it to, so a stale pre-verification precondition self-heals by setting the phase back to preverify (bounded, and recorded on the run) instead of re-running verify to the same point forever, and two genuinely different refusals no longer arrive inside one identical driver sentence, which is what made the deadlock classifier declare a deadlock between unrelated causes.

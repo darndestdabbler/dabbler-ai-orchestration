@@ -114,6 +114,10 @@ export type DriverRun = {
    */
   rejections?: number;
   /**
+   * How many times this run has answered a verify refusal by going back to the pre-verification phase rather than stopping. `verify` refuses when the targeted evidence does not match the tree, and running the affected tests again is exactly what makes that precondition true -- so the driver heals it instead of stopping in a phase it would re-enter forever. It is counted, and on disk rather than in a local, because a gate the preverify phase CANNOT satisfy would otherwise loop between the two: past the bound the driver stops and hands the operator verify's own reason.
+   */
+  preverify_heals?: number;
+  /**
    * The one long-running thing the framework has started and has not yet collected, or null. Long work is never awaited inside a call: a verification round, the complete suite and the close each outlast an engine's tool timeout, so they are started detached and the following call reports progress or the result.
    */
   job?: {

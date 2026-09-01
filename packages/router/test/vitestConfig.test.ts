@@ -9,6 +9,8 @@ describe("the suite's worker pool", () => {
     expect(workerCap({ CI: "true" })).toBe(WORKERS_CI);
     expect(WORKERS_CI).toBe(1);
     expect(workerCap({})).toBe(WORKERS_LOCAL);
-    expect(WORKERS_LOCAL).toBeLessThanOrEqual(4);
+    // Pinned rather than bounded: the value is the operator's call, made
+    // after a four-worker run of record took the host with it.
+    expect(WORKERS_LOCAL).toBe(2);
   });
 });

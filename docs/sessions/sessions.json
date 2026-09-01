@@ -1315,16 +1315,54 @@
         "identityProvenance": "direct"
       },
       "verificationVerdict": "VERIFIED",
-      "frameworkVersion": "2.0.0",
       "verification": {
         "rounds": 2,
+        "verifierModel": "gpt-5-6-sol",
+        "verifierProvider": "openai",
+        "transport": "api"
+      },
+      "frameworkVersion": "2.0.0"
+    },
+    {
+      "number": 67,
+      "title": "The watcher, and the driver's blind spots",
+      "status": "in-progress",
+      "startedAt": "2026-09-01T08:30:02.792000-04:00",
+      "completedAt": null,
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": "VERIFIED",
+      "frameworkVersion": "2.0.0",
+      "verification": {
+        "rounds": 1,
         "verifierModel": "gpt-5-6-sol",
         "verifierProvider": "openai",
         "transport": "api"
       }
     },
     {
-      "number": 67,
+      "number": 68,
+      "title": "The logic tree, harvested and held to the code",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    },
+    {
+      "number": 69,
+      "title": "The Solution Explorer goes multi-repository",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    },
+    {
+      "number": 70,
       "title": "The half of the trial that needs a published router",
       "status": "not-started",
       "startedAt": null,

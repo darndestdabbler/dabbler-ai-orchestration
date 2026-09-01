@@ -28,3 +28,23 @@ export {
 // shell, a `.cmd` shim quoted, its own process group on POSIX) rather than
 // restating it.
 export { spawnProgram, terminateTree } from "./checks.ts";
+// The watcher rule, for the same reason: the Dabbler terminal is what
+// renders "an instruction is outstanding and nothing has answered it", and
+// a renderer that decided it for itself would be a second statement of a
+// rule the driver already owns.
+export {
+  WATCHER_OUTSTANDING,
+  WATCHER_QUIET,
+  readWatcher,
+  treeTouchedAt,
+  watcherReading,
+  type WatcherInputs,
+  type WatcherReading,
+  type WatcherState,
+} from "./driver.ts";
+// The threshold that rule is judged against, from the repository's own
+// configuration. The operator's editor setting still wins over it -- that
+// precedence is the host's -- but the middle tier is the repository's to
+// state, and a renderer that fell back to a number of its own would ignore
+// a `verification.stalled_after_seconds` somebody set on purpose.
+export { stalledAfterSeconds } from "./progress.ts";

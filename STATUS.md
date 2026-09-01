@@ -1,8 +1,68 @@
-# STATUS — 67 of 70 closed. Next: 68, the logic-tree harvest
+# STATUS — 68 of 70 closed. Next: 69, the Solution Explorer goes multi-repository
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
 `experiment/verification-pipeline-v3` and `design/solution-decomposition`
 are merged and finished. Earlier handoff text is in `docs/status-archive.md`.
+
+> **Session 68 — the logic-tree harvest. CLOSED `VERIFIED` in five rounds,
+> 2026-09-01 (`ce31a28d`).** Two of those five rounds were authorised by the
+> operator past the cap of three; **D253** records why. Driven from my own CLI;
+> zero engine invocations.
+>
+> **The reconciliation came first, and paid for itself.** All eighteen findings
+> were read against the source before any was acted on
+> (`docs/logic-harvest-68.md`): sixteen reproduce, and three claims do not —
+> F3's "the budget stop's count increments so two never compare equal" (`invoke`
+> refuses *before* spending an invocation, so they do compare equal, and a test
+> now pins it), F14's "silent" (it is the loudest thing the framework says), and
+> F15's "no Send channel either" (session 63 built one). Both reviewers assert
+> things this codebase does not do; **take `gpt-5-6-sol`'s structural claims
+> seriously and check `gemini-3-1-pro`'s scenarios before quoting them.**
+>
+> **What landed in the machine.** Verification's terminal states have an edge
+> out: `noRoundReason` is stated once in `verify/rounds.ts` and asked by both
+> its own refusals and `phaseVerify`, so a terminal row or a clean at-cap round
+> **over an unmoved tree** advances to the run of record instead of stopping a
+> correct session forever — and a *moved* tree stops with what to do, because a
+> repair after the last reviewed round is unreviewed work. The UNRESOLVED cap
+> has its own exit code (`EXIT_UNRESOLVED`), so the dispositions→fix→preverify
+> →verify cycle cannot run on a finding that cites no path, and the consumed
+> disposition set is cleared once its fix step is issued. Releasability has one
+> owner: `phasePublish` reads the DECLARATION, and
+> `published_when_releasable` demands an outcome of `published` and joins
+> `EVIDENCE_GATES` so `--force` cannot skip it. The packaging outcome tokens
+> moved to `ledger.ts` so the gate can ask without a cycle.
+>
+> **`dabbler session rebaseline`** gives *halted, being repaired* its edge:
+> valid only while the run carries a stop, it records the absorbed paths and the
+> reason to `repairs.jsonl`, moves `baseline_tree`, and raises an
+> `accountability-signoff` decision. The driver's own files-changed refusal now
+> names it. **The watcher gained its second rule** — `job-outstanding`, a job
+> past the threshold whose log has stopped growing — because the rule shipped in
+> 67 is quiet whenever a job runs and was blind in exactly the window a wedged
+> round occupies.
+>
+> **THE LIFECYCLE MODEL WAS NOT ADOPTED, AND IS NOT IN THE TREE IN ANY FORM.**
+> The plan made it binary — held to the code, or deleted — and holding it means
+> every real transition declared *and* every declared transition observed. The
+> suite drives 21 of 38 phase edges; six of the other 17 are self-loops a phase
+> line cannot show at all. Three attempts to land less were refused by the
+> verifier, each correctly: an `exercised` flag (an exemption), deleting the
+> unexercised transitions (equality bought by narrowing the machine), and
+> keeping the whole thing as a Markdown table under a "snapshot, not a source"
+> disclaimer (a disclaimer is not a control; the rule is about the model, not
+> the file extension). **Adopting it is a session**: instrument `setPhase` and
+> the `Stop` constructor so self-loops are observable, then write the 17 tests.
+> `docs/logic-harvest-68.md` names the price; the harvest's own copy stays in
+> `C:\temp\dabbler-logic-harvest\`, outside the repository.
+>
+> **Twelve findings carried**, each with where it belongs: F1's entry question,
+> F6 (the close is terminal before its own bookkeeping; push mode cannot
+> recover), F7's job ceiling, F9 (`runRoundCap` exists and is unused), F10, F11,
+> F12, F13, F14, F16, F17, F18. F6, F17 and part of F18 are one machine — the
+> session-status one — and should land together.
+>
+> The extension is still **2.7.0** and predates 65 through 68.
 
 > **Session 67 — the watcher, and the driver's blind spots. CLOSED
 > `VERIFIED` in one round, 2026-09-01 (`de953825`).** Driven end to end from

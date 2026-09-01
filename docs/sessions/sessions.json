@@ -1326,9 +1326,9 @@
     {
       "number": 67,
       "title": "The watcher, and the driver's blind spots",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-01T08:30:02.792000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-09-01T09:30:54.140000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

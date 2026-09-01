@@ -1246,6 +1246,27 @@
       "title": "The escape route \u2014 when the framework stops, it asks",
       "status": "complete",
       "startedAt": "2026-08-31T15:41:34.814000-04:00",
+      "completedAt": "2026-08-31T17:40:05.160000-04:00",
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "model": "opus",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": "VERIFIED",
+      "verification": {
+        "rounds": 2,
+        "verifierModel": "gpt-5-6-sol",
+        "verifierProvider": "openai",
+        "transport": "api"
+      },
+      "frameworkVersion": "2.0.0"
+    },
+    {
+      "number": 64,
+      "title": "The operator onboarding deck",
+      "status": "in-progress",
+      "startedAt": "2026-08-31T17:44:30.434000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",
@@ -1253,7 +1274,7 @@
         "identityProvenance": "direct"
       },
       "frameworkVersion": "2.0.0",
-      "completedAt": "2026-08-31T17:40:05.160000-04:00",
+      "completedAt": null,
       "verificationVerdict": "VERIFIED",
       "verification": {
         "rounds": 2,
@@ -1261,15 +1282,6 @@
         "verifierProvider": "openai",
         "transport": "api"
       }
-    },
-    {
-      "number": 64,
-      "title": "The operator onboarding deck",
-      "status": "not-started",
-      "startedAt": null,
-      "completedAt": null,
-      "orchestrator": null,
-      "verificationVerdict": null
     },
     {
       "number": 65,

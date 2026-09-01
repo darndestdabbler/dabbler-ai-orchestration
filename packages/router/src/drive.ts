@@ -1231,6 +1231,22 @@ ${this.stopArtifacts()}`,
     this.currentStep = null;
   }
 
+  /**
+   * The step as the plan on disk now declares it, or the spec as issued.
+   *
+   * Only a step that came FROM the plan is refreshed: a step the driver
+   * synthesised has no entry to be amended, and reading one in would be
+   * reading somebody else's step.
+   */
+  private amendedSpec(spec: StepSpec): StepSpec {
+    if (!spec.fromPlan) return spec;
+    const plan = readWorkPlan(this.repoRoot, this.sessionNumber);
+    const amended = plan?.steps.find((step) => step.id === spec.id);
+    if (amended === undefined) return spec;
+    this.plan = plan;
+    return { ...amended, fromPlan: true };
+  }
+
   private async askForStep(spec: StepSpec): Promise<void> {
     if (this.run.baseline_tree === null) {
       const tree = snapshotWorktreeTree(this.repoRoot);
@@ -1240,6 +1256,15 @@ ${this.stopArtifacts()}`,
     }
     let reasons: string[] = [];
     for (;;) {
+      // An amendment to THIS step lands here, and nowhere else it could.
+      // `session plan amend` writes the plan and says the next instruction
+      // is measured against the new step; a loop holding the plan it read
+      // when it started made that sentence false in the one mode that
+      // needs it -- an unattended `drive` runs for the whole session in one
+      // process, so a step amended after a refusal was still judged against
+      // the step that was refused, forever. Re-read by id; a step the plan
+      // no longer declares keeps the spec it was issued with.
+      spec = this.amendedSpec(spec);
       const instruction = await this.converse({
         kind: reasons.length > 0 ? "rejection" : "step",
         step_id: spec.id,

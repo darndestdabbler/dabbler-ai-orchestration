@@ -35,7 +35,7 @@ import { openDecisions } from "../src/owedDecisions.ts";
 import { buildTaskRows, readSessionState } from "../src/progress.ts";
 import { resetForTests } from "../src/route.ts";
 import { resetForTests as resetRuntimeMode } from "../src/runtimeMode.ts";
-import { EXIT_BOUNDARY, EXIT_OK, interrupt, report, start } from "../src/session.ts";
+import { EXIT_BOUNDARY, EXIT_OK, interrupt, planAmend, report, start } from "../src/session.ts";
 import { readRecords } from "../src/testEvidence.ts";
 import { readTaskDeclaration } from "../src/writers.ts";
 import {
@@ -1275,6 +1275,48 @@ describe("dabbler session next", { timeout: 120_000 }, () => {
     ).toBe(0);
     expect((await next(sessionsDir)).instruction?.kind).toBe("wait");
     expect(readRun(repo, 1)?.accepted_steps).toEqual(["widget"]);
+  });
+
+  it("judges a retried step against the amendment, not the step it just refused", async () => {
+    const { repo, sessionsDir } = drivenRepo();
+    configure([VERIFIED]);
+
+    // A step whose declared check cannot pass, which is what an amendment
+    // is for. The engine amends it once, after the first refusal.
+    const impossible = {
+      ...PLAN,
+      steps: [{ ...PLAN.steps[0], checks: [{ argv: [NODE, "-e", "process.exit(1)"] }] }],
+    };
+    const passing = join(makeTempDir(), "checks.json");
+    writeFileSync(passing, JSON.stringify([{ argv: [NODE, "-e", "process.exit(0)"] }]), "utf8");
+
+    let amendments = 0;
+    const engine = scripted(({ instruction }, tools) => {
+      if (instruction.answer_schema === WORK_PLAN_SCHEMA) {
+        tools.answer(impossible);
+        return;
+      }
+      if (instruction.step_id !== "widget") return;
+      if (instruction.kind === "rejection" && amendments === 0) {
+        amendments += 1;
+        planAmend(sessionsDir, {
+          stepId: "widget",
+          files: null,
+          checksFile: passing,
+          reason: "the declared check cannot pass",
+          approver: "the test",
+        });
+      }
+      tools.write("src/widget.py", WIDGET_V2);
+      tools.report({ step: "widget", files: ["src/widget.py"] });
+    });
+
+    await drive(sessionsDir, engine);
+
+    // One refusal, then the amended check -- not three refusals and a stop,
+    // which is what a loop holding the plan it started with produces.
+    expect(amendments).toBe(1);
+    expect(readRun(repo, 1)).toMatchObject({ accepted_steps: ["widget"] });
   });
 
   it("carries the round cap and the transport on the run, for the call that reaches verification", async () => {

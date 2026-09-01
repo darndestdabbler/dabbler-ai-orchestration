@@ -15,5 +15,8 @@
     "test": "npm run test:unit --workspaces --if-present",
     "generate:types": "npm run generate:types -w dabbler-ai-router",
     "check:types": "node packages/router/scripts/run-ts.mjs packages/router/scripts/check-types-fresh.ts"
+  },
+  "devDependencies": {
+    "pptxgenjs": "^4.0.1"
   }
 }

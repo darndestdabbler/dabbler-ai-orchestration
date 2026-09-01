@@ -364,12 +364,14 @@ describe("published_when_releasable", () => {
     expect(row.remediation).toContain("publish phase");
   });
 
-  it("passes a releasable session that has one, whatever the feed answered", () => {
-    // The gate asks whether the framework tried and wrote it down, never
-    // whether a feed said yes. A refusal from the feed already stopped the
-    // session in the publish phase, so the close does not run at all; making
-    // this a second judge of the same fact is how two judges come to
-    // disagree about one session.
+  it("refuses a releasable session whose packaging runs all shipped nothing, and passes one that published", () => {
+    // A row is a record of TRYING. The gate used to accept any of them,
+    // which reads as sound only for the driven path -- where a feed refusal
+    // stops the session before the close. Every other path to the close is
+    // real, and the obvious one is the operator's: a publish stop offers
+    // "run it again" or "cancel", neither works, so they run `session
+    // close` by hand and the gate that exists to prove something shipped
+    // says PASS over a refusal.
     const { repo, sessionsDir } = closeReady();
     declareSessionTask(sessionsDir, { sessionNumber: 1, task: "ship it", releasable: true });
     appendPackaging(repo, 1, {
@@ -377,6 +379,23 @@ describe("published_when_releasable", () => {
       session_number: 1,
       releasable: true,
       refusal: "the feed would not take the artifact",
+      recorded_at: new Date().toISOString(),
+    });
+    const refused = byName(runGates(sessionsDir, { config: CONFIG }))["published_when_releasable"];
+    expect(refused.passed).toBe(false);
+    expect(refused.remediation).toContain("not of shipping");
+
+    appendPackaging(repo, 1, {
+      outcome: "published",
+      session_number: 1,
+      releasable: true,
+      feed: "https://feed.example/v3/index.json",
+      secret_name: "FEED_PAT",
+      artifacts: ["widget.1.0.0.nupkg"],
+      steps: [
+        { step: "pack", command: "pack {output}", exit_code: 0, duration_seconds: 1 },
+        { step: "push", command: "push {artifact}", exit_code: 0, duration_seconds: 1 },
+      ],
       recorded_at: new Date().toISOString(),
     });
     expect(
@@ -462,8 +481,12 @@ describe("the driver", () => {
     expect(rows["verification_clean"].passed).toBe(false);
   });
 
-  it("keeps the evidence gates to exactly the two that read the record", () => {
+  it("keeps the evidence gates to exactly the three that read the record", () => {
+    // Whether the tree was verified, whether the verdict is a word this
+    // framework knows, and whether the artifact a releasable session exists
+    // to produce was produced. `--force` is for formalities.
     expect([...EVIDENCE_GATES].sort()).toEqual([
+      "published_when_releasable",
       "verdict_vocabulary",
       "verification_clean",
     ]);

@@ -657,3 +657,81 @@ suite("the watcher", () => {
     rmrf(root);
   });
 });
+
+suite("the watcher's second rule", () => {
+  const STARTED = new Date(2026, 7, 31, 14, 28, 5).toISOString();
+
+  const WORKING = {
+    schema_version: 1,
+    session_number: 62,
+    engine: "claude-code",
+    phase: "verify",
+    seq: 4,
+    invocations: 0,
+    max_invocations: 24,
+    accepted_steps: [],
+    baseline_tree: null,
+    stop: null,
+    job: {
+      name: "verification",
+      argv: ["node", "dabbler.cjs", "verify"],
+      pid: 1,
+      log: ".dabbler/runs/s62/driver/jobs/verification.log",
+      status: ".dabbler/runs/s62/driver/jobs/verification.status.json",
+      started_at: STARTED,
+      retry_after_seconds: 60,
+    },
+    started_at: STARTED,
+    updated_at: STARTED,
+  };
+
+  test("says a job is outstanding when its log stops growing, and not while it grows", () => {
+    // The window the first rule is blind in: while a job runs, the engine
+    // owes nothing and the instruction is a `wait`, so a wedged verification
+    // round reads as the healthiest thing in the record.
+    setConfig("stalledAfterSeconds", 60);
+    const root = makeTempDir("dabbler-watcher-");
+    const driver = path.join(root, ".dabbler", "runs", "s62", "driver");
+    fs.mkdirSync(path.join(driver, "jobs"), { recursive: true });
+    fs.writeFileSync(path.join(driver, "run.json"), JSON.stringify(WORKING), "utf8");
+    const log = path.join(driver, "jobs", "verification.log");
+    fs.writeFileSync(log, "round 1 starting\n", "utf8");
+
+    // The watcher is consulted at most once per half-threshold, so the clock
+    // has to move for a second look to happen at all.
+    let clock = new Date(2026, 7, 31, 14, 30, 5);
+    const written: string[] = [];
+    const terminal = new DabblerTerminal({
+      repoRoot: root,
+      now: () => clock,
+      pollMs: 60_000,
+    });
+    terminal.onDidWrite((text: string) => written.push(text));
+    const tick = () => {
+      clock = new Date(clock.getTime() + 60_000);
+      terminal.poll();
+    };
+
+    // First look: the log is drained, and one look is not a comparison.
+    terminal.poll();
+    assert.deepStrictEqual(written.filter((t) => plain(t).includes("watcher")), []);
+
+    // It wrote something between looks, so it is working.
+    fs.appendFileSync(log, "still going\n", "utf8");
+    written.length = 0;
+    tick();
+    assert.deepStrictEqual(written.filter((t) => plain(t).includes("watcher")), []);
+
+    // And now it writes nothing at all.
+    written.length = 0;
+    tick();
+    const said = written.filter((t) => plain(t).includes("watcher"));
+    assert.strictEqual(said.length, 1);
+    assert.ok(plain(said[0]).includes("state=job-outstanding job=verification"));
+    assert.ok(said[0].includes(toneOf("warn", "dark")));
+
+    terminal.dispose();
+    clearConfig();
+    rmrf(root);
+  });
+});

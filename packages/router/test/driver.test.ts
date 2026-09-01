@@ -13,12 +13,15 @@ import { afterAll, describe, expect, it } from "vitest";
 import { sessionVerb } from "../src/cli/session.ts";
 import type { DriverInstruction, DriverRun } from "../src/generated/index.ts";
 import {
+  WATCHER_JOB_OUTSTANDING,
   WATCHER_OUTSTANDING,
   WATCHER_QUIET,
   type WatcherInputs,
   readAmendments,
   readDispositions,
   readReport,
+  readRepairs,
+  readRun,
   readWatcher,
   readWorkPlan,
   reportPath,
@@ -34,6 +37,8 @@ import {
   writeWorkPlan,
 } from "../src/driver.ts";
 import { LedgerError, appendRound } from "../src/ledger.ts";
+import { snapshotWorktreeTree } from "../src/journal.ts";
+import { openDecisions } from "../src/owedDecisions.ts";
 import { registerSessionStart } from "../src/writers.ts";
 import { captured, makeProject, makeSandboxRepo, removeTempDirs } from "./support/fixtures.ts";
 
@@ -475,5 +480,128 @@ describe("the watcher, which separates a thinking engine from a stopped one", ()
     writeFileSync(join(repo, "widget.ts"), "export const widget = 1;\n");
     expect(Date.parse(treeTouchedAt(repo) as string)).toBeGreaterThan(Date.parse(ISSUED));
     expect(readWatcher(repo, 1, 60, NOW).state).toBe(WATCHER_QUIET);
+  });
+});
+
+describe("dabbler session rebaseline", () => {
+  it("refuses while the run is going and records the repair while it is stopped", async () => {
+    const { repo, sessionsDir } = makeSandboxRepo();
+    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
+    const baseline = snapshotWorktreeTree(repo) as string;
+    writeRun(repo, 1, { ...RUN, baseline_tree: baseline });
+    const flags = [
+      "rebaseline",
+      "--sessions-dir",
+      sessionsDir,
+      "--reason",
+      "the driver's own spawn was fixed to get past the stop",
+      "--by",
+      "the operator",
+    ];
+
+    // A running loop reports work through its steps. Moving the baseline
+    // under one would hide that step's own change from the comparison that
+    // judges it.
+    const running = await captured(() => sessionVerb(flags));
+    expect(running.code).toBe(3);
+    expect(running.err).toContain("has not stopped");
+    expect(readRepairs(repo, 1)).toEqual([]);
+
+    writeRun(repo, 1, {
+      ...RUN,
+      baseline_tree: baseline,
+      stop: {
+        kind: "blocked",
+        reason: "the widget is load-bearing",
+        at: "2026-08-31T12:00:00-04:00",
+        step_id: "widget",
+      },
+    });
+    writeFileSync(join(repo, "src", "widget.py"), "def widget():\n    return 2\n", "utf8");
+
+    const repaired = await captured(() => sessionVerb(flags));
+    expect(repaired.code).toBe(0);
+    const [row] = readRepairs(repo, 1);
+    expect(row).toMatchObject({
+      session_number: 1,
+      stop_kind: "blocked",
+      step_id: "widget",
+      by: "the operator",
+      from_baseline: baseline,
+    });
+    expect(row?.["paths"]).toEqual(["src/widget.py"]);
+    // The baseline moved and NOTHING else did: the stop the operator is
+    // repairing under is still there to be re-run.
+    const run = readRun(repo, 1);
+    expect(run?.baseline_tree).toBe(row?.["to_baseline"]);
+    expect(run?.baseline_tree).not.toBe(baseline);
+    expect(run?.stop?.kind).toBe("blocked");
+    expect(run?.phase).toBe("steps");
+    // And a person owns it: a machine cannot judge whether work put in
+    // outside a step was the right work.
+    const owed = openDecisions(repo);
+    expect(owed.map((entry) => entry["id"])).toContain("repair-outside-a-step-1");
+    expect(owed[0]?.["severity"]).not.toBe("blocking");
+  });
+});
+
+describe("the watcher's other counterparty: the framework's own job", () => {
+  const STARTED = "2026-09-01T06:40:00-04:00";
+  const NOW = new Date("2026-09-01T06:41:12-04:00");
+  const JOB = {
+    name: "verification",
+    argv: ["node", "dabbler.cjs", "verify"],
+    pid: 1,
+    log: ".dabbler/runs/s1/driver/jobs/verification.log",
+    status: ".dabbler/runs/s1/driver/jobs/verification.status.json",
+    started_at: STARTED,
+    retry_after_seconds: 60,
+  };
+  const WAITING = {
+    ...RUN,
+    updated_at: STARTED,
+    job: JOB,
+  } as unknown as DriverRun;
+  // Under the pull the instruction during long work is a `wait`, re-issued
+  // with a fresh stamp on every call: every test the engine rule makes reads
+  // healthy for as long as somebody keeps polling.
+  const WAIT = {
+    schema_version: 1,
+    seq: 9,
+    kind: "wait",
+    session_number: 1,
+    issued_at: "2026-09-01T06:41:10-04:00",
+    retry_after_seconds: 60,
+    answer_command: "dabbler session next",
+  } as unknown as DriverInstruction;
+
+  const read = (job: WatcherInputs["jobLogGrew"], seconds = 60) =>
+    watcherReading(
+      {
+        instruction: WAIT,
+        run: WAITING,
+        answeredAt: null,
+        treeTouchedAt: () => {
+          throw new Error("the tree is not what says whether a JOB is working");
+        },
+        jobLogGrew: job,
+      },
+      seconds,
+      NOW,
+    );
+
+  it("says a job is outstanding only once it is past the threshold and writing nothing", () => {
+    // A growing log is a job working -- the same discrimination the engine
+    // rule makes with the tree.
+    expect(read(() => true).state).toBe(WATCHER_QUIET);
+    // A first look is not a comparison, so it is not evidence of silence.
+    expect(read(() => null).state).toBe(WATCHER_QUIET);
+    // Inside the threshold, nothing is owed but patience.
+    expect(read(() => false, 600).state).toBe(WATCHER_QUIET);
+
+    const reading = read(() => false);
+    expect(reading.state).toBe(WATCHER_JOB_OUTSTANDING);
+    expect(reading.sinceSeconds).toBe(72);
+    expect(reading.job).toBe("verification");
   });
 });

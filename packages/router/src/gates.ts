@@ -44,6 +44,7 @@ import {
 import {
   LIFECYCLE_WRITTEN_FILES,
   LedgerError,
+  OUTCOME_PUBLISHED,
   ROW_REMEDIATED_AT_CAP,
   readPackaging,
   readRounds,
@@ -93,10 +94,21 @@ const SET_BOOKKEEPING_BASENAMES: ReadonlySet<string> = new Set([
  */
 export const GATE_PUBLISHED_WHEN_RELEASABLE = "published_when_releasable";
 
-/** The two gates `--force` may never skip. */
+/**
+ * The gates `--force` may never skip.
+ *
+ * Evidence, not bookkeeping: whether the tree was verified, whether the
+ * verdict is a word the framework knows, and -- for a session that declared
+ * itself releasable -- whether the one artifact it exists to produce was
+ * produced. That last one was skippable, which made `--force` a way to
+ * close a session VERIFIED having shipped nothing; forcing past a fact is
+ * different from forcing past a formality, and only the second is what
+ * `--force` is for.
+ */
 export const EVIDENCE_GATES: ReadonlySet<string> = new Set([
   "verification_clean",
   "verdict_vocabulary",
+  GATE_PUBLISHED_WHEN_RELEASABLE,
 ]);
 
 /** One gate's row: the name, the answer, and what to do about a `false`. */
@@ -571,11 +583,24 @@ export function checkPublishedWhenReleasable(sessionsDir: string): Check {
       }`,
     ];
   }
-  if (rows.length > 0) return [true, ""];
+  // A row is not an answer: `dabbler packaging` records every non-dry run
+  // it makes, `refused` and `failed` among them, so an attempt that shipped
+  // nothing used to satisfy the gate that exists to prove something
+  // shipped. And the way past a publish stop is `session close`, where this
+  // printed PASS -- the csv-model gap reached from the other side. The
+  // predicate is packaging's own, so "what counts as published" is stated
+  // once.
+  if (rows.some((row) => row["outcome"] === OUTCOME_PUBLISHED)) return [true, ""];
+  const attempted = rows.length > 0;
   return [
     false,
-    "this session declared itself releasable and no packaging run is on " +
-      "its record, so closing it would report a session that shipped its " +
+    "this session declared itself releasable and " +
+      (attempted
+        ? `its packaging record holds ${rows.length} run(s) and none of them ` +
+          "published -- a refusal or a failure is a record of trying, not of " +
+          "shipping. Read the last row's refusal and answer it"
+        : "no packaging run is on its record") +
+      ", so closing it would report a session that shipped its " +
       "artifact when nothing was built or pushed. The publish phase runs " +
       "between the land and the close and writes that record; if it did " +
       "not run, find out why rather than closing past this. Declaring the " +

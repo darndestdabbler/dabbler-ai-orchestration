@@ -31,6 +31,7 @@ import {
   declare,
   decision,
   interrupt,
+  rebaseline,
   migrate,
   plan,
   planAmend,
@@ -48,6 +49,7 @@ const SUMMARY: Record<string, string> = {
   next: "advance the session one move and print the instruction to answer",
   drive: "run the next session end to end: the framework drives, the engine answers",
   interrupt: "end the engine's running invocation under a driven session, with a reason",
+  rebaseline: "record a repair made while the run was stopped, and move the baseline",
   report: "answer the driver's outstanding instruction",
   plan: "record the plan prose in project-work-plan.md; `plan amend` changes a driven step",
   close: "run gates and close the session",
@@ -130,6 +132,10 @@ const OPTIONS: Record<string, readonly string[]> = {
     "  --stop                   halt the loop instead of re-invoking: `interrupted` lands on",
     "                           run.json with the reason, the session stays in flight, and",
     "                           `session drive` re-runs from the phase it reached",
+  ],
+  rebaseline: [
+    "  --reason TEXT            required: what was repaired while the loop was halted",
+    "  --by WHO                 who made it; defaults to the operator",
   ],
   report: [
     "  --seq N                  required: the seq of the instruction being answered",
@@ -476,6 +482,17 @@ export async function sessionVerb(argv: string[]): Promise<number> {
       return EXIT_USAGE;
     }
     return interrupt(sessionsDir, { reason, sessionNumber, stop: switches.has("--stop") });
+  }
+
+  if (subcommand === "rebaseline") {
+    const reason = values.get("--reason");
+    if (reason === undefined) {
+      writeErr(
+        "dabbler session rebaseline: the following arguments are required: --reason\n",
+      );
+      return EXIT_USAGE;
+    }
+    return rebaseline(sessionsDir, { reason, by: values.get("--by") ?? null, sessionNumber });
   }
 
   if (subcommand === "report") {

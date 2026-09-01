@@ -62,6 +62,23 @@ export const RUN_FILENAME = "run.json";
  */
 export const AMENDMENTS_FILENAME = "amendments.jsonl";
 /**
+ * Every repair made to the tree while the run was stopped, in order.
+ *
+ * The state this file exists for is real and had no edge out of it:
+ * *halted, being repaired*. A stop is answered by a person, the answer is
+ * often a file, and the next report is measured against a tree the
+ * framework snapshotted before that file existed -- so the report omits it
+ * and is refused, correctly, forever.
+ *
+ * It is a record rather than a permission. The tree diff is the framework's
+ * strongest edge, and moving the baseline by hand is a hole in it; what
+ * makes the hole honest is that the paths and the reason are written down
+ * where nothing overwrites them, and that the round and the run of record
+ * both still bind to a tree this moves -- so a repair after verification is
+ * refused by the same machinery as any other post-verification change.
+ */
+export const REPAIRS_FILENAME = "repairs.jsonl";
+/**
  * A request to end the running invocation, written by `session interrupt`
  * and consumed by the driver -- the one file here that is a message rather
  * than a record, which is why it is removed the moment it is read.
@@ -102,6 +119,10 @@ export function runPath(repoRoot: string, sessionNumber: number): string {
 
 export function amendmentsPath(repoRoot: string, sessionNumber: number): string {
   return join(driverDir(repoRoot, sessionNumber), AMENDMENTS_FILENAME);
+}
+
+export function repairsPath(repoRoot: string, sessionNumber: number): string {
+  return join(driverDir(repoRoot, sessionNumber), REPAIRS_FILENAME);
 }
 
 export function interruptPath(repoRoot: string, sessionNumber: number): string {
@@ -422,6 +443,29 @@ export function writeDispositions(
   return valid;
 }
 
+/**
+ * Forget the disposition set, once the driver has acted on it.
+ *
+ * An answer here is the CURRENT answer, and a set that has already produced
+ * its fix step is a spent one. Left in place it is read again the next time
+ * the loop passes through dispositions — and if the round it names has not
+ * moved, which is exactly the case when the cap refused to write one, the
+ * driver re-issues the same fix without asking anybody. That is a cycle
+ * costing an engine turn and a suite run per lap, in the colours of ordinary
+ * progress.
+ *
+ * Removing rather than superseding: the file's whole meaning is "what the
+ * engine says to do about the round in hand", and there is no such thing as
+ * a stale one worth keeping. The history of a run is its transcripts.
+ */
+export function clearDispositions(repoRoot: string, sessionNumber: number): void {
+  try {
+    unlinkSync(dispositionsPath(repoRoot, sessionNumber));
+  } catch {
+    // Never written, or already gone. Both are the state this asks for.
+  }
+}
+
 export function writeRun(repoRoot: string, sessionNumber: number, record: unknown): DriverRun {
   const valid = validateRun(record);
   atomicWriteJsonIndented(runPath(repoRoot, sessionNumber), valid);
@@ -450,6 +494,65 @@ export interface AmendInput {
  */
 export function readAmendments(repoRoot: string, sessionNumber: number): Row[] {
   return readJsonl(amendmentsPath(repoRoot, sessionNumber), (record) => record);
+}
+
+export function readRepairs(repoRoot: string, sessionNumber: number): Row[] {
+  return readJsonl(repairsPath(repoRoot, sessionNumber), (record) => record);
+}
+
+/** What one repair absorbed, and who says why. */
+export interface RepairInput {
+  readonly reason: string;
+  readonly by: string;
+  readonly paths: readonly string[];
+  readonly baselineTree: string;
+  readonly recordedAt: string;
+}
+
+/**
+ * Move the baseline the next report is measured against, and say so.
+ *
+ * The whole of the mechanism: `run.json`'s `baseline_tree` becomes the tree
+ * as it now stands, and a row goes to `repairs.jsonl` naming what that
+ * absorbed. Nothing else changes -- not the phase, not the stop, not a
+ * verdict, not a gate. The stop the operator is repairing under is still
+ * there to be re-run.
+ */
+export function recordRepair(
+  repoRoot: string,
+  sessionNumber: number,
+  input: RepairInput,
+): Row {
+  const run = readRun(repoRoot, sessionNumber);
+  if (run === null) {
+    throw new LedgerError(`session ${sessionNumber} was never driven; there is no baseline to move`);
+  }
+  if (!run.stop) {
+    throw new LedgerError(
+      `session ${sessionNumber}'s run has not stopped. A running loop reports work through ` +
+        "its steps, and moving the baseline under one would hide a step's own change from " +
+        "the comparison that judges it",
+    );
+  }
+  const row: Row = {
+    schema_version: DRIVER_SCHEMA_VERSION,
+    session_number: sessionNumber,
+    stop_kind: run.stop.kind,
+    step_id: run.stop.step_id ?? null,
+    reason: input.reason,
+    by: input.by,
+    paths: [...input.paths],
+    from_baseline: run.baseline_tree,
+    to_baseline: input.baselineTree,
+    recorded_at: input.recordedAt,
+  };
+  appendJsonl(repairsPath(repoRoot, sessionNumber), row);
+  writeRun(repoRoot, sessionNumber, {
+    ...run,
+    baseline_tree: input.baselineTree,
+    updated_at: input.recordedAt,
+  });
+  return row;
 }
 
 /**
@@ -591,13 +694,28 @@ export function shapeReport(input: ReportInput, reportedAt: string): Record<stri
 export const WATCHER_QUIET = "quiet";
 /** An instruction is outstanding, unanswered, over a tree that has not moved. */
 export const WATCHER_OUTSTANDING = "instruction-outstanding";
+/**
+ * A job is running, past the threshold, and writing nothing.
+ *
+ * The second counterparty, and the one the first rule is structurally blind
+ * to: it is quiet whenever `run.job` is set, and under the pull the
+ * outstanding instruction during long work is a `wait` re-issued with a
+ * fresh stamp on every call — so a wedged verification round reads as the
+ * healthiest thing in the record for as long as the engine keeps polling.
+ */
+export const WATCHER_JOB_OUTSTANDING = "job-outstanding";
 
-export type WatcherState = typeof WATCHER_QUIET | typeof WATCHER_OUTSTANDING;
+export type WatcherState =
+  | typeof WATCHER_QUIET
+  | typeof WATCHER_OUTSTANDING
+  | typeof WATCHER_JOB_OUTSTANDING;
 
 export interface WatcherReading {
   readonly state: WatcherState;
-  /** Seconds the instruction has been outstanding; zero when quiet. */
+  /** Seconds the instruction or the job has been outstanding; zero when quiet. */
   readonly sinceSeconds: number;
+  /** The job being watched, on `job-outstanding` only. */
+  readonly job?: string;
 }
 
 export interface WatcherInputs {
@@ -620,6 +738,16 @@ export interface WatcherInputs {
    * not have used its answer is a git call per 500ms for nothing.
    */
   readonly treeTouchedAt: () => string | null;
+  /**
+   * Whether the running job's log has grown since the last look, or null
+   * when nothing has looked yet.
+   *
+   * A thunk for the same reason as the tree probe, and the same
+   * discrimination: a growing log is a job working, exactly as a moved tree
+   * is an engine working. `null` on a first look is not silence — nothing
+   * has been compared — so the rule waits for a second one.
+   */
+  readonly jobLogGrew?: () => boolean | null;
 }
 
 /** The instruction kinds that expect an engine answer. `wait` and `done` do not. */
@@ -642,16 +770,34 @@ export function watcherReading(
   thresholdSeconds: number,
   now: Date = new Date(),
 ): WatcherReading {
+  const run = inputs.run;
+  // A stop is a row of its own and not this one, whichever counterparty is
+  // silent behind it.
+  if (run?.stop) return QUIET;
+
+  // The framework's own work first, because while a job runs the engine
+  // owes nothing: the instruction in hand is a `wait`, which by
+  // construction expects no written answer, and under the pull it is
+  // re-issued with a fresh stamp on every call. Every test the engine rule
+  // makes would read healthy for as long as the operator kept polling a
+  // wedged round.
+  const job = run?.job ?? null;
+  if (job) {
+    const started = Date.parse(job.started_at);
+    if (!Number.isFinite(started)) return QUIET;
+    const running = Math.trunc((now.getTime() - started) / 1000);
+    if (running <= thresholdSeconds) return QUIET;
+    // A growing log is a job working. `null` means nothing has been
+    // compared yet -- a first look is not evidence of silence.
+    if (inputs.jobLogGrew?.() !== false) return QUIET;
+    return { state: WATCHER_JOB_OUTSTANDING, sinceSeconds: running, job: job.name };
+  }
+
   const instruction = inputs.instruction;
   if (instruction === null) return QUIET;
   if (!ANSWERABLE_KINDS.includes(instruction.kind)) return QUIET;
   const issued = Date.parse(instruction.issued_at);
   if (!Number.isFinite(issued)) return QUIET;
-  const run = inputs.run;
-  if (run !== null) {
-    if (run.stop) return QUIET;
-    if (run.job) return QUIET;
-  }
   const answered = Date.parse(inputs.answeredAt ?? "");
   if (Number.isFinite(answered) && answered > issued) return QUIET;
   const elapsed = Math.trunc((now.getTime() - issued) / 1000);
@@ -711,6 +857,7 @@ export function readWatcher(
   sessionNumber: number,
   thresholdSeconds: number,
   now: Date = new Date(),
+  jobLogGrew?: () => boolean | null,
 ): WatcherReading {
   let instruction: DriverInstruction | null;
   let run: DriverRun | null;
@@ -723,10 +870,56 @@ export function readWatcher(
     return QUIET;
   }
   return watcherReading(
-    { instruction, run, answeredAt, treeTouchedAt: () => treeTouchedAt(repoRoot) },
+    {
+      instruction,
+      run,
+      answeredAt,
+      treeTouchedAt: () => treeTouchedAt(repoRoot),
+      // A caller that has been reading the log already knows whether it
+      // grew -- the terminal drains it every 500ms -- so it supplies the
+      // answer. One that has not compares sizes itself, here.
+      jobLogGrew: jobLogGrew ?? (() => jobLogGrewSince(repoRoot, sessionNumber, run)),
+    },
     thresholdSeconds,
     now,
   );
+}
+
+/**
+ * Whether the running job's log is bigger than the last time this asked.
+ *
+ * The size is remembered in this process, not on disk: the question is "has
+ * it moved since I last looked", and a value on disk would answer a
+ * different one and would be a record the machine owns for nobody.
+ *
+ * Keyed on the job's IDENTITY -- its name, its log path and the moment it
+ * started -- rather than on the path alone. A re-run starts a new job under
+ * the same name, which truncates and re-uses the same log; compared against
+ * the last one's size it would read as "shrunk, therefore silent" on its
+ * first look, and warn about a job that had barely begun.
+ */
+const jobLogSizes = new Map<string, number>();
+
+function jobLogGrewSince(
+  repoRoot: string,
+  sessionNumber: number,
+  run: DriverRun | null,
+): boolean | null {
+  const job = run?.job;
+  const log = job?.log;
+  if (!job || !log) return null;
+  const path = join(repoRoot, ...log.split("/"));
+  const identity = `${sessionNumber}\0${job.name}\0${log}\0${job.started_at}`;
+  let size: number;
+  try {
+    size = statSync(path).size;
+  } catch {
+    // No log yet is not silence: the runner creates it as it starts.
+    return null;
+  }
+  const seen = jobLogSizes.get(identity);
+  jobLogSizes.set(identity, size);
+  return seen === undefined ? null : size > seen;
 }
 
 /**

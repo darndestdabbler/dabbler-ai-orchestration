@@ -5,7 +5,7 @@
 // same files a typed session leaves, written by the same verbs.
 
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -37,7 +37,7 @@ import { resetForTests } from "../src/route.ts";
 import { resetForTests as resetRuntimeMode } from "../src/runtimeMode.ts";
 import { EXIT_BOUNDARY, EXIT_OK, interrupt, planAmend, report, start } from "../src/session.ts";
 import { readRecords } from "../src/testEvidence.ts";
-import { readTaskDeclaration } from "../src/writers.ts";
+import { declareSessionTask, readTaskDeclaration } from "../src/writers.ts";
 import {
   captured,
   clearProviderKeys,
@@ -100,6 +100,9 @@ vi.mock("../src/route.ts", async (importOriginal) => {
 // --- the repository under drive ----------------------------------------------
 
 const NODE = process.execPath;
+
+/** The identity  registers under, for a test that registers first. */
+const REGISTRATION = { engine: "claude-code", provider: "anthropic" };
 const WIDGET_V2 = "def widget():\n    return 2\n";
 
 const SEED: Record<string, string> = {
@@ -109,10 +112,18 @@ const SEED: Record<string, string> = {
   "dabbler.yaml": "schema_version: 1\n",
   "src/widget.py": "def widget():\n    return 1\n",
   "tests/test_widget.py": "def test_widget():\n    assert True\n",
-  // The suite: red while the widget says it is broken, green otherwise.
+  // The suite: red while the widget says it is broken, green otherwise. And
+  // red for the WHOLE run only -- no test path named -- while
+  // `.dabbler/full-suite-red` exists, which is how a session reaches a
+  // failing run of record over a tree whose targeted tests pass. The marker
+  // lives under `.dabbler/` because that directory is outside the tree
+  // digest, so creating and removing it is not a file any step must report.
   "tests/run.mjs":
-    "import { readFileSync } from 'node:fs';\n" +
-    "process.exit(readFileSync('src/widget.py', 'utf8').includes('broken') ? 1 : 0);\n",
+    "import { existsSync, readFileSync } from 'node:fs';\n" +
+    "const widget = readFileSync('src/widget.py', 'utf8');\n" +
+    "const whole = process.argv.length <= 2;\n" +
+    "const red = whole && existsSync('.dabbler/full-suite-red');\n" +
+    "process.exit(widget.includes('broken') || red ? 1 : 0);\n",
   ".gitignore": ".dabbler/\n",
 };
 
@@ -440,6 +451,40 @@ describe("dabbler session drive", { timeout: 120_000 }, () => {
     expect(runGit(repo, ["status", "--porcelain"]).stdout).toBe("");
   });
 
+  it("asks the declaration whether to publish, not the plan the engine wrote", async () => {
+    // Two fields for one fact: the engine writes `releasable` into its work
+    // plan, and `phasePlan` turns that into a declaration ONLY when there is
+    // not one already. An operator who declared the session first can
+    // therefore disagree with the plan, and the publish phase used to
+    // believe the plan -- which is the engine deciding whether the session
+    // owes a deliverable.
+    const { repo, sessionsDir } = drivenRepo();
+    configure([VERIFIED]);
+    expect((await captured(async () => start(sessionsDir, REGISTRATION))).code).toBe(0);
+    declareSessionTask(sessionsDir, {
+      sessionNumber: 1,
+      task: "Make widget() return 2.",
+      releasable: false,
+    });
+    const engine = scripted(({ instruction }, tools) => {
+      if (instruction.answer_schema === WORK_PLAN_SCHEMA) {
+        return void tools.answer({ ...PLAN, releasable: true });
+      }
+      tools.write("src/widget.py", WIDGET_V2);
+      tools.report({ step: instruction.step_id as string, files: ["src/widget.py"] });
+    });
+
+    const { code } = await drive(sessionsDir, engine);
+    // It closes rather than stopping in `publish`: the operator said this
+    // session ships nothing, and the plan does not overrule them. (This
+    // repository declares no packaging block, so a publish would have
+    // stopped the loop -- which is how the old reading showed itself.)
+    expect(code).toBe(0);
+    expect(readTaskDeclaration(sessionsDir, 1)).toMatchObject({ releasable: false });
+    expect(readRun(repo, 1)?.phase).toBe("complete");
+    expect(sessionStatus(sessionsDir)).toBe("complete");
+  });
+
   it("passes a session that may not publish straight from land to close", async () => {
     // Nothing to say about a step that does not apply. The default plan is
     // `releasable: false`, which is every session this repository has run.
@@ -531,9 +576,12 @@ describe("dabbler session drive", { timeout: 120_000 }, () => {
     const { code } = await drive(sessionsDir, engine);
     expect(code).toBe(0);
     expect(engine.seen.map((entry) => entry.kind)).toEqual(["step", "step", "rejection"]);
-    expect(engine.seen[2]?.reasons).toEqual([
+    expect(engine.seen[2]?.reasons?.[0]).toContain(
       "[files-changed-omits] files_changed omits 'tests/test_widget.py', which the tree changed",
-    ]);
+    );
+    // And it names the one way a changed file can belong to no step, so an
+    // engine meeting a hand-repair is not left to fold it into this one.
+    expect(engine.seen[2]?.reasons?.[0]).toContain("session rebaseline");
     expect(engine.seen[2]?.ask).toContain("refused for the reasons listed");
     expect(readRun(repo, 1)).toMatchObject({ phase: "complete", accepted_steps: ["widget"] });
   });
@@ -628,7 +676,10 @@ describe("dabbler session drive", { timeout: 120_000 }, () => {
     // moved to -- `phase phase=dispositions` reads like any other phase line.
     expect(out).toContain("verification-blocking");
     expect(out).toContain("verification-passed");
-    expect(readDispositions(repo, 1)).toMatchObject({ seq: 4, round: 1 });
+    // Spent and forgotten: the set produced its fix step, and a set left
+    // behind is one the next pass through dispositions acts on again
+    // without asking anybody.
+    expect(readDispositions(repo, 1)).toBeNull();
     expect(readDisputes(repo, 1).map((row) => [row["round"], row["finding_index"]])).toEqual([[1, 1]]);
     expect(readRounds(repo, 1).map((row) => [row["round"], row["verdict"], row["phase"]])).toEqual([
       [1, "ISSUES_FOUND", "full"],
@@ -657,6 +708,148 @@ describe("dabbler session drive", { timeout: 120_000 }, () => {
     expect(said.length).toBeGreaterThanOrEqual(1);
     expect(said[0]).toContain("state=instruction-outstanding");
     expect(said[0]).toMatch(/since=\d+s/);
+  });
+
+  it("classifies a second budget stop under the same bound as a deadlock", async () => {
+    // The harvest read the budget stop's reason as carrying an incrementing
+    // count, which would make two of them never compare equal and the
+    // classifier useless on the bound most likely to be met twice. It does
+    // not: the count cannot advance while the bound is met -- `invoke`
+    // refuses BEFORE spending an invocation -- so the reason is identical
+    // and the classifier fires. Pinned here so a later change to that
+    // message cannot quietly make the harvest's version true.
+    const { repo, sessionsDir } = drivenRepo();
+    configure([VERIFIED], { max_invocations: 1 });
+    expect((await drive(sessionsDir, scripted(wellBehaved))).code).toBe(1);
+    expect(readRun(repo, 1)?.stop).toMatchObject({ kind: "budget", class: "first" });
+
+    const again = await drive(sessionsDir, scripted(wellBehaved));
+    expect(again.code).toBe(1);
+    expect(again.err).toContain("STOPPED (budget, deadlock)");
+    expect(readRun(repo, 1)?.stop).toMatchObject({ kind: "budget", class: "deadlock" });
+    const history = readRun(repo, 1)?.stop_history ?? [];
+    expect(history[0]?.reason).toBe(history[1]?.reason);
+  });
+
+  it("stops once at the cap on a finding that cannot be shown remediated, rather than cycling on it", async () => {
+    // The cycle this breaks: `verify` at the cap writes NO round and used to
+    // answer with the same code as a recorded blocking round, so the driver
+    // went back to dispositions, found the set it had already acted on,
+    // re-issued the same fix, ran the suite and arrived here again -- an
+    // engine turn and a suite run per lap, in the colours of ordinary
+    // progress. A finding citing no path can never be shown remediated, so
+    // no amount of work breaks it.
+    const { repo, sessionsDir } = drivenRepo();
+    configure(
+      ["ISSUES FOUND\n\nIssue 1: the error handling in this module is inconsistent.\nSeverity: Major\n"],
+      {},
+      { verification: { settings: { max_rounds: 1 } } },
+    );
+    const engine = scripted(async (invocation, tools) => {
+      const { instruction } = invocation;
+      if (instruction.answer_schema === DISPOSITION_SCHEMA) {
+        tools.answer({ dispositions: [{ finding_index: 0, action: "fix" }] });
+        return;
+      }
+      if (instruction.step_id === "fix-round-1") {
+        tools.write("src/widget.py", `# tried\n${WIDGET_V2}`);
+        tools.report({ step: "fix-round-1", files: ["src/widget.py"] });
+        return;
+      }
+      await wellBehaved(invocation, tools);
+    });
+
+    const { code } = await drive(sessionsDir, engine);
+    expect(code).toBe(1);
+    const stop = readRun(repo, 1)?.stop;
+    expect(stop?.kind).toBe("verification");
+    expect(stop?.reason).toContain("cannot be shown remediated");
+    expect(stop?.reason).toContain("(no path cited)");
+    // One lap, not many: one fix step, one round on the ledger, and the
+    // disposition set gone rather than waiting to be re-used.
+    expect(engine.seen.filter((entry) => entry.step_id === "fix-round-1")).toHaveLength(1);
+    expect(readRounds(repo, 1)).toHaveLength(1);
+    expect(readDispositions(repo, 1)).toBeNull();
+    expect(sessionStatus(sessionsDir)).toBe("in-progress");
+  });
+
+  it("routes past a verification that can open no further round, instead of stopping in front of it", async () => {
+    // The run of record fails AFTER a clean verification, which is the
+    // ordinary way back into `verify` -- and with the cap already reached
+    // over a clean round, `verify` refuses with "there is nothing left to
+    // verify. Close the session." That is an instruction to advance, and
+    // the driver used to read it as a wall: correct work, a green suite,
+    // and a session that could never close.
+    const { repo, sessionsDir } = drivenRepo();
+    configure([VERIFIED], {}, { verification: { settings: { max_rounds: 1 } } });
+    // The run of record fails for a reason outside the tree, and the fix is
+    // outside it too -- so the tree the verifier reviewed is still the tree,
+    // which is the condition under which advancing is honest.
+    mkdirSync(join(repo, ".dabbler"), { recursive: true });
+    writeFileSync(join(repo, ".dabbler", "full-suite-red"), "", "utf8");
+    const engine = scripted(({ instruction }, tools) => {
+      if (instruction.answer_schema === WORK_PLAN_SCHEMA) return void tools.answer(PLAN);
+      if (instruction.step_id === "widget") {
+        tools.write("src/widget.py", WIDGET_V2);
+        tools.report({ step: "widget", files: ["src/widget.py"] });
+        return;
+      }
+      rmSync(join(repo, ".dabbler", "full-suite-red"));
+      tools.report({ step: instruction.step_id as string, files: [] });
+    });
+
+    const { code, out, err } = await drive(sessionsDir, engine);
+    if (code !== 0) throw new Error(`${err}\n---OUT---\n${out}`);
+    expect(engine.seen.map((entry) => entry.step_id)).toEqual([
+      "plan",
+      "widget",
+      "fix-run-of-record",
+    ]);
+    // The second visit to `verify` spends no round and no job: the ledger
+    // already answers it.
+    expect(out).toContain("verification-settled reason=cap-clean");
+    expect(readRounds(repo, 1)).toHaveLength(1);
+    expect(readRecords(repo).map((row) => `${row.stage}:${row.outcome}`)).toEqual([
+      "preverify-targeted:passed",
+      "final-full:failed",
+      "preverify-targeted:passed",
+      "final-full:passed",
+    ]);
+    expect(sessionStatus(sessionsDir)).toBe("complete");
+  });
+
+  it("stops with what to do when the cap is spent and the tree is not the one that was verified", async () => {
+    // The other half of the same edge, and the reason it is not a bare
+    // route: a repair after the last reviewed round is work no verifier
+    // saw. `verify` would still say "nothing left to verify", which is
+    // true of the tree it reviewed and false of this one.
+    const { repo, sessionsDir } = drivenRepo();
+    configure([VERIFIED], {}, { verification: { settings: { max_rounds: 1 } } });
+    mkdirSync(join(repo, ".dabbler"), { recursive: true });
+    writeFileSync(join(repo, ".dabbler", "full-suite-red"), "", "utf8");
+    const engine = scripted(({ instruction }, tools) => {
+      if (instruction.answer_schema === WORK_PLAN_SCHEMA) return void tools.answer(PLAN);
+      if (instruction.step_id === "widget") {
+        tools.write("src/widget.py", WIDGET_V2);
+        tools.report({ step: "widget", files: ["src/widget.py"] });
+        return;
+      }
+      // This one repairs the tree as well, which is the ordinary shape of a
+      // fix and the reason the round it was verified against no longer
+      // describes anything.
+      rmSync(join(repo, ".dabbler", "full-suite-red"));
+      tools.write("src/widget.py", `${WIDGET_V2}# repaired\n`);
+      tools.report({ step: instruction.step_id as string, files: ["src/widget.py"] });
+    });
+
+    const { code } = await drive(sessionsDir, engine);
+    expect(code).toBe(1);
+    const stop = readRun(repo, 1)?.stop;
+    expect(stop?.kind).toBe("verification");
+    expect(stop?.reason).toContain("cap-clean");
+    expect(stop?.reason).toContain("the working tree changed after verification round");
+    expect(stop?.reason).toContain("--max-rounds");
+    expect(sessionStatus(sessionsDir)).toBe("in-progress");
   });
 
   it("stops at the invocation budget and a re-run continues from the phase it reached", async () => {

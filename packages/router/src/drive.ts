@@ -52,6 +52,7 @@ import {
   driverEngineOutput,
   driverInvocationCap,
   loadConfig,
+  verificationRoundCap,
 } from "./config.ts";
 import {
   DISPOSITION_SCHEMA,
@@ -61,6 +62,7 @@ import {
   WATCHER_OUTSTANDING,
   WORK_PLAN_SCHEMA,
   instructionPath,
+  clearDispositions,
   readDispositions,
   readInstruction,
   readReport,
@@ -75,7 +77,7 @@ import {
 import type { Engine, EngineOutput } from "./engines.ts";
 import { clip, stripEscapes } from "./engines.ts";
 import { SESSION_PLAN_FILENAME } from "./evidence.ts";
-import { SET_BOOKKEEPING_COMMIT_BASENAMES } from "./gates.ts";
+import { SET_BOOKKEEPING_COMMIT_BASENAMES, checkVerificationClean } from "./gates.ts";
 import type {
   DriverInstruction,
   DriverReport,
@@ -91,7 +93,14 @@ import {
   runGit,
   snapshotWorktreeTree,
 } from "./journal.ts";
-import { LedgerError, RUNS_DIRNAME, type Row, latestRound, readDisputes } from "./ledger.ts";
+import {
+  LedgerError,
+  RUNS_DIRNAME,
+  type Row,
+  latestRound,
+  readDisputes,
+  readRounds,
+} from "./ledger.ts";
 import {
   CLASS_VALUE_TRADEOFF,
   openDecisions,
@@ -111,8 +120,17 @@ import {
 } from "./session.ts";
 import { loadSuitesChecked } from "./testEvidence.ts";
 import { recordDispute, resolveRepoRelative } from "./verify/disputes.ts";
-import { EXIT_BLOCKING, EXIT_OK as VERIFY_OK } from "./verify/errors.ts";
-import { readTaskDeclaration } from "./writers.ts";
+import {
+  EXIT_BLOCKING,
+  EXIT_OK as VERIFY_OK,
+  EXIT_UNRESOLVED,
+} from "./verify/errors.ts";
+import {
+  NO_ROUND_CAP_CLEAN,
+  NO_ROUND_TERMINAL,
+  noRoundReason,
+} from "./verify/rounds.ts";
+import { readTaskDeclaration, sessionIsReleasable } from "./writers.ts";
 
 // --- The engine --------------------------------------------------------------
 
@@ -1407,8 +1425,18 @@ ${this.stopArtifacts()}`,
     }
     for (const file of changed) {
       if (!report.files_changed.includes(file)) {
+        // The refusal names the way out, because an engine that cannot see
+        // the edge does not have one: a change made while the loop was
+        // stopped -- a repair somebody did by hand -- belongs to no step,
+        // and reporting it inside one is what this rule refuses. Session 66
+        // met this and folded the repair into a step it was not part of.
         reasons.push(
-          refusal(RULE.filesChangedOmits, `files_changed omits '${file}', which the tree changed`),
+          refusal(
+            RULE.filesChangedOmits,
+            `files_changed omits '${file}', which the tree changed. If it was repaired while ` +
+              "the run was stopped, it belongs to no step: `dabbler session rebaseline " +
+              '--reason "<what was repaired>"` records it and moves the baseline',
+          ),
         );
       }
     }
@@ -1618,6 +1646,47 @@ ${this.stopArtifacts()}`,
   // --- verification ----------------------------------------------------------
 
   private async phaseVerify(): Promise<void> {
+    // Two of the three reasons a further round cannot open are instructions
+    // to ADVANCE, and both are answers the ledger already holds. A terminal
+    // row stands, or the cap is reached over a clean round: `verify` would
+    // refuse, in words that say "close the session", and the driver's next
+    // move is the run of record. Asking first spends no job, and -- before
+    // this -- a session whose run of record failed AFTER a clean at-cap
+    // verification could never close at all: the fix cycles back through
+    // preverify to here, and the refusal is the same one forever.
+    //
+    // The third, disputes at the cap, is not the driver's to answer:
+    // adjudication is a person routing findings to a third provider. It
+    // falls through to the job, which refuses, and the stop carries
+    // `verify`'s own words -- which say exactly that.
+    const noRound = noRoundReason(
+      this.repoRoot,
+      this.sessionNumber,
+      readRounds(this.repoRoot, this.sessionNumber),
+      this.run.verification?.max_rounds || verificationRoundCap(this.config),
+    );
+    if (noRound === NO_ROUND_TERMINAL || noRound === NO_ROUND_CAP_CLEAN) {
+      // With one condition, which `verify`'s own message cannot state and
+      // the close's own gate already answers: is this still the tree that
+      // was reviewed? "There is nothing left to verify" is true of an
+      // unmoved tree and false of a repaired one, and routing a repaired
+      // tree onward would carry it to a close that refuses it later and
+      // more confusingly. The gate is ASKED rather than restated -- there
+      // is one rule for "is the tree the verified one" and it lives there.
+      const [clean, why] = checkVerificationClean(this.sessionsDir);
+      if (clean) {
+        this.log("verification-settled", { reason: noRound });
+        this.setPhase("run-of-record");
+        return;
+      }
+      throw new Stop(
+        "verification",
+        `no further verification round may open (${noRound}), and this is not the ` +
+          `tree that was verified: ${why} Raising the round cap (--max-rounds ` +
+          "<larger>) buys the review this change has not had, which is a decision " +
+          "to spend another round; putting the tree back is the other answer.",
+      );
+    }
     const code = await this.longWork({
       name: "verification",
       argv: [
@@ -1680,6 +1749,19 @@ ${this.stopArtifacts()}`,
       this.save();
       this.setPhase("preverify");
       return;
+    }
+
+    // The cap, reached over findings that cannot be shown remediated. It is
+    // terminal by construction and no re-run changes it: the findings and
+    // what they cite are in the reason, and the next planning session is
+    // where they are read. Said in its own words rather than as one more
+    // refusal, because "run it again" is the one thing that will not work.
+    if (code === EXIT_UNRESOLVED) {
+      throw new Stop(
+        "verification",
+        "the round cap is reached and blocking findings cannot be shown " +
+          `remediated; nothing lands but the record. ${reason}`,
+      );
     }
 
     // A stop, and it says WHICH refusal. The identical sentence two unlike
@@ -1816,6 +1898,10 @@ ${this.stopArtifacts()}`,
       checks: this.allPlanChecks(),
       fromPlan: false,
     });
+    // Spent. The next pass through dispositions asks the engine rather than
+    // re-acting on an answer it has already used -- which is what turned a
+    // cap that wrote no round into a loop.
+    clearDispositions(this.repoRoot, this.sessionNumber);
     this.setPhase("preverify");
   }
 
@@ -1939,7 +2025,15 @@ ${this.stopArtifacts()}`,
    * this is the phase that would break if it ever changed.
    */
   private async phasePublish(): Promise<void> {
-    if (!this.requirePlan().releasable) {
+    // The DECLARATION, which is what `packageSession` and the close gate
+    // both read. The plan carries a `releasable` too and the engine writes
+    // it, and `phasePlan` turns it into a declaration only when there is
+    // not one already -- so an operator who declared the session before it
+    // was driven can disagree with the plan, and the two disagreeing is
+    // worse in both directions: reading the plan here publishes what was
+    // declared not-releasable, or skips a publish the close then demands a
+    // packaging row for. The plan may PROPOSE it; the declaration decides.
+    if (!sessionIsReleasable(this.sessionsDir, this.sessionNumber)) {
       this.setPhase("close");
       return;
     }

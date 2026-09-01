@@ -499,6 +499,21 @@ export function packageOutputDir(repoRoot: string, sessionNumber: number): strin
   return join(sessionRunDir(repoRoot, sessionNumber), PACKAGE_DIRNAME);
 }
 
+/**
+ * The three things a packaging run can have been, as the record spells them.
+ *
+ * Here rather than in `packaging.ts` because they are the RECORD's
+ * vocabulary, and this module owns the record: the close's gate has to ask
+ * whether a row says `published`, and `packaging` borrows the close's gates
+ * as its own preconditions -- so a token defined in `packaging.ts` and read
+ * in `gates.ts` would be a cycle, and a token spelled out in both would be
+ * the drift a shared vocabulary exists to prevent. `packaging.ts` re-exports
+ * them, so its own callers see no difference.
+ */
+export const OUTCOME_PUBLISHED = "published";
+export const OUTCOME_REFUSED = "refused";
+export const OUTCOME_FAILED = "failed";
+
 export function readPackaging(repoRoot: string, sessionNumber: number): Row[] {
   return readJsonl(packagingPath(repoRoot, sessionNumber), validatePackaging);
 }

@@ -33,6 +33,7 @@ export { spawnProgram, terminateTree } from "./checks.ts";
 // a renderer that decided it for itself would be a second statement of a
 // rule the driver already owns.
 export {
+  WATCHER_JOB_OUTSTANDING,
   WATCHER_OUTSTANDING,
   WATCHER_QUIET,
   readWatcher,

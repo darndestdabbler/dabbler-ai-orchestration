@@ -40,7 +40,7 @@ import * as fs from "fs";
 import * as path from "path";
 import * as vscode from "vscode";
 
-import { WATCHER_OUTSTANDING, readWatcher, stalledAfterSeconds } from "dabbler-ai-router";
+import { WATCHER_QUIET, readWatcher, stalledAfterSeconds } from "dabbler-ai-router";
 
 import { RUNS_REL } from "../utils/projection";
 
@@ -497,9 +497,12 @@ export class DabblerTerminal implements vscode.Pseudoterminal {
 
   /** When the watcher was last consulted, so its tree probe is not run per tick. */
   private lastLook = 0;
-  /** The instruction being watched, and how many thresholds have been said of it. */
-  private watchedSeq: number | null = null;
+  /** What is being watched -- an instruction seq, or a job name -- and how many
+   *  thresholds have been said of it. */
+  private watching: string | null = null;
   private saidMultiple = 0;
+  /** The drained size of the watched job log at the last look; null before one. */
+  private watchedLogSize: number | null = null;
 
   /**
    * How many rows of each JSONL record have been said, by absolute path.
@@ -724,19 +727,57 @@ export class DabblerTerminal implements vscode.Pseudoterminal {
     if (now.getTime() - this.lastLook < watcherLookMs(threshold)) return;
     this.lastLook = now.getTime();
 
-    const seq = run.seq ?? null;
-    if (seq !== this.watchedSeq) {
-      // A new instruction is a new silence: whatever was said of the last
-      // one says nothing about this one.
-      this.watchedSeq = seq;
+    // What is being watched: the instruction, or the job. Either changing
+    // is a new silence, and whatever was said of the last one says nothing
+    // about this one -- including how much of its log had arrived. A job's
+    // identity is its name, its log AND the moment it started, because a
+    // re-run starts a new job under the same name over the same truncated
+    // log, and inheriting the last one's size would read as silence on its
+    // first look.
+    const job = run.job;
+    const watching = job
+      ? `${job.name ?? ""}\0${job.log ?? ""}\0${job.started_at ?? ""}`
+      : `seq:${run.seq ?? ""}`;
+    if (watching !== this.watching) {
+      this.watching = watching;
       this.saidMultiple = 0;
+      this.watchedLogSize = null;
     }
-    const reading = readWatcher(this.repoRoot, session, threshold, now);
-    if (reading.state !== WATCHER_OUTSTANDING) return;
+    // The growth question is one this terminal has already answered: it
+    // drains every job log in the run's directory on every poll, so the
+    // offsets it keeps are the record of whether anything arrived. Asking
+    // the file again would be a second answer to a question already asked.
+    const reading = readWatcher(this.repoRoot, session, threshold, now, () =>
+      this.jobLogGrew(run),
+    );
+    if (reading.state === WATCHER_QUIET) return;
     const multiple = Math.trunc(reading.sinceSeconds / threshold);
     if (multiple <= this.saidMultiple) return;
     this.saidMultiple = multiple;
-    this.line("watcher", { since: `${reading.sinceSeconds}s`, state: reading.state });
+    this.line("watcher", {
+      since: `${reading.sinceSeconds}s`,
+      state: reading.state,
+      ...(reading.job ? { job: reading.job } : {}),
+    });
+  }
+
+  /**
+   * Whether the running job's log has grown since the last watcher look.
+   *
+   * Read from the offsets `drainJobs` maintains rather than from a fresh
+   * `stat`: those offsets ARE how much of the log this terminal has seen,
+   * and they move on every poll. Null until two looks have happened, because
+   * one look is not a comparison.
+   */
+  private jobLogGrew(run: RunRecord): boolean | null {
+    const log = run.job?.log;
+    if (!log) return null;
+    const full = path.join(this.repoRoot, ...log.split("/"));
+    const drained = this.logOffsets.get(full);
+    if (drained === undefined) return null;
+    const seen = this.watchedLogSize;
+    this.watchedLogSize = drained;
+    return seen === null ? null : drained > seen;
   }
 
   /**

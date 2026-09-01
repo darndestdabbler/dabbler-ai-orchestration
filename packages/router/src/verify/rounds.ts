@@ -96,6 +96,7 @@ import {
   EXIT_OK,
   EXIT_STATE,
   EXIT_UNAVAILABLE,
+  EXIT_UNRESOLVED,
   EXIT_USAGE,
   VerifyError,
 } from "./errors.ts";
@@ -146,6 +147,57 @@ export async function dispatchVerification(
 export function blockingFindings(row: Row): Row[] {
   const findings = Array.isArray(row["findings"]) ? (row["findings"] as Row[]) : [];
   return findings.filter((finding) => finding["blocking"] !== false);
+}
+
+// --- May another round open? -------------------------------------------------
+//
+// Asked twice: by `runRound`, which refuses when the answer is no, and by
+// the driver, which must not spend a verification job to be told. It is one
+// question and it is answered here, because the reason a session cannot
+// verify again decides what happens next -- two of the three answers mean
+// ADVANCE, and a caller that only saw the refusal treated all three as a
+// wall. A second statement of it in `drive.ts` is the drift ground rule 3
+// exists against.
+
+/** A terminal row already stands: adjudication, remediation at the cap, a waiver. */
+export const NO_ROUND_TERMINAL = "terminal-row";
+/** The cap is reached and the last round left no blocking finding. */
+export const NO_ROUND_CAP_CLEAN = "cap-clean";
+/** The cap is reached and blocking findings are disputed rather than fixed. */
+export const NO_ROUND_CAP_DISPUTED = "cap-disputed";
+
+export type NoRoundReason =
+  | typeof NO_ROUND_TERMINAL
+  | typeof NO_ROUND_CAP_CLEAN
+  | typeof NO_ROUND_CAP_DISPUTED
+  | null;
+
+/**
+ * Why no further verification round may open, or null when one may.
+ *
+ * Null covers both the ordinary case and the one terminal path that still
+ * has work to do: the cap reached with undisputed blocking findings, which
+ * `terminateAtCap` may still resolve into a `REMEDIATED_AT_CAP` row or an
+ * UNRESOLVED refusal. That decision needs the tree, so it is not asked here
+ * -- this answers only what the ledger alone can settle.
+ */
+export function noRoundReason(
+  repoRoot: string,
+  current: number,
+  priorRounds: readonly Row[],
+  cap: number,
+): NoRoundReason {
+  if (priorRounds.some((row) => TERMINAL_ROW_TYPES.has(String(row["type"])))) {
+    return NO_ROUND_TERMINAL;
+  }
+  if (priorRounds.length === 0) return null;
+  const latest = priorRounds[priorRounds.length - 1] as Row;
+  if (Number(latest["round"]) + 1 <= cap) return null;
+  if (!latest["blocking"]) return NO_ROUND_CAP_CLEAN;
+  const disputes = readDisputes(repoRoot, current);
+  return undisputedBlockingIndices(latest, disputes).length < blockingFindings(latest).length
+    ? NO_ROUND_CAP_DISPUTED
+    : null;
 }
 
 /**
@@ -199,7 +251,8 @@ export async function terminateAtCap(
   cap: number,
 ): Promise<number> {
   const latest = priorRounds[priorRounds.length - 1] as Row;
-  if (!latest["blocking"]) {
+  const noRound = noRoundReason(repoRoot, current, priorRounds, cap);
+  if (noRound === NO_ROUND_CAP_CLEAN) {
     writeErr(
       `verify: refused -- round ${String(latest["round"])} left no blocking ` +
         `finding and the cap (${cap}) is reached; there is nothing ` +
@@ -210,11 +263,7 @@ export async function terminateAtCap(
     return EXIT_USAGE;
   }
 
-  const disputes = readDisputes(repoRoot, current);
-  if (
-    undisputedBlockingIndices(latest, disputes).length <
-    blockingFindings(latest).length
-  ) {
+  if (noRound === NO_ROUND_CAP_DISPUTED) {
     writeErr(
       `verify: refused -- the cap (${cap}) is reached and round ` +
         `${String(latest["round"])} carries disputed blocking finding(s). A ` +
@@ -276,7 +325,13 @@ export async function terminateAtCap(
         "lands but the record; the close stays BLOCKED and these " +
         "findings are read at the next planning session.\n",
     );
-    return EXIT_BLOCKING;
+    // Its own code, never BLOCKING: no round is written here, so there is
+    // nothing to dispose of. An orchestrator told "blocking" sends the
+    // engine back to the disposition set it already acted on, then to the
+    // same fix and the same suite, and arrives here again -- a cycle that
+    // reads as ordinary progress and cannot break, because a finding citing
+    // no path can never be shown remediated by any amount of work.
+    return EXIT_UNRESOLVED;
   }
 
   const gate = preverifyGate(repoRoot, sessionsDir, config);
@@ -289,7 +344,10 @@ export async function terminateAtCap(
         "it makes necessary. Run them first:\n" +
         `${preverifyRefusalTail(sessionsDir, gate)}\n`,
     );
-    return EXIT_BLOCKING;
+    // The same refusal as the one that precedes any round, in the same
+    // words: a missing pre-verification run, not a finding. It answers with
+    // the same code, so one fact is not two.
+    return EXIT_USAGE;
   }
 
   const row: Row = {
@@ -403,9 +461,10 @@ export async function runRound(
     );
     return EXIT_USAGE;
   }
-  const terminal = priorRounds.find((row) =>
-    TERMINAL_ROW_TYPES.has(String(row["type"])),
-  );
+  const terminal =
+    noRoundReason(repoRoot, current, priorRounds, cap) === NO_ROUND_TERMINAL
+      ? priorRounds.find((row) => TERMINAL_ROW_TYPES.has(String(row["type"])))
+      : undefined;
   if (terminal !== undefined) {
     writeErr(
       `verify: refused -- session ${current} already carries its ` +

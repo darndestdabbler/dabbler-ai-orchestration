@@ -23,7 +23,14 @@ import { type RouterConfig, loadConfig } from "./config.ts";
 import { GATE_PUBLISHED_WHEN_RELEASABLE, type GateResult, runGates } from "./gates.ts";
 import { refuseIfResolvingFromSource } from "./resolution.ts";
 import { repoRootFor, snapshotWorktreeTree } from "./journal.ts";
-import { type Row, appendPackaging, packageOutputDir } from "./ledger.ts";
+import {
+  OUTCOME_FAILED,
+  OUTCOME_PUBLISHED,
+  OUTCOME_REFUSED,
+  type Row,
+  appendPackaging,
+  packageOutputDir,
+} from "./ledger.ts";
 import { readSessionState } from "./progress.ts";
 import { resolveSecret } from "./secretResolver.ts";
 import { sessionIsReleasable } from "./writers.ts";
@@ -45,9 +52,10 @@ export const PLACEHOLDER_SECRET = "{secret}";
  */
 export const REDACTION = PLACEHOLDER_SECRET;
 
-export const OUTCOME_PUBLISHED = "published";
-export const OUTCOME_REFUSED = "refused";
-export const OUTCOME_FAILED = "failed";
+// The record's own vocabulary, which `ledger.ts` owns: the close's gate must
+// ask whether a row says `published`, and this module borrows that gate.
+// Re-exported here because this is where a reader of packaging looks for it.
+export { OUTCOME_FAILED, OUTCOME_PUBLISHED, OUTCOME_REFUSED };
 
 export const STEP_PACK = "pack";
 export const STEP_PUSH = "push";

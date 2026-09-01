@@ -42,6 +42,8 @@ import { freshnessWarnings } from "./discovery.ts";
 import {
   ROUND_REF_NAMESPACE,
   SESSION_PLAN_FILENAME,
+  changedPathsBetween,
+  snapshotWorktreeTree,
   pushRoundRefs,
   repoRootFromSessionsDir,
   upstreamRemote,
@@ -57,6 +59,7 @@ import {
   planPath,
   readInstruction,
   readRun,
+  recordRepair,
   reportPath,
   requestInterrupt,
   shapeReport,
@@ -69,7 +72,11 @@ import { SET_BOOKKEEPING_COMMIT_BASENAMES, governingConfig, runGates } from "./g
 import { refuseIfResolvingFromSource } from "./resolution.ts";
 import { detectEcosystems } from "./bootstrap/detect.ts";
 import { PROJECT_CONFIG_FILENAME } from "./config.ts";
-import { refreshOwedDecisions } from "./owedDecisions.ts";
+import {
+  CLASS_ACCOUNTABILITY_SIGNOFF,
+  raiseOwed,
+  refreshOwedDecisions,
+} from "./owedDecisions.ts";
 import { loadSuitesChecked } from "./testEvidence.ts";
 import { nowIso, platformNewlines, repoRootFor, runGit } from "./journal.ts";
 import { LedgerError, RUNS_DIRNAME, type Row, latestRound } from "./ledger.ts";
@@ -1243,6 +1250,153 @@ export function interrupt(sessionsDir: string, options: InterruptCliOptions): nu
             "running invocation and halts -- the session stays in flight, and `session drive` re-runs it.\n"
         : `interrupt: requested for session ${number} (instruction ${run.seq}); the driver ends the ` +
             "running invocation and re-invokes the engine with the reason.\n",
+  );
+  return EXIT_OK;
+}
+
+// --- rebaseline --------------------------------------------------------------
+
+export interface RebaselineCliOptions {
+  readonly reason: string;
+  readonly by?: string | null;
+  readonly sessionNumber?: number | null;
+}
+
+/**
+ * Report a repair made while the run was stopped, and move the baseline the
+ * next report is measured against.
+ *
+ * There is a state the driven lifecycle reaches and had no edge out of:
+ * *halted, being repaired*. A stop is answered by a person; the answer is
+ * often a file; and the next report is judged against a tree the framework
+ * snapshotted before that file existed -- so the report omits it and is
+ * refused, correctly, every time. Session 66 met it and the only way past
+ * was for the operator to fold the repair into a step it did not belong to.
+ *
+ * **What it costs, plainly.** Every accepted report in this framework is
+ * measured against a tree the framework snapshotted itself, and that is its
+ * strongest edge; this verb moves that tree without a step. So it records
+ * rather than merely permits: the paths and the reason go to
+ * `repairs.jsonl`, and an `accountability-signoff` decision says a person
+ * put work in outside a step. What it does NOT do is weaken any judgement
+ * downstream -- the standing verification round and the run of record both
+ * bind to a tree this moves, so a repair after either is refused by exactly
+ * the machinery that refuses any other post-verification change. The hole
+ * is in the attribution of work, and only there.
+ *
+ * Refused while the run is not stopped: a running loop has steps, and a
+ * step is how work is reported.
+ */
+export function rebaseline(sessionsDir: string, options: RebaselineCliOptions): number {
+  if (!isDirectory(sessionsDir)) {
+    writeErr(`rebaseline: not a directory: ${sessionsDir}\n`);
+    return EXIT_USAGE;
+  }
+  const reason = options.reason.trim();
+  if (reason === "") {
+    writeErr(
+      "rebaseline: refused -- --reason is the whole of what this records; " +
+        "say what was repaired.\n",
+    );
+    return EXIT_USAGE;
+  }
+  const target = resolveTargetSession(sessionsDir, options.sessionNumber ?? null);
+  if (target === null) {
+    writeErr(`rebaseline: refused -- no session has been started under ${sessionsDir}.\n`);
+    return EXIT_BOUNDARY;
+  }
+  const repoRoot = repoRootFromSessionsDir(sessionsDir);
+  const number = sessionDisplayNumber(target);
+
+  let run;
+  try {
+    run = readRun(repoRoot, target);
+  } catch (error) {
+    if (!(error instanceof LedgerError)) throw error;
+    writeErr(`rebaseline: refused -- ${error.message}\n`);
+    return EXIT_BOUNDARY;
+  }
+  if (run === null) {
+    writeErr(
+      `rebaseline: refused -- session ${number} was never driven; a typed session reports ` +
+        "its work by committing it.\n",
+    );
+    return EXIT_BOUNDARY;
+  }
+  if (!run.stop) {
+    writeErr(
+      `rebaseline: refused -- session ${number}'s run has not stopped, so the work belongs ` +
+        "to the step in flight. Report it there; this verb exists for the repairs a person " +
+        "makes while the loop is halted, which no step can carry.\n",
+    );
+    return EXIT_BOUNDARY;
+  }
+
+  const tree = snapshotWorktreeTree(repoRoot);
+  if (tree === null) {
+    writeErr("rebaseline: refused -- git could not snapshot the working tree.\n");
+    return EXIT_GATE_FAILED;
+  }
+  const paths = run.baseline_tree
+    ? (changedPathsBetween(repoRoot, run.baseline_tree, tree) ?? [])
+    : [];
+  const by = (options.by ?? "").trim() || "the operator";
+
+  let row;
+  try {
+    row = recordRepair(repoRoot, target, {
+      reason,
+      by,
+      paths,
+      baselineTree: tree,
+      recordedAt: nowIso(),
+    });
+  } catch (error) {
+    if (!(error instanceof LedgerError)) throw error;
+    writeErr(`rebaseline: refused -- ${error.message}\n`);
+    return EXIT_BOUNDARY;
+  }
+
+  // The decision is the point as much as the row is: a machine cannot judge
+  // whether a repair made outside a step was the right one, and the class
+  // for "somebody did this and owns it" is what accountability-signoff is.
+  // It does not block a close -- moving a baseline is not a verification
+  // reduction, and the gates that would notice one still run.
+  raiseOwed(repoRoot, {
+    id: `repair-outside-a-step-${target}`,
+    decisionClass: CLASS_ACCOUNTABILITY_SIGNOFF,
+    question:
+      `Session ${number} had work put into its tree outside any step, while the run was ` +
+      `stopped (${run.stop.kind}). Does that stand as part of this session?`,
+    determined:
+      `${by} reported it as: ${reason}. ` +
+      (paths.length > 0
+        ? `It absorbed ${paths.length} path(s): ${paths.slice(0, 5).join(", ")}` +
+          (paths.length > 5 ? ", ..." : "")
+        : "The tree had not moved since the last baseline, so it absorbed nothing."),
+    options: [
+      {
+        label: "It stands",
+        consequence:
+          "The repair is part of this session's diff and is reviewed with it: the " +
+          "verification round and the run of record both bind to the tree it made.",
+      },
+      {
+        label: "It does not",
+        consequence:
+          "The repair is taken back out of the tree before the session continues, and " +
+          "the baseline moves again when it is.",
+      },
+    ],
+    sessionNumber: target,
+  });
+
+  writeOut(
+    `rebaseline: session ${number}'s baseline moved to ${tree.slice(0, 12)}; ` +
+      `${paths.length} path(s) recorded as repaired outside a step, and an ` +
+      "accountability-signoff decision raised. The stop is untouched -- re-run to " +
+      "carry on from it.\n" +
+      `${dumps({ paths: row["paths"], reason })}\n`,
   );
   return EXIT_OK;
 }

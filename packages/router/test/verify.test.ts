@@ -27,6 +27,7 @@ import {
   EXIT_BLOCKING,
   EXIT_OK,
   EXIT_STATE,
+  EXIT_UNRESOLVED,
   EXIT_USAGE,
 } from "../src/verify/errors.ts";
 import { deriveChangeId, loadAuthorClaims, renderClaimsMarkdown } from "../src/verify/prepare.ts";
@@ -787,7 +788,11 @@ describe("a verification round, end to end", () => {
     });
     writeFileSync(join(repo, "unrelated.txt"), "not the fix\n", "utf8");
     const { code, err } = await capturedAsync(() => runRound(sessionsDir, { maxRounds: 1 }));
-    expect(code).toBe(EXIT_BLOCKING);
+    // Its own code: no round is written here, so an orchestrator told
+    // "blocking" would send the engine to dispose of findings that are not
+    // there and arrive back at this same refusal, forever.
+    expect(code).toBe(EXIT_UNRESOLVED);
+    expect(code).not.toBe(EXIT_BLOCKING);
     expect(err).toContain("verify: UNRESOLVED");
     expect(err).toContain("cited: src/widget.py");
     expect(err).toContain("Nothing lands but the record");

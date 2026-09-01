@@ -8409,3 +8409,33 @@ It does, and it stays. A headless engine driven end to end is what the built ada
 There is no second code path. The seam is at `converse`: push invokes the engine there, pull returns the outstanding instruction or unwinds with the instruction it just issued. `drive` and `next` call the same `advance`, over the same phases, judging with the same `judge`, and the framework's own long work -- a verification round, the complete suite, the close -- runs as the same detached job under both, polled by the loop in push and answered with a `wait` instruction in pull. The push mode is the pull mode with an engine invoked between calls.
 
 What each is for, in one line apiece. `dabbler session next`: a person, or the engine they are already talking to, works the session from their own CLI and keeps their own context, their own interrupt, and their own bill. `dabbler session drive`: nobody is watching, and the framework invokes a headless engine per instruction under an invocation budget.
+
+## Session 68 — The logic tree, harvested and held to the code
+
+### D253 · 2026-09-01 · Operator · The operator authorised two verification rounds beyond the cap for session 68, so the lifecycle model's deletion would be reviewed rather than terminated at the cap
+
+Session 68's verification cap is three rounds, the repository's own
+`verification.settings.max_rounds`. Four rounds were spent on one thread: the
+lifecycle model's adoption, which the plan made binary -- held to the code, or
+deleted. Round 1 found the adopted model carrying the harvest's stale notes;
+round 2 refused an `exercised` flag as an exemption; round 3 refused the
+narrowing of the machine that bought equality; round 4 refused the same model
+kept as a Markdown table under a "snapshot, not a source" disclaimer. Every
+finding was accepted and fixed; none was disputed, which is why adjudication by
+a third provider was not the mechanism -- it routes disputes, and there were
+none.
+
+The operator authorised the extra rounds in two grants, each after being shown
+what remained: the first raised the cap to four, so that the deletion of
+`packages/router/lifecycle.json` would be reviewed rather than terminated at the
+cap; the second raised it to five, after round 4 found the same defect one level
+up. The reason in both cases was the same: the alternative was
+`REMEDIATED_AT_CAP` -- the work lands and the record says no verifier saw the
+final repair -- on a change that removes this session's headline deliverable. A
+verdict that says a verifier read it is worth two rounds.
+
+What the rounds bought, beyond the verdict: the model is not adopted in any
+form, and the reason is on the record rather than in an argument. Adopting it
+needs `setPhase` and the `Stop` constructor instrumented so self-loops are
+observable, plus tests for the seventeen driver edges nothing drives. That is a
+session, and it is named as one in `docs/logic-harvest-68.md`.

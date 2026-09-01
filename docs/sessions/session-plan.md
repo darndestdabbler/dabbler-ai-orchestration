@@ -3257,12 +3257,15 @@ controls and the verifier. It replaces none of them.*
 
 ---
 
-### Session 69 of 70: The Solution Explorer goes multi-repository
+### Session 69 of 70: The round cap stops being typeable, and the Solution Explorer goes multi-repository
 
-*The largest unaddressed item from the csv-model feedback (item 8), and the
-answer to the operator's own sentence: "once I completed the CSV model, I
-didn't know what to do next." More of it is built than the feedback
-assumed, so this is an extension rather than a new surface.*
+*Mostly the largest unaddressed item from the csv-model feedback (item 8),
+and the answer to the operator's own sentence: "once I completed the CSV
+model, I didn't know what to do next." More of it is built than the
+feedback assumed, so this is an extension rather than a new surface. It
+carries one unrelated item first, the way session 66 carried four: the item
+is a deletion, it needs no new verb, and giving it a session of its own
+would move the publication trial a seventh time for about thirty lines.*
 
 **What exists.** `ProjectionExternal` already carries `root` (where the
 producing repository is on THIS machine, or null), `reason`, `feed`,
@@ -3270,27 +3273,58 @@ producing repository is on THIS machine, or null), `reason`, `feed`,
 build files; `usedBy` is derived and never declared, deliberately.
 
 1. Register; declare `--not-releasable`.
-2. **Three location states, not two.** The row renders a binary today —
+2. **The round cap stops being typeable.** `--max-rounds` on any `next`
+   call overwrites the run's cap and records nothing — `this.options.maxRounds
+   ?? existing?.max_rounds ?? null` in `drive.ts`, so the flag always wins
+   and the persisted value never does. It moves the cap in BOTH directions:
+   with four rounds run, `--max-rounds 1` makes `latest.round + 1 <= cap`
+   false and routes the tree straight to `cap-clean` or `cap-disputed`. That
+   is a verification-reducing act with no approver anywhere on the record,
+   reachable by anyone who types a command.
+
+   The flag loses its mid-session power. The cap comes from config, and
+   afterwards moves only through `session plan amend`, which already writes
+   a reason and an approver — no new verb, and the change is mostly a
+   deletion.
+
+   **State the limit rather than overclaim it.** An amendment does not
+   prove a person authorized anything; the approver is whatever the engine
+   writes, and session 68's five amendments all read `claude-code, session
+   68`. What it buys is that the claim EXISTS, attributable and reviewable
+   at the close, instead of a bare number appearing in `run.json` with no
+   reason. No gate may read it — a gate that trusted an engine-written
+   approver would make the authorization forgeable, which is worse than
+   absent (ground rule 5).
+
+   *The incident, 2026-09-01, session 68:* the operator authorised a fourth
+   round in the chat window, the engine passed `--max-rounds 4`, and
+   `run.json` gained `"max_rounds": 4` with no reason and no approver. It
+   was almost certainly a no-op — round 3's finding was blocking and
+   dispositioned `fix` rather than disputed, and `noRoundReason` returns
+   `null` for an undisputed blocking finding past the cap, so round 4 would
+   have opened anyway. The record documents a decision that changed nothing
+   while the real reason the round opened is inferable only from source.
+3. **Three location states, not two.** The row renders a binary today —
    `reachable = Boolean(e.root)`, giving `dabblerExternalHere` and
    `dabblerExternalAbsent`. That collapses "in a remote that needs cloning"
    and "nobody has said where this lives" into one word, and the operator
    asked for both. A known remote that is not cloned is a different state
    from an undetermined one, and only the second needs a person.
-3. **Actions on an absent one.** `openRepository`, `revealRepository` and
+4. **Actions on an absent one.** `openRepository`, `revealRepository` and
    `openRepositoryInNewWindow` are all gated on `Here`; `Absent` has no
    commands at all. Add: identify the remote, point at a local folder,
    clone a known remote, create a new local repository.
-4. **The upstream direction, without a second declared one.** The operator
+5. **The upstream direction, without a second declared one.** The operator
    wants placemarkers in both directions — `this depends on these` and
    `these depend on this`. `usedBy` is derived precisely because two
    hand-kept directions disagree eventually and the disagreement is silent.
    **This is the session's one real design decision**: how a repository that
    nothing has yet declared a dependency on can appear, without
    reintroducing the second declared direction. Do not assume it away.
-5. **Shell repositories at planning time.** A multi-repository plan
+6. **Shell repositories at planning time.** A multi-repository plan
    scaffolds the repositories it will need, so finishing one leaves the next
    one visible rather than leaving the operator to remember it.
-6. Affected; verify; full suite as `final-full`; close.
+7. Affected; verify; full suite as `final-full`; close.
 
 ---
 

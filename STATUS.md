@@ -1,8 +1,64 @@
-# STATUS — 68 of 70 closed. Next: 69, the Solution Explorer goes multi-repository
+# STATUS — 69 of 70 closed. Next: 70, the publication trial
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
 `experiment/verification-pipeline-v3` and `design/solution-decomposition`
 are merged and finished. Earlier handoff text is in `docs/status-archive.md`.
+
+> **Session 69 — the round cap, and the Solution Explorer across
+> repositories. CLOSED `VERIFIED` in two rounds, 2026-09-01 (`24e4fa5e`).**
+> Driven from my own CLI through `dabbler session next`; zero engine
+> invocations.
+>
+> **The round cap is no longer typeable on a driving call.** `session next`
+> and `session drive` REFUSE `--max-rounds` — refused rather than ignored,
+> because the option parser takes any `--flag value` pair and a silently
+> dropped flag is worse than a stated limit. The cap is
+> `verification.settings.max_rounds`, and for one run it moves only through
+> `dabbler session plan amend --max-rounds N --reason … --approver …`, which
+> writes `run.json` and appends the before, the after, **the rounds already
+> run**, the reason and the approver to `amendments.jsonl`. **No gate reads
+> the approver**, and the comments say so: an engine writes it, and a gate
+> that trusted it would make the authorisation forgeable, which is worse than
+> absent. What the row buys is that the claim exists and is reviewable —
+> unlike session 68's `"max_rounds": 4`, which arrived with no reason at all.
+> The driver's at-cap refusal now names the amendment instead of the flag.
+>
+> **Three location states, not two.** The projection carries `remote` and
+> `declaredPath` beside `root`, and one exported rule in the tree model —
+> `externalLocation` — decides *here* / *remote* / *unknown*, with the three
+> context values following it. A known remote nobody has cloned is a command
+> away; only an undetermined one needs a person. A declared path that is not
+> there says so rather than claiming nobody said where it lives (round 1's
+> nit). The four actions an absent row had none of are now `dabbler deps
+> locate | clone | scaffold` — router verbs, because **the extension must
+> never author `solution-dependencies.json`**: two writers for one tracked
+> declaration drift, and only one of them can be schema-checked. The three
+> writing verbs rewrite the projection afterwards, so the row the operator
+> acted on stops saying the thing they acted on.
+>
+> **The upstream direction, without a second declared one (D254).** A
+> repository appears in the Explorer because **its own declaration names this
+> solution** — one home, owned by the repository the fact is about. So the
+> projection gained `members`, both directions derived (`provides` off this
+> repository's edges, `consumes` off that member's), and `usedBy` is
+> untouched.
+>
+> **A work plan may name the repositories it needs.** Round 1's blocking
+> finding was right: scaffolding only through a typed command still left the
+> operator to remember the next repository. `driver-work-plan.schema.json`
+> gained an optional `repositories: [{id, path?}]`, and `phasePlan` places
+> each one when the plan is accepted — through `placeMember`, the single rule
+> `deps scaffold` calls too. A shell is a directory, a `git init` and a
+> membership declaration; no edge, no `produces`, no version. An existing
+> declaration is left exactly as it stands, and a plan naming repositories in
+> a repository with no `solution-dependencies.json` stops with that sentence.
+>
+> Two papercuts fixed on the way: `dabbler deps` resolved its repository root
+> from `docs/sessions`, so it answered "not inside a git repository" in any
+> repository that had never run a session — including one it had just
+> scaffolded; it now falls back to the working directory.
+>
+> The extension is still **2.7.0** and predates 65 through 69.
 
 > **Session 68 — the logic-tree harvest. CLOSED `VERIFIED` in five rounds,
 > 2026-09-01 (`ce31a28d`).** Two of those five rounds were authorised by the

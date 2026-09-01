@@ -2930,17 +2930,24 @@ was 52, then 53, then 54, moving back a number each time a session was
 inserted ahead of it; placing it last ends that.*
 
 1. Register; declare `--not-releasable`.
-2. `dabbler release --verify-install` against the public registry, recorded as
+2. **One version** (the operator's directive, 2026-08-31, after an install
+   showed router 2.0.0 beside extension 2.7.0). The router stops carrying
+   its own number and takes the extension's: one version, stamped from one
+   source, read by `dabbler --version`, the ledger's `frameworkVersion`
+   and both release tags. The release order — router before the extension
+   — is unchanged; only the numbers merge. Done and verified before
+   anything is tagged, so the first published pair reads as one thing.
+3. `dabbler release --verify-install` against the public registry, recorded as
    evidence.
-3. Acceptance criteria **1, 2 and 5** from a clean VS Code profile and a fresh
+4. Acceptance criteria **1, 2 and 5** from a clean VS Code profile and a fresh
    clone: the Solution Explorer rendering the csv pipeline's repositories from
    their declarations with drift shown, the Work Explorer showing completed,
    current and planned sessions with the current session's tasks moving, and
    every `csv-model` feedback item carrying a linked test, a recorded release
    verification, or a dated deferred issue with an owner.
-4. **Amend the plan again with what it finds.** The same rule as session 50:
+5. **Amend the plan again with what it finds.** The same rule as session 50:
    a trial with no route to fix what it finds is a demonstration.
-5. Affected; verify; full suite as `final-full`; close.
+6. Affected; verify; full suite as `final-full`; close.
 
 **Precondition:** the operator has answered `publication` with `publish`,
 CI has published the tagged versions, and `dabbler release

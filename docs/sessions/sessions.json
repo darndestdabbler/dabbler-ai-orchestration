@@ -1265,7 +1265,7 @@
     {
       "number": 64,
       "title": "The operator onboarding deck",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-31T17:44:30.434000-04:00",
       "orchestrator": {
         "engine": "claude-code",
@@ -1274,7 +1274,7 @@
         "identityProvenance": "direct"
       },
       "frameworkVersion": "2.0.0",
-      "completedAt": null,
+      "completedAt": "2026-08-31T20:10:20.177000-04:00",
       "verificationVerdict": "VERIFIED",
       "verification": {
         "rounds": 2,

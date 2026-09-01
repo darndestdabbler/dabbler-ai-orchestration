@@ -1,8 +1,58 @@
-# STATUS — 66 of 70 closed. Next: 67, the watcher and the driver blind spots
+# STATUS — 67 of 70 closed. Next: 68, the logic-tree harvest
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
 `experiment/verification-pipeline-v3` and `design/solution-decomposition`
 are merged and finished. Earlier handoff text is in `docs/status-archive.md`.
+
+> **Session 67 — the watcher, and the driver's blind spots. CLOSED
+> `VERIFIED` in one round, 2026-09-01 (`de953825`).** Driven end to end from
+> my own CLI through `dabbler session next`; zero engine invocations, which
+> is what the pull is for.
+>
+> **`WORKERS_LOCAL` is 2.** The operator's call after a four-worker run of
+> record made the host unusable and had to be killed. Measured on the
+> twenty-core host: 20 workers 94 s wall / 873 s test time, 4 → 106 s /
+> 352 s, 2 → 138 s / 262 s. A third more wall clock is what a machine you
+> can still type on costs. `WORKERS_CI` stays 1.
+>
+> **`lastActivityAt` reads the driver's directory.** It read the ledger, the
+> activity log and the verification rounds and never `driver/run.json`,
+> `instruction.json` or `report.json` — so mid-session 66, two hours in with
+> eight steps accepted, it answered with the registration and
+> `possiblyStalled` was true through the whole productive stretch. It now
+> reads all three through the driver's own readers.
+>
+> **The watcher line.** The rule that separates the two silences — *an
+> instruction issued, no answer written since it was issued, no tree change
+> since, past the threshold* — is stated ONCE, in `driver.ts`:
+> `watcherReading` (pure), `readWatcher` (the reader) and `treeTouchedAt`
+> (a `git status --porcelain` probe that skips `.dabbler/`), exported from
+> `index.ts` alongside `stalledAfterSeconds`. The Dabbler terminal renders
+> it as `watcher since=Ns state=instruction-outstanding` in `warn` — a new
+> `lineTone` case, no new machinery — asking the rule at most twice per
+> threshold so the probe is never a git call per 500 ms poll. The headless
+> case rides the interrupt poll `invoke` already runs, on the driver's own
+> log channel; no companion process was needed. **The answer side is the
+> answer FILES, not the run record**: `issue()` writes the instruction and
+> saves `run.json` a millisecond later, so a rule comparing `updated_at` to
+> `issued_at` reads "answered" for every outstanding instruction there has
+> ever been. The headless test is what caught it.
+>
+> **The driver reads `verify`'s reason.** `phaseVerify` re-reads the refusal
+> from the job log (`jobLogTail`, on the deterministic path a job name
+> gives). A stale pre-verification precondition now heals — `setPhase
+> ("preverify")`, which is exactly the run that makes it true again —
+> bounded at two by `preverify_heals` on `run.json`, and the stop it
+> eventually raises carries verify's own words instead of the one sentence
+> every refusal used to arrive in. That sentence is why the deadlock
+> classifier called a red control and stale evidence the same impasse.
+>
+> **`session plan amend` is the ordinary move.** Two steps needed a file the
+> plan had not declared; the engine signs its own amendment and the
+> before/after lands in `amendments.jsonl`. Cheaper and more honest than
+> working around the envelope.
+>
+> The extension is still **2.7.0** and predates 65, 66 and 67.
 
 > **Recorded, 2026-09-01, after sessions 65 and 66 — the csv-model
 > papercuts, the publish gap, and CI's first green run in weeks.** Both

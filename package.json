@@ -1,0 +1,22 @@
+{
+  "name": "dabbler-ai-orchestration-workspace",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Workspace root. The router package and the VS Code extension build and test together so the extension can depend on the router without a publish.",
+  "license": "MIT",
+  "workspaces": [
+    "packages/router",
+    "tools/dabbler-ai-orchestration"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "node packages/router/scripts/run-ts.mjs packages/router/scripts/workspace-check.ts typecheck",
+    "lint": "node packages/router/scripts/run-ts.mjs packages/router/scripts/workspace-check.ts lint",
+    "test": "npm run test:unit --workspaces --if-present",
+    "generate:types": "npm run generate:types -w dabbler-ai-router",
+    "check:types": "node packages/router/scripts/run-ts.mjs packages/router/scripts/check-types-fresh.ts"
+  },
+  "devDependencies": {
+    "pptxgenjs": "^4.0.1"
+  }
+}

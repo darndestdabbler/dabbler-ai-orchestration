@@ -1,8 +1,113 @@
-# STATUS — 64 of 65 closed. Next: 65, the trial — when the operator decides to publish
+# STATUS — 66 of 69 closed. Next: 67, the watcher and the driver blind spots
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
 `experiment/verification-pipeline-v3` and `design/solution-decomposition`
 are merged and finished. Earlier handoff text is in `docs/status-archive.md`.
+
+> **Recorded, 2026-09-01, after sessions 65 and 66 — the csv-model
+> papercuts, the publish gap, and CI's first green run in weeks.** Both
+> closed `VERIFIED` in two rounds each. **The ledger still says 67 total and
+> `session-plan.md` still ends at 67.** Session 67 renumbers it: its first
+> step pastes the drafted sections for 67 and 68 and moves the publication
+> trial to 69. Those drafts are in
+> `C:	empdabbler-logic-harvestplan-67-68-69.md`, outside this repository
+> because a session was in flight when they were written. Register 67 with
+> `--total-sessions 69`.
+>
+> **Session 65 — the papercuts the csv-model trial found.** `windowsHide` on
+> the two spawn paths in `checks.ts` (the console windows that stole the
+> operator's cursor); the Dabbler terminal's band re-opened per physical
+> line, so a stop carrying git's multi-line stderr no longer staircases; the
+> teal band replaced by a neutral gray with per-event tones, and the verdict
+> and test outcome read from `rounds.jsonl` and `test-runs.jsonl` rather
+> than scraped from job bytes; `dabbler.terminalLocation` (default
+> `editor`); `Dabbler: Show Framework Terminal`, with a closed terminal
+> forgotten so it can be rebuilt; the land stop that said `fatal:` when a
+> repository simply has no remote; `affected` no longer claiming no suite is
+> declared when one is merely not `expensive`; the heredoc rule added to
+> `SHARED_BODY` so bootstrapped projects get it; the `api-models.lock`
+> warning given an owner (bootstrap says it once; `session start` never
+> calls a vendor); and `start()` refusing to re-register an in-flight
+> session under a contradicting identity — while an OMITTED field now
+> carries the record forward instead of being erased, which is the bug the
+> verifier caught in my own test.
+>
+> **Session 66 — the publish gap, CI, and the spinner.** CI had been red
+> since before session 63 and the reason was not what it said: the
+> repository declared no line endings, every text file is stored LF, and
+> `core.autocrlf` is true on `windows-latest`, so a fresh clone wrote CRLF
+> and all 31 generated modules compared unequal. `check:types` is the FIRST
+> step of that job, so typecheck, lint, the 1218-test router suite and the
+> bundles had not run at all in that time. One `.gitattributes` line fixes
+> it; reproduced in a scratch clone before planning, and nothing was hiding
+> behind it. `staleFiles` also now compares lines rather than the bytes
+> between them, so the control can never again blame the schemas for a
+> checkout setting. Then: a `publish` phase between `land` and `close` for a
+> releasable session (it cannot go earlier — `packageSession` asks the close
+> gates, and `working_tree_clean` and `pushed_to_remote` are false before
+> the land); the `published_when_releasable` close gate, which packaging
+> OMITS from its own preconditions because asking it of packaging by
+> packaging refuses the first publication for not having happened;
+> `secret` made optional for a feed that is a path on disk, failing safe on
+> anything it cannot identify as local; the managed body's publishing claim
+> made true and scoped to releasable sessions; `windowsHide` on the last
+> four `spawnSync` sites via one `hiddenSpawn` in `journal.ts` (the only
+> module low enough to hold it without a cycle); and the spinner — drawn
+> only at column 0, so it can never sit on a runner's partial line and erase
+> it, which is what the verifier caught.
+>
+> **Not yet active on the operator's machine.** `dist/` is gitignored, so a
+> session always runs under the PREVIOUS build — session 66's own close ran
+> six gates, not seven, and that is correct. The router was rebuilt after
+> the close and now carries everything. **The extension is still 2.7.0 and
+> predates both sessions**: the spinner, the tones, `terminalLocation` and
+> Show Framework Terminal are inert until it is repackaged, installed with
+> `--force` (same-version republish leaves seats stale) and the window
+> reloaded.
+>
+> **Four framework defects found by walking into them, all queued for 67.**
+> (1) `lastActivityAt` never reads the driver's run record, so
+> `possiblyStalled` was `true` through two hours of productive work and
+> would have looked identical during the forty minutes the engine actually
+> was stopped — it cannot discriminate at all. (2) The driver stops in
+> `verify` and re-runs it forever when `verify` reports the preverify
+> evidence stale, instead of re-entering `preverify` as `phaseRunOfRecord`
+> already does; this cost a full 24-file cycle and made the operator paste a
+> command by hand. (3) The deadlock classifier compares the driver's own
+> wrapper text, so two unrelated refusals were called a deadlock. (4)
+> Repairs made during a stop belong to no step, so a report omits them and
+> is refused — there is a real state (halted, being repaired) with no
+> reporting edge out of it. (2) and (3) are one fix: the driver reading
+> `verify`'s reason rather than only its exit code.
+>
+> **Test load is a live operator concern.** A 4-worker run of record made
+> the host unusable mid-session and had to be killed; the run was redone at
+> one worker via `CI=1` in the environment, which reaches vitest through the
+> job runner and changes no tracked file. Session 67 lowers `WORKERS_LOCAL`
+> to 2. Session 66 ran ~6 full-ish suites, only ONE of which was the run of
+> record — the other five were preverify cycles forced by stops, which is
+> why defect (2) is the bigger lever. Separately, the machine showed 4.35 GB
+> of compressed memory and a live `TiWorker` (Windows Update) during the
+> stall; the operator wants diagnostics later, and the tests may have been
+> the straw rather than the load.
+>
+> **Open proposals, not scheduled.** (a) The run of record moves to CI, with
+> a `run_of_record_green` close gate reading the CI conclusion — master
+> receives the commit as usual, but the ledger never says `VERIFIED` until
+> CI confirms. (b) The operator's extension of it: push a scratch branch for
+> preverify too and observe the result, which defeats the "preverify gates
+> verification, which precedes the push" objection. Both need CI's trigger
+> widened beyond `master`, both are per-repository escape hatches rather
+> than defaults, and `--shard` is what makes CI faster than local rather
+> than slower. Full write-up, with the accounting, in
+> `C:\temp\dabbler-logic-harvest\plan-67-68-69.md`.
+>
+> **Running in parallel, outside this repository.** A logic-tree harvest:
+> serialize the framework's decision machine and have `gpt-5-6-sol` and
+> `gemini-3-1-pro` critique it for gaps proactively. Plan and the watcher
+> specification are in `C:\temp\dabbler-logic-harvest\`. It targets the
+> state-machine gaps, not implementation slips — say so to anyone who
+> expects it to replace preverify or the verifier.
 
 > **Recorded, 2026-09-01, after session 64 — the deck exists.** Closed
 > `VERIFIED` in two rounds. `docs/onboarding/dabbler-onboarding.pptx`,

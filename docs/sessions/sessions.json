@@ -1286,9 +1286,9 @@
     {
       "number": 65,
       "title": "The half of the trial that needs a published router",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-01T02:59:12.656000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-09-01T04:08:22.017000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

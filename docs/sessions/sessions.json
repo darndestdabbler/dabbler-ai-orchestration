@@ -1366,9 +1366,9 @@
     {
       "number": 69,
       "title": "The round cap stops being typeable, and the Solution Explorer goes multi-repository",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-01T16:07:45.523000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-09-01T17:48:03.462000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

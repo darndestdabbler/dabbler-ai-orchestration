@@ -5,28 +5,33 @@
 are merged and finished. Earlier handoff text is in `docs/status-archive.md`.
 
 > **Session 72 — the rest of the runner's conditions. CLOSED `VERIFIED` in
-> one round, 2026-09-02 (`3ac7826e`). CI went from ~50 failures to TWO of
-> 1263.**  now canonicalises the deepest ancestor that exists
-> and re-appends the rest, so a not-yet-written file no longer keeps the
-> spelling it was handed. Every fixture repository declares its own
-> , ,  and  through one
-> , because the framework commits through its own  and a
-> bare runner has no identity to borrow.  was a THIRD production
-> comparer of the same family -- it staged its scaffold with a raw
-> , so in a repository reached through an alias it committed
-> nothing and said the scaffold was already committed.
+> one round, 2026-09-02 (`3ac7826e`). CI went from about fifty failures to
+> TWO of 1263.** `canonicalPath` now canonicalises the deepest ancestor that
+> exists and re-appends the rest, so a not-yet-written file no longer keeps
+> the spelling it was handed — session 71's own new test caught that on the
+> runner. Every fixture repository declares its own `user.name`,
+> `user.email`, `commit.gpgsign` and `core.autocrlf` through one `initRepo`,
+> because the framework commits through its own `runGit` and a bare runner
+> has no identity to borrow. And `bootstrap` was a THIRD production comparer
+> of the same family: it staged its own scaffold with a raw `relative()`, so
+> in a repository reached through an alias it committed nothing and reported
+> the scaffold already committed.
 >
-> ** now reproduces the whole
-> runner**:  aliased through a junction, /
-> pointed at nothing, and  set so git refuses to guess an
-> identity the way a runner does. Take suites as arguments. It is the reason
-> these were found in minutes rather than eight-minute round trips.
+> **`packages/router/scripts/aliased-temp-suite.mjs` reproduces the whole
+> runner now** — `TEMP` aliased through a junction, `GIT_CONFIG_GLOBAL` and
+> `GIT_CONFIG_SYSTEM` pointed at nothing, and `user.useConfigOnly` set so git
+> refuses to guess an identity the way a runner does — and it takes the
+> suites to run as arguments. It is why three causes were found in minutes
+> instead of eight-minute round trips.
 >
-> **The two that remain are session 73**: a  in a path (every 8.3 short
-> name has one) is not in 's path-token character class, so a
-> traceback there implicates nothing -- a production defect; and 
-> asserts the spelling it was handed. Plus one flake:  passes
-> and then exits 1 on a libuv assertion at .
+> **The two that remain are session 73.** A `~` in a path — every 8.3 short
+> name has one — is not in `fixloop`'s path-token character class, so a
+> traceback naming such a path implicates nothing: a production defect, not a
+> test one, and the fix round's envelope silently loses the file the failure
+> points at. And `drive.test` asserts the spelling it was handed, as
+> `packaging.test` did. Beside them one flake: `check:types` prints *31
+> generated module(s) match the schemas* and then exits 1 on a libuv
+> assertion at `process.exit()`.
 
 > **Session 71 — one canonical spelling for every path comparison. CLOSED
 > `VERIFIED` in one round, 2026-09-01 (`4eff83c2`). CI IS STILL RED, and

@@ -29,7 +29,13 @@ import {
   writeInstructionFiles,
 } from "../src/bootstrap/index.ts";
 import { TRANSPORT_COPILOT_CLI, TRANSPORT_ENV_VAR } from "../src/config.ts";
-import { makeProject, makeSandboxRepo, makeTempDir, removeTempDirs } from "./support/fixtures.ts";
+import {
+  initRepo,
+  makeProject,
+  makeSandboxRepo,
+  makeTempDir,
+  removeTempDirs,
+} from "./support/fixtures.ts";
 import { bootstrapVerb } from "../src/cli/bootstrap.ts";
 import { load } from "../src/solution.ts";
 import {
@@ -476,7 +482,7 @@ describe("the round-ref migration", () => {
     const repo = join(target, "repo");
     const remote = join(target, "remote.git");
     execFileSync("git", ["init", "-q", "--bare", remote], { stdio: "ignore" });
-    execFileSync("git", ["init", "-q", "-b", "main", repo], { stdio: "ignore" });
+    initRepo(repo, "-b", "main");
     execFileSync("git", ["-C", repo, "remote", "add", "origin", remote], {
       stdio: "ignore",
     });
@@ -527,7 +533,7 @@ describe("what setup does about the operator's typing", () => {
     // csv-model item 2's other half: the close printed `git push
     // --set-upstream <remote> main` for a remote nobody had created.
     const repo = makeProject();
-    execFileSync("git", ["init", "-q", "-b", "main"], { cwd: repo });
+    initRepo(repo, "-b", "main");
     execFileSync("git", ["config", "user.email", "t@t"], { cwd: repo });
     execFileSync("git", ["config", "user.name", "t"], { cwd: repo });
     await bootstrapVerb(["--project-dir", repo, "--no-transport-detect"]);
@@ -556,7 +562,7 @@ describe("what the Solution Explorer has to render", () => {
     // csv-model item 4. Three things caused that and none was a missing
     // writer; this is the manifest half.
     const repo = makeProject();
-    execFileSync("git", ["init", "-q", "-b", "main"], { cwd: repo });
+    initRepo(repo, "-b", "main");
     execFileSync("git", ["config", "user.email", "t@t"], { cwd: repo });
     execFileSync("git", ["config", "user.name", "t"], { cwd: repo });
     expect(scaffoldSolutionManifest(repo)).toBe(join(repo, "solution.yaml"));
@@ -574,7 +580,7 @@ describe("what the Solution Explorer has to render", () => {
 
   it("writes the first projection, so the tree has content before any verb", async () => {
     const repo = makeProject();
-    execFileSync("git", ["init", "-q", "-b", "main"], { cwd: repo });
+    initRepo(repo, "-b", "main");
     execFileSync("git", ["config", "user.email", "t@t"], { cwd: repo });
     execFileSync("git", ["config", "user.name", "t"], { cwd: repo });
     await bootstrapVerb(["--project-dir", repo, "--no-transport-detect"]);

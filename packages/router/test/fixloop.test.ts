@@ -12,7 +12,7 @@ import {
 } from "../src/agency.ts";
 import { checkRunGreen, type SelectionConfig } from "../src/checks.ts";
 import { readText } from "../src/textfile.ts";
-import { git, makeTempDir, removeTempDirs } from "./support/fixtures.ts";
+import { git, initRepo, makeTempDir, removeTempDirs } from "./support/fixtures.ts";
 
 afterAll(removeTempDirs);
 
@@ -119,7 +119,7 @@ function makeRepo(): string {
   );
   writeFileSync(join(root, ".gitignore"), ".dabbler/\n", "utf8");
   writeFileSync(join(root, "pytest.ini"), "[pytest]\n", "utf8");
-  git(root, "init", "-q", "-b", "main");
+  initRepo(root, "-b", "main");
   git(root, "config", "user.email", "test@example.invalid");
   git(root, "config", "user.name", "Test");
   git(root, "config", "commit.gpgsign", "false");

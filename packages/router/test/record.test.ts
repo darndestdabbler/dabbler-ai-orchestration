@@ -58,7 +58,7 @@ import {
   registerSessionStart,
   renderDecisionsLog,
 } from "../src/writers.ts";
-import { makeTempDir, removeTempDirs } from "./support/fixtures.ts";
+import { initRepo, makeTempDir, removeTempDirs } from "./support/fixtures.ts";
 
 afterAll(removeTempDirs);
 
@@ -332,7 +332,7 @@ describe("deriving a step key", () => {
 
 function makeSessionsDir(): { repo: string; sessionsDir: string } {
   const repo = makeTempDir();
-  execFileSync("git", ["init", "-q"], { cwd: repo, stdio: "ignore" });
+  initRepo(repo);
   const sessionsDir = join(repo, "docs", "sessions");
   mkdirSync(sessionsDir, { recursive: true });
   writeFileSync(

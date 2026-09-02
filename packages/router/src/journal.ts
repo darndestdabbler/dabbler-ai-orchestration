@@ -31,7 +31,7 @@ import {
   fsyncSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, relative, resolve } from "node:path";
+import { basename, dirname, join, relative, resolve } from "node:path";
 
 import { dumps } from "./pythonJson.ts";
 
@@ -166,15 +166,30 @@ export function repoRootFor(path: string): string | null {
  * what made twelve consecutive CI runs red while the same suite was green
  * on a machine whose temp directory has no short name.
  *
- * A path that does not exist cannot be canonicalised, and `resolve` is the
- * honest answer there rather than a refusal: half the callers name an output
- * before anything has written it.
+ * A path that does not exist yet is canonicalised as far as it goes: the
+ * deepest ancestor that IS on disk, with the rest re-appended. Half the
+ * callers name an output before anything has written it, and answering
+ * `resolve` for those -- which keeps whatever spelling it was handed -- put
+ * the mismatch straight back: a canonical root compared against a
+ * short-form path under it answers `../../../../../RUNNER~1/...` for a file
+ * that is plainly inside it. Only a path with no existing ancestor at all
+ * falls back whole.
  */
 export function canonicalPath(path: string): string {
-  try {
-    return realpathSync.native(path);
-  } catch {
-    return resolve(path);
+  const absolute = resolve(path);
+  const below: string[] = [];
+  let head = absolute;
+  for (;;) {
+    try {
+      const real = realpathSync.native(head);
+      return below.length === 0 ? real : join(real, ...below);
+    } catch {
+      const parent = dirname(head);
+      // The root of the volume: nothing above it to ask about.
+      if (parent === head) return absolute;
+      below.unshift(basename(head));
+      head = parent;
+    }
   }
 }
 

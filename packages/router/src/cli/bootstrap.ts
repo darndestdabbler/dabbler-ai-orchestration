@@ -9,12 +9,12 @@
 // must not touch the host opts out of the second.
 
 import { statSync } from "node:fs";
-import { join, relative as relativeTo } from "node:path";
+import { join } from "node:path";
 
 import { TRANSPORT_ENV_VAR, VALID_TRANSPORTS, loadConfig } from "../config.ts";
 import { freshnessWarnings } from "../discovery.ts";
 import { ensureRoundRefspecs, repoRootFor } from "../evidence.ts";
-import { runGit } from "../journal.ts";
+import { repoRelativePath, runGit } from "../journal.ts";
 import { raisePackagingDecisions, raiseRemoteDecision } from "../owedDecisions.ts";
 import { writeProjection } from "../workflow/project.ts";
 import {
@@ -399,7 +399,11 @@ function commitOwnScaffold(
   if (root === null) {
     return { committed: false, reason: "not inside a git repository" };
   }
-  const relative = paths.map((path) => relativeTo(root, path));
+  // Canonical on both sides: git answers with its own spelling of the root
+  // and these paths are the caller's, so a repository reached through an
+  // alias -- a junction, a short name, a mapped drive -- staged nothing and
+  // reported the scaffold already committed.
+  const relative = paths.map((path) => repoRelativePath(root, path));
   const added = runGit(root, ["add", "--", ...relative]);
   if (added.code !== 0) {
     return { committed: false, reason: added.stderr.trim() || "git add failed" };

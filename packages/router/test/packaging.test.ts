@@ -24,7 +24,7 @@ import {
   runAsRecord,
 } from "../src/packaging.ts";
 import { appendRound, packageOutputDir, packagingPath, readPackaging } from "../src/ledger.ts";
-import { snapshotWorktreeTree } from "../src/journal.ts";
+import { canonicalPath, snapshotWorktreeTree } from "../src/journal.ts";
 import { declareSessionTask, registerSessionStart } from "../src/writers.ts";
 import { makeConfig, makeSandboxRepo, removeTempDirs } from "./support/fixtures.ts";
 
@@ -331,8 +331,13 @@ describe("the publication", () => {
     });
     expect(run.outcome, run.refusal).toBe(OUTCOME_PUBLISHED);
     expect(run.artifacts).toEqual(["a-1.0.nupkg", "b-1.0.nupkg"]);
-    expect(pushes(pushLog).map((row) => row.argv[0])).toEqual(
-      run.artifacts.map((name) => join(packageOutputDir(repo, 1), name)),
+    // The same files, compared as the filesystem names them: the push is
+    // handed the path the framework resolved, and a fixture that reached
+    // its repository through an alias spells the same directory another
+    // way. What is being asserted is which artifact was pushed, not which
+    // of a directory's names the test happened to hold.
+    expect(pushes(pushLog).map((row) => canonicalPath(row.argv[0]))).toEqual(
+      run.artifacts.map((name) => canonicalPath(join(packageOutputDir(repo, 1), name))),
     );
     expect(run.steps.map((s) => s.step)).toEqual(["pack", "push", "push"]);
     expect(run.treeDigest).toBe(snapshotWorktreeTree(repo));

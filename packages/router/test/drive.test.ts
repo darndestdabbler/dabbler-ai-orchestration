@@ -42,6 +42,7 @@ import {
   captured,
   clearProviderKeys,
   git,
+  initRepo,
   makeConfig,
   makeTempDir,
   removeTempDirs,
@@ -154,9 +155,7 @@ function drivenRepo(): { repo: string; sessionsDir: string } {
     mkdirSync(dirname(path), { recursive: true });
     writeFileSync(path, text, "utf8");
   }
-  git(repo, "init", "-q", "-b", "main");
-  git(repo, "config", "core.autocrlf", "false");
-  git(repo, "config", "commit.gpgsign", "false");
+  initRepo(repo, "-b", "main");
   git(repo, "add", "-A");
   git(repo, "commit", "-q", "-m", "seed");
   git(target, "init", "-q", "--bare", remote);

@@ -85,12 +85,27 @@ describe("one spelling for a path, whoever handed it over", () => {
     expect(canonicalPath(alias)).toBe(canonicalPath(real));
   });
 
-  it("answers for a path that does not exist rather than refusing", () => {
-    // Half the callers name an output before anything has written it, and a
-    // path nobody has created cannot be canonicalised.
-    const root = mkdtempSync(join(tmpdir(), "canonical-"));
-    expect(repoRelativePath(root, join(root, "not", "written", "yet.json"))).toBe(
+  it("canonicalises a path that does not exist yet as far as it goes", () => {
+    // Half the callers name an output before anything has written it. The
+    // first version answered `resolve` for those, which keeps whatever
+    // spelling it was handed -- so a canonical root compared against a
+    // not-yet-written file under it mismatched exactly as before, and the
+    // CI runner said so: `../../../../../RUNNER~1/AppData/Local/Temp/...`
+    // for a file plainly inside the root. The deepest ancestor that exists
+    // is what can be canonicalised, and the rest is re-appended.
+    const real = mkdtempSync(join(tmpdir(), "canonical-"));
+    const alias = join(dirname(real), `${basename(real)}-alias`);
+    symlinkSync(real, alias, process.platform === "win32" ? "junction" : "dir");
+
+    expect(repoRelativePath(real, join(alias, "not", "written", "yet.json"))).toBe(
       "not/written/yet.json",
+    );
+    expect(repoRelativePath(alias, join(real, "docs", "sessions", "sessions.json"))).toBe(
+      "docs/sessions/sessions.json",
+    );
+    // And the plain case still answers, with no existing ancestor to find.
+    expect(repoRelativePath(real, join(real, "nothing", "here.json"))).toBe(
+      "nothing/here.json",
     );
   });
 });

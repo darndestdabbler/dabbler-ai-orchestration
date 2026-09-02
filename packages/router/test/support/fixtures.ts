@@ -139,9 +139,39 @@ export function removeTempDirs(): void {
 
 /** A real git repository, because that is how a project is discovered. */
 export function makeProject(): string {
-  const path = makeTempDir();
-  execFileSync("git", ["init", "-q"], { cwd: path, stdio: "ignore" });
-  return path;
+  return initRepo(makeTempDir());
+}
+
+/**
+ * `git init`, plus the settings a repository needs to be committable by
+ * anything -- including the framework.
+ *
+ * The identity goes in the REPOSITORY's own config rather than in the
+ * environment of the test's git calls, and that distinction is the whole
+ * point: the framework commits through its own `runGit`, which carries the
+ * ambient environment, so a fixture that only passed `GIT_AUTHOR_*` to its
+ * own calls left the driver's land phase to whatever the machine happened
+ * to have configured. On a bare CI runner that is nothing, and git refuses
+ * with *please tell me who you are* -- eight of the suite's failures there,
+ * none of them here, because a developer's machine has an identity.
+ *
+ * `core.autocrlf` and `commit.gpgsign` are here for the same reason: a
+ * fixture that borrows a machine setting passes for a reason it never
+ * stated.
+ */
+export function initRepo(repo: string, ...initArgs: string[]): string {
+  // The directory first: several callers name a repository that does not
+  // exist yet, which `git init <path>` would have created for them.
+  mkdirSync(repo, { recursive: true });
+  execFileSync("git", ["init", "-q", ...initArgs], { cwd: repo, stdio: "ignore" });
+  const set = (key: string, value: string): void => {
+    execFileSync("git", ["config", key, value], { cwd: repo, stdio: "ignore" });
+  };
+  set("user.name", "Dabbler Test");
+  set("user.email", "test@example.invalid");
+  set("commit.gpgsign", "false");
+  set("core.autocrlf", "false");
+  return repo;
 }
 
 /** Identity and signing pinned, so a commit here needs no host configuration. */
@@ -169,8 +199,7 @@ export function makeSeededRepo(
   files: Record<string, string> = { "a.txt": "one\n" },
 ): string {
   const repo = makeTempDir();
-  git(repo, "init", "-q", "-b", "main");
-  git(repo, "config", "commit.gpgsign", "false");
+  initRepo(repo, "-b", "main");
   for (const [rel, text] of Object.entries(files)) {
     const path = join(repo, ...rel.split("/"));
     mkdirSync(dirname(path), { recursive: true });
@@ -213,9 +242,7 @@ export function makeSandboxRepo(): { repo: string; sessionsDir: string } {
     mkdirSync(dirname(path), { recursive: true });
     writeFileSync(path, text, "utf8");
   }
-  git(repo, "init", "-q", "-b", "main");
-  git(repo, "config", "core.autocrlf", "false");
-  git(repo, "config", "commit.gpgsign", "false");
+  initRepo(repo, "-b", "main");
   git(repo, "add", "-A");
   git(repo, "commit", "-q", "-m", "seed");
   git(target, "init", "-q", "--bare", remote);

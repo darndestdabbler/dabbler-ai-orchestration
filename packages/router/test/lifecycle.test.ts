@@ -39,7 +39,13 @@ import {
   start,
 } from "../src/session.ts";
 import { registerSessionStart } from "../src/writers.ts";
-import { git, makeSandboxRepo, makeTempDir, removeTempDirs } from "./support/fixtures.ts";
+import {
+  git,
+  initRepo,
+  makeSandboxRepo,
+  makeTempDir,
+  removeTempDirs,
+} from "./support/fixtures.ts";
 
 afterAll(removeTempDirs);
 afterEach(() => vi.restoreAllMocks());
@@ -371,7 +377,7 @@ describe("migrating a set-scoped repository", () => {
     const target = makeTempDir();
     const repo = join(target, "repo");
     mkdirSync(join(repo, "docs", "sessions"), { recursive: true });
-    git(repo, "init", "-q", "-b", "main");
+    initRepo(repo, "-b", "main");
     const legacy = legacySet(repo);
     const sessionsDir = join(repo, "docs", "sessions");
     const result = captured(() => migrate(legacy, sessionsDir));

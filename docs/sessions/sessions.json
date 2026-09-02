@@ -1466,9 +1466,9 @@
     {
       "number": 74,
       "title": "The extension is the distribution, and the number is 2.0.0",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-02T04:25:43.899000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-09-02T05:23:52.476000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

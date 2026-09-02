@@ -4,23 +4,63 @@
 `experiment/verification-pipeline-v3` and `design/solution-decomposition`
 are merged and finished. Earlier handoff text is in `docs/status-archive.md`.
 
-> ## WAITING ON YOU: one command, and it is the irreversible one
+> ## WAITING ON YOU: two npm/Marketplace account settings. Nothing else.
+>
+> **The publication is authorised and half-executed.** You answered
+> `publication` with `publish` on 2026-09-02; `Test` is green; `v2.8.0` is
+> tagged and pushed; the tarball builds; the provenance statement is signed
+> and in the sigstore transparency log. **Nothing is published**, because the
+> registry refused the upload itself:
 >
 > ```
-> dabbler owed answer --sessions-dir docs/sessions --id publication --choice publish
+> npm error 404 Not Found - PUT https://registry.npmjs.org/dabbler-ai-router
+> npm error 404  ... could not be found or you do not have permission
 > ```
 >
-> **`Test` is green** — runs `33592304277` and `33592310323`, 2026-09-02, the
-> first green pair since session 66 — so the release workflows are no longer
-> gated shut. `dabbler release` has raised the brief and it is open;
-> `dabbler owed list` prints it. The answer pushes `v2.8.0`, waits for npm to
-> actually serve the router, then pushes `vsix-v2.8.0`; CI publishes both
-> over OIDC. **I did not type it**: publishing cannot be recalled, npm
-> refuses `unpublish` after 72 hours, and a Marketplace version slot is never
-> reusable — the framework reserves that answer for you and this session's
-> harness blocked it too, which is the same judgement twice.
+> **That is the chicken-and-egg this workflow was always going to hit once.**
+> It publishes over OIDC with no stored token, and OIDC authorises against a
+> *trusted publisher* configured **in the package's npm settings** — settings
+> that only exist for a package that exists. `dabbler-ai-router` has never
+> been published, so there is nothing to attach them to. The name is free
+> (`GET` returns 404), so nobody has taken it.
 >
-> After the tags land and npm serves the router, **session 74 is the trial**:
+> Three ways out, and all of them are yours because all of them are
+> credentials:
+>
+> 1. **Pre-register the trusted publisher** on npmjs.com for the name
+>    `dabbler-ai-router` (repository `darndestdabbler/dabbler-ai-orchestration`,
+>    workflow `release.yml`), if your npm account offers it for a name that
+>    does not exist yet. Cleanest: no token ever exists, and 2.8.0 keeps its
+>    provenance.
+> 2. **Publish 2.8.0 once by hand** — `npm login`, then
+>    `npm publish --access public` from `packages/router` — which creates the
+>    package; configure trusted publishing afterwards and every later release
+>    goes through CI. Cost: this one version has no CI provenance.
+> 3. **Store a granular npm token** as the repo secret the workflow would
+>    read for a first publish, then delete it. The workflow was written
+>    deliberately to avoid a long-lived credential, so this is the last
+>    resort.
+>
+> **When npm is settled, the cheapest retry is `gh run rerun 33605558413
+> --failed`** — the tag, the Test gate and the built tarball are all still
+> good, so only the publish job re-runs. Then `dabbler release` again: it
+> waits for npm to serve the router and pushes `vsix-v2.8.0`.
+>
+> **The Marketplace half needs a second thing**: `gh secret list` shows this
+> repository has **no secrets at all**, so `VSCE_PAT` — an Azure DevOps PAT
+> scoped to *Marketplace (publish)* — is not there and `publish-vscode.yml`
+> will fail the same way when its tag lands.
+>
+> **Three workflow defects were found and fixed on the way**, each only
+> reachable after the one before it, because this release path had never
+> executed end to end: `npm pack` needs its `--pack-destination` to exist;
+> `npm publish dist/x.tgz` resolves as a package SPEC and tried
+> `git ls-remote ssh://git@github.com/dist/...tgz.git`, so the path needs a
+> leading `./`; and `--provenance` on a package npm has never seen requires
+> an explicit `--access public`. Nothing was published on any attempt, so no
+> version is burned and `v2.8.0` was simply moved each time.
+>
+> After npm serves the router, **session 74 is the trial**:
 > `dabbler release --verify-install` as a step check, then acceptance
 > criteria 1 and 2 from a clean profile, then item 5 of the audit closes on
 > the recorded verification. `docs/field-trial-70.md` holds the expected

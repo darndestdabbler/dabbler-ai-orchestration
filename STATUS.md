@@ -1,7 +1,22 @@
-# STATUS — 78 closed: 52 back-edges are 4, both baselined; 79 next: seals and the merge gate
+# STATUS — 79 closed: seals, sentinels and the dual-mode gate exist; 80 next: the liveness guardian
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
 
+> ## SESSION 79 CLOSED, 2026-09-02, VERIFIED at adjudication
+>
+> Boundaries declared (ten contexts, every module a member, both
+> directions checked in lint); 69 seals accrue beside every green run of
+> record from the next driver build; the six-sentinel band runs in under a
+> second and caught two real defects on its first day (verb-closed
+> sessions never showing Work done; report() accepting a stale seq -- the
+> first lease fence now refuses that with the outstanding number in its
+> words); the candidate gate exists dual-mode with receipts, and the
+> git-only wait needs no CI vendor. Rounds 1-3 blocked on scope beyond the
+> amended plan; all four disputes were OVERRULED by the adjudicator
+> (gemini-flash/google) citing the plan text. Owed to the follow-on scope,
+> on the record: surface digest and run-id in the receipt, the scripted-CI
+> gate harness, seal enforcement with per-library suites.
+>
 > ## SESSIONS 77-78 CLOSED, 2026-09-02, both VERIFIED
 >
 > 77: the `journal.runGit` seam, a 15-test contract band, recorded answers

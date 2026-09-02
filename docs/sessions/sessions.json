@@ -1486,11 +1486,14 @@
     {
       "number": 75,
       "title": "The trial against what the Marketplace actually serves",
-      "status": "not-started",
+      "status": "cancelled",
       "startedAt": null,
       "completedAt": null,
       "orchestrator": null,
-      "verificationVerdict": null
+      "verificationVerdict": null,
+      "preCancelStatus": "not-started",
+      "cancelledReason": "Operator's call, 2026-09-02: session 74 wrapped without publishing, so this trial's one precondition \u2014 vsix-v2.0.0 pushed and served by the Marketplace \u2014 will not be met. Performance work (sessions 76-77) comes first; a trial belongs after whatever those change has shipped.",
+      "cancelledAt": "2026-09-02T05:35:31-04:00"
     }
   ]
 }

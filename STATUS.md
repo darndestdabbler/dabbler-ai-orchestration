@@ -1,8 +1,22 @@
-# STATUS — 74 of 75 closed. PAUSED BEFORE PUBLISHING at the operator's word: significant changes come first
+# STATUS — 74 closed, 75 cancelled, 76–77 planned: performance first, still unpublished
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
 `experiment/verification-pipeline-v3` and `design/solution-decomposition`
 are merged and finished. Earlier handoff text is in `docs/status-archive.md`.
+
+> ## THE PLAN MOVED, 2026-09-02: 75 cancelled, performance is next
+>
+> The operator, after session 74 closed: performance first. Session 75 —
+> the Marketplace trial — is **cancelled** by `session cancel`, reason on
+> its row in `sessions.json`: its one precondition, `vsix-v2.0.0` served,
+> will not be met while nothing is published. Sessions **76** (performance
+> patches: orphan reaping, the last two visible console windows, worker
+> priority) and **77** (the git seam: a contract band of real-git tests,
+> everything else fed recorded answers) are appended to the plan. A third
+> session — library boundaries with per-library digests and a checked
+> absorption rule — is drafted but NOT in the plan: the operator wants the
+> approach discussed further first. `restore` is the road back for 75 if a
+> later plan revives the trial.
 
 > ## PAUSED BEFORE PUBLISHING, 2026-09-02
 >

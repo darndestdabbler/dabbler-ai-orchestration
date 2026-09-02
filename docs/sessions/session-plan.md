@@ -3619,6 +3619,14 @@ no secrets at all today, so the Marketplace half will refuse until it does.
 
 ### Session 75 of 75: The trial against what the Marketplace actually serves
 
+> **Cancelled, 2026-09-02, the operator's call.** Session 74 wrapped without
+> publishing, so this trial's one precondition — `vsix-v2.0.0` pushed and
+> served by the Marketplace — will not be met. Performance work (sessions
+> 76–77) comes first; a trial belongs after whatever those change has
+> shipped. The cancellation and its reason are on the session row in
+> `sessions.json`, written by `session cancel`; `restore` is the road back
+> if a later plan revives it.
+
 *Added by session 70, on the rule session 50 set: a trial with no route to
 fix what it finds is a demonstration. Session 70 found its own precondition
 unmet — `dabbler-ai-router` has never been served by `registry.npmjs.org`,
@@ -3663,6 +3671,81 @@ recalled, and a `VSCE_PAT` secret this repository does not have yet.
    plan again with anything that needs a session of its own. A finding that
    survives being acted on is worth more than one that was written down.
 6. Affected; verify; full suite as `final-full`; close.
+
+---
+
+### Session 76 of 77: Performance patches — reaping, hidden windows, worker priority
+
+*The operator's feedback, 2026-09-02, with the measurements that confirmed
+it. Sessions cost ~40 minutes and ~18 of them are test suites; the machine
+is contended while they run; and processes the work started outlive the work
+— on 2026-09-02 an extension `test:unit` tree 38 hours old and a Playwright
+test-server 12.7 hours old were found idle and squatting on ~230 MB, reaped
+by hand. This session is the patches: everything mechanical, nothing that
+touches the evidence flow. The restructure that changes what runs at all is
+session 77 and a successor still being designed with the operator.*
+
+1. Register; declare `--not-releasable`.
+2. **What a session starts, a session ends.** Audit every spawn path the
+   router and the extension own — jobs, checks, engines, seats, harnesses —
+   for children that can outlive their session, and end them: `terminateTree`
+   on collection and on abandonment, and the extension's harness processes
+   tied to the run that started them. The two specimens above are the
+   incident; the fix is structural, not two `taskkill`s.
+3. **The last two visible windows.** `testEvidence.ts` runs the suite via
+   `spawnSync(command, { shell: true, stdio: "inherit" })` with no
+   `windowsHide`, so the longest-running command in every session opens a
+   console when driven from the console-less extension host; the `taskkill`
+   fallback in `checks.ts` has the same gap and fires often. Both get the
+   option the other spawn sites already carry.
+4. **Workers yield to the operator, then multiply.** A vitest setup file
+   sets each worker to below-normal OS priority (children inherit the
+   class, so the forked `git`/`node` grandchildren follow). Then raise
+   `WORKERS_LOCAL` from 2 to the highest count that keeps the host usable
+   — measured at the keyboard, not asserted; the config's comment records
+   the number chosen and the feel of the machine when it was chosen. The
+   stale benchmark in `vitest.config.ts` (138 s claimed, 590–698 s
+   recorded) is re-measured and the comment corrected.
+5. Affected; verify; full suite as `final-full`; close. The `final-full`
+   duration this session records is the baseline session 77 is measured
+   against.
+
+---
+
+### Session 77 of 77: The git seam — contract band and answered questions
+
+*The suite builds ~240 scratch repositories per run — 6–10 process spawns
+each before the test asks its question — because every test is treated as a
+test of git's behavior. Almost none are: selection, gates, digests and the
+ledger are functions from git's answers to the router's decisions, and they
+can be fed the answers. What actually needs real git is the contract — that
+`diff --name-only -z` emits what we parse, that autocrlf can rewrite a
+fresh clone's tree (the session 66 CI incident), that `update-ref` behaves
+on Windows. The router already spawns git in exactly one function,
+`journal.runGit`; this session makes that seam a tested boundary instead of
+a fact stated in a comment.*
+
+1. Register; declare `--not-releasable`.
+2. **The contract band.** A suite of order fifteen tests that runs
+   `journal.runGit` against real repositories and pins every git behavior
+   the router relies on — the parse formats, the autocrlf class, ref
+   updates, the porcelain shapes the gates read. These are the only tests
+   that may build a scratch repository from nothing.
+3. **Answers, not repositories.** A seam fixture that returns recorded git
+   answers through the `runGit` interface. The heaviest builders convert
+   first — `projection`, `owedDecisions`, `verify`, `facts`, `lifecycle`,
+   `evidence` hold ~130 of the ~240 build sites — each test stating the
+   answers it feeds and asserting the decision that comes back: input and
+   output, no processes. A test that genuinely exercises spawning
+   (`checks.execute`, the job runner, the engines) keeps its real children;
+   that is what it tests.
+4. **The suite that remains is counted.** Converted files delete their
+   repo-building; the run is re-measured against session 76's baseline and
+   the number recorded. The direction is the 215-test ceiling that returns
+   with the ground rules — not reached this session, but every conversion
+   states what behavior it proves so the shrink toward one-test-per-behavior
+   has its inventory.
+5. Affected; verify; full suite as `final-full`; close.
 
 ---
 

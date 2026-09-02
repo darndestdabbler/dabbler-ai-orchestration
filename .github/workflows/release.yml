@@ -198,7 +198,13 @@ jobs:
         # a successful publish fails; that is the registry's rule and not
         # something to work around.
         run: |
-          tarball="$(ls dist/*.tgz)"
+          # `./` is load-bearing. `npm publish dist/x.tgz` resolves the
+          # argument as a package SPEC, and a bare path with a slash in it
+          # looks enough like `owner/repo` that npm tried
+          # `git ls-remote ssh://git@github.com/dist/dabbler-ai-router-2.8.0.tgz.git`
+          # and failed on a public key. A leading `./` is what makes it a
+          # file. Found on the first publish this workflow ever reached.
+          tarball="./$(ls dist/*.tgz)"
           npm publish "$tarball" \
             --provenance \
             --tag "${{ needs.classify.outputs.is_final == 'true' && 'latest' || 'next' }}"

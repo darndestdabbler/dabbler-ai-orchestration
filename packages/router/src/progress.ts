@@ -993,11 +993,17 @@ export function buildTaskRows(
   // past the steps. A preverify evidence row is the OLD signal and still
   // ends the phase, so a record written before the targeted run was
   // removed reads exactly as it did.
+  // Completion dominates: a session closed through the verbs alone carries
+  // no driver record and, since the targeted run retired, no evidence row
+  // either -- the sentinel band's pipeline walk found exactly that session
+  // showing Work forever open. A closed session's work ended when it did.
   const stepsDone =
-    driverRun !== null && driverRun.phase !== "plan" && driverRun.phase !== "steps";
+    completedAt !== null ||
+    (driverRun !== null && driverRun.phase !== "plan" && driverRun.phase !== "steps");
   const stepsDoneAt = stepsDone
     ? (rounds.length > 0 ? pyStr(rounds[0]["recorded_at"]) || null : null) ??
       driverRun?.updated_at ??
+      completedAt ??
       null
     : null;
 

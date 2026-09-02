@@ -14,8 +14,10 @@
 // you did.
 
 import { createHash } from "node:crypto";
-import { appendFileSync, mkdirSync, readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { appendFileSync, mkdirSync, readFileSync, readdirSync } from "node:fs";
+import { dirname, join, relative, resolve } from "node:path";
+
+import { repoRootFromSessionsDir } from "./evidence.ts";
 
 // One vocabulary for what a suite may declare, imported rather than
 // restated: two lists that disagree make a valid declaration read as a typo
@@ -814,4 +816,132 @@ export function evaluateFreshness(
     }
   }
   return verdicts;
+}
+
+// --- Seals ---------------------------------------------------------------------
+//
+// The blackbox rule made mechanical: one seal per declared library (its
+// files hashed with normalized line endings, plus its direct dependencies'
+// digests) and one per workflow context (over its members' seals), appended
+// beside every run of record. Framework-owned hashing -- git never in the
+// loop, so the session-66 CRLF class cannot move a seal -- and nothing
+// gates on them yet: the ledger the merge gate will read accrues first,
+// and the gate that cites a standing green seal instead of re-running
+// arrives with per-library suites.
+
+const SEALS_FILENAME = "seals.jsonl";
+
+interface BoundariesDeclaration {
+  readonly contexts: Record<string, { readonly members: readonly string[] }>;
+}
+
+function sealNodeOf(srcRoot: string, filePath: string): string {
+  const rel = relative(srcRoot, filePath).split("\\").join("/");
+  const seg = rel.split("/");
+  return seg.length > 1 ? (seg[0] as string) : (seg[0] as string).replace(/\.ts$/, "");
+}
+
+/** sha256 over sorted (path, LF-normalized content) pairs. */
+function digestFiles(files: ReadonlyArray<readonly [string, string]>): string {
+  const hash = createHash("sha256");
+  for (const [rel, text] of [...files].sort((a, b) => (a[0] < b[0] ? -1 : 1))) {
+    hash.update(rel);
+    hash.update("\u0000");
+    hash.update(text.split("\r\n").join("\n"));
+    hash.update("\u0000");
+  }
+  return hash.digest("hex");
+}
+
+/**
+ * Every declared library's seal and every context's seal over its members.
+ * Returns null when the repository declares no boundaries -- a consumer
+ * repository without a declaration simply has no seals yet, which is not
+ * an error.
+ */
+export function computeSeals(repoRoot: string): Array<Record<string, unknown>> | null {
+  const boundariesPath = join(repoRoot, "packages", "router", "boundaries.json");
+  const srcRoot = join(repoRoot, "packages", "router", "src");
+  let declaration: BoundariesDeclaration;
+  try {
+    declaration = JSON.parse(readFileSync(boundariesPath, "utf8"));
+  } catch {
+    return null;
+  }
+  const filesByModule = new Map<string, Array<readonly [string, string]>>();
+  const edges = new Map<string, Set<string>>();
+  const walk = (dir: string): void => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const path = join(dir, entry.name);
+      if (entry.isDirectory()) {
+        walk(path);
+        continue;
+      }
+      if (!entry.name.endsWith(".ts")) continue;
+      const from = sealNodeOf(srcRoot, path);
+      const text = readFileSync(path, "utf8");
+      if (!filesByModule.has(from)) filesByModule.set(from, []);
+      filesByModule.get(from)!.push([relative(srcRoot, path).split("\\").join("/"), text]);
+      const specifiers = [
+        ...text.matchAll(/from\s+["'](\.[^"']+)["']/g),
+        ...text.matchAll(/import\(\s*["'](\.[^"']+)["']\s*\)/g),
+      ];
+      for (const match of specifiers) {
+        const to = sealNodeOf(srcRoot, resolve(dirname(path), match[1] as string));
+        if (to === from) continue;
+        if (!edges.has(from)) edges.set(from, new Set());
+        edges.get(from)!.add(to);
+      }
+    }
+  };
+  try {
+    walk(srcRoot);
+  } catch {
+    return null;
+  }
+  const own = new Map<string, string>();
+  for (const [name, files] of filesByModule) own.set(name, digestFiles(files));
+  const seals: Array<Record<string, unknown>> = [];
+  for (const [name, digest] of [...own.entries()].sort()) {
+    const deps: Record<string, string> = {};
+    for (const dep of [...(edges.get(name) ?? [])].sort()) {
+      const depDigest = own.get(dep);
+      if (depDigest !== undefined) deps[dep] = depDigest;
+    }
+    seals.push({ scope: "library", name, digest, deps });
+  }
+  for (const [context, block] of Object.entries(declaration.contexts).sort()) {
+    const hash = createHash("sha256");
+    for (const member of [...block.members].sort()) {
+      const memberDigest = own.get(member);
+      if (memberDigest === undefined) continue;
+      hash.update(member);
+      hash.update("\u0000");
+      hash.update(memberDigest);
+      hash.update("\u0000");
+    }
+    seals.push({ scope: "context", name: context, digest: hash.digest("hex") });
+  }
+  return seals;
+}
+
+/** Append the current seals beside a run of record; quietly no-op without a declaration. */
+export function appendSeals(
+  sessionsDir: string,
+  runDigest: string | null,
+  sessionNumber: number | null,
+): number {
+  const repoRoot = repoRootFromSessionsDir(sessionsDir);
+  const seals = computeSeals(repoRoot);
+  if (seals === null || seals.length === 0) return 0;
+  const path = join(repoRoot, ...RUNS_DIRNAME.split("/"), SEALS_FILENAME);
+  mkdirSync(dirname(path), { recursive: true });
+  const recordedAt = nowIso("microseconds");
+  const lines = seals
+    .map((seal) =>
+      dumps({ ...seal, recordedAt, runDigest, sessionNumber, stage: STAGE_FINAL_FULL }),
+    )
+    .join("\n");
+  appendFileSync(path, lines + "\n", "utf8");
+  return seals.length;
 }

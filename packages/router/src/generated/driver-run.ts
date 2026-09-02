@@ -25,7 +25,7 @@ export type DriverRun = {
   /**
    * Where the loop is. A re-run enters here; `complete` means the close ran and nothing is left to do. `publish` sits between the land and the close, and runs only for a session whose plan declared it releasable: packaging asks the close's own gates, and neither `working_tree_clean` nor `pushed_to_remote` passes before the commit and the push, so it cannot run earlier.
    */
-  phase: "plan" | "steps" | "preverify" | "verify" | "dispositions" | "fix" | "run-of-record" | "land" | "publish" | "close" | "complete";
+  phase: "plan" | "steps" | "preverify" | "verify" | "dispositions" | "fix" | "run-of-record" | "land" | "gate-wait" | "publish" | "close" | "complete";
   /**
    * The seq of the instruction last issued, so the next one is monotonic across re-runs.
    */

@@ -10245,6 +10245,13 @@
       "dateTime": "2026-09-02T09:16:41.944000-04:00",
       "task": "Make every component meet the operator's library criteria or be named as not one. First the redundant targeted pre-verification run dies (measured 353-625s per session, twice more than the full suite it approximates); the Work task-row signal moves to what the framework already owns, accepted steps, with the old stage vocabulary kept for reading old records. Then the measured back-edge clusters are cut in order: the cli/output print helpers move to a leaf (~7 back-edges), the session-state reader leaves progress's height (~10), config stops importing transports (1 cut freeing ~6). SCC-B (ledger/critique/evidence, 4 back-edges) pilots the single-writer append-only rule. The L5 club (~20 edges among cli/drive/session/verify/gates/progress) is begun along the five mini-workflow boundaries with recorded handoffs as the only interface; what does not finish is measured, named, and amended into a follow-on scope on the record. The boundary then holds by lint with a frozen baseline.",
       "releasable": false
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 79,
+      "dateTime": "2026-09-02T11:36:59.356000-04:00",
+      "task": "The blackbox rule made mechanical, and a master that only moves on green. The de-facto boundaries session 78 measured become a declaration: five workflow contexts and the platform beneath them, module membership stated, read by the boundary check. Seals land beside the run of record: a framework-computed digest per library (its files, hashed with normalized line endings, plus its dependencies' digests) and per workflow (its members' seals plus its handoff schemas), written when final-full is recorded - the ledger invariant the merge gate will read; the full run remains the whole answer until per-library suites exist, as the plan entry says. Five per-workflow sentinels plus one whole-pipeline land as the fail-fast band, each forcing an adverse decision and asserting on durable artifacts. The candidate gate arrives dual-mode: a workflow that runs the full check on candidate/s<N> at the exact tested SHA with step-level suite proof and fast-forwards master on green, and a close that pushes the candidate, records the receipt (base SHA, tested SHA, surface digest, executor), and in a repository with no CI executes the same check locally against the same SHA for the same receipt. Executor failover is the only escape; no typeable bypass exists.",
+      "releasable": false
     }
   ]
 }

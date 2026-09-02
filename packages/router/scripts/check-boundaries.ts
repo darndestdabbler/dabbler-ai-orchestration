@@ -95,6 +95,48 @@ const baseline: ReadonlyArray<readonly [string, string]> = JSON.parse(
 ).edges;
 const allowed = new Set(baseline.map(([a, b]) => `${a}->${b}`));
 
+// Every module belongs to exactly one declared context (`boundaries.json`):
+// membership is what the seals hash against, so a module outside the
+// declaration would be a component nothing seals and nothing owns.
+const BOUNDARIES_PATH = join(ROUTER_ROOT, "boundaries.json");
+const contexts: Record<string, { members: string[] }> = JSON.parse(
+  readFileSync(BOUNDARIES_PATH, "utf8"),
+).contexts;
+const memberOf = new Map<string, string>();
+const doubled: string[] = [];
+for (const [context, block] of Object.entries(contexts)) {
+  for (const member of block.members) {
+    if (memberOf.has(member)) doubled.push(member);
+    memberOf.set(member, context);
+  }
+}
+const unlisted = [...nodes].filter((node) => !memberOf.has(node)).sort();
+// Both directions: a declared member no module answers to is a typo or a
+// deletion the declaration missed, and either way the map lies.
+const phantom = [...memberOf.keys()].filter((name) => !nodes.has(name)).sort();
+if (phantom.length > 0) {
+  process.stderr.write(
+    "boundary: declared member(s) with no module behind them:\n" +
+      phantom.map((name) => `  ${name}\n`).join(""),
+  );
+  process.exit(1);
+}
+if (unlisted.length > 0 || doubled.length > 0) {
+  if (unlisted.length > 0) {
+    process.stderr.write(
+      "boundary: module(s) missing from boundaries.json:\n" +
+        unlisted.map((name) => `  ${name}\n`).join(""),
+    );
+  }
+  if (doubled.length > 0) {
+    process.stderr.write(
+      "boundary: module(s) listed in more than one context:\n" +
+        doubled.sort().map((name) => `  ${name}\n`).join(""),
+    );
+  }
+  process.exit(1);
+}
+
 const violations: string[] = [];
 for (const knot of knots) {
   const members = new Set(knot);

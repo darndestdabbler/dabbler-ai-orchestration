@@ -39,6 +39,7 @@
         "fix",
         "run-of-record",
         "land",
+        "gate-wait",
         "publish",
         "close",
         "complete"

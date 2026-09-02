@@ -1051,6 +1051,18 @@ export function report(sessionsDir: string, options: ReportCliOptions): number {
     );
     return EXIT_BOUNDARY;
   }
+  if (options.seq !== instruction.seq) {
+    // The first lease fence. On 2026-09-02 two driver processes wrote one
+    // run and phases were skipped silently; an answer that does not name
+    // the OUTSTANDING instruction is a stale attempt, and a stale attempt
+    // may not advance the run -- it is recorded here as refused instead.
+    writeErr(
+      `report: refused -- the outstanding instruction is ${instruction.seq} ` +
+        `and this report answers ${options.seq}. A stale attempt does not ` +
+        "advance the run; call `dabbler session next` and answer what it says.\n",
+    );
+    return EXIT_BOUNDARY;
+  }
   const answerFile = options.answerFile ?? null;
   if (answerFile === null) {
     if (instruction.answer_schema !== REPORT_SCHEMA) {

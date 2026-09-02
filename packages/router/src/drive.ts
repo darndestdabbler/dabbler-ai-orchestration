@@ -32,7 +32,7 @@
 // nothing: the session stays in flight, `run.json` says why, and a re-run
 // continues from the phase it reached.
 
-import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 
 import {
@@ -1925,6 +1925,22 @@ ${this.stopArtifacts()}`,
     this.setPhase("land");
   }
 
+  /**
+   * Whether this repository declares the candidate gate: `release.gate:
+   * candidate` in `dabbler.yaml`. Read raw and defensively -- an absent or
+   * unreadable declaration is today's direct land, so nothing changes under
+   * anyone silently.
+   */
+  private gateIsCandidate(): boolean {
+    try {
+      const text = readFileSync(join(this.repoRoot, "dabbler.yaml"), "utf8");
+      const match = /^release:\s*$[\s\S]*?^\s+gate:\s*candidate\s*$/m.exec(text);
+      return match !== null;
+    } catch {
+      return false;
+    }
+  }
+
   private phaseLand(): void {
     const task = this.requirePlan().task.split("\n")[0]?.trim() || "driven session";
     runGit(this.repoRoot, ["add", "-A", "--", "."]);
@@ -1960,6 +1976,35 @@ ${this.stopArtifacts()}`,
             "there.",
         );
       }
+      if (this.gateIsCandidate()) {
+        // The merge gate: master only moves to a full-check-green exact
+        // SHA, so the land pushes candidate/s<N> at the tested SHA and the
+        // gate workflow fast-forwards master on green. The receipt is the
+        // record the delegation stands on.
+        const tested = runGit(this.repoRoot, ["rev-parse", "HEAD"]).stdout;
+        const base = runGit(this.repoRoot, ["rev-parse", "origin/master"]).stdout;
+        const branch = `candidate/s${this.sessionNumber}`;
+        const pushed = runGit(this.repoRoot, ["push", "origin", `HEAD:refs/heads/${branch}`]);
+        if (pushed.code !== 0) {
+          throw new Stop("land", `the candidate push was refused: ${tail(pushed.stderr, 300)}`);
+        }
+        const receipt = {
+          mode: "candidate",
+          branch,
+          base_sha: base,
+          tested_sha: tested,
+          executor: "ci",
+          pushed_at: nowIso(),
+        };
+        const receiptPath = join(
+          this.repoRoot, ".dabbler", "runs", `s${this.sessionNumber}`, "driver", "gate-receipt.json",
+        );
+        mkdirSync(dirname(receiptPath), { recursive: true });
+        writeFileSync(receiptPath, `${JSON.stringify(receipt, null, 2)}\n`, "utf8");
+        this.log("candidate-pushed", { branch, tested: tested.slice(0, 12) });
+        this.setPhase("gate-wait");
+        return;
+      }
       const pushed = runGit(this.repoRoot, ["push"]);
       if (pushed.code !== 0) {
         // A push that reached a remote and was refused keeps git's own
@@ -1968,6 +2013,67 @@ ${this.stopArtifacts()}`,
         // cost the operator the one string worth searching for.
         throw new Stop("land", `the push was refused: ${tail(pushed.stderr, 300)}`);
       }
+    }
+    // The local executor's receipt: the same record the candidate mode
+    // writes, from the machine that ran the full check itself. One shape,
+    // two executors -- which is what makes the delegation auditable in a
+    // repository that will never have CI.
+    const localTested = runGit(this.repoRoot, ["rev-parse", "HEAD"]).stdout;
+    const localReceipt = {
+      mode: "local",
+      branch: "master",
+      base_sha: localTested,
+      tested_sha: localTested,
+      executor: "local",
+      pushed_at: nowIso(),
+    };
+    const localReceiptPath = join(
+      this.repoRoot, ".dabbler", "runs", `s${this.sessionNumber}`, "driver", "gate-receipt.json",
+    );
+    mkdirSync(dirname(localReceiptPath), { recursive: true });
+    writeFileSync(localReceiptPath, `${JSON.stringify(localReceipt, null, 2)}\n`, "utf8");
+    this.log("landed", { commit: runGit(this.repoRoot, ["rev-parse", "--short", "HEAD"]).stdout });
+    this.setPhase("publish");
+  }
+
+  /**
+   * Wait for the gate to move master to the tested SHA, then act on it.
+   *
+   * The poll is git-only -- `merge-base --is-ancestor tested origin/master`
+   * needs no CI vendor's API -- so the same wait works against any host the
+   * gate workflow runs on. Green pulls master forward and the lifecycle
+   * proceeds; a poll that runs out says where to look and stops, which
+   * routes the red run's failures into remediation the way every stop does.
+   */
+  private async phaseGateWait(): Promise<void> {
+    const receiptPath = join(
+      this.repoRoot, ".dabbler", "runs", `s${this.sessionNumber}`, "driver", "gate-receipt.json",
+    );
+    const receipt = JSON.parse(readFileSync(receiptPath, "utf8")) as { tested_sha: string };
+    const script =
+      "const {execFileSync}=require('node:child_process');" +
+      "const sha=process.argv[1];const until=Date.now()+25*60*1000;" +
+      "const tick=()=>{try{execFileSync('git',['fetch','origin','master'],{stdio:'ignore'});" +
+      "execFileSync('git',['merge-base','--is-ancestor',sha,'origin/master'],{stdio:'ignore'});" +
+      "process.exit(0);}catch{}" +
+      "if(Date.now()>until){console.error('the gate did not move master to '+sha+' in 25 minutes; read the candidate-gate run');process.exit(3);}" +
+      "setTimeout(tick,30000);};tick();";
+    const code = await this.longWork({
+      name: "candidate gate",
+      argv: [process.execPath, "-e", script, receipt.tested_sha],
+      retryAfterSeconds: 60,
+      stopKind: "land",
+    });
+    if (code !== EXIT_OK) {
+      throw new Stop(
+        "land",
+        "the candidate gate did not go green; the run's failure list is the " +
+          "remediation input, and the branch is still standing with it.",
+      );
+    }
+    const pulled = runGit(this.repoRoot, ["pull", "--ff-only"]);
+    if (pulled.code !== 0) {
+      throw new Stop("land", `master moved but the pull was refused: ${tail(pulled.stderr, 300)}`);
     }
     this.log("landed", { commit: runGit(this.repoRoot, ["rev-parse", "--short", "HEAD"]).stdout });
     this.setPhase("publish");
@@ -2092,6 +2198,9 @@ ${this.stopArtifacts()}`,
             break;
           case "land":
             this.phaseLand();
+            break;
+          case "gate-wait":
+            await this.phaseGateWait();
             break;
           case "publish":
             await this.phasePublish();

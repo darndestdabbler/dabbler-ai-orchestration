@@ -23,6 +23,7 @@ import {
   STAGES,
   STAGE_FINAL_FULL,
   STAGE_PREVERIFY_TARGETED,
+  appendSeals,
   loadSuitesChecked,
   recordRun,
   type SuiteSpec,
@@ -383,6 +384,14 @@ async function runSuite(argv: readonly string[]): Promise<number> {
       `recorded ${record.suite} [${record.stage}]: ${record.outcome} ` +
         `in ${durationSeconds}s (timed here)\n`,
     );
+    if (stage === STAGE_FINAL_FULL && outcome === OUTCOME_PASSED) {
+      const sealed = appendSeals(
+        sessionsDir,
+        (record as unknown as Record<string, unknown>)["surfaceDigest"] as string | null,
+        (record as unknown as Record<string, unknown>)["sessionNumber"] as number | null,
+      );
+      if (sealed > 0) writeOut(`sealed ${sealed} scope(s) beside the run of record\n`);
+    }
   } catch (error) {
     if (!(error instanceof RecordError)) throw error;
     writeErr(`test_evidence: ${error.message}\n`);

@@ -1,0 +1,248 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "driver/run.json (where a driven session's loop is, and why it stopped)",
+  "description": "The current state of one driven session, under .dabbler/runs/s<N>/driver/run.json. Written only by `dabbler session drive`, replaced whole after every transition, and read by a re-run to continue where the last one left off: the phase, the steps already accepted, the tree the next report is measured against, the seq last issued and the invocations spent. It is state, not history -- the history of a run is its transcripts and the lifecycle's own records. `stop` is the one field a person is meant to read: when the loop halts short of the close it says which bound it met, in words, and a re-run clears it. A file that fails validation on read is refused, never skipped. `rejections`, `job`, `verification`, `engine_session_id` and `stop_history` are optional for exactly that reason: they arrived after the record did, and a run written before them is still a run this reader must open.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "session_number",
+    "engine",
+    "phase",
+    "seq",
+    "invocations",
+    "max_invocations",
+    "accepted_steps",
+    "baseline_tree",
+    "stop",
+    "started_at",
+    "updated_at"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1,
+      "description": "Frozen at v1. A reader that finds any other value refuses the file rather than interpreting it."
+    },
+    "session_number": { "type": "integer", "minimum": 1 },
+    "engine": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The adapter the engine is reached through, by name. A re-run with a different one is refused: one engine's session store carries the run."
+    },
+    "phase": {
+      "enum": [
+        "plan",
+        "steps",
+        "preverify",
+        "verify",
+        "dispositions",
+        "fix",
+        "run-of-record",
+        "land",
+        "publish",
+        "close",
+        "complete"
+      ],
+      "description": "Where the loop is. A re-run enters here; `complete` means the close ran and nothing is left to do. `publish` sits between the land and the close, and runs only for a session whose plan declared it releasable: packaging asks the close's own gates, and neither `working_tree_clean` nor `pushed_to_remote` passes before the commit and the push, so it cannot run earlier."
+    },
+    "seq": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "The seq of the instruction last issued, so the next one is monotonic across re-runs."
+    },
+    "invocations": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "How many times the engine has been invoked for this session, across re-runs. On a seat each one is a premium request."
+    },
+    "max_invocations": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "The bound `invocations` is held under. Reaching it stops the loop and closes nothing; continuing is a re-run with a larger bound, which is a decision to spend more."
+    },
+    "accepted_steps": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+      "description": "The work-plan steps whose reports were accepted, in order. A re-run skips them."
+    },
+    "baseline_tree": {
+      "type": ["string", "null"],
+      "pattern": "^[0-9a-f]{40}$",
+      "description": "The tree object the working tree was at after the last accepted step, which is what the next report's `files_changed` is measured against. Null before the first step."
+    },
+    "stop": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["kind", "reason", "at"],
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/stopKind",
+          "description": "Which bound the loop met: the invocation budget; a step refused three times; the engine reporting `blocked`; the engine failing to run; a test run the framework could not hand back; a verification round that neither passed nor produced findings to dispose; the commit or push; packaging refusing or failing to reach the feed; the close's gates; a person asking it to stop (`session interrupt --stop`, with their reason)."
+        },
+        "reason": { "type": "string", "minLength": 1 },
+        "at": { "type": "string", "minLength": 1 },
+        "step_id": { "$ref": "#/$defs/stopStepId" },
+        "class": {
+          "enum": ["first", "deadlock"],
+          "description": "Whether this bound has been met like this before. `deadlock` is the same kind, the same step and the same reason as the stop immediately before it -- the loop is not making progress, and no number of re-runs will change that by itself. It is optional so that a run written before this field is still a run this reader opens; its absence means nothing was classified, not that the stop was a first."
+        }
+      },
+      "description": "Null while the loop runs or after it completed. Set when it halted short of the close, with the reason in words; the session stays in flight and this is what the operator reads."
+    },
+    "stop_history": {
+      "type": "array",
+      "maxItems": 8,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "reason", "at"],
+        "properties": {
+          "kind": { "$ref": "#/$defs/stopKind" },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The stop's own reason as the loop raised it, undecorated. What `stop.reason` shows a person may say more; this is what the next stop is compared against, and a comparison against a decorated reason would never match twice running."
+          },
+          "at": { "type": "string", "minLength": 1 },
+          "step_id": { "$ref": "#/$defs/stopStepId" }
+        }
+      },
+      "description": "The stops this run has already met, oldest first and capped -- the oldest is dropped rather than the newest, because what a deadlock is read from is the recent end. It is here, and short, because `run.json` is state: the history of a run is its transcripts, and this is only enough of it to see the loop going nowhere."
+    },
+    "triage": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["for_reason", "rungs", "at"],
+      "properties": {
+        "for_reason": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The stop reason the ladder was climbed for, undecorated. A re-run that reaches the same impasse does not ask again: the answer would be the same one, and the second call is spent for nothing."
+        },
+        "for_step": { "$ref": "#/$defs/stopStepId" },
+        "rungs": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "How many advisers were asked before the ladder ended, one per rung. It ends at a classification or at the human; no rung loops."
+        },
+        "classification": {
+          "type": ["string", "null"],
+          "description": "What the adviser called it, or null when none could say -- which is a fact about the ladder and not a missing value."
+        },
+        "adviser": {
+          "type": ["string", "null"],
+          "description": "The model that classified it and the provider it answered on, for a person deciding how much weight to give the opinion."
+        },
+        "amendment": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "required": ["step_id", "reason", "relaxes_a_gate"],
+          "properties": {
+            "step_id": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+            "files": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": { "type": "string", "minLength": 1 }
+            },
+            "checks": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["argv"],
+                "properties": {
+                  "argv": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } }
+                }
+              }
+            },
+            "reason": { "type": "string", "minLength": 1 },
+            "relaxes_a_gate": { "type": "boolean" }
+          },
+          "description": "The change an adviser proposed, kept whole because the option on the owed decision is otherwise a menu item with nothing behind it: the proposal lives in one process and the person who answers is in another. Nothing here is applied by the framework -- it is what a person needs in order to type `dabbler session plan amend` themselves, or to decide not to."
+        },
+        "at": { "type": "string", "minLength": 1 }
+      },
+      "description": "What the unattended ladder found, once per impasse. Optional and absent under the pull: an attended engine calls `dabbler triage` itself, and the framework does not spend a provider call on behalf of somebody who is sitting right there."
+    },
+    "rejections": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "How many times the outstanding answer has been refused, out of the three a step is allowed. It is here rather than in a local because a pull-mode call -- `dabbler session next` -- ends between the refusal and the answer, and a count a process holds is a count that resets every time the person's CLI comes back."
+    },
+    "preverify_heals": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "How many times this run has answered a verify refusal by going back to the pre-verification phase rather than stopping. `verify` refuses when the targeted evidence does not match the tree, and running the affected tests again is exactly what makes that precondition true -- so the driver heals it instead of stopping in a phase it would re-enter forever. It is counted, and on disk rather than in a local, because a gate the preverify phase CANNOT satisfy would otherwise loop between the two: past the bound the driver stops and hands the operator verify's own reason.",
+      "default": 0
+    },
+    "job": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["name", "argv", "pid", "log", "status", "started_at", "retry_after_seconds"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "What the framework is running, in the words the instruction shows: a verification round, a suite's run of record, the close."
+        },
+        "argv": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 },
+          "description": "The program and its arguments, spawned with no shell."
+        },
+        "pid": { "type": "integer", "minimum": 1 },
+        "log": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Where the job's output is being appended, repository-relative -- the path a `wait` hands back."
+        },
+        "status": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The file the runner writes the exit code into when the job ends, repository-relative. Its presence is what tells a finished job from a running one; a pid alone cannot, because pids are reused."
+        },
+        "started_at": { "type": "string", "minLength": 1 },
+        "retry_after_seconds": { "type": "integer", "minimum": 1 }
+      },
+      "description": "The one long-running thing the framework has started and has not yet collected, or null. Long work is never awaited inside a call: a verification round, the complete suite and the close each outlast an engine's tool timeout, so they are started detached and the following call reports progress or the result."
+    },
+    "verification": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "properties": {
+        "max_rounds": { "type": ["integer", "null"], "minimum": 1 },
+        "transport": { "type": ["string", "null"], "minLength": 1 }
+      },
+      "description": "The round cap and transport this session verifies under, as the call that opened the run named them. They belong to the run rather than to a call: under the pull the call that eventually starts verification is not the one the person typed them on -- it is whichever `dabbler session next` happens to reach that phase, following an `answer_command` that names neither. A later call may name them again to change them."
+    },
+    "engine_session_id": {
+      "type": ["string", "null"],
+      "description": "The engine's own conversation, by the id it reported on its first invocation. A resume names it; nothing here asks an engine for its most recent session, because the most recent one in a directory can be somebody else's."
+    },
+    "started_at": { "type": "string", "minLength": 1 },
+    "updated_at": { "type": "string", "minLength": 1 }
+  },
+  "$defs": {
+    "stopKind": {
+      "enum": [
+        "budget",
+        "rejected-thrice",
+        "blocked",
+        "engine",
+        "tests",
+        "verification",
+        "land",
+        "publish",
+        "close",
+        "interrupted"
+      ]
+    },
+    "stopStepId": {
+      "type": ["string", "null"],
+      "pattern": "^[a-z0-9-]+$",
+      "description": "The work-plan step the loop was on when it halted, or null when it was not on one -- a verification round, the suite, the close. Two stops on different steps are not the same stop however alike their reasons read."
+    }
+  }
+}

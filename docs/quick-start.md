@@ -103,6 +103,22 @@ idempotent — safe to re-run after a context reset. It refuses to start
 a session that is already in flight, re-open a completed one, or skip
 ahead.
 
+## 2b. Run it — the whole session, one command
+
+```
+dabbler session run
+```
+
+Identity comes from the record: the registered engine is invoked per
+instruction until the session says done, waits are slept out by their own
+retry times, and an engine the framework cannot invoke non-interactively
+degrades to watcher-only — the command waits and names what is owed and
+by which clock. Your whole vocabulary is **start, run, interact, cancel**:
+`dabbler session interrupt --reason "..."` talks to a running session, and
+`dabbler session cancel` is the way out. Everything else — instructions,
+reports, the `session next` protocol — is the machinery's conversation
+with the engine, not yours; you never type it.
+
 ## 3. Work the steps
 
 Follow the spec's step list for the current session: make the edits and

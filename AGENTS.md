@@ -142,6 +142,12 @@ you what to do next, one move at a time, and you do that and ask again.
 
 ## How to run a session
 
+> **If you are a person reading this:** your vocabulary is `dabbler
+> session start` (or the registering call below), `dabbler session run`,
+> `dabbler session interrupt`, and `dabbler session cancel`. Everything
+> from here down is the ENGINE's protocol — the machinery's side of the
+> conversation — and nothing in it is yours to type.
+
 Sessions are numbered directly in this repository, under one sessions root
 (`docs/sessions/`), so no command takes a handle to one.
 

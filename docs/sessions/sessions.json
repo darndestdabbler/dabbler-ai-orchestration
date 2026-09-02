@@ -1587,6 +1587,26 @@
         "identityProvenance": "direct"
       },
       "verificationVerdict": "VERIFIED",
+      "verification": {
+        "rounds": 4,
+        "verifierModel": "gemini-flash",
+        "verifierProvider": "google",
+        "transport": "api"
+      },
+      "frameworkVersion": "2.0.0"
+    },
+    {
+      "number": 81,
+      "title": "Publishing without a secret, and the last of the friction",
+      "status": "in-progress",
+      "startedAt": "2026-09-02T15:17:10.116000-04:00",
+      "completedAt": null,
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": "VERIFIED",
       "frameworkVersion": "2.0.0",
       "verification": {
         "rounds": 4,
@@ -1594,15 +1614,6 @@
         "verifierProvider": "google",
         "transport": "api"
       }
-    },
-    {
-      "number": 81,
-      "title": "Publishing without a secret, and the last of the friction",
-      "status": "not-started",
-      "startedAt": null,
-      "completedAt": null,
-      "orchestrator": null,
-      "verificationVerdict": null
     },
     {
       "number": 82,

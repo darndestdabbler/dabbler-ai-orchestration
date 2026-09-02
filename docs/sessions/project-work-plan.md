@@ -116,7 +116,7 @@ it.
 | 78 | Every component becomes a library, or is named as not one | no | 2026-09-02 |
 | 79 | Seals, and a master that only moves on green | no | 2026-09-02 |
 | 80 | The loop stops living in anyone's attention | no | 2026-09-02 |
-| 81 | Publishing without a secret, and the last of the friction | — | not declared |
+| 81 | Publishing without a secret, and the last of the friction | no | 2026-09-02 |
 | 82 | The trial, run by the operator against what the Marketplace serves | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
@@ -1782,3 +1782,9 @@ The blackbox rule made mechanical, and a master that only moves on green. The de
 **Releasable: no.**
 
 The loop stops living in anyone's attention. Instruction leases with epochs land on the record: every issued instruction carries the lease, answers carry it back, and a stale attempt is recorded and refused - the fence report() gained in session 79 is generalized to the driver's own judgment. The clocks split over free observables: acknowledgment, liveness and progress are separate, liveness resets on stream and OS signals, progress only on verified milestones, and no AI is ever asked for an ETA. The guardian arrives claude-code tier: on turn end with a lease outstanding the engine's stop hook consults the lease and continues the conversation instead of letting it settle; death and compaction recover through --continue with the instruction re-injected from the record; a pending permission prompt routes to the one state a human genuinely owns. Budgets, not confirmations: registration grants the session's paid-action budget and every supervision act appends to the record with its cost. dabbler session run drives a whole session under the guardian in one command; other engines degrade to watcher-only and say so.
+
+### Session 81 — Publishing without a secret, and the last of the friction
+
+**Releasable: no.**
+
+Publishing without a secret, and the last of the friction. The Marketplace workflow moves to Entra ID workload identity federation - id-token: write, an Azure login step, vsce --azure-credential - and the PAT path goes with its stale 2026-05-04 comment: Azure DevOps retires global PATs on 2026-12-01 and the supported automated path is federation, which the operator's judgment preceded. The one-time Azure steps land in docs/planning/marketplace-release-process.md at the copy-pasteable bar: create the Entra app, add the GitHub federated credential for this repository, grant the publisher, run dabbler release - exact portal paths, exact values. And the naming that misled the owner is retired from every document a person reads: quick-start and the managed guidance describe start, run, interact and cancel; no instruction tells a person to type session next.

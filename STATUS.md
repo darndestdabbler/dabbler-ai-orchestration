@@ -1,8 +1,32 @@
-# STATUS — 71 of 73 closed. CI is still red: next is 72, green CI part two; then 73, the trial
+# STATUS — 72 of 74 closed. CI is down to 2 failures of 1263: next is 73, the last two; then 74, the trial
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
 `experiment/verification-pipeline-v3` and `design/solution-decomposition`
 are merged and finished. Earlier handoff text is in `docs/status-archive.md`.
+
+> **Session 72 — the rest of the runner's conditions. CLOSED `VERIFIED` in
+> one round, 2026-09-02 (`3ac7826e`). CI went from ~50 failures to TWO of
+> 1263.**  now canonicalises the deepest ancestor that exists
+> and re-appends the rest, so a not-yet-written file no longer keeps the
+> spelling it was handed. Every fixture repository declares its own
+> , ,  and  through one
+> , because the framework commits through its own  and a
+> bare runner has no identity to borrow.  was a THIRD production
+> comparer of the same family -- it staged its scaffold with a raw
+> , so in a repository reached through an alias it committed
+> nothing and said the scaffold was already committed.
+>
+> ** now reproduces the whole
+> runner**:  aliased through a junction, /
+> pointed at nothing, and  set so git refuses to guess an
+> identity the way a runner does. Take suites as arguments. It is the reason
+> these were found in minutes rather than eight-minute round trips.
+>
+> **The two that remain are session 73**: a  in a path (every 8.3 short
+> name has one) is not in 's path-token character class, so a
+> traceback there implicates nothing -- a production defect; and 
+> asserts the spelling it was handed. Plus one flake:  passes
+> and then exits 1 on a libuv assertion at .
 
 > **Session 71 — one canonical spelling for every path comparison. CLOSED
 > `VERIFIED` in one round, 2026-09-01 (`4eff83c2`). CI IS STILL RED, and

@@ -2961,7 +2961,7 @@ demonstration.*
 
 ---
 
-### Session 65 of 73: The papercuts the trial found
+### Session 65 of 74: The papercuts the trial found
 
 1. Register; declare `--not-releasable`.
 2. **The cursor.** `spawnCheck` and `spawnProgram` in `checks.ts` — the
@@ -3010,7 +3010,7 @@ demonstration.*
 
 ---
 
-### Session 66 of 73: The publish phase, CI's first clean run, and the spinner
+### Session 66 of 74: The publish phase, CI's first clean run, and the spinner
 
 *Widened from "the publish phase" on the operator's call, 2026-09-01: a
 miscellaneous session, because three of the four things in it are small and
@@ -3119,7 +3119,7 @@ something a published framework would otherwise ship with.*
 
 ---
 
-### Session 67 of 73: The watcher, and the driver's blind spots
+### Session 67 of 74: The watcher, and the driver's blind spots
 
 *Planned 2026-09-01 from session 66's own conduct. Three of its four
 framework findings are the same root: the driver treating an exit code as
@@ -3197,7 +3197,7 @@ belonging to no step. It is session 68's, and the reason is recorded there.
 
 ---
 
-### Session 68 of 73: The logic tree, harvested and held to the code
+### Session 68 of 74: The logic tree, harvested and held to the code
 
 *The harvest runs outside this repository, beside it, because a session
 was in flight when it started and this repository's close checks for a
@@ -3257,7 +3257,7 @@ controls and the verifier. It replaces none of them.*
 
 ---
 
-### Session 69 of 73: The round cap stops being typeable, and the Solution Explorer goes multi-repository
+### Session 69 of 74: The round cap stops being typeable, and the Solution Explorer goes multi-repository
 
 *Mostly the largest unaddressed item from the csv-model feedback (item 8),
 and the answer to the operator's own sentence: "once I completed the CSV
@@ -3328,7 +3328,7 @@ build files; `usedBy` is derived and never declared, deliberately.
 
 ---
 
-### Session 70 of 73: The half of the trial that needs a published router
+### Session 70 of 74: The half of the trial that needs a published router
 
 > **Amended by session 70 itself, 2026-09-01, and the section below is left
 > as it was written.** What it asks for could not run: nothing is published
@@ -3445,7 +3445,7 @@ the reason to do it once testing is finished rather than to unblock a row.
 
 ---
 
-### Session 71 of 73: Green CI, because nothing can be published until it is
+### Session 71 of 74: Green CI, because nothing can be published until it is
 
 *Written by session 70 on the operator's call, 2026-09-01, and numbered by
 this doc-only commit immediately after that session closed — the same way
@@ -3486,7 +3486,7 @@ form and red on every runner.
 
 ---
 
-### Session 72 of 73: Green CI, part two — what the first fix did not reach
+### Session 72 of 74: Green CI, part two — what the first fix did not reach
 
 *Added 2026-09-02, after session 71 landed and its `Test` run was still red.
 71 was right and incomplete: the `sessions.json` failures it was written for
@@ -3531,7 +3531,41 @@ fact the suite assumed rather than declared.**
 
 ---
 
-### Session 73 of 73: The trial against what the registry actually serves
+### Session 73 of 74: Green CI, part three — the last two, and the tilde
+
+*Added 2026-09-02, after session 72's `Test` run came back with **two**
+failures out of 1263, down from around fifty. Both are named here because
+they are known, not suspected, and neither is the path-comparison bug the
+last two sessions were about.*
+
+1. **A `~` in a path makes the fix loop implicate nothing.** `TOKEN_BODY` in
+   `fixloop.ts` admits `[A-Za-z0-9_./\-]` and not `~`, so a traceback frame
+   naming `C:/Users/RUNNER~1/.../app.py` matches only the tail after the
+   tilde, which resolves to nothing and is dropped. Every Windows 8.3 short
+   name carries one. That is a production defect and not a test one: on such
+   a machine the fix round's envelope silently loses the file the failure
+   points at, which is the file the round exists to repair.
+2. **`drive.test` asserts the spelling it was handed**, exactly as
+   `packaging.test` did — the transcript carries the canonical argv and the
+   test holds the short form. Compare them as the filesystem names them.
+3. **And the flake beside them:** `check:types` printed *31 generated
+   module(s) match the schemas* and then exited 1 with
+   `Assertion failed: !(handle->flags & UV_HANDLE_CLOSING)` — libuv, on
+   `process.exit()` while a handle is closing. A control that passes and
+   reports failure is worse than one that fails. Set `process.exitCode` and
+   let the loop drain, in every script that exits by hand.
+
+1. Register; declare `--not-releasable`.
+2. Fix the three, each with the reproduction that shows it: a `~` path in
+   `fixloop`'s own test, an aliased run for the transcript, and the scripts'
+   own exit path.
+3. Push, and read the `Test` run. **This is the session that must end with a
+   green one**; the trial cannot start until it does.
+4. Affected; verify; full suite as `final-full`; close.
+
+---
+
+### Session 74 of 74: The trial against what the registry actually serves
 
 *Added by session 70, on the rule session 50 set: a trial with no route to
 fix what it finds is a demonstration. Session 70 found its own precondition

@@ -22,6 +22,7 @@ import { spawnSync } from "node:child_process";
 import {
   closeSync,
   mkdirSync,
+  realpathSync,
   openSync,
   renameSync,
   rmSync,
@@ -30,7 +31,7 @@ import {
   fsyncSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, join, relative, resolve } from "node:path";
 
 import { dumps } from "./pythonJson.ts";
 
@@ -150,6 +151,44 @@ function stripNewlines(text: string): string {
 export function repoRootFor(path: string): string | null {
   const result = runGit(path, ["rev-parse", "--show-toplevel"]);
   return result.code === 0 && result.stdout ? result.stdout : null;
+}
+
+/**
+ * One path, spelled the way the operating system spells it.
+ *
+ * `repoRootFor` above answers with GIT's spelling, and a caller's is
+ * whatever they were handed -- and Windows hands out several for one
+ * directory: the 8.3 short name (`C:\Users\RUNNER~1\...` for
+ * `C:\Users\runneradmin\...`), a junction, a mapped drive, another case.
+ * Comparing two of them with `relative()` answers `..\alias\docs\sessions`,
+ * which is not a containment failure but a spelling one -- and every rule
+ * that decides "is this path inside that one" then decides wrongly. That is
+ * what made twelve consecutive CI runs red while the same suite was green
+ * on a machine whose temp directory has no short name.
+ *
+ * A path that does not exist cannot be canonicalised, and `resolve` is the
+ * honest answer there rather than a refusal: half the callers name an output
+ * before anything has written it.
+ */
+export function canonicalPath(path: string): string {
+  try {
+    return realpathSync.native(path);
+  } catch {
+    return resolve(path);
+  }
+}
+
+/**
+ * `target` as `root` sees it: forward slashes, and both sides canonical.
+ *
+ * The one rule for every comparison that DECIDES something -- what the
+ * bookkeeping exclusion skips, which paths a step's report is measured
+ * against, whether a path is inside a plan's envelope, whether a verifier's
+ * read is inside the repository at all. Formatting a path for a message can
+ * use `relative` directly; deciding with it cannot.
+ */
+export function repoRelativePath(root: string, target: string): string {
+  return relative(canonicalPath(root), canonicalPath(target)).replace(/\\/g, "/");
 }
 
 // --- The machine-side directory ---------------------------------------------

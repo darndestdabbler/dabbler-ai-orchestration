@@ -91,6 +91,7 @@ import { tryWriteProjection } from "./workflow/project.ts";
 import {
   changedPathsBetween,
   nowIso,
+  repoRelativePath,
   repoRootFor,
   runGit,
   snapshotWorktreeTree,
@@ -1465,7 +1466,10 @@ ${this.stopArtifacts()}`,
     if (current === null) throw new Stop("engine", "could not snapshot the working tree");
     const diff = changedPathsBetween(this.repoRoot, String(this.run.baseline_tree), current);
     if (diff === null) throw new Stop("engine", "could not diff the working tree against the last accepted step");
-    const setRel = relative(this.repoRoot, this.sessionsDir).replace(/\\/g, "/");
+    // Canonical on both sides: git answers with its own spelling of the
+    // root while the sessions directory is whatever the caller was handed,
+    // and a mismatch here counts the ledger's own file as a step's work.
+    const setRel = repoRelativePath(this.repoRoot, this.sessionsDir);
     const changed = diff.filter((path) => {
       const name = path.split("/").pop() ?? path;
       return !(path.startsWith(`${setRel}/`) && SET_BOOKKEEPING_COMMIT_BASENAMES.includes(name));

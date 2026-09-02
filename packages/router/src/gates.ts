@@ -30,13 +30,14 @@
 // is what an operator reads when a close is refused.
 
 import { existsSync, realpathSync } from "node:fs";
-import { join, relative, resolve } from "node:path";
+import { join, resolve } from "node:path";
 
 import type { RouterConfig } from "./config.ts";
 import { PROJECT_CONFIG_FILENAME, loadConfig, projectRoot } from "./config.ts";
 import { changedPathsBetween, detectOutOfBandWrite } from "./evidence.ts";
 import {
   isMachineStatePath,
+  repoRelativePath,
   repoRootFor,
   runGit,
   snapshotWorktreeTree,
@@ -164,9 +165,19 @@ function matchesPattern(basename: string, pattern: string): boolean {
 }
 
 /** `os.path.relpath`, with the same fall back to the absolute path. */
+/**
+ * The sessions root as the repository sees it, and the reason it is not a
+ * bare `relative()`.
+ *
+ * `root` is git's spelling and `sessionsDir` is the caller's, and Windows
+ * hands out more than one spelling for the same directory. The unresolved
+ * comparison answered `..\alias\docs\sessions` on every CI runner -- whose
+ * `os.tmpdir()` is the 8.3 short form -- so the prefix below never matched
+ * and the ledger's own file counted as the session's work.
+ */
 function sessionsRel(root: string, sessionsDir: string): string {
   try {
-    return relative(root, sessionsDir).replace(/\\/g, "/");
+    return repoRelativePath(root, sessionsDir);
   } catch {
     return sessionsDir;
   }

@@ -5,6 +5,10 @@
 // inside one that does. What is under test is the options the router hands
 // the OS, and those are invisible from outside the call.
 
+import { mkdirSync, mkdtempSync, symlinkSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { basename, dirname, join } from "node:path";
+
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 /**
@@ -28,7 +32,8 @@ const spawnSync = vi.fn(
 
 vi.mock("node:child_process", () => ({ spawnSync }));
 
-const { hiddenSpawn, runGit, runGitBinary } = await import("../src/journal.ts");
+const { canonicalPath, hiddenSpawn, repoRelativePath, runGit, runGitBinary } =
+  await import("../src/journal.ts");
 
 afterEach(() => spawnSync.mockClear());
 
@@ -60,5 +65,32 @@ describe("what the router hands the OS", () => {
     // run rather than only where its window goes.
     const composed = hiddenSpawn({ cwd: "/repo", timeout: 30_000 });
     expect(composed).toEqual({ cwd: "/repo", timeout: 30_000, windowsHide: true });
+  });
+});
+
+describe("one spelling for a path, whoever handed it over", () => {
+  it("answers the same repository-relative path through an alias as through the real one", () => {
+    // Windows hands out more than one spelling for a directory -- the 8.3
+    // short name, a junction, a mapped drive -- and git answers with its
+    // own. Comparing two of them unresolved is what made twelve CI runs
+    // red, and it is not a test-only defect: the same comparison decides a
+    // plan's file envelope and a verifier's read scope.
+    const real = mkdtempSync(join(tmpdir(), "canonical-"));
+    mkdirSync(join(real, "docs", "sessions"), { recursive: true });
+    const alias = join(dirname(real), `${basename(real)}-alias`);
+    symlinkSync(real, alias, process.platform === "win32" ? "junction" : "dir");
+
+    expect(repoRelativePath(real, join(alias, "docs", "sessions"))).toBe("docs/sessions");
+    expect(repoRelativePath(alias, join(real, "docs", "sessions"))).toBe("docs/sessions");
+    expect(canonicalPath(alias)).toBe(canonicalPath(real));
+  });
+
+  it("answers for a path that does not exist rather than refusing", () => {
+    // Half the callers name an output before anything has written it, and a
+    // path nobody has created cannot be canonicalised.
+    const root = mkdtempSync(join(tmpdir(), "canonical-"));
+    expect(repoRelativePath(root, join(root, "not", "written", "yet.json"))).toBe(
+      "not/written/yet.json",
+    );
   });
 });

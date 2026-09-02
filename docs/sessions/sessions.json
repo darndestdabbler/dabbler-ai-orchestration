@@ -1395,13 +1395,42 @@
         "identityProvenance": "direct"
       },
       "verificationVerdict": "VERIFIED",
-      "frameworkVersion": "2.0.0",
       "verification": {
         "rounds": 2,
         "verifierModel": "gpt-5-6-sol",
         "verifierProvider": "openai",
         "transport": "api"
+      },
+      "frameworkVersion": "2.0.0"
+    },
+    {
+      "number": 71,
+      "title": "Green CI, because nothing can be published until it is",
+      "status": "in-progress",
+      "startedAt": "2026-09-01T21:53:07.859000-04:00",
+      "completedAt": null,
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": "VERIFIED",
+      "frameworkVersion": "2.0.0",
+      "verification": {
+        "rounds": 1,
+        "verifierModel": "gpt-5-6-sol",
+        "verifierProvider": "openai",
+        "transport": "api"
       }
+    },
+    {
+      "number": 72,
+      "title": "The trial against what the registry actually serves",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
     }
   ]
 }

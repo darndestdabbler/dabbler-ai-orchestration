@@ -32,7 +32,7 @@
 // truncated or ranged read is not slandered as a transform.
 
 import { mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
-import { dirname, isAbsolute, join, relative, resolve } from "node:path";
+import { dirname, isAbsolute, join, relative } from "node:path";
 
 import {
   type SelectionConfig,
@@ -42,6 +42,7 @@ import {
   scopeIsComplete,
   selectionTestRoots,
 } from "./checks.ts";
+import { canonicalPath } from "./journal.ts";
 import { pythonRepr } from "./pythonJson.ts";
 
 /** The round could look at the tree through tools. */
@@ -257,10 +258,15 @@ export function sessionScope(
  */
 function relativeToRepo(repoRoot: string, path: unknown): string | null {
   try {
-    const root = resolve(repoRoot);
+    // Canonical on both sides, which for a BOUNDARY is the stricter reading
+    // rather than the looser one: a symlink or junction out of the
+    // repository resolves to where it actually goes, and two spellings of
+    // the same directory -- the 8.3 short name Windows hands out, a mapped
+    // drive -- stop reading as "outside" for a path that is inside.
+    const root = canonicalPath(repoRoot);
     const raw = String(path).replace(/\\/g, "/");
     const candidate = isAbsolute(raw) ? raw : join(root, raw);
-    const resolved = resolve(candidate);
+    const resolved = canonicalPath(candidate);
     const step = relative(root, resolved);
     if (step.startsWith("..") || isAbsolute(step)) return null;
     return resolved;
@@ -273,7 +279,7 @@ function relativeToRepo(repoRoot: string, path: unknown): string | null {
 export function relativePosix(repoRoot: string, path: unknown): string | null {
   const resolved = relativeToRepo(repoRoot, path);
   if (resolved === null) return null;
-  return posix(relative(resolve(repoRoot), resolved));
+  return posix(relative(canonicalPath(repoRoot), resolved));
 }
 
 /**
@@ -984,7 +990,7 @@ function confine(
   if (target === null) {
     return [posix(rawPath), null, "the path resolves outside the repository"];
   }
-  const rel = posix(relative(resolve(repoRoot), target));
+  const rel = posix(relative(canonicalPath(repoRoot), target));
   if (grant.writeEnvelope.length > 0) {
     if (!grant.writeEnvelope.includes(rel)) {
       return [

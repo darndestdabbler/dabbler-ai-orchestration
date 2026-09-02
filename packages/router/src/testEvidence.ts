@@ -15,14 +15,21 @@
 
 import { createHash } from "node:crypto";
 import { appendFileSync, mkdirSync, readFileSync } from "node:fs";
-import { dirname, join, relative } from "node:path";
+import { dirname, join } from "node:path";
 
 // One vocabulary for what a suite may declare, imported rather than
 // restated: two lists that disagree make a valid declaration read as a typo
 // in whichever module holds the shorter one. The prefix rule comes from the
 // same place, for the same reason.
 import { SUITE_FIELDS, matchingPrefixes, normaliseRel } from "./checks.ts";
-import { isMachineStatePath, nowIso, platformNewlines, repoRootFor, runGit } from "./journal.ts";
+import {
+  isMachineStatePath,
+  nowIso,
+  platformNewlines,
+  repoRelativePath,
+  repoRootFor,
+  runGit,
+} from "./journal.ts";
 import { LIFECYCLE_WRITTEN_FILES, RUNS_DIRNAME } from "./ledger.ts";
 import { PythonFloat, dumps, pythonFloatRepr, pythonRepr } from "./pythonJson.ts";
 
@@ -299,7 +306,10 @@ function sessionsRelFor(repoRoot: string, sessionsDir?: string | null): string |
   if (sessionsDir === null || sessionsDir === undefined) return null;
   let rel: string;
   try {
-    rel = relative(repoRoot, sessionsDir);
+    // Both sides canonical: the digest decides which paths are the
+    // session's bookkeeping, and two spellings of one directory made it
+    // decide wrongly on every CI runner.
+    rel = repoRelativePath(repoRoot, sessionsDir);
   } catch {
     return null;
   }

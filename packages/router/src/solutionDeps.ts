@@ -23,7 +23,7 @@
 import { existsSync, mkdirSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 
-import { MACHINE_DIRNAME, runGit } from "./journal.ts";
+import { MACHINE_DIRNAME, repoRelativePath, runGit } from "./journal.ts";
 import { loadSchemaFile, schemaFailure } from "./schema/validate.ts";
 import { readText } from "./textfile.ts";
 
@@ -407,7 +407,7 @@ export function readBuildFile(path: string, repoRoot: string): BuildReference[] 
         kind: KIND_NUGET,
         // A project reference that climbs out of this repository is the
         // source-resolution shape, whether or not anyone declared it.
-        fromSource: relative(repoRoot, target).startsWith(".."),
+        fromSource: repoRelativePath(repoRoot, target).startsWith(".."),
       });
     }
     return refs;

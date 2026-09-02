@@ -20,11 +20,11 @@
 // makes rather than a note about it.
 
 import { appendFileSync, existsSync, mkdirSync } from "node:fs";
-import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
+import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 
 import { workingTreeChanges } from "./affected.ts";
 import { hashBytes } from "./evidence.ts";
-import { nowIso, platformNewlines } from "./journal.ts";
+import { nowIso, platformNewlines, repoRelativePath } from "./journal.ts";
 import {
   LIFECYCLE_WRITTEN_FILES,
   atomicWriteJsonIndented,
@@ -483,7 +483,11 @@ export function lifecycleWrittenPaths(
  * escape is what has to be detected rather than the containment.
  */
 function relativeTo(root: string, child: string): string | null {
-  const step = relative(root, child);
+  // Both sides canonical: this decides whether a path is inside the plan's
+  // envelope at all, and Windows spells one directory several ways (an 8.3
+  // short name, a junction, a mapped drive). Two spellings compared raw
+  // answer `..\alias\...`, which reads as "outside" for a path that is not.
+  const step = repoRelativePath(root, child);
   if (step.startsWith("..") || isAbsolute(step)) return null;
   return step;
 }

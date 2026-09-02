@@ -6,8 +6,8 @@
 // answer itself -- including the states the corpus never reaches, which is
 // most of the interesting ones.
 
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { mkdirSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
+import { basename, join } from "node:path";
 
 import { afterAll, describe, expect, it } from "vitest";
 
@@ -16,6 +16,7 @@ import {
   GATE_CHECKS,
   GATE_PUBLISHED_WHEN_RELEASABLE,
   type GateResult,
+  materialWorktreeChanges,
   runGates,
 } from "../src/gates.ts";
 import { snapshotWorktreeTree } from "../src/journal.ts";
@@ -243,6 +244,24 @@ describe("verification_clean", () => {
     }).find((entry) => entry.name === "test_run_fresh");
     expect(row?.inapplicable).toBe(true);
     expect(row?.remediation).toContain("no suite is declared");
+  });
+
+  it("excludes the ledger's own file through a path git spells differently", () => {
+    // Twelve consecutive CI runs, red for this and nothing else. The Windows
+    // runner's `os.tmpdir()` is the 8.3 short form (`C:\Users\RUNNER~1\...`)
+    // while `git rev-parse --show-toplevel` answers with the long one, so the
+    // sessions-relative prefix was `..\alias\docs\sessions`, the bookkeeping
+    // exclusion never matched, and the ledger's own file counted as the
+    // session's work. A junction reproduces the same two spellings here --
+    // this fails exactly as the runner does without the fix, and the machine
+    // that never sees a short path is no longer the only one it works on.
+    const { repo, sessionsDir } = makeSandboxRepo();
+    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
+    expect(materialWorktreeChanges(sessionsDir).paths).toEqual([]);
+
+    const alias = join(repo, "..", `${basename(repo)}-alias`);
+    symlinkSync(repo, alias, process.platform === "win32" ? "junction" : "dir");
+    expect(materialWorktreeChanges(join(alias, "docs", "sessions")).paths).toEqual([]);
   });
 
   it("names the file the operator edits, and never the packaged layer beneath it", () => {

@@ -1,6 +1,35 @@
-# STATUS — 76 closed; the queue is 77–82: seam, libraries, seals+gate, liveness, publish, trial
+# STATUS — 78 closed: 52 back-edges are 4, both baselined; 79 next: seals and the merge gate
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
+
+> ## SESSIONS 77-78 CLOSED, 2026-09-02, both VERIFIED
+>
+> 77: the `journal.runGit` seam, a 15-test contract band, recorded answers
+> for the heaviest repo-builders (240 build sites to 124); the residue is
+> concentrated -- `drive.test.ts` alone held half the suite -- and named
+> in `vitest.config.ts`. 78: the targeted pre-verification run REMOVED
+> whole (phase, verify gates, heal loop; the stage survives read-only);
+> the module knots cut from 52 back-edges to 4, both surviving pairs
+> baselined with reasons in `packages/router/boundary-baseline.json`, and
+> the boundary now holds inside the existing lint control, dynamic imports
+> counted. drive.test halved (647s to 334s) as a side effect.
+>
+> **One defect, on the record for session 80:** at 78's tail the
+> run-of-record and close phases were skipped silently -- two driver
+> processes (a detached check sweep and foreground calls) wrote one run,
+> and the framework has no lease epoch to refuse the stale writer.
+> Forensics in `.dabbler/scratch/s78-skip-forensics/`. The session was
+> completed honestly through the verbs afterwards: a real final-full
+> (582 s), a real close, every gate PASS. This specimen is session 80's
+> strongest argument: instruction leases make it impossible by
+> construction.
+>
+> Language-neutrality (operator, 2026-09-02): everything consumer-facing
+> speaks argv, declared file sets and git -- `dotnet test` and `mvn test`
+> sit where `python -m pytest` sits today, and 78's deletion of targeted
+> selection removed the one per-ecosystem piece. Session 82 gains a .NET
+> trial leg when its entry is amended; the TS-only boundary scanner is
+> self-governance for this repo, not a consumer feature.
 `experiment/verification-pipeline-v3` and `design/solution-decomposition`
 are merged and finished. Earlier handoff text is in `docs/status-archive.md`.
 

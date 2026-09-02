@@ -1,0 +1,291 @@
+name: Publish dabbler-ai-orchestration to VS Code Marketplace
+
+# Triggered on tag push:
+#
+#   - `vsix-vX.Y.Z-rcN` (e.g. `vsix-v0.13.0-rc1`) -> build only, no publish.
+#                         The RC tag exercises the build path and produces an
+#                         inspectable VSIX artifact without claiming a
+#                         Marketplace version slot.
+#   - `vsix-vX.Y.Z`     (e.g. `vsix-v0.13.0`)     -> Marketplace publish,
+#                         gated by the `marketplace` deployment environment.
+#
+# Anything else (e.g. `vsix-v1.0.0rc1`, `vsix-v1.2`, `vsix-vfoo`, plain `v0.1.0`)
+# is rejected by the `classify` job before any artifact build runs. The plain
+# `v*` pattern is reserved for `dabbler-ai-router`'s npm release workflow at
+# `.github/workflows/release.yml`; the `vsix-v*` prefix keeps the two
+# tag-driven release pipelines from colliding in a single repo.
+#
+# Authentication: Entra ID workload identity federation. The marketplace job
+# exchanges its OIDC token for an Azure credential (app client and tenant
+# ids in repository variables; no stored secret in the Marketplace path) and `vsce`
+# publishes with `--azure-credential`. Azure DevOps retires global PATs on
+# 2026-12-01, so the PAT path this file used to carry is gone rather than
+# deprecated-in-place. The Open VSX mirror job is gone with it: nothing
+# was ever published there (the record since set 133 says so), and a
+# never-used path holding the last stored secret was the wrong trade --
+# restore it from history the day a fork audience exists. One-time
+# setup and the per-release checklist:
+# `docs/planning/marketplace-release-process.md`.
+
+on:
+  push:
+    tags:
+      - 'vsix-v*'
+
+permissions:
+  contents: read
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Classify the pushed tag into one of {final, rc, invalid}. Final and
+  # RC tags must match the strict regexes below; anything else fails the
+  # workflow before any build/publish work happens. The classification
+  # outputs gate the downstream publish jobs so they cannot fire for
+  # the wrong tag shape.
+  # ---------------------------------------------------------------------------
+  classify:
+    name: Classify tag
+    runs-on: ubuntu-latest
+    outputs:
+      is_final: ${{ steps.classify.outputs.is_final }}
+      is_rc: ${{ steps.classify.outputs.is_rc }}
+      semver_version: ${{ steps.classify.outputs.semver_version }}
+    steps:
+      - name: Classify ${{ github.ref_name }}
+        id: classify
+        run: |
+          tag="${GITHUB_REF#refs/tags/}"
+          if [[ "$tag" =~ ^vsix-v([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
+            echo "is_final=true"  >> "$GITHUB_OUTPUT"
+            echo "is_rc=false"    >> "$GITHUB_OUTPUT"
+            echo "semver_version=${BASH_REMATCH[1]}" >> "$GITHUB_OUTPUT"
+            echo "Tag $tag classified as FINAL (semver ${BASH_REMATCH[1]})."
+          elif [[ "$tag" =~ ^vsix-v([0-9]+\.[0-9]+\.[0-9]+)-rc([0-9]+)$ ]]; then
+            echo "is_final=false" >> "$GITHUB_OUTPUT"
+            echo "is_rc=true"     >> "$GITHUB_OUTPUT"
+            # vsce / Marketplace use the dashed pre-release form natively
+            # (semver 2.0.0). No PEP 440 normalization step needed.
+            echo "semver_version=${BASH_REMATCH[1]}-rc${BASH_REMATCH[2]}" >> "$GITHUB_OUTPUT"
+            echo "Tag $tag classified as RC (semver ${BASH_REMATCH[1]}-rc${BASH_REMATCH[2]}). RC builds only — no Marketplace publish."
+          else
+            echo "::error::tag $tag does not match the release pattern. Expected vsix-v[0-9]+.[0-9]+.[0-9]+ for finals or vsix-v[0-9]+.[0-9]+.[0-9]+-rcN for release candidates."
+            exit 1
+          fi
+
+  # ---------------------------------------------------------------------------
+  # Build the VSIX. Uploaded as a workflow artifact so the publish job
+  # (and any human reviewing the release) can inspect the same bytes that
+  # go to the Marketplace.
+  # ---------------------------------------------------------------------------
+  build:
+    name: Build VSIX
+    needs: classify
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tools/dabbler-ai-orchestration
+    steps:
+      - name: Checkout tag
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
+        with:
+          fetch-depth: 1
+
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
+        with:
+          node-version: '24'
+
+      # At the ROOT: the extension is an npm workspace member now, so the
+      # one lockfile at the repository root is the one `npm ci` reads.
+      - name: Install dependencies
+        working-directory: .
+        run: npm ci
+
+      - name: Verify tag matches package.json version
+        # Catches the "tagged vsix-v0.13.0 but forgot to bump package.json"
+        # mistake before we waste a build/publish cycle. The check compares
+        # the semver version the classify job derived from the tag
+        # (`vsix-v0.13.0` -> `0.13.0`, `vsix-v0.13.0-rc1` -> `0.13.0-rc1`)
+        # against package.json's `version` field. vsce and the Marketplace
+        # both use semver 2.0.0, so string equality is sufficient.
+        env:
+          EXPECTED_VERSION: ${{ needs.classify.outputs.semver_version }}
+        run: |
+          node <<'JS'
+          const fs = require('fs');
+          const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          const expected = process.env.EXPECTED_VERSION;
+          if (pkg.version !== expected) {
+            console.error(
+              `::error::tag semver version '${expected}' does not match ` +
+              `package.json version '${pkg.version}'`
+            );
+            process.exit(1);
+          }
+          console.log(`tag-vs-package.json check OK: ${expected} == ${pkg.version}`);
+          JS
+
+      - name: Build VSIX
+        # `npm run package` compiles TypeScript via esbuild first, then
+        # runs vsce package. Using `npx vsce package` directly would skip
+        # the compile step and bundle whatever dist/ is committed.
+        run: npm run package
+
+      - name: Verify VSIX filename
+        # Belt-and-suspenders: the produced VSIX's filename must encode the
+        # expected version. vsce derives the filename from package.json, so
+        # this is unlikely to fail given the previous check passed, but it
+        # protects against a vsce-side regression where the produced file
+        # name diverges from the stated version.
+        #
+        # Defensive single-VSIX check: also fail if any *other* VSIX file is
+        # present in the working directory after `vsce package`. The repo
+        # commits the canonical sideload artifact at
+        # `tools/dabbler-ai-orchestration/dabbler-ai-orchestration-<prior>.vsix`,
+        # which is checked into the working tree at tag-checkout time.
+        # Without this check, the upload-artifact glob below would scoop up
+        # the prior committed VSIX alongside the freshly built one, and the
+        # publish step's `head -n1` would pick the lexicographically-first
+        # file — which is the wrong (older) version. (See the v0.12.1
+        # mis-publish on the vsix-v0.13.0 release run for the actual
+        # incident.) This step now rejects any extra VSIX so the wrong-
+        # artifact path can never silently re-occur.
+        env:
+          EXPECTED_VERSION: ${{ needs.classify.outputs.semver_version }}
+        run: |
+          expected_file="dabbler-ai-orchestration-${EXPECTED_VERSION}.vsix"
+          if [[ ! -f "$expected_file" ]]; then
+            echo "::error::expected VSIX file '$expected_file' not found in tools/dabbler-ai-orchestration/. Found:"
+            ls -la *.vsix || true
+            exit 1
+          fi
+          # Count VSIX files in the working directory; only the just-built
+          # one should remain. Any extras indicate a committed sideload
+          # artifact that needs removal before publish.
+          shopt -s nullglob
+          extras=()
+          for f in dabbler-ai-orchestration-*.vsix; do
+            if [[ "$f" != "$expected_file" ]]; then
+              extras+=("$f")
+            fi
+          done
+          if (( ${#extras[@]} > 0 )); then
+            echo "::error::extra VSIX file(s) present in tools/dabbler-ai-orchestration/ alongside '$expected_file': ${extras[*]}. Remove them from the working tree (or update the workflow to clean before vsce package) so the publish step cannot pick the wrong one."
+            exit 1
+          fi
+          echo "VSIX filename check OK: $expected_file is the only VSIX present."
+
+      - name: Upload VSIX artifact
+        # Path is version-pinned to the expected filename rather than a
+        # `*.vsix` glob, so even if the defensive check above fails to
+        # catch an extra VSIX, the artifact upload still ships only the
+        # intended bytes. Pre-the-fix, the glob uploaded both the built
+        # and the pre-committed VSIX, and the publish step picked the
+        # wrong one via `head -n1`.
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: vsix
+          path: tools/dabbler-ai-orchestration/dabbler-ai-orchestration-${{ needs.classify.outputs.semver_version }}.vsix
+          if-no-files-found: error
+          retention-days: 30
+
+  # ---------------------------------------------------------------------------
+  # Release prerequisite (operator-decided 2026-06-12): the tagged
+  # commit must have a SUCCESSFUL `Test` workflow run before anything
+  # publishes. The gate waits while Test is still running for the
+  # commit (push-then-tag-immediately is the normal flow), and fails
+  # loud on a red or absent run — re-run THIS workflow after Test is
+  # green; no tag re-push needed. RC tags are unaffected (build-only).
+  # ---------------------------------------------------------------------------
+  require-green-test:
+    name: Require green Test for the tagged commit
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+      # Set 110 S4: the gate reads each failed job's ANNOTATIONS to tell a
+      # provider fault ("Service Unavailable", "lost communication with the
+      # server") from a real test failure. Those live on the checks API.
+      checks: read
+    steps:
+      - name: Checkout tag (for the local composite action)
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
+        with:
+          fetch-depth: 1
+
+      - name: Require a successful Test run for ${{ github.sha }}
+        uses: ./.github/actions/require-green-test
+        with:
+          sha: ${{ github.sha }}
+          # Operator escape hatch for a GitHub outage. Set the repository
+          # variable to the exact commit being released -- it authorizes that
+          # ONE commit, so a variable left behind cannot silently disable the
+          # gate for every future release, and it never tolerates a genuine
+          # test failure. Clear it after the release.
+          infra-override-sha: ${{ vars.RELEASE_INFRA_OVERRIDE_SHA }}
+          infra-override-reason: ${{ vars.RELEASE_INFRA_OVERRIDE_REASON }}
+
+  # ---------------------------------------------------------------------------
+  # VS Code Marketplace publish — final tags only (`vsix-v[0-9]+.[0-9]+.[0-9]+`).
+  # The classify job already rejected anything else; this `if:` is a
+  # belt-and-suspenders gate. The `marketplace` environment requires a
+  # human reviewer's approval before the job runs.
+  #
+  # Authentication is Entra ID workload identity federation: this job's
+  # OIDC token (`id-token: write`) is exchanged for an Azure credential
+  # through the app registration whose client and tenant ids live in the
+  # repository VARIABLES `AZURE_CLIENT_ID` and `AZURE_TENANT_ID` — ids,
+  # not secrets, safe in variables. No stored credential exists anywhere:
+  # Azure DevOps retires global PATs on 2026-12-01, and federation is the
+  # supported automated path. The one-time Azure setup is
+  # `docs/planning/marketplace-release-process.md`.
+  # ---------------------------------------------------------------------------
+  publish-marketplace:
+    name: Publish to VS Code Marketplace (final releases only)
+    needs: [classify, build, require-green-test]
+    if: ${{ needs.classify.outputs.is_final == 'true' }}
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    environment:
+      name: marketplace
+      url: https://marketplace.visualstudio.com/items?itemName=DarndestDabbler.dabbler-ai-orchestration
+    steps:
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
+        with:
+          node-version: '20'
+
+      - name: Download VSIX artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
+        with:
+          name: vsix
+          path: vsix/
+
+      - name: Azure login (workload identity federation)
+        uses: azure/login@7184910d9eb2b1c5e48f7073824a90609bb9b6d6  # v2, resolved from the live tag
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          allow-no-subscriptions: true
+
+      - name: Publish to VS Code Marketplace
+        env:
+          EXPECTED_VERSION: ${{ needs.classify.outputs.semver_version }}
+        run: |
+          # Version-pinned path: pick the exact VSIX matching the tag, not
+          # whatever lexicographically-first file the download artifact
+          # happens to contain. The pre-fix `ls ... | head -n1` shape
+          # silently mis-published v0.12.1 from the vsix-v0.13.0 run when
+          # a stale committed VSIX was bundled alongside the just-built
+          # one.
+          vsix_file="vsix/dabbler-ai-orchestration-${EXPECTED_VERSION}.vsix"
+          if [[ ! -f "$vsix_file" ]]; then
+            echo "::error::expected VSIX '$vsix_file' not found in downloaded artifact. Files present:"
+            ls -la vsix/ || true
+            exit 1
+          fi
+          echo "Publishing $vsix_file to VS Code Marketplace..."
+          npx --yes @vscode/vsce publish --packagePath "$vsix_file" --azure-credential
+

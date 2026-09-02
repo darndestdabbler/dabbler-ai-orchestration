@@ -106,4 +106,7 @@ try {
   rmSync(real, { recursive: true, force: true });
 }
 
-process.exit(code);
+// `exitCode` rather than `exit()`: exiting while stdout is still draining is
+// what crashed `check:types` on a runner with libuv's `UV_HANDLE_CLOSING`
+// assertion, after it had printed that everything passed.
+process.exitCode = code;

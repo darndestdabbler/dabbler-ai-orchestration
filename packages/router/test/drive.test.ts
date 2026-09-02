@@ -29,7 +29,7 @@ import {
   transcriptPath,
 } from "../src/driver.ts";
 import type { DriverInstruction } from "../src/generated/index.ts";
-import { runGit } from "../src/journal.ts";
+import { canonicalPath, runGit } from "../src/journal.ts";
 import { readDisputes, readRounds } from "../src/ledger.ts";
 import { openDecisions } from "../src/owedDecisions.ts";
 import { buildTaskRows, readSessionState } from "../src/progress.ts";
@@ -1185,13 +1185,22 @@ describe("dabbler session drive", { timeout: 120_000 }, () => {
 
     const { code, out } = await drive(sessionsDir, adapter);
     expect(code).toBe(1);
-    const instruction = join(repo, ".dabbler", "runs", "s1", "driver", "instruction.json");
-    const transcript = readFileSync(transcriptPath(repo, 1, 1), "utf8");
+    // The path the framework resolved, spelled the way the filesystem names
+    // it: this fixture reached its repository by whatever spelling it was
+    // handed, and on a machine whose temp directory has an 8.3 short form
+    // those are two names for one file. What is asserted is WHICH file the
+    // engine was given, not which of its names this test happens to hold.
+    const instruction = canonicalPath(
+      join(repo, ".dabbler", "runs", "s1", "driver", "instruction.json"),
+    );
+    const canonicalise = (text: string): string =>
+      text.split(join(repo, ".dabbler")).join(canonicalPath(join(repo, ".dabbler")));
+    const transcript = canonicalise(readFileSync(transcriptPath(repo, 1, 1), "utf8"));
     expect(transcript).toContain(`argv ${instruction}`);
     expect(transcript).toContain(`env ${instruction}`);
     expect(transcript).toContain("stderr: nothing answered");
     expect(transcript).toMatch(/# exit 0 after \d+s/);
-    expect(out).toContain(`  │ argv ${instruction}`);
+    expect(canonicalise(out)).toContain(`  │ argv ${instruction}`);
     // Nothing was answered, so the plan was asked for again -- and the budget
     // of one refused the second invocation.
     expect(readInstruction(repo, 1)).toMatchObject({ seq: 2, kind: "rejection", step_id: "plan" });

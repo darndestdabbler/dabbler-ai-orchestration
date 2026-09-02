@@ -76,34 +76,43 @@ function stampLock(text: string, version: string): string {
   return `${JSON.stringify(lock, null, 2)}\n`;
 }
 
-const version = canonicalVersion();
-const stamped: { readonly path: string; readonly text: string }[] = [
-  { path: ROUTER_MANIFEST, text: stampVersionField(read(ROUTER_MANIFEST), version) },
-  {
-    path: EXTENSION_MANIFEST,
-    text: stampDependency(stampVersionField(read(EXTENSION_MANIFEST), version), version),
-  },
-  { path: LOCKFILE, text: stampLock(read(LOCKFILE), version) },
-];
+// `process.exitCode`, never `process.exit()`: this runs through `run-ts.mjs`'s
+// dynamic import, and exiting from inside one while stdout is still draining
+// crashes on Windows with libuv's `UV_HANDLE_CLOSING` assertion -- a control
+// that printed its pass and then failed the step.
+function main(): number {
+  const version = canonicalVersion();
+  const stamped: { readonly path: string; readonly text: string }[] = [
+    { path: ROUTER_MANIFEST, text: stampVersionField(read(ROUTER_MANIFEST), version) },
+    {
+      path: EXTENSION_MANIFEST,
+      text: stampDependency(stampVersionField(read(EXTENSION_MANIFEST), version), version),
+    },
+    { path: LOCKFILE, text: stampLock(read(LOCKFILE), version) },
+  ];
 
-const stale = stamped.filter((file) => file.text !== read(file.path));
+  const stale = stamped.filter((file) => file.text !== read(file.path));
 
-if (check) {
-  if (stale.length === 0) {
-    process.stdout.write(`check:version: ${stamped.length} manifest(s) carry ${version}\n`);
-    process.exit(0);
+  if (check) {
+    if (stale.length === 0) {
+      process.stdout.write(`check:version: ${stamped.length} manifest(s) carry ${version}\n`);
+      return 0;
+    }
+    for (const file of stale) process.stderr.write(`  stale      ${file.path}\n`);
+    process.stderr.write(
+      `check:version: ${stale.length} file(s) do not carry ${version}, the version ` +
+        "declared in version.json. Run 'npm run stamp:version'.\n",
+    );
+    return 1;
   }
-  for (const file of stale) process.stderr.write(`  stale      ${file.path}\n`);
-  process.stderr.write(
-    `check:version: ${stale.length} file(s) do not carry ${version}, the version ` +
-      "declared in version.json. Run 'npm run stamp:version'.\n",
+
+  for (const file of stale) writeFileSync(join(repoRoot, file.path), file.text, "utf8");
+  process.stdout.write(
+    stale.length === 0
+      ? `stamp:version: every manifest already carries ${version}\n`
+      : `stamp:version: wrote ${version} into ${stale.map((f) => f.path).join(", ")}\n`,
   );
-  process.exit(1);
+  return 0;
 }
 
-for (const file of stale) writeFileSync(join(repoRoot, file.path), file.text, "utf8");
-process.stdout.write(
-  stale.length === 0
-    ? `stamp:version: every manifest already carries ${version}\n`
-    : `stamp:version: wrote ${version} into ${stale.map((f) => f.path).join(", ")}\n`,
-);
+process.exitCode = main();

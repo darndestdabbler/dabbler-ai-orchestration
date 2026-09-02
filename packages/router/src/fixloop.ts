@@ -100,9 +100,17 @@ export const MAX_FILE_CHARS = 20_000;
  * inside a file. A leading drive letter is part of the token, because a
  * traceback on Windows prints one and a path that stops at the colon is not
  * the path the runner named.
+ *
+ * `~` is in the class because it is in PATHS, not because it is punctuation
+ * a runner might print: every Windows 8.3 short name carries one
+ * (`C:\Users\RUNNER~1\...`), and a frame naming such a path matched only the
+ * tail after the tilde -- which resolves under no repository, is dropped,
+ * and leaves the fix round an envelope with the failing file missing from
+ * it. Invisible on a machine whose paths have no short form, and true of
+ * every CI runner.
  */
 const DRIVE = String.raw`(?:[A-Za-z]:[\\/])?`;
-const TOKEN_BODY = `${DRIVE}[A-Za-z0-9_./\\\\-]*[A-Za-z0-9_-]\\.[A-Za-z0-9_]+`;
+const TOKEN_BODY = `${DRIVE}[A-Za-z0-9_~./\\\\-]*[A-Za-z0-9_~-]\\.[A-Za-z0-9_]+`;
 const TOKEN = new RegExp(`${TOKEN_BODY}(?:::[^\\s,)"']+)?`, "g");
 
 /**

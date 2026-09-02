@@ -1435,6 +1435,26 @@
         "identityProvenance": "direct"
       },
       "verificationVerdict": "VERIFIED",
+      "verification": {
+        "rounds": 1,
+        "verifierModel": "gpt-5-6-sol",
+        "verifierProvider": "openai",
+        "transport": "api"
+      },
+      "frameworkVersion": "2.0.0"
+    },
+    {
+      "number": 73,
+      "title": "Green CI, part three \u2014 the last two, and the tilde",
+      "status": "in-progress",
+      "startedAt": "2026-09-02T00:10:37.337000-04:00",
+      "completedAt": null,
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": "VERIFIED",
       "frameworkVersion": "2.0.0",
       "verification": {
         "rounds": 1,
@@ -1444,7 +1464,7 @@
       }
     },
     {
-      "number": 73,
+      "number": 74,
       "title": "The trial against what the registry actually serves",
       "status": "not-started",
       "startedAt": null,

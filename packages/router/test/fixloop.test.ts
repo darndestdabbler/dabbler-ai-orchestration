@@ -1,8 +1,8 @@
 // The complete suite and the fix loop a red one opens: the envelope is the
 // feature, and it is a boundary rather than a request.
 
-import { mkdirSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { mkdirSync, symlinkSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -215,6 +215,23 @@ describe("the envelope", () => {
     ]) {
       expect(implicatedPaths(repo, `${frame}\n`), frame).toEqual(["app.py"]);
     }
+  });
+
+  it("implicates a file whose path carries a tilde, as every short name does", () => {
+    // `C:\Users\RUNNER~1\...` is what Windows hands a process whose temp
+    // path has an 8.3 short form -- which is every CI runner and no
+    // developer's machine. The token class had no `~`, so the frame matched
+    // from the digit after it, resolved under no repository and was dropped:
+    // a fix round handed an envelope with the failing file missing.
+    const repo = makeRepo();
+    const alias = join(dirname(repo), "SHORT~1");
+    symlinkSync(repo, alias, process.platform === "win32" ? "junction" : "dir");
+    const aliasPosix = alias.split("\\").join("/");
+
+    expect(
+      implicatedPaths(repo, `File "${aliasPosix}/app.py", line 4, in add\n`),
+    ).toEqual(["app.py"]);
+    expect(implicatedPaths(repo, `${aliasPosix}/app.py:4: in add\n`)).toEqual(["app.py"]);
   });
 
   it("does not implicate a file the runner merely mentions", () => {

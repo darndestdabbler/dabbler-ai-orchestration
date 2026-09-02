@@ -1426,9 +1426,9 @@
     {
       "number": 72,
       "title": "Green CI, part two \u2014 what the first fix did not reach",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-01T22:59:07.328000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-09-01T23:53:07.260000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

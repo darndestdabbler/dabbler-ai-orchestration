@@ -2961,7 +2961,7 @@ demonstration.*
 
 ---
 
-### Session 65 of 74: The papercuts the trial found
+### Session 65 of 75: The papercuts the trial found
 
 1. Register; declare `--not-releasable`.
 2. **The cursor.** `spawnCheck` and `spawnProgram` in `checks.ts` — the
@@ -3010,7 +3010,7 @@ demonstration.*
 
 ---
 
-### Session 66 of 74: The publish phase, CI's first clean run, and the spinner
+### Session 66 of 75: The publish phase, CI's first clean run, and the spinner
 
 *Widened from "the publish phase" on the operator's call, 2026-09-01: a
 miscellaneous session, because three of the four things in it are small and
@@ -3119,7 +3119,7 @@ something a published framework would otherwise ship with.*
 
 ---
 
-### Session 67 of 74: The watcher, and the driver's blind spots
+### Session 67 of 75: The watcher, and the driver's blind spots
 
 *Planned 2026-09-01 from session 66's own conduct. Three of its four
 framework findings are the same root: the driver treating an exit code as
@@ -3197,7 +3197,7 @@ belonging to no step. It is session 68's, and the reason is recorded there.
 
 ---
 
-### Session 68 of 74: The logic tree, harvested and held to the code
+### Session 68 of 75: The logic tree, harvested and held to the code
 
 *The harvest runs outside this repository, beside it, because a session
 was in flight when it started and this repository's close checks for a
@@ -3257,7 +3257,7 @@ controls and the verifier. It replaces none of them.*
 
 ---
 
-### Session 69 of 74: The round cap stops being typeable, and the Solution Explorer goes multi-repository
+### Session 69 of 75: The round cap stops being typeable, and the Solution Explorer goes multi-repository
 
 *Mostly the largest unaddressed item from the csv-model feedback (item 8),
 and the answer to the operator's own sentence: "once I completed the CSV
@@ -3328,7 +3328,7 @@ build files; `usedBy` is derived and never declared, deliberately.
 
 ---
 
-### Session 70 of 74: The half of the trial that needs a published router
+### Session 70 of 75: The half of the trial that needs a published router
 
 > **Amended by session 70 itself, 2026-09-01, and the section below is left
 > as it was written.** What it asks for could not run: nothing is published
@@ -3445,7 +3445,7 @@ the reason to do it once testing is finished rather than to unblock a row.
 
 ---
 
-### Session 71 of 74: Green CI, because nothing can be published until it is
+### Session 71 of 75: Green CI, because nothing can be published until it is
 
 *Written by session 70 on the operator's call, 2026-09-01, and numbered by
 this doc-only commit immediately after that session closed — the same way
@@ -3486,7 +3486,7 @@ form and red on every runner.
 
 ---
 
-### Session 72 of 74: Green CI, part two — what the first fix did not reach
+### Session 72 of 75: Green CI, part two — what the first fix did not reach
 
 *Added 2026-09-02, after session 71 landed and its `Test` run was still red.
 71 was right and incomplete: the `sessions.json` failures it was written for
@@ -3531,7 +3531,7 @@ fact the suite assumed rather than declared.**
 
 ---
 
-### Session 73 of 74: Green CI, part three — the last two, and the tilde
+### Session 73 of 75: Green CI, part three — the last two, and the tilde
 
 *Added 2026-09-02, after session 72's `Test` run came back with **two**
 failures out of 1263, down from around fifty. Both are named here because
@@ -3565,7 +3565,59 @@ last two sessions were about.*
 
 ---
 
-### Session 74 of 74: The trial against what the registry actually serves
+### Session 74 of 75: The extension is the distribution, and the number is 2.0.0
+
+*The operator's call, 2026-09-02, made while the npm publish was failing on
+its third first-run defect — and the right call, because the premise had
+died and nobody had noticed. **npm was never needed.** The extension bundles
+the router: `esbuild.js` emits `dist/dabbler.cjs` beside `dist/extension.js`,
+and the terminal shim points at it; the `dabbler` command that has driven
+every session since the port resolves to the installed VSIX and never to a
+registry. What npm bought was `npm i -g dabbler-ai-router` on a machine with
+no extension, which nothing in this repository does and nobody has asked
+for. In v1 the PyPI dependency was real — a Python CLI had no other delivery
+route — and the port removed it. Continuing was following a plan whose
+reason had expired.*
+
+*And the number was wrong twice over. The Marketplace serves **1.0.4**, from
+2026-08-18, with twenty installs; nothing 2.x has ever been published
+anywhere. Rolling out as 2.8.0 would tell a reader that seven minor releases
+happened since. They did not: those numbers were bookkeeping between two
+people. **2.0.0** is greater than 1.0.4, which is all the Marketplace
+requires, and it says the true thing — one rewrite, Python to TypeScript.*
+
+1. Register; declare `--not-releasable`: this session prepares a release and
+   does not make one.
+2. **2.0.0, from the one source.** `version.json` becomes 2.0.0 and
+   `npm run stamp:version` writes it into both manifests and the lock.
+   Record the decision, with what the Marketplace actually serves in it, so
+   the ledger rows that say `2.8.0` for sessions 70–73 are explained rather
+   than merely contradicted.
+3. **Retire npm.** `.github/workflows/release.yml` goes: a workflow that
+   fires on `v*` tags and publishes to a registry nobody publishes to is a
+   trap, not an option held open. `tagsFor` stops emitting a router tag, so
+   a release is ONE tag, `vsix-v<version>`; the publication brief stops
+   describing an npm half and stops promising `npm i -g`; and the
+   router-before-extension ordering — with its wait for npm to serve the
+   router — goes with it, because there is no longer a half that can be
+   missing.
+4. **`--verify-install` asks the Marketplace**, which is now the registry
+   this product has. The check keeps its property: it asks what is actually
+   served rather than trusting a job's status.
+5. **Every document that says `npm i -g dabbler-ai-router`** — `AGENTS.md`,
+   `docs/quick-start.md`, the trial script — says instead what is true: the
+   CLI ships inside the extension and the shim puts it on `PATH`. csv-model
+   feedback item 5 was never a defect in the product; it was a wrong
+   instruction, and it closes as one.
+6. Affected; verify; full suite as `final-full`; close.
+
+**What is then owed by the operator, and only them:** a `VSCE_PAT` secret —
+an Azure DevOps token scoped to *Marketplace (publish)*. This repository has
+no secrets at all today, so the Marketplace half will refuse until it does.
+
+---
+
+### Session 75 of 75: The trial against what the Marketplace actually serves
 
 *Added by session 70, on the rule session 50 set: a trial with no route to
 fix what it finds is a demonstration. Session 70 found its own precondition
@@ -3578,22 +3630,22 @@ changes the version can never be the session that tags it**. That is
 `dabbler.yaml`'s own model — a session prepares a release, a tag push makes
 it — rather than a defect, and this session is where the other half runs.*
 
-**Precondition, and the only one:** the operator has answered the
-`publication` brief on the tree session 70 landed, the framework has pushed
-`v2.8.0` and `vsix-v2.8.0`, and CI's tag-driven workflows have published
-both. The answer is the operator's alone; publishing cannot be recalled.
+**Precondition, and the only one:** `vsix-v2.0.0` is pushed and the
+Marketplace serves it. That needs the operator twice -- the answer to the
+publication brief, which is theirs alone because publishing cannot be
+recalled, and a `VSCE_PAT` secret this repository does not have yet.
 
 1. Register; declare `--not-releasable`. This repository declares no
-   `packaging` block on purpose — its two artifacts go out through the
-   tag-driven pipelines, so a releasable session here would fail packaging
+   `packaging` block on purpose — its one artifact goes out through the
+   tag-driven pipeline, so a releasable session here would fail packaging
    for a release it did not make.
 2. **The steps that touch the registry come FIRST, before any edit**, which
    is the same constraint session 70 hit from the other side: a step that
    writes a file dirties the tree, and `dabbler release` will not run
    against a dirty one. `dabbler release --verify-install` is a step
-   **check** rather than something reported in prose — the real
-   `npm i -g dabbler-ai-router` from the public registry into a throwaway
-   prefix, exit 0 or the step fails. The install IS the record.
+   **check** rather than something reported in prose: it asks the
+   Marketplace what it actually serves, exit 0 or the step fails. What is
+   served IS the record, rather than a job's status.
 3. **Acceptance criteria 1 and 2**, performed by the operator from a clean
    VS Code profile with the extension installed from the Marketplace and a
    fresh clone of `csv-model` open, answering from visible UI only. The
@@ -3603,8 +3655,10 @@ both. The answer is the operator's alone; publishing cannot be recalled.
    the three location states, and the Work Explorer showing completed,
    current and planned sessions with the in-flight session's tasks moving.
 4. **Close item 5 of the feedback audit on the verification**, not on a
-   session number: `npm i -g dabbler-ai-router` fails is the one of the nine
-   that no test can hold, and the recorded install is what closes it.
+   session number. The item said `npm i -g dabbler-ai-router` fails; session
+   74 answers that it was a wrong instruction rather than a broken product,
+   and what closes it here is the Marketplace serving the extension the CLI
+   ships inside.
 5. Record what the trial found in `docs/field-trial-70.md`, and amend the
    plan again with anything that needs a session of its own. A finding that
    survives being acted on is worth more than one that was written down.

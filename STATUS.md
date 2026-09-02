@@ -1,70 +1,66 @@
-# STATUS — 73 of 74 closed. CI IS GREEN. One command from you publishes 2.8.0; then 74 is the trial
+# STATUS — 73 of 75 closed. npm is retired: the extension is the distribution, at 2.0.0. Next: 74
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
 `experiment/verification-pipeline-v3` and `design/solution-decomposition`
 are merged and finished. Earlier handoff text is in `docs/status-archive.md`.
 
-> ## WAITING ON YOU: two npm/Marketplace account settings. Nothing else.
+> ## THE DISTRIBUTION CHANGED, 2026-09-02: npm is retired
 >
-> **The publication is authorised and half-executed.** You answered
-> `publication` with `publish` on 2026-09-02; `Test` is green; `v2.8.0` is
-> tagged and pushed; the tarball builds; the provenance statement is signed
-> and in the sigstore transparency log. **Nothing is published**, because the
-> registry refused the upload itself:
+> **The operator's call, made while the npm publish was failing on its third
+> first-run defect, and it was the right one: the premise had died and
+> nobody had noticed.** npm was never needed. The extension BUNDLES the
+> router — `esbuild.js` emits `dist/dabbler.cjs` beside `dist/extension.js`,
+> and the terminal shim points at it — so the `dabbler` command that has
+> driven every session since the port resolves to the installed VSIX and
+> never to a registry. What npm bought was `npm i -g dabbler-ai-router` on a
+> machine with no extension, which nothing here does. In v1 the PyPI
+> dependency was real, because a Python CLI had no other delivery route; the
+> port removed it, and continuing was following a plan whose reason had
+> expired.
+>
+> **And the number is 2.0.0, not 2.8.0.** The Marketplace serves **1.0.4**
+> (2026-08-18, twenty installs) and nothing 2.x has ever been published
+> anywhere. 2.8.0 would tell a reader that seven minor releases happened
+> since 1.0.4; they were bookkeeping between two people. 2.0.0 is greater
+> than 1.0.4, which is all the Marketplace requires, and it says the true
+> thing: one rewrite.
+>
+> **Session 74 does it** — `version.json` to 2.0.0 and stamped everywhere,
+> `release.yml` deleted, `tagsFor` down to one tag (`vsix-v<version>`), the
+> publication brief rewritten without an npm half, `--verify-install` asking
+> the Marketplace instead of the registry, and every document that says `npm
+> i -g dabbler-ai-router` corrected. csv-model feedback item 5 was never a
+> defect in the product: it was a wrong instruction. **Session 75 is then
+> the trial**, against what the Marketplace actually serves.
+>
+> **Still owed by you, and only you:** a `VSCE_PAT` secret — an Azure DevOps
+> token scoped to *Marketplace (publish)*. `gh secret list` shows this
+> repository has no secrets at all, so the Marketplace publish will refuse
+> until it does. You chose 2.0.0 as a **stable** release.
+>
+> **The npm attempt left nothing behind.** No version was ever published;
+> `v2.8.0` is deleted. Three workflow defects were found and fixed on the
+> way, each only reachable after the one before it, and they are recorded
+> here because the same shapes wait in any first publish: `npm pack` needs
+> its `--pack-destination` to exist; `npm publish dist/x.tgz` resolves as a
+> package SPEC and tried `git ls-remote ssh://git@github.com/dist/…tgz.git`,
+> so the path needs a leading `./`; `--provenance` on an unseen package
+> requires an explicit `--access public`. The fourth was not a defect at
+> all — OIDC trusted publishing authorises against settings that only exist
+> for a package that exists:
 >
 > ```
 > npm error 404 Not Found - PUT https://registry.npmjs.org/dabbler-ai-router
 > npm error 404  ... could not be found or you do not have permission
 > ```
 >
-> **That is the chicken-and-egg this workflow was always going to hit once.**
-> It publishes over OIDC with no stored token, and OIDC authorises against a
-> *trusted publisher* configured **in the package's npm settings** — settings
-> that only exist for a package that exists. `dabbler-ai-router` has never
-> been published, so there is nothing to attach them to. The name is free
-> (`GET` returns 404), so nobody has taken it.
->
-> Three ways out, and all of them are yours because all of them are
-> credentials:
->
-> 1. **Pre-register the trusted publisher** on npmjs.com for the name
->    `dabbler-ai-router` (repository `darndestdabbler/dabbler-ai-orchestration`,
->    workflow `release.yml`), if your npm account offers it for a name that
->    does not exist yet. Cleanest: no token ever exists, and 2.8.0 keeps its
->    provenance.
-> 2. **Publish 2.8.0 once by hand** — `npm login`, then
->    `npm publish --access public` from `packages/router` — which creates the
->    package; configure trusted publishing afterwards and every later release
->    goes through CI. Cost: this one version has no CI provenance.
-> 3. **Store a granular npm token** as the repo secret the workflow would
->    read for a first publish, then delete it. The workflow was written
->    deliberately to avoid a long-lived credential, so this is the last
->    resort.
->
-> **When npm is settled, the cheapest retry is `gh run rerun 33605558413
-> --failed`** — the tag, the Test gate and the built tarball are all still
-> good, so only the publish job re-runs. Then `dabbler release` again: it
-> waits for npm to serve the router and pushes `vsix-v2.8.0`.
->
-> **The Marketplace half needs a second thing**: `gh secret list` shows this
-> repository has **no secrets at all**, so `VSCE_PAT` — an Azure DevOps PAT
-> scoped to *Marketplace (publish)* — is not there and `publish-vscode.yml`
-> will fail the same way when its tag lands.
->
-> **Three workflow defects were found and fixed on the way**, each only
-> reachable after the one before it, because this release path had never
-> executed end to end: `npm pack` needs its `--pack-destination` to exist;
-> `npm publish dist/x.tgz` resolves as a package SPEC and tried
-> `git ls-remote ssh://git@github.com/dist/...tgz.git`, so the path needs a
-> leading `./`; and `--provenance` on a package npm has never seen requires
-> an explicit `--access public`. Nothing was published on any attempt, so no
-> version is burned and `v2.8.0` was simply moved each time.
->
-> After npm serves the router, **session 74 is the trial**:
-> `dabbler release --verify-install` as a step check, then acceptance
-> criteria 1 and 2 from a clean profile, then item 5 of the audit closes on
-> the recorded verification. `docs/field-trial-70.md` holds the expected
-> answers, written before the run.
+> It was always going to hit that once, and the answer is not to solve it:
+> the product does not need the registry it was asking permission from.
+> **Session 75 is the trial**: `dabbler release --verify-install` as a step
+> check -- asking the Marketplace what it serves -- then acceptance criteria
+> 1 and 2 from a clean profile, then item 5 of the audit closes on that
+> verification. `docs/field-trial-70.md` holds the expected answers, written
+> before the run.
 
 > **Session 73 — the last two CI failures, and the tilde. CLOSED `VERIFIED`
 > in one round, 2026-09-02 (`9a96d9c3`).** A `~` was not in `fixloop`'s

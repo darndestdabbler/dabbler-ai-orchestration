@@ -1,7 +1,25 @@
-# STATUS — 79 closed: seals, sentinels and the dual-mode gate exist; 80 next: the liveness guardian
+# STATUS — 80 closed: the loop left everyone's attention span; 81 next: publishing without a secret
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
 
+> ## SESSION 80 CLOSED, 2026-09-02, VERIFIED at adjudication (the second 3-0)
+>
+> The liveness guardian, claude-code tier: lease epochs on the run record
+> with compare-and-swap saves under the lifecycle lock, failing CLOSED on
+> contention with a supervision row; stale reports refused with the
+> outstanding seq in the words; the watcher split into acknowledgment,
+> liveness and progress clocks, each reading carrying a recommended
+> action, spinning jobs escalating at a named five-threshold constant;
+> supervision.jsonl as the append-only spend-and-refusal record;
+> `dabbler session run` driving a whole session in one command with
+> watcher-only degradation; the Claude Code stop gate installed by
+> bootstrap, additively, only under a Claude Code host. This session's
+> own tail exercised 79's machinery live: 69 seals beside the run of
+> record and the local gate receipt at the land. The boundary control
+> caught its own builder mid-session (a dynamic-import knot from the
+> first draft of session run) and the fix moved the code rather than
+> baselining the edge.
+>
 > ## SESSION 79 CLOSED, 2026-09-02, VERIFIED at adjudication
 >
 > Boundaries declared (ten contexts, every module a member, both

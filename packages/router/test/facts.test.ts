@@ -39,6 +39,13 @@ import {
 import { snapshotWorktreeTree } from "../src/journal.ts";
 import { git, makeSeededRepo } from "./support/fixtures.ts";
 
+// KEPT REAL, deliberately: every describe here has git's or a child
+// process's behavior as its subject -- evidence bundles over real diffs
+// (untracked, deleted, inlined), changed-line counts parsed from real
+// output, controls that really spawn and really time out. Recorded answers
+// would restate the expected output beside itself and could never fail. The
+// repositories are the cheap seeded kind, and the spawns ARE the test.
+
 const CAP_ENV = "AI_ROUTER_VERIFY_MAX_EVIDENCE_CHARS";
 
 afterEach(() => {

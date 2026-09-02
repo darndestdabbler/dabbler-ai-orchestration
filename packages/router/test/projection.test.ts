@@ -12,7 +12,6 @@ import { dirname, join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 
 import { writeRun } from "../src/driver.ts";
-import { snapshotWorktreeTree } from "../src/journal.ts";
 import {
   appendRound,
   roundsPath,
@@ -41,13 +40,84 @@ import {
   verificationCap,
 } from "../src/progress.ts";
 import { declareSessionTask, flipStateToClosed, registerSessionStart } from "../src/writers.ts";
-import { git, makeSandboxRepo, makeTempDir, removeTempDirs } from "./support/fixtures.ts";
+import { makeTempDir, removeTempDirs } from "./support/fixtures.ts";
+import { gitAnswers } from "./support/gitAnswers.ts";
 
 afterAll(removeTempDirs);
+
+// What the git sandbox provided and these tests consume: two paths and a
+// handful of seeded files. The subjects under test ask git nothing -- the
+// fold reads state files -- so the repository here is directories and
+// writes, not processes. Tree identifiers in ledger rows are identifiers,
+// not checkouts: a literal serves exactly as well as a snapshot did.
+const SEED: Record<string, string> = {
+  "docs/sessions/session-plan.md":
+    "### Session 1 of 2: First things\n1. Register.\n2. **Build the widget.** Make it real.\n" +
+    "3. Cross-provider verification.\n4. Close-out.\n\n" +
+    "### Session 2 of 2: Second things\n1. Register.\n2. Polish it.\n",
+  "dabbler.yaml":
+    "schema_version: 1\n\ntesting:\n  suites:\n    - name: unit\n" +
+    "      command: python -m pytest\n      expensive: true\n" +
+    "      covers:\n        - src/\n        - tests/\n" +
+    "      test_roots:\n        - tests\n      test_glob: \"test_*.py\"\n\n" +
+    "  selection:\n    repo_wide:\n      - dabbler.yaml\n" +
+    "    smoke:\n      - tests/test_widget.py\n    rules:\n" +
+    "      - when: src/widget.py\n        select:\n          - tests/test_widget.py\n",
+  "src/widget.py": "def widget():\n    return 1\n",
+  "tests/test_widget.py": "def test_widget():\n    assert True\n",
+  ".gitignore": ".dabbler/\n",
+};
+
+function makeStateDirs(): { repo: string; sessionsDir: string } {
+  const repo = makeTempDir();
+  for (const [rel, text] of Object.entries(SEED)) {
+    const path = join(repo, ...rel.split("/"));
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, text, "utf8");
+  }
+  // The two questions state writers ask git here, answered from the record:
+  // where the toplevel is (git's spelling: forward slashes), and that the
+  // worktree is clean -- the contract band pins both shapes.
+  gitAnswers([
+    [["rev-parse", "--show-toplevel"], { stdout: repo.split("\\").join("/") }],
+    [["status", "--porcelain", "-uall"], { stdout: "" }],
+    [["status", "--porcelain"], { stdout: "" }],
+    // The view anchors rounds by asking whether the recorded tree exists;
+    // in the sandbox every snapshot was a real object, so the answer was
+    // always yes. Same answer, now on the record.
+    [(args) => args[0] === "cat-file" && args[1] === "-e", { code: 0 }],
+    // The ledger anchors a round by committing its tree and pointing a
+    // dabbler ref at it; the contract band pins both verbs' real shapes.
+    [["commit-tree"], { stdout: "c".repeat(40) }],
+    [["update-ref"], { code: 0 }],
+  ]);
+  return { repo, sessionsDir: join(repo, "docs", "sessions") };
+}
+
+/** A 40-hex tree identifier: what a ledger row carries, without a checkout. */
+function fakeTree(fill: string): string {
+  return fill.repeat(40);
+}
+
+// A real-time stamp, and then a spin until the clock moves: every event in
+// a test lands on its own millisecond, the way sandbox spawn latency used
+// to arrange without saying so. Future-dating instead would fall OUTSIDE
+// the window when the close stamps real time; ties fall on the coin.
+function nextStamp(): string {
+  const stamp = Date.now();
+  while (Date.now() <= stamp) {
+    // spin: the next stamp, whoever takes it, is strictly later
+  }
+  return new Date(stamp).toISOString();
+}
 
 /** Register session 1, which is the whole of what `dabbler session start` writes. */
 function start(sessionsDir: string): void {
   registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
+  const stamped = Date.now();
+  while (Date.now() <= stamped) {
+    // spin: whatever is recorded next is strictly after the start stamp
+  }
 }
 
 /** A schema-valid step event; the fold is what the tests are about. */
@@ -61,8 +131,8 @@ function recordRound(
     verifier_provider: "openai",
     findings: [],
     cost_usd: 0.05,
-    completion_tree: snapshotWorktreeTree(repo),
-    recorded_at: new Date().toISOString(),
+    completion_tree: fakeTree("a"),
+    recorded_at: nextStamp(),
     ...row,
   });
 }
@@ -201,7 +271,7 @@ describe("healing a whole ledger's titles", () => {
 
 describe("the source of a projection's sessions", () => {
   it("reads the plan when nothing has ever run here", () => {
-    const { repo, sessionsDir } = makeSandboxRepo();
+    const { repo, sessionsDir } = makeStateDirs();
     void repo;
     expect(ledgerExists(sessionsDir)).toBe(false);
     expect(sessionsFromPlan(sessionsDir)).toHaveLength(2);
@@ -213,7 +283,7 @@ describe("the source of a projection's sessions", () => {
   });
 
   it("carries an open decision's whole brief, options and consequences included", () => {
-    const { repo, sessionsDir } = makeSandboxRepo();
+    const { repo, sessionsDir } = makeStateDirs();
     raiseOwed(repo, {
       id: "driver-stop-s1",
       decisionClass: CLASS_VALUE_TRADEOFF,
@@ -248,7 +318,7 @@ describe("the source of a projection's sessions", () => {
   });
 
   it("reads the ledger once one exists", () => {
-    const { sessionsDir } = makeSandboxRepo();
+    const { sessionsDir } = makeStateDirs();
     start(sessionsDir);
     const repository = buildProjection(sessionsDir)["repository"] as Record<
       string,
@@ -261,7 +331,7 @@ describe("the source of a projection's sessions", () => {
   it("calls an unreadable ledger a fault rather than a fresh repository", () => {
     // Answering a broken record with the plan would report a fresh
     // repository where there is a record that needs looking at.
-    const { sessionsDir } = makeSandboxRepo();
+    const { sessionsDir } = makeStateDirs();
     writeFileSync(join(sessionsDir, "sessions.json"), "{ not json", "utf8");
     const repository = buildProjection(sessionsDir)["repository"] as Record<
       string,
@@ -273,7 +343,7 @@ describe("the source of a projection's sessions", () => {
   });
 
   it("reports a record whose invariants do not hold instead of throwing", () => {
-    const { sessionsDir } = makeSandboxRepo();
+    const { sessionsDir } = makeStateDirs();
     writeFileSync(
       join(sessionsDir, "sessions.json"),
       JSON.stringify({
@@ -293,7 +363,7 @@ describe("the source of a projection's sessions", () => {
   });
 
   it("renders a moved session under the plan's title", () => {
-    const { sessionsDir } = makeSandboxRepo();
+    const { sessionsDir } = makeStateDirs();
     start(sessionsDir);
     writeFileSync(
       join(sessionsDir, "session-plan.md"),
@@ -310,7 +380,7 @@ describe("the source of a projection's sessions", () => {
   });
 
   it("names each session beside its number and gives it an icon key", () => {
-    const { sessionsDir } = makeSandboxRepo();
+    const { sessionsDir } = makeStateDirs();
     start(sessionsDir);
     const sessions = buildProjection(sessionsDir)["sessions"] as Record<
       string,
@@ -341,7 +411,7 @@ describe("the task rows", () => {
         command: "python -m pytest",
         outcome: "passed",
         surfaceDigest: "0".repeat(12),
-        recordedAt: new Date().toISOString(),
+        recordedAt: nextStamp(),
         stage,
         ...extra,
       }) + "\n",
@@ -362,7 +432,7 @@ describe("the task rows", () => {
     // The rows are the lifecycle's, not the plan's: nothing is seeded from
     // prose, and `session start` writing `startedAt` is what finishes the
     // first one. The second is open because it is the first not done.
-    const { sessionsDir } = makeSandboxRepo();
+    const { sessionsDir } = makeStateDirs();
     start(sessionsDir);
     const rows = buildTaskRows(sessionsDir, 1);
     expect(rows.map((row) => row["stepId"])).toEqual([
@@ -388,7 +458,7 @@ describe("the task rows", () => {
   });
 
   it("the declaration ends Declare and opens Work", () => {
-    const { sessionsDir } = makeSandboxRepo();
+    const { sessionsDir } = makeStateDirs();
     start(sessionsDir);
     declareSessionTask(sessionsDir, { sessionNumber: 1, task: "Do it.", releasable: false });
     expect(states(sessionsDir).slice(0, 3)).toEqual(["done", "done", "in flight"]);
@@ -400,7 +470,7 @@ describe("the task rows", () => {
     // A row stamped with another session is not this one's; a row stamped
     // with none is attributed by the session's window, which is where every
     // row written before the stamp existed lands.
-    const { repo, sessionsDir } = makeSandboxRepo();
+    const { repo, sessionsDir } = makeStateDirs();
     start(sessionsDir);
     declareSessionTask(sessionsDir, { sessionNumber: 1, task: "Do it.", releasable: false });
     fileRun(repo, "preverify-targeted", { sessionNumber: 2 });
@@ -411,7 +481,7 @@ describe("the task rows", () => {
   });
 
   it("a blocking round keeps Verify open with the round in its words; a clean one ends it", () => {
-    const { repo, sessionsDir } = makeSandboxRepo();
+    const { repo, sessionsDir } = makeStateDirs();
     start(sessionsDir);
     declareSessionTask(sessionsDir, { sessionNumber: 1, task: "Do it.", releasable: false });
     fileRun(repo, "preverify-targeted");
@@ -423,7 +493,7 @@ describe("the task rows", () => {
       round: 2,
       verdict: "VERIFIED",
       blocking: false,
-      previous_tree: snapshotWorktreeTree(repo),
+      previous_tree: fakeTree("b"),
     });
     rows = buildTaskRows(sessionsDir, 1);
     expect(rows[3]["state"]).toBe("done");
@@ -431,7 +501,7 @@ describe("the task rows", () => {
   });
 
   it("verification that stopped at the cap is blocked on the cancelled glyph, and nothing is open", () => {
-    const { repo, sessionsDir } = makeSandboxRepo();
+    const { repo, sessionsDir } = makeStateDirs();
     start(sessionsDir);
     declareSessionTask(sessionsDir, { sessionNumber: 1, task: "Do it.", releasable: false });
     fileRun(repo, "preverify-targeted");
@@ -441,7 +511,7 @@ describe("the task rows", () => {
       verdict: "REMEDIATED_AT_CAP",
       blocking: false,
       type: "remediated_at_cap",
-      previous_tree: snapshotWorktreeTree(repo),
+      previous_tree: fakeTree("b"),
       remediated: {
         reviewed_round: 1,
         findings: [{ description: "fixed", severity: "major" }],
@@ -456,7 +526,7 @@ describe("the task rows", () => {
   });
 
   it("the run of record counts only after the verdict, and the close ends the list", () => {
-    const { repo, sessionsDir } = makeSandboxRepo();
+    const { repo, sessionsDir } = makeStateDirs();
     start(sessionsDir);
     declareSessionTask(sessionsDir, { sessionNumber: 1, task: "Do it.", releasable: false });
     fileRun(repo, "preverify-targeted");
@@ -473,12 +543,12 @@ describe("the task rows", () => {
   });
 
   it("has no tasks and no refusal in a repository nothing has run in", () => {
-    const { sessionsDir } = makeSandboxRepo();
+    const { sessionsDir } = makeStateDirs();
     expect(buildTaskRows(sessionsDir, 1)).toEqual([]);
   });
 
   it("reads a run record carrying a member it has never heard of, and still refuses a damaged one", () => {
-    const { repo, sessionsDir } = makeSandboxRepo();
+    const { repo, sessionsDir } = makeStateDirs();
     start(sessionsDir);
     declareSessionTask(sessionsDir, { sessionNumber: 1, task: "Do it.", releasable: false });
     const run = {
@@ -525,7 +595,7 @@ describe("the task rows", () => {
   });
 
   it("reaches the projection, which is where the tree reads them", () => {
-    const { sessionsDir } = makeSandboxRepo();
+    const { sessionsDir } = makeStateDirs();
     start(sessionsDir);
     const sessions = buildProjection(sessionsDir)["sessions"] as Record<
       string,
@@ -537,14 +607,14 @@ describe("the task rows", () => {
   });
 
   it("refuses rather than rendering an activity log it could not read", () => {
-    const { sessionsDir } = makeSandboxRepo();
+    const { sessionsDir } = makeStateDirs();
     start(sessionsDir);
     writeFileSync(join(sessionsDir, "activity-log.json"), "{ not json\n", "utf8");
     expect(() => buildTaskRows(sessionsDir, 1)).toThrow(TaskRowsRefused);
   });
 
   it("carries the refusal on the session rather than as an empty task list", () => {
-    const { sessionsDir } = makeSandboxRepo();
+    const { sessionsDir } = makeStateDirs();
     start(sessionsDir);
     writeFileSync(join(sessionsDir, "activity-log.json"), "{ not json\n", "utf8");
     const sessions = buildProjection(sessionsDir)["sessions"] as Record<
@@ -559,12 +629,12 @@ describe("the task rows", () => {
 
 describe("the verification view", () => {
   it("answers null for a session with no rounds", () => {
-    const { repo } = makeSandboxRepo();
+    const { repo } = makeStateDirs();
     expect(buildVerificationView(repo, 1, 3)).toBeNull();
   });
 
   it("reads a clean round as verified and keeps the nits it noted", () => {
-    const { repo } = makeSandboxRepo();
+    const { repo } = makeStateDirs();
     recordRound(repo, {
       round: 1,
       verdict: "VERIFIED",
@@ -580,7 +650,7 @@ describe("the verification view", () => {
   });
 
   it("calls a blocking round unresolved only once it is at the cap", () => {
-    const { repo } = makeSandboxRepo();
+    const { repo } = makeStateDirs();
     recordRound(repo, {
       round: 1,
       verdict: "ISSUES_FOUND",
@@ -601,7 +671,7 @@ describe("the verification view", () => {
   });
 
   it("says nothing about a cap it did not get", () => {
-    const { repo } = makeSandboxRepo();
+    const { repo } = makeStateDirs();
     recordRound(repo, { round: 1, verdict: "ISSUES_FOUND", blocking: true });
     const view = buildVerificationView(repo, 1, null) as Record<string, unknown>;
     expect(view["terminal"]).toBeNull();
@@ -611,14 +681,14 @@ describe("the verification view", () => {
   });
 
   it("reads a cap remediation as that terminal, with the paths the fix touched", () => {
-    const { repo } = makeSandboxRepo();
+    const { repo } = makeStateDirs();
     recordRound(repo, { round: 1, verdict: "ISSUES_FOUND", blocking: true });
     recordRound(repo, {
       round: 2,
       verdict: "REMEDIATED_AT_CAP",
       blocking: false,
       type: "remediated_at_cap",
-      previous_tree: snapshotWorktreeTree(repo),
+      previous_tree: fakeTree("b"),
       remediated: {
         reviewed_round: 1,
         findings: [{ description: "fixed", severity: "major" }],
@@ -635,7 +705,7 @@ describe("the verification view", () => {
   });
 
   it("reads the vendor and the agency log from the round that stopped the session", () => {
-    const { repo } = makeSandboxRepo();
+    const { repo } = makeStateDirs();
     recordRound(repo, {
       round: 1,
       verdict: "ISSUES_FOUND",
@@ -652,7 +722,7 @@ describe("the verification view", () => {
       verdict: "REMEDIATED_AT_CAP",
       blocking: false,
       type: "remediated_at_cap",
-      previous_tree: snapshotWorktreeTree(repo),
+      previous_tree: fakeTree("b"),
       remediated: {
         reviewed_round: 1,
         findings: [{ description: "fixed", severity: "major" }],
@@ -670,7 +740,7 @@ describe("the verification view", () => {
   });
 
   it("reads a row that predates the agency record as unknown, never as none", () => {
-    const { repo } = makeSandboxRepo();
+    const { repo } = makeStateDirs();
     recordRound(repo, { round: 1, verdict: "VERIFIED", blocking: false });
     const view = buildVerificationView(repo, 1, 3) as Record<string, unknown>;
     expect((view["agency"] as Record<string, unknown>)["mode"]).toBeNull();
@@ -678,14 +748,14 @@ describe("the verification view", () => {
   });
 
   it("refuses rather than reading past a ledger line it cannot parse", () => {
-    const { repo } = makeSandboxRepo();
+    const { repo } = makeStateDirs();
     recordRound(repo, { round: 1, verdict: "VERIFIED", blocking: false });
     writeFileSync(roundsPath(repo, 1), "{ not json\n", "utf8");
     expect(() => buildVerificationView(repo, 1, 3)).toThrow(VerificationRefused);
   });
 
   it("carries the view on every session that has rounds, and the refusal apart", () => {
-    const { repo, sessionsDir } = makeSandboxRepo();
+    const { repo, sessionsDir } = makeStateDirs();
     registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
     recordRound(repo, { round: 1, verdict: "VERIFIED", blocking: false });
     const sessions = buildProjection(sessionsDir)["sessions"] as Record<
@@ -705,8 +775,7 @@ describe("the round cap the view is judged against", () => {
   });
 
   it("comes from the repository the projection is about", () => {
-    const { repo } = makeSandboxRepo();
-    git(repo, "status", "--porcelain");
+    const { repo } = makeStateDirs();
     expect(verificationCap(repo)).toBeGreaterThan(0);
   });
 });
@@ -743,7 +812,7 @@ function sessions(sessionsDir: string): Record<string, unknown>[] {
 
 describe("a session the plan declares and the ledger has not reached", () => {
   it("projects as 'planned', which the ledger's own vocabulary does not contain", () => {
-    const { sessionsDir } = makeSandboxRepo();
+    const { sessionsDir } = makeStateDirs();
     start(sessionsDir);
     writePlan(sessionsDir, [
       [1, "First things"],
@@ -756,7 +825,7 @@ describe("a session the plan declares and the ledger has not reached", () => {
   });
 
   it("keeps the not-started glyph, so only the row's words separate the two", () => {
-    const { sessionsDir } = makeSandboxRepo();
+    const { sessionsDir } = makeStateDirs();
     start(sessionsDir);
     writePlan(sessionsDir, [
       [1, "First"],
@@ -770,7 +839,7 @@ describe("a session the plan declares and the ledger has not reached", () => {
   it("counts toward the total, so a caught-up ledger is not reported finished", () => {
     // csv-model's item 9, reproduced: a planning session's whole deliverable
     // is new headings, and until this the record said 2 of 2 complete.
-    const { sessionsDir } = makeSandboxRepo();
+    const { sessionsDir } = makeStateDirs();
     // `session start` grows the ledger to the plan as it stood then -- the
     // seed declares two -- so the ledger looks caught up and complete.
     registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
@@ -787,7 +856,7 @@ describe("a session the plan declares and the ledger has not reached", () => {
   });
 
   it("carries no run artifacts, because it has never been registered", () => {
-    const { sessionsDir } = makeSandboxRepo();
+    const { sessionsDir } = makeStateDirs();
     start(sessionsDir);
     writePlan(sessionsDir, [
       [1, "First"],
@@ -804,7 +873,7 @@ describe("a session the plan declares and the ledger has not reached", () => {
 
 describe("reconciling a hand-edited plan against the ledger", () => {
   it("never re-emits a number the ledger already holds", () => {
-    const { sessionsDir } = makeSandboxRepo();
+    const { sessionsDir } = makeStateDirs();
     start(sessionsDir);
     writePlan(sessionsDir, [
       [1, "A title the plan changed its mind about"],
@@ -816,7 +885,7 @@ describe("reconciling a hand-edited plan against the ledger", () => {
   });
 
   it("contributes a duplicated number once", () => {
-    const { sessionsDir } = makeSandboxRepo();
+    const { sessionsDir } = makeStateDirs();
     start(sessionsDir);
     writePlan(sessionsDir, [
       [1, "First"],
@@ -827,7 +896,7 @@ describe("reconciling a hand-edited plan against the ledger", () => {
   });
 
   it("leaves a gap alone rather than inventing the missing number", () => {
-    const { sessionsDir } = makeSandboxRepo();
+    const { sessionsDir } = makeStateDirs();
     start(sessionsDir);
     writePlan(sessionsDir, [
       [1, "First"],
@@ -841,7 +910,7 @@ describe("reconciling a hand-edited plan against the ledger", () => {
   });
 
   it("yields nothing when the plan is shorter than the ledger", () => {
-    const { sessionsDir } = makeSandboxRepo();
+    const { sessionsDir } = makeStateDirs();
     start(sessionsDir);
     registerSessionStart(sessionsDir, 2, { engine: "claude-code" });
     writePlan(sessionsDir, [[1, "The only one left in the plan"]]);
@@ -851,7 +920,7 @@ describe("reconciling a hand-edited plan against the ledger", () => {
   });
 
   it("takes nothing from a heading the parser cannot read", () => {
-    const { sessionsDir } = makeSandboxRepo();
+    const { sessionsDir } = makeStateDirs();
     start(sessionsDir);
     writePlan(sessionsDir, [[1, "First"]], "\n## Session eleven: not a heading\n");
     expect(repository(sessionsDir)["plannedSessions"]).toBe(0);
@@ -860,13 +929,13 @@ describe("reconciling a hand-edited plan against the ledger", () => {
 
 describe("what registers on the next session start", () => {
   it("is the session in flight, whatever its number", () => {
-    const { sessionsDir } = makeSandboxRepo();
+    const { sessionsDir } = makeStateDirs();
     start(sessionsDir);
     expect(repository(sessionsDir)["nextSession"]).toBe(1);
   });
 
   it("is the lowest session that has not run, planned ones included", () => {
-    const { sessionsDir } = makeSandboxRepo();
+    const { sessionsDir } = makeStateDirs();
     start(sessionsDir);
     closeSessionForTest(sessionsDir);
     writePlan(sessionsDir, [
@@ -878,7 +947,7 @@ describe("what registers on the next session start", () => {
   });
 
   it("is null when the plan declares nothing further", () => {
-    const { sessionsDir } = makeSandboxRepo();
+    const { sessionsDir } = makeStateDirs();
     start(sessionsDir);
     closeSessionForTest(sessionsDir);
     registerSessionStart(sessionsDir, 2, { engine: "claude-code" });
@@ -895,7 +964,7 @@ describe("a repository whose plan is its only record", () => {
   it("calls every row planned, because the ledger has reached none of them", () => {
     // Round 1 of this session's verification found the gap: `not-started`
     // means "registered, and not begun", and nothing here is registered.
-    const { sessionsDir } = makeSandboxRepo();
+    const { sessionsDir } = makeStateDirs();
     expect(ledgerExists(sessionsDir)).toBe(false);
     const projection = buildProjection(sessionsDir);
     const rows = projection["sessions"] as Record<string, unknown>[];
@@ -904,7 +973,7 @@ describe("a repository whose plan is its only record", () => {
   });
 
   it("counts them once, so the planned count is not the total twice over", () => {
-    const { sessionsDir } = makeSandboxRepo();
+    const { sessionsDir } = makeStateDirs();
     const repo = repository(sessionsDir);
     expect(repo["plannedSessions"]).toBe(2);
     expect(repo["totalSessions"]).toBe(2);
@@ -916,7 +985,7 @@ describe("a repository whose plan is its only record", () => {
     // `validateInvariants` accepts only the ledger's four statuses, and it
     // runs over the derived view. Stamping 'planned' any earlier would make a
     // fresh repository report an invariant violation instead of its sessions.
-    const { sessionsDir } = makeSandboxRepo();
+    const { sessionsDir } = makeStateDirs();
     expect(repository(sessionsDir)["invariantViolation"]).toBeNull();
   });
 });
@@ -925,7 +994,7 @@ describe("liveness, derived rather than stamped", () => {
   it("reads the latest timestamp the framework already wrote", () => {
     // A field stamped beside them would be a second statement of "when did
     // this last move", and the answer is already on disk twice over.
-    const { repo, sessionsDir } = makeSandboxRepo();
+    const { repo, sessionsDir } = makeStateDirs();
     start(sessionsDir);
     const at = lastActivityAt(sessionsDir, repo, 1);
     expect(typeof at).toBe("string");
@@ -937,7 +1006,7 @@ describe("liveness, derived rather than stamped", () => {
     // hours moved the driver's three files and nothing in the ledger or the
     // activity log, so liveness answered with the registration and called a
     // working session stalled.
-    const { repo, sessionsDir } = makeSandboxRepo();
+    const { repo, sessionsDir } = makeStateDirs();
     start(sessionsDir);
     const registered = lastActivityAt(sessionsDir, repo, 1) as string;
     const later = "2099-01-01T00:00:00-04:00";
@@ -960,7 +1029,7 @@ describe("liveness, derived rather than stamped", () => {
   });
 
   it("says nothing about a repository nothing has run in", () => {
-    const { repo, sessionsDir } = makeSandboxRepo();
+    const { repo, sessionsDir } = makeStateDirs();
     expect(lastActivityAt(sessionsDir, repo, null)).toBeNull();
   });
 
@@ -978,7 +1047,7 @@ describe("liveness, derived rather than stamped", () => {
   });
 
   it("publishes the threshold it judged against", () => {
-    const { sessionsDir } = makeSandboxRepo();
+    const { sessionsDir } = makeStateDirs();
     start(sessionsDir);
     const repository = buildProjection(sessionsDir)["repository"] as Record<
       string,

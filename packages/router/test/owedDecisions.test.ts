@@ -35,10 +35,51 @@ import { checkOwedDecisions } from "../src/gates.ts";
 import { renderDecision } from "../src/cli/owed.ts";
 import type { Row } from "../src/ledger.ts";
 import { appendSuitesToProjectConfig } from "../src/bootstrap/detect.ts";
-import { readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { parse as parseYaml } from "yaml";
-import { makeSandboxRepo, removeTempDirs } from "./support/fixtures.ts";
+import { makeTempDir, removeTempDirs } from "./support/fixtures.ts";
+import { gitAnswers } from "./support/gitAnswers.ts";
+
+// What the git sandbox provided and these tests consume: paths and seeded
+// files -- the owed ledger and its gates are filesystem readers, and no
+// subject here asks git anything. Same seed the sandbox carried, no
+// processes spawned to write it.
+const SEED: Record<string, string> = {
+  "docs/sessions/session-plan.md":
+    "### Session 1 of 2: First things\n1. Register.\n2. **Build the widget.** Make it real.\n" +
+    "3. Cross-provider verification.\n4. Close-out.\n\n" +
+    "### Session 2 of 2: Second things\n1. Register.\n2. Polish it.\n",
+  "dabbler.yaml":
+    "schema_version: 1\n\ntesting:\n  suites:\n    - name: unit\n" +
+    "      command: python -m pytest\n      expensive: true\n" +
+    "      covers:\n        - src/\n        - tests/\n" +
+    "      test_roots:\n        - tests\n      test_glob: \"test_*.py\"\n\n" +
+    "  selection:\n    repo_wide:\n      - dabbler.yaml\n" +
+    "    smoke:\n      - tests/test_widget.py\n    rules:\n" +
+    "      - when: src/widget.py\n        select:\n          - tests/test_widget.py\n",
+  "src/widget.py": "def widget():\n    return 1\n",
+  "tests/test_widget.py": "def test_widget():\n    assert True\n",
+  ".gitignore": ".dabbler/\n",
+};
+
+function makeStateDirs(): { repo: string; sessionsDir: string } {
+  const repo = makeTempDir();
+  for (const [rel, text] of Object.entries(SEED)) {
+    const path = join(repo, ...rel.split("/"));
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, text, "utf8");
+  }
+  // The questions the gates ask git on this path, answered from the record;
+  // without the toplevel answer the owed ledger is never found and a close
+  // gate passes for the wrong reason.
+  gitAnswers([
+    [["rev-parse", "--show-toplevel"], { stdout: repo.split("\\").join("/") }],
+    [["status", "--porcelain", "-uall"], { stdout: "" }],
+    [["status", "--porcelain"], { stdout: "" }],
+  ]);
+  return { repo, sessionsDir: join(repo, "docs", "sessions") };
+}
 
 afterAll(removeTempDirs);
 
@@ -59,28 +100,28 @@ const BRIEF = {
 
 describe("raising a decision", () => {
   it("refuses a question with one answer, which is a notification", () => {
-    const { repo } = makeSandboxRepo();
+    const { repo } = makeStateDirs();
     expect(() =>
       raiseOwed(repo, { ...BRIEF, options: [BRIEF.options[0]] }),
     ).toThrow(OwedDecisionError);
   });
 
   it("refuses a class outside the rubric's four", () => {
-    const { repo } = makeSandboxRepo();
+    const { repo } = makeStateDirs();
     expect(() => raiseOwed(repo, { ...BRIEF, decisionClass: "because-i-said" })).toThrow(
       OwedDecisionError,
     );
   });
 
   it("is idempotent, so a standing question is not re-asked every session", () => {
-    const { repo } = makeSandboxRepo();
+    const { repo } = makeStateDirs();
     expect(raiseOwed(repo, BRIEF)).not.toBeNull();
     expect(raiseOwed(repo, BRIEF)).toBeNull();
     expect(readOwed(repo)).toHaveLength(1);
   });
 
   it("does not re-raise a question that was already answered", () => {
-    const { repo } = makeSandboxRepo();
+    const { repo } = makeStateDirs();
     raiseOwed(repo, BRIEF);
     answerOwed(repo, BRIEF.id, "local-only");
     expect(raiseOwed(repo, BRIEF)).toBeNull();
@@ -89,20 +130,20 @@ describe("raising a decision", () => {
 
 describe("answering", () => {
   it("refuses a label that was never offered", () => {
-    const { repo } = makeSandboxRepo();
+    const { repo } = makeStateDirs();
     raiseOwed(repo, BRIEF);
     expect(() => answerOwed(repo, BRIEF.id, "whatever")).toThrow(OwedDecisionError);
   });
 
   it("refuses a second answer, because a different one is a new question", () => {
-    const { repo } = makeSandboxRepo();
+    const { repo } = makeStateDirs();
     raiseOwed(repo, BRIEF);
     answerOwed(repo, BRIEF.id, "attach");
     expect(() => answerOwed(repo, BRIEF.id, "local-only")).toThrow(OwedDecisionError);
   });
 
   it("keeps the question readable beside the answer", () => {
-    const { repo } = makeSandboxRepo();
+    const { repo } = makeStateDirs();
     raiseOwed(repo, BRIEF);
     answerOwed(repo, BRIEF.id, "attach");
     const folded = foldOwed(readOwed(repo)).get(BRIEF.id);
@@ -113,13 +154,13 @@ describe("answering", () => {
   });
 
   it("attributes the answer to the operator and to nobody else", () => {
-    const { repo } = makeSandboxRepo();
+    const { repo } = makeStateDirs();
     raiseOwed(repo, BRIEF);
     expect(answerOwed(repo, BRIEF.id, "attach")["answeredBy"]).toBe("operator");
   });
 
   it("retires a question the repository outgrew", () => {
-    const { repo } = makeSandboxRepo();
+    const { repo } = makeStateDirs();
     raiseOwed(repo, BRIEF);
     supersedeOwed(repo, BRIEF.id, "the remote question moved to setup");
     expect(openDecisions(repo)).toHaveLength(0);
@@ -128,7 +169,7 @@ describe("answering", () => {
 
 describe("which class holds the close", () => {
   it("lets every class but verification-reduction proceed", () => {
-    const { repo, sessionsDir } = makeSandboxRepo();
+    const { repo, sessionsDir } = makeStateDirs();
     raiseOwed(repo, BRIEF);
     expect(openDecisions(repo)).toHaveLength(1);
     expect(blockingDecisions(repo)).toHaveLength(0);
@@ -136,7 +177,7 @@ describe("which class holds the close", () => {
   });
 
   it("refuses the close while a verification-reducing question stands", () => {
-    const { repo, sessionsDir } = makeSandboxRepo();
+    const { repo, sessionsDir } = makeStateDirs();
     raiseOwed(repo, {
       ...BRIEF,
       id: "no-suite",
@@ -148,7 +189,7 @@ describe("which class holds the close", () => {
   });
 
   it("passes once it is answered", () => {
-    const { repo, sessionsDir } = makeSandboxRepo();
+    const { repo, sessionsDir } = makeStateDirs();
     raiseOwed(repo, {
       ...BRIEF,
       id: "no-suite",
@@ -159,7 +200,7 @@ describe("which class holds the close", () => {
   });
 
   it("passes in a repository that owes nothing at all", () => {
-    const { sessionsDir } = makeSandboxRepo();
+    const { sessionsDir } = makeStateDirs();
     expect(checkOwedDecisions(sessionsDir)[0]).toBe(true);
   });
 });
@@ -172,7 +213,7 @@ describe("the suite-declaration condition", () => {
   };
 
   it("asks when the repository builds something and declares no suite", () => {
-    const { repo } = makeSandboxRepo();
+    const { repo } = makeStateDirs();
     const row = refreshOwedDecisions(repo, { ...base, ecosystems: ["node"] });
     expect(row?.["class"]).toBe(CLASS_VERIFICATION_REDUCTION);
     expect(row?.["event"]).toBe(EVENT_RAISED);
@@ -182,12 +223,12 @@ describe("the suite-declaration condition", () => {
     // csv-model's first two sessions were exactly this, and closed green
     // correctly. Demanding a test command from them is the ceremony this
     // record exists to remove, not to relocate.
-    const { repo } = makeSandboxRepo();
+    const { repo } = makeStateDirs();
     expect(refreshOwedDecisions(repo, { ...base, ecosystems: [] })).toBeNull();
   });
 
   it("never asks a repository that already declared a suite", () => {
-    const { repo } = makeSandboxRepo();
+    const { repo } = makeStateDirs();
     expect(
       refreshOwedDecisions(repo, {
         ...base,
@@ -198,7 +239,7 @@ describe("the suite-declaration condition", () => {
   });
 
   it("states a default, because a question nobody answers still has an outcome", () => {
-    const { repo } = makeSandboxRepo();
+    const { repo } = makeStateDirs();
     const row = refreshOwedDecisions(repo, { ...base, ecosystems: ["node"] });
     expect(String(row?.["onNoAnswer"] ?? "")).not.toBe("");
     expect(row?.["recommendation"]).toBe("declare");
@@ -209,13 +250,13 @@ describe("the contract the record publishes", () => {
   it("states a current state, not just the event that produced it", () => {
     // The file is a log of events, so `raised` is a thing that happened.
     // `open` is a thing that is true, and it is what consumers were promised.
-    const { repo } = makeSandboxRepo();
+    const { repo } = makeStateDirs();
     raiseOwed(repo, BRIEF);
     expect(foldOwed(readOwed(repo)).get(BRIEF.id)?.["state"]).toBe(STATE_OPEN);
   });
 
   it("derives severity from the class, so no caller can lower it", () => {
-    const { repo } = makeSandboxRepo();
+    const { repo } = makeStateDirs();
     raiseOwed(repo, BRIEF);
     raiseOwed(repo, { ...BRIEF, id: "blocker", decisionClass: CLASS_VERIFICATION_REDUCTION });
     const folded = foldOwed(readOwed(repo));
@@ -233,7 +274,7 @@ describe("when the answer stops being true", () => {
   };
 
   it("asks again once tests exist, which is what no-tests-yet promised", () => {
-    const { repo } = makeSandboxRepo();
+    const { repo } = makeStateDirs();
     refreshOwedDecisions(repo, { ...base, hasTestRoot: false });
     answerOwed(repo, ID_TESTING_SUITES, "no-tests-yet");
     expect(blockingDecisions(repo)).toHaveLength(0);
@@ -244,14 +285,14 @@ describe("when the answer stops being true", () => {
   });
 
   it("stays quiet while the answer is still true", () => {
-    const { repo } = makeSandboxRepo();
+    const { repo } = makeStateDirs();
     refreshOwedDecisions(repo, { ...base, hasTestRoot: false });
     answerOwed(repo, ID_TESTING_SUITES, "no-tests-yet");
     expect(refreshOwedDecisions(repo, { ...base, hasTestRoot: false })).toBeNull();
   });
 
   it("does not re-ask once a suite is finally declared", () => {
-    const { repo } = makeSandboxRepo();
+    const { repo } = makeStateDirs();
     refreshOwedDecisions(repo, { ...base, hasTestRoot: false });
     answerOwed(repo, ID_TESTING_SUITES, "no-tests-yet");
     expect(
@@ -266,7 +307,7 @@ describe("when the answer stops being true", () => {
 
 describe("the published current-record contract", () => {
   it("hands consumers a state and a severity, both required", () => {
-    const { repo } = makeSandboxRepo();
+    const { repo } = makeStateDirs();
     raiseOwed(repo, BRIEF);
     const [row] = currentDecisions(repo);
     expect(row["state"]).toBe(STATE_OPEN);
@@ -274,7 +315,7 @@ describe("the published current-record contract", () => {
   });
 
   it("validates the fold, so a consumer cannot be handed an off-contract record", () => {
-    const { repo } = makeSandboxRepo();
+    const { repo } = makeStateDirs();
     raiseOwed(repo, BRIEF);
     answerOwed(repo, BRIEF.id, "attach");
     // Answered rows carry no brief of their own; the fold has to supply it,
@@ -300,7 +341,7 @@ describe("writing the suite the operator asked for", () => {
     // and then, until this, had no way through it: `declare` refused because
     // a list existed, so "safe" meant the operator edited the file by hand
     // forever.
-    const { repo } = makeSandboxRepo();
+    const { repo } = makeStateDirs();
     const path = join(repo, "dabbler.yaml");
     writeFileSync(
       path,
@@ -325,7 +366,7 @@ describe("writing the suite the operator asked for", () => {
   });
 
   it("inserts into a testing mapping that carries no suites", () => {
-    const { repo } = makeSandboxRepo();
+    const { repo } = makeStateDirs();
     const path = join(repo, "dabbler.yaml");
     writeFileSync(
       path,
@@ -351,7 +392,7 @@ describe("what a single persisted row tells a reader", () => {
     // so nothing can drift, and the alternative made every consumer of the
     // ledger reimplement the fold before it could read a state the record was
     // supposed to publish.
-    const { repo } = makeSandboxRepo();
+    const { repo } = makeStateDirs();
     raiseOwed(repo, { ...BRIEF, decisionClass: CLASS_VERIFICATION_REDUCTION });
     answerOwed(repo, BRIEF.id, "attach");
     const rows = readOwed(repo);
@@ -362,7 +403,7 @@ describe("what a single persisted row tells a reader", () => {
   });
 
   it("agrees with the fold, because the fold no longer derives anything", () => {
-    const { repo } = makeSandboxRepo();
+    const { repo } = makeStateDirs();
     raiseOwed(repo, BRIEF);
     const [row] = readOwed(repo);
     expect(foldOwed(readOwed(repo)).get(BRIEF.id)?.["state"]).toBe(row["state"]);
@@ -375,7 +416,7 @@ describe("a suites list that sits at its key's own column", () => {
     // key's indent as the list boundary would have inserted the new item
     // before the existing ones, at the wrong depth, producing a file that
     // does not parse.
-    const { repo } = makeSandboxRepo();
+    const { repo } = makeStateDirs();
     const path = join(repo, "dabbler.yaml");
     writeFileSync(
       path,
@@ -419,7 +460,7 @@ describe("what a row in the list says about itself", () => {
     // advisory row showed nothing at all -- and a reader looking down a list
     // could not tell which rows were still waiting on them from which had
     // been settled, which is the one thing the list is for.
-    const { repo } = makeSandboxRepo();
+    const { repo } = makeStateDirs();
     const row = raiseOwed(repo, BRIEF);
     expect(row?.["state"]).toBe(STATE_OPEN);
     const rendered = renderDecision(row as Row);
@@ -427,7 +468,7 @@ describe("what a row in the list says about itself", () => {
   });
 
   it("says when an open row is the kind that holds the close", () => {
-    const { repo } = makeSandboxRepo();
+    const { repo } = makeStateDirs();
     const row = raiseOwed(repo, {
       ...BRIEF,
       id: "reduces-verification",
@@ -443,7 +484,7 @@ describe("a brief that changed after it was raised", () => {
     // one already on disk. It was live: a recommendation was reversed and
     // the list went on printing the old one, advising the operator against
     // the thing the session existed to do.
-    const { repo } = makeSandboxRepo();
+    const { repo } = makeStateDirs();
     raiseOwed(repo, BRIEF);
     const again = raiseOwed(repo, {
       ...BRIEF,
@@ -458,7 +499,7 @@ describe("a brief that changed after it was raised", () => {
   it("stays silent when the brief is the same one", () => {
     // Otherwise every run of a verb that raises would append a row, which is
     // the per-session re-ask this record exists to end.
-    const { repo } = makeSandboxRepo();
+    const { repo } = makeStateDirs();
     raiseOwed(repo, BRIEF);
     expect(raiseOwed(repo, BRIEF)).toBeNull();
   });
@@ -466,7 +507,7 @@ describe("a brief that changed after it was raised", () => {
   it("leaves an answered decision alone, however the brief changes", () => {
     // Rewriting a brief under a decision somebody made changes what they are
     // recorded as having agreed to.
-    const { repo } = makeSandboxRepo();
+    const { repo } = makeStateDirs();
     raiseOwed(repo, BRIEF);
     answerOwed(repo, BRIEF.id, "attach");
     expect(raiseOwed(repo, { ...BRIEF, question: "Something else entirely?" })).toBeNull();
@@ -479,7 +520,7 @@ describe("asking how a repository publishes", () => {
   it("asks the feed and the credential's name as two questions", () => {
     // They fail differently: a wrong feed sends a release somewhere real, a
     // wrong credential name sends a build nowhere at all.
-    const { repo } = makeSandboxRepo();
+    const { repo } = makeStateDirs();
     const raised = raisePackagingDecisions(repo, {
       ecosystem: "dotnet",
       packCommand: "dotnet pack -o {output}",
@@ -490,7 +531,7 @@ describe("asking how a repository publishes", () => {
   });
 
   it("asks once, however often setup runs", () => {
-    const { repo } = makeSandboxRepo();
+    const { repo } = makeStateDirs();
     raisePackagingDecisions(repo, { ecosystem: "dotnet", packCommand: "dotnet pack" });
     expect(
       raisePackagingDecisions(repo, { ecosystem: "dotnet", packCommand: "dotnet pack" }),
@@ -500,13 +541,13 @@ describe("asking how a repository publishes", () => {
   it("does not block a close on either of them", () => {
     // Publishing is external consequence, not verification reduction. A
     // session that has not decided where it publishes still closes.
-    const { repo } = makeSandboxRepo();
+    const { repo } = makeStateDirs();
     raisePackagingDecisions(repo, { ecosystem: "dotnet", packCommand: "dotnet pack" });
     expect(blockingDecisions(repo)).toEqual([]);
   });
 
   it("names the credential and never carries one", () => {
-    const { repo } = makeSandboxRepo();
+    const { repo } = makeStateDirs();
     const [, secret] = raisePackagingDecisions(repo, {
       ecosystem: "dotnet",
       packCommand: "dotnet pack",

@@ -108,6 +108,31 @@ function spawnGit(
 }
 
 /**
+ * How a git question becomes an answer: the one seam between the router and
+ * the `git` binary. The default is the real spawn and production code never
+ * swaps it; the contract band (`test/gitContract.test.ts`) pins the real
+ * binary's behavior, and every other test may feed recorded answers through
+ * here instead of building a repository to ask a live one.
+ */
+export type GitSource = (
+  repoRoot: string,
+  args: readonly string[],
+  options: RunGitOptions,
+  encoding: "utf8" | "buffer",
+) => { code: number; stdout: string | Buffer; stderr: string };
+
+let gitSource: GitSource = spawnGit;
+
+/** Swap the source of git answers; the returned function restores the previous one. */
+export function setGitSource(source: GitSource): () => void {
+  const previous = gitSource;
+  gitSource = source;
+  return () => {
+    gitSource = previous;
+  };
+}
+
+/**
  * One git call. stdout drops only its newline framing -- porcelain status
  * columns are positional, and the first line may legitimately begin with a
  * space, so nothing but `\n` is stripped from either end.
@@ -117,7 +142,7 @@ export function runGit(
   args: readonly string[],
   options: RunGitOptions = {},
 ): GitResult {
-  const result = spawnGit(repoRoot, args, options, "utf8");
+  const result = gitSource(repoRoot, args, options, "utf8");
   return {
     code: result.code,
     stdout: stripNewlines(result.stdout as string),
@@ -131,7 +156,7 @@ export function runGitBinary(
   args: readonly string[],
   options: RunGitOptions = {},
 ): GitBinaryResult {
-  const result = spawnGit(repoRoot, args, options, "buffer");
+  const result = gitSource(repoRoot, args, options, "buffer");
   return {
     code: result.code,
     stdout: result.stdout as Buffer,

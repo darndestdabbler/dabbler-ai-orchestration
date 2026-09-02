@@ -1507,17 +1507,73 @@
         "identityProvenance": "direct"
       },
       "verificationVerdict": "VERIFIED",
-      "frameworkVersion": "2.0.0",
       "verification": {
         "rounds": 4,
         "verifierModel": "gemini-flash",
         "verifierProvider": "google",
         "transport": "api"
-      }
+      },
+      "frameworkVersion": "2.0.0"
     },
     {
       "number": 77,
       "title": "The git seam \u2014 contract band and answered questions",
+      "status": "in-progress",
+      "startedAt": "2026-09-02T08:13:26.250000-04:00",
+      "completedAt": null,
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": "VERIFIED",
+      "frameworkVersion": "2.0.0",
+      "verification": {
+        "rounds": 2,
+        "verifierModel": "gpt-5-6-sol",
+        "verifierProvider": "openai",
+        "transport": "api"
+      }
+    },
+    {
+      "number": 78,
+      "title": "Every component becomes a library, or is named as not one",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    },
+    {
+      "number": 79,
+      "title": "Seals, and a master that only moves on green",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    },
+    {
+      "number": 80,
+      "title": "The loop stops living in anyone's attention",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    },
+    {
+      "number": 81,
+      "title": "Publishing without a secret, and the last of the friction",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    },
+    {
+      "number": 82,
+      "title": "The trial, run by the operator against what the Marketplace serves",
       "status": "not-started",
       "startedAt": null,
       "completedAt": null,

@@ -11,7 +11,7 @@
 
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 
 import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
 
@@ -26,6 +26,7 @@ import {
   parseEntries,
 } from "../src/modules.ts";
 import { readRawSessionState } from "../src/progress.ts";
+import { gitAnswers } from "./support/gitAnswers.ts";
 import {
   EXIT_BOUNDARY,
   EXIT_GATE_FAILED,
@@ -163,10 +164,46 @@ describe("closing a session", () => {
 
 // --- cancel and restore -------------------------------------------------------
 
+// Registration, cancellation, restoration and the plan prose are state
+// writers: they read and write the ledger's files and ask git only where
+// the writers' own guards do. Paths, seeded state and recorded answers
+// serve; the close and migrate describes keep their real repositories
+// because upstream, digests and history are their subject.
+const SEED: Record<string, string> = {
+  "docs/sessions/session-plan.md":
+    "### Session 1 of 2: First things\n1. Register.\n2. **Build the widget.** Make it real.\n" +
+    "3. Cross-provider verification.\n4. Close-out.\n\n" +
+    "### Session 2 of 2: Second things\n1. Register.\n2. Polish it.\n",
+  "dabbler.yaml":
+    "schema_version: 1\n\ntesting:\n  suites:\n    - name: unit\n" +
+    "      command: python -m pytest\n      expensive: true\n" +
+    "      covers:\n        - src/\n        - tests/\n" +
+    "      test_roots:\n        - tests\n      test_glob: \"test_*.py\"\n",
+  "src/widget.py": "def widget():\n    return 1\n",
+};
+
+function makeStateDirs(): { repo: string; sessionsDir: string } {
+  const repo = makeTempDir();
+  for (const [rel, text] of Object.entries(SEED)) {
+    const path = join(repo, ...rel.split("/"));
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, text, "utf8");
+  }
+  gitAnswers([
+    [["rev-parse", "--show-toplevel"], { stdout: repo.split("\\").join("/") }],
+    [["status", "--porcelain", "-uall"], { stdout: "" }],
+    [["status", "--porcelain"], { stdout: "" }],
+    [(args) => args[0] === "cat-file" && args[1] === "-e", { code: 0 }],
+    [["commit-tree"], { stdout: "c".repeat(40) }],
+    [["update-ref"], { code: 0 }],
+  ]);
+  return { repo, sessionsDir: join(repo, "docs", "sessions") };
+}
+
 describe("who a session in flight belongs to", () => {
   /** A session in flight, registered by one engine. */
   function inFlight(): { repo: string; sessionsDir: string } {
-    const made = makeSandboxRepo();
+    const made = makeStateDirs();
     registerSessionStart(made.sessionsDir, 1, {
       engine: "claude-code",
       provider: "anthropic",
@@ -201,7 +238,7 @@ describe("who a session in flight belongs to", () => {
     // given, so a seat's session continued without `--model` passed the
     // guard and lost the model it was registered with -- the record then
     // saying a seat ran the session with no seat.
-    const { sessionsDir } = makeSandboxRepo();
+    const { sessionsDir } = makeStateDirs();
     registerSessionStart(sessionsDir, 1, {
       engine: "copilot",
       provider: "openai",
@@ -244,7 +281,7 @@ describe("who a session in flight belongs to", () => {
 
 describe("cancelling a session", () => {
   it("refuses one in flight without --force", () => {
-    const { sessionsDir } = makeSandboxRepo();
+    const { sessionsDir } = makeStateDirs();
     registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
     const result = captured(() => cancel(sessionsDir, 1, { reason: "stop" }));
     expect(result.code).toBe(EXIT_BOUNDARY);
@@ -252,7 +289,7 @@ describe("cancelling a session", () => {
   });
 
   it("keeps the status it had, so a restore has something to go back to", () => {
-    const { sessionsDir } = makeSandboxRepo();
+    const { sessionsDir } = makeStateDirs();
     registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
     const result = captured(() =>
       cancel(sessionsDir, 1, { reason: "stop", force: true }),
@@ -270,7 +307,7 @@ describe("cancelling a session", () => {
   });
 
   it("refuses a second cancellation of the same session", () => {
-    const { sessionsDir } = makeSandboxRepo();
+    const { sessionsDir } = makeStateDirs();
     registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
     captured(() => cancel(sessionsDir, 1, { reason: "stop", force: true }));
     const again = captured(() => cancel(sessionsDir, 1, { reason: "again", force: true }));
@@ -279,7 +316,7 @@ describe("cancelling a session", () => {
   });
 
   it("refuses a session number the record does not carry", () => {
-    const { sessionsDir } = makeSandboxRepo();
+    const { sessionsDir } = makeStateDirs();
     registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
     const result = captured(() => cancel(sessionsDir, 9, { reason: "stop" }));
     expect(result.code).toBe(EXIT_USAGE);
@@ -289,7 +326,7 @@ describe("cancelling a session", () => {
 
 describe("restoring a cancelled session", () => {
   it("puts back the status the session actually carried", () => {
-    const { sessionsDir } = makeSandboxRepo();
+    const { sessionsDir } = makeStateDirs();
     registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
     captured(() => cancel(sessionsDir, 1, { reason: "stop", force: true }));
     const result = captured(() => restore(sessionsDir, 1, { reason: "resumed" }));
@@ -307,7 +344,7 @@ describe("restoring a cancelled session", () => {
   });
 
   it("falls back to not-started when the record kept no prior status", () => {
-    const { sessionsDir } = makeSandboxRepo();
+    const { sessionsDir } = makeStateDirs();
     registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
     captured(() => cancel(sessionsDir, 1, { reason: "stop", force: true }));
     const path = join(sessionsDir, "sessions.json");
@@ -321,7 +358,7 @@ describe("restoring a cancelled session", () => {
   });
 
   it("refuses a session that was never cancelled", () => {
-    const { sessionsDir } = makeSandboxRepo();
+    const { sessionsDir } = makeStateDirs();
     registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
     const result = captured(() => restore(sessionsDir, 1));
     expect(result.code).toBe(EXIT_BOUNDARY);
@@ -333,7 +370,7 @@ describe("restoring a cancelled session", () => {
 
 describe("recording the plan prose", () => {
   it("renders the work plan around the prose it was handed", () => {
-    const { sessionsDir } = makeSandboxRepo();
+    const { sessionsDir } = makeStateDirs();
     registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
     const result = captured(() => plan(sessionsDir, { body: "Two sessions, then stop." }));
     expect(result.code).toBe(EXIT_OK);
@@ -342,7 +379,7 @@ describe("recording the plan prose", () => {
   });
 
   it("refuses when neither the prose nor a file carrying it was given", () => {
-    const { sessionsDir } = makeSandboxRepo();
+    const { sessionsDir } = makeStateDirs();
     const result = captured(() => plan(sessionsDir, {}));
     expect(result.code).toBe(EXIT_USAGE);
     expect(result.err).toContain("inline or from a file");

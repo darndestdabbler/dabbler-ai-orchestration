@@ -28,6 +28,20 @@ import { defineConfig } from "vitest/config";
 // supports. The operator's own feel of the machine was not sampled in that
 // session -- the probe stood in for it -- and their confirmation of the
 // count is owed; session 77 attacks the critical path itself.
+//
+// Session 77's attack, measured 2026-09-02: the `journal.runGit` seam plus
+// recorded answers (`test/support/gitAnswers.ts`) and a 15-test contract
+// band (`test/gitContract.test.ts`). Repo-builder call sites 240 -> 124;
+// every survivor is the contract band, a kept-real file whose head comment
+// says why, or outside the six files converted. Whole suite: 763 s wall
+// the session before (run of record, loaded machine) -> 649 s wall /
+// 1267 s test time after, same two workers. The residue is CONCENTRATED,
+// not smeared: drive.test.ts holds 647 s of the 1267 -- half the suite in
+// one file, driving whole sessions with real engine and job children --
+// then gates (150 s) and packaging (96 s). Those are process-real by
+// design; making them cheap is boundary work (the sealed-library sessions),
+// not fixture work, and no worker count changes a critical path this
+// shape.
 export const WORKERS_LOCAL = 2;
 export const WORKERS_CI = 1;
 

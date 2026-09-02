@@ -9,8 +9,8 @@
 // record it writes can be read rather than inferred.
 
 import { execFileSync } from "node:child_process";
-import { readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -55,8 +55,50 @@ import {
   setProviderKeys,
   writeYaml,
 } from "./support/fixtures.ts";
+import { gitAnswers } from "./support/gitAnswers.ts";
 
 afterAll(removeTempDirs);
+
+// Ledger and prompt mechanics need paths, state files, and consistent tree
+// identifiers -- not an object store. Where a test's subject is the object
+// store itself (the legal anchor, re-anchoring, the end-to-end band), the
+// real repository stays, and the describe says so.
+const SEED: Record<string, string> = {
+  "docs/sessions/session-plan.md":
+    "### Session 1 of 2: First things\n1. Register.\n2. **Build the widget.** Make it real.\n" +
+    "3. Cross-provider verification.\n4. Close-out.\n\n" +
+    "### Session 2 of 2: Second things\n1. Register.\n2. Polish it.\n",
+  "dabbler.yaml":
+    "schema_version: 1\n\ntesting:\n  suites:\n    - name: unit\n" +
+    "      command: python -m pytest\n      expensive: true\n" +
+    "      covers:\n        - src/\n        - tests/\n" +
+    "      test_roots:\n        - tests\n      test_glob: \"test_*.py\"\n",
+  "src/widget.py": "def widget():\n    return 1\n",
+  "tests/test_widget.py": "def test_widget():\n    assert True\n",
+};
+
+function fakeTree(fill: string): string {
+  return fill.repeat(40);
+}
+
+function makeStateDirs(): { repo: string; sessionsDir: string } {
+  const repo = makeTempDir();
+  for (const [rel, text] of Object.entries(SEED)) {
+    const path = join(repo, ...rel.split("/"));
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, text, "utf8");
+  }
+  gitAnswers([
+    [["rev-parse", "--show-toplevel"], { stdout: repo.split("\\").join("/") }],
+    [["status", "--porcelain", "-uall"], { stdout: "" }],
+    [["status", "--porcelain"], { stdout: "" }],
+    [(args) => args[0] === "cat-file" && args[1] === "-e", { code: 0 }],
+    [["commit-tree"], { stdout: "c".repeat(40) }],
+    [["update-ref"], { code: 0 }],
+    [["diff"], { stdout: "" }],
+  ]);
+  return { repo, sessionsDir: join(repo, "docs", "sessions") };
+}
 
 interface Output {
   readonly code: number;
@@ -226,7 +268,7 @@ describe("the prior-findings block", () => {
 
 describe("the task block a round opens with", () => {
   it("carries the session's own plan verbatim and the round number", () => {
-    const { sessionsDir } = makeSandboxRepo();
+    const { sessionsDir } = makeStateDirs();
     const block = buildTaskBlock(sessionsDir, 1, 1, []);
     expect(block).toContain("Session 1 of the active session set (verification round 1)");
     expect(block).toContain("**Build the widget.**");
@@ -238,7 +280,7 @@ describe("the task block a round opens with", () => {
   });
 
   it("appends the agency briefing only when a grant was made", () => {
-    const { sessionsDir } = makeSandboxRepo();
+    const { sessionsDir } = makeStateDirs();
     const seat = grantForTransport("copilot-cli", { scope: ["src/widget.py"] });
     expect(buildTaskBlock(sessionsDir, 1, 1, [], null, null, seat)).not.toBe(
       buildTaskBlock(sessionsDir, 1, 1, []),
@@ -279,21 +321,25 @@ describe("the adjudicator's brief", () => {
 
 describe("resolving a cited path", () => {
   it("refuses a path outside the repository even when it exists", () => {
-    const repo = makeSeededRepo();
+    // Path containment is filesystem arithmetic; no repository needed.
+    const repo = makeTempDir();
+    writeFileSync(join(repo, "a.txt"), "one\n", "utf8");
     expect(resolveRepoRelative(repo, "../elsewhere.py")).toEqual([null, "outside"]);
     expect(resolveRepoRelative(repo, "a.txt")).toEqual(["a.txt", null]);
     expect(resolveRepoRelative(repo, "nope.py")).toEqual([null, "missing"]);
   });
 
   it("refuses a directory, because a directory is not a passage", () => {
-    const repo = makeSeededRepo({ "src/a.py": "x\n" });
+    const repo = makeTempDir();
+    mkdirSync(join(repo, "src"), { recursive: true });
+    writeFileSync(join(repo, "src", "a.py"), "x\n", "utf8");
     expect(resolveRepoRelative(repo, "src")).toEqual([null, "missing"]);
   });
 });
 
 describe("recording a dispute", () => {
   function disputable(): { repo: string; sessionsDir: string } {
-    const { repo, sessionsDir } = makeSandboxRepo();
+    const { repo, sessionsDir } = makeStateDirs();
     registerSessionStart(sessionsDir, 1, {
       engine: "claude-code",
       provider: "anthropic",
@@ -305,7 +351,7 @@ describe("recording a dispute", () => {
       verifier_model: "offline:01.md",
       verifier_provider: "offline",
       findings: [{ severity: "major", description: "the widget is wrong", blocking: true }],
-      completion_tree: snapshotWorktreeTree(repo),
+      completion_tree: fakeTree("a"),
       recorded_at: "2026-01-01T00:00:00+00:00",
     });
     return { repo, sessionsDir };
@@ -402,8 +448,8 @@ describe("recording a dispute", () => {
       verifier_model: "offline:01.md",
       verifier_provider: "offline",
       findings: [],
-      completion_tree: snapshotWorktreeTree(repo),
-      previous_tree: snapshotWorktreeTree(repo),
+      completion_tree: fakeTree("a"),
+      previous_tree: fakeTree("b"),
       recorded_at: "2026-01-01T00:01:00+00:00",
     });
     captured(() =>
@@ -424,6 +470,9 @@ describe("recording a dispute", () => {
 
 // --- Re-anchoring -------------------------------------------------------------
 
+// KEPT REAL: the subject is the object store itself -- ancestry, commit
+// topology, and what resolves. Recorded answers would restate the rule
+// under test.
 describe("the legal anchor", () => {
   it("takes the round's own recorded HEAD, consulting no date", () => {
     const repo = makeSeededRepo();
@@ -478,6 +527,8 @@ describe("the legal anchor", () => {
   });
 });
 
+// KEPT REAL: re-anchoring exists for the case where a recorded tree does or
+// does not resolve in THIS object store; only a real one can answer that.
 describe("re-anchoring a round", () => {
   it("refuses while the recorded tree still resolves here", () => {
     // Re-anchoring a baseline that is present would let the author choose
@@ -568,7 +619,7 @@ describe("re-anchoring a round", () => {
 describe("the step commands", () => {
   it("refuses a step against a session with no approved plan", () => {
     // An envelope that can still move measures nothing.
-    const { sessionsDir } = makeSandboxRepo();
+    const { sessionsDir } = makeStateDirs();
     registerSessionStart(sessionsDir, 1, { engine: "claude-code", provider: "anthropic" });
     const { code, err } = captured(() => runStepStatus(sessionsDir));
     expect(code).toBe(EXIT_STATE);
@@ -576,7 +627,7 @@ describe("the step commands", () => {
   });
 
   it("lets a commit through when no step is open", () => {
-    expect(runStepGuardCommit(makeSeededRepo())).toBe(EXIT_OK);
+    expect(runStepGuardCommit(makeStateDirs().repo)).toBe(EXIT_OK);
   });
 
   it("lets a commit through outside a repository entirely", () => {
@@ -586,6 +637,9 @@ describe("the step commands", () => {
 
 // --- The round itself ---------------------------------------------------------
 
+// KEPT REAL: the always-on end-to-end band. One describe drives the whole
+// round pipeline against a real repository and a scripted verifier -- the
+// composition test that recorded answers must never replace.
 describe("a verification round, end to end", () => {
   beforeEach(() => {
     setProviderKeys();

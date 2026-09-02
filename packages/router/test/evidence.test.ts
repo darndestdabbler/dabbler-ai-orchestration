@@ -40,6 +40,12 @@ import {
 import { writeChecks } from "../src/critique.ts";
 import { git, makeSeededRepo, makeTempDir, removeTempDirs } from "./support/fixtures.ts";
 
+// KEPT REAL, deliberately: this file's subjects are the object store and
+// the worktree themselves -- snapshots that must equal or differ as files
+// change, round refs a clone must learn to carry, quotes re-derived from a
+// reviewed tree, a tracked file's deletion. Recorded answers would assert
+// the recording. The repositories are the cheap seeded kind.
+
 afterAll(removeTempDirs);
 
 function makeTranscript(overrides: Record<string, unknown> = {}): Record<string, unknown> {

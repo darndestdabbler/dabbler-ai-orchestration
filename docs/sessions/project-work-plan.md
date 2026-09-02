@@ -112,7 +112,12 @@ it.
 | 74 | The extension is the distribution, and the number is 2.0.0 | no | 2026-09-02 |
 | 75 | The trial against what the Marketplace actually serves | — | not declared |
 | 76 | Performance patches — reaping, hidden windows, worker priority | no | 2026-09-02 |
-| 77 | The git seam — contract band and answered questions | — | not declared |
+| 77 | The git seam — contract band and answered questions | no | 2026-09-02 |
+| 78 | Every component becomes a library, or is named as not one | — | not declared |
+| 79 | Seals, and a master that only moves on green | — | not declared |
+| 80 | The loop stops living in anyone's attention | — | not declared |
+| 81 | Publishing without a secret, and the last of the friction | — | not declared |
+| 82 | The trial, run by the operator against what the Marketplace serves | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -1753,3 +1758,9 @@ Session 74 makes the distribution match what the product actually is, on the ope
 **Releasable: no.**
 
 Session 76 of 77: performance patches -- reaping, hidden windows, worker priority. Everything mechanical, nothing that touches the evidence flow. (1) What a session starts, a session ends: `checks.ts` keeps a registry of every child it spawns (declared checks, engines, the Copilot seat, the extension's driver) and the router's own end -- SIGINT, SIGTERM, SIGHUP, or a plain exit with a child still live -- ends every tracked tree; `terminateTree` learns to end a tree by pid so a job the driver started in an earlier process can be ended from a later one; the job runner ends its child's tree when it is itself signalled; the driver ends a live job when the run is abandoned (a Stop while the job runs, including `session interrupt --stop`) rather than leaving it to squat; `test-evidence run` spawns the suite through the same tracked, grouped, hidden path instead of a blocking shell spawnSync; and the extension registers its drive registry for disposal so a driver does not outlive the window, with the Playwright launch seam ending the Electron tree when a graceful close fails. The 38-hour `test:unit` tree and the 12.7-hour Playwright test-server of 2026-09-02 are the incident; the audit of every spawn path is recorded in the step reports. (2) The last two visible windows: the `taskkill` fallback in `terminateTree` and the suite spawn in `testEvidence.ts` both get `windowsHide`. (3) Workers yield to the operator, then multiply: a vitest setup file puts every worker at below-normal OS priority, so forked `git`/`node` grandchildren inherit it; the full suite is then measured at 2, 4 and 8 workers with a normal-priority latency probe running beside it as the keyboard's proxy, `WORKERS_LOCAL` is raised to the count the measurements support, and the stale 138 s benchmark in `vitest.config.ts` is replaced by what was measured. (4) STATUS.md hands off, and the `final-full` this session records is the baseline session 77 is measured against. Not releasable.
+
+### Session 77 — The git seam — contract band and answered questions
+
+**Releasable: no.**
+
+Make journal.runGit a tested seam instead of a comment: a contract band of ~15 real-git tests pins every git behavior the router relies on (diff -z parse shapes, the autocrlf class from the session-66 incident, update-ref on Windows, the porcelain the gates read), and a recorded-answer fixture lets every other test feed git's answers through the runGit interface instead of building a scratch repository. The six heaviest repo-builders — projection, owedDecisions, verify, facts, lifecycle, evidence, holding ~130 of the ~240 build sites — convert to answers-in, decisions-out; tests that genuinely exercise spawning keep their real children. The suite is re-measured against session 76's baseline and the number recorded where the worker-cap comment already reasons from measurements.

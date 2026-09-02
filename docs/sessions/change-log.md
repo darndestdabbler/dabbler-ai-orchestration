@@ -574,3 +574,10 @@
 - Excluded providers: anthropic, openai
 - Dispute on round 3 finding 0: OVERRULED — The orchestrator's dispute is a request for the adjudicator to act as a verifier and re-review the work. The verifier found that the required operator-at-keyboard usability validation remains incomplete. The orchestrator's argument does not address this finding but instead offers excuses and explanations about why the validation could not be completed and why the existing data is sufficient. The orchestrator also repeatedly states that the operator's confirmation is "owed" or "not sampled," which directly supports the verifier's finding that the validation is incomplete.
 - Raw round output: `.dabbler/runs/s76/`
+
+## Session 77 verification — VERIFIED after 2 round(s)
+
+- Verifier: gpt-5-6-sol (openai) over api
+- Orchestrator provider (excluded): anthropic
+- Verifier's read surface: agency: none — this round's verifier could not look at the tree
+- Raw round output: `.dabbler/runs/s77/`

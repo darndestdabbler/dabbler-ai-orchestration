@@ -1558,9 +1558,9 @@
     {
       "number": 79,
       "title": "Seals, and a master that only moves on green",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-02T11:36:19.919000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-09-02T12:34:41.121000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

@@ -114,7 +114,14 @@ jobs:
 
       - name: Pack
         working-directory: packages/router
-        run: npm pack --pack-destination "$GITHUB_WORKSPACE/dist"
+        # The destination first: `npm pack` writes into `--pack-destination`
+        # and does not create it, so the first real run of this workflow --
+        # v2.8.0, 2026-09-02 -- failed with ENOENT on the tarball it was
+        # about to write. Nothing had been published, which is the only
+        # reason the tag could simply be moved.
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/dist"
+          npm pack --pack-destination "$GITHUB_WORKSPACE/dist"
 
       - name: Upload dist artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1

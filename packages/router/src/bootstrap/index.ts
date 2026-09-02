@@ -31,7 +31,7 @@ import { basename, join, resolve } from "node:path";
 
 import { SESSIONS_DIRNAME, SESSION_PLAN_FILENAME } from "../evidence.ts";
 import { readText } from "../textfile.ts";
-import { EXIT_BLOCKING } from "../verify/errors.ts";
+import { EXIT_BLOCKING } from "../contracts/exitCodes.ts";
 import {
   AGENTS_TAIL,
   BOOTSTRAP_PLAN,

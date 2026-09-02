@@ -13,13 +13,12 @@
 // either transport. One retry excludes a failed provider too; when nothing
 // survives, the close stays blocked and only the operator can resolve it.
 //
-// No round opens on unproved work. The tests a change makes necessary cost
-// nothing next to a model, so they run first: a round is refused until an
-// accepted `preverify-targeted` record exists for the surfaces as they
-// currently stand. The same economy governs the declared controls: `facts`
-// settles compile, typecheck, lint and analyzer before dispatch, and a red
-// required one returns to the author instead of being bought a verifier's
-// opinion.
+// What a round requires of the tree is what the round itself does: the
+// verifier's authored tests run inside it, and the complete suite remains
+// the run of record after the final verified tree. The declared controls
+// still run first -- `facts` settles compile, typecheck, lint and analyzer
+// before dispatch, and a red required one returns to the author instead of
+// being bought a verifier's opinion.
 
 import {
   applyWrites,
@@ -33,13 +32,9 @@ import {
 } from "../agency.ts";
 import {
   loadSelectionConfig,
-  preverifyGate,
-  preverifyRecipe,
-  remediationRecipe,
   workingTreeChanges,
-  type PreverifyGate,
 } from "../affected.ts";
-import { writeErr, writeOut } from "../cli/output.ts";
+import { writeErr, writeOut } from "../output.ts";
 import {
   loadConfig,
   resolveTransport,
@@ -222,14 +217,6 @@ export async function runOfRecordLines(
   return runOfRecordRecipe(sessionsDir, suite.name, suite.command);
 }
 
-function preverifyRefusalTail(sessionsDir: string, gate: PreverifyGate): string {
-  return gate.command
-    ? preverifyRecipe(sessionsDir, gate.suite, gate.command)
-    : "There is no targeted command to offer you: declare the " +
-        "missing mapping under testing.selection so the selector can " +
-        "answer for these paths.";
-}
-
 /**
  * The cap is reached, so no further round opens. Which of the two
  * cap-terminal states this is is decided from the record, never asked of
@@ -334,21 +321,9 @@ export async function terminateAtCap(
     return EXIT_UNRESOLVED;
   }
 
-  const gate = preverifyGate(repoRoot, sessionsDir, config);
-  if (!gate.ok) {
-    writeErr(
-      "verify: refused -- the fix has no valid targeted selection " +
-        `evidence for this tree: ${gate.reason}.\n` +
-        "REMEDIATED AT THE CAP lands work no verifier reviewed, so the " +
-        "one thing it does prove is that the repair passed the tests " +
-        "it makes necessary. Run them first:\n" +
-        `${preverifyRefusalTail(sessionsDir, gate)}\n`,
-    );
-    // The same refusal as the one that precedes any round, in the same
-    // words: a missing pre-verification run, not a finding. It answers with
-    // the same code, so one fact is not two.
-    return EXIT_USAGE;
-  }
+  // The targeted-evidence gate that stood here went with the selection it
+  // demanded; what REMEDIATED AT THE CAP now rests on is the run of record
+  // against the final tree, which the close still requires.
 
   const row: Row = {
     round: Number(latest["round"]) + 1,
@@ -516,29 +491,18 @@ export async function runRound(
     throw error;
   }
 
-  // After the bundle exists and before any model sees it: there is something
-  // to review, so the tests that review costs nothing must have run first.
-  const gate = preverifyGate(repoRoot, sessionsDir, config);
-  if (!gate.ok) {
-    writeErr(
-      "verify: refused -- no valid targeted selection evidence for " +
-        `this tree: ${gate.reason}.\n` +
-        "Verification is not the first thing a change meets; the tests " +
-        "the change affects are. The full suite is neither required nor " +
-        "accepted here -- it is the run of record, and it comes AFTER " +
-        `the final verified tree.\n${preverifyRefusalTail(sessionsDir, gate)}\n` +
-        "`dabbler affected` prints the selection and the " +
-        "reason behind each row.\n",
-    );
-    return EXIT_USAGE;
-  }
+  // No targeted-evidence gate stands here any more: the selection it
+  // demanded measured 353-625 s per session and twice cost more than the
+  // full suite it approximates. What a round requires of the tree is what
+  // the round itself does -- the verifier's authored tests inside it -- and
+  // the complete suite remains the run of record after the final verified
+  // tree.
 
   // Still before any model sees the bundle: everything the machine can
   // settle by itself, settled. A red required control is the author's to
   // fix, and a verification round spent rediscovering it buys nothing the
   // exit code already said.
   const facts = await collectFacts(repoRoot, sessionsDir, config, {
-    gate,
     roundNumber,
     sessionNumber: current,
   });
@@ -732,8 +696,10 @@ export async function runRound(
         `(verifier ${result.model_name}/${result.provider}). Raw output: ` +
         `${rawPath}\n` +
         `${summaryLine(agencyRecord)}\n` +
-        remediationRecipe(sessionsDir, gate.suite) +
-        "\n",
+        "Fix what the findings cite, then re-run " +
+        `\`dabbler verify --sessions-dir ${sessionsDir}\`: the next round ` +
+        "reviews the fix delta, and the complete suite remains the run of " +
+        "record after the final verified tree.\n",
     );
     return EXIT_BLOCKING;
   }

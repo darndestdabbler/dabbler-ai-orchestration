@@ -466,6 +466,32 @@ describe("the task rows", () => {
     expect(String(buildTaskRows(sessionsDir, 1)[1]["intent"])).toContain("Do it.");
   });
 
+  it("every accepted step ends Work when no targeted run was ever recorded", () => {
+    // The current signal: the driver's phase has moved past the steps. The
+    // preverify-row branch below it is the OLD signal, kept so records from
+    // before the targeted run was removed read unchanged.
+    const { repo, sessionsDir } = makeStateDirs();
+    start(sessionsDir);
+    declareSessionTask(sessionsDir, { sessionNumber: 1, task: "Do it.", releasable: false });
+    expect(states(sessionsDir)[2]).toBe("in flight");
+    writeRun(repo, 1, {
+      schema_version: 1,
+      session_number: 1,
+      engine: "claude-code",
+      phase: "verify",
+      seq: 3,
+      invocations: 0,
+      max_invocations: 24,
+      accepted_steps: ["widget"],
+      baseline_tree: null,
+      stop: null,
+      started_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    });
+    expect(states(sessionsDir)[2]).toBe("done");
+    expect(openId(sessionsDir)).toBe("verify");
+  });
+
   it("the affected tests recorded passing end Work, for this session's rows only", () => {
     // A row stamped with another session is not this one's; a row stamped
     // with none is attributed by the session's window, which is where every

@@ -8,7 +8,7 @@
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 
-import { writeErr, writeOut } from "../cli/output.ts";
+import { writeErr, writeOut } from "../output.ts";
 import {
   CRITIQUE_PIPELINE_DEFAULT,
   CRITIQUE_PIPELINE_SHADOW,

@@ -9,7 +9,7 @@
 import { writeAccepted } from "../agency.ts";
 import { checkRunGreen, type CheckRun } from "../checks.ts";
 import { loadConfig } from "../config.ts";
-import { writeOut } from "../cli/output.ts";
+import { writeOut } from "../output.ts";
 import * as fixloop from "../fixloop.ts";
 import { APPROVAL_STEPS, STEP_TITLES } from "../solution.ts";
 import * as stepreview from "../stepreview.ts";

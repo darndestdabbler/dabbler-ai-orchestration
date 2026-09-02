@@ -113,7 +113,7 @@ it.
 | 75 | The trial against what the Marketplace actually serves | — | not declared |
 | 76 | Performance patches — reaping, hidden windows, worker priority | no | 2026-09-02 |
 | 77 | The git seam — contract band and answered questions | no | 2026-09-02 |
-| 78 | Every component becomes a library, or is named as not one | — | not declared |
+| 78 | Every component becomes a library, or is named as not one | no | 2026-09-02 |
 | 79 | Seals, and a master that only moves on green | — | not declared |
 | 80 | The loop stops living in anyone's attention | — | not declared |
 | 81 | Publishing without a secret, and the last of the friction | — | not declared |
@@ -1764,3 +1764,9 @@ Session 76 of 77: performance patches -- reaping, hidden windows, worker priorit
 **Releasable: no.**
 
 Make journal.runGit a tested seam instead of a comment: a contract band of ~15 real-git tests pins every git behavior the router relies on (diff -z parse shapes, the autocrlf class from the session-66 incident, update-ref on Windows, the porcelain the gates read), and a recorded-answer fixture lets every other test feed git's answers through the runGit interface instead of building a scratch repository. The six heaviest repo-builders — projection, owedDecisions, verify, facts, lifecycle, evidence, holding ~130 of the ~240 build sites — convert to answers-in, decisions-out; tests that genuinely exercise spawning keep their real children. The suite is re-measured against session 76's baseline and the number recorded where the worker-cap comment already reasons from measurements.
+
+### Session 78 — Every component becomes a library, or is named as not one
+
+**Releasable: no.**
+
+Make every component meet the operator's library criteria or be named as not one. First the redundant targeted pre-verification run dies (measured 353-625s per session, twice more than the full suite it approximates); the Work task-row signal moves to what the framework already owns, accepted steps, with the old stage vocabulary kept for reading old records. Then the measured back-edge clusters are cut in order: the cli/output print helpers move to a leaf (~7 back-edges), the session-state reader leaves progress's height (~10), config stops importing transports (1 cut freeing ~6). SCC-B (ledger/critique/evidence, 4 back-edges) pilots the single-writer append-only rule. The L5 club (~20 edges among cli/drive/session/verify/gates/progress) is begun along the five mini-workflow boundaries with recorded handoffs as the only interface; what does not finish is measured, named, and amended into a follow-on scope on the record. The boundary then holds by lint with a frozen baseline.

@@ -20,7 +20,7 @@ import { dirname, join } from "node:path";
 
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 
-import { writeErr, writeOut } from "./cli/output.ts";
+import { writeErr, writeOut } from "./output.ts";
 import { writeTextLf } from "./journal.ts";
 import { dumps, pythonRepr } from "./pythonJson.ts";
 import { readText } from "./textfile.ts";

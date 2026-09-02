@@ -17,7 +17,7 @@
 // block to ask about.
 
 import { loadConfig } from "./config.ts";
-import { readSessionState } from "./progress.ts";
+import { readRawSessionState } from "./sessionState.ts";
 import { pythonRepr } from "./pythonJson.ts";
 import { KNOWN_PROVIDERS, confirmedCatalogEntries } from "./transports/copilot.ts";
 
@@ -32,7 +32,6 @@ export const PROVENANCE_ASSERTED = "asserted";
 export const SOURCE_MODEL_REGISTRY = "model-registry";
 export const SOURCE_PROVIDER_FIELD = "provider-field";
 
-const DATE_SUFFIX = /-\d{8}$/;
 
 /**
  * The orchestrator's effective provider cannot be established. Fail closed --
@@ -74,15 +73,13 @@ export function classifyIdentityProvenance(engine: unknown): string | null {
  * `claude-` ids -- an unscoped strip once let an invented dated variant of
  * another provider's id normalize onto a real entry.
  *
- * Public because the registry and a seat catalog spell the same model
- * differently, and more than one caller has to decide whether two ids name one
- * model.
+ * The rule itself lives with the shared shapes (`contracts/models.ts`):
+ * selection compares ids under the same spelling, and its import of this
+ * module for a string rule was a back-edge. Re-exported so this module's
+ * consumers keep their import.
  */
-export function normalizeModelToken(model: string): string {
-  let token = model.trim().toLowerCase().replace(/\./g, "-");
-  if (token.startsWith("claude-")) token = token.replace(DATE_SUFFIX, "");
-  return token;
-}
+export { normalizeModelToken } from "./contracts/models.ts";
+import { normalizeModelToken } from "./contracts/models.ts";
 
 function loadDefaultRegistry(): ModelsRegistry {
   try {
@@ -244,7 +241,10 @@ export function resolveSessionOrchestratorIdentity(
   sessionNumber?: number | null,
   options: { modelsRegistry?: ModelsRegistry | null } = {},
 ): OrchestratorIdentity {
-  const state = readSessionState(sessionsDir);
+  // The raw record: identity needs the sessions array and its stored
+  // per-session fields, which v5 carries as written; the projection's
+  // derived view is the Work Explorer's concern, not this resolution's.
+  const state = readRawSessionState(sessionsDir);
   if (state === null) {
     throw new IdentityResolutionError(
       `no readable session-state.json under ${sessionsDir}`,

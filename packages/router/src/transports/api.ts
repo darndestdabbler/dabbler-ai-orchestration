@@ -14,7 +14,7 @@
 // thread the process has. The retry ladder, what is retried and what is not,
 // and every field read off a response body are the same.
 
-import { writeErr } from "../cli/output.ts";
+import { writeErr } from "../output.ts";
 import { resolveSecret } from "../secretResolver.ts";
 import type { APIResult, DispatchRequest } from "./base.ts";
 

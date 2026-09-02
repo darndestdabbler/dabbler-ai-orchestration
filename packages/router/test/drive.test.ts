@@ -412,7 +412,7 @@ describe("dabbler session drive", { timeout: 120_000 }, () => {
     expect(sessionStatus(sessionsDir)).toBe("complete");
     expect(readRounds(repo, 1).map((row) => row["verdict"])).toEqual(["VERIFIED"]);
     const stages = readRecords(repo).map((row) => `${row.stage}:${row.outcome}`);
-    expect(stages).toEqual(["preverify-targeted:passed", "final-full:passed"]);
+    expect(stages).toEqual(["final-full:passed"]);
     const log = runGit(repo, ["log", "--format=%s", "-n", "3"]).stdout.split("\n");
     expect(log).toContain("Session 1: Make widget() return 2.");
     expect(runGit(repo, ["rev-list", "--count", "@{u}..HEAD"]).stdout).toBe("0");
@@ -685,8 +685,6 @@ describe("dabbler session drive", { timeout: 120_000 }, () => {
       [2, "VERIFIED", "fix-delta"],
     ]);
     expect(readRecords(repo).map((row) => `${row.stage}:${row.outcome}`)).toEqual([
-      "preverify-targeted:passed",
-      "preverify-targeted:passed",
       "final-full:passed",
     ]);
     expect(sessionStatus(sessionsDir)).toBe("complete");
@@ -809,9 +807,7 @@ describe("dabbler session drive", { timeout: 120_000 }, () => {
     expect(out).toContain("verification-settled reason=cap-clean");
     expect(readRounds(repo, 1)).toHaveLength(1);
     expect(readRecords(repo).map((row) => `${row.stage}:${row.outcome}`)).toEqual([
-      "preverify-targeted:passed",
       "final-full:failed",
-      "preverify-targeted:passed",
       "final-full:passed",
     ]);
     expect(sessionStatus(sessionsDir)).toBe("complete");
@@ -1142,28 +1138,23 @@ describe("dabbler session drive", { timeout: 120_000 }, () => {
     expect(consequence).toContain("process.exit(0)");
   });
 
-  it("runs the affected tests itself and sends a red run back as a fix step before any verifier sees the tree", async () => {
+  // The targeted pre-verification run and its fix-tests loop are gone: the
+  // behavior "run the affected tests before any verifier sees the tree" no
+  // longer exists to test. A red suite now surfaces at the run of record,
+  // whose own fix loop is tested below.
+  it("drives a session whose broken step is caught by the run of record, not before", async () => {
     const { repo, sessionsDir } = drivenRepo();
     configure([VERIFIED]);
     const engine = scripted(({ instruction }, tools) => {
       if (instruction.answer_schema === WORK_PLAN_SCHEMA) return void tools.answer(PLAN);
-      if (instruction.step_id === "widget") {
-        // Passes the step's own check and fails the suite.
-        tools.write("src/widget.py", "def widget():\n    return 2  # broken\n");
-        tools.report({ step: "widget", files: ["src/widget.py"] });
-        return;
-      }
       tools.write("src/widget.py", WIDGET_V2);
       tools.report({ step: instruction.step_id as string, files: ["src/widget.py"] });
     });
 
     const { code } = await drive(sessionsDir, engine);
     expect(code).toBe(0);
-    expect(engine.seen.map((entry) => entry.step_id)).toEqual(["plan", "widget", "fix-tests"]);
-    expect(engine.seen[2]?.ask).toContain("node tests/run.mjs tests/test_widget.py");
+    expect(engine.seen.map((entry) => entry.step_id)).toEqual(["plan", "widget"]);
     expect(readRecords(repo).map((row) => `${row.stage}:${row.outcome}`)).toEqual([
-      "preverify-targeted:failed",
-      "preverify-targeted:passed",
       "final-full:passed",
     ]);
     expect(readRounds(repo, 1)).toHaveLength(1);
@@ -1492,8 +1483,8 @@ describe("dabbler session next", { timeout: 120_000 }, () => {
     expect(waited.instruction?.answer_schema).toBeUndefined();
     expect(waited.instruction?.answer_command).toContain("session next");
     expect(existsSync(join(repo, String(waited.instruction?.log)))).toBe(true);
-    // The affected tests are the first of the framework's own long work.
-    expect(readRun(repo, 1)?.job).toMatchObject({ name: "affected tests: unit" });
+    // Verification is now the first of the framework's own long work.
+    expect(readRun(repo, 1)?.job).toMatchObject({ name: "verification" });
 
     let result = waited;
     for (let call = 0; call < 200 && result.instruction?.kind === "wait"; call += 1) {
@@ -1508,7 +1499,6 @@ describe("dabbler session next", { timeout: 120_000 }, () => {
     expect(sessionStatus(sessionsDir)).toBe("complete");
     expect(readRounds(repo, 1).map((row) => row["verdict"])).toEqual(["VERIFIED"]);
     expect(readRecords(repo).map((row) => `${row.stage}:${row.outcome}`)).toEqual([
-      "preverify-targeted:passed",
       "final-full:passed",
     ]);
   });
@@ -1719,41 +1709,10 @@ describe("dabbler session next", { timeout: 120_000 }, () => {
     expect(job?.argv.join(" ")).toContain("--transport offline");
   });
 
-  it("answers verify's refusal by running the affected tests again, and stops with verify's own words when that cannot help", async () => {
-    const { repo, sessionsDir } = drivenRepo();
-    // No smoke fallback: a path the selector cannot map is a refusal the
-    // pre-verification phase can never satisfy, which is what proves the
-    // heal is BOUNDED. The honest case -- evidence the tree moved under --
-    // is answered by the same re-run, and would not stop at all.
-    configure([VERIFIED], {}, {
-      testing: { ...TESTING, selection: { ...TESTING.selection, smoke: [] } },
-    });
-    await throughTheStep(repo, sessionsDir);
-
-    let result = await next(sessionsDir);
-    writeFileSync(join(repo, "notes.txt"), "the selector maps this to nothing\n", "utf8");
-    // Every call's channel, because the heal is announced by the call that
-    // makes it and the stop is printed by a later one.
-    let said = result.err;
-    for (let call = 0; call < 400 && result.instruction?.kind === "wait"; call += 1) {
-      await new Promise((resolve) => setTimeout(resolve, 100));
-      result = await next(sessionsDir);
-      said += result.err;
-    }
-
-    const run = readRun(repo, 1);
-    // Twice round, then the operator: a loop that healed forever would be
-    // the deadlock this fix is about, wearing a different hat.
-    expect(run?.preverify_heals).toBe(2);
-    expect(run?.stop?.kind).toBe("verification");
-    // The refusal's OWN reason, which is what the deadlock classifier
-    // compares. The sentence it replaced was identical for every refusal
-    // verify has, so two unlike causes read as one impasse.
-    expect(run?.stop?.reason).toContain("notes.txt");
-    expect(run?.stop?.reason).not.toContain("nothing here can answer it");
-    expect(said).toContain("preverify-stale");
-  });
-
+  // The verify-refusal heal and its bounded loop went with the targeted
+  // selection and the gate that demanded it: `verify` no longer refuses
+  // over missing targeted evidence, so there is no refusal to heal and no
+  // loop to bound.
   it("returns from every call that starts a job rather than waiting for it", async () => {
     const { repo, sessionsDir } = drivenRepo();
     // A suite slow enough that each job is still running when the call that
@@ -1787,13 +1746,11 @@ describe("dabbler session next", { timeout: 120_000 }, () => {
     // would say the same thing on an idle machine and something else on a
     // busy one.
     expect([...waitedOn].map((log) => log.split("/").pop()).sort()).toEqual([
-      "affected-tests-unit.log",
       "close.log",
       "run-of-record-unit.log",
       "verification.log",
     ]);
     expect(readRecords(repo).map((row) => `${row.stage}:${row.outcome}`)).toEqual([
-      "preverify-targeted:passed",
       "final-full:passed",
     ]);
   });

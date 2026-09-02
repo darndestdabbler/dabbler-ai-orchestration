@@ -248,34 +248,11 @@ export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-/**
- * The raw on-disk record, or null when no usable state exists.
- *
- * A read error other than "not there" propagates, as Python's does: a
- * locked file is not an absent one, and treating it as absent invites
- * writers to clobber real state.
- */
-export function readRawSessionState(
-  sessionsDir: string,
-): Record<string, unknown> | null {
-  let raw: unknown;
-  try {
-    raw = JSON.parse(readFileSync(join(sessionsDir, STATE_FILENAME), "utf8"));
-  } catch (error) {
-    // Absent and malformed are both "no usable state"; anything else -- a
-    // permission denial, a directory where the file should be -- propagates,
-    // because a locked file is not an absent one and treating it as absent
-    // invites writers to clobber real state.
-    //
-    // Asked of the file rather than of a prior `existsSync`: between that
-    // question and this read the file can go, and a caller that then saw
-    // ENOENT thrown would get an error where Python returns null.
-    if (error instanceof SyntaxError) return null;
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
-    throw error;
-  }
-  return isRecord(raw) ? raw : null;
-}
+// The raw reader lives at the record's level (`sessionState.ts`); the fold
+// and the projection stay here. Re-exported so every existing caller keeps
+// its import.
+import { readRawSessionState } from "./sessionState.ts";
+export { readRawSessionState };
 
 /**
  * The v5 record with the derived fields every caller asks for.
@@ -1002,14 +979,27 @@ export function buildTaskRows(
   // the first phase not done is blocked, and its intent says which bound
   // the loop met. Read from the driver's own state rather than inferred,
   // and refused like the rounds ledger when that file does not parse.
+  let driverRun: ReturnType<typeof readRun> = null;
   let driverStop: { kind: string; reason: string } | null = null;
   try {
-    const run = readRun(repoRoot, sessionNumber);
-    if (run !== null && run.stop !== null) driverStop = run.stop;
+    driverRun = readRun(repoRoot, sessionNumber);
+    if (driverRun !== null && driverRun.stop !== null) driverStop = driverRun.stop;
   } catch (error) {
     if (!(error instanceof LedgerError)) throw error;
     throw new TaskRowsRefused(`driver run: ${error.message}`);
   }
+  // Work is done when every step of the approved plan is accepted -- the
+  // fact the framework already owns; the driver's phase says it has moved
+  // past the steps. A preverify evidence row is the OLD signal and still
+  // ends the phase, so a record written before the targeted run was
+  // removed reads exactly as it did.
+  const stepsDone =
+    driverRun !== null && driverRun.phase !== "plan" && driverRun.phase !== "steps";
+  const stepsDoneAt = stepsDone
+    ? (rounds.length > 0 ? pyStr(rounds[0]["recorded_at"]) || null : null) ??
+      driverRun?.updated_at ??
+      null
+    : null;
 
   const phases: Phase[] = [
     {
@@ -1030,8 +1020,10 @@ export function buildTaskRows(
       id: TASK_WORK,
       intent: preverify
         ? `The edits, with the affected tests recorded passing (${preverify.suite}).`
-        : "The edits; done when the affected tests are recorded passing.",
-      doneAt: preverify ? preverify.recordedAt : null,
+        : stepsDone
+          ? "The edits: every step of the approved plan accepted."
+          : "The edits; done when every step of the approved plan is accepted.",
+      doneAt: preverify ? preverify.recordedAt : stepsDoneAt,
       blocked: false,
     },
     {

@@ -17,7 +17,7 @@
 import { statSync } from "node:fs";
 import { isAbsolute, relative, resolve } from "node:path";
 
-import { writeErr, writeOut } from "../cli/output.ts";
+import { writeErr, writeOut } from "../output.ts";
 import { loadConfig, verificationRoundCap } from "../config.ts";
 import { repoRootFor, runGit, snapshotWorktreeTree } from "../evidence.ts";
 import { buildDiffPathspecs, checkEvidenceCap } from "../facts.ts";

@@ -267,6 +267,20 @@ async function runSuite(argv: readonly string[]): Promise<number> {
     );
     return EXIT_USAGE;
   }
+  // The stage survives in the vocabulary only so old records still read.
+  // Nothing produces it any more -- the targeted pre-verification run was
+  // removed (session 78) after measuring 353-625 s per session against a
+  // 590-698 s full suite -- and a NEW row at this stage would revive the
+  // Work-completion signal the old records carry.
+  if (stage === STAGE_PREVERIFY_TARGETED) {
+    writeErr(
+      "dabbler test-evidence: refused -- the 'preverify-targeted' stage is " +
+        "read-only history: the targeted pre-verification run was removed, " +
+        "and no new row may claim it. The verifier's authored tests run " +
+        "inside the round, and the complete suite is the run of record.\n",
+    );
+    return EXIT_USAGE;
+  }
 
   let sessionsDir: string;
   try {

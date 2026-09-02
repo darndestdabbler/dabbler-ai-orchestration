@@ -78,6 +78,19 @@ function lint(): number {
       worst = Math.max(worst, code);
     }
   }
+  // The module boundary rides in the same control: no import cycle beyond
+  // the frozen baseline (`packages/router/boundary-baseline.json`). A
+  // script rather than a plugin, so the graph rule and its baseline live
+  // in the repository they govern.
+  const boundaries = run(
+    [join(REPO_ROOT, "packages", "router", "scripts", "run-ts.mjs"),
+     join(REPO_ROOT, "packages", "router", "scripts", "check-boundaries.ts")],
+    REPO_ROOT,
+  );
+  if (boundaries !== 0) {
+    process.stderr.write("workspace-check: boundary check failed\n");
+    worst = Math.max(worst, boundaries);
+  }
   return worst;
 }
 

@@ -35,17 +35,13 @@
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 
-import { preverifyBaseline, preverifyGate, workingTreeChanges } from "./affected.ts";
 import {
   checkRunGreen,
-  loadSelectionConfig,
   makeCheck,
-  selectTests,
-  targetedCommand,
   timeoutFor,
   execute as executeCheck,
 } from "./checks.ts";
-import { divertOut, writeErr, writeOut } from "./cli/output.ts";
+import { divertOut, writeErr, writeOut } from "./output.ts";
 import {
   ConfigError,
   type RouterConfig,
@@ -191,17 +187,6 @@ export const MAX_REJECTIONS = 3;
 const JOB_POLL_MS = 250;
 /** What a `wait` tells the engine to leave the framework's work alone for. */
 const VERIFY_RETRY_SECONDS = 60;
-/**
- * How many times one run may answer a verify refusal by re-running the
- * pre-verification phase.
- *
- * One heal is the honest case: the tree moved after the targeted run, the
- * tests run again, verification proceeds. A gate the preverify phase cannot
- * satisfy -- an unmapped path with no smoke fallback, a malformed selection
- * -- would otherwise put the two phases in a loop, so the second refusal is
- * the operator's, with verify's own words.
- */
-const PREVERIFY_HEAL_CAP = 2;
 const SUITE_RETRY_SECONDS = 60;
 const CLOSE_RETRY_SECONDS = 15;
 // A pack and a push to a feed are a build and a network call; the suite is
@@ -1552,74 +1537,19 @@ ${this.stopArtifacts()}`,
     return loaded.suites.filter((suite) => suite.expensive);
   }
 
-  /** The affected tests, run and recorded; the failing command when one fails. */
-  private async preverify(): Promise<string | null> {
-    const selection = loadSelectionConfig(this.config);
-    if (!selection.ok) {
-      throw new Stop("tests", `testing.selection is malformed: ${selection.errors.join("; ")}`);
-    }
-    const changed = workingTreeChanges(
-      this.repoRoot,
-      preverifyBaseline(this.repoRoot, this.sessionsDir),
-    );
-    if (changed === null) throw new Stop("tests", "the change set could not be determined");
-    const result = selectTests(this.repoRoot, changed, selection.config);
-    for (const suite of this.expensiveSuites()) {
-      const command = targetedCommand(suite.command, result.forSuite(suite.name), {
-        runsWhole: suite.runsWhole,
-      });
-      if (command === "") continue;
-      this.log("preverify", { suite: suite.name, command });
-      // Behind a job like the rest of the framework's own work. A targeted
-      // run is short until the day it is not, and `test-evidence run` hands
-      // the suite this process's own stdout -- which under the pull is the
-      // one channel the instruction has to itself.
-      const code = await this.longWork({
-        name: `affected tests: ${suite.name}`,
-        argv: [
-          ...selfArgv(),
-          "test-evidence",
-          "run",
-          "--sessions-dir",
-          this.sessionsDir,
-          "--suite",
-          suite.name,
-          "--stage",
-          "preverify-targeted",
-          "--command",
-          command,
-        ],
-        retryAfterSeconds: SUITE_RETRY_SECONDS,
-        stopKind: "tests",
-      });
-      if (code === 1) return command;
-      if (code !== EXIT_OK) {
-        throw new Stop("tests", `the pre-verification run for ${suite.name} could not be recorded (exit ${code})`);
-      }
-    }
-    return null;
-  }
-
   private allPlanChecks(): StepSpec["checks"] {
     return this.requirePlan().steps.flatMap((step) => step.checks);
   }
 
+  /**
+   * No targeted suite runs here any more. Measured over sessions 70-77 the
+   * selection cost 353-625 s per session and twice cost MORE than the full
+   * suite it approximates; the testing that remains is the verifier's
+   * authored tests inside the round and the complete suite as the run of
+   * record, which is unchanged. The phase name stays so an old record's
+   * `preverify` rows and stops still read as what they were.
+   */
   private async phasePreverify(): Promise<void> {
-    for (;;) {
-      const failed = await this.preverify();
-      if (failed === null) break;
-      this.log("tests-failed", { command: failed });
-      await this.runStep({
-        id: "fix-tests",
-        ask:
-          `The tests this change affects failed when the framework ran them: \`${failed}\`. ` +
-          "Fix the cause. The framework will run them again after your report, and every " +
-          "step's checks with them.",
-        files: [],
-        checks: this.allPlanChecks(),
-        fromPlan: false,
-      });
-    }
     this.setPhase("verify");
   }
 
@@ -1794,29 +1724,10 @@ ${this.stopArtifacts()}`,
     // it was.
     const reason = jobLogTail(this.repoRoot, this.sessionNumber, "verification");
 
-    // The one refusal this loop can answer by itself. `verify` requires
-    // targeted evidence matching the tree it is about to review, and the
-    // pre-verification phase is what produces exactly that -- so a driver
-    // that stopped here would be stopping in front of its own next move,
-    // and re-running `verify` reaches this point forever. Session 66 spent
-    // a 24-file, 687-test cycle on it and the operator typed the command by
-    // hand.
-    let gate: { ok: boolean; reason: string } = { ok: true, reason: "" };
-    try {
-      gate = preverifyGate(this.repoRoot, this.sessionsDir, loadConfig(undefined, this.repoRoot));
-    } catch {
-      // A config this process cannot read is not a refusal this loop can
-      // answer. It stops, with verify's reason, which is where the fault
-      // will be described anyway.
-    }
-    const healed = this.run.preverify_heals ?? 0;
-    if (!gate.ok && healed < PREVERIFY_HEAL_CAP) {
-      this.log("preverify-stale", { reason: gate.reason, heal: `${healed + 1}/${PREVERIFY_HEAL_CAP}` });
-      this.run = { ...this.run, preverify_heals: healed + 1 };
-      this.save();
-      this.setPhase("preverify");
-      return;
-    }
+    // The stale-evidence heal that stood here went with the targeted
+    // selection and the gate that demanded it; `verify` no longer refuses
+    // over missing targeted evidence, so there is nothing left for the
+    // loop to answer by re-entering preverify.
 
     // The cap, reached over findings that cannot be shown remediated. It is
     // terminal by construction and no re-run changes it: the findings and

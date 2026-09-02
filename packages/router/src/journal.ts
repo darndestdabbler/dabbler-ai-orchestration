@@ -434,3 +434,70 @@ export function writeTextLf(path: string, text: string): void {
 export function platformNewlines(text: string): string {
   return process.platform === "win32" ? text.replace(/\r?\n/g, "\r\n") : text;
 }
+
+// --- Round anchors ------------------------------------------------------------
+//
+// Git-seam plumbing for the rounds ledger: a snapshot tree is written
+// through a throwaway index, so on its own it is garbage-collectable and
+// unpushable; anchoring wraps it in a commit and points a dabbler ref at
+// it. This lived in `evidence.ts`, which made the ledger -- the record's
+// single writer -- import UP into the evidence layer to write its own
+// anchor: the ledger/critique/evidence knot in the 2026-09-02 measurement.
+// The plumbing is the seam's; the row stays the ledger's.
+
+export const ROUND_REF_NAMESPACE = "refs/dabbler/rounds";
+export const ROUND_REFSPEC = `+${ROUND_REF_NAMESPACE}/*:${ROUND_REF_NAMESPACE}/*`;
+
+/**
+ * Fixed, and not the operator's: an anchor is the router's bookkeeping, and
+ * a commit carrying a person's name would read in `git log` as work they
+ * did.
+ */
+const ANCHOR_IDENTITY: Record<string, string> = {
+  GIT_AUTHOR_NAME: "dabbler-ai-router",
+  GIT_AUTHOR_EMAIL: "router@dabbler.invalid",
+  GIT_COMMITTER_NAME: "dabbler-ai-router",
+  GIT_COMMITTER_EMAIL: "router@dabbler.invalid",
+};
+
+export function roundRef(sessionNumber: number, roundNumber: number): string {
+  return `${ROUND_REF_NAMESPACE}/s${Math.trunc(sessionNumber)}/r${Math.trunc(roundNumber)}`;
+}
+
+/** Whether `rev` names an object this store actually holds. */
+export function objectExists(repoRoot: string, rev: string): boolean {
+  return runGit(repoRoot, ["cat-file", "-e", `${rev}^{object}`]).code === 0;
+}
+
+/**
+ * Make `tree` reachable: wrap it in a commit and point the round's ref at
+ * it. Returns the anchoring commit, or null when the tree is not in this
+ * store -- a row can only anchor an object it has, and inventing one would
+ * be a baseline nobody snapshotted.
+ */
+export function anchorRoundTree(
+  repoRoot: string,
+  sessionNumber: number,
+  roundNumber: number,
+  tree: string,
+): string | null {
+  if (!objectExists(repoRoot, tree)) return null;
+  const written = runGit(
+    repoRoot,
+    [
+      "commit-tree",
+      tree,
+      "-m",
+      `dabbler round snapshot: session ${sessionNumber} round ${roundNumber}`,
+    ],
+    { env: ANCHOR_IDENTITY },
+  );
+  const commit = written.stdout.trim();
+  if (written.code !== 0 || !commit) return null;
+  const updated = runGit(repoRoot, [
+    "update-ref",
+    roundRef(sessionNumber, roundNumber),
+    commit,
+  ]);
+  return updated.code === 0 ? commit : null;
+}

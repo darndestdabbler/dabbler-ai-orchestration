@@ -20,7 +20,6 @@ import { runGit, snapshotWorktreeTree } from "../src/journal.ts";
 import { appendDispute, appendRound, readRounds } from "../src/ledger.ts";
 import { resetForTests } from "../src/route.ts";
 import { resetForTests as resetRuntimeMode } from "../src/runtimeMode.ts";
-import { testEvidenceVerb } from "../src/cli/testEvidence.ts";
 import { registerSessionStart } from "../src/writers.ts";
 import { recordDispute, resolveRepoRelative } from "../src/verify/disputes.ts";
 import {
@@ -703,9 +702,6 @@ describe("a verification round, end to end", () => {
       join(makeTempDir(), "router-config.yaml"),
       config,
     );
-    // After the config is named, because the selector that judges the
-    // command reads the same declaration the round will.
-    await recordTargeted(sessionsDir);
     return { repo, sessionsDir };
   }
 
@@ -758,19 +754,6 @@ describe("a verification round, end to end", () => {
     expect(findings[0]?.["section"]).toBe("body");
   });
 
-  it("refuses to open a round on a tree with no targeted-test evidence", async () => {
-    // Verification is not the first thing a change meets; the tests the
-    // change affects are.
-    const { repo, sessionsDir } = makeSandboxRepo();
-    registerSessionStart(sessionsDir, 1, { engine: "claude-code", provider: "anthropic" });
-    writeFileSync(join(repo, "src", "widget.py"), "def widget():\n    return 2\n", "utf8");
-    const { code, err } = await capturedAsync(() => runRound(sessionsDir));
-    expect(code).toBe(EXIT_USAGE);
-    expect(err).toContain("no valid targeted selection evidence for this tree");
-    expect(err).toContain("it is the run of record, and it comes AFTER");
-    expect(readRounds(repo, 1)).toEqual([]);
-  });
-
   it("refuses a second round after a terminal row, naming the row", async () => {
     const { repo, sessionsDir } = await reviewable(["VERIFIED\n"]);
     appendRound(repo, 1, {
@@ -808,7 +791,6 @@ describe("a verification round, end to end", () => {
     ]);
     await capturedAsync(() => runRound(sessionsDir));
     writeFileSync(join(repo, "src", "widget.py"), "def widget():\n    return 3\n", "utf8");
-    await recordTargeted(sessionsDir);
     const { code } = await capturedAsync(() => runRound(sessionsDir));
     expect(code).toBe(EXIT_OK);
 
@@ -873,7 +855,6 @@ describe("a verification round, end to end", () => {
       recorded_at: "2026-01-01T00:00:00+00:00",
     });
     writeFileSync(join(repo, "src", "widget.py"), "def widget():\n    return 3\n", "utf8");
-    await recordTargeted(sessionsDir);
     const { code, out } = await capturedAsync(() => runRound(sessionsDir, { maxRounds: 1 }));
     expect(code).toBe(EXIT_OK);
     expect(out).toContain("verify: REMEDIATED AT THE CAP");
@@ -1052,28 +1033,3 @@ function commitAt(repo: string, name: string, when: string): void {
   });
 }
 
-/**
- * The pre-verification evidence a round refuses to open without, recorded
- * through the verb that judges it rather than hand-built: the policy comes
- * from the selector, and a fixture that supplied one would prove the round
- * accepts whatever it is handed.
- */
-async function recordTargeted(sessionsDir: string): Promise<void> {
-  const { out, err } = sinks();
-  try {
-    const code = await testEvidenceVerb([
-      "record",
-      "--sessions-dir", sessionsDir,
-      "--suite", "unit",
-      "--stage", "preverify-targeted",
-      "--command", "python -m pytest tests/test_widget.py",
-      "--outcome", "passed",
-      "--duration-seconds", "1",
-    ]);
-    if (code !== 0) {
-      throw new Error(`the fixture could not record evidence: ${err.join("") || out.join("")}`);
-    }
-  } finally {
-    vi.restoreAllMocks();
-  }
-}

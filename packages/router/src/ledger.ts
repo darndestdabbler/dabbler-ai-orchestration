@@ -29,7 +29,7 @@ import {
 } from "node:fs";
 import { dirname, join } from "node:path";
 
-import { anchorRoundTree } from "./evidence.ts";
+import { anchorRoundTree } from "./journal.ts";
 import { RUNS_DIRNAME, platformNewlines } from "./journal.ts";
 import { dumps } from "./pythonJson.ts";
 import { loadSchemaFile, schemaFailure } from "./schema/validate.ts";

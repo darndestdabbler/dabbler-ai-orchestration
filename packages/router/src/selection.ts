@@ -16,7 +16,7 @@
 // selection can never land on a model the process could not call.
 
 import { truthy, type RouterConfig } from "./config.ts";
-import { normalizeModelToken } from "./identity.ts";
+import { normalizeModelToken } from "./contracts/models.ts";
 import { resolveSecret } from "./secretResolver.ts";
 
 export const ROLE_GENERATOR = "generator";

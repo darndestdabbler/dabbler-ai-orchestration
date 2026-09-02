@@ -115,7 +115,7 @@ import {
   registerSessionStart,
   validateAndWriteState,
 } from "./writers.ts";
-import { writeErr, writeOut } from "./cli/output.ts";
+import { writeErr, writeOut } from "./output.ts";
 
 /**
  * Stale-record warnings for the session about to start.

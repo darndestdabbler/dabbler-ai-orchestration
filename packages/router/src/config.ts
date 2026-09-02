@@ -43,7 +43,7 @@ import { ASSET_DIR, SCHEMA_DIR } from "./paths.ts";
 import { repoRootFor } from "./journal.ts";
 import { schemaFailure } from "./schema/validate.ts";
 import { readText } from "./textfile.ts";
-import { validateTransportTimeouts } from "./transports/copilot.ts";
+import { validateTransportTimeouts } from "./contracts/transports.ts";
 import { workingDirectory } from "./workdir.ts";
 
 /** The loaded config: schema-shaped data plus the `_`-prefixed provenance. */

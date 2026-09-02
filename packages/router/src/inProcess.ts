@@ -32,7 +32,7 @@ import { latestRound, sessionRunDir } from "./ledger.ts";
 import { buildProjection } from "./progress.ts";
 import { standIn } from "./workdir.ts";
 import { HANDLERS } from "./cli/registry.ts";
-import { capture } from "./cli/output.ts";
+import { capture } from "./output.ts";
 import {
   EXIT_OK,
   outcomeForExitCode,

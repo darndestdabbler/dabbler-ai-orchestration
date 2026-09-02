@@ -6,7 +6,7 @@
 // a second time for the same round, and the substitute must be the single
 // commit `legalAnchor` allows.
 
-import { writeErr, writeOut } from "../cli/output.ts";
+import { writeErr, writeOut } from "../output.ts";
 import { objectExists, repoRootFor, runGit } from "../evidence.ts";
 import { nowIso } from "../journal.ts";
 import { LedgerError, appendReanchor, readRounds, type Row } from "../ledger.ts";

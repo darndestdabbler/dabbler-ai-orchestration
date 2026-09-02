@@ -21,7 +21,7 @@ import { platformNewlines } from "./journal.ts";
 import { ASSET_DIR } from "./paths.ts";
 import { PythonFloat, dumps } from "./pythonJson.ts";
 import { readText } from "./textfile.ts";
-import { writeOut } from "./cli/output.ts";
+import { writeOut } from "./output.ts";
 
 export const METRICS_PATH_ENV_VAR = "AI_ROUTER_METRICS_PATH";
 const DEFAULT_LOG_FILENAME = "router-metrics.jsonl";

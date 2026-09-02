@@ -33,7 +33,7 @@ import {
   type EnvelopeComparison,
   type Plan,
 } from "../approvedPlan.ts";
-import { writeErr, writeOut } from "../cli/output.ts";
+import { writeErr, writeOut } from "../output.ts";
 import { loadConfig, type RouterConfig } from "../config.ts";
 import {
   SESSION_PLAN_FILENAME,

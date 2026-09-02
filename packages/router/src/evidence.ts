@@ -120,8 +120,17 @@ export function resolveSessionsDir(explicit?: string | null, start?: string): st
 // refspecs neither push nor fetch them; `ensureRoundRefspecs` is what
 // teaches a clone to carry them both ways.
 
-export const ROUND_REF_NAMESPACE = "refs/dabbler/rounds";
-export const ROUND_REFSPEC = `+${ROUND_REF_NAMESPACE}/*:${ROUND_REF_NAMESPACE}/*`;
+// The anchor plumbing lives at the git seam (`journal.ts`); re-exported so
+// every existing consumer keeps its import. The move is what freed the
+// ledger from importing up into this layer to write its own anchor.
+import {
+  ROUND_REFSPEC,
+  ROUND_REF_NAMESPACE,
+  anchorRoundTree,
+  objectExists,
+  roundRef,
+} from "./journal.ts";
+export { ROUND_REFSPEC, ROUND_REF_NAMESPACE, anchorRoundTree, objectExists, roundRef };
 
 /**
  * With `remote.<name>.push` set at all, a bare `git push` sends only what
@@ -132,69 +141,6 @@ export const ROUND_REFSPEC = `+${ROUND_REF_NAMESPACE}/*:${ROUND_REF_NAMESPACE}/*
  */
 export const ROUND_PUSH_BRANCH_REFSPEC = "HEAD";
 
-/**
- * The identity an anchor commit is made under.
- *
- * Fixed, and not the operator's: an anchor is the router's bookkeeping, and
- * a commit carrying a person's name would read in `git log` as work they
- * did.
- */
-const ANCHOR_IDENTITY: Record<string, string> = {
-  GIT_AUTHOR_NAME: "dabbler-ai-router",
-  GIT_AUTHOR_EMAIL: "router@dabbler.invalid",
-  GIT_COMMITTER_NAME: "dabbler-ai-router",
-  GIT_COMMITTER_EMAIL: "router@dabbler.invalid",
-};
-
-export function roundRef(sessionNumber: number, roundNumber: number): string {
-  return `${ROUND_REF_NAMESPACE}/s${Math.trunc(sessionNumber)}/r${Math.trunc(roundNumber)}`;
-}
-
-/**
- * Whether `rev` names an object this store actually holds.
- *
- * A round snapshot is written through a throwaway index, so on its own it
- * is garbage-collectable and unpushable; `anchorRoundTree` is what makes it
- * reachable, and a round recorded before that existed -- or fetched by a
- * clone that lacks `ROUND_REFSPEC` -- still arrives with its baseline left
- * behind.
- */
-export function objectExists(repoRoot: string, rev: string): boolean {
-  return runGit(repoRoot, ["cat-file", "-e", `${rev}^{object}`]).code === 0;
-}
-
-/**
- * Make `tree` reachable: wrap it in a commit and point the round's ref at
- * it. Returns the anchoring commit, or null when the tree is not in this
- * store -- a row can only anchor an object it has, and inventing one would
- * be a baseline nobody snapshotted.
- */
-export function anchorRoundTree(
-  repoRoot: string,
-  sessionNumber: number,
-  roundNumber: number,
-  tree: string,
-): string | null {
-  if (!objectExists(repoRoot, tree)) return null;
-  const written = runGit(
-    repoRoot,
-    [
-      "commit-tree",
-      tree,
-      "-m",
-      `dabbler round snapshot: session ${sessionNumber} round ${roundNumber}`,
-    ],
-    { env: ANCHOR_IDENTITY },
-  );
-  const commit = written.stdout.trim();
-  if (written.code !== 0 || !commit) return null;
-  const updated = runGit(repoRoot, [
-    "update-ref",
-    roundRef(sessionNumber, roundNumber),
-    commit,
-  ]);
-  return updated.code === 0 ? commit : null;
-}
 
 /** Every round ref this session has, ascending by round. */
 export function sessionRoundRefs(repoRoot: string, sessionNumber: number): string[] {

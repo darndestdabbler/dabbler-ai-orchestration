@@ -1,0 +1,1086 @@
+// The Work Explorer projection, and the two legacy readers beneath it.
+//
+// The extension renders this JSON and re-implements none of it, so every
+// question it can ask has to be answered here: where the sessions came
+// from, which of them is in flight, what its steps are doing, what stopped
+// its verification, and -- the part a projection gets wrong most easily --
+// how it says it could not tell.
+
+import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+
+import { afterAll, describe, expect, it } from "vitest";
+
+import { writeRun } from "../src/driver.ts";
+import {
+  appendRound,
+  roundsPath,
+} from "../src/ledger.ts";
+import { CLASS_VALUE_TRADEOFF, raiseOwed } from "../src/owedDecisions.ts";
+import {
+  SESSION_STATUSES,
+  SOURCE_LEDGER,
+  SOURCE_PLAN,
+  STATUS_PLANNED,
+  TaskRowsRefused,
+  VerificationRefused,
+  buildProjection,
+  DEFAULT_STALLED_AFTER_SECONDS,
+  buildTaskRows,
+  lastActivityAt,
+  possiblyStalled,
+  buildVerificationView,
+  healStaleTitles,
+  ledgerExists,
+  needsTitleHeal,
+  normalizeLegacyState,
+  readRawLegacyState,
+  sessionsFromPlan,
+  synthesizeV3FromV2,
+  verificationCap,
+} from "../src/progress.ts";
+import { declareSessionTask, flipStateToClosed, registerSessionStart } from "../src/writers.ts";
+import { makeTempDir, removeTempDirs } from "./support/fixtures.ts";
+import { gitAnswers } from "./support/gitAnswers.ts";
+
+afterAll(removeTempDirs);
+
+// What the git sandbox provided and these tests consume: two paths and a
+// handful of seeded files. The subjects under test ask git nothing -- the
+// fold reads state files -- so the repository here is directories and
+// writes, not processes. Tree identifiers in ledger rows are identifiers,
+// not checkouts: a literal serves exactly as well as a snapshot did.
+const SEED: Record<string, string> = {
+  "docs/sessions/session-plan.md":
+    "### Session 1 of 2: First things\n1. Register.\n2. **Build the widget.** Make it real.\n" +
+    "3. Cross-provider verification.\n4. Close-out.\n\n" +
+    "### Session 2 of 2: Second things\n1. Register.\n2. Polish it.\n",
+  "dabbler.yaml":
+    "schema_version: 1\n\ntesting:\n  suites:\n    - name: unit\n" +
+    "      command: python -m pytest\n      expensive: true\n" +
+    "      covers:\n        - src/\n        - tests/\n" +
+    "      test_roots:\n        - tests\n      test_glob: \"test_*.py\"\n\n" +
+    "  selection:\n    repo_wide:\n      - dabbler.yaml\n" +
+    "    smoke:\n      - tests/test_widget.py\n    rules:\n" +
+    "      - when: src/widget.py\n        select:\n          - tests/test_widget.py\n",
+  "src/widget.py": "def widget():\n    return 1\n",
+  "tests/test_widget.py": "def test_widget():\n    assert True\n",
+  ".gitignore": ".dabbler/\n",
+};
+
+function makeStateDirs(): { repo: string; sessionsDir: string } {
+  const repo = makeTempDir();
+  for (const [rel, text] of Object.entries(SEED)) {
+    const path = join(repo, ...rel.split("/"));
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, text, "utf8");
+  }
+  // The two questions state writers ask git here, answered from the record:
+  // where the toplevel is (git's spelling: forward slashes), and that the
+  // worktree is clean -- the contract band pins both shapes.
+  gitAnswers([
+    [["rev-parse", "--show-toplevel"], { stdout: repo.split("\\").join("/") }],
+    [["status", "--porcelain", "-uall"], { stdout: "" }],
+    [["status", "--porcelain"], { stdout: "" }],
+    // The view anchors rounds by asking whether the recorded tree exists;
+    // in the sandbox every snapshot was a real object, so the answer was
+    // always yes. Same answer, now on the record.
+    [(args) => args[0] === "cat-file" && args[1] === "-e", { code: 0 }],
+    // The ledger anchors a round by committing its tree and pointing a
+    // dabbler ref at it; the contract band pins both verbs' real shapes.
+    [["commit-tree"], { stdout: "c".repeat(40) }],
+    [["update-ref"], { code: 0 }],
+  ]);
+  return { repo, sessionsDir: join(repo, "docs", "sessions") };
+}
+
+/** A 40-hex tree identifier: what a ledger row carries, without a checkout. */
+function fakeTree(fill: string): string {
+  return fill.repeat(40);
+}
+
+// A real-time stamp, and then a spin until the clock moves: every event in
+// a test lands on its own millisecond, the way sandbox spawn latency used
+// to arrange without saying so. Future-dating instead would fall OUTSIDE
+// the window when the close stamps real time; ties fall on the coin.
+function nextStamp(): string {
+  const stamp = Date.now();
+  while (Date.now() <= stamp) {
+    // spin: the next stamp, whoever takes it, is strictly later
+  }
+  return new Date(stamp).toISOString();
+}
+
+/** Register session 1, which is the whole of what `dabbler session start` writes. */
+function start(sessionsDir: string): void {
+  registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
+  const stamped = Date.now();
+  while (Date.now() <= stamped) {
+    // spin: whatever is recorded next is strictly after the start stamp
+  }
+}
+
+/** A schema-valid step event; the fold is what the tests are about. */
+function recordRound(
+  repo: string,
+  row: Record<string, unknown>,
+  sessionNumber = 1,
+): void {
+  appendRound(repo, sessionNumber, {
+    verifier_model: "gpt-5-4",
+    verifier_provider: "openai",
+    findings: [],
+    cost_usd: 0.05,
+    completion_tree: fakeTree("a"),
+    recorded_at: nextStamp(),
+    ...row,
+  });
+}
+
+// --- The legacy readers -------------------------------------------------------
+
+describe("reading a pre-v5 record", () => {
+  it("answers null for a directory that carries none", () => {
+    expect(readRawLegacyState(makeTempDir())).toBeNull();
+  });
+
+  it("answers null for one that does not parse rather than throwing", () => {
+    const dir = makeTempDir();
+    writeFileSync(join(dir, "session-state.json"), "{ not json", "utf8");
+    expect(readRawLegacyState(dir)).toBeNull();
+  });
+
+  it("synthesizes sessions from a v2 file's bare counters", () => {
+    const dir = makeTempDir();
+    const plan = join(dir, "spec.md");
+    writeFileSync(plan, "### Session 2 of 3: The middle one\n", "utf8");
+    const out = synthesizeV3FromV2(
+      { totalSessions: 3, completedSessions: [1], currentSession: 2, status: "in-progress" },
+      plan,
+    );
+    const sessions = out["sessions"] as Record<string, unknown>[];
+    expect(sessions.map((s) => s["status"])).toEqual([
+      "complete",
+      "in-progress",
+      "not-started",
+    ]);
+    expect(sessions[1]["title"]).toBe("The middle one");
+  });
+
+  it("does not count currentSession into the total it derives", () => {
+    // Including it once inflated a plan-less set to 0/1.
+    const dir = makeTempDir();
+    const out = synthesizeV3FromV2({ currentSession: 4 }, join(dir, "absent.md"));
+    expect(out["sessions"]).toEqual([]);
+  });
+
+  it("takes only a real positive integer as a session number", () => {
+    const dir = makeTempDir();
+    const out = synthesizeV3FromV2(
+      { totalSessions: "2", completedSessions: [0, -1, 1.5] },
+      join(dir, "absent.md"),
+    );
+    expect(out["sessions"]).toEqual([]);
+  });
+
+  it("promotes a v3 file's single-valued metadata onto the sessions it belongs to", () => {
+    const dir = makeTempDir();
+    const out = normalizeLegacyState(
+      {
+        schemaVersion: 3,
+        status: "in-progress",
+        orchestrator: { engine: "claude-code" },
+        startedAt: "2026-01-01T00:00:00Z",
+        sessions: [
+          { number: 1, title: "One", status: "complete" },
+          { number: 2, title: "Two", status: "in-progress" },
+        ],
+      },
+      join(dir, "absent.md"),
+    );
+    const sessions = out["sessions"] as Record<string, unknown>[];
+    expect(sessions[1]["orchestrator"]).toEqual({ engine: "claude-code" });
+    expect(sessions[1]["startedAt"]).toBe("2026-01-01T00:00:00Z");
+    expect(out["currentSession"]).toBe(2);
+  });
+
+  it("leaves a v4 file's per-session metadata where it already is", () => {
+    const dir = makeTempDir();
+    const out = normalizeLegacyState(
+      {
+        schemaVersion: 4,
+        status: "in-progress",
+        orchestrator: { engine: "codex" },
+        sessions: [{ number: 1, title: "One", status: "in-progress" }],
+      },
+      join(dir, "absent.md"),
+    );
+    expect((out["sessions"] as Record<string, unknown>[])[0]["orchestrator"]).toBeNull();
+  });
+
+  it("carries the passthrough keys forward and drops nothing else", () => {
+    const dir = makeTempDir();
+    const out = normalizeLegacyState(
+      { schemaVersion: 4, sessions: [], forceClosed: true, nextOrchestrator: "gemini" },
+      join(dir, "absent.md"),
+    );
+    expect(out["forceClosed"]).toBe(true);
+    expect(out["nextOrchestrator"]).toBe("gemini");
+    expect(out["schemaVersion"]).toBe(4);
+  });
+
+  it("keeps a non-mapping session entry as a placeholder rather than dropping it", () => {
+    const dir = makeTempDir();
+    const out = normalizeLegacyState(
+      { schemaVersion: 4, sessions: ["nonsense"] },
+      join(dir, "absent.md"),
+    );
+    expect(out["sessions"]).toEqual([{ number: null, title: null, status: null }]);
+  });
+});
+
+describe("healing a whole ledger's titles", () => {
+  it("asks for a heal when any session is generic or historyless", () => {
+    expect(needsTitleHeal([{ number: 1, title: "Session 1", status: "complete" }])).toBe(
+      true,
+    );
+    expect(
+      needsTitleHeal([
+        { number: 1, title: "Real work", status: "complete", startedAt: "x" },
+      ]),
+    ).toBe(false);
+  });
+
+  it("skips an entry whose number is not a session number", () => {
+    expect(needsTitleHeal([{ number: "1", title: "" }])).toBe(false);
+  });
+
+  it("counts the titles it moved and leaves the rest alone", () => {
+    const sessions = [
+      { number: 1, title: "Session 1", status: "not-started" },
+      { number: 2, title: "Kept", status: "complete", completedAt: "x" },
+    ];
+    const healed = healStaleTitles(sessions, new Map([[1, "From the plan"], [2, "Ignored"]]));
+    expect(healed).toBe(1);
+    expect(sessions[0]["title"]).toBe("From the plan");
+    expect(sessions[1]["title"]).toBe("Kept");
+  });
+});
+
+// --- Where a projection's sessions come from ----------------------------------
+
+describe("the source of a projection's sessions", () => {
+  it("reads the plan when nothing has ever run here", () => {
+    const { repo, sessionsDir } = makeStateDirs();
+    void repo;
+    expect(ledgerExists(sessionsDir)).toBe(false);
+    expect(sessionsFromPlan(sessionsDir)).toHaveLength(2);
+    const projection = buildProjection(sessionsDir);
+    expect(
+      (projection["repository"] as Record<string, unknown>)["sessionsSource"],
+    ).toBe(SOURCE_PLAN);
+    expect((projection["sessions"] as unknown[]).length).toBe(2);
+  });
+
+  it("carries an open decision's whole brief, options and consequences included", () => {
+    const { repo, sessionsDir } = makeStateDirs();
+    raiseOwed(repo, {
+      id: "driver-stop-s1",
+      decisionClass: CLASS_VALUE_TRADEOFF,
+      question: "Session 001 stopped (budget). Run it again, or cancel it?",
+      determined: "the loop met driver.max_invocations (1)",
+      options: [
+        { label: "Run `next` again", consequence: "It resumes from 'steps'." },
+        { label: "Cancel the session", consequence: "It ends with a reason on the record." },
+      ],
+      recommendation: "Run `next` again",
+      confidence: "high",
+      onNoAnswer: "The session stays in flight and its record stops moving.",
+    });
+    const repository = buildProjection(sessionsDir)["repository"] as Record<
+      string,
+      unknown
+    >;
+    // A surface that had the labels but not their consequences would be
+    // asking the operator to choose from a menu with no prices, and one
+    // that had to open the ledger for them would be a second place to look.
+    expect((repository["owedDecisions"] as unknown[])[0]).toMatchObject({
+      id: "driver-stop-s1",
+      blocking: false,
+      determined: "the loop met driver.max_invocations (1)",
+      recommendation: "Run `next` again",
+      confidence: "high",
+      options: [
+        { label: "Run `next` again", consequence: "It resumes from 'steps'." },
+        { label: "Cancel the session", consequence: "It ends with a reason on the record." },
+      ],
+    });
+  });
+
+  it("reads the ledger once one exists", () => {
+    const { sessionsDir } = makeStateDirs();
+    start(sessionsDir);
+    const repository = buildProjection(sessionsDir)["repository"] as Record<
+      string,
+      unknown
+    >;
+    expect(repository["sessionsSource"]).toBe(SOURCE_LEDGER);
+    expect(repository["currentSession"]).toBe(1);
+  });
+
+  it("calls an unreadable ledger a fault rather than a fresh repository", () => {
+    // Answering a broken record with the plan would report a fresh
+    // repository where there is a record that needs looking at.
+    const { sessionsDir } = makeStateDirs();
+    writeFileSync(join(sessionsDir, "sessions.json"), "{ not json", "utf8");
+    const repository = buildProjection(sessionsDir)["repository"] as Record<
+      string,
+      unknown
+    >;
+    expect(repository["sessionsSource"]).toBe(SOURCE_LEDGER);
+    expect(String(repository["invariantViolation"])).toContain("could not be read");
+    expect(buildProjection(sessionsDir)["sessions"]).toEqual([]);
+  });
+
+  it("reports a record whose invariants do not hold instead of throwing", () => {
+    const { sessionsDir } = makeStateDirs();
+    writeFileSync(
+      join(sessionsDir, "sessions.json"),
+      JSON.stringify({
+        schemaVersion: 5,
+        sessions: [
+          { number: 1, status: "in-progress" },
+          { number: 2, status: "in-progress" },
+        ],
+      }),
+      "utf8",
+    );
+    const repository = buildProjection(sessionsDir)["repository"] as Record<
+      string,
+      unknown
+    >;
+    expect(String(repository["invariantViolation"])).toContain("more than one in-progress");
+  });
+
+  it("renders a moved session under the plan's title", () => {
+    const { sessionsDir } = makeStateDirs();
+    start(sessionsDir);
+    writeFileSync(
+      join(sessionsDir, "session-plan.md"),
+      "### Session 1 of 2: Renamed after the recut\n1. Register.\n\n" +
+        "### Session 2 of 2: Second things\n1. Register.\n",
+      "utf8",
+    );
+    const sessions = buildProjection(sessionsDir)["sessions"] as Record<
+      string,
+      unknown
+    >[];
+    // Session 1 has run, so it keeps its own title; session 2 has not.
+    expect(sessions[1]["title"]).toBe("Second things");
+  });
+
+  it("names each session beside its number and gives it an icon key", () => {
+    const { sessionsDir } = makeStateDirs();
+    start(sessionsDir);
+    const sessions = buildProjection(sessionsDir)["sessions"] as Record<
+      string,
+      unknown
+    >[];
+    expect(sessions[0]["displayNumber"]).toBe("001");
+    expect(sessions[0]["iconKey"]).toBe("in-progress");
+    expect(sessions[0]["inFlight"]).toBe(true);
+    expect(sessions[1]["iconKey"]).toBe("not-started");
+  });
+});
+
+// --- The task level -----------------------------------------------------------
+
+describe("the task rows", () => {
+  /** File a test run the way `test-evidence record` does, minus the digests. */
+  function fileRun(
+    repo: string,
+    stage: string,
+    extra: Record<string, unknown> = {},
+  ): void {
+    const path = join(repo, ".dabbler", "runs", "test-runs.jsonl");
+    mkdirSync(dirname(path), { recursive: true });
+    appendFileSync(
+      path,
+      JSON.stringify({
+        suite: "unit",
+        command: "python -m pytest",
+        outcome: "passed",
+        surfaceDigest: "0".repeat(12),
+        recordedAt: nextStamp(),
+        stage,
+        ...extra,
+      }) + "\n",
+      "utf8",
+    );
+  }
+
+  function states(sessionsDir: string): string[] {
+    return buildTaskRows(sessionsDir, 1).map((row) => String(row["state"]));
+  }
+
+  function openId(sessionsDir: string): string | null {
+    const open = buildTaskRows(sessionsDir, 1).find((row) => row["isOpen"]);
+    return open ? String(open["stepId"]) : null;
+  }
+
+  it("has six phases, and registering is the first of them done", () => {
+    // The rows are the lifecycle's, not the plan's: nothing is seeded from
+    // prose, and `session start` writing `startedAt` is what finishes the
+    // first one. The second is open because it is the first not done.
+    const { sessionsDir } = makeStateDirs();
+    start(sessionsDir);
+    const rows = buildTaskRows(sessionsDir, 1);
+    expect(rows.map((row) => row["stepId"])).toEqual([
+      "register",
+      "declare",
+      "work",
+      "verify",
+      "run-of-record",
+      "close",
+    ]);
+    expect(rows.map((row) => row["state"])).toEqual([
+      "done",
+      "in flight",
+      "pending",
+      "pending",
+      "pending",
+      "pending",
+    ]);
+    expect(rows[1]["isOpen"]).toBe(true);
+    expect(typeof rows[0]["startedAt"]).toBe("string");
+    expect(typeof rows[1]["startedAt"]).toBe("string");
+    expect(rows[2]["startedAt"]).toBeNull();
+  });
+
+  it("the declaration ends Declare and opens Work", () => {
+    const { sessionsDir } = makeStateDirs();
+    start(sessionsDir);
+    declareSessionTask(sessionsDir, { sessionNumber: 1, task: "Do it.", releasable: false });
+    expect(states(sessionsDir).slice(0, 3)).toEqual(["done", "done", "in flight"]);
+    expect(openId(sessionsDir)).toBe("work");
+    expect(String(buildTaskRows(sessionsDir, 1)[1]["intent"])).toContain("Do it.");
+  });
+
+  it("every accepted step ends Work when no targeted run was ever recorded", () => {
+    // The current signal: the driver's phase has moved past the steps. The
+    // preverify-row branch below it is the OLD signal, kept so records from
+    // before the targeted run was removed read unchanged.
+    const { repo, sessionsDir } = makeStateDirs();
+    start(sessionsDir);
+    declareSessionTask(sessionsDir, { sessionNumber: 1, task: "Do it.", releasable: false });
+    expect(states(sessionsDir)[2]).toBe("in flight");
+    writeRun(repo, 1, {
+      schema_version: 1,
+      session_number: 1,
+      engine: "claude-code",
+      phase: "verify",
+      seq: 3,
+      invocations: 0,
+      max_invocations: 24,
+      accepted_steps: ["widget"],
+      baseline_tree: null,
+      stop: null,
+      started_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    });
+    expect(states(sessionsDir)[2]).toBe("done");
+    expect(openId(sessionsDir)).toBe("verify");
+  });
+
+  it("the affected tests recorded passing end Work, for this session's rows only", () => {
+    // A row stamped with another session is not this one's; a row stamped
+    // with none is attributed by the session's window, which is where every
+    // row written before the stamp existed lands.
+    const { repo, sessionsDir } = makeStateDirs();
+    start(sessionsDir);
+    declareSessionTask(sessionsDir, { sessionNumber: 1, task: "Do it.", releasable: false });
+    fileRun(repo, "preverify-targeted", { sessionNumber: 2 });
+    expect(openId(sessionsDir)).toBe("work");
+    fileRun(repo, "preverify-targeted");
+    expect(openId(sessionsDir)).toBe("verify");
+    expect(states(sessionsDir)[2]).toBe("done");
+  });
+
+  it("a blocking round keeps Verify open with the round in its words; a clean one ends it", () => {
+    const { repo, sessionsDir } = makeStateDirs();
+    start(sessionsDir);
+    declareSessionTask(sessionsDir, { sessionNumber: 1, task: "Do it.", releasable: false });
+    fileRun(repo, "preverify-targeted");
+    recordRound(repo, { round: 1, verdict: "ISSUES_FOUND", blocking: true });
+    let rows = buildTaskRows(sessionsDir, 1);
+    expect(rows[3]["state"]).toBe("in flight");
+    expect(String(rows[3]["intent"])).toContain("round 1");
+    recordRound(repo, {
+      round: 2,
+      verdict: "VERIFIED",
+      blocking: false,
+      previous_tree: fakeTree("b"),
+    });
+    rows = buildTaskRows(sessionsDir, 1);
+    expect(rows[3]["state"]).toBe("done");
+    expect(rows[4]["isOpen"]).toBe(true);
+  });
+
+  it("verification that stopped at the cap is blocked on the cancelled glyph, and nothing is open", () => {
+    const { repo, sessionsDir } = makeStateDirs();
+    start(sessionsDir);
+    declareSessionTask(sessionsDir, { sessionNumber: 1, task: "Do it.", releasable: false });
+    fileRun(repo, "preverify-targeted");
+    recordRound(repo, { round: 1, verdict: "ISSUES_FOUND", blocking: true });
+    recordRound(repo, {
+      round: 2,
+      verdict: "REMEDIATED_AT_CAP",
+      blocking: false,
+      type: "remediated_at_cap",
+      previous_tree: fakeTree("b"),
+      remediated: {
+        reviewed_round: 1,
+        findings: [{ description: "fixed", severity: "major" }],
+        fix_paths: [],
+      },
+    });
+    const rows = buildTaskRows(sessionsDir, 1);
+    expect(rows[3]["state"]).toBe("blocked");
+    expect(rows[3]["iconKey"]).toBe("cancelled");
+    expect(rows.every((row) => row["isOpen"] === false)).toBe(true);
+    expect(rows[4]["state"]).toBe("pending");
+  });
+
+  it("the run of record counts only after the verdict, and the close ends the list", () => {
+    const { repo, sessionsDir } = makeStateDirs();
+    start(sessionsDir);
+    declareSessionTask(sessionsDir, { sessionNumber: 1, task: "Do it.", releasable: false });
+    fileRun(repo, "preverify-targeted");
+    fileRun(repo, "final-full");
+    expect(states(sessionsDir)[4]).toBe("pending");
+    recordRound(repo, { round: 1, verdict: "VERIFIED", blocking: false });
+    expect(states(sessionsDir)[4]).toBe("in flight");
+    fileRun(repo, "final-full");
+    expect(states(sessionsDir)[4]).toBe("done");
+    expect(openId(sessionsDir)).toBe("close");
+    flipStateToClosed(sessionsDir, { verdict: "VERIFIED", forced: false });
+    expect(states(sessionsDir)).toEqual(["done", "done", "done", "done", "done", "done"]);
+    expect(openId(sessionsDir)).toBeNull();
+  });
+
+  it("has no tasks and no refusal in a repository nothing has run in", () => {
+    const { sessionsDir } = makeStateDirs();
+    expect(buildTaskRows(sessionsDir, 1)).toEqual([]);
+  });
+
+  it("reads a run record carrying a member it has never heard of, and still refuses a damaged one", () => {
+    const { repo, sessionsDir } = makeStateDirs();
+    start(sessionsDir);
+    declareSessionTask(sessionsDir, { sessionNumber: 1, task: "Do it.", releasable: false });
+    const run = {
+      schema_version: 1,
+      session_number: 1,
+      engine: "claude-code",
+      phase: "steps",
+      seq: 3,
+      invocations: 1,
+      max_invocations: 24,
+      accepted_steps: [],
+      baseline_tree: null,
+      stop: { kind: "blocked", reason: "the widget is load-bearing", at: "2026-08-31T12:00:00-04:00" },
+      started_at: "2026-08-31T11:00:00-04:00",
+      updated_at: "2026-08-31T12:00:00-04:00",
+    };
+    const path = join(repo, ".dabbler", "runs", "s1", "driver", "run.json");
+    mkdirSync(dirname(path), { recursive: true });
+
+    // What a newer driver writes: everything this build knows, plus what it
+    // does not. The rows are what the file does say, and the stop still
+    // reaches the attention row.
+    writeFileSync(
+      path,
+      JSON.stringify({
+        ...run,
+        stop: { ...run.stop, class: "deadlock", provenance: "from a later build" },
+        weather: "unseasonable",
+      }),
+      "utf8",
+    );
+    const rows = buildTaskRows(sessionsDir, 1);
+    expect(rows).toHaveLength(6);
+    expect(rows.map((row) => String(row["intent"])).join("\n")).toContain(
+      "Driver stopped (blocked): the widget is load-bearing",
+    );
+
+    // Damage is still damage: an added member is read past, a member of the
+    // wrong type is not.
+    writeFileSync(path, JSON.stringify({ ...run, phase: 7 }), "utf8");
+    expect(() => buildTaskRows(sessionsDir, 1)).toThrow(TaskRowsRefused);
+    writeFileSync(path, JSON.stringify({ ...run, engine: undefined }), "utf8");
+    expect(() => buildTaskRows(sessionsDir, 1)).toThrow(TaskRowsRefused);
+  });
+
+  it("reaches the projection, which is where the tree reads them", () => {
+    const { sessionsDir } = makeStateDirs();
+    start(sessionsDir);
+    const sessions = buildProjection(sessionsDir)["sessions"] as Record<
+      string,
+      unknown
+    >[];
+    const inFlight = sessions.find((session) => session["inFlight"]);
+    expect((inFlight?.["tasks"] as unknown[]).length).toBe(6);
+    expect(inFlight?.["tasksRefused"]).toBeNull();
+  });
+
+  it("refuses rather than rendering an activity log it could not read", () => {
+    const { sessionsDir } = makeStateDirs();
+    start(sessionsDir);
+    writeFileSync(join(sessionsDir, "activity-log.json"), "{ not json\n", "utf8");
+    expect(() => buildTaskRows(sessionsDir, 1)).toThrow(TaskRowsRefused);
+  });
+
+  it("carries the refusal on the session rather than as an empty task list", () => {
+    const { sessionsDir } = makeStateDirs();
+    start(sessionsDir);
+    writeFileSync(join(sessionsDir, "activity-log.json"), "{ not json\n", "utf8");
+    const sessions = buildProjection(sessionsDir)["sessions"] as Record<
+      string,
+      unknown
+    >[];
+    const inFlight = sessions.find((session) => session["inFlight"]);
+    expect(inFlight?.["tasks"]).toEqual([]);
+    expect(String(inFlight?.["tasksRefused"])).toContain("activity-log.json");
+  });
+});
+
+describe("the verification view", () => {
+  it("answers null for a session with no rounds", () => {
+    const { repo } = makeStateDirs();
+    expect(buildVerificationView(repo, 1, 3)).toBeNull();
+  });
+
+  it("reads a clean round as verified and keeps the nits it noted", () => {
+    const { repo } = makeStateDirs();
+    recordRound(repo, {
+      round: 1,
+      verdict: "VERIFIED",
+      blocking: false,
+      findings: [{ description: "a nit", severity: "minor" }],
+    });
+    const view = buildVerificationView(repo, 1, 3) as Record<string, unknown>;
+    expect(view["terminal"]).toBe("VERIFIED");
+    expect(view["clean"]).toBe(true);
+    const findings = view["findings"] as Record<string, unknown>[];
+    expect(findings[0]["blocking"]).toBe(false);
+    expect(findings[0]["disposition"]).toBe("noted");
+  });
+
+  it("calls a blocking round unresolved only once it is at the cap", () => {
+    const { repo } = makeStateDirs();
+    recordRound(repo, {
+      round: 1,
+      verdict: "ISSUES_FOUND",
+      blocking: true,
+      findings: [{ description: "a bug", severity: "major" }],
+    });
+    const below = buildVerificationView(repo, 1, 3) as Record<string, unknown>;
+    expect(below["terminal"]).toBeNull();
+    expect(String(below["headline"])).toBe(
+      "blocking findings outstanding after round 1 of 3",
+    );
+    expect((below["findings"] as Record<string, unknown>[])[0]["disposition"]).toBe(
+      "outstanding",
+    );
+
+    const atCap = buildVerificationView(repo, 1, 1) as Record<string, unknown>;
+    expect(atCap["terminal"]).toBe("ISSUES_FOUND");
+  });
+
+  it("says nothing about a cap it did not get", () => {
+    const { repo } = makeStateDirs();
+    recordRound(repo, { round: 1, verdict: "ISSUES_FOUND", blocking: true });
+    const view = buildVerificationView(repo, 1, null) as Record<string, unknown>;
+    expect(view["terminal"]).toBeNull();
+    expect(String(view["headline"])).toBe(
+      "blocking findings outstanding after round 1",
+    );
+  });
+
+  it("reads a cap remediation as that terminal, with the paths the fix touched", () => {
+    const { repo } = makeStateDirs();
+    recordRound(repo, { round: 1, verdict: "ISSUES_FOUND", blocking: true });
+    recordRound(repo, {
+      round: 2,
+      verdict: "REMEDIATED_AT_CAP",
+      blocking: false,
+      type: "remediated_at_cap",
+      previous_tree: fakeTree("b"),
+      remediated: {
+        reviewed_round: 1,
+        findings: [{ description: "fixed", severity: "major" }],
+        fix_paths: ["src/widget.py"],
+      },
+    });
+    const view = buildVerificationView(repo, 1, 2) as Record<string, unknown>;
+    expect(view["terminal"]).toBe("REMEDIATED_AT_CAP");
+    expect(view["fixPaths"]).toEqual(["src/widget.py"]);
+    expect((view["findings"] as Record<string, unknown>[])[0]["disposition"]).toBe(
+      "fixed, unreviewed",
+    );
+    expect((view["findings"] as Record<string, unknown>[])[0]["round"]).toBe(1);
+  });
+
+  it("reads the vendor and the agency log from the round that stopped the session", () => {
+    const { repo } = makeStateDirs();
+    recordRound(repo, {
+      round: 1,
+      verdict: "ISSUES_FOUND",
+      blocking: true,
+      transport: "api",
+      agency: {
+        mode: "tools",
+        reads: 4,
+        operations: [{ kind: "read", target: "a", in_scope: true }],
+      },
+    });
+    recordRound(repo, {
+      round: 2,
+      verdict: "REMEDIATED_AT_CAP",
+      blocking: false,
+      type: "remediated_at_cap",
+      previous_tree: fakeTree("b"),
+      remediated: {
+        reviewed_round: 1,
+        findings: [{ description: "fixed", severity: "major" }],
+        fix_paths: ["src/widget.py"],
+      },
+    });
+    const view = buildVerificationView(repo, 1, 2) as Record<string, unknown>;
+    expect(view["rounds"]).toBe(1);
+    expect(view["stoppedAtRound"]).toBe(1);
+    expect(view["transport"]).toBe("api");
+    const agency = view["agency"] as Record<string, unknown>;
+    expect(agency["mode"]).toBe("tools");
+    expect(agency["reads"]).toBe(4);
+    expect((agency["operations"] as Record<string, unknown>[])[0]["inScope"]).toBe(true);
+  });
+
+  it("reads a row that predates the agency record as unknown, never as none", () => {
+    const { repo } = makeStateDirs();
+    recordRound(repo, { round: 1, verdict: "VERIFIED", blocking: false });
+    const view = buildVerificationView(repo, 1, 3) as Record<string, unknown>;
+    expect((view["agency"] as Record<string, unknown>)["mode"]).toBeNull();
+    expect((view["agency"] as Record<string, unknown>)["reads"]).toBe(0);
+  });
+
+  it("refuses rather than reading past a ledger line it cannot parse", () => {
+    const { repo } = makeStateDirs();
+    recordRound(repo, { round: 1, verdict: "VERIFIED", blocking: false });
+    writeFileSync(roundsPath(repo, 1), "{ not json\n", "utf8");
+    expect(() => buildVerificationView(repo, 1, 3)).toThrow(VerificationRefused);
+  });
+
+  it("carries the view on every session that has rounds, and the refusal apart", () => {
+    const { repo, sessionsDir } = makeStateDirs();
+    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
+    recordRound(repo, { round: 1, verdict: "VERIFIED", blocking: false });
+    const sessions = buildProjection(sessionsDir)["sessions"] as Record<
+      string,
+      unknown
+    >[];
+    expect((sessions[0]["verification"] as Record<string, unknown>)["clean"]).toBe(true);
+    expect(sessions[0]["verificationRefused"]).toBeNull();
+    expect(sessions[1]["verification"]).toBeNull();
+  });
+});
+
+describe("the round cap the view is judged against", () => {
+  it("is unknown, never a guess, when no configuration can be read", () => {
+    const dir = makeTempDir();
+    expect(verificationCap(join(dir, "nowhere"))).toBeTypeOf("number");
+  });
+
+  it("comes from the repository the projection is about", () => {
+    const { repo } = makeStateDirs();
+    expect(verificationCap(repo)).toBeGreaterThan(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The plan, on every projection
+// ---------------------------------------------------------------------------
+
+/** Overwrite the sandbox's plan with the given `[number, title]` headings. */
+function writePlan(
+  sessionsDir: string,
+  headings: ReadonlyArray<readonly [number, string]>,
+  extra = "",
+): void {
+  const total = headings.length;
+  const body = headings
+    .map(([n, t]) => `### Session ${n} of ${total}: ${t}\n1. Register.\n`)
+    .join("\n");
+  writeFileSync(join(sessionsDir, "session-plan.md"), body + extra, "utf8");
+}
+
+/** Close whatever is in flight, so the next-session rule has something to skip. */
+function closeSessionForTest(sessionsDir: string): void {
+  flipStateToClosed(sessionsDir, { verdict: "VERIFIED" });
+}
+
+function repository(sessionsDir: string): Record<string, unknown> {
+  return buildProjection(sessionsDir)["repository"] as Record<string, unknown>;
+}
+
+function sessions(sessionsDir: string): Record<string, unknown>[] {
+  return buildProjection(sessionsDir)["sessions"] as Record<string, unknown>[];
+}
+
+describe("a session the plan declares and the ledger has not reached", () => {
+  it("projects as 'planned', which the ledger's own vocabulary does not contain", () => {
+    const { sessionsDir } = makeStateDirs();
+    start(sessionsDir);
+    writePlan(sessionsDir, [
+      [1, "First things"],
+      [2, "Second things"],
+      [3, "Added after the last start"],
+    ]);
+    const row = sessions(sessionsDir).find((s) => s["number"] === 3);
+    expect(row?.["status"]).toBe(STATUS_PLANNED);
+    expect(SESSION_STATUSES).not.toContain(STATUS_PLANNED);
+  });
+
+  it("keeps the not-started glyph, so only the row's words separate the two", () => {
+    const { sessionsDir } = makeStateDirs();
+    start(sessionsDir);
+    writePlan(sessionsDir, [
+      [1, "First"],
+      [9, "Much later"],
+    ]);
+    const row = sessions(sessionsDir).find((s) => s["number"] === 9);
+    expect(row?.["iconKey"]).toBe("not-started");
+    expect(row?.["status"]).toBe(STATUS_PLANNED);
+  });
+
+  it("counts toward the total, so a caught-up ledger is not reported finished", () => {
+    // csv-model's item 9, reproduced: a planning session's whole deliverable
+    // is new headings, and until this the record said 2 of 2 complete.
+    const { sessionsDir } = makeStateDirs();
+    // `session start` grows the ledger to the plan as it stood then -- the
+    // seed declares two -- so the ledger looks caught up and complete.
+    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
+    expect(repository(sessionsDir)["totalSessions"]).toBe(2);
+    writePlan(sessionsDir, [
+      [1, "First"],
+      [2, "Second"],
+      [3, "Third"],
+      [4, "Fourth"],
+    ]);
+    const after = repository(sessionsDir);
+    expect(after["totalSessions"]).toBe(4);
+    expect(after["plannedSessions"]).toBe(2);
+  });
+
+  it("carries no run artifacts, because it has never been registered", () => {
+    const { sessionsDir } = makeStateDirs();
+    start(sessionsDir);
+    writePlan(sessionsDir, [
+      [1, "First"],
+      [5, "Never registered"],
+    ]);
+    const row = sessions(sessionsDir).find((s) => s["number"] === 5);
+    expect(row?.["tasks"]).toEqual([]);
+    expect(row?.["tasksRefused"]).toBeNull();
+    expect(row?.["verification"]).toBeNull();
+    expect(row?.["verificationRefused"]).toBeNull();
+    expect(row?.["inFlight"]).toBe(false);
+  });
+});
+
+describe("reconciling a hand-edited plan against the ledger", () => {
+  it("never re-emits a number the ledger already holds", () => {
+    const { sessionsDir } = makeStateDirs();
+    start(sessionsDir);
+    writePlan(sessionsDir, [
+      [1, "A title the plan changed its mind about"],
+      [2, "Second"],
+    ]);
+    const ones = sessions(sessionsDir).filter((s) => s["number"] === 1);
+    expect(ones).toHaveLength(1);
+    expect(ones[0]!["status"]).not.toBe(STATUS_PLANNED);
+  });
+
+  it("contributes a duplicated number once", () => {
+    const { sessionsDir } = makeStateDirs();
+    start(sessionsDir);
+    writePlan(sessionsDir, [
+      [1, "First"],
+      [7, "Alpha"],
+      [7, "Beta"],
+    ]);
+    expect(sessions(sessionsDir).filter((s) => s["number"] === 7)).toHaveLength(1);
+  });
+
+  it("leaves a gap alone rather than inventing the missing number", () => {
+    const { sessionsDir } = makeStateDirs();
+    start(sessionsDir);
+    writePlan(sessionsDir, [
+      [1, "First"],
+      [4, "Fourth"],
+      [6, "Sixth"],
+    ]);
+    const numbers = sessions(sessionsDir).map((s) => s["number"]);
+    expect(numbers).toContain(4);
+    expect(numbers).toContain(6);
+    expect(numbers).not.toContain(5);
+  });
+
+  it("yields nothing when the plan is shorter than the ledger", () => {
+    const { sessionsDir } = makeStateDirs();
+    start(sessionsDir);
+    registerSessionStart(sessionsDir, 2, { engine: "claude-code" });
+    writePlan(sessionsDir, [[1, "The only one left in the plan"]]);
+    const repo = repository(sessionsDir);
+    expect(repo["plannedSessions"]).toBe(0);
+    expect(repo["totalSessions"]).toBe(2);
+  });
+
+  it("takes nothing from a heading the parser cannot read", () => {
+    const { sessionsDir } = makeStateDirs();
+    start(sessionsDir);
+    writePlan(sessionsDir, [[1, "First"]], "\n## Session eleven: not a heading\n");
+    expect(repository(sessionsDir)["plannedSessions"]).toBe(0);
+  });
+});
+
+describe("what registers on the next session start", () => {
+  it("is the session in flight, whatever its number", () => {
+    const { sessionsDir } = makeStateDirs();
+    start(sessionsDir);
+    expect(repository(sessionsDir)["nextSession"]).toBe(1);
+  });
+
+  it("is the lowest session that has not run, planned ones included", () => {
+    const { sessionsDir } = makeStateDirs();
+    start(sessionsDir);
+    closeSessionForTest(sessionsDir);
+    writePlan(sessionsDir, [
+      [1, "First"],
+      [2, "Second"],
+      [3, "Third"],
+    ]);
+    expect(repository(sessionsDir)["nextSession"]).toBe(2);
+  });
+
+  it("is null when the plan declares nothing further", () => {
+    const { sessionsDir } = makeStateDirs();
+    start(sessionsDir);
+    closeSessionForTest(sessionsDir);
+    registerSessionStart(sessionsDir, 2, { engine: "claude-code" });
+    closeSessionForTest(sessionsDir);
+    writePlan(sessionsDir, [
+      [1, "First"],
+      [2, "Second"],
+    ]);
+    expect(repository(sessionsDir)["nextSession"]).toBeNull();
+  });
+});
+
+describe("a repository whose plan is its only record", () => {
+  it("calls every row planned, because the ledger has reached none of them", () => {
+    // Round 1 of this session's verification found the gap: `not-started`
+    // means "registered, and not begun", and nothing here is registered.
+    const { sessionsDir } = makeStateDirs();
+    expect(ledgerExists(sessionsDir)).toBe(false);
+    const projection = buildProjection(sessionsDir);
+    const rows = projection["sessions"] as Record<string, unknown>[];
+    expect(rows.length).toBeGreaterThan(0);
+    for (const row of rows) expect(row["status"]).toBe(STATUS_PLANNED);
+  });
+
+  it("counts them once, so the planned count is not the total twice over", () => {
+    const { sessionsDir } = makeStateDirs();
+    const repo = repository(sessionsDir);
+    expect(repo["plannedSessions"]).toBe(2);
+    expect(repo["totalSessions"]).toBe(2);
+    expect(repo["sessionsCompleted"]).toBe(0);
+    expect(repo["nextSession"]).toBe(1);
+  });
+
+  it("keeps the invariants readable, because the state is set after they run", () => {
+    // `validateInvariants` accepts only the ledger's four statuses, and it
+    // runs over the derived view. Stamping 'planned' any earlier would make a
+    // fresh repository report an invariant violation instead of its sessions.
+    const { sessionsDir } = makeStateDirs();
+    expect(repository(sessionsDir)["invariantViolation"]).toBeNull();
+  });
+});
+
+describe("liveness, derived rather than stamped", () => {
+  it("reads the latest timestamp the framework already wrote", () => {
+    // A field stamped beside them would be a second statement of "when did
+    // this last move", and the answer is already on disk twice over.
+    const { repo, sessionsDir } = makeStateDirs();
+    start(sessionsDir);
+    const at = lastActivityAt(sessionsDir, repo, 1);
+    expect(typeof at).toBe("string");
+    expect(Date.parse(at as string)).toBeGreaterThan(0);
+  });
+
+  it("reads the driven session's own directory, which is where its work is", () => {
+    // The gap session 66 was measured in: eight steps accepted over two
+    // hours moved the driver's three files and nothing in the ledger or the
+    // activity log, so liveness answered with the registration and called a
+    // working session stalled.
+    const { repo, sessionsDir } = makeStateDirs();
+    start(sessionsDir);
+    const registered = lastActivityAt(sessionsDir, repo, 1) as string;
+    const later = "2099-01-01T00:00:00-04:00";
+    writeRun(repo, 1, {
+      schema_version: 1,
+      session_number: 1,
+      engine: "claude-code",
+      phase: "steps",
+      seq: 1,
+      invocations: 0,
+      max_invocations: 24,
+      accepted_steps: [],
+      baseline_tree: null,
+      stop: null,
+      started_at: registered,
+      updated_at: later,
+    });
+    expect(lastActivityAt(sessionsDir, repo, 1)).toBe(later);
+    expect(possiblyStalled(later, 1, 60, new Date("2099-01-01T00:00:30-04:00"))).toBe(false);
+  });
+
+  it("says nothing about a repository nothing has run in", () => {
+    const { repo, sessionsDir } = makeStateDirs();
+    expect(lastActivityAt(sessionsDir, repo, null)).toBeNull();
+  });
+
+  it("calls no repository stalled while nothing is in flight", () => {
+    // Between sessions is not stalled; it is finished with the last one.
+    expect(possiblyStalled("2000-01-01T00:00:00+00:00", null, 60)).toBe(false);
+  });
+
+  it("calls a session stalled only once the threshold has passed", () => {
+    const now = new Date("2026-01-01T12:00:00Z");
+    const recent = "2026-01-01T11:59:00+00:00";
+    const old = "2026-01-01T10:00:00+00:00";
+    expect(possiblyStalled(recent, 1, 1800, now)).toBe(false);
+    expect(possiblyStalled(old, 1, 1800, now)).toBe(true);
+  });
+
+  it("publishes the threshold it judged against", () => {
+    const { sessionsDir } = makeStateDirs();
+    start(sessionsDir);
+    const repository = buildProjection(sessionsDir)["repository"] as Record<
+      string,
+      unknown
+    >;
+    expect(repository["stalledAfterSeconds"]).toBe(DEFAULT_STALLED_AFTER_SECONDS);
+    expect(repository["possiblyStalled"]).toBe(false);
+    expect(typeof repository["lastActivityAt"]).toBe("string");
+  });
+});

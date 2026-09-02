@@ -1,8 +1,105 @@
-# STATUS — 74 closed, 75 cancelled, 76–77 planned: performance first, still unpublished
+# STATUS — 76 closed, 77 next: the git seam, measured against 76's baseline; still unpublished
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
 `experiment/verification-pipeline-v3` and `design/solution-decomposition`
 are merged and finished. Earlier handoff text is in `docs/status-archive.md`.
+
+> ## SESSION 76 CLOSED, 2026-09-02: what a session starts, a session ends
+>
+> The operator's performance feedback, done as patches -- everything
+> mechanical, nothing that touches the evidence flow. The incident was two
+> processes found idle on 2026-09-02: an extension `test:unit` tree 38
+> hours old and a Playwright test-server 12.7 hours old, ~230 MB between
+> them, reaped by hand.
+>
+> **The spawn audit, path by path.**
+>
+> - **Declared checks, engines, the Copilot seat, the extension's driver**
+>   all spawn through `checks.spawnProgram`, and shell strings (a check's
+>   `command`, the suite `test-evidence run` starts) now go through its
+>   twin `spawnCommand`. Both track the child in a module-level registry;
+>   the router's own end -- SIGINT, SIGTERM, SIGHUP, or a plain exit with a
+>   child still live -- ends every tracked tree. Before this, `execute`
+>   ended a check only on its timeout and `runChild` only on an interrupt's
+>   ten-second fallback; a router that died any other way left the tree.
+> - **`test-evidence run`** used a blocking `spawnSync` through a shell with
+>   no `windowsHide`: a process blocked in one cannot observe the signal
+>   that would let it end its child, and a kill of the router left `cmd →
+>   npm → mocha` running. That is the shape of the 38-hour tree. It is an
+>   asynchronous, tracked, hidden spawn now.
+> - **Jobs** (the suite, a verification round, the close) are detached by
+>   design and outlive the `next` call that starts them; nothing ended one
+>   when the run was abandoned. `terminateTree` takes a pid now, `jobs.endJob`
+>   ends a job by its runner's pid (only if that pid is still alive -- the
+>   OS reuses them), the driver's one Stop catch ends a live job before the
+>   stop row is written (`session interrupt --stop` read while the pull was
+>   waiting on the job is the common case) and logs `job-ended`, and a job
+>   collected with no exit code is ended too. The job runner spawns its
+>   child as its own POSIX group and ends that tree on the signals it can
+>   observe.
+> - **The extension's drive registry** had a `dispose()` that killed every
+>   driver and nothing registered it; `sharedDrives()` is on
+>   `context.subscriptions` now, so a closing window ends its drivers and,
+>   through the registry above, what they ran.
+> - **The Playwright launch seam** records the Electron root pid and
+>   `closeVSCode` -- and the failed-launch path -- end the tree by force
+>   when `app.close()` rejects or exceeds 15 s.
+> - **The Playwright test-server is not ours.** Nothing in this repository
+>   -- no script, workflow or spec -- names or starts one. It is the
+>   Playwright VS Code extension's own process, started when it loads a
+>   workspace holding a playwright config, and outside this repository's
+>   reach. Closing that extension's test explorer, or the window, ends it.
+> - **What nothing here can observe:** a `taskkill /F` of the router itself
+>   with no `/T`. The registry needs a signal or an exit; `endJob` and the
+>   extension's tree kill are what reach a child from outside after that.
+>
+> **The last two windows.** `terminateTree`'s `taskkill` now builds through
+> `treeKillCommand`, which composes `hiddenSpawn`; the suite spawn is hidden
+> through `spawnCommand`. Every spawn site in the router carries
+> `windowsHide`.
+>
+> **Workers yield, and the count stays at two -- on the numbers.** A vitest
+> setup file (`test/support/priority.ts`) puts every worker at below-normal
+> priority, inherited by every `git` and `node` the suite forks. Then the
+> whole suite was measured at 2, 4 and 8 workers, one run each, with a
+> normal-priority probe beside each run as the keyboard's proxy (idle p50
+> 76 ms):
+>
+> | workers | wall  | test time | probe p50 / p95 |
+> |---------|-------|-----------|-----------------|
+> | 2       | 702 s | 1384 s    | 134 / 232 ms    |
+> | 4       | 705 s | 2256 s    | 206 / 306 ms    |
+> | 8       | 717 s | 3500 s    | 292 / 453 ms    |
+>
+> More workers return nothing: the wall clock is the longest files'
+> critical path, and every worker past two only contends. The stale 138 s
+> claim in `vitest.config.ts` is replaced by that table. **D256 amends the
+> plan item** from "raise to the highest usable count" to the highest count
+> the measurement supports, which is two; verification round 1 asked for
+> that amendment to be explicit rather than implied. **The operator's own
+> feel of the machine was not sampled** -- the probe stood in -- and their
+> confirmation of the count is owed: it is the one thing on this session's
+> record that only the operator can supply. Raw numbers were in
+> `.dabbler/scratch/measure/`, untracked.
+>
+> **Round 1 also caught a real defect in the runner.** The job runner had
+> spawned its command detached on POSIX -- its own group -- so `endJob`'s
+> kill of the runner's group could never reach it there, and a command that
+> exited clean after starting a helper left the helper running with a
+> clean status beside it. The runner now keeps its command in its own group
+> (Windows needs no group: libuv's job object takes a non-detached child
+> with its parent, and `taskkill /T` walks the rest), walks what is still
+> alive under the command before it writes the status -- by parent pid on
+> Windows, where orphans keep a dead parent's pid; by group on POSIX -- and
+> ends it, and sweeps its whole group on its own exit. A POSIX helper that
+> puts itself in a new session is the one thing out of reach, on purpose.
+> Three job tests, all real trees: poll, abandon, collect.
+>
+> **Baseline for 77.** Session 76's `final-full` duration on the record
+> is what session 77 -- the git seam, the recorded-answer fixture, the
+> deletion of ~240 scratch repositories per run -- is measured against. Two
+> workers at ~700 s is the number to beat; `drive.test.ts` alone runs for
+> over six minutes, and it is the critical path.
 
 > ## THE PLAN MOVED, 2026-09-02: 75 cancelled, performance is next
 >

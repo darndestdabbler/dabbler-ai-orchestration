@@ -4,7 +4,7 @@ import { registerOpenFileCommands } from "./commands/openFile";
 import { registerTroubleshootCommand } from "./commands/troubleshoot";
 import { registerCancelLifecycleCommands } from "./commands/cancelLifecycleCommands";
 import { registerNewModuleCommand } from "./commands/newModule";
-import { registerSessionCommands } from "./commands/sessionCommands";
+import { registerSessionCommands, sharedDrives } from "./commands/sessionCommands";
 import { registerBootstrapProjectCommand } from "./commands/bootstrapProject";
 import {
   DecisionAnnouncer,
@@ -187,6 +187,11 @@ export function activate(context: vscode.ExtensionContext): void {
   // repository bootstrapped after activation, a second folder or a worktree
   // is not left without one.
   context.subscriptions.push(disposeDabblerTerminals(), watchClosedTerminals());
+  // The drivers this window started end with it. The registry always had
+  // the dispose that kills them; nothing registered it, so a driver -- and
+  // the engine, the suite or the verification round under it -- outlived
+  // the window that could see and stop it.
+  context.subscriptions.push(sharedDrives());
   for (const root of discoverRoots()) {
     if (hasSessionsRoot(root)) openDabblerTerminal(root);
   }

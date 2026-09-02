@@ -254,6 +254,53 @@ export interface LaunchedVSCode {
   extensionsDir: string;
   /** Per-launch platform state root; one dir so teardown is one call. */
   stateRoot: string;
+  /** The Electron root process, so a close that fails can still end the tree. */
+  pid: number | undefined;
+}
+
+/** How long a graceful `app.close()` gets before the tree is ended by force. */
+const CLOSE_GRACE_MS = 15_000;
+
+/**
+ * End the launched VS Code and everything under it -- the renderer, the
+ * extension host, the shared process, pty hosts -- by its root pid.
+ * `taskkill /T` walks the tree on Windows; elsewhere Electron's children
+ * exit with their parent.
+ */
+function endElectronTree(pid: number | undefined): void {
+  if (pid === undefined) return;
+  try {
+    if (process.platform === "win32") {
+      cp.spawnSync("taskkill", ["/F", "/T", "/PID", String(pid)], {
+        stdio: "ignore",
+        windowsHide: true,
+      });
+    } else {
+      process.kill(pid, "SIGKILL");
+    }
+  } catch {
+    // already gone
+  }
+}
+
+/**
+ * Close gracefully, and end the tree by force when graceful does not
+ * happen: a rejected close, or one that never returns. A spec that fails
+ * mid-launch used to leave VS Code and its helpers behind for exactly as
+ * long as the machine stayed up.
+ */
+async function closeOrEnd(app: ElectronApplication, pid: number | undefined): Promise<void> {
+  let bound: NodeJS.Timeout | undefined;
+  const graceful = app.close().then(
+    () => true,
+    () => false,
+  );
+  const expired = new Promise<boolean>((resolve) => {
+    bound = setTimeout(() => resolve(false), CLOSE_GRACE_MS);
+  });
+  const closed = await Promise.race([graceful, expired]);
+  if (bound !== undefined) clearTimeout(bound);
+  if (!closed) endElectronTree(pid);
 }
 
 /**
@@ -271,6 +318,7 @@ export async function launchVSCode(
   const extensionsDir = fs.mkdtempSync(path.join(os.tmpdir(), "dabbler-pw-extensions-"));
   const state = _launch.makeLaunchStateDirs();
   let app: ElectronApplication | undefined;
+  let pid: number | undefined;
   // Everything the launched VS Code writes, kept so a FAILED launch can
   // say what the child said.
   let childOutput = "";
@@ -305,6 +353,7 @@ export async function launchVSCode(
     // where a blocked launch dies.
     try {
       const proc = app.process();
+      pid = proc.pid;
       proc.stdout?.on("data", captureChildOutput);
       proc.stderr?.on("data", captureChildOutput);
     } catch {
@@ -312,15 +361,11 @@ export async function launchVSCode(
     }
     const page = await app.firstWindow({ timeout: 60_000 });
     await page.locator(".activitybar").waitFor({ state: "visible", timeout: 60_000 });
-    return { app, page, userDataDir, extensionsDir, stateRoot: state.root };
+    return { app, page, userDataDir, extensionsDir, stateRoot: state.root, pid };
   } catch (err) {
-    if (app) {
-      try {
-        await app.close();
-      } catch {
-        // the launch is already failing; a close error would mask it
-      }
-    }
+    // The launch is already failing; a close that fails too must not mask
+    // it, and must not leave the half-launched tree behind either.
+    if (app) await closeOrEnd(app, pid);
     for (const dir of [userDataDir, extensionsDir, state.root]) {
       try {
         fs.rmSync(dir, { recursive: true, force: true, maxRetries: 3 });
@@ -335,11 +380,7 @@ export async function launchVSCode(
 }
 
 export async function closeVSCode(launch: LaunchedVSCode): Promise<void> {
-  try {
-    await launch.app.close();
-  } catch {
-    // best effort
-  }
+  await closeOrEnd(launch.app, launch.pid);
   for (const dir of [launch.userDataDir, launch.extensionsDir, launch.stateRoot]) {
     try {
       fs.rmSync(dir, { recursive: true, force: true, maxRetries: 3 });

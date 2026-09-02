@@ -10,7 +10,7 @@ import { join } from "node:path";
 
 import { afterAll, expect, it } from "vitest";
 
-import { pollJob, startJob } from "../src/jobs.ts";
+import { endJob, pollJob, startJob } from "../src/jobs.ts";
 
 import { makeTempDir, removeTempDirs } from "./support/fixtures.ts";
 
@@ -57,4 +57,89 @@ it("polls a detached job as running, then as exited with its code, and keeps its
 
   expect(readFileSync(join(repoRoot, job.log), "utf8")).toContain("the round is running");
   expect(existsSync(join(repoRoot, job.status))).toBe(true);
+});
+
+it("ends a running job and everything under it, from a process that never held it", async () => {
+  // A job is started by one router process and collected by another, so
+  // the record's pid is all the ending process has. The verb the job runs
+  // forks -- here a grandchild that reports its pid -- and a job that is
+  // abandoned must take that fork with it: the trees found squatting on the
+  // operator's machine were never the runner, they were what it ran.
+  const repoRoot = makeTempDir();
+  const pidFile = join(repoRoot, "grandchild.pid");
+  const job = startJob(repoRoot, 62, {
+    name: "the complete suite",
+    argv: [
+      process.execPath,
+      "-e",
+      "const { spawn } = require('node:child_process');" +
+        "const g = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' });" +
+        "require('node:fs').writeFileSync(process.argv[1], String(g.pid));" +
+        "setInterval(() => {}, 1000);",
+      pidFile,
+    ],
+    retryAfterSeconds: 30,
+  });
+  const deadline = Date.now() + 20_000;
+  while (!existsSync(pidFile)) {
+    if (Date.now() > deadline) throw new Error("the grandchild never reported");
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+  const grandchild = Number(readFileSync(pidFile, "utf8"));
+  expect(pollJob(repoRoot, job)).toEqual({ state: "running" });
+
+  endJob(job);
+
+  expect((await settle(repoRoot, job)).state).not.toBe("running");
+  const gone = Date.now() + 10_000;
+  for (;;) {
+    try {
+      process.kill(grandchild, 0);
+    } catch {
+      break;
+    }
+    if (Date.now() > gone) throw new Error(`the grandchild ${grandchild} outlived the job`);
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+});
+
+it("reaps what a collected command left running before it records the result", async () => {
+  // The other way a tree is left behind: the command exits clean after
+  // starting a helper it never waited for. The status must say 0 -- the
+  // command did what it said -- and the helper must be gone by the time
+  // that status can be read.
+  //
+  // The helper is detached on Windows and not on POSIX, because that is
+  // the helper that outlives its parent on each: libuv puts a Windows
+  // child in a job object that dies with the parent unless it is
+  // detached, and a POSIX child stays in the runner's group unless it is.
+  const repoRoot = makeTempDir();
+  const pidFile = join(repoRoot, "helper.pid");
+  const job = startJob(repoRoot, 63, {
+    name: "verification round 2",
+    argv: [
+      process.execPath,
+      "-e",
+      "const { spawn } = require('node:child_process');" +
+        "const h = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], " +
+        "{ stdio: 'ignore', detached: process.platform === 'win32' });" +
+        "h.unref();" +
+        "require('node:fs').writeFileSync(process.argv[1], String(h.pid));",
+      pidFile,
+    ],
+    retryAfterSeconds: 30,
+  });
+  expect(await settle(repoRoot, job)).toEqual({ state: "exited", exitCode: 0 });
+  const helper = Number(readFileSync(pidFile, "utf8"));
+  const gone = Date.now() + 10_000;
+  for (;;) {
+    try {
+      process.kill(helper, 0);
+    } catch {
+      break;
+    }
+    if (Date.now() > gone) throw new Error(`the helper ${helper} outlived its collected job`);
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+  expect(readFileSync(join(repoRoot, job.log), "utf8")).toContain("ended 1 process(es)");
 });

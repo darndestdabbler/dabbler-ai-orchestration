@@ -7,12 +7,11 @@
 // against the selector here rather than trusted, because the command IS the
 // evidence.
 
-import { spawnSync } from "node:child_process";
 
 import { nowIso } from "../journal.ts";
 import { loadConfig } from "../config.ts";
 import { SessionsRootNotFoundError, repoRootFor, resolveSessionsDir } from "../evidence.ts";
-import { loadSelectionConfig, selectTests, targetedCommand } from "../checks.ts";
+import { loadSelectionConfig, selectTests, spawnCommand, targetedCommand } from "../checks.ts";
 import {
   OUTCOME_PASSED,
   OUTCOME_FAILED,
@@ -241,7 +240,7 @@ function judgePreverifyCommand(
  * the command is the one the repository declares, so there is nothing to
  * mistype.
  */
-function runSuite(argv: readonly string[]): number {
+async function runSuite(argv: readonly string[]): Promise<number> {
   if (argv.includes("--help") || argv.includes("-h")) {
     writeOut(runUsage());
     return EXIT_OK;
@@ -342,14 +341,17 @@ function runSuite(argv: readonly string[]): number {
   const observedStart = nowIso("microseconds");
   writeOut(`running ${suiteName}: ${command}\n`);
   const started = Date.now();
-  const proc = spawnSync(command, {
-    cwd: root,
-    shell: true,
-    stdio: "inherit",
-    encoding: "utf8",
+  // Through the same spawn path as a declared check: tracked, so the suite
+  // ends with this process; its own group on POSIX and hidden on Windows.
+  // Asynchronous rather than a blocking spawnSync because a process blocked
+  // in one cannot observe the signal that would let it end its child.
+  const status = await new Promise<number | null>((resolve) => {
+    const child = spawnCommand(command, { cwd: root, stdio: "inherit" });
+    child.on("error", () => resolve(null));
+    child.on("close", (code) => resolve(code));
   });
   const durationSeconds = Math.max(1, Math.round((Date.now() - started) / 1000));
-  const outcome = proc.status === 0 ? OUTCOME_PASSED : OUTCOME_FAILED;
+  const outcome = status === 0 ? OUTCOME_PASSED : OUTCOME_FAILED;
 
   try {
     const record = recordRun(sessionsDir, suite, outcome, {

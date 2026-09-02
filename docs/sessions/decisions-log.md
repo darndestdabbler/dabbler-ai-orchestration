@@ -8494,3 +8494,24 @@ and are NOT rewritten. They record what the router said when they ran, which
 is what a record is for; a record edited to agree with a later decision is a
 record that cannot be trusted about anything else. The version this
 repository declares moves; its history does not.
+
+## Session 76 — Performance patches — reaping, hidden windows, worker priority
+
+### D256 · 2026-09-02 · Orchestrator (claude-fable-5-1/anthropic) · WORKERS_LOCAL stays at 2 on the measurement: two to eight workers leaves the wall clock flat (702-717 s) while the keyboard probe doubles to quadruples; plan item 4 of session 76 is amended to the count the measurement supports, and the operator's own keyboard confirmation is owed
+
+Session 76's plan item 4 said: put every vitest worker below normal priority, "then raise `WORKERS_LOCAL` from 2 to the highest count that keeps the host usable -- measured at the keyboard, not asserted". The priority half is done (`packages/router/test/support/priority.ts`). The raise is not, and this decision records why and what is owed.
+
+The measurement, taken 2026-09-02 on the twenty-core host with every worker at below-normal priority, one full-suite run per count, and a normal-priority probe spawning a trivial `node` every two seconds beside each run (idle: p50 76 ms, p95 128 ms):
+
+    workers   wall     test time   probe p50 / p95
+       2      702 s     1384 s      134 / 232 ms
+       4      705 s     2256 s      206 / 306 ms
+       8      717 s     3500 s      292 / 453 ms
+
+The plan's premise was that more workers would shorten the run and the only cost would be the keyboard. The first half is false on this suite: the wall clock is flat from two to eight because the longest files (`drive.test.ts` alone runs over six minutes) are the critical path, and every worker past two only contends for the same disk and process table -- test time balloons while the wall clock stands still. The second half is confirmed: the probe's latency doubles at four and nearly quadruples at eight. Raising the count would therefore cost the operator's keyboard and return nothing, which inverts the purpose of a performance session.
+
+Decision: `WORKERS_LOCAL` stays at 2, on the numbers. The plan item is amended to "the highest count the measurement supports", which is two, and the stale 138 s benchmark in `vitest.config.ts` is replaced by the table above.
+
+What this decision cannot supply, and says so: the plan asked for the operator's own feel of the machine at the keyboard, and the operator was not at the keyboard during this session. The probe stood in for them. The operator's confirmation -- that two at below-normal priority leaves the host usable, or that another count is preferred -- is owed and is theirs to give; nothing in this decision forecloses it. The session-66 incident (a four-worker run of record that made the host unusable) is the only keyboard evidence on the record, and it points the same way.
+
+Session 77, which attacks the critical path itself by converting scratch-repository tests to recorded git answers, is where the wall clock moves; the count can be re-measured after it and the answer may differ then.

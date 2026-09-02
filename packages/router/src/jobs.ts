@@ -27,6 +27,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { terminateTree } from "./checks.ts";
 import { driverDir } from "./driver.ts";
 import type { DriverRun } from "./generated/index.ts";
 import { nowIso } from "./journal.ts";
@@ -61,13 +62,31 @@ export const JOB_RUNNER_FILENAME = "job-runner.cjs";
  * run from a file on disk in every layout. It appends the child's output to
  * the log, and when the child is done it writes the status file through a
  * temp and a rename, so a reader never sees half of it.
+ *
+ * What the runner starts, the runner ends -- and what ends the runner ends
+ * the tree. `startJob` spawns the runner detached, so on POSIX it leads a
+ * process group of its own, and the command it runs is spawned INTO that
+ * group rather than detached from it: a kill of the group from outside
+ * (`endJob`, from a router process that never held the child) reaches the
+ * command and everything it forked, and so does the runner's own exit. On
+ * Windows `taskkill /T` walks the parent-child tree, and needs no group.
+ *
+ * Collection reaps too. A command that exits after starting a helper --
+ * a server, a watcher, a worker it never waited for -- used to leave it
+ * running with a clean status beside it. Before the status is written the
+ * runner walks what is still alive under the command (Windows keeps a
+ * dead parent's pid on its orphans, so the walk from the command's pid
+ * finds them; on POSIX the group is the walk) and ends it. A helper that
+ * puts itself in a new session on POSIX has declared independence and is
+ * out of reach; nothing here follows it.
  */
 const JOB_RUNNER = `// Written by packages/router/src/jobs.ts. Do not edit; it is replaced.
-const { spawn } = require("node:child_process");
+const { spawn, spawnSync } = require("node:child_process");
 const { createWriteStream, renameSync, writeFileSync } = require("node:fs");
 
 const [, , status, log, cwd, ...argv] = process.argv;
 const out = createWriteStream(log, { flags: "a" });
+const win = process.platform === "win32";
 
 function finish(exit) {
   out.end(() => {
@@ -78,17 +97,113 @@ function finish(exit) {
   });
 }
 
+function kill(pid) {
+  try {
+    process.kill(pid, "SIGKILL");
+  } catch {
+    /* already gone */
+  }
+}
+
+function alive(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return error && error.code === "EPERM";
+  }
+}
+
+// pid -> parent pid (Windows) or pid -> group (POSIX) for every process the
+// OS listed, minus the probe that listed them -- it runs in this very group
+// and lists itself -- or null when the OS would not say.
+function processTable() {
+  const probe = win
+    ? spawnSync("powershell", ["-NoProfile", "-NonInteractive", "-Command",
+        "Get-CimInstance Win32_Process | ForEach-Object { \\"$($_.ProcessId) $($_.ParentProcessId)\\" }"],
+        { encoding: "utf8", windowsHide: true })
+    : spawnSync("ps", ["-A", "-o", "pid=,pgid="], { encoding: "utf8" });
+  if (probe.error || probe.status !== 0) return null;
+  const rows = [];
+  for (const line of String(probe.stdout).split("\\n")) {
+    const [a, b] = line.trim().split(/\\s+/);
+    if (a && b && Number(a) !== probe.pid) rows.push([Number(a), Number(b)]);
+  }
+  return rows;
+}
+
+// Everything still alive under the command, after it has exited. Only what
+// is still alive at the moment of asking: a listed pid that has since gone
+// is a number the OS may already have given to somebody else.
+function survivors(commandPid) {
+  const table = processTable();
+  if (table === null) return [];
+  let found;
+  if (!win) {
+    // The group is the runner's own; every member but the runner itself.
+    found = table.filter(([pid, pgid]) => pgid === process.pid && pid !== process.pid).map(([pid]) => pid);
+  } else {
+    const seen = new Set();
+    let frontier = [commandPid];
+    while (frontier.length > 0) {
+      const next = [];
+      for (const [pid, parent] of table) {
+        if (frontier.includes(parent) && !seen.has(pid)) {
+          seen.add(pid);
+          next.push(pid);
+        }
+      }
+      frontier = next;
+    }
+    found = [...seen];
+  }
+  return found.filter(alive);
+}
+
 const child = spawn(argv[0], argv.slice(1), { cwd, stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
+let exited = false;
 child.stdout.pipe(out, { end: false });
 child.stderr.pipe(out, { end: false });
 child.on("error", (error) => {
   out.write("job-runner: " + (error && error.message ? error.message : String(error)) + "\\n");
   finish(null);
 });
+child.on("exit", () => {
+  // Before the close, which waits on the output pipes: a helper holding
+  // them open is exactly what is reaped here, and its end is what lets the
+  // close arrive.
+  exited = true;
+  const left = child.pid === undefined ? [] : survivors(child.pid);
+  if (left.length > 0) out.write("job-runner: ended " + left.length + " process(es) the command left running\\n");
+  for (const pid of left) kill(pid);
+});
 child.on("close", (code, signal) => {
   if (signal) out.write("job-runner: killed by " + signal + "\\n");
   finish(code === null ? null : code);
 });
+
+// A signal the runner can observe ends the command; its exit then reaps
+// the rest, and the close writes the status as usual, with no code.
+for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"]) {
+  process.on(signal, () => {
+    out.write("job-runner: ended by " + signal + "\\n");
+    if (!exited && child.pid !== undefined) {
+      if (win) spawnSync("taskkill", ["/F", "/T", "/PID", String(child.pid)], { stdio: "ignore", windowsHide: true });
+      else kill(child.pid);
+    }
+  });
+}
+// The group goes with the runner: a last sweep of anything the walk above
+// could not see, the runner included -- its status is already on disk.
+if (!win) {
+  process.on("exit", () => {
+    try {
+      process.kill(-process.pid, "SIGKILL");
+    } catch {
+      /* nobody left */
+    }
+  });
+}
 `;
 
 function slug(name: string): string {
@@ -208,6 +323,23 @@ export function startJob(
     started_at: nowIso(),
     retry_after_seconds: options.retryAfterSeconds,
   };
+}
+
+/**
+ * End a job and everything under it.
+ *
+ * The runner is what the record holds a pid for, and it is the root of the
+ * tree: a `taskkill /T` of it, or a kill of the group `detached` gave it,
+ * takes the verb it ran and whatever that verb forked. The runner gets no
+ * chance to write a status, so the job polls as `vanished` afterwards --
+ * which is the truth, and the caller that ends a job is a caller that is
+ * abandoning the run it belonged to and clears the record itself.
+ */
+export function endJob(job: Job): void {
+  // Only a runner that is still there: the OS reuses pids, and a job whose
+  // runner has already exited names a number that may be somebody else's.
+  if (!alive(job.pid)) return;
+  terminateTree(job.pid);
 }
 
 /** Where the job is: running, exited with its code, or vanished. */

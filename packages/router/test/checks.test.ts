@@ -10,7 +10,7 @@
 // policy that reads it.
 
 import { execFileSync } from "node:child_process";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { afterAll, describe, expect, it } from "vitest";
@@ -20,6 +20,7 @@ import {
   STAGE_TARGETED,
   coversAny,
   displayCommand,
+  endLiveChildren,
   execute,
   fnmatchCase,
   loadChecks,
@@ -30,11 +31,36 @@ import {
   shlexSplit,
   spawnOptionsFor,
   spawnProgram,
+  treeKillCommand,
 } from "../src/checks.ts";
 import { hiddenSpawn, snapshotWorktreeTree } from "../src/journal.ts";
 import { makeSeededRepo, makeTempDir, removeTempDirs } from "./support/fixtures.ts";
 
 afterAll(removeTempDirs);
+
+/** The file's content once it exists, or a loud failure. */
+async function waitForFile(path: string): Promise<string> {
+  const deadline = Date.now() + 20_000;
+  for (;;) {
+    if (existsSync(path)) return readFileSync(path, "utf8");
+    if (Date.now() > deadline) throw new Error(`${path} never appeared`);
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+}
+
+/** Whether the pid is dead, allowing the OS a moment to finish the kill. */
+async function gone(pid: number): Promise<boolean> {
+  const deadline = Date.now() + 10_000;
+  for (;;) {
+    try {
+      process.kill(pid, 0);
+    } catch {
+      return true;
+    }
+    if (Date.now() > deadline) return false;
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+}
 
 // --- The path grammar ------------------------------------------------------------
 
@@ -405,6 +431,47 @@ describe("finding the program a name means", () => {
     const code = await new Promise<number | null>((resolve) => child.on("close", resolve));
     expect(code).toBe(0);
     expect(seen).toContain("reached");
+  });
+
+  it("ends every child it started that is still running, tree and all", async () => {
+    // What a session starts, a session ends. The child forks a grandchild
+    // and reports its pid, then both idle forever; ending the registry's
+    // children must reach the grandchild too, because the trees left on the
+    // operator's machine were never the direct child -- they were what the
+    // suite command, the engine or the seat had forked under it.
+    const pidFile = join(makeTempDir(), "grandchild.pid");
+    const child = spawnProgram(
+      [
+        process.execPath,
+        "-e",
+        "const { spawn } = require('node:child_process');" +
+          "const g = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' });" +
+          "require('node:fs').writeFileSync(process.argv[1], String(g.pid));" +
+          "setInterval(() => {}, 1000);",
+        pidFile,
+      ],
+      { stdio: "ignore" },
+    );
+    const closed = new Promise<void>((resolve) => child.once("close", () => resolve()));
+    const grandchild = Number(await waitForFile(pidFile));
+
+    expect(endLiveChildren()).toBeGreaterThanOrEqual(1);
+
+    await closed;
+    expect(await gone(grandchild)).toBe(true);
+    // Idempotent: the registry forgot them, and nothing is ended twice --
+    // the OS reuses pids.
+    expect(endLiveChildren()).toBe(0);
+  });
+
+  it("hides the console window of the tree kill itself", () => {
+    // The last visible window: `taskkill` is a console program, and the
+    // engine's interrupt fallback reaches it often enough that a session
+    // driven from the extension host flashed it in front of the operator
+    // every time an invocation was ended.
+    const kill = treeKillCommand(4242);
+    expect(kill.argv).toEqual(["taskkill", "/F", "/T", "/PID", "4242"]);
+    expect(kill.options.windowsHide).toBe(true);
   });
 
   it("hides the console window on every path a check is reached by", () => {

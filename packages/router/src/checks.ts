@@ -26,6 +26,7 @@ import {
   spawnSync,
   type ChildProcess,
   type SpawnOptions,
+  type SpawnSyncOptions,
 } from "node:child_process";
 import { existsSync, mkdtempSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -1100,25 +1101,113 @@ export function isArgvTooLarge(error: unknown): boolean {
   return code === "ENAMETOOLONG" || code === "E2BIG";
 }
 
-/** Kill the child and everything it started. */
-export function terminateTree(child: ChildProcess): void {
-  const pid = child.pid;
+/**
+ * Kill the child -- or the process a pid names -- and everything it started.
+ *
+ * A pid rather than a handle is what a job is: started by one router
+ * process and collected by another, so the process that ends it never held
+ * the `ChildProcess`. `taskkill /T` walks the parent-child tree whatever
+ * process asks; on POSIX the negative pid is the group `spawnOptionsFor`
+ * gave the child, and a bare kill of the pid is the fallback for a child
+ * that was never a group leader.
+ */
+export function terminateTree(target: ChildProcess | number): void {
+  const pid = typeof target === "number" ? target : target.pid;
   if (pid === undefined) return;
   if (process.platform === "win32") {
-    spawnSync("taskkill", ["/F", "/T", "/PID", String(pid)], { stdio: "ignore" });
+    const kill = treeKillCommand(pid);
+    spawnSync(kill.argv[0] as string, kill.argv.slice(1), kill.options);
     return;
   }
   try {
-    // `detached: true` gave the child its own group, so the negative pid
-    // reaches the grandchildren a bare kill would leave running.
     process.kill(-pid, "SIGKILL");
   } catch {
     try {
-      child.kill("SIGKILL");
+      process.kill(pid, "SIGKILL");
     } catch {
       /* already gone */
     }
   }
+}
+
+/**
+ * The Windows tree kill, as argv and options. Hidden like every other
+ * spawn: this one fired often -- the engine's ten-second interrupt fallback
+ * reaches it -- and was the last console window a session driven from the
+ * console-less extension host still opened in front of the operator.
+ */
+export function treeKillCommand(pid: number): {
+  readonly argv: readonly string[];
+  readonly options: SpawnSyncOptions;
+} {
+  return {
+    argv: ["taskkill", "/F", "/T", "/PID", String(pid)],
+    options: hiddenSpawn({ stdio: "ignore" }),
+  };
+}
+
+// --- What this process started, this process ends ----------------------------
+
+/**
+ * Every child this process spawned and has not yet seen close.
+ *
+ * The router's children are the longest-running things a session does --
+ * an engine, a seat, a declared check, the complete suite -- and each of
+ * them forks further. A router that ends while one is live, whether by a
+ * signal, an uncaught throw or a tool's timeout, used to leave the whole
+ * tree behind: on 2026-09-02 an extension `test:unit` tree 38 hours old
+ * and a Playwright test-server 12.7 hours old were found idle on the
+ * operator's machine, squatting on ~230 MB, and were reaped by hand. The
+ * registry is the structural answer: every spawn path in this module
+ * tracks its child, and the process's own end -- the first signal it can
+ * observe, or a plain exit with a child still live -- ends every tracked
+ * tree. A `taskkill /F` of the router itself is the one end nothing here
+ * can observe; `jobs.endJob` and the extension's tree kill are what reach a
+ * child then, from outside.
+ */
+const liveChildren = new Set<ChildProcess>();
+let endsWithThisProcess = false;
+
+const ENDING_SIGNALS = ["SIGINT", "SIGTERM", "SIGHUP"] as const;
+
+function track(child: ChildProcess): ChildProcess {
+  liveChildren.add(child);
+  const forget = (): void => {
+    liveChildren.delete(child);
+  };
+  child.once("close", forget);
+  child.once("error", forget);
+  if (!endsWithThisProcess) {
+    endsWithThisProcess = true;
+    process.once("exit", () => {
+      endLiveChildren();
+    });
+    // Installing a handler replaces the default action, so the exit is
+    // ours to perform: the conventional code for the signal, after the
+    // children are gone. `once`, because a second signal while the first
+    // is being handled should get the default.
+    for (const signal of ENDING_SIGNALS) {
+      process.once(signal, () => {
+        endLiveChildren();
+        process.exit(128 + SIGNAL_NUMBERS[signal]);
+      });
+    }
+  }
+  return child;
+}
+
+const SIGNAL_NUMBERS: Record<(typeof ENDING_SIGNALS)[number], number> = {
+  SIGHUP: 1,
+  SIGINT: 2,
+  SIGTERM: 15,
+};
+
+/** End every tracked child that is still live; returns how many there were. */
+export function endLiveChildren(): number {
+  const ended = [...liveChildren];
+  liveChildren.clear();
+  for (const child of ended) terminateTree(child);
+  return ended.length;
 }
 
 /**
@@ -1238,11 +1327,22 @@ function spawnCheck(
     stdio: ["ignore", "pipe", "pipe"],
   };
   if (check.command) {
-    return spawn(command, spawnOptionsFor(options, "shell"));
+    return spawnCommand(command, options);
   }
   const argv =
     command === check.argv.join(" ") ? [...check.argv] : shlexSplit(command);
   return spawnProgram(argv, options);
+}
+
+/**
+ * Spawn a declared command string the way its declaration asks: through a
+ * shell, because the string is trusted repository configuration. The one
+ * implementation for every shell string the router runs -- a declared
+ * check's `command`, and the suite `test-evidence run` starts -- so both
+ * are tracked, grouped and hidden by the same options.
+ */
+export function spawnCommand(command: string, options: SpawnOptions): ChildProcess {
+  return track(spawn(command, spawnOptionsFor(options, "shell")));
 }
 
 /**
@@ -1273,12 +1373,14 @@ export function spawnProgram(argv: readonly string[], options: SpawnOptions): Ch
     // that hold its path together and cmd answers `'C:\Program' is not
     // recognized`, which reads as a missing program rather than as quoting.
     const line = `"${[resolved.path, ...rest].map(quoteForCmd).join(" ")}"`;
-    return spawn(process.env["COMSPEC"] ?? "cmd.exe", ["/d", "/s", "/v:off", "/c", line], {
-      ...grouped,
-      windowsVerbatimArguments: true,
-    });
+    return track(
+      spawn(process.env["COMSPEC"] ?? "cmd.exe", ["/d", "/s", "/v:off", "/c", line], {
+        ...grouped,
+        windowsVerbatimArguments: true,
+      }),
+    );
   }
-  return spawn(resolved.path, rest, grouped);
+  return track(spawn(resolved.path, rest, grouped));
 }
 
 export function emptySelection(): Record<string, unknown> {

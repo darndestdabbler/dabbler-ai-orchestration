@@ -3706,6 +3706,16 @@ session 77 and a successor still being designed with the operator.*
    the number chosen and the feel of the machine when it was chosen. The
    stale benchmark in `vitest.config.ts` (138 s claimed, 590–698 s
    recorded) is re-measured and the comment corrected.
+
+   > **Amended in session 76 (D256).** The raise did not happen, because the
+   > measurement it was conditioned on refused it: two, four and eight
+   > workers at below-normal priority ran the suite in 702, 705 and 717 s
+   > while a normal-priority probe's latency went from 134 to 206 to 292 ms
+   > (idle 76 ms). The wall clock is the longest files' critical path, not
+   > the pool. The item now reads "the highest count the measurement
+   > supports", which is two. The operator was not at the keyboard during
+   > the session; the probe stood in, and the operator's own confirmation of
+   > the count is owed.
 5. Affected; verify; full suite as `final-full`; close. The `final-full`
    duration this session records is the baseline session 77 is measured
    against.

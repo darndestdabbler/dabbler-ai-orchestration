@@ -85,7 +85,7 @@ import type {
   DriverWorkPlan,
   Triage,
 } from "./generated/index.ts";
-import { type Job, jobLogTail, pollJob, selfArgv, startJob } from "./jobs.ts";
+import { type Job, endJob, jobLogTail, pollJob, selfArgv, startJob } from "./jobs.ts";
 import { SolutionDepsError, placeMember } from "./solutionDeps.ts";
 import { tryWriteProjection } from "./workflow/project.ts";
 import {
@@ -1673,6 +1673,10 @@ ${this.stopArtifacts()}`,
         this.save();
         this.log("job-finished", { name: job.name, exit: state.exitCode, log: job.log });
         if (state.exitCode === null) {
+          // No code means the verb was killed or never spawned; whatever it
+          // forked before that may still be running, and the runner -- if
+          // it is still there to be the root of that tree -- is ended.
+          endJob(job);
           throw new Stop(
             options.stopKind,
             `${options.name} ended without an exit code; its log is ${job.log}`,
@@ -2210,6 +2214,19 @@ ${this.stopArtifacts()}`,
       }
     } catch (error) {
       if (!(error instanceof Stop)) throw error;
+      // A stop abandons the run, and a job still running under it -- the
+      // suite, a verification round, the close -- is abandoned with it. It
+      // is ended here, in the one place every Stop passes through, rather
+      // than at each site that can throw one: a `session interrupt --stop`
+      // read while the pull was waiting on the job is the common case, and
+      // the job it would otherwise leave behind is exactly the tree found
+      // squatting on the operator's machine 38 hours later.
+      const abandoned = this.run.job ?? null;
+      if (abandoned !== null) {
+        endJob(abandoned);
+        this.run = { ...this.run, job: null };
+        this.log("job-ended", { name: abandoned.name, pid: abandoned.pid, reason: error.message });
+      }
       const entry = {
         kind: error.kind,
         reason: error.message,

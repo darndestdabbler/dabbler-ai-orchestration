@@ -2,17 +2,28 @@
 
 Prerequisites: git, and the `dabbler` command.
 
-Inside VS Code there is nothing to install: the Dabbler AI Orchestration
-extension bundles the router and puts `dabbler` on the integrated
-terminal's PATH, run on the editor's own Node. Everywhere else — another
-editor, a bare shell, or a commit made from VS Code's Source Control panel,
-whose git does not inherit the terminal's environment:
+**Install the extension, and that is the whole of it.** The Dabbler AI
+Orchestration extension bundles the router and puts `dabbler` on the
+integrated terminal's PATH, run on the editor's own Node: there is no
+package to fetch, no interpreter and no virtual environment. `dist/
+dabbler.cjs` inside the VSIX is the same router the tree calls in-process,
+so the terminal and the views cannot disagree about what the record says.
+
+VS Code 1.135 or newer, and nothing else — inside the editor the router runs
+on the Node that VS Code already carries.
+
+Outside a VS Code terminal — another editor, a bare shell, or a commit made
+from the Source Control panel, whose git does not inherit the terminal's
+environment — run the same file directly. **That path needs a Node of its
+own, 22.18 or newer**, because there is no editor to borrow one from:
 
 ```
-npm i -g dabbler-ai-router
+node "<extension dir>/dist/dabbler.cjs" <verb>
 ```
 
-Node 22.18 or newer; VS Code 1.135 or newer for the extension.
+There is deliberately no `npm i -g`: the router was published to no registry
+as of 2026-09-02, because the extension already carries it and a second
+distribution is a second thing to keep in step.
 
 Then a way to reach models. Either a GitHub Copilot seat with the Copilot
 CLI — the shipped default transport — or the direct provider APIs: put at

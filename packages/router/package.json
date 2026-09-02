@@ -1,6 +1,6 @@
 {
   "name": "dabbler-ai-router",
-  "version": "2.8.0",
+  "version": "2.0.0",
   "description": "The Dabbler session router: session lifecycle, the record, cross-provider verification, and the six-step workflow.",
   "license": "MIT",
   "type": "module",

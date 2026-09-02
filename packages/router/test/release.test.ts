@@ -15,6 +15,7 @@ import {
   canonicalVersion,
   packageVersion,
   releaseVersion,
+  servedVersions,
   tagsFor,
 } from "../src/cli/release.ts";
 import {
@@ -31,19 +32,21 @@ afterAll(removeTempDirs);
 const VERSION = "2.0.0";
 
 describe("what an answer means", () => {
-  it("tags the router before the extension", () => {
-    // The extension bundles the router, so a Marketplace version whose npm
-    // half is missing is the broken half-release: somebody installs the
-    // extension, it cannot resolve what it wraps, and the failure looks like
-    // the extension's.
-    expect(tagsFor("publish", VERSION)).toEqual(["v2.0.0", "vsix-v2.0.0"]);
+  it("tags one artifact, because there is one", () => {
+    // There were two until 2026-09-02, with an order between them: the
+    // router to npm first, because the extension bundles it and a
+    // Marketplace version whose npm half was missing would be the broken
+    // half-release. npm is retired — the router ships INSIDE the extension —
+    // so there is no half that can be missing and nothing to sequence.
+    expect(tagsFor("publish", VERSION)).toEqual(["vsix-v2.0.0"]);
   });
 
-  it("rehearses the npm half only, and says so", () => {
-    // NOT "the whole path": it never touches the Marketplace, and calling it
-    // that is how an operator following the recommendation ends up with a
-    // product still returning 404.
-    expect(tagsFor("release-candidate", VERSION)).toEqual(["v2.0.0-rc1"]);
+  it("builds a release candidate without publishing it", () => {
+    // The workflow classifies an `-rcN` tag as build-only, so the artifact is
+    // downloadable from the run and installable by hand while the listing
+    // does not move. A rehearsal is not a release, and the brief says that of
+    // itself rather than leaving the reader to discover it.
+    expect(tagsFor("release-candidate", VERSION)).toEqual(["vsix-v2.0.0-rc1"]);
   });
 
   it("tags nothing at all for an answer that declines", () => {
@@ -125,9 +128,47 @@ describe("reading what would ship", () => {
     expect(agreed.reason).toBe("");
     expect(agreed.version).toBe(canonicalVersion(here));
     expect(tagsFor("publish", agreed.version ?? "")).toEqual([
-      `v${agreed.version}`,
       `vsix-v${agreed.version}`,
     ]);
+  });
+});
+
+describe("what the Marketplace says it serves", () => {
+  it("reads the versions out of a gallery answer, newest first", () => {
+    // The parsing is here and the network call is not: a test that asked the
+    // Marketplace would be a test of the Marketplace, green or red for
+    // reasons that have nothing to do with this repository.
+    expect(
+      servedVersions({
+        results: [
+          {
+            extensions: [
+              {
+                extensionName: "dabbler-ai-orchestration",
+                versions: [{ version: "2.0.0" }, { version: "1.0.4" }],
+              },
+            ],
+          },
+        ],
+      }),
+    ).toEqual(["2.0.0", "1.0.4"]);
+  });
+
+  it("separates a query that matched nothing from an answer it cannot read", () => {
+    // Two different facts, and only one of them is about the release. A
+    // query that matched no extension IS "the Marketplace serves nothing";
+    // an answer in a shape this reader does not recognise says nothing at
+    // all, and reporting it as a missing version would tell an operator
+    // mid-release that their publish failed on the evidence of a schema
+    // change.
+    expect(servedVersions({ results: [] })).toEqual([]);
+    expect(servedVersions({ results: [{ extensions: [] }] })).toEqual([]);
+    for (const unreadable of [{}, null, { results: {} }, { results: [{}] }]) {
+      expect(servedVersions(unreadable)).toBeNull();
+    }
+    // A recognised shape whose version entries are not versions is empty,
+    // not unreadable: the rows are there and none of them names one.
+    expect(servedVersions({ results: [{ extensions: [{ versions: [{}, 3] }] }] })).toEqual([]);
   });
 });
 
@@ -136,10 +177,7 @@ describe("the brief the operator answers", () => {
     // The whole reason this is a brief and not a prompt: the reader has to
     // be able to tell what they cannot take back.
     const { repo } = makeSandboxRepo();
-    const row = raisePublicationDecision(repo, {
-      routerVersion: "2.0.0",
-      extensionVersion: "2.0.0",
-    });
+    const row = raisePublicationDecision(repo, { version: "2.0.0" });
     expect(String(row?.["determined"])).toContain("cannot be recalled");
     expect((row?.["options"] as { label: string }[]).map((o) => o.label)).toEqual([
       "publish",
@@ -155,29 +193,27 @@ describe("the brief the operator answers", () => {
     // path", which was false -- it never touches the Marketplace -- and was
     // a recommendation to not do the thing.
     const { repo } = makeSandboxRepo();
-    const row = raisePublicationDecision(repo, {
-      routerVersion: "2.0.0",
-      extensionVersion: "2.0.0",
-    });
+    const row = raisePublicationDecision(repo, { version: "2.0.0" });
     expect(row?.["recommendation"]).toBe("publish");
     const rc = (row?.["options"] as { label: string; consequence: string }[]).find(
       (option) => option.label === "release-candidate",
     );
-    // And it says so of itself: a rehearsal that still returns 404.
-    expect(rc?.consequence).toContain("404");
+    // And it says so of itself: a build that publishes nothing.
+    expect(rc?.consequence).toContain("BUILDS and does");
+    expect(rc?.consequence).toContain("not publish");
   });
 
   it("does not block a close, because an unpublished product is not unverified", () => {
     const { repo } = makeSandboxRepo();
-    raisePublicationDecision(repo, { routerVersion: "2.0.0", extensionVersion: "2.0.0" });
+    raisePublicationDecision(repo, { version: "2.0.0" });
     expect(blockingDecisions(repo)).toEqual([]);
   });
 
   it("asks once, however often the verb runs", () => {
     const { repo } = makeSandboxRepo();
-    raisePublicationDecision(repo, { routerVersion: "2.0.0", extensionVersion: "2.0.0" });
+    raisePublicationDecision(repo, { version: "2.0.0" });
     expect(
-      raisePublicationDecision(repo, { routerVersion: "2.0.0", extensionVersion: "2.0.0" }),
+      raisePublicationDecision(repo, { version: "2.0.0" }),
     ).toBeNull();
   });
 
@@ -185,7 +221,7 @@ describe("the brief the operator answers", () => {
     // `answeredBy` is "operator" and there is no other value: a verdict a
     // model can write is a verdict a model can be wrong about.
     const { repo } = makeSandboxRepo();
-    raisePublicationDecision(repo, { routerVersion: "2.0.0", extensionVersion: "2.0.0" });
+    raisePublicationDecision(repo, { version: "2.0.0" });
     answerOwed(repo, ID_PUBLICATION, "not yet");
     const row = currentDecisions(repo).find((r) => String(r["id"]) === ID_PUBLICATION);
     expect(row?.["answer"]).toBe("not yet");

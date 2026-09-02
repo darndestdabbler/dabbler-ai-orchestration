@@ -8469,3 +8469,28 @@ guessed at those would put a claim in the graph that nobody made. It is the
 answer to the operator's own sentence about finishing the CSV model and not
 knowing what came next: the repositories a plan will need are visible before
 they have any content.
+
+## Session 74 — The extension is the distribution, and the number is 2.0.0
+
+### D255 · 2026-09-02 · Operator · The release is 2.0.0, not 2.8.0: the Marketplace serves 1.0.4 and nothing 2.x was ever published
+
+The Marketplace serves 1.0.4, published 2026-08-18, with twenty installs.
+Nothing 2.x has ever been published anywhere -- not to the Marketplace, not
+to npm, which this session retires. The numbers 2.0.0 through 2.8.0 were
+bookkeeping between two people: they were set as work landed and never
+released.
+
+Shipping 2.8.0 would tell anyone reading the listing that seven minor
+releases happened since 1.0.4. They did not. 2.0.0 is greater than 1.0.4,
+which is all the Marketplace requires of a new version, and it says the one
+true thing about what changed: a rewrite from Python to TypeScript, with the
+router bundled into the extension rather than installed beside it.
+
+It also has not been beta tested, which is the operator's own reason for
+refusing a number that implies a maturity nobody has demonstrated.
+
+The ledger rows for sessions 70 through 73 carry `frameworkVersion` 2.8.0
+and are NOT rewritten. They record what the router said when they ran, which
+is what a record is for; a record edited to agree with a later decision is a
+record that cannot be trusted about anything else. The version this
+repository declares moves; its history does not.

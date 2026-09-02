@@ -128,9 +128,11 @@ export const SHARED_BODY =
   "  `DABBLER_OPENAI_API_KEY`, `DABBLER_GEMINI_API_KEY`), never in files. The\n" +
   "  same rule covers a feed PAT: configuration names it and never holds it.\n" +
   "- The router is one command, `dabbler <verb>` — no interpreter, no virtual\n" +
-  "  environment. A VS Code terminal has it on `PATH`; anywhere else, run\n" +
-  "  `npm i -g dabbler-ai-router` once. \"dabbler: command not found\" is a\n" +
-  "  PATH problem, not a missing-keys problem.\n" +
+  "  environment, and nothing to install beside the extension: it ships\n" +
+  "  inside the VSIX, and a VS Code terminal has it on `PATH`. Anywhere else,\n" +
+  "  run that same file: `node \"<extension dir>/dist/dabbler.cjs\" <verb>`.\n" +
+  "  \"dabbler: command not found\" is a PATH problem, not a missing-keys\n" +
+  "  problem.\n" +
   "\n" +
   "## Writing files\n" +
   "\n" +

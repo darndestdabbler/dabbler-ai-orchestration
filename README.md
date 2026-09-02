@@ -11,8 +11,8 @@ There is one implementation, in TypeScript, and it runs two ways:
 
 - **`dabbler` — the command** an orchestrating engine runs from a terminal:
   the session lifecycle, the verification loop, the record, the six-step
-  workflow. `npm i -g dabbler-ai-router`, or nothing at all inside VS Code
-  (below).
+  workflow. It ships inside the extension — there is nothing to install
+  beside it and no package to fetch.
 - **VS Code extension "Dabbler AI Orchestration"** — the Work Explorer
   tree: one row per repository, its numbered sessions beneath it, and the
   in-flight session's steps beneath that. It bundles the router and calls
@@ -60,16 +60,20 @@ code --install-extension dabbler-ai-orchestration-2.0.0.vsix
 
 The extension puts `dabbler` on the integrated terminal's PATH, run on the
 editor's own Node — no runtime to install, no virtual environment, no
-global package. Outside VS Code, or for a commit made from the Source
-Control panel (whose git does not inherit the terminal's environment):
+global package, and no registry. Outside VS Code, or for a commit made from
+the Source Control panel (whose git does not inherit the terminal's
+environment), run the same file the shim runs — that path needs a Node of
+its own, 22.18 or newer, because there is no editor to borrow one from:
 
 ```
-npm i -g dabbler-ai-router
+node "<extension dir>/dist/dabbler.cjs" <verb>
 ```
 
-Node 22.18 or newer. The extension requires VS Code 1.135 or newer, which
-is the earliest release measured to carry an extension host with an
-unflagged `node:sqlite` — the seat-cost reader needs it.
+The extension requires VS Code 1.135 or newer, which is the earliest release
+measured to carry an extension host with an unflagged `node:sqlite` — the
+seat-cost reader needs it. Inside the editor that host is the runtime; a
+Node of your own is needed only to run `dabbler` outside it, or to build
+this repository.
 
 ## The repository's artifacts
 

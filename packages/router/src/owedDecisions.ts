@@ -815,8 +815,7 @@ export const ID_PUBLICATION = "publication";
 export function raisePublicationDecision(
   repoRoot: string,
   options: {
-    readonly routerVersion: string;
-    readonly extensionVersion: string;
+    readonly version: string;
     readonly sessionNumber?: number | null;
   },
 ): Row | null {
@@ -824,48 +823,45 @@ export function raisePublicationDecision(
     id: ID_PUBLICATION,
     decisionClass: CLASS_EXTERNAL_CONSEQUENCE,
     question:
-      `Publish dabbler-ai-router ${options.routerVersion} to npm and ` +
-      `dabbler-ai-orchestration ${options.extensionVersion} to the VS Code ` +
+      `Publish dabbler-ai-orchestration ${options.version} to the VS Code ` +
       "Marketplace?",
     file: "(git tags)",
     determined:
-      "Both are built, tested and unpublished, and `npm i -g " +
-      "dabbler-ai-router` returns 404 today -- which is why a new project " +
-      "cannot install the thing it is being asked to adopt. What ships is " +
-      `the router at ${options.routerVersion} (npm, \`latest\`) and the ` +
-      `extension at ${options.extensionVersion} (Marketplace), in that ` +
-      "order: the extension bundles the router, so a Marketplace version " +
-      "whose npm half is missing is the broken half-release. The framework " +
-      "waits for npm to actually serve the router before it tags the " +
-      "extension. Both publish through OIDC or a stored PAT in CI; no " +
-      "credential is read or written here.\n\nWhat a wrong answer costs: a " +
-      "published version is public from that moment and cannot be recalled " +
-      "-- npm refuses `unpublish` after 72 hours, and a Marketplace version " +
-      "slot is never reusable.",
+      "It is built, tested and unpublished. ONE artifact ships -- the " +
+      "extension -- and the CLI ships inside it: `dist/dabbler.cjs` is the " +
+      "same router as a command, and the terminal shim puts `dabbler` on the " +
+      "PATH of a VS Code terminal. There is no separate package to install " +
+      "and no second registry: npm was retired on 2026-09-02, because the " +
+      "port that bundled the router had already made it unnecessary.\n\n" +
+      "Publishing is a tag. CI builds the VSIX and publishes it with a " +
+      "credential this process never sees, and the `marketplace` environment " +
+      "asks a person to approve the job before it runs.\n\nWhat a wrong " +
+      "answer costs: a published version is public from that moment and " +
+      "cannot be recalled -- a Marketplace version slot is never reusable, " +
+      "so a number cannot be spent twice.",
     options: [
       {
         label: "publish",
         consequence:
-          `Pushes \`v${options.routerVersion}\`, waits for npm to serve it, ` +
-          `and then pushes \`vsix-v${options.extensionVersion}\`. Both become ` +
-          "public and neither can be recalled. `npm i -g dabbler-ai-router` " +
-          "starts working, which is the only outcome that closes this.",
+          `Pushes \`vsix-v${options.version}\`, and CI publishes it once the ` +
+          "environment's reviewer approves. It becomes public and cannot be " +
+          "recalled; anyone can then install the extension by name, and the " +
+          "CLI comes with it.",
       },
       {
         label: "release-candidate",
         consequence:
-          `Pushes \`v${options.routerVersion}-rc1\` only. It exercises the ` +
-          "NPM half of the path -- the build, the OIDC publish, the registry " +
-          "-- and touches neither `latest` nor the Marketplace. `npm i -g " +
-          "dabbler-ai-router` still returns 404 afterwards, so this does not " +
-          "make the product installable; it is a rehearsal, and `publish` " +
-          "still has to follow it.",
+          `Pushes \`vsix-v${options.version}-rc1\`, which CI BUILDS and does ` +
+          "not publish. The artifact is downloadable from the workflow run " +
+          "and installable by hand, which is how a version is exercised " +
+          "before anyone else is offered it; `publish` still has to follow.",
       },
       {
         label: "not yet",
         consequence:
-          "Nothing is tagged and nothing is published. The build stays where " +
-          "it is, and `npm i -g dabbler-ai-router` keeps returning 404.",
+          "Nothing is tagged and nothing is published. The Marketplace keeps " +
+          "serving what it serves today, and this repository keeps building " +
+          "a VSIX that only the operator installs.",
       },
     ],
     // The session exists BECAUSE the product is uninstallable, so the answer
@@ -876,10 +872,10 @@ export function raisePublicationDecision(
     recommendation: "publish",
     confidence: null,
     onNoAnswer:
-      "Nothing is published. This session closes either way -- an unpublished " +
-      "product is not an unverified one -- but `npm i -g dabbler-ai-router` " +
-      "keeps returning 404, so every adoption walkthrough still stops at its " +
-      "first step and the item stays open.",
+      "Nothing is published. The session closes either way -- an unpublished " +
+      "product is not an unverified one -- but the Marketplace keeps serving " +
+      "the version it serves today, so anyone adopting this gets that one " +
+      "and the item stays open.",
     sessionNumber: options.sessionNumber ?? null,
   });
 }

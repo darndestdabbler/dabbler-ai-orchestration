@@ -208,9 +208,11 @@ skip ahead to — the instruction in hand is the whole of what is asked.
   `DABBLER_OPENAI_API_KEY`, `DABBLER_GEMINI_API_KEY`), never in files. The
   same rule covers a feed PAT: configuration names it and never holds it.
 - The router is one command, `dabbler <verb>` — no interpreter, no virtual
-  environment. A VS Code terminal has it on `PATH`; anywhere else, run
-  `npm i -g dabbler-ai-router` once. "dabbler: command not found" is a
-  PATH problem, not a missing-keys problem.
+  environment, and nothing to install beside the extension: it ships
+  inside the VSIX, and a VS Code terminal has it on `PATH`. Anywhere else,
+  run that same file: `node "<extension dir>/dist/dabbler.cjs" <verb>`.
+  "dabbler: command not found" is a PATH problem, not a missing-keys
+  problem.
 
 ---
 

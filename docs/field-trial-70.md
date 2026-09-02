@@ -1,11 +1,11 @@
-# Field trial, session 70 — the half that needs a published router
+# Field trial: the acceptance exercise, and what it cost to reach it
 
 The acceptance exercise the plan reserved for "when the operator decides to
-publish". This document is written **before** the trial is run, which is the
-point: an acceptance run whose answers are decided while looking at the screen
+publish", written by session 70 and corrected by 74, when npm was retired.
+It is written **before** the trial is run, which is the point: an acceptance run whose answers are decided while looking at the screen
 is a demonstration. Every criterion below states its expected answer first.
 
-## What this session found before it started
+## What session 70 found before it started, and what came of it
 
 **The plan's precondition was not met.** It reads: *the operator has answered
 `publication` with `publish`, CI has published the tagged versions, and
@@ -14,7 +14,9 @@ was true:
 
 - `registry.npmjs.org` returns **404** for `dabbler-ai-router`. It has never
   been published under that name; the `v1.0.x` tags in this repository are
-  from the PyPI era, before the TypeScript port.
+  from the PyPI era, before the TypeScript port. **Session 74 answered that
+  by retiring npm rather than satisfying it:** the extension bundles the
+  router, so there was never a second artifact to publish.
 - There is no `v2.*` tag and no `vsix-v2.*` tag, so extension 2.7.0 was never
   released either.
 - `dabbler owed list` reports nothing waiting: the `publication` brief had not
@@ -35,16 +37,18 @@ publication had already happened by the time session 70 ran.
 
 | Order | Who | What |
 |---|---|---|
-| First | Session 70 | One version — 2.8.0, declared in `version.json` and **stamped** into both manifests, the extension's dependency on the router and the lock file by `npm run stamp:version`, with `dabbler release` refusing a stale one. This document, the feedback audit below, and the plan amendment. Lands and closes. |
-| Then | Sessions 71 and 72 | **Green CI.** `Test` has failed on every push since session 66, and both release workflows are gated on a green run for the tagged commit, so nothing can be published until it passes. The cause is a short-path/long-path mismatch on the Windows runner: `os.tmpdir()` gives the 8.3 short form (`RUNNER~1`) while git answers with the long one (`runneradmin`), so the sessions-relative path is nonsense and the bookkeeping exclusion never matches. |
-| Then | The operator | On the landed, green tree: `dabbler release` raises the brief; `dabbler owed answer --id publication --choice publish` settles it. The answer is the operator's alone — publishing cannot be recalled. |
-| Then | The framework | Tags `v2.8.0`, waits for npm to serve the router, then tags `vsix-v2.8.0`. CI publishes over OIDC. |
-| Last | Session 73 | `dabbler release --verify-install` as a step **check**, so the install is the record rather than a claim about it; then criteria 1 and 2 below, performed against the published extension from a clean profile; then this document's findings and item 5 of the audit. |
+| First | Session 70 | One version, stamped from `version.json` into both manifests, the router dependency and the lock. This document, the feedback audit below, and the plan amendment. |
+| Then | Sessions 71-73 | **Green CI**, which nothing could be published without: `Test` had failed on every push since session 66. One family of causes -- a path spelled two ways, a fixture borrowing the machine's git identity, and a `~` that was not in a path-token class. |
+| Then | Session 74 | **npm retired, and the number set to 2.0.0.** The extension bundles the router, so there was never a second thing to publish; and the Marketplace serves 1.0.4, so 2.8.0 would have claimed seven releases that never happened. |
+| Then | The operator | `dabbler release` raises the brief; answering it pushes `vsix-v2.0.0`. CI builds and publishes the VSIX once the `marketplace` environment's reviewer approves. |
+| Last | Session 75 | `dabbler release --verify-install` as a step **check** -- it asks the Marketplace what it actually serves -- then criteria 1 and 2 below, performed from a clean profile against the published extension. |
 
-**2.8.0 and not 2.7.0.** Sessions 65 through 69 landed after 2.7.0 was set —
-the watcher, the logic-tree repairs, `session rebaseline`, the round-cap
-amendment and the multi-repository Solution Explorer. Nothing was ever
-published as 2.7.0, so no number is skipped in public.
+**2.0.0, not 2.8.0.** The Marketplace serves 1.0.4 from 2026-08-18 with
+twenty installs, and nothing 2.x has ever been published anywhere. The
+numbers 2.0.0 through 2.8.0 were bookkeeping between two people; publishing
+2.8.0 would have told a reader that seven minor releases happened since
+1.0.4. 2.0.0 is greater than 1.0.4, which is all the Marketplace requires,
+and it says the one true thing: a rewrite (D255).
 
 ## The criteria, with their expected answers written down first
 
@@ -94,8 +98,9 @@ which is history rather than a control. The audit below replaces it.
 
 ## Feedback audit
 
-Written by session 70; item 5 closes in session 73 on the recorded
-verification, and is a dated deferred issue until it does.
+Written by session 70. Item 5 closed on 2026-09-02, when npm was retired:
+it turned out to be a wrong instruction rather than a defect, which is why
+the audit asks for a control per item and not a status per item.
 
 | # | Item | Held by |
 |---|---|---|
@@ -103,16 +108,15 @@ verification, and is a dated deferred issue until it does.
 | 2 | "Set Up New Project" should create the folder and initialise the repo | `tools/dabbler-ai-orchestration/src/test/suite/commandFlows.test.ts` — *creates the project when VS Code has no folder open at all*, *opens a folder it created before offering anything about it*, and *initialises a repository when bootstrap refuses for want of one*. |
 | 3 | `dabbler.yaml` should be filled in by the framework at the right moment | `packages/router/test/owedDecisions.test.ts` — the suites question is asked once and *written* on the answer (*appends to a suites list that already exists*, *inserts into a testing mapping that carries no suites*); packaging is detected and written the same way in `packages/router/test/detectPackaging.test.ts`. |
 | 4 | The Solution Explorer's purpose is unclear | `tools/dabbler-ai-orchestration/src/test/suite/actionRegistry.test.ts` — *the Solution Explorer says what it is for, and offers a way in*: the view contributes a welcome that names what it shows and carries a command, so an empty tree is not a dead end. |
-| 5 | `npm i -g dabbler-ai-router` fails | **Deferred, 2026-09-01, owner: the operator.** It closes on a recorded release verification and on nothing else: `dabbler release --verify-install` performs the real clean install from the public registry, and session 73 runs it as a step check once the tags are pushed. Today the registry returns 404, so any other disposition would be a claim. |
+| 5 | `npm i -g dabbler-ai-router` fails | **Closed 2026-09-02 as a wrong instruction, not a defect.** There is no package to install: the extension bundles the router and ships `dist/dabbler.cjs`, and the shim puts `dabbler` on the PATH of a VS Code terminal — which is how every session since the port has been driven, including the one that wrote this. npm was retired the same day (D256), so what the item asked for cannot fail because it no longer exists; what replaces it is held by `packages/router/test/release.test.ts` — *tags one artifact, because there is one* — and by the trial's own check, which asks the Marketplace what it serves. |
 | 6 | `--help` unusable on subcommands | `packages/router/test/lifecycleCli.test.ts` — *answers --help on a SUBCOMMAND with that subcommand's own arguments*, for `start`, `declare` and `plan`, and never with "expected one argument". |
 | 7 | A gate's error text names the wrong file | `packages/router/test/gates.test.ts` — *names the file the operator edits, and never the packaged layer beneath it*: the freshness gate's remediation cites `dabbler.yaml` and never `router-config.yaml`. |
 | 8 | No way to record "the selector chose nothing" | `packages/router/test/preverify.test.ts` — `none-selected` is an outcome the record carries, and the framework re-runs the selection rather than trusting a claim that nothing was needed. |
 | 9 | Planned sessions invisible; the project reads as finished | `packages/router/test/projection.test.ts` — *projects as 'planned', which the ledger's own vocabulary does not contain*, and `plannedSessions` is counted for the same reader the Work Explorer and `dabbler status` both use. |
 
-Eight are held by a test that would fail if the behaviour came back. The
-ninth is held by a verification that has not been possible to run, and it says
-so with a date and an owner rather than borrowing a session number as
-evidence.
+All nine are now held by something that fails if the behaviour comes back.
+Eight by a test; the ninth by the fact that the thing it complained about no
+longer exists, with the tag rule that replaced it under test.
 
 ## What the trial found
 

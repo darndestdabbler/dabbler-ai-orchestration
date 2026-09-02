@@ -33,10 +33,32 @@ are merged and finished. Earlier handoff text is in `docs/status-archive.md`.
 > defect in the product: it was a wrong instruction. **Session 75 is then
 > the trial**, against what the Marketplace actually serves.
 >
-> **Still owed by you, and only you:** a `VSCE_PAT` secret — an Azure DevOps
-> token scoped to *Marketplace (publish)*. `gh secret list` shows this
-> repository has no secrets at all, so the Marketplace publish will refuse
-> until it does. You chose 2.0.0 as a **stable** release.
+> **Nothing is owed on the credential side, and an earlier line here said
+> otherwise — it was wrong. The evidence, so this is checkable rather than
+> asserted:**
+>
+> ```
+> $ gh api repos/darndestdabbler/dabbler-ai-orchestration/environments/marketplace/secrets
+> {"total_count":1,"secrets":[{"name":"VSCE_PAT",
+>   "created_at":"2026-05-05T01:19:31Z","updated_at":"2026-05-29T20:21:10Z"}]}
+> ```
+>
+> `gh secret list` reads REPOSITORY secrets and there are none; `VSCE_PAT` is
+> bound to the `marketplace` **environment**, which is where
+> `publish-vscode.yml` reads it (`environment: marketplace`, then
+> `secrets.VSCE_PAT`). Reading an empty repository-level list as "no secrets
+> at all" was the mistake, and the corrected claim is checkable by anyone
+> with the same command.
+>
+> **And it demonstrably works**, which is stronger than the secret merely
+> existing: `vsix-v1.0.1` through `vsix-v1.0.4` were published by that same
+> workflow on 2026-08-17 and 2026-08-18, and the Marketplace serves 1.0.4
+> today. A publish job cannot succeed without the credential it authenticates
+> with.
+>
+> The environment also requires a reviewer's approval, so a `vsix-v*` tag
+> starts the publish and the operator approves it once. 2.0.0 goes out as a
+> **stable** release.
 >
 > **The npm attempt left nothing behind.** No version was ever published;
 > `v2.8.0` is deleted. Three workflow defects were found and fixed on the

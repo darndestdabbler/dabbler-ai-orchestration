@@ -1,9 +1,26 @@
-# STATUS — 73 of 75 closed. npm is retired: the extension is the distribution, at 2.0.0. Next: 74
+# STATUS — 74 of 75 closed. PAUSED BEFORE PUBLISHING at the operator's word: significant changes come first
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
 `experiment/verification-pipeline-v3` and `design/solution-decomposition`
 are merged and finished. Earlier handoff text is in `docs/status-archive.md`.
 
+> ## PAUSED BEFORE PUBLISHING, 2026-09-02
+>
+> The operator: *"Please pause and wrap up this session without publishing"*
+> and *"We need to make some significant changes before publishing."* So
+> session 74 closed with its work landed and **nothing was tagged**: no
+> `vsix-v2.0.0`, no npm version, and the Marketplace still serves 1.0.4.
+> Session 75 -- the trial -- is NOT started, because it exists to check a
+> published artifact and there is none.
+>
+> **The publication brief is answered `publish` on the record**, from
+> before the change of course. Nothing acts on that answer by itself --
+> `dabbler release` has to be run and it is not -- but the next session to
+> touch this should either re-raise it against whatever the significant
+> changes turn out to be, or record a decision superseding it. An answered
+> brief that no longer means what it says is the kind of thing this record
+> is supposed to catch.
+>
 > ## THE DISTRIBUTION CHANGED, 2026-09-02: npm is retired
 >
 > **The operator's call, made while the npm publish was failing on its third

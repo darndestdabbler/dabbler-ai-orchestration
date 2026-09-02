@@ -1,8 +1,41 @@
-# STATUS — 72 of 74 closed. CI is down to 2 failures of 1263: next is 73, the last two; then 74, the trial
+# STATUS — 73 of 74 closed. CI IS GREEN. One command from you publishes 2.8.0; then 74 is the trial
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
 `experiment/verification-pipeline-v3` and `design/solution-decomposition`
 are merged and finished. Earlier handoff text is in `docs/status-archive.md`.
+
+> ## WAITING ON YOU: one command, and it is the irreversible one
+>
+> ```
+> dabbler owed answer --sessions-dir docs/sessions --id publication --choice publish
+> ```
+>
+> **`Test` is green** — runs `33592304277` and `33592310323`, 2026-09-02, the
+> first green pair since session 66 — so the release workflows are no longer
+> gated shut. `dabbler release` has raised the brief and it is open;
+> `dabbler owed list` prints it. The answer pushes `v2.8.0`, waits for npm to
+> actually serve the router, then pushes `vsix-v2.8.0`; CI publishes both
+> over OIDC. **I did not type it**: publishing cannot be recalled, npm
+> refuses `unpublish` after 72 hours, and a Marketplace version slot is never
+> reusable — the framework reserves that answer for you and this session's
+> harness blocked it too, which is the same judgement twice.
+>
+> After the tags land and npm serves the router, **session 74 is the trial**:
+> `dabbler release --verify-install` as a step check, then acceptance
+> criteria 1 and 2 from a clean profile, then item 5 of the audit closes on
+> the recorded verification. `docs/field-trial-70.md` holds the expected
+> answers, written before the run.
+
+> **Session 73 — the last two CI failures, and the tilde. CLOSED `VERIFIED`
+> in one round, 2026-09-02 (`9a96d9c3`).** A `~` was not in `fixloop`'s
+> path-token class, so a traceback naming any Windows 8.3 short name
+> (`C:\Users\RUNNER~1\...`) implicated nothing and a fix round was handed an
+> envelope with the failing file missing — a production defect that only a
+> runner could show. `drive.test` asserted the spelling it was handed, as
+> `packaging.test` had. And every script that exited by hand now sets
+> `process.exitCode`: `check:types` had printed *31 generated module(s) match
+> the schemas* and then failed the step on libuv's `UV_HANDLE_CLOSING`
+> assertion, which is a control lying about its own result.
 
 > **Session 72 — the rest of the runner's conditions. CLOSED `VERIFIED` in
 > one round, 2026-09-02 (`3ac7826e`). CI went from about fifty failures to

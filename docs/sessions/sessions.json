@@ -1567,6 +1567,26 @@
         "identityProvenance": "direct"
       },
       "verificationVerdict": "VERIFIED",
+      "verification": {
+        "rounds": 4,
+        "verifierModel": "gemini-flash",
+        "verifierProvider": "google",
+        "transport": "api"
+      },
+      "frameworkVersion": "2.0.0"
+    },
+    {
+      "number": 80,
+      "title": "The loop stops living in anyone's attention",
+      "status": "in-progress",
+      "startedAt": "2026-09-02T12:35:50.991000-04:00",
+      "completedAt": null,
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": "VERIFIED",
       "frameworkVersion": "2.0.0",
       "verification": {
         "rounds": 4,
@@ -1574,15 +1594,6 @@
         "verifierProvider": "google",
         "transport": "api"
       }
-    },
-    {
-      "number": 80,
-      "title": "The loop stops living in anyone's attention",
-      "status": "not-started",
-      "startedAt": null,
-      "completedAt": null,
-      "orchestrator": null,
-      "verificationVerdict": null
     },
     {
       "number": 81,

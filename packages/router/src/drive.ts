@@ -69,7 +69,11 @@ import {
   transcriptPath,
   writeInstruction,
   writeRun,
+  appendSupervision,
 } from "./driver.ts";
+import { readRawSessionState } from "./sessionState.ts";
+import { repoRootFromSessionsDir } from "./evidence.ts";
+import { BUILT_IN_ENGINES, builtInEngine } from "./engines.ts";
 import type { Engine, EngineOutput } from "./engines.ts";
 import { clip, stripEscapes } from "./engines.ts";
 import { SESSION_PLAN_FILENAME } from "./evidence.ts";
@@ -116,6 +120,8 @@ import {
   declare,
   extractSpecExcerpt,
   start,
+  acquireLockWithTimeout,
+  releaseLock,
 } from "./session.ts";
 import { loadSuitesChecked } from "./testEvidence.ts";
 import { recordDispute, resolveRepoRelative } from "./verify/disputes.ts";
@@ -413,10 +419,59 @@ class Driver {
   }
 
   private save(): void {
+    // Atomic under the lifecycle lock: the fence below is check-then-write,
+    // and two drivers hitting the window between them was the whole
+    // incident. The lock makes the pair one act.
+    let lock: string | null = null;
+    try {
+      lock = acquireLockWithTimeout(this.sessionsDir, `driver-save/${process.pid}`);
+    } catch {
+      // Fail CLOSED: a save that cannot take the lock while another writer
+      // holds it is exactly the stale attempt the fence exists for. Stopping
+      // loses nothing -- the winner drives on.
+      appendSupervision(this.repoRoot, this.sessionNumber, {
+        event: "stale-save-refused",
+        cause: "lifecycle lock contended",
+        phase: this.run.phase,
+      });
+      throw new Stop(
+        "interrupted",
+        "the lifecycle lock is contended: another driver is writing this run, and a stale attempt does not advance it.",
+      );
+    }
+    try {
+    // The lease fence. Two drivers wrote one run on 2026-09-02 and phases
+    // were skipped silently; a save whose in-memory epoch is behind the
+    // file's is that second driver, and it stops here instead of advancing
+    // state. The refusal is a supervision event before it is a stop, so the
+    // record says which epoch lost.
+    const mine = this.run.lease_epoch ?? 1;
+    let disk: number;
+    try {
+      disk = readRun(this.repoRoot, this.sessionNumber)?.lease_epoch ?? 1;
+    } catch {
+      disk = mine;
+    }
+    if (disk > mine) {
+      appendSupervision(this.repoRoot, this.sessionNumber, {
+        event: "stale-save-refused",
+        my_epoch: mine,
+        disk_epoch: disk,
+        phase: this.run.phase,
+      });
+      throw new Stop(
+        "interrupted",
+        `another driver holds the lease (epoch ${disk}; this process took ${mine}). ` +
+          "A stale attempt does not advance the run; its record ends here.",
+      );
+    }
     this.run = writeRun(this.repoRoot, this.sessionNumber, {
       ...this.run,
       updated_at: nowIso(),
     });
+    } finally {
+      if (lock !== null) releaseLock(lock);
+    }
   }
 
   private setPhase(phase: DriverRun["phase"]): void {
@@ -544,9 +599,18 @@ class Driver {
       max_invocations: this.options.maxInvocations ?? existing.max_invocations,
       verification: this.verificationSettings(existing.verification ?? null),
       ...(afterRefusals ? { rejections: 0 } : {}),
+      // Taking the lease: this process's first write bumps the epoch, and
+      // any driver still holding the old number is refused at its next
+      // save. One writer per run, enforced by the record itself.
+      lease_epoch: (existing.lease_epoch ?? 1) + 1,
       stop: null,
     };
     this.save();
+    appendSupervision(this.repoRoot, this.sessionNumber, {
+      event: "lease-taken",
+      lease_epoch: this.run.lease_epoch,
+      phase: this.run.phase,
+    });
     if (existing.stop) this.settleStopDecision(existing.stop.kind);
     this.log("run-resumed", {
       session: sessionDisplayNumber(current),
@@ -975,7 +1039,11 @@ ${this.stopArtifacts()}`,
           saidMultiple = multiple;
           const reading = readWatcher(this.repoRoot, this.sessionNumber, threshold);
           if (reading.state === WATCHER_OUTSTANDING) {
-            this.log("watcher", { since: `${reading.sinceSeconds}s`, state: reading.state });
+            this.log("watcher", {
+              since: `${reading.sinceSeconds}s`,
+              state: reading.state,
+              ...(reading.clock ? { clock: reading.clock } : {}),
+            });
           }
         }
       }
@@ -998,6 +1066,11 @@ ${this.stopArtifacts()}`,
       // silently taking the push path with nothing on the other end.
       throw new Stop("engine", "this run has no engine adapter to invoke");
     }
+    appendSupervision(this.repoRoot, this.sessionNumber, {
+      event: "continuation-spent",
+      invocation,
+      of_budget: this.run.max_invocations,
+    });
     let outcome;
     try {
       outcome = await adapter.invoke({
@@ -2425,3 +2498,109 @@ export async function sessionNext(sessionsDir: string, options: NextOptions): Pr
   if (instruction !== null) writeOut(`${JSON.stringify(instruction, null, 2)}\n`);
   return code;
 }
+
+// --- run: one command, the whole session --------------------------------------
+
+export interface RunCliOptions {
+  readonly maxInvocations: number | null;
+  readonly showEngine: string | null;
+}
+
+/**
+ * Drive the in-flight session to `done` in one command, identity from the
+ * record. The developer's vocabulary is start, interact, cancel: `run` is
+ * what makes the middle word optional. A registered built-in engine is
+ * invoked per instruction through the same adapter machinery the push has
+ * always had; an engine the framework cannot invoke non-interactively
+ * degrades to watcher-only -- the loop waits, renders the clock readings
+ * with their recommended actions, and never pretends a liveness it cannot
+ * provide.
+ */
+export async function runWholeSession(
+  sessionsDir: string,
+  options: RunCliOptions,
+): Promise<number> {
+  const state = readRawSessionState(sessionsDir);
+  const sessions = Array.isArray(state?.["sessions"])
+    ? (state?.["sessions"] as Array<Record<string, unknown>>)
+    : [];
+  const inFlight = sessions.find((row) => row["status"] === "in-progress");
+  if (inFlight === undefined) {
+    writeErr(
+      "run: no session is in flight. Register one first -- `dabbler session " +
+        "next --sessions-dir <dir> --engine <engine> --provider <provider>` " +
+        "-- and `run` takes it from there.\n",
+    );
+    return EXIT_BOUNDARY;
+  }
+  const orchestrator = typeof inFlight["orchestrator"] === "object" && inFlight["orchestrator"] !== null && !Array.isArray(inFlight["orchestrator"])
+    ? (inFlight["orchestrator"] as Record<string, unknown>)
+    : {};
+  const engine = typeof orchestrator["engine"] === "string" ? orchestrator["engine"] : "";
+  const sessionNumber = Number(inFlight["number"]);
+  const repoRoot = repoRootFromSessionsDir(sessionsDir);
+
+
+  if ((BUILT_IN_ENGINES as readonly string[]).includes(engine)) {
+    const adapter = builtInEngine(
+      engine,
+      typeof orchestrator["model"] === "string" ? orchestrator["model"] : null,
+    );
+    if (typeof adapter === "string") {
+      writeErr(`run: ${adapter}\n`);
+      return EXIT_USAGE;
+    }
+    appendSupervision(repoRoot, sessionNumber, {
+      event: "session-run-started",
+      engine,
+      mode: "invoke",
+      max_invocations: options.maxInvocations ?? null,
+    });
+    return driveSession(sessionsDir, {
+      engine,
+      provider: typeof orchestrator["provider"] === "string" ? orchestrator["provider"] : null,
+      model: typeof orchestrator["model"] === "string" ? orchestrator["model"] : null,
+      effort: typeof orchestrator["effort"] === "string" ? orchestrator["effort"] : null,
+      adapter,
+      engineOutput:
+        options.showEngine === null ? null : (options.showEngine as "stream" | "quiet"),
+      maxInvocations: options.maxInvocations,
+    });
+  }
+
+  // Watcher-only: this engine answers in a CLI the framework does not
+  // invoke. The loop still owns the waiting -- wait instructions sleep
+  // their own retry, and an outstanding step renders the clock reading so
+  // the silence is at least named.
+  appendSupervision(repoRoot, sessionNumber, {
+    event: "session-run-started",
+    engine,
+    mode: "watcher-only",
+  });
+  const threshold = 120;
+  for (;;) {
+    const code = await sessionNext(sessionsDir, {});
+    let instruction;
+    try {
+      instruction = readInstruction(repoRoot, sessionNumber);
+    } catch {
+      return code;
+    }
+    if (instruction === null) return code;
+    if (instruction.kind === "done") return EXIT_OK;
+    if (instruction.kind === "wait") {
+      const retry = Number(instruction.retry_after_seconds ?? 60);
+      await new Promise((resolve) => setTimeout(resolve, Math.max(5, retry) * 1000));
+      continue;
+    }
+    const reading = readWatcher(repoRoot, sessionNumber, threshold);
+    if (reading.state !== "quiet") {
+      writeErr(
+        `run: [${reading.clock ?? "watch"}] ${reading.state} for ` +
+          `${reading.sinceSeconds}s -- ${reading.recommended_action ?? ""}\n`,
+      );
+    }
+    await new Promise((resolve) => setTimeout(resolve, threshold * 1000));
+  }
+}
+

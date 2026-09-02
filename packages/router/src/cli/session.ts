@@ -13,7 +13,7 @@
 // `--not-releasable` that parsed as nothing would publish.
 
 import { shlexSplit } from "../checks.ts";
-import { driveSession, sessionNext } from "../drive.ts";
+import { driveSession, runWholeSession, sessionNext } from "../drive.ts";
 import {
   ENGINE_OUTPUT_MODES,
   type Engine,
@@ -38,6 +38,7 @@ import {
   report,
   restore,
   start,
+  hookStop,
 } from "../session.ts";
 import { writeErr, writeOut } from "./output.ts";
 
@@ -47,6 +48,8 @@ const SUMMARY: Record<string, string> = {
   decision: "append a decision to decisions-log.md",
   declare: "declare the session's task list and releasability",
   next: "advance the session one move and print the instruction to answer",
+  run: "drive the in-flight session to done in one command, identity from the record",
+  "hook-stop": "the Claude Code stop gate: block the turn while an instruction is outstanding",
   drive: "run the next session end to end: the framework drives, the engine answers",
   interrupt: "end the engine's running invocation under a driven session, with a reason",
   rebaseline: "record a repair made while the run was stopped, and move the baseline",
@@ -106,6 +109,14 @@ const OPTIONS: Record<string, readonly string[]> = {
     "  its `ask` says, run its `answer_command`, then call this again -- until it says",
     "  `done`. A `wait` means the framework is running something long: leave it",
     "  `retry_after_seconds`, read its `log` if you like, and call this again.",
+  ],
+  run: [
+    "  --show-engine MODE       stream | quiet, for a registered built-in engine",
+    "  --max-invocations N      the paid-invocation budget for this run",
+    "",
+    "  Identity comes from the record: the registered orchestrator is invoked per",
+    "  instruction when its engine has a built-in command; any other engine degrades",
+    "  to watcher-only -- the loop waits, and the clock readings say what is owed.",
   ],
   drive: [
     "  --engine ENGINE          required: claude-code | codex | gemini | copilot -- who",
@@ -446,6 +457,26 @@ export async function sessionVerb(argv: string[]): Promise<number> {
       model: values.get("--model") ?? null,
       effort: values.get("--effort") ?? null,
       transport: values.get("--transport") ?? null,
+    });
+  }
+
+  if (subcommand === "hook-stop") {
+    // Quiet on purpose: the host runs this on every stop, and silence is
+    // the ordinary answer.
+    return hookStop(sessionsDir);
+  }
+
+  if (subcommand === "run") {
+    // One command, the whole session: the developer's vocabulary is start,
+    // interact, cancel -- `run` is the start that stays. Identity comes
+    // from the record (the registered orchestrator), never from a flag: a
+    // person should not have to remember what the ledger already knows.
+    return runWholeSession(sessionsDir, {
+      maxInvocations: (() => {
+        const parsed = integer(values.get("--max-invocations"), "--max-invocations");
+        return typeof parsed === "string" ? null : parsed;
+      })(),
+      showEngine: values.get("--show-engine") ?? null,
     });
   }
 

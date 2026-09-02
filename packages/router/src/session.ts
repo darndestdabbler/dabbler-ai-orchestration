@@ -68,6 +68,7 @@ import {
   writeDispositions,
   writeReport,
   writeWorkPlan,
+  appendSupervision,
 } from "./driver.ts";
 import { SET_BOOKKEEPING_COMMIT_BASENAMES, governingConfig, runGates } from "./gates.ts";
 import { refuseIfResolvingFromSource } from "./resolution.ts";
@@ -1052,6 +1053,11 @@ export function report(sessionsDir: string, options: ReportCliOptions): number {
     return EXIT_BOUNDARY;
   }
   if (options.seq !== instruction.seq) {
+    appendSupervision(repoRoot, target, {
+      event: "stale-report-refused",
+      got_seq: options.seq,
+      outstanding_seq: instruction.seq,
+    });
     // The first lease fence. On 2026-09-02 two driver processes wrote one
     // run and phases were skipped silently; an answer that does not name
     // the OUTSTANDING instruction is a stale attempt, and a stale attempt
@@ -2173,4 +2179,65 @@ function raiseSuiteDecisionIfOwed(
     ),
     sessionNumber,
   });
+}
+
+// --- hook-stop: the claude-code stop gate -------------------------------------
+
+/**
+ * The Stop-hook half of the guardian: Claude Code runs this as the turn
+ * tries to settle, and an outstanding lease turns the settle into the next
+ * move. Quiet by design -- an empty answer lets the turn end -- because
+ * the hook fires on every stop of every conversation in the repository,
+ * and a session that owes nothing must cost nothing.
+ *
+ * The decision protocol is the host's: a JSON object on stdout with
+ * `decision: "block"` keeps the turn alive and hands `reason` back to the
+ * model as its next input. The reason is the same sentence the push
+ * engine has always been given -- read the instruction, do the ask, RUN
+ * the answer_command -- because that sentence is the one a less capable
+ * engine reads literally, and the stop gate exists for exactly the moment
+ * an engine believed it was finished.
+ */
+export function hookStop(sessionsDir: string): number {
+  let repoRoot: string;
+  let sessionNumber: number;
+  try {
+    const state = readRawSessionState(sessionsDir);
+    const sessions = Array.isArray(state?.["sessions"])
+      ? (state?.["sessions"] as Array<Record<string, unknown>>)
+      : [];
+    const inFlight = sessions.find((row) => row["status"] === "in-progress");
+    if (inFlight === undefined) return 0;
+    sessionNumber = Number(inFlight["number"]);
+    repoRoot = repoRootFromSessionsDir(sessionsDir);
+  } catch {
+    return 0;
+  }
+  let instruction;
+  try {
+    instruction = readInstruction(repoRoot, sessionNumber);
+  } catch {
+    return 0;
+  }
+  if (instruction === null) return 0;
+  if (instruction.kind !== "step" && instruction.kind !== "rejection") return 0;
+  // A blocked settle is a paid continuation of the host's turn: on the
+  // record like every other supervision spend.
+  appendSupervision(repoRoot, sessionNumber, {
+    event: "stop-gate-continued",
+    seq: instruction.seq,
+  });
+  const path = `.dabbler/runs/s${sessionNumber}/driver/instruction.json`;
+  writeOut(
+    `${JSON.stringify({
+      decision: "block",
+      reason:
+        `Session ${sessionNumber} has an outstanding instruction (seq ` +
+        `${instruction.seq}). Read ${path} and do exactly what its "ask" ` +
+        'says, then RUN the shell command it names as "answer_command" -- ' +
+        "running it is the answer; printing it is not -- and continue " +
+        "until `dabbler session next` says done.",
+    })}\n`,
+  );
+  return 0;
 }

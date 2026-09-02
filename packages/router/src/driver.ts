@@ -765,6 +765,14 @@ export function shapeReport(input: ReportInput, reportedAt: string): Record<stri
 // forbids.
 
 /** The engine is thinking, or nobody is owed anything. Nothing to say. */
+/**
+ * How many liveness thresholds a job may run, still writing, before the
+ * progress clock names it anyway. Five: the configured threshold governs
+ * both clocks, and a job five thresholds deep whose only signal is that
+ * its log grows is the semantic-spin case the liveness clock is blind to.
+ */
+export const JOB_SPIN_MULTIPLIER = 5;
+
 export const WATCHER_QUIET = "quiet";
 /** An instruction is outstanding, unanswered, over a tree that has not moved. */
 export const WATCHER_OUTSTANDING = "instruction-outstanding";
@@ -790,6 +798,16 @@ export interface WatcherReading {
   readonly sinceSeconds: number;
   /** The job being watched, on `job-outstanding` only. */
   readonly job?: string;
+  /**
+   * Which clock expired: acknowledgment (nothing observed since the
+   * instruction), liveness (a job stopped writing), or progress (edits
+   * happened, then stopped, and no answer came). Null when quiet.
+   * Separate clocks because responsiveness is not progress: an engine can
+   * look alive forever while advancing nothing.
+   */
+  readonly clock?: "acknowledgment" | "liveness" | "progress";
+  /** What a supervisor should DO about it, in words the record can carry. */
+  readonly recommended_action?: string;
 }
 
 export interface WatcherInputs {
@@ -861,10 +879,31 @@ export function watcherReading(
     if (!Number.isFinite(started)) return QUIET;
     const running = Math.trunc((now.getTime() - started) / 1000);
     if (running <= thresholdSeconds) return QUIET;
-    // A growing log is a job working. `null` means nothing has been
-    // compared yet -- a first look is not evidence of silence.
-    if (inputs.jobLogGrew?.() !== false) return QUIET;
-    return { state: WATCHER_JOB_OUTSTANDING, sinceSeconds: running, job: job.name };
+    // A growing log is a job working -- up to a point. JOB_SPIN_MULTIPLIER
+    // thresholds past
+    // its start, output that only ever grows is the semantic-spin case, and
+    // the progress clock names it even while the bytes flow.
+    if (inputs.jobLogGrew?.() !== false) {
+      if (running <= thresholdSeconds * JOB_SPIN_MULTIPLIER) return QUIET;
+      return {
+        state: WATCHER_JOB_OUTSTANDING,
+        sinceSeconds: running,
+        job: job.name,
+        clock: "progress",
+        recommended_action:
+          `the job has run ${Math.trunc(running / Math.max(1, thresholdSeconds))}x past its threshold and is still writing; ` +
+          `read ${job.log} -- output that only grows can be a spin, and ending it is the operator's call.`,
+      };
+    }
+    return {
+      state: WATCHER_JOB_OUTSTANDING,
+      sinceSeconds: running,
+      job: job.name,
+      clock: "liveness",
+      recommended_action:
+        `read the tail of ${job.log}; a finished job is collected by the ` +
+        "next `session next`, and ending a wedged one is the operator's call.",
+    };
   }
 
   const instruction = inputs.instruction;
@@ -877,8 +916,34 @@ export function watcherReading(
   const elapsed = Math.trunc((now.getTime() - issued) / 1000);
   if (elapsed <= thresholdSeconds) return QUIET;
   const touched = Date.parse(inputs.treeTouchedAt() ?? "");
-  if (Number.isFinite(touched) && touched > issued) return QUIET;
-  return { state: WATCHER_OUTSTANDING, sinceSeconds: elapsed };
+  if (Number.isFinite(touched) && touched > issued) {
+    // Edits happened -- responsiveness -- but responsiveness is not
+    // progress. Recent edits are an engine working and say nothing; edits
+    // that STOPPED, with the answer still owed, are the progress clock,
+    // and the old rule read them as healthy forever.
+    const sinceTouch = Math.trunc((now.getTime() - touched) / 1000);
+    if (sinceTouch <= thresholdSeconds) return QUIET;
+    return {
+      state: WATCHER_OUTSTANDING,
+      sinceSeconds: sinceTouch,
+      clock: "progress",
+      recommended_action:
+        "edits happened and stopped without a report; the outstanding " +
+        "instruction's answer_command is what is owed.",
+    };
+  }
+  // Nothing observed at all since the instruction: the acknowledgment
+  // clock, and past five thresholds it stops being "slow to start" and
+  // becomes the progress clock's problem too.
+  return {
+    state: WATCHER_OUTSTANDING,
+    sinceSeconds: elapsed,
+    clock: elapsed > thresholdSeconds * 5 ? "progress" : "acknowledgment",
+    recommended_action:
+      "nothing has been observed since the instruction was issued; " +
+      "re-invoke the engine -- `dabbler session next` prints the " +
+      "outstanding instruction again.",
+  };
 }
 
 /**
@@ -1042,4 +1107,34 @@ export function stampAnswer(
     }
   }
   return { ...record, ...stamps };
+}
+
+// --- Supervision --------------------------------------------------------------
+//
+// The append-only record of every supervision act: a lease taken, a stale
+// save refused, a stale report refused, a paid continuation spent. One
+// file per session beside the driver's own records, because "who was
+// allowed to move the run, and when" is evidence the way a test run is --
+// the 2026-09-02 two-driver incident had no record at all, and the repair
+// began by admitting that.
+
+import { appendFileSync as supAppend, mkdirSync as supMkdir } from "node:fs";
+import { dirname as supDirname } from "node:path";
+
+const SUPERVISION_FILENAME = "supervision.jsonl";
+
+export function appendSupervision(
+  repoRoot: string,
+  sessionNumber: number,
+  event: Record<string, unknown>,
+): void {
+  const path = join(
+    repoRoot, ".dabbler", "runs", `s${sessionNumber}`, "driver", SUPERVISION_FILENAME,
+  );
+  supMkdir(supDirname(path), { recursive: true });
+  supAppend(
+    path,
+    `${JSON.stringify({ at: new Date().toISOString(), ...event })}\n`,
+    "utf8",
+  );
 }

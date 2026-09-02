@@ -115,7 +115,7 @@ it.
 | 77 | The git seam — contract band and answered questions | no | 2026-09-02 |
 | 78 | Every component becomes a library, or is named as not one | no | 2026-09-02 |
 | 79 | Seals, and a master that only moves on green | no | 2026-09-02 |
-| 80 | The loop stops living in anyone's attention | — | not declared |
+| 80 | The loop stops living in anyone's attention | no | 2026-09-02 |
 | 81 | Publishing without a secret, and the last of the friction | — | not declared |
 | 82 | The trial, run by the operator against what the Marketplace serves | — | not declared |
 
@@ -1776,3 +1776,9 @@ Make every component meet the operator's library criteria or be named as not one
 **Releasable: no.**
 
 The blackbox rule made mechanical, and a master that only moves on green. The de-facto boundaries session 78 measured become a declaration: five workflow contexts and the platform beneath them, module membership stated, read by the boundary check. Seals land beside the run of record: a framework-computed digest per library (its files, hashed with normalized line endings, plus its dependencies' digests) and per workflow (its members' seals plus its handoff schemas), written when final-full is recorded - the ledger invariant the merge gate will read; the full run remains the whole answer until per-library suites exist, as the plan entry says. Five per-workflow sentinels plus one whole-pipeline land as the fail-fast band, each forcing an adverse decision and asserting on durable artifacts. The candidate gate arrives dual-mode: a workflow that runs the full check on candidate/s<N> at the exact tested SHA with step-level suite proof and fast-forwards master on green, and a close that pushes the candidate, records the receipt (base SHA, tested SHA, surface digest, executor), and in a repository with no CI executes the same check locally against the same SHA for the same receipt. Executor failover is the only escape; no typeable bypass exists.
+
+### Session 80 — The loop stops living in anyone's attention
+
+**Releasable: no.**
+
+The loop stops living in anyone's attention. Instruction leases with epochs land on the record: every issued instruction carries the lease, answers carry it back, and a stale attempt is recorded and refused - the fence report() gained in session 79 is generalized to the driver's own judgment. The clocks split over free observables: acknowledgment, liveness and progress are separate, liveness resets on stream and OS signals, progress only on verified milestones, and no AI is ever asked for an ETA. The guardian arrives claude-code tier: on turn end with a lease outstanding the engine's stop hook consults the lease and continues the conversation instead of letting it settle; death and compaction recover through --continue with the instruction re-injected from the record; a pending permission prompt routes to the one state a human genuinely owns. Budgets, not confirmations: registration grants the session's paid-action budget and every supervision act appends to the record with its cost. dabbler session run drives a whole session under the guardian in one command; other engines degrade to watcher-only and say so.

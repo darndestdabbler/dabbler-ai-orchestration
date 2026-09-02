@@ -121,8 +121,14 @@ describe("the sentinel band", () => {
     );
     expect(stale.code).not.toBe(0);
     expect(stale.err).toContain("5");
-    // The durable oracle: the outstanding instruction is untouched.
+    // The durable oracles: the outstanding instruction is untouched, and
+    // the refusal is itself a supervision event on the record.
     expect(readInstruction(repo, 1)?.seq).toBe(5);
+    const supervision = readFileSync(
+      join(repo, ".dabbler", "runs", "s1", "driver", "supervision.jsonl"),
+      "utf8",
+    );
+    expect(supervision).toContain("stale-report-refused");
   });
 
   it("instruction-execution: work is not done until every step is accepted", () => {

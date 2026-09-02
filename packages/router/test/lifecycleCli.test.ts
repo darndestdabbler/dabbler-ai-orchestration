@@ -17,6 +17,7 @@ import { statusVerb } from "../src/cli/status.ts";
 import { HANDLERS } from "../src/cli/registry.ts";
 import { VERBS } from "../src/contracts/verbs.ts";
 import { sessionVerb } from "../src/cli/session.ts";
+import { writeInstruction } from "../src/driver.ts";
 import { readRawSessionState } from "../src/progress.ts";
 import { registerSessionStart } from "../src/writers.ts";
 import { makeSandboxRepo, makeTempDir, removeTempDirs } from "./support/fixtures.ts";
@@ -269,5 +270,53 @@ describe("the verb registry", () => {
     for (const spec of VERBS) {
       expect(typeof HANDLERS[spec.verb], spec.verb).toBe("function");
     }
+  });
+});
+
+describe("dabbler session run", () => {
+  it("refuses when no session is in flight, naming the registration it needs", async () => {
+    const dir = makeTempDir();
+    mkdirSync(join(dir, "docs", "sessions"), { recursive: true });
+    const result = await captured(() =>
+      sessionVerb(["run", "--sessions-dir", join(dir, "docs", "sessions")]),
+    );
+    expect(result.code).not.toBe(0);
+    expect(result.err).toContain("no session is in flight");
+    expect(result.err).toContain("session next");
+  });
+});
+
+describe("dabbler session hook-stop", () => {
+  it("blocks the settle while a step instruction is outstanding, in the RUN sentence", async () => {
+    const { repo, sessionsDir } = makeSandboxRepo();
+    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
+    writeInstruction(repo, 1, {
+      schema_version: 1,
+      seq: 3,
+      session_number: 1,
+      issued_at: new Date().toISOString(),
+      kind: "step",
+      step_id: "widget",
+      ask: "do the widget",
+      answer_schema: "driver-report.schema.json",
+      answer_command: "dabbler session report --seq 3",
+    });
+    const result = await captured(() =>
+      sessionVerb(["hook-stop", "--sessions-dir", sessionsDir]),
+    );
+    expect(result.code).toBe(0);
+    const decision = JSON.parse(result.out);
+    expect(decision.decision).toBe("block");
+    expect(decision.reason).toContain("RUN the shell command");
+    expect(decision.reason).toContain("seq 3");
+  });
+
+  it("stays silent when nothing is owed, because it fires on every stop", async () => {
+    const { sessionsDir } = makeSandboxRepo();
+    const result = await captured(() =>
+      sessionVerb(["hook-stop", "--sessions-dir", sessionsDir]),
+    );
+    expect(result.code).toBe(0);
+    expect(result.out).toBe("");
   });
 });

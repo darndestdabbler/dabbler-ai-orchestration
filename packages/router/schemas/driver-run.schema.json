@@ -177,6 +177,11 @@
       "description": "How many times this run has answered a verify refusal by going back to the pre-verification phase rather than stopping. `verify` refuses when the targeted evidence does not match the tree, and running the affected tests again is exactly what makes that precondition true -- so the driver heals it instead of stopping in a phase it would re-enter forever. It is counted, and on disk rather than in a local, because a gate the preverify phase CANNOT satisfy would otherwise loop between the two: past the bound the driver stops and hands the operator verify's own reason.",
       "default": 0
     },
+    "lease_epoch": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Which driver holds this run. Every process that resumes the loop takes the lease by writing epoch+1 before its first move, and every later save is compare-and-swap against the disk: a save whose in-memory epoch is behind the file's is a stale attempt -- on 2026-09-02 two drivers wrote one run and phases were skipped silently -- and it stops instead of advancing state. Absent on records from before the fence; read as epoch 1."
+    },
     "job": {
       "type": ["object", "null"],
       "additionalProperties": false,

@@ -522,6 +522,74 @@ describe("the watcher, which separates a thinking engine from a stopped one", ()
     );
     expect(reading.state).toBe(WATCHER_OUTSTANDING);
     expect(reading.sinceSeconds).toBe(72);
+    // Nothing was ever observed: the acknowledgment clock, with the move
+    // a supervisor should make in its words.
+    expect(reading.clock).toBe("acknowledgment");
+    expect(reading.recommended_action).toContain("session next");
+  });
+
+  it("names the progress clock when edits happened and then stopped", () => {
+    // Responsiveness is not progress: the old rule read ANY touch after
+    // the instruction as healthy forever, so an engine that edited once
+    // and wandered off was invisible.
+    const touchedLongAgo = "2026-09-01T06:40:05-04:00";
+    const reading = watcherReading(
+      {
+        instruction: INSTRUCTION,
+        run: LIVE,
+        answeredAt: null,
+        treeTouchedAt: () => touchedLongAgo,
+      },
+      60,
+      NOW,
+    );
+    expect(reading.state).toBe(WATCHER_OUTSTANDING);
+    expect(reading.clock).toBe("progress");
+    expect(reading.sinceSeconds).toBe(67);
+    expect(reading.recommended_action).toContain("answer_command");
+  });
+
+  it("stays quiet while the edits are recent", () => {
+    const justTouched = "2026-09-01T06:41:00-04:00";
+    const reading = watcherReading(
+      {
+        instruction: INSTRUCTION,
+        run: LIVE,
+        answeredAt: null,
+        treeTouchedAt: () => justTouched,
+      },
+      60,
+      NOW,
+    );
+    expect(reading.state).toBe(WATCHER_QUIET);
+  });
+
+  it("names a spinning job on the progress clock even while its log grows", () => {
+    const started = "2026-09-01T06:35:00-04:00"; // six thresholds before NOW
+    const reading = watcherReading(
+      {
+        instruction: { ...INSTRUCTION, kind: "wait" } as DriverInstruction,
+        run: { ...LIVE, job: { name: "verification", argv: [], pid: 1, log: "x.log", status: "s.json", started_at: started, retry_after_seconds: 60 } } as DriverRun,
+        answeredAt: null,
+        treeTouchedAt: never,
+        jobLogGrew: () => true,
+      },
+      60,
+      NOW,
+    );
+    expect(reading.state).toBe(WATCHER_JOB_OUTSTANDING);
+    expect(reading.clock).toBe("progress");
+    expect(reading.recommended_action).toContain("spin");
+  });
+
+  it("escalates a long acknowledgment silence to the progress clock", () => {
+    const reading = watcherReading(
+      { instruction: INSTRUCTION, run: LIVE, answeredAt: null, treeTouchedAt: () => null },
+      60,
+      new Date("2026-09-01T06:47:00-04:00"),
+    );
+    expect(reading.state).toBe(WATCHER_OUTSTANDING);
+    expect(reading.clock).toBe("progress");
   });
 
   it("reads one session's directory, and the tree it is over", () => {

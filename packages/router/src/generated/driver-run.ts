@@ -118,6 +118,10 @@ export type DriverRun = {
    */
   preverify_heals?: number;
   /**
+   * Which driver holds this run. Every process that resumes the loop takes the lease by writing epoch+1 before its first move, and every later save is compare-and-swap against the disk: a save whose in-memory epoch is behind the file's is a stale attempt -- on 2026-09-02 two drivers wrote one run and phases were skipped silently -- and it stops instead of advancing state. Absent on records from before the fence; read as epoch 1.
+   */
+  lease_epoch?: number;
+  /**
    * The one long-running thing the framework has started and has not yet collected, or null. Long work is never awaited inside a call: a verification round, the complete suite and the close each outlast an engine's tool timeout, so they are started detached and the following call reports progress or the result.
    */
   job?: {

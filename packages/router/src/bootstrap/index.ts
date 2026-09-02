@@ -26,8 +26,8 @@
 // the guard has to exist in the clone before the first step does, and a guard
 // installed by the thing it guards is installed too late.
 
-import { chmodSync, existsSync, mkdirSync, statSync, writeFileSync } from "node:fs";
-import { basename, join, resolve } from "node:path";
+import { chmodSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { basename, dirname, join, resolve } from "node:path";
 
 import { SESSIONS_DIRNAME, SESSION_PLAN_FILENAME } from "../evidence.ts";
 import { readText } from "../textfile.ts";
@@ -296,6 +296,39 @@ export function scaffoldSolutionManifest(projectDir: string): string | null {
   ].join("\n");
   try {
     writeFileSync(path, text, "utf8");
+  } catch {
+    return null;
+  }
+  return path;
+}
+
+/**
+ * The claude-code stop gate, installed where it can fire and nowhere else.
+ *
+ * Guarded three ways: only under a Claude Code host (the CLAUDECODE
+ * environment marker), only into a settings file that does not already
+ * carry the hook, and only ever ADDING an entry -- existing hooks are
+ * never rewritten, because the settings file is the operator's. Returns
+ * the path it wrote, or null when there was nothing to do.
+ */
+export function installStopGate(projectDir: string): string | null {
+  if (!process.env["CLAUDECODE"]) return null;
+  const path = join(projectDir, ".claude", "settings.json");
+  let settings: Record<string, unknown> = {};
+  try {
+    settings = JSON.parse(readFileSync(path, "utf8"));
+  } catch {
+    settings = {};
+  }
+  const command = "dabbler session hook-stop --sessions-dir docs/sessions";
+  const hooks = (settings["hooks"] ??= {}) as Record<string, unknown>;
+  const stop = (hooks["Stop"] ??= []) as Array<Record<string, unknown>>;
+  const present = JSON.stringify(stop).includes("session hook-stop");
+  if (present) return null;
+  stop.push({ hooks: [{ type: "command", command }] });
+  try {
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, `${JSON.stringify(settings, null, 2)}\n`, "utf8");
   } catch {
     return null;
   }

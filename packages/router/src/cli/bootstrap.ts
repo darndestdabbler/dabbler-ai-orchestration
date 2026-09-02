@@ -34,6 +34,7 @@ import {
   scaffoldSolutionManifest,
   scaffoldProjectConfig,
   writeInstructionFiles,
+  installStopGate,
 } from "../bootstrap/index.ts";
 import { writeErr, writeOut } from "./output.ts";
 
@@ -205,6 +206,16 @@ export async function bootstrapVerb(argv: string[]): Promise<number> {
     const path = join(project, ".gitignore");
     writeOut(`bootstrap: added ${IGNORE_RULE} to ${path}\n`);
     written.push(path);
+  }
+  {
+    // The claude-code stop gate: the turn-end half of the guardian,
+    // installed only where it can fire (a Claude Code host) and never over
+    // an operator's own hooks.
+    const hooked = installStopGate(project);
+    if (hooked !== null) {
+      writeOut(`bootstrap: installed the stop gate in ${hooked}\n`);
+      written.push(hooked);
+    }
   }
   // Re-run on an existing clone, this is the migration: a clone made before
   // round refs existed carries neither refspec, and the fix only reaches the

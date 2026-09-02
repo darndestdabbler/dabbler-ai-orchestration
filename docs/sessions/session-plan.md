@@ -3950,7 +3950,17 @@ operator's word; the candidate gate and Marketplace workflow have both
 gone green; the Marketplace serves 2.0.0.
 
 1. Register; declare `--not-releasable`.
-2. `dabbler release --verify-install` as a step check: the Marketplace is
+2. **The stale-job fence, before anything trusts a tail.** Sessions 78 and
+   81 both skipped their run-of-record and close phases silently:
+   `longWork` treats a standing job under ANOTHER name as already
+   finished and answers EXIT_OK, which is true within one phase's suite
+   walk and false across phases -- an uncollected verification job after
+   an adjudication turns every later phase fake-green (root cause in
+   `.dabbler/scratch/s81-skip-forensics/`; both sessions were completed
+   honestly through the verbs afterwards). The fix collects and clears
+   the mismatched job, then starts its own; a driver test pins it. The
+   engine runs this step before the operator begins the walk.
+3. `dabbler release --verify-install` as a step check: the Marketplace is
    asked what it actually serves; exit 0 or the step fails.
 3. **The operator, from a clean VS Code profile** with the extension
    installed from the Marketplace and a fresh clone of `csv-model`:
@@ -3960,9 +3970,16 @@ gone green; the Marketplace serves 2.0.0.
    completed, current, and planned sessions with a driven session's tasks
    moving; a session driven end to end under the session-80 guardian
    without once typing a protocol verb.
-4. Findings recorded in `docs/field-trial-70.md`; anything needing a
+4. **The .NET leg** (operator, 2026-09-02: what we build must work for
+   .NET and Java; only this application is TypeScript). Beside
+   csv-model, a minimal `dotnet new xunit` repository with its own
+   `dabbler.yaml` -- `dotnet test` as the suite command, `dotnet build`
+   as a control -- runs one driven session end to end. Everything
+   consumer-facing speaks argv, declared file sets and git; this leg is
+   where that claim meets a compiler that is not Node.
+5. Findings recorded in `docs/field-trial-70.md`; anything needing a
    session of its own is amended into the plan on the record.
-5. Affected; verify; full suite as `final-full`; close.
+6. Affected; verify; full suite as `final-full`; close.
 
 ---
 

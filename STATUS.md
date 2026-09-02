@@ -1,7 +1,35 @@
-# STATUS — 80 closed: the loop left everyone's attention span; 81 next: publishing without a secret
+# STATUS — 77-81 all closed VERIFIED in one day; 82 is the operator's trial, with one fence to land first
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
 
+> ## SESSION 81 CLOSED, 2026-09-02, VERIFIED at adjudication (the third)
+>
+> Publishing without a secret: the Marketplace workflow federates (OIDC
+> to Entra, ids in repository variables, vsce --azure-credential,
+> azure/login pinned to the SHA the live v2 tag resolves to), the PAT
+> path is gone, and the never-used Open VSX mirror went with it -- the
+> last stored secret removed by removal, revival path named. The
+> operator's one-time Azure steps are copy-pasteable in
+> docs/planning/marketplace-release-process.md. quick-start gains 2b:
+> the four-word vocabulary (start, run, interact, cancel) and session
+> next is now addressed to engines only.
+>
+> **The skip defect is root-caused.** Sessions 78 and 81 both slid
+> through run-of-record and close: longWork answers EXIT_OK for a
+> standing job under another name -- true inside one phase's walk,
+> false across phases, so an uncollected verification job after an
+> adjudication fake-greens every later phase. Forensics for both are
+> under .dabbler/scratch/; both sessions were completed honestly through
+> the verbs. The one-branch fix (collect and clear the mismatched job,
+> then start your own) is 82's step 2, engine-run, before the trial
+> trusts any tail.
+>
+> **Waiting on the operator tonight:** the Azure one-time setup (the doc
+> above, ~15 min); delete any OVSX_PAT left in GitHub settings (nothing
+> references it); the 2.0.0 release word (dabbler release); then 82's
+> walk -- now with a .NET xunit leg beside csv-model, per the
+> language-neutrality directive.
+>
 > ## SESSION 80 CLOSED, 2026-09-02, VERIFIED at adjudication (the second 3-0)
 >
 > The liveness guardian, claude-code tier: lease epochs on the run record

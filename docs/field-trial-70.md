@@ -36,10 +36,10 @@ publication had already happened by the time session 70 ran.
 | Order | Who | What |
 |---|---|---|
 | First | Session 70 | One version — 2.8.0, declared in `version.json` and **stamped** into both manifests, the extension's dependency on the router and the lock file by `npm run stamp:version`, with `dabbler release` refusing a stale one. This document, the feedback audit below, and the plan amendment. Lands and closes. |
-| Then | Session 71 | **Green CI.** `Test` has failed on every push since session 66, and both release workflows are gated on a green run for the tagged commit, so nothing can be published until it passes. The cause is a short-path/long-path mismatch on the Windows runner: `os.tmpdir()` gives the 8.3 short form (`RUNNER~1`) while git answers with the long one (`runneradmin`), so the sessions-relative path is nonsense and the bookkeeping exclusion never matches. |
+| Then | Sessions 71 and 72 | **Green CI.** `Test` has failed on every push since session 66, and both release workflows are gated on a green run for the tagged commit, so nothing can be published until it passes. The cause is a short-path/long-path mismatch on the Windows runner: `os.tmpdir()` gives the 8.3 short form (`RUNNER~1`) while git answers with the long one (`runneradmin`), so the sessions-relative path is nonsense and the bookkeeping exclusion never matches. |
 | Then | The operator | On the landed, green tree: `dabbler release` raises the brief; `dabbler owed answer --id publication --choice publish` settles it. The answer is the operator's alone — publishing cannot be recalled. |
 | Then | The framework | Tags `v2.8.0`, waits for npm to serve the router, then tags `vsix-v2.8.0`. CI publishes over OIDC. |
-| Last | Session 72 | `dabbler release --verify-install` as a step **check**, so the install is the record rather than a claim about it; then criteria 1 and 2 below, performed against the published extension from a clean profile; then this document's findings and item 5 of the audit. |
+| Last | Session 73 | `dabbler release --verify-install` as a step **check**, so the install is the record rather than a claim about it; then criteria 1 and 2 below, performed against the published extension from a clean profile; then this document's findings and item 5 of the audit. |
 
 **2.8.0 and not 2.7.0.** Sessions 65 through 69 landed after 2.7.0 was set —
 the watcher, the logic-tree repairs, `session rebaseline`, the round-cap
@@ -94,7 +94,7 @@ which is history rather than a control. The audit below replaces it.
 
 ## Feedback audit
 
-Written by session 70; item 5 closes in session 72 on the recorded
+Written by session 70; item 5 closes in session 73 on the recorded
 verification, and is a dated deferred issue until it does.
 
 | # | Item | Held by |
@@ -103,7 +103,7 @@ verification, and is a dated deferred issue until it does.
 | 2 | "Set Up New Project" should create the folder and initialise the repo | `tools/dabbler-ai-orchestration/src/test/suite/commandFlows.test.ts` — *creates the project when VS Code has no folder open at all*, *opens a folder it created before offering anything about it*, and *initialises a repository when bootstrap refuses for want of one*. |
 | 3 | `dabbler.yaml` should be filled in by the framework at the right moment | `packages/router/test/owedDecisions.test.ts` — the suites question is asked once and *written* on the answer (*appends to a suites list that already exists*, *inserts into a testing mapping that carries no suites*); packaging is detected and written the same way in `packages/router/test/detectPackaging.test.ts`. |
 | 4 | The Solution Explorer's purpose is unclear | `tools/dabbler-ai-orchestration/src/test/suite/actionRegistry.test.ts` — *the Solution Explorer says what it is for, and offers a way in*: the view contributes a welcome that names what it shows and carries a command, so an empty tree is not a dead end. |
-| 5 | `npm i -g dabbler-ai-router` fails | **Deferred, 2026-09-01, owner: the operator.** It closes on a recorded release verification and on nothing else: `dabbler release --verify-install` performs the real clean install from the public registry, and session 72 runs it as a step check once the tags are pushed. Today the registry returns 404, so any other disposition would be a claim. |
+| 5 | `npm i -g dabbler-ai-router` fails | **Deferred, 2026-09-01, owner: the operator.** It closes on a recorded release verification and on nothing else: `dabbler release --verify-install` performs the real clean install from the public registry, and session 73 runs it as a step check once the tags are pushed. Today the registry returns 404, so any other disposition would be a claim. |
 | 6 | `--help` unusable on subcommands | `packages/router/test/lifecycleCli.test.ts` — *answers --help on a SUBCOMMAND with that subcommand's own arguments*, for `start`, `declare` and `plan`, and never with "expected one argument". |
 | 7 | A gate's error text names the wrong file | `packages/router/test/gates.test.ts` — *names the file the operator edits, and never the packaged layer beneath it*: the freshness gate's remediation cites `dabbler.yaml` and never `router-config.yaml`. |
 | 8 | No way to record "the selector chose nothing" | `packages/router/test/preverify.test.ts` — `none-selected` is an outcome the record carries, and the framework re-runs the selection rather than trusting a claim that nothing was needed. |
@@ -116,4 +116,4 @@ evidence.
 
 ## What the trial found
 
-*Filled in by session 72, against the published pair.*
+*Filled in by session 73, against the published pair.*

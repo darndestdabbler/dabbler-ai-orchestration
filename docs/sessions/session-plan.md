@@ -2961,7 +2961,7 @@ demonstration.*
 
 ---
 
-### Session 65 of 72: The papercuts the trial found
+### Session 65 of 73: The papercuts the trial found
 
 1. Register; declare `--not-releasable`.
 2. **The cursor.** `spawnCheck` and `spawnProgram` in `checks.ts` — the
@@ -3010,7 +3010,7 @@ demonstration.*
 
 ---
 
-### Session 66 of 72: The publish phase, CI's first clean run, and the spinner
+### Session 66 of 73: The publish phase, CI's first clean run, and the spinner
 
 *Widened from "the publish phase" on the operator's call, 2026-09-01: a
 miscellaneous session, because three of the four things in it are small and
@@ -3119,7 +3119,7 @@ something a published framework would otherwise ship with.*
 
 ---
 
-### Session 67 of 72: The watcher, and the driver's blind spots
+### Session 67 of 73: The watcher, and the driver's blind spots
 
 *Planned 2026-09-01 from session 66's own conduct. Three of its four
 framework findings are the same root: the driver treating an exit code as
@@ -3197,7 +3197,7 @@ belonging to no step. It is session 68's, and the reason is recorded there.
 
 ---
 
-### Session 68 of 72: The logic tree, harvested and held to the code
+### Session 68 of 73: The logic tree, harvested and held to the code
 
 *The harvest runs outside this repository, beside it, because a session
 was in flight when it started and this repository's close checks for a
@@ -3257,7 +3257,7 @@ controls and the verifier. It replaces none of them.*
 
 ---
 
-### Session 69 of 72: The round cap stops being typeable, and the Solution Explorer goes multi-repository
+### Session 69 of 73: The round cap stops being typeable, and the Solution Explorer goes multi-repository
 
 *Mostly the largest unaddressed item from the csv-model feedback (item 8),
 and the answer to the operator's own sentence: "once I completed the CSV
@@ -3328,7 +3328,7 @@ build files; `usedBy` is derived and never declared, deliberately.
 
 ---
 
-### Session 70 of 72: The half of the trial that needs a published router
+### Session 70 of 73: The half of the trial that needs a published router
 
 > **Amended by session 70 itself, 2026-09-01, and the section below is left
 > as it was written.** What it asks for could not run: nothing is published
@@ -3445,7 +3445,7 @@ the reason to do it once testing is finished rather than to unblock a row.
 
 ---
 
-### Session 71 of 72: Green CI, because nothing can be published until it is
+### Session 71 of 73: Green CI, because nothing can be published until it is
 
 *Written by session 70 on the operator's call, 2026-09-01, and numbered by
 this doc-only commit immediately after that session closed — the same way
@@ -3486,7 +3486,52 @@ form and red on every runner.
 
 ---
 
-### Session 72 of 72: The trial against what the registry actually serves
+### Session 72 of 73: Green CI, part two — what the first fix did not reach
+
+*Added 2026-09-02, after session 71 landed and its `Test` run was still red.
+71 was right and incomplete: the `sessions.json` failures it was written for
+are gone from the runner's log, and four other things in the same family are
+not. Recorded as its own session rather than as a silent follow-up, because
+"the fix did not finish the job" is the sentence a plan is for.*
+
+**What is left, all of it one family — a path spelled two ways, or a machine
+fact the suite assumed rather than declared.**
+
+1. **`canonicalPath` gives up on a path that does not exist yet**, and falls
+   back to `resolve`, which keeps the spelling it was handed. So a
+   comparison between an existing root (canonical) and a not-yet-written
+   file under it (short form) is exactly the mismatch it was written to end:
+   `../../../../../RUNNER~1/AppData/Local/Temp/.../not/written/yet.json`.
+   Session 71's own new test caught this on the runner, which is the test
+   doing its job. It must canonicalise the deepest ancestor that DOES exist
+   and re-append the rest.
+2. **The suite depends on the machine having a git identity.** The runner has
+   none, so `git commit` inside a fixture's repository fails with *please
+   tell me who you are*, and the driver's land phase stops. That is the same
+   defect in a different coat: a fixture that borrows ambient configuration
+   is a fixture that passes for a reason it did not state. Every repository
+   the fixtures create declares its own `user.name` and `user.email`.
+3. **`packaging.test` asserts the spelling it was handed**, and the code now
+   answers with the canonical one. Decide which is right per assertion
+   rather than making the test agree with whatever came back.
+4. **`fixloop`'s traceback frame** implicates a file whose path arrives in
+   the short form; with (1) fixed it should resolve, and if it does not it
+   is its own comparison to convert.
+
+1. Register; declare `--not-releasable`.
+2. Fix (1) and prove it the way 71 proved its own: a test that fails without
+   it. Extend `aliased-temp-suite.mjs` to take the suites as arguments so
+   the whole failing set can be re-run under an aliased TEMP locally, which
+   is what makes (2), (3) and (4) reproducible here instead of only on a
+   runner.
+3. Fix (2) in the fixtures, (3) and (4) where they belong.
+4. Push, and read the `Test` run for the pushed commit. **Nothing is tagged
+   until it is green**, which is the whole reason this session exists.
+5. Affected; verify; full suite as `final-full`; close.
+
+---
+
+### Session 73 of 73: The trial against what the registry actually serves
 
 *Added by session 70, on the rule session 50 set: a trial with no route to
 fix what it finds is a demonstration. Session 70 found its own precondition

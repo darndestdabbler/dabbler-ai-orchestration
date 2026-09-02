@@ -1,8 +1,41 @@
-# STATUS — 70 of 72 closed. Next: 71, green CI; then 72, the publication trial
+# STATUS — 71 of 73 closed. CI is still red: next is 72, green CI part two; then 73, the trial
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
 `experiment/verification-pipeline-v3` and `design/solution-decomposition`
 are merged and finished. Earlier handoff text is in `docs/status-archive.md`.
+
+> **Session 71 — one canonical spelling for every path comparison. CLOSED
+> `VERIFIED` in one round, 2026-09-01 (`4eff83c2`). CI IS STILL RED, and
+> session 72 is the rest of it.**
+>
+> **What it fixed, and it was real:** `canonicalPath` and `repoRelativePath`
+> now sit beside `repoRootFor` in `journal.ts` — git answers with its own
+> spelling, a caller's is whatever they were handed, and Windows spells one
+> directory several ways. Every comparison that DECIDES containment asks them
+> now: the bookkeeping exclusion (`gates.ts`), the evidence digest
+> (`testEvidence.ts`), the step-report filter (`drive.ts`), the plan envelope
+> (`approvedPlan.ts`), the verifier's read scope (`agency.ts`, where a wrong
+> answer is a security answer) and `solutionDeps`' crosses-out-of-this-
+> repository test. Message formatting still uses `relative` and says so. The
+> `sessions.json` failures that made twelve runs red are **gone from the
+> runner's log**.
+>
+> **What it did not reach — four things, same family, all in session 72's
+> plan.** (1) `canonicalPath` falls back to `resolve` for a path that does
+> not exist yet, so it keeps the spelling it was handed and a comparison
+> against a canonical root mismatches again — *session 71's own new test
+> caught this on the runner*, which is the test doing its job. (2) The suite
+> borrows the machine's git identity, and the runner has none, so a fixture's
+> `git commit` fails with *please tell me who you are* and the driver's land
+> phase stops. (3) `packaging.test` asserts the spelling it was handed. (4) A
+> `fixloop` traceback frame carries a short-form path.
+>
+> **Two controls exist now and both are worth keeping:** a junction alias in
+> `gates.test.ts` reproduces the runner's two spellings without a runner, and
+> `packages/router/scripts/aliased-temp-suite.mjs` runs the failing suites
+> with `TEMP` pointed at an alias — the runner's condition on this machine.
+> It spawns vitest through `process.execPath` rather than `npx`, whose
+> Windows `.cmd` form `spawnSync` refuses outright.
 
 > **Session 70 — one version, and the trial written down before it runs.
 > CLOSED `VERIFIED` in two rounds, 2026-09-01 (`e453bb58`).** Driven from my

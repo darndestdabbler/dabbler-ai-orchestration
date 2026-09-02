@@ -1,0 +1,21 @@
+# What this project is built FROM, as opposed to the work of building
+# it. The Solution Explorer renders this joined to live state.
+#
+# One component, because this repository is one deliverable: the router
+# and the extension that bundles it ship together and are versioned
+# together. It is a real declaration rather than a placeholder -- a
+# repository nobody has decomposed IS one component.
+#
+# `dependsOn` is the only direction anyone writes. Who depends on a
+# component is derived from it -- two directions kept by hand disagree
+# eventually, and the disagreement is silent.
+solution:
+  name: dabbler-ai-orchestration
+  title: dabbler-ai-orchestration
+  step: plan
+
+components:
+  - name: dabbler-ai-orchestration
+    kind: integration
+    title: dabbler-ai-orchestration
+    step: plan

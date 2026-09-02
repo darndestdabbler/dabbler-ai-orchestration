@@ -1578,9 +1578,9 @@
     {
       "number": 80,
       "title": "The loop stops living in anyone's attention",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-02T12:35:50.991000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-09-02T15:15:22.546000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

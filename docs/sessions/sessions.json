@@ -1598,9 +1598,9 @@
     {
       "number": 81,
       "title": "Publishing without a secret, and the last of the friction",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-02T15:17:10.116000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-09-02T16:02:24.591000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

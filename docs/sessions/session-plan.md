@@ -3625,7 +3625,10 @@ no secrets at all today, so the Marketplace half will refuse until it does.
 > 76–77) comes first; a trial belongs after whatever those change has
 > shipped. The cancellation and its reason are on the session row in
 > `sessions.json`, written by `session cancel`; `restore` is the road back
-> if a later plan revives it.
+> if a later plan revives it. **Superseded by session 82**, which runs the
+> same trial against 2.0.0 once the Marketplace serves it — 82 rather than
+> a restore because registration takes the lowest open number, and this
+> trial must run after the sessions that make its precondition true.
 
 *Added by session 70, on the rule session 50 set: a trial with no route to
 fix what it finds is a demonstration. Session 70 found its own precondition
@@ -3755,6 +3758,210 @@ a fact stated in a comment.*
    with the ground rules — not reached this session, but every conversion
    states what behavior it proves so the shrink toward one-test-per-behavior
    has its inventory.
+5. Affected; verify; full suite as `final-full`; close.
+
+---
+
+### Session 78 of 82: Every component becomes a library, or is named as not one
+
+*The operator's rule, 2026-09-02: "it's either a library or it isn't — there
+is no in between." A library is frozen content, its own green suite at that
+content, and contract tests on its edges; meeting the criteria earns full
+blackbox treatment, and the 28-module knot fails them today — by
+reachability it is one module in 28 files. The design record this session
+executes is `docs/design/` (three consult rounds, both outside seats, the
+operator's decisions); the measured facts: 57 modules, 324 edges, 52
+back-edges in two knots, clustering into a few extractions. The bounded
+contexts for the entangled core are the operator's five mini-workflows —
+startup, instruction/execution, testing/fixing, verification/remediation,
+close-out — whose handoff artifacts already exist on disk and are promoted
+to the only interface between phases; a small stateless platform kernel
+(fs, process, git, atomic writes) sits below all of them.*
+
+1. Register; declare `--not-releasable`.
+2. **The redundant run dies first.** The targeted pre-verification suite
+   run is removed from the drive: measured 353–625 s per session and twice
+   MORE than the full suite it approximates; what remains before
+   verification is the verifier's authored tests, and the full suite stays
+   the run of record. The stage vocabulary keeps `preverify-targeted` only
+   for reading old records.
+3. **The mechanical cuts, in measured order.** The `cli/output` print
+   helpers move to a leaf (≈7 back-edges); the session-state reader leaves
+   `progress`'s height (≈10); `config -> transports` is cut (1, freeing
+   ≈6). Each cut is verified by the graph measurement re-run.
+4. **SCC-B is the pilot.** `ledger`/`critique`/`evidence` (4 back-edges)
+   adopt the rule the whole design rests on: single writer per record,
+   append-only events, consumers build projections. The technique is
+   proven here before it is applied to anything bigger.
+5. **The L5 club is cut along workflow boundaries.** `cli`, `drive`,
+   `session`, `verify`, `gates`, `progress` (≈20 back-edges): phases
+   communicate only through their recorded handoffs — a coupling not in a
+   handoff artifact is moved into one or deleted. Spawned verbs get a
+   versioned command envelope in `contracts`. This step is the hard part
+   and may not finish; what remains is measured, named, and amended into a
+   follow-on scope on the record rather than silently absorbed.
+6. **The boundary holds by lint.** `import/no-cycle` and a boundary rule
+   land in the existing lint control with a frozen baseline of anything
+   step 5 left; new violations fail the control.
+7. Affected; verify; full suite as `final-full`; close.
+
+---
+
+### Session 79 of 82: Seals, and a master that only moves on green
+
+*The blackbox rule made mechanical. A seal is a framework-computed digest —
+the `surfaceDigest` machinery at library scope, hashing the files the
+declaration names, no git in the loop — plus the digests of its
+dependencies and the identity of its last green run. Per library and per
+mini-workflow (a workflow's seal digests its members' seals and its handoff
+schemas). An unchanged seal is lodash: its evidence stands, cited, never
+re-run. A changed seal owes its own suite and the contract tests on its
+edges. "The full test suite" stops being an event and becomes a ledger
+invariant — every seal green at its current digest — and the merge gate's
+job is to make the ledger whole. The sentence "it's a library but test it
+anyway before production" is banned from this repository. The operator's
+merge rule, verbatim: "Branch -> Full Test -> Merge — all within CI. And
+the framework can wait and act on the result."*
+
+1. Register; declare `--not-releasable`.
+2. **Seal records.** `{scope, digest, deps' digests, last green run}` per
+   declared library and per workflow, written beside the test evidence;
+   the freshness gate answers per seal. Text is hashed with normalized
+   line endings, so the session-66 CRLF class cannot move a seal.
+3. **The dual-mode gate.** A session's close pushes `candidate/s<N>` at
+   the exact tested SHA. Where CI exists, a candidate-triggered workflow
+   makes the seal ledger whole (whatever moved seals owe; today, before
+   per-library suites exist, that degenerates to the full suite — a
+   placeholder the seals retire, not policy) and merges master
+   fast-forward on green, deleting the branch; the framework waits with
+   its own job machinery and acts on the result — a red run's failure
+   list routes into remediation. Where CI does not exist, a local
+   executor runs the same check against a clean checkout of the same SHA
+   and produces the same receipt. Master only ever moves to a
+   full-ledger-green SHA.
+4. **The receipt, one shape for both executors:** base SHA, tested SHA =
+   landed SHA, surface digest, executor identity, and step-level proof
+   the suite step itself ran — the session-66 lesson that "workflow ran"
+   is not "suite ran". Landing is compare-and-swap against the recorded
+   base. The only escape is executor failover — a recorded CI
+   infrastructure failure lets a local receipt stand in, one-use,
+   SHA-bound — never a typeable bypass: the waive rung stays deleted.
+5. **Five sentinels plus one.** One per mini-workflow and one
+   whole-pipeline, each forcing an adverse decision and asserting on
+   durable artifacts (a startup that must block, a red test that must
+   route to fixing, a verification rejection that must route to
+   remediation, a stale-evidence close that must refuse, an interrupted
+   close that must not double-record). They always all run at local
+   close — about a minute — and never gate on cleverness.
+6. **The descent tree is a decision, not a build.** Recorded here: the
+   fail-fast layer is the sentinels; the diagnostic descent tree is built
+   only if, after this session and 77 are measured, `p(F-D) > B/H + M`
+   holds — measured sentinel-red rate p ≈ 4% (2 red in 49 recorded
+   typescript runs), so at post-77 full-suite times of 90/180/300 s the
+   crossover needs p above ~27%/6.7%/3.3% — and only once 78 has made
+   the graph partitionable at all. Until both hold, a red sentinel is
+   followed by the local full suite, which is the diagnosis.
+7. Affected; verify; full suite as `final-full`; close.
+
+---
+
+### Session 80 of 82: The loop stops living in anyone's attention
+
+*Session 76 stalled twice in one morning with a healthy lifecycle and
+nobody owed a call — the pull model's loop lives in the engine's attention
+span, and attention ends with a turn, a compaction, or a closed terminal.
+The operator rejected making the human the retry mechanism. The design is
+round 3 of the design record: a conversation-first guardian. The person's
+living conversation stays primary; a process owns liveness.*
+
+1. Register; declare `--not-releasable`.
+2. **Instruction leases.** Every issued instruction carries a lease with
+   an epoch; answers and supervision events carry it back; a stale
+   attempt is recorded and cannot advance state. Two agents on one
+   workspace becomes structurally impossible instead of procedurally
+   avoided.
+3. **Clocks over free observables.** Acknowledgment, liveness, and
+   progress are separate clocks: liveness resets on stream events and OS
+   signals (free); progress resets only on verified milestones — tool
+   transitions, tree movement, accepted answers. Repetitive output never
+   resets progress. No AI is ever asked for an ETA.
+4. **The guardian, claude-code tier.** On turn end with a lease
+   outstanding, the engine's own stop hook consults the lease and
+   continues the conversation instead of letting it settle — the dominant
+   stall becomes a deterministic host event. Death, compaction, and
+   reboot recover through `--continue` with the instruction re-injected
+   from the record. A pending permission prompt routes to BLOCKED_HUMAN:
+   the one state a human genuinely owns. Other engines degrade to
+   watcher-only, and say so honestly.
+5. **Budgets, not confirmations.** START grants the session's paid-action
+   budget (continuations, probes, recoveries — bootstrap 8/2/2); every
+   supervision act appends to the record with its cost; exhaustion is the
+   only thing that escalates. Raising a spend ceiling is a real decision;
+   clicking Continue was not.
+6. **`dabbler session run`** drives a whole session under the guardian in
+   one command for a bare terminal; the extension host is the guardian
+   when VS Code is open. The developer's vocabulary is start, interact,
+   cancel. `session next` remains the protocol's verb, not a person's.
+7. Affected; verify; full suite as `final-full`; close.
+
+---
+
+### Session 81 of 82: Publishing without a secret, and the last of the friction
+
+*The Marketplace no longer wants what the workflow asks for. The workflow's
+own comment — PAT-only, "as of 2026-05-04" — went stale: Azure DevOps
+retires global PATs on 2026-12-01 and the supported automated path is
+Entra ID workload identity federation from GitHub Actions, which vsce
+supports natively. The operator's judgment preceded the evidence. No
+secret is stored anywhere, which is where this repository's rules always
+wanted the credential story to end.*
+
+1. Register; declare `--not-releasable`: this session prepares the
+   release; the tag that makes one is the operator's, tonight.
+2. **`publish-vscode.yml` federates.** `id-token: write`, Entra login,
+   `vsce --azure-credential`; the PAT path and the stale comment go; the
+   candidate-gate trigger from session 79 and this workflow stop
+   overlapping by construction.
+3. **The operator's one-time steps** land in
+   `docs/planning/marketplace-release-process.md`, rewritten to the
+   copy-pasteable bar: create the Entra app, add the GitHub federated
+   credential for this repository, grant the publisher, done — with the
+   exact portal paths and values, and the `dabbler release` command that
+   follows them.
+4. **The naming that misled the owner** is retired from every document a
+   person reads: quick-start and the managed guidance describe start,
+   interact, cancel, and `session run`; no instruction tells a person to
+   type `session next`.
+5. Affected; verify; full suite as `final-full`; close.
+
+---
+
+### Session 82 of 82: The trial, run by the operator against what the Marketplace serves
+
+*Session 75's trial, revived at the number the queue allows, with the same
+rule it was written under: a trial with no route to fix what it finds is a
+demonstration. The operator performs it — which also closes the oldest
+item of feedback on this framework: that it rebuilt a UI-bearing product
+without once recommending UAT.*
+
+**Preconditions:** the Entra credential exists (session 81's doc, operator's
+one-time step); `dabbler release` has tagged `vsix-v2.0.0` on the
+operator's word; the candidate gate and Marketplace workflow have both
+gone green; the Marketplace serves 2.0.0.
+
+1. Register; declare `--not-releasable`.
+2. `dabbler release --verify-install` as a step check: the Marketplace is
+   asked what it actually serves; exit 0 or the step fails.
+3. **The operator, from a clean VS Code profile** with the extension
+   installed from the Marketplace and a fresh clone of `csv-model`:
+   acceptance criteria answered from visible UI only, expected answers
+   written down before the run — the Solution Explorer rendering the
+   pipeline with drift and location states; the Work Explorer showing
+   completed, current, and planned sessions with a driven session's tasks
+   moving; a session driven end to end under the session-80 guardian
+   without once typing a protocol verb.
+4. Findings recorded in `docs/field-trial-70.md`; anything needing a
+   session of its own is amended into the plan on the record.
 5. Affected; verify; full suite as `final-full`; close.
 
 ---

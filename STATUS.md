@@ -1,8 +1,29 @@
-# STATUS — 76 closed, 77 next: the git seam, measured against 76's baseline; still unpublished
+# STATUS — 76 closed; the queue is 77–82: seam, libraries, seals+gate, liveness, publish, trial
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
 `experiment/verification-pipeline-v3` and `design/solution-decomposition`
 are merged and finished. Earlier handoff text is in `docs/status-archive.md`.
+
+> ## THE QUEUE REWRITTEN, 2026-09-02: sessions 77–82, from the design record
+>
+> A day of design with the operator and two outside seats (GPT-5.6 Sol,
+> Gemini 3.1 Pro; three rounds, all in `docs/design/consults/`) settled
+> the architecture: libraries and mini-workflows as sealed blackboxes
+> (framework-computed digests, git only for landing), a dual-mode merge
+> gate (master only moves to a full-ledger-green exact SHA; CI where it
+> exists, a local executor where not; executor failover, never a typeable
+> bypass), five per-workflow sentinels as the fail-fast layer, the
+> descent tree held behind a measured threshold (p ≈ 4% against
+> crossovers of ~27%/6.7%/3.3% at 90/180/300 s), and a conversation-first
+> liveness guardian (leases with epochs, free-observable clocks, stop-gate
+> continuation, budgets not confirmations). Session 75's trial is revived
+> as session 82, operator-performed. Publishing moves to Entra workload
+> identity federation — no stored secret; the one-time Azure steps are
+> the operator's, documented in session 81.
+>
+> The operator is away 2026-09-02; the orchestrator (claude-code) drives
+> 77 onward back to back on their instruction, and the operator performs
+> 82's UAT on return.
 
 > ## SESSION 76 CLOSED, 2026-09-02: what a session starts, a session ends
 >

@@ -204,7 +204,15 @@ jobs:
           # `git ls-remote ssh://git@github.com/dist/dabbler-ai-router-2.8.0.tgz.git`
           # and failed on a public key. A leading `./` is what makes it a
           # file. Found on the first publish this workflow ever reached.
+          #
+          # `--access public` is required rather than merely true: npm
+          # refuses to generate provenance for a package it has never seen
+          # ("Can't generate provenance for new or private package, you must
+          # set `access` to public"), and this package had never been seen.
+          # It is the default for an unscoped name, so saying it changes
+          # nothing except that the first publish is allowed to happen.
           tarball="./$(ls dist/*.tgz)"
           npm publish "$tarball" \
             --provenance \
+            --access public \
             --tag "${{ needs.classify.outputs.is_final == 'true' && 'latest' || 'next' }}"

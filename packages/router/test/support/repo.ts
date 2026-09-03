@@ -76,3 +76,33 @@ export function makeRepo(files: Record<string, string>, options: { origin?: bool
   }
   return repo;
 }
+
+/**
+ * The seed a walkthrough works over: a session plan of two, one suite with
+ * its selection rules, one source file and the test that covers it.
+ */
+export const SANDBOX_SEED: Record<string, string> = {
+  "docs/sessions/session-plan.md":
+    "### Session 1 of 2: First things\n1. Register.\n2. **Build the widget.** Make it real.\n" +
+    "3. Cross-provider verification.\n4. Close-out.\n\n" +
+    "### Session 2 of 2: Second things\n1. Register.\n2. Polish it.\n",
+  "dabbler.yaml":
+    "schema_version: 1\n\ntesting:\n  suites:\n    - name: unit\n" +
+    "      command: python -m pytest\n      expensive: true\n" +
+    "      covers:\n        - src/\n        - tests/\n" +
+    "      test_roots:\n        - tests\n      test_glob: \"test_*.py\"\n\n" +
+    "  selection:\n    repo_wide:\n      - dabbler.yaml\n" +
+    "    smoke:\n      - tests/test_widget.py\n    rules:\n" +
+    "      - when: src/widget.py\n        select:\n          - tests/test_widget.py\n",
+  "src/widget.py": "def widget():\n    return 1\n",
+  "tests/test_widget.py": "def test_widget():\n    assert True\n",
+  ".gitignore": ".dabbler/\n",
+};
+
+/** That seed as a repository with an upstream, and where its sessions live. */
+export function makeSandbox(
+  extra: Record<string, string> = {},
+): { repo: string; sessionsDir: string } {
+  const repo = makeRepo({ ...SANDBOX_SEED, ...extra }, { origin: true });
+  return { repo, sessionsDir: join(repo, "docs", "sessions") };
+}

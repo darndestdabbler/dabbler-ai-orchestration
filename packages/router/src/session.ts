@@ -530,7 +530,7 @@ export interface StartOptions {
 }
 
 /** Who is working, as the four fields the orchestrator block carries. */
-interface OrchestratorIdentity {
+export interface OrchestratorIdentity {
   readonly engine: string;
   readonly provider: string | null;
   readonly model: string | null;
@@ -567,7 +567,7 @@ function statedField(block: Record<string, unknown> | null, field: string): stri
  * because letting an omission through without preserving it is how the
  * guard came to permit the erasure it was written to prevent.
  */
-function identityClash(
+export function identityClash(
   recorded: Record<string, unknown> | null,
   asking: OrchestratorIdentity,
 ): string | null {
@@ -597,7 +597,7 @@ function identityClash(
  * here too even though the guard ignores it: a dial the call does not
  * mention is a dial nobody asked to change.
  */
-function carryForward(
+export function carryForward(
   recorded: Record<string, unknown> | null,
   asking: OrchestratorIdentity,
 ): OrchestratorIdentity {
@@ -613,6 +613,80 @@ function carryForward(
     model: keep(asking.model, "model"),
     effort: keep(asking.effort, "effort"),
   };
+}
+
+/** What the record says about the sequence a `start` is asking to join. */
+export interface SequenceFacts {
+  /** The session in flight, or null. */
+  readonly current: number | null;
+  /** Every closed session, ascending. */
+  readonly completed: readonly number[];
+  /** Every cancelled session. */
+  readonly cancelled: ReadonlySet<number>;
+  /** The number the caller named, or null to take the next one. */
+  readonly requested: number | null;
+}
+
+/**
+ * Which session a `start` means, and whether it may have it.
+ *
+ * A cancelled session is settled work, not a hole in the sequence: the next
+ * session steps over it, and "next" is the first one still available to run
+ * rather than one past the highest closed number. The three refusals are the
+ * boundary triad -- a session already in flight, one already closed, and one
+ * that is not the next in sequence -- plus the cancelled one, which is
+ * refused with the verb that would undo it rather than silently erasing the
+ * reason somebody recorded.
+ */
+export function judgeStartBoundary(
+  facts: SequenceFacts,
+): { readonly requested: number } & BoundaryRuling {
+  const nextAvailable = (after: number): number => {
+    let candidate = after;
+    while (facts.cancelled.has(candidate)) candidate += 1;
+    return candidate;
+  };
+  const expected = nextAvailable(
+    facts.completed.length > 0 ? Math.max(...facts.completed) + 1 : 1,
+  );
+  const requested =
+    facts.requested ?? (facts.current !== null ? facts.current : expected);
+  const closed = `completedSessions=[${facts.completed.join(", ")}]`;
+  const refuse = (refusal: string): { requested: number } & BoundaryRuling => ({
+    requested,
+    refusal,
+    exitCode: EXIT_BOUNDARY,
+  });
+
+  if (facts.current !== null && requested !== facts.current) {
+    return refuse(
+      `refused -- session ${sessionDisplayNumber(facts.current)} is still in ` +
+        `flight (${closed}). Close session ` +
+        `${sessionDisplayNumber(facts.current)} before starting session ` +
+        `${sessionDisplayNumber(requested)}.`,
+    );
+  }
+  if (facts.completed.includes(requested)) {
+    return refuse(
+      `refused -- session ${sessionDisplayNumber(requested)} is already ` +
+        `closed (${closed}). Sessions are never re-opened.`,
+    );
+  }
+  if (facts.cancelled.has(requested)) {
+    return refuse(
+      `refused -- session ${sessionDisplayNumber(requested)} is cancelled. ` +
+        "Starting it would erase the cancellation and the reason for it; " +
+        `restore it first: dabbler session restore ${requested}`,
+    );
+  }
+  if (facts.current === null && requested !== expected) {
+    return refuse(
+      `refused -- session ${sessionDisplayNumber(requested)} is not the next ` +
+        `sequential session (expected ${expected}; ${closed}). Close the ` +
+        "intervening sessions first.",
+    );
+  }
+  return { requested, refusal: null, exitCode: EXIT_OK };
 }
 
 export function start(sessionsDir: string, options: StartOptions): number {
@@ -645,63 +719,17 @@ export function start(sessionsDir: string, options: StartOptions): number {
     const cancelled = cancelledNumbers(normalized);
     const current = (normalized?.["currentSession"] ?? null) as number | null;
 
-    // A cancelled session is settled work, not a hole in the sequence: the
-    // next session steps over it, and "next" is the first one still
-    // available to run rather than one past the highest closed number.
-    const nextAvailable = (after: number): number => {
-      let candidate = after;
-      while (cancelled.has(candidate)) candidate += 1;
-      return candidate;
-    };
-
-    let requested = options.sessionNumber ?? null;
-    if (requested === null) {
-      requested =
-        current !== null
-          ? current
-          : nextAvailable(completed.length > 0 ? Math.max(...completed) + 1 : 1);
+    const boundary = judgeStartBoundary({
+      current,
+      completed,
+      cancelled,
+      requested: options.sessionNumber ?? null,
+    });
+    if (boundary.refusal !== null) {
+      writeErr(`start: ${boundary.refusal}\n`);
+      return boundary.exitCode;
     }
-
-    // The boundary triad.
-    if (current !== null && requested !== current) {
-      writeErr(
-        `start: refused -- session ${sessionDisplayNumber(current)} is still in ` +
-          `flight (completedSessions=[${completed.join(", ")}]). Close session ` +
-          `${sessionDisplayNumber(current)} before starting session ` +
-          `${sessionDisplayNumber(requested)}.\n`,
-      );
-      return EXIT_BOUNDARY;
-    }
-    if (completed.includes(requested)) {
-      writeErr(
-        `start: refused -- session ${sessionDisplayNumber(requested)} is already ` +
-          `closed (completedSessions=[${completed.join(", ")}]). Sessions are ` +
-          "never re-opened.\n",
-      );
-      return EXIT_BOUNDARY;
-    }
-    if (cancelled.has(requested)) {
-      writeErr(
-        `start: refused -- session ${sessionDisplayNumber(requested)} is ` +
-          "cancelled. Starting it would erase the cancellation and the reason " +
-          `for it; restore it first: dabbler session restore ${requested}\n`,
-      );
-      return EXIT_BOUNDARY;
-    }
-    if (current === null) {
-      const expected = nextAvailable(
-        completed.length > 0 ? Math.max(...completed) + 1 : 1,
-      );
-      if (requested !== expected) {
-        writeErr(
-          `start: refused -- session ${sessionDisplayNumber(requested)} is not ` +
-            `the next sequential session (expected ${expected}; ` +
-            `completedSessions=[${completed.join(", ")}]). Close the intervening ` +
-            "sessions first.\n",
-        );
-        return EXIT_BOUNDARY;
-      }
-    }
+    const requested = boundary.requested;
 
     // Re-registering the session in flight is the ordinary way a pull
     // continues -- `dabbler session next --engine ...` called a second time
@@ -2000,6 +2028,96 @@ const RESTORABLE_STATUSES: readonly unknown[] = [
   STATUS_COMPLETE,
 ];
 
+/** A boundary rule's answer: the words it refuses with, or nothing. */
+export interface BoundaryRuling {
+  readonly refusal: string | null;
+  readonly exitCode: number;
+}
+
+const ALLOWED: BoundaryRuling = { refusal: null, exitCode: EXIT_OK };
+
+/**
+ * Whether this session may be cancelled, decided from its own record.
+ *
+ * A session already cancelled is settled, and one in flight is work
+ * somebody is doing: cancelling it without saying so is how a run
+ * disappears from under the person running it.
+ */
+export function judgeCancellation(
+  record: Record<string, unknown>,
+  sessionNumber: number,
+  force: boolean,
+): BoundaryRuling {
+  const prior = canonicalizeStatus(record["status"]);
+  if (prior === STATUS_CANCELLED) {
+    return {
+      refusal: `session ${sessionDisplayNumber(sessionNumber)} is already cancelled`,
+      exitCode: EXIT_BOUNDARY,
+    };
+  }
+  if (prior === STATUS_IN_PROGRESS && !force) {
+    return {
+      refusal:
+        `refused -- session ${sessionDisplayNumber(sessionNumber)} is in flight. ` +
+        "Close it first, or pass --force.",
+      exitCode: EXIT_BOUNDARY,
+    };
+  }
+  return ALLOWED;
+}
+
+/**
+ * Write the cancellation onto the record.
+ *
+ * The status it had is kept, because a restore has to have something to go
+ * back to; a status outside the restorable set is not kept, and the restore
+ * then falls back rather than reviving a state that was never a session's.
+ */
+export function applyCancellation(
+  record: Record<string, unknown>,
+  reason: string,
+  at: string,
+): void {
+  const prior = canonicalizeStatus(record["status"]);
+  if (RESTORABLE_STATUSES.includes(prior)) record["preCancelStatus"] = prior;
+  record["status"] = STATUS_CANCELLED;
+  record["cancelledReason"] = reason;
+  record["cancelledAt"] = at;
+}
+
+/** Whether there is a cancellation to undo. */
+export function judgeRestoration(
+  record: Record<string, unknown>,
+  sessionNumber: number,
+): BoundaryRuling {
+  if (canonicalizeStatus(record["status"]) === STATUS_CANCELLED) return ALLOWED;
+  return {
+    refusal:
+      `refused -- session ${sessionDisplayNumber(sessionNumber)} is not ` +
+      "cancelled; there is nothing to restore.",
+    exitCode: EXIT_BOUNDARY,
+  };
+}
+
+/**
+ * Undo the cancellation, and answer with the status the session went back
+ * to. A record that kept no prior status falls back to not-started rather
+ * than to whatever it happens to hold.
+ */
+export function applyRestoration(
+  record: Record<string, unknown>,
+  reason: string,
+): unknown {
+  let prior: unknown = record["preCancelStatus"] ?? null;
+  delete record["preCancelStatus"];
+  if (!RESTORABLE_STATUSES.includes(prior)) prior = STATUS_NOT_STARTED;
+  record["status"] = prior;
+  delete record["cancelledReason"];
+  delete record["cancelledAt"];
+  if (reason) record["restoredReason"] = reason;
+  return prior;
+}
+
 function sessionRecord(
   state: Record<string, unknown>,
   number: number,
@@ -2049,25 +2167,12 @@ export function cancel(
       );
       return EXIT_USAGE;
     }
-    const prior = canonicalizeStatus(record["status"]);
-    if (prior === STATUS_CANCELLED) {
-      writeErr(
-        `cancel: session ${sessionDisplayNumber(sessionNumber)} is ` +
-          "already cancelled\n",
-      );
-      return EXIT_BOUNDARY;
+    const ruling = judgeCancellation(record, sessionNumber, options.force === true);
+    if (ruling.refusal !== null) {
+      writeErr(`cancel: ${ruling.refusal}\n`);
+      return ruling.exitCode;
     }
-    if (prior === STATUS_IN_PROGRESS && options.force !== true) {
-      writeErr(
-        `cancel: refused -- session ${sessionDisplayNumber(sessionNumber)} ` +
-          "is in flight. Close it first, or pass --force.\n",
-      );
-      return EXIT_BOUNDARY;
-    }
-    if (RESTORABLE_STATUSES.includes(prior)) record["preCancelStatus"] = prior;
-    record["status"] = STATUS_CANCELLED;
-    record["cancelledReason"] = options.reason;
-    record["cancelledAt"] = nowIsoSeconds();
+    applyCancellation(record, options.reason, nowIsoSeconds());
     try {
       validateAndWriteState(sessionsDir, state);
     } catch (error) {
@@ -2115,21 +2220,12 @@ export function restore(
       );
       return EXIT_USAGE;
     }
-    if (canonicalizeStatus(record["status"]) !== STATUS_CANCELLED) {
-      writeErr(
-        "restore: refused -- session " +
-          `${sessionDisplayNumber(sessionNumber)} is not ` +
-          "cancelled; there is nothing to restore.\n",
-      );
-      return EXIT_BOUNDARY;
+    const ruling = judgeRestoration(record, sessionNumber);
+    if (ruling.refusal !== null) {
+      writeErr(`restore: ${ruling.refusal}\n`);
+      return ruling.exitCode;
     }
-    let prior: unknown = record["preCancelStatus"] ?? null;
-    delete record["preCancelStatus"];
-    if (!RESTORABLE_STATUSES.includes(prior)) prior = STATUS_NOT_STARTED;
-    record["status"] = prior;
-    delete record["cancelledReason"];
-    delete record["cancelledAt"];
-    if (reason) record["restoredReason"] = reason;
+    const prior = applyRestoration(record, reason);
     try {
       validateAndWriteState(sessionsDir, state);
     } catch (error) {

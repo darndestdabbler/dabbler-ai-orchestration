@@ -40,6 +40,35 @@ import {
 
 export const EXIT_OK = 0;
 
+/**
+ * The three calls the step driver makes out of itself: a routed review, a
+ * run of the tests a verifier authored, and a run of the declared suite.
+ *
+ * One seam for the three, because what this module decides is what it
+ * RECORDS -- and a test of that has no business arranging a model or a
+ * runner. Production never swaps them; the returned function restores what
+ * stood, the way the git and router seams do.
+ */
+export interface WorkSources {
+  readonly review: typeof stepreview.review;
+  readonly runAuthored: typeof testphase.runAuthored;
+  readonly runSuite: typeof fixloop.runSuite;
+}
+
+let sources: WorkSources = {
+  review: (options) => stepreview.review(options),
+  runAuthored: (root, config, paths) => testphase.runAuthored(root, config, paths),
+  runSuite: (root, config, paths) => fixloop.runSuite(root, config, paths),
+};
+
+export function setWorkSources(replacements: Partial<WorkSources>): () => void {
+  const previous = sources;
+  sources = { ...sources, ...replacements };
+  return () => {
+    sources = previous;
+  };
+}
+
 /** What every command needs to know about which target it is acting on. */
 export interface TargetArgs {
   readonly component?: string | null;
@@ -205,7 +234,7 @@ export async function runReview(args: ReviewArgs, root: string): Promise<number>
     throw new WorkflowError(terminalRefusal(target, step, state, terminal, cap));
   }
 
-  const [outcome, raws] = await stepreview.review({
+  const [outcome, raws] = await sources.review({
     target,
     step,
     artifactPaths: args.artifact,
@@ -367,7 +396,7 @@ export async function runTests(args: TargetArgs, root: string): Promise<number> 
   const authored = [...state.testsAuthored];
   let runs: CheckRun[];
   try {
-    runs = await testphase.runAuthored(
+    runs = await sources.runAuthored(
       root,
       loadConfig(undefined, String(root)),
       authored,
@@ -423,7 +452,7 @@ export async function runSuite(args: TargetArgs, root: string): Promise<number> 
   let runs: CheckRun[];
   try {
     selection = fixloop.selectionFor(config);
-    runs = await fixloop.runSuite(root, config, authored);
+    runs = await sources.runSuite(root, config, authored);
   } catch (error) {
     if (error instanceof fixloop.FixLoopError) throw new WorkflowError(error.message);
     throw error;

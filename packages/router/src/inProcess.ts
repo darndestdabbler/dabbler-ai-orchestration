@@ -141,7 +141,15 @@ function targetArgs(target: RepositoryTarget): string[] {
 export class InProcessRouter implements Router {
   private queue: Promise<unknown> = Promise.resolve();
 
-  constructor(private readonly options: InProcessRouterOptions = {}) {}
+  // Declared and assigned, not a constructor parameter property: Node runs
+  // these sources by stripping types, and a parameter property is syntax it
+  // would have to compile rather than erase. The bundle hid it -- esbuild
+  // compiles -- so this module simply could not be loaded from source.
+  private readonly options: InProcessRouterOptions;
+
+  constructor(options: InProcessRouterOptions = {}) {
+    this.options = options;
+  }
 
   /**
    * The next call waits for the one in flight, whichever way that one

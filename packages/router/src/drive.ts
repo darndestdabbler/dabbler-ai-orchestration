@@ -189,6 +189,159 @@ interface DriverOptions extends Omit<DriveOptions, "engine" | "adapter"> {
 }
 
 export const MAX_REJECTIONS = 3;
+
+/**
+ * Whether this driver still holds the lease on the run it is about to write.
+ *
+ * Two drivers wrote one run on 2026-09-02 and phases were skipped silently.
+ * A save whose in-memory epoch is BEHIND the file's is that second driver:
+ * something else took the lease while this process was working, so this
+ * process's view of the run is stale and advancing state from it would
+ * overwrite what the holder wrote. Equal is the ordinary case -- one driver,
+ * saving repeatedly -- and a disk epoch behind the caller's cannot happen
+ * without the file having been rewound, which is not this fence's to judge.
+ */
+export function judgeLease(mine: number, onDisk: number): { readonly refusal: string | null } {
+  if (onDisk <= mine) return { refusal: null };
+  return {
+    refusal:
+      `another driver holds the lease (epoch ${onDisk}; this process took ${mine}). ` +
+      "A stale attempt does not advance the run; its record ends here.",
+  };
+}
+
+/**
+ * The epoch a driver takes when it registers or resumes: one past whatever
+ * stood. Taking the same one would let two processes both believe they hold
+ * the run, which is the fence's whole subject.
+ */
+export function nextLeaseEpoch(existing: number | null | undefined): number {
+  return (existing ?? 1) + 1;
+}
+
+/**
+ * What the tree moved that belongs to a step.
+ *
+ * The ledger's own bookkeeping is not a step's work: it is written by the
+ * lifecycle on the way past, and counting it would make every step's report
+ * omit a file it never touched. Canonical on both sides, because git answers
+ * with its own spelling of the root while the sessions directory is whatever
+ * the caller was handed.
+ */
+export function stepChangedPaths(
+  diff: readonly string[],
+  sessionsRel: string,
+): string[] {
+  return diff.filter((path) => {
+    const name = path.split("/").pop() ?? path;
+    return !(path.startsWith(`${sessionsRel}/`) && SET_BOOKKEEPING_COMMIT_BASENAMES.includes(name));
+  });
+}
+
+/**
+ * Whether a report answers the instruction it was handed at all.
+ *
+ * Read before the tree is: a report about something else cannot be measured
+ * against this change set, and reading the tree to say so would be work
+ * spent on an answer already known to be the wrong one. `"blocked"` is the
+ * engine saying the step cannot be done; `"ok"` sends it on to the files.
+ */
+export function judgeReportShape(
+  report: DriverReport | null,
+  instruction: DriverInstruction,
+  spec: StepSpec,
+): string[] | "blocked" | "ok" {
+  if (report === null) {
+    return [
+      refusal(
+        RULE.noReport,
+        `no report was written for instruction ${instruction.seq}; the answer is ` +
+          `\`${instruction.answer_command}\``,
+      ),
+    ];
+  }
+  const reasons: string[] = [];
+  if (report.seq !== instruction.seq) {
+    reasons.push(
+      refusal(
+        RULE.reportSeq,
+        `the report answers seq ${report.seq}; instruction ${instruction.seq} is outstanding`,
+      ),
+    );
+  }
+  if (report.step_id !== spec.id) {
+    reasons.push(
+      refusal(
+        RULE.reportStep,
+        `the report is for step '${report.step_id}'; the instruction asked for '${spec.id}'`,
+      ),
+    );
+  }
+  if (reasons.length > 0) return reasons;
+  return report.status === "blocked" ? "blocked" : "ok";
+}
+
+/**
+ * Whether the report names exactly what the tree moved.
+ *
+ * `exists` is the one read, passed in: a named file the tree did not change
+ * is a different refusal depending on whether it is there at all.
+ */
+export function judgeReportFiles(
+  report: DriverReport,
+  changed: readonly string[],
+  exists: (file: string) => boolean,
+): string[] {
+  const reasons: string[] = [];
+  for (const file of report.files_changed) {
+    if (changed.includes(file)) continue;
+    reasons.push(
+      exists(file)
+        ? refusal(
+            RULE.filesChangedUnchanged,
+            `files_changed names '${file}', which the tree did not change since the last accepted step`,
+          )
+        : refusal(RULE.filesChangedMissingFile, `files_changed names '${file}', which does not exist`),
+    );
+  }
+  for (const file of changed) {
+    if (report.files_changed.includes(file)) continue;
+    // The refusal names the way out, because an engine that cannot see the
+    // edge does not have one: a change made while the loop was stopped -- a
+    // repair somebody did by hand -- belongs to no step, and reporting it
+    // inside one is what this rule refuses. Session 66 met this and folded
+    // the repair into a step it was not part of.
+    reasons.push(
+      refusal(
+        RULE.filesChangedOmits,
+        `files_changed omits '${file}', which the tree changed. If it was repaired while ` +
+          "the run was stopped, it belongs to no step: `dabbler session rebaseline " +
+          '--reason "<what was repaired>"` records it and moves the baseline',
+      ),
+    );
+  }
+  return reasons;
+}
+
+/**
+ * The step files the tree left byte-identical, which is not a refusal.
+ *
+ * The work can be done and the diff empty -- session 62's managed body,
+ * where bootstrap rewrote CLAUDE.md and GEMINI.md with content identical to
+ * what stood. Refusing made the step unanswerable: omitting the file failed
+ * a must-include while naming it failed the unchanged rule. A declared file
+ * that DID change and is missing from the report is still refused, and the
+ * step's checks remain the gate on the work itself.
+ */
+export function unchangedStepFiles(
+  spec: StepSpec,
+  report: DriverReport,
+  changed: readonly string[],
+): string[] {
+  return spec.files.filter(
+    (file) => !report.files_changed.includes(file) && !changed.includes(file),
+  );
+}
 /** How often the push loop looks at a running job; a pull call never waits. */
 const JOB_POLL_MS = 250;
 /** What a `wait` tells the engine to leave the framework's work alone for. */
@@ -335,7 +488,8 @@ class Awaiting extends Error {
   }
 }
 
-interface StepSpec {
+/** One step as the loop measures it: a plan step, or a fix round's own. */
+export interface StepSpec {
   readonly id: string;
   readonly ask: string;
   readonly files: readonly string[];
@@ -440,11 +594,6 @@ class Driver {
       );
     }
     try {
-    // The lease fence. Two drivers wrote one run on 2026-09-02 and phases
-    // were skipped silently; a save whose in-memory epoch is behind the
-    // file's is that second driver, and it stops here instead of advancing
-    // state. The refusal is a supervision event before it is a stop, so the
-    // record says which epoch lost.
     const mine = this.run.lease_epoch ?? 1;
     let disk: number;
     try {
@@ -452,18 +601,17 @@ class Driver {
     } catch {
       disk = mine;
     }
-    if (disk > mine) {
+    const lease = judgeLease(mine, disk);
+    if (lease.refusal !== null) {
+      // The refusal is a supervision event before it is a stop, so the
+      // record says which epoch lost.
       appendSupervision(this.repoRoot, this.sessionNumber, {
         event: "stale-save-refused",
         my_epoch: mine,
         disk_epoch: disk,
         phase: this.run.phase,
       });
-      throw new Stop(
-        "interrupted",
-        `another driver holds the lease (epoch ${disk}; this process took ${mine}). ` +
-          "A stale attempt does not advance the run; its record ends here.",
-      );
+      throw new Stop("interrupted", lease.refusal);
     }
     this.run = writeRun(this.repoRoot, this.sessionNumber, {
       ...this.run,
@@ -602,7 +750,7 @@ class Driver {
       // Taking the lease: this process's first write bumps the epoch, and
       // any driver still holding the old number is refused at its next
       // save. One writer per run, enforced by the record itself.
-      lease_epoch: (existing.lease_epoch ?? 1) + 1,
+      lease_epoch: nextLeaseEpoch(existing.lease_epoch),
       stop: null,
     };
     this.save();
@@ -1491,84 +1639,19 @@ ${this.stopArtifacts()}`,
     instruction: DriverInstruction,
     spec: StepSpec,
   ): Promise<string[] | "blocked"> {
-    if (report === null) {
-      return [
-        refusal(
-          RULE.noReport,
-          `no report was written for instruction ${instruction.seq}; the answer is ` +
-            `\`${instruction.answer_command}\``,
-        ),
-      ];
-    }
-    const reasons: string[] = [];
-    if (report.seq !== instruction.seq) {
-      reasons.push(
-        refusal(
-          RULE.reportSeq,
-          `the report answers seq ${report.seq}; instruction ${instruction.seq} is outstanding`,
-        ),
-      );
-    }
-    if (report.step_id !== spec.id) {
-      reasons.push(
-        refusal(
-          RULE.reportStep,
-          `the report is for step '${report.step_id}'; the instruction asked for '${spec.id}'`,
-        ),
-      );
-    }
-    if (reasons.length > 0) return reasons;
-    if (report.status === "blocked") return "blocked";
+    const shape = judgeReportShape(report, instruction, spec);
+    if (shape !== "ok") return shape;
+    const answered = report as DriverReport;
 
     const current = snapshotWorktreeTree(this.repoRoot);
     if (current === null) throw new Stop("engine", "could not snapshot the working tree");
     const diff = changedPathsBetween(this.repoRoot, String(this.run.baseline_tree), current);
     if (diff === null) throw new Stop("engine", "could not diff the working tree against the last accepted step");
-    // Canonical on both sides: git answers with its own spelling of the
-    // root while the sessions directory is whatever the caller was handed,
-    // and a mismatch here counts the ledger's own file as a step's work.
-    const setRel = repoRelativePath(this.repoRoot, this.sessionsDir);
-    const changed = diff.filter((path) => {
-      const name = path.split("/").pop() ?? path;
-      return !(path.startsWith(`${setRel}/`) && SET_BOOKKEEPING_COMMIT_BASENAMES.includes(name));
-    });
-    for (const file of report.files_changed) {
-      if (changed.includes(file)) continue;
-      reasons.push(
-        existsSync(join(this.repoRoot, file))
-          ? refusal(
-              RULE.filesChangedUnchanged,
-              `files_changed names '${file}', which the tree did not change since the last accepted step`,
-            )
-          : refusal(RULE.filesChangedMissingFile, `files_changed names '${file}', which does not exist`),
-      );
-    }
-    for (const file of changed) {
-      if (!report.files_changed.includes(file)) {
-        // The refusal names the way out, because an engine that cannot see
-        // the edge does not have one: a change made while the loop was
-        // stopped -- a repair somebody did by hand -- belongs to no step,
-        // and reporting it inside one is what this rule refuses. Session 66
-        // met this and folded the repair into a step it was not part of.
-        reasons.push(
-          refusal(
-            RULE.filesChangedOmits,
-            `files_changed omits '${file}', which the tree changed. If it was repaired while ` +
-              "the run was stopped, it belongs to no step: `dabbler session rebaseline " +
-              '--reason "<what was repaired>"` records it and moves the baseline',
-          ),
-        );
-      }
-    }
-    for (const file of spec.files) {
-      if (report.files_changed.includes(file) || changed.includes(file)) continue;
-      // A step file the tree left byte-identical is not a refusal: the work
-      // can be done and the diff empty (session 62's managed body -- bootstrap
-      // rewrote CLAUDE.md and GEMINI.md with content identical to what stood).
-      // Refusing made the step unanswerable: omitting the file failed a
-      // must-include while naming it failed the unchanged rule. A declared
-      // file that DID change and is missing from the report is still refused
-      // above, and the step's checks remain the gate on the work itself.
+    const changed = stepChangedPaths(diff, repoRelativePath(this.repoRoot, this.sessionsDir));
+    const reasons = judgeReportFiles(answered, changed, (file) =>
+      existsSync(join(this.repoRoot, file)),
+    );
+    for (const file of unchangedStepFiles(spec, answered, changed)) {
       this.log("step-file-unchanged", { step: spec.id, file });
     }
     if (reasons.length > 0) return reasons;

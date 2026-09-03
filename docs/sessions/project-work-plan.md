@@ -122,7 +122,7 @@ it.
 | 84 | The record layer | no | 2026-09-03 |
 | 85 | Verification | no | 2026-09-03 |
 | 86 | Routing, transports and configuration | no | 2026-09-03 |
-| 87 | The lifecycle and the driver | — | not declared |
+| 87 | The lifecycle and the driver | no | 2026-09-03 |
 | 88 | Packaging, release, bootstrap, the solution — and vitest retired | — | not declared |
 | 89 | The trial, run by the operator against what the Marketplace serves | — | not declared |
 
@@ -1825,3 +1825,9 @@ The verification layer, rebuilt the way sessions 83 and 84 proved. The judges ar
 **Releasable: no.**
 
 Routing, transports and configuration, rebuilt the way sessions 83 to 85 proved. The configuration layer is judged from literal inputs: the config loader's validation and precedence, the transport-timeout contract, the schema validator and its failure shape, the lockfile's hash and rows, the metrics writer's records, the runtime-mode and secret-resolver rules. Selection by role, identity resolution and the router's own dispatch are tested as pure judgements over enumerated candidates and configuration, with the routed call passed in rather than mocked -- the vi.mock of route.ts has no successor because the call is a parameter. The transports keep their one seam: the direct-API path's request shaping and result classification, the offline transport's scripted answers, and the Copilot seat's fake process through the spawner the module already exposes, with its catalog probe and lockfile reads named as thin readers over facts. Discovery and dependency resolution get the same treatment: enumeration, freshness and drift as pure functions over vendor payloads, the project-file and feed reads as thin readers. Every rewritten behaviour lands under test/ as node:test files with literal inputs and no repository unless the behaviour is about a repository; the fifteen vitest files this covers are deleted, and config.test.ts leaves the integration list.
+
+### Session 87 — The lifecycle and the driver
+
+**Releasable: no.**
+
+The lifecycle and the driver, rebuilt the way sessions 83 to 86 proved. Every decision the loop makes becomes a function of facts and is asserted from literal inputs: what a session owes before it closes and what a close, a cancel and a restore are allowed to say; the check declaration's parsing, coverage and envelope, and the program a name resolves to; the driver's four answer schemas, its report validation, the plan amendment, the three watcher clocks with their recommended actions, the lease epoch's compare-and-swap and the stale-job disposition; the drive loop's instruction rendering, its refusal vocabulary over a change set, its phase order and the interrupt rules; each engine's argv, its stream rendering and truncation, its resume and its interrupt; the in-process router's working-directory and capture rules and the command line it echoes; and the workflow's fold, its record authority, its bounded loops and its projection. Where a decision was tangled with a read, a spawn or a routed call, the decision becomes a pure function the reader composes -- which is what retires the last two vi.mock calls in the suite, both of route.ts. Two walkthroughs carry what only a whole run can show: test/walk-session.test.ts drives one repository from next to done over a scripted in-process engine and recorded answers, asserting every transition as a milestone, and test/walk-jobs.test.ts walks one job through start, poll, collect and end, including a tree ended from a process that never held it. The eleven vitest files this covers are deleted and the integration list shrinks to what session 88 retires.

@@ -66,20 +66,10 @@ export const WORKERS_CI = 1;
  */
 export const INTEGRATION_FILES: readonly string[] = [
   "bootstrap.test.ts",
-  "checks.test.ts",
   "detectPackaging.test.ts",
-  "drive.test.ts",
-  "driver.test.ts",
-  "engines.test.ts",
-  "inProcess.test.ts",
-  "jobs.test.ts",
-  "lifecycle.test.ts",
-  "lifecycleCli.test.ts",
   "packaging.test.ts",
   "release.test.ts",
   "solutionDeps.test.ts",
-  "testphase.test.ts",
-  "workflow.test.ts",
 ];
 
 /** The worker cap for the environment the suite runs in. */

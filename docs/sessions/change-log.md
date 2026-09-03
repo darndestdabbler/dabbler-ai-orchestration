@@ -641,3 +641,9 @@
 - Orchestrator provider (excluded): anthropic
 - Verifier's read surface: agency: 34 read(s), 0 search(es), 0 listing(s); 1 read(s) were transformed; 2 not confined to scope
 - Raw round output: `.dabbler/runs/s86/`
+
+## Session 87 verification — REMEDIATED AT THE CAP after 3 round(s)
+
+- Every blocking finding of round 3 was fixed; the cap left the fix unreviewed.
+- Fixed, unreviewed: [major] The new stale-driver test still does not verify the thing it claims to protect: that the losing driver cannot advance `run.json` after the lease is stolen.
+- This work lands UNREVIEWED. It is not a waiver: nothing was accepted over a standing finding — what is unproved is the repair.

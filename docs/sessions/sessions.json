@@ -1635,9 +1635,9 @@
     {
       "number": 83,
       "title": "The runner, the gates slice, and the git-states walkthrough",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-03T08:04:48.790000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-09-03T08:34:11.399000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

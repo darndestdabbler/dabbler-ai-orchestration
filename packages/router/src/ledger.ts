@@ -151,8 +151,16 @@ export function validatePackaging(record: Row): Row {
  */
 export function readJsonl(path: string, validate: Validator): Row[] {
   if (!existsSync(path)) return [];
+  return parseJsonlText(readFileSync(path, "utf8"), validate, path);
+}
+
+/**
+ * The pure half of `readJsonl`: every row of one JSONL text, validated,
+ * with a refusal naming `source` and the file's own line number.
+ */
+export function parseJsonlText(text: string, validate: Validator, source = "<text>"): Row[] {
   const records: Row[] = [];
-  const lines = readFileSync(path, "utf8").split(/\r\n|\r|\n/);
+  const lines = text.split(/\r\n|\r|\n/);
   // Python's `splitlines()` drops a trailing empty field where `split` keeps
   // one, and a blank line is skipped either way -- so the line numbers below
   // are the file's own, which is what a refusal has to name.
@@ -164,15 +172,21 @@ export function readJsonl(path: string, validate: Validator): Row[] {
       record = JSON.parse(line);
     } catch (error) {
       throw new LedgerError(
-        `${path} line ${index + 1} is not valid JSON: ${
+        `${source} line ${index + 1} is not valid JSON: ${
           error instanceof Error ? error.message : String(error)
         }`,
       );
     }
     if (typeof record !== "object" || record === null || Array.isArray(record)) {
-      throw new LedgerError(`${path} line ${index + 1} is not an object`);
+      throw new LedgerError(`${source} line ${index + 1} is not an object`);
     }
-    validate(record as Row);
+    try {
+      validate(record as Row);
+    } catch (error) {
+      throw new LedgerError(
+        `${source} line ${index + 1}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
     records.push(record as Row);
   }
   return records;
@@ -218,20 +232,7 @@ export function appendRound(
   sessionNumber: number,
   record: Row,
 ): Row {
-  // The framework stamps itself here rather than at each of the three call
-  // sites that build a row -- the round, the adjudication, the cap
-  // terminal. A stamp a caller can forget is a stamp that is absent on the
-  // row that most needed it, and absence already means something else: a
-  // row written before the stamp existed.
-  record["framework_version"] = VERSION;
-  validateRound(record);
-  const existing = readRounds(repoRoot, sessionNumber);
-  if (existing.some((row) => row["round"] === record["round"])) {
-    throw new LedgerError(
-      `round ${String(record["round"])} is already recorded for session ` +
-        `${sessionNumber}; rounds are append-only and never overwritten`,
-    );
-  }
+  roundToAppend(readRounds(repoRoot, sessionNumber), sessionNumber, record);
   const anchor = anchorRoundTree(
     repoRoot,
     sessionNumber,
@@ -240,6 +241,27 @@ export function appendRound(
   );
   if (anchor) record["anchor_commit"] = anchor;
   appendJsonl(roundsPath(repoRoot, sessionNumber), record);
+  return record;
+}
+
+/**
+ * The pure half of `appendRound`: the row stamped and validated against the
+ * rounds already recorded, or a refusal. Mutates and returns `record`.
+ */
+export function roundToAppend(existing: readonly Row[], sessionNumber: number, record: Row): Row {
+  // The framework stamps itself here rather than at each of the three call
+  // sites that build a row -- the round, the adjudication, the cap
+  // terminal. A stamp a caller can forget is a stamp that is absent on the
+  // row that most needed it, and absence already means something else: a
+  // row written before the stamp existed.
+  record["framework_version"] = VERSION;
+  validateRound(record);
+  if (existing.some((row) => row["round"] === record["round"])) {
+    throw new LedgerError(
+      `round ${String(record["round"])} is already recorded for session ` +
+        `${sessionNumber}; rounds are append-only and never overwritten`,
+    );
+  }
   return record;
 }
 
@@ -358,9 +380,10 @@ export function appendStepEvent(
 
 /**
  * The last opened row with no closed row after it. One at a time is a
- * property of this fold, not a count anybody maintains.
+ * property of this fold, not a count anybody maintains. Pure over the rows;
+ * `openStep` reads them.
  */
-function openStepIn(events: readonly Row[]): Row | null {
+export function openStepIn(events: readonly Row[]): Row | null {
   let current: Row | null = null;
   for (const event of events) {
     if (event["event"] === STEP_EVENT_OPENED) current = event;

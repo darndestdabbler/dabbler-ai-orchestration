@@ -345,42 +345,67 @@ export function surfaceDigest(
   covers: readonly string[],
   options: { sessionsDir?: string | null } = {},
 ): string | null {
+  const entries = enumerateSurface(repoRoot, covers, options);
+  return entries === null ? null : digestOfEntries(entries);
+}
+
+/** One file of a covered surface: its repository-relative path and its bytes. */
+export type SurfaceEntry = readonly [path: string, bytes: Buffer];
+
+/**
+ * The thin reader: every tracked or untracked non-ignored file under the
+ * covered prefixes, with its bytes. Null when git is unavailable.
+ *
+ * A path `ls-files` names but the disk no longer holds is omitted, not
+ * marked: a tracked file deleted and not yet committed would otherwise put a
+ * marker line in the digest that leaves the moment the deletion is committed
+ * and `ls-files` stops naming it -- moving the digest across a commit in
+ * which no file's content changed, and making the freshness gate demand a
+ * second full run to prove nothing happened. Omitting it moves the digest
+ * once, when the file actually goes.
+ */
+export function enumerateSurface(
+  repoRoot: string,
+  covers: readonly string[],
+  options: { sessionsDir?: string | null } = {},
+): SurfaceEntry[] | null {
   const tracked = gitZ(repoRoot, ["ls-files", "-z", "--"]);
   const untracked = gitZ(repoRoot, [
     "ls-files", "--others", "--exclude-standard", "-z", "--",
   ]);
   if (tracked === null || untracked === null) return null;
   const sessionsRel = sessionsRelFor(repoRoot, options.sessionsDir);
-  const lines: string[] = [];
-  for (const rel of [...new Set([...tracked, ...untracked])].sort()) {
+  const entries: SurfaceEntry[] = [];
+  for (const rel of [...new Set([...tracked, ...untracked])]) {
     if (matchingPrefixes(rel, covers).length === 0) continue;
     if (isSessionBookkeeping(rel, sessionsRel)) continue;
     if (isMachineStatePath(rel)) {
       // The fifth reader that has to know the run ledger is not work. This
-      // function records a digest and then its caller appends a row to
+      // digest is recorded and then its caller appends a row to
       // `.dabbler/runs/` -- so counting it makes the digest it just stored
       // wrong the instant it is stored, and the freshness gate can never
       // pass. A round is appended after the tree it describes; the ledger is
       // the record, not the work.
       continue;
     }
-    let digest: string;
     try {
-      digest = createHash("sha256")
-        .update(readFileSync(join(repoRoot, ...rel.split("/"))))
-        .digest("hex");
+      entries.push([rel, readFileSync(join(repoRoot, ...rel.split("/")))]);
     } catch {
-      // Omitted, not marked. `ls-files` lists a tracked file that has been
-      // deleted but not yet committed, so a marker line here would leave the
-      // digest the moment the deletion is committed and `ls-files` stops
-      // naming the path -- moving the digest across a commit in which no
-      // file's content changed at all, and making the freshness gate demand a
-      // second full suite run to prove that nothing happened. Omitting it
-      // moves the digest once, when the file actually goes.
       continue;
     }
-    lines.push(`${normaliseRel(rel)}\0${digest}`);
   }
+  return entries;
+}
+
+/**
+ * The digest of a surface: SHA-256 over the sorted (path, content-hash)
+ * pairs. Pure -- the same entries in any order digest the same, and only
+ * bytes move it, never a timestamp.
+ */
+export function digestOfEntries(entries: readonly SurfaceEntry[]): string {
+  const lines = [...entries]
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+    .map(([rel, bytes]) => `${normaliseRel(rel)}\0${createHash("sha256").update(bytes).digest("hex")}`);
   return createHash("sha256").update(Buffer.from(lines.join("\n"), "utf8")).digest("hex");
 }
 
@@ -726,96 +751,101 @@ export function evaluateFreshness(
       continue;
     }
     const current = surfaceDigest(root, suite.covers, { sessionsDir });
-    if (current === null) {
-      verdicts.push({
-        suite: suite.name,
-        required: true,
-        passed: false,
-        reason: "could not digest the covered surfaces (failing closed)",
-        changedInputs: changed,
-      });
-      continue;
-    }
-    const mine = records.filter(
-      (row) => row.suite === suite.name && row.stage === STAGE_FINAL_FULL,
+    // The tree digest is read only when a run of record exists to bind to;
+    // the judge asks for it through the thunk.
+    verdicts.push(
+      freshnessVerdict(suite, {
+        changed,
+        current,
+        records,
+        currentTree: () => treeDigest(root, { sessionsDir }),
+      }),
     );
-    if (mine.length === 0) {
-      const targeted = records.filter(
-        (row) => row.suite === suite.name && row.stage === STAGE_PREVERIFY_TARGETED,
-      );
-      let preamble =
-        `this session changed ${suite.name}'s covered surfaces but no ` +
-        "final-full run of record exists";
-      if (targeted.length > 0) {
-        preamble +=
-          ` (${targeted.length} preverify-targeted record(s) are present; a ` +
-          "targeted run precedes verification and never proves the suite is " +
-          "green)";
-      }
-      verdicts.push({
-        suite: suite.name,
-        required: true,
-        passed: false,
-        reason:
-          `${preamble}; run \`${suite.command}\` after your last code change, ` +
-          `then \`dabbler test-evidence record --sessions-dir ` +
-          `<dir> --suite ${suite.name} --stage ${STAGE_FINAL_FULL} ` +
-          `--outcome passed --duration-seconds <elapsed>\``,
-        changedInputs: changed,
-      });
-      continue;
-    }
-    const latest = mine[mine.length - 1] as TestRunRecord;
-    const currentTree = treeDigest(root, { sessionsDir });
-    if (latest.surfaceDigest !== current) {
-      verdicts.push({
-        suite: suite.name,
-        required: true,
-        passed: false,
-        reason:
-          `the ${suite.name} run of record (recorded ` +
-          `${latest.recordedAt || "at an unknown time"}) PREDATES a change to ` +
-          `the surfaces it covers; re-run \`${suite.command}\` after your last ` +
-          "code change and record it again",
-        changedInputs: changed,
-      });
-    } else if (latest.outcome !== OUTCOME_PASSED) {
-      verdicts.push({
-        suite: suite.name,
-        required: true,
-        passed: false,
-        reason:
-          `the ${suite.name} run of record is fresh but its outcome is ` +
-          `${pythonRepr(latest.outcome)}; a close needs a green run of record`,
-        changedInputs: changed,
-      });
-    } else if (
-      latest.treeDigest &&
-      currentTree &&
-      latest.treeDigest !== currentTree
-    ) {
-      verdicts.push({
-        suite: suite.name,
-        required: true,
-        passed: false,
-        reason:
-          `the ${suite.name} run of record is green but the tree moved under ` +
-          "it: a final-full run binds to the tree it ran against, and this one " +
-          `does not match. Re-run \`${suite.command}\` against the final tree ` +
-          "and record it again",
-        changedInputs: changed,
-      });
-    } else {
-      verdicts.push({
-        suite: suite.name,
-        required: true,
-        passed: true,
-        reason: `fresh, green, recorded ${latest.recordedAt}`,
-        changedInputs: changed,
-      });
-    }
   }
   return verdicts;
+}
+
+/** What the freshness judge is handed for one suite. */
+export interface FreshnessFacts {
+  /** The session's changed inputs under this suite's covers. */
+  readonly changed: readonly string[];
+  /** The covered surfaces' digest now; null when it could not be taken. */
+  readonly current: string | null;
+  /** Every run record in the repository. */
+  readonly records: readonly TestRunRecord[];
+  /** The whole tree's digest now, read on demand; null when unmeasurable. */
+  readonly currentTree: () => string | null;
+}
+
+/**
+ * One expensive suite's freshness, from the facts alone: no run of record,
+ * a record that predates the surfaces, a red one, one whose tree moved, or
+ * fresh and green.
+ */
+export function freshnessVerdict(suite: SuiteSpec, facts: FreshnessFacts): FreshnessVerdict {
+  const { changed, current, records } = facts;
+  const verdict = (passed: boolean, reason: string): FreshnessVerdict => ({
+    suite: suite.name,
+    required: true,
+    passed,
+    reason,
+    changedInputs: changed,
+  });
+  if (current === null) {
+    return verdict(false, "could not digest the covered surfaces (failing closed)");
+  }
+  const mine = records.filter(
+    (row) => row.suite === suite.name && row.stage === STAGE_FINAL_FULL,
+  );
+  if (mine.length === 0) {
+    const targeted = records.filter(
+      (row) => row.suite === suite.name && row.stage === STAGE_PREVERIFY_TARGETED,
+    );
+    let preamble =
+      `this session changed ${suite.name}'s covered surfaces but no ` +
+      "final-full run of record exists";
+    if (targeted.length > 0) {
+      preamble +=
+        ` (${targeted.length} preverify-targeted record(s) are present; a ` +
+        "targeted run precedes verification and never proves the suite is " +
+        "green)";
+    }
+    return verdict(
+      false,
+      `${preamble}; run \`${suite.command}\` after your last code change, ` +
+        `then \`dabbler test-evidence record --sessions-dir ` +
+        `<dir> --suite ${suite.name} --stage ${STAGE_FINAL_FULL} ` +
+        `--outcome passed --duration-seconds <elapsed>\``,
+    );
+  }
+  const latest = mine[mine.length - 1] as TestRunRecord;
+  if (latest.surfaceDigest !== current) {
+    return verdict(
+      false,
+      `the ${suite.name} run of record (recorded ` +
+        `${latest.recordedAt || "at an unknown time"}) PREDATES a change to ` +
+        `the surfaces it covers; re-run \`${suite.command}\` after your last ` +
+        "code change and record it again",
+    );
+  }
+  if (latest.outcome !== OUTCOME_PASSED) {
+    return verdict(
+      false,
+      `the ${suite.name} run of record is fresh but its outcome is ` +
+        `${pythonRepr(latest.outcome)}; a close needs a green run of record`,
+    );
+  }
+  const currentTree = latest.treeDigest ? facts.currentTree() : null;
+  if (latest.treeDigest && currentTree && latest.treeDigest !== currentTree) {
+    return verdict(
+      false,
+      `the ${suite.name} run of record is green but the tree moved under ` +
+        "it: a final-full run binds to the tree it ran against, and this one " +
+        `does not match. Re-run \`${suite.command}\` against the final tree ` +
+        "and record it again",
+    );
+  }
+  return verdict(true, `fresh, green, recorded ${latest.recordedAt}`);
 }
 
 // --- Seals ---------------------------------------------------------------------

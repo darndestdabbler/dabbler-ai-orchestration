@@ -338,6 +338,26 @@ export function registerSessionStart(
   options: RegisterOptions,
 ): Record<string, unknown> {
   const raw = readRawSessionState(sessionsDir);
+  const specTitles = new Map(
+    extractSessionTitlesFromPlan(join(sessionsDir, SESSION_PLAN_FILENAME)),
+  );
+  const state = stateAfterStart(raw, specTitles, sessionNumber, options, nowIsoFull());
+  validateAndWriteState(sessionsDir, state);
+  return state;
+}
+
+/**
+ * The pure half of a session start: the state file as it will read once
+ * `sessionNumber` is registered, from the state as read, the plan's titles,
+ * and the clock. Refuses to re-open a closed session.
+ */
+export function stateAfterStart(
+  raw: Record<string, unknown> | null,
+  specTitles: ReadonlyMap<number, string>,
+  sessionNumber: number,
+  options: RegisterOptions,
+  now: string,
+): Record<string, unknown> {
   const normalized = raw ? derivedView(raw) : null;
   const completed = completedNumbers(normalized);
   if (completed.has(sessionNumber)) {
@@ -349,9 +369,6 @@ export function registerSessionStart(
     );
   }
 
-  const specTitles = new Map(
-    extractSessionTitlesFromPlan(join(sessionsDir, SESSION_PLAN_FILENAME)),
-  );
   // The ledger never shrinks -- dropping a session would drop its record --
   // but it does grow to the plan. A plan re-cut from seventeen sessions to
   // twenty is a declaration that three more exist; leaving the ledger at
@@ -379,7 +396,6 @@ export function registerSessionStart(
     priorSessions,
     specTitles,
   );
-  const now = nowIsoFull();
   for (const record of sessions) {
     if (record["number"] !== sessionNumber) continue;
     record["startedAt"] = record["startedAt"] || now;
@@ -402,7 +418,6 @@ export function registerSessionStart(
 
   const state: Record<string, unknown> = { schemaVersion: SCHEMA_VERSION, sessions };
   if (raw && "forceClosed" in raw) state["forceClosed"] = raw["forceClosed"];
-  validateAndWriteState(sessionsDir, state);
   return state;
 }
 

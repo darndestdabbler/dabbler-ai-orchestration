@@ -119,7 +119,7 @@ it.
 | 81 | Publishing without a secret, and the last of the friction | no | 2026-09-02 |
 | 82 | The trial, run by the operator against what the Marketplace serves | no | 2026-09-03 |
 | 83 | The runner, the gates slice, and the git-states walkthrough | no | 2026-09-03 |
-| 84 | The record layer | — | not declared |
+| 84 | The record layer | no | 2026-09-03 |
 | 85 | Verification | — | not declared |
 | 86 | Routing, transports and configuration | — | not declared |
 | 87 | The lifecycle and the driver | — | not declared |
@@ -1807,3 +1807,9 @@ The trial against what the Marketplace actually serves, with the tail it can tru
 **Releasable: no.**
 
 The proof of the test rebuild's shape on the gates module, on the operator's ruling of 2026-09-03 that the suite must stop taking the machine. The runner becomes Node's own: npm run test:unit runs node --test over packages/router/test, every existing vitest file moves to packages/router/test-vitest with both vitest configs following it, dabbler.yaml declares node --test as the ordinary suite beside the vitest default tier, and the integration tier is undeclared locally on the operator's authorisation while CI keeps running it. gates.ts is split so every gate that shells out is a thin reader returning facts plus a pure judge, with the porcelain and rev-list parsers as named pure functions, and test/gates.test.ts tests those with literal inputs and no repository. One walkthrough, test/walk-git-states.test.ts, builds one repository and walks it through clean, untracked, modified, staged-deletion, ahead-of-upstream, no-upstream and no-remote, parsing and judging the real git output at each milestone; it replaces gitContract.test.ts and the repository-building half of gates.test.ts, which are deleted.
+
+### Session 84 — The record layer
+
+**Releasable: no.**
+
+The record layer, rebuilt the way session 83 proved: journal, ledger, writers, progress, sessionState, owedDecisions, evidence, facts and testEvidence keep every exported signature, gain a pure function wherever a decision was tangled with a read (the freshness digest over a list of path-and-bytes pairs with enumeration as its one thin reader; ledger row parsing over text; the evidence-bundle and control-fact judgements over facts), and get node:test files that call the pure functions with literal inputs and no repository. One walkthrough, test/walk-record.test.ts, builds one repository and walks the record through register, declare, digest, run of record, round with its anchored ref, decision, projection and owed decision, milestones asserted in order. The six vitest files it replaces are deleted and the integration list shrinks.

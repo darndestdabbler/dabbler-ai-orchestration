@@ -205,6 +205,32 @@ export interface RaiseOptions {
  * have consulted someone.
  */
 export function raiseOwed(repoRoot: string, options: RaiseOptions): Row | null {
+  const current = foldOwed(readOwed(repoRoot)).get(options.id);
+  const next = raiseDisposition(current, options, nowIso("seconds"));
+  if (next === null) return null;
+  if (!next.supersede) return append(repoRoot, next.row);
+  supersedeOwed(
+    repoRoot,
+    options.id,
+    "the brief changed; re-raised so the question on the record is the " +
+      "one the framework is actually asking",
+    options.sessionNumber ?? null,
+  );
+  // Stamped after the supersede row, so the re-raised row never reads as
+  // earlier than the row that retired its predecessor.
+  return append(repoRoot, { ...next.row, recordedAt: nowIso("seconds") });
+}
+
+/**
+ * The pure half of `raiseOwed`: given what the record currently says about
+ * this id, the row to append (and whether an open row is superseded first),
+ * or null when nothing is to be written. Refuses a malformed brief.
+ */
+export function raiseDisposition(
+  current: Row | undefined,
+  options: RaiseOptions,
+  recordedAt: string,
+): { readonly supersede: boolean; readonly row: Row } | null {
   if (!CLASSES.includes(options.decisionClass)) {
     throw new OwedDecisionError(
       `class must be one of ${CLASSES.join(", ")}, got '${options.decisionClass}'`,
@@ -216,11 +242,11 @@ export function raiseOwed(repoRoot: string, options: RaiseOptions): Row | null {
         "a question with one answer is a notification",
     );
   }
-  const current = foldOwed(readOwed(repoRoot)).get(options.id);
   // Answered is settled: a different answer is a new question, and rewriting
   // the brief under one that has been decided would change what the operator
   // is recorded as having agreed to.
   if (current !== undefined && current["event"] === EVENT_ANSWERED) return null;
+  let supersede = false;
   if (current !== undefined && current["event"] === EVENT_RAISED) {
     // Idempotent on the QUESTION, not on the id. A brief corrected in code
     // never reached a decision already on disk, so the operator kept reading
@@ -229,19 +255,13 @@ export function raiseOwed(repoRoot: string, options: RaiseOptions): Row | null {
     // brief has changed is superseded and re-raised, which leaves both on
     // the record and puts the current one in front of the reader.
     if (sameBrief(current, options)) return null;
-    supersedeOwed(
-      repoRoot,
-      options.id,
-      "the brief changed; re-raised so the question on the record is the " +
-        "one the framework is actually asking",
-      options.sessionNumber ?? null,
-    );
+    supersede = true;
   }
-  return append(repoRoot, {
+  const row: Row = {
     id: options.id,
     event: EVENT_RAISED,
     state: STATE_OPEN,
-    recordedAt: nowIso("seconds"),
+    recordedAt,
     sessionNumber: options.sessionNumber ?? null,
     class: options.decisionClass,
     // Derived from the class, never declared per call: a severity a caller
@@ -260,7 +280,8 @@ export function raiseOwed(repoRoot: string, options: RaiseOptions): Row | null {
     recommendation: options.recommendation ?? null,
     confidence: options.confidence ?? null,
     onNoAnswer: options.onNoAnswer ?? null,
-  });
+  };
+  return { supersede, row };
 }
 
 /**

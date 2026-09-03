@@ -743,11 +743,24 @@ export function verifyQuote(
       `${path} is not in the reviewed tree ${reviewedTree}`,
     );
   }
+  return verifyQuoteAgainst(path, blob, declaredHash, quote["span"]);
+}
+
+/**
+ * The pure half of `verifyQuote`: the declared span of `blob`, re-hashed,
+ * must equal the hash the worker declared.
+ */
+export function verifyQuoteAgainst(
+  path: string,
+  blob: Buffer,
+  declaredHash: string,
+  span: unknown,
+): VerifiedQuote {
   // Python indexes `quote["span"]` and raises KeyError when there is none.
   // A language-level lookup error has no counterpart here, so an absent span
   // reaches `spanBounds` and earns this module's own refusal instead. Both
   // raise; only the class differs, and nothing catches on it.
-  const [start, end] = spanBounds(blob, quote["span"]);
+  const [start, end] = spanBounds(blob, span);
   const actual = hashBytes(blob.subarray(start, end));
   if (actual !== declaredHash) {
     throw new EvidenceError(
@@ -756,11 +769,10 @@ export function verifyQuote(
         "the worker recorded -- the quote does not come from the reviewed tree",
     );
   }
-
   return {
     path,
     content_hash: actual,
-    span: { ...(quote["span"] as Record<string, unknown>) },
+    span: { ...(span as Record<string, unknown>) },
   };
 }
 
@@ -829,6 +841,11 @@ export function scopePaths(
   reviewedTree: string,
   scope: unknown,
 ): string[] {
+  return matchScope(treePaths(repoRoot, reviewedTree), scope);
+}
+
+/** The pure half of `scopePaths`: which of `paths` the declared scope names. */
+export function matchScope(paths: readonly string[], scope: unknown): string[] {
   if (!Array.isArray(scope) || scope.length === 0) {
     throw new EvidenceError(
       "absence-declaration-malformed",
@@ -836,9 +853,29 @@ export function scopePaths(
     );
   }
   const matchers = scope.map((pattern) => globToRegExp(String(pattern)));
-  return treePaths(repoRoot, reviewedTree)
-    .filter((path) => matchers.some((matcher) => matcher.test(path)))
-    .sort();
+  return paths.filter((path) => matchers.some((matcher) => matcher.test(path))).sort();
+}
+
+/** A declared query as the regular expression the search runs; refuses one that does not compile. */
+export function compileAbsenceQuery(query: string, queryKind: string): RegExp {
+  if (queryKind === "regex") {
+    try {
+      return new RegExp(query, "g");
+    } catch (error) {
+      throw new EvidenceError(
+        "absence-query-invalid",
+        `${pythonRepr(query)} is not a regex (${
+          error instanceof Error ? error.message : String(error)
+        })`,
+      );
+    }
+  }
+  return new RegExp(escapeForRegExp(query), "g");
+}
+
+/** How many times the pattern occurs in `text`. */
+export function countMatches(text: string, pattern: RegExp): number {
+  return [...text.matchAll(pattern)].length;
 }
 
 export interface AbsenceSearchRow {
@@ -893,21 +930,7 @@ export function runAbsenceSearch(
     );
   }
 
-  let pattern: RegExp;
-  if (queryKind === "regex") {
-    try {
-      pattern = new RegExp(query, "g");
-    } catch (error) {
-      throw new EvidenceError(
-        "absence-query-invalid",
-        `${pythonRepr(query)} is not a regex (${
-          error instanceof Error ? error.message : String(error)
-        })`,
-      );
-    }
-  } else {
-    pattern = new RegExp(escapeForRegExp(query), "g");
-  }
+  const pattern = compileAbsenceQuery(query, queryKind);
 
   let matches = 0;
   for (const path of selected) {
@@ -922,7 +945,7 @@ export function runAbsenceSearch(
     // `toString("utf8")` substitutes U+FFFD for an invalid sequence, which is
     // what Python's `decode("utf-8", "replace")` does: a binary file in scope
     // is searched rather than refused.
-    matches += [...blob.toString("utf8").matchAll(pattern)].length;
+    matches += countMatches(blob.toString("utf8"), pattern);
   }
 
   return {

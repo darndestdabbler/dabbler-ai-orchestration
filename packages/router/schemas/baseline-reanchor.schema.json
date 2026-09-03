@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "baseline-reanchors.jsonl row (one recovered round baseline)",
+  "description": "One row per round whose recorded completion_tree is unreachable in this object store, in .dabbler/runs/s<N>/baseline-reanchors.jsonl. A round snapshot is a dangling tree: it is written through a throwaway index, so it is garbage-collectable and it never travels with a push. A session that moves between machines therefore carries rounds whose baseline object stayed behind, and rounds >=2 cannot compute their fix delta. This row names a commit-reachable tree to diff from instead. Written only by the CLI (ai_router.verify --reanchor-baseline); refused whenever the recorded tree DOES resolve locally, so it can never shrink a review on a machine that still holds the object. The reason is mandatory and permanent: a re-anchored baseline is a weaker record than the one it replaces, and the ledger has to say so out loud.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "round",
+    "recorded_tree",
+    "anchor_tree",
+    "anchor_commit",
+    "reason",
+    "recorded_at"
+  ],
+  "properties": {
+    "round": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "The round whose completion_tree is unreachable."
+    },
+    "session_number": { "type": "integer", "minimum": 1 },
+    "recorded_tree": {
+      "type": "string",
+      "minLength": 7,
+      "description": "The tree the round recorded and this object store does not have."
+    },
+    "anchor_tree": {
+      "type": "string",
+      "minLength": 7,
+      "description": "The tree to diff from instead. Must be the tree of anchor_commit, and anchor_commit must be the single commit made last at or before the round's recorded_at. Every later commit is refused, including the first one after the round: remediation normally begins the moment a round reports, so a post-round commit is at least as likely to contain fixes as to materialize the reviewed tree, and no timestamp can tell those apart. The baseline therefore lands before the round and the next round re-reviews work already reviewed -- deliberately, because on a path taken only when a session changes machines, a wider review is the right trade against a silently narrowed one."
+    },
+    "anchor_commit": {
+      "type": "string",
+      "minLength": 7,
+      "description": "The commit anchor_tree belongs to. Reachable from a ref, so the baseline now survives gc and a push."
+    },
+    "reason": { "type": "string", "minLength": 1 },
+    "recorded_at": { "type": "string", "minLength": 1 }
+  }
+}

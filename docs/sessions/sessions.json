@@ -1696,9 +1696,9 @@
     {
       "number": 86,
       "title": "Routing, transports and configuration",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-03T12:39:05.460000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-09-03T13:26:53.733000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

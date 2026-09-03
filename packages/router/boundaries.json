@@ -1,0 +1,114 @@
+{
+  "comment": "The declared module boundaries: five workflow contexts over a shared dispatch service, the record, the contracts and the platform. Membership is the declaration the seals hash against and the boundary check enforces - a module missing here fails the lint control, so nothing arrives context-less. Direction rules between contexts are future work; the baseline file carries the tolerated cycles.",
+  "contexts": {
+    "platform": {
+      "comment": "Stateless or append-only services every layer may reach: the git seam, process and job plumbing, printing, paths, the clock.",
+      "members": [
+        "journal",
+        "output",
+        "checks",
+        "jobs",
+        "paths",
+        "textfile",
+        "pythonJson",
+        "workdir",
+        "runtimeMode",
+        "secretResolver",
+        "sessionState",
+        "lockfile",
+        "resolution",
+        "version"
+      ]
+    },
+    "contracts": {
+      "comment": "Shared shapes both sides of any seam consume: schemas, generated types, exit codes, model spelling, transport timeouts, verb registry.",
+      "members": [
+        "contracts",
+        "schema",
+        "generated",
+        "verdict"
+      ]
+    },
+    "dispatch": {
+      "comment": "How a prompt reaches a model on either transport: routing, selection, identity, the seat.",
+      "members": [
+        "route",
+        "selection",
+        "identity",
+        "transports",
+        "engines",
+        "config",
+        "metrics",
+        "seatCost"
+      ]
+    },
+    "record": {
+      "comment": "The machine-owned record and its readers: rounds, evidence, critique provenance, owed decisions.",
+      "members": [
+        "ledger",
+        "evidence",
+        "critique",
+        "owedDecisions"
+      ]
+    },
+    "workflow-startup": {
+      "comment": "Register, bootstrap, discover: a repository becomes a place a session can run.",
+      "members": [
+        "bootstrap",
+        "discovery",
+        "modules",
+        "solution",
+        "solutionDeps",
+        "contractdoc"
+      ]
+    },
+    "workflow-instruction": {
+      "comment": "The instruction/execution loop: the driver, its plans, its reviews, its agency.",
+      "members": [
+        "drive",
+        "driver",
+        "agency",
+        "approvedPlan",
+        "planReview",
+        "stepreview",
+        "session"
+      ]
+    },
+    "workflow-testing": {
+      "comment": "The testing/fixing loop: evidence, selection of what a change owes, the fix loop, the authored-tests phase, the controls.",
+      "members": [
+        "testEvidence",
+        "affected",
+        "fixloop",
+        "testphase",
+        "facts"
+      ]
+    },
+    "workflow-verification": {
+      "comment": "Cross-provider rounds, disputes, adjudication, triage.",
+      "members": [
+        "verify",
+        "verifyjob",
+        "triage"
+      ]
+    },
+    "workflow-close": {
+      "comment": "Close-out: gates, state writers, packaging, release.",
+      "members": [
+        "gates",
+        "writers",
+        "packaging"
+      ]
+    },
+    "projection": {
+      "comment": "What a person sees: the fold, the CLI rim, the in-process face the extension calls, the six-step workflow verb.",
+      "members": [
+        "progress",
+        "cli",
+        "inProcess",
+        "workflow",
+        "index"
+      ]
+    }
+  }
+}

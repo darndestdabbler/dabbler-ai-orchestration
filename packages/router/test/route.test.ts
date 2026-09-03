@@ -44,6 +44,7 @@ import {
   modelEntry,
   type Catalog,
 } from "../src/transports/copilot.ts";
+import { setHttpSource } from "../src/transports/api.ts";
 import type { APIResult } from "../src/transports/base.ts";
 import { makeConfig, seed, setProviderKeys, tempDir } from "./support/answers.ts";
 
@@ -448,6 +449,128 @@ describe("--no-router mode", () => {
     const result = await route("anything");
     assert.equal(result.model_name, "no-router-mode");
     assert.equal(result.transport, "none");
+  });
+});
+
+describe("dispatching over the direct-API transport", () => {
+  // The seam is the wire (`setHttpSource`), so everything above it is the
+  // shipping path: the ladder built from the registry, the rate limiter
+  // looked up per provider, the generation params resolved per task type,
+  // the escalation walked, and the telemetry row written. The pure tests
+  // above cover each decision; this covers that the loop composes them.
+  let restoreHttp: (() => void) | null = null;
+
+  afterEach(() => {
+    restoreHttp?.();
+    restoreHttp = null;
+  });
+
+  /** A Google answer, which is what `roles.generator.prefer` reaches first. */
+  function googleAnswer(text: string, outputTokens = 100): Response {
+    return new Response(
+      JSON.stringify({
+        candidates: [{ content: { parts: [{ text }] }, finishReason: "STOP" }],
+        usageMetadata: { promptTokenCount: 10, candidatesTokenCount: outputTokens },
+        modelVersion: "g-served",
+      }),
+      { status: 200, headers: { "content-type": "application/json" } },
+    );
+  }
+
+  it("records the tokens and the telemetry row end to end", async () => {
+    configOnDisk();
+    const urls: string[] = [];
+    restoreHttp = setHttpSource((url) => {
+      urls.push(String(url));
+      return Promise.resolve(googleAnswer("the answer"));
+    });
+
+    const result = await route("say hi", { taskType: "formatting", sessionNumber: 3 });
+    assert.equal(result.content, "the answer");
+    assert.equal(result.model_name, "flash"); // roles.generator.prefer[0]
+    assert.equal(result.transport, "api");
+    assert.deepEqual([result.input_tokens, result.output_tokens], [10, 100]);
+    assert.equal(result.served_model_id, "g-served");
+
+    const [row] = metricRows();
+    assert.equal(row?.["session_number"], 3);
+    assert.equal(row?.["transport"], "api");
+    // The spend is attributable here, so the seat's flag stays unraised.
+    assert.equal(row?.["billed_usage_unavailable"], null);
+    assert.equal(row?.["requested_model_id"], "g-flash");
+    assert.equal(row?.["served_model_id"], "g-served");
+  });
+
+  it("walks the role order on an escalation and records the history", async () => {
+    configOnDisk();
+    restoreHttp = setHttpSource((url) =>
+      Promise.resolve(
+        String(url).includes("g-flash")
+          ? googleAnswer("", 0) // empty -> escalate
+          : googleAnswer("recovered ".repeat(20), 200),
+      ),
+    );
+
+    const result = await route("say hi", { taskType: "formatting" });
+    assert.equal(result.escalated, true);
+    assert.deepEqual(result.escalation_history, [["flash", "empty_response"]]);
+    assert.equal(result.model_name, "pro");
+    const [row] = metricRows();
+    assert.equal(row?.["escalated"], true);
+    assert.equal(row?.["model"], "pro");
+  });
+
+  it("stops at max_escalations even with candidates left", async () => {
+    // The ladder is bounded by two independent limits -- how many models
+    // remain, and how many escalations the config allows -- and a run that
+    // escalated past the second would spend a call the operator capped.
+    configOnDisk(
+      makeConfig({
+        escalation: {
+          enabled: true,
+          max_escalations: 1,
+          triggers: { empty_response: true, min_output_tokens: 30 },
+          refusal_phrases: [],
+        },
+      }),
+    );
+    const urls: string[] = [];
+    restoreHttp = setHttpSource((url) => {
+      urls.push(String(url));
+      return Promise.resolve(googleAnswer("", 0)); // every model empties
+    });
+
+    const result = await route("say hi");
+    assert.equal(result.escalation_history.length, 1);
+    assert.equal(urls.length, 2);
+  });
+
+  it("honours an exclusion end to end, and fails closed when it leaves nothing", async () => {
+    configOnDisk();
+    const urls: string[] = [];
+    restoreHttp = setHttpSource((url) => {
+      urls.push(String(url));
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({
+            content: [{ type: "text", text: "from anthropic ".repeat(5) }],
+            usage: { input_tokens: 5, output_tokens: 50 },
+            stop_reason: "end_turn",
+            model: "a-sonnet",
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        ),
+      );
+    });
+
+    const result = await route("say hi", { excludeProviders: ["google", "openai"] });
+    assert.equal(result.provider, "anthropic");
+    assert.ok(!urls.join(" ").includes("google"));
+
+    await assert.rejects(
+      () => route("say hi", { excludeProviders: ["google", "openai", "anthropic"] }),
+      NoCandidateError,
+    );
   });
 });
 

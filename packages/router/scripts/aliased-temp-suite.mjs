@@ -33,8 +33,12 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-/** The suites whose CI failures were this bug, when the caller names none. */
-const DEFAULT_SUITES = ["record.test", "projection.test", "gates.test"];
+/** The files whose CI failures were this bug, when the caller names none. */
+const DEFAULT_SUITES = [
+  "packages/router/test/walk-record.test.ts",
+  "packages/router/test/walk-git-states.test.ts",
+  "packages/router/test/gates.test.ts",
+];
 
 const SUITES = process.argv.slice(2).length > 0 ? process.argv.slice(2) : DEFAULT_SUITES;
 
@@ -52,18 +56,11 @@ try {
       "              and no git configuration but each repository's own\n" +
       `              suites: ${SUITES.join(" ")}\n`,
   );
-  // This node, running vitest's own entry point. Not `npx`: its Windows
-  // form is a `.cmd`, which `spawnSync` refuses outright (EINVAL) unless it
-  // is given a shell, and this control has no business opening one.
-  const run = spawnSync(
-    process.execPath,
-    [
-      join(repoRoot, "node_modules", "vitest", "vitest.mjs"),
-      "run",
-      "--root",
-      "packages/router",
-      ...SUITES,
-    ],
+  // This node, running its own test runner over the files named. Node
+  // expands nothing here, so each argument is a path from the repository
+  // root -- and no shell is opened, which this control has no business
+  // doing.
+  const run = spawnSync(process.execPath, ["--test", ...SUITES],
     {
       cwd: repoRoot,
       env: {

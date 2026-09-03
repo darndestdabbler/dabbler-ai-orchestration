@@ -2,12 +2,11 @@
 //
 // The property worth pinning is that this is a READING and not an inference:
 // a .NET repository that publishes nothing is the ordinary case, and the
-// difference between the two is a statement the build file makes.
-
-import { mkdirSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
-
-import { afterAll, describe, expect, it } from "vitest";
+// difference between the two is a statement the build file makes. The
+// reading itself walks a directory, so these seed one; the block the
+// framework writes is a function of a recipe and is asserted from literals.
+import assert from "node:assert/strict";
+import { describe, it } from "node:test";
 
 import {
   appendPackagingToProjectConfig,
@@ -17,17 +16,11 @@ import {
   renderPackagingBlock,
 } from "../src/bootstrap/detect.ts";
 import { readText } from "../src/textfile.ts";
-import { makeTempDir, removeTempDirs } from "./support/fixtures.ts";
-
-afterAll(removeTempDirs);
+import { seed, tempDir } from "./support/answers.ts";
 
 function repoWith(files: Record<string, string>): string {
-  const root = makeTempDir();
-  for (const [rel, text] of Object.entries(files)) {
-    const path = join(root, ...rel.split("/"));
-    mkdirSync(join(path, ".."), { recursive: true });
-    writeFileSync(path, text, "utf8");
-  }
+  const root = tempDir("detect-");
+  seed(root, files);
   return root;
 }
 
@@ -41,22 +34,22 @@ const APPLICATION =
 
 describe("what a build file says about publishing", () => {
   it("reads package metadata as the statement that this is a package", () => {
-    expect(declaresPackage(LIBRARY)).toBe(true);
-    expect(declaresPackage(APPLICATION)).toBe(false);
+    assert.equal(declaresPackage(LIBRARY), true);
+    assert.equal(declaresPackage(APPLICATION), false);
   });
 
   it("derives pack and push for a project that means to be published", () => {
     const found = detectPackaging(repoWith({ "model.csproj": LIBRARY }));
-    expect(found.recipe?.key).toBe("dotnet");
-    expect(found.recipe?.pack).toContain("{output}");
-    expect(found.recipe?.push).toContain("{secret}");
+    assert.equal(found.recipe?.key, "dotnet");
+    assert.ok(found.recipe?.pack.includes("{output}"));
+    assert.ok(found.recipe?.push.includes("{secret}"));
   });
 
   it("declares nothing for an application, and says why", () => {
     // Packing it produces a nupkg nobody wanted.
     const found = detectPackaging(repoWith({ "app.csproj": APPLICATION }));
-    expect(found.recipe).toBeNull();
-    expect(found.reason).toContain("package metadata");
+    assert.equal(found.recipe, null);
+    assert.match(String(found.reason), /package metadata/);
   });
 
   it("declares nothing when the projects are below the root, and says why", () => {
@@ -64,8 +57,8 @@ describe("what a build file says about publishing", () => {
     // them fails the first time it runs. Silence that explains itself is what
     // separates a framework the operator trusts from one they work around.
     const found = detectPackaging(repoWith({ "src/model.csproj": LIBRARY }));
-    expect(found.recipe).toBeNull();
-    expect(found.reason).toContain("below the repository root");
+    assert.equal(found.recipe, null);
+    assert.match(String(found.reason), /below the repository root/);
   });
 
   it("declares nothing for Maven, and says which contract it does not fit", () => {
@@ -76,18 +69,16 @@ describe("what a build file says about publishing", () => {
     // of a server. A detected line that fails the first time it runs is worse
     // than an honest absence.
     const found = detectPackaging(repoWith({ "pom.xml": "<project></project>" }));
-    expect(found.recipe).toBeNull();
-    expect(found.reason).toContain("settings.xml");
+    assert.equal(found.recipe, null);
+    assert.match(String(found.reason), /settings\.xml/);
   });
 
   it("refuses to pick between two packable projects", () => {
     // Which of them publishes decides where an artifact carrying the
     // operator's name arrives, and filesystem order is not an answer to it.
-    const found = detectPackaging(
-      repoWith({ "a.csproj": LIBRARY, "b.csproj": LIBRARY }),
-    );
-    expect(found.recipe).toBeNull();
-    expect(found.reason).toContain("both declare package metadata");
+    const found = detectPackaging(repoWith({ "a.csproj": LIBRARY, "b.csproj": LIBRARY }));
+    assert.equal(found.recipe, null);
+    assert.match(String(found.reason), /both declare package metadata/);
   });
 });
 
@@ -100,18 +91,22 @@ describe("the block the framework writes", () => {
       "https://feed.invalid/index.json # not a comment",
       "PAT",
     );
-    expect(block).toContain('feed: "https://feed.invalid/index.json # not a comment"');
+    assert.match(block, /feed: "https:\/\/feed\.invalid\/index\.json # not a comment"/);
   });
 
   it("renders argv and never a shell string", () => {
     // A credential in a shell string is a credential a shell can re-split.
     const block = renderPackagingBlock(
-      { key: "dotnet", pack: ["dotnet", "pack", "-o", "{output}"], push: ["dotnet", "nuget"] },
+      {
+        key: "dotnet",
+        pack: ["dotnet", "pack", "-o", "{output}"],
+        push: ["dotnet", "nuget"],
+      },
       "https://feed.invalid/index.json",
       "DABBLER_FEED_PAT",
     );
-    expect(block).toContain('argv: ["dotnet", "pack", "-o", "{output}"]');
-    expect(block).toContain('secret: "DABBLER_FEED_PAT"');
+    assert.match(block, /argv: \["dotnet", "pack", "-o", "\{output\}"\]/);
+    assert.match(block, /secret: "DABBLER_FEED_PAT"/);
   });
 
   it("writes the credential's name and never a credential", () => {
@@ -123,41 +118,42 @@ describe("the block the framework writes", () => {
       "https://feed.invalid/index.json",
       "DABBLER_FEED_PAT",
     );
-    expect(path).not.toBeNull();
-    const text = readText(path as string);
-    expect(text).toContain('secret: "DABBLER_FEED_PAT"');
-    expect(declaresPackaging(root)).toBe(true);
+    assert.notEqual(path, null);
+    assert.match(readText(path as string), /secret: "DABBLER_FEED_PAT"/);
+    assert.equal(declaresPackaging(root), true);
   });
 
   it("declines a file that already states how this repository publishes", () => {
     // A second mapping key produces a document whose later copy silently
     // wins, and how a repository publishes is not something to overwrite.
     const root = repoWith({
-      "dabbler.yaml": "packaging:\n  pack:\n    argv: [\"true\"]\n",
+      "dabbler.yaml": 'packaging:\n  pack:\n    argv: ["true"]\n',
       "model.csproj": LIBRARY,
     });
     const recipe = detectPackaging(root).recipe;
-    expect(
+    assert.equal(
       appendPackagingToProjectConfig(
         root,
         recipe as NonNullable<typeof recipe>,
         "https://feed.invalid/index.json",
         "DABBLER_FEED_PAT",
       ),
-    ).toBeNull();
+      null,
+    );
   });
 
   it("declines a repository with no dabbler.yaml to write into", () => {
     const root = repoWith({ "model.csproj": LIBRARY });
     const recipe = detectPackaging(root).recipe;
-    expect(
+    assert.equal(
       appendPackagingToProjectConfig(
         root,
         recipe as NonNullable<typeof recipe>,
         "https://feed.invalid/index.json",
         "DABBLER_FEED_PAT",
       ),
-    ).toBeNull();
-    expect(declaresPackaging(root)).toBe(false);
+      null,
+    );
+    assert.equal(declaresPackaging(root), false);
   });
 });

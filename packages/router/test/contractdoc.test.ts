@@ -1,15 +1,13 @@
 // Contract rendering: the sections a reader needs, and the refusals.
 
+import assert from "node:assert/strict";
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
-
-import { afterAll, describe, expect, it } from "vitest";
+import { describe, it } from "node:test";
 
 import { ContractError, load, render } from "../src/contractdoc.ts";
 import { parse as parseSolution } from "../src/solution.ts";
-import { makeTempDir, removeTempDirs } from "./support/fixtures.ts";
-
-afterAll(removeTempDirs);
+import { tempDir } from "./support/answers.ts";
 
 const CONTRACT: Record<string, unknown> = {
   component: "csv-parser",
@@ -48,30 +46,30 @@ describe("rendering", () => {
       "Side effects",
       "How it fails",
     ]) {
-      expect(out).toContain(heading);
+      assert.ok(out.includes(heading), heading);
     }
   });
 
   it("calls out what is not promised, separately from the table", () => {
     const out = render(CONTRACT);
-    expect(out).toContain("Not promised");
-    expect(out).toContain("concrete List implementation");
+    assert.ok((out).includes("Not promised"));
+    assert.ok((out).includes("concrete List implementation"));
   });
 
   it("says an empty section is empty rather than rendering blank", () => {
     const thin = { component: "x", operations: [{ name: "go" }] };
-    expect(render(thin)).toContain("*none stated*");
+    assert.ok((render(thin)).includes("*none stated*"));
   });
 
   it("shows both dependency directions in the diagram", () => {
     const out = render(CONTRACT, SOLUTION);
-    expect(out).toContain("```mermaid");
-    expect(out).toContain("csv_parser --> csv_model");
-    expect(out).toContain("csv_app");
+    assert.ok((out).includes("```mermaid"));
+    assert.ok((out).includes("csv_parser --> csv_model"));
+    assert.ok((out).includes("csv_app"));
   });
 
   it("names who breaks under used-by", () => {
-    expect(render(CONTRACT, SOLUTION)).toContain("**Used by:** `csv-app`");
+    assert.ok(render(CONTRACT, SOLUTION).includes("**Used by:** `csv-app`"));
   });
 
   it("draws no diagram for a component outside the solution", () => {
@@ -79,29 +77,29 @@ describe("rendering", () => {
       { component: "stranger", operations: [{ name: "go" }] },
       SOLUTION,
     );
-    expect(out).not.toContain("```mermaid");
+    assert.ok(!out.includes("```mermaid"));
   });
 
   it("says not to hand-edit it", () => {
-    expect(render(CONTRACT)).toContain("Do not edit by hand");
+    assert.ok(render(CONTRACT).includes("Do not edit by hand"));
   });
 });
 
 describe("refusals", () => {
   it("refuses a missing file", () => {
-    expect(() => load(join(makeTempDir(), "nope.yaml"))).toThrow(/no contract/);
+    assert.throws(() => load(join(tempDir("contract-"), "nope.yaml")), /no contract/);
   });
 
   it("refuses a contract without operations", () => {
-    const path = join(makeTempDir(), "c.yaml");
+    const path = join(tempDir("contract-"), "c.yaml");
     writeFileSync(path, "component: x\n", "utf8");
-    expect(() => load(path)).toThrow(/operations/);
+    assert.throws(() => load(path), /operations/);
   });
 
   it("refuses an operation without a name", () => {
-    const path = join(makeTempDir(), "c.yaml");
+    const path = join(tempDir("contract-"), "c.yaml");
     writeFileSync(path, "component: x\noperations:\n  - signature: foo()\n", "utf8");
-    expect(() => load(path)).toThrow(ContractError);
+    assert.throws(() => load(path), ContractError);
   });
 });
 
@@ -113,7 +111,7 @@ describe("what proves a clause", () => {
       component: "x",
       operations: [{ name: "f", preconditions: ["a is positive"] }],
     });
-    expect(md).toContain("**not proved**");
+    assert.ok(md.includes("**not proved**"));
   });
 
   it("names the test that proves a clause", () => {
@@ -127,13 +125,13 @@ describe("what proves a clause", () => {
         },
       ],
     });
-    expect(md).toContain("`test_rejects_negative_a`");
-    expect(md).not.toContain("**not proved**");
+    assert.ok(md.includes("`test_rejects_negative_a`"));
+    assert.ok(!md.includes("**not proved**"));
   });
 
   it("has nothing to prove for an empty section", () => {
     const md = render({ component: "x", operations: [{ name: "f" }] });
-    expect(md).toContain("*nothing to prove*");
-    expect(md).not.toContain("**not proved**");
+    assert.ok(md.includes("*nothing to prove*"));
+    assert.ok(!md.includes("**not proved**"));
   });
 });

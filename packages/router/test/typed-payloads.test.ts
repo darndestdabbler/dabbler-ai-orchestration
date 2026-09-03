@@ -10,7 +10,8 @@
 // error it expects does not occur, so a return type silently widened to
 // `unknown` or `RouterText` fails here and in `tsc --noEmit` both.
 
-import { describe, expect, it } from "vitest";
+import assert from "node:assert/strict";
+import { describe, it } from "node:test";
 
 import type { Router, RouterResult } from "../src/contracts/router.ts";
 import type { ApprovedPlan } from "../src/generated/approved-plan.ts";
@@ -56,8 +57,10 @@ describe("the schema-backed answers", () => {
       generatedAt: "2026-08-28T00:00:00-04:00",
     };
 
-    expect([missingTree, badVerdict, halfProjection]).toHaveLength(3);
-    expect([_progress, _progressBack, _plan, _planBack, _round, _roundBack])
-      .toHaveLength(6);
+    // The assertions above are the @ts-expect-error lines: this file fails
+    // to COMPILE if any of them stops being an error. These two only keep
+    // the bindings used, so the type checker has to look at them.
+    assert.equal([missingTree, badVerdict, halfProjection].length, 3);
+    assert.equal([_progress, _progressBack, _plan, _planBack, _round, _roundBack].length, 6);
   });
 });

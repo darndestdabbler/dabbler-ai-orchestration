@@ -9,16 +9,17 @@
 //
 // **Excluded from the default run**, and by an explicit opt-in rather than
 // by "are there keys on this machine" -- a developer with keys set must not
-// discover that `npm test` spends money. `DABBLER_E2E=1` is the switch; it
-// is the vitest twin of pytest's `e2e` marker, which `pytest.ini` declares
-// for the same reason.
+// discover that `npm test` spends money. `DABBLER_E2E=1` is the switch, and
+// it is read per TEST rather than per file, so the four report as SKIPPED
+// on an ordinary run: a reachability tier nobody can see is one nobody runs.
 //
-//     DABBLER_E2E=1 npx vitest run test/live.test.ts
+//     DABBLER_E2E=1 node --test packages/router/test/live.test.ts
 //
 // The prompts are one sentence and the ceilings are small: this is a
 // reachability check, not a capability one.
 
-import { describe, expect, it } from "vitest";
+import assert from "node:assert/strict";
+import { describe, it } from "node:test";
 
 import { loadConfig } from "../src/config.ts";
 import { callModel } from "../src/transports/api.ts";
@@ -49,9 +50,9 @@ function modelIdFor(provider: string): string {
   throw new Error(`the bundled registry names no enabled model for ${provider}`);
 }
 
-describe.runIf(LIVE)("a live call to each vendor", () => {
+describe("a live call to each vendor", () => {
   for (const provider of ["anthropic", "openai", "google"]) {
-    it(`reaches ${provider} and reads its answer`, async () => {
+    it(`reaches ${provider} and reads its answer`, { skip: !LIVE }, async () => {
       const result = await callModel(
         provider,
         modelIdFor(provider),
@@ -61,14 +62,14 @@ describe.runIf(LIVE)("a live call to each vendor", () => {
         providerBlock(provider),
         provider === "openai" ? { reasoning_effort: "none" } : {},
       );
-      expect(result.content.toLowerCase()).toContain("paris");
+      assert.ok(result.content.toLowerCase().includes("paris"), result.content);
       // A vendor that answered but reported nothing is the case the metrics
       // must keep distinguishable, so this asserts the counts exist rather
       // than what they are.
-      expect(Number.isFinite(result.input_tokens)).toBe(true);
-      expect(Number.isFinite(result.output_tokens)).toBe(true);
-      expect(result.stop_reason).not.toBe("");
-    }, 120_000);
+      assert.equal(Number.isFinite(result.input_tokens), true);
+      assert.equal(Number.isFinite(result.output_tokens), true);
+      assert.notEqual(result.stop_reason, "");
+    });
   }
 });
 
@@ -111,10 +112,10 @@ function planted(): string {
   ].join("\n");
 }
 
-describe.runIf(LIVE)("a live handoff through the seat", () => {
-  it("reads the payload through and earns its acknowledgement", async () => {
+describe("a live handoff through the seat", () => {
+  it("reads the payload through and earns its acknowledgement", { skip: !LIVE }, async () => {
     const version = getCliVersion();
-    expect(version, "the Copilot CLI must be on PATH for this test").not.toBeNull();
+    assert.notEqual(version, null, "the Copilot CLI must be on PATH for this test");
 
     const prompt = planted();
     const transport = new CopilotCliTransport({ maxInvocations: 1 });
@@ -127,31 +128,29 @@ describe.runIf(LIVE)("a live handoff through the seat", () => {
     // Assert the CALL took the branch under test before asserting anything
     // about the answer: a prompt that fell under the ceiling would pass every
     // content check below while proving nothing about the handoff.
-    expect(result.metadata["handoff"], JSON.stringify(result.metadata)).toBe(true);
-    expect(Number(result.metadata["payload_bytes"])).toBeGreaterThan(
-      HANDOFF_THRESHOLD_UTF16_UNITS,
-    );
+    assert.equal(result.metadata["handoff"], true, JSON.stringify(result.metadata));
+    assert.ok(Number(result.metadata["payload_bytes"]) > HANDOFF_THRESHOLD_UTF16_UNITS);
     // The whole metadata, not just the stderr: a seat that refuses for quota
     // and a payload the model under-read are different failures, and the run
     // that has to be read later is the one that failed.
-    expect(isOk(result), JSON.stringify(result.metadata, null, 2)).toBe(true);
-    expect(result.metadata["handoff_ack"]).toBe("validated");
-    expect(result.metadata["payload_file_modified"]).toBe(false);
+    assert.equal(isOk(result), true, JSON.stringify(result.metadata, null, 2));
+    assert.equal(result.metadata["handoff_ack"], "validated");
+    assert.equal(result.metadata["payload_file_modified"], false);
 
     for (const fact of [HEAD_FACT, MIDDLE_FACT, TAIL_FACT]) {
-      expect(result.content).toContain(fact);
+      assert.ok(result.content.includes(fact), fact);
     }
     // Stripped, not merely present: the ack is transport control and must
     // never reach a caller as part of the model's answer.
-    expect(result.content).not.toContain("HANDOFF-ACK");
+    assert.ok(!result.content.includes("HANDOFF-ACK"));
     // The conversation id is the only handle on what this call cost, and
     // `seat-cost` is what prices it.
-    expect(String(result.metadata["session_id"])).not.toBe("");
+    assert.notEqual(String(result.metadata["session_id"]), "");
 
     process.stderr.write(
       `[live seat probe] model=${SEAT_MODEL} cli=${String(version)} ` +
         `conversation=${String(result.metadata["session_id"])} ` +
         `payload_bytes=${String(result.metadata["payload_bytes"])}\n`,
     );
-  }, 600_000);
+  });
 });

@@ -3,14 +3,15 @@
 // The pack and push commands are `node -e` scripts rather than a real build
 // tool: the behaviours under test are how the framework spawns a command and
 // what it does with the result, and a repository that shipped dotnet would be
-// testing dotnet.
-
-import { execFileSync } from "node:child_process";
+// testing dotnet. The declaration's own rules need no repository and are
+// asserted from literals.
+import assert from "node:assert/strict";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { beforeEach, describe, it } from "node:test";
 
-import { afterAll, beforeEach, describe, expect, it } from "vitest";
-
+import { canonicalPath, snapshotWorktreeTree } from "../src/journal.ts";
+import { appendRound, packageOutputDir, packagingPath, readPackaging } from "../src/ledger.ts";
 import {
   OUTCOME_FAILED,
   OUTCOME_PUBLISHED,
@@ -19,16 +20,13 @@ import {
   feedTakesCredential,
   loadDeclaration,
   packageSession,
-  redact,
   record,
+  redact,
   runAsRecord,
 } from "../src/packaging.ts";
-import { appendRound, packageOutputDir, packagingPath, readPackaging } from "../src/ledger.ts";
-import { canonicalPath, snapshotWorktreeTree } from "../src/journal.ts";
 import { declareSessionTask, registerSessionStart } from "../src/writers.ts";
-import { makeConfig, makeSandboxRepo, removeTempDirs } from "./support/fixtures.ts";
-
-afterAll(removeTempDirs);
+import { makeConfig } from "./support/answers.ts";
+import { git, gitOut, makeSandbox } from "./support/repo.ts";
 
 // Writes one file into whatever directory the framework hands it, named by
 // the arguments after it.
@@ -56,22 +54,9 @@ const PUSH_SRC =
   "console.log('pushing with token '+process.argv[4]);" +
   "process.exit(Number(process.env.CI||'0'));";
 
-const FEED =
-  "https://pkgs.dev.azure.test/org/_packaging/feed/nuget/v3/index.json";
+const FEED = "https://pkgs.dev.azure.test/org/_packaging/feed/nuget/v3/index.json";
 const SECRET_ENV = "DABBLER_FEED_PAT_TEST";
 const SECRET_VALUE = "pat-0123456789abcdef";
-
-function git(repo: string, ...args: string[]): string {
-  return execFileSync("git", ["-C", repo, ...args], {
-    encoding: "utf8",
-    env: {
-      ...process.env,
-      GIT_AUTHOR_NAME: "Test", GIT_AUTHOR_EMAIL: "test@example.invalid",
-      GIT_COMMITTER_NAME: "Test", GIT_COMMITTER_EMAIL: "test@example.invalid",
-      GIT_CONFIG_NOSYSTEM: "1",
-    },
-  });
-}
 
 function packagingConfig(
   pushLog: string,
@@ -81,15 +66,10 @@ function packagingConfig(
   return makeConfig({
     packaging: {
       pack: {
-        argv: options.packArgv ?? [
-          process.execPath, "-e", PACK_SRC, "{output}", ...artifacts,
-        ],
+        argv: options.packArgv ?? [process.execPath, "-e", PACK_SRC, "{output}", ...artifacts],
       },
       push: {
-        argv: [
-          process.execPath, "-e", PUSH_SRC, pushLog,
-          "{artifact}", "{feed}", "{secret}",
-        ],
+        argv: [process.execPath, "-e", PUSH_SRC, pushLog, "{artifact}", "{feed}", "{secret}"],
         feed: FEED,
         secret: SECRET_ENV,
       },
@@ -97,8 +77,16 @@ function packagingConfig(
   });
 }
 
-function pushes(pushLog: string): { argv: string[]; env: string[] }[] {
-  return JSON.parse(readFileSync(pushLog, "utf8"));
+function pushes(pushLog: string): Array<{ argv: string[]; env: string[] }> {
+  return JSON.parse(readFileSync(pushLog, "utf8")) as Array<{ argv: string[]; env: string[] }>;
+}
+
+/** The `packaging` half of a config, so a test can break one field of it. */
+function half(config: Record<string, unknown>, which: string): Record<string, unknown> {
+  return (config["packaging"] as Record<string, Record<string, unknown>>)[which] as Record<
+    string,
+    unknown
+  >;
 }
 
 /**
@@ -106,16 +94,9 @@ function pushes(pushLog: string): { argv: string[]; env: string[] }[] {
  * verified, committed, pushed and left with a clean tree.
  */
 function publishable(): { repo: string; sessionsDir: string; pushLog: string } {
-  const { repo, sessionsDir } = makeSandboxRepo();
-  registerSessionStart(sessionsDir, 1, {
-    engine: "claude-code",
-    provider: "anthropic",
-  });
-  declareSessionTask(sessionsDir, {
-    sessionNumber: 1,
-    task: "ship the widget",
-    releasable: true,
-  });
+  const { repo, sessionsDir } = makeSandbox();
+  registerSessionStart(sessionsDir, 1, { engine: "claude-code", provider: "anthropic" });
+  declareSessionTask(sessionsDir, { sessionNumber: 1, task: "ship the widget", releasable: true });
   writeFileSync(join(repo, "widget.py"), "WIDGET = 1\n", "utf8");
   git(repo, "add", "-A");
   git(repo, "commit", "-q", "-m", "work");
@@ -139,38 +120,42 @@ beforeEach(() => {
   delete process.env[SECRET_ENV];
 });
 
+// --- The declaration ------------------------------------------------------------
+
 describe("the declaration", () => {
   // A repository publishes because it said how. Nothing here is inferred
   // from a language nobody named.
 
   it("loads nothing for a repository that declares nothing", () => {
-    expect(loadDeclaration(makeConfig())).toBeNull();
+    assert.equal(loadDeclaration(makeConfig()), null);
   });
 
   // Each placeholder is the framework's only route for one fact. A command
   // missing one takes that fact from somewhere the record cannot see -- an
   // ambient credential, a stale output directory, a feed the record names
   // but the command never used.
-  it.each([
+  for (const [step, placeholder] of [
     ["pack", "{output}"],
     ["push", "{artifact}"],
     ["push", "{feed}"],
     ["push", "{secret}"],
-  ])("refuses a %s command that takes %s from elsewhere", (half, drop) => {
-    const config = packagingConfig("log.json");
-    const block = (config["packaging"] as Record<string, Record<string, unknown>>)[
-      half
-    ] as Record<string, unknown>;
-    block["argv"] = (block["argv"] as string[]).filter((a) => a !== drop);
-    expect(() => loadDeclaration(config)).toThrow(PackagingConfigError);
-    expect(() => loadDeclaration(config)).toThrow(drop);
-  });
+  ] as const) {
+    it(`refuses a ${step} command that takes ${placeholder} from elsewhere`, () => {
+      const config = packagingConfig("log.json");
+      const block = half(config, step);
+      block["argv"] = (block["argv"] as string[]).filter((token) => token !== placeholder);
+      assert.throws(() => loadDeclaration(config), PackagingConfigError);
+      assert.throws(() => loadDeclaration(config), new RegExp(placeholder.replace(/[{}]/g, "\\$&")));
+    });
+  }
 
   it("refuses a block that declares one half and not the other", () => {
     // A pack nobody pushes is a build, and a push with nothing to send is a
     // typo; neither is a publication, so neither is accepted alone.
-    const config = makeConfig({ packaging: { pack: { argv: ["x", "{output}"] } } });
-    expect(() => loadDeclaration(config)).toThrow(/push must be a mapping/);
+    assert.throws(
+      () => loadDeclaration(makeConfig({ packaging: { pack: { argv: ["x", "{output}"] } } })),
+      /push must be a mapping/,
+    );
   });
 
   it("refuses a push that names no feed and one that names no credential", () => {
@@ -179,22 +164,16 @@ describe("the declaration", () => {
       ["secret", /must name the credential/],
     ] as const) {
       const config = packagingConfig("log.json");
-      const push = (config["packaging"] as Record<string, Record<string, unknown>>)[
-        "push"
-      ] as Record<string, unknown>;
-      push[field] = "";
-      expect(() => loadDeclaration(config)).toThrow(message);
+      half(config, "push")[field] = "";
+      assert.throws(() => loadDeclaration(config), message);
     }
   });
 
   it("refuses a timeout that is not a positive number", () => {
     for (const value of ["soon", 0, -1]) {
       const config = packagingConfig("log.json");
-      const pack = (config["packaging"] as Record<string, Record<string, unknown>>)[
-        "pack"
-      ] as Record<string, unknown>;
-      pack["timeout_seconds"] = value;
-      expect(() => loadDeclaration(config)).toThrow(PackagingConfigError);
+      half(config, "pack")["timeout_seconds"] = value;
+      assert.throws(() => loadDeclaration(config), PackagingConfigError, String(value));
     }
   });
 });
@@ -205,8 +184,8 @@ describe("a feed that takes no credential", () => {
   // the declaration demanded one anyway, so the operator declared
   // DABBLER_FEED_PAT and exported a placeholder value for a folder on their
   // own disk. The redactor then blanked that word wherever it appeared in
-  // captured output, which is the second bite: pick a natural word and
-  // watch every occurrence of it vanish from the transcript.
+  // captured output, which is the second bite: pick a natural word and watch
+  // every occurrence of it vanish from the transcript.
 
   it("knows a path on disk from a feed on the network, and is unsure in the repository's favour", () => {
     for (const local of [
@@ -223,7 +202,7 @@ describe("a feed that takes no credential", () => {
       "feeds/local",
       "feeds\\local",
     ]) {
-      expect(feedTakesCredential(local), local).toBe(false);
+      assert.equal(feedTakesCredential(local), false, local);
     }
     for (const remote of [
       "https://pkgs.dev.azure.test/org/_packaging/feed/nuget/v3/index.json",
@@ -233,46 +212,44 @@ describe("a feed that takes no credential", () => {
       "internal-feed",
       "",
     ]) {
-      expect(feedTakesCredential(remote), remote).toBe(true);
+      assert.equal(feedTakesCredential(remote), true, remote);
     }
   });
 
   it("loads a folder feed with no secret and no {secret} placeholder", () => {
     const config = packagingConfig("log.json");
-    const push = (config["packaging"] as Record<string, Record<string, unknown>>)["push"];
+    const push = half(config, "push");
     push["feed"] = "D:/Projects/dabbler-local-feed";
     delete push["secret"];
     push["argv"] = (push["argv"] as string[]).filter((token) => token !== "{secret}");
-
-    const declaration = loadDeclaration(makeConfig(config));
-    expect(declaration?.push.secret).toBe("");
+    assert.equal(loadDeclaration(config)?.push.secret, "");
   });
 
   it("still refuses an http feed that names no credential", () => {
     // The requirement is dropped for a folder and for nothing else.
     const config = packagingConfig("log.json");
-    const push = (config["packaging"] as Record<string, Record<string, unknown>>)["push"];
-    delete push["secret"];
-    expect(() => loadDeclaration(makeConfig(config))).toThrow(/must name the credential/);
+    delete half(config, "push")["secret"];
+    assert.throws(() => loadDeclaration(config), /must name the credential/);
   });
 });
+
+// --- Who may publish ------------------------------------------------------------
 
 describe("who may publish", () => {
   // Step (a) decides, step (f) reads. The order is the point: a session that
   // declares after the work is a model choosing in hindsight.
 
   // Two shapes of the same answer: a session that declared `no`, and one
-  // that never declared at all. `sessionIsReleasable` fails closed, so the
-  // absent declaration is a refusal rather than an unknown.
-  it.each([["never declared", null], ["declared no", false]])(
-    "refuses a session that %s",
-    (_label, declaration) => {
-      const { repo, sessionsDir } = makeSandboxRepo();
+  // that never declared at all. The read fails closed, so the absent
+  // declaration is a refusal rather than an unknown.
+  for (const [label, declaration] of [
+    ["never declared", null],
+    ["declared no", false],
+  ] as const) {
+    it(`refuses a session that ${label}`, () => {
+      const { repo, sessionsDir } = makeSandbox();
       const pushLog = join(repo, "..", "pushes.json");
-      registerSessionStart(sessionsDir, 1, {
-        engine: "claude-code",
-        provider: "anthropic",
-      });
+      registerSessionStart(sessionsDir, 1, { engine: "claude-code", provider: "anthropic" });
       if (declaration !== null) {
         declareSessionTask(sessionsDir, {
           sessionNumber: 1,
@@ -280,21 +257,19 @@ describe("who may publish", () => {
           releasable: declaration,
         });
       }
-      const run = packageSession(sessionsDir, {
-        config: packagingConfig(pushLog),
-      });
-      expect(run.outcome).toBe(OUTCOME_REFUSED);
-      expect(run.releasable).toBe(false);
-      expect(run.refusal).toContain("releasable");
-      expect(existsSync(pushLog)).toBe(false);
-    },
-  );
+      const run = packageSession(sessionsDir, { config: packagingConfig(pushLog) });
+      assert.equal(run.outcome, OUTCOME_REFUSED);
+      assert.equal(run.releasable, false);
+      assert.match(String(run.refusal), /releasable/);
+      assert.equal(existsSync(pushLog), false);
+    });
+  }
 
   it("refuses a releasable session in a repository with no feed", () => {
     const { sessionsDir } = publishable();
     const run = packageSession(sessionsDir, { config: makeConfig() });
-    expect(run.outcome).toBe(OUTCOME_REFUSED);
-    expect(run.refusal).toContain("publishes nothing");
+    assert.equal(run.outcome, OUTCOME_REFUSED);
+    assert.match(String(run.refusal), /publishes nothing/);
   });
 
   it("proves the order by the gates, not by the command sequence", () => {
@@ -306,50 +281,45 @@ describe("who may publish", () => {
     git(repo, "add", "-A");
     git(repo, "commit", "-q", "-m", "more work");
     const run = packageSession(sessionsDir, { config: packagingConfig(pushLog) });
-    expect(run.outcome).toBe(OUTCOME_REFUSED);
-    expect(run.refusal).toContain("pushed_to_remote");
-    expect(existsSync(pushLog)).toBe(false);
+    assert.equal(run.outcome, OUTCOME_REFUSED);
+    assert.match(String(run.refusal), /pushed_to_remote/);
+    assert.equal(existsSync(pushLog), false);
   });
 
   it("refuses a missing credential before anything is built", () => {
     const { repo, sessionsDir, pushLog } = publishable();
     delete process.env[SECRET_ENV];
     const run = packageSession(sessionsDir, { config: packagingConfig(pushLog) });
-    expect(run.outcome).toBe(OUTCOME_REFUSED);
-    expect(run.refusal).toContain(SECRET_ENV);
-    expect(existsSync(packageOutputDir(repo, 1))).toBe(false);
+    assert.equal(run.outcome, OUTCOME_REFUSED);
+    assert.match(String(run.refusal), new RegExp(SECRET_ENV));
+    assert.equal(existsSync(packageOutputDir(repo, 1)), false);
   });
 });
 
+// --- The publication ------------------------------------------------------------
+
 describe("the publication", () => {
-  it("packs once and pushes once per artifact", () => {
+  it("packs once and pushes once per artifact, into the run directory", () => {
     const { repo, sessionsDir, pushLog } = publishable();
     const run = packageSession(sessionsDir, {
-      config: packagingConfig(pushLog, {
-        artifacts: ["a-1.0.nupkg", "b-1.0.nupkg"],
-      }),
+      config: packagingConfig(pushLog, { artifacts: ["a-1.0.nupkg", "b-1.0.nupkg"] }),
     });
-    expect(run.outcome, run.refusal).toBe(OUTCOME_PUBLISHED);
-    expect(run.artifacts).toEqual(["a-1.0.nupkg", "b-1.0.nupkg"]);
+    assert.equal(run.outcome, OUTCOME_PUBLISHED, String(run.refusal));
+    assert.deepEqual(run.artifacts, ["a-1.0.nupkg", "b-1.0.nupkg"]);
     // The same files, compared as the filesystem names them: the push is
-    // handed the path the framework resolved, and a fixture that reached
-    // its repository through an alias spells the same directory another
-    // way. What is being asserted is which artifact was pushed, not which
-    // of a directory's names the test happened to hold.
-    expect(pushes(pushLog).map((row) => canonicalPath(row.argv[0]))).toEqual(
+    // handed the path the framework resolved, and a fixture that reached its
+    // repository through an alias spells the same directory another way.
+    assert.deepEqual(
+      pushes(pushLog).map((row) => canonicalPath(row.argv[0] as string)),
       run.artifacts.map((name) => canonicalPath(join(packageOutputDir(repo, 1), name))),
     );
-    expect(run.steps.map((s) => s.step)).toEqual(["pack", "push", "push"]);
-    expect(run.treeDigest).toBe(snapshotWorktreeTree(repo));
-  });
-
-  it("writes into the run directory and leaves the tree alone", () => {
-    // The tree that was verified stays the tree that was verified, and the
-    // artifacts land where the record can name them.
-    const { repo, sessionsDir, pushLog } = publishable();
-    packageSession(sessionsDir, { config: packagingConfig(pushLog) });
-    expect(existsSync(join(packageOutputDir(repo, 1), "thing-1.0.nupkg"))).toBe(true);
-    expect(git(repo, "status", "--porcelain").trim()).toBe("");
+    assert.deepEqual(
+      run.steps.map((step) => step.step),
+      ["pack", "push", "push"],
+    );
+    // The tree that was verified stays the tree that was verified.
+    assert.equal(run.treeDigest, snapshotWorktreeTree(repo));
+    assert.equal(gitOut(repo, "status", "--porcelain").trim(), "");
   });
 
   it("does not publish a stale artifact from a previous run", () => {
@@ -358,8 +328,8 @@ describe("the publication", () => {
     mkdirSync(output, { recursive: true });
     writeFileSync(join(output, "last-week-9.9.nupkg"), "old", "utf8");
     const run = packageSession(sessionsDir, { config: packagingConfig(pushLog) });
-    expect(run.artifacts).toEqual(["thing-1.0.nupkg"]);
-    expect(existsSync(join(output, "last-week-9.9.nupkg"))).toBe(false);
+    assert.deepEqual(run.artifacts, ["thing-1.0.nupkg"]);
+    assert.equal(existsSync(join(output, "last-week-9.9.nupkg")), false);
   });
 
   it("refuses a pack that produced nothing rather than reporting published", () => {
@@ -367,9 +337,9 @@ describe("the publication", () => {
     const run = packageSession(sessionsDir, {
       config: packagingConfig(pushLog, { artifacts: [] }),
     });
-    expect(run.outcome).toBe(OUTCOME_REFUSED);
-    expect(run.refusal).toContain("nothing to push");
-    expect(existsSync(pushLog)).toBe(false);
+    assert.equal(run.outcome, OUTCOME_REFUSED);
+    assert.match(String(run.refusal), /nothing to push/);
+    assert.equal(existsSync(pushLog), false);
   });
 
   it("publishes nothing from a pack that dirtied the repository", () => {
@@ -380,16 +350,13 @@ describe("the publication", () => {
     const { repo, sessionsDir, pushLog } = publishable();
     const run = packageSession(sessionsDir, {
       config: packagingConfig(pushLog, {
-        packArgv: [
-          process.execPath, "-e", DIRTY_PACK_SRC, "{output}",
-          join(repo, "obj.log"),
-        ],
+        packArgv: [process.execPath, "-e", DIRTY_PACK_SRC, "{output}", join(repo, "obj.log")],
       }),
     });
-    expect(run.outcome).toBe(OUTCOME_FAILED);
-    expect(run.treeMutated).toBe(true);
-    expect(run.postTreeDigest).not.toBe(run.treeDigest);
-    expect(existsSync(pushLog)).toBe(false);
+    assert.equal(run.outcome, OUTCOME_FAILED);
+    assert.equal(run.treeMutated, true);
+    assert.notEqual(run.postTreeDigest, run.treeDigest);
+    assert.equal(existsSync(pushLog), false);
   });
 
   it("stops the release at the first rejected push", () => {
@@ -399,13 +366,14 @@ describe("the publication", () => {
     process.env["CI"] = "1";
     const { sessionsDir, pushLog } = publishable();
     const run = packageSession(sessionsDir, {
-      config: packagingConfig(pushLog, {
-        artifacts: ["a-1.0.nupkg", "b-1.0.nupkg"],
-      }),
+      config: packagingConfig(pushLog, { artifacts: ["a-1.0.nupkg", "b-1.0.nupkg"] }),
     });
-    expect(run.outcome).toBe(OUTCOME_FAILED);
-    expect(run.steps.map((s) => s.step)).toEqual(["pack", "push"]);
-    expect(pushes(pushLog)).toHaveLength(1);
+    assert.equal(run.outcome, OUTCOME_FAILED);
+    assert.deepEqual(
+      run.steps.map((step) => step.step),
+      ["pack", "push"],
+    );
+    assert.equal(pushes(pushLog).length, 1);
   });
 
   it("records a command that could not start as a failed step", () => {
@@ -413,15 +381,15 @@ describe("the publication", () => {
     // the command that needed it, not as a crash.
     const { sessionsDir, pushLog } = publishable();
     const run = packageSession(sessionsDir, {
-      config: packagingConfig(pushLog, {
-        packArgv: ["definitely-not-a-program-here", "{output}"],
-      }),
+      config: packagingConfig(pushLog, { packArgv: ["definitely-not-a-program-here", "{output}"] }),
     });
-    expect(run.outcome).toBe(OUTCOME_FAILED);
-    expect(run.steps[0]?.exitCode).toBeNull();
-    expect(run.steps[0]?.output).toContain("could not start");
+    assert.equal(run.outcome, OUTCOME_FAILED);
+    assert.equal(run.steps[0]?.exitCode, null);
+    assert.match(String(run.steps[0]?.output), /could not start/);
   });
 });
+
+// --- The credential -------------------------------------------------------------
 
 describe("the credential", () => {
   it("reaches the command and no environment", () => {
@@ -432,11 +400,11 @@ describe("the credential", () => {
     try {
       const { sessionsDir, pushLog } = publishable();
       const run = packageSession(sessionsDir, { config: packagingConfig(pushLog) });
-      expect(run.outcome, run.refusal).toBe(OUTCOME_PUBLISHED);
-      const row = pushes(pushLog)[0] as { argv: string[]; env: string[] };
-      expect(row.argv[2]).toBe(SECRET_VALUE);
-      expect(row.env).not.toContain(SECRET_ENV);
-      expect(row.env).not.toContain("DABBLER_ANTHROPIC_API_KEY");
+      assert.equal(run.outcome, OUTCOME_PUBLISHED, String(run.refusal));
+      const row = pushes(pushLog)[0]!;
+      assert.equal(row.argv[2], SECRET_VALUE);
+      assert.ok(!row.env.includes(SECRET_ENV));
+      assert.ok(!row.env.includes("DABBLER_ANTHROPIC_API_KEY"));
     } finally {
       delete process.env["DABBLER_ANTHROPIC_API_KEY"];
     }
@@ -449,60 +417,55 @@ describe("the credential", () => {
     const { sessionsDir, pushLog } = publishable();
     const run = packageSession(sessionsDir, { config: packagingConfig(pushLog) });
     const pushStep = run.steps[run.steps.length - 1];
-    expect(pushStep?.command).toContain("{secret}");
-    expect(pushStep?.output).toContain("pushing with token {secret}");
-    expect(JSON.stringify(runAsRecord(run))).not.toContain(SECRET_VALUE);
+    assert.match(String(pushStep?.command), /\{secret\}/);
+    assert.match(String(pushStep?.output), /pushing with token \{secret\}/);
+    assert.ok(!JSON.stringify(runAsRecord(run)).includes(SECRET_VALUE));
   });
 
   it("leaves a credential too short to scrub in the output as itself", () => {
     // A one- or two-character "secret" would match inside ordinary words and
     // turn the record into redaction confetti. A credential that short is a
     // misconfiguration the record should show plainly.
-    expect(redact("a short pat", "short")).toBe("a short pat");
-    expect(redact(`echo ${SECRET_VALUE}`, SECRET_VALUE)).toBe("echo {secret}");
+    assert.equal(redact("a short pat", "short"), "a short pat");
+    assert.equal(redact(`echo ${SECRET_VALUE}`, SECRET_VALUE), "echo {secret}");
   });
 });
 
+// --- The record -----------------------------------------------------------------
+
 describe("the record", () => {
   it("appends refusals and publications to one validated ledger", () => {
-    // A record holding only the successes cannot be read as a history of
-    // what was released, so a refusal files beside a publication.
+    // A record holding only the successes cannot be read as a history of what
+    // was released, so a refusal files beside a publication.
     const { repo, sessionsDir, pushLog } = publishable();
     delete process.env[SECRET_ENV];
     record(sessionsDir, packageSession(sessionsDir, { config: packagingConfig(pushLog) }));
     process.env[SECRET_ENV] = SECRET_VALUE;
     record(sessionsDir, packageSession(sessionsDir, { config: packagingConfig(pushLog) }));
     const rows = readPackaging(repo, 1);
-    expect(rows.map((r) => r["outcome"])).toEqual([
-      OUTCOME_REFUSED,
-      OUTCOME_PUBLISHED,
-    ]);
-    expect(rows[rows.length - 1]?.["feed"]).toBe(FEED);
-    expect(rows[rows.length - 1]?.["secret_name"]).toBe(SECRET_ENV);
+    assert.deepEqual(
+      rows.map((row) => row["outcome"]),
+      [OUTCOME_REFUSED, OUTCOME_PUBLISHED],
+    );
+    assert.equal(rows[rows.length - 1]?.["feed"], FEED);
+    assert.equal(rows[rows.length - 1]?.["secret_name"], SECRET_ENV);
   });
 
-  it("shows the gates and runs nothing for a dry run", () => {
+  it("shows the gates, runs nothing, and refuses to file a dry run", () => {
+    // A rehearsal is not an attempt, and a ledger that carried them could not
+    // be read as a history of what was released.
     const { repo, sessionsDir, pushLog } = publishable();
     const run = packageSession(sessionsDir, {
       config: packagingConfig(pushLog),
       dryRun: true,
     });
-    expect(run.ready).toBe(true);
-    expect(run.gates.map((g) => g.passed)).toEqual([
-      true, true, true, true, true, true,
-    ]);
-    expect(existsSync(pushLog)).toBe(false);
-    expect(existsSync(packagingPath(repo, 1))).toBe(false);
-  });
-
-  it("refuses to file a dry run", () => {
-    // A rehearsal is not an attempt, and a ledger that carried them could not
-    // be read as a history of what was released.
-    const { sessionsDir, pushLog } = publishable();
-    const run = packageSession(sessionsDir, {
-      config: packagingConfig(pushLog),
-      dryRun: true,
-    });
-    expect(() => record(sessionsDir, run)).toThrow(/nothing to file/);
+    assert.equal(run.ready, true);
+    assert.deepEqual(
+      run.gates.map((gate) => gate.passed),
+      [true, true, true, true, true, true],
+    );
+    assert.equal(existsSync(pushLog), false);
+    assert.equal(existsSync(packagingPath(repo, 1)), false);
+    assert.throws(() => record(sessionsDir, run), /nothing to file/);
   });
 });

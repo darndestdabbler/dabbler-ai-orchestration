@@ -24,12 +24,10 @@
     "prepare": "node build.mjs",
     "build": "node build.mjs",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint src scripts test test-vitest build.mjs vitest.config.ts vitest.integration.config.ts --ext .ts,.mjs",
+    "lint": "eslint src scripts test build.mjs --ext .ts,.mjs",
     "test:unit": "node --test \"test/**/*.test.ts\"",
     "generate:types": "node scripts/run-ts.mjs scripts/generate-types.ts",
-    "check:types": "node scripts/run-ts.mjs scripts/check-types-fresh.ts",
-    "test:integration": "vitest run --config vitest.integration.config.ts",
-    "test:vitest": "vitest run"
+    "check:types": "node scripts/run-ts.mjs scripts/check-types-fresh.ts"
   },
   "dependencies": {
     "ajv": "^8.17.1",
@@ -42,7 +40,6 @@
     "@typescript-eslint/parser": "^7.0.0",
     "esbuild": "^0.20.0",
     "eslint": "^8.56.0",
-    "typescript": "^5.3.0",
-    "vitest": "^2.1.0"
+    "typescript": "^5.3.0"
   }
 }

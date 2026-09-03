@@ -10,7 +10,7 @@
 // `process.env` when it spawns git.
 
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
@@ -61,20 +61,60 @@ export function writeFiles(root: string, files: Record<string, string>): void {
  * for, a bare remote beside it that `main` tracks. Returns the checkout.
  */
 export function makeRepo(files: Record<string, string>, options: { origin?: boolean } = {}): string {
+  // Before the temp directory is made under it, not only inside the template
+  // builder: a declared check runs with TEMP redirected to a scratch
+  // directory of its own, so `ROOT` is a path that does not exist yet on the
+  // first call in that process.
   pinGit();
   const target = mkdtempSync(join(ROOT, "walk-"));
+  copyTemplate(templateFor(files, options.origin === true), target);
+  return join(target, "repo");
+}
+
+// Building a repository costs a `git init`, a `git add`, a `git commit` and
+// -- with an upstream -- a second init and a push: five or six processes,
+// each paying creation and antivirus inspection on this host. A file that
+// builds one per test paid that per test, and the packaging suite alone
+// spent ninety seconds on it. One seed is built per distinct (files,
+// origin) pair and every caller gets a COPY, which is a directory tree copy
+// and no processes at all. The copy is private, so a test that commits into
+// it cannot be seen by the next.
+const TEMPLATES = new Map<string, string>();
+let templateCount = 0;
+
+function templateFor(files: Record<string, string>, withOrigin: boolean): string {
+  const key = JSON.stringify([withOrigin, files]);
+  const known = TEMPLATES.get(key);
+  if (known !== undefined) return known;
+  pinGit();
+  templateCount += 1;
+  const target = join(ROOT, `template-${process.pid}-${templateCount}`);
   const repo = join(target, "repo");
-  mkdirSync(repo);
+  mkdirSync(repo, { recursive: true });
   git(repo, "init", "-q");
-  writeFiles(repo, files);
-  git(repo, "add", "-A");
-  git(repo, "commit", "-q", "-m", "seed");
-  if (options.origin) {
+  // A repository with no files is a legitimate seed -- it is what a project
+  // looks like the moment before it is set up -- and `git commit` with
+  // nothing staged fails, so there is nothing to commit.
+  if (Object.keys(files).length > 0) {
+    writeFiles(repo, files);
+    git(repo, "add", "-A");
+    git(repo, "commit", "-q", "-m", "seed");
+  }
+  if (withOrigin) {
     git(target, "init", "-q", "--bare", join(target, "remote.git"));
     git(repo, "remote", "add", "origin", "../remote.git");
     git(repo, "push", "-q", "-u", "origin", "main");
   }
-  return repo;
+  TEMPLATES.set(key, target);
+  return target;
+}
+
+/** A private copy of a template's `repo`, and of the remote it tracks. */
+function copyTemplate(template: string, target: string): void {
+  for (const name of ["repo", "remote.git"]) {
+    const source = join(template, name);
+    if (existsSync(source)) cpSync(source, join(target, name), { recursive: true });
+  }
 }
 
 /**

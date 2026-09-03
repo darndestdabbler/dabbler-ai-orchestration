@@ -56,7 +56,7 @@ jobs:
         run: npm run compile
 
   router:
-    name: Router suite (vitest + the declared controls)
+    name: Router suite (node --test + the declared controls)
     runs-on: windows-latest
     timeout-minutes: 20
     steps:
@@ -88,12 +88,6 @@ jobs:
 
       - name: Router suite (node --test)
         run: npm run test:unit -w dabbler-ai-router
-
-      - name: Router suite not yet rewritten (vitest default tier)
-        run: npm run test:vitest -w dabbler-ai-router
-
-      - name: Router integration suite (vitest, real git and processes; CI is its run of record until session 88)
-        run: npm run test:integration -w dabbler-ai-router
 
       - name: CLI bundles
         run: npm run build -w dabbler-ai-router

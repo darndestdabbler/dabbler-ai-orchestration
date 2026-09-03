@@ -67,26 +67,6 @@ testing:
         - packages/router/test
       test_glob: "*.test.ts"
 
-    # The vitest files not yet rewritten, under packages/router/test-vitest.
-    # This is the default tier only -- the files that spawn nothing. The
-    # integration tier (vitest.integration.config.ts, INTEGRATION_FILES) is
-    # NOT declared here for the duration of the rebuild: on the operator's
-    # authorisation of 2026-09-03 it is not run on the developer's machine,
-    # because it takes the keyboard for the duration; CI runs it on every
-    # push (.github/workflows/test.yml) and is its run of record until
-    # session 88 deletes it. This suite goes with session 88 too.
-    - name: typescript-vitest
-      command: npx vitest run --root packages/router
-      expensive: false
-      covers:
-        - packages/router/
-        - package.json
-        - package-lock.json
-        - dabbler.yaml
-      test_roots:
-        - packages/router/test-vitest
-      test_glob: "*.test.ts"
-
     # The VS Code extension. Declared in session 39 against D242, which
     # session 37 found by being the first session in a long while to change
     # only extension files: `tools/` was covered by nothing, so `dabbler

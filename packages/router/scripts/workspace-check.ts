@@ -34,7 +34,7 @@ const PACKAGES: readonly Package[] = [
   {
     name: "packages/router",
     dir: join(REPO_ROOT, "packages", "router"),
-    lintTargets: ["src", "scripts", "test", "test-vitest", "build.mjs", "vitest.config.ts", "vitest.integration.config.ts"],
+    lintTargets: ["src", "scripts", "test", "build.mjs"],
     lintExtensions: ".ts,.mjs",
   },
   {

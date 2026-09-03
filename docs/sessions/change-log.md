@@ -647,3 +647,10 @@
 - Every blocking finding of round 3 was fixed; the cap left the fix unreviewed.
 - Fixed, unreviewed: [major] The new stale-driver test still does not verify the thing it claims to protect: that the losing driver cannot advance `run.json` after the lease is stolen.
 - This work lands UNREVIEWED. It is not a waiver: nothing was accepted over a standing finding — what is unproved is the repair.
+
+## Session 88 verification — VERIFIED after 1 round(s)
+
+- Verifier: gpt-5.4 (openai) over copilot-cli
+- Orchestrator provider (excluded): anthropic
+- Verifier's read surface: agency: 32 read(s), 0 search(es), 1 listing(s); 2 read(s) were transformed; 3 not confined to scope
+- Raw round output: `.dabbler/runs/s88/`

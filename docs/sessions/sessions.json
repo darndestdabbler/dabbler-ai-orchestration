@@ -1655,9 +1655,9 @@
     {
       "number": 84,
       "title": "The record layer",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-03T08:35:36.645000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-09-03T09:14:12.856000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

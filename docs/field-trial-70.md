@@ -121,3 +121,13 @@ longer exists, with the tag rule that replaced it under test.
 ## What the trial found
 
 *Filled in by session 73, against the published pair.*
+
+## The served version, 2026-09-03
+
+`dabbler release --verify-install` against the live listing: *the Marketplace
+serves 2.0.1 for darndestdabbler.dabbler-ai-orchestration. It is installable,
+and the CLI ships inside it.* 2.0.1 is the copilot-cli patch (a corrupt echo
+line no longer fails a verification round; the briefing stops quoting a
+bearer header), tagged the same morning the csv-model trial found the
+failure. The operator's walk and the .NET leg did not run on this date and
+return as session 89, after the test rebuild that sessions 83-88 are.

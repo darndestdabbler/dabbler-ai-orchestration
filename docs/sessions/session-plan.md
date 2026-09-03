@@ -3989,6 +3989,233 @@ gone green; the Marketplace serves 2.0.0.
    session of its own is amended into the plan on the record.
 6. Affected; verify; full suite as `final-full`; close.
 
+> **Cancelled 2026-09-03.** Steps 1-3 landed on master; verify-install
+> answered 2.0.1 (recorded in `docs/field-trial-70.md`). The operator's walk
+> and the .NET leg return as session 89.
+
+---
+
+## Why sessions 83–88 exist: the tests, rebuilt the way a developer writes them
+
+*The operator's ruling, 2026-09-03, after a morning in which one full run of
+the router suite took the keyboard for fifteen minutes.*
+
+**What was measured.** 1,303 tests in 52 files; 868 s on the operator's
+machine at two workers, 685 s on CI at one. CPU never passed half. The load
+was process creation: 207 call sites building a git repository per test
+(`git init`, four `git config`, `add`, `commit`, a bare remote, `push`),
+the framework's own fifty git call sites exercised through 41 whole driven
+sessions, and a PowerShell process-table walk on every job exit. Over two
+thousand fixture directories had been left in `%TEMP%`. The Python suite
+the port replaced ran the same kind of test under two rules -- one pinned
+git configuration, and a repository built once and copied per test -- and
+had no driver tier at all; the port kept the fixtures and lost the rules,
+then added the heaviest tier on top. The same day's quick fixes (two tiers,
+templates, no walk after a clean exit) made `npm test` spawn-free but left
+the integration tier as it was.
+
+**The ruling.** *It is not acceptable. Rebuild the tests from the ground up,
+the way a human developer would write them: no vitest, no git spawns per
+test. Refactor the code so side effects live in their own small functions
+and the rest is pure, tested plainly. Chain the side-effecting tests: one
+walkthrough with asserted milestones, fail-first, instead of a fresh
+repository per test. Take the easiest path that holds. A significant
+compromise in the integrity of the process is accepted.* And the
+authorisation that lets it happen in a day: **the full suite is not run
+locally until the rebuild is complete.** CI runs whatever still spawns
+(`.github/workflows/test.yml` keeps the integration tier until session 88
+deletes it), and is the run of record for it in the meantime.
+
+**The shape.**
+
+- **The runner is Node's own.** `node --test` and `node:assert/strict`; the
+  repository already requires Node 22.18 because Node strips types itself
+  from there, so `.ts` tests run with no transpile and no dependency.
+  vitest's API is not the reason it goes -- it goes because a rewrite makes
+  its API moot: `vi.mock` is replaced by passing the impure function in, and
+  the seams that exist already (`journal.setGitSource`, the transport's
+  `spawner`) are used instead of module mocking.
+- **Purity first, in the module, then the tests.** A module that reads git,
+  the disk or a process exposes the reading as one thin function and
+  everything it decides as pure functions over the facts read. Tests call
+  the pure functions with literal inputs and no setup. The thin readers are
+  exercised once, inside a walkthrough. The split changes source; it does
+  not change behaviour, and each session's cross-provider verification is
+  where that claim is checked.
+- **A handful of walkthroughs, not hundreds of repositories.** Each
+  side-effecting area has ONE test file that builds ONE repository (or
+  none), walks it through its states in order, and asserts at each
+  milestone. A failed assert stops that walkthrough at the first wrong
+  fact, which is what fail-first means here; the later milestones are not
+  lost, they are simply not reached until the first is fixed.
+- **What is kept on purpose.** Twelve current test files cite a recorded
+  decision or a session incident, and three decision numbers appear. Those
+  behaviours are ported as named asserts. The falsifier twins, the tests of
+  test infrastructure and the tests that pin exact prose go. The test-budget
+  rule stands: one test per behaviour.
+- **Transition.** Session 83 moves every existing vitest file to
+  `packages/router/test-vitest/` so the two runners never see each other's
+  files; each session then rewrites one area into `packages/router/test/`
+  and deletes the old files it replaces. Session 88 deletes `test-vitest/`,
+  the vitest configs and dependency, and the integration tier from CI. The
+  declared suites in `dabbler.yaml` follow: `node --test` from 83 on as the
+  ordinary suite, the vitest default tier alongside it until 88, and the
+  integration tier undeclared locally from 83 (CI runs it) -- on the
+  operator's authorisation above, recorded here so the record says why the
+  run of record shrank.
+
+### Session 83 of 89: The runner, the gates slice, and the git-states walkthrough
+
+*The proof of the shape on the module the operator named: gates.*
+
+1. Register; declare `--not-releasable`.
+2. **The runner.** `npm run test:unit` in `packages/router` becomes
+   `node --test test/`; every existing `test/*.test.ts` and
+   `test/support/` moves to `test-vitest/` (git mv, history kept) and both
+   vitest configs point there; `npm run test:vitest` runs the old default
+   tier. `dabbler.yaml` declares `node --test` as the ordinary suite and the
+   vitest default tier as a second cheap one; the integration tier is no
+   longer declared locally -- `test.yml` keeps running it. A one-file
+   `test/support/repo.ts` gives a walkthrough its single repository under
+   the pinned git configuration (the template-and-copy rule from the quick
+   fixes, kept for the one copy a walkthrough makes). The lint config covers
+   both directories.
+3. **gates.ts, split.** Every gate that shells out becomes a thin reader
+   (`readWorkingTree`, `readUpstream`, ...) returning facts, and a pure
+   judge over those facts; the porcelain and rev-list parsers are pure
+   functions with names. `runGates` composes readers and judges and is
+   otherwise unchanged. `test/gates.test.ts` tests the parsers and judges
+   with literal inputs: no repository, no setup.
+4. **`test/walk-git-states.test.ts`.** One repository, walked in order
+   through the states the gates and the evidence readers care about --
+   clean, an untracked file, a modified tracked file, a staged deletion, a
+   commit ahead of its upstream, no upstream, no remote -- with the real
+   `git` output parsed and judged at each milestone. This is the contract
+   band and the gates' integration tests in one file; it replaces
+   `gitContract.test.ts` and the repository-building half of
+   `gates.test.ts`.
+5. Delete `test-vitest/gates.test.ts` and `test-vitest/gitContract.test.ts`;
+   `INTEGRATION_FILES` and the CI step shrink accordingly.
+6. Affected; verify; full suite as `final-full` (the declared cheap
+   suites); close.
+
+### Session 84 of 89: The record layer
+
+*journal, evidence, testEvidence, facts, ledger, writers, sessionState,
+progress, owedDecisions.*
+
+1. Register; declare `--not-releasable`.
+2. **Pure where it can be.** The freshness digest becomes a pure function
+   over a list of (path, bytes) with the enumeration as its one thin reader;
+   the tree snapshot, round rows, decision ordinals, ledger validation, the
+   projection and the task rows are pure over facts. Thin readers named.
+3. `test/record.test.ts`, `test/evidence.test.ts`, `test/facts.test.ts`,
+   `test/progress.test.ts`, `test/owedDecisions.test.ts`: pure tests with
+   literal inputs, one per behaviour, the decision-cited ones ported by name.
+4. **`test/walk-record.test.ts`.** One repository: register a session,
+   declare its task, take a digest, record a preverify row and a round, make
+   the round's tree reachable from its ref, append a decision, render the
+   decisions log, read the projection -- milestones asserted in order.
+5. Delete the replaced files under `test-vitest/`.
+6. Affected; verify; full suite as `final-full`; close.
+
+### Session 85 of 89: Verification
+
+*verify/rounds, verify/steps, verify/disputes, verdict, critique, fixloop,
+preverify, verificationSupport, stepreview, planReview, triage, agency.*
+
+1. Register; declare `--not-releasable`.
+2. **Pure where it can be.** Verdict parsing, findings and severities,
+   dispute and adjudication judging, remediation-round bookkeeping, the
+   agency briefing, scope, budget and fidelity marks, the step review and
+   plan review judgements -- all over facts, with the routed call and the
+   tree reads as thin functions passed in.
+3. Pure tests, one file per module, literal inputs.
+4. **`test/walk-verify.test.ts`.** One verification loop with recorded
+   transport answers: a round that finds a Major, a remediation, a dispute,
+   an adjudication, the VERIFIED close -- no network, and the one
+   repository the loop anchors to.
+5. Delete the replaced files under `test-vitest/`.
+6. Affected; verify; full suite as `final-full`; close.
+
+### Session 86 of 89: Routing, transports and configuration
+
+*config, route, selection, identity, resolution, discovery, transports/*,
+the copilot catalog, seatCost, secretResolver, runtimeMode, metrics,
+contracts, schema, lockfile.*
+
+1. Register; declare `--not-releasable`.
+2. These are mostly pure already; what is not (the catalog probe, the seat
+   spawn, the config discovery through git) gets its thin reader named.
+3. Tests rewritten under `node --test`, the transport's fake process kept
+   as an in-process seam, `vi.mock("../src/route.ts")` replaced by passing
+   the call in.
+4. Delete the replaced files under `test-vitest/`.
+5. Affected; verify; full suite as `final-full`; close.
+
+### Session 87 of 89: The lifecycle and the driver
+
+*session, drive, driver, jobs, engines, inProcess, workflow/*, checks,
+affected, cli/*.*
+
+1. Register; declare `--not-releasable`.
+2. **Pure where it can be.** Step judging, instruction rendering, report
+   validation, the interrupt and lease rules, the stale-job disposition,
+   affected-test selection, the CLI argument parsing -- over facts.
+3. Pure tests, one file per module.
+4. **`test/walk-session.test.ts`.** One repository, one session driven from
+   `next` to `done` by a scripted in-process engine: plan, step, rejection,
+   retry, the wait on a job, verification with recorded answers, land, run
+   of record, close -- every transition a milestone. **`test/walk-jobs.test.ts`**:
+   start, poll, collect, end, a tree ended from a process that never held it.
+   These two replace the 41 driven sessions and the driver, lifecycle,
+   inProcess, jobs and engines files.
+5. Delete the replaced files under `test-vitest/`.
+6. Affected; verify; full suite as `final-full`; close.
+
+### Session 88 of 89: Packaging, release, bootstrap, the solution — and vitest retired
+
+1. Register; declare `--not-releasable`.
+2. packaging, release, bootstrap/*, solution, solutionDeps, solutionWorkspace,
+   modules, detectPackaging: pure where they can be; the `node -e` stand-ins
+   for pack and push stay, as they were never the build tool.
+3. **`test/walk-bootstrap.test.ts`**: one directory bootstrapped, its suites
+   and packaging detected, its first projection written, the release tag
+   planned. Pure tests for the rest.
+4. **Retirement.** `test-vitest/` deleted, both vitest configs and the
+   vitest dependency removed, `test.yml` runs `node --test`, `dabbler.yaml`
+   declares one suite, `vitestConfig.test.ts` and `priority.ts` gone with
+   the pool they governed.
+5. **The integrity review.** The new corpus is routed to `gpt-5-6-sol` for
+   review: what a pure test fails to hold, what a walkthrough skips, which
+   asserts are tautologies. Findings triaged on the record; the real ones
+   fixed in this session.
+6. Affected; verify; full suite as `final-full`; close.
+
+### Session 89 of 89: The trial, run by the operator against what the Marketplace serves
+
+*Session 82's operator half, at the number the queue allows; its engine
+half landed. Preconditions: the Marketplace serves 2.0.1 or later
+(verify-install answered 2.0.1 on 2026-09-03).*
+
+1. Register; declare `--not-releasable`.
+2. **The operator, from a clean VS Code profile** with the extension
+   installed from the Marketplace and a fresh clone of `csv-model`:
+   acceptance criteria answered from visible UI only, expected answers
+   written down before the run -- the Solution Explorer rendering the
+   pipeline with drift and location states; the Work Explorer showing
+   completed, current, and planned sessions with a driven session's tasks
+   moving; a session driven end to end under the session-80 guardian
+   without once typing a protocol verb.
+3. **The .NET leg** (operator, 2026-09-02: what we build must work for
+   .NET and Java; only this application is TypeScript). Beside csv-model, a
+   minimal `dotnet new xunit` repository with its own `dabbler.yaml` --
+   `dotnet test` as the suite command, `dotnet build` as a control -- runs
+   one driven session end to end.
+4. Findings recorded in `docs/field-trial-70.md`; anything needing a
+   session of its own is amended into the plan on the record.
+5. Affected; verify; full suite as `final-full`; close.
+
 ---
 
 ## Acceptance criterion for sessions 37–50

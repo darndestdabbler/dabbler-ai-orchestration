@@ -239,7 +239,11 @@ describe("dispatching one turn through the seat", () => {
       eventLines({ type: "assistant.message", data: { content: "x", outputTokens: "7" } }),
     ],
     ["there is no assistant.message at all", eventLines({ type: "result", sessionId: "s" })],
-    ["one malformed line poisons the response", OK_STDOUT + "not json\n"],
+    ["a line of no readable type poisons the response", OK_STDOUT + "not json\n"],
+    [
+      "a corrupt line is of an event it reads",
+      '{"type":"tool.execution_complete","data":{"result":"f\\"******" was shown"}}\n' + OK_STDOUT,
+    ],
     [
       "content is null rather than absent",
       eventLines({ type: "assistant.message", data: { content: null } }),
@@ -254,6 +258,21 @@ describe("dispatching one turn through the seat", () => {
       expect(result.content).toBe("");
     });
   }
+
+  it("tolerates a corrupt line of an event it never reads", async () => {
+    // The CLI scrubs credential-shaped text after serialising the event, and
+    // the rewrite can eat the backslash escaping the next quote. The prompt
+    // echo below is what a prompt quoting a bearer header comes back as -- the
+    // bare quote after the asterisks ends the string early; the answer lines
+    // are intact, and the answer is what the caller gets.
+    const echo = '{"type":"user.message","data":{"content":"f\\"******" can arrive"}}\n';
+    const result = await dispatch(
+      new CopilotCliTransport({ spawner: spawnerFor(fakeProcess({ stdout: echo + OK_STDOUT })) }),
+    );
+    expect(isOk(result)).toBe(true);
+    expect(result.content).toBe("hello from seat");
+    expect(result.metadata["unread_lines_corrupt"]).toBe(1);
+  });
 
   for (const [stderr, expected] of [
     ["The model from --model flag is not available", "invalid-model"],

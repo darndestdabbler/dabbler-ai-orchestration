@@ -20,10 +20,14 @@
 // Fidelity is the part that is not bookkeeping. Scope, budget and a log record
 // which file was opened and never what came back from it, and those differ
 // whenever anything sits between the file and the model. The CLI's scrubbing
-// layer rewrites credential-shaped text, so a correct `f"Bearer {api_key}"` is
-// displayed as `f"******"` -- one confident, specific, wrong Major finding
-// already came from exactly that. The scrubber is right and stays; what was
-// missing is the mark.
+// layer rewrites credential-shaped text, so a correct authorization header
+// built from a variable is displayed as a run of asterisks -- one confident,
+// specific, wrong Major finding already came from exactly that. The scrubber
+// is right and stays; what was missing is the mark. The example is described
+// here and in the briefing, never quoted: the scrubber also runs over the
+// CLI's own serialised event stream, and a credential-shaped literal in this
+// text came back as JSON the rewrite had broken (see `claimedEventType` in
+// transports/copilot.ts).
 //
 // `view` returns its content as `N. <text>` with the file's own 1-based line
 // numbers, which turns fidelity into an exact comparison instead of a guess:
@@ -449,7 +453,8 @@ function readBriefing(grant: AgencyGrant): string[] {
       "not open is a finding without evidence.",
     "**What you are shown may not be what is on disk.** Credential-" +
       "shaped text is rewritten before it reaches you, so a correct " +
-      '`f"Bearer {api_key}"` can arrive as `f"******"`. The framework ' +
+      "authorization header built from a variable can arrive as a run of " +
+      "asterisks. The framework " +
       "compares what you were shown against the bytes on disk and marks " +
       "the difference. Do not raise a hardcoded-secret finding from a " +
       "read alone.",

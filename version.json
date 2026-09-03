@@ -1,4 +1,4 @@
 {
   "//": "The one version this repository releases. `npm run stamp:version` writes it into every manifest that must carry it; `npm run check:version` fails when one of them is stale, and `dabbler release` refuses to tag against a stale manifest. Edit this file to bump the release, then stamp -- never the manifests themselves.",
-  "version": "2.0.0"
+  "version": "2.0.1"
 }

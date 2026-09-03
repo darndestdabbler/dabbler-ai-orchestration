@@ -705,6 +705,40 @@ export function parseJsonl(
   return [events, malformed];
 }
 
+/** The event types `successResult` reads; every other line is an echo. */
+const CONSUMED_EVENT_TYPES: ReadonlySet<string> = new Set([
+  "assistant.message",
+  "result",
+  "tool.execution_start",
+  "tool.execution_complete",
+]);
+
+/**
+ * The type a malformed line claims in its leading `{"type":"..."`, or null
+ * when not even that can be read.
+ *
+ * The CLI scrubs credential-shaped text AFTER serialising each event, and the
+ * rewrite can eat the backslash that escaped the next quote: a prompt that
+ * quotes `"Bearer {api_key}"` comes back as an unparseable `user.message`
+ * echo and an unparseable `model.messages_snapshot`, while every answer line
+ * parses. Those echoes are never read, so their corruption is counted and
+ * not fatal. A corrupt line of a type that IS read -- the answer, the
+ * result, or a tool event the agency record is built from -- or one whose
+ * type cannot be read, still fails the whole response closed: the record
+ * is either complete or absent, never patched.
+ */
+function claimedEventType(line: string): string | null {
+  const match = /^\{\s*"type"\s*:\s*"([^"\\]*)"/.exec(line);
+  return match === null ? null : match[1]!;
+}
+
+function corruptionIsUnread(malformed: readonly string[]): boolean {
+  return malformed.every((line) => {
+    const type = claimedEventType(line);
+    return type !== null && !CONSUMED_EVENT_TYPES.has(type);
+  });
+}
+
 function lastEvent(
   events: ReadonlyArray<Record<string, unknown>>,
   eventType: string,
@@ -1090,9 +1124,10 @@ export class CopilotCliTransport implements Transport {
         handoff,
       });
 
-    // A zero exit with no parseable final message (or any malformed line) is
-    // not trustworthy content -- never patch together a partial answer.
-    if (finalMessage === null || malformedLines.length > 0) return failClosed();
+    // A zero exit with no parseable final message, or a corrupt line among
+    // the ones this reads, is not trustworthy content -- never patch together
+    // a partial answer. Corrupt echoes are counted on the result instead.
+    if (finalMessage === null || !corruptionIsUnread(malformedLines)) return failClosed();
 
     // Every field below came off the wire as arbitrary JSON. A well-formed
     // event with an unexpected field shape must fail closed like a missing
@@ -1165,6 +1200,7 @@ export class CopilotCliTransport implements Transport {
         session_id: sessionId,
         premium_requests: usage["premiumRequests"] ?? null,
         tool_calls: toolCalls(events),
+        unread_lines_corrupt: malformedLines.length,
         ...handoffMetadataFields(handoff, ackOutcome),
       },
     };

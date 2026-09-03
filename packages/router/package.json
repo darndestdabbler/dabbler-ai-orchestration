@@ -27,7 +27,8 @@
     "lint": "eslint src scripts test build.mjs vitest.config.ts --ext .ts,.mjs",
     "test:unit": "vitest run",
     "generate:types": "node scripts/run-ts.mjs scripts/generate-types.ts",
-    "check:types": "node scripts/run-ts.mjs scripts/check-types-fresh.ts"
+    "check:types": "node scripts/run-ts.mjs scripts/check-types-fresh.ts",
+    "test:integration": "vitest run --config vitest.integration.config.ts"
   },
   "dependencies": {
     "ajv": "^8.17.1",

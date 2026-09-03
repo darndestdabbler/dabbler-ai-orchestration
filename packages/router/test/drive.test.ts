@@ -42,8 +42,8 @@ import {
   captured,
   clearProviderKeys,
   git,
-  initRepo,
   makeConfig,
+  makeRepoPair,
   makeTempDir,
   removeTempDirs,
   setProviderKeys,
@@ -147,21 +147,9 @@ const TESTING = {
 };
 
 function drivenRepo(): { repo: string; sessionsDir: string } {
-  const target = makeTempDir();
-  const repo = join(target, "repo");
-  const remote = join(target, "remote.git");
-  for (const [rel, text] of Object.entries(SEED)) {
-    const path = join(repo, ...rel.split("/"));
-    mkdirSync(dirname(path), { recursive: true });
-    writeFileSync(path, text, "utf8");
-  }
-  initRepo(repo, "-b", "main");
-  git(repo, "add", "-A");
-  git(repo, "commit", "-q", "-m", "seed");
-  git(target, "init", "-q", "--bare", remote);
-  git(repo, "remote", "add", "origin", "../remote.git");
-  git(repo, "push", "-q", "-u", "origin", "main");
-  return { repo, sessionsDir: join(repo, "docs", "sessions") };
+  // A copy of a pair built once for this seed: the repository and the bare
+  // origin its branch tracks (`fixtures.makeRepoPair`).
+  return makeRepoPair(SEED);
 }
 
 /**

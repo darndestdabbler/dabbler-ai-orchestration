@@ -4,9 +4,37 @@
 // collected. It exists because `config` discovers a project through git --
 // the same discovery the gates use -- so a test of the layering needs a real
 // repository rather than a bare directory.
+//
+// Every git spawn costs a process, and on Windows a process costs the
+// operator their keyboard: creation, antivirus inspection and a console
+// host, thousands of times over, is what made the suite unusable rather than
+// merely slow. Two rules keep the count down without faking git (the loop is
+// trust machinery, and a fake that diverged from git's tree hashing would be
+// the failure that matters most and shows least):
+//
+// - The suite runs under ONE pinned git configuration, set in this worker's
+//   environment before any test runs. Identity, default branch, line
+//   endings, signing and gc are decided once, so no repository pays four
+//   `git config` spawns for its own, and the framework's own `runGit` --
+//   which carries the ambient environment into the driver's land phase --
+//   commits under the same identity on a bare CI runner as here.
+// - A repository is built ONCE per distinct seed and every test gets a
+//   directory copy. A git repository is a directory; the remote is named by
+//   a relative path, so a copied pair points at its own remote.
+//
+// These are the rules the Python suite ran under; the port lost them.
 
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  cpSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
@@ -112,9 +140,36 @@ export function clearProviderKeys(): void {
   for (const name of PROVIDER_KEYS) delete process.env[name];
 }
 
+// --- The temp root ----------------------------------------------------------
+//
+// One folder under the system temp dir holds everything this suite writes, so
+// a Defender exclusion can name one path, a killed run's leftovers are found
+// by the next run rather than accumulating for weeks, and nothing is ever
+// created inside a git checkout -- a temp directory inside this repository
+// would make `git -C <dir>` answer for THIS repository until the fixture had
+// run `git init`, which is the wrong repository to commit into by accident.
+
+const TEMP_ROOT = join(tmpdir(), "dabbler-router-tests");
+const STALE_AFTER_MS = 2 * 60 * 60 * 1000;
+
+function scavengeStaleRuns(): void {
+  mkdirSync(TEMP_ROOT, { recursive: true });
+  const now = Date.now();
+  for (const name of readdirSync(TEMP_ROOT)) {
+    const path = join(TEMP_ROOT, name);
+    try {
+      if (now - statSync(path).mtimeMs < STALE_AFTER_MS) continue;
+      rmSync(path, { recursive: true, force: true, maxRetries: 3, retryDelay: 50 });
+    } catch {
+      // Another worker is scavenging the same entry, or something still
+      // holds it. The next run gets another chance.
+    }
+  }
+}
+
 /** A temporary directory that removes itself when the test file is done. */
 export function makeTempDir(): string {
-  const path = mkdtempSync(join(tmpdir(), "dabbler-router-test-"));
+  const path = mkdtempSync(join(TEMP_ROOT, "t-"));
   TEMP_DIRS.push(path);
   return path;
 }
@@ -132,60 +187,123 @@ export function removeTempDirs(): void {
       // children that outlive the test that started them by a moment
       // (`jobs.ts`). Leaving a temp directory behind is untidy; failing the
       // whole file in `afterAll` -- every test in it green -- is a red run
-      // of record for a housekeeping race, which is worse.
+      // of record for a housekeeping race, which is worse. The stale sweep
+      // at the next run's start is what collects it.
     }
+  }
+}
+
+// --- One git configuration for the whole worker ------------------------------
+
+const GIT_CONFIG =
+  "[user]\n\tname = Dabbler Test\n\temail = test@example.invalid\n" +
+  "[init]\n\tdefaultBranch = main\n" +
+  "[core]\n\tautocrlf = false\n\tfsmonitor = false\n" +
+  "[commit]\n\tgpgsign = false\n" +
+  "[gc]\n\tauto = 0\n";
+
+/**
+ * Pin git for this process and everything it spawns. Runs at import, before
+ * the first test: the framework under test reads `process.env` when it
+ * spawns git, so the pin reaches its commits and pushes, not only the
+ * fixtures' own calls.
+ */
+function pinGitEnvironment(): string {
+  const dir = join(TEMP_ROOT, `git-env-${process.pid}`);
+  mkdirSync(dir, { recursive: true });
+  const config = join(dir, "gitconfig");
+  writeFileSync(config, GIT_CONFIG, "utf8");
+  process.env["GIT_CONFIG_GLOBAL"] = config;
+  process.env["GIT_CONFIG_NOSYSTEM"] = "1";
+  return dir;
+}
+
+scavengeStaleRuns();
+const WORKER_DIR = pinGitEnvironment();
+process.on("exit", () => {
+  try {
+    rmSync(WORKER_DIR, { recursive: true, force: true });
+  } catch {
+    // The stale sweep collects it later.
+  }
+});
+
+/** A git call under the pinned configuration. */
+export function git(repo: string, ...args: string[]): void {
+  execFileSync("git", args, { cwd: repo, stdio: "ignore", windowsHide: true });
+}
+
+// --- Templates: built once per seed, copied per test --------------------------
+
+const TEMPLATES = new Map<string, string>();
+let templateCount = 0;
+
+function writeFiles(root: string, files: Record<string, string>): void {
+  for (const [rel, text] of Object.entries(files)) {
+    const path = join(root, ...rel.split("/"));
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, text, "utf8");
+  }
+}
+
+/**
+ * The directory a template lives in: `repo` inside it, and `remote.git`
+ * beside it when the seed wants an upstream. Built on first use for a
+ * distinct (files, remote) pair and reused for the rest of the worker's life.
+ */
+function templateFor(files: Record<string, string>, withRemote: boolean): string {
+  const key = JSON.stringify([withRemote, files]);
+  const known = TEMPLATES.get(key);
+  if (known !== undefined) return known;
+  templateCount += 1;
+  const target = join(WORKER_DIR, `template-${templateCount}`);
+  const repo = join(target, "repo");
+  mkdirSync(repo, { recursive: true });
+  git(repo, "init", "-q");
+  if (Object.keys(files).length > 0) {
+    writeFiles(repo, files);
+    git(repo, "add", "-A");
+    git(repo, "commit", "-q", "-m", "seed");
+  }
+  if (withRemote) {
+    git(target, "init", "-q", "--bare", join(target, "remote.git"));
+    git(repo, "remote", "add", "origin", "../remote.git");
+    git(repo, "push", "-q", "-u", "origin", "main");
+  }
+  TEMPLATES.set(key, target);
+  return target;
+}
+
+/** A private copy of a template's `repo` (and `remote.git`, when it has one). */
+function copyTemplate(template: string, target: string): void {
+  for (const name of ["repo", "remote.git"]) {
+    const source = join(template, name);
+    if (existsSync(source)) cpSync(source, join(target, name), { recursive: true });
   }
 }
 
 /** A real git repository, because that is how a project is discovered. */
 export function makeProject(): string {
-  return initRepo(makeTempDir());
+  const target = makeTempDir();
+  copyTemplate(templateFor({}, false), target);
+  return join(target, "repo");
 }
 
 /**
- * `git init`, plus the settings a repository needs to be committable by
- * anything -- including the framework.
- *
- * The identity goes in the REPOSITORY's own config rather than in the
- * environment of the test's git calls, and that distinction is the whole
- * point: the framework commits through its own `runGit`, which carries the
- * ambient environment, so a fixture that only passed `GIT_AUTHOR_*` to its
- * own calls left the driver's land phase to whatever the machine happened
- * to have configured. On a bare CI runner that is nothing, and git refuses
- * with *please tell me who you are* -- eight of the suite's failures there,
- * none of them here, because a developer's machine has an identity.
- *
- * `core.autocrlf` and `commit.gpgsign` are here for the same reason: a
- * fixture that borrows a machine setting passes for a reason it never
- * stated.
+ * `git init` at `repo`. With the configuration pinned for the worker, a
+ * plain init and an init `-b main` are the same repository, so both are a
+ * copy of the empty template; any other flag runs the real command.
  */
 export function initRepo(repo: string, ...initArgs: string[]): string {
-  // The directory first: several callers name a repository that does not
-  // exist yet, which `git init <path>` would have created for them.
+  const plain = initArgs.length === 0 || initArgs.join(" ") === "-b main";
+  if (plain) {
+    mkdirSync(dirname(repo), { recursive: true });
+    cpSync(join(templateFor({}, false), "repo"), repo, { recursive: true });
+    return repo;
+  }
   mkdirSync(repo, { recursive: true });
-  execFileSync("git", ["init", "-q", ...initArgs], { cwd: repo, stdio: "ignore" });
-  const set = (key: string, value: string): void => {
-    execFileSync("git", ["config", key, value], { cwd: repo, stdio: "ignore" });
-  };
-  set("user.name", "Dabbler Test");
-  set("user.email", "test@example.invalid");
-  set("commit.gpgsign", "false");
-  set("core.autocrlf", "false");
+  git(repo, "init", "-q", ...initArgs);
   return repo;
-}
-
-/** Identity and signing pinned, so a commit here needs no host configuration. */
-export function git(repo: string, ...args: string[]): void {
-  execFileSync("git", args, {
-    cwd: repo,
-    stdio: "ignore",
-    env: {
-      ...process.env,
-      GIT_AUTHOR_NAME: "Test", GIT_AUTHOR_EMAIL: "test@example.invalid",
-      GIT_COMMITTER_NAME: "Test", GIT_COMMITTER_EMAIL: "test@example.invalid",
-      GIT_CONFIG_NOSYSTEM: "1",
-    },
-  });
 }
 
 /**
@@ -198,16 +316,20 @@ export function git(repo: string, ...args: string[]): void {
 export function makeSeededRepo(
   files: Record<string, string> = { "a.txt": "one\n" },
 ): string {
-  const repo = makeTempDir();
-  initRepo(repo, "-b", "main");
-  for (const [rel, text] of Object.entries(files)) {
-    const path = join(repo, ...rel.split("/"));
-    mkdirSync(dirname(path), { recursive: true });
-    writeFileSync(path, text, "utf8");
-  }
-  git(repo, "add", "-A");
-  git(repo, "commit", "-q", "-m", "seed", "--no-gpg-sign");
-  return repo;
+  const target = makeTempDir();
+  copyTemplate(templateFor(files, false), target);
+  return join(target, "repo");
+}
+
+/**
+ * A committed repository and the bare `origin` its branch tracks, as a
+ * private pair under one temp directory.
+ */
+export function makeRepoPair(files: Record<string, string>): { repo: string; sessionsDir: string } {
+  const target = makeTempDir();
+  copyTemplate(templateFor(files, true), target);
+  const repo = join(target, "repo");
+  return { repo, sessionsDir: join(repo, "docs", "sessions") };
 }
 
 export function writeYaml(path: string, body: unknown): string {
@@ -234,21 +356,7 @@ export function writeConfig(
  * with no remote would waive the push gate rather than exercise it.
  */
 export function makeSandboxRepo(): { repo: string; sessionsDir: string } {
-  const target = makeTempDir();
-  const repo = join(target, "repo");
-  const remote = join(target, "remote.git");
-  for (const [rel, text] of Object.entries(SANDBOX_SEED)) {
-    const path = join(repo, ...rel.split("/"));
-    mkdirSync(dirname(path), { recursive: true });
-    writeFileSync(path, text, "utf8");
-  }
-  initRepo(repo, "-b", "main");
-  git(repo, "add", "-A");
-  git(repo, "commit", "-q", "-m", "seed");
-  git(target, "init", "-q", "--bare", remote);
-  git(repo, "remote", "add", "origin", "../remote.git");
-  git(repo, "push", "-q", "-u", "origin", "main");
-  return { repo, sessionsDir: join(repo, "docs", "sessions") };
+  return makeRepoPair(SANDBOX_SEED);
 }
 
 const SANDBOX_SEED: Record<string, string> = {

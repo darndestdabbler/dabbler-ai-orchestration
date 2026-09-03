@@ -103,11 +103,13 @@ it("ends a running job and everything under it, from a process that never held i
   }
 });
 
-it("reaps what a collected command left running before it records the result", async () => {
-  // The other way a tree is left behind: the command exits clean after
-  // starting a helper it never waited for. The status must say 0 -- the
-  // command did what it said -- and the helper must be gone by the time
-  // that status can be read.
+it("reaps what a failed command left running before it records the result", async () => {
+  // The other way a tree is left behind: the command ends badly after
+  // starting a helper it never waited for. The status must carry the
+  // command's own code -- it said what happened -- and the helper must be
+  // gone by the time that status can be read. A command that exited zero is
+  // not walked (the walk costs the machine more than a leaked helper does),
+  // so the command here fails on purpose.
   //
   // The helper is detached on Windows and not on POSIX, because that is
   // the helper that outlives its parent on each: libuv puts a Windows
@@ -124,12 +126,13 @@ it("reaps what a collected command left running before it records the result", a
         "const h = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], " +
         "{ stdio: 'ignore', detached: process.platform === 'win32' });" +
         "h.unref();" +
-        "require('node:fs').writeFileSync(process.argv[1], String(h.pid));",
+        "require('node:fs').writeFileSync(process.argv[1], String(h.pid));" +
+        "process.exit(2);",
       pidFile,
     ],
     retryAfterSeconds: 30,
   });
-  expect(await settle(repoRoot, job)).toEqual({ state: "exited", exitCode: 0 });
+  expect(await settle(repoRoot, job)).toEqual({ state: "exited", exitCode: 2 });
   const helper = Number(readFileSync(pidFile, "utf8"));
   const gone = Date.now() + 10_000;
   for (;;) {

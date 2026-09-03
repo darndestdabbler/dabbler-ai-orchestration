@@ -42,25 +42,88 @@ import { defineConfig } from "vitest/config";
 // design; making them cheap is boundary work (the sealed-library sessions),
 // not fixture work, and no worker count changes a critical path this
 // shape.
+//
+// 2026-09-03, the operator's ruling: the cost that matters is not the wall
+// clock but the machine. A run at two workers left the keyboard unusable for
+// fifteen minutes -- not CPU, which never passed half, but thousands of
+// short-lived `git`, `node` and `powershell` processes, each paying creation
+// and antivirus inspection. So the suite is now two tiers. This config, the
+// default `vitest run` and the command `dabbler.yaml` names as the ordinary
+// suite, runs every file that spawns nothing. `vitest.integration.config.ts`
+// runs the files listed below -- the ones that build repositories, spawn
+// processes or drive sessions -- and is the expensive suite CI runs on every
+// push and the framework runs at close. A developer who wants the whole
+// thing runs both, on purpose, when the keyboard is not needed.
 export const WORKERS_LOCAL = 2;
 export const WORKERS_CI = 1;
+
+/**
+ * The integration tier: every file that spawns a process. Membership is by
+ * what the file does, not how long it takes -- a file that builds one
+ * repository belongs here even when it is quick, because the rule the
+ * default tier keeps is "nothing forks", and a rule with a threshold is a
+ * rule that drifts.
+ */
+export const INTEGRATION_FILES: readonly string[] = [
+  "bootstrap.test.ts",
+  "checks.test.ts",
+  "config.test.ts",
+  "detectPackaging.test.ts",
+  "drive.test.ts",
+  "driver.test.ts",
+  "engines.test.ts",
+  "evidence.test.ts",
+  "facts.test.ts",
+  "fixloop.test.ts",
+  "gates.test.ts",
+  "gitContract.test.ts",
+  "inProcess.test.ts",
+  "jobs.test.ts",
+  "journal.test.ts",
+  "lifecycle.test.ts",
+  "lifecycleCli.test.ts",
+  "packaging.test.ts",
+  "preverify.test.ts",
+  "record.test.ts",
+  "release.test.ts",
+  "solutionDeps.test.ts",
+  "testphase.test.ts",
+  "verificationSupport.test.ts",
+  "verify.test.ts",
+  "workflow.test.ts",
+];
 
 /** The worker cap for the environment the suite runs in. */
 export function workerCap(env: NodeJS.ProcessEnv = process.env): number {
   return env["CI"] ? WORKERS_CI : WORKERS_LOCAL;
 }
 
-const workers = workerCap();
-
-export default defineConfig({
-  test: {
+/** The pool both tiers share: bounded workers, every one below normal priority. */
+export function poolFor(env: NodeJS.ProcessEnv = process.env): {
+  minWorkers: number;
+  maxWorkers: number;
+  setupFiles: string[];
+} {
+  const workers = workerCap(env);
+  return {
     // Both bounds. vitest defaults the minimum to the core count, and a
     // minimum above the maximum is not a smaller pool.
     minWorkers: workers,
     maxWorkers: workers,
     // Every worker, and so everything a worker forks, runs below normal
-    // priority: the operator's keyboard comes first, and the count above
-    // can be raised because it does.
+    // priority: the operator's keyboard comes first.
     setupFiles: ["./test/support/priority.ts"],
+  };
+}
+
+export default defineConfig({
+  test: {
+    ...poolFor(),
+    exclude: ["**/node_modules/**", ...INTEGRATION_FILES.map((name) => `test/${name}`)],
+    // A targeted run naming only integration files (`dabbler affected`
+    // narrows the suite command to changed test files) finds nothing in
+    // this tier, and that is not a red run: the integration suite runs the
+    // same files under its own config.
+    passWithNoTests: true,
   },
 });

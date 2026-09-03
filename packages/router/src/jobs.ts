@@ -71,14 +71,21 @@ export const JOB_RUNNER_FILENAME = "job-runner.cjs";
  * command and everything it forked, and so does the runner's own exit. On
  * Windows `taskkill /T` walks the parent-child tree, and needs no group.
  *
- * Collection reaps too. A command that exits after starting a helper --
- * a server, a watcher, a worker it never waited for -- used to leave it
- * running with a clean status beside it. Before the status is written the
- * runner walks what is still alive under the command (Windows keeps a
- * dead parent's pid on its orphans, so the walk from the command's pid
- * finds them; on POSIX the group is the walk) and ends it. A helper that
- * puts itself in a new session on POSIX has declared independence and is
- * out of reach; nothing here follows it.
+ * Collection reaps too, when the command did not end well. A command that
+ * was killed, timed out or failed may have left a helper -- a server, a
+ * watcher, a worker it never waited for -- and before the status is written
+ * the runner walks what is still alive under it (Windows keeps a dead
+ * parent's pid on its orphans, so the walk from the command's pid finds
+ * them; on POSIX the group is the walk) and ends it. A helper that puts
+ * itself in a new session on POSIX has declared independence and is out of
+ * reach; nothing here follows it.
+ *
+ * A command that exited zero on its own is NOT walked. The walk on Windows
+ * is a PowerShell enumeration of the whole process table, one to three
+ * seconds of CPU per job, and on the operator's ruling of 2026-09-03 the
+ * machine outranks the tidiness: a clean exit that nevertheless leaked a
+ * helper leaves it running, which is what every other tool on the machine
+ * does too.
  */
 const JOB_RUNNER = `// Written by packages/router/src/jobs.ts. Do not edit; it is replaced.
 const { spawn, spawnSync } = require("node:child_process");
@@ -168,11 +175,12 @@ child.on("error", (error) => {
   out.write("job-runner: " + (error && error.message ? error.message : String(error)) + "\\n");
   finish(null);
 });
-child.on("exit", () => {
+child.on("exit", (code, signal) => {
   // Before the close, which waits on the output pipes: a helper holding
   // them open is exactly what is reaped here, and its end is what lets the
-  // close arrive.
+  // close arrive. Only after an abnormal end; a clean exit is not walked.
   exited = true;
+  if (code === 0 && !signal) return;
   const left = child.pid === undefined ? [] : survivors(child.pid);
   if (left.length > 0) out.write("job-runner: ended " + left.length + " process(es) the command left running\\n");
   for (const pid of left) kill(pid);

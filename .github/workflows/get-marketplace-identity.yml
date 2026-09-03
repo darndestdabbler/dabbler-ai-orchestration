@@ -33,12 +33,11 @@ jobs:
 
           resource_id="$(jq -r '.id // empty' <<< "$response")"
 
-          if [[ -z "$resource_id" ]]; then
-            echo "::error::No Marketplace resource ID was returned."
-            echo "$response"
-            exit 1
-          fi
-
-          echo "### Marketplace managed identity resource ID" \
-            >> "$GITHUB_STEP_SUMMARY"
-          echo "\`$resource_id\`" >> "$GITHUB_STEP_SUMMARY"
+      - name: Verify Marketplace publishing permission
+        shell: bash
+        run: |
+          npx --yes @vscode/vsce verify-pat \
+            DarndestDabbler \
+            --azure-credential
+            
+       

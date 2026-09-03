@@ -338,12 +338,15 @@ export function adjudicationPrompt(
     "",
     "#### Required output",
     "",
-    "For each dispute, exactly one judgment line, nothing else " + "decides the outcome:",
+    "For each dispute, exactly one judgment line, nothing else " + "decides the outcome. " +
+      "The verb is about the FINDING: UPHOLD keeps the finding standing, so " +
+      "the dispute fails; OVERRULE clears the finding, so the dispute " +
+      "succeeds.",
     "",
-    "Dispute N: UPHOLD — reasons that address the cited evidence",
-    "Dispute N: OVERRULE — reasons",
+    "Dispute N: UPHOLD — reasons that address the cited evidence (the finding stands)",
+    "Dispute N: OVERRULE — reasons (the finding is cleared)",
     "",
-    "A dispute you do not clearly judge counts as UPHELD.",
+    "A dispute you do not clearly judge leaves its finding UPHELD.",
   );
   return lines.join("\n");
 }

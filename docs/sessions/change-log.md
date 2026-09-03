@@ -627,3 +627,10 @@
 - Every blocking finding of round 3 was fixed; the cap left the fix unreviewed.
 - Fixed, unreviewed: [major] The required fact-pure record-layer migration remains incomplete.
 - This work lands UNREVIEWED. It is not a waiver: nothing was accepted over a standing finding — what is unproved is the repair.
+
+## Session 85 verification — VERIFIED after 4 round(s)
+
+- Verifier: gpt-5.4 (openai) over copilot-cli
+- Orchestrator provider (excluded): anthropic
+- Verifier's read surface: agency: 8 read(s), 0 search(es), 0 listing(s); 1 read(s) were transformed; 5 not confined to scope
+- Raw round output: `.dabbler/runs/s85/`

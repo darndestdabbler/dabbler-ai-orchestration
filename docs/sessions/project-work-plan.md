@@ -120,7 +120,7 @@ it.
 | 82 | The trial, run by the operator against what the Marketplace serves | no | 2026-09-03 |
 | 83 | The runner, the gates slice, and the git-states walkthrough | no | 2026-09-03 |
 | 84 | The record layer | no | 2026-09-03 |
-| 85 | Verification | — | not declared |
+| 85 | Verification | no | 2026-09-03 |
 | 86 | Routing, transports and configuration | — | not declared |
 | 87 | The lifecycle and the driver | — | not declared |
 | 88 | Packaging, release, bootstrap, the solution — and vitest retired | — | not declared |
@@ -1813,3 +1813,9 @@ The proof of the test rebuild's shape on the gates module, on the operator's rul
 **Releasable: no.**
 
 The record layer, rebuilt the way session 83 proved: journal, ledger, writers, progress, sessionState, owedDecisions, evidence, facts and testEvidence keep every exported signature, gain a pure function wherever a decision was tangled with a read (the freshness digest over a list of path-and-bytes pairs with enumeration as its one thin reader; ledger row parsing over text; the evidence-bundle and control-fact judgements over facts), and get node:test files that call the pure functions with literal inputs and no repository. One walkthrough, test/walk-record.test.ts, builds one repository and walks the record through register, declare, digest, run of record, round with its anchored ref, decision, projection and owed decision, milestones asserted in order. The six vitest files it replaces are deleted and the integration list shrinks.
+
+### Session 85 — Verification
+
+**Releasable: no.**
+
+The verification layer, rebuilt the way sessions 83 and 84 proved. The judges are tested from literal inputs: verdict parsing and severity, the adjudication parser, the agency briefing, scope, budget and fidelity marks, the plan review's hash, risk flags, envelope, free checks and reviewer-answer parsing, the critique subtree's validators, the prompts' blocks, the round's cap and terminal rules, the dispute rules, the fix loop's envelope and failure reading, the step review's rows, triage's rule citations, and the test selector with its pre-verification gate. Where a decision was tangled with a read or a routed call, the decision becomes a pure function the reader composes; the routed call is reached through the offline transport, which is the framework's own scripted-response path, so no module is mocked. The adjudication vocabulary is fixed on the record: the adjudicator's prompt and the parser agree that UPHOLD keeps the FINDING and OVERRULE clears it. One walkthrough, test/walk-verify.test.ts, drives one repository through a round that finds a Major, the dispositions, the fix, a verified round, a dispute and its adjudication, over scripted responses. The seven vitest files this covers are deleted and the integration list shrinks.

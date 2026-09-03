@@ -72,18 +72,14 @@ export const INTEGRATION_FILES: readonly string[] = [
   "drive.test.ts",
   "driver.test.ts",
   "engines.test.ts",
-  "fixloop.test.ts",
   "inProcess.test.ts",
   "jobs.test.ts",
   "lifecycle.test.ts",
   "lifecycleCli.test.ts",
   "packaging.test.ts",
-  "preverify.test.ts",
   "release.test.ts",
   "solutionDeps.test.ts",
   "testphase.test.ts",
-  "verificationSupport.test.ts",
-  "verify.test.ts",
   "workflow.test.ts",
 ];
 

@@ -523,6 +523,33 @@ export async function route(
   content: string,
   options: RouteOptions = {},
 ): Promise<RouteResult> {
+  return routeSource(content, options);
+}
+
+/**
+ * How a routed call becomes an answer: the one seam between the router's
+ * callers and the transports. The default is the live dispatch and
+ * production code never swaps it; a test feeds scripted replies through here
+ * -- with a provider on each, so the cross-vendor rules can be exercised --
+ * instead of replacing the module.
+ */
+export type RouteSource = (content: string, options: RouteOptions) => Promise<RouteResult>;
+
+let routeSource: RouteSource = routeLive;
+
+/** Swap the source of routed answers; the returned function restores the previous one. */
+export function setRouteSource(source: RouteSource): () => void {
+  const previous = routeSource;
+  routeSource = source;
+  return () => {
+    routeSource = previous;
+  };
+}
+
+async function routeLive(
+  content: string,
+  options: RouteOptions = {},
+): Promise<RouteResult> {
   const taskType = options.taskType ?? "general";
   const context = options.context ?? "";
   const role = options.role ?? ROLE_GENERATOR;

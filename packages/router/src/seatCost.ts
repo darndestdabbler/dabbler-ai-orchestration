@@ -314,10 +314,30 @@ export function measureConversations(
     });
   }
 
+  const environ = options.env ?? process.env;
+  return judgeUsage(ids, readUsage(path as string, ids), {
+    ownConversationId: (environ[SEAT_SESSION_ID_ENV] ?? "").trim(),
+  });
+}
+
+/** What the store held for the ids asked about. Nothing here judges anything. */
+export interface UsageReading {
+  readonly totalNano: number;
+  readonly eventCount: number;
+  /**
+   * Every id the store knows at all -- through a usage row, or through a
+   * sessions row with no usage, which is a genuine zero rather than an
+   * absence.
+   */
+  readonly known: ReadonlySet<string>;
+}
+
+/** The thin reader: two queries per chunk, no arithmetic beyond the sums. */
+export function readUsage(path: string, ids: readonly string[]): UsageReading {
   let totalNano = 0;
   let eventCount = 0;
   const known = new Set<string>();
-  const conn = connect(path!);
+  const conn = connect(path);
   try {
     for (const chunk of chunks(ids, ID_CHUNK)) {
       const marks = chunk.map(() => "?").join(",");
@@ -351,21 +371,35 @@ export function measureConversations(
   } finally {
     conn.close();
   }
+  return { totalNano, eventCount, known };
+}
 
-  const measured = ids.filter((id) => known.has(id));
-  const missing = ids.filter((id) => !known.has(id));
+/**
+ * The measurement itself: which ids were measured, what they cost, and
+ * whether the number may be trusted as a total.
+ *
+ * An id the store does not know at all makes the result a floor -- the spend
+ * is real but incomplete -- as does measuring the caller's own live
+ * conversation, whose closing turns are not in the store yet.
+ */
+export function judgeUsage(
+  ids: readonly string[],
+  reading: UsageReading,
+  options: { ownConversationId?: string } = {},
+): SeatCost {
+  const measured = ids.filter((id) => reading.known.has(id));
+  const missing = ids.filter((id) => !reading.known.has(id));
   if (measured.length === 0) {
     return seatCost({
       status: STATUS_UNMEASURED,
-      session_ids: ids,
+      session_ids: [...ids],
       missing_session_ids: missing,
       reason: "none of the requested conversation ids are in the store",
     });
   }
 
-  const credits = totalNano / NANO_AIU_PER_CREDIT;
-  const environ = options.env ?? process.env;
-  const ownId = (environ[SEAT_SESSION_ID_ENV] ?? "").trim();
+  const credits = reading.totalNano / NANO_AIU_PER_CREDIT;
+  const ownId = options.ownConversationId ?? "";
   const selfMeasured = Boolean(ownId) && measured.includes(ownId);
 
   if (missing.length > 0 || selfMeasured) {
@@ -384,8 +418,8 @@ export function measureConversations(
     return seatCost({
       status: STATUS_FLOOR,
       credits,
-      event_count: eventCount,
-      session_ids: ids,
+      event_count: reading.eventCount,
+      session_ids: [...ids],
       measured_session_ids: measured,
       missing_session_ids: missing,
       reason: reasons.join("; "),
@@ -395,8 +429,8 @@ export function measureConversations(
   return seatCost({
     status: STATUS_MEASURED,
     credits,
-    event_count: eventCount,
-    session_ids: ids,
+    event_count: reading.eventCount,
+    session_ids: [...ids],
     measured_session_ids: measured,
   });
 }

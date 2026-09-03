@@ -67,7 +67,6 @@ export const WORKERS_CI = 1;
 export const INTEGRATION_FILES: readonly string[] = [
   "bootstrap.test.ts",
   "checks.test.ts",
-  "config.test.ts",
   "detectPackaging.test.ts",
   "drive.test.ts",
   "driver.test.ts",

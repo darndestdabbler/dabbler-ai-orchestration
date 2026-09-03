@@ -295,11 +295,40 @@ export function feedConfigFiles(repoRoot: string, home?: string): string[] {
  * reach.
  */
 export function configuredFeeds(repoRoot: string, home?: string): Feed[] {
+  return feedsFromConfigs(
+    feedConfigFiles(repoRoot, home).map((file) => {
+      try {
+        return { file, text: readText(file) };
+      } catch {
+        return { file, text: null };
+      }
+    }),
+  );
+}
+
+/** One configuration file, already read. `null` text is one that would not read. */
+export interface FeedConfigFile {
+  readonly file: string;
+  readonly text: string | null;
+}
+
+/**
+ * The sources a sequence of configuration files declares, nearest first.
+ *
+ * `<clear />` and `<remove>` are honoured because NuGet honours them: a
+ * repository that clears the inherited sources has no inherited sources, and
+ * reporting them anyway would say a feed is available that no restore will
+ * reach.
+ */
+export function feedsFromConfigs(
+  configs: readonly FeedConfigFile[],
+  localProblem: (value: string) => string = localSourceProblem,
+): Feed[] {
   const feeds: Feed[] = [];
   const disabled = new Set<string>();
   const removed = new Set<string>();
   let cleared = false;
-  for (const file of feedConfigFiles(repoRoot, home)) {
+  for (const { file, text } of configs) {
     // A `<clear />` discards the sources of every file FURTHER OUT, not the
     // ones beside it: NuGet reads nearest last and clears what it inherited,
     // so a file that clears and then adds keeps what it added. Applying it
@@ -307,7 +336,8 @@ export function configuredFeeds(repoRoot: string, home?: string): Feed[] {
     if (cleared) break;
     let elements;
     try {
-      elements = readXmlElements(readText(file));
+      if (text === null) throw new Error("unreadable");
+      elements = readXmlElements(text);
     } catch {
       // A configuration file that does not parse is reported through the
       // list, not thrown: a broken NuGet.config elsewhere on the machine
@@ -351,7 +381,7 @@ export function configuredFeeds(repoRoot: string, home?: string): Feed[] {
   return feeds.map((feed) => ({
     ...feed,
     enabled: feed.enabled && !disabled.has(feed.key),
-    unusable: feed.unusable || localSourceProblem(feed.value),
+    unusable: feed.unusable || localProblem(feed.value),
   }));
 }
 
@@ -378,8 +408,19 @@ export function reconcileResolution(
   members: readonly SolutionMember[],
   feeds: readonly Feed[],
 ): Reconciliation[] {
-  const out: Reconciliation[] = [];
-  const self = members[0];
+  return reconcileFrom(members, feeds, readProducerFacts(members));
+}
+
+/** What the producer checkouts hold: what each has published, and what each builds. */
+export interface ProducerFacts {
+  /** package id -> every version there is evidence was published. */
+  readonly published: ReadonlyMap<string, readonly string[]>;
+  /** producer repository id -> the version its checkout currently builds. */
+  readonly built: ReadonlyMap<string, string>;
+}
+
+/** The thin reader over the producer checkouts. Nothing here judges anything. */
+export function readProducerFacts(members: readonly SolutionMember[]): ProducerFacts {
   // Keyed by PACKAGE, not by repository. A producer publishing two packages
   // is ordinary, and attributing one package's release to the other is a
   // finding that sends a consumer at a version of its dependency that was
@@ -400,6 +441,18 @@ export function reconcileResolution(
     const version = producerBuildVersion(member.root);
     if (version !== null) built.set(member.id, version);
   }
+  return { published, built };
+}
+
+/** The findings themselves, over the declared edges, the pins and those facts. */
+export function reconcileFrom(
+  members: readonly SolutionMember[],
+  feeds: readonly Feed[],
+  facts: ProducerFacts,
+): Reconciliation[] {
+  const out: Reconciliation[] = [];
+  const self = members[0];
+  const { published, built } = facts;
 
   for (const edge of self?.deps?.consumes ?? []) {
     const releases = published.get(edge.id) ?? [];

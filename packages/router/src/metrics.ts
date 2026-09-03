@@ -83,12 +83,17 @@ export interface CallRecord {
 }
 
 /**
- * Append one record. Never throws -- a write failure (disk full, permissions)
- * skips silently rather than breaking the routed call.
+ * The row one call becomes, decided from the call alone.
+ *
+ * Separate from the append so the shape both routers write -- the effort and
+ * thinking fields each provider spells differently, the tri-state
+ * served-model flag, the float that stays a float -- is a judgement over
+ * facts rather than something only a written file can show.
  */
-export function recordCall(config: RouterConfig, call: CallRecord): void {
-  if (!metricsEnabled(config)) return;
-
+export function metricsRow(
+  call: CallRecord,
+  now: Date = new Date(),
+): Record<string, unknown> {
   const params = call.generationParams ?? {};
   let effort: unknown = null;
   let thinkingOn = false;
@@ -109,7 +114,7 @@ export function recordCall(config: RouterConfig, call: CallRecord): void {
   const requested = call.requestedModelId ?? null;
   const served = call.servedModelId ?? null;
   const row: Array<readonly [string, unknown]> = [
-    ["timestamp", pythonUtcNow()],
+    ["timestamp", pythonUtcNow(now)],
     ["session_number", call.sessionNumber ?? null],
     ["call_type", call.callType],
     ["task_type", call.taskType],
@@ -135,15 +140,21 @@ export function recordCall(config: RouterConfig, call: CallRecord): void {
     ["verdict", call.verdict ?? null],
     ["issue_count", call.issueCount ?? null],
   ];
+  return Object.fromEntries(row);
+}
 
+/**
+ * Append one record. Never throws -- a write failure (disk full, permissions)
+ * skips silently rather than breaking the routed call.
+ */
+export function recordCall(config: RouterConfig, call: CallRecord): void {
+  if (!metricsEnabled(config)) return;
   try {
     const path = logPath(config);
     mkdirSync(dirname(path), { recursive: true });
-    appendFileSync(
-      path,
-      platformNewlines(dumps(Object.fromEntries(row)) + "\n"),
-      { encoding: "utf8" },
-    );
+    appendFileSync(path, platformNewlines(dumps(metricsRow(call)) + "\n"), {
+      encoding: "utf8",
+    });
   } catch {
     // Best-effort by contract; see the module header.
   }
@@ -205,15 +216,22 @@ export function printMetricsReport(
   config: RouterConfig,
   write: (text: string) => void = writeOut,
 ): void {
+  write(renderMetricsReport(loadMetrics(config)));
+}
+
+/** The report's whole text, over rows already read. */
+export function renderMetricsReport(
+  records: ReadonlyArray<Record<string, unknown>>,
+): string {
+  let out = "";
   const print = (line = ""): void => {
-    write(line + "\n");
+    out += line + "\n";
   };
-  const records = loadMetrics(config);
   if (records.length === 0) {
     print(
       "(no metrics recorded yet -- router-metrics.jsonl is empty " + "or missing)",
     );
-    return;
+    return out;
   }
 
   const rule = "=".repeat(68);
@@ -345,6 +363,7 @@ export function printMetricsReport(
   }
 
   print(rule + "\n");
+  return out;
 }
 
 /** `dabbler metrics`. */

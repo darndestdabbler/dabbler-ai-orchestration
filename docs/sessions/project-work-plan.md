@@ -121,7 +121,7 @@ it.
 | 83 | The runner, the gates slice, and the git-states walkthrough | no | 2026-09-03 |
 | 84 | The record layer | no | 2026-09-03 |
 | 85 | Verification | no | 2026-09-03 |
-| 86 | Routing, transports and configuration | — | not declared |
+| 86 | Routing, transports and configuration | no | 2026-09-03 |
 | 87 | The lifecycle and the driver | — | not declared |
 | 88 | Packaging, release, bootstrap, the solution — and vitest retired | — | not declared |
 | 89 | The trial, run by the operator against what the Marketplace serves | — | not declared |
@@ -1819,3 +1819,9 @@ The record layer, rebuilt the way session 83 proved: journal, ledger, writers, p
 **Releasable: no.**
 
 The verification layer, rebuilt the way sessions 83 and 84 proved. The judges are tested from literal inputs: verdict parsing and severity, the adjudication parser, the agency briefing, scope, budget and fidelity marks, the plan review's hash, risk flags, envelope, free checks and reviewer-answer parsing, the critique subtree's validators, the prompts' blocks, the round's cap and terminal rules, the dispute rules, the fix loop's envelope and failure reading, the step review's rows, triage's rule citations, and the test selector with its pre-verification gate. Where a decision was tangled with a read or a routed call, the decision becomes a pure function the reader composes; the routed call is reached through the offline transport, which is the framework's own scripted-response path, so no module is mocked. The adjudication vocabulary is fixed on the record: the adjudicator's prompt and the parser agree that UPHOLD keeps the FINDING and OVERRULE clears it. One walkthrough, test/walk-verify.test.ts, drives one repository through a round that finds a Major, the dispositions, the fix, a verified round, a dispute and its adjudication, over scripted responses. The seven vitest files this covers are deleted and the integration list shrinks.
+
+### Session 86 — Routing, transports and configuration
+
+**Releasable: no.**
+
+Routing, transports and configuration, rebuilt the way sessions 83 to 85 proved. The configuration layer is judged from literal inputs: the config loader's validation and precedence, the transport-timeout contract, the schema validator and its failure shape, the lockfile's hash and rows, the metrics writer's records, the runtime-mode and secret-resolver rules. Selection by role, identity resolution and the router's own dispatch are tested as pure judgements over enumerated candidates and configuration, with the routed call passed in rather than mocked -- the vi.mock of route.ts has no successor because the call is a parameter. The transports keep their one seam: the direct-API path's request shaping and result classification, the offline transport's scripted answers, and the Copilot seat's fake process through the spawner the module already exposes, with its catalog probe and lockfile reads named as thin readers over facts. Discovery and dependency resolution get the same treatment: enumeration, freshness and drift as pure functions over vendor payloads, the project-file and feed reads as thin readers. Every rewritten behaviour lands under test/ as node:test files with literal inputs and no repository unless the behaviour is about a repository; the fifteen vitest files this covers are deleted, and config.test.ts leaves the integration list.

@@ -1,9 +1,23 @@
+// The Copilot seat: one turn through the CLI, the catalog it dispatches
+// against, and the refresh that keeps that catalog honest.
+//
+// The spawner is the one seam, and it is filled with a real in-process
+// stream rather than a stub -- so the line pump, the queue, the three
+// deadlines and the parser that ship are the ones under test. Nothing here
+// spawns a process, reaches a network or replaces a module.
+import assert from "node:assert/strict";
 import { existsSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { Readable } from "node:stream";
+import { describe, it } from "node:test";
 
-import { afterAll, describe, expect, it } from "vitest";
-
+import {
+  PROVENANCE_HAND_EDITED,
+  PROVENANCE_MACHINE_WRITTEN,
+  PROVENANCE_UNSTAMPED,
+} from "../src/lockfile.ts";
+import { ASSET_DIR } from "../src/paths.ts";
+import { isOk, type APIResult } from "../src/transports/base.ts";
 import {
   CopilotCliTransport,
   ERROR_CLASS_INVALID_MODEL,
@@ -14,10 +28,6 @@ import {
   SCOPE_MODELS,
   SCOPE_QUORUM,
   SCOPE_STALE,
-  type Catalog,
-  type ModelEntry,
-  type ProcessHandle,
-  type RefreshPlan,
   catalogMeta,
   catalogProvenance,
   confirmedModels,
@@ -39,17 +49,12 @@ import {
   validateCatalog,
   validateTransportTimeouts,
   writeCatalog,
+  type Catalog,
+  type ModelEntry,
+  type ProcessHandle,
+  type RefreshPlan,
 } from "../src/transports/copilot.ts";
-import { isOk, type APIResult } from "../src/transports/base.ts";
-import {
-  PROVENANCE_HAND_EDITED,
-  PROVENANCE_MACHINE_WRITTEN,
-  PROVENANCE_UNSTAMPED,
-} from "../src/lockfile.ts";
-import { ASSET_DIR } from "../src/paths.ts";
-import { makeTempDir, removeTempDirs } from "./support/fixtures.ts";
-
-afterAll(removeTempDirs);
+import { tempDir } from "./support/answers.ts";
 
 const V1_LOCK = join(import.meta.dirname, "fixtures", "seat-catalog.lock");
 
@@ -65,10 +70,7 @@ const SHIPPED_LOCK = join(ASSET_DIR, "copilot-catalog.lock");
  * These locks are committed and this checkout has `core.autocrlf` on, so they
  * are CRLF on disk while the writer emits LF on every platform -- deliberately,
  * because the content digest covers the bytes and a CRLF rewrite would convict
- * a clean file. Python's universal newlines erase that difference for its own
- * tests; Node's `readFileSync` does not, so the erasure is done here instead of
- * being smuggled into the reader, where it would be a second answer about what
- * a line is.
+ * a clean file.
  */
 function readAsPython(path: string): string {
   return readFileSync(path, "utf8").replace(/\r\n/g, "\n");
@@ -98,7 +100,11 @@ function fakeProcess(
 
 /** A stdout that never ends, so a deadline is what resolves the call. */
 function blockingProcess(lines: readonly string[] = []): ProcessHandle & { killed: boolean } {
-  const stream = new Readable({ read() { /* nothing more is ever pushed */ } });
+  const stream = new Readable({
+    read() {
+      /* nothing more is ever pushed */
+    },
+  });
   for (const line of lines) stream.push(line);
   const handle = {
     stdout: stream as NodeJS.ReadableStream,
@@ -161,44 +167,32 @@ describe("dispatching one turn through the seat", () => {
       new CopilotCliTransport({ spawner: spawnerFor(fakeProcess({ stdout: OK_STDOUT })) }),
       { model_id: "claude-sonnet-4.6", system_prompt: "sys", user_message: "user" },
     );
-    expect(isOk(result)).toBe(true);
-    expect(result.content).toBe("hello from seat");
-    expect(result.output_tokens).toBe(42);
-    expect(result.input_tokens).toBe(0); // never reported by the CLI
-    expect(result.served_model_id).toBe("claude-sonnet-4.6");
-    expect(result.metadata["session_id"]).toBe("conv-123");
-    expect(result.metadata["premium_requests"]).toBe(1);
+    assert.equal(isOk(result), true);
+    assert.equal(result.content, "hello from seat");
+    assert.equal(result.output_tokens, 42);
+    assert.equal(result.input_tokens, 0); // never reported by the CLI
+    assert.equal(result.served_model_id, "claude-sonnet-4.6");
+    assert.equal(result.metadata["session_id"], "conv-123");
+    assert.equal(result.metadata["premium_requests"], 1);
   });
 
-  it("carries the read-only tool grant and the auto-update pin in its argv", async () => {
-    const spawner = spawnerFor(fakeProcess({ stdout: OK_STDOUT }));
-    await dispatch(new CopilotCliTransport({ spawner }));
-    expect(spawner.argv).toContain("--available-tools");
-    expect(spawner.argv[spawner.argv.indexOf("--available-tools") + 1]).toBe(
-      "view,grep,glob",
-    );
-    expect(spawner.argv).toContain("--no-auto-update");
-    expect(spawner.argv).toContain("--allow-all-tools");
-    expect(spawner.env).toEqual({ COPILOT_AUTO_UPDATE: "false" });
-  });
-
-  it("joins the system and user text, because the CLI has one prompt flag", async () => {
+  it("carries the read-only grant, the auto-update pin and one joined prompt", async () => {
+    // The CLI has one prompt flag, so the system and user text are joined;
+    // the workspace's custom instructions are disabled because a routed call
+    // is not an orchestrator session -- the CLI would otherwise load
+    // AGENTS.md into the system prompt and tell a routed verifier it is
+    // running the session it was asked to judge.
     const spawner = spawnerFor(fakeProcess({ stdout: OK_STDOUT }));
     await dispatch(new CopilotCliTransport({ spawner }), {
       system_prompt: "SYS",
       user_message: "USER",
     });
-    expect(spawner.argv[spawner.argv.indexOf("-p") + 1]).toBe("SYS\n\nUSER");
-  });
-
-  it("disables the workspace's custom instructions", async () => {
-    // A routed call is not an orchestrator session. The CLI would otherwise
-    // load AGENTS.md/CLAUDE.md into the system prompt -- text the API
-    // transport never sends, and which tells a routed verifier it is running
-    // the session it was asked to judge.
-    const spawner = spawnerFor(fakeProcess({ stdout: OK_STDOUT }));
-    await dispatch(new CopilotCliTransport({ spawner }));
-    expect(spawner.argv).toContain("--no-custom-instructions");
+    assert.equal(spawner.argv[spawner.argv.indexOf("--available-tools") + 1], "view,grep,glob");
+    assert.ok(spawner.argv.includes("--no-auto-update"));
+    assert.ok(spawner.argv.includes("--allow-all-tools"));
+    assert.ok(spawner.argv.includes("--no-custom-instructions"));
+    assert.equal(spawner.argv[spawner.argv.indexOf("-p") + 1], "SYS\n\nUSER");
+    assert.deepEqual(spawner.env, { COPILOT_AUTO_UPDATE: "false" });
   });
 
   it("reports the tools the CLI ran, paired from its own events", async () => {
@@ -221,13 +215,8 @@ describe("dispatching one turn through the seat", () => {
     const result = await dispatch(
       new CopilotCliTransport({ spawner: spawnerFor(fakeProcess({ stdout })) }),
     );
-    expect(result.metadata["tool_calls"]).toEqual([
-      {
-        tool: "view",
-        arguments: { path: "a.py" },
-        success: true,
-        result: { content: "shown" },
-      },
+    assert.deepEqual(result.metadata["tool_calls"], [
+      { tool: "view", arguments: { path: "a.py" }, success: true, result: { content: "shown" } },
     ]);
   });
 
@@ -253,25 +242,25 @@ describe("dispatching one turn through the seat", () => {
       const result = await dispatch(
         new CopilotCliTransport({ spawner: spawnerFor(fakeProcess({ stdout })) }),
       );
-      expect(isOk(result)).toBe(false);
-      expect(result.metadata["error_class"]).toBe("generic-unknown");
-      expect(result.content).toBe("");
+      assert.equal(isOk(result), false);
+      assert.equal(result.metadata["error_class"], "generic-unknown");
+      assert.equal(result.content, "");
     });
   }
 
   it("tolerates a corrupt line of an event it never reads", async () => {
     // The CLI scrubs credential-shaped text after serialising the event, and
     // the rewrite can eat the backslash escaping the next quote. The prompt
-    // echo below is what a prompt quoting a bearer header comes back as -- the
-    // bare quote after the asterisks ends the string early; the answer lines
-    // are intact, and the answer is what the caller gets.
+    // echo below is what a prompt quoting a bearer header comes back as --
+    // the bare quote after the asterisks ends the string early; the answer
+    // lines are intact, and the answer is what the caller gets.
     const echo = '{"type":"user.message","data":{"content":"f\\"******" can arrive"}}\n';
     const result = await dispatch(
       new CopilotCliTransport({ spawner: spawnerFor(fakeProcess({ stdout: echo + OK_STDOUT })) }),
     );
-    expect(isOk(result)).toBe(true);
-    expect(result.content).toBe("hello from seat");
-    expect(result.metadata["unread_lines_corrupt"]).toBe(1);
+    assert.equal(isOk(result), true);
+    assert.equal(result.content, "hello from seat");
+    assert.equal(result.metadata["unread_lines_corrupt"], 1);
   });
 
   for (const [stderr, expected] of [
@@ -287,9 +276,9 @@ describe("dispatching one turn through the seat", () => {
           versionProbe: () => "v1.0.69",
         }),
       );
-      expect(isOk(result)).toBe(false);
-      expect(result.metadata["error_class"]).toBe(expected);
-      expect(result.metadata["retryable"]).toBe(false);
+      assert.equal(isOk(result), false);
+      assert.equal(result.metadata["error_class"], expected);
+      assert.equal(result.metadata["retryable"], false);
     });
   }
 
@@ -302,49 +291,52 @@ describe("dispatching one turn through the seat", () => {
         versionProbe: () => "GitHub Copilot CLI 1.0.69.",
       }),
     );
-    expect(auth.metadata["reprobe_cli_version"]).toBe("GitHub Copilot CLI 1.0.69.");
+    assert.equal(auth.metadata["reprobe_cli_version"], "GitHub Copilot CLI 1.0.69.");
     const quota = await dispatch(
       new CopilotCliTransport({
         spawner: spawnerFor(fakeProcess({ stderr: "429\n", exitCode: 1 })),
         versionProbe: () => "should not be asked",
       }),
     );
-    expect(quota.metadata["reprobe_cli_version"]).toBeNull();
+    assert.equal(quota.metadata["reprobe_cli_version"], null);
   });
 
   it("classifies a spawn that never returns as a spawn timeout", async () => {
     const result = await dispatch(
       new CopilotCliTransport({
-        spawner: () => new Promise<ProcessHandle>(() => { /* never settles */ }),
+        spawner: () =>
+          new Promise<ProcessHandle>(() => {
+            /* never settles */
+          }),
         timeouts: { spawn_seconds: 0.05, first_byte_seconds: 0.1, total_seconds: 0.2 },
       }),
     );
-    expect(result.metadata["error_class"]).toBe("spawn-timeout");
+    assert.equal(result.metadata["error_class"], "spawn-timeout");
   });
 
   it("kills the child when no first byte arrives", async () => {
-    const process = blockingProcess();
+    const child = blockingProcess();
     const result = await dispatch(
       new CopilotCliTransport({
-        spawner: spawnerFor(process),
+        spawner: spawnerFor(child),
         timeouts: { spawn_seconds: 1.0, first_byte_seconds: 0.05, total_seconds: 5.0 },
       }),
     );
-    expect(result.metadata["error_class"]).toBe("first-byte-timeout");
-    expect(process.killed).toBe(true);
+    assert.equal(result.metadata["error_class"], "first-byte-timeout");
+    assert.equal(child.killed, true);
   });
 
   it("discards partial output at the total timeout rather than parsing it", async () => {
-    const process = blockingProcess(['{"type":"other"}\n']);
+    const child = blockingProcess(['{"type":"other"}\n']);
     const result = await dispatch(
       new CopilotCliTransport({
-        spawner: spawnerFor(process),
+        spawner: spawnerFor(child),
         timeouts: { spawn_seconds: 1.0, first_byte_seconds: 2.0, total_seconds: 0.2 },
       }),
     );
-    expect(result.metadata["error_class"]).toBe("total-timeout");
-    expect(result.metadata["partial_output_discarded"]).toBe(true);
-    expect(process.killed).toBe(true);
+    assert.equal(result.metadata["error_class"], "total-timeout");
+    assert.equal(result.metadata["partial_output_discarded"], true);
+    assert.equal(child.killed, true);
   });
 
   it("trips the invocation breaker without spawning", async () => {
@@ -356,12 +348,12 @@ describe("dispatching one turn through the seat", () => {
       },
       maxInvocations: 2,
     });
-    expect(isOk(await dispatch(transport))).toBe(true);
-    expect(isOk(await dispatch(transport))).toBe(true);
+    assert.equal(isOk(await dispatch(transport)), true);
+    assert.equal(isOk(await dispatch(transport)), true);
     const blocked = await dispatch(transport);
-    expect(blocked.metadata["error_class"]).toBe("invocation-breaker");
-    expect(spawns).toBe(2); // a breaker-blocked call never spawns
-    expect(transport.invocationCount).toBe(2);
+    assert.equal(blocked.metadata["error_class"], "invocation-breaker");
+    assert.equal(spawns, 2); // a breaker-blocked call never spawns
+    assert.equal(transport.invocationCount, 2);
   });
 
   it("classifies a spawner failure rather than letting it escape", async () => {
@@ -372,8 +364,8 @@ describe("dispatching one turn through the seat", () => {
         },
       }),
     );
-    expect(result.metadata["error_class"]).toBe("generic-unknown");
-    expect(String(result.metadata["stderr_tail"])).toContain("not found");
+    assert.equal(result.metadata["error_class"], "generic-unknown");
+    assert.match(String(result.metadata["stderr_tail"]), /not found/);
   });
 
   it("gives the OS's size refusal its own error class", async () => {
@@ -389,8 +381,8 @@ describe("dispatching one turn through the seat", () => {
         },
       }),
     );
-    expect(result.metadata["error_class"]).toBe("argv-too-large");
-    expect(result.metadata["retryable"]).toBe(false);
+    assert.equal(result.metadata["error_class"], "argv-too-large");
+    assert.equal(result.metadata["retryable"], false);
   });
 });
 
@@ -398,31 +390,28 @@ describe("dispatching one turn through the seat", () => {
 
 describe("the timeout contract config validates at load", () => {
   it("accepts an ordered trio", () => {
-    expect(() =>
+    assert.doesNotThrow(() =>
       validateTransportTimeouts({
         spawn_seconds: 5,
         first_byte_seconds: 20,
         total_seconds: 600,
       }),
-    ).not.toThrow();
+    );
   });
 
   it("rejects an unknown key rather than silently keeping the default", () => {
-    expect(() => validateTransportTimeouts({ total_second: 300 })).toThrow(
-      /total_second/,
-    );
+    assert.throws(() => validateTransportTimeouts({ total_second: 300 }), /total_second/);
   });
 
   it("rejects a boolean, which Python would read as one second", () => {
-    expect(() => validateTransportTimeouts({ total_seconds: true })).toThrow(
-      /must be a number/,
-    );
+    assert.throws(() => validateTransportTimeouts({ total_seconds: true }), /must be a number/);
   });
 
   it("rejects an out-of-order trio, where an inner ceiling can never fire", () => {
-    expect(() =>
-      validateTransportTimeouts({ spawn_seconds: 100, first_byte_seconds: 30 }),
-    ).toThrow(/spawn_seconds </);
+    assert.throws(
+      () => validateTransportTimeouts({ spawn_seconds: 100, first_byte_seconds: 30 }),
+      /spawn_seconds </,
+    );
   });
 });
 
@@ -446,80 +435,70 @@ function entry(id: string, provider: string, enablement = "confirmed"): ModelEnt
   return modelEntry({ id, provider, enablement });
 }
 
+const DIVERSE = [entry("a", "anthropic"), entry("b", "openai")];
+
 describe("the seat catalog as a record", () => {
   it("reads a v1 lockfile, legacy probe key and all", () => {
     const loaded = loadCatalog(V1_LOCK);
-    expect(confirmedModels(loaded)).toHaveLength(15);
+    assert.equal(confirmedModels(loaded).length, 15);
     const sonnet = loaded.models.find((model) => model.id === "claude-sonnet-4.6")!;
-    expect(sonnet.probe_premium_requests).toBe(1); // the legacy key still reads
-    expect(loaded.meta.seat_id).toBe("op-personal");
-    expect(providerOf(loaded, "gpt-5.5")).toBe("openai");
+    assert.equal(sonnet.probe_premium_requests, 1); // the legacy key still reads
+    assert.equal(loaded.meta.seat_id, "op-personal");
+    assert.equal(providerOf(loaded, "gpt-5.5"), "openai");
   });
 
   it("resolves no provider for an unconfirmed entry", () => {
-    expect(providerOf(catalog([entry("m1", "openai", "unconfirmed")]), "m1")).toBeNull();
+    assert.equal(providerOf(catalog([entry("m1", "openai", "unconfirmed")]), "m1"), null);
   });
 
   it("passes a diverse confirmed catalog", () => {
-    expect(validateCatalog(catalog([entry("a", "anthropic"), entry("b", "openai")])).ok)
-      .toBe(true);
+    assert.equal(validateCatalog(catalog(DIVERSE)).ok, true);
   });
 
   it("fails version drift only when the lockfile pinned strictly", () => {
-    const pinned = catalog([entry("a", "anthropic"), entry("b", "openai")], {
-      pin: true,
-    });
-    const strict = validateCatalog(pinned, { liveCliVersion: "v2" });
-    expect(strict.ok).toBe(false);
-    expect(strict.reasons[0]).toContain("drift");
+    const strict = validateCatalog(catalog(DIVERSE, { pin: true }), { liveCliVersion: "v2" });
+    assert.equal(strict.ok, false);
+    assert.match(String(strict.reasons[0]), /drift/);
   });
 
   it("warns about drift by default, because the seat CLI auto-updates", () => {
     // Refusing the seat for a routine auto-update stranded working seats and
     // taught people to hand-edit the pin, destroying the signal.
-    const result = validateCatalog(catalog([entry("a", "anthropic"), entry("b", "openai")]), {
-      liveCliVersion: "v2",
-    });
-    expect(result.ok).toBe(true);
-    expect(result.reasons).toEqual([]);
-    expect(result.warnings.some((warning) => warning.includes("drift"))).toBe(true);
+    const result = validateCatalog(catalog(DIVERSE), { liveCliVersion: "v2" });
+    assert.equal(result.ok, true);
+    assert.deepEqual(result.reasons, []);
+    assert.ok(result.warnings.some((warning) => warning.includes("drift")));
   });
 
   it("says nothing about drift when the versions match", () => {
-    const result = validateCatalog(catalog([entry("a", "anthropic"), entry("b", "openai")]), {
-      liveCliVersion: "v1",
-    });
-    expect(result.warnings.some((warning) => warning.includes("drift"))).toBe(false);
+    const result = validateCatalog(catalog(DIVERSE), { liveCliVersion: "v1" });
+    assert.ok(!result.warnings.some((warning) => warning.includes("drift")));
   });
 
   it("fails a confirmed entry with no trustworthy provider", () => {
     const result = validateCatalog(catalog([entry("a", ""), entry("b", "openai")]));
-    expect(result.ok).toBe(false);
-    expect(result.reasons.some((reason) => reason.includes("provenance"))).toBe(true);
+    assert.equal(result.ok, false);
+    assert.ok(result.reasons.some((reason) => reason.includes("provenance")));
   });
 
   it("fails a catalog that could only verify against itself", () => {
     const result = validateCatalog(catalog([entry("a", "openai"), entry("b", "openai")]));
-    expect(result.ok).toBe(false);
-    expect(result.reasons.some((reason) => reason.includes("Same-provider-only"))).toBe(
-      true,
-    );
+    assert.equal(result.ok, false);
+    assert.ok(result.reasons.some((reason) => reason.includes("Same-provider-only")));
   });
 
   it("names the refresh command in every message about a wrong file", () => {
     // The absence of that verb is the incident: an operator told the file is
     // wrong, and handed no command, edits the file.
     const results = [
-      validateCatalog(catalog([entry("a", "anthropic"), entry("b", "openai")]), {
-        liveCliVersion: "v9",
-      }),
+      validateCatalog(catalog(DIVERSE), { liveCliVersion: "v9" }),
       validateCatalog(catalog([entry("a", ""), entry("b", "openai")])),
       validateCatalog(catalog([entry("a", "openai"), entry("b", "openai")])),
     ];
     for (const result of results) {
       const messages = [...result.reasons, ...result.warnings];
-      expect(messages.length).toBeGreaterThan(0);
-      expect(messages.every((message) => message.includes(REFRESH_COMMAND))).toBe(true);
+      assert.ok(messages.length > 0);
+      assert.ok(messages.every((message) => message.includes(REFRESH_COMMAND)));
     }
   });
 
@@ -527,19 +506,20 @@ describe("the seat catalog as a record", () => {
     // The CLI cannot enumerate models, so the universe is data in the file
     // rather than a list in code.
     const shipped = loadCatalog(SHIPPED_LOCK);
-    expect([...shipped.meta.candidate_universe]).toEqual(
+    assert.deepEqual(
+      [...shipped.meta.candidate_universe],
       shipped.models.map((model) => model.id),
     );
   });
 
   it("refuses a malformed candidate universe at load", () => {
-    const path = join(makeTempDir(), "c.lock");
+    const path = join(tempDir("catalog-"), "c.lock");
     writeFileSync(
       path,
       '[meta]\ncli_version = "v1"\nseat_id = "s"\ncandidate_universe = [1, 2]\n',
       "utf8",
     );
-    expect(() => loadCatalog(path)).toThrow(/candidate_universe/);
+    assert.throws(() => loadCatalog(path), /candidate_universe/);
   });
 });
 
@@ -558,11 +538,11 @@ describe("writing the seat catalog back", () => {
   it("round-trips the shipped lockfile byte for byte", () => {
     // The contract that makes a partial refresh honest: a catalog nothing
     // touched renders back to the bytes it was read from.
-    expect(dumpsCatalog(loadCatalog(SHIPPED_LOCK))).toBe(readAsPython(SHIPPED_LOCK));
+    assert.equal(dumpsCatalog(loadCatalog(SHIPPED_LOCK)), readAsPython(SHIPPED_LOCK));
   });
 
   it("keeps a key this version does not model", () => {
-    const path = join(makeTempDir(), "c.lock");
+    const path = join(tempDir("catalog-"), "c.lock");
     writeFileSync(
       path,
       '[meta]\ncli_version = "v1"\nseat_id = "s"\n\n' +
@@ -570,51 +550,45 @@ describe("writing the seat catalog back", () => {
         'enablement = "confirmed"\nfuture_key = "keep me"\n',
       "utf8",
     );
-    expect(dumpsCatalog(loadCatalog(path))).toContain('future_key = "keep me"');
+    assert.match(dumpsCatalog(loadCatalog(path)), /future_key = "keep me"/);
   });
 
   it("refuses a value it cannot represent instead of mangling it", () => {
     const broken = catalog([
-      modelEntry({
-        id: "a",
-        provider: "anthropic",
-        raw: { probe_detail: { nested: "table" } },
-      }),
+      modelEntry({ id: "a", provider: "anthropic", raw: { probe_detail: { nested: "table" } } }),
     ]);
-    expect(() => dumpsCatalog(broken)).toThrow(/cannot represent/);
+    assert.throws(() => dumpsCatalog(broken), /cannot represent/);
   });
 
   it("writes unknown by omission, never as a placeholder zero", () => {
     // TOML has no null, and an absent key already means unknown.
     const text = dumpsCatalog(catalog([entry("a", "anthropic")]));
-    expect(text).not.toContain("echoed_model");
-    expect(text).not.toContain("probe_premium_requests");
+    assert.ok(!text.includes("echoed_model"));
+    assert.ok(!text.includes("probe_premium_requests"));
   });
 
   it("writes a lockfile its own reader accepts", () => {
-    const path = join(makeTempDir(), "seat.lock");
-    writeCatalog(path, catalog([entry("a", "anthropic"), entry("b", "openai")]));
-    expect(validateCatalog(loadCatalog(path)).ok).toBe(true);
+    const path = join(tempDir("catalog-"), "seat.lock");
+    writeCatalog(path, catalog(DIVERSE));
+    assert.equal(validateCatalog(loadCatalog(path)).ok, true);
   });
 });
 
-describe("the writer stamp", () => {
-  const STAMP = "2026-08-19T00:00:00Z";
+const STAMP = "2026-08-19T00:00:00Z";
 
+describe("the writer stamp", () => {
   function written(entries: readonly ModelEntry[], writtenAt?: string): string {
-    const path = join(makeTempDir(), "seat.lock");
+    const path = join(tempDir("catalog-"), "seat.lock");
     writeCatalog(path, catalog(entries), writtenAt ? { writtenAt } : {});
     return path;
   }
 
   it("records what wrote the file and when", () => {
-    const path = written([entry("a", "anthropic"), entry("b", "openai")], STAMP);
+    const path = written(DIVERSE, STAMP);
     const meta = loadCatalog(path).meta;
-    expect(meta.written_at).toBe(STAMP);
-    expect(meta.written_by).toMatch(/^dabbler\.copilot/);
-    expect(catalogProvenance(loadCatalog(path))).toBe(
-      PROVENANCE_MACHINE_WRITTEN,
-    );
+    assert.equal(meta.written_at, STAMP);
+    assert.match(String(meta.written_by), /^dabbler\.copilot/);
+    assert.equal(catalogProvenance(loadCatalog(path)), PROVENANCE_MACHINE_WRITTEN);
   });
 
   it("reports an edit after the write as hand-edited, and still loads", () => {
@@ -622,17 +596,17 @@ describe("the writer stamp", () => {
     // made checkable rather than aspirational. Two people hand-edited this
     // file's pin, which is exactly what it must report. Detection, not
     // enforcement: the seat still loads, and says so.
-    const path = written([entry("a", "anthropic"), entry("b", "openai")]);
+    const path = written(DIVERSE);
     writeFileSync(
       path,
       readFileSync(path, "utf8").replace('cli_version = "v1"', 'cli_version = "v2"'),
       "utf8",
     );
     const loaded = loadCatalog(path);
-    expect(catalogProvenance(loaded)).toBe(PROVENANCE_HAND_EDITED);
+    assert.equal(catalogProvenance(loaded), PROVENANCE_HAND_EDITED);
     const result = validateCatalog(loaded);
-    expect(result.ok).toBe(true);
-    expect(result.warnings.some((warning) => warning.includes("hand-edited"))).toBe(true);
+    assert.equal(result.ok, true);
+    assert.ok(result.warnings.some((warning) => warning.includes("hand-edited")));
   });
 
   it("reads a deleted digest as hand-edited, not as unstamped", () => {
@@ -646,19 +620,15 @@ describe("the writer stamp", () => {
         .join("\n"),
       "utf8",
     );
-    expect(catalogProvenance(loadCatalog(path))).toBe(
-      PROVENANCE_HAND_EDITED,
-    );
+    assert.equal(catalogProvenance(loadCatalog(path)), PROVENANCE_HAND_EDITED);
   });
 
   it("reads a lockfile no writer ever touched as unstamped", () => {
     const loaded = loadCatalog(V1_LOCK);
-    expect(catalogProvenance(loaded)).toBe(PROVENANCE_UNSTAMPED);
-    expect(
-      validateCatalog(loaded).warnings.some((warning) =>
-        warning.includes("no writer stamp"),
-      ),
-    ).toBe(true);
+    assert.equal(catalogProvenance(loaded), PROVENANCE_UNSTAMPED);
+    assert.ok(
+      validateCatalog(loaded).warnings.some((warning) => warning.includes("no writer stamp")),
+    );
   });
 });
 
@@ -692,7 +662,6 @@ const PROBE_REFUSED: readonly [string, string, number] = [
   "model from --model flag is not available",
   1,
 ];
-const STAMP = "2026-08-19T00:00:00Z";
 
 function probe(
   modelIds: readonly string[],
@@ -713,19 +682,19 @@ describe("probing the seat", () => {
       { "claude-sonnet-4.6": probeOk("claude-sonnet-4.6", { premiumRequests: 1 }) },
       "GitHub Copilot CLI 1.0.80.",
     );
-    expect(only!.enablement).toBe("confirmed");
-    expect(only!.confirmed_at).toBe(STAMP);
-    expect(only!.confirmed_on_cli_version).toBe("GitHub Copilot CLI 1.0.80.");
-    expect(only!.echoed_model).toBe("claude-sonnet-4.6");
-    expect(only!.probe_premium_requests).toBe(1);
+    assert.equal(only!.enablement, "confirmed");
+    assert.equal(only!.confirmed_at, STAMP);
+    assert.equal(only!.confirmed_on_cli_version, "GitHub Copilot CLI 1.0.80.");
+    assert.equal(only!.echoed_model, "claude-sonnet-4.6");
+    assert.equal(only!.probe_premium_requests, 1);
   });
 
   it("records a failed probe's own error class without confirming it", async () => {
     const [only] = await probe(["ghost-1"], { "ghost-1": PROBE_REFUSED });
-    expect(only!.enablement).toBe("unconfirmed");
-    expect(only!.last_probe_error).toBe(ERROR_CLASS_INVALID_MODEL);
-    expect(only!.last_probe_at).toBe(STAMP);
-    expect(only!.confirmed_at).toBeNull();
+    assert.equal(only!.enablement, "unconfirmed");
+    assert.equal(only!.last_probe_error, ERROR_CLASS_INVALID_MODEL);
+    assert.equal(only!.last_probe_at, STAMP);
+    assert.equal(only!.confirmed_at, null);
   });
 
   it("keeps a fractional sample, which is a measurement and not malformation", async () => {
@@ -735,10 +704,10 @@ describe("probing the seat", () => {
     const [only] = await probe(["claude-haiku-4.5"], {
       "claude-haiku-4.5": probeOk("claude-haiku-4.5", { premiumRequests: 0.33 }),
     });
-    expect(only!.probe_premium_requests).toBe(0.33);
-    const path = join(makeTempDir(), "seat.lock");
+    assert.equal(only!.probe_premium_requests, 0.33);
+    const path = join(tempDir("catalog-"), "seat.lock");
     writeCatalog(path, catalog([only!, entry("o", "openai")]));
-    expect(loadCatalog(path).models[0]!.probe_premium_requests).toBe(0.33);
+    assert.equal(loadCatalog(path).models[0]!.probe_premium_requests, 0.33);
   });
 
   it("reads anything that is not a count as unknown, never as free", async () => {
@@ -746,7 +715,7 @@ describe("probing the seat", () => {
       const [only] = await probe(["gpt-5.5"], {
         "gpt-5.5": probeOk("gpt-5.5", { premiumRequests: wire }),
       });
-      expect(only!.probe_premium_requests, String(wire)).toBeNull();
+      assert.equal(only!.probe_premium_requests, null, String(wire));
     }
   });
 
@@ -754,11 +723,11 @@ describe("probing the seat", () => {
     const [guessed] = await probe(["gemini-3.5-flash"], {
       "gemini-3.5-flash": probeOk("gemini-3.5-flash"),
     });
-    expect(guessed!.provider).toBe("google");
-    expect(guessed!.provider_source).toBe(PROVIDER_SOURCE_HEURISTIC);
+    assert.equal(guessed!.provider, "google");
+    assert.equal(guessed!.provider_source, PROVIDER_SOURCE_HEURISTIC);
     const [unknown] = await probe(["mystery-1"], { "mystery-1": probeOk("mystery-1") });
-    expect(unknown!.provider).toBe("");
-    expect(unknown!.provider_source).toBe("");
+    assert.equal(unknown!.provider, "");
+    assert.equal(unknown!.provider_source, "");
   });
 });
 
@@ -777,8 +746,10 @@ describe("folding probe results back into the file", () => {
     );
     const before = modelBlocks(readAsPython(V1_LOCK));
     const after = modelBlocks(merged);
-    const changed = Object.keys(before).filter((key) => before[key] !== after[key]);
-    expect(changed).toEqual(['id = "gpt-5.5"']);
+    assert.deepEqual(
+      Object.keys(before).filter((key) => before[key] !== after[key]),
+      ['id = "gpt-5.5"'],
+    );
   });
 
   it("keeps a prior confirmation when a probe fails", async () => {
@@ -793,10 +764,10 @@ describe("folding probe results back into the file", () => {
       }),
     ]);
     const merged = mergeCatalog(before, await probe(["a"], { a: PROBE_REFUSED }));
-    expect(merged.models[0]!.enablement).toBe("confirmed");
-    expect(merged.models[0]!.confirmed_at).toBe("2026-07-04T16:17:00Z");
-    expect(merged.models[0]!.last_probe_error).toBe(ERROR_CLASS_INVALID_MODEL);
-    expect(merged.models[0]!.last_probe_at).toBe(STAMP);
+    assert.equal(merged.models[0]!.enablement, "confirmed");
+    assert.equal(merged.models[0]!.confirmed_at, "2026-07-04T16:17:00Z");
+    assert.equal(merged.models[0]!.last_probe_error, ERROR_CLASS_INVALID_MODEL);
+    assert.equal(merged.models[0]!.last_probe_at, STAMP);
   });
 
   it("appends an id the catalog did not carry", async () => {
@@ -804,7 +775,10 @@ describe("folding probe results back into the file", () => {
       catalog([entry("a", "anthropic")]),
       await probe(["gpt-5.5"], { "gpt-5.5": probeOk("gpt-5.5") }),
     );
-    expect(merged.models.map((model) => model.id)).toEqual(["a", "gpt-5.5"]);
+    assert.deepEqual(
+      merged.models.map((model) => model.id),
+      ["a", "gpt-5.5"],
+    );
   });
 
   it("re-dates the CLI version and the probe time", () => {
@@ -812,8 +786,8 @@ describe("folding probe results back into the file", () => {
       cliVersion: "v2",
       probedAt: STAMP,
     });
-    expect(merged.meta.cli_version).toBe("v2");
-    expect(merged.meta.probed_at).toBe(STAMP);
+    assert.equal(merged.meta.cli_version, "v2");
+    assert.equal(merged.meta.probed_at, STAMP);
   });
 
   it("keeps the prior sample when a run reported none", async () => {
@@ -828,7 +802,7 @@ describe("folding probe results back into the file", () => {
       }),
     ]);
     const merged = mergeCatalog(before, await probe(["a"], { a: probeOk("a") }));
-    expect(merged.models[0]!.probe_premium_requests).toBe(15);
+    assert.equal(merged.models[0]!.probe_premium_requests, 15);
   });
 });
 
@@ -854,12 +828,12 @@ describe("what a refresh selects", () => {
     // seat survive the auto-update?" is one nobody runs, which is what left
     // hand-editing as the only remedy.
     const plan = planRefresh(loadCatalog(V1_LOCK), { scope: SCOPE_QUORUM });
-    expect(planModelIds(plan)).toEqual([
+    assert.deepEqual(planModelIds(plan), [
       "claude-sonnet-4.6",
       "gemini-3.1-pro-preview",
       "gpt-5.5",
     ]);
-    expect(knownPremiumRequests(plan)).toBe(2);
+    assert.equal(knownPremiumRequests(plan), 2);
   });
 
   it("prefers a measured sample to an unmeasured one", () => {
@@ -873,7 +847,7 @@ describe("what a refresh selects", () => {
       ]),
       { scope: SCOPE_QUORUM },
     );
-    expect(planModelIds(plan)).toEqual(["a-measured", "o-1"]);
+    assert.deepEqual(planModelIds(plan), ["a-measured", "o-1"]);
   });
 
   it("treats an unprobed entry as unprobed rather than stale", () => {
@@ -888,63 +862,84 @@ describe("what a refresh selects", () => {
       ]),
       { scope: SCOPE_STALE, liveCliVersion: "v2" },
     );
-    expect(planModelIds(plan)).toEqual(["cheap", "dear"]);
+    assert.deepEqual(planModelIds(plan), ["cheap", "dear"]);
   });
 
   it("prices the whole declared universe from the file", () => {
     const loaded = loadCatalog(V1_LOCK);
     const plan = planRefresh(loaded, { scope: SCOPE_ALL });
-    expect(planModelIds(plan)).toEqual([...loaded.meta.candidate_universe]);
-    expect(knownPremiumRequests(plan)).toBe(39);
-    expect(unknownCostIds(plan)).toHaveLength(5);
+    assert.deepEqual(planModelIds(plan), [...loaded.meta.candidate_universe]);
+    assert.equal(knownPremiumRequests(plan), 39);
+    assert.equal(unknownCostIds(plan).length, 5);
   });
 
   it("bounds what may be probed by the declared universe", () => {
     // The CLI has no list-models command, so the universe in the file is the
     // only list there is: a probe costs a premium request a typo must not buy.
-    expect(() =>
-      planRefresh(loadCatalog(V1_LOCK), {
-        scope: SCOPE_MODELS,
-        models: ["claude-opus-9"],
-      }),
-    ).toThrow(/candidate universe/);
-    expect(() =>
-      planRefresh(catalog([entry("a", "anthropic")]), { scope: SCOPE_ALL }),
-    ).toThrow(/candidate_universe/);
+    assert.throws(
+      () => planRefresh(loadCatalog(V1_LOCK), { scope: SCOPE_MODELS, models: ["claude-opus-9"] }),
+      /candidate universe/,
+    );
+    assert.throws(
+      () => planRefresh(catalog([entry("a", "anthropic")]), { scope: SCOPE_ALL }),
+      /candidate_universe/,
+    );
   });
 
   it("names an unknown cost rather than costing it zero", () => {
     const text = formatPlan(
-      planRefresh(
-        catalog([sampled("a", "anthropic"), sampled("b", "openai", { sample: 1 })]),
-        { scope: SCOPE_QUORUM },
-      ),
+      planRefresh(catalog([sampled("a", "anthropic"), sampled("b", "openai", { sample: 1 })]), {
+        scope: SCOPE_QUORUM,
+      }),
     );
-    expect(text).toContain("projected cost: 1 premium request(s)");
-    expect(text).toContain("unknown is not zero");
-    expect(text).toContain("floor");
+    assert.match(text, /projected cost: 1 premium request\(s\)/);
+    assert.match(text, /unknown is not zero/);
+    assert.match(text, /floor/);
   });
 
   it("never asks for the quorum and always asks for the universe", () => {
     // Friction on the cheap path is what made v1's writer unrunnable.
     const loaded = loadCatalog(V1_LOCK);
-    expect(needsConfirmation(planRefresh(loaded, { scope: SCOPE_QUORUM }))).toBe(false);
-    expect(needsConfirmation(planRefresh(loaded, { scope: SCOPE_ALL }))).toBe(true);
+    assert.equal(needsConfirmation(planRefresh(loaded, { scope: SCOPE_QUORUM })), false);
+    assert.equal(needsConfirmation(planRefresh(loaded, { scope: SCOPE_ALL })), true);
+  });
+
+  it("separates a priced projection from an unpriced one", () => {
+    const priced: RefreshPlan = {
+      scope: SCOPE_QUORUM,
+      samples: [
+        ["a", 1],
+        ["b", 2],
+      ],
+      threshold: 5,
+    };
+    assert.equal(knownPremiumRequests(priced), 3);
+    assert.deepEqual(unknownCostIds(priced), []);
+    assert.equal(needsConfirmation(priced), false);
+    // A plan that cannot bound its own spend has not been priced, whatever
+    // the known part adds up to.
+    assert.equal(
+      needsConfirmation({ scope: SCOPE_QUORUM, samples: [["a", null]], threshold: 5 }),
+      true,
+    );
   });
 });
 
 // --- Running a refresh -------------------------------------------------------
 
 function lockCopy(): string {
-  const path = join(makeTempDir(), "copilot-catalog.lock");
+  const path = join(tempDir("refresh-"), "copilot-catalog.lock");
   writeFileSync(path, readAsPython(V1_LOCK), "utf8");
   return path;
 }
 
-function writeLock(metaLines: readonly string[], ...entries: ReadonlyArray<readonly string[]>): string {
+function writeLock(
+  metaLines: readonly string[],
+  ...entries: ReadonlyArray<readonly string[]>
+): string {
   const tables = ["[meta]\n" + metaLines.join("\n")];
   for (const lines of entries) tables.push("[[models]]\n" + lines.join("\n"));
-  const path = join(makeTempDir(), "small.lock");
+  const path = join(tempDir("refresh-"), "small.lock");
   writeFileSync(path, tables.join("\n\n") + "\n", "utf8");
   return path;
 }
@@ -985,9 +980,9 @@ describe("a refresh run end to end", () => {
       dryRun: true,
       out: out.sink,
     });
-    expect(code).toBe(0);
-    expect(out.text()).toContain("refresh plan: scope=all");
-    expect(readFileSync(path)).toEqual(before);
+    assert.equal(code, 0);
+    assert.match(out.text(), /refresh plan: scope=all/);
+    assert.deepEqual(readFileSync(path), before);
   });
 
   it("spends nothing on a plan nobody approved", async () => {
@@ -1003,16 +998,16 @@ describe("a refresh run end to end", () => {
       confirm: () => false,
       out: out.sink,
     });
-    expect(code).toBe(1);
-    expect(out.text()).toContain("declined");
-    expect(readFileSync(path)).toEqual(before);
+    assert.equal(code, 1);
+    assert.match(out.text(), /declined/);
+    assert.deepEqual(readFileSync(path), before);
   });
 
   it("writes its merge and reports it as a diff", async () => {
     const path = lockCopy();
     const before = modelBlocks(readAsPython(path));
     const out = collector();
-    expect(
+    assert.equal(
       await runRefresh({
         catalogPath: path,
         transport: quorumSeat(),
@@ -1020,16 +1015,22 @@ describe("a refresh run end to end", () => {
         clock: () => STAMP,
         out: out.sink,
       }),
-    ).toBe(0);
-    expect(loadCatalog(path).meta.cli_version).toBe(SEAT_VERSION);
-    expect(out.text()).toContain("cli version re-dated");
-    expect(out.text()).toContain("re-confirmed: claude-sonnet-4.6");
-    // Merge, never clobber: the 15 entries this run did not probe are
+      0,
+    );
+    assert.equal(loadCatalog(path).meta.cli_version, SEAT_VERSION);
+    assert.match(out.text(), /cli version re-dated/);
+    assert.match(out.text(), /re-confirmed: claude-sonnet-4\.6/);
+    // Merge, never clobber: the entries this run did not probe are
     // byte-identical, provenance included.
     const after = modelBlocks(readAsPython(path));
-    expect(Object.keys(before).filter((key) => before[key] !== after[key]).sort()).toEqual(
-      ['id = "claude-sonnet-4.6"', 'id = "gemini-3.1-pro-preview"', 'id = "gpt-5.5"'],
-    );
+    assert.deepEqual(Object.keys(before).filter((key) => before[key] !== after[key]).sort(), [
+      'id = "claude-sonnet-4.6"',
+      'id = "gemini-3.1-pro-preview"',
+      'id = "gpt-5.5"',
+    ]);
+    // And the file it left reads back as machine-written.
+    assert.equal(catalogProvenance(loadCatalog(path)), PROVENANCE_MACHINE_WRITTEN);
+    assert.equal(loadCatalog(path).meta.written_at, STAMP);
   });
 
   it("reports a failed probe and leaves the confirmation standing", async () => {
@@ -1042,19 +1043,29 @@ describe("a refresh run end to end", () => {
       clock: () => STAMP,
       out: out.sink,
     });
-    expect(code).toBe(0);
-    expect(out.text()).toContain(`probe failed: gpt-5.5 (${ERROR_CLASS_INVALID_MODEL})`);
-    expect(out.text()).toContain("stands, visibly stale");
-    expect(providerOf(loadCatalog(path), "gpt-5.5")).toBe("openai");
+    assert.equal(code, 0);
+    assert.match(out.text(), new RegExp(`probe failed: gpt-5\\.5 \\(${ERROR_CLASS_INVALID_MODEL}\\)`));
+    assert.match(out.text(), /stands, visibly stale/);
+    assert.equal(providerOf(loadCatalog(path), "gpt-5.5"), "openai");
   });
 
   it("says so when nothing moved", async () => {
     const path = writeLock(
       ['cli_version = "v1"', 'seat_id = "s"', 'candidate_universe = [\n    "a",\n    "o",\n]'],
-      ['id = "a"', 'provider = "anthropic"', 'enablement = "confirmed"',
-        'confirmed_on_cli_version = "v1"', "probe_premium_requests = 1"],
-      ['id = "o"', 'provider = "openai"', 'enablement = "confirmed"',
-        'confirmed_on_cli_version = "v1"', "probe_premium_requests = 0"],
+      [
+        'id = "a"',
+        'provider = "anthropic"',
+        'enablement = "confirmed"',
+        'confirmed_on_cli_version = "v1"',
+        "probe_premium_requests = 1",
+      ],
+      [
+        'id = "o"',
+        'provider = "openai"',
+        'enablement = "confirmed"',
+        'confirmed_on_cli_version = "v1"',
+        "probe_premium_requests = 0",
+      ],
     );
     const out = collector();
     const code = await runRefresh({
@@ -1069,23 +1080,9 @@ describe("a refresh run end to end", () => {
       clock: () => STAMP,
       out: out.sink,
     });
-    expect(code).toBe(0);
-    expect(out.text()).toContain("no change");
-    expect(out.text()).not.toContain("changed:");
-  });
-
-  it("leaves a refreshed lockfile reading back as machine-written", async () => {
-    const path = lockCopy();
-    await runRefresh({
-      catalogPath: path,
-      transport: quorumSeat(),
-      liveCliVersion: SEAT_VERSION,
-      clock: () => STAMP,
-      out: () => { /* the diff is asserted elsewhere */ },
-    });
-    const loaded = loadCatalog(path);
-    expect(catalogProvenance(loaded)).toBe(PROVENANCE_MACHINE_WRITTEN);
-    expect(loaded.meta.written_at).toBe(STAMP);
+    assert.equal(code, 0);
+    assert.match(out.text(), /no change/);
+    assert.ok(!out.text().includes("changed:"));
   });
 });
 
@@ -1110,42 +1107,35 @@ describe("resolving a role against the seat", () => {
     ]);
   }
 
-  it("orders by the role's preference list", () => {
+  it("orders by the role's preference list and never offers an unconfirmed entry", () => {
     const candidates = resolveRoleCandidates(CONFIG, seatCatalog(), "generator");
-    expect(candidates[0]).toEqual(["claude-x", "anthropic"]);
-    expect(candidates[1]).toEqual(["gpt-x", "openai"]);
-  });
-
-  it("never offers an unconfirmed entry", () => {
-    const candidates = resolveRoleCandidates(CONFIG, seatCatalog(), "generator");
-    expect(candidates.every(([id]) => id !== "blocked-x")).toBe(true);
-  });
-
-  it("keeps a confirmed entry the preference list does not name, sorted last", () => {
-    const candidates = resolveRoleCandidates(CONFIG, seatCatalog(), "generator");
-    expect(candidates[candidates.length - 1]).toEqual(["gemini-x", "google"]);
+    assert.deepEqual(candidates[0], ["claude-x", "anthropic"]);
+    assert.deepEqual(candidates[1], ["gpt-x", "openai"]);
+    assert.ok(candidates.every(([id]) => id !== "blocked-x"));
+    // A confirmed entry the preference list does not name is kept, sorted last.
+    assert.deepEqual(candidates[candidates.length - 1], ["gemini-x", "google"]);
   });
 
   it("leaves the rest of the confirmed catalog after an exclusion", () => {
-    expect(
+    assert.deepEqual(
       resolveRoleCandidates(CONFIG, seatCatalog(), "generator", ["anthropic", "openai"]),
-    ).toEqual([["gemini-x", "google"]]);
-    expect(
+      [["gemini-x", "google"]],
+    );
+    assert.deepEqual(
       resolveRoleCandidates(CONFIG, seatCatalog(), "generator", [
         "anthropic",
         "openai",
         "google",
       ]),
-    ).toEqual([]);
+      [],
+    );
   });
 
   it("applies the role's provider filter", () => {
     const config = {
-      roles: {
-        generator: { prefer: ["claude-x", "gpt-x"], require_provider_in: ["openai"] },
-      },
+      roles: { generator: { prefer: ["claude-x", "gpt-x"], require_provider_in: ["openai"] } },
     };
-    expect(resolveRoleCandidates(config, seatCatalog(), "generator")).toEqual([
+    assert.deepEqual(resolveRoleCandidates(config, seatCatalog(), "generator"), [
       ["gpt-x", "openai"],
     ]);
   });
@@ -1180,20 +1170,22 @@ function ackStdout(nonce: string, body = "answer body"): string {
 }
 
 /**
- * Reads the payload at spawn time -- which is what proves the write handle was
- * closed -- then answers with whatever the test asked for.
+ * Reads the payload at spawn time -- which is what proves the write handle
+ * was closed -- then answers with whatever the test asked for.
  */
 class HandoffSpawner {
   argv: string[] = [];
   payloadText = "";
   payloadPath = "";
 
-  constructor(
-    private readonly options: {
-      respond?: (nonce: string) => string;
-      mutatePayload?: boolean;
-    } = {},
-  ) {}
+  // Declared and assigned, not a constructor parameter property: Node runs
+  // these sources by stripping types, and a parameter property is syntax it
+  // would have to compile rather than erase.
+  private readonly options: { respond?: (nonce: string) => string; mutatePayload?: boolean };
+
+  constructor(options: { respond?: (nonce: string) => string; mutatePayload?: boolean } = {}) {
+    this.options = options;
+  }
 
   readonly spawn = (argv: readonly string[]): ProcessHandle => {
     this.argv = [...argv];
@@ -1221,7 +1213,7 @@ describe("measuring the rendered command line", () => {
     [["\u{1F600}"], 3], // one astral character is two UTF-16 units
   ] as const) {
     it(`counts ${JSON.stringify(argv)} as ${expected} UTF-16 units`, () => {
-      expect(renderedUtf16Units(argv)).toBe(expected);
+      assert.equal(renderedUtf16Units(argv), expected);
     });
   }
 });
@@ -1233,9 +1225,9 @@ describe("choosing between the inline argv and the pull", () => {
       system_prompt: "sys",
       user_message: "small",
     });
-    expect(spawner.argv[spawner.argv.indexOf("-p") + 1]).toBe("sys\n\nsmall");
-    expect(result.metadata["handoff"]).toBe(false);
-    expect(result.metadata).not.toHaveProperty("payload_bytes");
+    assert.equal(spawner.argv[spawner.argv.indexOf("-p") + 1], "sys\n\nsmall");
+    assert.equal(result.metadata["handoff"], false);
+    assert.ok(!Object.hasOwn(result.metadata, "payload_bytes"));
   });
 
   it("takes the pull exactly at the threshold, and not one unit below", async () => {
@@ -1244,14 +1236,15 @@ describe("choosing between the inline argv and the pull", () => {
     // own quoting does not skew the arithmetic.
     const overhead = renderedUtf16Units(transport.buildArgv("z", "m")) - 1;
     const exact = "z".repeat(HANDOFF_THRESHOLD_UTF16_UNITS - overhead);
-    expect(renderedUtf16Units(transport.buildArgv(exact, "m"))).toBe(
+    assert.equal(
+      renderedUtf16Units(transport.buildArgv(exact, "m")),
       HANDOFF_THRESHOLD_UTF16_UNITS,
     );
 
     const below = await new CopilotCliTransport({
       spawner: spawnerFor(fakeProcess({ stdout: OK_STDOUT })),
     }).dispatch({ model_id: "m", system_prompt: "", user_message: exact.slice(0, -1) });
-    expect(below.metadata["handoff"]).toBe(false);
+    assert.equal(below.metadata["handoff"], false);
 
     const at = new HandoffSpawner();
     const result = await new CopilotCliTransport({ spawner: at.spawn }).dispatch({
@@ -1259,23 +1252,23 @@ describe("choosing between the inline argv and the pull", () => {
       system_prompt: "",
       user_message: exact,
     });
-    expect(result.metadata["handoff"]).toBe(true);
+    assert.equal(result.metadata["handoff"], true);
   });
 
   it("names a POSIX path in the bootstrap and keeps the nonce out of argv", async () => {
     const spawner = new HandoffSpawner();
     await dispatchBig(spawner);
     const bootstrap = spawner.argv[spawner.argv.indexOf("-p") + 1]!;
-    expect(payloadPathFrom(spawner.argv)).not.toContain("\\");
-    expect(bootstrap).not.toContain(BIG_PROMPT);
-    expect(spawner.argv.join(" ")).not.toContain(nonceOf(spawner.payloadText));
+    assert.ok(!payloadPathFrom(spawner.argv).includes("\\"));
+    assert.ok(!bootstrap.includes(BIG_PROMPT));
+    assert.ok(!spawner.argv.join(" ").includes(nonceOf(spawner.payloadText)));
   });
 
   it("puts the exact prompt plus the footer in the payload", async () => {
     const spawner = new HandoffSpawner();
     await dispatchBig(spawner);
-    expect(spawner.payloadText.startsWith(`sys\n\n${BIG_PROMPT}`)).toBe(true);
-    expect(spawner.payloadText).toContain("HANDOFF-ACK ");
+    assert.ok(spawner.payloadText.startsWith(`sys\n\n${BIG_PROMPT}`));
+    assert.match(spawner.payloadText, /HANDOFF-ACK /);
   });
 
   it("builds an otherwise identical argv on both branches", async () => {
@@ -1290,7 +1283,7 @@ describe("choosing between the inline argv and the pull", () => {
       const index = argv.indexOf("-p");
       return [...argv.slice(0, index), ...argv.slice(index + 2)];
     };
-    expect(withoutPrompt(pull.argv)).toEqual(withoutPrompt(inline.argv));
+    assert.deepEqual(withoutPrompt(pull.argv), withoutPrompt(inline.argv));
   });
 });
 
@@ -1298,15 +1291,18 @@ describe("the handoff acknowledgement", () => {
   it("strips a valid ack from the content it returns", async () => {
     const spawner = new HandoffSpawner();
     const result = await dispatchBig(spawner);
-    expect(isOk(result)).toBe(true);
-    expect(result.content).toBe("answer body");
-    expect(result.metadata["handoff_ack"]).toBe("validated");
-    expect(result.metadata["payload_bytes"]).toBe(
+    assert.equal(isOk(result), true);
+    assert.equal(result.content, "answer body");
+    assert.equal(result.metadata["handoff_ack"], "validated");
+    assert.equal(
+      result.metadata["payload_bytes"],
       Buffer.byteLength(spawner.payloadText, "utf8"),
     );
   });
 
   it("discards the content when the ack is missing", async () => {
+    // A truncated review whose handoff acknowledgement still validated would
+    // return a clean-looking verdict over half a diff.
     const result = await dispatchBig(
       new HandoffSpawner({
         respond: () =>
@@ -1316,40 +1312,38 @@ describe("the handoff acknowledgement", () => {
           ),
       }),
     );
-    expect(isOk(result)).toBe(false);
-    expect(result.metadata["error_class"]).toBe("handoff-incomplete");
-    expect(result.metadata["handoff_ack"]).toBe("missing");
-    expect(result.content).toBe("");
+    assert.equal(isOk(result), false);
+    assert.equal(result.metadata["error_class"], "handoff-incomplete");
+    assert.equal(result.metadata["handoff_ack"], "missing");
+    assert.equal(result.content, "");
   });
 
   it("tells a mismatched ack from a missing one", async () => {
     const result = await dispatchBig(
       new HandoffSpawner({ respond: () => ackStdout("deadbeef".repeat(4)) }),
     );
-    expect(result.metadata["error_class"]).toBe("handoff-incomplete");
-    expect(result.metadata["handoff_ack"]).toBe("mismatch");
+    assert.equal(result.metadata["error_class"], "handoff-incomplete");
+    assert.equal(result.metadata["handoff_ack"], "mismatch");
   });
 
   it("records a payload mutation rather than gating on it", async () => {
     const result = await dispatchBig(new HandoffSpawner({ mutatePayload: true }));
-    expect(isOk(result)).toBe(true);
-    expect(result.metadata["payload_file_modified"]).toBe(true);
+    assert.equal(isOk(result), true);
+    assert.equal(result.metadata["payload_file_modified"], true);
   });
 });
 
 describe("the payload file's lifetime", () => {
-  it("is deleted after a successful call", async () => {
-    const spawner = new HandoffSpawner();
-    await dispatchBig(spawner);
-    expect(existsSync(spawner.payloadPath)).toBe(false);
-  });
+  it("is deleted after a successful call and after a malformed answer", async () => {
+    const good = new HandoffSpawner();
+    await dispatchBig(good);
+    assert.equal(existsSync(good.payloadPath), false);
 
-  it("is deleted after a malformed answer too", async () => {
-    const spawner = new HandoffSpawner({ respond: () => "not json\n" });
-    const result = await dispatchBig(spawner);
-    expect(result.metadata["error_class"]).toBe("generic-unknown");
-    expect(result.metadata["handoff"]).toBe(true);
-    expect(existsSync(spawner.payloadPath)).toBe(false);
+    const bad = new HandoffSpawner({ respond: () => "not json\n" });
+    const result = await dispatchBig(bad);
+    assert.equal(result.metadata["error_class"], "generic-unknown");
+    assert.equal(result.metadata["handoff"], true);
+    assert.equal(existsSync(bad.payloadPath), false);
   });
 
   it("is retained only under the explicit diagnostics toggle", async () => {
@@ -1358,7 +1352,7 @@ describe("the payload file's lifetime", () => {
     const spawner = new HandoffSpawner();
     try {
       await dispatchBig(spawner);
-      expect(existsSync(spawner.payloadPath)).toBe(true);
+      assert.equal(existsSync(spawner.payloadPath), true);
     } finally {
       if (previous === undefined) delete process.env["DABBLER_COPILOT_DIAGNOSTICS"];
       else process.env["DABBLER_COPILOT_DIAGNOSTICS"] = previous;
@@ -1366,25 +1360,5 @@ describe("the payload file's lifetime", () => {
       // the test that proved that has to.
       if (existsSync(spawner.payloadPath)) unlinkSync(spawner.payloadPath);
     }
-  });
-});
-
-// A refresh plan is a value, and the readings it is asked for are its
-// whole interface.
-describe("what a plan can say about itself", () => {
-  it("separates a priced projection from an unpriced one", () => {
-    const priced: RefreshPlan = {
-      scope: SCOPE_QUORUM,
-      samples: [["a", 1], ["b", 2]],
-      threshold: 5,
-    };
-    expect(knownPremiumRequests(priced)).toBe(3);
-    expect(unknownCostIds(priced)).toEqual([]);
-    expect(needsConfirmation(priced)).toBe(false);
-    // A plan that cannot bound its own spend has not been priced, whatever
-    // the known part adds up to.
-    expect(
-      needsConfirmation({ scope: SCOPE_QUORUM, samples: [["a", null]], threshold: 5 }),
-    ).toBe(true);
   });
 });

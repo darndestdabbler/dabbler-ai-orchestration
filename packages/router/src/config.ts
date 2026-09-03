@@ -228,23 +228,23 @@ function validateAgainst(
 
 // --- Where the three layers live --------------------------------------------
 
-/** Explicit path > `AI_ROUTER_CONFIG` env var > bundled default. */
-function resolveConfigPath(path?: string): string {
-  if (path !== undefined) return path;
-  const override = process.env[CONFIG_ENV_VAR];
-  if (override) return override;
-  return BUNDLED_CONFIG_PATH;
-}
-
-interface ConfigSources {
+/** Where the three layers were found. */
+export interface ConfigSources {
   readonly base: string;
   readonly project: string | null;
   readonly overrides: string | null;
 }
 
+/** The two layer files, in the order they merge. */
+export const LAYER_FILENAMES = [
+  PROJECT_CONFIG_FILENAME,
+  LOCAL_OVERRIDES_FILENAME,
+] as const;
+
 /**
  * The base config plus the two layers, the latter null when they do not
- * apply.
+ * apply. A decision over facts: which path the caller named, what the env var
+ * says, where the project root is, and which layer files that root holds.
  *
  * An explicitly-named config -- by argument or by `AI_ROUTER_CONFIG` -- is the
  * whole answer and takes neither layer: a caller that named a file means that
@@ -255,16 +255,50 @@ interface ConfigSources {
  * say how to run a test suite, which is the drift the layering exists to
  * prevent. `dabbler.yaml` is that way.
  */
-function resolveConfigSources(path?: string, projectDir?: string): ConfigSources {
-  const base = resolveConfigPath(path);
-  if (path !== undefined || process.env[CONFIG_ENV_VAR]) {
+export function chooseConfigSources(
+  explicitPath: string | undefined,
+  envPath: string | undefined,
+  root: string | null,
+  present: ReadonlySet<string>,
+): ConfigSources {
+  const base = explicitPath ?? (envPath || BUNDLED_CONFIG_PATH);
+  if (explicitPath !== undefined || envPath) {
     return { base, project: null, overrides: null };
   }
+  const layer = (filename: string): string | null =>
+    root !== null && present.has(filename) ? join(root, filename) : null;
   return {
     base,
-    project: projectConfigPath(projectDir),
-    overrides: localOverridesPath(projectDir),
+    project: layer(PROJECT_CONFIG_FILENAME),
+    overrides: layer(LOCAL_OVERRIDES_FILENAME),
   };
+}
+
+/**
+ * The thin reader behind the decision above: which of the layer files the
+ * project root actually holds. Nothing here judges anything.
+ */
+function layerFilesAt(root: string | null): ReadonlySet<string> {
+  const present = new Set<string>();
+  if (root === null) return present;
+  for (const filename of LAYER_FILENAMES) {
+    try {
+      if (statSync(join(root, filename)).isFile()) present.add(filename);
+    } catch {
+      // Absent, or not readable from here: the same answer either way.
+    }
+  }
+  return present;
+}
+
+function resolveConfigSources(path?: string, projectDir?: string): ConfigSources {
+  const root = projectRoot(projectDir);
+  return chooseConfigSources(
+    path,
+    process.env[CONFIG_ENV_VAR],
+    root,
+    layerFilesAt(root),
+  );
 }
 
 // Resolved once per working directory: the overlay's location is a property
@@ -296,13 +330,7 @@ function rootRelativeFile(
   filename: string,
 ): string | null {
   const root = projectRoot(projectDir);
-  if (root === null) return null;
-  const candidate = join(root, filename);
-  try {
-    return statSync(candidate).isFile() ? candidate : null;
-  } catch {
-    return null;
-  }
+  return layerFilesAt(root).has(filename) ? join(root as string, filename) : null;
 }
 
 /** The machine-local overlay, when the project has one. */
@@ -377,7 +405,19 @@ function rejectUnknownOverlayKeys(
 // --- Loading ------------------------------------------------------------------
 
 export function loadConfig(path?: string, projectDir?: string): RouterConfig {
-  const sources = resolveConfigSources(path, projectDir);
+  return loadConfigFrom(resolveConfigSources(path, projectDir));
+}
+
+/**
+ * Everything loading a config decides, once the three layers are known.
+ *
+ * The split is the whole of what git contributes: `loadConfig` finds the
+ * project root and asks what it holds, and this reads exactly the files it is
+ * handed. Merge order, both schemas, the overlay's vocabulary, the
+ * cross-block rules and the provenance keys live here, so all of it can be
+ * exercised from named files in any directory.
+ */
+export function loadConfigFrom(sources: ConfigSources): RouterConfig {
   if (!existsSync(sources.base)) {
     throw new ConfigNotFoundError(
       `Router config not found: ${sources.base}. Create it from the ` +

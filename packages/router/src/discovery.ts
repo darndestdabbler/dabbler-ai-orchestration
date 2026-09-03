@@ -1035,8 +1035,27 @@ function apiFreshness(
     // there.
     return makeRow(RECORD_API, path, threshold, ENUMERATE_COMMAND, null, true, now);
   }
+  const age = apiRecordAge(recordValue, enumerableProviders(config));
+  return makeRow(
+    RECORD_API, path, threshold, ENUMERATE_COMMAND, age.datedAt, true, now, age.notes,
+  );
+}
+
+/**
+ * How old an API record is, and what the record-level date cannot say.
+ *
+ * A record is only as current as its stalest ENABLED vendor:
+ * `meta.enumerated_at` advances whenever any vendor answers, so reading it
+ * alone would report the whole record fresh while one vendor's key is
+ * expired and its entries are weeks old. The date returned is the oldest
+ * per-vendor stamp, and every vendor that is missing, undated or last failed
+ * is named.
+ */
+export function apiRecordAge(
+  recordValue: ModelRecord,
+  expected: readonly string[],
+): { datedAt: string | null; notes: string[] } {
   const statuses = new Map(recordValue.providers.map((status) => [status.name, status]));
-  const expected = enumerableProviders(config);
   let oldest: readonly [number, string] | null = null;
   const notes: string[] = [];
   for (const name of expected) {
@@ -1065,9 +1084,7 @@ function apiFreshness(
     : expected.length > 0
       ? null
       : recordValue.meta.enumerated_at;
-  return makeRow(
-    RECORD_API, path, threshold, ENUMERATE_COMMAND, datedAt, true, now, notes,
-  );
+  return { datedAt, notes };
 }
 
 /**
@@ -1148,7 +1165,7 @@ export interface Drift {
 }
 
 /** `model id -> the roles that name it`, over every role's preference order. */
-function roleNames(config: RouterConfig): Map<string, string[]> {
+export function roleNames(config: RouterConfig): Map<string, string[]> {
   const out = new Map<string, string[]>();
   for (const [role, block] of Object.entries(record(config["roles"]))) {
     if (!isRecord(block)) continue;
@@ -1214,19 +1231,35 @@ function joinUnique(values: readonly string[]): string {
  * confirms it, and the writer records it. Nothing here enables a model.
  */
 export function computeDrift(config: RouterConfig, now: number = Date.now()): Drift {
-  const roles = roleNames(config);
-  const known = knownModels(config);
+  return driftBetween(roleNames(config), knownModels(config), checkFreshness(config, now));
+}
 
+/**
+ * The diff itself, over what the roles name and what the records carry.
+ *
+ * Both records feed `known`, because a role's preference order names ids as
+ * each transport puts them on the wire: a name that exists only on the seat
+ * is inert on the API path rather than missing, and reporting it as missing
+ * would train the reader to ignore the report.
+ */
+export function driftBetween(
+  roles: ReadonlyMap<string, readonly string[]>,
+  known: ReadonlyMap<string, readonly string[]>,
+  freshness: readonly FreshnessRow[],
+): Drift {
+  const byId = (
+    [left]: readonly [string, unknown],
+    [right]: readonly [string, unknown],
+  ): number => (left < right ? -1 : left > right ? 1 : 0);
   const unnamed = [...known.entries()]
-    .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
+    .sort(byId)
     .filter(([modelId]) => !roles.has(modelId))
     .map(([modelId, records]) => [modelId, joinUnique(records)] as const);
   const unavailable = [...roles.entries()]
-    .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
+    .sort(byId)
     .filter(([modelId]) => !known.has(modelId))
     .map(([modelId, roleList]) => [modelId, joinUnique(roleList)] as const);
-
-  return { unnamed, unavailable, freshness: checkFreshness(config, now) };
+  return { unnamed, unavailable, freshness: [...freshness] };
 }
 
 export function formatDrift(drift: Drift): string {
@@ -1281,6 +1314,11 @@ export function sessionsInFlight(sessionsDir?: string | null): string[] {
   } catch {
     return [];
   }
+  return inFlightSessions(state);
+}
+
+/** The in-flight sessions a state record names, in order and without repeats. */
+export function inFlightSessions(state: unknown): string[] {
   const sessions = record(state)["sessions"];
   const numbers: number[] = [];
   if (Array.isArray(sessions)) {

@@ -67,6 +67,27 @@ function sleep(seconds: number): Promise<void> {
   });
 }
 
+/**
+ * How a request reaches the wire: the one seam between this transport and
+ * the network, and the counterpart of the seat transport's spawner.
+ *
+ * The default is `fetch` and production never swaps it. A test answers with
+ * a recorded response, so the request this module BUILDS and the response it
+ * READS are the shipping code rather than a stand-in for it.
+ */
+export type HttpSource = (url: string, init: RequestInit) => Promise<Response>;
+
+let httpSource: HttpSource = (url, init) => fetch(url, init);
+
+/** Swap the source of HTTP answers; the returned function restores the previous one. */
+export function setHttpSource(source: HttpSource): () => void {
+  const previous = httpSource;
+  httpSource = source;
+  return () => {
+    httpSource = previous;
+  };
+}
+
 function isTimeout(error: unknown): boolean {
   return (
     error instanceof Error &&
@@ -106,7 +127,7 @@ async function request(
 ): Promise<Json> {
   let response: Response;
   try {
-    response = await fetch(url, {
+    response = await httpSource(url, {
       ...init,
       signal: AbortSignal.timeout(timeoutSeconds * 1000),
     });

@@ -19,7 +19,11 @@
 import { loadConfig } from "./config.ts";
 import { readRawSessionState } from "./sessionState.ts";
 import { pythonRepr } from "./pythonJson.ts";
-import { KNOWN_PROVIDERS, confirmedCatalogEntries } from "./transports/copilot.ts";
+import {
+  KNOWN_PROVIDERS,
+  confirmedCatalogEntries,
+  type ConfirmedCatalogEntry,
+} from "./transports/copilot.ts";
 
 export const MULTI_PROVIDER_ENGINES: ReadonlySet<string> = new Set([
   "github-copilot",
@@ -95,8 +99,11 @@ function loadDefaultRegistry(): ModelsRegistry {
  * documented truth, so membership there is a registry lookup, not a
  * name-prefix guess. Best-effort -- an unreadable lock resolves nothing.
  */
-function catalogProvider(token: string): string | null {
-  for (const entry of confirmedCatalogEntries()) {
+function catalogProvider(
+  token: string,
+  entries: readonly ConfirmedCatalogEntry[] = confirmedCatalogEntries(),
+): string | null {
+  for (const entry of entries) {
     if (normalizeModelToken(entry.id) === token) {
       const provider = entry.provider.trim().toLowerCase();
       return KNOWN_PROVIDERS.has(provider) ? provider : null;
@@ -120,6 +127,7 @@ function providerOf(entry: unknown): string | null {
 export function resolveModelProvider(
   model: unknown,
   modelsRegistry?: ModelsRegistry | null,
+  catalog?: readonly ConfirmedCatalogEntry[],
 ): string | null {
   if (typeof model !== "string" || model.trim() === "") return null;
   const registry =
@@ -151,7 +159,7 @@ export function resolveModelProvider(
     if (provider !== null) return provider;
   }
 
-  return catalogProvider(token);
+  return catalogProvider(token, catalog);
 }
 
 function trimmedOrNull(value: unknown): string | null {
@@ -169,7 +177,10 @@ function trimmedOrNull(value: unknown): string | null {
  */
 export function resolveOrchestratorIdentity(
   orchestrator: unknown,
-  options: { modelsRegistry?: ModelsRegistry | null } = {},
+  options: {
+    modelsRegistry?: ModelsRegistry | null;
+    catalog?: readonly ConfirmedCatalogEntry[];
+  } = {},
 ): OrchestratorIdentity {
   if (!isRecord(orchestrator) || Object.keys(orchestrator).length === 0) {
     throw new IdentityResolutionError(
@@ -183,7 +194,7 @@ export function resolveOrchestratorIdentity(
   const multi = isMultiProviderEngine(engine);
 
   if (model !== null) {
-    const provider = resolveModelProvider(model, options.modelsRegistry);
+    const provider = resolveModelProvider(model, options.modelsRegistry, options.catalog);
     if (provider) {
       return {
         effectiveProvider: provider,
@@ -239,7 +250,10 @@ export function resolveOrchestratorIdentity(
 export function resolveSessionOrchestratorIdentity(
   sessionsDir: string,
   sessionNumber?: number | null,
-  options: { modelsRegistry?: ModelsRegistry | null } = {},
+  options: {
+    modelsRegistry?: ModelsRegistry | null;
+    catalog?: readonly ConfirmedCatalogEntry[];
+  } = {},
 ): OrchestratorIdentity {
   // The raw record: identity needs the sessions array and its stored
   // per-session fields, which v5 carries as written; the projection's
@@ -250,14 +264,36 @@ export function resolveSessionOrchestratorIdentity(
       `no readable session-state.json under ${sessionsDir}`,
     );
   }
+  const block = chooseOrchestratorBlock(state, sessionNumber ?? null);
+  if (block === null) {
+    throw new IdentityResolutionError(
+      `no session under ${sessionsDir} carries an orchestrator block ` +
+        `(session_number=${pythonRepr(sessionNumber ?? null)}); re-run ` +
+        "start_session with --model, then retry.",
+    );
+  }
+  return resolveOrchestratorIdentity(block, options);
+}
+
+/**
+ * Which orchestrator block a record answers with, or null when none does.
+ *
+ * An explicit number wins; otherwise the session in flight; otherwise the
+ * last session that carries a block at all -- which is what makes the
+ * question answerable between two sessions. A record-level `orchestrator`
+ * stands in for a session that carries none.
+ */
+export function chooseOrchestratorBlock(
+  state: Record<string, unknown>,
+  sessionNumber: number | null,
+): unknown {
   const sessions = (Array.isArray(state["sessions"]) ? state["sessions"] : []).filter(
     isRecord,
   );
 
   let chosen: Record<string, unknown> | null = null;
-  const wanted = sessionNumber ?? null;
-  if (wanted !== null) {
-    chosen = sessions.find((entry) => entry["number"] === wanted) ?? null;
+  if (sessionNumber !== null) {
+    chosen = sessions.find((entry) => entry["number"] === sessionNumber) ?? null;
   } else {
     chosen = sessions.find((entry) => entry["status"] === "in-progress") ?? null;
     if (chosen === null) {
@@ -270,12 +306,6 @@ export function resolveSessionOrchestratorIdentity(
     fromSession !== null && fromSession !== undefined && fromSession !== false
       ? fromSession
       : (state["orchestrator"] ?? null);
-  if (!block || (isRecord(block) && Object.keys(block).length === 0)) {
-    throw new IdentityResolutionError(
-      `no session under ${sessionsDir} carries an orchestrator block ` +
-        `(session_number=${pythonRepr(wanted)}); re-run start_session ` +
-        "with --model, then retry.",
-    );
-  }
-  return resolveOrchestratorIdentity(block, options);
+  if (!block || (isRecord(block) && Object.keys(block).length === 0)) return null;
+  return block;
 }

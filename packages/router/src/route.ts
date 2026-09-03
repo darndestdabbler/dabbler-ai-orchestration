@@ -31,7 +31,7 @@ import {
   truthy,
   type RouterConfig,
 } from "./config.ts";
-import { recordCall } from "./metrics.ts";
+import { recordCall, type CallRecord } from "./metrics.ts";
 import { isNoRouterMode } from "./runtimeMode.ts";
 import { ROLE_GENERATOR, registryCandidates } from "./selection.ts";
 import { isOk, type APIResult } from "./transports/base.ts";
@@ -479,11 +479,210 @@ function getConfig(): RouterConfig {
 
 // --- The one dispatch body --------------------------------------------------
 
-interface Candidate {
+export interface Candidate {
   /** Registry alias (API) or catalog id (Copilot). */
   readonly alias: string;
   readonly model_id: string;
   readonly provider: string;
+}
+
+/**
+ * The exclusion as the dispatch reads it: trimmed, lowercased, de-duplicated
+ * and ordered, so a caller's spelling cannot decide whether a provider is
+ * excluded.
+ */
+export function normalizeExclusions(
+  excludeProviders: readonly string[] | null | undefined,
+): string[] {
+  return [
+    ...new Set(
+      (excludeProviders ?? [])
+        .filter((provider) => Boolean(provider))
+        .map((provider) => String(provider).trim().toLowerCase()),
+    ),
+  ].sort();
+}
+
+/**
+ * The exclusion asserted at the CALL SITE, not only where candidates were
+ * filtered.
+ *
+ * Cross-provider review is the one invariant a later preference path must
+ * not be able to undo, so it is checked again immediately before the wire.
+ * No current path can reach this refusal, which is exactly why it is a
+ * function rather than a line inside the loop: the day a preference path
+ * does reach it, this is what stops the dispatch.
+ */
+export function assertNotExcluded(
+  candidate: Candidate,
+  exclude: readonly string[],
+): void {
+  if (!exclude.includes(candidate.provider)) return;
+  throw new ExcludedProviderError(
+    `'${candidate.alias}' resolved to provider ` +
+      `'${candidate.provider}', which this call excludes ` +
+      `(${renderList(exclude)}). Refusing to dispatch.`,
+  );
+}
+
+/**
+ * The direct-API ladder for a role: every enabled, reachable, unexcluded
+ * registry entry in the role's order. Empty is not a ladder -- a call with
+ * nothing to dispatch to fails closed here rather than silently picking a
+ * provider the caller ruled out.
+ */
+export function apiLadder(
+  config: RouterConfig,
+  role: string,
+  taskType: string,
+  exclude: readonly string[],
+): Candidate[] {
+  const models = record(config["models"]);
+  const ladder: Candidate[] = registryCandidates(config, role, exclude).map((alias) => ({
+    alias,
+    model_id: String(record(models[alias])["model_id"]),
+    provider: String(record(models[alias])["provider"]),
+  }));
+  if (ladder.length === 0) {
+    throw new NoCandidateError(
+      "no enabled model in router-config.yaml survives the " +
+        `provider exclusion ${renderList(exclude)} for the '${role}' role ` +
+        `(task_type='${taskType}'). Enable a model from a surviving ` +
+        "provider, or set its API key.",
+    );
+  }
+  return ladder;
+}
+
+/** The same, over the seat's confirmed catalog. */
+export function seatLadder(
+  config: RouterConfig,
+  catalog: Catalog,
+  role: string,
+  exclude: readonly string[],
+): Candidate[] {
+  const ladder: Candidate[] = resolveRoleCandidates(config, catalog, role, exclude).map(
+    ([modelId, provider]) => ({ alias: modelId, model_id: modelId, provider }),
+  );
+  if (ladder.length === 0) {
+    throw new NoCandidateError(
+      "copilot-cli: no confirmed catalog entry survives the " +
+        `provider exclusion ${renderList(exclude)} for the '${role}' role`,
+    );
+  }
+  return ladder;
+}
+
+/**
+ * Whether the ladder takes another step, and what to record for the one it
+ * leaves.
+ *
+ * Two independent limits bound it -- how many models remain, and how many
+ * escalations the config allows -- and a run that escalated past either
+ * would spend a call the operator capped.
+ */
+export function escalationStep(
+  result: APIResult,
+  escalationConfig: Record<string, unknown>,
+  position: {
+    readonly escalates: boolean;
+    readonly index: number;
+    readonly ladderLength: number;
+    readonly escalationsSoFar: number;
+    readonly maxEscalations: number;
+  },
+): { escalate: boolean; reason: string | null } {
+  const escalate =
+    position.escalates &&
+    truthy(escalationConfig["enabled"]) &&
+    shouldEscalate(result, escalationConfig) &&
+    position.escalationsSoFar < position.maxEscalations &&
+    position.index + 1 < position.ladderLength;
+  return {
+    escalate,
+    reason: escalate ? classifyEscalationReason(result, escalationConfig) : null,
+  };
+}
+
+/**
+ * Whether this task type's answer is reviewed before it is returned.
+ *
+ * A verification is never itself verified: the recursion would bill a
+ * vendor for every level of it.
+ */
+export function shouldAutoVerify(config: RouterConfig, taskType: string): boolean {
+  const verification = record(config["verification"]);
+  const autoTypes = verification["auto_verify_task_types"];
+  return (
+    truthy(verification["enabled"]) &&
+    (Array.isArray(autoTypes) ? autoTypes : []).includes(taskType) &&
+    taskType !== "verification" &&
+    taskType !== "session-verification"
+  );
+}
+
+/** One completed dispatch, as both the answer and the telemetry row read it. */
+export interface DispatchOutcome {
+  readonly candidate: Candidate;
+  readonly result: APIResult;
+  readonly elapsedSeconds: number;
+  readonly generationParams: Record<string, unknown>;
+  readonly escalationHistory: ReadonlyArray<readonly [string, string]>;
+  readonly transport: string;
+  readonly taskType: string;
+  readonly sessionNumber?: number | null;
+}
+
+/** The seat's conversation id, which is the only thing that can price a seat call. */
+function seatSessionId(outcome: DispatchOutcome): string | null {
+  if (outcome.transport !== TRANSPORT_COPILOT_CLI) return null;
+  return (outcome.result.metadata["session_id"] ?? null) as string | null;
+}
+
+/** The answer a caller gets back. */
+export function routeResultOf(outcome: DispatchOutcome): RouteResult {
+  const { candidate, result } = outcome;
+  return {
+    content: result.content,
+    model_name: candidate.alias,
+    model_id: candidate.model_id,
+    provider: candidate.provider,
+    input_tokens: result.input_tokens,
+    output_tokens: result.output_tokens,
+    escalated: outcome.escalationHistory.length > 0,
+    escalation_history: [...outcome.escalationHistory],
+    elapsed_seconds: outcome.elapsedSeconds,
+    transport: outcome.transport,
+    truncated: detectTruncation(result.content, result.stop_reason),
+    transport_session_id: seatSessionId(outcome),
+    served_model_id: result.served_model_id ?? null,
+    metadata: { ...result.metadata },
+  };
+}
+
+/** The telemetry row the same dispatch writes. */
+export function routeCallRecordOf(outcome: DispatchOutcome): CallRecord {
+  const onSeat = outcome.transport === TRANSPORT_COPILOT_CLI;
+  return {
+    callType: "route",
+    taskType: outcome.taskType,
+    model: outcome.candidate.alias,
+    provider: outcome.candidate.provider,
+    generationParams: outcome.generationParams,
+    inputTokens: outcome.result.input_tokens,
+    outputTokens: outcome.result.output_tokens,
+    elapsedSeconds: outcome.elapsedSeconds,
+    escalated: outcome.escalationHistory.length > 0,
+    stopReason: outcome.result.stop_reason,
+    sessionNumber: outcome.sessionNumber ?? null,
+    requestedModelId: outcome.candidate.model_id,
+    servedModelId: outcome.result.served_model_id ?? null,
+    transport: outcome.transport,
+    // Real spend on a seat, and not attributable here: the conversation id
+    // is what prices it.
+    billedUsageUnavailable: onSeat ? true : null,
+    transportSessionId: seatSessionId(outcome),
+  };
 }
 
 /** The four seams a transport fills, so the loop below is written once. */
@@ -558,13 +757,7 @@ async function routeLive(
 
   const config = getConfig();
   const transportName = resolveTransport(config, options.transport ?? null);
-  const exclude = [
-    ...new Set(
-      (options.excludeProviders ?? [])
-        .filter((provider) => Boolean(provider))
-        .map((provider) => String(provider).trim().toLowerCase()),
-    ),
-  ].sort();
+  const exclude = normalizeExclusions(options.excludeProviders);
 
   const path = buildPath(config, transportName, role, taskType, exclude);
 
@@ -578,16 +771,7 @@ async function routeLive(
   let genParams: Record<string, unknown>;
 
   for (;;) {
-    // The exclusion is asserted here and not only where candidates were
-    // filtered: this is the call site, and cross-provider review is the one
-    // invariant a later preference path must not be able to undo.
-    if (exclude.includes(current.provider)) {
-      throw new ExcludedProviderError(
-        `'${current.alias}' resolved to provider ` +
-          `'${current.provider}', which this call excludes ` +
-          `(${renderList(exclude)}). Refusing to dispatch.`,
-      );
-    }
+    assertNotExcluded(current, exclude);
 
     const [systemPrompt, userMessage] = buildPrompt(
       content,
@@ -613,17 +797,15 @@ async function routeLive(
       );
     }
 
-    if (
-      path.escalates &&
-      truthy(escalationConfig["enabled"]) &&
-      shouldEscalate(result, escalationConfig) &&
-      escalationHistory.length < maxEscalations &&
-      index + 1 < path.ladder.length
-    ) {
-      escalationHistory.push([
-        current.alias,
-        classifyEscalationReason(result, escalationConfig),
-      ]);
+    const step = escalationStep(result, escalationConfig, {
+      escalates: path.escalates,
+      index,
+      ladderLength: path.ladder.length,
+      escalationsSoFar: escalationHistory.length,
+      maxEscalations,
+    });
+    if (step.escalate) {
+      escalationHistory.push([current.alias, step.reason as string]);
       index += 1;
       current = path.ladder[index] as Candidate;
       continue;
@@ -631,55 +813,20 @@ async function routeLive(
     break;
   }
 
-  const onCopilot = transportName === TRANSPORT_COPILOT_CLI;
-  const sessionId = onCopilot
-    ? ((result.metadata["session_id"] ?? null) as string | null)
-    : null;
-
-  recordCall(config, {
-    callType: "route",
-    taskType,
-    model: current.alias,
-    provider: current.provider,
-    generationParams: genParams,
-    inputTokens: result.input_tokens,
-    outputTokens: result.output_tokens,
+  const outcome: DispatchOutcome = {
+    candidate: current,
+    result,
     elapsedSeconds: elapsed,
-    escalated: escalationHistory.length > 0,
-    stopReason: result.stop_reason,
+    generationParams: genParams,
+    escalationHistory,
+    transport: transportName,
+    taskType,
     sessionNumber: options.sessionNumber ?? null,
-    requestedModelId: current.model_id,
-    servedModelId: result.served_model_id ?? null,
-    transport: transportName,
-    billedUsageUnavailable: onCopilot ? true : null,
-    transportSessionId: sessionId,
-  });
-
-  const routeResult: RouteResult = {
-    content: result.content,
-    model_name: current.alias,
-    model_id: current.model_id,
-    provider: current.provider,
-    input_tokens: result.input_tokens,
-    output_tokens: result.output_tokens,
-    escalated: escalationHistory.length > 0,
-    escalation_history: escalationHistory,
-    elapsed_seconds: elapsed,
-    transport: transportName,
-    truncated: detectTruncation(result.content, result.stop_reason),
-    transport_session_id: sessionId,
-    served_model_id: result.served_model_id ?? null,
-    metadata: { ...result.metadata },
   };
+  recordCall(config, routeCallRecordOf(outcome));
+  const routeResult = routeResultOf(outcome);
 
-  const verificationConfig = record(config["verification"]);
-  const autoTypes = verificationConfig["auto_verify_task_types"];
-  if (
-    truthy(verificationConfig["enabled"]) &&
-    (Array.isArray(autoTypes) ? autoTypes : []).includes(taskType) &&
-    taskType !== "verification" &&
-    taskType !== "session-verification"
-  ) {
+  if (shouldAutoVerify(config, taskType)) {
     // Imported here rather than at module scope because `verifyjob` calls
     // back into `route`; Python defers the same edge the same way.
     const { autoVerify } = await import("./verifyjob.ts");
@@ -730,24 +877,8 @@ function buildPath(
 
   if (transportName === TRANSPORT_COPILOT_CLI) {
     const [transport, catalog] = getCopilot(config);
-    const ladder: Candidate[] = resolveRoleCandidates(
-      config,
-      catalog,
-      role,
-      exclude,
-    ).map(([modelId, provider]) => ({
-      alias: modelId,
-      model_id: modelId,
-      provider,
-    }));
-    if (ladder.length === 0) {
-      throw new NoCandidateError(
-        "copilot-cli: no confirmed catalog entry survives the " +
-          `provider exclusion ${renderList(exclude)} for the '${role}' role`,
-      );
-    }
     return {
-      ladder,
+      ladder: seatLadder(config, catalog, role, exclude),
       escalates: true,
       dispatch: (candidate, systemPrompt, userMessage) =>
         transport.dispatch({
@@ -766,21 +897,8 @@ function buildPath(
 
   const models = record(config["models"]);
   const providers = record(config["providers"]);
-  const ladder: Candidate[] = registryCandidates(config, role, exclude).map((alias) => ({
-    alias,
-    model_id: String(record(models[alias])["model_id"]),
-    provider: String(record(models[alias])["provider"]),
-  }));
-  if (ladder.length === 0) {
-    throw new NoCandidateError(
-      "no enabled model in router-config.yaml survives the " +
-        `provider exclusion ${renderList(exclude)} for the '${role}' role ` +
-        `(task_type='${taskType}'). Enable a model from a surviving ` +
-        "provider, or set its API key.",
-    );
-  }
   return {
-    ladder,
+    ladder: apiLadder(config, role, taskType, exclude),
     escalates: true,
     dispatch: (candidate, systemPrompt, userMessage, genParams) => {
       const entry = record(models[candidate.alias]);

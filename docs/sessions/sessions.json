@@ -1716,9 +1716,9 @@
     {
       "number": 87,
       "title": "The lifecycle and the driver",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-03T13:33:27.493000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-09-03T14:49:14.857000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

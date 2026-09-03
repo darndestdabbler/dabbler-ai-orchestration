@@ -1,0 +1,99 @@
+name: Test
+
+# The release gate (.github/actions/require-green-test) requires a
+# successful run of THIS workflow for the tagged commit before either
+# publish pipeline (release.yml, publish-vscode.yml) will ship.
+#
+# windows-latest on both jobs deliberately: it is the platform the
+# suites are developed and proven on, and the router shells to git where
+# path/quoting behavior is the risk surface.
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+permissions:
+  contents: read
+
+jobs:
+  extension:
+    name: Extension suite (unit + typecheck + lint)
+    runs-on: windows-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: tools/dabbler-ai-orchestration
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
+        with:
+          fetch-depth: 1
+
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
+        with:
+          node-version: '24'
+
+      # At the ROOT: the two TypeScript packages are npm workspaces, so
+      # there is one lockfile and one install for both of them.
+      - name: Install dependencies
+        working-directory: .
+        run: npm ci
+
+      - name: Typecheck
+        working-directory: .
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit suite (vscode stub)
+        run: npm run test:unit
+
+      - name: Bundle compiles
+        run: npm run compile
+
+  router:
+    name: Router suite (vitest + the declared controls)
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
+        with:
+          fetch-depth: 1
+
+      # 24, not 20: the generator and the staleness control are
+      # TypeScript run directly by node, which strips types from 22.18
+      # on. It is also the runtime floor the extension host was measured
+      # at (D131), and the router now RUNS in that host.
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
+        with:
+          node-version: '24'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generated types still match the schemas
+        run: npm run check:types
+
+      - name: Typecheck (both packages)
+        run: npm run typecheck
+
+      - name: Lint (both packages)
+        run: npm run lint
+
+      - name: Router suite (node --test)
+        run: npm run test:unit -w dabbler-ai-router
+
+      - name: Router suite not yet rewritten (vitest default tier)
+        run: npm run test:vitest -w dabbler-ai-router
+
+      - name: Router integration suite (vitest, real git and processes; CI is its run of record until session 88)
+        run: npm run test:integration -w dabbler-ai-router
+
+      - name: CLI bundles
+        run: npm run build -w dabbler-ai-router

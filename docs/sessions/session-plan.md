@@ -1666,7 +1666,7 @@ is a survey, not a refactor.
    on.
 5. Amend the plan for sessions 41, 42 and 47 with what the survey found. A
    session that cannot follow its plan amends the plan on the record.
-6. Affected; verify; full suite as `final-full`; close.
+7. Affected; verify; full suite as `final-full`; close.
 
 **Known material going in, so the session is bounded rather than exploratory:**
 `bootstrapProject.ts` ends setup with *"Open a terminal and run `dabbler
@@ -3960,7 +3960,15 @@ gone green; the Marketplace serves 2.0.0.
    honestly through the verbs afterwards). The fix collects and clears
    the mismatched job, then starts its own; a driver test pins it. The
    engine runs this step before the operator begins the walk.
-3. `dabbler release --verify-install` as a step check: the Marketplace is
+3. **The publish path ships as it shipped for months.** The operator's
+   Entra-connected org accepted the service principal, but the MSA-era
+   publisher would not seat it under any identifier -- so the workflow's
+   PAT auth step returns (the environment secret never left), and
+   federation is the owed item before 2026-12-01 with two researched
+   paths on the record: the member-add retried after real propagation,
+   or a deliberate new-publisher migration announced to the installed
+   base.
+4. `dabbler release --verify-install` as a step check: the Marketplace is
    asked what it actually serves; exit 0 or the step fails.
 3. **The operator, from a clean VS Code profile** with the extension
    installed from the Marketplace and a fresh clone of `csv-model`:
@@ -3970,14 +3978,14 @@ gone green; the Marketplace serves 2.0.0.
    completed, current, and planned sessions with a driven session's tasks
    moving; a session driven end to end under the session-80 guardian
    without once typing a protocol verb.
-4. **The .NET leg** (operator, 2026-09-02: what we build must work for
+5. **The .NET leg** (operator, 2026-09-02: what we build must work for
    .NET and Java; only this application is TypeScript). Beside
    csv-model, a minimal `dotnet new xunit` repository with its own
    `dabbler.yaml` -- `dotnet test` as the suite command, `dotnet build`
    as a control -- runs one driven session end to end. Everything
    consumer-facing speaks argv, declared file sets and git; this leg is
    where that claim meets a compiler that is not Node.
-5. Findings recorded in `docs/field-trial-70.md`; anything needing a
+6. Findings recorded in `docs/field-trial-70.md`; anything needing a
    session of its own is amended into the plan on the record.
 6. Affected; verify; full suite as `final-full`; close.
 

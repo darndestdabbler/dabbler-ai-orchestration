@@ -49,20 +49,14 @@ schema_version: 1
 # evidence.
 testing:
   suites:
-    # The router suite is two tiers that partition its files
-    # (packages/router/vitest.config.ts, INTEGRATION_FILES). Positional
-    # paths are vitest's file filters, so the targeted form
-    # `<command> packages/router/test/x.test.ts` is a real command and
-    # the audit needs no per-ecosystem narrowing rule (D116); a file that
-    # belongs to the other tier passes with no tests under this one.
-    #
-    # The default tier spawns nothing and is cheap enough to run on every
-    # step. The integration tier builds repositories, spawns processes and
-    # drives sessions; it is the expensive suite, run at close and by CI on
-    # every push, because on a Windows host it takes the keyboard for the
-    # duration (2026-09-03, the operator's ruling).
+    # The router's tests, rebuilt from session 83 on (session plan, "Why
+    # sessions 83-88 exist"): Node's own runner over packages/router/test,
+    # pure functions tested plainly and a handful of chained walkthroughs.
+    # Node expands the glob itself, so the argv needs no shell, and a
+    # positional file appended by the targeted form
+    # `<command> packages/router/test/x.test.ts` is one more pattern (D116).
     - name: typescript
-      command: npx vitest run --root packages/router
+      command: node --test packages/router/test/**/*.test.ts
       expensive: false
       covers:
         - packages/router/
@@ -73,16 +67,24 @@ testing:
         - packages/router/test
       test_glob: "*.test.ts"
 
-    - name: typescript-integration
-      command: npx vitest run --root packages/router --config vitest.integration.config.ts
-      expensive: true
+    # The vitest files not yet rewritten, under packages/router/test-vitest.
+    # This is the default tier only -- the files that spawn nothing. The
+    # integration tier (vitest.integration.config.ts, INTEGRATION_FILES) is
+    # NOT declared here for the duration of the rebuild: on the operator's
+    # authorisation of 2026-09-03 it is not run on the developer's machine,
+    # because it takes the keyboard for the duration; CI runs it on every
+    # push (.github/workflows/test.yml) and is its run of record until
+    # session 88 deletes it. This suite goes with session 88 too.
+    - name: typescript-vitest
+      command: npx vitest run --root packages/router
+      expensive: false
       covers:
         - packages/router/
         - package.json
         - package-lock.json
         - dabbler.yaml
       test_roots:
-        - packages/router/test
+        - packages/router/test-vitest
       test_glob: "*.test.ts"
 
     # The VS Code extension. Declared in session 39 against D242, which

@@ -118,6 +118,13 @@ it.
 | 80 | The loop stops living in anyone's attention | no | 2026-09-02 |
 | 81 | Publishing without a secret, and the last of the friction | no | 2026-09-02 |
 | 82 | The trial, run by the operator against what the Marketplace serves | no | 2026-09-03 |
+| 83 | The runner, the gates slice, and the git-states walkthrough | no | 2026-09-03 |
+| 84 | The record layer | — | not declared |
+| 85 | Verification | — | not declared |
+| 86 | Routing, transports and configuration | — | not declared |
+| 87 | The lifecycle and the driver | — | not declared |
+| 88 | Packaging, release, bootstrap, the solution — and vitest retired | — | not declared |
+| 89 | The trial, run by the operator against what the Marketplace serves | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -1794,3 +1801,9 @@ Publishing without a secret, and the last of the friction. The Marketplace workf
 **Releasable: no.**
 
 The trial against what the Marketplace actually serves, with the tail it can trust and the publish path that works today. First the stale-job fence: longWork answers EXIT_OK for a standing job under another name, which is true within one phase's suite walk and false across phases - an uncollected verification job after an adjudication fake-greened every later phase in sessions 78 and 81. The disposition rule becomes exact: a mismatched job still running is ahead of us in this walk; a mismatched job that has exited is stale state - collected, logged, cleared, and then this call site starts its own. Then the publish path: the MSA-era publisher refused the Entra service principal under every identifier, so the workflow's PAT auth step returns (the environment secret never left GitHub) and federation moves to the owed record for before 2026-12-01. Then the operator's half: the release word, the environment approval, verify-install against what is actually served, and the walk - csv-model and the .NET leg - answering from visible UI only.
+
+### Session 83 — The runner, the gates slice, and the git-states walkthrough
+
+**Releasable: no.**
+
+The proof of the test rebuild's shape on the gates module, on the operator's ruling of 2026-09-03 that the suite must stop taking the machine. The runner becomes Node's own: npm run test:unit runs node --test over packages/router/test, every existing vitest file moves to packages/router/test-vitest with both vitest configs following it, dabbler.yaml declares node --test as the ordinary suite beside the vitest default tier, and the integration tier is undeclared locally on the operator's authorisation while CI keeps running it. gates.ts is split so every gate that shells out is a thin reader returning facts plus a pure judge, with the porcelain and rev-list parsers as named pure functions, and test/gates.test.ts tests those with literal inputs and no repository. One walkthrough, test/walk-git-states.test.ts, builds one repository and walks it through clean, untracked, modified, staged-deletion, ahead-of-upstream, no-upstream and no-remote, parsing and judging the real git output at each milestone; it replaces gitContract.test.ts and the repository-building half of gates.test.ts, which are deleted.

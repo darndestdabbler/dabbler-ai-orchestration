@@ -28,6 +28,13 @@
 // Every remediation string here is compared byte for byte against its
 // Python twin by the parity control, em dashes included: a gate's wording
 // is what an operator reads when a close is refused.
+//
+// Shape (session 83): each gate is a thin READER that asks git, the disk or
+// the ledger and returns facts, and a pure JUDGE over those facts that
+// returns the row. The `check*` predicates compose the two and keep their
+// signatures. The judges are what the unit tests call, with literal facts
+// and no repository; the readers are exercised once, in the git-states
+// walkthrough.
 
 import { existsSync, realpathSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -54,7 +61,12 @@ import { sessionIsReleasable } from "./writers.ts";
 import { readSessionState } from "./progress.ts";
 import { pythonRepr, pythonStr } from "./pythonJson.ts";
 import { blockingDecisions } from "./owedDecisions.ts";
-import { evaluateFreshness, loadSuitesChecked } from "./testEvidence.ts";
+import {
+  evaluateFreshness,
+  loadSuitesChecked,
+  type FreshnessVerdict,
+  type SuiteLoadResult,
+} from "./testEvidence.ts";
 import { SESSION_VERDICTS } from "./verdict.ts";
 
 /** Editor and platform droppings, plus the close machinery's own lock. */
@@ -164,7 +176,6 @@ function matchesPattern(basename: string, pattern: string): boolean {
   return new RegExp(source).test(basename);
 }
 
-/** `os.path.relpath`, with the same fall back to the absolute path. */
 /**
  * The sessions root as the repository sees it, and the reason it is not a
  * bare `relative()`.
@@ -203,7 +214,13 @@ function currentSession(sessionsDir: string): unknown {
   return current === undefined ? null : current;
 }
 
-// --- The five predicates ------------------------------------------------------
+/** A session-directory path the close itself will commit, or its lock. */
+function isSetBookkeeping(forwardPath: string, setRel: string): boolean {
+  const basename = forwardPath.split("/").pop() ?? forwardPath;
+  return forwardPath.startsWith(`${setRel}/`) && SET_BOOKKEEPING_BASENAMES.has(basename);
+}
+
+// --- verification_clean -------------------------------------------------------
 
 /**
  * The run ledger says the latest round is non-blocking, the worktree has
@@ -216,39 +233,123 @@ function currentSession(sessionsDir: string): unknown {
  * than letting unreviewed work read as verified.
  */
 export function checkVerificationClean(sessionsDir: string): Check {
-  const root = repoRootFor(sessionsDir);
-  if (root === null) {
-    return [false, `not inside a git repository: ${sessionsDir}`];
-  }
+  return judgeVerification(readVerificationFacts(sessionsDir), sessionsDir);
+}
 
+/** What the verification gate reads, in the order it needs the answers. */
+export interface VerificationFacts {
+  /** Null outside a git repository. */
+  readonly root: string | null;
+  /** A hand edit the sanctioned writers cannot account for, or null. */
+  readonly outOfBand: string | null;
+  /** The session in flight, or null. */
+  readonly current: unknown;
+  /** The ledger's rounds; null when the ledger could not be read. */
+  readonly rounds: readonly Record<string, unknown>[] | null;
+  readonly ledgerError: string | null;
+  /** The worktree snapshot; null when it could not be taken (or was not needed). */
+  readonly currentTree: string | null;
+  /** Paths changed since the latest round's tree; null when the diff failed. */
+  readonly changedSinceLatest: readonly string[] | null;
+  readonly setRel: string;
+}
+
+/** Ask the record, the ledger and git, stopping where a judge would have. */
+export function readVerificationFacts(sessionsDir: string): VerificationFacts {
+  const facts: {
+    -readonly [K in keyof VerificationFacts]: VerificationFacts[K];
+  } = {
+    root: repoRootFor(sessionsDir),
+    outOfBand: null,
+    current: null,
+    rounds: null,
+    ledgerError: null,
+    currentTree: null,
+    changedSinceLatest: null,
+    setRel: sessionsDir,
+  };
+  const root = facts.root;
+  if (root === null) return facts;
+  facts.setRel = sessionsRel(root, sessionsDir);
   // The integrity axis runs first and short-circuits: a hand-edited state
   // file must surface as itself, not as whatever downstream confusion it
   // causes.
-  const oob = detectOutOfBandWrite(sessionsDir, root, { requireRecord: true });
-  if (oob) {
+  facts.outOfBand = detectOutOfBandWrite(sessionsDir, root, { requireRecord: true }) || null;
+  if (facts.outOfBand !== null) return facts;
+  facts.current = currentSession(sessionsDir);
+  if (facts.current === null) return facts;
+  try {
+    facts.rounds = readRounds(root, facts.current as number);
+  } catch (error) {
+    if (!(error instanceof LedgerError)) throw error;
+    facts.ledgerError = error.message;
+    return facts;
+  }
+  if (judgeLatestRound(facts.rounds, facts.current, sessionsDir) !== null) return facts;
+  const latest = facts.rounds[facts.rounds.length - 1];
+  facts.currentTree = snapshotWorktreeTree(root);
+  if (facts.currentTree === null) return facts;
+  // Deliberately the recorded tree, never `effectiveBaseline`: a re-anchored
+  // baseline is safe for a fix delta, which only changes what the next round
+  // is shown, and fatal here, where the question is whether the tree still IS
+  // the verified one. Without that object there is no answer, and the diff
+  // fails closed rather than substituting a tree nobody verified.
+  facts.changedSinceLatest = changedPathsBetween(
+    root,
+    pythonStr(latest["completion_tree"]),
+    facts.currentTree,
+  );
+  return facts;
+}
+
+/** The verification gate's row, from the facts alone. */
+export function judgeVerification(facts: VerificationFacts, sessionsDir: string): Check {
+  if (facts.root === null) {
+    return [false, `not inside a git repository: ${sessionsDir}`];
+  }
+  if (facts.outOfBand !== null) {
     return [
       false,
-      `session-state integrity: ${oob}. State files are written by ` +
+      `session-state integrity: ${facts.outOfBand}. State files are written by ` +
         "the router, never by hand.",
     ];
   }
-
-  const current = currentSession(sessionsDir);
-  if (current === null) {
+  if (facts.current === null) {
     return [false, `no session is in flight under ${sessionsDir}`];
   }
-
-  let rounds: Record<string, unknown>[];
-  try {
-    rounds = readRounds(root, current as number);
-  } catch (error) {
-    if (!(error instanceof LedgerError)) throw error;
+  if (facts.rounds === null) {
     return [
       false,
-      `the run ledger is unreadable or invalid (${error.message}); failing ` +
+      `the run ledger is unreadable or invalid (${facts.ledgerError ?? ""}); failing ` +
         "closed rather than trusting a tampered record",
     ];
   }
+  const standing = judgeLatestRound(facts.rounds, facts.current, sessionsDir);
+  if (standing !== null) return standing;
+  if (facts.currentTree === null) {
+    return [false, "could not snapshot the working tree (failing closed)"];
+  }
+  if (facts.changedSinceLatest === null) {
+    return [
+      false,
+      "could not diff the working tree against the verified round " +
+        "(failing closed)",
+    ];
+  }
+  const latest = facts.rounds[facts.rounds.length - 1];
+  return judgeTreeSinceRound(latest, facts.changedSinceLatest, facts.setRel, sessionsDir);
+}
+
+/**
+ * What the ledger's rounds say before the tree is even looked at: no round
+ * at all, or a latest round that is blocking, refuse; otherwise null and
+ * the tree is next.
+ */
+export function judgeLatestRound(
+  rounds: readonly Record<string, unknown>[],
+  current: unknown,
+  sessionsDir: string,
+): Check | null {
   if (rounds.length === 0) {
     return [
       false,
@@ -269,36 +370,21 @@ export function checkVerificationClean(sessionsDir: string): Check {
         "lands nothing but its record",
     ];
   }
+  return null;
+}
 
-  const currentTree = snapshotWorktreeTree(root);
-  if (currentTree === null) {
-    return [false, "could not snapshot the working tree (failing closed)"];
-  }
-  // Deliberately the recorded tree, never `effectiveBaseline`: a re-anchored
-  // baseline is safe for a fix delta, which only changes what the next round
-  // is shown, and fatal here, where the question is whether the tree still IS
-  // the verified one. Without that object there is no answer, and the diff
-  // below fails closed rather than substituting a tree nobody verified.
-  const changed = changedPathsBetween(
-    root,
-    pythonStr(latest["completion_tree"]),
-    currentTree,
-  );
-  if (changed === null) {
-    return [
-      false,
-      "could not diff the working tree against the verified round " +
-        "(failing closed)",
-    ];
-  }
-  const setRel = sessionsRel(root, sessionsDir);
-  const material = changed.filter((path) => {
-    const forward = path.replace(/\\/g, "/");
-    const basename = forward.split("/").pop() ?? forward;
-    return !(
-      forward.startsWith(`${setRel}/`) && SET_BOOKKEEPING_BASENAMES.has(basename)
-    );
-  });
+/**
+ * Whether the paths that changed since the latest round's tree are the
+ * session's work (refuse) or only its bookkeeping (pass), and what a cap
+ * remediation says about itself.
+ */
+export function judgeTreeSinceRound(
+  latest: Record<string, unknown>,
+  changed: readonly string[],
+  setRel: string,
+  sessionsDir: string,
+): Check {
+  const material = changed.filter((path) => !isSetBookkeeping(path.replace(/\\/g, "/"), setRel));
   if (material.length > 0) {
     const preview = material.slice(0, 5).join(", ");
     const suffix = material.length > 5 ? ` (+${material.length - 5} more)` : "";
@@ -325,10 +411,114 @@ export function checkVerificationClean(sessionsDir: string): Check {
   return [true, ""];
 }
 
+// --- working_tree_clean -------------------------------------------------------
+
 export interface WorktreeChanges {
   readonly paths: readonly string[];
   /** Empty when the question was answerable; a sentence when it was not. */
   readonly error: string;
+}
+
+/** `git status --porcelain -uall` as text, or the sentence for why not. */
+export function readWorktreeStatus(root: string): { text: string; error: string } {
+  // `-uall` expands collapsed untracked directories to per-file entries; a
+  // single umbrella row would defeat the ignore filter.
+  const status = runGit(root, ["status", "--porcelain", "-uall"]);
+  if (status.code !== 0) {
+    return { text: "", error: `git status failed: ${status.stderr || "unknown error"}` };
+  }
+  return { text: status.stdout, error: "" };
+}
+
+/** One porcelain status line: the two-character code and the path it names. */
+export interface PorcelainEntry {
+  readonly code: string;
+  readonly path: string;
+}
+
+const C_ESCAPES: Readonly<Record<string, number>> = {
+  a: 0x07, b: 0x08, f: 0x0c, n: 0x0a, r: 0x0d, t: 0x09, v: 0x0b,
+  "\\": 0x5c, '"': 0x22,
+};
+
+/**
+ * Git's C-style quoting, undone: a path git printed between double quotes
+ * carries `\\`, `\"`, the C control escapes and `\ooo` octal BYTES, which
+ * are UTF-8 once reassembled. An unquoted path is taken as written.
+ */
+export function unquotePorcelainPath(raw: string): string {
+  if (!(raw.length >= 2 && raw.startsWith('"') && raw.endsWith('"'))) return raw;
+  const inner = raw.slice(1, -1);
+  const bytes: number[] = [];
+  for (let index = 0; index < inner.length; index += 1) {
+    const char = inner[index]!;
+    if (char !== "\\") {
+      bytes.push(...Buffer.from(char, "utf8"));
+      continue;
+    }
+    const next = inner[index + 1] ?? "";
+    const octal = /^[0-7]{1,3}/.exec(inner.slice(index + 1, index + 4))?.[0];
+    if (octal !== undefined) {
+      bytes.push(Number.parseInt(octal, 8));
+      index += octal.length;
+    } else if (next in C_ESCAPES) {
+      bytes.push(C_ESCAPES[next]!);
+      index += 1;
+    } else {
+      bytes.push(0x5c);
+    }
+  }
+  return Buffer.from(bytes).toString("utf8");
+}
+
+/**
+ * `git status --porcelain` parsed: two characters of code, a space, then
+ * the path -- the NEW name of a rename, unquoted where git quoted it. A
+ * line too short to carry a path is skipped.
+ */
+export function parsePorcelain(porcelain: string): PorcelainEntry[] {
+  const entries: PorcelainEntry[] = [];
+  for (const line of porcelain.split("\n")) {
+    if (line.length < 4) continue;
+    let path = line.slice(3);
+    if (path.includes(" -> ")) path = path.split(" -> ", 2)[1];
+    path = path.trim();
+    // A quoted path is decoded exactly: a backslash inside it is a byte of
+    // the name (POSIX allows one). Git spells every unquoted path with
+    // forward slashes, so a backslash in one came from somewhere else and
+    // is read as a separator.
+    path = path.startsWith('"') ? unquotePorcelainPath(path) : path.replace(/\\/g, "/");
+    entries.push({ code: line.slice(0, 2), path });
+  }
+  return entries;
+}
+
+/** `git rev-list --count` output as a number; anything but an integer is 0. */
+export function parseRevListCount(text: string): number {
+  return pythonInt(text);
+}
+
+/**
+ * The paths in a porcelain status that are work: not editor noise, not the
+ * session's own bookkeeping under `setRel`, not the run ledger.
+ */
+export function materialPaths(porcelain: string, setRel: string): string[] {
+  const blocking: string[] = [];
+  for (const entry of parsePorcelain(porcelain)) {
+    const path = entry.path;
+    const basename = path.split("/").pop() ?? path;
+    if (IGNORE_BASENAME_PATTERNS.some((pattern) => matchesPattern(basename, pattern))) {
+      continue;
+    }
+    if (isSetBookkeeping(path, setRel)) {
+      continue; // the close commits its own bookkeeping after the flip
+    }
+    if (isMachineStatePath(path)) {
+      continue; // the run ledger is the record, not the work
+    }
+    blocking.push(path);
+  }
+  return blocking;
 }
 
 /**
@@ -341,43 +531,32 @@ export interface WorktreeChanges {
  * after work exists.
  */
 export function materialWorktreeChanges(sessionsDir: string): WorktreeChanges {
+  return judgeWorktree(readWorktreeFacts(sessionsDir), sessionsDir);
+}
+
+/** What the working-tree gate reads: the porcelain, and where the record lives. */
+export interface WorktreeFacts {
+  readonly root: string | null;
+  readonly porcelain: string;
+  /** The sentence for why the porcelain could not be read, or empty. */
+  readonly error: string;
+  readonly setRel: string;
+}
+
+export function readWorktreeFacts(sessionsDir: string): WorktreeFacts {
   const root = repoRootFor(sessionsDir);
-  if (root === null) {
+  if (root === null) return { root, porcelain: "", error: "", setRel: sessionsDir };
+  const status = readWorktreeStatus(root);
+  return { root, porcelain: status.text, error: status.error, setRel: sessionsRel(root, sessionsDir) };
+}
+
+/** The work in the tree, from the facts alone. */
+export function judgeWorktree(facts: WorktreeFacts, sessionsDir: string): WorktreeChanges {
+  if (facts.root === null) {
     return { paths: [], error: `not inside a git repository: ${sessionsDir}` };
   }
-  // `-uall` expands collapsed untracked directories to per-file entries; a
-  // single umbrella row would defeat the ignore filter.
-  const status = runGit(root, ["status", "--porcelain", "-uall"]);
-  if (status.code !== 0) {
-    return {
-      paths: [],
-      error: `git status failed: ${status.stderr || "unknown error"}`,
-    };
-  }
-  const setRel = sessionsRel(root, sessionsDir);
-
-  const blocking: string[] = [];
-  for (const line of status.stdout.split("\n")) {
-    if (line.length < 4) continue;
-    let path = line.slice(3);
-    if (path.includes(" -> ")) path = path.split(" -> ", 2)[1];
-    // `strip('"')` takes every quote off both ends, not one: git quotes a
-    // path that needs escaping, and a name ending in a quote would leave one
-    // behind if only the outermost came off.
-    path = path.trim().replace(/^"+/, "").replace(/"+$/, "").replace(/\\/g, "/");
-    const basename = path.split("/").pop() ?? path;
-    if (IGNORE_BASENAME_PATTERNS.some((pattern) => matchesPattern(basename, pattern))) {
-      continue;
-    }
-    if (path.startsWith(`${setRel}/`) && SET_BOOKKEEPING_BASENAMES.has(basename)) {
-      continue; // the close commits its own bookkeeping after the flip
-    }
-    if (isMachineStatePath(path)) {
-      continue; // the run ledger is the record, not the work
-    }
-    blocking.push(path);
-  }
-  return { paths: blocking, error: "" };
+  if (facts.error) return { paths: [], error: facts.error };
+  return { paths: materialPaths(facts.porcelain, facts.setRel), error: "" };
 }
 
 /** The first five paths, and how many more there are. */
@@ -393,12 +572,39 @@ export function checkWorkingTreeClean(sessionsDir: string): Check {
   return [false, `working tree has uncommitted changes: ${previewPaths(paths)}`];
 }
 
+// --- pushed_to_remote ---------------------------------------------------------
+
 const PUSH_FAILURE_SIGNALS: readonly (readonly [string, string])[] = [
   ["non-fast-forward", "non-fast-forward; rebase or pull --rebase first"],
   ["rejected", "remote rejected the push (branch protection or non-FF)"],
   ["protected branch", "remote rejected the push (branch protected)"],
   ["denied", "remote denied the push (permissions or branch protection)"],
 ];
+
+/** What a push dry-run's stderr says went wrong, in the operator's words. */
+export function classifyPushFailure(stderr: string): string {
+  const lowered = (stderr || "").toLowerCase();
+  for (const [signal, remediation] of PUSH_FAILURE_SIGNALS) {
+    if (lowered.includes(signal)) return remediation;
+  }
+  const first = stderr ? stderr.split("\n")[0] : "unknown error";
+  return `git push --dry-run failed: ${first}`;
+}
+
+/** The facts the push gate judges, as git and the disk answered them. */
+export interface PushFacts {
+  /** The checked-out branch, or null when HEAD is detached. */
+  readonly branch: string | null;
+  /** The upstream's name, or null when the branch tracks nothing. */
+  readonly upstream: string | null;
+  /** Read only when there is no upstream: the waiver's two conditions. */
+  readonly localOnlyMarker: boolean;
+  readonly hasRemote: boolean;
+  /** Commits the upstream has not seen; 0 when unknown. */
+  readonly ahead: number;
+  /** Read only when ahead: null means the dry run succeeded. */
+  readonly dryRunError: string | null;
+}
 
 /** A failed `git remote` is not an answer: the waiver needs an affirmative no. */
 function hasRemote(repoRoot: string): boolean {
@@ -407,15 +613,19 @@ function hasRemote(repoRoot: string): boolean {
   return result.stdout.trim().length > 0;
 }
 
-export function checkPushedToRemote(sessionsDir: string): Check {
-  const root = repoRootFor(sessionsDir);
-  if (root === null) {
-    return [false, `not inside a git repository: ${sessionsDir}`];
-  }
+/** Ask git, in the order the judge needs the answers and no further. */
+export function readPushFacts(root: string): PushFacts {
+  const facts = {
+    branch: null as string | null,
+    upstream: null as string | null,
+    localOnlyMarker: false,
+    hasRemote: true,
+    ahead: 0,
+    dryRunError: null as string | null,
+  };
   const head = runGit(root, ["symbolic-ref", "--short", "HEAD"]);
-  if (head.code !== 0) {
-    return [false, "HEAD is detached; check out a branch before close-out"];
-  }
+  if (head.code !== 0) return facts;
+  facts.branch = head.stdout;
   const upstream = runGit(root, [
     "rev-parse",
     "--abbrev-ref",
@@ -423,7 +633,26 @@ export function checkPushedToRemote(sessionsDir: string): Check {
     "@{u}",
   ]);
   if (upstream.code !== 0) {
-    if (existsSync(join(root, ".dabbler", "local-only")) && !hasRemote(root)) {
+    facts.localOnlyMarker = existsSync(join(root, ".dabbler", "local-only"));
+    facts.hasRemote = facts.localOnlyMarker ? hasRemote(root) : true;
+    return facts;
+  }
+  facts.upstream = upstream.stdout;
+  const count = runGit(root, ["rev-list", "--count", "@{u}..HEAD"]);
+  facts.ahead = count.code === 0 ? parseRevListCount(count.stdout) : 0;
+  if (facts.ahead === 0) return facts;
+  const dryRun = runGit(root, ["push", "--dry-run", "--porcelain"]);
+  if (dryRun.code !== 0) facts.dryRunError = dryRun.stderr || "";
+  return facts;
+}
+
+/** The push gate's row, from the facts alone. */
+export function judgePushState(facts: PushFacts): Check {
+  if (facts.branch === null) {
+    return [false, "HEAD is detached; check out a branch before close-out"];
+  }
+  if (facts.upstream === null) {
+    if (facts.localOnlyMarker && !facts.hasRemote) {
       return [
         true,
         "local-only repo: push gate waived (.dabbler/local-only " +
@@ -432,28 +661,28 @@ export function checkPushedToRemote(sessionsDir: string): Check {
     }
     return [
       false,
-      `branch ${pythonRepr(head.stdout)} has no upstream; run: ` +
-        `git push --set-upstream <remote> ${head.stdout}`,
+      `branch ${pythonRepr(facts.branch)} has no upstream; run: ` +
+        `git push --set-upstream <remote> ${facts.branch}`,
     ];
   }
-  const count = runGit(root, ["rev-list", "--count", "@{u}..HEAD"]);
-  const ahead = count.code === 0 ? pythonInt(count.stdout) : 0;
-  if (ahead === 0) return [true, ""];
-  const dryRun = runGit(root, ["push", "--dry-run", "--porcelain"]);
-  if (dryRun.code !== 0) {
-    const lowered = (dryRun.stderr || "").toLowerCase();
-    for (const [signal, remediation] of PUSH_FAILURE_SIGNALS) {
-      if (lowered.includes(signal)) return [false, remediation];
-    }
-    const first = dryRun.stderr ? dryRun.stderr.split("\n")[0] : "unknown error";
-    return [false, `git push --dry-run failed: ${first}`];
-  }
+  if (facts.ahead === 0) return [true, ""];
+  if (facts.dryRunError !== null) return [false, classifyPushFailure(facts.dryRunError)];
   return [
     false,
-    `branch ${pythonRepr(head.stdout)} is ${ahead} commit(s) ahead of ` +
-      `${upstream.stdout}; run: git push`,
+    `branch ${pythonRepr(facts.branch)} is ${facts.ahead} commit(s) ahead of ` +
+      `${facts.upstream}; run: git push`,
   ];
 }
+
+export function checkPushedToRemote(sessionsDir: string): Check {
+  const root = repoRootFor(sessionsDir);
+  if (root === null) {
+    return [false, `not inside a git repository: ${sessionsDir}`];
+  }
+  return judgePushState(readPushFacts(root));
+}
+
+// --- test_run_fresh -----------------------------------------------------------
 
 /**
  * The configuration that actually governs `sessionsDir`'s repository.
@@ -476,12 +705,11 @@ export function governingConfig(sessionsDir: string): RouterConfig | null {
   }
 }
 
-export function checkTestRunFresh(
-  sessionsDir: string,
-  config: RouterConfig | null = null,
-): Check {
-  const governing = config ?? governingConfig(sessionsDir);
-  const loaded = loadSuitesChecked(governing);
+/**
+ * What the suite declaration alone decides: malformed refuses, no expensive
+ * suite is inapplicable, otherwise null and the freshness verdicts are next.
+ */
+export function judgeSuiteDeclaration(loaded: SuiteLoadResult): Check | null {
   if (loaded.errors.length > 0) {
     // "No expensive suites declared" and "every declared suite was a typo
     // and got dropped" must never be indistinguishable.
@@ -502,10 +730,40 @@ export function checkTestRunFresh(
     // is undeclared, not this row.
     return [true, "no suite is declared, so nothing was measured", true];
   }
-  const verdicts = evaluateFreshness(sessionsDir, null, loaded.suites);
+  return null;
+}
+
+/** The freshness row: every required suite's verdict, the failures named. */
+export function judgeFreshness(verdicts: readonly FreshnessVerdict[]): Check {
   const failures = verdicts.filter((verdict) => verdict.required && !verdict.passed);
   if (failures.length === 0) return [true, ""];
   return [false, failures.map((v) => `${v.suite}: ${v.reason}`).join("; ")];
+}
+
+export function checkTestRunFresh(
+  sessionsDir: string,
+  config: RouterConfig | null = null,
+): Check {
+  const governing = config ?? governingConfig(sessionsDir);
+  const loaded = loadSuitesChecked(governing);
+  const declared = judgeSuiteDeclaration(loaded);
+  if (declared !== null) return declared;
+  return judgeFreshness(evaluateFreshness(sessionsDir, null, loaded.suites));
+}
+
+// --- owed_decisions -----------------------------------------------------------
+
+/** The owed-decision row, from the blocking rows alone. */
+export function judgeOwedDecisions(blocking: readonly Record<string, unknown>[]): Check {
+  if (blocking.length === 0) return [true, ""];
+  const names = blocking.map((row) => String(row["id"])).join(", ");
+  return [
+    false,
+    `${blocking.length} unanswered decision(s) would reduce what verification ` +
+      `proves: ${names}. The work is done and the record cannot call it ` +
+      "verified until they are answered -- run `dabbler owed list` to read " +
+      "them, and `dabbler owed answer` to settle one.",
+  ];
 }
 
 /**
@@ -538,14 +796,39 @@ export function checkOwedDecisions(sessionsDir: string): Check {
       }`,
     ];
   }
-  if (blocking.length === 0) return [true, ""];
-  const names = blocking.map((row) => String(row["id"])).join(", ");
+  return judgeOwedDecisions(blocking);
+}
+
+// --- published_when_releasable ------------------------------------------------
+
+/**
+ * The packaging row for a session that declared itself releasable: a
+ * `published` outcome passes; a record of trying, or no record, refuses.
+ */
+export function judgePackagingRecord(rows: readonly Record<string, unknown>[]): Check {
+  // A row is not an answer: `dabbler packaging` records every non-dry run
+  // it makes, `refused` and `failed` among them, so an attempt that shipped
+  // nothing used to satisfy the gate that exists to prove something
+  // shipped. And the way past a publish stop is `session close`, where this
+  // printed PASS -- the csv-model gap reached from the other side. The
+  // predicate is packaging's own, so "what counts as published" is stated
+  // once.
+  if (rows.some((row) => row["outcome"] === OUTCOME_PUBLISHED)) return [true, ""];
+  const attempted = rows.length > 0;
   return [
     false,
-    `${blocking.length} unanswered decision(s) would reduce what verification ` +
-      `proves: ${names}. The work is done and the record cannot call it ` +
-      "verified until they are answered -- run `dabbler owed list` to read " +
-      "them, and `dabbler owed answer` to settle one.",
+    "this session declared itself releasable and " +
+      (attempted
+        ? `its packaging record holds ${rows.length} run(s) and none of them ` +
+          "published -- a refusal or a failure is a record of trying, not of " +
+          "shipping. Read the last row's refusal and answer it"
+        : "no packaging run is on its record") +
+      ", so closing it would report a session that shipped its " +
+      "artifact when nothing was built or pushed. The publish phase runs " +
+      "between the land and the close and writes that record; if it did " +
+      "not run, find out why rather than closing past this. Declaring the " +
+      "session not-releasable is a change to what the session IS and is " +
+      "made at step (a), never here.",
   ];
 }
 
@@ -594,30 +877,27 @@ export function checkPublishedWhenReleasable(sessionsDir: string): Check {
       }`,
     ];
   }
-  // A row is not an answer: `dabbler packaging` records every non-dry run
-  // it makes, `refused` and `failed` among them, so an attempt that shipped
-  // nothing used to satisfy the gate that exists to prove something
-  // shipped. And the way past a publish stop is `session close`, where this
-  // printed PASS -- the csv-model gap reached from the other side. The
-  // predicate is packaging's own, so "what counts as published" is stated
-  // once.
-  if (rows.some((row) => row["outcome"] === OUTCOME_PUBLISHED)) return [true, ""];
-  const attempted = rows.length > 0;
-  return [
-    false,
-    "this session declared itself releasable and " +
-      (attempted
-        ? `its packaging record holds ${rows.length} run(s) and none of them ` +
-          "published -- a refusal or a failure is a record of trying, not of " +
-          "shipping. Read the last row's refusal and answer it"
-        : "no packaging run is on its record") +
-      ", so closing it would report a session that shipped its " +
-      "artifact when nothing was built or pushed. The publish phase runs " +
-      "between the land and the close and writes that record; if it did " +
-      "not run, find out why rather than closing past this. Declaring the " +
-      "session not-releasable is a change to what the session IS and is " +
-      "made at step (a), never here.",
-  ];
+  return judgePackagingRecord(rows);
+}
+
+// --- verdict_vocabulary -------------------------------------------------------
+
+/** Every persisted token, named by its source, is in the closed allowlist. */
+export function judgeVerdictTokens(tokens: readonly (readonly [string, unknown])[]): Check {
+  for (const [source, token] of tokens) {
+    if (!SESSION_VERDICTS.has(pythonStr(token).trim())) {
+      const vocabulary = [...SESSION_VERDICTS].sort();
+      return [
+        false,
+        `${source} carries verdict ${pythonRepr(token)}, which is not in the ` +
+          `closed vocabulary ${pythonRepr(vocabulary)}. Verdicts ` +
+          "are written by the router, never invented — a free-form " +
+          "token (the v1 'manual-override-development' incident) or " +
+          "a prefix look-alike never closes a session.",
+      ];
+    }
+  }
+  return [true, ""];
 }
 
 /**
@@ -653,25 +933,12 @@ export function checkVerdictVocabulary(sessionsDir: string): Check {
       }
     }
   }
-  for (const [source, token] of tokens) {
-    if (!SESSION_VERDICTS.has(pythonStr(token).trim())) {
-      const vocabulary = [...SESSION_VERDICTS].sort();
-      return [
-        false,
-        `${source} carries verdict ${pythonRepr(token)}, which is not in the ` +
-          `closed vocabulary ${pythonRepr(vocabulary)}. Verdicts ` +
-          "are written by the router, never invented — a free-form " +
-          "token (the v1 'manual-override-development' incident) or " +
-          "a prefix look-alike never closes a session.",
-      ];
-    }
-  }
-  return [true, ""];
+  return judgeVerdictTokens(tokens);
 }
 
 // --- Driver -------------------------------------------------------------------
 
-type Predicate = (sessionsDir: string, config?: RouterConfig | null) => Check;
+export type Predicate = (sessionsDir: string, config?: RouterConfig | null) => Check;
 
 export const GATE_CHECKS: readonly (readonly [string, Predicate])[] = [
   ["verification_clean", checkVerificationClean],
@@ -702,6 +969,8 @@ export interface RunGatesOptions {
    * evidence that the question was asked and answered.
    */
   readonly omit?: readonly string[];
+  /** The gates to run; `GATE_CHECKS` unless a test hands in its own. */
+  readonly gates?: readonly (readonly [string, Predicate])[];
 }
 
 /**
@@ -717,7 +986,7 @@ export function runGates(
   const config = options.config ?? null;
   const omit = new Set(options.omit ?? []);
   const results: GateResult[] = [];
-  for (const [name, predicate] of GATE_CHECKS) {
+  for (const [name, predicate] of options.gates ?? GATE_CHECKS) {
     if (omit.has(name)) continue;
     if (forced && !EVIDENCE_GATES.has(name)) {
       results.push({

@@ -75,8 +75,6 @@ export const INTEGRATION_FILES: readonly string[] = [
   "evidence.test.ts",
   "facts.test.ts",
   "fixloop.test.ts",
-  "gates.test.ts",
-  "gitContract.test.ts",
   "inProcess.test.ts",
   "jobs.test.ts",
   "journal.test.ts",
@@ -112,14 +110,21 @@ export function poolFor(env: NodeJS.ProcessEnv = process.env): {
     maxWorkers: workers,
     // Every worker, and so everything a worker forks, runs below normal
     // priority: the operator's keyboard comes first.
-    setupFiles: ["./test/support/priority.ts"],
+    setupFiles: ["./test-vitest/support/priority.ts"],
   };
 }
+
+// From session 83 the vitest files live under `test-vitest/`, and `test/` is
+// Node's own runner (`node --test`): the two never see each other's files.
+// Every session of the rebuild rewrites one area into `test/` and deletes
+// what it replaced here; session 88 deletes this config with the last of it.
+export const VITEST_DIR = "test-vitest";
 
 export default defineConfig({
   test: {
     ...poolFor(),
-    exclude: ["**/node_modules/**", ...INTEGRATION_FILES.map((name) => `test/${name}`)],
+    include: [`${VITEST_DIR}/**/*.test.ts`],
+    exclude: ["**/node_modules/**", ...INTEGRATION_FILES.map((name) => `${VITEST_DIR}/${name}`)],
     // A targeted run naming only integration files (`dabbler affected`
     // narrows the suite command to changed test files) finds nothing in
     // this tier, and that is not a red run: the integration suite runs the

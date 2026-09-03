@@ -4,11 +4,11 @@
 // two are a partition of the suite and CI runs both.
 import { defineConfig } from "vitest/config";
 
-import { INTEGRATION_FILES, poolFor } from "./vitest.config.ts";
+import { INTEGRATION_FILES, VITEST_DIR, poolFor } from "./vitest.config.ts";
 
 export default defineConfig({
   test: {
     ...poolFor(),
-    include: INTEGRATION_FILES.map((name) => `test/${name}`),
+    include: INTEGRATION_FILES.map((name) => `${VITEST_DIR}/${name}`),
   },
 });

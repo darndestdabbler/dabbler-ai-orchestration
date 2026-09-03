@@ -614,3 +614,10 @@
 - Excluded providers: anthropic, openai
 - Dispute on round 3 finding 0: OVERRULED — The orchestrator's claim that the record says no secret existed is incorrect. The cited `session-plan.md` (lines 3605-3615) refers to a *`VSCE_PAT` secret* as "then owed by the operator" and says "This repository has no secrets", which refers to that specific secret *at that time*, not all secrets for all time, nor specifically `OVSX_PAT`. The `publish-vscode.yml` (lines 18-28) states "a never-used path holding the last stored secret was the wrong trade", which indicates a secret *was* stored. The `marketplace-release-process.md` (lines 1-10) states "no PAT, no stored secret anywhere" referring to the *current* authentication method, not past methods or secrets. The verifier's finding is specific to the `OVSX_PAT` and its persistence in GitHub environments, which is not contradicted by the cited evidence; rather, the evidence from `publish-vscode.yml` implies a past stored secret.
 - Raw round output: `.dabbler/runs/s81/`
+
+## Session 83 verification — VERIFIED after 3 round(s)
+
+- Verifier: gpt-5-6-sol (openai) over api
+- Orchestrator provider (excluded): anthropic
+- Verifier's read surface: agency: none — this round's verifier could not look at the tree
+- Raw round output: `.dabbler/runs/s83/`

@@ -1,527 +1,371 @@
-// The close gates, and the driver that runs them.
-//
-// Each gate is here because an incident is, so each test names the state
-// the gate refuses rather than the code path it takes. The parity control
-// proves the two routers word these identically; what these prove is the
-// answer itself -- including the states the corpus never reaches, which is
-// most of the interesting ones.
-
-import { mkdirSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
-import { basename, join } from "node:path";
-
-import { afterAll, describe, expect, it } from "vitest";
+// The close gates' judges, with literal facts. No repository, no setup: a
+// judge takes what a reader would have returned and answers the row. The
+// readers themselves are exercised in walk-git-states.test.ts.
+import assert from "node:assert/strict";
+import { describe, it } from "node:test";
 
 import {
   EVIDENCE_GATES,
   GATE_CHECKS,
-  GATE_PUBLISHED_WHEN_RELEASABLE,
-  type GateResult,
-  materialWorktreeChanges,
+  classifyPushFailure,
+  judgeFreshness,
+  judgeLatestRound,
+  judgeOwedDecisions,
+  judgePackagingRecord,
+  judgePushState,
+  judgeSuiteDeclaration,
+  judgeTreeSinceRound,
+  judgeVerdictTokens,
+  judgeVerification,
+  judgeWorktree,
+  materialPaths,
+  parsePorcelain,
+  parseRevListCount,
+  previewPaths,
   runGates,
+  unquotePorcelainPath,
+  type PushFacts,
+  type VerificationFacts,
 } from "../src/gates.ts";
-import { snapshotWorktreeTree } from "../src/journal.ts";
-import { appendPackaging, appendRound, roundsPath } from "../src/ledger.ts";
-import { recordRun } from "../src/testEvidence.ts";
-import { declareSessionTask, registerSessionStart } from "../src/writers.ts";
-import { git, makeSandboxRepo, removeTempDirs } from "./support/fixtures.ts";
+import type { SuiteLoadResult } from "../src/testEvidence.ts";
 
-afterAll(removeTempDirs);
+const SESSIONS = "docs/sessions";
 
-function byName(results: readonly GateResult[]): Record<string, GateResult> {
-  return Object.fromEntries(results.map((row) => [row.name, row]));
-}
-
-function recordRound(
-  repo: string,
-  options: {
-    blocking?: boolean;
-    round?: number;
-    previousTree?: string;
-    verdict?: string;
-    type?: string;
-    remediated?: Record<string, unknown>;
-  } = {},
-): Record<string, unknown> {
-  const blocking = options.blocking ?? false;
-  const row: Record<string, unknown> = {
-    round: options.round ?? 1,
-    verdict: options.verdict ?? (blocking ? "ISSUES_FOUND" : "VERIFIED"),
-    blocking,
-    verifier_model: "gpt-5-4",
-    verifier_provider: "openai",
-    findings: [],
-    cost_usd: 0.05,
-    completion_tree: snapshotWorktreeTree(repo),
-    recorded_at: new Date().toISOString(),
-  };
-  if (options.previousTree) row["previous_tree"] = options.previousTree;
-  if (options.type) row["type"] = options.type;
-  if (options.remediated) row["remediated"] = options.remediated;
-  appendRound(repo, 1, row);
-  return row;
-}
-
-/**
- * A session in the state a clean close expects: registered, work committed
- * and pushed, one non-blocking round recorded, and a green run of record
- * bound to the tree it ran against.
- */
-function closeReady(): { repo: string; sessionsDir: string } {
-  const { repo, sessionsDir } = makeSandboxRepo();
-  registerSessionStart(sessionsDir, 1, { engine: "claude-code", provider: "anthropic" });
-  writeFileSync(join(repo, "src", "widget.py"), "def widget():\n    return 2\n", "utf8");
-  git(repo, "add", "-A");
-  git(repo, "commit", "-q", "-m", "work");
-  git(repo, "push", "-q");
-  recordFullRun(sessionsDir);
-  recordRound(repo);
-  return { repo, sessionsDir };
-}
-
-/**
- * The run of record for `SUITE`.
- *
- * A gate reads the suites the CONFIG declares, and the ambient config
- * belongs to whichever repository the tests are running in -- never to the
- * sandbox. So every test that means to exercise this gate hands it
- * `CONFIG`; the other gates' tests get the vacuous "no expensive suite is
- * declared" pass, which is what the Python twin's fixture gets too.
- */
-function recordFullRun(sessionsDir: string): void {
-  recordRun(sessionsDir, SUITE, "passed", { stage: "final-full", durationSeconds: 1.5 });
-}
-
-const SUITE = {
-  name: "pytest",
-  command: "pytest",
-  covers: ["."],
-  expensive: true,
-  runsWhole: false,
-};
-
-const CONFIG = {
-  testing: {
-    suites: [{ name: "pytest", command: "pytest", covers: ["."], expensive: true }],
-  },
-};
-
-describe("a close with nothing wrong with it", () => {
-  it("passes all seven gates", () => {
-    const { sessionsDir } = closeReady();
-    const results = runGates(sessionsDir, { config: CONFIG });
-    expect(results).toHaveLength(7);
-    for (const row of results) {
-      expect(`${row.name}: ${row.remediation}`).toBe(`${row.name}: `);
-    }
+describe("working_tree_clean: what counts as work in a porcelain status", () => {
+  it("keeps modified and untracked paths, taking the new name of a rename", () => {
+    const status = " M src/a.ts\n?? new.txt\nR  old.txt -> renamed.txt\n";
+    assert.deepEqual(materialPaths(status, SESSIONS), ["src/a.ts", "new.txt", "renamed.txt"]);
   });
 
-  it("runs the seven in the order the close prints them", () => {
-    // `owed_decisions` sits after `test_run_fresh` on purpose: the operator
-    // reads "nothing was measured" and then reads why that is not allowed to
-    // stand, in that order.
-    expect(GATE_CHECKS.map(([name]) => name)).toEqual([
-      "verification_clean",
-      "working_tree_clean",
-      "pushed_to_remote",
-      "test_run_fresh",
-      "owed_decisions",
-      // Before `verdict_vocabulary` rather than after: a session that
-      // shipped nothing is a fact about the work, and the vocabulary check
-      // is a fact about how the record spells its verdicts. The operator
-      // reads what went wrong before how it was written down.
-      "published_when_releasable",
-      "verdict_vocabulary",
+  it("decodes the C-quoting git puts around a path it had to escape", () => {
+    // Octal bytes reassemble to UTF-8; the control escapes and the escaped
+    // quote and backslash mean themselves.
+    assert.equal(unquotePorcelainPath('"caf\\303\\251.txt"'), "café.txt");
+    assert.equal(unquotePorcelainPath('"tab\\there"'), "tab\there");
+    assert.equal(unquotePorcelainPath('"quo\\"te"'), 'quo"te');
+    assert.equal(unquotePorcelainPath('"back\\\\slash"'), "back\\slash");
+    assert.equal(unquotePorcelainPath("plain name.txt"), "plain name.txt");
+    assert.deepEqual(parsePorcelain('?? "caf\\303\\251.txt"\n M a.txt\n'), [
+      { code: "??", path: "café.txt" },
+      { code: " M", path: "a.txt" },
     ]);
   });
-});
 
-describe("verification_clean", () => {
-  it("refuses a session with no round, and names the command that opens one", () => {
-    const { sessionsDir } = makeSandboxRepo();
-    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
-    const row = byName(runGates(sessionsDir))["verification_clean"];
-    expect(row.passed).toBe(false);
-    expect(row.remediation).toContain("dabbler verify");
+  it("keeps a backslash that is part of a quoted name, and reads one in an unquoted path as a separator", () => {
+    assert.deepEqual(materialPaths('?? "back\\\\slash"\n?? docs\\notes.md\n', SESSIONS), ["back\\slash", "docs/notes.md"]);
   });
 
-  it("refuses while the latest round is blocking", () => {
-    const { repo, sessionsDir } = closeReady();
-    const tree = snapshotWorktreeTree(repo) as string;
-    recordRound(repo, { blocking: true, round: 2, previousTree: tree });
-    const row = byName(runGates(sessionsDir))["verification_clean"];
-    expect(row.passed).toBe(false);
-    expect(row.remediation).toContain("blocking finding");
-  });
-
-  it("refuses when the work changed after the round that verified it", () => {
-    const { repo, sessionsDir } = closeReady();
-    writeFileSync(join(repo, "src", "widget.py"), "def widget():\n    return 3\n", "utf8");
-    const row = byName(runGates(sessionsDir))["verification_clean"];
-    expect(row.passed).toBe(false);
-    expect(row.remediation).toContain("changed after verification");
-  });
-
-  it("allows the session's own bookkeeping to move after the round", () => {
-    // `verify` writes the verdict and the change-log entry after its final
-    // snapshot, so a gate that counted them as work would make every
-    // verified session unclosable.
-    const { sessionsDir } = closeReady();
-    writeFileSync(join(sessionsDir, "change-log.md"), "## s1\n", "utf8");
-    const row = byName(runGates(sessionsDir))["verification_clean"];
-    expect(row.passed).toBe(true);
-  });
-
-  it("refuses a state file that no sanctioned write accounts for", () => {
-    const { sessionsDir } = closeReady();
-    const path = join(sessionsDir, "sessions.json");
-    writeFileSync(path, readFileSync(path, "utf8").replace("in-progress", "complete"), "utf8");
-    const row = byName(runGates(sessionsDir))["verification_clean"];
-    expect(row.passed).toBe(false);
-    expect(row.remediation).toContain("out of band");
-  });
-
-  it("fails closed on a ledger it cannot parse rather than trusting it", () => {
-    const { repo, sessionsDir } = closeReady();
-    const path = roundsPath(repo, 1);
-    writeFileSync(path, readFileSync(path, "utf8").replace('"VERIFIED"', "not json"), "utf8");
-    const row = byName(runGates(sessionsDir))["verification_clean"];
-    expect(row.passed).toBe(false);
-    expect(row.remediation).toContain("failing closed");
-  });
-
-  it("passes a cap remediation and says out loud that nobody reviewed it", () => {
-    const { repo, sessionsDir } = closeReady();
-    const tree = snapshotWorktreeTree(repo) as string;
-    recordRound(repo, {
-      round: 2,
-      previousTree: tree,
-      verdict: "REMEDIATED_AT_CAP",
-      type: "remediated_at_cap",
-      remediated: {
-        reviewed_round: 1,
-        findings: [
-          { description: "one", severity: "major" },
-          { description: "two", severity: "critical" },
-        ],
-        fix_paths: ["src/widget.py"],
-      },
+  it("answers the working-tree question from the facts alone", () => {
+    assert.deepEqual(judgeWorktree({ root: null, porcelain: "", error: "", setRel: SESSIONS }, SESSIONS), {
+      paths: [],
+      error: "not inside a git repository: docs/sessions",
     });
-    const row = byName(runGates(sessionsDir))["verification_clean"];
-    expect(row.passed).toBe(true);
-    expect(row.remediation).toContain("2 blocking finding(s)");
-    expect(row.remediation).toContain("LANDS UNREVIEWED");
+    assert.deepEqual(judgeWorktree({ root: "/r", porcelain: "", error: "git status failed: boom", setRel: SESSIONS }, SESSIONS), {
+      paths: [],
+      error: "git status failed: boom",
+    });
+    assert.deepEqual(judgeWorktree({ root: "/r", porcelain: " M a.txt\n", error: "", setRel: SESSIONS }, SESSIONS), {
+      paths: ["a.txt"],
+      error: "",
+    });
   });
 
-  it("closes in a repository that never ignored the run ledger", () => {
-    // The round is written after the tree it describes, so counting it as
-    // work made every verified session unclosable no matter how many times
-    // it was re-verified.
-    const { repo, sessionsDir } = makeSandboxRepo();
-    writeFileSync(join(repo, ".gitignore"), "__pycache__/\n", "utf8");
-    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
-    writeFileSync(join(repo, "src", "widget.py"), "def widget():\n    return 2\n", "utf8");
-    recordRound(repo);
-    git(repo, "add", "-A");
-    git(repo, "commit", "-q", "-m", "work");
-    git(repo, "push", "-q");
-    for (const row of runGates(sessionsDir)) {
-      expect(row.passed).toBe(true);
-      // An inapplicable gate carries the reason it judged nothing. Only the
-      // gates that actually measured something are silent.
-      if (row.inapplicable) continue;
-      expect(`${row.name}: ${row.remediation}`).toBe(`${row.name}: `);
-    }
-  });
-
-  it("reports SKIP rather than PASS when no suite is declared", () => {
-    // The sandbox declares a suite; a repository that declares none is the
-    // state csv-model closed session 1 in, at a clean 5/5 with nothing
-    // runnable. A gate that cannot see its own precondition must not report
-    // success -- it grows quieter as the work grows more consequential.
-    const { sessionsDir } = makeSandboxRepo();
-    const row = runGates(sessionsDir, {
-      config: { testing: { suites: [] } } as never,
-    }).find((entry) => entry.name === "test_run_fresh");
-    expect(row?.inapplicable).toBe(true);
-    expect(row?.remediation).toContain("no suite is declared");
-  });
-
-  it("excludes the ledger's own file through a path git spells differently", () => {
-    // Twelve consecutive CI runs, red for this and nothing else. The Windows
-    // runner's `os.tmpdir()` is the 8.3 short form (`C:\Users\RUNNER~1\...`)
-    // while `git rev-parse --show-toplevel` answers with the long one, so the
-    // sessions-relative prefix was `..\alias\docs\sessions`, the bookkeeping
-    // exclusion never matched, and the ledger's own file counted as the
-    // session's work. A junction reproduces the same two spellings here --
-    // this fails exactly as the runner does without the fix, and the machine
-    // that never sees a short path is no longer the only one it works on.
-    const { repo, sessionsDir } = makeSandboxRepo();
-    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
-    expect(materialWorktreeChanges(sessionsDir).paths).toEqual([]);
-
-    const alias = join(repo, "..", `${basename(repo)}-alias`);
-    symlinkSync(repo, alias, process.platform === "win32" ? "junction" : "dir");
-    expect(materialWorktreeChanges(join(alias, "docs", "sessions")).paths).toEqual([]);
-  });
-
-  it("names the file the operator edits, and never the packaged layer beneath it", () => {
-    // csv-model's seventh feedback item: the gate said to fix the suites in
-    // `router-config.yaml`, the packaged layer no project should be opening,
-    // so following the remediation led nowhere. The PATH is what is asserted
-    // here rather than the sentence around it -- the path is the whole use.
-    const { sessionsDir } = makeSandboxRepo();
-    const row = runGates(sessionsDir, {
-      config: { testing: { suites: [{ name: "typescript" }] } } as never,
-    }).find((entry) => entry.name === "test_run_fresh");
-    expect(row?.passed).toBe(false);
-    expect(row?.remediation).toContain("dabbler.yaml");
-    expect(row?.remediation).not.toContain("router-config.yaml");
-  });
-});
-
-describe("working_tree_clean", () => {
-  it("refuses uncommitted work and previews the first five paths", () => {
-    const { repo, sessionsDir } = closeReady();
-    for (let index = 0; index < 7; index += 1) {
-      writeFileSync(join(repo, `extra-${index}.txt`), "x\n", "utf8");
-    }
-    const row = byName(runGates(sessionsDir))["working_tree_clean"];
-    expect(row.passed).toBe(false);
-    expect(row.remediation).toContain("(+2 more)");
+  it("reads a rev-list count as an integer and anything else as none", () => {
+    assert.equal(parseRevListCount("3"), 3);
+    assert.equal(parseRevListCount(" 12\n"), 12);
+    assert.equal(parseRevListCount("fatal: bad revision"), 0);
+    assert.equal(parseRevListCount(""), 0);
   });
 
   it("ignores editor droppings, which are nobody's work", () => {
-    const { repo, sessionsDir } = closeReady();
-    writeFileSync(join(repo, ".DS_Store"), "junk", "utf8");
-    writeFileSync(join(repo, "notes.txt~"), "junk", "utf8");
-    expect(byName(runGates(sessionsDir))["working_tree_clean"].passed).toBe(true);
+    const status =
+      "?? .DS_Store\n?? a.swp\n?? b~\n?? Thumbs.db\n?? desktop.ini\n?? docs/sessions/.lifecycle.lock\n";
+    assert.deepEqual(materialPaths(status, SESSIONS), []);
   });
 
-  it("ignores a modified bookkeeping file even when git lists it first", () => {
-    // The first porcelain line has no leading marker to strip; a parser that
-    // trimmed the whole line would read the path one character short.
-    const { sessionsDir } = closeReady();
-    writeFileSync(join(sessionsDir, "decisions-log.md"), "# Decisions\n", "utf8");
-    expect(byName(runGates(sessionsDir))["working_tree_clean"].passed).toBe(true);
-  });
-});
-
-describe("pushed_to_remote", () => {
-  it("refuses a commit the upstream has not seen", () => {
-    const { repo, sessionsDir } = closeReady();
-    writeFileSync(join(repo, "extra.txt"), "x\n", "utf8");
-    git(repo, "add", "-A");
-    git(repo, "commit", "-q", "-m", "later");
-    const row = byName(runGates(sessionsDir))["pushed_to_remote"];
-    expect(row.passed).toBe(false);
-    expect(row.remediation).toContain("ahead of");
+  it("ignores the session's own bookkeeping under the sessions root and nowhere else", () => {
+    const status = " M docs/sessions/sessions.json\n M elsewhere/sessions.json\n";
+    assert.deepEqual(materialPaths(status, SESSIONS), ["elsewhere/sessions.json"]);
   });
 
-  it("waives the gate for a repository that declares itself local-only", () => {
-    const { repo, sessionsDir } = closeReady();
-    git(repo, "remote", "remove", "origin");
-    mkdirSync(join(repo, ".dabbler"), { recursive: true });
-    writeFileSync(join(repo, ".dabbler", "local-only"), "", "utf8");
-    const row = byName(runGates(sessionsDir))["pushed_to_remote"];
-    expect(row.passed).toBe(true);
-    expect(row.remediation).toContain("local-only repo");
+  it("ignores the run ledger, which is the record and not the work", () => {
+    assert.deepEqual(materialPaths("?? .dabbler/runs/s1/rounds.jsonl\n", SESSIONS), []);
   });
 
-  it("refuses a branch with no upstream and no local-only marker", () => {
-    const { repo, sessionsDir } = closeReady();
-    git(repo, "checkout", "-q", "-b", "side");
-    const row = byName(runGates(sessionsDir))["pushed_to_remote"];
-    expect(row.passed).toBe(false);
-    expect(row.remediation).toContain("--set-upstream");
+  it("skips a line too short to carry a path", () => {
+    assert.deepEqual(materialPaths("??\n\n", SESSIONS), []);
+  });
+
+  it("previews the first five paths and counts the rest", () => {
+    assert.equal(previewPaths(["a", "b", "c", "d", "e", "f", "g"]), "a, b, c, d, e (+2 more)");
+    assert.equal(previewPaths(["a"]), "a");
   });
 });
 
-describe("test_run_fresh", () => {
-  it("refuses a malformed suite declaration rather than reading it as none", () => {
-    // "No expensive suites declared" and "every declared suite was a typo"
-    // must never be indistinguishable.
-    const { sessionsDir } = closeReady();
-    const row = byName(
-      runGates(sessionsDir, {
-        config: { testing: { suites: [{ name: "unit" }] } },
-      }),
-    )["test_run_fresh"];
-    expect(row.passed).toBe(false);
-    expect(row.remediation).toContain("testing.suites");
+function pushFacts(overrides: Partial<PushFacts>): PushFacts {
+  return {
+    branch: "main",
+    upstream: "origin/main",
+    localOnlyMarker: false,
+    hasRemote: true,
+    ahead: 0,
+    dryRunError: null,
+    ...overrides,
+  };
+}
+
+describe("pushed_to_remote: the row from the push facts", () => {
+  it("refuses a detached HEAD", () => {
+    assert.deepEqual(judgePushState(pushFacts({ branch: null })), [
+      false,
+      "HEAD is detached; check out a branch before close-out",
+    ]);
   });
 
-  it("asks nothing of a repository that declares no expensive suite", () => {
-    const { sessionsDir } = closeReady();
-    const row = byName(
-      runGates(sessionsDir, { config: { testing: { suites: [] } } }),
-    )["test_run_fresh"];
-    expect(row.passed).toBe(true);
+  it("waives the gate for a local-only repository with no remote at all", () => {
+    const row = judgePushState(pushFacts({ upstream: null, localOnlyMarker: true, hasRemote: false }));
+    assert.equal(row[0], true);
+    assert.match(row[1], /local-only repo: push gate waived/);
   });
 
-  it("refuses when no run of record covers the declared suite", () => {
-    const { sessionsDir } = makeSandboxRepo();
-    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
-    const row = byName(runGates(sessionsDir, { config: CONFIG }))["test_run_fresh"];
-    expect(row.passed).toBe(false);
-    expect(row.remediation).toContain("no final-full run of record");
+  it("does not waive it when the marker is present but a remote is configured", () => {
+    const row = judgePushState(pushFacts({ upstream: null, localOnlyMarker: true, hasRemote: true }));
+    assert.equal(row[0], false);
+    assert.match(row[1], /has no upstream/);
   });
 
-  it("accepts a green run of record bound to this tree", () => {
-    const { sessionsDir } = closeReady();
-    const row = byName(runGates(sessionsDir, { config: CONFIG }))["test_run_fresh"];
-    expect(`${row.passed}: ${row.remediation}`).toBe("true: ");
+  it("refuses a branch with no upstream and names the command that sets one", () => {
+    assert.deepEqual(judgePushState(pushFacts({ upstream: null })), [
+      false,
+      "branch 'main' has no upstream; run: git push --set-upstream <remote> main",
+    ]);
   });
 
-  it("refuses a green run of record the tree has moved under", () => {
-    const { repo, sessionsDir } = closeReady();
-    writeFileSync(join(repo, "src", "widget.py"), "def widget():\n    return 9\n", "utf8");
-    const row = byName(runGates(sessionsDir, { config: CONFIG }))["test_run_fresh"];
-    expect(row.passed).toBe(false);
-    expect(row.remediation).toContain("PREDATES");
+  it("passes a branch its upstream has fully seen", () => {
+    assert.deepEqual(judgePushState(pushFacts({ ahead: 0 })), [true, ""]);
+  });
+
+  it("refuses commits the upstream has not seen and says how many", () => {
+    assert.deepEqual(judgePushState(pushFacts({ ahead: 2 })), [
+      false,
+      "branch 'main' is 2 commit(s) ahead of origin/main; run: git push",
+    ]);
+  });
+
+  it("names a non-fast-forward when the dry run says so", () => {
+    const row = judgePushState(pushFacts({ ahead: 1, dryRunError: "! [rejected] non-fast-forward" }));
+    assert.deepEqual(row, [false, "non-fast-forward; rebase or pull --rebase first"]);
+  });
+
+  it("falls back to the first line of an unrecognised dry-run failure", () => {
+    assert.equal(classifyPushFailure("ssh: could not resolve\nsecond line"), "git push --dry-run failed: ssh: could not resolve");
+    assert.equal(classifyPushFailure(""), "git push --dry-run failed: unknown error");
+  });
+});
+
+describe("verification_clean: the rounds, then the tree", () => {
+  it("refuses a session with no round and names the command that opens one", () => {
+    const row = judgeLatestRound([], 7, SESSIONS);
+    assert.equal(row?.[0], false);
+    assert.match(row?.[1] ?? "", /no verification round is recorded for session 7/);
+    assert.match(row?.[1] ?? "", /dabbler verify --sessions-dir docs\/sessions/);
+  });
+
+  it("refuses while the latest round is blocking", () => {
+    const rounds = [{ round: 1, blocking: false }, { round: 2, blocking: true, verdict: "ISSUES_FOUND" }];
+    const row = judgeLatestRound(rounds, 7, SESSIONS);
+    assert.match(row?.[1] ?? "", /round 2 ended with blocking findings \(ISSUES_FOUND\)/);
+  });
+
+  it("hands over to the tree when the latest round is not blocking", () => {
+    assert.equal(judgeLatestRound([{ round: 1, blocking: false }], 7, SESSIONS), null);
+  });
+
+  it("refuses when the work changed after the round that verified it", () => {
+    const row = judgeTreeSinceRound({ round: 3 }, ["src/a.ts"], SESSIONS, SESSIONS);
+    assert.deepEqual(row, [
+      false,
+      "the working tree changed after verification round 3: src/a.ts. Re-run: dabbler verify --sessions-dir docs/sessions",
+    ]);
+  });
+
+  it("allows the session's own bookkeeping to move after the round", () => {
+    const changed = ["docs/sessions/sessions.json", "docs/sessions/activity-log.json"];
+    assert.deepEqual(judgeTreeSinceRound({ round: 3 }, changed, SESSIONS, SESSIONS), [true, ""]);
+  });
+
+  it("previews five changed paths and counts the rest", () => {
+    const changed = ["a", "b", "c", "d", "e", "f"];
+    assert.match(judgeTreeSinceRound({ round: 1 }, changed, SESSIONS, SESSIONS)[1], /a, b, c, d, e \(\+1 more\)/);
+  });
+
+  it("refuses, in order, a missing repository, a hand edit, no session, an unreadable ledger, and a tree it cannot measure", () => {
+    const facts = (overrides: Partial<VerificationFacts>): VerificationFacts => ({
+      root: "/r",
+      outOfBand: null,
+      current: 7,
+      rounds: [{ round: 1, blocking: false, completion_tree: "t" }],
+      ledgerError: null,
+      currentTree: "u",
+      changedSinceLatest: [],
+      setRel: SESSIONS,
+      ...overrides,
+    });
+    assert.equal(judgeVerification(facts({ root: null }), SESSIONS)[1], "not inside a git repository: docs/sessions");
+    assert.match(judgeVerification(facts({ outOfBand: "sessions.json edited" }), SESSIONS)[1], /^session-state integrity: sessions\.json edited\./);
+    assert.equal(judgeVerification(facts({ current: null }), SESSIONS)[1], "no session is in flight under docs/sessions");
+    assert.match(judgeVerification(facts({ rounds: null, ledgerError: "bad row" }), SESSIONS)[1], /unreadable or invalid \(bad row\)/);
+    assert.match(judgeVerification(facts({ rounds: [] }), SESSIONS)[1], /no verification round is recorded/);
+    assert.match(judgeVerification(facts({ currentTree: null }), SESSIONS)[1], /could not snapshot/);
+    assert.match(judgeVerification(facts({ changedSinceLatest: null }), SESSIONS)[1], /could not diff/);
+    assert.deepEqual(judgeVerification(facts({}), SESSIONS), [true, ""]);
+  });
+
+  it("passes a cap remediation and says out loud that nobody reviewed it", () => {
+    const latest = {
+      round: 4,
+      type: "remediated_at_cap",
+      remediated: { reviewed_round: 3, findings: [{}, {}] },
+    };
+    const row = judgeTreeSinceRound(latest, [], SESSIONS, SESSIONS);
+    assert.equal(row[0], true);
+    assert.match(row[1], /remediated at the cap: 2 blocking finding\(s\) from round 3/);
+    assert.match(row[1], /THIS WORK LANDS UNREVIEWED/);
+  });
+});
+
+function loaded(errors: string[], expensive: boolean[]): SuiteLoadResult {
+  return {
+    errors,
+    suites: expensive.map((flag, index) => ({ name: `s${index}`, expensive: flag })),
+  } as unknown as SuiteLoadResult;
+}
+
+describe("test_run_fresh: the declaration, then the verdicts", () => {
+  it("names the file the operator edits, and never the packaged layer beneath it", () => {
+    const row = judgeSuiteDeclaration(loaded(["suite 0 has no command"], []));
+    assert.equal(row?.[0], false);
+    assert.match(row?.[1] ?? "", /fix testing\.suites in dabbler\.yaml/);
+    assert.doesNotMatch(row?.[1] ?? "", /router-config\.yaml/);
+  });
+
+  it("reports inapplicable rather than passed when no expensive suite is declared", () => {
+    assert.deepEqual(judgeSuiteDeclaration(loaded([], [false])), [
+      true,
+      "no suite is declared, so nothing was measured",
+      true,
+    ]);
+  });
+
+  it("hands over to the verdicts when an expensive suite is declared", () => {
+    assert.equal(judgeSuiteDeclaration(loaded([], [false, true])), null);
+  });
+
+  it("names every required suite that is not fresh, and only those", () => {
+    const verdicts = [
+      { suite: "unit", required: true, passed: false, reason: "the tree moved", changedInputs: [] },
+      { suite: "e2e", required: false, passed: false, reason: "never ran", changedInputs: [] },
+      { suite: "lint", required: true, passed: true, reason: "", changedInputs: [] },
+    ];
+    assert.deepEqual(judgeFreshness(verdicts), [false, "unit: the tree moved"]);
+    assert.deepEqual(judgeFreshness([verdicts[2]]), [true, ""]);
+  });
+});
+
+describe("owed_decisions", () => {
+  it("passes when nothing is owed", () => {
+    assert.deepEqual(judgeOwedDecisions([]), [true, ""]);
+  });
+
+  it("refuses and names every unanswered verification-reducing decision", () => {
+    const row = judgeOwedDecisions([{ id: "suite-undeclared" }, { id: "source-resolution" }]);
+    assert.equal(row[0], false);
+    assert.match(row[1], /^2 unanswered decision\(s\) would reduce what verification proves: suite-undeclared, source-resolution\./);
   });
 });
 
 describe("published_when_releasable", () => {
   it("refuses a releasable session with no packaging run on its record", () => {
-    // csv-model session 6: declared releasable, held a valid packaging
-    // declaration, passed every gate, landed, closed VERIFIED -- and
-    // published nothing, because no phase ever called packaging and no gate
-    // ever asked. The phase is the fix; this is what keeps it fixed.
-    const { sessionsDir } = closeReady();
-    declareSessionTask(sessionsDir, { sessionNumber: 1, task: "ship it", releasable: true });
-    const row = byName(runGates(sessionsDir, { config: CONFIG }))["published_when_releasable"];
-    expect(row.passed).toBe(false);
-    expect(row.remediation).toContain("releasable");
-    // And it says where the record comes from, so the reader knows what did
-    // not happen rather than only that something is missing.
-    expect(row.remediation).toContain("publish phase");
+    const row = judgePackagingRecord([]);
+    assert.equal(row[0], false);
+    assert.match(row[1], /no packaging run is on its record/);
   });
 
-  it("refuses a releasable session whose packaging runs all shipped nothing, and passes one that published", () => {
-    // A row is a record of TRYING. The gate used to accept any of them,
-    // which reads as sound only for the driven path -- where a feed refusal
-    // stops the session before the close. Every other path to the close is
-    // real, and the obvious one is the operator's: a publish stop offers
-    // "run it again" or "cancel", neither works, so they run `session
-    // close` by hand and the gate that exists to prove something shipped
-    // says PASS over a refusal.
-    const { repo, sessionsDir } = closeReady();
-    declareSessionTask(sessionsDir, { sessionNumber: 1, task: "ship it", releasable: true });
-    appendPackaging(repo, 1, {
-      outcome: "refused",
-      session_number: 1,
-      releasable: true,
-      refusal: "the feed would not take the artifact",
-      recorded_at: new Date().toISOString(),
-    });
-    const refused = byName(runGates(sessionsDir, { config: CONFIG }))["published_when_releasable"];
-    expect(refused.passed).toBe(false);
-    expect(refused.remediation).toContain("not of shipping");
-
-    appendPackaging(repo, 1, {
-      outcome: "published",
-      session_number: 1,
-      releasable: true,
-      feed: "https://feed.example/v3/index.json",
-      secret_name: "FEED_PAT",
-      artifacts: ["widget.1.0.0.nupkg"],
-      steps: [
-        { step: "pack", command: "pack {output}", exit_code: 0, duration_seconds: 1 },
-        { step: "push", command: "push {artifact}", exit_code: 0, duration_seconds: 1 },
-      ],
-      recorded_at: new Date().toISOString(),
-    });
-    expect(
-      byName(runGates(sessionsDir, { config: CONFIG }))["published_when_releasable"].passed,
-    ).toBe(true);
+  it("refuses a record of trying that shipped nothing", () => {
+    const row = judgePackagingRecord([{ outcome: "refused" }, { outcome: "failed" }]);
+    assert.match(row[1], /holds 2 run\(s\) and none of them published/);
   });
 
-  it("is omitted rather than passed for the run that is trying to publish", () => {
-    // packaging asks the close's gates as its own preconditions, and this
-    // one asks whether packaging has run. Asked of packaging by packaging it
-    // answers itself wrongly: the first publication would be refused for not
-    // having happened, and no session could ever publish. Omitted, not
-    // passed -- a green row nobody evaluated is worse than no row, because
-    // something downstream will read it as evidence.
-    const { sessionsDir } = closeReady();
-    declareSessionTask(sessionsDir, { sessionNumber: 1, task: "ship it", releasable: true });
-    const rows = runGates(sessionsDir, {
-      config: CONFIG,
-      omit: [GATE_PUBLISHED_WHEN_RELEASABLE],
-    });
-    expect(rows).toHaveLength(6);
-    expect(rows.map((row) => row.name)).not.toContain(GATE_PUBLISHED_WHEN_RELEASABLE);
-    // Every other gate still answered, so the omission is one gate and not
-    // a way past the set.
-    expect(rows.every((row) => row.passed)).toBe(true);
-  });
-
-  it("passes a session that was never going to publish", () => {
-    // The ordinary case, and every session this repository has ever run.
-    const { sessionsDir } = closeReady();
-    expect(
-      byName(runGates(sessionsDir, { config: CONFIG }))["published_when_releasable"].passed,
-    ).toBe(true);
+  it("passes once a run published", () => {
+    assert.deepEqual(judgePackagingRecord([{ outcome: "failed" }, { outcome: "published" }]), [true, ""]);
   });
 });
 
 describe("verdict_vocabulary", () => {
-  it("refuses a token no writer of this router ever produced", () => {
-    // Incident replay: a confabulated token must never survive to a close
-    // even if it somehow reached the state file.
-    const { sessionsDir } = closeReady();
-    const path = join(sessionsDir, "sessions.json");
-    const state = JSON.parse(readFileSync(path, "utf8")) as {
-      sessions: Record<string, unknown>[];
-    };
-    state.sessions[0]["verificationVerdict"] = "manual-override-development";
-    writeFileSync(path, JSON.stringify(state, null, 2), "utf8");
-    const row = byName(runGates(sessionsDir))["verdict_vocabulary"];
-    expect(row.passed).toBe(false);
-    expect(row.remediation).toContain("closed vocabulary");
+  it("passes tokens the router writes", () => {
+    assert.deepEqual(judgeVerdictTokens([["run ledger", "VERIFIED"], ["session-state", "ISSUES_FOUND"]]), [true, ""]);
   });
 
-  it("stays silent about a session with no rounds at all", () => {
-    // Absence of rounds is verification_clean's finding; double-reporting
-    // one root cause is worse than silence.
-    const { sessionsDir } = makeSandboxRepo();
-    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
-    expect(byName(runGates(sessionsDir))["verdict_vocabulary"].passed).toBe(true);
+  it("refuses a token no writer of this router ever produced, naming its source", () => {
+    const row = judgeVerdictTokens([["session-state", "manual-override-development"]]);
+    assert.equal(row[0], false);
+    assert.match(row[1], /^session-state carries verdict 'manual-override-development', which is not in the closed vocabulary/);
   });
 });
 
 describe("the driver", () => {
+  const pass = (): readonly [boolean, string] => [true, ""];
+  const fail = (): readonly [boolean, string] => [false, "no"];
+
   it("turns a gate that throws into a failed row rather than wedging the close", () => {
-    // A repository path that is not a repository at all reaches the first
-    // guard of every gate; the point is that every row still comes back.
-    const results = runGates(join(makeSandboxRepo().repo, "nowhere"));
-    expect(results).toHaveLength(7);
-    expect(results.every((row) => typeof row.remediation === "string")).toBe(true);
+    const boom = (): never => {
+      throw new Error("boom");
+    };
+    const rows = runGates(SESSIONS, { gates: [["working_tree_clean", boom]] });
+    assert.deepEqual(rows, [
+      { name: "working_tree_clean", passed: false, remediation: "gate crashed (Error: boom); failing closed", inapplicable: false },
+    ]);
   });
 
   it("lets --force skip the bookkeeping gates and never the evidence ones", () => {
-    const { sessionsDir } = makeSandboxRepo();
-    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
-    const rows = byName(runGates(sessionsDir, { forced: true }));
-    for (const [name, row] of Object.entries(rows)) {
-      if (EVIDENCE_GATES.has(name)) {
-        expect(row.remediation).not.toContain("skipped by --force");
-      } else {
-        expect(row.passed).toBe(true);
-        expect(row.remediation).toBe("skipped by --force (bookkeeping gate)");
-      }
-    }
-    expect(rows["verification_clean"].passed).toBe(false);
+    const rows = runGates(SESSIONS, {
+      forced: true,
+      gates: [["working_tree_clean", fail], ["verdict_vocabulary", fail]],
+    });
+    assert.deepEqual(rows.map((row) => [row.name, row.passed]), [
+      ["working_tree_clean", true],
+      ["verdict_vocabulary", false],
+    ]);
+    assert.equal(rows[0].remediation, "skipped by --force (bookkeeping gate)");
+  });
+
+  it("omits a named gate rather than passing it", () => {
+    const rows = runGates(SESSIONS, {
+      omit: ["published_when_releasable"],
+      gates: [["published_when_releasable", pass], ["owed_decisions", pass]],
+    });
+    assert.deepEqual(rows.map((row) => row.name), ["owed_decisions"]);
+  });
+
+  it("marks an inapplicable row as such and not as a pass", () => {
+    const skip = (): readonly [boolean, string, boolean] => [true, "nothing measured", true];
+    const [row] = runGates(SESSIONS, { gates: [["test_run_fresh", skip]] });
+    assert.equal(row.inapplicable, true);
   });
 
   it("keeps the evidence gates to exactly the three that read the record", () => {
-    // Whether the tree was verified, whether the verdict is a word this
-    // framework knows, and whether the artifact a releasable session exists
-    // to produce was produced. `--force` is for formalities.
-    expect([...EVIDENCE_GATES].sort()).toEqual([
+    assert.deepEqual([...EVIDENCE_GATES].sort(), ["published_when_releasable", "verdict_vocabulary", "verification_clean"]);
+  });
+
+  it("runs the seven in the order the close prints them", () => {
+    assert.deepEqual(GATE_CHECKS.map(([name]) => name), [
+      "verification_clean",
+      "working_tree_clean",
+      "pushed_to_remote",
+      "test_run_fresh",
+      "owed_decisions",
       "published_when_releasable",
       "verdict_vocabulary",
-      "verification_clean",
     ]);
   });
 });

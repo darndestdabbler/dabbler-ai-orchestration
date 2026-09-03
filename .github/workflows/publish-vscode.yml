@@ -15,12 +15,14 @@ name: Publish dabbler-ai-orchestration to VS Code Marketplace
 # `.github/workflows/release.yml`; the `vsix-v*` prefix keeps the two
 # tag-driven release pipelines from colliding in a single repo.
 #
-# Authentication: Entra ID workload identity federation. The marketplace job
-# exchanges its OIDC token for an Azure credential (app client and tenant
-# ids in repository variables; no stored secret in the Marketplace path) and `vsce`
-# publishes with `--azure-credential`. Azure DevOps retires global PATs on
-# 2026-12-01, so the PAT path this file used to carry is gone rather than
-# deprecated-in-place. The Open VSX mirror job is gone with it: nothing
+# Authentication: the `VSCE_PAT` environment secret, the way every publish
+# to date has shipped. Federation was built and stands one revert away in
+# history: the Entra-connected organization accepted the service principal,
+# but the MSA-era publisher seats no service principal under any identifier
+# (display name, client id, identity GUID all refused, 2026-09-03), so the
+# owed item before the 2026-12-01 PAT retirement is either that member-add
+# after real propagation or a deliberate new-publisher migration announced
+# to the installed base. The Open VSX mirror job is gone with it: nothing
 # was ever published there (the record since set 133 says so), and a
 # never-used path holding the last stored secret was the wrong trade --
 # restore it from history the day a fork audience exists. One-time
@@ -245,9 +247,6 @@ jobs:
     needs: [classify, build, require-green-test]
     if: ${{ needs.classify.outputs.is_final == 'true' }}
     runs-on: ubuntu-latest
-    permissions:
-      id-token: write
-      contents: read
     environment:
       name: marketplace
       url: https://marketplace.visualstudio.com/items?itemName=DarndestDabbler.dabbler-ai-orchestration
@@ -263,15 +262,9 @@ jobs:
           name: vsix
           path: vsix/
 
-      - name: Azure login (workload identity federation)
-        uses: azure/login@7184910d9eb2b1c5e48f7073824a90609bb9b6d6  # v2, resolved from the live tag
-        with:
-          client-id: ${{ vars.AZURE_CLIENT_ID }}
-          tenant-id: ${{ vars.AZURE_TENANT_ID }}
-          allow-no-subscriptions: true
-
       - name: Publish to VS Code Marketplace
         env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
           EXPECTED_VERSION: ${{ needs.classify.outputs.semver_version }}
         run: |
           # Version-pinned path: pick the exact VSIX matching the tag, not
@@ -287,5 +280,5 @@ jobs:
             exit 1
           fi
           echo "Publishing $vsix_file to VS Code Marketplace..."
-          npx --yes @vscode/vsce publish --packagePath "$vsix_file" --azure-credential
+          npx --yes @vscode/vsce publish --packagePath "$vsix_file" -p "$VSCE_PAT"
 

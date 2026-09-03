@@ -2,9 +2,19 @@
 
 The Marketplace serves the extension; the extension bundles the router;
 `dabbler release` cuts the one tag (`vsix-v<version>`) that makes a
-release. Publishing authenticates by **Entra ID workload identity
-federation** — no PAT, no stored secret anywhere. Azure DevOps retires
-global PATs on 2026-12-01; this path does not use one today.
+release. Publishing authenticates today by the **`VSCE_PAT` environment
+secret**, the way every publish to date has shipped. Federation was built
+and is one revert away: the Entra-connected organization accepted the
+service principal (2026-09-03), but the MSA-era publisher refused to seat
+it under any identifier — display name, client id, identity GUID — so
+before Azure DevOps retires global PATs on **2026-12-01** one of two
+recorded paths must land: the publisher member-add retried after real
+propagation (support ticket if it never resolves), or a deliberate
+new-publisher migration announced to the installed base, since a new
+publisher is a new extension identity that existing installs do not
+follow. The one-time Entra setup below is DONE and keeps: app
+registration, federated credential, and the service principal seated in
+the organization all exist and wait only on the publisher.
 
 ## One-time setup (the operator, ~15 minutes)
 

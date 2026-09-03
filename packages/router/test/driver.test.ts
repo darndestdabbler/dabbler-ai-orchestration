@@ -37,6 +37,7 @@ import {
   writeWorkPlan,
 } from "../src/driver.ts";
 import { LedgerError, appendRound } from "../src/ledger.ts";
+import { staleJobDisposition } from "../src/drive.ts";
 import { snapshotWorktreeTree } from "../src/journal.ts";
 import { openDecisions } from "../src/owedDecisions.ts";
 import { registerSessionStart } from "../src/writers.ts";
@@ -729,5 +730,19 @@ describe("the watcher's other counterparty: the framework's own job", () => {
     expect(reading.state).toBe(WATCHER_JOB_OUTSTANDING);
     expect(reading.sinceSeconds).toBe(72);
     expect(reading.job).toBe("verification");
+  });
+});
+
+describe("the stale-job disposition", () => {
+  it("a running job of another name means this site is behind the walk", () => {
+    expect(staleJobDisposition("run of record: extension", "run of record: typescript", "running")).toBe("behind");
+  });
+
+  it("an exited job of another name is stale cross-phase state, never proof of completion", () => {
+    // Sessions 78 and 81: an uncollected verification job after an
+    // adjudication fake-greened every later phase. Exited-and-mismatched
+    // must always read as stale.
+    expect(staleJobDisposition("verification", "run of record: typescript", "exited")).toBe("stale");
+    expect(staleJobDisposition("verification", "close", "vanished")).toBe("stale");
   });
 });

@@ -1650,13 +1650,29 @@ ${this.stopArtifacts()}`,
     readonly retryAfterSeconds: number;
     readonly stopKind: StopKind;
   }): Promise<number> {
-    // A job outstanding under ANOTHER name means this call site is behind
-    // the one that unwound: a phase re-entered from the top walks its suites
-    // in the same order, and a call site reached before the outstanding job
-    // is one that already finished -- had it failed, the phase would have
-    // branched away instead of reaching here.
+    // A job outstanding under ANOTHER name is one of two very different
+    // things, and sessions 78 and 81 paid for conflating them. Still
+    // RUNNING: this call site is behind the walk that started it -- a
+    // re-entered phase walks its suites in order, and a site reached while
+    // a later one's job runs already finished; EXIT_OK, as always. Already
+    // EXITED: that is stale cross-phase state -- an uncollected
+    // verification job after an adjudication settled the phase by terminal
+    // row -- and treating it as "this site finished" fake-greened
+    // run-of-record and the close, twice. Stale is collected, logged and
+    // cleared, and this call site starts its own work.
     if (this.run.job !== null && this.run.job !== undefined && this.run.job.name !== options.name) {
-      return EXIT_OK;
+      const stale = this.run.job;
+      if (staleJobDisposition(stale.name, options.name, pollJob(this.repoRoot, stale).state) === "behind") {
+        return EXIT_OK;
+      }
+      this.run = { ...this.run, job: null };
+      this.save();
+      this.log("job-finished-stale", { name: stale.name, log: stale.log });
+      appendSupervision(this.repoRoot, this.sessionNumber, {
+        event: "stale-job-collected",
+        name: stale.name,
+        collected_by: options.name,
+      });
     }
     let job: Job | null = this.run.job ?? null;
     if (job === null) {
@@ -2604,3 +2620,21 @@ export async function runWholeSession(
   }
 }
 
+
+/**
+ * What a call site does about a standing job under another name.
+ *
+ * "behind": the job is still running, so this site is earlier in the same
+ * walk than the site that started it -- answer EXIT_OK and let the walk
+ * catch up. "stale": the job has exited (or vanished) uncollected, which is
+ * cross-phase leftover state; collect it, clear it, and do your own work.
+ * Pure so the rule is testable without a driver.
+ */
+export function staleJobDisposition(
+  standingName: string,
+  requestedName: string,
+  polledState: string,
+): "behind" | "stale" {
+  if (standingName === requestedName) return "behind";
+  return polledState === "running" ? "behind" : "stale";
+}

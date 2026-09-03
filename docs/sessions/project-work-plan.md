@@ -117,7 +117,7 @@ it.
 | 79 | Seals, and a master that only moves on green | no | 2026-09-02 |
 | 80 | The loop stops living in anyone's attention | no | 2026-09-02 |
 | 81 | Publishing without a secret, and the last of the friction | no | 2026-09-02 |
-| 82 | The trial, run by the operator against what the Marketplace serves | — | not declared |
+| 82 | The trial, run by the operator against what the Marketplace serves | no | 2026-09-03 |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -1788,3 +1788,9 @@ The loop stops living in anyone's attention. Instruction leases with epochs land
 **Releasable: no.**
 
 Publishing without a secret, and the last of the friction. The Marketplace workflow moves to Entra ID workload identity federation - id-token: write, an Azure login step, vsce --azure-credential - and the PAT path goes with its stale 2026-05-04 comment: Azure DevOps retires global PATs on 2026-12-01 and the supported automated path is federation, which the operator's judgment preceded. The one-time Azure steps land in docs/planning/marketplace-release-process.md at the copy-pasteable bar: create the Entra app, add the GitHub federated credential for this repository, grant the publisher, run dabbler release - exact portal paths, exact values. And the naming that misled the owner is retired from every document a person reads: quick-start and the managed guidance describe start, run, interact and cancel; no instruction tells a person to type session next.
+
+### Session 82 — The trial, run by the operator against what the Marketplace serves
+
+**Releasable: no.**
+
+The trial against what the Marketplace actually serves, with the tail it can trust and the publish path that works today. First the stale-job fence: longWork answers EXIT_OK for a standing job under another name, which is true within one phase's suite walk and false across phases - an uncollected verification job after an adjudication fake-greened every later phase in sessions 78 and 81. The disposition rule becomes exact: a mismatched job still running is ahead of us in this walk; a mismatched job that has exited is stale state - collected, logged, cleared, and then this call site starts its own. Then the publish path: the MSA-era publisher refused the Entra service principal under every identifier, so the workflow's PAT auth step returns (the environment secret never left GitHub) and federation moves to the owed record for before 2026-12-01. Then the operator's half: the release word, the environment approval, verify-install against what is actually served, and the walk - csv-model and the .NET leg - answering from visible UI only.

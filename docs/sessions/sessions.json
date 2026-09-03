@@ -1607,22 +1607,27 @@
         "identityProvenance": "direct"
       },
       "verificationVerdict": "VERIFIED",
-      "frameworkVersion": "2.0.0",
       "verification": {
         "rounds": 4,
         "verifierModel": "gemini-flash",
         "verifierProvider": "google",
         "transport": "api"
-      }
+      },
+      "frameworkVersion": "2.0.0"
     },
     {
       "number": 82,
       "title": "The trial, run by the operator against what the Marketplace serves",
-      "status": "not-started",
-      "startedAt": null,
+      "status": "in-progress",
+      "startedAt": "2026-09-03T03:22:55.945000-04:00",
       "completedAt": null,
-      "orchestrator": null,
-      "verificationVerdict": null
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": null,
+      "frameworkVersion": "2.0.0"
     }
   ]
 }

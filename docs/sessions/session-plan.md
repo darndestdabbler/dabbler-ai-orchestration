@@ -4218,6 +4218,232 @@ half landed. Preconditions: the Marketplace serves 2.0.1 or later
 
 ---
 
+## Why sessions 90–95 exist: what the operator's CSV walkthrough found
+
+*The operator ran the framework end to end against a small `csv-model`
+tutorial, unaided, driving the Copilot CLI in the pull. They produced 18
+numbered findings (`docs/design/consults/issues-feedback.md`). Sol
+(gpt-5.6-sol) and Gemini (gemini-3.1-pro) reviewed the six with a design
+question inside them; both transcripts are under
+`docs/design/consults/round4-*.md`. A capture trial on 2026-09-04 measured
+the rest.*
+
+**The finding that reorders everything.** `Driver.register()` starts the
+NEXT session whenever a call carries `--engine` and nothing is in flight,
+and the extension's launch prompt hands the engine one command line with
+those flags in it. An engine that re-runs the command it was given, once,
+after `done`, registers session N+1 and starts work nobody asked for; an
+engine that correctly drops the flags gets `refused -- no session is in
+flight` instead. Both endings are wrong, and both reviewers independently
+said the same thing: `next` should advance a session, never create one.
+That is session 90 and it goes first.
+
+**The cost finding.** One 20-minute trial session charged **364 premium
+requests** on the operator's personal seat. Two causes compounded:
+verification resolved to `gemini-3.5-flash` — weight 14, named in no role's
+preference order — instead of the named weight-1 candidate, and agentic
+verification billed 26 separate calls across 3 rounds. Nothing surfaced
+either before the spend, and `rounds.jsonl` records no escalation history,
+so nothing on the record says why the cheap named candidate lost. Session 93
+makes that legible.
+
+**What the capture trial settled, and what it retired.** VS Code's
+`TerminalShellExecution.read()` captures an AI CLI's output live with no
+native module — measured over 18 minutes, 5,530 chunks, zero errors, one
+execution never re-bracketed. But 84% of those bytes were a spinner at
+49 bytes per 100ms, and when the operator marked *"I would nudge it now"*
+the engine's last real output was 0 seconds earlier. **Terminal silence is
+anti-correlated with operator impatience**, and `sendText` cannot deliver a
+message to a CLI that owns the screen — the nudge was consumed by the shell
+behind it. So the terminal is a liveness signal and nothing more, and the
+watcher's nudge (finding 4) is NOT built on it.
+
+**What replaces it.** `copilot --acp` speaks Agent Client Protocol v1
+(confirmed against 1.0.83: `loadSession: true`, session list and close,
+embedded context), and Claude Code has the equivalent full-duplex channel in
+`--input-format stream-json` / `--output-format stream-json`, which
+`engines.ts` already uses for its interrupt. Both give the four things the
+framework actually needs — send a message at any time, receive structured
+events, cancel, resume by id — which is what the four hand-built adapters in
+`engines.ts` approximate today, each with its own argv, its own interrupt
+and its own resume quirk. Session 95 builds the client **additively, called
+by nothing**, so verification can adopt it later as a config flip rather
+than a rewrite. Adoption is not in this block: replacing the verifier's
+transport is the one change that, if it breaks, stops every session closing.
+
+**Deliberately not in this block.** Verification over ACP (needs 95 proven
+first). The attended chat surface, where a human and the framework share one
+agent connection — a product decision about what an orchestrating model is
+*for* once it delegates the work, and not one to make against a deadline.
+The watcher's nudge, which follows ACP. Local packages and bundling
+(finding 18), whose second consult round is out.
+
+**One finding is deliberately NOT acted on.** Session 1 of the trial
+invented a project plan from the folder name, and three verification rounds
+missed it. The operator's ruling: that run authored on `gpt-5-mini` and
+verified on `gemini-3.5-flash` — the least capable models available, chosen
+for cost — and more capable models have followed the instruction reliably.
+The prose instruction is not shown to be insufficient, and it is not being
+turned into a gate on the strength of one weak-model run.
+
+### Session 90 of 95: `next` advances a session, and never starts one
+
+*First, because everything after it runs sessions.*
+
+1. Register; declare `--not-releasable`.
+2. Registration comes out of `session next`. `Driver.register()` no longer
+   calls `start` — a call naming `--engine` with nothing in flight is
+   refused with the one sentence that says `dabbler session start` is the
+   door in. `session start` is unchanged and remains the only creator.
+3. A flagless `next` with nothing in flight returns a `done`-shaped
+   instruction and `EXIT_OK`, not a usage refusal: an engine looping "until
+   it says done" has to be able to terminate cleanly.
+4. `session drive` binds the session number it registered at launch and
+   exits when THAT session completes, rather than inferring another start.
+5. The extension's launch prompt (`openingSentence`) changes in the same
+   session so no window exists where the old prompt still starts unrequested
+   work; the managed guidance in `AGENTS.md` is corrected to match.
+6. Affected; verify; full suite as `final-full`; close.
+
+### Session 91 of 95: The eight papercuts the walkthrough found
+
+*Independent, small, each verifiable by looking at it.*
+
+1. Register; declare `--not-releasable`.
+2. `solutionDeps.loadDeps` coerces an explicit JSON `null` to the string
+   `"null"` for `feed`, so `check` reports a feed nobody configured
+   (finding 5). `repositoryId` on the same read has the identical latent
+   bug. Both become null-safe.
+3. Solution Explorer: member rows carry no `contextValue` at all and
+   `repositoryPathOf` answers only for `external` nodes, so the "Solution
+   repositories" list cannot be opened (finding 8). Both extended, with the
+   same three-valued location gating the external rows already use.
+4. Start Session becomes reachable from a planned session row, not only the
+   repository row — gated on the repository having nothing in flight
+   (finding 9).
+5. The Solution Explorer watches one file that only four commands rewrite,
+   so it is stale by construction during a session (finding 7). It refreshes
+   on the events that actually change it.
+6. The Dabbler terminal reveals itself when a session starts, rather than
+   existing unseen since activation (finding 1).
+7. Affected; verify; full suite as `final-full`; close.
+
+### Session 92 of 95: The task list says what a session is doing
+
+*Findings 14, 15 and 16.*
+
+1. Register; declare `--not-releasable`.
+2. The six task rows are relabelled in the operator's own words:
+   `Register → Plan declared → Work → Verify → Test → Close`. The row IDs on
+   disk do not change; only what a reader sees. `Plan declared` rather than
+   `Plan`, because the row ends when the declaration is appended and a label
+   may not claim more than its record.
+3. The Work row expands to one row per approved-plan step, each done when
+   its step id appears in `accepted_steps`, with derived ids `work:<step-id>`
+   so the row set stays addressable. One placeholder row before a plan
+   exists.
+4. The component workflow's `N/6`, its progress bar and its "written at step
+   3" contract row stop rendering unless the repository has actually entered
+   that workflow — a bootstrapped repository shows `1/6 Plan and design`
+   forever today, because nothing in the session lifecycle advances it.
+   Hidden, not deleted: its fate is decided with the packaging block.
+5. Affected; verify; full suite as `final-full`; close.
+
+### Session 93 of 95: What a verification round costs, before it is spent
+
+*The 364-request session, made impossible to repeat silently.*
+
+1. Register; declare `--not-releasable`.
+2. A round records the model that was WANTED, the model that was SERVED, and
+   the reason they differ — a filtered candidate, an escalation, a dispatch
+   failure. `rounds.jsonl` carries `verifier_model` and no escalation
+   history today, which is why the 364-request round cannot be explained
+   from the record.
+3. The round's cost is surfaced where the operator already looks: the
+   premium weight for a seat call, the token count for an API call, and the
+   agentic turn count — which is what turned 3 rounds into 26 billed calls.
+4. A model that no role's preference order names cannot be selected by
+   preference falling through to it. An expensive unnamed candidate is a
+   configuration accident, and `gemini-3.5-flash` at weight 14 has now cost
+   real money twice.
+5. `--usage-output-file` is requested of the seat where the transport
+   supports it, so the number comes from the vendor rather than from
+   arithmetic.
+6. Affected; verify; full suite as `final-full`; close.
+
+### Session 94 of 95: Paused, not stopped — and the two green events
+
+*Findings 3, 12 and 13, cut the way both reviewers recommended: a rendering
+layer over a record that does not change.*
+
+1. Register; declare `--not-releasable`.
+2. One router-owned function renders a stop for a person, and the terminal,
+   `dabbler status` and the Work Explorer all consume it — a second wording
+   in a renderer is the drift the ground rules forbid. `kind`, `class` and
+   the rule token on disk are untouched; they are what gates and tests read.
+3. The rendering says **paused**, says what happened in plain words, and
+   names who is expected to act next. Sol's correction is kept: it also says
+   the invocation has ENDED and the session remains in flight, because
+   "paused" alone invites a person to wait for a process that is gone. What
+   it never says is that the AI is working on it — under the pull the
+   framework cannot see the engine and may not claim it.
+4. A repeated impasse stays visibly named. Gemini's objection is upheld
+   here: a deadlock is a mechanical fact — same kind, same step, same
+   undecorated reason — and softening the one word that says "running this
+   again reaches this exact point" would cost the operator money.
+5. Two honest green events, and no third: **progress resumed**, emitted only
+   when a standing stop is gone AND the phase advanced without an immediate
+   replacement, and **decision answered**, when an owed decision folds from
+   `open` to `answered`. Nothing emits a "resolved" an engine asserted about
+   itself.
+6. Affected; verify; full suite as `final-full`; close.
+
+### Session 95 of 95: An ACP client, wired to nothing
+
+*The foundation for the engine interface, built where it cannot break a
+session.*
+
+1. Register; declare `--not-releasable`.
+2. One `dabbler` verb opens an ACP session against `copilot --acp`, sends
+   one prompt, streams the structured events back, and closes. It is called
+   by no phase, no gate and no lifecycle path; nothing depends on it, which
+   is what makes this session low-risk by construction.
+3. What it must prove, and record: the handshake and negotiated
+   capabilities; a session created, prompted, and resumed by id
+   (`loadSession: true`, which is the defect session 60 paid for on the seat);
+   tool calls arriving as events rather than as screen paint; cancellation
+   mid-turn; and what the client does when the agent asks permission — which
+   is a policy the framework must state, not a prompt it can forward when
+   nobody is watching.
+4. The shape is an interface, not a protocol: **send a message, receive
+   events, cancel, resume by id**. Claude Code satisfies it through
+   `--input-format stream-json` / `--output-format stream-json` rather than
+   ACP, and the interface is written so that is an implementation and not a
+   special case. Codex is out of scope by the operator's ruling.
+5. No adoption. Verification, `session drive` and the engine adapters in
+   `engines.ts` are untouched; what replaces them is the next block's work,
+   behind a flag, once this has run against a real agent.
+6. Affected; verify; full suite as `final-full`; close.
+
+---
+
+## Test budget for sessions 90–95
+
+The suite at session 90 is the one sessions 83–88 rebuilt: `node --test`
+over `packages/router/test`, plus the extension's own tier. This block adds
+roughly **45 router tests and 15 extension tests**, one per behaviour.
+
+The banned kinds still apply: no falsifier twins, no source-text assertions,
+no migration-path tests, no tests of test infrastructure, no tests asserting
+exact markdown strings, no test asserting the wording of a brief, and no
+test asserting a projection's rendered layout. Two additions for this block:
+**no test asserts the rendered wording of a stop** — session 94 makes one
+function own it, and the structure is what is asserted — and **no test in
+session 95 requires a live agent**; the ACP client is exercised against a
+scripted peer, and the live run is a walkthrough the session records.
+
+---
+
 ## Acceptance criterion for sessions 37–50
 
 **Mechanical, and checked in session 50.** From a clean VS Code profile, with

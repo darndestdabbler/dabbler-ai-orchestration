@@ -4218,7 +4218,7 @@ half landed. Preconditions: the Marketplace serves 2.0.1 or later
 
 ---
 
-## Why sessions 90–95 exist: what the operator's CSV walkthrough found
+## Why sessions 90–96 exist: what the operator's CSV walkthrough found
 
 *The operator ran the framework end to end against a small `csv-model`
 tutorial, unaided, driving the Copilot CLI in the pull. They produced 18
@@ -4286,7 +4286,7 @@ for cost — and more capable models have followed the instruction reliably.
 The prose instruction is not shown to be insufficient, and it is not being
 turned into a gate on the strength of one weak-model run.
 
-### Session 90 of 95: `next` advances a session, and never starts one
+### Session 90 of 96: `next` advances a session, and never starts one
 
 *First, because everything after it runs sessions.*
 
@@ -4305,7 +4305,7 @@ turned into a gate on the strength of one weak-model run.
    work; the managed guidance in `AGENTS.md` is corrected to match.
 6. Affected; verify; full suite as `final-full`; close.
 
-### Session 91 of 95: The eight papercuts the walkthrough found
+### Session 91 of 96: The eight papercuts the walkthrough found
 
 *Independent, small, each verifiable by looking at it.*
 
@@ -4328,7 +4328,7 @@ turned into a gate on the strength of one weak-model run.
    existing unseen since activation (finding 1).
 7. Affected; verify; full suite as `final-full`; close.
 
-### Session 92 of 95: The task list says what a session is doing
+### Session 92 of 96: The task list says what a session is doing
 
 *Findings 14, 15 and 16.*
 
@@ -4349,7 +4349,7 @@ turned into a gate on the strength of one weak-model run.
    Hidden, not deleted: its fate is decided with the packaging block.
 5. Affected; verify; full suite as `final-full`; close.
 
-### Session 93 of 95: What a verification round costs, before it is spent
+### Session 93 of 96: What a verification round costs, before it is spent
 
 *The 364-request session, made impossible to repeat silently.*
 
@@ -4371,7 +4371,7 @@ turned into a gate on the strength of one weak-model run.
    arithmetic.
 6. Affected; verify; full suite as `final-full`; close.
 
-### Session 94 of 95: Paused, not stopped — and the two green events
+### Session 94 of 96: Paused, not stopped — and the two green events
 
 *Findings 3, 12 and 13, cut the way both reviewers recommended: a rendering
 layer over a record that does not change.*
@@ -4398,7 +4398,39 @@ layer over a record that does not change.*
    itself.
 6. Affected; verify; full suite as `final-full`; close.
 
-### Session 95 of 95: An ACP client, wired to nothing
+### Session 95 of 96: The git seam, finally used
+
+*Session 77 built one seam for every git call. Nothing has ever used it.*
+
+**Why it is here and not at the head of the block.** The operator ruled it
+ahead of the papercuts on 2026-09-05, before the standing directive of the
+same day made rule (e) explicit: this extension exists to make building and
+maintaining .NET and Java applications easier, not to make this repository
+pleasant to develop. Every other session in this block is customer-facing;
+this one is not. It was a rescue when the operator's machine was
+unresponsive, and session 90 answered that with `--test-concurrency=4` —
+which leaves this as an optimisation. It stays in the block because it makes
+every session after it faster, including 96's, and because a bounded cap is
+a throttle rather than a fix. The reordering is recorded here rather than
+raised, per the directive.
+
+1. Register; declare `--not-releasable`.
+2. `journal.setGitSource` (`packages/router/src/journal.ts:127`) is the one
+   seam every git call in production already goes through, and **no test
+   calls it**: 15 files build real repositories across 52
+   `makeRepo`/`makeSandbox` call sites (`inProcess` 13, `cli` 10, `fixloop`
+   8, `release` 5, `bootstrap` 4, the rest one or two each). Route the
+   non-walkthrough sites through the seam, so a test that is not about git
+   spawns no git.
+3. The five `walk-*` walkthroughs keep their real repositories. That is the
+   shape sessions 83–88 established, and `walk-git-states` is *about* git —
+   mocking it would test the mock.
+4. The measure of success is mechanical: the suite runs spawn-free outside
+   the walkthroughs, and `--test-concurrency=4` comes back off
+   `dabbler.yaml` because it is no longer holding anything together.
+5. Affected; verify; full suite as `final-full`; close.
+
+### Session 96 of 96: An ACP client, wired to nothing
 
 *The foundation for the engine interface, built where it cannot break a
 session.*
@@ -4427,7 +4459,7 @@ session.*
 
 ---
 
-## Test budget for sessions 90–95
+## Test budget for sessions 90–96
 
 The suite at session 90 is the one sessions 83–88 rebuilt: `node --test`
 over `packages/router/test`, plus the extension's own tier. This block adds

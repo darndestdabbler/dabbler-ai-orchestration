@@ -654,3 +654,10 @@
 - Orchestrator provider (excluded): anthropic
 - Verifier's read surface: agency: 32 read(s), 0 search(es), 1 listing(s); 2 read(s) were transformed; 3 not confined to scope
 - Raw round output: `.dabbler/runs/s88/`
+
+## Session 90 verification — VERIFIED after 2 round(s)
+
+- Verifier: gpt-5.4 (openai) over copilot-cli
+- Orchestrator provider (excluded): anthropic
+- Verifier's read surface: agency: 11 read(s), 0 search(es), 1 listing(s); 1 read(s) were transformed; 1 not confined to scope
+- Raw round output: `.dabbler/runs/s90/`

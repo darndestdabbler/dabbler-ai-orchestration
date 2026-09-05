@@ -25,7 +25,7 @@ import { capture } from "../src/output.ts";
 import { readSessionState } from "../src/progress.ts";
 import { resetForTests as resetRouter } from "../src/route.ts";
 import { resetForTests as resetRuntimeMode } from "../src/runtimeMode.ts";
-import { EXIT_OK, planAmend, report } from "../src/session.ts";
+import { EXIT_OK, planAmend, report, start } from "../src/session.ts";
 import { readRecords } from "../src/testEvidence.ts";
 import { readTaskDeclaration } from "../src/writers.ts";
 import { makeConfig, seed, setProviderKeys, tempDir } from "./support/answers.ts";
@@ -174,8 +174,17 @@ describe("one session, walked from next to done", () => {
 
     const milestones: string[] = [];
 
-    // --- the first call registers, and asks for a plan ------------------------
-    const plan = await next(sessionsDir, { engine: "claude-code", provider: "anthropic" });
+    // --- `start` registers; the first `next` asks for a plan ------------------
+    // Identity goes on `start` and nowhere else. `next` advances a session and
+    // never creates one, so the flags an engine was launched with do not start
+    // a second session when it re-runs its command line after `done`.
+    assert.equal(
+      (await capture(() =>
+        Promise.resolve(start(sessionsDir, { engine: "claude-code", provider: "anthropic" })),
+      )).value,
+      EXIT_OK,
+    );
+    const plan = await next(sessionsDir);
     assert.equal(plan.code, EXIT_OK);
     assert.equal(plan.instruction?.kind, "step");
     assert.equal(plan.instruction?.step_id, "plan");

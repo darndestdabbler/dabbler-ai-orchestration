@@ -125,6 +125,12 @@ it.
 | 87 | The lifecycle and the driver | no | 2026-09-03 |
 | 88 | Packaging, release, bootstrap, the solution — and vitest retired | no | 2026-09-03 |
 | 89 | The trial, run by the operator against what the Marketplace serves | — | not declared |
+| 90 | `next` advances a session, and never starts one | no | 2026-09-05 |
+| 91 | The eight papercuts the walkthrough found | — | not declared |
+| 92 | The task list says what a session is doing | — | not declared |
+| 93 | What a verification round costs, before it is spent | — | not declared |
+| 94 | Paused, not stopped — and the two green events | — | not declared |
+| 95 | An ACP client, wired to nothing | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -1837,3 +1843,9 @@ The lifecycle and the driver, rebuilt the way sessions 83 to 86 proved. Every de
 **Releasable: no.**
 
 Packaging, release, bootstrap and the solution, rebuilt the way sessions 83 to 87 proved -- and then vitest retired. The packaging block's declaration and substitution, what a pack and a push refuse, the artifact record; the detection of a project's suites and its packaging from what is on disk; the bootstrap's managed body, its hook and its ignore rule; the solution manifest, its steps and its workspace; the dependency declaration, its edges and the graph over them; the release the operator authorises, router before extension; and the contract a module's declaration renders to. Each becomes a decision over facts wherever it is one, with the disk read and the `node -e` stand-ins for pack and push kept as they are -- they were never the build tool. One walkthrough, test/walk-bootstrap.test.ts, takes one directory from nothing: bootstrapped, its suites and packaging detected, its first projection written and its release tag planned. Then the retirement: test-vitest/ is deleted whole, the live reachability tier moving to test/ under the same explicit opt-in so it is retired rather than lost; both vitest configs, the vitest dependency and the two vitest npm scripts go; test.yml runs node --test alone; dabbler.yaml declares one router suite. Last, the new corpus is read adversarially against itself -- what a pure test fails to hold, what a walkthrough skips, which asserts are tautologies -- and the real findings are fixed in this session. The verifier that reads it is chosen by role and provider exclusion rather than pinned to a named model, because no verb pins one; that difference from the session plan's wording is on the record here rather than papered over.
+
+### Session 90 — `next` advances a session, and never starts one
+
+**Releasable: no.**
+
+Make `dabbler session next` advance a session and never create one. Driver.register() currently calls start() whenever a call names --engine and no close is being collected, which includes the case where nothing is in flight -- so an engine that re-runs the command line it was launched with, once, after `done`, registers and starts the next session unasked; and an engine that correctly drops the flags instead gets a usage refusal, so both endings of the documented loop are wrong. The registration decision becomes a pure function over three facts (engine named, session in flight, uncollected close) and register() composes it: a re-registration of the session in flight stays exactly as it is, a call naming --engine with nothing in flight is refused with the sentence that says `dabbler session start` is the door in, and a flagless call with nothing in flight returns a done-shaped instruction and exit 0 so a loop told to run 'until it says done' can terminate cleanly. `session drive` binds the session number it registered at launch and exits when that session completes rather than inferring another start. The extension's launch prompt and the managed guidance change in the same session, so no window exists in which the old prompt still starts unrequested work.

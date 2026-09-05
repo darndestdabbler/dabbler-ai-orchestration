@@ -732,7 +732,7 @@ export function start(sessionsDir: string, options: StartOptions): number {
     const requested = boundary.requested;
 
     // Re-registering the session in flight is the ordinary way a pull
-    // continues -- `dabbler session next --engine ...` called a second time
+    // continues -- `dabbler session start --engine ...` called a second time
     // in the same session lands here -- and under the SAME identity it is
     // silent and idempotent. Under a different one it is not a continuation
     // at all: `registerSessionStart` rewrites the orchestrator block whole,

@@ -11,11 +11,20 @@ import { describe, it } from "node:test";
 
 import {
   MAX_REJECTIONS,
+  REFUSE_START_REASON,
+  REGISTER_COLLECT,
+  REGISTER_CONTINUE,
+  REGISTER_IDLE,
+  REGISTER_REFUSE_START,
+  REGISTER_START,
+  idleInstruction,
+  judgeRegistration,
   judgeReportFiles,
   judgeReportShape,
   staleJobDisposition,
   stepChangedPaths,
   unchangedStepFiles,
+  type RegistrationFacts,
   type StepSpec,
 } from "../src/drive.ts";
 import type { DriverInstruction, DriverReport } from "../src/generated/index.ts";
@@ -208,5 +217,124 @@ describe("how many times one step may be refused", () => {
     // A loop that refuses forever spends an engine's budget on the same
     // misunderstanding.
     assert.equal(MAX_REJECTIONS, 3);
+  });
+});
+
+describe("what a registration call is, from the facts it can read", () => {
+  const facts = (over: Partial<RegistrationFacts> = {}): RegistrationFacts => ({
+    engineNamed: false,
+    inFlight: false,
+    closing: false,
+    pull: true,
+    ...over,
+  });
+
+  it("refuses to start when an identity is named and nothing is in flight", () => {
+    // The defect this session exists for. The extension hands the engine one
+    // command line carrying --engine; an engine that re-runs it once after
+    // `done` used to register and start the NEXT session unasked.
+    assert.equal(
+      judgeRegistration(facts({ engineNamed: true })),
+      REGISTER_REFUSE_START,
+    );
+  });
+
+  it("starts under a push, where registering is the launcher's job", () => {
+    // `session drive` is how a person BEGINS work; the same facts under a
+    // pull are an engine's leftover launch flags, not a request for a new
+    // session. The mode is the whole difference between the two.
+    assert.equal(
+      judgeRegistration(facts({ engineNamed: true, pull: false })),
+      REGISTER_START,
+    );
+  });
+
+  it("continues the session in flight when an identity is named", () => {
+    // Re-registering the session in flight under the same identity is silent
+    // and idempotent, and is how a pull legitimately continues.
+    assert.equal(
+      judgeRegistration(facts({ engineNamed: true, inFlight: true })),
+      REGISTER_CONTINUE,
+    );
+  });
+
+  it("continues the session in flight when no identity is named", () => {
+    assert.equal(judgeRegistration(facts({ inFlight: true })), REGISTER_CONTINUE);
+  });
+
+  it("is idle when nothing is named and nothing is in flight", () => {
+    assert.equal(judgeRegistration(facts()), REGISTER_IDLE);
+  });
+
+  it("collects a standing close before anything else", () => {
+    // Precedence, and it matters: registering underneath an uncollected close
+    // would start the next session while this one's close is in flight.
+    for (const over of [{}, { engineNamed: true }, { inFlight: true }]) {
+      assert.equal(
+        judgeRegistration(facts({ ...over, closing: true })),
+        REGISTER_COLLECT,
+      );
+    }
+  });
+
+  it("names the door in when it refuses", () => {
+    // The refusal has to say what to do instead, or it strands the loop it
+    // just stopped.
+    assert.match(REFUSE_START_REASON, /session start/);
+  });
+});
+
+describe("what `next` answers when nothing is in flight", () => {
+  it("is a done, so a loop told to run until done can end", () => {
+    // The other half of the same defect: an engine that correctly dropped its
+    // launch flags used to get a usage refusal, so both ways out of the
+    // documented loop were wrong.
+    const instruction = idleInstruction("2026-09-05T03:00:00-04:00");
+    assert.equal(instruction.kind, "done");
+    assert.equal(instruction.schema_version, 1);
+  });
+
+  it("names no session, because there is none", () => {
+    // Every other kind carries a real session number; this is the only
+    // instruction that can honestly name none.
+    assert.equal(idleInstruction("2026-09-05T03:00:00-04:00").session_number, 0);
+    assert.equal(idleInstruction("2026-09-05T03:00:00-04:00").seq, 0);
+  });
+
+  it("says how to begin the next one", () => {
+    assert.match(String(idleInstruction("2026-09-05T03:00:00-04:00").ask), /session start/);
+  });
+});
+
+describe("a drive binds the session it registered, and only that one", () => {
+  it("registers once under a push, and continues rather than starting again", () => {
+    // `withDriver` registers a driver once and that driver drives one
+    // session, so the binding is structural. What this pins is the decision
+    // underneath it: a second push call against a session already in flight
+    // continues it -- it does not start session N+1.
+    assert.equal(
+      judgeRegistration({
+        engineNamed: true,
+        inFlight: true,
+        closing: false,
+        pull: false,
+      }),
+      REGISTER_CONTINUE,
+    );
+  });
+
+  it("never starts a second session while a close is being collected", () => {
+    // Sessions 78 and 81 both slid through the run of record because an
+    // uncollected job answered for a later phase; registering underneath a
+    // standing close is the same shape of mistake.
+    assert.equal(
+      judgeRegistration({
+        engineNamed: true,
+        inFlight: false,
+        closing: true,
+        pull: false,
+      }),
+      REGISTER_COLLECT,
+    );
   });
 });

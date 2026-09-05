@@ -519,6 +519,105 @@ function describeFinding(index: number, finding: Row): string {
   );
 }
 
+/**
+ * What a registration call does, decided from the three facts it can read.
+ *
+ * **`next` advances a session; it does not create one.** The decision used to
+ * live tangled with the reading of it, and the tangle is exactly what let an
+ * engine start work nobody asked for: the launch prompt hands the engine one
+ * command line carrying `--engine`, so an engine that re-runs the line it was
+ * given, once, after `done`, arrives here with the flags still on it and
+ * nothing in flight -- and `start` was called. The other ending was no better:
+ * an engine that correctly dropped the flags got a usage refusal, so both ways
+ * out of the documented "call it until it says done" loop were wrong.
+ *
+ * Precedence is the order below and it matters. A close still being collected
+ * outranks everything, because registering underneath one would start the NEXT
+ * session while this one's close is in flight -- which is the bug this
+ * ordering was already written to prevent, and it is kept whole.
+ */
+export const REGISTER_COLLECT = "collect";
+export const REGISTER_CONTINUE = "continue";
+export const REGISTER_START = "start";
+export const REGISTER_REFUSE_START = "refuse-start";
+export const REGISTER_IDLE = "idle";
+
+export type RegistrationOutcome =
+  | typeof REGISTER_COLLECT
+  | typeof REGISTER_CONTINUE
+  | typeof REGISTER_START
+  | typeof REGISTER_REFUSE_START
+  | typeof REGISTER_IDLE;
+
+/** The four facts a registration reads, and nothing else. */
+export interface RegistrationFacts {
+  /** An identity was named on this call: `--engine` (with `--provider`). */
+  readonly engineNamed: boolean;
+  /** The ledger says a session is in flight. */
+  readonly inFlight: boolean;
+  /** A close was written and has not been collected yet. */
+  readonly closing: boolean;
+  /**
+   * The call is a pull -- `session next`, the engine asking for its next move.
+   *
+   * It is the whole difference between the two starts. `session drive` is a
+   * launcher: a person typed it to begin work, and registering is its job. An
+   * engine calling `next` is mid-conversation, and the flags on its command
+   * line are left over from the launch rather than a request for new work.
+   */
+  readonly pull: boolean;
+}
+
+/**
+ * Which of the four a registration is.
+ *
+ * `continue` covers both in-flight cases; whether the identity is re-written
+ * follows from `engineNamed`, which the caller already holds. Re-registering
+ * the session in flight under the SAME identity is silent and idempotent and
+ * is how a pull legitimately continues -- it is not a start, and nothing here
+ * may turn it into one.
+ */
+export function judgeRegistration(facts: RegistrationFacts): RegistrationOutcome {
+  if (facts.closing) return REGISTER_COLLECT;
+  if (facts.inFlight) return REGISTER_CONTINUE;
+  if (facts.engineNamed) {
+    return facts.pull ? REGISTER_REFUSE_START : REGISTER_START;
+  }
+  return REGISTER_IDLE;
+}
+
+/**
+ * The answer to `next` when nothing is in flight and nothing was asked for.
+ *
+ * A `done`, and built here rather than issued: `issue` writes into a session's
+ * own run directory, and an idle call has no session to write into. Nothing is
+ * recorded, which is the point -- asking an empty repository what to do next
+ * is not an event in any session's life.
+ *
+ * `session_number` is 0 because there is no session. Every other kind carries
+ * a real one; this is the only instruction that can honestly name none, and a
+ * reader that treats 0 as a session will find no record for it.
+ */
+export function idleInstruction(now: string): DriverInstruction {
+  return {
+    schema_version: DRIVER_SCHEMA_VERSION,
+    seq: 0,
+    session_number: 0,
+    issued_at: now,
+    kind: "done",
+    ask:
+      "Nothing is in flight, and there is nothing to do. `dabbler session " +
+      "start --engine <engine> --provider <provider>` begins the next one.",
+  };
+}
+
+/** What a refused start says, in the one sentence that names the door in. */
+export const REFUSE_START_REASON =
+  "dabbler: refused -- `session next` advances a session and does not start " +
+  "one. Nothing is in flight; `dabbler session start --engine <engine> " +
+  "--provider <provider>` is the door in, and every later call carries no " +
+  "identity flags.\n";
+
 class Driver {
   private readonly sessionsDir: string;
   private readonly options: DriverOptions;
@@ -526,6 +625,13 @@ class Driver {
   private readonly config: RouterConfig;
   private sessionNumber = 0;
   private run!: DriverRun;
+  /**
+   * Registration found nothing in flight and nothing asked for.
+   *
+   * There is no run and no session number behind this driver, so nothing may
+   * ask it to advance -- the caller answers with `idleInstruction` instead.
+   */
+  private idle = false;
   private plan: DriverWorkPlan | null = null;
   /** Sends that arrived with no invocation to end; the next instruction carries them. */
   private deferred: string[] = [];
@@ -662,23 +768,52 @@ class Driver {
     return null;
   }
 
+  /** Whether registration found nothing in flight and nothing asked for. */
+  isIdle(): boolean {
+    return this.idle;
+  }
+
   /** Register (or re-register) and load or open the run's state. */
   register(): number {
     // A pull call that names no engine is a person continuing a session
     // already in flight: its identity is on the record, and re-registering
     // would only ask them to repeat it.
     const inFlight = readSessionState(this.sessionsDir)?.["currentSession"];
-    const closing = typeof inFlight === "number" || !this.pull ? null : this.uncollectedClose();
-    if (this.options.engine === null && typeof inFlight !== "number" && closing === null) {
-      writeErr(
-        "dabbler: refused -- no session is in flight, and none can be started " +
-          "without --engine (and --provider).\n",
-      );
+    // A standing close is read in BOTH modes. It used to be pull-only, which
+    // made `closing` structurally false for every push call -- so `session
+    // drive`, launched at the boundary where a pull loop has closed a session
+    // and not yet collected it, classified the repository as startable and
+    // opened session N+1 instead of finishing session N. That is this
+    // session's own defect surviving on the unattended entrypoint, and it is
+    // what round 1 caught.
+    const closing = typeof inFlight === "number" ? null : this.uncollectedClose();
+    // The facts are read here; which case they are is decided in one pure
+    // function above, so the rule can be exercised from literal inputs
+    // without a repository on disk.
+    const outcome = judgeRegistration({
+      engineNamed: this.options.engine !== null,
+      inFlight: typeof inFlight === "number",
+      closing: closing !== null,
+      pull: this.pull,
+    });
+    if (outcome === REGISTER_REFUSE_START) {
+      writeErr(REFUSE_START_REASON);
       return EXIT_USAGE;
     }
-    // Registering here would start the NEXT session while this one's close
-    // is still being collected.
-    if (this.options.engine !== null && closing === null) {
+    if (outcome === REGISTER_IDLE) {
+      // Not a refusal. An engine told to call `next` until it says `done` has
+      // to be able to reach `done`; ending its loop on a usage error was the
+      // other half of the defect this session fixes.
+      this.idle = true;
+      return EXIT_OK;
+    }
+    // Re-registration of the session in flight, and only that: `collect` is a
+    // close still being gathered, and registering underneath it would start
+    // the NEXT session while this one's close is in flight.
+    if (
+      (outcome === REGISTER_START || outcome === REGISTER_CONTINUE) &&
+      this.options.engine !== null
+    ) {
       const code = start(this.sessionsDir, {
         engine: this.options.engine,
         provider: this.options.provider ?? null,
@@ -2588,6 +2723,12 @@ export async function sessionNext(sessionsDir: string, options: NextOptions): Pr
         mode: "pull",
       },
       async (driver) => {
+        // Nothing in flight and nothing asked for: answer `done` without
+        // advancing. There is no run behind this driver to advance.
+        if (driver.isIdle()) {
+          instruction = idleInstruction(nowIso());
+          return EXIT_OK;
+        }
         const outcome = await driver.advance();
         instruction = outcome.instruction;
         return outcome.code;
@@ -2627,7 +2768,7 @@ export async function runWholeSession(
   if (inFlight === undefined) {
     writeErr(
       "run: no session is in flight. Register one first -- `dabbler session " +
-        "next --sessions-dir <dir> --engine <engine> --provider <provider>` " +
+        "start --sessions-dir <dir> --engine <engine> --provider <provider>` " +
         "-- and `run` takes it from there.\n",
     );
     return EXIT_BOUNDARY;

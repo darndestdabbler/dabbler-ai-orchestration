@@ -119,9 +119,15 @@ export interface EngineTerminal {
  */
 export function openingSentence(choice: EngineChoice, model: string): string {
   const seat = choice.modelRequired && model.trim() !== "" ? ` --model ${model.trim()}` : "";
+  const dir = SESSIONS_REL.replace(/\\/g, "/");
+  // Two commands, and the identity is on the FIRST one only. One line
+  // carrying `--engine` on `next` is what an engine re-runs after `done`,
+  // and until session 90 that registered and started the next session
+  // unasked. `next` refuses it now; the sentence must not ask for it.
   return (
-    `Call \`dabbler session next --sessions-dir ${SESSIONS_REL.replace(/\\/g, "/")} ` +
-    `--engine ${choice.engine} --provider ${choice.provider}${seat}\` ` +
+    `Run \`dabbler session start --sessions-dir ${dir} ` +
+    `--engine ${choice.engine} --provider ${choice.provider}${seat}\` once, ` +
+    `then call \`dabbler session next --sessions-dir ${dir}\` ` +
     "and do what it says until it says `done`."
   );
 }

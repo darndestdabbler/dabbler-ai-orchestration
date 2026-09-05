@@ -66,15 +66,20 @@ export const SHARED_BODY =
   "the whole loop, and there is nothing to remember between calls: the\n" +
   "framework holds the state.\n" +
   "\n" +
-  "**The first call registers the session**, so it is the one that carries\n" +
-  "who is working:\n" +
+  "**`start` registers the session; `next` never does.** Registering is a\n" +
+  "separate verb, and it is the one that carries who is working:\n" +
   "\n" +
-  "    dabbler session next --sessions-dir docs/sessions \\\n" +
+  "    dabbler session start --sessions-dir docs/sessions \\\n" +
   "        --engine <claude-code|codex|gemini|copilot> --provider <anthropic|openai|google>\n" +
   "\n" +
   "A Copilot seat adds `--model` (the seat label is not trusted; identity\n" +
-  "resolves through the model registry). Every later call carries none of\n" +
-  "them — the session is in flight and its identity is on the record.\n" +
+  "resolves through the model registry). **Every `next` call carries none of\n" +
+  "them** — the session is in flight and its identity is on the record, and a\n" +
+  "`next` that names an identity with nothing in flight is refused rather\n" +
+  "than starting work nobody asked for.\n" +
+  "\n" +
+  "`next` with nothing in flight answers `done`. That is the honest end of\n" +
+  "the loop, not an error: it means there is no session to advance.\n" +
   "\n" +
   "## What comes back\n" +
   "\n" +

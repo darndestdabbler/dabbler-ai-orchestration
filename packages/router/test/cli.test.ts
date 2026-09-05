@@ -235,7 +235,10 @@ describe("dabbler session run", () => {
     const result = await run(() => sessionVerb(["run", "--sessions-dir", sessionsDir]));
     assert.notEqual(result.code, 0);
     assert.match(result.err, /no session is in flight/);
-    assert.match(result.err, /session next/);
+    // `start`, not `next`: registration left `next` in session 90, so a
+    // refusal that still named `next` would send the operator to a verb
+    // that now refuses them back.
+    assert.match(result.err, /session start/);
   });
 });
 

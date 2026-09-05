@@ -1746,25 +1746,90 @@
         "identityProvenance": "direct"
       },
       "verificationVerdict": "VERIFIED",
-      "frameworkVersion": "2.0.1",
       "verification": {
         "rounds": 1,
+        "verifierModel": "gpt-5.4",
+        "verifierProvider": "openai",
+        "transport": "copilot-cli"
+      },
+      "frameworkVersion": "2.0.1"
+    },
+    {
+      "number": 89,
+      "title": "The trial, run by the operator against what the Marketplace serves",
+      "status": "cancelled",
+      "preCancelStatus": "not-started",
+      "cancelledReason": "Operator trial, not engine work: session 89 is run by hand from a clean VS Code profile against what the Marketplace serves. It sat at the head of a strictly sequential queue and blocked sessions 90-95. Cancelled on the operator's explicit instruction to unblock that block; the trial is re-planned at a number after it, as it already was once (82 to 89). Restore with: dabbler session restore 89 --reason '...'",
+      "cancelledAt": "2026-09-05T03:28:29-04:00",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    },
+    {
+      "number": 90,
+      "title": "`next` advances a session, and never starts one",
+      "status": "in-progress",
+      "startedAt": "2026-09-05T03:28:52.850000-04:00",
+      "completedAt": null,
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": "VERIFIED",
+      "frameworkVersion": "2.0.1",
+      "verification": {
+        "rounds": 2,
         "verifierModel": "gpt-5.4",
         "verifierProvider": "openai",
         "transport": "copilot-cli"
       }
     },
     {
-      "number": 89,
-      "title": "The trial, run by the operator against what the Marketplace serves",
-      "status": "cancelled",
+      "number": 91,
+      "title": "The eight papercuts the walkthrough found",
+      "status": "not-started",
       "startedAt": null,
       "completedAt": null,
       "orchestrator": null,
-      "verificationVerdict": null,
-      "preCancelStatus": "not-started",
-      "cancelledReason": "Operator trial, not engine work: session 89 is run by hand from a clean VS Code profile against what the Marketplace serves. It sat at the head of a strictly sequential queue and blocked sessions 90-95. Cancelled on the operator's explicit instruction to unblock that block; the trial is re-planned at a number after it, as it already was once (82 to 89). Restore with: dabbler session restore 89 --reason '...'",
-      "cancelledAt": "2026-09-05T03:28:29-04:00"
+      "verificationVerdict": null
+    },
+    {
+      "number": 92,
+      "title": "The task list says what a session is doing",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    },
+    {
+      "number": 93,
+      "title": "What a verification round costs, before it is spent",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    },
+    {
+      "number": 94,
+      "title": "Paused, not stopped \u2014 and the two green events",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    },
+    {
+      "number": 95,
+      "title": "An ACP client, wired to nothing",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
     }
   ]
 }

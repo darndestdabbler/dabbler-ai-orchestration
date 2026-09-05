@@ -499,7 +499,18 @@ suite("Start opens the person's own CLI", () => {
     assert.strictEqual(cli.options.location, vscode.TerminalLocation.Panel);
     // Claude Code takes a positional prompt for an interactive session, so
     // the sentence is argv and nothing is typed.
-    assert.match(cli.options.shellArgs[0], /dabbler session next .*--engine claude-code/);
+    // The identity is on `start` and on nothing else. A launch line that put
+    // `--engine` on `next` is what an engine re-ran after `done`, and until
+    // session 90 that registered and started the next session unasked.
+    assert.match(cli.options.shellArgs[0], /dabbler session start .*--engine claude-code/);
+    assert.match(cli.options.shellArgs[0], /dabbler session next /);
+    const afterNext = cli.options.shellArgs[0].slice(
+      cli.options.shellArgs[0].indexOf("dabbler session next "),
+    );
+    assert.ok(
+      !/--engine|--provider|--model/.test(afterNext),
+      "the `next` half of the launch sentence must carry no identity flags",
+    );
     assert.deepStrictEqual(cli.sent, []);
     assert.deepStrictEqual(launcher.launched, []);
 

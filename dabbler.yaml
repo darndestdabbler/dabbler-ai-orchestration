@@ -55,8 +55,17 @@ testing:
     # Node expands the glob itself, so the argv needs no shell, and a
     # positional file appended by the targeted form
     # `<command> packages/router/test/x.test.ts` is one more pattern (D116).
+    #
+    # `--test-concurrency=4` restores D246 (session 54), which the node:test
+    # rebuild dropped. `node --test` defaults to one worker per CPU -- 20 on
+    # the operator's machine -- and the fixtures build git repositories, so
+    # the default is 20 concurrent git storms. It cost two things at once: the
+    # machine became unresponsive during a run, and the suite failed on a
+    # DIFFERENT file each time with `git commit` errors, which is a run of
+    # record nobody can trust. Bounded at 4 it is green and the box stays
+    # usable. The number is D246's, not a fresh guess.
     - name: typescript
-      command: node --test packages/router/test/**/*.test.ts
+      command: node --test --test-concurrency=4 packages/router/test/**/*.test.ts
       expensive: false
       covers:
         - packages/router/

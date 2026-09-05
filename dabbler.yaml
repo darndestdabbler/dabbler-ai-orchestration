@@ -56,14 +56,18 @@ testing:
     # positional file appended by the targeted form
     # `<command> packages/router/test/x.test.ts` is one more pattern (D116).
     #
-    # `--test-concurrency=4` restores D246 (session 54), which the node:test
-    # rebuild dropped. `node --test` defaults to one worker per CPU -- 20 on
-    # the operator's machine -- and the fixtures build git repositories, so
-    # the default is 20 concurrent git storms. It cost two things at once: the
-    # machine became unresponsive during a run, and the suite failed on a
-    # DIFFERENT file each time with `git commit` errors, which is a run of
-    # record nobody can trust. Bounded at 4 it is green and the box stays
-    # usable. The number is D246's, not a fresh guess.
+    # The `--import` preload is part of the run of record. Git is spawned by
+    # the five `walk-*` files and nowhere else: every other test feeds git's
+    # answers through `journal.setGitSource` (test/support/answers.ts), and
+    # `test/support/no-git.ts` fails a worker outside a walkthrough the
+    # moment it spawns git, naming the test file. That is the constraint that
+    # replaced `--test-concurrency=4` (D246, restored in session 90): the cap
+    # existed because `node --test` runs one worker per CPU -- 20 on the
+    # operator's machine -- and fifteen files built git repositories, so the
+    # default was 20 concurrent git storms that locked the box and failed a
+    # different file each run. A bounded cap throttled the storm; the seam
+    # removed it, and Node's default worker count is safe again because
+    # nothing outside the walkthroughs builds a repository.
     # `expensive: true` is not a claim about cost -- 1117 tests in 32
     # seconds. It is the flag that makes a suite the RUN OF RECORD, and it
     # gates two things at once: `drive.expensiveSuites()` filters the
@@ -81,7 +85,7 @@ testing:
     # a surface covered only by a non-expensive suite -- is session 95's,
     # and it is the loader's: `loadSuitesChecked` names the suite.
     - name: typescript
-      command: node --test --test-concurrency=4 packages/router/test/**/*.test.ts
+      command: node --test --import ./packages/router/test/support/no-git.ts packages/router/test/**/*.test.ts
       expensive: true
       covers:
         - packages/router/
@@ -498,7 +502,10 @@ testing:
           - packages/router/test/config.test.ts
           - packages/router/test/identity.test.ts
       # Not a test file: the suite's glob is `*.test.ts`, so nothing under
-      # it is collected -- but every test that builds a config uses it.
+      # it is collected -- but every test that builds a config uses it, and
+      # since session 96 so does every test whose repository is a directory
+      # answering git's questions from a table (answers.ts) rather than a
+      # checkout (repo.ts, which only the walkthroughs build).
       - when: packages/router/test/support/
         select:
           - packages/router/test/config.test.ts
@@ -507,6 +514,17 @@ testing:
           - packages/router/test/transports.test.ts
           - packages/router/test/selection.test.ts
           - packages/router/test/route.test.ts
+          - packages/router/test/inProcess.test.ts
+          - packages/router/test/cli.test.ts
+          - packages/router/test/release.test.ts
+          - packages/router/test/driver.test.ts
+          - packages/router/test/testphase.test.ts
+          - packages/router/test/checks.test.ts
+          - packages/router/test/preverify.test.ts
+          - packages/router/test/bootstrap.test.ts
+          - packages/router/test/packaging.test.ts
+          - packages/router/test/walk-git-states.test.ts
+          - packages/router/test/walk-bootstrap.test.ts
       - when: packages/router/scripts/
         select: []
       - when: packages/router/build.mjs

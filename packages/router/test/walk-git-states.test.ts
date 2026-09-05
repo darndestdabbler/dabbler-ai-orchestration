@@ -11,6 +11,8 @@ import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it, type TestContext } from "node:test";
 
+import { preverifyGate } from "../src/affected.ts";
+import { STAGE_TARGETED, displayCommand, execute, makeCheck } from "../src/checks.ts";
 import { sessionRoundRefs, treePaths } from "../src/evidence.ts";
 import {
   judgePushState,
@@ -26,7 +28,10 @@ import {
   runGitBinary,
   snapshotWorktreeTree,
 } from "../src/journal.ts";
-import { git, gitOut, makeRepo } from "./support/repo.ts";
+import { appendRound } from "../src/ledger.ts";
+import { POLICY_TARGETED, loadSuitesChecked, recordRun, type SuiteSpec } from "../src/testEvidence.ts";
+import { registerSessionStart } from "../src/writers.ts";
+import { git, gitOut, makeRepo, writeFiles } from "./support/repo.ts";
 
 const SESSIONS = "docs/sessions";
 const HEX40 = /^[0-9a-f]{40}$/;
@@ -209,5 +214,96 @@ describe("a repository walked through the states the close gates read", () => {
     rmSync(join(repo, "lf.txt"));
     git(repo, "checkout", "--", "lf.txt");
     assert.equal(readFileSync(join(repo, "lf.txt"), "utf8"), "a\nb\n");
+  });
+});
+
+describe("the gate that stands in front of a verification round", () => {
+  const CONFIG = {
+    testing: {
+      suites: [{ name: "python", command: "python -m pytest", covers: ["docs/"], expensive: true, test_roots: ["tests"], test_glob: "test_*.py" }],
+      selection: { repo_wide: ["pyproject.toml"], rules: [{ when: "docs/", select: [] }, { when: "src/", select: ["tests/test_thing.py"] }] },
+    },
+  };
+  // One repository, walked: the change set is what git measures against the
+  // seed, so the milestones below build on each other.
+  const gateRepo = makeRepo({
+    "docs/keep.md": "x\n",
+    "docs/sessions/session-plan.md": "### Session 1 of 2: First\n1. Register.\n2. Build it.\n\n### Session 2 of 2: Second\n1. Register.\n",
+  });
+  const gateSessions = join(gateRepo, "docs", "sessions");
+
+  it("walks one repository: an empty mapping skips evidence, an unmapped path blocks, a remediation is measured by the fix, and a suite asked for nothing is satisfied by the run it asked for", () => {
+    // One test, because each part stands on the state the part before it
+    // left: the change set is what git measures against the seed.
+    //
+    // -- skips evidence only for a declared empty mapping, and blocks on a
+    // path nobody mapped even beside a mapped one. "Nothing is affected" and
+    // "nobody knows what is affected" look identical from the selected-test
+    // list and must never be treated alike.
+    writeFileSync(join(gateRepo, "docs", "notes.md"), "x\n", "utf8");
+    assert.equal(preverifyGate(gateRepo, gateSessions, CONFIG).ok, true);
+    mkdirSync(join(gateRepo, "scripts"), { recursive: true });
+    writeFileSync(join(gateRepo, "scripts", "deploy.rb"), "x\n", "utf8");
+    const blocked = preverifyGate(gateRepo, gateSessions, CONFIG);
+    assert.equal(blocked.ok, false);
+    assert.match(blocked.reason, /scripts\/deploy\.rb/);
+    assert.equal(blocked.command, "");
+    writeFiles(gateRepo, { "src/app.py": "x = 1\n" });
+    assert.match(preverifyGate(gateRepo, gateSessions, CONFIG).reason, /scripts\/deploy\.rb/);
+
+    // -- measures a remediation by the fix rather than by the whole
+    // session. A repository-wide edit buys one full run, at the round that
+    // reviewed it; judging later rounds against HEAD would re-buy it every
+    // time.
+    rmSync(join(gateRepo, "scripts"), { recursive: true, force: true });
+    registerSessionStart(gateSessions, 1, { engine: "claude-code", provider: "anthropic" });
+    writeFileSync(join(gateRepo, "pyproject.toml"), "[p]\n", "utf8");
+    assert.equal(preverifyGate(gateRepo, gateSessions, CONFIG).command, "python -m pytest");
+    appendRound(gateRepo, 1, {
+      round: 1, verdict: "ISSUES_FOUND", blocking: true, findings: [], recorded_at: "2026-08-19T18:00:00-04:00",
+      verifier_model: "m", verifier_provider: "openai", completion_tree: snapshotWorktreeTree(gateRepo) as string,
+    });
+    writeFileSync(join(gateRepo, "src", "app.py"), "x = 2\n", "utf8");
+    assert.equal(preverifyGate(gateRepo, gateSessions, CONFIG).command, "python -m pytest tests/test_thing.py");
+
+    // -- asks a suite the selection named no test of for nothing, and is
+    // satisfied by the run it asked for.
+    const twoSuites = {
+      testing: {
+        suites: [
+          { name: "python", command: "python -m pytest", covers: ["src/"], expensive: true, test_roots: ["tests"], test_glob: "test_*.py" },
+          { name: "typescript", command: "vitest run", covers: ["src/"], expensive: true, test_roots: ["suite"], test_glob: "*.test.ts" },
+        ],
+        selection: { rules: [{ when: "src/app.py", select: ["tests/test_app.py"] }, { when: "docs/", select: [] }, { when: "pyproject.toml", select: [] }] },
+      },
+    };
+    const asked = preverifyGate(gateRepo, gateSessions, twoSuites);
+    assert.equal(asked.ok, false, asked.reason);
+    assert.equal(asked.suite, "python");
+    assert.equal(asked.command, "python -m pytest tests/test_app.py");
+    const python = loadSuitesChecked(twoSuites).suites.find((s) => s.name === "python") as SuiteSpec;
+    recordRun(gateSessions, python, "passed", {
+      stage: "preverify-targeted", durationSeconds: 1, command: "python -m pytest tests/test_app.py", policy: POLICY_TARGETED,
+      policyReason: "named every selected test", selectedTests: [["tests/test_app.py", "configured-rule"]],
+    });
+    const satisfied = preverifyGate(gateRepo, gateSessions, twoSuites);
+    assert.equal(satisfied.ok, true, satisfied.reason);
+    assert.deepEqual(satisfied.accepted.map(([name]) => name), ["python"]);
+  });
+});
+
+describe("the check executor over a real index", () => {
+  it("leaves the real index alone across a run", async () => {
+    // The executor snapshots the tree before and after the check through a
+    // temporary index; what the operator has (or has not) staged is theirs.
+    const project = makeRepo({ "a.txt": "one\n" });
+    writeFileSync(join(project, "untracked.txt"), "x\n", "utf8");
+    const check = makeCheck({ name: "noop", argv: [process.execPath, "-e", "0"] });
+    await execute(project, check, displayCommand(check), {
+      stage: STAGE_TARGETED,
+      treeDigest: snapshotWorktreeTree(project) as string,
+      timeoutSeconds: 60,
+    });
+    assert.match(gitOut(project, "status", "--porcelain"), /\?\? untracked\.txt/);
   });
 });

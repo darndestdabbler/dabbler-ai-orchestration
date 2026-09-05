@@ -14,7 +14,12 @@ import {
   runOfRecordLines,
   turnCount,
 } from "../src/verify/rounds.ts";
-import { tempDir } from "./support/answers.ts";
+import { gitAnswers, tempDir } from "./support/answers.ts";
+
+// A directory with no repository holds no object, so a round's tree is never
+// anchored: that is what git said of a temp directory before, and it is fed
+// here so nothing is spawned to say it again.
+gitAnswers([[(args) => args[0] === "cat-file" && args[1] === "-e", { code: 128 }]]);
 
 const finding = (blocking: boolean) => ({ severity: blocking ? "major" : "minor", description: "d", blocking });
 

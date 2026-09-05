@@ -1,28 +1,19 @@
 // Pre-verification: the policy that makes a targeted run evidence, judged
-// from a selection and a command, and the gate that stands in front of a
-// round, walked over one repository whose change set git measures.
+// from a selection and a command. The gate that stands in front of a round is
+// walked in walk-git-states.test.ts, whose repository is real.
 import assert from "node:assert/strict";
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
 import { describe, it } from "node:test";
 
-import { classifyPreverifyCommand, preverifyGate } from "../src/affected.ts";
+import { classifyPreverifyCommand } from "../src/affected.ts";
 import { selectTests, targetedCommand, type SelectionConfig } from "../src/checks.ts";
-import { appendRound } from "../src/ledger.ts";
-import { snapshotWorktreeTree } from "../src/journal.ts";
 import {
   POLICY_ALL_TESTS_AFFECTED,
   POLICY_OPERATOR_OVERRIDE,
   POLICY_SUITE_WHOLE,
   POLICY_TARGETED,
   POLICY_VIOLATION,
-  loadSuitesChecked,
-  recordRun,
-  type SuiteSpec,
 } from "../src/testEvidence.ts";
-import { registerSessionStart } from "../src/writers.ts";
 import { seed, tempDir } from "./support/answers.ts";
-import { makeRepo, writeFiles } from "./support/repo.ts";
 
 function tree(): string {
   const repo = tempDir();
@@ -76,77 +67,3 @@ describe("what makes a pre-verification run evidence", () => {
   });
 });
 
-describe("the gate that stands in front of a verification round", () => {
-  const CONFIG = {
-    testing: {
-      suites: [{ name: "python", command: "python -m pytest", covers: ["docs/"], expensive: true, test_roots: ["tests"], test_glob: "test_*.py" }],
-      selection: { repo_wide: ["pyproject.toml"], rules: [{ when: "docs/", select: [] }, { when: "src/", select: ["tests/test_thing.py"] }] },
-    },
-  };
-  // One repository, walked: the change set is what git measures against the
-  // seed, so the milestones below build on each other.
-  const repo = makeRepo({
-    "docs/keep.md": "x\n",
-    "docs/sessions/session-plan.md": "### Session 1 of 2: First\n1. Register.\n2. Build it.\n\n### Session 2 of 2: Second\n1. Register.\n",
-  });
-  const sessionsDir = join(repo, "docs", "sessions");
-
-  it("walks one repository: an empty mapping skips evidence, an unmapped path blocks, a remediation is measured by the fix, and a suite asked for nothing is satisfied by the run it asked for", () => {
-    // One test, because each part stands on the state the part before it
-    // left: the change set is what git measures against the seed.
-    //
-    // -- skips evidence only for a declared empty mapping, and blocks on a
-    // path nobody mapped even beside a mapped one. "Nothing is affected" and
-    // "nobody knows what is affected" look identical from the selected-test
-    // list and must never be treated alike.
-    writeFileSync(join(repo, "docs", "notes.md"), "x\n", "utf8");
-    assert.equal(preverifyGate(repo, sessionsDir, CONFIG).ok, true);
-    mkdirSync(join(repo, "scripts"), { recursive: true });
-    writeFileSync(join(repo, "scripts", "deploy.rb"), "x\n", "utf8");
-    const blocked = preverifyGate(repo, sessionsDir, CONFIG);
-    assert.equal(blocked.ok, false);
-    assert.match(blocked.reason, /scripts\/deploy\.rb/);
-    assert.equal(blocked.command, "");
-    writeFiles(repo, { "src/app.py": "x = 1\n" });
-    assert.match(preverifyGate(repo, sessionsDir, CONFIG).reason, /scripts\/deploy\.rb/);
-
-    // -- measures a remediation by the fix rather than by the whole
-    // session. A repository-wide edit buys one full run, at the round that
-    // reviewed it; judging later rounds against HEAD would re-buy it every
-    // time.
-    rmSync(join(repo, "scripts"), { recursive: true, force: true });
-    registerSessionStart(sessionsDir, 1, { engine: "claude-code", provider: "anthropic" });
-    writeFileSync(join(repo, "pyproject.toml"), "[p]\n", "utf8");
-    assert.equal(preverifyGate(repo, sessionsDir, CONFIG).command, "python -m pytest");
-    appendRound(repo, 1, {
-      round: 1, verdict: "ISSUES_FOUND", blocking: true, findings: [], recorded_at: "2026-08-19T18:00:00-04:00",
-      verifier_model: "m", verifier_provider: "openai", completion_tree: snapshotWorktreeTree(repo) as string,
-    });
-    writeFileSync(join(repo, "src", "app.py"), "x = 2\n", "utf8");
-    assert.equal(preverifyGate(repo, sessionsDir, CONFIG).command, "python -m pytest tests/test_thing.py");
-
-    // -- asks a suite the selection named no test of for nothing, and is
-    // satisfied by the run it asked for.
-    const twoSuites = {
-      testing: {
-        suites: [
-          { name: "python", command: "python -m pytest", covers: ["src/"], expensive: true, test_roots: ["tests"], test_glob: "test_*.py" },
-          { name: "typescript", command: "vitest run", covers: ["src/"], expensive: true, test_roots: ["suite"], test_glob: "*.test.ts" },
-        ],
-        selection: { rules: [{ when: "src/app.py", select: ["tests/test_app.py"] }, { when: "docs/", select: [] }, { when: "pyproject.toml", select: [] }] },
-      },
-    };
-    const asked = preverifyGate(repo, sessionsDir, twoSuites);
-    assert.equal(asked.ok, false, asked.reason);
-    assert.equal(asked.suite, "python");
-    assert.equal(asked.command, "python -m pytest tests/test_app.py");
-    const python = loadSuitesChecked(twoSuites).suites.find((s) => s.name === "python") as SuiteSpec;
-    recordRun(sessionsDir, python, "passed", {
-      stage: "preverify-targeted", durationSeconds: 1, command: "python -m pytest tests/test_app.py", policy: POLICY_TARGETED,
-      policyReason: "named every selected test", selectedTests: [["tests/test_app.py", "configured-rule"]],
-    });
-    const satisfied = preverifyGate(repo, sessionsDir, twoSuites);
-    assert.equal(satisfied.ok, true, satisfied.reason);
-    assert.deepEqual(satisfied.accepted.map(([name]) => name), ["python"]);
-  });
-});

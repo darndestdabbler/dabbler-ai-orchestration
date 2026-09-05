@@ -26,7 +26,7 @@ import {
   readOwed,
 } from "../src/owedDecisions.ts";
 import { standIn, workingDirectory } from "../src/workdir.ts";
-import { makeSandbox } from "./support/repo.ts";
+import { makeAnsweredSandbox } from "./support/answers.ts";
 
 /** An echo that keeps what it was told, in order. */
 function recordingEcho(): { echo: RouterEcho; lines: string[] } {
@@ -93,7 +93,7 @@ describe("what a verb writes, collected", () => {
 
 describe("the in-process router", () => {
   it("answers the projection as a value, with no text in between", async () => {
-    const { repo, sessionsDir } = makeSandbox();
+    const { repo, sessionsDir } = makeAnsweredSandbox();
     const result = await createInProcessRouter().progress({ repoRoot: repo, sessionsDir });
     assert.equal(result.ok, true);
     if (!result.ok) return;
@@ -102,7 +102,7 @@ describe("the in-process router", () => {
   });
 
   it("derives the sessions root from the repository when the caller names none", async () => {
-    const { repo } = makeSandbox();
+    const { repo } = makeAnsweredSandbox();
     const result = await createInProcessRouter().progress({ repoRoot: repo });
     assert.equal(result.ok, true);
     if (!result.ok) return;
@@ -110,7 +110,7 @@ describe("the in-process router", () => {
   });
 
   it("registers a session, and the record on disk is what moved", async () => {
-    const { repo, sessionsDir } = makeSandbox();
+    const { repo, sessionsDir } = makeAnsweredSandbox();
     const result = await createInProcessRouter().session.start({
       repoRoot: repo,
       sessionsDir,
@@ -129,7 +129,7 @@ describe("the in-process router", () => {
     // The extension calls these rather than editing the tracked declaration
     // itself: two writers for one file drift, and only one of them can be
     // schema-checked on the way out.
-    const { repo, sessionsDir } = makeSandbox({
+    const { repo, sessionsDir } = makeAnsweredSandbox({
       "solution-dependencies.json": JSON.stringify({
         schemaVersion: 1,
         solution: "csv-pipeline",
@@ -198,7 +198,7 @@ describe("the in-process router", () => {
   });
 
   it("turns a verb's refusal into the contract's outcome, with its own words", async () => {
-    const { repo, sessionsDir } = makeSandbox();
+    const { repo, sessionsDir } = makeAnsweredSandbox();
     const router = createInProcessRouter();
     await router.session.start({
       repoRoot: repo,
@@ -222,14 +222,14 @@ describe("the in-process router", () => {
   });
 
   it("bootstraps a project, which is the whole of first-run now", async () => {
-    const { repo } = makeSandbox();
+    const { repo } = makeAnsweredSandbox();
     const result = await createInProcessRouter().bootstrap({ projectDir: repo });
     assert.equal(result.ok, true);
     assert.ok(existsSync(join(repo, "AGENTS.md")));
   });
 
   it("settles an owed decision, and the ledger is what says so", async () => {
-    const { repo, sessionsDir } = makeSandbox();
+    const { repo, sessionsDir } = makeAnsweredSandbox();
     raiseOwed(repo, {
       id: "driver-stop-s1",
       decisionClass: CLASS_VALUE_TRADEOFF,
@@ -261,7 +261,7 @@ describe("the in-process router", () => {
   });
 
   it("reads the last round of a session, or null when it has none", async () => {
-    const { repo } = makeSandbox();
+    const { repo } = makeAnsweredSandbox();
     const result = await createInProcessRouter().ledger.latestRound({
       repoRoot: repo,
       sessionNumber: 1,
@@ -276,7 +276,7 @@ describe("the in-process router", () => {
     // fails the same way: a ledger line that will not parse, a plan whose
     // bytes no sanctioned write accounts for, a sessions root that is not
     // there. Each is something the caller has to SHOW.
-    const { repo } = makeSandbox();
+    const { repo } = makeAnsweredSandbox();
     const runDir = join(repo, ".dabbler", "runs", "s1");
     mkdirSync(runDir, { recursive: true });
     writeFileSync(
@@ -295,7 +295,7 @@ describe("the in-process router", () => {
   });
 
   it("shows the operator the line they could have typed, and what came back", async () => {
-    const { repo, sessionsDir } = makeSandbox();
+    const { repo, sessionsDir } = makeAnsweredSandbox();
     const { echo, lines } = recordingEcho();
     await createInProcessRouter({ echo }).session.start({
       repoRoot: repo,
@@ -309,14 +309,14 @@ describe("the in-process router", () => {
   });
 
   it("keeps a polled read out of the command log", async () => {
-    const { repo, sessionsDir } = makeSandbox();
+    const { repo, sessionsDir } = makeAnsweredSandbox();
     const { echo, lines } = recordingEcho();
     await createInProcessRouter({ echo }).progress({ repoRoot: repo, sessionsDir });
     assert.deepEqual(lines, []);
   });
 
   it("serializes concurrent calls rather than letting them share a buffer", async () => {
-    const { repo, sessionsDir } = makeSandbox();
+    const { repo, sessionsDir } = makeAnsweredSandbox();
     const router = createInProcessRouter();
     const answers = await Promise.all([
       router.progress({ repoRoot: repo, sessionsDir }),
@@ -327,7 +327,7 @@ describe("the in-process router", () => {
   });
 
   it("keeps answering after a call rejects, rather than wedging the queue", async () => {
-    const { repo, sessionsDir } = makeSandbox();
+    const { repo, sessionsDir } = makeAnsweredSandbox();
     const router = new InProcessRouter();
     await assert.rejects(() => router.runVerb("nonesuch", [], repo), /no verb/);
     const result = await router.progress({ repoRoot: repo, sessionsDir });

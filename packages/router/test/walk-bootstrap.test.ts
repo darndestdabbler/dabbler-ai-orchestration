@@ -12,7 +12,7 @@
 // that ONE directory answers all of them, from nothing, in one pass -- which
 // is what a person setting up a project actually does.
 import assert from "node:assert/strict";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it } from "node:test";
 
@@ -53,6 +53,13 @@ describe("a project on its first day", () => {
     assert.ok(!existsSync(join(repo, ".gitignore")));
     assert.ok(!existsSync(join(repo, "dabbler.yaml")));
     assert.ok(!existsSync(join(repo, "solution.yaml")));
+    // A clone made before round refs existed carries neither refspec; the
+    // assertion after setup is then a claim about setup and not the fixture.
+    assert.ok(
+      !gitOut(repo, "config", "--get-all", "remote.origin.fetch").includes("dabbler/rounds"),
+    );
+    // And the operator has work of their own in progress, uncommitted.
+    writeFileSync(join(repo, "mine.txt"), "the operator's own work\n", "utf8");
     milestones.push("nothing yet");
 
     // --- the bootstrap ------------------------------------------------------
@@ -126,12 +133,22 @@ describe("a project on its first day", () => {
 
     // --- what setup left in git --------------------------------------------
     // It commits its own files and only those: the operator's README was
-    // already committed, and nothing of theirs is staged.
-    assert.equal(gitOut(repo, "status", "--porcelain", "-uall").trim(), "");
+    // already committed, their work in progress is still theirs and
+    // untracked, and nothing of theirs is staged. It used to print "commit
+    // what this just wrote" -- asking the operator to run a command it
+    // could run, knowing session 1 would be refused while the files sat.
+    assert.equal(gitOut(repo, "status", "--porcelain", "-uall").trim(), "?? mine.txt");
     assert.equal(gitOut(repo, "log", "-1", "--format=%s").trim(), "Set up Dabbler");
     const committed = gitOut(repo, "show", "--name-only", "--format=", "HEAD");
     assert.match(committed, /AGENTS\.md/);
     assert.ok(!committed.includes("README.md"));
+    assert.ok(!committed.includes("mine.txt"));
+    // And the clone is taught to fetch and push round baselines: re-running
+    // setup is the migration for a clone made before round refs existed.
+    assert.match(
+      gitOut(repo, "config", "--get-all", "remote.origin.fetch"),
+      /refs\/dabbler\/rounds/,
+    );
     milestones.push("setup committed its own work");
 
     // --- what a release would tag ------------------------------------------

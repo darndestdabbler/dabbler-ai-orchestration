@@ -30,8 +30,7 @@ import {
   treeKillCommand,
 } from "../src/checks.ts";
 import { hiddenSpawn, snapshotWorktreeTree } from "../src/journal.ts";
-import { tempDir } from "./support/answers.ts";
-import { gitOut, makeRepo } from "./support/repo.ts";
+import { makeAnsweredRepo, tempDir } from "./support/answers.ts";
 
 const onWindows = process.platform === "win32";
 
@@ -197,9 +196,9 @@ describe("which changed paths a check covers", () => {
 
 // --- Execution ----------------------------------------------------------------
 
-/** A repository with one tracked file, which is all the executor needs. */
+/** A directory answering as a repository with one tracked file, which is all the executor needs. */
 function seededRepo(): string {
-  return makeRepo({ "a.txt": "one\n" });
+  return makeAnsweredRepo({ "a.txt": "one\n" }).repo;
 }
 
 function options(repo: string): { stage: string; treeDigest: string; timeoutSeconds: number } {
@@ -319,14 +318,6 @@ describe("running a declared check", () => {
     assert.match(run.output, /out/);
     assert.match(run.output, /err/);
     assert.equal(run.outcome, "passed");
-  });
-
-  it("leaves the real index alone across a run", async () => {
-    const repo = seededRepo();
-    writeFileSync(join(repo, "untracked.txt"), "x\n", "utf8");
-    const check = makeCheck({ name: "noop", argv: [process.execPath, "-e", "0"] });
-    await execute(repo, check, displayCommand(check), options(repo));
-    assert.match(gitOut(repo, "status", "--porcelain"), /\?\? untracked\.txt/);
   });
 });
 

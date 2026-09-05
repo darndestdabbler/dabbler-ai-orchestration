@@ -25,8 +25,7 @@ import {
   runAsRecord,
 } from "../src/packaging.ts";
 import { declareSessionTask, registerSessionStart } from "../src/writers.ts";
-import { makeConfig } from "./support/answers.ts";
-import { git, gitOut, makeSandbox } from "./support/repo.ts";
+import { makeAnsweredSandbox, makeConfig } from "./support/answers.ts";
 
 // Writes one file into whatever directory the framework hands it, named by
 // the arguments after it.
@@ -91,16 +90,18 @@ function half(config: Record<string, unknown>, which: string): Record<string, un
 
 /**
  * A session that may publish: declared releasable before the work, then
- * verified, committed, pushed and left with a clean tree.
+ * verified, and -- as git tells it -- committed, pushed and left with a
+ * clean tree. `ahead` is how a test takes the push back.
  */
-function publishable(): { repo: string; sessionsDir: string; pushLog: string } {
-  const { repo, sessionsDir } = makeSandbox();
+function publishable(): {
+  repo: string;
+  sessionsDir: string;
+  pushLog: string;
+  ahead: (count: number) => void;
+} {
+  const { repo, sessionsDir, ahead } = makeAnsweredSandbox({ "widget.py": "WIDGET = 1\n" });
   registerSessionStart(sessionsDir, 1, { engine: "claude-code", provider: "anthropic" });
   declareSessionTask(sessionsDir, { sessionNumber: 1, task: "ship the widget", releasable: true });
-  writeFileSync(join(repo, "widget.py"), "WIDGET = 1\n", "utf8");
-  git(repo, "add", "-A");
-  git(repo, "commit", "-q", "-m", "work");
-  git(repo, "push", "-q");
   appendRound(repo, 1, {
     round: 1,
     verdict: "VERIFIED",
@@ -112,7 +113,7 @@ function publishable(): { repo: string; sessionsDir: string; pushLog: string } {
     recorded_at: new Date().toISOString(),
   });
   process.env[SECRET_ENV] = SECRET_VALUE;
-  return { repo, sessionsDir, pushLog: join(repo, "..", "pushes.json") };
+  return { repo, sessionsDir, pushLog: join(repo, "..", "pushes.json"), ahead };
 }
 
 beforeEach(() => {
@@ -247,7 +248,7 @@ describe("who may publish", () => {
     ["declared no", false],
   ] as const) {
     it(`refuses a session that ${label}`, () => {
-      const { repo, sessionsDir } = makeSandbox();
+      const { repo, sessionsDir } = makeAnsweredSandbox();
       const pushLog = join(repo, "..", "pushes.json");
       registerSessionStart(sessionsDir, 1, { engine: "claude-code", provider: "anthropic" });
       if (declaration !== null) {
@@ -276,10 +277,8 @@ describe("who may publish", () => {
     // Step (f) runs after (e). "After" means the evidence exists, so work
     // left unpushed refuses the publication rather than shipping a tree the
     // remote has never seen.
-    const { repo, sessionsDir, pushLog } = publishable();
-    writeFileSync(join(repo, "widget.py"), "WIDGET = 2\n", "utf8");
-    git(repo, "add", "-A");
-    git(repo, "commit", "-q", "-m", "more work");
+    const { sessionsDir, pushLog, ahead } = publishable();
+    ahead(1);
     const run = packageSession(sessionsDir, { config: packagingConfig(pushLog) });
     assert.equal(run.outcome, OUTCOME_REFUSED);
     assert.match(String(run.refusal), /pushed_to_remote/);
@@ -319,7 +318,6 @@ describe("the publication", () => {
     );
     // The tree that was verified stays the tree that was verified.
     assert.equal(run.treeDigest, snapshotWorktreeTree(repo));
-    assert.equal(gitOut(repo, "status", "--porcelain").trim(), "");
   });
 
   it("does not publish a stale artifact from a previous run", () => {

@@ -25,8 +25,7 @@ import {
   currentDecisions,
   raisePublicationDecision,
 } from "../src/owedDecisions.ts";
-import { tempDir } from "./support/answers.ts";
-import { makeSandbox } from "./support/repo.ts";
+import { makeAnsweredSandbox, tempDir } from "./support/answers.ts";
 
 const VERSION = "2.0.0";
 
@@ -174,7 +173,7 @@ describe("the brief the operator answers", () => {
   it("states the cost of a wrong answer, not only the choices", () => {
     // The whole reason this is a brief and not a prompt: the reader has to
     // be able to tell what they cannot take back.
-    const { repo } = makeSandbox();
+    const { repo } = makeAnsweredSandbox();
     const row = raisePublicationDecision(repo, { version: "2.0.0" });
     assert.match(String(row?.["determined"]), /cannot be recalled/);
     assert.deepEqual(
@@ -189,7 +188,7 @@ describe("the brief the operator answers", () => {
     // draft recommended the release candidate and called it "the whole
     // path", which was false -- it never touches the Marketplace -- and was
     // a recommendation to not do the thing.
-    const { repo } = makeSandbox();
+    const { repo } = makeAnsweredSandbox();
     const row = raisePublicationDecision(repo, { version: "2.0.0" });
     assert.deepEqual(row?.["recommendation"], "publish");
     const rc = (row?.["options"] as { label: string; consequence: string }[]).find(
@@ -201,13 +200,13 @@ describe("the brief the operator answers", () => {
   });
 
   it("does not block a close, because an unpublished product is not unverified", () => {
-    const { repo } = makeSandbox();
+    const { repo } = makeAnsweredSandbox();
     raisePublicationDecision(repo, { version: "2.0.0" });
     assert.deepEqual(blockingDecisions(repo), []);
   });
 
   it("asks once, however often the verb runs", () => {
-    const { repo } = makeSandbox();
+    const { repo } = makeAnsweredSandbox();
     raisePublicationDecision(repo, { version: "2.0.0" });
     assert.equal(raisePublicationDecision(repo, { version: "2.0.0" }), null);
   });
@@ -215,7 +214,7 @@ describe("the brief the operator answers", () => {
   it("carries the operator's answer, and nobody else's", () => {
     // `answeredBy` is "operator" and there is no other value: a verdict a
     // model can write is a verdict a model can be wrong about.
-    const { repo } = makeSandbox();
+    const { repo } = makeAnsweredSandbox();
     raisePublicationDecision(repo, { version: "2.0.0" });
     answerOwed(repo, ID_PUBLICATION, "not yet");
     const row = currentDecisions(repo).find((r) => String(r["id"]) === ID_PUBLICATION);

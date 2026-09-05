@@ -20,8 +20,7 @@ import { writeInstruction } from "../src/driver.ts";
 import { capture } from "../src/output.ts";
 import { readRawSessionState } from "../src/progress.ts";
 import { registerSessionStart } from "../src/writers.ts";
-import { tempDir } from "./support/answers.ts";
-import { makeSandbox } from "./support/repo.ts";
+import { makeAnsweredSandbox, tempDir } from "./support/answers.ts";
 
 async function run(
   verb: () => Promise<number> | number,
@@ -72,7 +71,7 @@ describe("dabbler session, the whole surface", () => {
   });
 
   it("runs the close read-only under --dry-run", async () => {
-    const { sessionsDir } = makeSandbox();
+    const { sessionsDir } = makeAnsweredSandbox();
     registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
     const result = await run(() => sessionVerb(["close", "--dry-run", "--sessions-dir", sessionsDir]));
     assert.equal(result.code, 1);
@@ -82,7 +81,7 @@ describe("dabbler session, the whole surface", () => {
   });
 
   it("takes the session number for cancel as a positional", async () => {
-    const { sessionsDir } = makeSandbox();
+    const { sessionsDir } = makeAnsweredSandbox();
     registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
     const result = await run(() =>
       sessionVerb(["cancel", "1", "--reason", "stop", "--force", "--sessions-dir", sessionsDir]),
@@ -92,14 +91,14 @@ describe("dabbler session, the whole surface", () => {
   });
 
   it("requires the reason a cancellation is recorded under", async () => {
-    const { sessionsDir } = makeSandbox();
+    const { sessionsDir } = makeAnsweredSandbox();
     const result = await run(() => sessionVerb(["cancel", "1", "--sessions-dir", sessionsDir]));
     assert.equal(result.code, 2);
     assert.match(result.err, /--reason/);
   });
 
   it("refuses a session number that is not one, and requires the positional", async () => {
-    const { sessionsDir } = makeSandbox();
+    const { sessionsDir } = makeAnsweredSandbox();
     const notANumber = await run(() => sessionVerb(["restore", "one", "--sessions-dir", sessionsDir]));
     assert.equal(notANumber.code, 2);
     assert.match(notANumber.err, /invalid int value/);
@@ -110,7 +109,7 @@ describe("dabbler session, the whole surface", () => {
   });
 
   it("takes the plan prose inline or from a file, and never both", async () => {
-    const { sessionsDir } = makeSandbox();
+    const { sessionsDir } = makeAnsweredSandbox();
     registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
     const both = await run(() =>
       sessionVerb(["plan", "--body", "a", "--body-file", "b", "--sessions-dir", sessionsDir]),
@@ -130,7 +129,7 @@ describe("dabbler session, the whole surface", () => {
   });
 
   it("requires the legacy directory a migration reads", async () => {
-    const { sessionsDir } = makeSandbox();
+    const { sessionsDir } = makeAnsweredSandbox();
     const result = await run(() => sessionVerb(["migrate", "--sessions-dir", sessionsDir]));
     assert.equal(result.code, 2);
     assert.match(result.err, /legacy_set_dir/);
@@ -140,7 +139,7 @@ describe("dabbler session, the whole surface", () => {
 describe("dabbler status", () => {
   it("emits the projection as indented JSON, in one output mode", async () => {
     // `--json` is what the projection IS, not a switch between two shapes.
-    const { sessionsDir } = makeSandbox();
+    const { sessionsDir } = makeAnsweredSandbox();
     registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
     const bare = await run(() => statusVerb(["--sessions-dir", sessionsDir]));
     assert.equal(bare.code, 0);
@@ -231,7 +230,7 @@ describe("the verb registry", () => {
 
 describe("dabbler session run", () => {
   it("refuses when no session is in flight, naming the registration it needs", async () => {
-    const { sessionsDir } = makeSandbox();
+    const { sessionsDir } = makeAnsweredSandbox();
     const result = await run(() => sessionVerb(["run", "--sessions-dir", sessionsDir]));
     assert.notEqual(result.code, 0);
     assert.match(result.err, /no session is in flight/);
@@ -244,7 +243,7 @@ describe("dabbler session run", () => {
 
 describe("dabbler session hook-stop", () => {
   it("blocks the settle while a step instruction is outstanding, in the RUN sentence", async () => {
-    const { repo, sessionsDir } = makeSandbox();
+    const { repo, sessionsDir } = makeAnsweredSandbox();
     registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
     writeInstruction(repo, 1, {
       schema_version: 1,
@@ -266,7 +265,7 @@ describe("dabbler session hook-stop", () => {
   });
 
   it("stays silent when nothing is owed, because it fires on every stop", async () => {
-    const { sessionsDir } = makeSandbox();
+    const { sessionsDir } = makeAnsweredSandbox();
     const result = await run(() => sessionVerb(["hook-stop", "--sessions-dir", sessionsDir]));
     assert.equal(result.code, 0);
     assert.equal(result.out, "");
@@ -277,7 +276,7 @@ describe("dabbler session hook-stop", () => {
     // the end of its turn was the one with no enforcement: session 91's job
     // finished with its exit code on disk and the session sat idle for three
     // hours because nothing made the next call.
-    const { repo, sessionsDir } = makeSandbox();
+    const { repo, sessionsDir } = makeAnsweredSandbox();
     registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
     writeInstruction(repo, 1, {
       schema_version: 1,
@@ -298,7 +297,7 @@ describe("dabbler session hook-stop", () => {
   });
 
   it("lets the turn end while a wait is not yet due, and says when it is", async () => {
-    const { repo, sessionsDir } = makeSandbox();
+    const { repo, sessionsDir } = makeAnsweredSandbox();
     registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
     writeInstruction(repo, 1, {
       schema_version: 1,

@@ -5,12 +5,14 @@
 // declares what git would have said and asserts the decision made from it:
 // no process, no checkout. An unfed question throws with its argv, so a
 // missing answer names itself rather than passing for the wrong reason.
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
 import { setGitSource, type RunGitOptions } from "../../src/journal.ts";
 import { NoCandidateError, setRouteSource, type RouteOptions, type RouteResult } from "../../src/route.ts";
+import { SANDBOX_SEED } from "./repo.ts";
 
 const ROOT = join(tmpdir(), "dabbler-router-tests");
 
@@ -170,4 +172,186 @@ export function cleanRepoAnswers(repo: string): () => void {
     [["commit-tree"], { stdout: "c".repeat(40) }],
     [["update-ref"], { code: 0 }],
   ]);
+}
+
+// --- A checkout that answers, without a repository ----------------------------
+
+const HEAD_COMMIT = "a1b2c3d4".repeat(5);
+const ANCHOR_COMMIT = "c".repeat(40);
+
+/**
+ * `git init` in a directory: the one thing about it a test can see is the
+ * `.git/` it leaves, so the answer leaves one. The framework places a
+ * repository beside this one this way, and what the tests then read is the
+ * declaration written into it.
+ */
+export const GIT_INIT: AnswerRow = [
+  ["init"],
+  (_args, repoRoot) => {
+    mkdirSync(join(repoRoot, ".git"), { recursive: true });
+    return { code: 0 };
+  },
+];
+
+/**
+ * A directory that answers git's questions the way a clean, pushed checkout
+ * of `main` with an `origin` would, and the handles a test uses to say
+ * otherwise. `calls` is every argv asked, in order.
+ */
+export interface AnsweredRepo {
+  readonly repo: string;
+  readonly calls: string[][];
+  readonly restore: () => void;
+  /** What `git status --porcelain` prints; "" is a clean tree. */
+  status(text: string): void;
+  /** Commits ahead of the upstream; 0 is pushed. */
+  ahead(count: number): void;
+}
+
+/** The same, seeded with the sandbox and naming where its sessions live. */
+export interface AnsweredSandbox extends AnsweredRepo {
+  readonly sessionsDir: string;
+}
+
+/** The paths under `root` that a tree of it would list, in git's spelling. */
+function treeListing(root: string, prefix = ""): string[] {
+  const paths: string[] = [];
+  for (const entry of readdirSync(root, { withFileTypes: true })) {
+    if (prefix === "" && (entry.name === ".git" || entry.name === ".dabbler")) continue;
+    const rel = prefix === "" ? entry.name : `${prefix}/${entry.name}`;
+    if (entry.isDirectory()) paths.push(...treeListing(join(root, entry.name), rel));
+    else paths.push(rel);
+  }
+  return paths.sort();
+}
+
+/**
+ * What `write-tree` answers: a digest over the files on disk, so a tree
+ * that changed answers differently and one that did not answers the same
+ * -- which is the one property of a tree id the framework relies on.
+ */
+function diskTree(root: string): string {
+  const hash = createHash("sha1");
+  for (const path of treeListing(root)) {
+    hash.update(path).update("\0").update(readFileSync(join(root, ...path.split("/")))).update("\0");
+  }
+  return hash.digest("hex");
+}
+
+/**
+ * `files` on disk, a `.git/` so the checks that look for a repository on
+ * disk find one, and git answering from a table: HEAD holds the tree the
+ * files made, the worktree snapshots to whatever is on disk now, the tree
+ * is clean until a test says otherwise through the setters, and when
+ * `origin` is asked for the branch tracks one and is pushed. The table is
+ * installed for the process until `restore` is called, or until the next
+ * one replaces it, which is what a file of independent tests wants.
+ */
+export function makeAnsweredRepo(
+  files: Record<string, string>,
+  options: { origin?: boolean } = {},
+): AnsweredRepo {
+  const target = tempDir("answered-");
+  const repo = join(target, "repo");
+  seed(repo, files);
+  mkdirSync(join(repo, ".git"), { recursive: true });
+  const posixRepo = repo.split("\\").join("/");
+  const withOrigin = options.origin === true;
+  const state = { status: "", ahead: 0, headTree: diskTree(repo) };
+  const config = new Map<string, string[]>(
+    withOrigin
+      ? [
+          ["remote.origin.url", ["../remote.git"]],
+          ["remote.origin.fetch", ["+refs/heads/*:refs/remotes/origin/*"]],
+          ["branch.main.remote", ["origin"]],
+          ["branch.main.merge", ["refs/heads/main"]],
+        ]
+      : [],
+  );
+  const calls: string[][] = [];
+  const restore = gitAnswers([
+    // Records every question and answers none of them.
+    [(args) => { calls.push([...args]); return false; }, {}],
+    [["rev-parse", "--show-toplevel"], { stdout: posixRepo }],
+    [["rev-parse", "--verify", "HEAD"], { stdout: HEAD_COMMIT }],
+    [["rev-parse", "--short", "HEAD"], { stdout: HEAD_COMMIT.slice(0, 7) }],
+    [
+      ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"],
+      withOrigin ? { stdout: "origin/main" } : { code: 128, stderr: "fatal: no upstream configured for branch 'main'" },
+    ],
+    [["rev-parse", "HEAD"], { stdout: HEAD_COMMIT }],
+    [(args) => args[0] === "rev-parse" && String(args[1]).endsWith("^{tree}"), () => ({ stdout: state.headTree })],
+    [(args) => args[0] === "symbolic-ref", { stdout: "main" }],
+    [["status"], () => ({ stdout: state.status })],
+    [
+      ["remote", "get-url"],
+      (args) => (withOrigin && args[2] === "origin" ? { stdout: "../remote.git" } : { code: 2 }),
+    ],
+    [["remote"], { stdout: withOrigin ? "origin" : "" }],
+    [
+      ["rev-list", "--count", "@{u}..HEAD"],
+      () => (withOrigin ? { stdout: String(state.ahead) } : { code: 128, stderr: "fatal: no upstream configured" }),
+    ],
+    [["push"], { code: 0 }],
+    [["read-tree"], { code: 0 }],
+    [["add"], { code: 0 }],
+    [["rm", "--cached"], { code: 0 }],
+    [["write-tree"], () => ({ stdout: diskTree(repo) })],
+    [["commit-tree"], { stdout: ANCHOR_COMMIT }],
+    [["update-ref"], { code: 0 }],
+    [["commit"], { code: 0 }],
+    [(args) => args[0] === "cat-file" && args[1] === "-e", { code: 0 }],
+    [
+      (args) => args[0] === "cat-file" && args[1] === "blob",
+      (args) => {
+        const path = join(repo, ...String(args[2]).slice(41).split("/"));
+        return existsSync(path) ? { bytes: readFileSync(path) } : { code: 128 };
+      },
+    ],
+    [["ls-tree", "-r", "--name-only", "-z"], () => ({ stdout: treeListing(repo).join("\0") })],
+    [
+      (args) => args[0] === "config" && (args[1] === "--get-all" || args[1] === "--get"),
+      (args) => {
+        const values = config.get(String(args[2]));
+        return values === undefined ? { code: 1 } : { stdout: values.join("\n") };
+      },
+    ],
+    [
+      ["config", "--add"],
+      (args) => {
+        const key = String(args[2]);
+        config.set(key, [...(config.get(key) ?? []), String(args[3])]);
+        return { code: 0 };
+      },
+    ],
+    [["for-each-ref"], { stdout: "" }],
+    [["diff", "--cached", "--quiet"], { code: 1 }],
+    // Two trees differ by nothing when they are the same tree; a diff
+    // between two different ones is a fact the test has to state.
+    [
+      ["diff", "--name-only", "-z", "--no-ext-diff"],
+      (args) => {
+        if (args[4] === args[5]) return { stdout: "" };
+        throw new Error(`no recorded git answer for a diff between two trees: git ${args.join(" ")}`);
+      },
+    ],
+    GIT_INIT,
+  ]);
+  return {
+    repo,
+    calls,
+    restore,
+    status: (text) => { state.status = text; },
+    ahead: (count) => { state.ahead = count; },
+  };
+}
+
+/**
+ * The sandbox seed with `extra` over it, answering as above, and where its
+ * sessions live. A test that only needed a sessions directory takes `repo`
+ * and `sessionsDir` and ignores the rest.
+ */
+export function makeAnsweredSandbox(extra: Record<string, string> = {}): AnsweredSandbox {
+  const answered = makeAnsweredRepo({ ...SANDBOX_SEED, ...extra }, { origin: true });
+  return { ...answered, sessionsDir: join(answered.repo, "docs", "sessions") };
 }

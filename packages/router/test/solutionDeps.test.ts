@@ -28,7 +28,11 @@ import {
   workspaceFolders,
   writeWorkspaceFile,
 } from "../src/solutionDeps.ts";
-import { seed, tempDir } from "./support/answers.ts";
+import { GIT_INIT, gitAnswers, seed, tempDir } from "./support/answers.ts";
+
+// Scaffolding a member is `git init` in a directory that is not yet a
+// repository, and nothing else is asked of git here.
+gitAnswers([GIT_INIT]);
 
 function repoWith(files: Record<string, string>): string {
   const root = tempDir("deps-");

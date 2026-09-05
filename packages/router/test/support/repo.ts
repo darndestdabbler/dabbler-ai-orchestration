@@ -79,16 +79,19 @@ export function makeRepo(files: Record<string, string>, options: { origin?: bool
 // origin) pair and every caller gets a COPY, which is a directory tree copy
 // and no processes at all. The copy is private, so a test that commits into
 // it cannot be seen by the next.
+//
+// The template's directory is a fresh temp name, never the process id: the
+// temp root outlives the run, Windows reuses pids, and a worker that landed
+// in a template an earlier process had built found the remote already
+// added and failed before its first test.
 const TEMPLATES = new Map<string, string>();
-let templateCount = 0;
 
 function templateFor(files: Record<string, string>, withOrigin: boolean): string {
   const key = JSON.stringify([withOrigin, files]);
   const known = TEMPLATES.get(key);
   if (known !== undefined) return known;
   pinGit();
-  templateCount += 1;
-  const target = join(ROOT, `template-${process.pid}-${templateCount}`);
+  const target = mkdtempSync(join(ROOT, "template-"));
   const repo = join(target, "repo");
   mkdirSync(repo, { recursive: true });
   git(repo, "init", "-q");

@@ -36,8 +36,7 @@ import {
 } from "../src/driver.ts";
 import type { DriverInstruction, DriverRun } from "../src/generated/index.ts";
 import { LedgerError, appendRound } from "../src/ledger.ts";
-import { gitAnswers, tempDir } from "./support/answers.ts";
-import { makeRepo } from "./support/repo.ts";
+import { gitAnswers, makeAnsweredSandbox, tempDir } from "./support/answers.ts";
 
 const STEP_INSTRUCTION = {
   schema_version: 1,
@@ -504,10 +503,12 @@ describe("the watcher over one session's directory", () => {
   const NOW = new Date("2026-09-01T06:41:12-04:00");
 
   it("reads the record it kept, and the tree it is over", () => {
-    // A real repository, because the probe is `git status` plus the mtimes
-    // of what it names. The seed is aged behind the instruction so the first
-    // reading is over a tree that has not moved SINCE.
-    const repo = makeRepo({ ".gitignore": ".dabbler/\n", "widget.ts": "export const widget = 0;\n" });
+    // The probe is `git status` plus the mtimes of what it names: git
+    // answers from the table, the mtimes are the files' own. The seed is
+    // aged behind the instruction so the first reading is over a tree that
+    // has not moved SINCE.
+    const sandbox = makeAnsweredSandbox({ "widget.ts": "export const widget = 0;\n" });
+    const repo = sandbox.repo;
     const long_ago = new Date("2026-09-01T06:30:00-04:00");
     for (const name of [".gitignore", "widget.ts"]) {
       utimesSync(join(repo, name), long_ago, long_ago);
@@ -517,12 +518,13 @@ describe("the watcher over one session's directory", () => {
     assert.equal(readWatcher(repo, 1, 60, NOW).state, WATCHER_QUIET);
     writeInstruction(repo, 1, { ...STEP_INSTRUCTION, issued_at: ISSUED });
     writeRun(repo, 1, { ...RUN, updated_at: ISSUED });
-    // The driver's own files are under `.dabbler/`, which is ignored, so
-    // the probe sees an untouched tree and the watcher speaks.
+    // The driver's own files are under `.dabbler/`, which git does not
+    // report, so the probe sees an untouched tree and the watcher speaks.
     assert.equal(readWatcher(repo, 1, 60, NOW).state, WATCHER_OUTSTANDING);
     // A file written now is newer than an instruction issued in the past,
     // and the probe is what says so.
     writeFileSync(join(repo, "widget.ts"), "export const widget = 1;\n", "utf8");
+    sandbox.status(" M widget.ts");
     assert.ok(Date.parse(treeTouchedAt(repo) as string) > Date.parse(ISSUED));
     assert.equal(readWatcher(repo, 1, 60, NOW).state, WATCHER_QUIET);
   });

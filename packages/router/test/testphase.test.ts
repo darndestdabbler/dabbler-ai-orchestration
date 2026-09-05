@@ -21,8 +21,7 @@ import {
   runAuthored,
   suitesFor,
 } from "../src/testphase.ts";
-import { routeAnswers, type Reply, type RoutedCall } from "./support/answers.ts";
-import { makeRepo } from "./support/repo.ts";
+import { makeAnsweredRepo, routeAnswers, type Reply, type RoutedCall } from "./support/answers.ts";
 
 // Quoted, because this machine's Node lives under `C:/Program Files`. A
 // targeted command is re-split with `shlexSplit`, which would otherwise take
@@ -63,13 +62,13 @@ function config(overrides: Record<string, unknown> = {}): Record<string, unknown
  * legible without a real test framework in the sandbox.
  */
 function repo(): string {
-  return makeRepo({
+  return makeAnsweredRepo({
     "app.py": "VALUE = 1\n",
     "runner.js":
       "process.stdout.write(process.argv.slice(2).join(' '));\nprocess.exit(3);\n",
     ".gitignore": ".dabbler/\n",
     "tests/.keep": "",
-  });
+  }).repo;
 }
 
 /** Script one reply from the router and record what it was asked. */

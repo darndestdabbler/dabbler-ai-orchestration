@@ -4,7 +4,7 @@
 // Which branch runs, what is left alone, and what a second run does. The
 // scope decision takes its writer as a parameter, so it is asserted from
 // literals; the rest reads and writes files in a directory, and the two that
-// commit need a repository.
+// commit ask git, which answers from a table.
 import assert from "node:assert/strict";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -38,8 +38,7 @@ import {
 import { capture } from "../src/output.ts";
 import { load } from "../src/solution.ts";
 import { registerSessionStart } from "../src/writers.ts";
-import { seed, tempDir } from "./support/answers.ts";
-import { gitOut, makeRepo, makeSandbox } from "./support/repo.ts";
+import { makeAnsweredRepo, makeAnsweredSandbox, seed, tempDir } from "./support/answers.ts";
 
 const savedTransport = process.env[TRANSPORT_ENV_VAR];
 afterEach(() => {
@@ -47,9 +46,9 @@ afterEach(() => {
   else process.env[TRANSPORT_ENV_VAR] = savedTransport;
 });
 
-/** A bare git repository with nothing in it: a project the moment before setup. */
+/** A directory answering as a repository with nothing in it, and no remote: a project the moment before setup. */
 function emptyRepo(): string {
-  return makeRepo({});
+  return makeAnsweredRepo({}).repo;
 }
 
 /** A writer that records what it was asked for and answers as told. */
@@ -460,19 +459,9 @@ describe("what a repository declares about its tests", () => {
 });
 
 describe("what setup does about the operator's typing", () => {
-  it("commits the files it wrote, and only those", async () => {
-    // It used to print "commit what this just wrote" -- the framework asking
-    // the operator to run a command it could run, about files it had just
-    // written, knowing session 1 would be refused while they sat there.
-    const { repo } = makeSandbox();
-    writeFileSync(join(repo, "mine.txt"), "the operator's own work\n", "utf8");
-    await bootstrapVerb(["--project-dir", repo, "--no-transport-detect"]);
-    const status = gitOut(repo, "status", "--porcelain", "-uall");
-    // The operator's file is untouched; setup's own are committed.
-    assert.match(status, /mine\.txt/);
-    assert.ok(!status.includes("AGENTS.md"));
-    assert.equal(gitOut(repo, "log", "-1", "--format=%s").trim(), "Set up Dabbler");
-  });
+  // That setup commits its own files and only those, and leaves the
+  // operator's work in progress alone, is walk-bootstrap's: it is a claim
+  // about what git holds afterwards, and it is made against a real one.
 
   it("leaves its files uncommitted while a session is in flight, and says so", async () => {
     // Session 94 re-ran bootstrap mid-session to regenerate the managed
@@ -480,15 +469,14 @@ describe("what setup does about the operator's typing", () => {
     // "Set up Dabbler" -- a commit outside the framework's own land phase.
     // With a session in flight, the land's `git add -A` is what commits
     // the files, so bootstrap writes them and leaves them.
-    const { repo, sessionsDir } = makeSandbox();
+    const { repo, sessionsDir, calls } = makeAnsweredSandbox();
     registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
-    const head = gitOut(repo, "rev-parse", "HEAD").trim();
     const run = await capture(() =>
       bootstrapVerb(["--project-dir", repo, "--no-transport-detect"]),
     );
     assert.equal(run.value, 0, run.stderr);
-    assert.equal(gitOut(repo, "rev-parse", "HEAD").trim(), head);
-    assert.match(gitOut(repo, "status", "--porcelain", "-uall"), /AGENTS\.md/);
+    assert.ok(existsSync(join(repo, "AGENTS.md")));
+    assert.ok(!calls.some((argv) => argv[0] === "commit" || argv[0] === "add"), "git was asked to commit");
     assert.match(run.stdout, /left them uncommitted: session 1 is in flight/);
     assert.doesNotMatch(run.stdout, /committed \d+ file/);
   });
@@ -503,7 +491,7 @@ describe("what setup does about the operator's typing", () => {
 
   it("does not ask a repository that already has a remote, and never holds the close", () => {
     // Staying local is a real answer, so the question is advisory.
-    const { repo } = makeSandbox();
+    const { repo } = makeAnsweredSandbox();
     assert.equal(raiseRemoteDecision(repo, { hasRemote: true }), null);
     const local = emptyRepo();
     assert.equal(raiseRemoteDecision(local, { hasRemote: false })?.["severity"], "advisory");
@@ -534,25 +522,5 @@ describe("what the Solution Explorer has to render", () => {
     const repo = emptyRepo();
     await bootstrapVerb(["--project-dir", repo, "--no-transport-detect"]);
     assert.ok(existsSync(join(repo, ".dabbler", "solution", "projection.json")));
-  });
-});
-
-describe("the round-ref migration", () => {
-  it("teaches an existing clone to fetch and push round baselines", async () => {
-    // A clone made before round refs existed carries neither refspec, and the
-    // fix only reaches the machine a session moves to once its clone fetches
-    // them -- so re-running bootstrap is the migration.
-    const { repo } = makeSandbox();
-    // The refspec is absent before, which is what makes the assertion after
-    // it a claim about this call rather than about the fixture.
-    assert.ok(
-      !gitOut(repo, "config", "--get-all", "remote.origin.fetch").includes("dabbler/rounds"),
-    );
-    await bootstrapVerb(["--project-dir", repo, "--no-transport-detect"]);
-    assert.match(
-      gitOut(repo, "config", "--get-all", "remote.origin.fetch"),
-      /refs\/dabbler\/rounds/,
-    );
-    assert.ok(existsSync(join(repo, "AGENTS.md")));
   });
 });

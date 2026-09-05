@@ -38,8 +38,7 @@ import {
 } from "../src/workflow/log.ts";
 import { project } from "../src/workflow/project.ts";
 import { reviewCap, reviewTerminal, runCap, runTerminal, suiteTerminal } from "../src/workflow/terminal.ts";
-import { seed, tempDir } from "./support/answers.ts";
-import { git } from "./support/repo.ts";
+import { makeAnsweredRepo, seed, tempDir } from "./support/answers.ts";
 
 /** One verb run, with everything it printed. */
 async function run(argv: string[]): Promise<{ code: number; out: string; err: string }> {
@@ -177,14 +176,13 @@ function makeRoot(): string {
 }
 
 /**
- * The workspace as a real repository. Whether a failing run has been answered
- * is decided by comparing tree ids, so the loops' terminal states need a tree
- * to compare.
+ * The workspace answering as a repository. Whether a failing run has been
+ * answered is decided by comparing tree ids, so the loops' terminal states
+ * need a tree to compare -- and the answered repository's tree is a digest
+ * of what is on disk, which is the one property the comparison needs.
  */
 function makeGitRoot(): string {
-  const root = makeRoot();
-  git(root, "init", "-q");
-  return root;
+  return makeAnsweredRepo({ "solution.yaml": MANIFEST }).repo;
 }
 
 /**

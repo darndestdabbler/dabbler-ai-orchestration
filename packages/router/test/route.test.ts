@@ -46,11 +46,23 @@ import {
 } from "../src/transports/copilot.ts";
 import { setHttpSource } from "../src/transports/api.ts";
 import type { APIResult } from "../src/transports/base.ts";
-import { makeConfig, seed, setProviderKeys, tempDir } from "./support/answers.ts";
+import { gitAnswers, makeConfig, seed, setProviderKeys, tempDir } from "./support/answers.ts";
 
 const KEYS = ["TEST_ANTHROPIC_KEY", "TEST_GOOGLE_KEY", "TEST_OPENAI_KEY"];
 
 let configPath = "";
+let configDir = "";
+
+// The config loader asks git for the toplevel of the working directory to
+// find the project's overlay files. Answered from THIS repository, a test
+// here read the router's own layers; the project is the directory the test
+// wrote its config into, and before one exists there is no repository.
+gitAnswers([
+  [
+    ["rev-parse", "--show-toplevel"],
+    () => (configDir === "" ? { code: 128, stderr: "fatal: not a git repository" } : { stdout: configDir }),
+  ],
+]);
 
 /**
  * The config on disk with `AI_ROUTER_CONFIG` pointing at it, so `route`'s
@@ -59,6 +71,7 @@ let configPath = "";
 function configOnDisk(config: Record<string, unknown> = makeConfig()): void {
   const directory = tempDir("route-");
   seed(directory, { "router-config.yaml": stringify(config) });
+  configDir = directory.split("\\").join("/");
   configPath = `${directory}/router-config.yaml`;
   process.env[CONFIG_ENV_VAR] = configPath;
 }

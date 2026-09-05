@@ -297,6 +297,64 @@ suite("solutionTreeModel: what other repositories build", () => {
     assert.strictEqual(repositoryPathOf({ kind: "solution" }, p), null);
   });
 
+  test("a component that never entered the workflow says nothing about its steps", () => {
+    // csv-model feedback item 14. `1/6 Plan and design` rendered forever on
+    // a bootstrapped repository: the step is declared in the manifest and
+    // nothing in the session lifecycle advances the component workflow, so
+    // the reading never changed and was never a position.
+    const p = projection({
+      solution: {
+        name: "csv-demo", title: "CSV walkthrough", step: "design",
+        stepTitle: "Plan and design", stepNumber: 1, stepCount: 6,
+        waitingOn: null, returns: 0, entered: false,
+      },
+      components: [
+        {
+          name: "csv-model", kind: "library", title: "Record model",
+          step: "design", stepTitle: "Plan and design", stepNumber: 1,
+          dependsOn: [], usedBy: [], returns: 0, entered: false,
+        },
+        {
+          name: "csv-parser", kind: "library", title: "Parser",
+          step: "mocks", stepTitle: "Build stand-ins", stepNumber: 4,
+          dependsOn: [], usedBy: [], returns: 0, entered: true,
+        },
+      ],
+    } as Partial<Projection>);
+
+    const quiet = descriptorFor({ kind: "component", name: "csv-model" }, p);
+    assert.ok(!quiet.description?.includes("1/6"));
+    assert.ok(!quiet.description?.includes("Plan and design"));
+    // No progress bar under it either: one filled square forever reads as
+    // progress and is a default.
+    assert.deepStrictEqual(
+      childrenOf({ kind: "component", name: "csv-model" }, p).map((n) => n.kind),
+      ["contract"],
+    );
+    // And the Contract row stops naming a step nothing will reach.
+    const contract = descriptorFor({ kind: "contract", name: "csv-model" }, p);
+    assert.ok(!contract.tooltip?.includes("step 3"));
+    assert.ok(contract.tooltip?.includes("No contract yet"));
+
+    // The solution head, same rule.
+    assert.ok(!descriptorFor({ kind: "solution" }, p).description?.includes("step 1/6"));
+
+    // A component that HAS entered is untouched: the row set, the N/6 and
+    // the progress bar are exactly what they were.
+    const live = descriptorFor({ kind: "component", name: "csv-parser" }, p);
+    assert.ok(live.description?.includes("4/6 Build stand-ins"));
+    assert.ok(
+      childrenOf({ kind: "component", name: "csv-parser" }, p).some((n) => n.kind === "progress"),
+    );
+
+    // A projection written before the field existed says nothing about it,
+    // and silence reads as the behaviour it was rendered under.
+    const older = projection();
+    assert.ok(
+      descriptorFor({ kind: "component", name: "csv-model" }, older).description?.includes("6/6"),
+    );
+  });
+
   test("the tree watches what the projection is derived from, not only the projection", () => {
     // csv-model feedback item 7. The projection is written by the four
     // commands that record an event and by nothing else, so a declaration

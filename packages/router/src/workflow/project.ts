@@ -127,6 +127,18 @@ export function project(root: string): Record<string, unknown> {
   projectReviewLoop(head, root, solState, cap);
   projectTestLoop(head, root, solState, tcap);
   projectSuiteLoop(head, root, solState, tcap);
+  // Whether this has entered the component workflow AT ALL, stated rather
+  // than left to be inferred from a step number.
+  //
+  // `solution.yaml` declares a step and `solution.ts` projects it, so every
+  // row carries one whether or not any event has ever been recorded against
+  // it -- and a bootstrapped repository then reads `1/6 Plan and design`
+  // forever, because nothing in the SESSION lifecycle advances the component
+  // workflow (csv-model feedback item 14). The declared step is not wrong,
+  // it is a default; what was missing is the difference between a default
+  // and a position. A reader cannot recover that from the number, because
+  // step 1 is exactly what an entered workflow looks like on its first day.
+  head.entered = Boolean(solState?.step);
   if (solState?.step) {
     head.step = solState.step;
     head.stepTitle = STEP_TITLES[solState.step];
@@ -136,6 +148,7 @@ export function project(root: string): Record<string, unknown> {
   const components = doc.components as Node[];
   for (const c of components) {
     const cs = state.get(String(c.name));
+    c.entered = Boolean(cs?.step);
     if (cs?.step) {
       c.step = cs.step;
       c.stepTitle = STEP_TITLES[cs.step];

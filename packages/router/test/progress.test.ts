@@ -9,7 +9,7 @@ import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { describe, it } from "node:test";
 
-import { writeRun } from "../src/driver.ts";
+import { writeRun, writeWorkPlan } from "../src/driver.ts";
 import { appendRound, roundsPath } from "../src/ledger.ts";
 import { CLASS_VALUE_TRADEOFF, raiseOwed } from "../src/owedDecisions.ts";
 import {
@@ -284,6 +284,67 @@ describe("the task rows", () => {
     assert.deepEqual(states(sessionsDir).slice(0, 3), ["done", "done", "in flight"]);
     assert.equal(openId(sessionsDir), "work");
     assert.match(String(buildTaskRows(sessionsDir, 1)[1]["intent"]), /Do it\./);
+  });
+
+  it("opens Work out into one row per planned step, done by accepted_steps alone", () => {
+    // csv-model feedback items 14 and 15: the task list did not say what
+    // the session was actually doing. The steps are the plan's, and done is
+    // the driver's `accepted_steps` -- written when it accepted the report
+    // AND its checks passed, so there is no state here an engine asserts
+    // about itself.
+    const { repo, sessionsDir } = makeStateDirs();
+    start(sessionsDir);
+    declareSessionTask(sessionsDir, { sessionNumber: 1, task: "Do it.", releasable: false });
+
+    // Before a plan exists the Work row stands alone: a row is a reading of
+    // a record, and an undeclared step has none.
+    assert.deepEqual(
+      buildTaskRows(sessionsDir, 1).map((row) => row["stepId"]),
+      ["register", "declare", "work", "verify", "run-of-record", "close"],
+    );
+
+    writeWorkPlan(repo, 1, {
+      schema_version: 1,
+      session_number: 1,
+      task: "Do it.",
+      releasable: false,
+      recorded_at: "2026-08-31T11:05:00-04:00",
+      steps: [
+        { id: "widget", ask: "Build the widget.", files: ["src/w.ts"], checks: [{ argv: ["true"] }] },
+        { id: "polish", ask: "Polish it.", files: ["src/w.ts"], checks: [{ argv: ["true"] }] },
+      ],
+    });
+    writeRun(repo, 1, { ...RUN, accepted_steps: ["widget"] });
+
+    const rows = buildTaskRows(sessionsDir, 1);
+    // Directly after their parent, so the flat list reads in order and the
+    // renderer can nest on the prefix alone.
+    assert.deepEqual(rows.map((row) => row["stepId"]), [
+      "register", "declare", "work", "work:widget", "work:polish", "verify", "run-of-record", "close",
+    ]);
+    // Position is the row's place in what a reader sees, renumbered over
+    // the whole list rather than left as the six phases' own count.
+    assert.deepEqual(rows.map((row) => row["position"]), [0, 1, 2, 3, 4, 5, 6, 7]);
+    assert.equal(rows[3]["state"], "done");
+    assert.equal(rows[4]["state"], "in flight");
+    assert.equal(rows[4]["isOpen"], true);
+    // The step's own words, which is what a reader wants the row to say.
+    assert.equal(rows[3]["intent"], "Build the widget.");
+    // No invented clock: `accepted_steps` carries no timestamps and
+    // `step-execution.jsonl` has a writer nothing calls.
+    assert.equal(rows[3]["startedAt"], null);
+    assert.equal(rows[4]["startedAt"], null);
+
+    // A driver that stopped marks the step it stopped on, rather than
+    // showing it as still being worked.
+    writeRun(repo, 1, {
+      ...RUN,
+      accepted_steps: ["widget"],
+      stop: { kind: "engine", reason: "it could not be done", at: "2026-08-31T12:30:00-04:00" },
+    });
+    const stopped = buildTaskRows(sessionsDir, 1);
+    assert.equal(stopped[4]["state"], "blocked");
+    assert.equal(stopped[4]["isOpen"], false);
   });
 
   it("every accepted step ends Work once the driver's phase has moved past the steps", () => {

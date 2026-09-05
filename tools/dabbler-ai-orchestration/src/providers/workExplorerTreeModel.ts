@@ -242,12 +242,46 @@ export function taskNodes(node: SessionNode): (TaskNode | RefusalNode)[] {
       },
     ];
   }
-  return node.session.tasks.map((row) => ({
+  return node.session.tasks.filter((row) => !isWorkStepRow(row)).map((row) => ({
     kind: "task",
     repository: node.repository,
     session: node.session,
     row,
   }));
+}
+
+/**
+ * The prefix that makes a task row a step of the Work phase.
+ *
+ * The projection emits its rows flat and in reading order, and the parent
+ * relationship travels in the id — `work:<step-id>`, derived from the
+ * approved plan. Nesting on the prefix means the renderer adds no structure
+ * the record does not already carry: a row is a child because of what it is
+ * called, not because this file decided where to put it.
+ */
+const WORK_STEP_PREFIX = "work:";
+
+function isWorkStepRow(row: TaskRecord): boolean {
+  return (row.stepId ?? "").startsWith(WORK_STEP_PREFIX);
+}
+
+/**
+ * The steps of the Work row, in plan order.
+ *
+ * Empty for every other row, and empty for Work itself before a plan is
+ * accepted — which is the placeholder state: the phase is real and the steps
+ * under it are not declared yet.
+ */
+export function workStepNodes(node: TaskNode): TaskNode[] {
+  if (node.row.stepId !== "work") return [];
+  return node.session.tasks
+    .filter(isWorkStepRow)
+    .map((row) => ({
+      kind: "task" as const,
+      repository: node.repository,
+      session: node.session,
+      row,
+    }));
 }
 
 /**
@@ -300,8 +334,9 @@ export function childrenOf(node: WorkExplorerNode): WorkExplorerNode[] {
       return [...verificationNodes(node), ...taskNodes(node)];
     case "verification":
       return findingNodes(node);
-    case "finding":
     case "task":
+      return workStepNodes(node);
+    case "finding":
     case "attention":
     case "refusal":
       return [];
@@ -780,6 +815,31 @@ export function humanizeStepKey(key: string): string {
 }
 
 /**
+ * What a reader sees for each of the six lifecycle rows.
+ *
+ * The ids on disk are untouched — they are what the plan, the execution
+ * record, the CLI and every gate address a phase by, and renaming them to
+ * improve a label would be renaming the record to improve the view. This is
+ * the operator's own vocabulary over them (csv-model feedback item 16).
+ *
+ * Two of the six say something the humanized id did not. `Plan declared`
+ * rather than `Plan`, because the row ends when the declaration is appended
+ * — the plan is not carried out at that point, only stated, and a label may
+ * not claim more than the record it is folded from. `Test` rather than `Run
+ * of record`, because what the row is waiting for is the suite; "run of
+ * record" is what the evidence is CALLED, which is a thing the record needs
+ * to say and a reader does not.
+ */
+const LIFECYCLE_ROW_LABELS: Record<string, string> = {
+  register: "Register",
+  declare: "Plan declared",
+  work: "Work",
+  verify: "Verify",
+  "run-of-record": "Test",
+  close: "Close",
+};
+
+/**
  * The row label: the humanized `step_id`, not the intent — a step_id is
  * the identity the plan, the execution record and the CLI all address
  * the step by, and it is short enough for a tree row. The intent is one
@@ -787,7 +847,15 @@ export function humanizeStepKey(key: string): string {
  * wraps is not a tree row.
  */
 export function taskRowLabel(row: TaskRecord): string {
-  if (row.stepId) return humanizeStepKey(row.stepId);
+  if (row.stepId) {
+    // A step of the Work phase reads as its own step id: `work:` is how the
+    // row says who its parent is, and under that parent it would be a
+    // prefix repeated on every child. The lifecycle vocabulary is NOT
+    // consulted for one — a plan may legitimately name a step `close`, and
+    // it would not mean the lifecycle's Close.
+    if (isWorkStepRow(row)) return humanizeStepKey(row.stepId.slice(WORK_STEP_PREFIX.length));
+    return LIFECYCLE_ROW_LABELS[row.stepId] ?? humanizeStepKey(row.stepId);
+  }
   const intent = row.intent.trim();
   if (intent) {
     return intent.length > 60 ? `${intent.slice(0, 57)}…` : intent;
@@ -842,7 +910,10 @@ export function taskDescriptor(node: TaskNode): RowDescriptor {
       `task-${row.iconKey}`,
       ...(row.isOpen ? ["task-open"] : []),
     ]),
-    collapsible: "none",
+    // Collapsed, never expanded, and only when there is something under it:
+    // an expander on a Work row with no accepted plan is an invitation to
+    // open a row that will say nothing.
+    collapsible: workStepNodes(node).length > 0 ? "collapsed" : "none",
   };
 }
 

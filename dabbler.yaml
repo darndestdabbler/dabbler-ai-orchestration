@@ -64,9 +64,24 @@ testing:
     # DIFFERENT file each time with `git commit` errors, which is a run of
     # record nobody can trust. Bounded at 4 it is green and the box stays
     # usable. The number is D246's, not a fresh guess.
+    # `expensive: true` is not a claim about cost -- 1117 tests in 32
+    # seconds. It is the flag that makes a suite the RUN OF RECORD, and it
+    # gates two things at once: `drive.expensiveSuites()` filters the
+    # run-of-record phase by it, and `testEvidence.evaluateFreshness` skips a
+    # non-expensive suite outright. Turning it off removes the run and the
+    # gate that would notice the run was missing, together.
+    #
+    # It was `false` here, and correctly so when session 83 declared this
+    # tier BESIDE vitest and vitest was the expensive one. Session 88 retired
+    # vitest and deleted its declaration; the survivor kept a flag whose
+    # meaning died with the tier it was defined against. The cost: no run of
+    # record for `packages/router/` between 2026-09-02 and session 92, while
+    # sessions 90 and 91 both changed router source and both closed green on
+    # the extension's suite alone. The refusal that makes it unrepeatable --
+    # a surface covered only by a non-expensive suite -- is session 94's.
     - name: typescript
       command: node --test --test-concurrency=4 packages/router/test/**/*.test.ts
-      expensive: false
+      expensive: true
       covers:
         - packages/router/
         - package.json

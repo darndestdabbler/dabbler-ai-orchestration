@@ -28,7 +28,7 @@ import {
   STATE_FILENAME,
   repoRootFromSessionsDir,
 } from "./evidence.ts";
-import { readInstruction, readReport, readRun } from "./driver.ts";
+import { readInstruction, readReport, readRun, readWorkPlan } from "./driver.ts";
 import { nowIso } from "./journal.ts";
 import {
   LedgerError,
@@ -1078,7 +1078,7 @@ export function buildTaskRows(
   const inFlight = status === STATUS_IN_PROGRESS;
   let previousEnd: string | null = startedAt;
   let halted = false;
-  return phases.map((phase, position) => {
+  const lifecycle = phases.map((phase, position) => {
     let stateWord = STEP_STATE_PENDING;
     let iconKey = STATUS_NOT_STARTED;
     let isOpen = false;
@@ -1110,6 +1110,96 @@ export function buildTaskRows(
       iconKey,
       isOpen,
       startedAt: rowStartedAt,
+    };
+  });
+
+  // The Work phase, opened out: one row per step of the approved plan,
+  // inserted directly after its parent so the flat list stays in reading
+  // order and the renderer nests on the `work:` prefix alone.
+  const workRows = workStepRows(repoRoot, sessionNumber, driverRun, {
+    inFlight,
+    stopped: driverStop !== null,
+  });
+  if (workRows.length === 0) return lifecycle;
+  const at = lifecycle.findIndex((row) => row["stepId"] === TASK_WORK);
+  if (at < 0) return lifecycle;
+  const rows = [
+    ...lifecycle.slice(0, at + 1),
+    ...workRows,
+    ...lifecycle.slice(at + 1),
+  ];
+  // One sequence over the whole list: `position` is the row's place in what
+  // a reader sees, and it is what an unlabelled row falls back to naming
+  // itself by.
+  return rows.map((row, position) => ({ ...row, position }));
+}
+
+/**
+ * One row per step of the approved work plan, or none at all.
+ *
+ * Done is `accepted_steps` and nothing else -- the fact the driver already
+ * owns, written when it accepted the report and its checks passed. There is
+ * no state here an engine can assert about itself, which is the whole reason
+ * the rows were taken off the activity log (D247).
+ *
+ * **No start time.** `accepted_steps` is an ordered list of ids and carries
+ * no timestamps, and the only per-step history the record has a shape for --
+ * `step-execution.jsonl` -- has a writer that nothing calls. A row here
+ * says done, open or pending, and does not invent a clock the record does
+ * not keep.
+ *
+ * Empty before there is a plan. A session between `start` and the accepted
+ * work plan has no steps because none have been declared, and the parent
+ * Work row standing alone is what that looks like -- rows are readings of
+ * records, and inventing one for an undeclared step is what this level
+ * exists not to do.
+ */
+function workStepRows(
+  repoRoot: string,
+  sessionNumber: number,
+  run: ReturnType<typeof readRun>,
+  session: { inFlight: boolean; stopped: boolean },
+): Record<string, unknown>[] {
+  let plan: ReturnType<typeof readWorkPlan>;
+  try {
+    plan = readWorkPlan(repoRoot, sessionNumber);
+  } catch (error) {
+    if (!(error instanceof LedgerError)) throw error;
+    throw new TaskRowsRefused(`work plan: ${error.message}`);
+  }
+  const steps = plan?.steps ?? [];
+  if (steps.length === 0) return [];
+  const accepted = new Set(run?.accepted_steps ?? []);
+  // The steps phase is the only one in which a step can be the one being
+  // worked on; past it, an unaccepted step is one the run never reached.
+  const working = session.inFlight && (run?.phase === "plan" || run?.phase === "steps");
+  let seenOpen = false;
+  return steps.map((step: { id: string; ask: string }) => {
+    const done = accepted.has(step.id);
+    let stateWord = STEP_STATE_PENDING;
+    let iconKey: string = STATUS_NOT_STARTED;
+    let isOpen = false;
+    if (done) {
+      stateWord = STEP_STATE_DONE;
+      iconKey = STATUS_COMPLETE;
+    } else if (!seenOpen && session.stopped) {
+      stateWord = STEP_STATE_BLOCKED;
+      iconKey = STATUS_CANCELLED;
+      seenOpen = true;
+    } else if (!seenOpen && working) {
+      stateWord = STEP_STATE_IN_FLIGHT;
+      iconKey = STATUS_IN_PROGRESS;
+      isOpen = true;
+      seenOpen = true;
+    }
+    return {
+      position: 0,
+      stepId: `${TASK_WORK}:${step.id}`,
+      intent: step.ask,
+      state: stateWord,
+      iconKey,
+      isOpen,
+      startedAt: null,
     };
   });
 }

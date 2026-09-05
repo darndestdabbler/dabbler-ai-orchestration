@@ -1798,22 +1798,33 @@
         "identityProvenance": "direct"
       },
       "verificationVerdict": "VERIFIED",
-      "frameworkVersion": "2.0.1",
       "verification": {
         "rounds": 2,
         "verifierModel": "gpt-5.4",
         "verifierProvider": "openai",
         "transport": "copilot-cli"
-      }
+      },
+      "frameworkVersion": "2.0.1"
     },
     {
       "number": 92,
       "title": "The task list says what a session is doing",
-      "status": "not-started",
-      "startedAt": null,
+      "status": "in-progress",
+      "startedAt": "2026-09-05T11:22:58.227000-04:00",
       "completedAt": null,
-      "orchestrator": null,
-      "verificationVerdict": null
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": "VERIFIED",
+      "frameworkVersion": "2.0.1",
+      "verification": {
+        "rounds": 1,
+        "verifierModel": "gpt-5.4",
+        "verifierProvider": "openai",
+        "transport": "copilot-cli"
+      }
     },
     {
       "number": 93,

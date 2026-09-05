@@ -15,6 +15,17 @@ export interface ProjectionSolution {
   stepCount: number;
   waitingOn?: string | null;
   returns?: number;
+  /**
+   * Whether the component workflow has been entered at all.
+   *
+   * The step is DECLARED in `solution.yaml` and projected whether or not any
+   * event has been recorded against it, so a step number alone cannot tell a
+   * default from a position — step 1 is exactly what an entered workflow
+   * looks like on its first day. Optional because a projection written
+   * before this field existed carries none, and the honest reading of its
+   * absence is the behaviour that projection was rendered under.
+   */
+  entered?: boolean;
 }
 
 export interface ProjectionComponent {
@@ -32,6 +43,8 @@ export interface ProjectionComponent {
   usedBy: string[];
   waitingOn?: string | null;
   returns?: number;
+  /** As on the solution: has this component entered the workflow at all. */
+  entered?: boolean;
 }
 
 /**
@@ -133,6 +146,22 @@ export function contractTarget(
 ): string | undefined {
   if (!c) return undefined;
   return c.contractDoc || c.contract || undefined;
+}
+
+/**
+ * Whether a row may speak about the component workflow's steps.
+ *
+ * One rule, read by the three places that render a step: the solution's
+ * `step N/6`, a component's `N/6` and its progress bar, and the Contract
+ * row's "it is written at step 3". A projection that predates the field says
+ * nothing about it, and the honest reading of silence is the behaviour that
+ * projection was rendered under — not a repository suddenly going quiet
+ * because it has not been re-projected yet.
+ */
+export function showsWorkflowStep(
+  row: Pick<ProjectionComponent, "entered"> | Pick<ProjectionSolution, "entered"> | undefined,
+): boolean {
+  return row?.entered !== false;
 }
 
 export type IconSpec = { id: string; tone?: "attention" | "done" | "muted" };
@@ -320,7 +349,10 @@ export function childrenOf(node: SolutionNode, p: Projection): SolutionNode[] {
       // Only rendered when there is something to say. An empty folder is a
       // row the reader has to open to learn nothing.
       if (c.usedBy.length > 0) out.push({ kind: "usedBy", name: c.name });
-      out.push({ kind: "progress", name: c.name });
+      // Same rule as the description: a progress bar for a workflow nothing
+      // has entered draws one filled square forever, which reads as progress
+      // and is a default.
+      if (showsWorkflowStep(c)) out.push({ kind: "progress", name: c.name });
       return out;
     }
     case "usedBy": {
@@ -345,13 +377,18 @@ export function descriptorFor(
     case "solution": {
       const s = p.solution;
       const waiting = p.needsYou.length > 0;
+      const stepped = showsWorkflowStep(s);
       return {
         id: `solution:${s.name}`,
         label: s.title,
-        description: `step ${s.stepNumber}/${s.stepCount} · ${s.stepTitle}`,
+        ...(stepped
+          ? { description: `step ${s.stepNumber}/${s.stepCount} · ${s.stepTitle}` }
+          : {}),
         tooltip: waiting
           ? `Waiting on you: ${p.needsYou.join(", ")}`
-          : `${s.stepTitle} — nothing is waiting on you`,
+          : stepped
+            ? `${s.stepTitle} — nothing is waiting on you`
+            : "Nothing is waiting on you.",
         icon: { id: "project", tone: waiting ? "attention" : undefined },
         expandable: true,
         contextValue: "dabblerSolution",
@@ -364,7 +401,10 @@ export function descriptorFor(
       }
       const bits: string[] = [];
       if (c.version) bits.push(`v${c.version}`);
-      bits.push(`${c.stepNumber}/6 ${c.stepTitle}`);
+      // Silent rather than `1/6 Plan and design` on a component that has
+      // never entered the workflow: nothing in the session lifecycle
+      // advances it, so that reading never changed and was not a state.
+      if (showsWorkflowStep(c)) bits.push(`${c.stepNumber}/6 ${c.stepTitle}`);
       if (c.owner) bits.push(c.owner);
       if (c.returns && c.returns > 0) {
         bits.push(`${c.returns}× sent back`);
@@ -381,7 +421,11 @@ export function descriptorFor(
             : c.title,
         icon: {
           id: c.kind === "integration" ? "layers" : "package",
-          tone: attention ? "attention" : c.stepNumber === 6 ? "done" : undefined,
+          tone: attention
+            ? "attention"
+            : showsWorkflowStep(c) && c.stepNumber === 6
+              ? "done"
+              : undefined,
         },
         expandable: true,
         contextValue: `dabblerComponent:${c.kind}`,
@@ -396,7 +440,11 @@ export function descriptorFor(
         description: has ? "open" : "not written yet",
         tooltip: has
           ? "What this component promises. Opens in an editor tab."
-          : "No contract yet — it is written at step 3.",
+          : showsWorkflowStep(c)
+            ? "No contract yet — it is written at step 3."
+            : // Naming a step of a workflow this component has not entered
+              // sends the reader looking for a step nothing will reach.
+              "No contract yet — what this component promises, once someone writes it.",
         icon: { id: "file-text", tone: has ? undefined : "muted" },
         expandable: false,
         contextValue: has ? "dabblerContract" : "dabblerContractMissing",

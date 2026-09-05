@@ -160,6 +160,64 @@ suite("workExplorerTreeModel: nodes", () => {
     assert.strictEqual(taskNode.kind, "task");
     assert.deepStrictEqual(childrenOf(taskNode), []);
   });
+
+  test("the plan's steps hang under Work, and nowhere else", () => {
+    // The projection emits its rows flat and says which is whose by the
+    // `work:` id prefix, so the renderer adds no structure the record does
+    // not already carry.
+    const session = makeSession({
+      status: "in-progress",
+      tasks: [
+        makeTask({ position: 0, stepId: "register", state: "done" }),
+        makeTask({ position: 1, stepId: "work", state: "in flight", isOpen: true }),
+        makeTask({ position: 2, stepId: "work:build-the-widget", state: "done" }),
+        makeTask({ position: 3, stepId: "work:polish", state: "in flight", isOpen: true }),
+        makeTask({ position: 4, stepId: "verify" }),
+      ],
+    });
+    const repository = makeRepository();
+    const lifecycle = taskNodes({ kind: "session", repository, session });
+    // The step rows are not siblings of the phases.
+    assert.deepStrictEqual(
+      lifecycle.map((n) => (n.kind === "task" ? n.row.stepId : n.kind)),
+      ["register", "work", "verify"],
+    );
+
+    const work = lifecycle[1];
+    assert.strictEqual(work.kind, "task");
+    assert.deepStrictEqual(
+      childrenOf(work).map((n) => (n.kind === "task" ? n.row.stepId : n.kind)),
+      ["work:build-the-widget", "work:polish"],
+    );
+    // Only Work has them, and a step row is a leaf.
+    assert.deepStrictEqual(childrenOf(lifecycle[0]), []);
+    assert.deepStrictEqual(childrenOf(lifecycle[2]), []);
+    assert.deepStrictEqual(childrenOf(childrenOf(work)[0]), []);
+
+    // The row reads as its own step id: the prefix says who its parent is,
+    // and repeating it on every child would say nothing.
+    assert.strictEqual(taskRowLabel(session.tasks[2]), "Build the widget");
+    // Expandable because it has children, and the phases beside it are not.
+    assert.strictEqual(descriptorFor(work).collapsible, "collapsed");
+    assert.strictEqual(descriptorFor(lifecycle[0]).collapsible, "none");
+  });
+
+  test("a Work row with no accepted plan yet is a leaf, not an empty expander", () => {
+    const session = makeSession({
+      status: "in-progress",
+      tasks: [makeTask({ position: 0, stepId: "work", state: "in flight", isOpen: true })],
+    });
+    const [work] = taskNodes({ kind: "session", repository: makeRepository(), session });
+    assert.strictEqual(descriptorFor(work).collapsible, "none");
+    assert.deepStrictEqual(childrenOf(work), []);
+  });
+
+  test("a plan step named like a lifecycle phase keeps its own name", () => {
+    // The vocabulary is over the six phases. A plan may legitimately call a
+    // step `close`, and it does not mean the lifecycle's Close.
+    assert.strictEqual(taskRowLabel(makeTask({ stepId: "work:close" })), "Close");
+    assert.strictEqual(taskRowLabel(makeTask({ stepId: "work:run-of-record" })), "Run of record");
+  });
 });
 
 suite("workExplorerTreeModel: tokens", () => {
@@ -555,7 +613,28 @@ suite("workExplorerTreeModel: task rows", () => {
     assert.strictEqual(humanizeStepKey("run_tests"), "Run tests");
   });
 
+  test("the six lifecycle rows read in the operator's words, and the ids do not move", () => {
+    // csv-model feedback item 16. The step ids are what the plan, the
+    // execution record, the CLI and every gate address a phase by, so the
+    // vocabulary change is a label change and nothing else.
+    const labelFor = (stepId: string) => taskRowLabel(makeTask({ stepId }));
+    assert.strictEqual(labelFor("register"), "Register");
+    assert.strictEqual(labelFor("work"), "Work");
+    assert.strictEqual(labelFor("verify"), "Verify");
+    assert.strictEqual(labelFor("close"), "Close");
+    // The two that say something the humanized id did not. The declare row
+    // ends when the declaration is appended -- the plan is stated there,
+    // not carried out -- so the label may not say more than that.
+    assert.strictEqual(labelFor("declare"), "Plan declared");
+    // "Run of record" is what the evidence is called; what the row waits
+    // for is the suite.
+    assert.strictEqual(labelFor("run-of-record"), "Test");
+  });
+
   test("taskRowLabel prefers the step id, then truncated intent, then position", () => {
+    // A row whose id is not one of the six still renders, humanized: the
+    // map is a vocabulary over the lifecycle rows, not a gate on which
+    // rows may exist.
     assert.strictEqual(taskRowLabel(makeTask({ stepId: "close-out" })), "Close out");
     const longIntent = "d".repeat(80);
     const noId = makeTask({ stepId: null, intent: longIntent });

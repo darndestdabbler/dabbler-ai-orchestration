@@ -440,6 +440,32 @@ describe("the projection", () => {
     assert.deepEqual(parser["usedBy"], ["csv-app"]);
   });
 
+  it("says whether the workflow was entered at all, which a step number cannot", () => {
+    // csv-model feedback item 14: a bootstrapped repository reads
+    // `1/6 Plan and design` forever, because `solution.yaml` DECLARES a step
+    // and nothing in the session lifecycle advances the component workflow.
+    // Step 1 is also exactly what an entered workflow looks like on its
+    // first day, so the number cannot tell a default from a position and the
+    // projection states the fact instead.
+    const fresh = makeRoot();
+    const before = project(fresh);
+    assert.equal((before["solution"] as Record<string, unknown>)["entered"], false);
+    for (const component of before["components"] as Record<string, unknown>[]) {
+      assert.equal(component["entered"], false, String(component["name"]));
+      // The declared step is still projected -- it is a default, not a lie,
+      // and the renderer is what stops repeating it.
+      assert.equal(typeof component["stepNumber"], "number");
+    }
+
+    // One event against one component enters it, and only it.
+    walkTo(fresh, "csv-parser", "mocks");
+    const after = project(fresh);
+    const entered = (name: string) =>
+      (after["components"] as Record<string, unknown>[]).find((c) => c["name"] === name)?.["entered"];
+    assert.equal(entered("csv-parser"), true);
+    assert.equal(entered("csv-model"), false);
+  });
+
   it("lists everything waiting on the developer", () => {
     const root = makeRoot();
     append(root, { event: "reviewed", target: "csv-model", verdict: "clear", needsApproval: true });

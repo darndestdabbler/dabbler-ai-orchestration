@@ -1789,9 +1789,9 @@
     {
       "number": 91,
       "title": "The eight papercuts the walkthrough found",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-05T07:18:12.291000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-09-05T11:18:31.439000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

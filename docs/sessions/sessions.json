@@ -1869,9 +1869,9 @@
     {
       "number": 95,
       "title": "The framework notices what it is not doing",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-05T16:00:53.041000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-09-05T16:50:11.715000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

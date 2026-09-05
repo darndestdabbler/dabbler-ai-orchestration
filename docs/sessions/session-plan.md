@@ -4266,7 +4266,7 @@ embedded context), and Claude Code has the equivalent full-duplex channel in
 framework actually needs — send a message at any time, receive structured
 events, cancel, resume by id — which is what the four hand-built adapters in
 `engines.ts` approximate today, each with its own argv, its own interrupt
-and its own resume quirk. Session 95 builds the client **additively, called
+and its own resume quirk. Session 97 builds the client **additively, called
 by nothing**, so verification can adopt it later as a config flip rather
 than a rewrite. Adoption is not in this block: replacing the verifier's
 transport is the one change that, if it breaks, stops every session closing.
@@ -4422,7 +4422,10 @@ layer over a record that does not change.*
 *Four gates and the map beneath them, each from a defect this block hit
 in its own conduct rather than one anybody imagined. Split out of session
 94 on 2026-09-05: rendering a stop for a person is one subject, and the
-framework failing to notice its own unfinished work is another.*
+framework failing to notice its own unfinished work is another. Items 7
+and 8 were folded in the same day from session 94's closing report, and
+both are the same subject: the framework doing something nobody asked it
+to, or its own test missing what it did.*
 
 1. Register; declare `--not-releasable`.
 2. **A `wait` past its due time stops the turn.** `hookStop` blocks only
@@ -4490,7 +4493,23 @@ framework failing to notice its own unfinished work is another.*
    actually import, and a control keeps them honest, because a map
    nothing verifies drifts the moment a file is renamed -- which is the
    same failure as the four above, one layer up.
-7. Affected; verify; full suite as `final-full`; close.
+7. **`dabbler bootstrap` leaves its files uncommitted while a session is
+   in flight, and says so.** It commits the instruction files it writes as
+   "Set up Dabbler" -- a guard written for a fresh project, where session 1
+   is refused while they sit uncommitted -- and session 94 met it
+   mid-session: a template change landed as a commit outside the
+   framework's own land phase (6ad1597a). With a session in flight the
+   land's `git add -A` is what commits them; bootstrap reads the ledger,
+   skips the commit, and prints that it did and why.
+8. **The whole-session walk polls on a clock, not a count.**
+   `walk-session.test.ts` spins sixty `next` calls with no pause between
+   them and fails with `'wait' !== 'done'` when the framework's own jobs
+   outlast sixty rapid polls on a loaded machine -- it did once in session
+   94, then passed. The loop pauses briefly on each `wait` and gives up on
+   a deadline, the shape `walk-jobs.test.ts` already uses. The same walk
+   declares two expensive suites, because that is the shape item 4's
+   livelock has to be proved against.
+9. Affected; verify; full suite as `final-full`; close.
 
 
 ### Session 96 of 97: The git seam, finally used

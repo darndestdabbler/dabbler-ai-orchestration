@@ -190,6 +190,12 @@ complete suite as the run of record, the commit, the push, and the close.
 None of them is yours to run, and none of them is yours to skip ahead to
 — the instruction in hand is the whole of what is asked.
 
+**The framework owns the clock, the state and the sequencing.** An
+instruction that names a command is answered by running that command —
+never by waiting on a condition that your own next call is what causes.
+A `wait` answered by watching `run.json` for its job to clear waits
+forever: only the `next` you did not call clears it.
+
 **A session that declared itself releasable also publishes**, between the
 push and the close, and the framework does that for itself too. A session
 that declared `--not-releasable` publishes nothing, which is most of them:
@@ -220,12 +226,10 @@ supposed to ship and did not must not read as one that shipped.
 - API keys live in env vars (`DABBLER_ANTHROPIC_API_KEY`,
   `DABBLER_OPENAI_API_KEY`, `DABBLER_GEMINI_API_KEY`), never in files. The
   same rule covers a feed PAT: configuration names it and never holds it.
-- The router is one command, `dabbler <verb>` — no interpreter, no virtual
-  environment, and nothing to install beside the extension: it ships
-  inside the VSIX, and a VS Code terminal has it on `PATH`. Anywhere else,
-  run that same file: `node "<extension dir>/dist/dabbler.cjs" <verb>`.
-  "dabbler: command not found" is a PATH problem, not a missing-keys
-  problem.
+- The router is one command, `dabbler <verb>` — nothing to install beside
+  the extension: it ships inside the VSIX, and a VS Code terminal has it
+  on `PATH`. Anywhere else, run `node "<extension dir>/dist/dabbler.cjs"
+  <verb>`. "dabbler: command not found" is a PATH problem, not a keys one.
 
 ## Writing files
 

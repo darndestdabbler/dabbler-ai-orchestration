@@ -4452,6 +4452,25 @@ layer over a record that does not change.*
       expensive suites' `covers` do not reach a source path that a
       non-expensive suite does cover is a declaration the loader rejects,
       with the suite named.
+   5. **The run of record remembers which suites it has run.** Declaring a
+      second expensive suite in session 92 livelocked `phaseRunOfRecord` on
+      its own tail. The walk restarts at the first suite on every invocation
+      and keeps no record of which it finished, so `staleJobDisposition` —
+      which distinguishes "still running, this site is behind the walk" from
+      "exited uncollected, cross-phase leftover" — meets a third case it has
+      no name for: a COMPLETED earlier suite of the walk in hand. The first
+      site is visited first every time, so it is always the one that finds
+      the standing job; if the second suite has exited it is read as stale
+      and discarded, and if it is still running the walk waits. The second
+      suite's completion can therefore never be collected by the site that
+      owns it. Deterministic, not a race, and invisible while a repository
+      had one expensive suite. The walk skips a suite that already holds a
+      green `final-full` record for the tree in hand — the fact
+      `evaluateFreshness` already reads — rather than inferring its position
+      from which job happens to be standing. Session 92 landed and closed by
+      hand for this reason, on the record in its commit; its evidence was
+      never in question, because `test-evidence run` writes its record as it
+      finishes and both suites' rows stood green against the same tree.
 7. Affected; verify; full suite as `final-full`; close.
 
 ### Session 95 of 96: The git seam, finally used

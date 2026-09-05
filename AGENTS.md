@@ -142,12 +142,6 @@ you what to do next, one move at a time, and you do that and ask again.
 
 ## How to run a session
 
-> **If you are a person reading this:** your vocabulary is `dabbler
-> session start` (or the registering call below), `dabbler session run`,
-> `dabbler session interrupt`, and `dabbler session cancel`. Everything
-> from here down is the ENGINE's protocol — the machinery's side of the
-> conversation — and nothing in it is yours to type.
-
 Sessions are numbered directly in this repository, under one sessions root
 (`docs/sessions/`), so no command takes a handle to one.
 
@@ -160,15 +154,20 @@ it is the answer — and call `next` again, until it says `done`. That is
 the whole loop, and there is nothing to remember between calls: the
 framework holds the state.
 
-**The first call registers the session**, so it is the one that carries
-who is working:
+**`start` registers the session; `next` never does.** Registering is a
+separate verb, and it is the one that carries who is working:
 
-    dabbler session next --sessions-dir docs/sessions \
+    dabbler session start --sessions-dir docs/sessions \
         --engine <claude-code|codex|gemini|copilot> --provider <anthropic|openai|google>
 
 A Copilot seat adds `--model` (the seat label is not trusted; identity
-resolves through the model registry). Every later call carries none of
-them — the session is in flight and its identity is on the record.
+resolves through the model registry). **Every `next` call carries none of
+them** — the session is in flight and its identity is on the record, and a
+`next` that names an identity with nothing in flight is refused rather
+than starting work nobody asked for.
+
+`next` with nothing in flight answers `done`. That is the honest end of
+the loop, not an error: it means there is no session to advance.
 
 ## What comes back
 
@@ -187,9 +186,17 @@ Four kinds of instruction, and no fifth:
 Everything the framework now does for itself happens inside those calls:
 declaring the work, selecting and running the tests a change makes
 necessary, cross-provider verification and its remediation rounds, the
-complete suite as the run of record, the commit, the push, publishing and
-the close. None of them is yours to run, and none of them is yours to
-skip ahead to — the instruction in hand is the whole of what is asked.
+complete suite as the run of record, the commit, the push, and the close.
+None of them is yours to run, and none of them is yours to skip ahead to
+— the instruction in hand is the whole of what is asked.
+
+**A session that declared itself releasable also publishes**, between the
+push and the close, and the framework does that for itself too. A session
+that declared `--not-releasable` publishes nothing, which is most of them:
+releasability is declared at the start, before the work, and is never
+decided afterwards. If a releasable session reaches the close with no
+packaging run on its record, the close refuses — a session that was
+supposed to ship and did not must not read as one that shipped.
 
 ## When the framework stops
 
@@ -219,6 +226,23 @@ skip ahead to — the instruction in hand is the whole of what is asked.
   run that same file: `node "<extension dir>/dist/dabbler.cjs" <verb>`.
   "dabbler: command not found" is a PATH problem, not a missing-keys
   problem.
+
+## Writing files
+
+**Write files with your editing tools, never with a shell heredoc.** On a
+Windows host the shell is usually Git Bash, and a heredoc there eats
+backslashes: `\n` arrives as a newline and `\\` as one backslash, so
+JSON escapes, regular expressions and Windows paths are silently
+corrupted on the way to disk. Nothing fails — the file is written, and
+it is wrong. The same goes for `echo` and for `printf` with a format
+string you did not escape twice.
+
+**Nothing may touch the working tree between a report and the `next`
+that judges it.** The framework hashes the tree before and after a
+step's checks, and an edit made while one is running refuses the report
+— correctly, because a check run against a tree that moved under it
+proves nothing about either version. Finish the step, report it, and
+wait for the answer before starting the next one.
 
 ---
 

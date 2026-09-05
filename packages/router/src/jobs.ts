@@ -28,7 +28,13 @@ import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { terminateTree } from "./checks.ts";
-import { driverDir } from "./driver.ts";
+import {
+  type UncollectedJob,
+  driverDir,
+  readRun,
+  renderUncollected,
+  uncollectedJob,
+} from "./driver.ts";
 import type { DriverRun } from "./generated/index.ts";
 import { nowIso } from "./journal.ts";
 import { PACKAGE_ROOT } from "./paths.ts";
@@ -39,7 +45,12 @@ export type Job = NonNullable<DriverRun["job"]>;
 /** Where a poll found the job. There is no fourth answer. */
 export type JobState =
   | { readonly state: "running" }
-  | { readonly state: "exited"; readonly exitCode: number | null }
+  | {
+      readonly state: "exited";
+      readonly exitCode: number | null;
+      /** When the runner wrote the status, as it stamped it; null when it did not say. */
+      readonly endedAt: string | null;
+    }
   | { readonly state: "vanished" };
 
 export interface StartJobOptions {
@@ -362,7 +373,9 @@ export function pollJob(repoRoot: string, job: Job): JobState {
   return readStatus(status) ?? { state: "vanished" };
 }
 
-function readStatus(path: string): { state: "exited"; exitCode: number | null } | null {
+function readStatus(
+  path: string,
+): { state: "exited"; exitCode: number | null; endedAt: string | null } | null {
   if (!existsSync(path)) return null;
   let parsed: unknown;
   try {
@@ -370,10 +383,45 @@ function readStatus(path: string): { state: "exited"; exitCode: number | null } 
   } catch {
     // Half a file cannot happen -- the runner renames -- so unparseable
     // here means something else wrote it, and "no code" is the honest read.
-    return { state: "exited", exitCode: null };
+    return { state: "exited", exitCode: null, endedAt: null };
   }
   const code = (parsed as { exit?: unknown })?.exit;
-  return { state: "exited", exitCode: typeof code === "number" ? code : null };
+  const ended = (parsed as { ended_at?: unknown })?.ended_at;
+  return {
+    state: "exited",
+    exitCode: typeof code === "number" ? code : null,
+    endedAt: typeof ended === "string" && ended !== "" ? ended : null,
+  };
+}
+
+/** An uncollected job as a courtesy surface reads it: the facts, and the words. */
+export type UncollectedJobReading = UncollectedJob & { readonly words: string };
+
+/**
+ * The job the run names, finished and not yet collected -- or null.
+ *
+ * Nothing about session 91's three-hour stall needed the engine: the status
+ * file held the exit code the whole time, and the driver's own collection
+ * took milliseconds once somebody called it. The rule is the driver's
+ * (`uncollectedJob`) and so are the words (`renderUncollected`); this reads
+ * the record and polls the job. A record that will not parse answers null,
+ * because every caller is a courtesy surface and a courtesy that threw
+ * would take the surface with it.
+ */
+export function readUncollectedJob(
+  repoRoot: string,
+  sessionNumber: number,
+): UncollectedJobReading | null {
+  let run: DriverRun | null;
+  try {
+    run = readRun(repoRoot, sessionNumber);
+  } catch {
+    return null;
+  }
+  if (run === null || !run.job) return null;
+  const finished = uncollectedJob(run, pollJob(repoRoot, run.job));
+  if (finished === null) return null;
+  return { ...finished, words: renderUncollected(finished, run) };
 }
 
 /**

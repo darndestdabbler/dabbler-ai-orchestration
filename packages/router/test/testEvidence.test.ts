@@ -64,12 +64,41 @@ describe("the suite declaration", () => {
       "testing.suites[3].covers must be a list of path prefixes",
       "testing.suites[4] has unknown key(s) ['surprise']",
       "testing.suites[5] must be a mapping",
+      // `extra` parses, is not expensive, and covers the whole repository,
+      // which `unit`'s src/ does not reach.
+      "testing.suites 'extra' is not expensive and covers '.', which no expensive suite covers: " +
+        "its run would never be the run of record, and nothing would notice the run was missing. " +
+        "Declare it expensive, or cover '.' from a suite that is.",
     ]);
   });
 
   it("reads no suites from no declaration and refuses one that is not a list", () => {
     assert.deepEqual(loadSuitesChecked({}), { suites: [], errors: [], ok: true });
     assert.deepEqual(loadSuitesChecked({ testing: { suites: {} } }).errors, ["testing.suites must be a list"]);
+  });
+
+  it("refuses a cheap suite alone over a path, by name, and accepts one beside an expensive suite that reaches it", () => {
+    // The flag gates the run of record AND the gate that would notice the
+    // run was missing: sessions 90 and 91 closed green over 1117 tests
+    // nobody ran because the router's suite had kept `expensive: false`
+    // from a tier session 88 retired.
+    const alone = loadSuitesChecked({
+      testing: { suites: [{ name: "quick", command: "npm run quick", covers: ["src/"] }] },
+    });
+    assert.equal(alone.ok, false);
+    assert.equal(alone.errors.length, 1);
+    assert.match(alone.errors[0] ?? "", /^testing\.suites 'quick' is not expensive and covers 'src\/'/);
+    assert.match(alone.errors[0] ?? "", /never be the run of record/);
+    const beside = loadSuitesChecked({
+      testing: {
+        suites: [
+          { name: "full", command: "npm test", covers: ["src/", "tests/"], expensive: true },
+          { name: "quick", command: "npm run quick", covers: ["src/lib/", "tests/"] },
+        ],
+      },
+    });
+    assert.equal(beside.ok, true, beside.errors.join("; "));
+    assert.deepEqual(beside.suites.map((suite) => suite.name), ["full", "quick"]);
   });
 });
 

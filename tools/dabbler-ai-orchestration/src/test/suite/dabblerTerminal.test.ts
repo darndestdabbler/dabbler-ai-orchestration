@@ -148,6 +148,62 @@ suite("the Dabbler terminal", () => {
     rmrf(root);
   });
 
+  test("stops claiming working once the job has exited uncollected, and says the router's words once", () => {
+    // Session 91: the status file held the exit code for three hours while
+    // the indicator spun. A full record, because the reader that answers
+    // this is the router's and it validates what it reads.
+    const job = {
+      name: "verification",
+      argv: ["node", "-e", "0"],
+      pid: 1,
+      log: ".dabbler/runs/s62/driver/jobs/verification.log",
+      status: ".dabbler/runs/s62/driver/jobs/verification.status.json",
+      started_at: "2026-08-31T14:00:00.000Z",
+      retry_after_seconds: 60,
+    };
+    const record = {
+      schema_version: 1,
+      session_number: 62,
+      engine: "cli",
+      phase: "verify",
+      seq: 5,
+      invocations: 0,
+      max_invocations: 24,
+      accepted_steps: [],
+      baseline_tree: null,
+      stop: null,
+      started_at: "2026-08-31T13:00:00.000Z",
+      updated_at: "2026-08-31T14:00:00.000Z",
+      job,
+    };
+    const { root, driver, terminal, written } = drivenRepo(record);
+    fs.writeFileSync(
+      path.join(driver, "jobs", "verification.status.json"),
+      JSON.stringify({ exit: 4, ended_at: "2026-08-31T14:05:00.000Z" }),
+      "utf8",
+    );
+    terminal.poll();
+    assert.strictEqual(terminal.indicator, "uncollected");
+    const said = written.filter((t) => plain(t).includes("] uncollected"));
+    assert.strictEqual(said.length, 1);
+    assert.ok(plain(said[0]).includes("'verification' finished at 2026-08-31T14:05:00.000Z (exit 4)"));
+    assert.ok(plain(said[0]).includes("`dabbler session next`"));
+    assert.ok(!written.some((t) => plain(t).includes("] working")));
+    // Said once, not on every look.
+    written.length = 0;
+    terminal.poll();
+    assert.deepStrictEqual(written.filter((t) => plain(t).includes("] uncollected")), []);
+    // A tick while nothing runs draws no frame: the two glyphs the
+    // indicator spins with never reach the writer.
+    written.length = 0;
+    terminal.tick();
+    assert.ok(!written.some((t) => plain(t).includes("/") || plain(t).includes("\\")));
+    assert.strictEqual(terminal.indicator, "uncollected");
+
+    terminal.dispose();
+    rmrf(root);
+  });
+
   test("keeps a job's last bytes when the record drops it, and a whole job it never saw", () => {
     const { root, driver, terminal, written } = drivenRepo(RUNNING);
     const log = path.join(driver, "jobs", "verification-round.log");

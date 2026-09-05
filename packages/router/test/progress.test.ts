@@ -347,6 +347,46 @@ describe("the task rows", () => {
     assert.equal(stopped[4]["isOpen"], false);
   });
 
+  it("the open row says a finished job is waiting to be collected, in the router's words", () => {
+    // Session 91: the status file held the exit code for three hours while
+    // every surface read the record and said "working". The row stays open
+    // -- nothing refused anything -- and carries the one wording.
+    const { repo, sessionsDir } = makeStateDirs();
+    start(sessionsDir);
+    declareSessionTask(sessionsDir, { sessionNumber: 1, task: "Do it.", releasable: false });
+    const jobs = join(repo, ".dabbler", "runs", "s1", "driver", "jobs");
+    mkdirSync(jobs, { recursive: true });
+    const job = {
+      name: "run of record: unit",
+      argv: ["node", "-e", "0"],
+      pid: 1,
+      log: ".dabbler/runs/s1/driver/jobs/run-of-record-unit.log",
+      status: ".dabbler/runs/s1/driver/jobs/run-of-record-unit.status.json",
+      started_at: "2026-08-31T12:00:00-04:00",
+      retry_after_seconds: 60,
+    };
+    writeRun(repo, 1, { ...RUN, phase: "run-of-record", engine: "cli", job });
+    // Still running as far as the record can tell: the ordinary open row --
+    // Verify, because the fold opens the first phase without a record and
+    // no round has been written; the words go wherever that row is.
+    const running = buildTaskRows(sessionsDir, 1).find((row) => row["isOpen"]);
+    assert.equal(running?.["stepId"], "verify");
+    assert.doesNotMatch(String(running?.["intent"]), /not been collected/);
+
+    writeFileSync(
+      join(jobs, "run-of-record-unit.status.json"),
+      JSON.stringify({ exit: 0, ended_at: "2026-08-31T12:05:00.000Z" }),
+      "utf8",
+    );
+    const finished = buildTaskRows(sessionsDir, 1).find((row) => row["isOpen"]);
+    assert.equal(finished?.["stepId"], "verify");
+    assert.equal(finished?.["state"], "in flight");
+    assert.match(String(finished?.["intent"]), /'run of record: unit' finished at 2026-08-31T12:05:00.000Z \(exit 0\)/);
+    assert.match(String(finished?.["intent"]), /not been collected/);
+    assert.match(String(finished?.["intent"]), /`dabbler session next` collects the result/);
+    assert.doesNotMatch(String(finished?.["intent"]), /working/);
+  });
+
   it("every accepted step ends Work once the driver's phase has moved past the steps", () => {
     const { repo, sessionsDir } = makeStateDirs();
     start(sessionsDir);

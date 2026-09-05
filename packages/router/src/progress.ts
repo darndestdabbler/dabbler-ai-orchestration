@@ -28,7 +28,16 @@ import {
   STATE_FILENAME,
   repoRootFromSessionsDir,
 } from "./evidence.ts";
-import { readInstruction, readReport, readRun, readWorkPlan, renderStop } from "./driver.ts";
+import {
+  readInstruction,
+  readReport,
+  readRun,
+  readWorkPlan,
+  renderStop,
+  renderUncollected,
+  uncollectedJob,
+} from "./driver.ts";
+import { pollJob } from "./jobs.ts";
 import { nowIso } from "./journal.ts";
 import {
   LedgerError,
@@ -1068,6 +1077,21 @@ export function buildTaskRows(
         ...(phases[openIndex] as Phase),
         blocked: true,
         intent: words.text,
+      };
+    }
+  }
+
+  // A job that finished and nobody collected is the other way a session
+  // can look like it is working and not be. The open row carries the
+  // router's one wording of it -- open rather than blocked, because nothing
+  // refused anything: the next call collects the result and carries on.
+  if (driverStop === null && driverRun !== null && driverRun.job && status === STATUS_IN_PROGRESS) {
+    const finished = uncollectedJob(driverRun, pollJob(repoRoot, driverRun.job));
+    const openIndex = phases.findIndex((phase) => phase.doneAt === null);
+    if (finished !== null && openIndex >= 0) {
+      phases[openIndex] = {
+        ...(phases[openIndex] as Phase),
+        intent: renderUncollected(finished, driverRun),
       };
     }
   }

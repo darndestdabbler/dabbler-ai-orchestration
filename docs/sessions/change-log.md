@@ -689,3 +689,10 @@
 - Orchestrator provider (excluded): anthropic
 - Verifier's read surface: agency: 23 read(s), 0 search(es), 0 listing(s); 7 not confined to scope
 - Raw round output: `.dabbler/runs/s94/`
+
+## Session 95 adjudication — VERIFIED (every disputed finding OVERRULED)
+
+- Adjudicator: gemini-flash (google) over api
+- Excluded providers: anthropic, openai
+- Dispute on round 3 finding 0: OVERRULED — The orchestrator's evidence (session-plan.md, check-selection-map.ts, steps.ts, drive.ts) consistently clarifies that the selection map is a narrowing aid for targeted runs within a step, not a comprehensive record of all tests reaching a path. The project explicitly decided against enforcing "every test reaching a path must be listed under it" due to its cost and limited benefit, as the full test suite remains the run of record. The current control refuses dishonest entries (false claims), which aligns with the plan, but does not enforce completeness (all omissions listed). The finding's premise that the 'promised guard' should catch non-empty omissions is contradicted by the project's documented scope and rationale.
+- Raw round output: `.dabbler/runs/s95/`

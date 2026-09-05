@@ -13,9 +13,11 @@ import { join } from "node:path";
 
 import { TRANSPORT_ENV_VAR, VALID_TRANSPORTS, loadConfig } from "../config.ts";
 import { freshnessWarnings } from "../discovery.ts";
-import { ensureRoundRefspecs, repoRootFor } from "../evidence.ts";
+import { SESSIONS_DIRNAME, ensureRoundRefspecs, repoRootFor } from "../evidence.ts";
 import { repoRelativePath, runGit } from "../journal.ts";
 import { raisePackagingDecisions, raiseRemoteDecision } from "../owedDecisions.ts";
+import { STATUS_IN_PROGRESS } from "../progress.ts";
+import { readRawSessionState } from "../sessionState.ts";
 import { writeProjection } from "../workflow/project.ts";
 import {
   DECOMPOSITION_PROMPT,
@@ -328,8 +330,24 @@ export async function bootstrapVerb(argv: string[]): Promise<number> {
   // sat uncommitted. It commits them, whether or not this run also
   // scaffolded the sessions: a re-run that only refreshes the guidance
   // leaves the same dirty tree behind, and the same session 1 refusal.
-  const commit = commitOwnScaffold(project, written);
-  if (commit.committed) {
+  //
+  // Not while a session is in flight. That guard is written for a fresh
+  // project, and session 94 met it mid-session: a regenerated AGENTS.md
+  // went out as "Set up Dabbler", a commit outside the framework's own land
+  // phase. With a session in flight the land's `git add -A` is what
+  // commits these, and the step's report still passes -- the driver
+  // compares trees, not commits.
+  const inFlight = sessionInFlight(project);
+  const commit =
+    inFlight === null
+      ? commitOwnScaffold(project, written)
+      : { committed: false, reason: "" };
+  if (inFlight !== null && written.length > 0) {
+    writeOut(
+      `bootstrap: wrote ${written.length} file(s) and left them uncommitted: ` +
+        `session ${inFlight} is in flight, and its land is what commits them.\n`,
+    );
+  } else if (commit.committed) {
     writeOut(
       `bootstrap: committed ${written.length} file(s) it wrote; the ` +
         "declaration a session makes comes before its work, so session 1 " +
@@ -386,6 +404,26 @@ function absentRecordNotices(): string[] {
   } catch {
     return [];
   }
+}
+
+/**
+ * The number of the session in flight under this project's sessions root,
+ * or null: no ledger, no usable ledger, or nothing in progress.
+ */
+function sessionInFlight(projectDir: string): number | null {
+  let state: Record<string, unknown> | null;
+  try {
+    state = readRawSessionState(join(projectDir, "docs", SESSIONS_DIRNAME));
+  } catch {
+    return null;
+  }
+  const rows = Array.isArray(state?.["sessions"])
+    ? (state?.["sessions"] as Array<Record<string, unknown>>)
+    : [];
+  const open = rows.find((row) => row["status"] === STATUS_IN_PROGRESS);
+  if (open === undefined) return null;
+  const number = Number(open["number"]);
+  return Number.isInteger(number) ? number : null;
 }
 
 /**

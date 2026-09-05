@@ -19,7 +19,7 @@ import type {
   ProgressProjectionSession as SessionRecord,
 } from "dabbler-ai-router";
 import { ProjectionCache, ProjectionResult } from "./projection";
-import { type Activity, currentActivity } from "../router/dabblerTerminal";
+import { type Activity, currentActivity, uncollectedWords } from "../router/dabblerTerminal";
 
 /**
  * Where a repository's sessions came from. `ledger` is the
@@ -86,6 +86,12 @@ export interface SessionsRepository {
    * a fixture -- has no run to read.
    */
   activity?: Activity;
+  /**
+   * The router's words for a job that finished and nobody collected, when
+   * `activity` is `uncollected`; the row's detail is these and no wording
+   * of the Explorer's own.
+   */
+  uncollected?: string | null;
   orchestrator: OrchestratorInfo | null;
   /**
    * The projection's sessions, with tasks populated on the in-flight
@@ -222,6 +228,7 @@ function buildRepository(
     possiblyStalled: p ? p.repository.possiblyStalled : false,
     owedDecisions: p ? p.repository.owedDecisions : [],
     activity: currentActivity(root),
+    uncollected: uncollectedWords(root),
     forceClosed: p ? p.repository.forceClosed : false,
     schemaVersionOnDisk: p ? p.repository.schemaVersionOnDisk : null,
     // A failed projection is not a fresh repository. "ledger" is what a

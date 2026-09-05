@@ -1084,20 +1084,28 @@ export function attentionNodes(node: RepositoryNode): AttentionNode[] {
     // waiting session is one the framework is not running, not one that
     // has stopped being useful.
     const working = repository.activity === "working";
+    // A job that finished and nobody collected: the row says so in the
+    // router's words, which are the same words `dabbler status` and the
+    // terminal use, because a wording of the Explorer's own would be a
+    // second statement of a rule the driver already owns.
+    const finished = repository.activity === "uncollected";
+    const state = finished ? "finished, waiting to be collected" : working ? "working" : "waiting";
     rows.push({
       kind: "attention",
       repository,
       subject: "stalled",
       label: repository.possiblyStalled
         ? `${named} — nothing written for ${age ?? "a while"}`
-        : `${named} — ${working ? "working" : "waiting"}`,
+        : `${named} — ${state}`,
       // Deliberately never "stalled" or "stuck". It reports that the record
       // stopped moving; it cannot see whether the thinking is still useful,
       // and a row that implied it could would be making that judgment.
       detail:
-        (working
-          ? "The framework is running something. "
-          : "Nothing is running; the session is between calls. ") +
+        (finished
+          ? `${repository.uncollected ?? "The framework's job has finished and nothing has collected its result; `dabbler session next` does."} `
+          : working
+            ? "The framework is running something. "
+            : "Nothing is running; the session is between calls. ") +
         (age
           ? `Last written ${age} ago. This is the record moving, not the work.`
           : "Nothing has been written yet."),

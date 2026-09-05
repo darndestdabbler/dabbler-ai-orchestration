@@ -126,7 +126,7 @@ import {
   acquireLockWithTimeout,
   releaseLock,
 } from "./session.ts";
-import { loadSuitesChecked } from "./testEvidence.ts";
+import { evaluateFreshness, loadSuitesChecked } from "./testEvidence.ts";
 import { recordDispute, resolveRepoRelative } from "./verify/disputes.ts";
 import {
   EXIT_BLOCKING,
@@ -2227,11 +2227,47 @@ ${this.stopArtifacts()}`,
 
   // --- the run of record, the landing, the close -----------------------------
 
+  /**
+   * The complete suites, one job each, against the verified tree.
+   *
+   * The walk restarts at the first suite on every invocation, and under the
+   * pull every invocation is a fresh process -- so it has to know which
+   * suites it has already run, and it knows that from the record rather
+   * than from which job happens to be standing. A suite that already holds
+   * a green `final-full` record bound to the tree in hand is done: the same
+   * fact the close gate reads, asked here first. Without it a second
+   * expensive suite livelocked this phase on its own tail (session 92): the
+   * first site always found the second suite's exited job, read it as a
+   * cross-phase leftover, discarded it and ran the first suite again, so
+   * the second suite's completion could never be collected by the site
+   * that owned it. Deterministic, and invisible while a repository had one
+   * suite.
+   */
   private async phaseRunOfRecord(): Promise<void> {
     for (const suite of this.expensiveSuites()) {
+      const jobName = `run of record: ${suite.name}`;
+      const standing = evaluateFreshness(this.sessionsDir, null, [suite], {
+        repoRoot: this.repoRoot,
+      }).find((verdict) => verdict.suite === suite.name);
+      // The record is written by the verb as it finishes, a moment before
+      // its runner exits, so this suite's own job can still stand on the
+      // run beside a green record. It is collected here, by the site that
+      // owns it; stepped over, the close would find it and read it as a
+      // cross-phase leftover. One still running is waited on below.
+      const own = this.run.job?.name === jobName ? this.run.job : null;
+      const polled = own === null ? null : pollJob(this.repoRoot, own);
+      if (standing?.passed && (polled === null || polled.state === "exited")) {
+        if (own !== null && polled !== null && polled.state === "exited") {
+          this.run = { ...this.run, job: null };
+          this.save();
+          this.log("job-finished", { name: own.name, exit: polled.exitCode, log: own.log });
+        }
+        this.log("run-of-record-standing", { suite: suite.name, reason: standing.reason });
+        continue;
+      }
       this.log("run-of-record", { suite: suite.name, command: suite.command });
       const code = await this.longWork({
-        name: `run of record: ${suite.name}`,
+        name: jobName,
         argv: [
           ...selfArgv(),
           "test-evidence",

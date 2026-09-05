@@ -474,6 +474,30 @@ suite("workExplorerTreeModel: session descriptor", () => {
     assert.strictEqual(waiting.urgent, false);
   });
 
+  test("the liveness row says a finished job is waiting to be collected, in the router's words", () => {
+    // The state that read as "working" for three hours in session 91. The
+    // detail is the router's wording, shared with `dabbler status` and the
+    // terminal, and nothing of the Explorer's own.
+    const words =
+      "Session 003: the framework's job 'verification' finished at 2026-09-05T11:43:00.000Z " +
+      "(exit 4) and its result has not been collected. Nothing is running, and collecting " +
+      "it takes a moment. Next: whoever calls `dabbler session next`.";
+    const row = attentionNodes({
+      kind: "repository",
+      repository: makeRepository({
+        currentSession: 3,
+        lastActivityAt: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
+        sessions: [makeSession({ number: 3, status: "in-progress", inFlight: true })],
+        activity: "uncollected",
+        uncollected: words,
+      }),
+    })[0];
+    assert.ok(row.label.includes("finished, waiting to be collected"));
+    assert.ok(!row.label.includes("working"));
+    assert.ok(row.detail.startsWith(words));
+    assert.strictEqual(row.urgent, false);
+  });
+
   test("says how long since the record moved, whether or not it looks stalled", () => {
     // "What happened while I was away" is a question about a RUNNING
     // session, so answering it only once the session looks stuck leaves the

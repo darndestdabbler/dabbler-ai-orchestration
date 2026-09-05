@@ -51,6 +51,11 @@ const SEED: Record<string, string> = {
 };
 
 const TESTING = {
+  // Two expensive suites, because one is the shape that hid the run of
+  // record's livelock for ninety sessions: with a second suite the walk's
+  // first site always found the second suite's job and, until the phase
+  // learned to read its own records, discarded it as stale and ran the
+  // first suite again.
   suites: [
     {
       name: "unit",
@@ -59,6 +64,14 @@ const TESTING = {
       covers: ["src/", "tests/"],
       test_roots: ["tests"],
       test_glob: "test_*.py",
+    },
+    {
+      name: "integration",
+      command: "node tests/run.mjs",
+      expensive: true,
+      covers: ["src/", "tests/"],
+      test_roots: ["tests"],
+      test_glob: "check_*.py",
     },
   ],
   selection: {
@@ -283,8 +296,13 @@ describe("one session, walked from next to done", () => {
     milestones.push("reported the step it did");
 
     // --- from here the framework works, and a call is a poll ----------------
+    // On a clock, not a count: sixty calls with no pause between them
+    // outran the framework's own jobs on a loaded machine and failed a walk
+    // whose every phase was fine. The framework owns the clock; the walk
+    // waits a moment and asks again, and gives up loudly on a deadline.
     let instruction: DriverInstruction | null = null;
-    for (let call = 0; call < 60; call += 1) {
+    const deadline = Date.now() + 180_000;
+    for (;;) {
       const move = await next(sessionsDir);
       instruction = move.instruction;
       if (instruction === null) break;
@@ -295,6 +313,8 @@ describe("one session, walked from next to done", () => {
         if (!milestones.includes("waited on the framework's own job")) {
           milestones.push("waited on the framework's own job");
         }
+        if (Date.now() > deadline) assert.fail("the framework's own jobs never finished");
+        await new Promise((resolve) => setTimeout(resolve, 100));
         continue;
       }
       assert.fail(
@@ -310,9 +330,27 @@ describe("one session, walked from next to done", () => {
     assert.equal(rounds.length, 1);
     assert.equal(rounds[0]?.["verdict"], "VERIFIED");
 
-    // The run of record: the complete suite, over the verified tree.
+    // The run of record: every complete suite, over the verified tree --
+    // and the second one collected by the site that owns it, never read as
+    // a stale leftover by the first. The phase knows which suites it has
+    // run from the record, not from which job happens to be standing.
     const records = readRecords(repo);
-    assert.ok(records.some((row) => String(row.stage) === "final-full"));
+    for (const suite of ["unit", "integration"]) {
+      assert.ok(
+        records.some(
+          (row) => row.suite === suite && row.stage === "final-full" && row.outcome === "passed",
+        ),
+        `no green final-full record for ${suite}`,
+      );
+    }
+    const supervisionPath = join(repo, ".dabbler", "runs", "s1", "driver", "supervision.jsonl");
+    const supervised = existsSync(supervisionPath)
+      ? readFileSync(supervisionPath, "utf8")
+          .split("\n")
+          .filter((line) => line.trim() !== "")
+          .map((line) => JSON.parse(line) as Record<string, unknown>)
+      : [];
+    assert.deepEqual(supervised.filter((row) => row["event"] === "stale-job-collected"), []);
 
     // The land: the work is committed, the tree is clean, and the branch is
     // ahead of nothing -- it was pushed.

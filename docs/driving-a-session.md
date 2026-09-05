@@ -254,6 +254,15 @@ call rather than the work — this is exactly how the driver spike died. A
 `wait` gives the engine its turn back and lets it come to the framework
 when it is ready.
 
+Under Claude Code the stop gate `bootstrap` installs holds the turn once a
+`wait` is past due — `issued_at` plus `retry_after_seconds` — and hands
+back the same sentence it uses for a step: run the `answer_command`. A
+wait not yet due lets the turn end and notes when it is due. The gate
+matters most here: a `wait` is the one instruction that asks the engine to
+carry an obligation across the end of its turn, and one session lost three
+hours to an engine that answered it by polling `run.json` for a field only
+`next` clears.
+
 ## Talking to the engine, and stopping the framework
 
 They are two different things. Your CLI's own Esc or Ctrl+C interrupts the
@@ -588,6 +597,16 @@ ROW  Session 001 is in flight — waiting
 It reports the record moving, not the thinking. A `waiting` session is one
 the framework is not running something for; it is not a judgment about
 whether the work is going well.
+
+A third state is the one that used to read as `working`: the job the
+record names has exited, its status file holds the exit code, and nothing
+has made the call that collects it. The row, the `dabbler status` task row
+and the Dabbler terminal all say so in the router's one wording:
+
+```
+ROW  Session 001 is in flight — finished, waiting to be collected
+     Session 001: the framework's job 'run of record: unit' finished at 2026-09-05T15:37:41.973Z (exit 0) and its result has not been collected. Nothing is running, and collecting it takes a moment. Next: whoever calls `dabbler session next` -- the engine if its loop is still running, otherwise you; `dabbler session next` collects the result and carries on from 'run-of-record'.
+```
 
 ## `session drive`: the same loop, unattended
 

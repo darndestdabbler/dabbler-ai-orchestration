@@ -35,7 +35,9 @@ import {
   openDecisions,
   raiseRemoteDecision,
 } from "../src/owedDecisions.ts";
+import { capture } from "../src/output.ts";
 import { load } from "../src/solution.ts";
+import { registerSessionStart } from "../src/writers.ts";
 import { seed, tempDir } from "./support/answers.ts";
 import { gitOut, makeRepo, makeSandbox } from "./support/repo.ts";
 
@@ -470,6 +472,25 @@ describe("what setup does about the operator's typing", () => {
     assert.match(status, /mine\.txt/);
     assert.ok(!status.includes("AGENTS.md"));
     assert.equal(gitOut(repo, "log", "-1", "--format=%s").trim(), "Set up Dabbler");
+  });
+
+  it("leaves its files uncommitted while a session is in flight, and says so", async () => {
+    // Session 94 re-ran bootstrap mid-session to regenerate the managed
+    // body, and the fresh-project guard committed AGENTS.md by itself as
+    // "Set up Dabbler" -- a commit outside the framework's own land phase.
+    // With a session in flight, the land's `git add -A` is what commits
+    // the files, so bootstrap writes them and leaves them.
+    const { repo, sessionsDir } = makeSandbox();
+    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
+    const head = gitOut(repo, "rev-parse", "HEAD").trim();
+    const run = await capture(() =>
+      bootstrapVerb(["--project-dir", repo, "--no-transport-detect"]),
+    );
+    assert.equal(run.value, 0, run.stderr);
+    assert.equal(gitOut(repo, "rev-parse", "HEAD").trim(), head);
+    assert.match(gitOut(repo, "status", "--porcelain", "-uall"), /AGENTS\.md/);
+    assert.match(run.stdout, /left them uncommitted: session 1 is in flight/);
+    assert.doesNotMatch(run.stdout, /committed \d+ file/);
   });
 
   it("asks where the repository pushes rather than printing a push command", async () => {

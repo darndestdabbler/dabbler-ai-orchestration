@@ -52,11 +52,20 @@ export {
   PULL_ENGINE,
   progressResumed,
   renderStop,
+  renderUncollected,
+  uncollectedJob,
+  type JobPoll,
   type PhaseReading,
   type StopContext,
   type StopRecord,
   type StopRendering,
+  type UncollectedJob,
 } from "./driver.ts";
+// A job that finished and nobody collected, read the one way: the Work
+// Explorer's liveness row and the terminal's indicator both said "working"
+// over a process that had exited, and this is the reader that says
+// otherwise, in the driver's words.
+export { readUncollectedJob, type UncollectedJobReading } from "./jobs.ts";
 // The threshold that rule is judged against, from the repository's own
 // configuration. The operator's editor setting still wins over it -- that
 // precedence is the host's -- but the middle tier is the repository's to

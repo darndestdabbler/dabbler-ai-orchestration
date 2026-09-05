@@ -20,8 +20,10 @@ import {
   readReport,
   readWatcher,
   renderStop,
+  renderUncollected,
   reportPath,
   treeTouchedAt,
+  uncollectedJob,
   validateDispositions,
   validateInstruction,
   validateReport,
@@ -588,6 +590,47 @@ describe("a stop, as a person reads it", () => {
     );
     // Gone, and the loop is somewhere else.
     assert.equal(progressResumed(paused, { stop: null, phase: "land" }), true);
+  });
+});
+
+describe("a job finished and nobody collected", () => {
+  const job = { name: "verification", log: ".dabbler/runs/s91/driver/jobs/verification.log" };
+  const exited = { state: "exited", exitCode: 4, endedAt: "2026-09-05T11:43:12.000Z" };
+
+  it("is a job on the record whose poll says exited, under no stop -- and nothing else", () => {
+    // Session 91: the status file held {exit: 4, ended_at} for three hours
+    // while run.json kept naming the job and every surface said working.
+    assert.deepEqual(uncollectedJob({ stop: null, job }, exited), {
+      name: "verification",
+      log: job.log,
+      exit: 4,
+      ended_at: "2026-09-05T11:43:12.000Z",
+    });
+    // Still running is the framework working; a stop is a row of its own
+    // and ended the job under it; a vanished job is the driver's to report
+    // as a stop when it collects; no job is the space between calls.
+    assert.equal(uncollectedJob({ stop: null, job }, { state: "running" }), null);
+    assert.equal(uncollectedJob({ stop: { kind: "tests" }, job }, exited), null);
+    assert.equal(uncollectedJob({ stop: null, job }, { state: "vanished" }), null);
+    assert.equal(uncollectedJob({ stop: null, job: null }, exited), null);
+    // A status the runner did not stamp still reads as finished.
+    assert.equal(uncollectedJob({ stop: null, job }, { state: "exited" })?.exit, null);
+  });
+
+  it("is worded once: the job, when and how it ended, nothing running, and who calls next", () => {
+    const found = uncollectedJob({ stop: null, job }, exited);
+    assert.ok(found);
+    const pull = renderUncollected(found, { session_number: 91, phase: "verify", engine: "cli" });
+    assert.match(pull, /^Session 091: the framework's job 'verification' finished at 2026-09-05T11:43:12.000Z \(exit 4\)/);
+    assert.match(pull, /has not been collected\. Nothing is running/);
+    assert.match(pull, /Next: whoever calls `dabbler session next` -- the engine if its loop is still running, otherwise you/);
+    assert.match(pull, /carries on from 'verify'/);
+    // Under the push the driver's own poll would have collected it, so an
+    // uncollected job means the drive is gone and a person restarts it.
+    const push = renderUncollected(found, { session_number: 91, phase: "verify", engine: "claude-code" });
+    assert.match(push, /Next: you\. `dabbler session drive` collects the result first/);
+    // Never a claim the engine is working on it, in either mode.
+    for (const words of [pull, push]) assert.doesNotMatch(words, /working/);
   });
 });
 

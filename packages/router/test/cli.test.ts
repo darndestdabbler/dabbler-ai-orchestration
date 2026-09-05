@@ -271,4 +271,50 @@ describe("dabbler session hook-stop", () => {
     assert.equal(result.code, 0);
     assert.equal(result.out, "");
   });
+
+  it("holds the turn once a wait is past due, in the same RUN sentence", async () => {
+    // The one instruction that asks the engine to carry an obligation across
+    // the end of its turn was the one with no enforcement: session 91's job
+    // finished with its exit code on disk and the session sat idle for three
+    // hours because nothing made the next call.
+    const { repo, sessionsDir } = makeSandbox();
+    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
+    writeInstruction(repo, 1, {
+      schema_version: 1,
+      seq: 4,
+      session_number: 1,
+      issued_at: new Date(Date.now() - 120_000).toISOString(),
+      kind: "wait",
+      retry_after_seconds: 60,
+      log: ".dabbler/runs/s1/driver/jobs/verification.log",
+      answer_command: "dabbler session next",
+    });
+    const result = await run(() => sessionVerb(["hook-stop", "--sessions-dir", sessionsDir]));
+    assert.equal(result.code, 0);
+    const decision = JSON.parse(result.out) as Record<string, string>;
+    assert.equal(decision["decision"], "block");
+    assert.match(String(decision["reason"]), /wait \(seq 4\) was due \d+s ago/);
+    assert.match(String(decision["reason"]), /RUN the shell command/);
+  });
+
+  it("lets the turn end while a wait is not yet due, and says when it is", async () => {
+    const { repo, sessionsDir } = makeSandbox();
+    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
+    writeInstruction(repo, 1, {
+      schema_version: 1,
+      seq: 4,
+      session_number: 1,
+      issued_at: new Date().toISOString(),
+      kind: "wait",
+      retry_after_seconds: 600,
+      log: ".dabbler/runs/s1/driver/jobs/verification.log",
+      answer_command: "dabbler session next",
+    });
+    const result = await run(() => sessionVerb(["hook-stop", "--sessions-dir", sessionsDir]));
+    assert.equal(result.code, 0);
+    const note = JSON.parse(result.out) as Record<string, string>;
+    assert.equal(note["decision"], undefined);
+    assert.match(String(note["systemMessage"]), /due in \d+s/);
+    assert.match(String(note["systemMessage"]), /dabbler session next/);
+  });
 });

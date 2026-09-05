@@ -1858,22 +1858,33 @@
         "identityProvenance": "direct"
       },
       "verificationVerdict": "VERIFIED",
-      "frameworkVersion": "2.0.1",
       "verification": {
         "rounds": 1,
         "verifierModel": "gpt-5.4",
         "verifierProvider": "openai",
         "transport": "copilot-cli"
-      }
+      },
+      "frameworkVersion": "2.0.1"
     },
     {
       "number": 95,
       "title": "The framework notices what it is not doing",
-      "status": "not-started",
-      "startedAt": null,
+      "status": "in-progress",
+      "startedAt": "2026-09-05T16:00:53.041000-04:00",
       "completedAt": null,
-      "orchestrator": null,
-      "verificationVerdict": null
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": "VERIFIED",
+      "frameworkVersion": "2.0.1",
+      "verification": {
+        "rounds": 4,
+        "verifierModel": "gemini-flash",
+        "verifierProvider": "google",
+        "transport": "api"
+      }
     },
     {
       "number": 96,

@@ -78,7 +78,8 @@ testing:
     # record for `packages/router/` between 2026-09-02 and session 92, while
     # sessions 90 and 91 both changed router source and both closed green on
     # the extension's suite alone. The refusal that makes it unrepeatable --
-    # a surface covered only by a non-expensive suite -- is session 94's.
+    # a surface covered only by a non-expensive suite -- is session 95's,
+    # and it is the loader's: `loadSuitesChecked` names the suite.
     - name: typescript
       command: node --test --test-concurrency=4 packages/router/test/**/*.test.ts
       expensive: true
@@ -181,6 +182,12 @@ testing:
     smoke:
       - packages/router/test/schema.test.ts
 
+    # Every rule below is held by the lint control
+    # (`packages/router/scripts/check-selection-map.ts`): each path a rule
+    # names must exist, and a test selected for a code path must import
+    # something under that path, transitively -- the loop's test reaches the
+    # driver through the loop, and that is the point of the mapping. A rule
+    # the control refuses is corrected here, never baselined.
     rules:
       # The extension's own sources. This list used to decide only what the
       # record NAMED -- the suite ran whole whatever it said, so a test file
@@ -225,16 +232,14 @@ testing:
       # The command's own files: the verb registry, the verbs' entry points
       # and the one seam every verb writes through. The report is what the
       # metrics test reads, so it answers for them too.
+      # It used to select the metrics, driver and drive tests as well, on the
+      # claim that the verbs parsed here are proven there. None of the three
+      # imports anything under cli/, transitively or otherwise -- they prove
+      # the modules the verbs call -- and the audit refused them.
       - when: packages/router/src/cli/
         select:
           - packages/router/test/cli.test.ts
           - packages/router/test/schema.test.ts
-          - packages/router/test/metrics.test.ts
-          # `session report` and `session drive` are parsed here and proven
-          # there: the driver's contract by the report verb's refusals, the
-          # loop by a scripted engine.
-          - packages/router/test/driver.test.ts
-          - packages/router/test/drive.test.ts
           - packages/router/test/engines.test.ts
       # The driver's ledger (the four answers and the run's state) and the
       # loop that fills it. The loop's test drives a whole session through
@@ -257,10 +262,26 @@ testing:
       # The package's export surface. No test imports it directly -- it is a
       # re-export file -- so what answers for it is what exercises the two
       # things it hands out: the in-process router, and the contracts.
+      # The library entry: what the extension consumes as the package
+      # `dabbler-ai-router`. No router test imports it -- they import the
+      # modules it re-exports -- so the two it used to select could not be
+      # reached by a change here. Nearly every extension module reaches it
+      # through the package name, the test helpers included, so a change to
+      # the entry reaches these nine extension tests; the audit resolves
+      # that one bare specifier and holds this list to it. The two extension
+      # tests not here (specSectionLocator, terminalShim) import nothing
+      # that reaches the package.
       - when: packages/router/src/index.ts
         select:
-          - packages/router/test/inProcess.test.ts
-          - packages/router/test/schema.test.ts
+          - tools/dabbler-ai-orchestration/src/test/suite/actionRegistry.test.ts
+          - tools/dabbler-ai-orchestration/src/test/suite/commandFlows.test.ts
+          - tools/dabbler-ai-orchestration/src/test/suite/dabblerTerminal.test.ts
+          - tools/dabbler-ai-orchestration/src/test/suite/driveProcess.test.ts
+          - tools/dabbler-ai-orchestration/src/test/suite/fileSystem.test.ts
+          - tools/dabbler-ai-orchestration/src/test/suite/owedDecisionCommands.test.ts
+          - tools/dabbler-ai-orchestration/src/test/suite/sessionsModel.test.ts
+          - tools/dabbler-ai-orchestration/src/test/suite/solutionTreeModel.test.ts
+          - tools/dabbler-ai-orchestration/src/test/suite/workExplorerTreeModel.test.ts
       # The ported modules. A module's own test comes first; the others are
       # the modules that IMPORT it, because a leaf of the import graph
       # breaking shows up in its dependants and not in itself.
@@ -367,6 +388,7 @@ testing:
           - packages/router/test/engines.test.ts
       - when: packages/router/src/testEvidence.ts
         select:
+          - packages/router/test/testEvidence.test.ts
           - packages/router/test/preverify.test.ts
       - when: packages/router/src/affected.ts
         select:
@@ -377,9 +399,12 @@ testing:
       # dispatch body over them, and the record of what currently exists.
       # `selection.test.ts` carries the escalation triggers as well, because
       # they live in `route.ts` and are what selection walks the ladder for.
+      # The ROLE selector. It used to select selection.test.ts, which proves
+      # the TEST selector in checks.ts and reaches this file only through
+      # affected.ts; roleSelection.test.ts is the test that imports it.
       - when: packages/router/src/selection.ts
         select:
-          - packages/router/test/selection.test.ts
+          - packages/router/test/roleSelection.test.ts
           - packages/router/test/route.test.ts
       - when: packages/router/src/route.ts
         select:
@@ -453,13 +478,15 @@ testing:
       # the loop's HEAD resolution -- so a change to any of them is a change
       # to the round, and naming them individually would be a list to forget
       # to add to.
+      # verdict.test.ts is not here: verify/ imports the verdict vocabulary,
+      # not the reverse, so a change here cannot reach that test. It is the
+      # verdict.ts rule's.
       - when: packages/router/src/verify/
         select:
           - packages/router/test/disputes.test.ts
           - packages/router/test/prompts.test.ts
           - packages/router/test/rounds.test.ts
           - packages/router/test/steps.test.ts
-          - packages/router/test/verdict.test.ts
           - packages/router/test/walk-verify.test.ts
       - when: packages/router/src/transports/
 

@@ -81,7 +81,12 @@ describe("one job, from start to collection", () => {
     assert.deepEqual(pollJob(repoRoot, job), { state: "running" });
 
     writeFileSync(gate, "", "utf8");
-    assert.deepEqual(await settle(repoRoot, job), { state: "exited", exitCode: 3 });
+    const exited = await settle(repoRoot, job);
+    assert.equal(exited.state, "exited");
+    assert.equal(exited.state === "exited" ? exited.exitCode : null, 3);
+    // The runner stamps when it wrote the status; the uncollected-job row
+    // reads that stamp back.
+    assert.match(String(exited.state === "exited" ? exited.endedAt : ""), /^\d{4}-\d{2}-\d{2}T/);
 
     assert.match(readFileSync(join(repoRoot, job.log), "utf8"), /the round is running/);
     assert.ok(existsSync(join(repoRoot, job.status)));
@@ -148,7 +153,9 @@ describe("what a job leaves behind", () => {
       ],
       retryAfterSeconds: 30,
     });
-    assert.deepEqual(await settle(repoRoot, job), { state: "exited", exitCode: 2 });
+    const exited = await settle(repoRoot, job);
+    assert.equal(exited.state, "exited");
+    assert.equal(exited.state === "exited" ? exited.exitCode : null, 2);
     await waitGone(Number(readFileSync(pidFile, "utf8")), "its collected job");
     assert.match(readFileSync(join(repoRoot, job.log), "utf8"), /ended 1 process\(es\)/);
   });

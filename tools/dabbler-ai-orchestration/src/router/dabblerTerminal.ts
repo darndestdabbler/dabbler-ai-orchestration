@@ -43,6 +43,7 @@ import * as vscode from "vscode";
 import {
   WATCHER_QUIET,
   progressResumed,
+  readUncollectedJob,
   readWatcher,
   renderStop,
   stalledAfterSeconds,
@@ -201,6 +202,10 @@ export function lineTone(event: string, fields: Record<string, string> = {}): To
   // The two honest green events, and no third: the phase moved past a
   // pause with nothing in its place, and a person answered a question.
   if (event === "progress-resumed" || event === "decision-answered") return "good";
+  // A finished job nobody collected is amber for the watcher's reason: the
+  // framework knows of nothing wrong, and what is being said is that the
+  // next call is owed and nobody has made it.
+  if (event === "uncollected") return "warn";
   // The watcher is a nudge, not a verdict: nothing has gone wrong that the
   // framework knows of, and the only thing being said is that the engine
   // has been quiet over an unmoved tree. `warn` is the amber the indicator
@@ -240,7 +245,12 @@ function relativeToRoot(repoRoot: string, full: string): string {
 }
 
 /** What the terminal is doing, which is the indicator the operator reads. */
-export type Activity = "working" | "waiting";
+/**
+ * `working` while a job runs, `waiting` between calls, and `uncollected`
+ * when the job the record names has exited and nothing has collected it --
+ * the state that read as `working` for three hours in session 91.
+ */
+export type Activity = "working" | "waiting" | "uncollected";
 
 /** The parts of `run.json` this terminal reads. Nothing else is its business. */
 interface RunRecord {
@@ -418,7 +428,25 @@ export function currentActivity(repoRoot: string): Activity {
   if (runPath === null) return "waiting";
   const run = readRun(runPath);
   if (run === null || run.stop) return "waiting";
-  return run.job ? "working" : "waiting";
+  if (!run.job) return "waiting";
+  return uncollectedWords(repoRoot, run) === null ? "working" : "uncollected";
+}
+
+/**
+ * The router's words for a job that finished and nobody collected, or null.
+ *
+ * One reader and one wording, both the router's: this asks and paints.
+ * A record the reader refuses -- a fixture, a half-written file -- reads
+ * as no such job, which is what it read as before.
+ */
+export function uncollectedWords(repoRoot: string, run?: RunRecord | null): string | null {
+  const record = run ?? (() => {
+    const runPath = liveRunPath(repoRoot);
+    return runPath === null ? null : readRun(runPath);
+  })();
+  if (record === null || record.stop || !record.job) return null;
+  if (typeof record.session_number !== "number") return null;
+  return readUncollectedJob(repoRoot, record.session_number)?.words ?? null;
 }
 
 /**
@@ -753,11 +781,17 @@ export class DabblerTerminal implements vscode.Pseudoterminal {
 
     // The indicator, said rather than merely held: a person watching this
     // terminal is asking "is anything happening", and a getter no surface
-    // renders does not answer them.
-    this.activity = stop || !job ? "waiting" : "working";
+    // renders does not answer them. A job that has exited uncollected is
+    // not "working" -- the spinner claimed it was for three hours once --
+    // and the line that says so carries the router's words for it.
+    const finished = stop || !job ? null : uncollectedWords(this.repoRoot, run);
+    this.activity = stop || !job ? "waiting" : finished === null ? "working" : "uncollected";
     if (this.activity !== this.spoken) {
       this.spoken = this.activity;
-      this.line(this.activity);
+      this.line(
+        this.activity,
+        finished === null ? {} : { name: job?.name ?? "job", reason: finished },
+      );
     }
     // The indicator follows the activity immediately rather than at the
     // next animation tick: a framework that has just stopped should not

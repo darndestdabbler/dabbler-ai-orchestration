@@ -293,6 +293,28 @@ export function loadSuitesChecked(config: unknown): SuiteLoadResult {
       runsWhole: Boolean(entry["runs_whole"]),
     });
   });
+  // A suite that is not expensive is never the run of record, and the
+  // freshness gate never asks about it: the run and the gate that would
+  // notice the run was missing are keyed to one flag. So a path only a
+  // cheap suite covers is a path nothing proves. Session 88 retired the
+  // expensive tier beside the router's suite and the survivor kept a flag
+  // whose meaning died with that tier; sessions 90 and 91 changed router
+  // source and closed green over 1117 tests nobody ran. A cheap tier is
+  // welcome BESIDE an expensive suite whose covers reach everything it
+  // covers; alone over a path, it is refused by name.
+  const expensiveCovers = suites.filter((suite) => suite.expensive).flatMap((suite) => suite.covers);
+  for (const suite of suites) {
+    if (suite.expensive) continue;
+    for (const cover of suite.covers) {
+      if (matchingPrefixes(cover, expensiveCovers).length > 0) continue;
+      errors.push(
+        `testing.suites '${suite.name}' is not expensive and covers ${pythonRepr(cover)}, ` +
+          "which no expensive suite covers: its run would never be the run of record, " +
+          "and nothing would notice the run was missing. Declare it expensive, or cover " +
+          `${pythonRepr(cover)} from a suite that is.`,
+      );
+    }
+  }
   return done(suites, errors);
 }
 

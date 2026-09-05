@@ -91,6 +91,19 @@ function lint(): number {
     process.stderr.write("workspace-check: boundary check failed\n");
     worst = Math.max(worst, boundaries);
   }
+  // The selection map rides in the same control: every rule in
+  // dabbler.yaml is held to what the tests it names actually import
+  // (`check-selection-map.ts`), because a map nothing verifies drifts the
+  // moment a file is renamed.
+  const selection = run(
+    [join(REPO_ROOT, "packages", "router", "scripts", "run-ts.mjs"),
+     join(REPO_ROOT, "packages", "router", "scripts", "check-selection-map.ts")],
+    REPO_ROOT,
+  );
+  if (selection !== 0) {
+    process.stderr.write("workspace-check: selection-map check failed\n");
+    worst = Math.max(worst, selection);
+  }
   return worst;
 }
 

@@ -1160,14 +1160,28 @@ function asSentence(text: string): string {
  * the pull the re-run is whoever calls `next`, which the framework cannot
  * see: the engine if its loop is still going, otherwise the person.
  */
-function nextMove(stop: StopRecord, run: StopContext): string {
+/**
+ * Who makes the next call, per mode. Under the pull the re-run is whoever
+ * calls `next`, which the framework cannot see: the engine if its loop is
+ * still going, otherwise the person. Under the push it is the person.
+ */
+function nextActor(run: StopContext): {
+  readonly pull: boolean;
+  readonly resume: string;
+  readonly whoever: string;
+} {
   const pull = (run.engine ?? PULL_ENGINE) === PULL_ENGINE;
   const resume = pull ? "`dabbler session next`" : "`dabbler session drive`";
-  const resumes = `${resume} resumes it from '${run.phase}'`;
-  const cancel = "`dabbler session cancel` ends it instead";
   const whoever = pull
     ? "whoever calls " + resume + " -- the engine if its loop is still running, otherwise you"
     : "you";
+  return { pull, resume, whoever };
+}
+
+function nextMove(stop: StopRecord, run: StopContext): string {
+  const { resume, whoever } = nextActor(run);
+  const resumes = `${resume} resumes it from '${run.phase}'`;
+  const cancel = "`dabbler session cancel` ends it instead";
   const step = stop.step_id ? ` '${stop.step_id}'` : "";
   let advice: string;
   switch (stop.kind) {
@@ -1238,6 +1252,81 @@ export function renderStop(stop: StopRecord, run: StopContext): StopRendering {
     text: `${headline}. ${happened} ${ended} ${next}`,
     deadlock,
   };
+}
+
+// --- A job finished and nobody collected ---------------------------------------
+//
+// The other thing a session can be doing that looks like working and is
+// not. Session 91's verification job finished at 07:43 with its exit code
+// in `jobs/<name>.status.json`, `run.json` kept naming it, and every
+// surface that read the record said "working" until the operator asked at
+// 11:03. The rule and the words are here for the same reason a stop's are:
+// the status row, the Work Explorer and the terminal all read them, and
+// none of them may say "working" over a process that has exited.
+
+/** A job that finished and nobody collected, as the record and its status file say. */
+export interface UncollectedJob {
+  readonly name: string;
+  readonly log: string;
+  readonly exit: number | null;
+  readonly ended_at: string | null;
+}
+
+/** What a poll of the job said, as far as the rule reads it. */
+export interface JobPoll {
+  readonly state: string;
+  readonly exitCode?: number | null;
+  readonly endedAt?: string | null;
+}
+
+/**
+ * The rule: a job on the record whose poll says it exited, under no stop.
+ *
+ * A stop is a row of its own, and the job under it was ended by the stop
+ * rather than left behind. A job still running is the framework working.
+ * A job that vanished -- no process, no status -- is the driver's to
+ * report when it collects, and it reports it as a stop; nothing here
+ * dresses it up as finished.
+ */
+export function uncollectedJob(
+  run: {
+    readonly stop?: unknown;
+    readonly job?: { readonly name: string; readonly log: string } | null;
+  },
+  polled: JobPoll | null,
+): UncollectedJob | null {
+  if (run.stop) return null;
+  const job = run.job ?? null;
+  if (job === null || polled === null || polled.state !== "exited") return null;
+  return {
+    name: job.name,
+    log: job.log,
+    exit: polled.exitCode ?? null,
+    ended_at: polled.endedAt ?? null,
+  };
+}
+
+/**
+ * The one wording of an uncollected job, for a person.
+ *
+ * It says which job, when it finished and with what, that nothing is
+ * running, and who is expected to make the call that collects it -- in
+ * the same mode-aware words a stop's next move uses. It never says the
+ * engine is working on it, for the reason `renderStop` never does.
+ */
+export function renderUncollected(job: UncollectedJob, run: StopContext): string {
+  const session = `Session ${String(run.session_number).padStart(3, "0")}`;
+  const { pull, resume, whoever } = nextActor(run);
+  const finished =
+    `finished${job.ended_at ? ` at ${job.ended_at}` : ""}` +
+    `${job.exit === null ? "" : ` (exit ${job.exit})`}`;
+  const next = pull
+    ? `Next: ${whoever}; ${resume} collects the result and carries on from '${run.phase}'.`
+    : `Next: you. ${resume} collects the result first and carries on from '${run.phase}'.`;
+  return (
+    `${session}: the framework's job '${job.name}' ${finished} and its result has ` +
+    `not been collected. Nothing is running, and collecting it takes a moment. ${next}`
+  );
 }
 
 /**

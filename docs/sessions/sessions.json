@@ -1849,9 +1849,9 @@
     {
       "number": 94,
       "title": "Paused, not stopped \u2014 and the two green events",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-05T14:58:59.044000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-09-05T15:38:43.534000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

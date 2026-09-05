@@ -4569,7 +4569,25 @@ session.*
 5. No adoption. Verification, `session drive` and the engine adapters in
    `engines.ts` are untouched; what replaces them is the next block's work,
    behind a flag, once this has run against a real agent.
-6. Affected; verify; full suite as `final-full`; close.
+6. **Two papercuts session 96 found in its own close, amended here on
+   2026-09-05 because 96 had already landed when they surfaced.** (a) Under
+   the pull, a `fix-run-of-record` step is never judged and never
+   re-verified: `phaseRunOfRecord` (`drive.ts`) re-enters from its loop
+   head on the resuming call, re-runs the suite and lands, so the step's
+   checks (`allPlanChecks()`) never run and the `setPhase("preverify")`
+   after `runStep` is never reached. Session 96's close refused on
+   `verification_clean`, correctly, and `dabbler verify` round 2 satisfied
+   it. The fix is the same shape as the plan steps: on resume, an
+   outstanding synthesised step is judged before the phase's own work, and
+   its acceptance sets the phase it names. One test in `walk-session`
+   proves a red run of record, a fix and a second verification round, in
+   that order. (b) The suite's temp root (`dabbler-router-tests` under the
+   OS temp directory) is never cleaned -- 17,000 entries on the operator's
+   machine -- and `repo.ts` used to name templates by pid, which Windows
+   reuses; 96 fixed the naming, and the root is still nobody's to clear.
+   Remove what a run left behind at the start of the next one, in
+   `repo.ts` and `answers.ts`, and nowhere else.
+7. Affected; verify; full suite as `final-full`; close.
 
 ---
 

@@ -1,6 +1,36 @@
-# STATUS — 77-81 all closed VERIFIED in one day; 82 is the operator's trial, with one fence to land first
+# STATUS — 96 closed VERIFIED; the suite spawns git nowhere but the walkthroughs; 97 is the ACP client, plus two papercuts 96 found
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
+
+> ## SESSION 96 CLOSED, 2026-09-05, VERIFIED (two rounds, gpt-5.4 over the seat)
+>
+> The git seam is used. Ten non-walkthrough test files that built real
+> repositories now take a directory answering git's questions from a table
+> (`test/support/answers.ts`: `makeAnsweredRepo`, `makeAnsweredSandbox`,
+> `GIT_INIT`; `write-tree` answers a digest of the files on disk), and the
+> four assertions that were about git moved into `walk-bootstrap` and
+> `walk-git-states`. `test/support/no-git.ts` is a `--import` preload that
+> fails any worker outside a `walk-*` file the moment it spawns git, and
+> `dabbler.yaml` runs the suite under it with no `--test-concurrency=4`:
+> 1133 pass, 4 skipped, 17 s at Node's default worker count (32 s capped
+> at 4 before). The guard found four more files the plan had not counted
+> -- rounds, route, solutionDeps, workflow -- one of which (route) had been
+> reading THIS repository's config overlays through `projectRoot()`.
+>
+> **Two framework papercuts, on the record for session 97.** (1) Under
+> the pull, a `fix-run-of-record` step is never judged and never
+> re-verified: `phaseRunOfRecord` re-enters from its loop head on the next
+> call, re-runs the suite, and lands; the close's `verification_clean`
+> gate refused, correctly, and `dabbler verify` round 2 satisfied it. Its
+> checks (`allPlanChecks()`) never ran either. (2) `test/support/repo.ts`
+> named template directories by pid and counter; the temp root is never
+> cleaned (425 templates, 17k entries), Windows reused a pid, and
+> `walk-verify` died at load on `git remote add origin`. Fixed with a
+> mkdtemp name; the root's cleanup is still nobody's.
+>
+> Also seen: the copilot-cli lock is pinned to CLI 1.0.80 while 1.0.83 is
+> installed (`dabbler copilot refresh --quorum` re-dates it). Sessions
+> 82-95 wrote no handoff here; their record is `docs/sessions/change-log.md`.
 
 > ## SESSION 81 CLOSED, 2026-09-02, VERIFIED at adjudication (the third)
 >

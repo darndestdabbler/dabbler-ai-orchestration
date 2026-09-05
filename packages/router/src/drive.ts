@@ -70,6 +70,9 @@ import {
   writeInstruction,
   writeRun,
   appendSupervision,
+  progressResumed,
+  renderStop,
+  type StopRendering,
 } from "./driver.ts";
 import { readRawSessionState } from "./sessionState.ts";
 import { repoRootFromSessionsDir } from "./evidence.ts";
@@ -732,6 +735,23 @@ class Driver {
     this.run = { ...this.run, phase };
     this.save();
     this.log("phase", { phase });
+    // The first green event, said once: the loop has moved past the phase
+    // it paused in, and nothing stands in the stop's place. The rule is the
+    // router's (`progressResumed`), so the terminal reading the record
+    // cannot say it differently; the marker is the record's, so the pull's
+    // fresh process finds what the resuming one left.
+    const past = this.run.resumed_from ?? null;
+    if (past !== null && progressResumed({ stop: past, phase: past.phase }, this.run)) {
+      this.run = { ...this.run, resumed_from: null };
+      this.save();
+      this.log("progress-resumed", { past: past.kind, from: past.phase, phase });
+      appendSupervision(this.repoRoot, this.sessionNumber, {
+        event: "progress-resumed",
+        past_stop: past.kind,
+        from_phase: past.phase,
+        phase,
+      });
+    }
   }
 
   // --- register --------------------------------------------------------------
@@ -887,6 +907,20 @@ class Driver {
       // save. One writer per run, enforced by the record itself.
       lease_epoch: nextLeaseEpoch(existing.lease_epoch),
       stop: null,
+      // What was resumed past, kept on the record until the phase moves on:
+      // that move is the one honest "progress resumed", and under the pull
+      // the process that resumes is never the one that advances. A call
+      // that finds no stop carries the marker an earlier one left.
+      ...(existing.stop
+        ? {
+            resumed_from: {
+              kind: existing.stop.kind,
+              at: existing.stop.at,
+              step_id: existing.stop.step_id ?? null,
+              phase: existing.phase,
+            },
+          }
+        : {}),
     };
     this.save();
     appendSupervision(this.repoRoot, this.sessionNumber, {
@@ -944,8 +978,11 @@ class Driver {
    * The reason is on `run.json` and on stderr either way, and a stop
    * reported as a crash would cost more than the row it failed to write.
    */
-  private raiseStopDecision(kind: StopKind, reason: string, ladder: Ladder | null = null): void {
+  private raiseStopDecision(words: StopRendering, ladder: Ladder | null = null): void {
     const advice = ladder?.advice ?? null;
+    // The brief's first paragraph is the rendering, whole: what happened,
+    // that the command ended and the session did not, and who acts next.
+    const reason = `${words.happened} ${words.ended} ${words.next}`;
     const options = [
       {
         label: RESUME_CHOICE,
@@ -980,9 +1017,7 @@ class Driver {
       raiseOwed(this.repoRoot, {
         id: stopDecisionId(this.sessionNumber),
         decisionClass: CLASS_VALUE_TRADEOFF,
-        question:
-          `Session ${sessionDisplayNumber(this.sessionNumber)} stopped ` +
-          `(${kind}) in phase '${this.run.phase}'. Run it again, or cancel it?`,
+        question: `${words.headline} in phase '${this.run.phase}'. Run it again, or cancel it?`,
         // Three briefs, and which one this is says how much is known. No
         // ladder was climbed: the stop's own reason, which is what an
         // attended session reads. An adviser answered: its opinion, marked
@@ -2584,6 +2619,10 @@ ${this.stopArtifacts()}`,
           class: deadlock ? "deadlock" : "first",
         },
         stop_history: [...history, entry].slice(-STOP_HISTORY_CAP),
+        // A stop landing before the phase moved on is the replacement that
+        // silences "progress resumed": this pause is spoken, and it says
+        // all there is to say.
+        resumed_from: null,
       };
       this.save();
       // A loop going nowhere is asked about before a person is. Only a
@@ -2608,12 +2647,13 @@ ${this.stopArtifacts()}`,
         }
         this.save();
       }
-      this.raiseStopDecision(error.kind, reason, ladder);
+      // The words are the router's one rendering of a stop, shared with the
+      // status row and the terminal; what is on disk is the record above.
+      const words = renderStop(this.run.stop as NonNullable<DriverRun["stop"]>, this.run);
+      this.raiseStopDecision(words, ladder);
       writeErr(
-        `dabbler: STOPPED (${error.kind}${deadlock ? ", deadlock" : ""}) in phase ` +
-          `'${this.run.phase}' after ${this.run.invocations} invocation(s) -- ${reason}\n` +
-          `Session ${sessionDisplayNumber(this.sessionNumber)} stays in flight; ` +
-          "the same command re-runs from this phase.\n",
+        `dabbler: ${words.headline} in phase '${this.run.phase}' after ` +
+          `${this.run.invocations} invocation(s).\n${words.happened}\n${words.ended} ${words.next}\n`,
       );
       return EXIT_GATE_FAILED;
     }

@@ -28,7 +28,7 @@ import {
   STATE_FILENAME,
   repoRootFromSessionsDir,
 } from "./evidence.ts";
-import { readInstruction, readReport, readRun, readWorkPlan } from "./driver.ts";
+import { readInstruction, readReport, readRun, readWorkPlan, renderStop } from "./driver.ts";
 import { nowIso } from "./journal.ts";
 import {
   LedgerError,
@@ -980,7 +980,7 @@ export function buildTaskRows(
   // the loop met. Read from the driver's own state rather than inferred,
   // and refused like the rounds ledger when that file does not parse.
   let driverRun: ReturnType<typeof readRun> = null;
-  let driverStop: { kind: string; reason: string } | null = null;
+  let driverStop: NonNullable<ReturnType<typeof readRun>>["stop"] = null;
   try {
     driverRun = readRun(repoRoot, sessionNumber);
     if (driverRun !== null && driverRun.stop !== null) driverStop = driverRun.stop;
@@ -1056,16 +1056,18 @@ export function buildTaskRows(
     },
   ];
 
-  if (driverStop !== null && status === STATUS_IN_PROGRESS) {
-    const stop = driverStop;
+  if (driverStop !== null && driverRun !== null && status === STATUS_IN_PROGRESS) {
+    // The router's one rendering of a stop, so this row, the driver's
+    // stderr and the terminal cannot word it differently -- and so the
+    // command it names is the mode's, which a sentence written here once
+    // got wrong for every pulled session.
+    const words = renderStop(driverStop, driverRun);
     const openIndex = phases.findIndex((phase) => phase.doneAt === null);
     if (openIndex >= 0) {
       phases[openIndex] = {
         ...(phases[openIndex] as Phase),
         blocked: true,
-        intent:
-          `Driver stopped (${stop.kind}): ${stop.reason} -- ` +
-          "`dabbler session drive` re-runs from this phase.",
+        intent: words.text,
       };
     }
   }

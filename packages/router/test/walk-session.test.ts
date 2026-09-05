@@ -347,6 +347,66 @@ describe("one session, walked from next to done", () => {
   });
 });
 
+describe("a session paused, then moving again", () => {
+  it("says progress resumed once, and only once the phase has moved past the pause", async () => {
+    setProviderKeys();
+    delete process.env["DABBLER_TRANSPORT"];
+    resetRouter();
+    resetRuntimeMode();
+    const repo = makeRepo(SEED, { origin: true });
+    const sessionsDir = join(repo, "docs", "sessions");
+    configure([VERIFIED]);
+    await capture(() =>
+      Promise.resolve(start(sessionsDir, { engine: "claude-code", provider: "anthropic" })),
+    );
+
+    // --- three calls with no plan written stop the loop ----------------------
+    // Under the pull an outstanding instruction is judged on the next call,
+    // and a plan instruction nobody answered is judged as no plan: each call
+    // is one refusal, and the third stops the session.
+    let asked = await next(sessionsDir);
+    assert.equal(asked.instruction?.step_id, "plan");
+    for (let refusal = 0; refusal < 3; refusal += 1) {
+      asked = await next(sessionsDir);
+    }
+    assert.equal(asked.instruction, null, "a stop prints no instruction");
+    const paused = readRun(repo, 1)?.stop;
+    assert.equal(paused?.kind, "rejected-thrice");
+    // The record keeps its vocabulary; the person is told it is paused, that
+    // this command has ended, that the session has not, and who acts next.
+    assert.match(asked.err, /Session 001 paused \(rejected-thrice\) in phase 'plan'/);
+    assert.match(asked.err, /has ended; session 001 remains in flight/);
+    assert.match(asked.err, /Next: /);
+    assert.doesNotMatch(asked.err, /STOPPED|progress-resumed/);
+
+    // --- the next call resumes it, and says nothing green yet -----------------
+    // The stop is cleared by the resume itself, which is not progress: the
+    // plan is merely asked again.
+    const again = await next(sessionsDir);
+    assert.equal(again.instruction?.step_id, "plan");
+    assert.equal(readRun(repo, 1)?.stop, null);
+    assert.match(again.err, /run-resumed .*after=rejected-thrice/);
+    assert.doesNotMatch(again.err, /progress-resumed/);
+
+    // --- a plan accepted moves the phase, and THAT is progress resumed --------
+    assert.equal(await answerPlan(sessionsDir, again.instruction?.seq ?? 0, PLAN), EXIT_OK);
+    const moved = await next(sessionsDir);
+    assert.equal(readRun(repo, 1)?.phase, "steps");
+    const said = moved.err.match(/progress-resumed[^\n]*/g) ?? [];
+    assert.equal(said.length, 1, moved.err);
+    assert.match(said[0] ?? "", /past=rejected-thrice/);
+    assert.match(said[0] ?? "", /from=plan/);
+    const supervision = readFileSync(
+      join(repo, ".dabbler", "runs", "s1", "driver", "supervision.jsonl"),
+      "utf8",
+    )
+      .split("\n")
+      .filter((line) => line.trim() !== "")
+      .map((line) => JSON.parse(line) as Record<string, unknown>);
+    assert.equal(supervision.filter((row) => row["event"] === "progress-resumed").length, 1);
+  });
+});
+
 describe("a second driver taking the lease mid-run", () => {
   it("stops the stale one before it advances the run, and says which epoch lost", async () => {
     // Two drivers wrote one run on 2026-09-02 and phases were skipped

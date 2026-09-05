@@ -40,7 +40,13 @@ import * as fs from "fs";
 import * as path from "path";
 import * as vscode from "vscode";
 
-import { WATCHER_QUIET, readWatcher, stalledAfterSeconds } from "dabbler-ai-router";
+import {
+  WATCHER_QUIET,
+  progressResumed,
+  readWatcher,
+  renderStop,
+  stalledAfterSeconds,
+} from "dabbler-ai-router";
 
 import { RUNS_REL } from "../utils/projection";
 
@@ -155,6 +161,13 @@ const ROUNDS_FILENAME = "rounds.jsonl";
 const TEST_RUNS_FILENAME = "test-runs.jsonl";
 
 /**
+ * The owed decisions of the repository, beside the test runs and read the
+ * same way: forward from where it stood when this terminal first looked.
+ * What is spoken from it is the `answered` fold alone.
+ */
+const OWED_FILENAME = "owed-decisions.jsonl";
+
+/**
  * A verdict's tone.
  *
  * `VERIFIED` is the only clean one and it is the only green one. Everything
@@ -180,7 +193,14 @@ export function verdictTone(verdict: string): Tone {
  * of it rather than competing with it.
  */
 export function lineTone(event: string, fields: Record<string, string> = {}): Tone {
-  if (event === "stopped") return "bad";
+  // A pause is amber: the loop met a bound and a person is told who acts
+  // next, which is not an alarm. A deadlock is red, because it is the one
+  // pause that says "running this again unchanged reaches this exact point
+  // again", and softening that word would cost the operator money.
+  if (event === "paused") return fields["class"] === "deadlock" ? "bad" : "warn";
+  // The two honest green events, and no third: the phase moved past a
+  // pause with nothing in its place, and a person answered a question.
+  if (event === "progress-resumed" || event === "decision-answered") return "good";
   // The watcher is a nudge, not a verdict: nothing has gone wrong that the
   // framework knows of, and the only thing being said is that the engine
   // has been quiet over an unmoved tree. `warn` is the amber the indicator
@@ -207,7 +227,10 @@ export function fieldTone(event: string, key: string, value: string): Tone {
   if (key === "verdict") return verdictTone(value);
   if (key === "outcome") return value === "passed" ? "good" : "bad";
   if (key === "phase") return MILESTONE_PHASES.has(value) ? "milestone" : "plain";
-  if (event === "stopped" && (key === "kind" || key === "reason")) return "bad";
+  // On a pause the kind is amber and a deadlock class is red; the words
+  // themselves stay plain, because prose painted whole is a wall.
+  if (event === "paused" && key === "kind") return "warn";
+  if (event === "paused" && key === "class") return value === "deadlock" ? "bad" : "warn";
   return "plain";
 }
 
@@ -223,9 +246,17 @@ export type Activity = "working" | "waiting";
 interface RunRecord {
   readonly session_number?: number;
   readonly phase?: string;
+  /** The adapter the run names; `cli` is the pull, and the rendering says which command resumes. */
+  readonly engine?: string;
   /** The seq of the instruction last issued: which silence is being watched. */
   readonly seq?: number;
-  readonly stop?: { kind?: string; reason?: string } | null;
+  readonly stop?: {
+    kind?: string;
+    reason?: string;
+    class?: "first" | "deadlock";
+    at?: string;
+    step_id?: string | null;
+  } | null;
   readonly job?: {
     name?: string;
     log?: string;
@@ -449,7 +480,14 @@ export class DabblerTerminal implements vscode.Pseudoterminal {
 
   private phase: string | null = null;
   private jobName: string | null = null;
-  private stopKind: string | null = null;
+  /**
+   * The pause this terminal spoke last and has not yet seen moved past: the
+   * stop's identity, and the phase it stood in. Compared, through the
+   * router's own rule, against every later reading -- a stop gone with the
+   * phase unmoved is a resume and not progress; a stop gone with the phase
+   * moved on is the one green line this terminal may say about it.
+   */
+  private paused: { identity: string; stop: { kind: string }; phase: string } | null = null;
   private activity: Activity = "waiting";
   private spoken: Activity | null = null;
 
@@ -676,6 +714,7 @@ export class DabblerTerminal implements vscode.Pseudoterminal {
     const runDir = path.dirname(path.dirname(runPath));
     this.drainRounds(path.join(runDir, ROUNDS_FILENAME));
     this.drainTestRuns(path.join(this.repoRoot, RUNS_REL, TEST_RUNS_FILENAME));
+    this.drainOwed(path.join(this.repoRoot, RUNS_REL, OWED_FILENAME));
 
     if (collected !== null) {
       // What it exited with is the record's to say, not this terminal's to
@@ -685,11 +724,31 @@ export class DabblerTerminal implements vscode.Pseudoterminal {
     }
 
     const stop = run.stop ?? null;
-    if (stop && stop.kind !== this.stopKind) {
-      this.stopKind = stop.kind ?? "stopped";
-      this.line("stopped", { kind: this.stopKind, reason: stop.reason ?? "" });
-    } else if (!stop && this.stopKind !== null) {
-      this.stopKind = null;
+    const phase = run.phase ?? "";
+    if (stop) {
+      // A stop is its kind, its moment and its reason: a replacement of the
+      // same kind is a new pause, spoken as one. The words are the router's
+      // one rendering, shared with the driver's stderr and the status row.
+      const identity = `${stop.kind ?? ""}\0${stop.at ?? ""}\0${stop.reason ?? ""}`;
+      if (this.paused === null || this.paused.identity !== identity) {
+        const kind = stop.kind ?? "?";
+        this.paused = { identity, stop: { kind }, phase };
+        const words = renderStop(
+          { kind, reason: stop.reason ?? "", class: stop.class ?? null, step_id: stop.step_id ?? null },
+          { session_number: run.session_number ?? 0, phase, engine: run.engine },
+        );
+        this.line("paused", {
+          session: this.sessionLabel(run),
+          kind,
+          class: stop.class ?? "",
+          reason: `${words.happened} ${words.ended} ${words.next}`,
+        });
+      }
+    } else if (this.paused !== null && progressResumed(this.paused, { stop: null, phase })) {
+      // Gone AND moved on. Gone alone is the resume clearing it, and says
+      // nothing yet; this terminal keeps the pause until the phase leaves it.
+      this.line("progress-resumed", { past: this.paused.stop.kind, from: this.paused.phase, phase });
+      this.paused = null;
     }
 
     // The indicator, said rather than merely held: a person watching this
@@ -841,6 +900,24 @@ export class DabblerTerminal implements vscode.Pseudoterminal {
         suite: String(row["suite"] ?? "?"),
         stage: String(row["stage"] ?? ""),
         outcome: String(row["outcome"] ?? "?"),
+      });
+    }
+  }
+
+  /**
+   * The second green event: a question folded to `answered`.
+   *
+   * Repository-wide like the test runs, and not replayed for the same
+   * reason. Only the `answered` fold is spoken -- a question raised is an
+   * attention row in the Explorer, and a question superseded is the
+   * framework tidying after itself, and neither is something a person did.
+   */
+  private drainOwed(file: string): void {
+    for (const row of this.newRows(file, false)) {
+      if (row["event"] !== "answered") continue;
+      this.line("decision-answered", {
+        id: String(row["id"] ?? "?"),
+        answer: String(row["answer"] ?? ""),
       });
     }
   }

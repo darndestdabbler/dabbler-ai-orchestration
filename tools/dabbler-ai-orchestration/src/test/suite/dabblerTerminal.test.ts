@@ -213,8 +213,13 @@ suite("the Dabbler terminal", () => {
 
     terminal.poll();
     const spoken = plain(written.join(""));
-    assert.ok(spoken.includes("stopped kind=budget"));
+    // The router's words, not this terminal's: paused rather than stopped,
+    // the command ended and the session not, and who acts next.
+    assert.ok(spoken.includes("paused session=062 kind=budget"));
     assert.ok(spoken.includes("driver.max_invocations (24)"));
+    assert.ok(spoken.includes("remains in flight"));
+    assert.ok(spoken.includes("Next: "));
+    assert.ok(!spoken.includes("stopped kind"));
     assert.ok(!spoken.includes("rewritten"));
     assert.ok(!spoken.includes("engine:"));
 
@@ -240,7 +245,7 @@ suite("the Dabbler terminal", () => {
     });
 
     terminal.poll();
-    const stop = written.find((text) => plain(text).includes("stopped kind=land"));
+    const stop = written.find((text) => plain(text).includes("paused session=062 kind=land"));
     assert.ok(stop !== undefined);
     // Not one bare LF anywhere in it: every newline is a full CRLF.
     assert.strictEqual(stop.split("\n").length - 1, stop.split("\r\n").length - 1);
@@ -294,6 +299,89 @@ suite("the Dabbler terminal", () => {
     rmrf(root);
   });
 
+  test("says progress resumed once the phase has left the pause, and not before, and not past a replacement", () => {
+    const { root, driver, written, terminal } = drivenRepo({
+      session_number: 62,
+      phase: "steps",
+      job: null,
+      stop: { kind: "tests", reason: "the suite was red", at: "2026-08-31T14:00:00-04:00" },
+    });
+    terminal.poll();
+    assert.ok(plain(written.join("")).includes("paused session=062 kind=tests"));
+
+    // The resume clears the stop and re-enters the same phase: nothing has
+    // happened yet, and nothing green is said.
+    written.length = 0;
+    writeRun(driver, { session_number: 62, phase: "steps", job: null, stop: null });
+    terminal.poll();
+    assert.ok(!plain(written.join("")).includes("progress-resumed"));
+
+    // The phase moves on: that is progress, said once.
+    written.length = 0;
+    writeRun(driver, { session_number: 62, phase: "verify", job: null, stop: null });
+    terminal.poll();
+    const moved = plain(written.join(""));
+    assert.ok(moved.includes("progress-resumed past=tests from=steps phase=verify"), moved);
+    written.length = 0;
+    writeRun(driver, { session_number: 62, phase: "run-of-record", job: null, stop: null });
+    terminal.poll();
+    assert.ok(!plain(written.join("")).includes("progress-resumed"));
+
+    // A replacement: the stop is gone and the phase moved, but another stop
+    // stands in its place. That is a new pause, and never progress.
+    written.length = 0;
+    writeRun(driver, {
+      session_number: 62,
+      phase: "run-of-record",
+      job: null,
+      stop: { kind: "land", reason: "the push was refused", at: "2026-08-31T14:10:00-04:00" },
+    });
+    terminal.poll();
+    written.length = 0;
+    writeRun(driver, {
+      session_number: 62,
+      phase: "close",
+      job: null,
+      stop: { kind: "close", reason: "the close refused", at: "2026-08-31T14:20:00-04:00" },
+    });
+    terminal.poll();
+    const replaced = plain(written.join(""));
+    assert.ok(replaced.includes("paused session=062 kind=close"), replaced);
+    assert.ok(!replaced.includes("progress-resumed"), replaced);
+
+    terminal.dispose();
+    rmrf(root);
+  });
+
+  test("says a decision answered, from the owed ledger, and only from where it first looked", () => {
+    const { root, written, terminal } = drivenRepo(RUNNING);
+    const owed = path.join(root, ".dabbler", "runs", "owed-decisions.jsonl");
+    // Rows written before this terminal existed are history, and a question
+    // raised is not something a person did: neither is spoken.
+    fs.writeFileSync(
+      owed,
+      `${JSON.stringify({ id: "old-question", event: "answered", state: "answered", answer: "Yes" })}\n` +
+        `${JSON.stringify({ id: "driver-stop-s62", event: "raised", state: "open" })}\n`,
+      "utf8",
+    );
+    terminal.poll();
+    assert.ok(!plain(written.join("")).includes("decision-answered"));
+
+    written.length = 0;
+    fs.appendFileSync(
+      owed,
+      `${JSON.stringify({ id: "driver-stop-s62", event: "answered", state: "answered", answer: "Run `next` again" })}\n`,
+      "utf8",
+    );
+    terminal.poll();
+    const spoken = plain(written.join(""));
+    assert.ok(spoken.includes("decision-answered id=driver-stop-s62 answer=Run `next` again"), spoken);
+    assert.ok(!spoken.includes("old-question"));
+
+    terminal.dispose();
+    rmrf(root);
+  });
+
   test("resolves the same tone in either theme, and never the same colour", () => {
     // Two palettes, one vocabulary. A tone that resolved to one colour in
     // both themes would be unreadable in one of them, which is the failure
@@ -307,7 +395,13 @@ suite("the Dabbler terminal", () => {
     // the operator reads this terminal to know where the session got to.
     assert.strictEqual(lineTone("phase", { phase: "close" }), "milestone");
     assert.strictEqual(lineTone("phase", { phase: "steps" }), "plain");
-    assert.strictEqual(lineTone("stopped", {}), "bad");
+    // A pause is amber and a deadlock is red: the one word that says
+    // "running this again reaches this exact point" keeps its colour.
+    assert.strictEqual(lineTone("paused", {}), "warn");
+    assert.strictEqual(lineTone("paused", { class: "deadlock" }), "bad");
+    // The two honest green events, and no third.
+    assert.strictEqual(lineTone("progress-resumed", {}), "good");
+    assert.strictEqual(lineTone("decision-answered", {}), "good");
     // An unrecognised verdict warns rather than passing as clean, because
     // that is exactly the case where guessing "fine" is worst.
     assert.strictEqual(lineTone("verify", { verdict: "SOMETHING_NEW" }), "warn");

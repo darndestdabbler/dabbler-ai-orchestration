@@ -102,6 +102,12 @@ export const SHARED_BODY =
   "None of them is yours to run, and none of them is yours to skip ahead to\n" +
   "— the instruction in hand is the whole of what is asked.\n" +
   "\n" +
+  "**The framework owns the clock, the state and the sequencing.** An\n" +
+  "instruction that names a command is answered by running that command —\n" +
+  "never by waiting on a condition that your own next call is what causes.\n" +
+  "A `wait` answered by watching `run.json` for its job to clear waits\n" +
+  "forever: only the `next` you did not call clears it.\n" +
+  "\n" +
   "**A session that declared itself releasable also publishes**, between the\n" +
   "push and the close, and the framework does that for itself too. A session\n" +
   "that declared `--not-releasable` publishes nothing, which is most of them:\n" +
@@ -132,12 +138,10 @@ export const SHARED_BODY =
   "- API keys live in env vars (`DABBLER_ANTHROPIC_API_KEY`,\n" +
   "  `DABBLER_OPENAI_API_KEY`, `DABBLER_GEMINI_API_KEY`), never in files. The\n" +
   "  same rule covers a feed PAT: configuration names it and never holds it.\n" +
-  "- The router is one command, `dabbler <verb>` — no interpreter, no virtual\n" +
-  "  environment, and nothing to install beside the extension: it ships\n" +
-  "  inside the VSIX, and a VS Code terminal has it on `PATH`. Anywhere else,\n" +
-  "  run that same file: `node \"<extension dir>/dist/dabbler.cjs\" <verb>`.\n" +
-  "  \"dabbler: command not found\" is a PATH problem, not a missing-keys\n" +
-  "  problem.\n" +
+  "- The router is one command, `dabbler <verb>` — nothing to install beside\n" +
+  "  the extension: it ships inside the VSIX, and a VS Code terminal has it\n" +
+  "  on `PATH`. Anywhere else, run `node \"<extension dir>/dist/dabbler.cjs\"\n" +
+  "  <verb>`. \"dabbler: command not found\" is a PATH problem, not a keys one.\n" +
   "\n" +
   "## Writing files\n" +
   "\n" +

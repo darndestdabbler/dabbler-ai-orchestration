@@ -111,6 +111,22 @@
       },
       "description": "The stops this run has already met, oldest first and capped -- the oldest is dropped rather than the newest, because what a deadlock is read from is the recent end. It is here, and short, because `run.json` is state: the history of a run is its transcripts, and this is only enough of it to see the loop going nowhere."
     },
+    "resumed_from": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["kind", "at", "phase"],
+      "properties": {
+        "kind": { "$ref": "#/$defs/stopKind" },
+        "at": { "type": "string", "minLength": 1 },
+        "step_id": { "$ref": "#/$defs/stopStepId" },
+        "phase": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The phase the stop stood in, which a resume re-enters. Progress is the loop leaving it."
+        }
+      },
+      "description": "The stop the run resumed past, until the phase moves on. Set by the resume that clears `stop`, and cleared by the first phase change after it -- the one honest 'progress resumed', said exactly once -- or by a new stop landing first, which is spoken as its own pause. On the record rather than in memory because under the pull every `next` is a fresh process, and the process that resumes is never the one that advances. Optional: a run written before this member is a run this reader opens, and its absence means nothing was resumed past."
+    },
     "triage": {
       "type": ["object", "null"],
       "additionalProperties": false,

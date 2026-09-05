@@ -15,9 +15,11 @@ import {
   WATCHER_JOB_OUTSTANDING,
   WATCHER_OUTSTANDING,
   WATCHER_QUIET,
+  progressResumed,
   readDispositions,
   readReport,
   readWatcher,
+  renderStop,
   reportPath,
   treeTouchedAt,
   validateDispositions,
@@ -521,6 +523,71 @@ describe("the watcher over one session's directory", () => {
     writeFileSync(join(repo, "widget.ts"), "export const widget = 1;\n", "utf8");
     assert.ok(Date.parse(treeTouchedAt(repo) as string) > Date.parse(ISSUED));
     assert.equal(readWatcher(repo, 1, 60, NOW).state, WATCHER_QUIET);
+  });
+});
+
+describe("a stop, as a person reads it", () => {
+  const KINDS = [
+    "budget",
+    "rejected-thrice",
+    "blocked",
+    "engine",
+    "tests",
+    "verification",
+    "land",
+    "publish",
+    "close",
+    "interrupted",
+  ];
+
+  it("says paused, says the command ended and the session did not, and names who acts next", () => {
+    // Every kind, both classes, both modes: the words are the same shape
+    // whatever the record says, because the four things a person needs are
+    // the same four things every time. What the words never say is that the
+    // engine is working on it -- under the pull the framework cannot see the
+    // engine, and a sentence that claimed otherwise would have a person
+    // waiting on a process that is gone.
+    for (const kind of KINDS) {
+      for (const klass of ["first", "deadlock"] as const) {
+        for (const engine of ["cli", "claude-code"]) {
+          const stop = { kind, reason: "the widget is load-bearing", class: klass, step_id: "widget" };
+          const words = renderStop(stop, { session_number: 7, phase: "verify", engine });
+          const label = `${kind}/${klass}/${engine}`;
+          assert.equal(
+            words.headline,
+            `Session 007 paused (${kind}${klass === "deadlock" ? ", deadlock" : ""})`,
+            label,
+          );
+          assert.match(words.happened, /load-bearing/, label);
+          assert.match(words.ended, /has ended/, label);
+          assert.match(words.ended, /remains in flight/, label);
+          assert.match(words.next, /^Next: /, label);
+          // The command that resumes it is the mode's, never the other one's.
+          assert.match(words.next, engine === "cli" ? /session next/ : /session drive/, label);
+          assert.doesNotMatch(words.text, /working on|is working|fixing it|STOPPED/, label);
+          assert.equal(words.deadlock, klass === "deadlock", label);
+          assert.equal(/deadlock/.test(words.next), klass === "deadlock", label);
+          for (const part of [words.headline, words.happened, words.ended, words.next]) {
+            assert.ok(words.text.includes(part), label);
+          }
+        }
+      }
+    }
+  });
+
+  it("says progress resumed only once the phase has moved past the pause, with nothing in its place", () => {
+    const paused = { stop: { kind: "tests", reason: "red", at: "2026-09-05T10:00:00-04:00" }, phase: "verify" };
+    // No pause to move past.
+    assert.equal(progressResumed({ stop: null, phase: "verify" }, { stop: null, phase: "land" }), false);
+    // Cleared by the resume, but nothing has happened yet.
+    assert.equal(progressResumed(paused, { stop: null, phase: "verify" }), false);
+    // Replaced: the opposite of progress, however far the phase moved.
+    assert.equal(
+      progressResumed(paused, { stop: { kind: "land" }, phase: "land" }),
+      false,
+    );
+    // Gone, and the loop is somewhere else.
+    assert.equal(progressResumed(paused, { stop: null, phase: "land" }), true);
   });
 });
 

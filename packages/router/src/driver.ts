@@ -1078,6 +1078,195 @@ function lastAnsweredAt(repoRoot: string, sessionNumber: number): string | null 
   return stamps.length === 0 ? null : stamps.reduce((latest, at) => (at > latest ? at : latest));
 }
 
+// --- Rendering a stop for a person -------------------------------------------
+//
+// The record keeps `kind`, `class`, `reason` and `step_id`, and gates and
+// tests read those. A person reads words, and the words are made here and
+// nowhere else: the driver's stderr line, the stop's owed decision, the
+// `dabbler status` task row and the Dabbler terminal all call this, so none
+// of them can word a stop differently from the others.
+//
+// What the words may say is bounded by what the framework can see. It can
+// say the session is paused, which bound the loop met, that the command
+// which met it has ended while the session stays in flight, and who is
+// expected to act next. It may NOT say the engine is working on it: under
+// the pull the framework cannot see the engine at all, and a sentence that
+// claimed otherwise would have a person waiting on a process that is gone.
+
+/** The parts of a stop the rendering reads. Every one is on `run.json`. */
+export interface StopRecord {
+  readonly kind: string;
+  readonly reason: string;
+  readonly class?: "first" | "deadlock" | null;
+  readonly step_id?: string | null;
+  readonly at?: string;
+}
+
+/** The parts of the run the rendering reads beside the stop. */
+export interface StopContext {
+  readonly session_number: number;
+  readonly phase: string;
+  /** The adapter the run names. `cli` is the pull: the framework invokes no engine. */
+  readonly engine?: string;
+}
+
+export interface StopRendering {
+  /** "Session 094 paused (verification, deadlock)". */
+  readonly headline: string;
+  /** What happened in plain words, then the stop's own reason. */
+  readonly happened: string;
+  /** That the command which met the stop has ended, and the session has not. */
+  readonly ended: string;
+  /** Who is expected to act next, and the command that resumes it. */
+  readonly next: string;
+  /** The four joined, for a surface that renders one string. */
+  readonly text: string;
+  readonly deadlock: boolean;
+}
+
+/** The engine name a pulled run records: nothing invokes the engine. */
+export const PULL_ENGINE = "cli";
+
+/** One plain sentence per bound the loop can meet, keyed by the stop's kind. */
+const HAPPENED: Readonly<Record<string, string>> = {
+  budget: "The loop reached its invocation bound.",
+  "rejected-thrice": "An answer was refused three times running.",
+  blocked: "The engine reported its step blocked.",
+  engine: "The engine could not be run, or what it gave back could not be used.",
+  tests: "A test run could not be handed back.",
+  verification: "A verification round ended without a verdict the framework could act on.",
+  land: "The commit or the push did not go through.",
+  publish: "Packaging did not publish.",
+  close: "The close's gates refused.",
+  interrupted: "Somebody asked it to stop.",
+};
+
+/** A reason as a sentence of its own: a capital to start, a stop to end. */
+function asSentence(text: string): string {
+  const trimmed = text.trim();
+  if (trimmed === "") return "";
+  const capitalised = trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
+  return /[.!?]$/.test(capitalised) ? capitalised : `${capitalised}.`;
+}
+
+/**
+ * What a person is told to do about a stop, per kind.
+ *
+ * The actor is a person for every kind but two. A budget, a blocked step,
+ * an engine that would not run, a red suite, a round without a verdict, a
+ * refused push, a failed publish or a refused close each need something
+ * put right before running again reaches anywhere else. An interruption and
+ * a thrice-refused answer are the two a plain re-run answers -- and under
+ * the pull the re-run is whoever calls `next`, which the framework cannot
+ * see: the engine if its loop is still going, otherwise the person.
+ */
+function nextMove(stop: StopRecord, run: StopContext): string {
+  const pull = (run.engine ?? PULL_ENGINE) === PULL_ENGINE;
+  const resume = pull ? "`dabbler session next`" : "`dabbler session drive`";
+  const resumes = `${resume} resumes it from '${run.phase}'`;
+  const cancel = "`dabbler session cancel` ends it instead";
+  const whoever = pull
+    ? "whoever calls " + resume + " -- the engine if its loop is still running, otherwise you"
+    : "you";
+  const step = stop.step_id ? ` '${stop.step_id}'` : "";
+  let advice: string;
+  switch (stop.kind) {
+    case "budget":
+      advice =
+        "Next: you. Continuing is a decision to spend more: " +
+        `${resume} with --max-invocations <larger> resumes it from '${run.phase}', and ${cancel}.`;
+      break;
+    case "rejected-thrice":
+      advice =
+        `Next: ${whoever}. Read the last rejection's reasons first; ` +
+        `${resume} asks the step${step} afresh, and ${cancel}.`;
+      break;
+    case "blocked":
+      advice =
+        `Next: you. Clear what the engine said step${step} is blocked on ` +
+        `(an owed item may carry it), then ${resumes}; ${cancel}.`;
+      break;
+    case "interrupted":
+      advice = `Next: ${whoever}. ${resumes}; ${cancel}.`;
+      break;
+    case "close":
+      advice =
+        "Next: you. Satisfy the gate the close named -- an owed decision is " +
+        `answered with \`dabbler owed answer\` -- then ${resumes}.`;
+      break;
+    case "land":
+      advice = `Next: you. Put right what git refused, then ${resumes}.`;
+      break;
+    case "publish":
+      advice = `Next: you. Read the publish job's log and put it right, then ${resumes}.`;
+      break;
+    case "tests":
+      advice = `Next: you. Read the run's log and put right what stopped it, then ${resumes}.`;
+      break;
+    case "verification":
+      advice = `Next: you. Read the round's reason above and put it right, then ${resumes}.`;
+      break;
+    default:
+      advice = `Next: you. Read the reason above and put it right, then ${resumes}.`;
+  }
+  if (stop.class === "deadlock") {
+    advice +=
+      " It is a deadlock: running it again unchanged reaches this exact point again, " +
+      "so change something first.";
+  }
+  return advice;
+}
+
+/**
+ * A stop, as a person reads it. Pure: the record is the input and words are
+ * the output, and nothing here reads a file or decides a lifecycle rule.
+ */
+export function renderStop(stop: StopRecord, run: StopContext): StopRendering {
+  const session = `Session ${String(run.session_number).padStart(3, "0")}`;
+  const deadlock = stop.class === "deadlock";
+  const headline = `${session} paused (${stop.kind}${deadlock ? ", deadlock" : ""})`;
+  const what = HAPPENED[stop.kind] ?? "The loop met a bound it could not pass.";
+  const reason = asSentence(stop.reason);
+  const happened = reason === "" ? what : `${what} ${reason}`;
+  const ended = `The dabbler command that met it has ended; ${session.toLowerCase()} remains in flight.`;
+  const next = nextMove(stop, run);
+  return {
+    headline,
+    happened,
+    ended,
+    next,
+    text: `${headline}. ${happened} ${ended} ${next}`,
+    deadlock,
+  };
+}
+
+/**
+ * One reading of a run: whether a stop stood (its kind is all the rule
+ * needs, so `run.resumed_from` reads here as readily as `run.stop`), and
+ * the phase it stood in.
+ */
+export interface PhaseReading {
+  readonly stop: { readonly kind: string } | null | undefined;
+  readonly phase: string;
+}
+
+/**
+ * The first honest green event: a standing stop is gone AND the phase moved
+ * on, with nothing standing in its place.
+ *
+ * A stop merely gone is not progress -- a resume clears it before anything
+ * has happened -- and a stop replaced by another is the opposite of
+ * progress. Only the phase advancing past the one it paused in says the
+ * loop is moving again, and that is the one thing the framework can vouch
+ * for from its own record. The driver says it at the phase change; the
+ * terminal says it from two polls. One rule, so they cannot disagree.
+ */
+export function progressResumed(before: PhaseReading, after: PhaseReading): boolean {
+  if (!before.stop) return false;
+  if (after.stop) return false;
+  return after.phase !== before.phase;
+}
+
 // --- Shaping an answer file --------------------------------------------------
 
 /**

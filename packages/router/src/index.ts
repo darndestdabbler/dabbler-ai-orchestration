@@ -43,6 +43,20 @@ export {
   type WatcherReading,
   type WatcherState,
 } from "./driver.ts";
+// The words a stop is read in, and the one rule for "it is moving again",
+// for the same reason once more: the Dabbler terminal renders both from
+// the run record, and a renderer with a wording of its own is a second
+// statement of what the driver already says on stderr and in the status
+// projection.
+export {
+  PULL_ENGINE,
+  progressResumed,
+  renderStop,
+  type PhaseReading,
+  type StopContext,
+  type StopRecord,
+  type StopRendering,
+} from "./driver.ts";
 // The threshold that rule is judged against, from the repository's own
 // configuration. The operator's editor setting still wins over it -- that
 // precedence is the host's -- but the middle tier is the repository's to

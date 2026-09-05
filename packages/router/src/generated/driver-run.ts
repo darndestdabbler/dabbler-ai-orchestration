@@ -75,6 +75,18 @@ export type DriverRun = {
     step_id?: DriverRunStopStepId;
   }[];
   /**
+   * The stop the run resumed past, until the phase moves on. Set by the resume that clears `stop`, and cleared by the first phase change after it -- the one honest 'progress resumed', said exactly once -- or by a new stop landing first, which is spoken as its own pause. On the record rather than in memory because under the pull every `next` is a fresh process, and the process that resumes is never the one that advances. Optional: a run written before this member is a run this reader opens, and its absence means nothing was resumed past.
+   */
+  resumed_from?: {
+    kind: DriverRunStopKind;
+    at: string;
+    step_id?: DriverRunStopStepId;
+    /**
+     * The phase the stop stood in, which a resume re-enters. Progress is the loop leaving it.
+     */
+    phase: string;
+  } | null;
+  /**
    * What the unattended ladder found, once per impasse. Optional and absent under the pull: an attended engine calls `dabbler triage` itself, and the framework does not spend a provider call on behalf of somebody who is sitting right there.
    */
   triage?: {

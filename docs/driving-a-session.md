@@ -297,8 +297,9 @@ The stop lands on the next call, which prints no instruction and exits 1:
 
 ```
 dabbler [11:31:38] run-resumed session=001 phase=verify invocations=0 max_invocations=24
-dabbler: STOPPED (interrupted) in phase 'verify' after 0 invocation(s) -- I want to look at the diff first
-Session 001 stays in flight; the same command re-runs from this phase.
+dabbler: Session 001 paused (interrupted) in phase 'verify' after 0 invocation(s).
+Somebody asked it to stop. I want to look at the diff first.
+The dabbler command that met it has ended; session 001 remains in flight. Next: you. `dabbler session drive` resumes it from 'verify'; `dabbler session cancel` ends it instead.
 ```
 
 **A Send reaches a stopped run too.** There is no invocation to end, so
@@ -525,20 +526,20 @@ and the badge the Explorer built — printed here as the model carries them,
 since a screenshot cannot be pasted into a text file:
 
 ```
-ROW  Session 001 stopped (interrupted) in phase 'preverify'. Run it again, or cancel it?
+ROW  Session 001 paused (interrupted) in phase 'preverify'. Run it again, or cancel it?
      Nothing happens. The session stays in flight and its record stops moving until someone resumes it or cancels it.
      icon={"kind":"theme","id":"warning","color":"charts.yellow"} command=dabbler.answerOwedDecision
 
-BADGE {"value":1,"tooltip":"Dabbler is waiting on you: Session 001 stopped (interrupted) in phase 'preverify'. Run it again, or cancel it?"}
+BADGE {"value":1,"tooltip":"Dabbler is waiting on you: Session 001 paused (interrupted) in phase 'preverify'. Run it again, or cancel it?"}
 ```
 
 The row's tooltip is the whole brief — the question, what the framework
 already established, and each option with what follows from it:
 
 ```
-**Session 001 stopped (interrupted) in phase 'preverify'. Run it again, or cancel it?**
+**Session 001 paused (interrupted) in phase 'preverify'. Run it again, or cancel it?**
 
-the widget needs a rethink
+Somebody asked it to stop. The widget needs a rethink. The dabbler command that met it has ended; session 001 remains in flight. Next: you. `dabbler session drive` resumes it from 'preverify'; `dabbler session cancel` ends it instead.
 
 - **Run `next` again** — *recommended*: The session resumes from 'preverify'. The steps it has already accepted are not asked for again.
 - **Cancel the session**: `dabbler session cancel` ends it with a reason on the record. What the working tree already carries stays where it is.

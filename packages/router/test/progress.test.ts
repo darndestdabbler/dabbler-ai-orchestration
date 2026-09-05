@@ -431,7 +431,13 @@ describe("the task rows", () => {
     writeFileSync(path, JSON.stringify({ ...RUN, stop: { ...stop, class: "deadlock" }, weather: "unseasonable" }), "utf8");
     const rows = buildTaskRows(sessionsDir, 1);
     assert.equal(rows.length, 6);
-    assert.match(rows.map((row) => String(row["intent"])).join("\n"), /Driver stopped \(blocked\): the widget is load-bearing/);
+    // The row reads in the router's one rendering: paused, not stopped; the
+    // deadlock named; the resume command the run's own mode (a push here).
+    const intents = rows.map((row) => String(row["intent"])).join("\n");
+    assert.match(intents, /Session 001 paused \(blocked, deadlock\)\. .*The widget is load-bearing\./);
+    assert.match(intents, /remains in flight/);
+    assert.match(intents, /session drive/);
+    assert.doesNotMatch(intents, /Driver stopped/);
     writeFileSync(path, JSON.stringify({ ...RUN, phase: 7 }), "utf8");
     assert.throws(() => buildTaskRows(sessionsDir, 1), TaskRowsRefused);
   });

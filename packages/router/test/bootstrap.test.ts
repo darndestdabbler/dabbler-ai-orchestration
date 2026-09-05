@@ -263,6 +263,21 @@ describe("the instruction files", () => {
     assert.match(agents.toLowerCase(), /working tree/);
   });
 
+  it("tells the engine the clock is the framework's, not a thing to re-engineer", () => {
+    // The body said "a call you make later, never a sleep you hold", and a
+    // capable model read it and built a background poll on `run.json`'s job
+    // field -- which only `next` clears, so the callback was its own
+    // precondition and a finished verification sat uncollected for three
+    // hours. The sentence ruled out a sleep and left a mechanism open; the
+    // rule now names the mechanism. Asserted by meaning, not by wording.
+    const project = tempDir("bootstrap-");
+    writeInstructionFiles(project, "acme-app");
+    const agents = readFileSync(join(project, "AGENTS.md"), "utf8").toLowerCase();
+    assert.match(agents, /owns the clock/);
+    assert.match(agents, /your own next call/);
+    assert.match(agents, /waits\s+forever/);
+  });
+
   it("gives each engine its own tail", () => {
     const project = tempDir("bootstrap-");
     writeInstructionFiles(project, "x");

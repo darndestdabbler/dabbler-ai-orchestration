@@ -133,26 +133,130 @@ export function resolveRole<T extends Candidate>(
   candidates: readonly T[],
   excludeProviders: readonly string[] | null = null,
 ): T[] {
+  return explainRole(config, role, candidates, excludeProviders).candidates;
+}
+
+/** Why a candidate is not here: the rule that removed it, and nothing else. */
+export const REMOVED_EXCLUDED_PROVIDER = "excluded-provider";
+export const REMOVED_NOT_PERMITTED = "not-permitted";
+export const REMOVED_UNTRUSTED_VERIFIER = "untrusted-verifier";
+export const REMOVED_NO_PROVIDER = "no-provider";
+
+export interface RemovedCandidate {
+  readonly model: string;
+  readonly provider: string;
+  readonly rule: string;
+}
+
+/**
+ * How the chosen candidate was reached.
+ *
+ * `rank` is its place in the role's `prefer` order. `null` means the order
+ * does not name it and it was reached by falling PAST the end of one -- a
+ * different fact from "there is no order", which is `preferenceDeclared:
+ * false`. The 364-request session is the reason the difference is worth
+ * carrying: a weight-14 model no order named verified a session that had
+ * named a weight-1 one, and the record could only say which model answered.
+ */
+export interface RoleResolution<T> {
+  readonly candidates: T[];
+  readonly preferenceDeclared: boolean;
+  /** The chosen candidate's rank, or null when nothing survived or it was unranked. */
+  readonly rank: number | null;
+  /** True when a preference order is declared and the chosen candidate is outside it. */
+  readonly fellThrough: boolean;
+  readonly removed: readonly RemovedCandidate[];
+}
+
+/**
+ * `resolveRole`, with what it discarded on the way.
+ *
+ * The selection rule is unchanged and lives here once; `resolveRole` is the
+ * projection of this for every caller that only wants the list. The removals
+ * are recorded per rule rather than counted, because "no trusted verifier
+ * was reachable" and "every candidate was on the excluded provider" are
+ * different problems with different answers, and a round that says only
+ * which model answered can distinguish neither.
+ */
+export function explainRole<T extends Candidate>(
+  config: RouterConfig,
+  role: string,
+  candidates: readonly T[],
+  excludeProviders: readonly string[] | null = null,
+): RoleResolution<T> {
   const { prefer, permitted } = roleDeclaration(config, role);
   const exclude = normalizeProviders(excludeProviders);
   const untrusted = role === ROLE_VERIFIER ? untrustedAsVerifier(config) : new Set<string>();
-  const surviving = candidates.filter(
-    (candidate) =>
-      Boolean(candidate[1]) &&
-      !exclude.has(candidate[1]) &&
-      (permitted.size === 0 || permitted.has(candidate[1])) &&
-      (untrusted.size === 0 || !untrusted.has(normalizeModelToken(String(candidate[0])))),
-  );
+  const removed: RemovedCandidate[] = [];
+  const surviving = candidates.filter((candidate) => {
+    const provider = candidate[1];
+    const model = String(candidate[0]);
+    const drop = (rule: string): false => {
+      removed.push({ model, provider: String(provider ?? ""), rule });
+      return false;
+    };
+    if (!provider) return drop(REMOVED_NO_PROVIDER);
+    if (exclude.has(provider)) return drop(REMOVED_EXCLUDED_PROVIDER);
+    if (permitted.size > 0 && !permitted.has(provider)) return drop(REMOVED_NOT_PERMITTED);
+    if (untrusted.size > 0 && untrusted.has(normalizeModelToken(model))) {
+      return drop(REMOVED_UNTRUSTED_VERIFIER);
+    }
+    return true;
+  });
   const rank = new Map(prefer.map((modelId, index) => [modelId, index]));
   // `Array.prototype.sort` is stable in every engine this runs on, which is
   // what makes an unranked candidate keep its enumerated position -- the
   // same guarantee Python's `sorted` gives.
-  return surviving
+  const ordered = surviving
     .slice()
     .sort(
       (left, right) =>
         (rank.get(left[0]) ?? prefer.length) - (rank.get(right[0]) ?? prefer.length),
     );
+  const chosen = ordered[0];
+  const chosenRank = chosen === undefined ? undefined : rank.get(chosen[0]);
+  return {
+    candidates: ordered,
+    preferenceDeclared: prefer.length > 0,
+    rank: chosenRank ?? null,
+    fellThrough: prefer.length > 0 && chosen !== undefined && chosenRank === undefined,
+    removed,
+  };
+}
+
+/**
+ * What to tell the operator when a role fell past its own preference order.
+ *
+ * Null when nothing needs saying, which is every ordinary round. The
+ * sentence names the model that will answer, the order it is not in, and
+ * what removed the ones that were -- because "your preference order is
+ * stale" and "every model you named is on the provider this round excludes"
+ * are different problems and only one of them is worth editing config over.
+ *
+ * A warning rather than a refusal. A hard filter would end cross-provider
+ * verification the first time an order named only excluded providers, which
+ * is the ordinary shape of a two-provider repository; and the module's own
+ * trust rule already holds that an absent record is unknown rather than
+ * unsupported. What was wrong was never that the fall-through happens -- it
+ * is that it happened in a sort order nobody could see, and a session was
+ * billed 364 premium requests before anyone could ask why.
+ */
+export function fellThroughWarning<T extends Candidate>(
+  resolution: RoleResolution<T>,
+  role: string,
+): string | null {
+  if (!resolution.fellThrough) return null;
+  const chosen = resolution.candidates[0];
+  if (chosen === undefined) return null;
+  const rules = [...new Set(resolution.removed.map((row) => row.rule))];
+  const because =
+    rules.length === 0
+      ? "the order names no reachable model"
+      : `the models it names were removed: ${rules.join(", ")}`;
+  return (
+    `the '${role}' role fell past its preference order and resolved to ` +
+    `'${chosen[0]}' (${chosen[1]}), which the order does not name -- ${because}`
+  );
 }
 
 /**
@@ -167,9 +271,22 @@ export function registryCandidates(
   role: string,
   excludeProviders: readonly string[] | null = null,
 ): string[] {
+  return explainRegistryCandidates(config, role, excludeProviders).candidates.map(
+    ([, , alias]) => alias,
+  );
+}
+
+/**
+ * Every registry entry a role could draw on, before the role is applied.
+ *
+ * Enabled, with a named provider, and that provider reachable -- selection
+ * can never land on a model the process could not call.
+ */
+function registryEnumeration(
+  config: RouterConfig,
+): Array<readonly [string, string, string]> {
   const reachable = new Map<string, boolean>();
   const candidates: Array<readonly [string, string, string]> = [];
-
   for (const [alias, entry] of Object.entries(record(config["models"]))) {
     if (!isRecord(entry) || !flagOn(entry, "is_enabled")) continue;
     const provider = String(entry["provider"] ?? "").trim().toLowerCase();
@@ -180,8 +297,21 @@ export function registryCandidates(
     if (!reachable.get(provider)) continue;
     candidates.push([String(entry["model_id"] ?? alias), provider, alias]);
   }
+  return candidates;
+}
 
-  return resolveRole(config, role, candidates, excludeProviders).map(
-    ([, , alias]) => alias,
-  );
+/**
+ * The same enumeration, with how the role resolved over it.
+ *
+ * Split from `registryCandidates` rather than duplicated: the enumeration
+ * rule -- enabled entry, named provider, reachable provider -- has one home,
+ * and the caller that wants to WARN about the resolution reads the same list
+ * the caller that wants to dispatch reads.
+ */
+export function explainRegistryCandidates(
+  config: RouterConfig,
+  role: string,
+  excludeProviders: readonly string[] | null = null,
+): RoleResolution<readonly [string, string, string]> {
+  return explainRole(config, role, registryEnumeration(config), excludeProviders);
 }

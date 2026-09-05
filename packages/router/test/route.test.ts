@@ -149,6 +149,40 @@ describe("the ladder a call may take", () => {
       /Enable a model from a surviving provider, or set its API key/,
     );
   });
+
+  it("says out loud when the role fell past its own preference order", () => {
+    // The 364-request session had this fact at selection time and printed
+    // nothing: a model no order named answered, and the first anyone could
+    // have known was the bill. Said BEFORE the round is spent, on the same
+    // channel the catalog's own warnings use, so it reaches the Dabbler
+    // terminal while there is still someone who could stop it.
+    const written: string[] = [];
+    const original = process.stderr.write.bind(process.stderr);
+    process.stderr.write = ((chunk: string) => {
+      written.push(String(chunk));
+      return true;
+    }) as typeof process.stderr.write;
+    try {
+      // The order names google models only -- by model id, which is what it
+      // ranks on -- and google is the excluded provider, so what answers is
+      // a model the order never mentions.
+      const config = makeConfig({ roles: { generator: { prefer: ["g-flash", "g-pro"] } } });
+      const ladder = apiLadder(config, "generator", "general", ["google"]);
+      assert.ok(ladder.length > 0, "a stranger is still reachable, which is the point");
+      const warning = written.join("");
+      assert.match(warning, /fell past its preference order/);
+      // What answered, and why the named ones did not.
+      assert.match(warning, new RegExp(ladder[0]!.alias));
+      assert.match(warning, /excluded-provider/);
+
+      // Silence on an ordinary round: the order's own first choice answers.
+      written.length = 0;
+      apiLadder(config, "generator", "general", []);
+      assert.strictEqual(written.join(""), "");
+    } finally {
+      process.stderr.write = original;
+    }
+  });
 });
 
 describe("the seat's ladder", () => {

@@ -83,7 +83,7 @@ import {
 } from "../lockfile.ts";
 import { ASSET_DIR } from "../paths.ts";
 import { pythonFloatRepr } from "../pythonJson.ts";
-import { resolveRole } from "../selection.ts";
+import { explainRole, type RoleResolution } from "../selection.ts";
 import { truthy, type RouterConfig } from "../config.ts";
 import { isOk, type APIResult, type DispatchRequest, type Transport } from "./base.ts";
 
@@ -873,21 +873,37 @@ export class CopilotCliTransport implements Transport {
     const prompt = request.system_prompt
       ? `${request.system_prompt}\n\n${request.user_message}`
       : request.user_message;
-    const inlineArgv = this.buildArgv(prompt, request.model_id);
+    // One path per dispatch, offered to whichever branch takes the call.
+    // The argv is measured WITH the flag on it, so the handoff threshold
+    // still describes the command line that will actually be spawned.
+    const usagePath = this.usageFilePath();
+    const inlineArgv = this.buildArgv(prompt, request.model_id, usagePath);
     // Inline stays primary and highest-fidelity; the pull is taken only when
     // the rendered inline command line reaches the ceiling. One helper owns
     // the decision so both branches stay exercised.
     if (renderedUtf16Units(inlineArgv) < HANDOFF_THRESHOLD_UTF16_UNITS) {
-      return this.run(inlineArgv, null);
+      return this.run(inlineArgv, null, usagePath);
     }
-    return this.runHandoff(prompt, request.model_id);
+    return this.runHandoff(prompt, request.model_id, usagePath);
+  }
+
+  /**
+   * A path for the CLI to write its usage statistics to, and its removal.
+   *
+   * Created empty-handed: the CLI writes the file, so offering a path is the
+   * whole of the request. Removal is best-effort on every exit path, because
+   * a temp file left behind is untidy and a dispatch refused for tidiness
+   * would be worse.
+   */
+  usageFilePath(): string {
+    return join(tmpdir(), `dabbler-copilot-usage-${randomBytes(8).toString("hex")}.json`);
   }
 
   /**
    * The dispatch argv. Identical on both branches except for what `-p`
    * carries: the whole prompt inline, or the handoff bootstrap.
    */
-  buildArgv(promptText: string, modelId: string): string[] {
+  buildArgv(promptText: string, modelId: string, usagePath: string | null = null): string[] {
     return [
       this.binary,
       "-p", promptText,
@@ -896,6 +912,10 @@ export class CopilotCliTransport implements Transport {
       "--available-tools", READ_ONLY_TOOLS.join(","),
       "--no-custom-instructions",
       "--output-format", "json",
+      // The vendor's own count, asked for rather than estimated. Absent when
+      // no path was offered, which is how a caller that does not want the
+      // file says so.
+      ...(usagePath === null ? [] : ["--usage-output-file", usagePath]),
       NO_AUTO_UPDATE_FLAG,
     ];
   }
@@ -907,7 +927,11 @@ export class CopilotCliTransport implements Transport {
    * -- an open handle blocks the child's read on Windows -- and the file is
    * deleted on every path.
    */
-  private async runHandoff(prompt: string, modelId: string): Promise<APIResult> {
+  private async runHandoff(
+    prompt: string,
+    modelId: string,
+    usagePath: string | null = null,
+  ): Promise<APIResult> {
     const nonce = randomBytes(16).toString("hex");
     const payloadText = prompt + buildHandoffFooter(nonce);
     const payload = Buffer.from(payloadText, "utf8");
@@ -943,9 +967,10 @@ export class CopilotCliTransport implements Transport {
     const argv = this.buildArgv(
       buildHandoffBootstrap(path.replace(/\\/g, "/")),
       modelId,
+      usagePath,
     );
     try {
-      return await this.run(argv, handoff);
+      return await this.run(argv, handoff, usagePath);
     } finally {
       // payload_file_modified is read inside `run`, before this runs, so the
       // file still exists when the result is built.
@@ -962,6 +987,7 @@ export class CopilotCliTransport implements Transport {
   private async run(
     argv: readonly string[],
     handoff: HandoffContext | null,
+    usagePath: string | null = null,
   ): Promise<APIResult> {
     const timeouts = this.timeouts;
 
@@ -1074,7 +1100,7 @@ export class CopilotCliTransport implements Transport {
       });
     }
 
-    return this.successResult(rawStdout, rawStderr, exit, handoff);
+    return this.successResult(rawStdout, rawStderr, exit, handoff, usagePath);
   }
 
   private errorResult(input: {
@@ -1110,7 +1136,9 @@ export class CopilotCliTransport implements Transport {
     rawStderr: string,
     exitCode: number,
     handoff: HandoffContext | null,
+    usagePath: string | null = null,
   ): APIResult {
+    const vendorUsage = readVendorUsage(usagePath);
     const [events, malformedLines] = parseJsonl(rawStdout);
     const finalMessage = lastEvent(events, "assistant.message");
     const resultEvent = lastEvent(events, "result");
@@ -1198,8 +1226,26 @@ export class CopilotCliTransport implements Transport {
         retryable: false,
         exit_code: exitCode,
         session_id: sessionId,
-        premium_requests: usage["premiumRequests"] ?? null,
+        // The seat's own number, and where it came from. In-band
+        // `usage.premiumRequests` is what the JSONL result event carries;
+        // the usage file is what the CLI writes when asked. They agree in
+        // the ordinary case, and when they do not the file is the vendor's
+        // final word -- so it wins, and `premium_requests_source` says
+        // which was used. An estimate presented as a measurement is what
+        // made 364 requests invisible until the bill arrived.
+        premium_requests: vendorUsage ?? usage["premiumRequests"] ?? null,
+        premium_requests_source:
+          vendorUsage !== null
+            ? PREMIUM_SOURCE_USAGE_FILE
+            : usage["premiumRequests"] === undefined || usage["premiumRequests"] === null
+              ? null
+              : PREMIUM_SOURCE_IN_BAND,
         tool_calls: toolCalls(events),
+        // The CLI reports no prompt-token count at all. `input_tokens` on the
+        // result must be a number, so it is 0; this says that 0 is the type's
+        // floor and not a measurement, and a reader that records cost writes
+        // unknown instead.
+        input_tokens_reported: false,
         unread_lines_corrupt: malformedLines.length,
         ...handoffMetadataFields(handoff, ackOutcome),
       },
@@ -1284,6 +1330,46 @@ export const CATALOG_LOCK_PATH = join(ASSET_DIR, "copilot-catalog.lock");
  * because "weight" reads as a rate and the value is a one-call sample. It is
  * NOT a price and never feeds selection; absent means unknown, never free.
  */
+/** Where a premium-request number came from. Never inferred by a reader. */
+export const PREMIUM_SOURCE_USAGE_FILE = "usage-file";
+export const PREMIUM_SOURCE_IN_BAND = "in-band";
+
+/**
+ * The premium-request count the CLI wrote, or null.
+ *
+ * Null covers every way there is no vendor number -- no path offered, no
+ * file written, unreadable, not JSON, no numeric count in it -- because the
+ * caller does the same thing in all of them: fall back to the in-band figure
+ * and say so. A shape that is not a finite number is not a count, and
+ * guessing at one is the failure this whole session is about.
+ *
+ * The key is read leniently across the two spellings the CLI has used, and
+ * the file is removed whether or not it parsed.
+ */
+export function readVendorUsage(path: string | null): number | null {
+  if (path === null) return null;
+  let raw: string;
+  try {
+    raw = readFileSync(path, "utf8");
+  } catch {
+    return null;
+  } finally {
+    bestEffortRemove(path);
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (!isRecord(parsed)) return null;
+  for (const key of ["premiumRequests", "premium_requests"]) {
+    const value = parsed[key];
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+  }
+  return null;
+}
+
 const LEGACY_PROBE_PREMIUM_KEY = "premium_request_weight";
 const PROBE_PREMIUM_KEY = "probe_premium_requests";
 
@@ -1959,7 +2045,24 @@ export function resolveRoleCandidates(
   role: string,
   excludeProviders: readonly string[] | null = null,
 ): Array<readonly [string, string]> {
-  return resolveRole(
+  return explainRoleCandidates(config, catalog, role, excludeProviders).candidates;
+}
+
+/**
+ * The same, with how the role resolved over the catalog.
+ *
+ * Split rather than duplicated: the enumeration rule -- a confirmed entry
+ * with a provider the router knows -- has one home, and the caller that
+ * wants to warn about the resolution reads the same list the caller that
+ * dispatches reads.
+ */
+export function explainRoleCandidates(
+  config: RouterConfig,
+  catalog: Catalog,
+  role: string,
+  excludeProviders: readonly string[] | null = null,
+): RoleResolution<readonly [string, string]> {
+  return explainRole(
     config,
     role,
     catalog.models

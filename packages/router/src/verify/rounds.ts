@@ -139,6 +139,44 @@ export async function dispatchVerification(
   throw lastError; // unreachable; defensive
 }
 
+// --- What a round says it cost ----------------------------------------------
+//
+// Three small readings, pure and separate from the append, because each one
+// exists to keep an unknown from being written as a number. Round 1 of
+// session 93's own verification found two of them being got wrong.
+
+/** A reported cost, or null. Anything that is not a finite number is unknown. */
+export function costNumber(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+/**
+ * Agentic turns in one round.
+ *
+ * The seat reports its turns as the LIST of tool calls it made, and what a
+ * cost record wants is the count -- 26 billed calls across 3 rounds is a
+ * length, not a figure anyone stated. A transport that reports a number is
+ * taken at its word; anything else is unknown rather than zero.
+ */
+export function turnCount(value: unknown): number | null {
+  return Array.isArray(value) ? value.length : costNumber(value);
+}
+
+/**
+ * Prompt tokens, or null where the transport counts none.
+ *
+ * `APIResult.input_tokens` must be a number, so a transport that reports no
+ * prompt count carries 0 -- the type's floor, not a measurement. The Copilot
+ * seat is exactly that case, and recording its 0 would read as a round that
+ * sent no prompt.
+ */
+export function reportedInputTokens(
+  tokens: number,
+  metadata: Record<string, unknown>,
+): number | null {
+  return metadata["input_tokens_reported"] === false ? null : tokens;
+}
+
 export function blockingFindings(row: Row): Row[] {
   const findings = Array.isArray(row["findings"]) ? (row["findings"] as Row[]) : [];
   return findings.filter((finding) => finding["blocking"] !== false);
@@ -671,6 +709,26 @@ export async function runRound(
     recorded_at: nowIso("microseconds"),
     transport: result.transport,
     agency: recordRow(agencyRecord),
+    // What was asked for, what answered, and what the round cost. Every one
+    // of these was already in the dispatch result and was dropped here, so
+    // a round could say which model answered and nothing else -- which is
+    // why the 364-request session cannot be explained from its own record.
+    //
+    // `served_model` stays null when the provider did not say. That is a
+    // different fact from "it served what was asked", and collapsing the
+    // two would hide exactly the case the field exists for.
+    requested_model: result.model_id,
+    served_model: result.served_model_id ?? null,
+    escalation_history: result.escalation_history.map((step) => [...step]),
+    // A transport that does not count a thing says so, and the round writes
+    // null rather than the zero its result type has to carry. The seat never
+    // reports prompt tokens; recording that as 0 would read as a round that
+    // sent no prompt, which is the unknown-as-zero mistake this whole record
+    // exists to stop making.
+    input_tokens: reportedInputTokens(result.input_tokens, result.metadata),
+    output_tokens: result.output_tokens,
+    premium_requests: costNumber(result.metadata["premium_requests"]),
+    tool_calls: turnCount(result.metadata["tool_calls"]),
   };
   if (roundNumber >= 2) {
     // previous_tree stays the tree the prior round actually completed at.

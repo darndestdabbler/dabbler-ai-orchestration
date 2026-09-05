@@ -3,18 +3,98 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { appendDispute } from "../src/ledger.ts";
+import { appendDispute, appendRound, readRounds } from "../src/ledger.ts";
 import {
   NO_ROUND_CAP_CLEAN,
   NO_ROUND_CAP_DISPUTED,
   NO_ROUND_TERMINAL,
   blockingFindings,
   noRoundReason,
+  reportedInputTokens,
   runOfRecordLines,
+  turnCount,
 } from "../src/verify/rounds.ts";
 import { tempDir } from "./support/answers.ts";
 
 const finding = (blocking: boolean) => ({ severity: blocking ? "major" : "minor", description: "d", blocking });
+
+describe("what a round says it cost", () => {
+  const base = {
+    round: 1,
+    verdict: "VERIFIED",
+    blocking: false,
+    findings: [],
+    completion_tree: "a".repeat(40),
+    recorded_at: "2026-09-05T12:00:00.000000-04:00",
+  };
+
+  it("carries what was asked for, what answered, and what it cost", () => {
+    // The 364-request session charged a personal seat and its record could
+    // say only which model answered: no requested id, no escalation
+    // history, no turn count. Each of these was in the dispatch result and
+    // was dropped at the append.
+    const repo = tempDir();
+    appendRound(repo, 7, {
+      ...base,
+      verifier_model: "gemini-3.5-flash",
+      verifier_provider: "google",
+      requested_model: "gemini-3.5-flash",
+      served_model: null,
+      escalation_history: [["gpt-5.4", "empty_response"]],
+      input_tokens: 12000,
+      output_tokens: 900,
+      premium_requests: 14,
+      tool_calls: 26,
+    });
+    const [row] = readRounds(repo, 7);
+    assert.equal(row["requested_model"], "gemini-3.5-flash");
+    // The provider said nothing, which is not the same as "it served what
+    // was asked" and must stay distinguishable.
+    assert.equal(row["served_model"], null);
+    assert.deepEqual(row["escalation_history"], [["gpt-5.4", "empty_response"]]);
+    assert.equal(row["premium_requests"], 14);
+    // The multiplier a round count cannot show.
+    assert.equal(row["tool_calls"], 26);
+  });
+
+  it("still reads a round from before it counted, and does not call its silence zero", () => {
+    // A row without these is not a free round; it is a round from before
+    // the framework counted, and reading absence as 0 would understate
+    // exactly the sessions this record exists to explain.
+    const repo = tempDir();
+    appendRound(repo, 7, { ...base, verifier_model: "gpt-5.4", verifier_provider: "openai" });
+    const [row] = readRounds(repo, 7);
+    assert.equal(row["premium_requests"], undefined);
+    assert.equal(row["tool_calls"], undefined);
+    assert.equal(row["escalation_history"], undefined);
+  });
+
+  it("counts the seat's turns and does not call its unreported prompt zero", () => {
+    // Both from round 1 of this session's own verification. The seat
+    // reports its turns as the LIST of tool calls, so a reader expecting a
+    // number wrote null and lost the multiplier it was added to capture;
+    // and it reports no prompt count at all, so copying the result type's 0
+    // would read as a round that sent no prompt.
+    const repo = tempDir();
+    appendRound(repo, 8, {
+      ...base,
+      verifier_model: "claude-sonnet-4.6",
+      verifier_provider: "anthropic",
+      tool_calls: turnCount([{ id: "t1" }, { id: "t2" }, { id: "t3" }]),
+      input_tokens: reportedInputTokens(0, { input_tokens_reported: false }),
+    });
+    const [row] = readRounds(repo, 8);
+    assert.equal(row["tool_calls"], 3);
+    assert.equal(row["input_tokens"], null);
+  });
+
+  it("refuses a cost that is not a number, rather than storing whatever arrived", () => {
+    const repo = tempDir();
+    assert.throws(() =>
+      appendRound(repo, 7, { ...base, premium_requests: "fourteen" }),
+    );
+  });
+});
 
 describe("which findings block", () => {
   it("counts every finding not marked non-blocking, and none of an empty or absent list", () => {

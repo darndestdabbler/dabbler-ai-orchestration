@@ -900,7 +900,15 @@ export function taskDescriptor(node: TaskNode): RowDescriptor {
 
   const started = stepStartLabel(row.startedAt);
   return {
-    id: `task:${node.repository.root}/${node.session.number}/${row.position}`,
+    // Keyed on the step id, which is the row's stable identity — the same
+    // one the plan, the execution record and the CLI address it by. It was
+    // keyed on `position`, and session 92 made positions move: the lifecycle
+    // rows after Work are renumbered as its steps are inserted, so Verify,
+    // Test and Close changed identity the moment a work plan was accepted
+    // and VS Code dropped the tree's expansion and selection state under the
+    // operator mid-session. The position remains the fallback for a row that
+    // carries no step id, which is the only case where it is the identity.
+    id: `task:${node.repository.root}/${node.session.number}/${row.stepId ?? `#${row.position}`}`,
     label: taskRowLabel(row),
     ...(started ? { description: started } : {}),
     tooltip: tooltipLines.join("\n"),

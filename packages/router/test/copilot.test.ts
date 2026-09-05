@@ -22,8 +22,11 @@ import {
   CopilotCliTransport,
   ERROR_CLASS_INVALID_MODEL,
   HANDOFF_THRESHOLD_UTF16_UNITS,
+  PREMIUM_SOURCE_IN_BAND,
+  PREMIUM_SOURCE_USAGE_FILE,
   PROVIDER_SOURCE_HEURISTIC,
   REFRESH_COMMAND,
+  readVendorUsage,
   SCOPE_ALL,
   SCOPE_MODELS,
   SCOPE_QUORUM,
@@ -174,6 +177,60 @@ describe("dispatching one turn through the seat", () => {
     assert.equal(result.served_model_id, "claude-sonnet-4.6");
     assert.equal(result.metadata["session_id"], "conv-123");
     assert.equal(result.metadata["premium_requests"], 1);
+  });
+
+  it("asks the seat for its own usage number, and says which number it used", async () => {
+    // The transport inferred a call's premium cost from a probe sample in
+    // the catalog lockfile -- an estimate standing in for a number the
+    // vendor will state on request. An estimate presented as a measurement
+    // is what made 364 premium requests invisible until the bill.
+    const spawner = spawnerFor(fakeProcess({ stdout: OK_STDOUT }));
+    const asked = await dispatch(new CopilotCliTransport({ spawner }));
+    const flagAt = spawner.argv.indexOf("--usage-output-file");
+    assert.ok(flagAt >= 0, "the seat is asked for its usage file");
+    assert.ok(spawner.argv[flagAt + 1]?.endsWith(".json"));
+    // Nothing wrote the file here, so the in-band figure stands and the
+    // record says so rather than implying the vendor confirmed it.
+    assert.equal(asked.metadata["premium_requests"], 1);
+    assert.equal(asked.metadata["premium_requests_source"], PREMIUM_SOURCE_IN_BAND);
+
+    // A CLI that DOES write the file is believed over the in-band figure,
+    // which is the whole point: the result event said 1 and the vendor says
+    // 14, and 14 is what the seat will bill.
+    const writing = (argv: readonly string[]): ProcessHandle => {
+      writeFileSync(
+        String(argv[argv.indexOf("--usage-output-file") + 1]),
+        JSON.stringify({ premiumRequests: 14 }),
+        "utf8",
+      );
+      return fakeProcess({ stdout: OK_STDOUT });
+    };
+    const measured = await dispatch(new CopilotCliTransport({ spawner: writing }));
+    assert.equal(measured.metadata["premium_requests"], 14);
+    assert.equal(measured.metadata["premium_requests_source"], PREMIUM_SOURCE_USAGE_FILE);
+  });
+
+  it("prefers the file the vendor wrote over the figure carried in-band", async () => {
+    const path = join(tempDir(), "usage.json");
+    writeFileSync(path, JSON.stringify({ premiumRequests: 14 }), "utf8");
+    // The vendor's final word wins, and the file is cleaned up behind it.
+    assert.equal(readVendorUsage(path), 14);
+    assert.equal(existsSync(path), false);
+
+    // Every way there is no vendor number reads the same, because the
+    // caller does the same thing in all of them.
+    assert.equal(readVendorUsage(null), null);
+    assert.equal(readVendorUsage(join(tempDir(), "never-written.json")), null);
+    const notJson = join(tempDir(), "broken.json");
+    writeFileSync(notJson, "{ not json", "utf8");
+    assert.equal(readVendorUsage(notJson), null);
+    const noCount = join(tempDir(), "empty.json");
+    writeFileSync(noCount, JSON.stringify({ somethingElse: 1 }), "utf8");
+    assert.equal(readVendorUsage(noCount), null);
+    // A shape that is not a finite number is not a count.
+    const nonsense = join(tempDir(), "nonsense.json");
+    writeFileSync(nonsense, JSON.stringify({ premiumRequests: "fourteen" }), "utf8");
+    assert.equal(readVendorUsage(nonsense), null);
   });
 
   it("carries the read-only grant, the auto-update pin and one joined prompt", async () => {
@@ -1233,11 +1290,17 @@ describe("choosing between the inline argv and the pull", () => {
   it("takes the pull exactly at the threshold, and not one unit below", async () => {
     const transport = new CopilotCliTransport({ spawner: spawnerFor(null) });
     // Overhead measured against a one-character prompt, so an empty string's
-    // own quoting does not skew the arithmetic.
-    const overhead = renderedUtf16Units(transport.buildArgv("z", "m")) - 1;
+    // own quoting does not skew the arithmetic -- and WITH a usage path on
+    // it, because `dispatch` measures the command line it will really
+    // spawn. The flag is fixed-width for a given machine, so this is the
+    // same overhead every dispatch carries; leaving it out would test a
+    // command line shorter than the one that reaches the CLI, which is the
+    // whole failure the 32k argv ceiling exists to prevent.
+    const usagePath = transport.usageFilePath();
+    const overhead = renderedUtf16Units(transport.buildArgv("z", "m", usagePath)) - 1;
     const exact = "z".repeat(HANDOFF_THRESHOLD_UTF16_UNITS - overhead);
     assert.equal(
-      renderedUtf16Units(transport.buildArgv(exact, "m")),
+      renderedUtf16Units(transport.buildArgv(exact, "m", usagePath)),
       HANDOFF_THRESHOLD_UTF16_UNITS,
     );
 
@@ -1279,11 +1342,22 @@ describe("choosing between the inline argv and the pull", () => {
     });
     const pull = new HandoffSpawner();
     await dispatchBig(pull);
-    const withoutPrompt = (argv: readonly string[]): string[] => {
-      const index = argv.indexOf("-p");
-      return [...argv.slice(0, index), ...argv.slice(index + 2)];
+    // The two per-dispatch values are dropped: what `-p` carries, and the
+    // usage file, which is a fresh temp path every call and must be --
+    // two dispatches sharing one would race to overwrite each other's
+    // numbers. Everything else has to match, which is the invariant.
+    const withoutPerCall = (argv: readonly string[]): string[] => {
+      let out = [...argv];
+      for (const flag of ["-p", "--usage-output-file"]) {
+        const index = out.indexOf(flag);
+        if (index >= 0) out = [...out.slice(0, index), ...out.slice(index + 2)];
+      }
+      return out;
     };
-    assert.deepEqual(withoutPrompt(pull.argv), withoutPrompt(inline.argv));
+    assert.deepEqual(withoutPerCall(pull.argv), withoutPerCall(inline.argv));
+    // And both branches really did ask for one.
+    assert.ok(pull.argv.includes("--usage-output-file"));
+    assert.ok(inline.argv.includes("--usage-output-file"));
   });
 });
 

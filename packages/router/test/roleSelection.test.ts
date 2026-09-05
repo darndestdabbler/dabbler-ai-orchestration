@@ -11,7 +11,11 @@ import { afterEach, beforeEach, describe, it } from "node:test";
 
 import { normalizeModelToken } from "../src/contracts/models.ts";
 import {
+  REMOVED_EXCLUDED_PROVIDER,
+  REMOVED_NOT_PERMITTED,
+  REMOVED_UNTRUSTED_VERIFIER,
   ROLE_VERIFIER,
+  explainRole,
   providerReachable,
   registryCandidates,
   resolveRole,
@@ -113,6 +117,70 @@ describe("resolving a role", () => {
 
   it("keeps every candidate, in declared order, for an undeclared role", () => {
     assert.deepEqual(resolveRole(makeConfig(), "nobody-declared-me", CANDIDATES), CANDIDATES);
+  });
+
+  it("says how the chosen candidate was reached, and what it passed on the way", () => {
+    // The 364-request session could not be explained from its record: a
+    // weight-14 model no preference order names verified a session that had
+    // named a weight-1 one, and `rounds.jsonl` could only say which model
+    // answered. `resolveRole` knew and discarded it.
+    const named = explainRole(
+      makeConfig({ roles: { r: { prefer: ["g-one", "o-one"] } } }),
+      "r",
+      CANDIDATES,
+    );
+    assert.equal(named.rank, 0);
+    assert.equal(named.fellThrough, false);
+    assert.equal(named.preferenceDeclared, true);
+
+    // The order names one model, and it is on the excluded provider: what
+    // answers is a stranger, and that is the fact worth carrying.
+    const strayed = explainRole(
+      makeConfig({ roles: { r: { prefer: ["g-one"] } } }),
+      "r",
+      CANDIDATES,
+      ["google"],
+    );
+    assert.equal(strayed.candidates[0]?.[0], "a-one");
+    assert.equal(strayed.rank, null);
+    assert.equal(strayed.fellThrough, true);
+    assert.deepEqual(strayed.removed, [
+      { model: "g-one", provider: "google", rule: REMOVED_EXCLUDED_PROVIDER },
+    ]);
+
+    // Falling past the end of an order is NOT the same as there being no
+    // order: an undeclared role expresses no expectation to fall past.
+    const unrestricted = explainRole(makeConfig(), "nobody-declared-me", CANDIDATES);
+    assert.equal(unrestricted.preferenceDeclared, false);
+    assert.equal(unrestricted.fellThrough, false);
+    assert.equal(unrestricted.rank, null);
+
+    // Nothing survives: no chosen candidate, so nothing fell through either.
+    const empty = explainRole(
+      makeConfig({ roles: { r: { require_provider_in: ["openai"] } } }),
+      "r",
+      CANDIDATES,
+      ["openai"],
+    );
+    assert.deepEqual(empty.candidates, []);
+    assert.equal(empty.fellThrough, false);
+    assert.deepEqual(
+      empty.removed.map((row) => row.rule).sort(),
+      [REMOVED_EXCLUDED_PROVIDER, REMOVED_NOT_PERMITTED, REMOVED_NOT_PERMITTED].sort(),
+    );
+  });
+
+  it("names the rule that removed each candidate, not merely that one was", () => {
+    // "No trusted verifier was reachable" and "every candidate was on the
+    // excluded provider" are different problems with different answers.
+    const resolved = explainRole(registryConfig(), ROLE_VERIFIER, [
+      ["o-mini", "openai"],
+      ["a-one", "anthropic"],
+    ] as const);
+    assert.deepEqual(resolved.candidates.map((c) => c[0]), ["a-one"]);
+    assert.deepEqual(resolved.removed, [
+      { model: "o-mini", provider: "openai", rule: REMOVED_UNTRUSTED_VERIFIER },
+    ]);
   });
 
   it("carries the transport's own handle through untouched", () => {

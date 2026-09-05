@@ -98,4 +98,32 @@ export type Rounds = {
     exhausted_via: "upheld-adjudication" | "adjudication-unavailable";
     findings: Record<string, unknown>[];
   };
+  /**
+   * The model id this round ASKED for -- what went on the wire. `verifier_model` is the alias or catalog id the ladder knew it by, which is not always the same string and is never the provider's answer.
+   */
+  requested_model?: string | null;
+  /**
+   * The model id the PROVIDER says it served, read off the response body. Null means the provider did not say, which is a different fact from 'served what was asked' and must stay distinguishable: OpenAI has resolved a bare id to a differently-priced variant with nothing else able to see it.
+   */
+  served_model?: string | null;
+  /**
+   * `[model, reason]` for each rung the ladder left, in order. Empty means the first candidate answered. Its absence from this ledger is why the 364-request round could not be explained: the record said which model answered and nothing about the ones before it.
+   */
+  escalation_history?: string[][];
+  /**
+   * Prompt tokens the round spent, as the provider counted them. Null when the transport reports none -- the Copilot seat reports no prompt count at all, and recording its result type's 0 would read as a round that sent no prompt.
+   */
+  input_tokens?: number | null;
+  /**
+   * Completion tokens the round spent, as the provider counted them.
+   */
+  output_tokens?: number | null;
+  /**
+   * What the SEAT says this round cost, in premium requests -- an integer for premium models and a fraction for sub-premium ones. Null on a transport that is not seat-billed, or where the CLI reported nothing. Not derived from the catalog's probe sample: an estimate presented as a measurement is what made 364 requests invisible until the bill.
+   */
+  premium_requests?: number | null;
+  /**
+   * Agentic turns inside this ONE round -- the COUNT of tool calls the verifier made. It is the multiplier nothing surfaced: 3 rounds became 26 billed calls because each round's agency turns are each priced, and a round count alone cannot show that. Null on a transport that reports no turns, which is not the same as a round that made none.
+   */
+  tool_calls?: number | null;
 };

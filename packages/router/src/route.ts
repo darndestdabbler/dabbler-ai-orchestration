@@ -33,7 +33,13 @@ import {
 } from "./config.ts";
 import { recordCall, type CallRecord } from "./metrics.ts";
 import { isNoRouterMode } from "./runtimeMode.ts";
-import { ROLE_GENERATOR, registryCandidates } from "./selection.ts";
+import {
+  ROLE_GENERATOR,
+  explainRegistryCandidates,
+  fellThroughWarning,
+  type Candidate as RoleCandidate,
+  type RoleResolution,
+} from "./selection.ts";
 import { isOk, type APIResult } from "./transports/base.ts";
 import { DirectApiTransport } from "./transports/api.ts";
 import {
@@ -47,7 +53,7 @@ import {
   getCliVersion,
   loadCatalog,
   resolveLockfilePath,
-  resolveRoleCandidates,
+  explainRoleCandidates,
   resolveTransportTimeouts,
   validateCatalog,
   type Catalog,
@@ -538,7 +544,9 @@ export function apiLadder(
   exclude: readonly string[],
 ): Candidate[] {
   const models = record(config["models"]);
-  const ladder: Candidate[] = registryCandidates(config, role, exclude).map((alias) => ({
+  const resolution = explainRegistryCandidates(config, role, exclude);
+  warnIfFellThrough(resolution, role);
+  const ladder: Candidate[] = resolution.candidates.map(([, , alias]) => ({
     alias,
     model_id: String(record(models[alias])["model_id"]),
     provider: String(record(models[alias])["provider"]),
@@ -554,6 +562,22 @@ export function apiLadder(
   return ladder;
 }
 
+/**
+ * Say it before the round is spent, not only in the ledger afterwards.
+ *
+ * One line on stderr, through the same channel the catalog's own warnings
+ * use, so it reaches the Dabbler terminal and the session transcript while
+ * there is still a person who could stop it. The 364-request session had
+ * this fact available at selection time and printed nothing.
+ */
+function warnIfFellThrough<T extends RoleCandidate>(
+  resolution: RoleResolution<T>,
+  role: string,
+): void {
+  const warning = fellThroughWarning(resolution, role);
+  if (warning !== null) process.stderr.write(`ai_router: ${warning}\n`);
+}
+
 /** The same, over the seat's confirmed catalog. */
 export function seatLadder(
   config: RouterConfig,
@@ -561,7 +585,9 @@ export function seatLadder(
   role: string,
   exclude: readonly string[],
 ): Candidate[] {
-  const ladder: Candidate[] = resolveRoleCandidates(config, catalog, role, exclude).map(
+  const resolution = explainRoleCandidates(config, catalog, role, exclude);
+  warnIfFellThrough(resolution, role);
+  const ladder: Candidate[] = resolution.candidates.map(
     ([modelId, provider]) => ({ alias: modelId, model_id: modelId, provider }),
   );
   if (ladder.length === 0) {

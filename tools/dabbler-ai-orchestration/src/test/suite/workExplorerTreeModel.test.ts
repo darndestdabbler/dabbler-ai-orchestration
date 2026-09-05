@@ -212,6 +212,49 @@ suite("workExplorerTreeModel: nodes", () => {
     assert.deepStrictEqual(childrenOf(work), []);
   });
 
+  test("a row's identity survives the plan arriving under it", () => {
+    // Session 92's own round-1 nit. The Work row's steps are inserted into
+    // the flat list and everything after them is renumbered, so a row keyed
+    // on `position` changed identity the moment a plan was accepted — and
+    // VS Code drops expansion and selection state when an id moves.
+    const repository = makeRepository();
+    const before = makeSession({
+      status: "in-progress",
+      tasks: [
+        makeTask({ position: 0, stepId: "work" }),
+        makeTask({ position: 1, stepId: "verify" }),
+      ],
+    });
+    const after = makeSession({
+      status: "in-progress",
+      tasks: [
+        makeTask({ position: 0, stepId: "work" }),
+        makeTask({ position: 1, stepId: "work:build" }),
+        makeTask({ position: 2, stepId: "verify" }),
+      ],
+    });
+    const idOf = (session: ReturnType<typeof makeSession>, stepId: string) =>
+      descriptorFor({
+        kind: "task",
+        repository,
+        session,
+        row: session.tasks.find((t) => t.stepId === stepId)!,
+      }).id;
+
+    assert.strictEqual(idOf(before, "verify"), idOf(after, "verify"));
+    // And two rows of one session are still distinct.
+    assert.notStrictEqual(idOf(after, "work"), idOf(after, "work:build"));
+
+    // A row with no step id has no other identity, so the position is it.
+    const bare = makeSession({
+      status: "in-progress",
+      tasks: [makeTask({ position: 3, stepId: null })],
+    });
+    assert.ok(
+      descriptorFor({ kind: "task", repository, session: bare, row: bare.tasks[0] }).id.endsWith("#3"),
+    );
+  });
+
   test("a plan step named like a lifecycle phase keeps its own name", () => {
     // The vocabulary is over the six phases. A plan may legitimately call a
     // step `close`, and it does not mean the lifecycle's Close.
@@ -661,20 +704,23 @@ suite("workExplorerTreeModel: task rows", () => {
     assert.deepStrictEqual(d.icon, { kind: "file", slug: "in-progress.svg" });
   });
 
-  test("task ids disambiguate by plan position", () => {
-    const a = taskDescriptor({
-      kind: "task",
-      repository,
-      session: makeSession(),
-      row: makeTask({ position: 0 }),
-    });
-    const b = taskDescriptor({
-      kind: "task",
-      repository,
-      session: makeSession(),
-      row: makeTask({ position: 1 }),
-    });
-    assert.notStrictEqual(a.id, b.id);
+  test("task ids disambiguate by step id, which is what a row is addressed by", () => {
+    // It was the plan position, and the position moves: session 92 inserts
+    // the Work row's steps into the flat list and renumbers what follows.
+    // Two rows of one session never share a step id — the six lifecycle ids
+    // are fixed and a plan refuses a duplicate step id — so this is the
+    // identity that both disambiguates and holds still.
+    const idFor = (row: ReturnType<typeof makeTask>) =>
+      taskDescriptor({ kind: "task", repository, session: makeSession(), row }).id;
+    assert.notStrictEqual(
+      idFor(makeTask({ position: 0, stepId: "work" })),
+      idFor(makeTask({ position: 1, stepId: "verify" })),
+    );
+    // The position is the identity only where there is no other one.
+    assert.notStrictEqual(
+      idFor(makeTask({ position: 0, stepId: null })),
+      idFor(makeTask({ position: 1, stepId: null })),
+    );
   });
 
   test("a started task shows its opening time in the description slot", () => {

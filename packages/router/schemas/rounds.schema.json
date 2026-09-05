@@ -12,131 +12,288 @@
     "recorded_at"
   ],
   "properties": {
-    "round": { "type": "integer", "minimum": 1 },
-    "phase": { "type": "string", "enum": ["full", "fix-delta"] },
+    "round": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "phase": {
+      "type": "string",
+      "enum": [
+        "full",
+        "fix-delta"
+      ]
+    },
     "verdict": {
       "type": "string",
-      "enum": ["VERIFIED", "ISSUES_FOUND", "WAIVED", "REMEDIATED_AT_CAP"]
+      "enum": [
+        "VERIFIED",
+        "ISSUES_FOUND",
+        "WAIVED",
+        "REMEDIATED_AT_CAP"
+      ]
     },
-    "blocking": { "type": "boolean" },
-    "verifier_model": { "type": "string", "minLength": 1 },
-    "verifier_provider": { "type": "string", "minLength": 1 },
-    "orchestrator_provider": { "type": "string" },
+    "blocking": {
+      "type": "boolean"
+    },
+    "verifier_model": {
+      "type": "string",
+      "minLength": 1
+    },
+    "verifier_provider": {
+      "type": "string",
+      "minLength": 1
+    },
+    "orchestrator_provider": {
+      "type": "string"
+    },
     "findings": {
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["description", "severity"],
+        "required": [
+          "description",
+          "severity"
+        ],
         "properties": {
-          "description": { "type": "string", "minLength": 1 },
+          "description": {
+            "type": "string",
+            "minLength": 1
+          },
           "severity": {
             "type": "string",
-            "enum": ["critical", "major", "minor"]
+            "enum": [
+              "critical",
+              "major",
+              "minor"
+            ]
           },
-          "category": { "type": "string" },
-          "failureScenario": { "type": "string" },
+          "category": {
+            "type": "string"
+          },
+          "failureScenario": {
+            "type": "string"
+          },
           "evidencePaths": {
             "type": "array",
-            "items": { "type": "string" }
+            "items": {
+              "type": "string"
+            }
           },
-          "blocking": { "type": "boolean" }
+          "blocking": {
+            "type": "boolean"
+          }
         }
       }
     },
     "cost_usd": {
-      "type": ["number", "null"],
+      "type": [
+        "number",
+        "null"
+      ],
       "description": "Historical only. Dollars are not computed anywhere in this framework -- tokens are the record and the vendor's console is the reconciliation -- so no writer emits this key; it stays readable because older ledgers carry it."
     },
-    "baseline_tree": { "type": ["string", "null"] },
-    "completion_tree": { "type": "string", "minLength": 7 },
+    "baseline_tree": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "completion_tree": {
+      "type": "string",
+      "minLength": 7
+    },
     "anchor_commit": {
       "type": "string",
       "minLength": 7,
       "description": "The framework-authored commit whose tree is completion_tree, named by refs/dabbler/rounds/s<N>/r<R> from the moment the row was appended. It is what makes the baseline survive garbage collection and travel with a push. Absent on rows written before rounds were anchored, and on a row whose tree the writing store did not hold; verify reanchor is the recovery for both."
     },
-    "previous_tree": { "type": "string", "minLength": 7 },
+    "previous_tree": {
+      "type": "string",
+      "minLength": 7
+    },
     "head_commit": {
-      "type": ["string", "null"],
+      "type": [
+        "string",
+        "null"
+      ],
       "description": "The commit HEAD stood at when this round was recorded. A baseline recovery places itself by topology when this is present and falls back to committer timestamps when it is not, so rows written before this field existed still resolve. Optional for exactly that reason."
     },
     "baseline_reanchor": {
       "description": "Present only when this round was measured from a substitute baseline because the previous round's snapshot tree was unreachable in this object store (see baseline-reanchors.jsonl). previous_tree still names where the previous round ended; anchor_tree names where this round actually diffed from. A round carrying this key is a weaker record than one without it.",
       "type": "object",
-      "required": ["recorded_tree", "anchor_tree"],
+      "required": [
+        "recorded_tree",
+        "anchor_tree"
+      ],
       "properties": {
-        "recorded_tree": { "type": "string", "minLength": 7 },
-        "anchor_tree": { "type": "string", "minLength": 7 }
+        "recorded_tree": {
+          "type": "string",
+          "minLength": 7
+        },
+        "anchor_tree": {
+          "type": "string",
+          "minLength": 7
+        }
       }
     },
-    "recorded_at": { "type": "string", "minLength": 1 },
+    "recorded_at": {
+      "type": "string",
+      "minLength": 1
+    },
     "framework_version": {
       "type": "string",
       "minLength": 1,
       "description": "The router version that recorded this round, as its own manifest declares it. Additive and absent on rows written before it existed. A round is the framework's own judgement of a change, so which framework made it is part of what the row says -- and unlike the verifier's model, nothing else in the row carries it."
     },
-    "transport": { "type": "string" },
+    "transport": {
+      "type": "string"
+    },
     "agency": {
       "description": "The verifier's tool surface for this round: what it was granted, and what it did with it. mode 'none' is a round that could not look at the tree at all (the direct-API path sends no tools) and is never equivalent to one that could. in_scope means the operation was confined to the grant: a read names a path and is placed against the scope, while a search or listing is confined only when it also names a path — a pattern on its own reaches the whole tree and is recorded as unconfined. Each read carries a fidelity: 'verbatim' means the shown lines matched the bytes on disk, 'transformed' means they did not (the credential scrubber rewrites text before a model sees it, and a finding resting on a transformed read is weighable rather than trustable), 'unverified' means the comparison could not be made. 'writes' is the fourth operation and the only one no tool performs: the verifier proposes a test file in its answer and the framework writes the bytes, so a proposal outside the declared test root is refused before anything reaches the filesystem. Every proposal is recorded, applied or refused, because a boundary nobody can see being enforced is indistinguishable from one that is not there.",
       "type": "object",
-      "required": ["mode"],
+      "required": [
+        "mode"
+      ],
       "properties": {
-        "mode": { "type": "string", "enum": ["tools", "none"] },
+        "mode": {
+          "type": "string",
+          "enum": [
+            "tools",
+            "none"
+          ]
+        },
         "operations_granted": {
           "type": "array",
           "items": {
             "type": "string",
-            "enum": ["list", "search", "read", "write"]
+            "enum": [
+              "list",
+              "search",
+              "read",
+              "write"
+            ]
           }
         },
-        "read_budget": { "type": "integer", "minimum": 0 },
-        "scope": { "type": "array", "items": { "type": "string" } },
-        "scope_size": { "type": "integer", "minimum": 0 },
-        "reads": { "type": "integer", "minimum": 0 },
-        "listings": { "type": "integer", "minimum": 0 },
-        "searches": { "type": "integer", "minimum": 0 },
-        "out_of_scope": { "type": "integer", "minimum": 0 },
-        "over_budget": { "type": "integer", "minimum": 0 },
-        "transformed_reads": { "type": "integer", "minimum": 0 },
-        "reason": { "type": "string" },
+        "read_budget": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "scope": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "scope_size": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "reads": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "listings": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "searches": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "out_of_scope": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "over_budget": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "transformed_reads": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "reason": {
+          "type": "string"
+        },
         "operations": {
           "type": "array",
           "items": {
             "type": "object",
-            "required": ["kind", "target", "in_scope"],
+            "required": [
+              "kind",
+              "target",
+              "in_scope"
+            ],
             "properties": {
               "kind": {
                 "type": "string",
-                "enum": ["list", "search", "read"]
+                "enum": [
+                  "list",
+                  "search",
+                  "read"
+                ]
               },
-              "target": { "type": "string" },
-              "in_scope": { "type": "boolean" },
+              "target": {
+                "type": "string"
+              },
+              "in_scope": {
+                "type": "boolean"
+              },
               "fidelity": {
                 "type": "string",
-                "enum": ["verbatim", "transformed", "unverified"]
+                "enum": [
+                  "verbatim",
+                  "transformed",
+                  "unverified"
+                ]
               },
-              "detail": { "type": "string" }
+              "detail": {
+                "type": "string"
+              }
             }
           }
         },
-        "writes_applied": { "type": "integer", "minimum": 0 },
-        "writes_refused": { "type": "integer", "minimum": 0 },
+        "writes_applied": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "writes_refused": {
+          "type": "integer",
+          "minimum": 0
+        },
         "writes": {
           "type": "array",
           "items": {
             "type": "object",
-            "required": ["path", "outcome"],
+            "required": [
+              "path",
+              "outcome"
+            ],
             "properties": {
-              "path": { "type": "string" },
+              "path": {
+                "type": "string"
+              },
               "outcome": {
                 "type": "string",
-                "enum": ["accepted", "refused"]
+                "enum": [
+                  "accepted",
+                  "refused"
+                ]
               },
               "action": {
                 "type": "string",
-                "enum": ["created", "modified"]
+                "enum": [
+                  "created",
+                  "modified"
+                ]
               },
-              "bytes": { "type": "integer", "minimum": 0 },
-              "reason": { "type": "string" }
+              "bytes": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "reason": {
+                "type": "string"
+              }
             }
           }
         }
@@ -144,11 +301,18 @@
     },
     "type": {
       "type": "string",
-      "enum": ["adjudication", "waive", "remediated_at_cap"]
+      "enum": [
+        "adjudication",
+        "waive",
+        "remediated_at_cap"
+      ]
     },
     "excluded_providers": {
       "type": "array",
-      "items": { "type": "string", "minLength": 1 },
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
       "minItems": 1
     },
     "outcomes": {
@@ -156,99 +320,253 @@
       "minItems": 1,
       "items": {
         "type": "object",
-        "required": ["finding_index", "outcome"],
+        "required": [
+          "finding_index",
+          "outcome"
+        ],
         "properties": {
-          "finding_index": { "type": "integer", "minimum": 0 },
-          "outcome": { "type": "string", "enum": ["UPHELD", "OVERRULED"] },
-          "reasons": { "type": "string" }
+          "finding_index": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "UPHELD",
+              "OVERRULED"
+            ]
+          },
+          "reasons": {
+            "type": "string"
+          }
         }
       }
     },
-    "attestation": { "type": "string", "minLength": 1 },
+    "attestation": {
+      "type": "string",
+      "minLength": 1
+    },
     "remediated": {
       "type": "object",
-      "required": ["reviewed_round", "findings"],
+      "required": [
+        "reviewed_round",
+        "findings"
+      ],
       "properties": {
-        "reviewed_round": { "type": "integer", "minimum": 1 },
+        "reviewed_round": {
+          "type": "integer",
+          "minimum": 1
+        },
         "findings": {
           "type": "array",
           "minItems": 1,
           "items": {
             "type": "object",
-            "required": ["description", "severity"]
+            "required": [
+              "description",
+              "severity"
+            ]
           }
         }
       }
     },
     "waived": {
       "type": "object",
-      "required": ["exhausted_via", "findings"],
+      "required": [
+        "exhausted_via",
+        "findings"
+      ],
       "properties": {
         "exhausted_via": {
           "type": "string",
-          "enum": ["upheld-adjudication", "adjudication-unavailable"]
+          "enum": [
+            "upheld-adjudication",
+            "adjudication-unavailable"
+          ]
         },
         "findings": {
           "type": "array",
           "minItems": 1,
           "items": {
             "type": "object",
-            "required": ["description", "severity"]
+            "required": [
+              "description",
+              "severity"
+            ]
           }
         }
       }
+    },
+    "requested_model": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "The model id this round ASKED for -- what went on the wire. `verifier_model` is the alias or catalog id the ladder knew it by, which is not always the same string and is never the provider's answer."
+    },
+    "served_model": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "The model id the PROVIDER says it served, read off the response body. Null means the provider did not say, which is a different fact from 'served what was asked' and must stay distinguishable: OpenAI has resolved a bare id to a differently-priced variant with nothing else able to see it."
+    },
+    "escalation_history": {
+      "type": "array",
+      "items": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "minItems": 2,
+        "maxItems": 2
+      },
+      "description": "`[model, reason]` for each rung the ladder left, in order. Empty means the first candidate answered. Its absence from this ledger is why the 364-request round could not be explained: the record said which model answered and nothing about the ones before it."
+    },
+    "input_tokens": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0,
+      "description": "Prompt tokens the round spent, as the provider counted them. Null when the transport reports none -- the Copilot seat reports no prompt count at all, and recording its result type's 0 would read as a round that sent no prompt."
+    },
+    "output_tokens": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0,
+      "description": "Completion tokens the round spent, as the provider counted them."
+    },
+    "premium_requests": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "description": "What the SEAT says this round cost, in premium requests -- an integer for premium models and a fraction for sub-premium ones. Null on a transport that is not seat-billed, or where the CLI reported nothing. Not derived from the catalog's probe sample: an estimate presented as a measurement is what made 364 requests invisible until the bill."
+    },
+    "tool_calls": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0,
+      "description": "Agentic turns inside this ONE round -- the COUNT of tool calls the verifier made. It is the multiplier nothing surfaced: 3 rounds became 26 billed calls because each round's agency turns are each priced, and a round count alone cannot show that. Null on a transport that reports no turns, which is not the same as a round that made none."
     }
   },
   "allOf": [
     {
-      "if": { "properties": { "round": { "minimum": 2 } } },
-      "then": { "required": ["previous_tree"] }
-    },
-    {
       "if": {
-        "properties": { "type": { "const": "adjudication" } },
-        "required": ["type"]
-      },
-      "then": { "required": ["outcomes", "excluded_providers"] }
-    },
-    {
-      "if": {
-        "properties": { "type": { "const": "waive" } },
-        "required": ["type"]
+        "properties": {
+          "round": {
+            "minimum": 2
+          }
+        }
       },
       "then": {
-        "required": ["attestation", "waived"],
-        "properties": {
-          "verdict": { "const": "WAIVED" },
-          "blocking": { "const": false }
-        }
-      }
-    },
-    {
-      "if": {
-        "properties": { "type": { "const": "remediated_at_cap" } },
-        "required": ["type"]
-      },
-      "then": {
-        "required": ["remediated", "previous_tree"],
-        "properties": {
-          "verdict": { "const": "REMEDIATED_AT_CAP" },
-          "blocking": { "const": false }
-        }
+        "required": [
+          "previous_tree"
+        ]
       }
     },
     {
       "if": {
         "properties": {
-          "type": { "enum": ["waive", "remediated_at_cap"] }
+          "type": {
+            "const": "adjudication"
+          }
         },
-        "required": ["type"]
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "required": [
+          "outcomes",
+          "excluded_providers"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "waive"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "required": [
+          "attestation",
+          "waived"
+        ],
+        "properties": {
+          "verdict": {
+            "const": "WAIVED"
+          },
+          "blocking": {
+            "const": false
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "remediated_at_cap"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "required": [
+          "remediated",
+          "previous_tree"
+        ],
+        "properties": {
+          "verdict": {
+            "const": "REMEDIATED_AT_CAP"
+          },
+          "blocking": {
+            "const": false
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "enum": [
+              "waive",
+              "remediated_at_cap"
+            ]
+          }
+        },
+        "required": [
+          "type"
+        ]
       },
       "then": true,
       "else": {
-        "required": ["verifier_model", "verifier_provider"],
+        "required": [
+          "verifier_model",
+          "verifier_provider"
+        ],
         "properties": {
-          "verdict": { "enum": ["VERIFIED", "ISSUES_FOUND"] }
+          "verdict": {
+            "enum": [
+              "VERIFIED",
+              "ISSUES_FOUND"
+            ]
+          }
         }
       }
     }

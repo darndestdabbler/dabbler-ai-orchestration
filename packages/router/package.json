@@ -1,0 +1,45 @@
+{
+  "name": "dabbler-ai-router",
+  "version": "2.0.1",
+  "description": "The Dabbler session router: session lifecycle, the record, cross-provider verification, and the six-step workflow.",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "dabbler": "dist/dabbler.cjs"
+  },
+  "main": "dist/index.cjs",
+  "types": "src/index.ts",
+  "files": [
+    "dist",
+    "src",
+    "schemas",
+    "prompt-templates",
+    "router-config.yaml",
+    "copilot-catalog.lock"
+  ],
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "prepare": "node build.mjs",
+    "build": "node build.mjs",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src scripts test build.mjs --ext .ts,.mjs",
+    "test:unit": "node --test \"test/**/*.test.ts\"",
+    "generate:types": "node scripts/run-ts.mjs scripts/generate-types.ts",
+    "check:types": "node scripts/run-ts.mjs scripts/check-types-fresh.ts"
+  },
+  "dependencies": {
+    "ajv": "^8.17.1",
+    "smol-toml": "^1.3.1",
+    "yaml": "^2.7.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
+    "esbuild": "^0.20.0",
+    "eslint": "^8.56.0",
+    "typescript": "^5.3.0"
+  }
+}

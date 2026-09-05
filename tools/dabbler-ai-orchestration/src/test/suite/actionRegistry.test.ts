@@ -75,6 +75,42 @@ suite("ActionRegistry: session actions", () => {
     }
   });
 
+  test("Start Session is offered on the row that would actually be registered", () => {
+    // csv-model feedback item 9: right-clicking the next session in Not
+    // Started and choosing Start Session. The repository row already
+    // offered it; the session rows offered nothing but Cancel, so the
+    // operator's own reading of "what runs next" was the one place they
+    // could not act.
+    const sessions = [
+      makeSession({ number: 1, status: "complete" }),
+      makeSession({ number: 2, status: "not-started" }),
+      makeSession({ number: 3, status: "not-started" }),
+    ];
+    const idle = makeRepository({ currentSession: null, nextSession: 2, sessions });
+    const offered = (
+      repository: ReturnType<typeof makeRepository>,
+      session: ReturnType<typeof makeSession>,
+    ) => applicableSessionActions(repository, session).map((a) => a.id);
+
+    assert.ok(offered(idle, sessions[1]).includes("dabblerSessionSets.startSession"));
+    // Not on any other row. `session start` takes no session number -- it
+    // registers the next one -- so an entry on session 3 would start
+    // session 2, which is a menu item that lies about what it does.
+    assert.ok(!offered(idle, sessions[2]).includes("dabblerSessionSets.startSession"));
+    assert.ok(!offered(idle, sessions[0]).includes("dabblerSessionSets.startSession"));
+
+    // And never while one is in flight, whatever the row says.
+    const running = makeRepository({ currentSession: 2, nextSession: 2, sessions });
+    assert.ok(!offered(running, sessions[1]).includes("dabblerSessionSets.startSession"));
+
+    // A repository whose projection could not say what is next offers it
+    // nowhere, rather than guessing a session to register.
+    const unknown = makeRepository({ currentSession: null, nextSession: null, sessions });
+    for (const session of sessions) {
+      assert.ok(!offered(unknown, session).includes("dabblerSessionSets.startSession"));
+    }
+  });
+
   test("cancel and restore are mutually exclusive on one row", () => {
     const cancelled = makeSession({ number: 1, status: "cancelled" });
     const ids = applicableSessionActions(

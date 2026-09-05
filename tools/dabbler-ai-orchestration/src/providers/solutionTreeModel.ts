@@ -185,6 +185,45 @@ function members(p: Projection): ProjectionMember[] {
   return p.members ?? [];
 }
 
+/** The document the tree renders, relative to a repository root. */
+export const PROJECTION_RELPATH = ".dabbler/solution/projection.json";
+
+/**
+ * Every file whose change can change what this tree shows.
+ *
+ * The projection is DERIVED, and it is written by four commands: the
+ * `workflow` verbs that record an event, the `deps` verbs that place a
+ * repository, `bootstrap`, and the driver when a plan asks for one. Nothing
+ * rewrites it when the declarations underneath it move -- a component added
+ * to the manifest by hand, a sibling cloned, a version bumped in a build
+ * file -- so the view spent a whole session showing what was true when the
+ * last event was recorded.
+ *
+ * Watching only the projection cannot fix that: an event on a file nothing
+ * rewrote re-reads the same bytes. These are the inputs, and a change to one
+ * of them is what the tree re-derives on.
+ *
+ * Repository-relative glob patterns, because that is what the watcher takes:
+ *
+ * - `solution.yaml` -- what this repository builds, and every component row.
+ * - `solution-dependencies.json` -- who produces what it consumes, and the
+ *   membership rows, which come from nowhere else.
+ * - the workflow event log -- the step, the loop counters and who each
+ *   component is waiting on are a fold of it.
+ * - the build files -- the PIN is read from them on every projection rather
+ *   than copied, so the drift rows change when they do.
+ *
+ * The projection itself is deliberately absent: it is this list's output,
+ * and re-deriving on it would be a loop.
+ */
+export const PROJECTION_SOURCE_GLOBS: readonly string[] = [
+  "solution.yaml",
+  "solution-dependencies.json",
+  ".dabbler/solution/events.jsonl",
+  "**/*.csproj",
+  "**/pom.xml",
+];
+
 /** Where a producing repository is, as three states rather than two. */
 export type ExternalLocation = "here" | "remote" | "unknown";
 
@@ -195,8 +234,17 @@ export type ExternalLocation = "here" | "remote" | "unknown";
  * remote is the difference between a clone away and a question for a person
  * -- and only the second is something nobody can act on alone. A single
  * "absent" collapsed the two and offered an action for neither.
+ *
+ * It takes the two fields rather than one row type because both row kinds
+ * carry them and both are asked the same question. The producer rows under
+ * "Consumed from other repositories" and the membership rows under "Solution
+ * repositories" are two readings of one set of repositories, and a second
+ * rule for the second list is how the same repository ends up offering Clone
+ * in one place and nothing in the other.
  */
-export function externalLocation(e: ProjectionExternal): ExternalLocation {
+export function externalLocation(
+  e: Pick<ProjectionExternal, "root" | "remote">,
+): ExternalLocation {
   if (e.root) return "here";
   return e.remote ? "remote" : "unknown";
 }
@@ -528,6 +576,18 @@ export function descriptorFor(
           tone: m.root ? undefined : "muted",
         },
         expandable: false,
+        // The same three context values the producer rows carry, so the
+        // Open, Reveal, Clone, Locate, Identify and Create entries already
+        // in the manifest reach these rows without a second `when`. Without
+        // one at all -- which is what these rows had -- "Solution
+        // repositories" was a list nothing could be done to, and it is the
+        // list holding the repositories no edge reaches yet.
+        //
+        // This repository's own row is included and reads `here`, because
+        // it IS here: Reveal on it is the ordinary way to find the checkout
+        // in a file manager, and carving out an exception would mean a
+        // second rule saying where a row's repository is.
+        contextValue: LOCATION_CONTEXT[externalLocation(m)],
       };
     }
     case "progress": {
@@ -557,7 +617,16 @@ export function repositoryPathOf(
   node: SolutionNode,
   p: Projection,
 ): string | null {
-  if (node.kind !== "external") return null;
-  const row = externals(p).find((e) => e.id === node.id);
-  return row?.root ?? null;
+  if (node.kind === "external") {
+    return externals(p).find((e) => e.id === node.id)?.root ?? null;
+  }
+  // Both lists name repositories, so both answer. Answering for only one of
+  // them is what made the membership rows unopenable: they carried the
+  // right context value, the menu offered Open, and the command that read
+  // the path got null and did nothing -- a menu item that looks live and
+  // is not.
+  if (node.kind === "member") {
+    return members(p).find((m) => m.id === node.id)?.root ?? null;
+  }
+  return null;
 }

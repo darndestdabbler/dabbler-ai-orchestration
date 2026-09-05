@@ -13,6 +13,8 @@ import * as fs from "fs";
 import * as path from "path";
 import * as vscode from "vscode";
 import {
+  PROJECTION_RELPATH as PROJECTION_GLOB,
+  PROJECTION_SOURCE_GLOBS,
   Projection,
   SolutionNode,
   childrenOf,
@@ -20,8 +22,20 @@ import {
   descriptorFor,
   rootNodes,
 } from "./solutionTreeModel";
+import { reprojectSolution } from "../router/host";
 
 const PROJECTION_RELPATH = path.join(".dabbler", "solution", "projection.json");
+
+/**
+ * How long a burst of source events is allowed to settle.
+ *
+ * A re-derivation folds the event log and reads every member repository's
+ * build files, so it is not something to run once per keystroke of an
+ * editor's autosave. Short enough that the tree moves while the operator is
+ * still looking at it, long enough that a save which touches four files is
+ * one derivation.
+ */
+const SETTLE_MS = 300;
 
 const TONE: Record<string, string> = {
   attention: "charts.yellow",
@@ -41,17 +55,48 @@ export class SolutionTreeProvider
   private readonly watchers: vscode.FileSystemWatcher[] = [];
   private cached: Projection | undefined;
 
+  private settling: ReturnType<typeof setTimeout> | undefined;
+
   constructor(private readonly workspaceRoot: string | undefined) {
     if (!workspaceRoot) return;
-    const pattern = new vscode.RelativePattern(
-      workspaceRoot,
-      ".dabbler/solution/projection.json",
+    // The document itself: something rewrote it, so read it again.
+    this.watch(PROJECTION_GLOB, () => this.refresh());
+    // And the declarations it is derived from. A change to one of these
+    // makes the projection stale without touching it, which is why the tree
+    // spent a whole session showing what was true when the last workflow
+    // event was recorded: refreshing over a file nothing rewrote re-reads
+    // the same bytes.
+    for (const glob of PROJECTION_SOURCE_GLOBS) {
+      this.watch(glob, () => this.rederive());
+    }
+  }
+
+  private watch(glob: string, onEvent: () => void): void {
+    if (!this.workspaceRoot) return;
+    const watcher = vscode.workspace.createFileSystemWatcher(
+      new vscode.RelativePattern(this.workspaceRoot, glob),
     );
-    const watcher = vscode.workspace.createFileSystemWatcher(pattern);
-    watcher.onDidChange(() => this.refresh());
-    watcher.onDidCreate(() => this.refresh());
-    watcher.onDidDelete(() => this.refresh());
+    watcher.onDidChange(onEvent);
+    watcher.onDidCreate(onEvent);
+    watcher.onDidDelete(onEvent);
     this.watchers.push(watcher);
+  }
+
+  /**
+   * Ask the router for a current projection, then render it.
+   *
+   * Debounced, and it refreshes whether or not the derivation changed the
+   * file: an identical rewrite fires no watcher event, and a view that
+   * refreshed only on one would sit on a cleared cache it never re-read.
+   */
+  private rederive(): void {
+    if (!this.workspaceRoot) return;
+    if (this.settling) clearTimeout(this.settling);
+    this.settling = setTimeout(() => {
+      this.settling = undefined;
+      if (this.workspaceRoot) reprojectSolution(this.workspaceRoot);
+      this.refresh();
+    }, SETTLE_MS);
   }
 
   public refresh(): void {
@@ -60,6 +105,9 @@ export class SolutionTreeProvider
   }
 
   public dispose(): void {
+    // A pending derivation outliving the window would write a projection
+    // for a workspace nothing is showing any more.
+    if (this.settling) clearTimeout(this.settling);
     this.watchers.forEach((w) => w.dispose());
     this.onDidChangeEmitter.dispose();
   }

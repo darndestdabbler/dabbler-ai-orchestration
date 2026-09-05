@@ -16,6 +16,7 @@
 import {
   createInProcessRouter,
   commandLineFor,
+  tryWriteProjection,
   type Router,
   type RouterResult,
 } from "dabbler-ai-router";
@@ -74,4 +75,28 @@ export function productionRouter(): Router {
 
 export function productionCommands(): RouterCommands {
   return commands;
+}
+
+/**
+ * Re-derive this repository's solution projection, right now.
+ *
+ * The Solution Explorer renders a document four commands write and nothing
+ * else refreshes, so a view watching the DECLARATIONS underneath it needs a
+ * way to ask for a current one. It goes through here because this directory
+ * is where the extension meets the router: the alternative is a provider
+ * that folds the event log and reads the sibling repositories for itself,
+ * which is a second implementation of the projection.
+ *
+ * It never throws. A manifest the operator is halfway through saving is the
+ * ordinary case for a watcher-driven call, and the right answer to it is to
+ * leave the last good projection standing rather than to empty the view or
+ * raise a dialog nobody asked for.
+ */
+export function reprojectSolution(repoRoot: string): void {
+  try {
+    tryWriteProjection(repoRoot);
+  } catch {
+    // `dabbler status` surfaces a manifest problem plainly when someone
+    // asks. A background refresh is not where a person learns of one.
+  }
 }

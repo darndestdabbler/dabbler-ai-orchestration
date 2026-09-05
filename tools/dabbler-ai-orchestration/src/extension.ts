@@ -18,6 +18,7 @@ import {
   disposeDabblerTerminals,
   openDabblerTerminal,
   revealDabblerTerminal,
+  revealOnSessionStart,
   watchClosedTerminals,
 } from "./router/dabblerTerminal";
 import {
@@ -83,6 +84,12 @@ export function activate(context: vscode.ExtensionContext): void {
   const announcer = new DecisionAnnouncer();
   treeProvider.onScan((repositories) => {
     treeView.badge = badgeFor(repositories);
+    // A session starting anywhere -- the operator's own CLI, most often --
+    // brings the framework's terminal into view. The scan is the reading
+    // that knows; the transition rule is the terminal's.
+    for (const repository of repositories) {
+      revealOnSessionStart(repository.root, repository.currentSession);
+    }
     for (const target of announcer.fresh(repositories)) {
       void offerDecision(target, defaultOwedDecisionUi(), productionRouter()).then(
         (answered) => {

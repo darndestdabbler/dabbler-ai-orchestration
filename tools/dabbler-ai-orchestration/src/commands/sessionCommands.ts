@@ -34,7 +34,20 @@ import { routerOutputChannel } from "../router/commandLog";
 import { type DriveHandle, launchDriver } from "../router/driveProcess";
 import { resolveRouterCli } from "../router/terminalShim";
 import { ensureDabblerTerminal, terminalLocation } from "../router/dabblerTerminal";
-import { asRepositoryNode } from "./workExplorerTreeCommands";
+import { asRepositoryNode, asSessionNode } from "./workExplorerTreeCommands";
+
+/**
+ * The repository a clicked row belongs to, whichever row kind it is.
+ *
+ * Start Session is offered on the repository row and on the row for the
+ * session that would be registered next, and both rows carry the same
+ * repository. Narrowing to one node kind is what made the second offer do
+ * nothing at all when it was clicked: the menu appeared, the handler failed
+ * to recognise its argument, and the command returned silently.
+ */
+export function repositoryOf(arg: unknown): SessionsRepository | undefined {
+  return (asRepositoryNode(arg) ?? asSessionNode(arg))?.repository;
+}
 
 const CHANNEL_NAME = "Dabbler Session";
 export const ENGINE_CHANNEL_NAME = "Dabbler: Engine";
@@ -611,12 +624,12 @@ export function registerSessionCommands(
     vscode.commands.registerCommand(
       "dabblerSessionSets.startSession",
       async (arg: unknown) => {
-        const node = asRepositoryNode(arg);
-        if (!node) return;
+        const repository = repositoryOf(arg);
+        if (!repository) return;
         // No channel is shown: the engine is in the terminal that just
         // opened, and the framework's own work goes to the Dabbler
         // terminal rather than here.
-        await runStartSession(node.repository, ui);
+        await runStartSession(repository, ui);
       },
     ),
     vscode.commands.registerCommand(

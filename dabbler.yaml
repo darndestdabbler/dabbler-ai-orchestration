@@ -85,15 +85,27 @@ testing:
     # on this repository, and sessions 41, 42, 43 and 47 are all
     # extension-heavy.
     #
-    # `runs_whole` because the runner is an npm script with its spec glob
-    # baked in: naming a file after it ADDS to the glob rather than narrowing
-    # it, so there is no targeted form to invent. The complete run is the
-    # smallest honest evidence, and at roughly three seconds that costs
-    # nothing worth optimising.
+    # It used to declare `runs_whole`, and the reason was true: the command
+    # was an npm script with its spec glob baked in, mocha MERGES an appended
+    # path list with its `spec` rather than being narrowed by it, and there
+    # was no targeted form to invent. D116 recorded that the honest
+    # declaration needed a runner entry point of its own.
+    #
+    # Session 91 built one. `scripts/run-unit.mjs` runs mocha from the
+    # package directory with no baked-in glob when it is given specs, and it
+    # resolves a path written either way -- against the repository, which is
+    # what the selector appends, or against the package, which is what a
+    # person copies out of package.json. So the bare command really is the
+    # whole suite and the appended form really is those tests, and
+    # `runs_whole` would now be a claim that is no longer true.
+    #
+    # `npm run test:unit` is unchanged and is still what CI runs: this
+    # names the runner directly because a declared command is spawned as
+    # written, and `node` is an executable on every host while `npm` is a
+    # shim.
     - name: extension
-      command: npm run test:unit -w dabbler-ai-orchestration
+      command: node tools/dabbler-ai-orchestration/scripts/run-unit.mjs
       expensive: true
-      runs_whole: true
       covers:
         - tools/dabbler-ai-orchestration/
         - package.json
@@ -145,19 +157,31 @@ testing:
 
     # Run when a changed path maps to nothing. Cheap, broad, and enough to
     # notice a structural break -- not a substitute for a real mapping.
+    #
+    # It has to name a file that EXISTS, and for two sessions it did not:
+    # session 83's rebuild deleted `contracts.test.ts` and this entry kept
+    # naming it, so every unmapped path fell through to nothing at all. The
+    # schema test is the structural one now -- it reads the verb registry
+    # and both contract files and fails if they stop agreeing.
     smoke:
-      - packages/router/test/contracts.test.ts
+      - packages/router/test/schema.test.ts
 
     rules:
-      # The extension's own sources. The suite `runs_whole`, so this list
-      # decides what the record NAMES, never what actually runs -- a test file
-      # added and not listed here still runs, and the failure direction is
-      # therefore under-naming rather than under-running.
+      # The extension's own sources. This list used to decide only what the
+      # record NAMED -- the suite ran whole whatever it said, so a test file
+      # missing from it still ran. That is no longer true: the suite takes a
+      # subset now, so an omission here is a test that does NOT run, and the
+      # list must name every file under `src/test/suite`. It names all
+      # eleven. Three were missing when the suite stopped running whole, and
+      # they went in with it rather than after it.
       - when: tools/dabbler-ai-orchestration/src/
         select:
           - tools/dabbler-ai-orchestration/src/test/suite/actionRegistry.test.ts
           - tools/dabbler-ai-orchestration/src/test/suite/commandFlows.test.ts
+          - tools/dabbler-ai-orchestration/src/test/suite/dabblerTerminal.test.ts
+          - tools/dabbler-ai-orchestration/src/test/suite/driveProcess.test.ts
           - tools/dabbler-ai-orchestration/src/test/suite/fileSystem.test.ts
+          - tools/dabbler-ai-orchestration/src/test/suite/owedDecisionCommands.test.ts
           - tools/dabbler-ai-orchestration/src/test/suite/sessionsModel.test.ts
           - tools/dabbler-ai-orchestration/src/test/suite/solutionTreeModel.test.ts
           - tools/dabbler-ai-orchestration/src/test/suite/specSectionLocator.test.ts
@@ -181,16 +205,16 @@ testing:
           - packages/router/test/typed-payloads.test.ts
       - when: packages/router/src/contracts/
         select:
-          - packages/router/test/contracts.test.ts
+          - packages/router/test/schema.test.ts
           - packages/router/test/typed-payloads.test.ts
       # The command's own files: the verb registry, the verbs' entry points
       # and the one seam every verb writes through. The report is what the
       # metrics test reads, so it answers for them too.
       - when: packages/router/src/cli/
         select:
-          - packages/router/test/contracts.test.ts
+          - packages/router/test/cli.test.ts
+          - packages/router/test/schema.test.ts
           - packages/router/test/metrics.test.ts
-          - packages/router/test/lifecycleCli.test.ts
           # `session report` and `session drive` are parsed here and proven
           # there: the driver's contract by the report verb's refusals, the
           # loop by a scripted engine.
@@ -215,9 +239,13 @@ testing:
         select:
           - packages/router/test/engines.test.ts
           - packages/router/test/drive.test.ts
+      # The package's export surface. No test imports it directly -- it is a
+      # re-export file -- so what answers for it is what exercises the two
+      # things it hands out: the in-process router, and the contracts.
       - when: packages/router/src/index.ts
         select:
-          - packages/router/test/contracts.test.ts
+          - packages/router/test/inProcess.test.ts
+          - packages/router/test/schema.test.ts
       # The ported modules. A module's own test comes first; the others are
       # the modules that IMPORT it, because a leaf of the import graph
       # breaking shows up in its dependants and not in itself.
@@ -242,64 +270,75 @@ testing:
           - packages/router/test/lockfile.test.ts
           - packages/router/test/metrics.test.ts
           - packages/router/test/discovery.test.ts
+      # Neither of these has a file of its own any more: the rebuild folded
+      # both into the configuration test, which is where a caller meets
+      # them. Naming a deleted file is worse than naming the one that runs.
       - when: packages/router/src/secretResolver.ts
         select:
-          - packages/router/test/secretResolver.test.ts
+          - packages/router/test/config.test.ts
       - when: packages/router/src/runtimeMode.ts
         select:
-          - packages/router/test/runtimeMode.test.ts
+          - packages/router/test/config.test.ts
+          - packages/router/test/route.test.ts
+      # Every record file is written through the journal, and the git seam
+      # is read through it: its own test, the walkthrough that builds a real
+      # repository and moves it through the git states, and the record walk.
       - when: packages/router/src/journal.ts
         select:
-          - packages/router/test/config.test.ts
-          - packages/router/test/record.test.ts
+          - packages/router/test/journal.test.ts
+          - packages/router/test/walk-git-states.test.ts
+          - packages/router/test/walk-record.test.ts
       # The record: the ledger, the critique subtree, the sanctioned
       # writers, the lifecycle flow that reaches them, and the three
-      # forward slices they are built on. One test file answers for all of
-      # them, because what it proves is one thing -- the rules the record
-      # is made of -- and splitting it per module would put the folds and
-      # the refusals they protect in different files.
+      # forward slices they are built on. The rebuild split what used to be
+      # one file into a test per module plus two walkthroughs -- one over
+      # the record, one over a whole session -- so each module names its own
+      # test and the walkthrough that carries it end to end.
       - when: packages/router/src/ledger.ts
         select:
-          - packages/router/test/record.test.ts
-          - packages/router/test/projection.test.ts
+          - packages/router/test/ledger.test.ts
+          - packages/router/test/walk-record.test.ts
+          - packages/router/test/progress.test.ts
       - when: packages/router/src/critique.ts
         select:
-          - packages/router/test/record.test.ts
+          - packages/router/test/critique.test.ts
+          - packages/router/test/ledger.test.ts
       - when: packages/router/src/writers.ts
         select:
-          - packages/router/test/record.test.ts
-          - packages/router/test/lifecycle.test.ts
+          - packages/router/test/writers.test.ts
+          - packages/router/test/walk-record.test.ts
+          - packages/router/test/walk-session.test.ts
       - when: packages/router/src/session.ts
         select:
-          - packages/router/test/record.test.ts
-          - packages/router/test/lifecycle.test.ts
-          - packages/router/test/lifecycleCli.test.ts
+          - packages/router/test/session.test.ts
+          - packages/router/test/walk-session.test.ts
+          - packages/router/test/cli.test.ts
       - when: packages/router/src/progress.ts
         select:
-          - packages/router/test/record.test.ts
-          - packages/router/test/projection.test.ts
-          - packages/router/test/gates.test.ts
+          - packages/router/test/progress.test.ts
+          - packages/router/test/walk-record.test.ts
+          - packages/router/test/writers.test.ts
       # The evidence protocol and the record are two readers of one module:
-      # the round anchor and the digest ledger are what `record.test.ts`
-      # exercises, and the transcripts, quote provenance and absence
-      # searches are `evidence.test.ts`.
+      # the transcripts, quote provenance and absence searches are its own
+      # file, and the round anchor against a real repository is the two
+      # walkthroughs.
       - when: packages/router/src/evidence.ts
         select:
-          - packages/router/test/record.test.ts
           - packages/router/test/evidence.test.ts
-      # The close's five gates. `record.test.ts` still answers for the
-      # declaration's half of `materialWorktreeChanges`; the gates
-      # themselves and the driver are their own file.
+          - packages/router/test/walk-record.test.ts
+          - packages/router/test/walk-git-states.test.ts
+      # The close's five gates: the pure judges are their own file, and the
+      # git states they judge are walked against a real repository.
       - when: packages/router/src/gates.ts
         select:
           - packages/router/test/gates.test.ts
-          - packages/router/test/record.test.ts
-          - packages/router/test/lifecycle.test.ts
+          - packages/router/test/walk-git-states.test.ts
+          - packages/router/test/walk-record.test.ts
       # The module manifest: one reader, one writer, one command line.
       - when: packages/router/src/modules.ts
         select:
-          - packages/router/test/lifecycle.test.ts
-          - packages/router/test/lifecycleCli.test.ts
+          - packages/router/test/session.test.ts
+          - packages/router/test/cli.test.ts
       # The pre-verification stage. `checks` is the leaf -- the declaration,
       # the path grammar and the executor -- so it selects its own test and
       # the two modules that import it; `test_evidence` and `affected` are
@@ -331,17 +370,26 @@ testing:
         select:
           - packages/router/test/route.test.ts
           - packages/router/test/selection.test.ts
-      # `session start` prints its staleness warnings, so the record's own
-      # test file answers for that half.
       - when: packages/router/src/discovery.ts
         select:
           - packages/router/test/discovery.test.ts
-          - packages/router/test/record.test.ts
+      # The cross-repository graph and the projection over it. Both were
+      # mapped to nothing at all, so a change to either fell through to the
+      # smoke test -- which is how session 91 came to be editing the
+      # declaration the selector reads while the selector could not name a
+      # test for it.
+      - when: packages/router/src/solutionDeps.ts
+        select:
+          - packages/router/test/solutionDeps.test.ts
+          - packages/router/test/resolution.test.ts
+      - when: packages/router/src/workflow/
+        select:
+          - packages/router/test/workflow.test.ts
       - when: packages/router/src/pythonJson.ts
         select:
-          - packages/router/test/record.test.ts
           - packages/router/test/lockfile.test.ts
-          - packages/router/test/metrics.test.ts
+          - packages/router/test/ledger.test.ts
+          - packages/router/test/writers.test.ts
       - when: packages/router/src/textfile.ts
         select:
           - packages/router/test/config.test.ts
@@ -383,7 +431,7 @@ testing:
       - when: packages/router/src/facts.ts
         select:
           - packages/router/test/facts.test.ts
-          - packages/router/test/verify.test.ts
+          - packages/router/test/walk-record.test.ts
       # The verification loop, split by seam. One rule for the directory
       # rather than one per file: the seams call each other -- the loop
       # reads the prompts, the cap reads the dispute ladder, the steps read
@@ -392,8 +440,12 @@ testing:
       # to add to.
       - when: packages/router/src/verify/
         select:
-          - packages/router/test/verify.test.ts
+          - packages/router/test/disputes.test.ts
+          - packages/router/test/prompts.test.ts
+          - packages/router/test/rounds.test.ts
+          - packages/router/test/steps.test.ts
           - packages/router/test/verdict.test.ts
+          - packages/router/test/walk-verify.test.ts
       - when: packages/router/src/transports/
 
         select:
@@ -425,22 +477,17 @@ testing:
       - when: packages/router/package.json
         select:
           - packages/router/test/lockfile.test.ts
-      # The extension's two layers -- mocha over the vscode stub, and
-      # Playwright -- are not declared suites, so no declared test answers
-      # for this path and the empty list is what the selector can truly
-      # say. It is not what a reader should take away: the mocha layer is
-      # exactly the test that notices this source breaking, and CI runs it
-      # on every push.
+      # Everything under `tools/` that the rule above does not reach: the
+      # manifest has its own rule, the sources have theirs, and what is left
+      # is the build script, the Playwright layer and the packaging files.
+      # Playwright is not a declared suite, so no declared test answers for
+      # those and the empty list is what the selector can truly say.
       #
-      # Declaring it is owed, and it is D116's shape rather than a line
-      # here. `targeted_command` appends the selected paths to the
-      # declared command, and mocha MERGES a path list with its `spec`
-      # (whether the spec comes from the command line or from
-      # `.mocharc.json`) instead of being narrowed by it -- measured, both
-      # forms. So the bare command cannot mean "the whole suite" and the
-      # appended form mean "these tests", and the honest declaration needs
-      # a runner entry point of its own. `runs_whole` would be the cheap
-      # way through and it would be false: mocha does take a subset.
+      # D116's owed item is settled and the entry point is
+      # `scripts/run-unit.mjs`, declared as the extension suite's command
+      # above. The reason it was owed -- mocha merging an appended path list
+      # with its baked-in `spec` rather than being narrowed by it -- is why
+      # the runner passes specs and no glob when it is given any.
       - when: tools/dabbler-ai-orchestration/
         select: []
       - when: packages/router/schemas/
@@ -449,7 +496,8 @@ testing:
           - packages/router/test/typed-payloads.test.ts
       - when: packages/router/prompt-templates/
         select:
-          - packages/router/test/verify.test.ts
+          - packages/router/test/prompts.test.ts
+          - packages/router/test/walk-verify.test.ts
       - when: packages/router/copilot-catalog.lock
         select:
           - packages/router/test/copilot.test.ts

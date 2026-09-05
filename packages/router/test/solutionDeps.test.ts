@@ -69,6 +69,41 @@ describe("the declaration", () => {
   it("is absent rather than empty in a repository that stands alone", () => {
     assert.equal(loadDeps(repoWith({})), null);
   });
+
+  it("reads an explicit null as nothing, not as the word", () => {
+    // The schema allows `feed: null` -- it is how a declaration says this
+    // edge names no source -- and `String(null)` turns that into a feed
+    // called "null", which `check` then reports as a source nobody
+    // registered. The two ways JSON says "nothing" have to read the same.
+    //
+    // `repositoryId` and the producer's `remote` and `path` go through the
+    // same reading. Only `feed` and the producer's are reachable through
+    // this door: the schema still requires `repositoryId` to be a non-empty
+    // string when present, so an explicit null there is refused before the
+    // reader sees it. It shares the reading so it cannot drift back if that
+    // ever widens.
+    const root = repoWith({
+      [DEPS_FILENAME]: JSON.stringify({
+        schemaVersion: 1,
+        solution: "csv-pipeline",
+        consumes: [
+          {
+            id: "Dabbler.Csv.Model",
+            kind: "nuget",
+            producedBy: { id: "csv-model", remote: null, path: null },
+            resolve: "feed",
+            feed: null,
+          },
+        ],
+      }),
+    });
+    const deps = loadDeps(root);
+    assert.equal(deps?.consumes[0].feed, null);
+    assert.equal(deps?.consumes[0].producedBy.remote, null);
+    assert.equal(deps?.consumes[0].producedBy.path, null);
+    // Omitted entirely, which is the other way to say it.
+    assert.equal(deps?.repositoryId, null);
+  });
 });
 
 describe("reading a build file without building it", () => {

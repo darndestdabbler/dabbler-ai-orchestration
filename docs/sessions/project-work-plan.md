@@ -126,11 +126,12 @@ it.
 | 88 | Packaging, release, bootstrap, the solution — and vitest retired | no | 2026-09-03 |
 | 89 | The trial, run by the operator against what the Marketplace serves | — | not declared |
 | 90 | `next` advances a session, and never starts one | no | 2026-09-05 |
-| 91 | The eight papercuts the walkthrough found | — | not declared |
+| 91 | The eight papercuts the walkthrough found | no | 2026-09-05 |
 | 92 | The task list says what a session is doing | — | not declared |
 | 93 | What a verification round costs, before it is spent | — | not declared |
 | 94 | Paused, not stopped — and the two green events | — | not declared |
-| 95 | An ACP client, wired to nothing | — | not declared |
+| 95 | The git seam, finally used | — | not declared |
+| 96 | An ACP client, wired to nothing | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -1849,3 +1850,9 @@ Packaging, release, bootstrap and the solution, rebuilt the way sessions 83 to 8
 **Releasable: no.**
 
 Make `dabbler session next` advance a session and never create one. Driver.register() currently calls start() whenever a call names --engine and no close is being collected, which includes the case where nothing is in flight -- so an engine that re-runs the command line it was launched with, once, after `done`, registers and starts the next session unasked; and an engine that correctly drops the flags instead gets a usage refusal, so both endings of the documented loop are wrong. The registration decision becomes a pure function over three facts (engine named, session in flight, uncollected close) and register() composes it: a re-registration of the session in flight stays exactly as it is, a call naming --engine with nothing in flight is refused with the sentence that says `dabbler session start` is the door in, and a flagless call with nothing in flight returns a done-shaped instruction and exit 0 so a loop told to run 'until it says done' can terminate cleanly. `session drive` binds the session number it registered at launch and exits when that session completes rather than inferring another start. The extension's launch prompt and the managed guidance change in the same session, so no window exists in which the old prompt still starts unrequested work.
+
+### Session 91 — The eight papercuts the walkthrough found
+
+**Releasable: no.**
+
+The papercuts the operator's CSV walkthrough found, each independent and each verifiable by looking at it. `solutionDeps.loadDeps` coerces an explicit JSON `null` to the string "null" for `feed` and for `repositoryId`, so `check` reports a feed nobody configured; both become null-safe (finding 5). The Solution Explorer's member rows carry no `contextValue` and `repositoryPathOf` answers only for `external` nodes, so the "Solution repositories" list cannot be opened; both are extended with the same three-valued location the external rows already gate on (finding 8). Start Session becomes reachable from the session row that IS next, gated on the repository having nothing in flight -- narrower than the plan's "a planned session row" because `session start` can only register the next session, and a menu item on session 94 that starts 91 would be a lie; the operator's own wording of finding 9 says "the next session" (finding 9). The Solution Explorer watches one file that only four commands rewrite, so it is stale by construction during a session; it watches the declarations the projection derives from as well and re-derives through the in-process router before refreshing, because refreshing over an unrewritten file re-reads the same bytes (finding 7). The Dabbler terminal reveals itself, without taking focus, when a session goes in flight for a repository this window shows -- which is the case the plan's item 6 is about: a session started in the operator's own CLI, where nothing in the extension was the thing that started it (finding 1). Two steps are additions to the plan's list and are declared here rather than taken silently. The first is an argv entry point for the extension's mocha suite: a plan check is argv spawned with no shell, `npm` is a shim argv cannot reach on Windows, and mocha under `ts-node/register` resolves its tsconfig from the working directory -- so without a runner the extension steps have no honest mechanical check. The second is a repair of `dabbler.yaml`'s selection map: session 83's rebuild deleted `contracts.test.ts`, `record.test.ts`, `lifecycle.test.ts`, `lifecycleCli.test.ts`, `projection.test.ts`, `runtimeMode.test.ts`, `secretResolver.test.ts` and `verify.test.ts`, and the map still names all eight -- including as the `smoke` fallback, which is what an unmapped path falls through to. This session changes `solutionDeps.ts` and `index.ts`, and both land on that fallback, so its own pre-verification evidence depends on the repair.

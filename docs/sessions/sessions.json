@@ -1778,6 +1778,26 @@
         "identityProvenance": "direct"
       },
       "verificationVerdict": "VERIFIED",
+      "verification": {
+        "rounds": 2,
+        "verifierModel": "gpt-5.4",
+        "verifierProvider": "openai",
+        "transport": "copilot-cli"
+      },
+      "frameworkVersion": "2.0.1"
+    },
+    {
+      "number": 91,
+      "title": "The eight papercuts the walkthrough found",
+      "status": "in-progress",
+      "startedAt": "2026-09-05T07:18:12.291000-04:00",
+      "completedAt": null,
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": "VERIFIED",
       "frameworkVersion": "2.0.1",
       "verification": {
         "rounds": 2,
@@ -1785,15 +1805,6 @@
         "verifierProvider": "openai",
         "transport": "copilot-cli"
       }
-    },
-    {
-      "number": 91,
-      "title": "The eight papercuts the walkthrough found",
-      "status": "not-started",
-      "startedAt": null,
-      "completedAt": null,
-      "orchestrator": null,
-      "verificationVerdict": null
     },
     {
       "number": 92,
@@ -1824,6 +1835,15 @@
     },
     {
       "number": 95,
+      "title": "The git seam, finally used",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    },
+    {
+      "number": 96,
       "title": "An ACP client, wired to nothing",
       "status": "not-started",
       "startedAt": null,

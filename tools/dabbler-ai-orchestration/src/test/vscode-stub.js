@@ -208,8 +208,13 @@ const vscodeStub = {
         // and one left behind would accumulate per session.
         disposed: 0,
         sent: [],
-        show: () => {
+        // Recorded, not discarded: whether a terminal takes the focus is a
+        // behaviour. A reveal that pulls focus out of the CLI the operator
+        // is typing in is worse than one that never happens.
+        preserveFocus: undefined,
+        show: (preserveFocus) => {
           terminal.shown += 1;
+          terminal.preserveFocus = preserveFocus;
         },
         sendText: (text, addNewLine) => terminal.sent.push({ text, addNewLine }),
         dispose: () => {

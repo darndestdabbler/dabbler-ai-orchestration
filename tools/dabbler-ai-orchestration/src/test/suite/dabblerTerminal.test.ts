@@ -19,8 +19,10 @@ import {
   ensureDabblerTerminal,
   forgetClosedTerminal,
   frameworkTerminalLocation,
+  isSessionStart,
   openDabblerTerminal,
   revealDabblerTerminal,
+  revealOnSessionStart,
   lineTone,
   paint,
   terminalLocation,
@@ -316,6 +318,8 @@ suite("the Dabbler terminal", () => {
 interface FakeTerminal {
   options: { name: string; location?: unknown; pty?: unknown };
   shown: number;
+  /** What the last `show()` asked for; undefined until one is made. */
+  preserveFocus?: boolean;
 }
 
 function createdTerminals(): FakeTerminal[] {
@@ -495,6 +499,57 @@ suite("where Start puts the two terminals", () => {
     const built = createdTerminals().length;
     ensureDabblerTerminal(root, { name: "a second CLI" } as unknown as vscode.Terminal);
     assert.strictEqual(createdTerminals().length, built);
+
+    disposeDabblerTerminals().dispose();
+    rmrf(root);
+  });
+});
+
+suite("a session starting brings the framework's terminal into view", () => {
+  test("a start shows it; activation, a scan and a close do not", () => {
+    // csv-model feedback item 1. Under the pull the session is started in
+    // the operator's own CLI, so nothing in the extension is the thing that
+    // started it -- and the framework's terminal stayed created-and-unseen
+    // since activation, which is easy not to know about at all.
+    assert.strictEqual(isSessionStart(null, 5), true);
+    assert.strictEqual(isSessionStart(4, 5), true, "one closing and the next registering");
+    assert.strictEqual(isSessionStart(5, 5), false, "the same reading again");
+    assert.strictEqual(isSessionStart(5, null), false, "a session ending opens nothing");
+    assert.strictEqual(isSessionStart(null, null), false);
+    // No previous reading: this window has just activated, and a session
+    // already running was not started by anything the operator did here.
+    assert.strictEqual(isSessionStart(undefined, 5), false);
+
+    const root = makeTempDir("dabbler-onstart-");
+    const built = createdTerminals().length;
+    // The first scan of a quiet repository builds nothing and shows nothing.
+    revealOnSessionStart(root, null);
+    assert.strictEqual(createdTerminals().length, built);
+
+    // The session starts.
+    revealOnSessionStart(root, 91);
+    const terminal = lastTerminal();
+    assert.strictEqual(createdTerminals().length, built + 1);
+    assert.strictEqual(terminal.shown, 1);
+    // Focus stays where the operator is typing, which is the CLI that
+    // started it.
+    assert.strictEqual(terminal.preserveFocus, true);
+
+    // Every scan after it is the same session, and re-showing a panel on a
+    // timer would make the editor unusable.
+    revealOnSessionStart(root, 91);
+    revealOnSessionStart(root, 91);
+    assert.strictEqual(terminal.shown, 1);
+
+    // It closes, and nothing is shown for that.
+    revealOnSessionStart(root, null);
+    assert.strictEqual(terminal.shown, 1);
+
+    // The next one starts, and the terminal that is already open is shown
+    // rather than rebuilt.
+    revealOnSessionStart(root, 92);
+    assert.strictEqual(createdTerminals().length, built + 1);
+    assert.strictEqual(terminal.shown, 2);
 
     disposeDabblerTerminals().dispose();
     rmrf(root);

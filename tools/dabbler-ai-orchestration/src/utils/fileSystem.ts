@@ -59,6 +59,15 @@ export interface SessionsRepository {
   totalSessions: number | null;
   sessionsCompleted: number;
   currentSession: number | null;
+  /**
+   * What the next `session start` would register, by the router's own rule.
+   *
+   * Carried rather than recomputed: the rule is "the session in flight if
+   * there is one, else the lowest-numbered row that has not run", it spans
+   * the ledger AND the plan's rows, and a second reading of it here would
+   * offer to start a session the framework would refuse to start.
+   */
+  nextSession: number | null;
   forceClosed: boolean;
   schemaVersionOnDisk: number | null;
   sessionsSource: SessionsSource;
@@ -208,6 +217,7 @@ function buildRepository(
     totalSessions: p ? p.repository.totalSessions : null,
     sessionsCompleted: p ? p.repository.sessionsCompleted : 0,
     currentSession: p ? p.repository.currentSession : null,
+    nextSession: p ? p.repository.nextSession : null,
     lastActivityAt: p ? p.repository.lastActivityAt : null,
     possiblyStalled: p ? p.repository.possiblyStalled : false,
     owedDecisions: p ? p.repository.owedDecisions : [],

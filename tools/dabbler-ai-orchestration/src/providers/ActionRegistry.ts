@@ -82,6 +82,22 @@ export interface SessionAction {
 
 export const SESSION_ACTIONS: SessionAction[] = [
   {
+    id: "dabblerSessionSets.startSession",
+    label: "Start Session",
+    group: 900,
+    // On the row for the session that would actually be registered, and
+    // only while nothing is in flight. Both halves matter and neither is
+    // decided here: `session start` registers the NEXT session and takes no
+    // number, so an entry on any other planned row would start a different
+    // session than the one it was clicked on -- and `nextSession` is the
+    // router's own answer to which that is, carried through the projection
+    // rather than recomputed beside it.
+    when: (repository, session) =>
+      repository.currentSession === null &&
+      repository.nextSession !== null &&
+      session.number === repository.nextSession,
+  },
+  {
     id: "dabblerSessionSets.cancel",
     label: "Cancel Session",
     group: 901,

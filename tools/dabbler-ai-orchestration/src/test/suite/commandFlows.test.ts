@@ -27,6 +27,7 @@ import {
   type SessionRunUi,
   defaultSessionRunUi,
   engineOutputChannel,
+  repositoryOf,
   runSendToEngine,
   runStartSession,
   runStartUnattendedSession,
@@ -718,6 +719,21 @@ suite("tree command argument narrowing", () => {
     assert.ok(
       asSessionNode({ kind: "session", repository, session: makeSession() }),
     );
+  });
+
+  test("Start Session reads its repository off either row it is offered on", () => {
+    // It is offered on the repository row and on the row for the session
+    // that would be registered next. Narrowed to one node kind, the second
+    // offer opened a menu whose command recognised nothing and returned
+    // without a word -- worse than not offering it.
+    const repository = makeRepository({ root: "D:/ws" });
+    assert.strictEqual(repositoryOf({ kind: "repository", repository }), repository);
+    assert.strictEqual(
+      repositoryOf({ kind: "session", repository, session: makeSession() }),
+      repository,
+    );
+    assert.strictEqual(repositoryOf({ kind: "bucket" }), undefined);
+    assert.strictEqual(repositoryOf(null), undefined);
   });
 
   test("cancellableSessionOf reads the spawn root and number off the row", () => {

@@ -1094,6 +1094,56 @@ export function openDabblerTerminal(repoRoot: string): void {
 }
 
 /**
+ * Whether two consecutive readings of one repository are a session STARTING.
+ *
+ * Three cases decide it, and each is here because getting it wrong is
+ * visible to the operator:
+ *
+ * - Nothing in flight now: not a start, whatever came before. A session
+ *   ending must not open a panel.
+ * - No previous reading: not a start. This window has just activated, and a
+ *   session that was already running when it opened was not started by
+ *   anything the operator did here -- taking the panel then is the
+ *   startup-noise activation deliberately avoids.
+ * - The number changed: a start. One session closing and the next
+ *   registering between two readings is still the next one starting, and it
+ *   is the exact shape of the loop this framework runs.
+ */
+export function isSessionStart(
+  before: number | null | undefined,
+  after: number | null,
+): boolean {
+  if (after === null || before === undefined) return false;
+  return before !== after;
+}
+
+/** The last reading per repository, so a start is a change and not a state. */
+const inFlightSeen = new Map<string, number | null>();
+
+/**
+ * Show the framework's terminal when a session starts here.
+ *
+ * csv-model feedback item 1: the operator ran `dabbler session start` in
+ * their own CLI and the framework's terminal stayed exactly where activation
+ * left it -- created, never shown, and easy not to know about. Start Session
+ * pressed in the Explorer already opens it; a session begun anywhere else
+ * did not, which is most of them under the pull.
+ *
+ * Focus is preserved, because the person is typing in the CLI that started
+ * the session, and it fires on the transition rather than on every scan: the
+ * repositories are re-read on a timer and on every file event, and a panel
+ * that reopened on each of those would be unusable.
+ */
+export function revealOnSessionStart(
+  repoRoot: string,
+  currentSession: number | null,
+): void {
+  const before = inFlightSeen.get(repoRoot);
+  inFlightSeen.set(repoRoot, currentSession);
+  if (isSessionStart(before, currentSession)) ensureDabblerTerminal(repoRoot);
+}
+
+/**
  * A terminal the person closed, forgotten so the next request builds one.
  *
  * Without this the map holds a disposed terminal for the life of the
@@ -1144,6 +1194,10 @@ export function disposeDabblerTerminals(): vscode.Disposable {
         entry.terminal.dispose();
       }
       open.clear();
+      // The readings go with them. A window that reopens starts with no
+      // previous reading, which is what makes a session already in flight
+      // at activation not a start.
+      inFlightSeen.clear();
     },
   };
 }

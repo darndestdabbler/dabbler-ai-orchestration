@@ -1,5 +1,7 @@
 import * as assert from "assert";
 import {
+  PROJECTION_RELPATH,
+  PROJECTION_SOURCE_GLOBS,
   Projection,
   childrenOf,
   contractTarget,
@@ -293,6 +295,87 @@ suite("solutionTreeModel: what other repositories build", () => {
     const node = { kind: "external" as const, id: "Dabbler.Csv.Model" };
     assert.strictEqual(repositoryPathOf(node, p), "C:/repos/csv-model");
     assert.strictEqual(repositoryPathOf({ kind: "solution" }, p), null);
+  });
+
+  test("the tree watches what the projection is derived from, not only the projection", () => {
+    // csv-model feedback item 7. The projection is written by the four
+    // commands that record an event and by nothing else, so a declaration
+    // edited during a session moved nothing: the view watched one file that
+    // nobody had rewritten, and refreshing over it re-read the same bytes.
+    // What the tree re-derives on is the INPUTS.
+    const globs = [...PROJECTION_SOURCE_GLOBS];
+    // What this repository builds, and what it takes from the others: the
+    // component rows come from the first, the membership rows from the
+    // second and from nowhere else.
+    assert.ok(globs.includes("solution.yaml"));
+    assert.ok(globs.includes("solution-dependencies.json"));
+    // The step, the loop counters and who each component is waiting on are
+    // a fold of the event log.
+    assert.ok(globs.includes(".dabbler/solution/events.jsonl"));
+    // The pin is read from the build files on every projection rather than
+    // copied, so the drift rows change when they do.
+    assert.ok(globs.some((g) => g.endsWith("*.csproj")));
+    assert.ok(globs.some((g) => g.endsWith("pom.xml")));
+
+    // And never the projection itself: it is this list's output, so
+    // re-deriving on it would be a loop that never settles.
+    assert.ok(!globs.includes(PROJECTION_RELPATH));
+    assert.ok(!globs.some((g) => g.includes("projection.json")));
+    // Nothing under the run records either. Those are the session's
+    // lifecycle and the Work Explorer's subject; they change many times a
+    // minute and change nothing this tree renders.
+    assert.ok(!globs.some((g) => g.includes(".dabbler/runs")));
+  });
+
+  test("a membership row can be opened, cloned or located like a producer row", () => {
+    // "Solution repositories" was a list nothing could be done to: the rows
+    // carried no contextValue at all, so no menu entry matched, and
+    // `repositoryPathOf` answered only for producer rows, so the commands
+    // would have had no folder even if one had. It is the list holding the
+    // repositories no edge reaches yet -- the next one the plan needs.
+    const p = projection({
+      members: [
+        { id: "csv-app", self: true, root: "C:/repos/csv-app", provides: [], consumes: [], shell: false },
+        {
+          id: "csv-model",
+          self: false,
+          root: "C:/repos/csv-model",
+          provides: ["Dabbler.Csv.Model"],
+          consumes: [],
+          shell: false,
+        },
+        {
+          id: "csv-reports",
+          self: false,
+          root: null,
+          remote: "git@github.com:dabbler/csv-reports.git",
+          provides: [],
+          consumes: [],
+          shell: false,
+        },
+        { id: "csv-cli", self: false, root: null, remote: null, provides: [], consumes: [], shell: true },
+      ],
+    } as Partial<Projection>);
+    const row = (id: string) => descriptorFor({ kind: "member", id }, p);
+    // The same three values the producer rows carry, so the entries already
+    // in the manifest reach these rows with no second `when`.
+    assert.strictEqual(row("csv-model").contextValue, "dabblerExternalHere");
+    assert.strictEqual(row("csv-reports").contextValue, "dabblerExternalRemote");
+    assert.strictEqual(row("csv-cli").contextValue, "dabblerExternalUnknown");
+    // This repository's own row is here, because it is: Reveal on it is the
+    // ordinary way to find the checkout, and an exception would be a second
+    // rule about where a row's repository is.
+    assert.strictEqual(row("csv-app").contextValue, "dabblerExternalHere");
+
+    assert.strictEqual(
+      repositoryPathOf({ kind: "member", id: "csv-model" }, p),
+      "C:/repos/csv-model",
+    );
+    assert.strictEqual(repositoryPathOf({ kind: "member", id: "csv-app" }, p), "C:/repos/csv-app");
+    // Not on this machine, and the reading says so rather than guessing a
+    // folder for a command to fail on.
+    assert.strictEqual(repositoryPathOf({ kind: "member", id: "csv-reports" }, p), null);
+    assert.strictEqual(repositoryPathOf({ kind: "member", id: "nobody" }, p), null);
   });
 
   test("explains an absent sibling rather than failing at it", () => {

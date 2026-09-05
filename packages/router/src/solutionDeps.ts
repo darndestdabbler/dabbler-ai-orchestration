@@ -44,6 +44,24 @@ export const RESOLVE_SOURCE = "source";
  */
 export const UNREADABLE_ID = "(unreadable)";
 
+/**
+ * A declared value that may be absent, read without inventing one.
+ *
+ * `String(x)` is not a reading of an optional field: JSON has two ways to
+ * say "nothing" -- the key left out and the key set to `null` -- and
+ * `String(null)` turns the second into the four-character string `"null"`.
+ * A feed declared as an explicit null then read back as a feed named
+ * "null" is a source nobody registered, reported by `check` against a
+ * declaration that says the opposite.
+ *
+ * One function rather than an expression per field, because the fields
+ * that need it are read in two places and the ones that had it were
+ * already spelled differently from the ones that did not.
+ */
+function optionalString(value: unknown): string | null {
+  return value === undefined || value === null ? null : String(value);
+}
+
 export class SolutionDepsError extends Error {
   constructor(message: string) {
     super(message);
@@ -143,11 +161,11 @@ export function loadDeps(repoRoot: string): SolutionDeps | null {
         kind: String(row["kind"]),
         producedBy: {
           id: String(producer["id"]),
-          remote: (producer["remote"] as string | null) ?? null,
-          path: (producer["path"] as string | null) ?? null,
+          remote: optionalString(producer["remote"]),
+          path: optionalString(producer["path"]),
         },
         resolve: String(row["resolve"]),
-        feed: row["feed"] === undefined ? null : String(row["feed"]),
+        feed: optionalString(row["feed"]),
       } satisfies Edge;
     },
   );
@@ -157,7 +175,7 @@ export function loadDeps(repoRoot: string): SolutionDeps | null {
   return {
     solution: String(doc["solution"]),
     consumes,
-    repositoryId: doc["repositoryId"] === undefined ? null : String(doc["repositoryId"]),
+    repositoryId: optionalString(doc["repositoryId"]),
     searchPaths: paths,
   };
 }

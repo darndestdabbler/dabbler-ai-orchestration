@@ -1757,11 +1757,14 @@
     {
       "number": 89,
       "title": "The trial, run by the operator against what the Marketplace serves",
-      "status": "not-started",
+      "status": "cancelled",
       "startedAt": null,
       "completedAt": null,
       "orchestrator": null,
-      "verificationVerdict": null
+      "verificationVerdict": null,
+      "preCancelStatus": "not-started",
+      "cancelledReason": "Operator trial, not engine work: session 89 is run by hand from a clean VS Code profile against what the Marketplace serves. It sat at the head of a strictly sequential queue and blocked sessions 90-95. Cancelled on the operator's explicit instruction to unblock that block; the trial is re-planned at a number after it, as it already was once (82 to 89). Restore with: dabbler session restore 89 --reason '...'",
+      "cancelledAt": "2026-09-05T03:28:29-04:00"
     }
   ]
 }

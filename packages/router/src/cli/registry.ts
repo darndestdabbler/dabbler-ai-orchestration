@@ -6,6 +6,7 @@
 // without a handler or reachable without being listed.
 
 import { affectedVerb } from "./affected.ts";
+import { agentVerb } from "./agent.ts";
 import { bootstrapVerb } from "./bootstrap.ts";
 import { contractdocVerb } from "./contractdoc.ts";
 import { copilotVerb } from "./copilot.ts";
@@ -32,6 +33,7 @@ export type VerbHandler = (argv: string[]) => Promise<number>;
 
 export const HANDLERS: Readonly<Record<string, VerbHandler>> = {
   affected: affectedVerb,
+  agent: agentVerb,
   bootstrap: bootstrapVerb,
   contractdoc: contractdocVerb,
   copilot: copilotVerb,

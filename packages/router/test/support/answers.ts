@@ -6,20 +6,16 @@
 // no process, no checkout. An unfed question throws with its argv, so a
 // missing answer names itself rather than passing for the wrong reason.
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 import { setGitSource, type RunGitOptions } from "../../src/journal.ts";
 import { NoCandidateError, setRouteSource, type RouteOptions, type RouteResult } from "../../src/route.ts";
-import { SANDBOX_SEED } from "./repo.ts";
+import { SANDBOX_SEED, scratchDir } from "./repo.ts";
 
-const ROOT = join(tmpdir(), "dabbler-router-tests");
-
-/** A fresh directory under the suite's one temp root. */
+/** A fresh directory under the suite's one temp root, swept of finished runs' leavings. */
 export function tempDir(prefix = "t-"): string {
-  mkdirSync(ROOT, { recursive: true });
-  return mkdtempSync(join(ROOT, prefix));
+  return scratchDir(prefix);
 }
 
 /** Write files under `root`, creating directories as needed. */

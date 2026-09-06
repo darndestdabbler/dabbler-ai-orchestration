@@ -1715,6 +1715,29 @@ ${this.stopArtifacts()}`,
     );
   }
 
+  /**
+   * A step the driver made up rather than read from the plan -- the fix
+   * after a red run of record -- asked until accepted, and then the phase
+   * its acceptance sets.
+   *
+   * Written on the run first and cleared last. A plan step needs nothing
+   * like this: `phaseSteps` walks the plan on a resume and re-asks what was
+   * not accepted. A synthesised step has no plan to be walked from, and
+   * before this the run-of-record phase re-entered from its head on the
+   * resuming call, ran the suite again and landed -- the fix's report was
+   * never judged, its checks never ran and the repaired tree was never
+   * verified. The loop head reads `pending_step` before any phase's own
+   * work, so the outstanding answer is judged first under either mode.
+   */
+  private async runSynthesisedStep(id: string, ask: string, then: DriverRun["phase"]): Promise<void> {
+    this.run = { ...this.run, pending_step: { id, ask, then } };
+    this.save();
+    await this.runStep({ id, ask, files: [], checks: this.allPlanChecks(), fromPlan: false });
+    this.run = { ...this.run, pending_step: null };
+    this.save();
+    this.setPhase(then);
+  }
+
   /** Ask for a step until its report is accepted, refused three times, or blocked. */
   private async runStep(spec: StepSpec): Promise<void> {
     // Cleared on the way out and NOT in a `finally`: a `finally` runs while
@@ -2287,17 +2310,13 @@ ${this.stopArtifacts()}`,
         throw new Stop("tests", `the run of record for ${suite.name} could not be recorded (exit ${code})`);
       }
       this.log("tests-failed", { command: suite.command });
-      await this.runStep({
-        id: "fix-run-of-record",
-        ask:
-          `The run of record failed: \`${suite.command}\`, the complete ${suite.name} suite ` +
-          "against the verified tree. Fix the cause. The framework will run the affected " +
-          "tests, verification and the suite again.",
-        files: [],
-        checks: this.allPlanChecks(),
-        fromPlan: false,
-      });
-      this.setPhase("preverify");
+      await this.runSynthesisedStep(
+        "fix-run-of-record",
+        `The run of record failed: \`${suite.command}\`, the complete ${suite.name} suite ` +
+          "against the verified tree. Fix the cause. The framework will run every step's " +
+          "checks, verification and the suite again.",
+        "preverify",
+      );
       return;
     }
     this.setPhase("land");
@@ -2552,6 +2571,13 @@ ${this.stopArtifacts()}`,
         // A stop asked for while the framework's own phase was running (a
         // verification round, the suite) takes effect at this boundary.
         if (this.run.phase !== "complete") this.honourPendingStop();
+        // A synthesised step whose answer is outstanding is judged before
+        // the phase it was issued from does anything else.
+        const pending = this.run.pending_step ?? null;
+        if (pending !== null && this.run.phase !== "complete") {
+          await this.runSynthesisedStep(pending.id, pending.ask, pending.then);
+          continue;
+        }
         switch (this.run.phase) {
           case "plan":
             await this.phasePlan();

@@ -385,6 +385,122 @@ describe("one session, walked from next to done", () => {
   });
 });
 
+describe("a red run of record, fixed, verified again, then run again", () => {
+  it("judges the fix before the suite runs again, and in that order: checks, a second round, the suite", async () => {
+    setProviderKeys();
+    delete process.env["DABBLER_TRANSPORT"];
+    resetRouter();
+    resetRuntimeMode();
+    const repo = makeRepo(SEED, { origin: true });
+    const sessionsDir = join(repo, "docs", "sessions");
+    configure([VERIFIED, VERIFIED]);
+    await capture(() =>
+      Promise.resolve(start(sessionsDir, { engine: "claude-code", provider: "anthropic" })),
+    );
+    const plan = await next(sessionsDir);
+    assert.equal(await answerPlan(sessionsDir, plan.instruction?.seq ?? 0, PLAN), EXIT_OK);
+    const step = await next(sessionsDir);
+    assert.equal(step.instruction?.step_id, "widget");
+
+    // The step is done and its own check passes -- the widget returns 2 --
+    // and the suite is red, which only the run of record can see.
+    writeFileSync(join(repo, "src", "widget.py"), "def widget():\n    return 2  # broken\n", "utf8");
+    assert.equal(
+      (await answerStep(sessionsDir, step.instruction?.seq ?? 0, "widget", ["src/widget.py"])).code,
+      EXIT_OK,
+    );
+
+    // What the record says happened, in the order it happened. Read after
+    // every call rather than from timestamps, because the order IS the
+    // assertion: a fix judged after the suite re-ran would still leave the
+    // same records, in a different order.
+    const milestones: string[] = [];
+    const observe = (): void => {
+      const rounds = readRounds(repo, 1).length;
+      const unit = readRecords(repo).filter((row) => row.suite === "unit" && row.stage === "final-full");
+      const mark = (milestone: string): void => {
+        if (!milestones.includes(milestone)) milestones.push(milestone);
+      };
+      if (rounds >= 1) mark("round 1 recorded");
+      if (unit.some((row) => row.outcome !== "passed")) mark("run of record red");
+      if (rounds >= 2) mark("round 2 recorded");
+      if (unit.some((row) => row.outcome === "passed")) mark("run of record green");
+    };
+    const walk = async (
+      until: (instruction: DriverInstruction) => boolean,
+    ): Promise<DriverInstruction | null> => {
+      const deadline = Date.now() + 180_000;
+      for (;;) {
+        const move = await next(sessionsDir);
+        observe();
+        const instruction = move.instruction;
+        if (instruction === null || until(instruction)) return instruction;
+        if (instruction.kind !== "wait") {
+          assert.fail(`the framework asked for ${instruction.kind} ${String(instruction.step_id)}`);
+        }
+        if (Date.now() > deadline) assert.fail("the framework's own jobs never finished");
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+    };
+
+    // --- verification passes, the run of record fails, the fix is asked ------
+    const fix = await walk((instruction) => instruction.kind === "step");
+    assert.equal(fix?.step_id, "fix-run-of-record");
+    milestones.push("fix asked");
+    const waiting = readRun(repo, 1);
+    assert.equal(waiting?.phase, "run-of-record");
+    assert.equal(waiting?.pending_step?.id, "fix-run-of-record");
+    assert.equal(waiting?.pending_step?.then, "preverify");
+
+    // --- the fix, reported; the resuming call judges it first ----------------
+    writeFileSync(join(repo, "src", "widget.py"), "def widget():\n    return 2\n", "utf8");
+    assert.equal(
+      (await answerStep(sessionsDir, fix?.seq ?? 0, "fix-run-of-record", ["src/widget.py"])).code,
+      EXIT_OK,
+    );
+    const judged = await next(sessionsDir);
+    observe();
+    // Accepted: the step is off the run, the phase is the one it named --
+    // and the same call has gone on through it to start the second round,
+    // not the suite.
+    const accepted = readRun(repo, 1);
+    assert.equal(accepted?.pending_step, null);
+    assert.equal(accepted?.phase, "verify");
+    assert.equal(judged.instruction?.kind, "wait");
+    assert.equal(accepted?.job?.name, "verification");
+
+    // --- round two, the suite green, the close -------------------------------
+    const done = await walk((instruction) => instruction.kind === "done");
+    assert.equal(done?.kind, "done");
+    milestones.push("done");
+    assert.deepEqual(milestones, [
+      "round 1 recorded",
+      "run of record red",
+      "fix asked",
+      "round 2 recorded",
+      "run of record green",
+      "done",
+    ]);
+    assert.equal(readRounds(repo, 1).length, 2);
+    for (const suite of ["unit", "integration"]) {
+      assert.ok(
+        readRecords(repo).some(
+          (row) => row.suite === suite && row.stage === "final-full" && row.outcome === "passed",
+        ),
+        `no green final-full record for ${suite}`,
+      );
+    }
+    assert.doesNotMatch(readFileSync(join(repo, "src", "widget.py"), "utf8"), /broken/);
+    assert.equal(gitOut(repo, "status", "--porcelain").trim(), "");
+    const state = readSessionState(sessionsDir);
+    const session = ((state?.["sessions"] ?? []) as Array<Record<string, unknown>>).find(
+      (row) => row["number"] === 1,
+    );
+    assert.equal(session?.["status"], "complete");
+    assert.equal(session?.["verificationVerdict"], "VERIFIED");
+  });
+});
+
 describe("a session paused, then moving again", () => {
   it("says progress resumed once, and only once the phase has moved past the pause", async () => {
     setProviderKeys();

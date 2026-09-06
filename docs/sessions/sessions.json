@@ -1898,6 +1898,26 @@
         "identityProvenance": "direct"
       },
       "verificationVerdict": "VERIFIED",
+      "verification": {
+        "rounds": 2,
+        "verifierModel": "gpt-5.4",
+        "verifierProvider": "openai",
+        "transport": "copilot-cli"
+      },
+      "frameworkVersion": "2.0.1"
+    },
+    {
+      "number": 97,
+      "title": "An ACP client, wired to nothing",
+      "status": "in-progress",
+      "startedAt": "2026-09-05T20:34:04.813000-04:00",
+      "completedAt": null,
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": "VERIFIED",
       "frameworkVersion": "2.0.1",
       "verification": {
         "rounds": 2,
@@ -1905,15 +1925,6 @@
         "verifierProvider": "openai",
         "transport": "copilot-cli"
       }
-    },
-    {
-      "number": 97,
-      "title": "An ACP client, wired to nothing",
-      "status": "not-started",
-      "startedAt": null,
-      "completedAt": null,
-      "orchestrator": null,
-      "verificationVerdict": null
     }
   ]
 }

@@ -10,11 +10,88 @@
 // `process.env` when it spawns git.
 
 import { execFileSync } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
 const ROOT = join(tmpdir(), "dabbler-router-tests");
+
+/**
+ * The run this process belongs to: the `node --test` that started it as a
+ * worker, or the shell that ran the file alone. Every directory made under
+ * the root carries it in its name, so the next run can tell whose each
+ * entry is -- the workers of ONE run are separate processes sharing this
+ * root for minutes, and a sweep that could not tell them apart would take
+ * a template a slower worker is still copying from.
+ */
+const RUN = process.ppid;
+const RUN_TAG = /-(\d+)-[A-Za-z0-9]{6}$/;
+/**
+ * The age past which an entry goes whatever its run: one whose name carries
+ * no run (an older naming), or one whose run's pid some other process holds
+ * now. An hour is longer than any run.
+ */
+const LEFTOVER_MS = 60 * 60 * 1000;
+/** How long one process spends sweeping before it gets on with its tests. */
+const SWEEP_BUDGET_MS = 2_000;
+let swept = false;
+
+function alive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Whether an entry was left by a run that is over. */
+function leftover(name: string, mtimeMs: number, cutoff: number): boolean {
+  const tag = RUN_TAG.exec(name);
+  if (tag === null) return mtimeMs < cutoff;
+  const pid = Number(tag[1]);
+  if (pid === RUN) return false;
+  return !alive(pid) || mtimeMs < cutoff;
+}
+
+/**
+ * The suite's temp root, swept once per process of what finished runs left
+ * behind. Nothing else cleans it, and 17,000 entries had accumulated on the
+ * operator's machine before this. Every worker sweeps for a bounded time
+ * from a point of its own and ignores what it cannot remove -- an entry
+ * another worker got to first, or one a lingering process still holds --
+ * so a normal run's leavings go at the start of the next run and a backlog
+ * goes over a few.
+ */
+function tempRoot(): string {
+  mkdirSync(ROOT, { recursive: true });
+  if (swept) return ROOT;
+  swept = true;
+  const cutoff = Date.now() - LEFTOVER_MS;
+  const deadline = Date.now() + SWEEP_BUDGET_MS;
+  let names: string[];
+  try {
+    names = readdirSync(ROOT);
+  } catch {
+    return ROOT;
+  }
+  const start = names.length === 0 ? 0 : process.pid % names.length;
+  for (let index = 0; index < names.length && Date.now() < deadline; index += 1) {
+    const name = names[(start + index) % names.length] as string;
+    const path = join(ROOT, name);
+    try {
+      if (leftover(name, statSync(path).mtimeMs, cutoff)) rmSync(path, { recursive: true, force: true });
+    } catch {
+      // Gone already, or held by a process that outlived its run.
+    }
+  }
+  return ROOT;
+}
+
+/** A fresh directory under the root, named for the run that made it. */
+export function scratchDir(prefix: string): string {
+  return mkdtempSync(join(tempRoot(), `${prefix}${RUN}-`));
+}
 
 const GIT_CONFIG =
   "[user]\n\tname = Dabbler Test\n\temail = test@example.invalid\n" +
@@ -27,8 +104,7 @@ let pinned = false;
 
 function pinGit(): void {
   if (pinned) return;
-  mkdirSync(ROOT, { recursive: true });
-  const config = join(mkdtempSync(join(ROOT, "git-env-")), "gitconfig");
+  const config = join(scratchDir("git-env-"), "gitconfig");
   writeFileSync(config, GIT_CONFIG, "utf8");
   process.env["GIT_CONFIG_GLOBAL"] = config;
   process.env["GIT_CONFIG_NOSYSTEM"] = "1";
@@ -66,7 +142,7 @@ export function makeRepo(files: Record<string, string>, options: { origin?: bool
   // directory of its own, so `ROOT` is a path that does not exist yet on the
   // first call in that process.
   pinGit();
-  const target = mkdtempSync(join(ROOT, "walk-"));
+  const target = scratchDir("walk-");
   copyTemplate(templateFor(files, options.origin === true), target);
   return join(target, "repo");
 }
@@ -91,7 +167,7 @@ function templateFor(files: Record<string, string>, withOrigin: boolean): string
   const known = TEMPLATES.get(key);
   if (known !== undefined) return known;
   pinGit();
-  const target = mkdtempSync(join(ROOT, "template-"));
+  const target = scratchDir("template-");
   const repo = join(target, "repo");
   mkdirSync(repo, { recursive: true });
   git(repo, "init", "-q");

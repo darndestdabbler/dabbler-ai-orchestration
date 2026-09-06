@@ -2,6 +2,8 @@
 // Do not edit: the schema is the source, and `npm run check:types` fails
 // when this file no longer matches it.
 
+export type DriverRunPhase = "plan" | "steps" | "preverify" | "verify" | "dispositions" | "fix" | "run-of-record" | "land" | "gate-wait" | "publish" | "close" | "complete";
+
 export type DriverRunStopKind = "budget" | "rejected-thrice" | "blocked" | "engine" | "tests" | "verification" | "land" | "publish" | "close" | "interrupted";
 
 /**
@@ -25,7 +27,18 @@ export type DriverRun = {
   /**
    * Where the loop is. A re-run enters here; `complete` means the close ran and nothing is left to do. `publish` sits between the land and the close, and runs only for a session whose plan declared it releasable: packaging asks the close's own gates, and neither `working_tree_clean` nor `pushed_to_remote` passes before the commit and the push, so it cannot run earlier.
    */
-  phase: "plan" | "steps" | "preverify" | "verify" | "dispositions" | "fix" | "run-of-record" | "land" | "gate-wait" | "publish" | "close" | "complete";
+  phase: DriverRunPhase;
+  /**
+   * The step the driver made up rather than read from the plan -- the fix after a red run of record -- while its answer is outstanding, and the phase its acceptance sets. Written when the step is issued and cleared when its report is accepted, so the call that resumes the run judges the outstanding answer before any phase's own work. Without it the run-of-record phase re-entered from its head on the resuming call, ran the suite again and landed: the fix was never judged, its checks never ran and the repaired tree was never verified. Null or absent when there is none; a plan step needs no such entry because the plan itself is walked on a resume.
+   */
+  pending_step?: {
+    id: string;
+    ask: string;
+    /**
+     * The phase the step's acceptance sets.
+     */
+    then: DriverRunPhase;
+  } | null;
   /**
    * The seq of the instruction last issued, so the next one is monotonic across re-runs.
    */

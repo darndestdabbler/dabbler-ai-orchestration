@@ -201,9 +201,12 @@ The same shape carries the verifier's findings. When a round is blocking
 you are asked for a **disposition** per finding — `fix`, or `reject` with
 a reason and evidence paths — as JSON. A `fix` becomes a step named
 `fix-round-<N>`, checked by every plan step's checks; a `reject` becomes a
-dispute the next round must engage. Red affected tests and a red run of
-record come back the same way, as steps named `fix-tests` and
-`fix-run-of-record`.
+dispute the next round must engage. A red run of record comes back the
+same way, as a step named `fix-run-of-record`: your fix is judged and
+checked like any step, verified again, and only then is the suite run
+again. The step the framework is waiting on is written on `run.json` as
+`pending_step` until its report is accepted, which is what lets the call
+that resumes the session judge it before the phase's own work.
 
 ## `wait`: the framework's own long work
 

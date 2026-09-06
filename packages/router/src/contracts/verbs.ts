@@ -116,6 +116,16 @@ export const VERBS: readonly VerbSpec[] = [
     summary: "refresh the seat catalog: probe a named scope and merge it in",
   },
   {
+    // A measuring instrument, not a lifecycle verb: the one caller of the
+    // engine interface in `acp.ts`, which no phase, gate or record reads
+    // yet. Not extension-facing -- it spends a turn on an agent, and a
+    // button that spends one is a button somebody presses to see what it
+    // does.
+    verb: "agent",
+    extensionFacing: false,
+    summary: "one turn against an agent over its own protocol: prompt, events, cancel, resume by id",
+  },
+  {
     verb: "metrics",
     extensionFacing: false,
     summary: "per-call telemetry, gitignored and not the record",

@@ -37,6 +37,7 @@
         "identity",
         "transports",
         "engines",
+        "acp",
         "config",
         "metrics",
         "seatCost"

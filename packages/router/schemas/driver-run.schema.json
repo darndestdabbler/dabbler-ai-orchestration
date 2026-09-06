@@ -30,21 +30,22 @@
       "description": "The adapter the engine is reached through, by name. A re-run with a different one is refused: one engine's session store carries the run."
     },
     "phase": {
-      "enum": [
-        "plan",
-        "steps",
-        "preverify",
-        "verify",
-        "dispositions",
-        "fix",
-        "run-of-record",
-        "land",
-        "gate-wait",
-        "publish",
-        "close",
-        "complete"
-      ],
+      "$ref": "#/$defs/phase",
       "description": "Where the loop is. A re-run enters here; `complete` means the close ran and nothing is left to do. `publish` sits between the land and the close, and runs only for a session whose plan declared it releasable: packaging asks the close's own gates, and neither `working_tree_clean` nor `pushed_to_remote` passes before the commit and the push, so it cannot run earlier."
+    },
+    "pending_step": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["id", "ask", "then"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+        "ask": { "type": "string", "minLength": 1 },
+        "then": {
+          "$ref": "#/$defs/phase",
+          "description": "The phase the step's acceptance sets."
+        }
+      },
+      "description": "The step the driver made up rather than read from the plan -- the fix after a red run of record -- while its answer is outstanding, and the phase its acceptance sets. Written when the step is issued and cleared when its report is accepted, so the call that resumes the run judges the outstanding answer before any phase's own work. Without it the run-of-record phase re-entered from its head on the resuming call, ran the suite again and landed: the fix was never judged, its checks never ran and the repaired tree was never verified. Null or absent when there is none; a plan step needs no such entry because the plan itself is walked on a resume."
     },
     "seq": {
       "type": "integer",
@@ -247,6 +248,22 @@
     "updated_at": { "type": "string", "minLength": 1 }
   },
   "$defs": {
+    "phase": {
+      "enum": [
+        "plan",
+        "steps",
+        "preverify",
+        "verify",
+        "dispositions",
+        "fix",
+        "run-of-record",
+        "land",
+        "gate-wait",
+        "publish",
+        "close",
+        "complete"
+      ]
+    },
     "stopKind": {
       "enum": [
         "budget",

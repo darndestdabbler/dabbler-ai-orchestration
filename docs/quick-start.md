@@ -414,6 +414,44 @@ CLI version drift is a warning, not a refusal: the seat CLI auto-updates
 on its own schedule. Every stale-catalog message names the exact refresh
 invocation that resolves it.
 
+## Talking to an agent over its own protocol
+
+`dabbler agent` is a measuring instrument, adopted by nothing yet. It
+opens a conversation with an agent through the one interface the
+framework needs — open (fresh, or resumed **by id**), send a message,
+receive structured events, cancel — and prints what was negotiated as a
+first `{"kind":"open"}` JSON line (the handshake's reply and the reply to
+opening the conversation, as the agent gave them); sends one prompt and
+prints every event the agent produces as one JSON line on stdout as it
+arrives; prints the turn's outcome as a final `{"kind":"turn"}` line; and
+closes:
+
+```
+dabbler agent prompt "<text>" [--engine copilot|claude-code] [--model <id>]
+                     [--resume <session id>] [--cwd <dir>]
+                     [--permissions allow|deny] [--cancel-after <seconds>]
+```
+
+`copilot` (the default) speaks the Agent Client Protocol to `copilot
+--acp`; `claude-code` speaks Claude Code's stream-json conversation. Both
+are implementations of the same interface: tool calls arrive as `tool`
+and `tool-update` events, not as screen paint; `--cancel-after` ends the
+turn from the client's side and the final line says `cancelled: true`
+whatever word the agent used. What a resume replays is the agent's to
+decide: the Copilot seat sends the conversation's history back, and it is
+printed before the turn with each event marked `replayed`; Claude Code
+replays nothing, and the turn simply continues the named conversation.
+
+**When the agent asks whether a tool may run, nobody is asked.** The
+answer is a policy stated on the command line: `--permissions deny` (the
+default) answers every request with the agent's reject option, and
+`--permissions allow` with its allow-*once* option — never "always",
+because the decision is the framework's and is not handed to the agent's
+memory. A request that arrives after a cancel is answered `cancelled`.
+What the Copilot seat actually answered on this machine is recorded in
+`docs/acp-walkthrough.md`; the Claude Code implementation has been run
+only against the scripted peer in its tests, and the walkthrough says so.
+
 ## The Work Explorer (VS Code)
 
 Install the extension VSIX

@@ -245,6 +245,8 @@ testing:
           - packages/router/test/cli.test.ts
           - packages/router/test/schema.test.ts
           - packages/router/test/engines.test.ts
+          # `dabbler agent` is proven end to end, over a scripted peer.
+          - packages/router/test/acp.test.ts
       # The driver's ledger (the four answers and the run's state) and the
       # loop that fills it. The loop's test drives a whole session through
       # every verb the typed lifecycle has, so a change to either file is a
@@ -263,6 +265,12 @@ testing:
         select:
           - packages/router/test/engines.test.ts
           - packages/router/test/drive.test.ts
+      # The engine interface and its two protocol implementations, called by
+      # nothing in the lifecycle: its own test, over scripted peers, is the
+      # whole of what a change here reaches.
+      - when: packages/router/src/acp.ts
+        select:
+          - packages/router/test/acp.test.ts
       # The package's export surface. No test imports it directly -- it is a
       # re-export file -- so what answers for it is what exercises the two
       # things it hands out: the in-process router, and the contracts.
@@ -508,6 +516,7 @@ testing:
       # checkout (repo.ts, which only the walkthroughs build).
       - when: packages/router/test/support/
         select:
+          - packages/router/test/acp.test.ts
           - packages/router/test/config.test.ts
           - packages/router/test/metrics.test.ts
           - packages/router/test/lockfile.test.ts

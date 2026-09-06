@@ -1,0 +1,68 @@
+name: Candidate gate
+
+# The merge gate's CI half: master only moves to a full-check-green exact
+# SHA. A session's close pushes `candidate/s<N>` at the tested SHA; this
+# workflow runs the whole check against exactly that SHA, with each proof a
+# separately named step -- "workflow ran" and "suite ran" are not
+# equivalent, which a red-for-weeks incident taught this repository -- and
+# on green fast-forwards master to the tested SHA and deletes the branch.
+# A non-fast-forward answer fails the merge step rather than inventing a
+# merge commit nobody tested. A red run leaves the branch standing with the
+# failure list in this log; the framework's wait-and-act reads the
+# conclusion and routes the failures into remediation.
+
+on:
+  push:
+    branches:
+      - 'candidate/**'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: candidate-gate-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  full-check:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout the exact candidate SHA
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      - name: Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install
+        run: npm ci
+
+      - name: Typecheck
+        run: node packages/router/scripts/run-ts.mjs packages/router/scripts/workspace-check.ts typecheck
+
+      - name: Lint and boundary
+        run: node packages/router/scripts/run-ts.mjs packages/router/scripts/workspace-check.ts lint
+
+      - name: Router suite (the full check, step-level proof)
+        run: node node_modules/vitest/vitest.mjs run --root packages/router
+
+      - name: Extension suite
+        run: npm run test:unit -w dabbler-ai-orchestration
+
+      - name: Fast-forward master to the tested SHA
+        shell: bash
+        run: |
+          git fetch origin master
+          # --ff-only is the whole contract: master moves to the SHA the
+          # steps above proved, or this step fails and a person looks.
+          git checkout -B master origin/master
+          git merge --ff-only ${{ github.sha }}
+          git push origin master
+
+      - name: Delete the candidate branch
+        shell: bash
+        run: git push origin --delete "${GITHUB_REF#refs/heads/}"

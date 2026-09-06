@@ -1,6 +1,125 @@
-# STATUS — 98 closed VERIFIED: the csv-model notes fixed and the Copilot view tool measured; the plan declares no further session, the next block is the operator's
+# STATUS — 99 closed VERIFIED: csv-model's last two sessions answered, and the solution-layout decision is on the record; the next block is the monorepo-first module work
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
+
+> ## THE NEXT BLOCK, DECIDED 2026-09-06 — one repository, one module per session, a solution plan first
+>
+> The operator asked, after the csv-model trial finished, for a better
+> developer experience around a *solution*: a solution plan before the
+> repository plan, the solution broken into local libraries, and — as the
+> mechanism — one repository with one branch per library, where a branch
+> holds that library's source and every other library as a committed
+> compiled artifact. Sol (`gpt-5.6-sol`) and Gemini (`gemini-3.1-pro`)
+> were consulted on it (`docs/design/consults/round6-*.md`); both reject
+> the branch mechanism for the same reasons (nothing to merge, no base for
+> a pull request, no authoritative tree for CI, binaries in history, N-1
+> fan-out per producer change, and no team of skilled developers works
+> that way), and both deliver the proposal's goals with a **monorepo, a
+> directory per module** — the July module decision, and the shape of the
+> operator's own `D:\Projects\dabbler-csv-pipeline`. The decision and its
+> reasoning by rules (a)–(f) are in
+> `docs/design/consults/round6-synthesis.md`; the five slides: one trunk
+> monorepo; a solution plan first, as a reviewed hypothesis
+> (`docs/planning/solution-plan.md` + `docs/modules.yaml`, session 001
+> authors, session 002 challenges; the six-step `solution.yaml` workflow
+> is deleted); sibling modules as packages from one gitignored root
+> `.local-feed/` registered by a relative path in a tracked `nuget.config`,
+> rebuilt by the framework under an immutable dev version
+> (`1.3.0-dev.<digest>`); a session sees one module — the driver refuses
+> files outside its roots, the verifier's scope is the module, the
+> extension opens its `.slnf`, and `dabbler module open <slug>` gives the
+> physical wall the operator asked for as a framework-made sparse
+> worktree on a short-lived session branch (the advisors' one
+> disagreement; both are built, rule first); bundling recorded in
+> `release/<bundle>/bundle.yaml` and never executed, with module-keyed
+> `packaging` blocks under `modules:` in the one root `dabbler.yaml` and
+> round 5's local-byte gate at a releasable close. Eight day-sized
+> sessions are listed in the synthesis, with their real dependencies.
+> There are no public 2.x users (the Marketplace serves 1.0.4), so the
+> breaking change breaks nobody; `solution-dependencies.json`, the plan's
+> `repositories` member and `deps clone/scaffold` stay as the secondary
+> mode for a solution that really is several repositories.
+>
+> **What the operator can overrule with one word:** the focused worktree
+> (Gemini calls it over-correction; Sol calls the rule-only wall theatre
+> because the engine's reads are never mediated); keeping source mode
+> (Gemini would delete it); immutable dev versions (the round-5 instinct
+> was "a human just rebuilds", which is right about attestations and
+> wrong about NuGet's cache). Session 100 should be the first of the
+> eight: the solution plan, the module manifest, and the deletion of the
+> six-step workflow.
+
+> ## SESSION 99 CLOSED, 2026-09-06, VERIFIED (round 2, gpt-5.4 over the seat; landed 9956ec6e) -- csv-model's sessions 5 and 6, and session 98's papercuts
+>
+> Eight steps, each an entry from `D:\Projects\csv-model\docs\
+> framework-notes.md` written after session 98 was planned, or a papercut
+> session 98's own close recorded, confirmed in this tree first. The
+> packaging detector reads a root solution file and names the one packable
+> project below it (`detectPackaging`, `bootstrap/detect.ts`) instead of
+> saying a pack would fail — csv-model's did not, six checks and a real
+> publish over. `dabbler packaging --dry-run` says "No gate was asked"
+> beside a releasability refusal instead of "every gate passes", exits 0
+> when the declaration loads and releasability is the only obstacle (one
+> field, `declared`, on the run), and — found by the step's own test —
+> the config schema still *required* `packaging.push.secret`, so the
+> folder-feed exemption in `loadDeclaration` was unreachable through a
+> real `dabbler.yaml`; `secret` is optional in the schema now, and the
+> help and the scaffolded comment say a folder feed takes none. The
+> selector maps the framework-installed `.claude/settings.json` to no
+> test (one definition, `isFrameworkInstalledPath`, moved down into
+> `checks.ts` because `gates.ts` already imports `testEvidence.ts`, which
+> imports `checks.ts`); `session start` says the file lands with the
+> session's commit. `dabbler bootstrap` runs `git init` where there is no
+> repository (the extension's Set Up New Project already did) and says a
+> remote is needed before the first close; the sessions-root error names
+> `git init`, not `--sessions-dir`. `readFidelity` reads the disk before
+> the framing (a guessed path is "not a file here", not "no line numbers
+> on this transport"), a `view` of a directory is recorded as a listing,
+> and a shown line that is the disk line cut short says so. The fix step's
+> ask stops promising the affected tests; the projection note names
+> `dabbler`; candidate mode gates onto the branch HEAD is on
+> (`candidateTrunk`, both sites) instead of a literal `origin/master`;
+> `writeAtomically` retries a rename once on `EPERM`/`EBUSY`. The
+> run-of-record `wait` names a quarter over the suite's last recorded
+> duration, floor ten, ceiling sixty (`suiteRetrySeconds`). The guide
+> counts four kinds under the pull and `interrupt` only from `drive`,
+> shows the verification job rather than an affected-tests job that no
+> longer runs, and says what a check's environment is, what moves the
+> tree, what `affected` measures, and what `retry_after_seconds` is; the
+> plan ask says the check-environment and `repositories` sentences.
+> Nine router tests. Two `plan amend`s (the schema and its generated type
+> joined step 2; `gates.ts` joined step 3).
+>
+> **The run of record was red once, and it was right again.** Round 1
+> verified the tree; the complete suite then failed one test:
+> `version.json` still declared 2.0.1 while the 2.0.2 version commit after
+> session 98 had bumped both manifests by hand, against the rule the file
+> itself states. The fix step set `version.json` to 2.0.2 (the report
+> naming `package-lock.json` too was refused — the stamp had only rewritten
+> its line endings, which git normalises away, so the driver was right
+> that it had not changed); every step's checks re-ran, round 2 verified,
+> both suites green (1161 + 209). Router and extension are **2.0.3**,
+> rebuilt and installed after the close.
+>
+> **Not carried, on purpose:** `run.json`'s `engine: cli` and
+> `max_invocations` under the pull (a record shape with no reader that
+> cares); the facts row's `changedLines` omitting a deleted file (the
+> verifier's scope names it; `deletedFiles` is a schema change for a
+> session that needs it); a build identifier in the record when the
+> version string does not move (the framework developer's own case; 2.0.2
+> was bumped). **Owed to the next session:** the dry run's explanation
+> still prints "Using the credential named" with nothing after it when a
+> folder feed declares no secret (round 1's nit, one line in
+> `cli/packaging.ts` `explain()`); `FIDELITY_UNREADABLE` could say
+> "missing" alone now that a directory is a listing (round 1's second
+> nit); the land prefixes `Session N:` onto a task paragraph that may
+> already begin with it (this session's commit title reads `Session 99:
+> Session 99: …` — the plan ask should say the task starts with the work,
+> or the land should not double it); `job-finished-stale` after a
+> cap-clean settle (from 98) is still unexamined. **The csv-model
+> repository's own re-bootstrap** onto this router is one command the
+> operator runs there (`dabbler bootstrap --no-transport-detect`), and its
+> open notes entries are answered by this router.
 
 > ## SESSION 98 CLOSED, 2026-09-06, VERIFIED (three rounds, gpt-5.4 over the seat; landed e3e9ef2e) -- what the csv-model notes found, fixed and measured
 >

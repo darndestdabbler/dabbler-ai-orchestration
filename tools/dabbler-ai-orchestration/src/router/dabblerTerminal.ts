@@ -49,6 +49,8 @@
 // follows set into it -- `framework`, or the job's name. The scrollback
 // then reads as titled groups, and a job's bytes inside its group are the
 // runner's own, untouched. Nothing is drawn between two framework lines.
+// A session opens under a heavier banner of its own -- `SESSION 004`
+// between two double rules -- whenever the run record moves to a new one.
 //
 // **The first look says history, and dumps nothing.** A terminal opened
 // mid-session, or after one, used to replay every job log on disk whole
@@ -556,10 +558,25 @@ const CLEAR_ALL = `${ESC}[H${ESC}[2J${ESC}[3J`;
  */
 const HISTORY_CAP_BYTES = 4 * 1024 * 1024;
 
+/**
+ * The banner a session opens under: a double rule, the session's name in
+ * capitals centred beneath it, and a double rule again. The one thing in
+ * this terminal drawn heavier than a voice rule, because a session is the
+ * one boundary in the scrollback bigger than a change of voice. In the
+ * milestone tone, since a session beginning is the first milestone of all.
+ */
+export function banner(label: string, columns: number | null, kind: ThemeKind): string {
+  const width = Math.max(label.length + 2, (columns ?? DEFAULT_RULE_COLUMNS) - 1);
+  const rule = paint("═".repeat(width), "milestone", kind);
+  const lead = " ".repeat(Math.floor((width - label.length) / 2));
+  return `${rule}${CRLF}${lead}${paint(label, "milestone", kind, true)}${CRLF}${rule}${CRLF}`;
+}
+
 /** Everything this terminal has said or passed through, in order. */
 type HistoryEntry =
   | { readonly kind: "line"; readonly at: Date; readonly event: string; readonly fields: Record<string, string> }
-  | { readonly kind: "raw"; readonly label: string; readonly bytes: string };
+  | { readonly kind: "raw"; readonly label: string; readonly bytes: string }
+  | { readonly kind: "banner"; readonly label: string };
 
 /** The name a job log's bytes are labelled with: the file's own, without its suffix. */
 function jobLabel(logPath: string): string {
@@ -889,6 +906,28 @@ export class DabblerTerminal implements vscode.Pseudoterminal {
     this.atLineStart = text.endsWith(CRLF) || text.endsWith("\n");
   }
 
+  /**
+   * A session's banner, kept for a re-layout and drawn now.
+   *
+   * It stands apart from what came before by one empty line, and it is
+   * the framework speaking: the lines under it are the framework's until
+   * a job's bytes arrive, and a voice rule directly beneath a banner would
+   * be two headings for one group.
+   */
+  private sayBanner(label: string): void {
+    this.remember({ kind: "banner", label });
+    this.erase();
+    this.emitBanner(label);
+    this.draw();
+  }
+
+  private emitBanner(label: string): void {
+    const before = this.speaker === null ? "" : this.atLineStart ? CRLF : `${CRLF}${CRLF}`;
+    this.writer.fire(`${before}${banner(label, this.columns, this.theme)}`);
+    this.speaker = FRAMEWORK_VOICE;
+    this.atLineStart = true;
+  }
+
   /** A replay once the resize that asks for it has settled. */
   private scheduleReplay(): void {
     if (this.resizeTimer !== undefined) clearTimeout(this.resizeTimer);
@@ -953,8 +992,10 @@ export class DabblerTerminal implements vscode.Pseudoterminal {
     for (const entry of this.history) {
       if (entry.kind === "line") {
         this.emit(this.render(entry.at, entry.event, entry.fields), FRAMEWORK_VOICE);
-      } else {
+      } else if (entry.kind === "raw") {
         this.emit(forTerminal(entry.bytes), entry.label);
+      } else {
+        this.emitBanner(entry.label);
       }
     }
     this.draw();
@@ -1064,6 +1105,9 @@ export class DabblerTerminal implements vscode.Pseudoterminal {
     // already running is the state of the world at the first look.
     if (typeof run.session_number === "number" && run.session_number !== this.lastSession) {
       this.lastSession = run.session_number;
+      // Under its own banner, whether it is starting now or was already
+      // there when the terminal first looked: what follows is one session's.
+      this.sayBanner(`SESSION ${this.sessionLabel(run)}`);
       if (startedAfter(run.started_at, this.since)) this.started.fire(run.session_number);
     }
 

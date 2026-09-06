@@ -546,11 +546,18 @@ suite("the outline", () => {
     });
     terminal.onDidWrite((text: string) => written.push(text));
     const clear = `${ESC}[H${ESC}[2J${ESC}[3J`;
-    // The rule between voices is a line of its own and not a framework line.
+    // The rule between voices and the session's banner are lines of their
+    // own and not framework lines.
     const physical = (text: string) =>
       plain(text.split(clear).join(""))
         .split("\r\n")
-        .filter((line) => line !== "" && !line.includes("─"));
+        .filter(
+          (line) =>
+            line !== "" &&
+            !line.includes("─") &&
+            !line.includes("═") &&
+            !line.trim().startsWith("SESSION "),
+        );
 
     terminal.open({ columns: 60, rows: 20 });
     terminal.poll();
@@ -672,6 +679,58 @@ suite("the first look, and the rule between voices", () => {
     const narrow = plain(written.join("")).split("\r\n").filter((line) => line.includes("─ close ─"));
     assert.strictEqual(narrow.length, 1);
     assert.strictEqual(narrow[0]?.length, 39, narrow[0]);
+
+    terminal.dispose();
+    rmrf(root);
+  });
+
+  test("opens a session under its own banner, again when the next one starts, and at the width in hand", async () => {
+    useTheme(vscode.ColorThemeKind.Dark);
+    const root = makeTempDir("dabbler-banner-");
+    const first = path.join(root, ".dabbler", "runs", "s62", "driver");
+    fs.mkdirSync(path.join(first, "jobs"), { recursive: true });
+    writeRun(first, { session_number: 62, phase: "complete", job: null, stop: null });
+    const written: string[] = [];
+    const terminal = new DabblerTerminal({
+      repoRoot: root,
+      now: () => new Date(2026, 7, 31, 14, 30, 5),
+      pollMs: 60_000,
+      resizeMs: 1,
+    });
+    terminal.onDidWrite((text: string) => written.push(text));
+    terminal.open({ columns: 80, rows: 20 });
+    terminal.poll();
+
+    const lines = (text: string) => plain(text).split("\r\n");
+    const opened = lines(written.join(""));
+    // The session already there at the first look gets its banner before
+    // anything is said of it: a double rule, the name centred, the rule.
+    const heading = opened.indexOf("═".repeat(79));
+    assert.ok(heading >= 0, opened.join("|"));
+    assert.strictEqual(opened[heading + 1]?.trim(), "SESSION 062");
+    assert.strictEqual(opened[heading + 1]?.indexOf("S"), Math.floor((79 - "SESSION 062".length) / 2));
+    assert.strictEqual(opened[heading + 2], "═".repeat(79));
+    assert.ok(opened.indexOf("14:30:05 phase session=062 now=complete") > heading + 2);
+    // No voice rule directly under the banner: the framework is speaking.
+    assert.ok(!opened[heading + 3]?.includes("─"), opened[heading + 3]);
+
+    // The next session's run record: its own banner, once.
+    written.length = 0;
+    const next = path.join(root, ".dabbler", "runs", "s63", "driver");
+    fs.mkdirSync(path.join(next, "jobs"), { recursive: true });
+    writeRun(next, { session_number: 63, phase: "plan", job: null, stop: null });
+    terminal.poll();
+    terminal.poll();
+    assert.strictEqual(lines(written.join("")).filter((line) => line.trim() === "SESSION 063").length, 1);
+    assert.ok(plain(written.join("")).includes("phase session=063 now=plan"));
+
+    // Narrowed: every banner is drawn again at the new width.
+    written.length = 0;
+    terminal.setDimensions({ columns: 50, rows: 20 });
+    await new Promise((resolve) => setTimeout(resolve, 40));
+    const narrow = lines(written.join(""));
+    assert.strictEqual(narrow.filter((line) => line === "═".repeat(49)).length, 4, narrow.join("|"));
+    assert.strictEqual(narrow.filter((line) => line === "═".repeat(79)).length, 0);
 
     terminal.dispose();
     rmrf(root);

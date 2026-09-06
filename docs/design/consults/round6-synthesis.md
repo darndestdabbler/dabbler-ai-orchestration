@@ -1,5 +1,7 @@
 # Design consult, round 6 — synthesis and decision: how a solution is laid out for one-module sessions
 
+> **Amended by round 7 (same day).** The repository shape below stands. The wall changed: a session runs in a dedicated blob-filtered sparse clone (not a worktree beside a full checkout), the AI reads a generated, committed contract per module instead of sibling source, packages are committed, and the verifier refuses rather than counts. Slides 3 and 4 and the session list are superseded by `round7-synthesis.md`.
+
 **Decided 2026-09-06 by the orchestrator under the standing unattended-work
 directive**, after `round6-brief.md` was answered by Sol (`gpt-5.6-sol`,
 `round6-sol.md`) and Gemini (`gemini-3.1-pro-preview`, `round6-gemini.md`).

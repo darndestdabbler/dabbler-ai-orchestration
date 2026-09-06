@@ -4,6 +4,37 @@
 
 > ## THE NEXT BLOCK, DECIDED 2026-09-06 — one repository, one module per session, a solution plan first
 >
+> **Amended the same day by consult round 7
+> (`docs/design/consults/round7-synthesis.md`), on the operator's
+> reframing: "we want to prevent AI from reading more code than it needs
+> to read … what if the code is in a child directory in the repo."** Both
+> advisors, this time in agreement, put the wall on the disk: a session
+> runs in a **dedicated blob-filtered sparse clone** holding the module's
+> source and tests, the shared root build files, and every dependency's
+> **contract** and **package** — no sibling implementation exists in it (a
+> worktree beside a full checkout would share its object store, so it is
+> a clone). The AI reads a **generated, committed contract** per module
+> (`modules/<slug>/contract/`: GenAPI-style stubs or `javap` output with
+> the doc comments and a short human notes page, regenerated at every
+> land beside the package; the existing `contractdoc` verb is repointed).
+> Packages are committed (the follow-up decision stands). The verifier
+> **refuses** out-of-scope reads instead of counting them. The measure is
+> **exposure** — sibling implementation bytes present in the session's
+> filesystem, target zero — recorded in an exposure manifest at start
+> and close; counting reads is the wrong metric (this session: 137 Bash
+> calls to 6 Read), transcript audits are diagnostics at most, engine
+> path rules are defence in depth for Claude Code only, `.slnf` is
+> convenience, containers are a hardened mode. Cross-module work is
+> `modules: [a, b]` with a reason, reported. "Prevent" means ordinary and
+> accidental reads; deliberate retrieval is not prevented and the
+> framework says so. The eight sessions are re-ordered: plan+manifest;
+> module config + exception schema; **contracts**; committed packages;
+> **the focused checkout**; module-scoped sessions + hard verifier scope
+> + exposure manifest; the atomic land with drift, ceiling and bundles;
+> Maven parity + secondary mode. The paragraph below is round 6 as
+> decided; where it says "rule first" or "sparse worktree", round 7
+> governs.
+>
 > The operator asked, after the csv-model trial finished, for a better
 > developer experience around a *solution*: a solution plan before the
 > repository plan, the solution broken into local libraries, and — as the

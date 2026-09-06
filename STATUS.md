@@ -1,6 +1,76 @@
-# STATUS — HANDOFF to session 100: plan the modules block and start building it; single-module solutions stay the default and must work unchanged
+# STATUS — the modules block (sessions 100–108) is running unattended; session 100 closed VERIFIED, session 101 next
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
+
+> ## THE MODULES BLOCK, RUNNING UNATTENDED FROM 2026-09-06 — where it stands
+>
+> The operator asked for the nine sessions of the block to be planned and
+> run back to back, unattended, with Sol consulted where input was needed.
+> The plan is `docs/sessions/session-plan.md` ("Why sessions 100–108
+> exist"), reviewed by Sol before it was committed
+> (`docs/design/consults/round9-brief.md`, `round9-sol.md`). The handoff
+> below is the one this run started from and is kept as written; each
+> session that closes adds its own block under it, newest first.
+>
+> | session | what | state |
+> | --- | --- | --- |
+> | 100 | solution plan and module manifest; the six-step workflow deleted | CLOSED VERIFIED, landed 19d621c5 |
+> | 101 | module configuration, the exception schema, the test-impact vocabulary | next |
+> | 102 | designed contracts and contract-test source; the ecosystem seam | planned |
+> | 103 | committed immutable packages | planned |
+> | 104 | the focused checkout and the Windows preflight | planned |
+> | 105 | module-scoped sessions, the hard verifier scope, exposure, grants | planned |
+> | 106 | the impact plan and the selected run of record | planned |
+> | 107 | the atomic land | planned |
+> | 108 | Maven parity and the hardened profiles | planned |
+
+> ## SESSION 100 CLOSED, 2026-09-06, VERIFIED (round 2, gpt-5.4 over the seat; landed 19d621c5) -- the solution plan and the module manifest; the six-step workflow deleted
+>
+> The first of the nine sessions of the modules block
+> (`docs/sessions/session-plan.md`, "Why sessions 100–108 exist"; Sol's
+> round-9 review of the plan is `docs/design/consults/round9-*.md`, six
+> corrections adopted and two declined on the operator's handoff). Five
+> steps. **The manifest** (`modules.ts`) gains `kind` (`shared-types` |
+> `library` | `application`), `dependsOn` (must exist; a cycle is refused
+> naming it), `package` and `contract` (`designed` | `package` |
+> `generated`; a declared package is its own abstraction until somebody
+> designs one); consumers are derived (`consumersOf`, transitive, in
+> dependency order) and never written; **`solutionShape(root)` is the one
+> function that says which shape a repository is in** -- an absent manifest
+> is one implicit module (the repository, `codeRoots: ["."]`), one entry is
+> single, two are many -- and every later session asks it. `dabbler modules
+> create` takes `--kind`, `--depends-on`, `--package`, `--contract` and
+> rewrites the projection; `dabbler modules show` prints the shape with
+> `usedBy` per module. **The projection** the Solution Explorer reads is
+> `projection.ts` over the manifest (dependency order, `usedBy`, the
+> contract folder when the tree has it; the secondary mode's `external` and
+> `members` unchanged). **Bootstrap** writes a one-module `docs/modules.yaml`
+> by default (the second entry is what switches the module machinery on)
+> and its two setup sessions are rewritten around
+> `docs/planning/solution-plan.md` -- one module is a fine answer; a
+> repository with `project-plan.md` amends that file -- carrying the plan,
+> decompose and contracts deliverables the workflow held. **The six-step
+> component workflow is deleted**: `solution.ts`, `cli/workflow.ts`,
+> `cli/solution.ts`, `workflow/*`, `stepreview.ts`, `testphase.ts`,
+> `fixloop.ts`, their five test files, the `workflow` and `solution` verbs,
+> this repository's own `solution.yaml`; `contractdoc` draws its diagram
+> from the manifest. **The Solution Explorer renders modules**: rows in
+> dependency order with depends-on and used-by children only where there is
+> something to list, one row and nothing under it for a single-module
+> solution, the empty state naming session 1; New Module asks kind and
+> depends-on. Router suite 1,076 tests (1,072 passing, 4 skipped; 89 fewer than before, the deleted workflow's), extension 196.
+>
+> **Round 1 found two blocking findings and a nit, all fixed:** `modules
+> create` did not rewrite the projection (it does, with a test); the
+> scaffolded session 2 named only `solution-plan.md` where the prompt named
+> the `project-plan.md` fallback too; the extension's walkthrough text still
+> said "project plan". Round 2 verified.
+>
+> **The single-module requirement held.** `walk-session.test.ts` and
+> `walk-bootstrap.test.ts` pass unchanged in substance; a bootstrapped
+> repository reads as single-module and nothing module-shaped switches on.
+> One trap for the next session: a bare `.` in YAML 1.1 is a number, so a
+> scaffolded `codeRoots` entry is quoted.
 
 > ## HANDOFF, 2026-09-06 — what the next session is asked to do, and everything it needs
 >

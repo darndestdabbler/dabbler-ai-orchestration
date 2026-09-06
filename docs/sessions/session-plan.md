@@ -4589,9 +4589,93 @@ session.*
    `repo.ts` and `answers.ts`, and nowhere else.
 7. Affected; verify; full suite as `final-full`; close.
 
+### Session 98 of 98: What the csv-model notes found
+
+*The framework, read by engines that trusted it. Every item below is an
+entry in `D:\Projects\csv-model\docs\framework-notes.md`, written by the
+agents that ran that repository's sessions 1–4 on router 2.0.1 during
+2026-09-06, and each was confirmed against this tree before it was
+planned. Nothing here is a hazard anybody imagined.*
+
+1. Register; declare `--not-releasable`.
+2. **The gate receipt names the branch it pushed to.** `drive.ts` writes
+   `"branch": "master"` as a literal into `gate-receipt.json`; three
+   receipts on a `main` repository name a branch that does not exist.
+   Read the branch from `HEAD` (`git rev-parse --abbrev-ref HEAD`), and
+   refuse to write a receipt when HEAD is detached rather than guessing.
+   One test.
+3. **The Claude Code stop hook is installed for the engine that needs it,
+   not for the shell that happened to run bootstrap.** `installStopGate`
+   fires only under the `CLAUDECODE` environment marker, so Set Up New
+   Project from the extension and a plain-shell `dabbler bootstrap` never
+   install it — the wait gate session 95 built is absent from exactly the
+   projects the extension creates. Install it, idempotently, whenever a
+   session registers with `--engine claude-code` (and keep the bootstrap
+   path); one test that a registration under another engine writes
+   nothing.
+4. **The typed flow stops leaking into the pull.** Two sites. (a)
+   `session start` ends by printing the `declare` and `affected` recipe,
+   which contradicts the managed body an engine has just read; four
+   csv-model sessions saw it four times. After registering it says the one
+   thing that is true under both flows: call `dabbler session next`. (b)
+   The driven verify job's log ends with "The run of record and the push
+   remain: <suite command> / test-evidence record / git commit / session
+   close", because the driver spawns the ordinary CLI with nothing that
+   says it is driven — and AGENTS.md tells the engine that a `wait`'s `log`
+   is where the work is written. The driver marks every job it spawns
+   (`DABBLER_DRIVEN=1` in the job's environment), and `verify` under that
+   marker prints the verdict line and "the driver runs the rest" and
+   nothing else. One test each.
+5. **The Copilot CLI verifier is graded by something that can see it.**
+   `.dabbler/runs/s3/rounds.jsonl` in csv-model: 22 tool calls, 9 of them
+   reads of the transport's own handoff temp file — counted as
+   out-of-scope — and every one of the 12 real reads graded
+   `unverified: the tool returned no line-numbered content`. Two things.
+   (a) The handoff file is the transport's plumbing: a read of it is
+   neither an excursion nor a read, and the agency record says so (one
+   test over a scripted round). (b) ONE live call on the seat, `gpt-5-mini`
+   at weight 0, to capture what Copilot CLI 1.0.83's `view` tool actually
+   returns for a repository file; `readFidelity` then parses that shape,
+   or — if the tool no longer numbers lines — the round records that
+   fidelity is not measurable on this transport, once, instead of grading
+   every read unverified. The capture goes in `docs/acp-walkthrough.md`'s
+   sibling record for the seat, and the verifier prompt stops telling the
+   model to re-read a file it has already acknowledged.
+6. **`dabbler --version`** (and `dabbler version`) prints the router's
+   version and the extension's when it is running inside one. The managed
+   body tells agents to report the version they ran; there was no verb.
+7. **The work-plan view stops saying no plan is recorded.** Nothing in the
+   driven loop records the plan prose, so `project-work-plan.md` reads
+   `_No plan recorded yet._` for the life of a repository and the verifier
+   raised it as a nit in csv-model session 1. The plan step decides between
+   two shapes and records why: the work plan's `task` paragraph is recorded
+   as the prose at plan acceptance (the same write `session plan` makes),
+   or the view stops claiming a prose that the pull never asks for.
+8. **The guidance says what the code does.** In one pass, and then this
+   repository's own `AGENTS.md` is re-bootstrapped from the templates so
+   nothing is edited by hand: the managed body stops promising that `next`
+   "selects and runs the tests a change makes necessary" — the preverify
+   phase has been a deliberate no-op since the session 70s, and the tests
+   that run are the verifier's own inside the round and the complete suite
+   as the run of record; the session-plan template's "Affected tests as
+   preverify" step says that instead; the `dabbler.yaml` selection comment
+   stops saying pre-verification fails closed, says `rules[].when` is a
+   path prefix anchored at `/` and not a glob, and names
+   `testing.controls` with its four kinds; `session next --help` stops
+   saying `--engine` registers; `driving-a-session.md` § *Before the first
+   call* says `start` registers and `next` never does, and marks
+   `interrupt` as an instruction only `drive` can send; `run-started` under
+   the pull names the mode rather than `engine=cli` and prints no
+   `max_invocations`, which is not a bound there; and the step ask says a
+   deleted file is a change to name. No test asserts a document's wording.
+9. Affected; verify; full suite as `final-full`; close. The csv-model
+   notes file is the operator's; this session does not edit it, and the
+   entries it answers are marked fixed there by whichever csv-model session
+   next runs on the router this one ships.
+
 ---
 
-## Test budget for sessions 90–97
+## Test budget for sessions 90–98
 
 The suite at session 90 is the one sessions 83–88 rebuilt: `node --test`
 over `packages/router/test`, plus the extension's own tier. This block adds
@@ -4605,6 +4689,10 @@ test asserting a projection's rendered layout. Two additions for this block:
 function own it, and the structure is what is asserted — and **no test in
 session 95 requires a live agent**; the ACP client is exercised against a
 scripted peer, and the live run is a walkthrough the session records.
+
+Session 98 adds at most **eight router tests**, one per behaviour it
+changes, and no extension tests. Its one live call — step 5's capture of
+the seat's `view` output — is a recorded measurement, not a test.
 
 ---
 

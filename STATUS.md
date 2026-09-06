@@ -1,6 +1,36 @@
-# STATUS — 97 closed VERIFIED, the plan's last: the engine interface exists and nothing calls it; 96's two papercuts fixed; the next block is adoption behind a flag
+# STATUS — 98 planned from the csv-model notes; 97 closed VERIFIED: the engine interface exists and nothing calls it; 96's two papercuts fixed; the block after 98 is adoption behind a flag
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
+
+> ## SESSION 98 PLANNED, 2026-09-06 — what the csv-model notes found
+>
+> The operator's test repository, `D:\Projects\csv-model`, keeps
+> `docs/framework-notes.md`: every confusion and every suspected bug the
+> agents met running its sessions 1–4 on router 2.0.1 today. Twenty-eight
+> entries; each open one was checked against this tree before session 98
+> was written, and the session carries only what the code confirmed.
+> Defects: the gate receipt's branch is the literal `"master"`
+> (`drive.ts`); the Claude Code stop hook installs only when bootstrap
+> itself runs under Claude Code, so the extension's Set Up New Project
+> never installs it; `session start` and the driven `verify` job both
+> print the typed-verb recipe into a pull that forbids it; the Copilot
+> CLI verifier spends up to 41 % of a round's tool calls re-reading the
+> transport's own handoff file, counted out-of-scope, while every real
+> read is graded unverified because `readFidelity` expects `N. text`
+> lines the 1.0.83 `view` tool evidently no longer returns; there is no
+> `dabbler --version`; and the work-plan view says no plan is recorded
+> forever. Guidance the code has left behind: the managed body and the
+> session-plan template still promise the affected tests run before
+> verification, `next --help` and the driving guide still say `next`
+> registers, and `run-started` under the pull prints a bound that does
+> not apply. The plan block says which of these is a fix and which is a
+> decision; the notes file itself is not edited here.
+>
+> Not carried into 98, because they are conventions or not the router's:
+> the notes-lag convention, the `SKIP` row before a suite exists, the
+> publish pass-through (working), Copilot CLI 1.0.83 (working over
+> `copilot-cli`), the .NET 10 `.slnx` default, and the deleted-file
+> report, which is one sentence in the step ask and rides in step 8.
 
 > ## SESSION 97 CLOSED, 2026-09-05, VERIFIED (round 2, gpt-5.4 over the seat) -- the last session the plan declares
 >

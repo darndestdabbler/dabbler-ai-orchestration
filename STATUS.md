@@ -28,9 +28,21 @@
 > `walk-verify` died at load on `git remote add origin`. Fixed with a
 > mkdtemp name; the root's cleanup is still nobody's.
 >
-> Also seen: the copilot-cli lock is pinned to CLI 1.0.80 while 1.0.83 is
-> installed (`dabbler copilot refresh --quorum` re-dates it). Sessions
-> 82-95 wrote no handoff here; their record is `docs/sessions/change-log.md`.
+> **After the close, the seat catalog (operator-requested):** the lock is
+> re-dated to CLI 1.0.83; `gemini-3.1-pro-preview` is gone from Copilot
+> and its entry removed; `gemini-3.8-flash` added and confirmed. **The
+> lock's `probe_premium_requests` samples are not prices.** GitHub moved
+> to usage-based per-token billing on 2026-06-01 (AI credits, $0.01
+> each; docs.github.com/en/copilot/reference/copilot-billing/
+> models-and-pricing); Gemini 3.8 Flash is $0.75/$3.75 per M tokens,
+> among the cheapest on the seat, while the probe sampled 14. Legacy
+> request multipliers apply only to annual Pro/Pro+ plans that stayed on
+> them, and that table has GPT-5.5 at 57, not the 7.5 the lock holds.
+> Owed: re-base seat cost (session 93's legibility, the refresh's
+> cheapest-first order, the trial's 364 figure) on tokens times the
+> published rate. Until then, nothing should steer model choice by the
+> samples. Sessions 82-95 wrote no handoff here; their record is
+> `docs/sessions/change-log.md`.
 
 > ## SESSION 81 CLOSED, 2026-09-02, VERIFIED at adjudication (the third)
 >

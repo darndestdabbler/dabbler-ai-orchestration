@@ -1949,9 +1949,9 @@
     {
       "number": 99,
       "title": "What csv-model's last two sessions found, and session 98's papercuts",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-06T09:18:53.092000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-09-06T09:48:33.400000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

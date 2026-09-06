@@ -498,11 +498,27 @@ export function parseRevListCount(text: string): number {
   return pythonInt(text);
 }
 
+/** How the worktree gate is being asked. */
+export interface WorktreeGateOptions {
+  /**
+   * The question is "has the work begun?" (the task declaration), asked
+   * right after a registration: an UNTRACKED stop-gate file is then the
+   * registration's own install, not work. The close never passes this --
+   * it asks "is everything committed?", and the hook file counts there
+   * like any other, install or edit.
+   */
+  readonly beforeWork?: boolean;
+}
+
 /**
  * The paths in a porcelain status that are work: not editor noise, not the
  * session's own bookkeeping under `setRel`, not the run ledger.
  */
-export function materialPaths(porcelain: string, setRel: string): string[] {
+export function materialPaths(
+  porcelain: string,
+  setRel: string,
+  options: WorktreeGateOptions = {},
+): string[] {
   const blocking: string[] = [];
   for (const entry of parsePorcelain(porcelain)) {
     const path = entry.path;
@@ -516,9 +532,26 @@ export function materialPaths(porcelain: string, setRel: string): string[] {
     if (isMachineStatePath(path)) {
       continue; // the run ledger is the record, not the work
     }
+    if (options.beforeWork && entry.code === "??" && isFrameworkInstalledPath(path)) {
+      continue; // the registration's own install, not work; the land commits it
+    }
     blocking.push(path);
   }
   return blocking;
+}
+
+/**
+ * The one file the framework writes into a repository on a session's behalf
+ * and before the session's work: the Claude Code stop gate, installed by
+ * `session start` for a claude-code registration. A declaration made right
+ * after that must not be refused for it -- and ONLY for it: the exemption
+ * holds for the untracked file the install created, when the gate is asked
+ * whether work has begun. A tracked, modified `.claude/settings.json` is
+ * the operator's edit and is work; at the close the file counts however it
+ * got there.
+ */
+export function isFrameworkInstalledPath(path: string): boolean {
+  return String(path).replace(/\\/g, "/").replace(/^\.\//, "") === ".claude/settings.json";
 }
 
 /**
@@ -530,8 +563,11 @@ export function materialPaths(porcelain: string, setRel: string): string[] {
  * uncommitted work, and the task declaration, which refuses to be made
  * after work exists.
  */
-export function materialWorktreeChanges(sessionsDir: string): WorktreeChanges {
-  return judgeWorktree(readWorktreeFacts(sessionsDir), sessionsDir);
+export function materialWorktreeChanges(
+  sessionsDir: string,
+  options: WorktreeGateOptions = {},
+): WorktreeChanges {
+  return judgeWorktree(readWorktreeFacts(sessionsDir), sessionsDir, options);
 }
 
 /** What the working-tree gate reads: the porcelain, and where the record lives. */
@@ -551,12 +587,16 @@ export function readWorktreeFacts(sessionsDir: string): WorktreeFacts {
 }
 
 /** The work in the tree, from the facts alone. */
-export function judgeWorktree(facts: WorktreeFacts, sessionsDir: string): WorktreeChanges {
+export function judgeWorktree(
+  facts: WorktreeFacts,
+  sessionsDir: string,
+  options: WorktreeGateOptions = {},
+): WorktreeChanges {
   if (facts.root === null) {
     return { paths: [], error: `not inside a git repository: ${sessionsDir}` };
   }
   if (facts.error) return { paths: [], error: facts.error };
-  return { paths: materialPaths(facts.porcelain, facts.setRel), error: "" };
+  return { paths: materialPaths(facts.porcelain, facts.setRel, options), error: "" };
 }
 
 /** The first five paths, and how many more there are. */

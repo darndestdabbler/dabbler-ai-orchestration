@@ -26,6 +26,7 @@ import { solutionVerb } from "./solution.ts";
 import { testEvidenceVerb } from "./testEvidence.ts";
 import { triageVerb } from "./triage.ts";
 import { verifyVerb } from "./verify.ts";
+import { versionVerb } from "./version.ts";
 import { workflowVerb } from "./workflow.ts";
 
 /** argv after the verb; the process's exit code comes back. */
@@ -53,5 +54,6 @@ export const HANDLERS: Readonly<Record<string, VerbHandler>> = {
   "test-evidence": testEvidenceVerb,
   triage: triageVerb,
   verify: verifyVerb,
+  version: versionVerb,
   workflow: workflowVerb,
 };

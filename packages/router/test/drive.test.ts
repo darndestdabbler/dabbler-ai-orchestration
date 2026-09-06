@@ -21,6 +21,7 @@ import {
   judgeRegistration,
   judgeReportFiles,
   judgeReportShape,
+  localGateReceipt,
   staleJobDisposition,
   stepChangedPaths,
   unchangedStepFiles,
@@ -28,6 +29,7 @@ import {
   type StepSpec,
 } from "../src/drive.ts";
 import type { DriverInstruction, DriverReport } from "../src/generated/index.ts";
+import { gitAnswers } from "./support/answers.ts";
 
 const INSTRUCTION = {
   schema_version: 1,
@@ -336,5 +338,34 @@ describe("a drive binds the session it registered, and only that one", () => {
       }),
       REGISTER_COLLECT,
     );
+  });
+});
+
+describe("what the local gate receipt names", () => {
+  it("names the branch HEAD is on, and refuses a detached HEAD rather than guessing", () => {
+    // Three receipts in a repository whose trunk is `main` once named a
+    // `master` that did not exist: the branch was a literal.
+    const onMain = gitAnswers([
+      [["rev-parse", "--abbrev-ref", "HEAD"], { stdout: "main" }],
+      [["rev-parse", "HEAD"], { stdout: "0123456789abcdef0123456789abcdef01234567" }],
+    ]);
+    try {
+      const local = localGateReceipt("/repo");
+      assert.equal(local.refusal, null);
+      assert.equal(local.receipt?.["branch"], "main");
+      assert.equal(local.receipt?.["mode"], "local");
+      assert.equal(local.receipt?.["tested_sha"], "0123456789abcdef0123456789abcdef01234567");
+      assert.equal(local.receipt?.["base_sha"], local.receipt?.["tested_sha"]);
+    } finally {
+      onMain();
+    }
+    const detached = gitAnswers([[["rev-parse", "--abbrev-ref", "HEAD"], { stdout: "HEAD" }]]);
+    try {
+      const local = localGateReceipt("/repo");
+      assert.equal(local.receipt, null);
+      assert.match(String(local.refusal), /detached/);
+    } finally {
+      detached();
+    }
   });
 });

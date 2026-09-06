@@ -32,8 +32,10 @@ import {
   buildOrchestratorBlock,
   declareSessionTask,
   planStepKey,
+  recordProjectPlan,
   registerSessionStart,
   renderDecisionsLog,
+  renderProjectWorkPlan,
   stateAfterStart,
 } from "../src/writers.ts";
 import { gitAnswers, seed, tempDir } from "./support/answers.ts";
@@ -296,6 +298,22 @@ describe("appending a decision", () => {
 });
 
 describe("declaring a session's task list", () => {
+  it("renders the sessions and their declarations without claiming a plan prose nobody recorded, and shows one once it is", () => {
+    // Under the pull nothing calls `session plan`, and the view used to say
+    // "_No plan recorded yet._" for the life of the repository.
+    const { sessionsDir } = makeSessionsDir();
+    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
+    declareSessionTask(sessionsDir, { sessionNumber: 1, task: "Build the widget.", releasable: false });
+    const without = renderProjectWorkPlan(sessionsDir);
+    assert.doesNotMatch(without, /No plan recorded|## The plan/);
+    assert.match(without, /\| 1 \| First \| no \|/);
+    assert.match(without, /Build the widget\./);
+    recordProjectPlan(sessionsDir, "Two sessions, then stop.");
+    const withPlan = renderProjectWorkPlan(sessionsDir);
+    assert.match(withPlan, /## The plan\n\nTwo sessions, then stop\./);
+    assert.match(withPlan, /Build the widget\./);
+  });
+
   it("refuses a second declaration", () => {
     const { sessionsDir } = makeSessionsDir();
     registerSessionStart(sessionsDir, 1, { engine: "claude-code" });

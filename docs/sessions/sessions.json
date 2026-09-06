@@ -1918,9 +1918,29 @@
         "identityProvenance": "direct"
       },
       "verificationVerdict": "VERIFIED",
-      "frameworkVersion": "2.0.1",
       "verification": {
         "rounds": 2,
+        "verifierModel": "gpt-5.4",
+        "verifierProvider": "openai",
+        "transport": "copilot-cli"
+      },
+      "frameworkVersion": "2.0.1"
+    },
+    {
+      "number": 98,
+      "title": "What the csv-model notes found",
+      "status": "in-progress",
+      "startedAt": "2026-09-06T05:18:30.866000-04:00",
+      "completedAt": null,
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": "VERIFIED",
+      "frameworkVersion": "2.0.1",
+      "verification": {
+        "rounds": 3,
         "verifierModel": "gpt-5.4",
         "verifierProvider": "openai",
         "transport": "copilot-cli"

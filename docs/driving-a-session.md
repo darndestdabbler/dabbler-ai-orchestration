@@ -19,10 +19,10 @@ which the session resumed. Its lines are as they were printed too.
 ## The shape of it
 
 A session is a numbered block of work in `docs/sessions/session-plan.md`
-with a lifecycle around it: register, declare, work, run the affected
-tests, verify with a different provider, run the whole suite, commit and
-push, close. Following that list in prose is what an engine is worst at —
-it wanders, and a less capable engine wanders further.
+with a lifecycle around it: register, declare, work (each step proved by
+its own checks), verify with a different provider, run the whole suite,
+commit and push, close. Following that list in prose is what an engine is
+worst at — it wanders, and a less capable engine wanders further.
 
 So the framework owns the list, and the engine asks it what to do next:
 
@@ -50,18 +50,20 @@ session next` and do what it says until it says `done`.*
   `DABBLER_ANTHROPIC_API_KEY`, `DABBLER_OPENAI_API_KEY` or
   `DABBLER_GEMINI_API_KEY` — for a provider *other* than the engine's.
   Verification is cross-provider and there is no way to skip it.
-- The first call registers the session, so it needs to know who is
-  working:
+- `session start` registers the session, and it is the one call that
+  carries who is working:
 
   ```
-  dabbler session next --sessions-dir docs/sessions \
+  dabbler session start --sessions-dir docs/sessions \
       --engine claude-code --provider anthropic
   ```
 
-  Leave both off on every later call: the session is in flight and its
-  identity is on the record.
+  `next` never registers. Every `next` carries no identity — the session
+  is in flight and its identity is on the record — and a `next` that names
+  an engine with nothing in flight is refused rather than starting work
+  nobody asked for. With nothing in flight, `next` answers `done`.
 
-- `--transport`, if you want it, goes on that first call too. It is the
+- `--transport`, if you want it, goes on the first `next`. It is the
   *run's*, not the call's: the call that eventually starts verification is
   whichever `next` happens to reach that phase, following an
   `answer_command` that names it, so it is kept on `run.json` and used when
@@ -102,7 +104,7 @@ else the framework says goes to stderr, where you can read it and a
 parser does not have to.
 
 ```
-dabbler [11:31:20] run-started session=001 engine=claude-code max_invocations=24
+dabbler [11:31:20] run-started session=001 mode=pull
 dabbler [11:31:20] instruction-issued seq=1 kind=step step=plan
 ```
 
@@ -126,7 +128,7 @@ Five kinds and no sixth.
 | `step` | work to do — the plan, or one step of it | do it, run `answer_command`, call `next` |
 | `rejection` | your last answer was refused; `reasons` says why | put them right, answer again with **this** seq |
 | `wait` | the framework is running something long | leave it `retry_after_seconds`, call `next` |
-| `interrupt` | your invocation was ended; the reason is in `reasons` | read it, then answer what was still owed |
+| `interrupt` | your invocation was ended; the reason is in `reasons`. Only `session drive` sends this — a `next` never does, because nothing but you is running your engine | read it, then answer what was still owed |
 | `done` | the session is closed | stop |
 
 `answer_command` is always literal and always right: run it as printed,
@@ -308,7 +310,7 @@ interrupt: stop requested for session 001 (instruction 5); the driver ends the r
 The stop lands on the next call, which prints no instruction and exits 1:
 
 ```
-dabbler [11:31:38] run-resumed session=001 phase=verify invocations=0 max_invocations=24
+dabbler [11:31:38] run-resumed session=001 phase=verify mode=pull
 dabbler: Session 001 paused (interrupted) in phase 'verify' after 0 invocation(s).
 Somebody asked it to stop. I want to look at the diff first.
 The dabbler command that met it has ended; session 001 remains in flight. Next: you. `dabbler session drive` resumes it from 'verify'; `dabbler session cancel` ends it instead.
@@ -330,7 +332,7 @@ bound was met. **The same call resumes** — there is no separate resume
 verb, and no flag to remember:
 
 ```
-dabbler [11:31:42] run-resumed session=001 phase=verify invocations=0 max_invocations=24 after=interrupted
+dabbler [11:31:42] run-resumed session=001 phase=verify mode=pull after=interrupted
 dabbler [11:31:42] job-finished name=verification exit=0 log=.dabbler/runs/s1/driver/jobs/verification.log
 dabbler [11:31:42] verification-passed
 ```

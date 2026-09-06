@@ -73,6 +73,7 @@ import {
 import { SET_BOOKKEEPING_COMMIT_BASENAMES, governingConfig, runGates } from "./gates.ts";
 import { refuseIfResolvingFromSource } from "./resolution.ts";
 import { detectEcosystems } from "./bootstrap/detect.ts";
+import { installStopGate } from "./bootstrap/index.ts";
 import { PROJECT_CONFIG_FILENAME } from "./config.ts";
 import {
   CLASS_ACCOUNTABILITY_SIGNOFF,
@@ -110,7 +111,6 @@ import {
   flipStateToClosed,
   nowIsoSeconds,
   onDiskState,
-  readTaskDeclaration,
   recordProjectPlan,
   WORK_PLAN_FILENAME,
   registerSessionStart,
@@ -798,6 +798,18 @@ export function start(sessionsDir: string, options: StartOptions): number {
         `${basename(sessionsDir)} registered (${options.engine}).\n`,
     );
     for (const line of discoveryWarnings()) writeOut(`${line}\n`);
+    // The stop gate is installed for the engine that needs it, here, where
+    // the engine is known -- not by bootstrap, which knows only the shell it
+    // ran under. Idempotent, and best-effort: a registration must not fail
+    // because a settings file could not be written.
+    if (identity.engine === "claude-code") {
+      try {
+        const hooked = installStopGate(repoRootFromSessionsDir(sessionsDir));
+        if (hooked !== null) writeOut(`start: installed the stop gate in ${hooked}\n`);
+      } catch {
+        // Deliberately silent: see above.
+      }
+    }
     // Raised before the work, so the question is standing before the session
     // that would trip over it begins. Idempotent, and best-effort: a
     // registration must not fail because a brief could not be written.
@@ -813,24 +825,13 @@ export function start(sessionsDir: string, options: StartOptions): number {
     } catch {
       // Deliberately silent: see above.
     }
-    if (readTaskDeclaration(sessionsDir, requested) === null) {
-      // Step (a) of the lifecycle. Said here because the declaration has to
-      // precede the work to mean anything -- a session that declares itself
-      // releasable after building is a model deciding in hindsight what may
-      // be published.
-      writeOut(
-        "This session has not declared its task list. Before the edits:\n" +
-          `  dabbler session declare --sessions-dir ${sessionsDir} \\\n` +
-          '      --task "<what this session will do>" --releasable|--not-releasable\n',
-      );
-    }
-    writeOut(
-      "Next, once the edits are made:\n" +
-        `  dabbler affected --sessions-dir ${sessionsDir}\n` +
-        "It prints the tests this change makes necessary and the exact command " +
-        "to run. The complete suite is not accepted before verification -- it " +
-        "is the run of record, and it comes after the final verified tree.\n",
-    );
+    // The one thing true under both flows. This used to print the typed
+    // lifecycle's recipe -- `session declare`, then `dabbler affected` --
+    // which contradicted the managed body the engine had just read, and
+    // four sessions of one test repository were told to run verbs the pull
+    // forbids. The declaration is the plan step's answer; the tests are the
+    // framework's.
+    writeOut(`Next: dabbler session next --sessions-dir ${sessionsDir}\n`);
     return EXIT_OK;
   } finally {
     releaseLock(lock);

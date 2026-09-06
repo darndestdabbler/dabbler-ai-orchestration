@@ -68,6 +68,7 @@ describe("one job, from start to collection", () => {
         "-e",
         "const fs = require('node:fs');" +
           "process.stdout.write('the round is running\\n');" +
+          "process.stdout.write('driven=' + process.env.DABBLER_DRIVEN + '\\n');" +
           "const wait = () => (fs.existsSync(process.argv[1]) ? process.exit(3) : setTimeout(wait, 25));" +
           "wait();",
         gate,
@@ -88,7 +89,12 @@ describe("one job, from start to collection", () => {
     // reads that stamp back.
     assert.match(String(exited.state === "exited" ? exited.endedAt : ""), /^\d{4}-\d{2}-\d{2}T/);
 
-    assert.match(readFileSync(join(repoRoot, job.log), "utf8"), /the round is running/);
+    const logged = readFileSync(join(repoRoot, job.log), "utf8");
+    assert.match(logged, /the round is running/);
+    // Every job the driver starts is marked, and the mark reaches the verb
+    // through the runner: that is how `verify` knows the driver runs the
+    // rest.
+    assert.match(logged, /driven=1/);
     assert.ok(existsSync(join(repoRoot, job.status)));
   });
 });

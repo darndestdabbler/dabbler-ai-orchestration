@@ -17,6 +17,8 @@ import {
   WRITE_LABEL_FIX,
   WRITE_LABEL_TEST,
   WRITE_REFUSED,
+  FIDELITY_NOT_FRAMED,
+  OP_HANDOFF,
   applyWrites,
   briefing,
   declaredDependencies,
@@ -89,6 +91,28 @@ describe("what the round did", () => {
     assert.equal(row["out_of_scope"], 1);
   });
 
+  it("records a read of the transport's own handoff file as plumbing: neither a read nor an excursion", () => {
+    // The Copilot CLI transport tells the model to read its payload file
+    // first, and one csv-model round spent 9 of 22 calls doing so -- each
+    // recorded as an out-of-scope read graded unverified.
+    const handoff = "C:/Users/someone/AppData/Local/Temp/dabbler-copilot-handoff-25a322cdaa712f31.txt";
+    const record = recordForRound("/nowhere", grant, {
+      tool_calls: [
+        { tool: "view", arguments: { path: handoff }, result: { content: "task text" } },
+        { tool: "view", arguments: { path: handoff }, result: { content: "task text" } },
+      ],
+    });
+    assert.deepEqual(record.operations.map((operation) => [operation.kind, operation.inScope, operation.fidelity]), [
+      [OP_HANDOFF, true, null],
+      [OP_HANDOFF, true, null],
+    ]);
+    const row = recordRow(record);
+    assert.equal(row["reads"], 0);
+    assert.equal(row["out_of_scope"], 0);
+    assert.equal(row["over_budget"], 0);
+    assert.match(summaryLine(record), /2 read\(s\) of the transport's own handoff file/);
+  });
+
   it("says out loud that a round with no tools is not equivalent to one with them, and that a granted surface went unused", () => {
     const none = recordForRound("/nowhere", grantForTransport("api"), {});
     assert.match(String(recordRow(none)["reason"]), /could not look at the tree/);
@@ -102,21 +126,60 @@ describe("what the round did", () => {
 });
 
 describe("read fidelity", () => {
+  // The shape Copilot CLI 1.0.83's `view` returns (docs/copilot-cli-walkthrough.md):
+  // `content` is the file's text, and `detailedContent` a unified diff of
+  // the file against itself whose hunk header numbers the lines.
+  const viewed = (lines: string[], from = 1) => ({
+    content: lines.join("\n"),
+    detailedContent:
+      "\ndiff --git a/x b/x\nindex 0000000..0000000 100644\n--- a/x\n+++ b/x\n" +
+      `@@ -${from},${lines.length} +${from},${lines.length} @@\n` +
+      lines.map((line) => ` ${line}`).join("\n") +
+      "\n",
+  });
+
   it("marks a shown line that is not the disk line it claims to be", () => {
     const repo = tempDir();
     writeFileSync(join(repo, "a.py"), 'key = f"Bearer {api_key}"\n', "utf8");
-    assert.equal(readFidelity(repo, "a.py", { content: '1. key = f"Bearer {api_key}"' })[0], FIDELITY_VERBATIM);
-    const [transformed, detail] = readFidelity(repo, "a.py", { content: '1. key = f"******"' });
+    assert.equal(readFidelity(repo, "a.py", viewed(['key = f"Bearer {api_key}"']))[0], FIDELITY_VERBATIM);
+    const [transformed, detail] = readFidelity(repo, "a.py", viewed(['key = f"******"']));
     assert.equal(transformed, FIDELITY_TRANSFORMED);
     assert.match(String(detail), /line 1 was shown as/);
   });
 
   it("says unverified rather than clean when there is nothing to compare, and does not slander a ranged read", () => {
     const repo = tempDir();
-    assert.equal(readFidelity(repo, "gone.py", { content: "1. x" })[0], FIDELITY_UNVERIFIED);
+    assert.equal(readFidelity(repo, "gone.py", viewed(["x"]))[0], FIDELITY_UNVERIFIED);
     writeFileSync(join(repo, "a.py"), "one\ntwo\nthree\n", "utf8");
-    assert.equal(readFidelity(repo, "a.py", { content: "no numbers here" })[0], FIDELITY_UNVERIFIED);
-    assert.equal(readFidelity(repo, "a.py", { content: "3. three" })[0], FIDELITY_VERBATIM);
+    assert.equal(readFidelity(repo, "a.py", viewed(["three"], 3))[0], FIDELITY_VERBATIM);
+  });
+
+  it("takes the line numbers from the tool's framing, never from a line that starts with a digit, and says once per round when there is no framing", () => {
+    // csv-model's session plan opens `1. Register.` and was graded
+    // transformed by a regex that read the markdown list as line numbers;
+    // the same transport, given no diff, is not measurable -- and that is
+    // one fact about the round, not one unverified read per file.
+    const repo = tempDir();
+    const grant = grantForTransport("copilot-cli", { scope: ["plan.md"] });
+    writeFileSync(join(repo, "plan.md"), "1. Register.\n2. Build it.\n", "utf8");
+    const framed = readFidelity(repo, "plan.md", viewed(["1. Register.", "2. Build it."]));
+    assert.equal(framed[0], FIDELITY_VERBATIM);
+    const [unframed, detail] = readFidelity(repo, "plan.md", { content: "1. Register.\n2. Build it.\n" });
+    assert.equal(unframed, FIDELITY_UNVERIFIED);
+    assert.equal(detail, FIDELITY_NOT_FRAMED);
+    const unmeasurable = recordRow(
+      recordForRound(repo, grant, {
+        tool_calls: [{ tool: "view", arguments: { path: "plan.md" }, result: { content: "1. Register.\n2. Build it.\n" } }],
+      }),
+    );
+    assert.equal(unmeasurable["fidelity_measurable"], false);
+    const measurable = recordRow(
+      recordForRound(repo, grant, {
+        tool_calls: [{ tool: "view", arguments: { path: "plan.md" }, result: viewed(["1. Register.", "2. Build it."]) }],
+      }),
+    );
+    assert.equal(measurable["fidelity_measurable"], true);
+    assert.equal("fidelity_measurable" in recordRow(recordForRound(repo, grant, { tool_calls: [] })), false);
   });
 });
 

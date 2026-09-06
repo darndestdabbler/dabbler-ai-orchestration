@@ -5,6 +5,7 @@ import { describe, it } from "node:test";
 
 import { appendDispute, appendRound, readRounds } from "../src/ledger.ts";
 import {
+  DRIVER_RUNS_THE_REST,
   NO_ROUND_CAP_CLEAN,
   NO_ROUND_CAP_DISPUTED,
   NO_ROUND_TERMINAL,
@@ -132,9 +133,32 @@ describe("whether another round may open", () => {
 
 describe("what stands between a verified tree and a close", () => {
   it("names the declared suite's run of record, and only the push when no expensive suite is declared", async () => {
-    const generic = await runOfRecordLines("docs/sessions", { testing: {} } as never);
-    assert.match(generic, /The run of record and the push remain before `dabbler session close`/);
-    const named = await runOfRecordLines("docs/sessions", { testing: { suites: [{ name: "unit", command: "npm test", expensive: true, covers: ["."] }] } } as never);
-    assert.ok(named.includes("npm test") && named.includes("unit"));
+    // The suite itself runs as a job the driver spawned, so the marker is
+    // in this process's environment; the typed answer is the one WITHOUT it.
+    const before = process.env["DABBLER_DRIVEN"];
+    delete process.env["DABBLER_DRIVEN"];
+    try {
+      const generic = await runOfRecordLines("docs/sessions", { testing: {} } as never);
+      assert.match(generic, /The run of record and the push remain before `dabbler session close`/);
+      const named = await runOfRecordLines("docs/sessions", { testing: { suites: [{ name: "unit", command: "npm test", expensive: true, covers: ["."] }] } } as never);
+      assert.ok(named.includes("npm test") && named.includes("unit"));
+    } finally {
+      if (before !== undefined) process.env["DABBLER_DRIVEN"] = before;
+    }
+  });
+
+  it("names nothing but the driver when the driver spawned it", async () => {
+    // The job log is where the managed body sends an engine during a wait,
+    // and a recipe there was read as an instruction.
+    const before = process.env["DABBLER_DRIVEN"];
+    process.env["DABBLER_DRIVEN"] = "1";
+    try {
+      const driven = await runOfRecordLines("docs/sessions", { testing: { suites: [{ name: "unit", command: "npm test", expensive: true, covers: ["."] }] } } as never);
+      assert.equal(driven, DRIVER_RUNS_THE_REST);
+      assert.doesNotMatch(driven, /npm test|test-evidence|session close/);
+    } finally {
+      if (before === undefined) delete process.env["DABBLER_DRIVEN"];
+      else process.env["DABBLER_DRIVEN"] = before;
+    }
   });
 });

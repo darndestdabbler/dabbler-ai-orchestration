@@ -174,6 +174,13 @@ export const VERBS: readonly VerbSpec[] = [
     extensionFacing: false,
     summary: "render a module's contract from its declaration",
   },
+  {
+    // The managed body tells an engine to report the version it ran; this
+    // is what it runs. `dabbler --version` is the same handler.
+    verb: "version",
+    extensionFacing: false,
+    summary: "the router's version, and the extension's when inside one",
+  },
 ];
 
 /** The verb by name, or undefined. */

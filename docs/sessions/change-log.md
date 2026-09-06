@@ -717,3 +717,17 @@
 - Orchestrator provider (excluded): anthropic
 - Verifier's read surface: agency: 11 read(s), 0 search(es), 0 listing(s); 2 not confined to scope
 - Raw round output: `.dabbler/runs/s97/`
+
+## Session 98 verification — VERIFIED after 1 round(s)
+
+- Verifier: gpt-5.4 (openai) over copilot-cli
+- Orchestrator provider (excluded): anthropic
+- Verifier's read surface: agency: 25 read(s), 0 search(es), 1 listing(s); 7 not confined to scope; 1 read(s) of the transport's own handoff file, not counted
+- Raw round output: `.dabbler/runs/s98/`
+
+## Session 98 verification — VERIFIED after 3 round(s)
+
+- Verifier: gpt-5.4 (openai) over copilot-cli
+- Orchestrator provider (excluded): anthropic
+- Verifier's read surface: agency: 3 read(s), 0 search(es), 0 listing(s); 1 read(s) of the transport's own handoff file, not counted
+- Raw round output: `.dabbler/runs/s98/`

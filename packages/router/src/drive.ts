@@ -345,6 +345,41 @@ export function unchangedStepFiles(
     (file) => !report.files_changed.includes(file) && !changed.includes(file),
   );
 }
+/**
+ * The local executor's receipt: the same record the candidate mode writes,
+ * from the machine that ran the full check itself. One shape, two executors
+ * -- which is what makes the delegation auditable in a repository that will
+ * never have CI.
+ *
+ * The branch is read from HEAD, never assumed: this used to write the
+ * literal `master`, and three receipts in a repository whose trunk is `main`
+ * named a branch that did not exist. A detached HEAD names no branch, and
+ * the answer then is a refusal rather than a guess.
+ */
+export function localGateReceipt(
+  repoRoot: string,
+): { receipt: Record<string, unknown>; refusal: null } | { receipt: null; refusal: string } {
+  const branch = runGit(repoRoot, ["rev-parse", "--abbrev-ref", "HEAD"]);
+  if (branch.code !== 0 || branch.stdout === "") {
+    return { receipt: null, refusal: `the branch could not be read: ${tail(branch.stderr, 200)}` };
+  }
+  if (branch.stdout === "HEAD") {
+    return { receipt: null, refusal: "HEAD is detached, so there is no branch for the receipt to name" };
+  }
+  const tested = runGit(repoRoot, ["rev-parse", "HEAD"]).stdout;
+  return {
+    receipt: {
+      mode: "local",
+      branch: branch.stdout,
+      base_sha: tested,
+      tested_sha: tested,
+      executor: "local",
+      pushed_at: nowIso(),
+    },
+    refusal: null,
+  };
+}
+
 /** How often the push loop looks at a running job; a pull call never waits. */
 const JOB_POLL_MS = 250;
 /** What a `wait` tells the engine to leave the framework's work alone for. */
@@ -877,7 +912,16 @@ class Driver {
         updated_at: now,
       };
       this.save();
-      this.log("run-started", { session: sessionDisplayNumber(current), engine: this.run.engine, max_invocations: cap });
+      // Under the pull there is no engine the framework invokes and no
+      // invocation bound it holds anyone to, so the line says the mode and
+      // nothing that reads as a budget: `engine=cli max_invocations=24` was
+      // read by engines as a limit on their own calls.
+      this.log("run-started", {
+        session: sessionDisplayNumber(current),
+        ...(this.options.mode === "pull"
+          ? { mode: "pull" }
+          : { engine: this.run.engine, max_invocations: cap }),
+      });
       return EXIT_OK;
     }
     const named = this.engineName();
@@ -932,8 +976,9 @@ class Driver {
     this.log("run-resumed", {
       session: sessionDisplayNumber(current),
       phase: this.run.phase,
-      invocations: this.run.invocations,
-      max_invocations: this.run.max_invocations,
+      ...(this.options.mode === "pull"
+        ? { mode: "pull" }
+        : { invocations: this.run.invocations, max_invocations: this.run.max_invocations }),
       ...(existing.stop ? { after: existing.stop.kind } : {}),
       ...(afterRefusals ? { refusals: "reset; the step is asked afresh" } : {}),
     });
@@ -1243,7 +1288,7 @@ ${this.stopArtifacts()}`,
       if (kind === "file") return `${head} --answer-file <path to the JSON you wrote>`;
       return (
         `${head} --step ${stepId} --status done ` +
-        "--files <every file you created or changed, comma-separated, repository-relative> " +
+        "--files <every file you created, changed or deleted, comma-separated, repository-relative> " +
         '--notes "<one line>" [--tests "<the test command you ran>"]'
       );
     };
@@ -1706,8 +1751,9 @@ ${this.stopArtifacts()}`,
     return (
       spec.ask +
       "\n\nWhen the step is done, report with the answer command. --files names every " +
-      "file you created or changed in this step and nothing else. Use --status blocked " +
-      "only if the step cannot be done, and say why in --notes." +
+      "file you created, changed or deleted in this step and nothing else -- a deleted " +
+      "file is a change to name. Use --status blocked only if the step cannot be done, " +
+      "and say why in --notes." +
       (rejected
         ? "\n\nThe previous report for this step was refused for the reasons listed under " +
           "`reasons`. Put them right and report again, with THIS instruction's seq."
@@ -2411,19 +2457,11 @@ ${this.stopArtifacts()}`,
         throw new Stop("land", `the push was refused: ${tail(pushed.stderr, 300)}`);
       }
     }
-    // The local executor's receipt: the same record the candidate mode
-    // writes, from the machine that ran the full check itself. One shape,
-    // two executors -- which is what makes the delegation auditable in a
-    // repository that will never have CI.
-    const localTested = runGit(this.repoRoot, ["rev-parse", "HEAD"]).stdout;
-    const localReceipt = {
-      mode: "local",
-      branch: "master",
-      base_sha: localTested,
-      tested_sha: localTested,
-      executor: "local",
-      pushed_at: nowIso(),
-    };
+    const local = localGateReceipt(this.repoRoot);
+    if (local.receipt === null) {
+      throw new Stop("land", `no gate receipt can be written: ${local.refusal}`);
+    }
+    const localReceipt = local.receipt;
     const localReceiptPath = join(
       this.repoRoot, ".dabbler", "runs", `s${this.sessionNumber}`, "driver", "gate-receipt.json",
     );

@@ -303,16 +303,21 @@ export function scaffoldSolutionManifest(projectDir: string): string | null {
 }
 
 /**
- * The claude-code stop gate, installed where it can fire and nowhere else.
+ * The claude-code stop gate, installed for the engine that needs it.
  *
- * Guarded three ways: only under a Claude Code host (the CLAUDECODE
- * environment marker), only into a settings file that does not already
- * carry the hook, and only ever ADDING an entry -- existing hooks are
- * never rewritten, because the settings file is the operator's. Returns
- * the path it wrote, or null when there was nothing to do.
+ * Whether the engine is Claude Code is the CALLER's question: a session
+ * registering under `--engine claude-code` knows, and bootstrap reads the
+ * host it runs under. It used to be decided here from the CLAUDECODE
+ * environment marker, which meant the extension's Set Up New Project and a
+ * plain-shell bootstrap never installed it -- the gate was absent from
+ * exactly the projects the extension creates.
+ *
+ * Guarded two ways: only into a settings file that does not already carry
+ * the hook, and only ever ADDING an entry -- existing hooks are never
+ * rewritten, because the settings file is the operator's. Returns the path
+ * it wrote, or null when there was nothing to do.
  */
 export function installStopGate(projectDir: string): string | null {
-  if (!process.env["CLAUDECODE"]) return null;
   const path = join(projectDir, ".claude", "settings.json");
   let settings: Record<string, unknown> = {};
   try {

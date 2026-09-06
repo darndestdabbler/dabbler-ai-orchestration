@@ -66,6 +66,12 @@ export const JOBS_DIRNAME = "jobs";
 export const JOB_RUNNER_FILENAME = "job-runner.cjs";
 
 /**
+ * The environment variable every job the driver spawns carries, set to "1".
+ * A verb reads it to know the driver runs the rest of the lifecycle.
+ */
+export const DRIVEN_MARKER = "DABBLER_DRIVEN";
+
+/**
  * The runner, written beside the job it runs.
  *
  * CommonJS and dependency-free because it is spawned on a bare `node` with
@@ -328,6 +334,11 @@ export function startJob(
     detached: true,
     stdio: "ignore",
     windowsHide: true,
+    // The driver marks every job it spawns, and the runner's child inherits
+    // the mark. A verb that reads it knows the lifecycle around it is the
+    // framework's -- `verify` under the mark prints no recipe for a run of
+    // record and a push that the driver is about to do itself.
+    env: { ...process.env, [DRIVEN_MARKER]: "1" },
   });
   child.unref();
   if (child.pid === undefined) {

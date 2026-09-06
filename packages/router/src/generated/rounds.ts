@@ -64,9 +64,13 @@ export type Rounds = {
     out_of_scope?: number;
     over_budget?: number;
     transformed_reads?: number;
+    /**
+     * Present when the round read anything: whether the read tool framed its results with line numbers, so a fidelity comparison could be made at all. False once for the round says the transport is the reason, not each file.
+     */
+    fidelity_measurable?: boolean;
     reason?: string;
     operations?: Array<{
-      kind: "list" | "search" | "read";
+      kind: "list" | "search" | "read" | "handoff";
       target: string;
       in_scope: boolean;
       fidelity?: "verbatim" | "transformed" | "unverified";

@@ -184,11 +184,13 @@ Four kinds of instruction, and no fifth:
 - **`done`** — the session is over and closed. Stop.
 
 Everything the framework now does for itself happens inside those calls:
-declaring the work, selecting and running the tests a change makes
-necessary, cross-provider verification and its remediation rounds, the
-complete suite as the run of record, the commit, the push, and the close.
+declaring the work, each step's own checks, cross-provider verification
+and its remediation rounds (the verifier runs its own tests inside the
+round), the complete suite as the run of record, the commit, the push,
+and the close. No other test run happens between a step and the round.
 None of them is yours to run, and none of them is yours to skip ahead to
-— the instruction in hand is the whole of what is asked.
+— the instruction in hand is the whole of what is asked. `dabbler
+version` says which router this is; report it when you report a problem.
 
 **The framework owns the clock, the state and the sequencing.** An
 instruction that names a command is answered by running that command —

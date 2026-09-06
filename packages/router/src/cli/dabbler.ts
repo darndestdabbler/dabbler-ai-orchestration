@@ -27,6 +27,9 @@ export async function run(argv: string[]): Promise<number> {
     writeOut(usage());
     return name === undefined ? EXIT_USAGE : EXIT_OK;
   }
+  // The flag every command answers, routed to the verb of the same name so
+  // there is one answer to "which router is this".
+  if (name === "--version" || name === "-V") return HANDLERS["version"]!(rest);
 
   const spec = findVerb(name);
   const handler = spec ? HANDLERS[spec.verb] : undefined;

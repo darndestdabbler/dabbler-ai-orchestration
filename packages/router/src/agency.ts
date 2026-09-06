@@ -63,11 +63,34 @@ export const OP_LIST = "list";
 export const OP_SEARCH = "search";
 export const OP_READ = "read";
 /**
+ * A read of the transport's own handoff file: the payload the Copilot CLI
+ * transport writes to the temp directory when the prompt is too long for
+ * argv, and tells the model to read first. It is the transport's plumbing,
+ * neither an excursion out of scope nor a read of the tree, and it is
+ * recorded under its own kind so the counts say what the verifier looked
+ * at. One csv-model round spent 9 of 22 tool calls on it, every one
+ * recorded as an out-of-scope read graded unverified.
+ */
+export const OP_HANDOFF = "handoff";
+/**
  * The only write, and the only operation no tool performs: the verifier asks
  * for it in its answer and the framework acts, which is what makes a refusal
  * possible at all.
  */
 export const OP_WRITE = "write";
+
+/**
+ * The stem of the handoff file's name. Defined here and imported by the
+ * transport that writes the file, so the record and the writer cannot drift.
+ */
+export const HANDOFF_FILE_PREFIX = "dabbler-copilot-handoff-";
+const HANDOFF_FILE_PATTERN = new RegExp(`(^|[\\\\/])${HANDOFF_FILE_PREFIX}[0-9a-f]{16}\\.txt$`, "i");
+const HANDOFF_DETAIL = "the transport's own handoff payload";
+
+/** Whether a path the model named is the transport's handoff file. */
+export function isHandoffFile(path: string): boolean {
+  return HANDOFF_FILE_PATTERN.test(path);
+}
 
 /**
  * The CLI tool that performs each granted read operation. This mapping is the
@@ -125,7 +148,18 @@ export const WRITE_LABEL_FIX = "fix-write";
 const MAX_RECORDED_SCOPE = 200;
 const MAX_RECORDED_OPERATIONS = 200;
 
-const VIEW_LINE = /^\s*(\d+)\.(?: (.*))?$/;
+/**
+ * A unified-diff hunk header, which is how the Copilot CLI's `view` tool
+ * frames a file: `detailedContent` is a diff of the file against itself,
+ * every line a context line, numbered from the hunk's start (measured on
+ * 1.0.83, `docs/copilot-cli-walkthrough.md`). It used to be `N. text` lines
+ * in `content`, and that regex also matched a markdown file's own numbered
+ * list -- a session plan's `1. Register.` was graded transformed -- so the
+ * framing is now the tool's, never a line that happens to start with a digit.
+ */
+const HUNK_HEADER = /^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/;
+/** The detail every read carries when the tool framed nothing. */
+export const FIDELITY_NOT_FRAMED = "the view tool returns no line numbers on this transport";
 
 const IMPORT_STATEMENT =
   /^[ \t]*(?:from[ \t]+(\.*)([\w.]*)[ \t]+import[ \t]+([^\n#]*)|import[ \t]+([\w.]+))/gm;
@@ -634,6 +668,17 @@ export function recordTransformedReads(record: AgencyRecord): number {
   ).length;
 }
 
+/**
+ * Whether any read of the round came back framed with line numbers. A read
+ * of a file that is gone is still a measurable read that could not be made;
+ * only the tool framing nothing makes the round's fidelity unmeasurable.
+ */
+export function recordFidelityMeasurable(record: AgencyRecord): boolean {
+  return record.operations.some(
+    (operation) => operation.kind === OP_READ && operation.detail !== FIDELITY_NOT_FRAMED,
+  );
+}
+
 export function recordWritesApplied(record: AgencyRecord): number {
   return record.writes.filter(writeAccepted).length;
 }
@@ -655,6 +700,10 @@ export function recordRow(record: AgencyRecord): Record<string, unknown> {
     out_of_scope: recordOutOfScope(record),
     over_budget: recordOverBudget(record),
     transformed_reads: recordTransformedReads(record),
+    // Said once for the round when the tool framed nothing, so a transport
+    // that numbers no lines reads as what it is rather than as every file
+    // being unverifiable on its own account.
+    ...(recordReads(record) > 0 ? { fidelity_measurable: recordFidelityMeasurable(record) } : {}),
     operations: record.operations
       .slice(0, MAX_RECORDED_OPERATIONS)
       .map(operationRow),
@@ -702,16 +751,32 @@ function toolTarget(argumentsValue: unknown): [string, boolean] {
 }
 
 /**
- * The `N. <text>` lines a `view` returned, keyed by the file line number the
- * tool claims each one is.
+ * The lines a `view` returned, keyed by the file line number the tool's own
+ * framing gives each one: the context and added lines of every hunk in
+ * `detailedContent`, numbered from the hunk header's new-file start. A
+ * removed line belongs to the old numbering and is skipped; anything before
+ * the first hunk header is the diff's preamble.
  */
 function shownLines(result: unknown): Map<number, string> {
-  const content = isRecordValue(result) ? result["content"] : result;
+  const detailed = isRecordValue(result) ? result["detailedContent"] : null;
   const shown = new Map<number, string>();
-  if (typeof content !== "string" || !content) return shown;
-  for (const raw of content.replace(/\r\n/g, "\n").split("\n")) {
-    const match = VIEW_LINE.exec(raw);
-    if (match) shown.set(Number(match[1]), match[2] ?? "");
+  if (typeof detailed !== "string" || !detailed) return shown;
+  let next: number | null = null;
+  for (const raw of detailed.replace(/\r\n/g, "\n").split("\n")) {
+    const header = HUNK_HEADER.exec(raw);
+    if (header) {
+      next = Number(header[1]);
+      continue;
+    }
+    if (next === null) continue;
+    const mark = raw.charAt(0);
+    if (mark === " " || mark === "+") {
+      shown.set(next, raw.slice(1));
+      next += 1;
+    } else if (mark !== "-" && mark !== "\\") {
+      // Not a diff line: the hunk is over.
+      next = null;
+    }
   }
   return shown;
 }
@@ -727,7 +792,7 @@ export function readFidelity(
 ): [string, string | null] {
   const shown = shownLines(result);
   if (shown.size === 0) {
-    return [FIDELITY_UNVERIFIED, "the tool returned no line-numbered content"];
+    return [FIDELITY_UNVERIFIED, FIDELITY_NOT_FRAMED];
   }
   let disk: string[];
   try {
@@ -797,6 +862,16 @@ export function recordForRound(
       // string is one -- a tool that named the repository root itself would
       // otherwise be recorded as having named nothing.
       rel = relativePosix(repoRoot, target) || posix(target);
+      if (kind === OP_READ && isHandoffFile(rel)) {
+        operations.push({
+          kind: OP_HANDOFF,
+          target: rel,
+          inScope: true,
+          fidelity: null,
+          detail: HANDOFF_DETAIL,
+        });
+        continue;
+      }
       scoped = inScope(grant.scope, rel);
     } else {
       // A pattern with no path was not confined to anything. Calling that
@@ -845,6 +920,11 @@ export function summaryLine(record: AgencyRecord): string {
     }
     if (recordOutOfScope(record)) {
       parts.push(`${recordOutOfScope(record)} not confined to scope`);
+    }
+    if (countKind(record, OP_HANDOFF)) {
+      parts.push(
+        `${countKind(record, OP_HANDOFF)} read(s) of the transport's own handoff file, not counted`,
+      );
     }
     if (recordOverBudget(record)) {
       parts.push(`${recordOverBudget(record)} past the read budget`);

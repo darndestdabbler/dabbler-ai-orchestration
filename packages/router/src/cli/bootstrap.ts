@@ -210,10 +210,11 @@ export async function bootstrapVerb(argv: string[]): Promise<number> {
     written.push(path);
   }
   {
-    // The claude-code stop gate: the turn-end half of the guardian,
-    // installed only where it can fire (a Claude Code host) and never over
-    // an operator's own hooks.
-    const hooked = installStopGate(project);
+    // The claude-code stop gate: the turn-end half of the guardian. Bootstrap
+    // knows only the host it runs under (the CLAUDECODE marker), so it
+    // installs the gate there; a session registering under claude-code
+    // installs it for itself, whatever shell ran the setup.
+    const hooked = process.env["CLAUDECODE"] ? installStopGate(project) : null;
     if (hooked !== null) {
       writeOut(`bootstrap: installed the stop gate in ${hooked}\n`);
       written.push(hooked);

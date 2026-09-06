@@ -263,7 +263,7 @@ describe("dispatching one turn through the seat", () => {
         data: {
           toolCallId: "t1",
           success: true,
-          result: { content: "shown", detailedContent: "dropped" },
+          result: { content: "shown", detailedContent: "@@ -1,1 +1,1 @@\n shown" },
         },
       },
       { type: "assistant.message", data: { content: "done", outputTokens: 1 } },
@@ -272,8 +272,16 @@ describe("dispatching one turn through the seat", () => {
     const result = await dispatch(
       new CopilotCliTransport({ spawner: spawnerFor(fakeProcess({ stdout })) }),
     );
+    // Both halves travel: the text the model saw, and the CLI's own diff of
+    // the file, which is the only line-numbered framing a fidelity
+    // comparison can use.
     assert.deepEqual(result.metadata["tool_calls"], [
-      { tool: "view", arguments: { path: "a.py" }, success: true, result: { content: "shown" } },
+      {
+        tool: "view",
+        arguments: { path: "a.py" },
+        success: true,
+        result: { content: "shown", detailedContent: "@@ -1,1 +1,1 @@\n shown" },
+      },
     ]);
   });
 

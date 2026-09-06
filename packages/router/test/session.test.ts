@@ -7,7 +7,7 @@
 // from a table -- no checkout, no process. The close is the whole pipeline
 // and belongs to walk-session.test.ts.
 import assert from "node:assert/strict";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it } from "node:test";
 
@@ -259,6 +259,64 @@ describe("registering a session", () => {
       });
     } finally {
       state.restore();
+    }
+  });
+
+  it("says the next call is `session next`, and names neither the declaration nor the affected tests", async () => {
+    // Both were the typed lifecycle's recipe, printed at the one moment an
+    // engine had just read the managed body saying the framework does them.
+    const state = stateDir();
+    try {
+      const registered = await run(() =>
+        start(state.sessionsDir, { engine: "codex", provider: "openai" }),
+      );
+      assert.equal(registered.code, EXIT_OK);
+      assert.match(registered.out, /dabbler session next --sessions-dir/);
+      assert.doesNotMatch(registered.out, /declare|affected/);
+    } finally {
+      state.restore();
+    }
+  });
+
+  it("installs the Claude Code stop gate for a claude-code registration, and nothing for another engine", async () => {
+    // The gate used to be installed only when BOOTSTRAP ran under Claude
+    // Code, which is a fact about the shell that set the project up, not
+    // about the engine that will run it: the extension's Set Up New Project
+    // never installed it.
+    const codex = stateDir();
+    try {
+      const registered = await run(() =>
+        start(codex.sessionsDir, { engine: "codex", provider: "openai" }),
+      );
+      assert.equal(registered.code, EXIT_OK);
+      assert.equal(existsSync(join(codex.repo, ".claude")), false);
+    } finally {
+      codex.restore();
+    }
+    const claude = stateDir();
+    try {
+      const registered = await run(() =>
+        start(claude.sessionsDir, { engine: "claude-code", provider: "anthropic" }),
+      );
+      assert.equal(registered.code, EXIT_OK);
+      const settings = JSON.parse(
+        readFileSync(join(claude.repo, ".claude", "settings.json"), "utf8"),
+      ) as { hooks: { Stop: unknown[] } };
+      assert.match(JSON.stringify(settings.hooks.Stop), /session hook-stop/);
+      assert.match(registered.out, /installed the stop gate/);
+      // Registering again adds nothing: the hook is present, and the
+      // settings file is the operator's.
+      const again = await run(() =>
+        start(claude.sessionsDir, { engine: "claude-code", provider: "anthropic" }),
+      );
+      assert.equal(again.code, EXIT_OK);
+      assert.equal(
+        (JSON.parse(readFileSync(join(claude.repo, ".claude", "settings.json"), "utf8")) as { hooks: { Stop: unknown[] } })
+          .hooks.Stop.length,
+        1,
+      );
+    } finally {
+      claude.restore();
     }
   });
 });

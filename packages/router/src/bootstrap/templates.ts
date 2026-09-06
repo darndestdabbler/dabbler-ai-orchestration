@@ -96,11 +96,13 @@ export const SHARED_BODY =
   "- **`done`** — the session is over and closed. Stop.\n" +
   "\n" +
   "Everything the framework now does for itself happens inside those calls:\n" +
-  "declaring the work, selecting and running the tests a change makes\n" +
-  "necessary, cross-provider verification and its remediation rounds, the\n" +
-  "complete suite as the run of record, the commit, the push, and the close.\n" +
+  "declaring the work, each step's own checks, cross-provider verification\n" +
+  "and its remediation rounds (the verifier runs its own tests inside the\n" +
+  "round), the complete suite as the run of record, the commit, the push,\n" +
+  "and the close. No other test run happens between a step and the round.\n" +
   "None of them is yours to run, and none of them is yours to skip ahead to\n" +
-  "— the instruction in hand is the whole of what is asked.\n" +
+  "— the instruction in hand is the whole of what is asked. `dabbler\n" +
+  "version` says which router this is; report it when you report a problem.\n" +
   "\n" +
   "**The framework owns the clock, the state and the sequencing.** An\n" +
   "instruction that names a command is answered by running that command —\n" +
@@ -249,10 +251,11 @@ export const DECOMPOSITION_PROMPT =
   "  cancelled sessions.\n" +
   "- **Layout:** one `### Session <N>: <title>` heading per session, and its\n" +
   "  steps as a top-level ordered list. Step 1 registers the session; the last\n" +
-  "  steps run the affected tests, cross-provider verification, the complete\n" +
-  "  suite once against the verified tree, and close-out; the middle steps are\n" +
-  "  the work. Never write a step that says \"run the tests\" without saying\n" +
-  "  which run it means.\n" +
+  "  steps are cross-provider verification, the complete suite once against\n" +
+  "  the verified tree, and close-out; the middle steps are the work. The\n" +
+  "  only tests that run before the round are each step's own checks; never\n" +
+  "  write a step that says \"run the tests\" without saying which run it\n" +
+  "  means.\n" +
   "- A session may declare `Policy: fast` or `Policy: verified` on its own\n" +
   "  line; omitting it uses the repository default.\n" +
   "- Do NOT hand-author `sessions.json`: the first `session start` bootstraps\n" +
@@ -293,10 +296,9 @@ export const BOOTSTRAP_PLAN =
   "   areas, and each phase's key deliverables. Keep it concise — session 2\n" +
   "   turns each phase into numbered sessions, so scope each phase to a\n" +
   "   handful of focused AI sessions.\n" +
-  "3. Affected tests as preverify.\n" +
-  "4. Cross-provider verification.\n" +
-  "5. Full test suite, recorded as the run of record.\n" +
-  "6. Close-out.\n" +
+  "3. Cross-provider verification.\n" +
+  "4. Full test suite, recorded as the run of record.\n" +
+  "5. Close-out.\n" +
   "\n" +
   "**Creates:** `docs/planning/project-plan.md`. A later revision is just\n" +
   "another plan session that amends the same file.\n" +
@@ -308,16 +310,15 @@ export const BOOTSTRAP_PLAN =
   "   sessions appended to this file. Each session is a focused unit of work\n" +
   "   one AI coding session can complete: one\n" +
   "   `### Session <N>: <title>` heading, and its steps as a top-level\n" +
-  "   ordered list. Step 1 registers the session; the last steps run the\n" +
-  "   affected tests, cross-provider verification, the complete suite once\n" +
-  "   against the verified tree, and close-out; the middle steps are the\n" +
-  "   work. Never write a step that says \"run the tests\" without saying which\n" +
-  "   run it means. Order sessions so earlier ones unblock later ones, and\n" +
-  "   keep at most ~3 work steps per session.\n" +
-  "3. Affected tests as preverify.\n" +
-  "4. Cross-provider verification.\n" +
-  "5. Full test suite, recorded as the run of record.\n" +
-  "6. Close-out.\n" +
+  "   ordered list. Step 1 registers the session; the last steps are\n" +
+  "   cross-provider verification, the complete suite once against the\n" +
+  "   verified tree, and close-out; the middle steps are the work. Never\n" +
+  "   write a step that says \"run the tests\" without saying which run it\n" +
+  "   means. Order sessions so earlier ones unblock later ones, and keep at\n" +
+  "   most ~3 work steps per session.\n" +
+  "3. Cross-provider verification.\n" +
+  "4. Full test suite, recorded as the run of record.\n" +
+  "5. Close-out.\n" +
   "\n" +
   "**Creates:** the numbered session list the rest of this repository runs.\n" +
   "\n" +
@@ -340,9 +341,11 @@ export const PROJECT_CONFIG_HEADER =
 
 export const PROJECT_CONFIG_TESTING_HEADER =
   "\n" +
-  "# Which tests a change makes necessary, and what proves the suite was green.\n" +
-  "# Pre-verification runs the selected tests only; the complete suite is\n" +
-  "# recorded once, against the final verified tree.\n" +
+  "# Which tests answer for which path, and what proves the suite was green.\n" +
+  "# Nothing runs the selected tests before verification: the verifier runs\n" +
+  "# its own tests inside the round, and the complete suite is recorded once,\n" +
+  "# against the final verified tree. The selection is what the record NAMES\n" +
+  "# as affected by a change, and what `dabbler affected` prints.\n" +
   "#\n" +
   "# One suite per ecosystem whose root build file says how its tests run, so\n" +
   "# a repository that is Java and .NET at once hands each runner its own\n" +
@@ -355,8 +358,19 @@ export const PROJECT_CONFIG_TESTING_HEADER =
   "#               did not need rather than skip one you did -- so narrow it as\n" +
   "#               the layout settles.\n" +
   "#   runs_whole  says the runner takes a filter rather than a list of test\n" +
-  "#               files, so there is no narrowed form of it to run.\n" +
-  "#               Pre-verification runs it complete and the record says so.\n" +
+  "#               files, so there is no narrowed form of it to run, and a\n" +
+  "#               run of it is always the complete suite.\n" +
+  "#\n" +
+  "# Beside the suites, `controls` are the deterministic checks that run\n" +
+  "# before every verification round, one entry per kind -- compile,\n" +
+  "# typecheck, lint, analyzer -- each a `command` (argv for `node`, never a\n" +
+  "# shim like `npm`) whose exit code is the fact; `required: true` sends a red\n" +
+  "# result back to the author instead of buying a verifier's opinion on it:\n" +
+  "#\n" +
+  "#   controls:\n" +
+  "#     - kind: typecheck\n" +
+  "#       command: node scripts/typecheck.mjs\n" +
+  "#       required: true\n" +
   "testing:\n" +
   "  suites:\n";
 
@@ -365,18 +379,24 @@ export const PROJECT_CONFIG_SELECTION =
   "  # Which tests answer for which path.\n" +
   "  #\n" +
   "  # A scaffolded repository has declared no mapping yet, and the framework\n" +
-  "  # refuses to invent one: a path no rule covers is `selection_unknown`, and\n" +
-  "  # pre-verification fails closed rather than let a green run for the mapped\n" +
-  "  # half of a change read as covering the other half. So setup declares the\n" +
-  "  # only honest starting mapping there is -- every path is repository-wide,\n" +
-  "  # every change affects every test, and the complete suite is what\n" +
-  "  # pre-verification asks for.\n" +
+  "  # refuses to invent one: a path no rule covers is `selection_unknown`,\n" +
+  "  # and the record says so rather than let a mapping for half of a change\n" +
+  "  # read as covering the other half. So setup declares the only honest\n" +
+  "  # starting mapping there is -- every path is repository-wide, and every\n" +
+  "  # change is recorded as affecting every test.\n" +
   "  #\n" +
-  "  # It is correct and it is expensive, and it is meant to be replaced. Narrow\n" +
-  "  # it as the repository takes shape: `repo_wide` for the few paths that\n" +
-  "  # really do change what every test does (the test config, the lockfile),\n" +
-  "  # `rules` mapping a source path to the tests that would notice it breaking,\n" +
-  "  # and `smoke` for what runs when a path maps to nothing.\n" +
+  "  # It is meant to be replaced. Narrow it as the repository takes shape:\n" +
+  "  # `repo_wide` for the few paths that really do change what every test\n" +
+  "  # does (the test config, the lockfile), `rules` mapping a source path to\n" +
+  "  # the tests that would notice it breaking, and `smoke` for what answers\n" +
+  "  # when a path maps to nothing. A rule's `when` is a PATH PREFIX anchored\n" +
+  "  # at the repository root -- `src/api/` covers everything under it, and a\n" +
+  "  # file name covers that file -- not a glob: `*` and `**` match nothing.\n" +
+  "  #\n" +
+  "  #   rules:\n" +
+  "  #     - when: src/api/\n" +
+  "  #       select:\n" +
+  "  #         - tests/api/test_routes.py\n" +
   "  selection:\n" +
   "    repo_wide:\n" +
   "      - \".\"\n";

@@ -793,7 +793,9 @@ export function declareSessionTask(
     );
   }
 
-  const { paths, error } = materialWorktreeChanges(sessionsDir);
+  // Asked as "has the work begun?": the stop gate a claude-code registration
+  // just installed is not work, and is the one untracked file this ignores.
+  const { paths, error } = materialWorktreeChanges(sessionsDir, { beforeWork: true });
   if (error) {
     throw new SanctionedWriteError(
       `cannot tell whether session ${number}'s work has begun: ${error}`,
@@ -968,6 +970,14 @@ export function renderProjectWorkPlan(sessionsDir: string): string {
     .filter((value): value is number => Number.isInteger(value))
     .sort((left, right) => left - right);
 
+  // The prose section exists only when `session plan` recorded one. The
+  // driven loop never asks for a project prose -- each session's work plan
+  // declares that session's task, below -- and a page that said "no plan
+  // recorded yet" for the life of every repository run under the pull was
+  // claiming an absence of something nobody was ever going to write.
+  // Folding each accepted work plan's task paragraph in here instead was
+  // considered and rejected: "the plan" would then read as whichever
+  // session ran last.
   const lines: string[] = [
     `# Project work plan — ${basename(sessionsDir)}`,
     "",
@@ -975,13 +985,13 @@ export function renderProjectWorkPlan(sessionsDir: string): string {
     "",
     "---",
     "",
-    "## The plan",
-    "",
-    plans.length > 0
-      ? String(plans[plans.length - 1]["body"]).trim()
-      : "_No plan recorded yet._",
-    "",
+    ...(plans.length > 0
+      ? ["## The plan", "", String(plans[plans.length - 1]["body"]).trim(), ""]
+      : []),
     "## Sessions",
+    "",
+    `The numbered sessions are declared from \`${SESSION_PLAN_FILENAME}\`; each ` +
+      "one's task is what its own plan step declared.",
     "",
     "| # | Session | Releasable | Declared |",
     "| ---: | --- | --- | --- |",

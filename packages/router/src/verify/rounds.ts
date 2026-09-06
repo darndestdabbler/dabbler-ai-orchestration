@@ -62,6 +62,7 @@ import {
   resolveSessionOrchestratorIdentity,
   type OrchestratorIdentity,
 } from "../identity.ts";
+import { DRIVEN_MARKER } from "../jobs.ts";
 import { nowIso } from "../journal.ts";
 import {
   ROW_REMEDIATED_AT_CAP,
@@ -233,15 +234,24 @@ export function noRoundReason(
     : null;
 }
 
+/** What a verdict is followed by when the driver spawned this verb. */
+export const DRIVER_RUNS_THE_REST = "The driver runs the rest.";
+
 /**
  * The close is two steps away from a verified tree, and this names them. A
  * malformed or suite-less config says nothing rather than guessing a
  * command: a wrong command here is what the message exists to prevent.
+ *
+ * Under the driver's mark it names nothing at all: the run of record, the
+ * commit and the push are the driver's next phases, and a recipe printed
+ * into a job log that the managed body tells the engine to read was four
+ * sessions' worth of engines told to run verbs the pull forbids.
  */
 export async function runOfRecordLines(
   sessionsDir: string,
   config: RouterConfig,
 ): Promise<string> {
+  if (process.env[DRIVEN_MARKER] === "1") return DRIVER_RUNS_THE_REST;
   const { loadSuitesChecked, runOfRecordRecipe } = await import("../testEvidence.ts");
 
   const loaded = loadSuitesChecked(config);

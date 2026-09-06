@@ -212,6 +212,10 @@
           "type": "integer",
           "minimum": 0
         },
+        "fidelity_measurable": {
+          "description": "Present when the round read anything: whether the read tool framed its results with line numbers, so a fidelity comparison could be made at all. False once for the round says the transport is the reason, not each file.",
+          "type": "boolean"
+        },
         "reason": {
           "type": "string"
         },
@@ -230,7 +234,8 @@
                 "enum": [
                   "list",
                   "search",
-                  "read"
+                  "read",
+                  "handoff"
                 ]
               },
               "target": {

@@ -7,7 +7,7 @@
 // usage error rather than a silent no-op. A misspelled `--not-releasable`
 // that parsed as nothing would publish.
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it } from "node:test";
 
@@ -15,7 +15,9 @@ import { modulesVerb } from "../src/cli/modules.ts";
 import { HANDLERS } from "../src/cli/registry.ts";
 import { sessionVerb } from "../src/cli/session.ts";
 import { statusVerb } from "../src/cli/status.ts";
+import { extensionAbove, versionVerb } from "../src/cli/version.ts";
 import { VERBS } from "../src/contracts/verbs.ts";
+import { VERSION } from "../src/version.ts";
 import { writeInstruction } from "../src/driver.ts";
 import { capture } from "../src/output.ts";
 import { readRawSessionState } from "../src/progress.ts";
@@ -28,6 +30,25 @@ async function run(
   const collected = await capture(() => Promise.resolve(verb()));
   return { code: collected.value, out: collected.stdout, err: collected.stderr };
 }
+
+describe("dabbler version", () => {
+  it("prints the manifest's version, and the extension's only when one is above the package", async () => {
+    const result = await run(() => versionVerb([]));
+    assert.equal(result.code, 0);
+    assert.equal(result.out.trim().split("\n")[0], `dabbler-ai-router ${VERSION}`);
+    // A development checkout sits under no extension; the VSIX puts the
+    // bundle under a manifest that declares `engines.vscode`.
+    const extension = tempDir("ext-");
+    writeFileSync(
+      join(extension, "package.json"),
+      JSON.stringify({ name: "some-extension", version: "9.9.9", engines: { vscode: "^1.90.0" } }),
+      "utf8",
+    );
+    mkdirSync(join(extension, "dist"), { recursive: true });
+    assert.deepEqual(extensionAbove(join(extension, "dist")), ["some-extension", "9.9.9"]);
+    assert.equal(extensionAbove(tempDir("no-ext-")), null);
+  });
+});
 
 describe("dabbler session, the whole surface", () => {
   it("registers every subcommand the lifecycle documents", async () => {

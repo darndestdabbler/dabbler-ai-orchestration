@@ -66,6 +66,7 @@ import { dirname, isAbsolute, join, resolve } from "node:path";
 
 import { parse as parseToml } from "smol-toml";
 
+import { HANDOFF_FILE_PREFIX } from "../agency.ts";
 import { isArgvTooLarge, quoteForCmd, resolveProgram, spawnProgram, terminateTree } from "../checks.ts";
 import { hiddenSpawn } from "../journal.ts";
 import {
@@ -278,6 +279,10 @@ function buildHandoffBootstrap(posixPath: string): string {
     "to read the ENTIRE file at the path below, from the first byte through " +
     "the end of file, reading in sequential chunks if it is large:\n" +
     `${posixPath}\n` +
+    "Read it ONCE. When you have reached its footer you have the whole of " +
+    "it; do not open it again afterwards, and do not re-read any part of it " +
+    "to check -- every read of it is logged, and a second read proves " +
+    "nothing the first did not. " +
     "Execute the file's contents as your full instructions. Do not summarize " +
     "the file back to me. The file ends with a transport-control footer that " +
     "specifies an exact acknowledgement line; obey it -- the final line of " +
@@ -763,9 +768,13 @@ const TOOL_COMPLETE = "tool.execution_complete";
  * outside the read-only allowlist is the first thing a reader of the round
  * needs to see.
  *
- * `result.content` is kept and `detailedContent` dropped: the former is what
- * the model was shown, which is the only copy any fidelity claim can be made
- * against.
+ * Both halves of a `view` result are kept. `result.content` is the file's
+ * text as the model was shown it, with no line numbers; `detailedContent`
+ * is the CLI's own unified diff of the file against itself (measured on
+ * 1.0.83, `docs/copilot-cli-walkthrough.md`), whose hunk header numbers
+ * every line. The second is the only framing a line-for-line fidelity
+ * comparison can be made from, and dropping it -- as this once did -- left
+ * every read of every round graded unverified.
  */
 export function toolCalls(
   events: ReadonlyArray<Record<string, unknown>>,
@@ -796,7 +805,11 @@ export function toolCalls(
     const result = data["result"];
     if (isRecord(result)) {
       const content = result["content"];
-      entry["result"] = { content: typeof content === "string" ? content : "" };
+      const detailed = result["detailedContent"];
+      entry["result"] = {
+        content: typeof content === "string" ? content : "",
+        ...(typeof detailed === "string" ? { detailedContent: detailed } : {}),
+      };
     } else if (typeof result === "string") {
       entry["result"] = { content: result };
     }
@@ -937,7 +950,7 @@ export class CopilotCliTransport implements Transport {
     const payload = Buffer.from(payloadText, "utf8");
     const path = join(
       tmpdir(),
-      `dabbler-copilot-handoff-${randomBytes(8).toString("hex")}.txt`,
+      `${HANDOFF_FILE_PREFIX}${randomBytes(8).toString("hex")}.txt`,
     );
     try {
       const descriptor = openSync(path, "wx");

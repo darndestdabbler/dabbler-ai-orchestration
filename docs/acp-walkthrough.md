@@ -61,12 +61,15 @@ as the seat stated them on the §2 run's `open` line:
 | gemini-3.5 / 3.6 / 3.7 / 3.8-flash | 14x | grok-4.5 / 4.6 | 1x |
 | mai-code-1.1-flash, mai-code-1-flash-picker | 1x | kimi-k3, kimi-k2.7-code | 1x |
 
-That is the price list `copilot-catalog.lock` earns today by making a
-billed call per model (`dabbler copilot refresh --all` costs 39 premium
-requests). The seat's metadata and the catalog do not agree everywhere —
-the catalog's probe measured `gpt-5.4` at 0 and `claude-fable-5` at 1
-where the seat says 1x and 15x — so this is a finding to weigh, not a
-value to copy: one is what the seat claims, the other is what a call cost.
+These are the seat's own statement of its request multipliers, free to
+read, where `copilot-catalog.lock` samples them today by making a billed
+call per model (`dabbler copilot refresh --all` costs 39 premium
+requests). They are not prices: GitHub has billed the seat per token
+since 2026-06-01 (`STATUS.md`, under session 96), and the multipliers
+are the legacy request weights. The seat's metadata and the catalog do
+not agree everywhere — the catalog's probe sampled `gpt-5.4` at 0 and
+`claude-fable-5` at 1 where the seat says 1x and 15x — so this is a
+finding to weigh in the owed seat-cost re-base, not a value to copy.
 Nothing here acts on it.
 
 ## 2. A tool call arrives as events, not as screen paint

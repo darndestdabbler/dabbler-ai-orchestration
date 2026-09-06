@@ -1,6 +1,64 @@
-# STATUS — 96 closed VERIFIED; the suite spawns git nowhere but the walkthroughs; 97 is the ACP client, plus two papercuts 96 found
+# STATUS — 97 closed VERIFIED, the plan's last: the engine interface exists and nothing calls it; 96's two papercuts fixed; the next block is adoption behind a flag
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
+
+> ## SESSION 97 CLOSED, 2026-09-05, VERIFIED (round 2, gpt-5.4 over the seat) -- the last session the plan declares
+>
+> The engine interface exists and nothing in the lifecycle calls it.
+> `packages/router/src/acp.ts`: open a conversation (fresh, or resumed BY
+> ID and never by recency), send one message, receive structured events,
+> cancel -- with the Agent Client Protocol over stdio (`copilot --acp`)
+> and Claude Code's stream-json as two implementations of the one
+> interface. What the client answers when the agent asks permission is a
+> POLICY stated on the connection -- `allow` answers allow-ONCE, never
+> allow-always; `deny` answers reject; a request after a cancel is
+> answered `cancelled` -- and never a prompt forwarded to nobody.
+> `dabbler agent prompt` is its only caller: an `open` line with what was
+> negotiated, one JSON line per event, a `turn` line last. Ten tests over
+> scripted peers (`acp.test.ts`); the live record is
+> `docs/acp-walkthrough.md`, measured on Copilot CLI 1.0.83 with
+> `gpt-5-mini` (0x): `loadSession: true`; a tool call arrives as
+> `tool_call` -> `session/request_permission` (allow_once, allow_always,
+> reject_once) -> `tool_call_update`, and the file is on disk before the
+> completion event; an edit asks and a read does not; a denial is
+> `status: failed`, `code: rejected`, after which gpt-5-mini ended the
+> turn with no text at all; `session/cancel` is answered `end_turn` with
+> no usage, not the protocol's `cancelled`, so the client reports
+> cancelled from its own knowledge; `session/load` replays the whole
+> history before its own reply, and a session closed with
+> `session/close` is still loadable. The Claude Code implementation is
+> scripted-peer only; its permission channel is unmeasured.
+>
+> Session 96's two papercuts are fixed. `run.json` carries
+> `pending_step` {id, ask, then}; `drive.ts` writes it when it issues a
+> synthesised step and the loop head judges it before any phase's own
+> work, so under the pull a `fix-run-of-record` report is judged, its
+> checks run and the repaired tree is verified again before the suite
+> reruns -- walk-session proves the order: round 1, red run of record,
+> fix asked, round 2, green, close. The suite's temp root is swept at
+> the start of the next run: every directory under it is named for the
+> pid of the run that made it (`repo.ts scratchDir`), a finished run's
+> go at once, a live run's stay, and an unlabelled name goes after an
+> hour. Round 1 refused the first version, which pruned by age only,
+> and it was right; the plan text said "at the start of the next one".
+>
+> **A finding, not acted on.** The seat's `session/new` reply lists
+> every model it can dispatch with a `copilotUsage` multiplier
+> (gpt-5-mini 0x, gpt-5.4 1x, gpt-5.5 7.5x, gemini-*-flash 14x,
+> claude-fable-5 15x, opus-4.8-fast 30x) -- free, no billed probe. Read
+> with the note under session 96: those are the legacy request
+> multipliers, not prices under per-token billing, and they disagree
+> with the lock's samples in places (gpt-5.4 1x against the lock's 0;
+> claude-fable-5 15x against 1). Whatever the owed seat-cost re-base
+> uses, this is where the seat states its own weights, and the verb
+> prints it on every open.
+>
+> **Next block, the operator's to plan.** Adopt `acp.ts` behind a flag:
+> verification first, once session 95's cost legibility is proven on a
+> real run; then the driver's engine adapters in `engines.ts`; then the
+> watcher's nudge. Measure Claude Code's `--permission-prompt-tool
+> stdio` channel live before anything relies on it. The plan declares no
+> further session.
 
 > ## SESSION 96 CLOSED, 2026-09-05, VERIFIED (two rounds, gpt-5.4 over the seat)
 >

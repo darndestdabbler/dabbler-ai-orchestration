@@ -39,6 +39,7 @@
 import { existsSync, realpathSync } from "node:fs";
 import { join, resolve } from "node:path";
 
+import { isFrameworkInstalledPath } from "./checks.ts";
 import type { RouterConfig } from "./config.ts";
 import { PROJECT_CONFIG_FILENAME, loadConfig, projectRoot } from "./config.ts";
 import { changedPathsBetween, detectOutOfBandWrite } from "./evidence.ts";
@@ -538,20 +539,6 @@ export function materialPaths(
     blocking.push(path);
   }
   return blocking;
-}
-
-/**
- * The one file the framework writes into a repository on a session's behalf
- * and before the session's work: the Claude Code stop gate, installed by
- * `session start` for a claude-code registration. A declaration made right
- * after that must not be refused for it -- and ONLY for it: the exemption
- * holds for the untracked file the install created, when the gate is asked
- * whether work has begun. A tracked, modified `.claude/settings.json` is
- * the operator's edit and is work; at the close the file counts however it
- * got there.
- */
-export function isFrameworkInstalledPath(path: string): boolean {
-  return String(path).replace(/\\/g, "/").replace(/^\.\//, "") === ".claude/settings.json";
 }
 
 /**

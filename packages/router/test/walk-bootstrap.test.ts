@@ -27,7 +27,7 @@ import { canonicalVersion, packageVersion, releaseVersion, tagsFor } from "../sr
 import { capture } from "../src/output.ts";
 import { ID_GIT_REMOTE, openDecisions } from "../src/owedDecisions.ts";
 import { load as loadSolution } from "../src/solution.ts";
-import { gitOut, makeRepo } from "./support/repo.ts";
+import { git, gitOut, makeRepo, scratchDir, writeFiles } from "./support/repo.ts";
 
 /**
  * A .NET library that means to be published, and a Python suite beside it:
@@ -44,6 +44,26 @@ const PROJECT: Record<string, string> = {
 };
 
 describe("a project on its first day", () => {
+  it("initialises the repository it needs when the folder has none, and commits its scaffold into it", async () => {
+    // A folder that has not been `git init`ed is the ordinary state of a
+    // project on its first day; three trial runs did the init by hand after
+    // every verb had refused with a flag that could not help.
+    const folder = scratchDir("fresh-");
+    writeFiles(folder, { "README.md": PROJECT["README.md"]! });
+    git(folder, "--version"); // pins the suite's git identity for the child
+    assert.ok(!existsSync(join(folder, ".git")));
+
+    const setup = await capture(() =>
+      bootstrapVerb(["--project-dir", folder, "--no-transport-detect"]),
+    );
+    assert.equal(setup.value, 0, setup.stderr);
+    assert.match(setup.stdout, /initialised a git repository/);
+    assert.match(setup.stdout, /remote/);
+    assert.ok(existsSync(join(folder, ".git")));
+    assert.match(gitOut(folder, "log", "--oneline"), /Set up Dabbler/);
+    assert.equal(gitOut(folder, "status", "--porcelain", "--", "AGENTS.md"), "");
+  });
+
   it("answers every question the framework can ask, from nothing, in one pass", async () => {
     const repo = makeRepo(PROJECT, { origin: true });
     const milestones: string[] = [];

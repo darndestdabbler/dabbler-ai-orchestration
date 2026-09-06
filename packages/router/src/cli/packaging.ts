@@ -36,6 +36,13 @@ function usage(): string {
     "Only a session that declared itself releasable at step (a) may publish,",
     "and only after the evidence for (a) through (e) exists.",
     "",
+    "A feed that is a folder on disk -- a drive path, a UNC path, a POSIX path",
+    "or file:// -- takes no credential: leave `secret` out of the declaration",
+    "and the push runs without one. `--dry-run` rehearses: it says what would",
+    "pack and where it would push, runs nothing, files nothing, and exits 0",
+    "when the declaration loads -- in a session that may not publish too, so",
+    "a plan check can name it.",
+    "",
   ].join("\n");
 }
 
@@ -124,7 +131,17 @@ function explain(sessionsDir: string, run: PackagingRun): string {
       "at the moment of the push and written nowhere.",
   );
   const failed = run.gates.filter((gate) => !gate.passed);
-  if (failed.length === 0) {
+  if (run.gates.length === 0) {
+    // Zero failed gates out of zero asked is not every gate passing. The
+    // refusal that follows came before any gate was read -- releasability,
+    // or a dependency resolving from source -- and the one thing this
+    // rehearsal proved is the declaration itself.
+    lines.push(
+      "No gate was asked: the refusal below came before the gates were " +
+        "read. The declaration itself loads, and that is what this " +
+        "rehearsal proved.",
+    );
+  } else if (failed.length === 0) {
     lines.push("Every gate the close reads passes, so a real run would publish.");
   } else {
     lines.push(
@@ -230,5 +247,9 @@ export async function packagingVerb(argv: string[]): Promise<number> {
         ? `${explain(sessionsDir, run)}\n\n${render(run)}`
         : render(run)) + "\n",
   );
-  return runIsPublished(run) || run.ready ? EXIT_OK : EXIT_ERROR;
+  // A rehearsal that reached the point of packing, or one that proved the
+  // declaration in a session that may not publish, both answer 0: each is
+  // the rehearsal saying "nothing is wrong with what you declared".
+  const rehearsed = parsed.dryRun && (run.ready || run.declared);
+  return runIsPublished(run) || rehearsed ? EXIT_OK : EXIT_ERROR;
 }

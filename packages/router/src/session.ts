@@ -805,7 +805,12 @@ export function start(sessionsDir: string, options: StartOptions): number {
     if (identity.engine === "claude-code") {
       try {
         const hooked = installStopGate(repoRootFromSessionsDir(sessionsDir));
-        if (hooked !== null) writeOut(`start: installed the stop gate in ${hooked}\n`);
+        if (hooked !== null) {
+          writeOut(
+            `start: installed the stop gate in ${hooked} -- the framework's own ` +
+              "file, committed with this session's work; no step needs to name it.\n",
+          );
+        }
       } catch {
         // Deliberately silent: see above.
       }

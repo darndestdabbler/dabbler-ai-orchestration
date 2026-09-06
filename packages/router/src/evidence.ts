@@ -96,9 +96,13 @@ export function resolveSessionsDir(explicit?: string | null, start?: string): st
   const from = start ?? workingDirectory();
   const root = repoRootFor(from);
   if (root === null) {
+    // `--sessions-dir` is not the answer here: the router needs a repository
+    // for its tree hashes, its commit and its push, and a sessions directory
+    // outside one has nothing to be measured against.
     throw new SessionsRootNotFoundError(
       `not inside a git repository: ${from}. Run from the repository, or ` +
-        "pass --sessions-dir.",
+        "run `git init` there first -- `dabbler bootstrap` does, and then " +
+        "commits what it wrote.",
     );
   }
   return sessionsDirFor(root);

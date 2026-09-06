@@ -121,7 +121,9 @@ dabbler [11:31:20] instruction-issued seq=1 kind=step step=plan
 }
 ```
 
-Five kinds and no sixth.
+Four kinds under the pull, and no fifth — the same four the managed
+body names. A fifth, `interrupt`, exists only under `session drive`, where
+the framework is the one running the engine; a `next` never sends it.
 
 | `kind` | what it means | what you do |
 | --- | --- | --- |
@@ -164,6 +166,36 @@ A step is answered with the files you actually changed:
 dabbler session report --sessions-dir docs/sessions --seq 3 --step widget \
     --status done --files "src/widget.mjs" --notes "widget returns 2"
 ```
+
+Three facts about how a step is judged, each learned by a session that
+planned without them:
+
+- **A check runs in a built environment and sees no credential.** The
+  framework spawns each check with PATH, HOME, the toolchain roots
+  (`DOTNET_ROOT`, `JAVA_HOME`, …) and a scratch TEMP, and nothing else — a
+  check is repository-declared argv, and inheriting the shell would hand
+  every vendor key and feed PAT to code the framework did not write. A
+  driver *job* (verification, the run of record, the publish) inherits
+  the shell, so a credential set where `next` runs does reach the publish;
+  a check asserting it is refused, correctly.
+- **Ignored build output does not move the tree.** The framework hashes
+  the working tree as a git tree, so what `.gitignore` covers — `bin/`,
+  `obj/`, `node_modules/` — is invisible to it, and a check that compiles
+  is safe. A check that writes a *tracked* file is a check that changed
+  the tree under itself, and the report is refused for it.
+- **The router's own state writes are in the change set.** Registering a
+  session writes `docs/sessions/sessions.json`, and `dabbler affected`
+  measures everything since `HEAD`, so a repository maps `docs/sessions`
+  (or `docs`) to no test — the scaffolded `dabbler.yaml` does, and one
+  that was narrowed by hand must keep doing it. The one file the framework
+  installs at registration, `.claude/settings.json`, is mapped to no test
+  by the framework itself.
+
+The plan's optional `repositories` member is for a plan whose *steps*
+need the solution's other repositories on disk — it places each beside
+this one, declaring only which solution it belongs to. A plan for one
+repository of a many-repository solution leaves it out: the other
+repositories existing is not the same as this plan needing them.
 
 ## When an answer is refused
 
@@ -212,15 +244,18 @@ that resumes the session judge it before the phase's own work.
 
 ## `wait`: the framework's own long work
 
-Four things take longer than a tool call: the affected tests, a
-verification round, the complete suite, and the close. None of them runs
-inside a `next` call. The framework starts each one detached and comes
-straight back:
+Three things take longer than a tool call: a verification round, the
+complete suite as the run of record, and the close — four, for a session
+that declared itself releasable, whose publish runs between the push and
+the close. (The preverify phase runs nothing: the tests that run are the
+verifier's own inside the round, and the complete suite after it.) None
+of them runs inside a `next` call. The framework starts each one detached
+and comes straight back:
 
 ```
 dabbler [11:31:30] phase phase=preverify
-dabbler [11:31:30] preverify suite=unit command=node tests/run.mjs tests/test_widget.mjs
-dabbler [11:31:30] job-started name=affected tests: unit pid=49320 log=.dabbler/runs/s1/driver/jobs/affected-tests-unit.log
+dabbler [11:31:30] phase phase=verify
+dabbler [11:31:30] job-started name=verification pid=28444 log=.dabbler/runs/s1/driver/jobs/verification.log
 dabbler [11:31:30] instruction-issued seq=4 kind=wait reasons=1
 ```
 
@@ -229,7 +264,7 @@ dabbler [11:31:30] instruction-issued seq=4 kind=wait reasons=1
   "seq": 4,
   "kind": "wait",
   "retry_after_seconds": 60,
-  "log": ".dabbler/runs/s1/driver/jobs/affected-tests-unit.log",
+  "log": ".dabbler/runs/s1/driver/jobs/verification.log",
   "answer_command": "dabbler session next --sessions-dir C:\\temp\\pull-walk-61\\repo\\docs\\sessions"
 }
 ```
@@ -239,18 +274,30 @@ Nothing is owed here. Do something else for `retry_after_seconds`, read
 reports progress or collects the result:
 
 ```
-dabbler [11:31:37] job-finished name=affected tests: unit exit=0 log=.dabbler/runs/s1/driver/jobs/affected-tests-unit.log
-dabbler [11:31:37] phase phase=verify
-dabbler [11:31:37] job-started name=verification pid=28444 log=.dabbler/runs/s1/driver/jobs/verification.log
+dabbler [11:32:05] job-finished name=verification exit=0 log=.dabbler/runs/s1/driver/jobs/verification.log
+dabbler [11:32:05] verification-passed
+dabbler [11:32:05] phase phase=run-of-record
+dabbler [11:32:05] job-started name=run of record: unit pid=49320 log=.dabbler/runs/s1/driver/jobs/run-of-record-unit.log
 ```
 
 The log is the job's own output, whole:
 
 ```
-running unit: node tests/run.mjs tests/test_widget.mjs
+running unit: node tests/run.mjs
 widget ok
-recorded unit [preverify-targeted]: passed in 1s (timed here)
+recorded unit [final-full]: passed in 1s (timed here)
 ```
+
+`retry_after_seconds` is advice, not a floor. The driver judges the job's
+real state on every call, so a `next` made before the number is up is
+answered with progress if the job has finished and with another `wait` if
+it has not — never refused. The number is honest where it can be: a
+run-of-record wait names a quarter over the suite's last recorded
+duration (floor ten seconds, ceiling sixty), and a verification wait names
+sixty. What may be watched, if you must watch something, is the job's
+own status file beside its log (`<job>.status.json`), which the job
+writes at its exit; `run.json` is the driver's state, and only the `next`
+you have not called yet moves it.
 
 **A `wait` is a tool call, not a sleep,** and that is the point of it. An
 engine that blocks for four minutes waiting on a verification round hits
@@ -259,8 +306,8 @@ call rather than the work — this is exactly how the driver spike died. A
 `wait` gives the engine its turn back and lets it come to the framework
 when it is ready.
 
-Under Claude Code the stop gate `bootstrap` installs holds the turn once a
-`wait` is past due — `issued_at` plus `retry_after_seconds` — and hands
+Under Claude Code the stop gate `session start` installs for a
+`claude-code` registration holds the turn once a `wait` is past due — `issued_at` plus `retry_after_seconds` — and hands
 back the same sentence it uses for a step: run the `answer_command`. A
 wait not yet due lets the turn end and notes when it is due. The gate
 matters most here: a `wait` is the one instruction that asks the engine to

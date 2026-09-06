@@ -18,6 +18,7 @@ import {
   WRITE_LABEL_TEST,
   WRITE_REFUSED,
   FIDELITY_NOT_FRAMED,
+  FIDELITY_UNREADABLE,
   OP_HANDOFF,
   applyWrites,
   briefing,
@@ -145,6 +146,38 @@ describe("read fidelity", () => {
     const [transformed, detail] = readFidelity(repo, "a.py", viewed(['key = f"******"']));
     assert.equal(transformed, FIDELITY_TRANSFORMED);
     assert.match(String(detail), /line 1 was shown as/);
+  });
+
+  it("reads the disk before the framing: a path that is not a file is recorded as that, not as a transport with no line numbers", () => {
+    // The verifier guessed `git.ts`; the round said the view tool returns no
+    // line numbers on this transport, which was the wrong reason.
+    const repo = tempDir();
+    const [fidelity, detail] = readFidelity(repo, "guessed.ts", { content: "x\n" });
+    assert.equal(fidelity, FIDELITY_UNVERIFIED);
+    assert.equal(detail, FIDELITY_UNREADABLE);
+  });
+
+  it("records a view of a directory as the listing it is", () => {
+    // csv-model's session 6 round: a `view` of `docs/sessions`, recorded as
+    // a read that "could not be read as text here".
+    const repo = tempDir();
+    mkdirSync(join(repo, "docs", "sessions"), { recursive: true });
+    const grant = grantForTransport("copilot-cli", { scope: ["docs/sessions"] });
+    const record = recordForRound(repo, grant, {
+      tool_calls: [{ tool: "view", arguments: { path: "docs/sessions" }, result: { content: "a\nb\n" } }],
+    });
+    assert.equal(record.operations[0]?.kind, "list");
+    assert.equal(record.operations[0]?.inScope, true);
+    assert.equal(record.operations[0]?.fidelity, null);
+  });
+
+  it("says when a shown line is the disk line cut short, rather than shown as something else", () => {
+    const repo = tempDir();
+    const long = "x".repeat(300);
+    writeFileSync(join(repo, "notes.md"), `${long}\n`, "utf8");
+    const [fidelity, detail] = readFidelity(repo, "notes.md", viewed([long.slice(0, 120)]));
+    assert.equal(fidelity, FIDELITY_TRANSFORMED);
+    assert.match(String(detail), /cut short by the tool at 120 of 300/);
   });
 
   it("says unverified rather than clean when there is nothing to compare, and does not slander a ranged read", () => {

@@ -890,7 +890,7 @@ function capitalize(text: string): string {
 }
 
 const PROJECTION_NOTE =
-  "**Written by `ai_router.writers` as a fold of `activity-log.json`.**\n" +
+  "**Written by `dabbler` as a fold of `activity-log.json`.**\n" +
   "Hand edits are overwritten by the next append. The record is the log;\n" +
   "this page is one view of it.";
 

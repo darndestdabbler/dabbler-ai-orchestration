@@ -640,6 +640,20 @@ export function isTestFile(
 }
 
 /**
+ * The one file the framework writes into a repository on a session's behalf
+ * and before the session's work: the Claude Code stop gate, installed by
+ * `session start` for a claude-code registration. Two readers ask: the
+ * declaration gate, which must not refuse a session for it (and ONLY for it,
+ * as the untracked file the install created -- a tracked, modified
+ * `.claude/settings.json` is the operator's edit and is work; at the close
+ * the file counts however it got there), and the selector, which maps it to
+ * no test rather than to nobody. Defined here, below both, so there is one.
+ */
+export function isFrameworkInstalledPath(path: string): boolean {
+  return String(path).replace(/\\/g, "/").replace(/^\.\//, "") === ".claude/settings.json";
+}
+
+/**
  * The tests `changedPaths` make necessary, each with the reason that selected
  * it, plus the risks the selection raised.
  *
@@ -702,6 +716,13 @@ export function selectTests(
         for (const target of targets) offer(target, REASON_CONFIGURED_RULE, rel);
       }
     }
+
+    // A file the framework itself installed at registration is not the
+    // session's change and reaches no test: it is mapped to nothing, the way
+    // an empty rule target is, rather than reported as a path nobody
+    // thought about. No scaffolded rule names it, because it did not exist
+    // when the rules were written.
+    if (!matched && isFrameworkInstalledPath(rel)) matched = true;
 
     if (!matched) unknown.push(rel);
   }

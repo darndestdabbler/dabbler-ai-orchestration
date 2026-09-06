@@ -12,6 +12,7 @@ import { join } from "node:path";
 import { describe, it } from "node:test";
 
 import { modulesVerb } from "../src/cli/modules.ts";
+import { packagingVerb } from "../src/cli/packaging.ts";
 import { HANDLERS } from "../src/cli/registry.ts";
 import { sessionVerb } from "../src/cli/session.ts";
 import { statusVerb } from "../src/cli/status.ts";
@@ -21,7 +22,7 @@ import { VERSION } from "../src/version.ts";
 import { writeInstruction } from "../src/driver.ts";
 import { capture } from "../src/output.ts";
 import { readRawSessionState } from "../src/progress.ts";
-import { registerSessionStart } from "../src/writers.ts";
+import { declareSessionTask, registerSessionStart } from "../src/writers.ts";
 import { makeAnsweredSandbox, tempDir } from "./support/answers.ts";
 
 async function run(
@@ -30,6 +31,36 @@ async function run(
   const collected = await capture(() => Promise.resolve(verb()));
   return { code: collected.value, out: collected.stdout, err: collected.stderr };
 }
+
+describe("dabbler packaging --dry-run", () => {
+  it("exits 0 in a session that may not publish when the declaration loads, and says no gate was asked", async () => {
+    // A rehearsal that exited 1 on releasability alone, one line under a
+    // sentence saying every gate passed, could not be named by a plan check
+    // in the sessions before the one that publishes -- which is every
+    // session in which the declaration is written.
+    const { repo, sessionsDir } = makeAnsweredSandbox();
+    writeFileSync(
+      join(repo, "dabbler.yaml"),
+      [
+        "schema_version: 1",
+        "packaging:",
+        "  pack:",
+        '    argv: ["dotnet", "pack", "-c", "Release", "-o", "{output}"]',
+        "  push:",
+        '    argv: ["dotnet", "nuget", "push", "{artifact}", "--source", "{feed}"]',
+        "    feed: /feeds/local",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
+    declareSessionTask(sessionsDir, { sessionNumber: 1, task: "refactor only", releasable: false });
+    const result = await run(() => packagingVerb(["--dry-run", "--sessions-dir", sessionsDir]));
+    assert.equal(result.code, 0, result.err);
+    assert.match(result.out, /No gate was asked/);
+    assert.doesNotMatch(result.out, /Every gate the close reads passes/);
+  });
+});
 
 describe("dabbler version", () => {
   it("prints the manifest's version, and the extension's only when one is above the package", async () => {

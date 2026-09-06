@@ -160,6 +160,8 @@ const MAX_RECORDED_OPERATIONS = 200;
 const HUNK_HEADER = /^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/;
 /** The detail every read carries when the tool framed nothing. */
 export const FIDELITY_NOT_FRAMED = "the view tool returns no line numbers on this transport";
+/** The detail a read carries when the path is not a file here: missing, or a directory. */
+export const FIDELITY_UNREADABLE = "the path is not a file here: missing, or a directory";
 
 const IMPORT_STATEMENT =
   /^[ \t]*(?:from[ \t]+(\.*)([\w.]*)[ \t]+import[ \t]+([^\n#]*)|import[ \t]+([\w.]+))/gm;
@@ -781,6 +783,15 @@ function shownLines(result: unknown): Map<number, string> {
   return shown;
 }
 
+/** Whether `rel` names a directory under `repoRoot`; false for anything else, including nothing. */
+function isDirectoryHere(repoRoot: string, rel: string): boolean {
+  try {
+    return statSync(join(repoRoot, rel)).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
 /**
  * `[fidelity, detail]` for one read, by comparing each shown line against the
  * disk line it numbers itself as.
@@ -790,25 +801,40 @@ export function readFidelity(
   rel: string,
   result: unknown,
 ): [string, string | null] {
-  const shown = shownLines(result);
-  if (shown.size === 0) {
-    return [FIDELITY_UNVERIFIED, FIDELITY_NOT_FRAMED];
-  }
+  // The disk first, then the framing. A read of a path that is not a file
+  // here -- the verifier guessed a name, or named a directory -- has nothing
+  // to compare against whatever the tool returned, and grading it "no line
+  // numbers on this transport" blamed the transport for the verifier's
+  // guess.
   let disk: string[];
   try {
     disk = readFileSync(join(repoRoot, rel), "utf8").replace(/\r\n/g, "\n").split("\n");
   } catch {
-    return [FIDELITY_UNVERIFIED, "the file could not be read as text here"];
+    return [FIDELITY_UNVERIFIED, FIDELITY_UNREADABLE];
+  }
+  const shown = shownLines(result);
+  if (shown.size === 0) {
+    return [FIDELITY_UNVERIFIED, FIDELITY_NOT_FRAMED];
   }
   for (const number of [...shown.keys()].sort((left, right) => left - right)) {
-    const text = shown.get(number)!;
+    const text = shown.get(number)!.replace(/\r+$/, "");
     if (number < 1 || number > disk.length) continue;
-    if (disk[number - 1].replace(/\r+$/, "") !== text.replace(/\r+$/, "")) {
+    const onDisk = disk[number - 1].replace(/\r+$/, "");
+    if (onDisk === text) continue;
+    // A proper prefix is the tool cutting a long line short, and the record
+    // says so: a 2 KB line shown to its first few hundred characters is a
+    // different fact from a line shown as something else, and only the
+    // second is the verifier being shown a file that is not the file.
+    if (text.length > 0 && text.length < onDisk.length && onDisk.startsWith(text)) {
       return [
         FIDELITY_TRANSFORMED,
-        `line ${number} was shown as ${pythonRepr(text.trim().slice(0, 120))}`,
+        `line ${number} was cut short by the tool at ${text.length} of ${onDisk.length} characters`,
       ];
     }
+    return [
+      FIDELITY_TRANSFORMED,
+      `line ${number} was shown as ${pythonRepr(text.trim().slice(0, 120))}`,
+    ];
   }
   return [FIDELITY_VERBATIM, null];
 }
@@ -873,6 +899,20 @@ export function recordForRound(
         continue;
       }
       scoped = inScope(grant.scope, rel);
+      if (kind === OP_READ && isDirectoryHere(repoRoot, rel)) {
+        // A `view` of a directory is the tool listing it, and the record
+        // says so: recorded as a read, it graded as a file that "could not
+        // be read as text", which is true of every directory and tells the
+        // operator nothing.
+        operations.push({
+          kind: OP_LIST,
+          target: rel,
+          inScope: scoped,
+          fidelity: null,
+          detail: "a view of a directory, recorded as the listing it is",
+        });
+        continue;
+      }
     } else {
       // A pattern with no path was not confined to anything. Calling that
       // in-scope would let a repository-wide search leave the record attesting

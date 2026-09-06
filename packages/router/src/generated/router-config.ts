@@ -93,14 +93,17 @@ export type RouterConfig = {
     };
     push: {
       /**
-       * Must contain {artifact}, {feed} and {secret}. All three are required rather than conventional: a command without {artifact} pushes nothing the framework can name, a command without {feed} makes the recorded destination a label instead of a fact about what ran, and a command without {secret} is publishing on an ambient credential the framework cannot see -- which makes 'the PAT is never in an environment' unprovable rather than true.
+       * Must contain {artifact} and {feed}, and {secret} whenever the feed takes a credential. The first two are required rather than conventional: a command without {artifact} pushes nothing the framework can name, and a command without {feed} makes the recorded destination a label instead of a fact about what ran. {secret} is required for every feed that authenticates -- a command without it there is publishing on an ambient credential the framework cannot see, which makes 'the PAT is never in an environment' unprovable rather than true -- and is left out for a feed that is a folder on disk, which authenticates nothing. Which is which is decided by the loader from the feed, not declared here.
        */
       argv: string[];
+      /**
+       * A URL, or a folder on disk -- a drive path, a UNC path, a POSIX path or file://. A folder takes no credential.
+       */
       feed: string;
       /**
-       * The NAME of the credential, never its value. It resolves through ai_router.secret_resolver at spawn time, exactly as a provider's api_key_env does.
+       * The NAME of the credential, never its value. It resolves through the secret resolver at spawn time, exactly as a provider's api_key_env does. Required by the loader when the feed takes a credential; a folder feed declares none.
        */
-      secret: string;
+      secret?: string;
       /**
        * Which secret_resolver backend holds it. Defaults to 'env'.
        */

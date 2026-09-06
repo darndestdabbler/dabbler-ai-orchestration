@@ -126,7 +126,7 @@ import {
   acquireLockWithTimeout,
   releaseLock,
 } from "./session.ts";
-import { evaluateFreshness, loadSuitesChecked } from "./testEvidence.ts";
+import { evaluateFreshness, loadSuitesChecked, readRecords } from "./testEvidence.ts";
 import { recordDispute, resolveRepoRelative } from "./verify/disputes.ts";
 import {
   EXIT_BLOCKING,
@@ -380,11 +380,63 @@ export function localGateReceipt(
   };
 }
 
+/**
+ * The trunk a candidate is gated onto: the branch HEAD is on, at `origin`.
+ *
+ * It was the literal `origin/master` at both sites -- the receipt's base
+ * and the poll's ancestor check -- so a `main` repository in candidate mode
+ * would have polled a ref that does not exist for twenty-five minutes and
+ * stopped. The same reading the local receipt makes, with the same refusal
+ * for a detached HEAD.
+ */
+export function candidateTrunk(
+  repoRoot: string,
+): { trunk: string; refusal: null } | { trunk: null; refusal: string } {
+  const branch = runGit(repoRoot, ["rev-parse", "--abbrev-ref", "HEAD"]);
+  if (branch.code !== 0 || branch.stdout === "") {
+    return { trunk: null, refusal: `the branch could not be read: ${tail(branch.stderr, 200)}` };
+  }
+  if (branch.stdout === "HEAD") {
+    return {
+      trunk: null,
+      refusal: "HEAD is detached, so there is no trunk for the candidate to be gated onto",
+    };
+  }
+  return { trunk: branch.stdout, refusal: null };
+}
+
 /** How often the push loop looks at a running job; a pull call never waits. */
 const JOB_POLL_MS = 250;
 /** What a `wait` tells the engine to leave the framework's work alone for. */
 const VERIFY_RETRY_SECONDS = 60;
 const SUITE_RETRY_SECONDS = 60;
+/** The shortest run-of-record wait worth naming: under it, the call costs more than the wait. */
+const SUITE_RETRY_FLOOR_SECONDS = 10;
+
+/**
+ * What the run-of-record `wait` says for `suite`: a quarter over the suite's
+ * last recorded duration, rounded up, never under the floor and never over
+ * the constant a suite with no history gets.
+ *
+ * Every such wait said 60. A four-second suite got the same number as a
+ * twenty-minute one, and the engine that noticed learned to watch the job's
+ * status file and call `next` at fourteen seconds instead -- which is the
+ * framework teaching an engine that its numbers are not worth reading. The
+ * newest row for the suite is the one that counts; a row with no duration
+ * says nothing.
+ */
+export function suiteRetrySeconds(
+  records: readonly { suite: string; durationSeconds: number | null }[],
+  suite: string,
+  fallback: number = SUITE_RETRY_SECONDS,
+): number {
+  let last: number | null = null;
+  for (const record of records) {
+    if (record.suite === suite && record.durationSeconds !== null) last = record.durationSeconds;
+  }
+  if (last === null) return fallback;
+  return Math.min(fallback, Math.max(SUITE_RETRY_FLOOR_SECONDS, Math.ceil(last * 1.25)));
+}
 const CLOSE_RETRY_SECONDS = 15;
 // A pack and a push to a feed are a build and a network call; the suite is
 // the nearest thing to either in this file, so this takes the suite's number.
@@ -1617,7 +1669,10 @@ ${this.stopArtifacts()}`,
       'to do, in words>", "files": ["<every repository-relative file the step creates or ' +
       'changes>"], "checks": [{"argv": ["<program>", "<argument>", ...]}]}\n' +
       "Every step has at least one check, and a check is argv the framework spawns with no " +
-      "shell: exit 0 proves the step. A step whose product is prose still has a mechanical " +
+      "shell: exit 0 proves the step. A check runs in a built environment -- PATH, HOME, the " +
+      "toolchain roots, a scratch TEMP -- and sees no credential; a driver job (verification, " +
+      "the run of record, the publish) inherits the shell, so do not assert a credential from " +
+      "a check. A step whose product is prose still has a mechanical " +
       "check. Keep steps small, one concern each; the files a step lists are exactly the " +
       "files it will touch, because its report is measured against them.\n" +
       "One member is optional and is left out of a single-repository session:\n" +
@@ -1626,7 +1681,9 @@ ${this.stopArtifacts()}`,
       "this plan is accepted -- created beside this one, declaring which solution it is in " +
       "and nothing else -- so finishing this repository leaves the next one visible in the " +
       "Solution Explorer. One that already declares itself is left alone, and placing a " +
-      "repository never declares a dependency on it.\n" +
+      "repository never declares a dependency on it. Name it only when this plan's own steps " +
+      "need those repositories on disk; a plan for one repository of a many-repository " +
+      "solution leaves it out.\n" +
       "Do not include schema_version, session_number or recorded_at: the framework stamps them."
     );
   }
@@ -2281,8 +2338,8 @@ ${this.stopArtifacts()}`,
         `Verification round ${roundNumber} found the following, and you chose to fix each ` +
         "of them:\n" +
         chosen.map((line) => `  ${line}`).join("\n") +
-        "\n\nMake the fixes. The framework will run the affected tests, every step's checks " +
-        "and another verification round on what you changed.",
+        "\n\nMake the fixes. The framework will run every step's checks and another " +
+        "verification round on what you changed; the complete suite follows as the run of record.",
       files: [],
       checks: this.allPlanChecks(),
       fromPlan: false,
@@ -2348,7 +2405,7 @@ ${this.stopArtifacts()}`,
           "--stage",
           "final-full",
         ],
-        retryAfterSeconds: SUITE_RETRY_SECONDS,
+        retryAfterSeconds: suiteRetrySeconds(readRecords(this.repoRoot), suite.name),
         stopKind: "tests",
       });
       if (code === EXIT_OK) continue;
@@ -2424,8 +2481,13 @@ ${this.stopArtifacts()}`,
         // SHA, so the land pushes candidate/s<N> at the tested SHA and the
         // gate workflow fast-forwards master on green. The receipt is the
         // record the delegation stands on.
+        const trunkRead = candidateTrunk(this.repoRoot);
+        if (trunkRead.trunk === null) {
+          throw new Stop("land", `no candidate can be pushed: ${trunkRead.refusal}`);
+        }
+        const trunk = trunkRead.trunk;
         const tested = runGit(this.repoRoot, ["rev-parse", "HEAD"]).stdout;
-        const base = runGit(this.repoRoot, ["rev-parse", "origin/master"]).stdout;
+        const base = runGit(this.repoRoot, ["rev-parse", `origin/${trunk}`]).stdout;
         const branch = `candidate/s${this.sessionNumber}`;
         const pushed = runGit(this.repoRoot, ["push", "origin", `HEAD:refs/heads/${branch}`]);
         if (pushed.code !== 0) {
@@ -2434,6 +2496,7 @@ ${this.stopArtifacts()}`,
         const receipt = {
           mode: "candidate",
           branch,
+          trunk,
           base_sha: base,
           tested_sha: tested,
           executor: "ci",
@@ -2484,18 +2547,27 @@ ${this.stopArtifacts()}`,
     const receiptPath = join(
       this.repoRoot, ".dabbler", "runs", `s${this.sessionNumber}`, "driver", "gate-receipt.json",
     );
-    const receipt = JSON.parse(readFileSync(receiptPath, "utf8")) as { tested_sha: string };
+    const receipt = JSON.parse(readFileSync(receiptPath, "utf8")) as {
+      tested_sha: string;
+      trunk?: string;
+    };
+    // The receipt names the trunk it was pushed against; a receipt written
+    // before it did is read the way it was written, from HEAD.
+    const trunk = receipt.trunk ?? candidateTrunk(this.repoRoot).trunk;
+    if (trunk === null) {
+      throw new Stop("land", "the candidate gate has no trunk to watch: HEAD is detached");
+    }
     const script =
       "const {execFileSync}=require('node:child_process');" +
-      "const sha=process.argv[1];const until=Date.now()+25*60*1000;" +
-      "const tick=()=>{try{execFileSync('git',['fetch','origin','master'],{stdio:'ignore'});" +
-      "execFileSync('git',['merge-base','--is-ancestor',sha,'origin/master'],{stdio:'ignore'});" +
+      "const sha=process.argv[1];const trunk=process.argv[2];const until=Date.now()+25*60*1000;" +
+      "const tick=()=>{try{execFileSync('git',['fetch','origin',trunk],{stdio:'ignore'});" +
+      "execFileSync('git',['merge-base','--is-ancestor',sha,'origin/'+trunk],{stdio:'ignore'});" +
       "process.exit(0);}catch{}" +
-      "if(Date.now()>until){console.error('the gate did not move master to '+sha+' in 25 minutes; read the candidate-gate run');process.exit(3);}" +
+      "if(Date.now()>until){console.error('the gate did not move '+trunk+' to '+sha+' in 25 minutes; read the candidate-gate run');process.exit(3);}" +
       "setTimeout(tick,30000);};tick();";
     const code = await this.longWork({
       name: "candidate gate",
-      argv: [process.execPath, "-e", script, receipt.tested_sha],
+      argv: [process.execPath, "-e", script, receipt.tested_sha, trunk],
       retryAfterSeconds: 60,
       stopKind: "land",
     });

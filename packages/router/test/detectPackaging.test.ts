@@ -52,6 +52,21 @@ describe("what a build file says about publishing", () => {
     assert.match(String(found.reason), /package metadata/);
   });
 
+  it("reads the projects a root solution file fronts, and names the one that publishes", () => {
+    // `dotnet pack src/x/x.csproj` from the root is the argv the SDK's own
+    // layout runs; the test project the solution also fronts is not packable
+    // and is not named.
+    const found = detectPackaging(
+      repoWith({
+        "Csv.sln": "",
+        "src/model/model.csproj": LIBRARY,
+        "tests/model.tests/model.tests.csproj": APPLICATION,
+      }),
+    );
+    assert.equal(found.recipe?.key, "dotnet");
+    assert.ok(found.recipe?.pack.includes("src/model/model.csproj"));
+  });
+
   it("declares nothing when the projects are below the root, and says why", () => {
     // A pack command declares no working directory, so a line naming one of
     // them fails the first time it runs. Silence that explains itself is what

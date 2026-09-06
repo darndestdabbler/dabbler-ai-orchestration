@@ -429,7 +429,10 @@ export const PROJECT_CONFIG_PACKAGING =
   "# declared itself releasable publishes through these -- both argv, never\n" +
   "# shell strings, and `push` naming the credential rather than holding it.\n" +
   "# This repository declares none, and that is the declaration: it publishes\n" +
-  "# to no feed today.\n" +
+  "# to no feed today. A feed that is a folder on disk -- a drive path, a UNC\n" +
+  "# path or file:// -- takes no credential: leave `secret` out, and the push\n" +
+  "# runs without one. `dabbler packaging --dry-run` rehearses the block and\n" +
+  "# exits 0 when it loads, in a session that may not publish too.\n" +
   "#\n" +
   "#   packaging:\n" +
   "#     pack:\n" +

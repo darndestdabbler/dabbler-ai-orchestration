@@ -405,7 +405,25 @@ function writeAtomically(path: string, body: string): void {
   } finally {
     closeSync(handle);
   }
-  renameSync(temp, path);
+  renameOnceMore(temp, path);
+}
+
+/**
+ * The rename, retried once after a short pause when Windows answers `EPERM`
+ * or `EBUSY`: an indexer or a scanner holding the target for a moment. One
+ * `next` died on exactly that rename of `run.json` and the retry judged the
+ * same report normally, so the second attempt is made here, once, and any
+ * other answer -- or the same one twice -- is the truth and is thrown.
+ */
+function renameOnceMore(from: string, to: string): void {
+  try {
+    renameSync(from, to);
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code !== "EPERM" && code !== "EBUSY") throw error;
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 100);
+    renameSync(from, to);
+  }
 }
 
 /** A whole file, replaced without the fsync -- for text nothing fsyncs today. */

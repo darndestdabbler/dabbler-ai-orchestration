@@ -21,7 +21,9 @@ import {
   judgeRegistration,
   judgeReportFiles,
   judgeReportShape,
+  candidateTrunk,
   localGateReceipt,
+  suiteRetrySeconds,
   staleJobDisposition,
   stepChangedPaths,
   unchangedStepFiles,
@@ -364,6 +366,39 @@ describe("what the local gate receipt names", () => {
       const local = localGateReceipt("/repo");
       assert.equal(local.receipt, null);
       assert.match(String(local.refusal), /detached/);
+    } finally {
+      detached();
+    }
+  });
+
+  it("names a run-of-record wait from the suite's last recorded duration, within a floor and the old ceiling", () => {
+    // csv-model's four-second suite was told to wait sixty, every time.
+    const row = (suite: string, durationSeconds: number | null) => ({ suite, durationSeconds });
+    assert.equal(suiteRetrySeconds([row("dotnet", 4)], "dotnet"), 10);
+    assert.equal(suiteRetrySeconds([row("dotnet", 17)], "dotnet"), 22);
+    assert.equal(suiteRetrySeconds([row("dotnet", 600)], "dotnet"), 60);
+    assert.equal(suiteRetrySeconds([], "dotnet"), 60);
+    // The newest row for the suite counts; another suite's and an undated one do not.
+    assert.equal(
+      suiteRetrySeconds([row("dotnet", 40), row("node", 4), row("dotnet", 16), row("dotnet", null)], "dotnet"),
+      20,
+    );
+  });
+
+  it("gates a candidate onto the branch HEAD is on, never onto a literal master", () => {
+    // Both candidate-mode sites read `origin/master` as a literal; a `main`
+    // repository would have polled a ref that does not exist and stopped.
+    const onMain = gitAnswers([[["rev-parse", "--abbrev-ref", "HEAD"], { stdout: "main" }]]);
+    try {
+      assert.deepEqual(candidateTrunk("/repo"), { trunk: "main", refusal: null });
+    } finally {
+      onMain();
+    }
+    const detached = gitAnswers([[["rev-parse", "--abbrev-ref", "HEAD"], { stdout: "HEAD" }]]);
+    try {
+      const read = candidateTrunk("/repo");
+      assert.equal(read.trunk, null);
+      assert.match(String(read.refusal), /detached/);
     } finally {
       detached();
     }

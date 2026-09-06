@@ -63,6 +63,16 @@ describe("what the selector calls a test", () => {
     assert.equal(wide.allTestsAffected, true);
     assert.match(String(wide.allAffectedReason), /conftest/);
   });
+
+  it("maps the file the framework installed at registration to nothing, rather than to nobody", () => {
+    // `session start` writes the stop hook before any rule could name it;
+    // reporting it as selection_unknown told every claude-code session its
+    // first change set was unmapped.
+    const installed = selectTests(tree(), [".claude/settings.json"], SELECTION);
+    assert.deepEqual(installed.unknownPaths, []);
+    assert.deepEqual(installed.risks, []);
+    assert.deepEqual(installed.testPaths, []);
+  });
 });
 
 describe("reading the selection declaration", () => {

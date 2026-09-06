@@ -41,6 +41,7 @@ import {
 import { writeErr, writeOut } from "./output.ts";
 
 const EXIT_OK = 0;
+const EXIT_ERROR = 1;
 const EXIT_USAGE = 2;
 
 const CHOICES = [...VALID_TRANSPORTS].sort();
@@ -194,6 +195,31 @@ export async function bootstrapVerb(argv: string[]): Promise<number> {
   if (!isDirectory(project)) {
     writeErr(`bootstrap: not a directory: ${project}\n`);
     return EXIT_USAGE;
+  }
+
+  // A repository, before anything else. Everything after this needs one --
+  // the commit guard lives under .git/hooks, the scaffold is committed at
+  // the end, and every later verb hashes trees, commits and pushes -- and
+  // a folder that has not been `git init`ed yet is the ordinary state of a
+  // project on its first day. The extension's Set Up New Project already
+  // initialises one; a plain-shell bootstrap left the operator to do it by
+  // hand, after every verb had refused. The remote is still theirs: the
+  // owed decision below asks for it once.
+  if (repoRootFor(project) === null) {
+    const init = runGit(project, ["init"]);
+    if (init.code !== 0) {
+      writeErr(
+        `bootstrap: ${project} is not a git repository and \`git init\` failed ` +
+          `(${init.stderr.trim() || "no output"}). The framework needs one for its ` +
+          "tree hashes, its commit and its push; initialise it and run this again.\n",
+      );
+      return EXIT_ERROR;
+    }
+    writeOut(
+      `bootstrap: initialised a git repository in ${project} -- the framework ` +
+        "needs one for its tree hashes, its commit and its push. Add a remote " +
+        "before the first close; `dabbler owed list` asks where it should push.\n",
+    );
   }
 
   // Every path bootstrap itself writes, so it can commit exactly those and

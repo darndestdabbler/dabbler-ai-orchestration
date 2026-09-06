@@ -173,6 +173,15 @@ export interface PackagingRun {
    * what was released.
    */
   readonly ready: boolean;
+  /**
+   * A dry run in a session that may not publish, whose packaging block
+   * nonetheless loaded: the rehearsal proved the declaration and could go no
+   * further. Never serialized, for the same reason as `ready`. It is the fact
+   * a plan check can stand on -- "the declaration parses" is answerable
+   * before the one session that publishes, and a rehearsal that exited 1 on
+   * releasability alone told a check nothing it could use.
+   */
+  readonly declared: boolean;
 }
 
 export function runIsPublished(run: PackagingRun): boolean {
@@ -664,6 +673,7 @@ function refusal(
     steps: [],
     recordedAt: nowIso(),
     ready: false,
+    declared: false,
   };
 }
 
@@ -703,7 +713,7 @@ export function packageSession(
 
   const releasable = sessionIsReleasable(sessionsDir, sessionNumber);
   if (!releasable) {
-    return refusal(
+    const refused = refusal(
       sessionNumber,
       false,
       `session ${sessionNumber} did not declare itself releasable at ` +
@@ -711,6 +721,13 @@ export function packageSession(
         "refusal, not an unknown: declaring after the work is done is a " +
         "model deciding in hindsight what may reach a feed.",
     );
+    // A rehearsal still reads the declaration, because that is the one
+    // thing it can prove here: the block parses, the feed and the
+    // credential's name are what they should be. A malformed block throws
+    // the same way it would on the real run.
+    return options.dryRun === true
+      ? { ...refused, declared: loadDeclaration(config) !== null }
+      : refused;
   }
 
   const switched = refuseIfResolvingFromSource(repoRootFor(sessionsDir), "packaging");
@@ -784,6 +801,7 @@ export function packageSession(
       feed: declaration.push.feed,
       secretName: declaration.push.secret,
       ready: true,
+      declared: true,
     };
   }
 
@@ -826,6 +844,7 @@ function execute(
     steps: [...steps],
     recordedAt: nowIso(),
     ready: false,
+    declared: true,
   });
 
   /**

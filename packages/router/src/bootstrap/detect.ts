@@ -16,7 +16,7 @@
 //   it a red suite instead.
 
 import { existsSync, readdirSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 
 import { PROJECT_CONFIG_FILENAME } from "../config.ts";
 import { readText } from "../textfile.ts";
@@ -472,7 +472,18 @@ export function detectPackaging(projectDir: string): PackagingReading {
     };
   }
 
-  const projects = rootFiles(projectDir).filter((name) => name.endsWith(".csproj"));
+  // A solution file at the root is the shape the SDK itself lays out: the
+  // projects live below it, and `dotnet pack <project>` from the root
+  // resolves them the way the solution does. The reading covers what the
+  // solution fronts, because a pack from here does not fail -- a repository
+  // with `X.sln` at the root and the library under `src/` ran exactly that
+  // argv through six checks and one publish while this detector said it
+  // would fail the first time.
+  const atRoot = rootFiles(projectDir);
+  const solution = atRoot.some((name) => name.endsWith(".sln") || name.endsWith(".slnx"));
+  const rootProjects = atRoot.filter((name) => name.endsWith(".csproj"));
+  const projects =
+    rootProjects.length > 0 ? rootProjects : solution ? projectsBelow(projectDir) : [];
   if (projects.length === 0) {
     const deeper = hasDeeperProject(projectDir);
     return {
@@ -535,6 +546,40 @@ function rootFiles(root: string): string[] {
   } catch {
     return [];
   }
+}
+
+/**
+ * The `.csproj` files below the root, repository-relative with `/`, in the
+ * order the walk meets them -- the projects a root solution file fronts.
+ * Build output, dependencies and the router's own state are not walked, for
+ * the same reason `hasDeeperProject` skips them: a project file under `bin/`
+ * is a copy, not a project.
+ */
+function projectsBelow(root: string, depth = 3): string[] {
+  const found: string[] = [];
+  const walk = (dir: string, left: number): void => {
+    let entries: { name: string; isDirectory: () => boolean }[];
+    try {
+      entries = readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      const path = join(dir, entry.name);
+      if (!entry.isDirectory()) {
+        if (dir !== root && entry.name.endsWith(".csproj")) {
+          found.push(relative(root, path).split("\\").join("/"));
+        }
+        continue;
+      }
+      const name = entry.name;
+      if (name === "node_modules" || name === ".git" || name === "bin") continue;
+      if (name === "obj" || name === "target" || name === ".dabbler") continue;
+      if (left > 0) walk(path, left - 1);
+    }
+  };
+  walk(root, depth);
+  return found;
 }
 
 /** Whether a project file exists somewhere below the root but not at it. */

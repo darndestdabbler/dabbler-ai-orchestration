@@ -1,6 +1,93 @@
-# STATUS — 98 planned from the csv-model notes; 97 closed VERIFIED: the engine interface exists and nothing calls it; 96's two papercuts fixed; the block after 98 is adoption behind a flag
+# STATUS — 98 closed VERIFIED: the csv-model notes fixed and the Copilot view tool measured; the plan declares no further session, the next block is the operator's
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
+
+> ## SESSION 98 CLOSED, 2026-09-06, VERIFIED (three rounds, gpt-5.4 over the seat; landed e3e9ef2e) -- what the csv-model notes found, fixed and measured
+>
+> Nine steps, every one an entry from `D:\Projects\csv-model\docs\
+> framework-notes.md` confirmed in this tree; the notes file is the
+> operator's and is marked from the csv-model side. The local gate receipt
+> names the branch HEAD is on (`localGateReceipt`, drive.ts) and refuses a
+> detached HEAD instead of writing `master`; the Claude Code stop hook is
+> installed by `session start` for a `claude-code` registration
+> (`installStopGate` is unguarded; bootstrap keeps its CLAUDECODE guard at
+> the call site), so the extension's Set Up New Project no longer leaves it
+> out; `start` ends with one line naming `session next` and no typed
+> recipe; every job the driver spawns carries `DABBLER_DRIVEN=1`
+> (`jobs.startJob`) and `verify` under it prints the verdict and "The
+> driver runs the rest." -- this session's own verification log ends with
+> exactly that; `dabbler version` and `--version` print the router's
+> version and the extension's when a manifest with `engines.vscode` sits
+> above the package root; `project-work-plan.md` renders "## The plan"
+> only when `session plan` recorded one (folding each session's task
+> paragraph in was rejected: the plan would read as whichever session ran
+> last); the managed body, the plan template, the scaffolded
+> `dabbler.yaml` comments (`when` is a path prefix, not a glob; the four
+> control kinds), `next --help`, the driving guide and the `run-started`
+> line under the pull (`mode=pull`, no invocation bound) say what the
+> code does, and AGENTS.md was regenerated from the rebuilt bundle.
+>
+> **The measurement, `docs/copilot-cli-walkthrough.md`.** One gpt-5-mini
+> call on the seat (0 premium requests): Copilot CLI 1.0.83's `view`
+> returns `content` as the file's raw text with no line numbers, and
+> `detailedContent` as a unified diff of the file against itself whose
+> hunk header numbers every line. The transport dropped `detailedContent`;
+> it keeps it now, `readFidelity` numbers lines from hunk headers, and the
+> `^\d+\.` regex -- which graded csv-model's session plan `transformed`
+> because its first line is `1. Register.` -- is gone. A read of the
+> transport's own handoff payload is recorded as kind `handoff`, in
+> scope, not counted (the round schema admits the kind), and the handoff
+> bootstrap says to read the file once. Proven on this session's round:
+> 24 of 25 reads verbatim, one handoff read (csv-model's session 3 had
+> nine), `fidelity_measurable: true`, no findings. Across csv-model's five
+> sessions before this, zero reads were verbatim.
+>
+> **The run of record was red once, and it was right.** Round 1 verified
+> the tree; the complete suite then failed four tests. Three were
+> `walk-session`: registering under claude-code now writes
+> `.claude/settings.json` into a fresh repository, and the plan step's
+> declaration refused a tree that "already carries 1 change" -- a defect
+> this session's own step 2 introduced and only the walkthrough could
+> see. `materialPaths` (gates.ts) now treats that one file as the
+> framework's install rather than the session's work; the land commits
+> it. The fourth was the rounds test asserting the typed recipe while the
+> suite itself ran as a job the driver had marked `DABBLER_DRIVEN=1` -- the
+> test now clears the marker it never controlled. The `fix-run-of-record`
+> step was judged and every step's checks re-ran -- session 96's
+> papercut, fixed in 97, seen working -- and round 2 then refused the
+> fix, correctly: the first version exempted `.claude/settings.json` from
+> the worktree gate for the close as well as the declaration, so an
+> operator's uncommitted edit to it would have landed unseen. The
+> exemption is now one shape: the UNTRACKED file, when the declaration
+> asks whether work has begun (`beforeWork`, gates.ts); a tracked edit is
+> work, and the close sees the file however it got there.
+>
+> **Papercuts for the next session.** (1) `readFidelity` checks the
+> framing before the disk: a read of a file that does not exist (the
+> verifier guessed `packages/router/src/git.ts`) is graded `unverified:
+> the view tool returns no line numbers on this transport`, which is the
+> wrong reason -- check readability first, then framing. (2) The
+> candidate-mode receipt and `phaseGateWait` still name `origin/master`;
+> a `main` repository in candidate mode would fail there. (3) A transient
+> Windows `EPERM` on renaming `run.json` killed one `next`; the retry
+> judged the report normally -- `saveRun` could retry the rename once.
+> (4) `PROJECTION_NOTE` in writers.ts still says `ai_router.writers`.
+> (5) The synthesised fix step's ask (drive.ts, "Make the fixes. The
+> framework will run the affected tests, ...") still promises the affected
+> tests; step 9's pass reached the templates and the guide, not that
+> string. (6) After round 3 settled from the record, the run-of-record
+> site collected the just-finished verification job as
+> `job-finished-stale` -- harmless, but the row reads as if something was
+> left behind.
+>
+> **Two things about the pull, learned by being refused.** A step's
+> report must name only the files that changed, even when the plan's
+> `files` lists more: the plan tolerates a byte-identical file
+> (`step-file-unchanged`), the report does not (`files-changed-
+> unchanged`). And `session plan amend --step X --files ...` is how a step
+> widens mid-session; it was used twice here, both times because the
+> round schema pins an operation's kind and a new kind drags the schema
+> and its generated type into the step.
 
 > ## SESSION 98 PLANNED, 2026-09-06 — what the csv-model notes found
 >

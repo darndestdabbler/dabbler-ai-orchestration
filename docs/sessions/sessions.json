@@ -1909,9 +1909,9 @@
     {
       "number": 97,
       "title": "An ACP client, wired to nothing",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-05T20:34:04.813000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-09-05T21:09:24.891000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

@@ -4673,9 +4673,133 @@ planned. Nothing here is a hazard anybody imagined.*
    entries it answers are marked fixed there by whichever csv-model session
    next runs on the router this one ships.
 
+### Session 99 of 99: What csv-model's last two sessions found, and session 98's papercuts
+
+*The csv-model trial is finished: six sessions, one class, one real publish
+to the folder feed — session 6 ran on router 2.0.2 and its post-freeze
+record confirms session 98's fixes live (the handoff read counted as
+plumbing, eight of nine reads verbatim, a receipt naming `main`, the
+publish job's pack and push both exit 0). What is left is what its sessions
+5 and 6 wrote into `docs/framework-notes.md` after session 98 was planned,
+and the six papercuts session 98's own close recorded. Each item below was
+confirmed against this tree before it was planned. Two findings are
+deliberately NOT carried: `run.json` still records `engine: cli` and a
+`max_invocations` the pull never applies (a record-shape change with no
+reader that cares), and the facts row's `changedLines` omitting a deleted
+file (the verifier's scope names the file; a `deletedFiles` member is a
+schema change this session does not need).*
+
+1. Register; declare `--not-releasable`.
+2. **The packaging detector reads the solution file.** `detectPackaging`
+   (`bootstrap/detect.ts`) looks for a `.csproj` at the repository root
+   only, so csv-model — `CsvModel.sln` at the root, the library under
+   `src/` — was told "the project files are below the repository root, and
+   a pack command declares no working directory. A line naming one of them
+   would fail the first time it ran", while `dotnet pack -c Release -o
+   {output}` from that root succeeded on every check and in the real
+   publish (`.dabbler/runs/s6/packaging.jsonl`). When the root holds a
+   solution file (`.sln` or `.slnx`) and no project, the detector walks
+   the projects below it with the same `declaresPackage` reading: exactly
+   one packable project yields a recipe naming that project's path;
+   several yields the existing "which of them publishes" refusal; none
+   yields the existing honest absence. One test.
+3. **The dry run says what it asked.** `dabbler packaging --dry-run` in a
+   non-releasable session printed "Every gate the close reads passes, so a
+   real run would publish." one line above the refusal that says it would
+   not: `explain()` (`cli/packaging.ts`) counts failed gates, and
+   `packageSession` refuses a non-releasable session before any gate is
+   asked, with `gates: []`. When no gate was asked the line says so, and
+   the refusal stands alone. The dry run exits 0 when the declaration
+   loads and the session's releasability is the only thing standing in the
+   way — a rehearsal that proved the declaration has not failed, and a plan
+   check can then name the verb as argv, which csv-model's session 5 could
+   not. The scaffolded `packaging:` comment and the verb's help say that a
+   feed which is a folder on disk takes no credential (the rule
+   `feedTakesCredential` already applies; nothing an operator reads says
+   so). One test, for the exit code.
+4. **The framework's own install is not the session's unknown.** `session
+   start` under `--engine claude-code` writes `.claude/settings.json`,
+   untracked; the declaration exempts it (`materialPaths`, `beforeWork`)
+   and the land commits it, but `dabbler affected` reports it as
+   `selection_unknown` because no scaffolded rule names `.claude`. The
+   selector treats the framework-installed path (`isFrameworkInstalledPath`,
+   gates.ts — one definition, imported) as mapped to no test, and `start`'s
+   "installed the stop gate" line says the file is committed with this
+   session's work, so the engine can declare it rather than discover it
+   in the verifier's nit. One test.
+5. **Bootstrap initialises the repository it needs.** The extension's Set
+   Up New Project runs `git init` first (`commands/bootstrapProject.ts`);
+   a plain-shell `dabbler bootstrap` in a folder with no `.git` writes its
+   scaffold, cannot commit it, and every verb after it answers "not inside
+   a git repository … or pass `--sessions-dir`", a flag that does not
+   help because the router needs a repository for its tree hashes, commit
+   and push — csv-model's operator did `git init` by hand for the third
+   time. Bootstrap runs `git init` when there is no repository, then its
+   own commit as today, and its summary says a remote must be added before
+   the first close; `resolveSessionsDir`'s error (`evidence.ts`) names
+   `git init`, not the flag. One test.
+6. **The agency record reads the disk before the framing, and a directory
+   is a listing.** `readFidelity` (`agency.ts`) checks a read's framing
+   first, so a `view` of a file that does not exist is graded "no line
+   numbers on this transport" — the wrong reason, and session 98's first
+   papercut; csv-model's session 6 round shows the second shape, a `view`
+   of `docs/sessions` (a directory) recorded as a read that "could not be
+   read as text here". Readability first: a missing path is recorded as
+   missing; a directory `view` is recorded as a listing, in scope by the
+   same rule as any listing; and a shown line that is a proper prefix of
+   the disk line is reported as truncated at that many characters (the
+   grade stays `transformed`; the detail says which kind), because
+   csv-model's one transformed read on 2.0.2 was a 2 KB line the tool cut
+   short and the record could not say so. Three tests, one per behaviour.
+7. **Four small truths.** (a) The synthesised fix step's ask (`drive.ts`,
+   "The framework will run the affected tests, …") stops promising the
+   affected tests — step 9 of session 98 reached the templates and the
+   guide, not that string. (b) `PROJECTION_NOTE` (`writers.ts`) names
+   `dabbler`, not `ai_router.writers`. (c) Candidate mode reads the trunk
+   from the receipt's own branch rather than the literal `origin/master`
+   at both sites (the candidate receipt and `phaseGateWait`'s poll), the
+   way `localGateReceipt` already does. (d) `writeAtomically`
+   (`journal.ts`) retries the rename once after a short pause when
+   Windows answers `EPERM` or `EBUSY` — the transient that killed one
+   `next` in session 98, whose retry then judged normally. One test for
+   (c); none for (a), (b) or (d): a string, a string, and a transient the
+   suite cannot provoke.
+8. **The wait names a number that is true.** Every run-of-record `wait`
+   says `retry_after_seconds: 60`; csv-model's suite takes four seconds,
+   and its agent learned to watch the job's status file and call `next`
+   at fourteen seconds instead. The run-of-record wait takes its number
+   from the suite's last recorded `durationSeconds` in `test-runs.jsonl`
+   (`readRecords`, testEvidence.ts) — a quarter over it, floor ten
+   seconds, ceiling the sixty of today — so a short suite gets a short,
+   honest wait and a long one is unchanged. Verification, publish and
+   close keep their constants. One test.
+9. **The guidance says what the code does, part two.** In one pass:
+   `driving-a-session.md` counts the kinds the way the managed body does
+   — four under the pull, and `interrupt` a fifth that only `drive`
+   sends — instead of "Five kinds and no sixth" against "no fifth"; the
+   plan ask and the guide say that a check runs in a built environment
+   (PATH, HOME, the toolchain roots, a scratch TEMP) and sees no
+   credential, while a driver job inherits the shell — csv-model's
+   session 6 asserted `DABBLER_FEED_PAT` from a check and was refused
+   once for it; the ask says when a plan names `repositories` (the
+   solution's other repositories this plan's steps need on disk, placed
+   beside this one — a plan for one repository of a many-repository
+   solution leaves it out, and csv-model's agent guessed right); the guide
+   says that ignored build output does not move the tree, so a compiling
+   check is safe, that the router's own registration write is part of the
+   change set `affected` measures, and that `retry_after_seconds` is
+   advice the driver does not hold anyone to — the job's own status file
+   is written at its exit, and a `next` before the number is judged on
+   the job's real state. The managed body does not change; nothing is
+   re-bootstrapped. No test asserts a document's wording.
+10. Affected; verify; full suite as `final-full`; close. The csv-model
+    notes file is the operator's and is not edited here; its open entries
+    are answered by the router this session ships, and the repository's
+    own re-bootstrap onto it is one command the operator runs.
+
 ---
 
-## Test budget for sessions 90–98
+## Test budget for sessions 90–99
 
 The suite at session 90 is the one sessions 83–88 rebuilt: `node --test`
 over `packages/router/test`, plus the extension's own tier. This block adds
@@ -4693,6 +4817,11 @@ scripted peer, and the live run is a walkthrough the session records.
 Session 98 adds at most **eight router tests**, one per behaviour it
 changes, and no extension tests. Its one live call — step 5's capture of
 the seat's `view` output — is a recorded measurement, not a test.
+
+Session 99 adds at most **nine router tests**, one per behaviour it
+changes, and no extension tests. Three of its changes get none, and the
+plan says which and why: two are strings, and one is a retry against a
+transient the suite cannot provoke.
 
 ---
 

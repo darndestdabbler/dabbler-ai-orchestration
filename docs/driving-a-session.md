@@ -498,9 +498,11 @@ own output as it arrives. This is what that terminal printed on the walk:
 14:21:30 phase session=001 now=preverify
 14:21:30 job-started name=affected tests: unit log=.dabbler/runs/s1/driver/jobs/affected-tests-unit.log
 14:21:30 working
+
 ──────────────────── affected-tests-unit ──────────────────────
 running unit: node tests/run.mjs tests/test_widget.mjs
 recorded unit [preverify-targeted]: passed in 1s (timed here)
+
 ────────────────────────── framework ──────────────────────────
 14:21:31 tests suite=unit stage=preverify-targeted outcome=passed
 14:21:31 job-collected name=affected tests: unit
@@ -509,8 +511,9 @@ recorded unit [preverify-targeted]: passed in 1s (timed here)
 (The lines are the walk's; the layout is the current one.) A session
 opens under a banner of its own, whenever the run record moves to a new
 one. Two voices speak beneath it, and a rule with the voice's name in it
-is drawn wherever one gives way to the other: `framework` over the
-framework's own lines, the job's name over its output. The framework's lines are an outline: the
+is drawn wherever one gives way to the other, with an empty line before
+it: `framework` over the framework's own lines, the job's name over its
+output. The framework's lines are an outline: the
 clock stands at the left edge, and a line that wraps — or carries git's own
 newlines in a stop's reason — continues under the text rather than under
 the clock. Both the rules and the wrapping follow the terminal's width,

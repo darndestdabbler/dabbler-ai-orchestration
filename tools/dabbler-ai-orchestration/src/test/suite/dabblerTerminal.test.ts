@@ -669,6 +669,13 @@ suite("the first look, and the rule between voices", () => {
     const after = plain(written.join(""));
     assert.match(after, /─ close ─+\r\nclose: pushed 1 round ref\(s\)\r\n/, after);
     assert.match(after, /─ framework ─+\r\n14:30:05 paused/, after);
+    // An empty line stands before each rule, so the groups have room
+    // between them; the one at the very top has nothing above it. The
+    // framework's last line had ended its own line, so one CRLF is the
+    // empty line before the close rule; the job's bytes had too.
+    assert.ok(after.startsWith("\r\n─"), after.slice(0, 40));
+    assert.match(after, /ref\(s\)\r\n\r\n─+ framework ─/, after);
+    assert.ok(said.startsWith("─"), said.slice(0, 40));
     // The rule spans the terminal's width, one column short, and follows it
     // through a resize because it is drawn again with everything else.
     const rule = after.split("\r\n").find((line) => line.includes("─ close ─")) ?? "";

@@ -888,15 +888,18 @@ export class DabblerTerminal implements vscode.Pseudoterminal {
   /**
    * One write, in one voice, and where it left the cursor.
    *
-   * A change of voice gets its rule first, on a line of its own, so the
-   * framework's lines and a job's output read as titled groups. A job that
-   * left its line unfinished has that line ended before the rule, because
-   * the rule and the framework's next line must start at the edge and
-   * never on the tail of a runner's.
+   * A change of voice gets its rule first, on a line of its own with an
+   * empty line before it, so the framework's lines and a job's output read
+   * as titled groups with room between them. A job that left its line
+   * unfinished has that line ended before the empty one, because the rule
+   * and the framework's next line must start at the edge and never on the
+   * tail of a runner's. The very first rule stands at the top with nothing
+   * above it to keep room from.
    */
   private emit(text: string, speaker: string): void {
     if (this.speaker !== speaker) {
-      this.writer.fire(`${this.atLineStart ? "" : CRLF}${divider(speaker, this.columns, this.theme)}`);
+      const before = this.speaker === null ? "" : this.atLineStart ? CRLF : `${CRLF}${CRLF}`;
+      this.writer.fire(`${before}${divider(speaker, this.columns, this.theme)}`);
       this.speaker = speaker;
       this.atLineStart = true;
     }

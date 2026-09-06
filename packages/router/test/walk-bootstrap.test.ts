@@ -26,7 +26,7 @@ import { bootstrapVerb } from "../src/cli/bootstrap.ts";
 import { canonicalVersion, packageVersion, releaseVersion, tagsFor } from "../src/cli/release.ts";
 import { capture } from "../src/output.ts";
 import { ID_GIT_REMOTE, openDecisions } from "../src/owedDecisions.ts";
-import { load as loadSolution } from "../src/solution.ts";
+import { solutionShape } from "../src/modules.ts";
 import { git, gitOut, makeRepo, scratchDir, writeFiles } from "./support/repo.ts";
 
 /**
@@ -72,7 +72,7 @@ describe("a project on its first day", () => {
     assert.ok(!existsSync(join(repo, "AGENTS.md")));
     assert.ok(!existsSync(join(repo, ".gitignore")));
     assert.ok(!existsSync(join(repo, "dabbler.yaml")));
-    assert.ok(!existsSync(join(repo, "solution.yaml")));
+    assert.ok(!existsSync(join(repo, "docs", "modules.yaml")));
     // A clone made before round refs existed carries neither refspec; the
     // assertion after setup is then a claim about setup and not the fixture.
     assert.ok(
@@ -139,10 +139,12 @@ describe("a project on its first day", () => {
 
     // --- what the Solution Explorer renders --------------------------------
     // The view was empty in every new project and explained nothing. A fresh
-    // repository IS a one-component solution.
-    const solution = loadSolution(repo);
-    assert.equal(solution.components.length, 1);
-    assert.equal(solution.components[0]?.kind, "integration");
+    // repository IS a one-module solution, and one module is the shape in
+    // which nothing module-shaped switches on.
+    const shape = solutionShape(repo);
+    assert.equal(shape.multi, false);
+    assert.equal(shape.modules.length, 1);
+    assert.equal(shape.modules[0]?.kind, "application");
     assert.ok(existsSync(join(repo, ".dabbler", "solution", "projection.json")));
     milestones.push("the Explorer has something to render");
 

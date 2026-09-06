@@ -13,11 +13,14 @@ import { describe, it } from "node:test";
 
 import {
   ManifestError,
+  consumersOf,
   create,
+  dependenciesOf,
   findEntry,
   loadEntries,
   loadManifest,
   parseEntries,
+  solutionShape,
 } from "../src/modules.ts";
 import { capture } from "../src/output.ts";
 import { platformNewlines } from "../src/journal.ts";
@@ -537,5 +540,83 @@ describe("the module manifest", () => {
     const refused = await run(() => create(broken, "greeter", "Greeter"));
     assert.equal(refused.code, 1);
     assert.match(refused.err, /modules create: refused/);
+  });
+
+  it("parses the module vocabulary, defaults it, and refuses a cycle by name", () => {
+    const [model, persister] = parseEntries({
+      modules: [
+        { slug: "model", kind: "shared-types", package: "CsvModel" },
+        { slug: "persister", dependsOn: ["model"], package: "CsvPersister", contract: "designed" },
+      ],
+    });
+    assert.equal(model?.kind, "shared-types");
+    // A declared package is its own abstraction until somebody designs one.
+    assert.equal(model?.contract, "package");
+    assert.equal(persister?.kind, "library");
+    assert.deepEqual(persister?.dependsOn, ["model"]);
+    assert.equal(persister?.contract, "designed");
+    // A module with no package has no seam to name a contract for.
+    assert.equal(parseEntries({ modules: [{ slug: "app" }] })[0]?.contract, null);
+    assert.throws(
+      () => parseEntries({ modules: [{ slug: "a", kind: "service" }] }),
+      /'kind' must be one of shared-types, library, application/,
+    );
+    assert.throws(
+      () => parseEntries({ modules: [{ slug: "a", dependsOn: ["b"] }] }),
+      /'a' depends on 'b', which the manifest does not declare/,
+    );
+    assert.throws(
+      () =>
+        parseEntries({
+          modules: [
+            { slug: "a", dependsOn: ["b"] },
+            { slug: "b", dependsOn: ["c"] },
+            { slug: "c", dependsOn: ["a"] },
+          ],
+        }),
+      /cycle: a -> b -> c -> a/,
+    );
+  });
+
+  it("derives who depends on a module transitively, in dependency order, and never reads it", () => {
+    // Declared out of order on purpose: the derivation orders, the file
+    // does not have to.
+    const entries = parseEntries({
+      modules: [
+        { slug: "listener", kind: "application", dependsOn: ["deserializer", "persister"] },
+        { slug: "persister", dependsOn: ["model"] },
+        { slug: "deserializer", dependsOn: ["model"] },
+        { slug: "model", kind: "shared-types" },
+      ],
+    });
+    assert.deepEqual(consumersOf(entries, "model"), ["persister", "deserializer", "listener"]);
+    assert.deepEqual(consumersOf(entries, "persister"), ["listener"]);
+    assert.deepEqual(consumersOf(entries, "listener"), []);
+    assert.deepEqual(dependenciesOf(entries, "listener"), ["model", "persister", "deserializer"]);
+  });
+
+  it("reads an absent manifest as one implicit module, one entry as single, and two as many", () => {
+    const bare = tempDir("shape-");
+    const implicit = solutionShape(bare);
+    assert.equal(implicit.multi, false);
+    assert.equal(implicit.implicit, true);
+    assert.deepEqual(implicit.modules.map((m) => m.codeRoots), [["."]]);
+    assert.equal(implicit.modules[0]?.kind, "application");
+
+    const one = tempDir("shape-");
+    seed(one, { "docs/modules.yaml": "modules:\n- slug: whole\n  codeRoots: ['.']\n" });
+    const single = solutionShape(one);
+    assert.equal(single.multi, false);
+    assert.equal(single.implicit, false);
+    assert.equal(single.modules[0]?.slug, "whole");
+
+    const two = tempDir("shape-");
+    seed(two, {
+      "docs/modules.yaml":
+        "modules:\n- slug: app\n  dependsOn: [lib]\n- slug: lib\n  package: Lib\n",
+    });
+    const many = solutionShape(two);
+    assert.equal(many.multi, true);
+    assert.deepEqual(many.modules.map((m) => m.slug), ["lib", "app"]);
   });
 });

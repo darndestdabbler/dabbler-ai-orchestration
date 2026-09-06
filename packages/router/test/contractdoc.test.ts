@@ -5,8 +5,7 @@ import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it } from "node:test";
 
-import { ContractError, load, render } from "../src/contractdoc.ts";
-import { parse as parseSolution } from "../src/solution.ts";
+import { type ContractGraph, ContractError, load, render } from "../src/contractdoc.ts";
 import { tempDir } from "./support/answers.ts";
 
 const CONTRACT: Record<string, unknown> = {
@@ -27,14 +26,10 @@ const CONTRACT: Record<string, unknown> = {
   ],
 };
 
-const SOLUTION = parseSolution({
-  solution: { name: "csv-demo", title: "CSV" },
-  components: [
-    { name: "csv-model" },
-    { name: "csv-parser", dependsOn: ["csv-model"] },
-    { name: "csv-app", kind: "integration", dependsOn: ["csv-parser"] },
-  ],
-});
+// csv-parser's place in a three-module graph, as `dabbler contractdoc`
+// derives it from docs/modules.yaml: what it declares, and who is derived
+// to use it.
+const GRAPH: ContractGraph = { dependsOn: ["csv-model"], usedBy: ["csv-app"] };
 
 describe("rendering", () => {
   it("carries every section a reader needs", () => {
@@ -62,22 +57,21 @@ describe("rendering", () => {
   });
 
   it("shows both dependency directions in the diagram", () => {
-    const out = render(CONTRACT, SOLUTION);
+    const out = render(CONTRACT, GRAPH);
     assert.ok((out).includes("```mermaid"));
     assert.ok((out).includes("csv_parser --> csv_model"));
     assert.ok((out).includes("csv_app"));
   });
 
   it("names who breaks under used-by", () => {
-    assert.ok(render(CONTRACT, SOLUTION).includes("**Used by:** `csv-app`"));
+    assert.ok(render(CONTRACT, GRAPH).includes("**Used by:** `csv-app`"));
   });
 
-  it("draws no diagram for a component outside the solution", () => {
-    const out = render(
-      { component: "stranger", operations: [{ name: "go" }] },
-      SOLUTION,
-    );
+  it("draws no diagram for a module the manifest does not place, nor for one with no edges", () => {
+    const out = render({ component: "stranger", operations: [{ name: "go" }] }, null);
     assert.ok(!out.includes("```mermaid"));
+    const alone = render(CONTRACT, { dependsOn: [], usedBy: [] });
+    assert.ok(!alone.includes("```mermaid"));
   });
 
   it("says not to hand-edit it", () => {

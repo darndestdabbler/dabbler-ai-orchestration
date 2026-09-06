@@ -58,7 +58,6 @@
         "bootstrap",
         "discovery",
         "modules",
-        "solution",
         "solutionDeps",
         "contractdoc"
       ]
@@ -71,7 +70,6 @@
         "agency",
         "approvedPlan",
         "planReview",
-        "stepreview",
         "session"
       ]
     },
@@ -80,8 +78,6 @@
       "members": [
         "testEvidence",
         "affected",
-        "fixloop",
-        "testphase",
         "facts"
       ]
     },
@@ -102,12 +98,12 @@
       ]
     },
     "projection": {
-      "comment": "What a person sees: the fold, the CLI rim, the in-process face the extension calls, the six-step workflow verb.",
+      "comment": "What a person sees: the fold, the Solution Explorer's projection, the CLI rim, the in-process face the extension calls, the package entry.",
       "members": [
         "progress",
+        "projection",
         "cli",
         "inProcess",
-        "workflow",
         "index"
       ]
     }

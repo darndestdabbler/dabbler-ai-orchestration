@@ -204,25 +204,48 @@ export const GEMINI_TAIL =
  * A scaffolded repository's session 1, for running the same work untracked.
  */
 export const PLAN_PROMPT =
-  "You are preparing a project plan for the Dabbler session workflow.\n" +
+  "You are preparing the solution plan for the Dabbler session workflow.\n" +
   "\n" +
-  "Create — or import — `docs/planning/project-plan.md`, the stable artifact\n" +
-  "the decomposition session reads from.\n" +
+  "Create — or import — `docs/planning/solution-plan.md`, the stable artifact\n" +
+  "session 2 reads from. A repository that already carries\n" +
+  "`docs/planning/project-plan.md` has its plan there: amend that file in\n" +
+  "place rather than writing a second one.\n" +
   "\n" +
   "The plan's substance is the operator's, not yours. Before writing\n" +
-  "anything, ask them what the project is: its purpose, what success looks\n" +
-  "like, the phases or feature areas they have in mind, and whether a plan,\n" +
-  "brief or notes already exist that should be imported. Ask when the\n" +
-  "repository and your prompt do not already answer those questions. Do not\n" +
-  "search neighbouring directories for a plan, and do not draft one from the\n" +
-  "folder name — a guessed plan is decomposed by the next session into\n" +
-  "sessions nobody asked for.\n" +
+  "anything, ask them what the solution is: its purpose, who uses it, what\n" +
+  "it must do and what is deliberately out of scope, what success looks\n" +
+  "like, and whether a plan, brief or notes already exist that should be\n" +
+  "imported. Ask when the repository and your prompt do not already answer\n" +
+  "those questions. Do not search neighbouring directories for a plan, and\n" +
+  "do not draft one from the folder name — a guessed plan is broken by the\n" +
+  "next session into sessions nobody asked for.\n" +
   "\n" +
-  "- **Create:** from the operator's answers, draft the plan: overview, goals\n" +
-  "  and success criteria, high-level phases or feature areas, and each\n" +
-  "  phase's key deliverables. Keep it concise — the decomposition session\n" +
-  "  turns each phase into numbered sessions, so scope each phase to a\n" +
-  "  handful of focused AI sessions.\n" +
+  "What the plan carries, in this order:\n" +
+  "- **The objective**, stated so a reader can act on it: what the solution\n" +
+  "  is for, who uses it, what it must do, and what is deliberately out of\n" +
+  "  scope. Vagueness that would let two people build different things is\n" +
+  "  the defect to look for.\n" +
+  "- **The modules.** What each is responsible for, the contract each\n" +
+  "  exposes to the others (what must be true going in, what is guaranteed\n" +
+  "  coming out, what is kept on purpose, how it fails, and what callers\n" +
+  "  must not depend on), the dependency direction, the reason for each cut,\n" +
+  "  and the cuts deferred. ONE MODULE IS A FINE ANSWER, and most small\n" +
+  "  solutions are one module: say so and stop. Where a cut is not obvious,\n" +
+  "  give more than one candidate decomposition in plain language, recommend\n" +
+  "  one and say why; modules should hide decisions likely to change rather\n" +
+  "  than mirror processing steps, and a single candidate presented as the\n" +
+  "  only option is a defect.\n" +
+  "- **The phases or feature areas** and each one's key deliverables. Keep\n" +
+  "  it concise — session 2 turns each into numbered sessions, so scope each\n" +
+  "  to a handful of focused AI sessions.\n" +
+  "\n" +
+  "Then declare the modules in `docs/modules.yaml` through `dabbler modules\n" +
+  "create` (`--kind`, `--depends-on`, `--package`, `--contract`), one entry\n" +
+  "per module. The bootstrapped manifest already carries one entry naming\n" +
+  "the repository as the module: leave it when one module is the answer,\n" +
+  "and replace it when there are several. Who depends on a module is\n" +
+  "derived from `dependsOn`, never written.\n" +
+  "\n" +
   "- **Import:** if the operator points you at an existing plan (a doc, a\n" +
   "  ticket, notes), bring its content into that path in this same shape,\n" +
   "  preserving intent while conforming to the structure above.\n" +
@@ -236,10 +259,17 @@ export const DECOMPOSITION_PROMPT =
   "You are a session architect for an AI-led development workflow (the\n" +
   "Dabbler session workflow).\n" +
   "\n" +
-  "Read `docs/planning/project-plan.md` in this workspace (it is deliberately\n" +
-  "not inlined here) and decompose it into a sequence of numbered sessions.\n" +
-  "Each session is a focused unit of work that one AI coding session can\n" +
-  "complete.\n" +
+  "Read `docs/planning/solution-plan.md` in this workspace (or\n" +
+  "`docs/planning/project-plan.md` where that is the file; it is deliberately\n" +
+  "not inlined here). First CHALLENGE it: for each module, ask whether it\n" +
+  "should exist at all, whether its contract is a promise something can\n" +
+  "prove, and whether the dependency direction is the one that hides the\n" +
+  "decisions most likely to change; where the plan deferred a cut, decide it\n" +
+  "or say why it stays deferred. Record the answers in the plan's rationale\n" +
+  "and, where a module changes, in `docs/modules.yaml`. Then decompose the\n" +
+  "plan into a sequence of numbered sessions. Each session is a focused unit\n" +
+  "of work that one AI coding session can complete, and each names ONE\n" +
+  "module.\n" +
   "\n" +
   "Append the sessions to `docs/sessions/session-plan.md`, under its\n" +
   "`## Sessions` heading. There is no level above a session: no sets, no\n" +
@@ -256,6 +286,11 @@ export const DECOMPOSITION_PROMPT =
   "  only tests that run before the round are each step's own checks; never\n" +
   "  write a step that says \"run the tests\" without saying which run it\n" +
   "  means.\n" +
+  "- **One module per session.** Where `docs/modules.yaml` declares more than\n" +
+  "  one module, the heading is followed by `Module: <slug>` on its own line,\n" +
+  "  and the session's steps stay inside that module's roots. A session that\n" +
+  "  must change two modules says `Modules: <a>, <b>` and the reason, and\n" +
+  "  that is rare. With one module declared there is nothing to name.\n" +
   "- A session may declare `Policy: fast` or `Policy: verified` on its own\n" +
   "  line; omitting it uses the repository default.\n" +
   "- Do NOT hand-author `sessions.json`: the first `session start` bootstraps\n" +
@@ -263,7 +298,9 @@ export const DECOMPOSITION_PROMPT =
   "  authored by hand.\n" +
   "\n" +
   "Authoring guidance:\n" +
-  "- Order sessions so earlier ones unblock later ones.\n" +
+  "- Order sessions so earlier ones unblock later ones: a module before the\n" +
+  "  modules that depend on it, and the module that composes the others\n" +
+  "  last.\n" +
   "- Keep scope tight: at most ~3 work steps per session. A session whose\n" +
   "  evidence bundle a verifier cannot read is too large, and the evidence cap\n" +
   "  is the measure of that — treat it as a planning signal, not a threshold\n" +
@@ -283,42 +320,61 @@ export const BOOTSTRAP_PLAN =
   "\n" +
   "## Sessions\n" +
   "\n" +
-  "### Session 1: Author or import the project plan\n" +
+  "### Session 1: Author or import the solution plan\n" +
   "\n" +
   "1. Register.\n" +
-  "2. Ask the operator what the project is — its purpose, what success looks\n" +
-  "   like, the phases or feature areas they have in mind, and whether a\n" +
-  "   plan, brief or notes already exist — unless the repository or your\n" +
-  "   prompt already says. The plan's substance is theirs: do not search\n" +
+  "2. Ask the operator what the solution is — its purpose, who uses it, what\n" +
+  "   it must do and what is out of scope, what success looks like, and\n" +
+  "   whether a plan, brief or notes already exist — unless the repository or\n" +
+  "   your prompt already says. The plan's substance is theirs: do not search\n" +
   "   neighbouring directories for one, and do not draft one from the folder\n" +
-  "   name. Then create — or import — `docs/planning/project-plan.md`:\n" +
-  "   overview, goals and success criteria, high-level phases or feature\n" +
-  "   areas, and each phase's key deliverables. Keep it concise — session 2\n" +
-  "   turns each phase into numbered sessions, so scope each phase to a\n" +
-  "   handful of focused AI sessions.\n" +
-  "3. Cross-provider verification.\n" +
-  "4. Full test suite, recorded as the run of record.\n" +
-  "5. Close-out.\n" +
+  "   name. Then create — or import — `docs/planning/solution-plan.md`: the\n" +
+  "   objective a reader can act on; the modules, with what each is\n" +
+  "   responsible for, the contract each exposes (what must be true going\n" +
+  "   in, what is guaranteed coming out, how it fails), the dependency\n" +
+  "   direction, the reason for each cut and the cuts deferred — one module\n" +
+  "   is a fine answer, and most small solutions are one; and the phases or\n" +
+  "   feature areas with their key deliverables, each scoped to a handful of\n" +
+  "   focused AI sessions. A repository that already has\n" +
+  "   `docs/planning/project-plan.md` amends that file instead.\n" +
+  "3. Declare the modules in `docs/modules.yaml` through `dabbler modules\n" +
+  "   create`. The manifest already names this repository as its one\n" +
+  "   module: leave it when one module is the answer, replace it when there\n" +
+  "   are several. Who depends on a module is derived, never written.\n" +
+  "4. Cross-provider verification.\n" +
+  "5. Full test suite, recorded as the run of record.\n" +
+  "6. Close-out.\n" +
   "\n" +
-  "**Creates:** `docs/planning/project-plan.md`. A later revision is just\n" +
-  "another plan session that amends the same file.\n" +
+  "**Creates:** `docs/planning/solution-plan.md`, and the module manifest as\n" +
+  "the plan decided it. A later revision is just another plan session that\n" +
+  "amends the same files.\n" +
   "\n" +
-  "### Session 2: Break the plan into numbered sessions\n" +
+  "### Session 2: Challenge the plan, then break it into numbered sessions\n" +
   "\n" +
   "1. Register.\n" +
-  "2. Read `docs/planning/project-plan.md` and break it into numbered\n" +
-  "   sessions appended to this file. Each session is a focused unit of work\n" +
-  "   one AI coding session can complete: one\n" +
+  "2. Read `docs/planning/solution-plan.md` (or `docs/planning/project-plan.md`\n" +
+  "   where that is the file this repository keeps its plan in) and challenge\n" +
+  "   its cuts: for each\n" +
+  "   module, whether it should exist, whether its contract is a promise\n" +
+  "   something can prove, and whether the dependency direction hides the\n" +
+  "   decisions most likely to change; decide each deferred cut or say why it\n" +
+  "   stays deferred. Record the answers in the plan's rationale and, where a\n" +
+  "   module changes, in `docs/modules.yaml`.\n" +
+  "3. Break the plan into numbered sessions appended to this file, each\n" +
+  "   naming ONE module (`Module: <slug>` under the heading, where the\n" +
+  "   manifest declares more than one). Each session is a focused unit of\n" +
+  "   work one AI coding session can complete: one\n" +
   "   `### Session <N>: <title>` heading, and its steps as a top-level\n" +
   "   ordered list. Step 1 registers the session; the last steps are\n" +
   "   cross-provider verification, the complete suite once against the\n" +
   "   verified tree, and close-out; the middle steps are the work. Never\n" +
   "   write a step that says \"run the tests\" without saying which run it\n" +
-  "   means. Order sessions so earlier ones unblock later ones, and keep at\n" +
-  "   most ~3 work steps per session.\n" +
-  "3. Cross-provider verification.\n" +
-  "4. Full test suite, recorded as the run of record.\n" +
-  "5. Close-out.\n" +
+  "   means. Order sessions so earlier ones unblock later ones — a module\n" +
+  "   before the modules that depend on it — and keep at most ~3 work steps\n" +
+  "   per session.\n" +
+  "4. Cross-provider verification.\n" +
+  "5. Full test suite, recorded as the run of record.\n" +
+  "6. Close-out.\n" +
   "\n" +
   "**Creates:** the numbered session list the rest of this repository runs.\n" +
   "\n" +

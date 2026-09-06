@@ -434,9 +434,13 @@ testing:
         select:
           - packages/router/test/solutionDeps.test.ts
           - packages/router/test/resolution.test.ts
-      - when: packages/router/src/workflow/
+      # The projection the Solution Explorer renders, over the module
+      # manifest: its own test, and the bootstrap test that reads the first
+      # projection a fresh repository gets.
+      - when: packages/router/src/projection.ts
         select:
-          - packages/router/test/workflow.test.ts
+          - packages/router/test/projection.test.ts
+          - packages/router/test/bootstrap.test.ts
       - when: packages/router/src/pythonJson.ts
         select:
           - packages/router/test/lockfile.test.ts
@@ -527,7 +531,6 @@ testing:
           - packages/router/test/cli.test.ts
           - packages/router/test/release.test.ts
           - packages/router/test/driver.test.ts
-          - packages/router/test/testphase.test.ts
           - packages/router/test/checks.test.ts
           - packages/router/test/preverify.test.ts
           - packages/router/test/bootstrap.test.ts

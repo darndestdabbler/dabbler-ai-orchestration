@@ -90,7 +90,7 @@ import type {
 } from "./generated/index.ts";
 import { type Job, endJob, jobLogTail, pollJob, selfArgv, startJob } from "./jobs.ts";
 import { SolutionDepsError, placeMember } from "./solutionDeps.ts";
-import { tryWriteProjection } from "./workflow/project.ts";
+import { tryWriteProjection } from "./projection.ts";
 import {
   changedPathsBetween,
   nowIso,

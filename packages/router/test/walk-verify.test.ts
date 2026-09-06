@@ -6,8 +6,7 @@
 // and treats it as terminal, so the two adjudication branches -- UPHOLD
 // keeping a finding, OVERRULE clearing one -- are walked in sessions 2 and
 // 3 of the same repository and plan. Beside them: the legal anchor over
-// real commits, the fix loop's envelope over a real diff and a real suite
-// run, and the approved plan's envelope over a real change set. Every model
+// real commits, and the approved plan's envelope over a real change set. Every model
 // answer is a file; every milestone stops the walk when it fails.
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
@@ -18,10 +17,8 @@ import { stringify as stringifyYaml } from "yaml";
 
 import { preverifyGate } from "../src/affected.ts";
 import { approvePlan, compareToEnvelope, needsAmendment, newPlan, writePlan } from "../src/approvedPlan.ts";
-import { checkRunGreen, type SelectionConfig } from "../src/checks.ts";
 import { CONFIG_ENV_VAR } from "../src/config.ts";
 import { EXIT_BLOCKING } from "../src/contracts/exitCodes.ts";
-import { buildEnvelope, envelopeAllows, runSuite } from "../src/fixloop.ts";
 import { snapshotWorktreeTree } from "../src/journal.ts";
 import { readDisputes, readRounds } from "../src/ledger.ts";
 import { readSessionState } from "../src/progress.ts";
@@ -74,7 +71,6 @@ const TESTING = {
   selection: { repo_wide: ["dabbler.yaml"], smoke: ["tests/test_widget.py"], rules: [{ when: "src/widget.py", select: ["tests/test_widget.py"] }] },
 };
 const UNIT: SuiteSpec = { name: "unit", command: "python -m pytest", covers: ["src/", "tests/"], expensive: true, runsWhole: false };
-const SELECTION: SelectionConfig = { scopes: [{ suite: "unit", roots: ["tests"], glob: "test_*.py" }], smoke: [], repoWide: [], rules: [] };
 const RED = "============ FAILURES ============\nsrc/widget.py:2: in widget\nE   assert 2 == 1\nFAILED tests/test_widget.py::test_widget - assert 2 == 1\n";
 const ISSUE = "ISSUES FOUND\n\nIssue 1: the widget returns the wrong number.\nSeverity: Major\nEvidence paths: src/widget.py\n";
 const TARGETED = { stage: "preverify-targeted", durationSeconds: 1, command: "python -m pytest tests/test_widget.py", policy: "targeted" };
@@ -271,29 +267,13 @@ describe("a repository walked through the verification loop", () => {
     assert.match(legalAnchor(repo, seedHead, "1999-01-01T00:00:00+00:00")[1], /There is nothing to re-anchor onto\./);
   });
 
-  milestone("the fix loop's envelope is the session diff plus the files a real run's failures implicate, and the suite really runs", async () => {
-    writeFiles(repo, { "tests/test_widget.py": "from src.widget import widget\n\n\ndef test_widget():\n    assert widget() == 1\n", "notes.md": "scratch\n" });
-    const envelope = buildEnvelope(repo, "HEAD", RED, SELECTION);
-    assert.ok(envelope.sessionPaths.includes("tests/test_widget.py") && envelope.sessionPaths.includes("notes.md"));
-    // The traceback frame implicates the source file; the FAILED line names
-    // the test file. Both are where a fix may land; the runner's own files
-    // are not.
-    assert.deepEqual([...envelope.implicated].sort(), ["src/widget.py", "tests/test_widget.py"]);
-    assert.equal(envelopeAllows(envelope, "src/widget.py"), true);
-    assert.equal(envelopeAllows(envelope, "runner.js"), false);
-    assert.throws(() => buildEnvelope(repo, "0".repeat(40), RED, SELECTION), /unmeasurable session diff/);
-    const interpreter = `"${process.execPath.split("\\").join("/")}"`;
-    const suiteConfig = { run_policy: { check_timeout_seconds: 60 }, testing: { suites: [{ name: "unit", argv: [interpreter, "runner.js"], covers: ["src/", "tests/"], test_roots: ["tests"], test_glob: "test_*.py" }] } };
-    const runs = await runSuite(repo, suiteConfig, ["tests/test_widget.py"]);
-    assert.equal(runs.length, 1);
-    assert.equal(checkRunGreen(runs[0]), false);
-    await assert.rejects(runSuite(repo, suiteConfig, []), /no authored test to include/);
-  });
-
   milestone("the approved plan's envelope is compared against what git says changed: inside, outside, and a dependency change named as its own kind", () => {
     const directory = join(repo, ".dabbler", "runs", "s3");
     writePlan(directory, newPlan(3, "fixture", [{ step_id: "finish", intent: "Finish", file_envelope: ["tests/test_widget.py"], evidence_contract: [{ kind: "deterministic", description: "pytest passes" }] }]));
     const plan = approvePlan(directory);
+    // The change set the envelope is compared against: one file inside it,
+    // one outside it, and a new dependency file.
+    writeFiles(repo, { "tests/test_widget.py": "from src.widget import widget\n\n\ndef test_widget():\n    assert widget() == 1\n", "notes.md": "scratch\n" });
     writeFileSync(join(repo, "pyproject.toml"), "[project]\n", "utf8");
     const comparison = compareToEnvelope(repo, plan, sessionsDir);
     assert.equal(comparison.measured, true);

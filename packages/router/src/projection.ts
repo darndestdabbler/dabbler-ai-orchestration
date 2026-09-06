@@ -1,179 +1,86 @@
-// The projection the Explorer reads: the manifest, joined to live state.
+// The projection the Solution Explorer reads: the module manifest, joined
+// to what the tree and the sibling repositories say.
 //
-// TypeScript renders; Python decides -- and once there is one router, the
-// projection is still the seam. The extension never folds the event log
-// itself, because two implementations of one rule disagree eventually and the
-// disagreement shows up as a wrong status nobody can explain.
+// The extension renders; the router decides. The extension never reads the
+// manifest or the sibling repositories itself, because two implementations
+// of one rule disagree eventually and the disagreement shows up as a wrong
+// row nobody can explain. Everything here is DERIVED: dependency order and
+// `usedBy` from `dependsOn`, the contract folder from the disk, the drift
+// rows from build files read on every projection.
+//
+// A single-module solution -- an absent manifest, or one entry -- projects
+// one module row and nothing module-shaped beyond it, which is the shape of
+// every repository that predates the manifest.
 
-import { mkdirSync, writeFileSync } from "node:fs";
-import { dirname } from "node:path";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { basename, dirname, join, resolve } from "node:path";
 
-import { platformNewlines } from "../journal.ts";
-import { dumps } from "../pythonJson.ts";
-import {
-  asDict,
-  load as loadSolution,
-  ManifestError,
-  STEP_TITLES,
-  STEPS,
-} from "../solution.ts";
+import { platformNewlines } from "./journal.ts";
+import { dumps } from "./pythonJson.ts";
+import { consumersOf, ManifestError, solutionShape } from "./modules.ts";
 import {
   assembleSolution,
   locateProducer,
   type Edge,
   type SolutionMember,
-} from "../solutionDeps.ts";
+} from "./solutionDeps.ts";
 import {
   comparePins,
   configuredFeeds,
   publishedVersions,
   reconcileResolution,
-} from "../resolution.ts";
-import {
-  fold,
-  projectionPath,
-  read,
-  type TargetState,
-  WorkflowError,
-} from "./log.ts";
-import {
-  reviewCap,
-  reviewTerminal,
-  runCap,
-  runTerminal,
-  suiteTerminal,
-  TERMINAL_HEADLINES,
-} from "./terminal.ts";
+} from "./resolution.ts";
 
 type Node = Record<string, unknown>;
 
-/**
- * Publish the loop's position, decided here.
- *
- * The extension is handed the round count, the bound and the terminal token
- * rather than the events, because a second implementation of "has this loop
- * finished" disagrees with the first eventually, and the disagreement shows
- * up as a status nobody can explain.
- */
-function projectReviewLoop(
-  node: Node,
-  root: string,
-  state: TargetState | undefined,
-  cap: number,
-): void {
-  const terminal = reviewTerminal(root, state, cap);
-  node.reviewRounds = state?.reviewRounds ?? 0;
-  node.reviewCap = cap;
-  node.reviewTerminal = terminal;
-  node.reviewTerminalLabel = terminal ? TERMINAL_HEADLINES[terminal] : null;
+export const PROJECTION_RELPATH = join(".dabbler", "solution", "projection.json");
+
+export function projectionPath(root: string): string {
+  return join(root, PROJECTION_RELPATH);
 }
 
-/** The tests phase's position, on the same terms and for the same reason. */
-function projectTestLoop(
-  node: Node,
-  root: string,
-  state: TargetState | undefined,
-  cap: number,
-): void {
-  const terminal = runTerminal(root, state, cap);
-  node.testsAuthored = [...(state?.testsAuthored ?? [])];
-  node.testRounds = state?.testRounds ?? 0;
-  node.testCap = cap;
-  node.testTerminal = terminal;
-  node.testTerminalLabel = terminal ? TERMINAL_HEADLINES[terminal] : null;
+/** Where a module's contract bundle lives, relative to the root. */
+export function contractDirFor(slug: string): string {
+  return `modules/${slug}/contract`;
 }
 
-/**
- * The complete suite's position, and how many fix rounds it cost.
- *
- * The fix count is published beside the round count because the two answer
- * different questions: how close the loop came to its bound, and how much
- * repair the step needed to get there.
- */
-function projectSuiteLoop(
-  node: Node,
-  root: string,
-  state: TargetState | undefined,
-  cap: number,
-): void {
-  const terminal = suiteTerminal(root, state, cap);
-  node.suiteRounds = state?.suiteRounds ?? 0;
-  node.suiteCap = cap;
-  node.fixRounds = state?.fixRounds ?? 0;
-  node.suiteTerminal = terminal;
-  node.suiteTerminalLabel = terminal ? TERMINAL_HEADLINES[terminal] : null;
-}
-
-/** What the Explorer reads: the manifest, joined to live state. */
+/** What the Explorer reads: the manifest, joined to the tree. */
 export function project(root: string): Record<string, unknown> {
-  let solution;
-  try {
-    solution = loadSolution(root);
-  } catch (error) {
-    if (error instanceof ManifestError) throw new WorkflowError(error.message);
-    throw error;
-  }
-
-  const state = fold(read(root));
-  const cap = reviewCap(root);
-  const tcap = runCap(root);
-  const doc = asDict(solution);
-  const head = doc.solution as Node;
-  const solState = state.get("solution");
-  head.waitingOn = solState?.waitingOn ?? null;
-  head.returns = solState?.returns ?? 0;
-  head.reviewers = solState?.reviewers ?? [];
-  head.findings = solState?.findings ?? [];
-  projectReviewLoop(head, root, solState, cap);
-  projectTestLoop(head, root, solState, tcap);
-  projectSuiteLoop(head, root, solState, tcap);
-  // Whether this has entered the component workflow AT ALL, stated rather
-  // than left to be inferred from a step number.
-  //
-  // `solution.yaml` declares a step and `solution.ts` projects it, so every
-  // row carries one whether or not any event has ever been recorded against
-  // it -- and a bootstrapped repository then reads `1/6 Plan and design`
-  // forever, because nothing in the SESSION lifecycle advances the component
-  // workflow (csv-model feedback item 14). The declared step is not wrong,
-  // it is a default; what was missing is the difference between a default
-  // and a position. A reader cannot recover that from the number, because
-  // step 1 is exactly what an entered workflow looks like on its first day.
-  head.entered = Boolean(solState?.step);
-  if (solState?.step) {
-    head.step = solState.step;
-    head.stepTitle = STEP_TITLES[solState.step];
-    head.stepNumber = STEPS.indexOf(solState.step) + 1;
-  }
-
-  const components = doc.components as Node[];
-  for (const c of components) {
-    const cs = state.get(String(c.name));
-    c.entered = Boolean(cs?.step);
-    if (cs?.step) {
-      c.step = cs.step;
-      c.stepTitle = STEP_TITLES[cs.step];
-      c.stepNumber = STEPS.indexOf(cs.step) + 1;
-    }
-    c.waitingOn = cs?.waitingOn ?? null;
-    c.returns = cs?.returns ?? 0;
-    c.reviewed = cs?.reviewed ?? false;
-    c.approved = cs?.approved ?? false;
-    c.reviewers = cs?.reviewers ?? [];
-    c.findings = cs?.findings ?? [];
-    projectReviewLoop(c, root, cs, cap);
-    projectTestLoop(c, root, cs, tcap);
-    projectSuiteLoop(c, root, cs, tcap);
-  }
-
-  const waiting = components
-    .filter((c) => c.waitingOn === "developer")
-    .map((c) => c.name);
-  if (head.waitingOn === "developer") waiting.unshift(head.name);
-  doc.needsYou = waiting;
-  // One assembly for both halves of the graph. It reads sibling directories
-  // and every member's build files, and the projection is written on every
-  // recorded event -- doing it twice to answer two questions about the same
-  // reading is a cost with nothing bought.
+  const shape = solutionShape(root);
+  const name = basename(resolve(root)) || "solution";
+  const modules: Node[] = shape.modules.map((entry) => {
+    const contractDir = contractDirFor(entry.slug);
+    return {
+      slug: entry.slug,
+      title: entry.title,
+      kind: entry.kind,
+      package: entry.package,
+      contract: entry.contract,
+      codeRoots: [...entry.codeRoots],
+      dependsOn: [...entry.dependsOn],
+      // Derived on every projection, declared nowhere.
+      usedBy: consumersOf(shape.modules, entry.slug),
+      // The folder, when the tree has it; the Explorer opens it and says
+      // "not written yet" otherwise. Never claimed for a module that has
+      // not declared a seam.
+      contractDir:
+        entry.contract !== null && existsSync(join(root, contractDir)) ? contractDir : null,
+    } satisfies Node;
+  });
+  const doc: Node = {
+    solution: {
+      name,
+      title: name,
+      multi: shape.multi,
+      implicit: shape.implicit,
+      moduleCount: modules.length,
+    },
+    modules,
+  };
+  // One assembly for both halves of the cross-repository graph. It reads
+  // sibling directories and every member's build files, and the projection
+  // is written on every recorded event -- doing it twice to answer two
+  // questions about the same reading is a cost with nothing bought.
   const members = assembleSolution(root);
   doc.external = externalComponents(root, members);
   doc.members = solutionMembers(members);
@@ -196,13 +103,14 @@ export function writeProjection(root: string): string {
  * Write the projection, or leave the event that was just recorded standing.
  *
  * A manifest problem must not swallow an event that is already on the log;
- * `status` surfaces the manifest error plainly when someone asks for it.
+ * `dabbler modules show` surfaces the manifest error plainly when someone
+ * asks for it.
  */
 export function tryWriteProjection(root: string): void {
   try {
     writeProjection(root);
   } catch (error) {
-    if (error instanceof WorkflowError || error instanceof ManifestError) return;
+    if (error instanceof ManifestError) return;
     throw error;
   }
 }

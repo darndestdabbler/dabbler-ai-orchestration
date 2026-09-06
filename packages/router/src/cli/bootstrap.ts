@@ -18,7 +18,7 @@ import { repoRelativePath, runGit } from "../journal.ts";
 import { raisePackagingDecisions, raiseRemoteDecision } from "../owedDecisions.ts";
 import { STATUS_IN_PROGRESS } from "../progress.ts";
 import { readRawSessionState } from "../sessionState.ts";
-import { writeProjection } from "../workflow/project.ts";
+import { writeProjection } from "../projection.ts";
 import {
   DECOMPOSITION_PROMPT,
   IGNORE_RULE,
@@ -33,7 +33,7 @@ import {
   persistTransportPreference,
   resolveBootstrapTransport,
   scaffoldBootstrapSessions,
-  scaffoldSolutionManifest,
+  scaffoldModuleManifest,
   scaffoldProjectConfig,
   writeInstructionFiles,
   installStopGate,
@@ -332,9 +332,10 @@ export async function bootstrapVerb(argv: string[]): Promise<number> {
   }
 
   // The Solution Explorer had nothing to render in a fresh project and no
-  // way to say why. This is the manifest half; the welcome state is the
-  // extension's, and the projection below is the third.
-  const manifest = scaffoldSolutionManifest(project);
+  // way to say why. This is the manifest half -- one module, the
+  // repository, so nothing module-shaped switches on; the welcome state is
+  // the extension's, and the projection below is the third.
+  const manifest = scaffoldModuleManifest(project);
   if (manifest !== null) {
     writeOut(`bootstrap: scaffolded ${manifest}
 `);
@@ -342,7 +343,7 @@ export async function bootstrapVerb(argv: string[]): Promise<number> {
     try {
       writeProjection(project);
     } catch {
-      // A manifest that will not project is `solution check`'s to explain.
+      // A manifest that will not project is `modules show`'s to explain.
     }
   }
 

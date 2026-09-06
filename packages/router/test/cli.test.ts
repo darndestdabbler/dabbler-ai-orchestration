@@ -231,10 +231,53 @@ describe("dabbler status", () => {
 });
 
 describe("dabbler modules", () => {
-  it("has one subcommand, because the manifest has one writer", async () => {
-    const result = await run(() => modulesVerb(["list", tempDir("cli-")]));
+  it("refuses a subcommand it does not have", async () => {
+    const result = await run(() => modulesVerb(["retire", tempDir("cli-")]));
     assert.equal(result.code, 2);
     assert.match(result.err, /is not a subcommand/);
+  });
+
+  it("creates with the module vocabulary and shows it back with usedBy derived", async () => {
+    const root = tempDir("cli-");
+    const model = await run(() =>
+      modulesVerb([
+        "create", root, "--slug", "model", "--title", "Model",
+        "--kind", "shared-types", "--package", "CsvModel", "--code-root", "modules/model",
+      ]),
+    );
+    assert.equal(model.code, 0);
+    const persister = await run(() =>
+      modulesVerb([
+        "create", root, "--slug", "persister", "--title", "Persister",
+        "--depends-on", "model", "--package", "CsvPersister", "--contract", "designed",
+      ]),
+    );
+    assert.equal(persister.code, 0);
+    const shown = await run(() => modulesVerb(["show", root]));
+    assert.equal(shown.code, 0);
+    const doc = JSON.parse(shown.out) as {
+      multi: boolean;
+      modules: { slug: string; kind: string; contract: string | null; usedBy: string[] }[];
+    };
+    assert.equal(doc.multi, true);
+    assert.deepEqual(doc.modules.map((m) => m.slug), ["model", "persister"]);
+    assert.deepEqual(doc.modules[0], {
+      slug: "model", title: "Model", kind: "shared-types", package: "CsvModel",
+      contract: "package", codeRoots: ["modules/model"], dependsOn: [], usedBy: ["persister"],
+    });
+    assert.equal(doc.modules[1]?.contract, "designed");
+    // The verb that moved the manifest rewrote the projection the Solution
+    // Explorer reads, so a terminal `create` shows up in the tree.
+    const projected = JSON.parse(
+      readFileSync(join(root, ".dabbler", "solution", "projection.json"), "utf8"),
+    ) as { modules: { slug: string }[] };
+    assert.deepEqual(projected.modules.map((m) => m.slug), ["model", "persister"]);
+    // A dependency the manifest does not declare is refused at write time.
+    const dangling = await run(() =>
+      modulesVerb(["create", root, "--slug", "x", "--title", "X", "--depends-on", "nope"]),
+    );
+    assert.equal(dangling.code, 1);
+    assert.match(dangling.err, /does not declare/);
   });
 
   it("passes the root positionally and collects each repeatable flag", async () => {

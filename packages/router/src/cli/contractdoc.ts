@@ -3,6 +3,7 @@
 import { writeFileSync } from "node:fs";
 
 import {
+  type ContractGraph,
   ContractError,
   EXIT_OK,
   EXIT_REFUSED,
@@ -10,7 +11,7 @@ import {
   render,
 } from "../contractdoc.ts";
 import { platformNewlines } from "../journal.ts";
-import { load as loadSolution, type Solution } from "../solution.ts";
+import { consumersOf, solutionShape } from "../modules.ts";
 import { writeErr, writeOut } from "./output.ts";
 
 const EXIT_USAGE = 2;
@@ -26,10 +27,34 @@ function usage(): string {
     "options:",
     "  -h, --help            show this help message and exit",
     "  --workspace-root WORKSPACE_ROOT",
-    "                        read solution.yaml from here for the diagram",
+    "                        read docs/modules.yaml from here for the diagram",
     "  -o OUT, --out OUT     write here instead of stdout",
     "",
   ].join("\n");
+}
+
+/**
+ * The contract's place in the module graph, from the manifest: the module
+ * whose slug or package the contract names, its declared `dependsOn` and
+ * its derived consumers. A single-module solution has no graph to draw,
+ * and neither does a contract for something the manifest does not declare.
+ */
+function graphFor(workspaceRoot: string, component: string): ContractGraph | null {
+  let shape;
+  try {
+    shape = solutionShape(workspaceRoot);
+  } catch {
+    return null;
+  }
+  if (!shape.multi) return null;
+  const entry = shape.modules.find(
+    (module) => module.slug === component || module.package === component,
+  );
+  if (entry === undefined) return null;
+  return {
+    dependsOn: [...entry.dependsOn],
+    usedBy: consumersOf(shape.modules, entry.slug),
+  };
 }
 
 export function contractdocVerb(argv: string[]): Promise<number> {
@@ -88,15 +113,10 @@ function run(argv: string[]): number {
     throw error;
   }
 
-  // The diagram is a bonus; a missing manifest is not fatal.
-  let solution: Solution | null = null;
-  try {
-    solution = loadSolution(workspaceRoot);
-  } catch {
-    solution = null;
-  }
+  // The diagram is a bonus; a missing or single-module manifest draws none.
+  const graph = graphFor(workspaceRoot, String(document.component));
 
-  const text = render(document, solution);
+  const text = render(document, graph);
   if (out !== null) {
     writeFileSync(out, platformNewlines(text), { encoding: "utf8" });
     writeOut(`wrote ${out}\n`);

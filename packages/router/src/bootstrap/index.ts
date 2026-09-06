@@ -46,7 +46,7 @@ import {
   SHARED_BODY,
 } from "./templates.ts";
 
-import { MANIFEST_RELPATH } from "../solution.ts";
+import { MANIFEST_RELPATH } from "../modules.ts";
 
 export * from "./templates.ts";
 export * from "./detect.ts";
@@ -252,49 +252,48 @@ export function writeInstructionFiles(
 }
 
 /**
- * The one-component solution a fresh repository is, written so the Solution
- * Explorer has something true to show from the first minute.
+ * The one-module solution a fresh repository is, written so the Solution
+ * Explorer has something true to show from the first minute and so that
+ * nothing module-shaped switches on.
  *
- * The view was empty in every new project and explained nothing, which is
- * `csv-model`'s item 4. Three things caused that and none of them was a
- * missing writer: nothing scaffolded a manifest, no extension-facing path
- * triggered a projection write, and the view had no welcome state. This is
- * the first.
- *
- * One component, named for the repository, at step 1. It is a real
- * declaration rather than a placeholder -- a repository that has not been
- * decomposed yet IS one component -- so the first thing an operator does to
- * it is split it, not delete it.
+ * One module, named for the repository, whose roots are the repository. It
+ * is a real declaration rather than a placeholder -- a repository nobody
+ * has decomposed yet IS one module, and that is the shape every session
+ * runs in until a second entry is declared: no focused clone, no packages
+ * folder, no contracts, the run of record the module's own suites. Session
+ * 1 writes the solution plan and decides whether there are several. Left
+ * exactly as it is when a manifest already exists.
  */
-export function scaffoldSolutionManifest(projectDir: string): string | null {
+export function scaffoldModuleManifest(projectDir: string): string | null {
   const path = join(projectDir, MANIFEST_RELPATH);
   if (existsSync(path)) return null;
   const name = basename(resolve(projectDir)) || "solution";
   const text = [
-    "# What this project is built FROM, as opposed to the work of building",
-    "# it. The Solution Explorer renders this joined to live state.",
+    "# What this repository is built FROM: its modules. The Solution Explorer",
+    "# renders this, and a session is scoped by it.",
     "#",
-    "# One component to start with, because a repository nobody has",
-    "# decomposed yet IS one component. Step 2 of the six-step workflow is",
-    "# where it becomes several; until then this is true rather than a",
-    "# placeholder.",
+    "# One module, because a repository nobody has decomposed yet IS one",
+    "# module -- and that is the shape every session runs in until a second",
+    "# entry is declared here: no focused clone, no packages folder, no",
+    "# contracts, the run of record the module's own suites. Session 1 writes",
+    "# the solution plan and decides whether there are several; a second",
+    "# entry is what switches the module machinery on.",
     "#",
     "# `dependsOn` is the only direction anyone writes. Who depends on a",
-    "# component is derived from it -- two directions kept by hand disagree",
+    "# module is derived from it -- two directions kept by hand disagree",
     "# eventually, and the disagreement is silent.",
-    "solution:",
-    `  name: ${name}`,
+    "modules:",
+    `- slug: ${name}`,
     `  title: ${name}`,
-    "  step: plan",
-    "",
-    "components:",
-    `  - name: ${name}`,
-    "    kind: integration",
-    `    title: ${name}`,
-    "    step: plan",
+    "  kind: application",
+    // Quoted: a bare `.` reads as a number under the YAML 1.1 resolver the
+    // manifest is parsed with, and the roots must be strings.
+    "  codeRoots:",
+    "  - '.'",
     "",
   ].join("\n");
   try {
+    mkdirSync(dirname(path), { recursive: true });
     writeFileSync(path, text, "utf8");
   } catch {
     return null;

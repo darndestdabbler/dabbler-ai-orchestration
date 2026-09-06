@@ -25,7 +25,7 @@ import {
   resolveBootstrapTransport,
   scaffoldBootstrapSessions,
   scaffoldProjectConfig,
-  scaffoldSolutionManifest,
+  scaffoldModuleManifest,
   writeInstructionFiles,
 } from "../src/bootstrap/index.ts";
 import { TRANSPORT_COPILOT_CLI, TRANSPORT_ENV_VAR } from "../src/config.ts";
@@ -36,7 +36,7 @@ import {
   raiseRemoteDecision,
 } from "../src/owedDecisions.ts";
 import { capture } from "../src/output.ts";
-import { load } from "../src/solution.ts";
+import { solutionShape } from "../src/modules.ts";
 import { registerSessionStart } from "../src/writers.ts";
 import { makeAnsweredRepo, makeAnsweredSandbox, seed, tempDir } from "./support/answers.ts";
 
@@ -500,22 +500,32 @@ describe("what setup does about the operator's typing", () => {
 });
 
 describe("what the Solution Explorer has to render", () => {
-  it("scaffolds a one-component manifest, which is what a fresh repo IS", () => {
-    // The view was empty in every new project and explained nothing. Three
-    // things caused that and none was a missing writer; this is the manifest
-    // half.
+  it("scaffolds a one-module manifest the framework reads as single-module, and a plan that names the solution plan", () => {
+    // A fresh repository IS one module, and one module is the shape in
+    // which nothing module-shaped switches on -- the requirement every
+    // session of the modules block is held to.
     const repo = emptyRepo();
-    assert.equal(scaffoldSolutionManifest(repo), join(repo, "solution.yaml"));
-    const solution = load(repo);
-    assert.equal(solution.components.length, 1);
-    assert.equal(solution.components[0]?.kind, "integration");
+    assert.equal(scaffoldModuleManifest(repo), join(repo, "docs", "modules.yaml"));
+    const shape = solutionShape(repo);
+    assert.equal(shape.multi, false);
+    assert.equal(shape.implicit, false);
+    assert.equal(shape.modules.length, 1);
+    assert.equal(shape.modules[0]?.kind, "application");
+    assert.deepEqual(shape.modules[0]?.codeRoots, ["."]);
+    for (const path of scaffoldBootstrapSessions(repo)) {
+      if (!path.endsWith("session-plan.md")) continue;
+      const plan = readFileSync(path, "utf8");
+      assert.match(plan, /docs\/planning\/solution-plan\.md/);
+      assert.match(plan, /one module\s+is a fine answer/i);
+    }
   });
 
   it("leaves a manifest the project already wrote alone", () => {
     const repo = emptyRepo();
-    writeFileSync(join(repo, "solution.yaml"), "# mine\n", "utf8");
-    assert.equal(scaffoldSolutionManifest(repo), null);
-    assert.equal(readFileSync(join(repo, "solution.yaml"), "utf8"), "# mine\n");
+    mkdirSync(join(repo, "docs"), { recursive: true });
+    writeFileSync(join(repo, "docs", "modules.yaml"), "# mine\n", "utf8");
+    assert.equal(scaffoldModuleManifest(repo), null);
+    assert.equal(readFileSync(join(repo, "docs", "modules.yaml"), "utf8"), "# mine\n");
   });
 
   it("writes the first projection, so the tree has content before any verb", async () => {

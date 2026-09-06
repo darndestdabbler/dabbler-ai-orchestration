@@ -73,12 +73,11 @@ export { readUncollectedJob, type UncollectedJobReading } from "./jobs.ts";
 // a `verification.stalled_after_seconds` somebody set on purpose.
 export { stalledAfterSeconds } from "./progress.ts";
 // Re-deriving the solution projection, for the same reason again: it is
-// written by the four commands that record an event and by nothing else, so
+// written by the commands that move a declaration and by nothing else, so
 // a host watching the DECLARATIONS underneath it has to be able to ask for
-// a fresh one. The alternative is a host that folds the event log and reads
+// a fresh one. The alternative is a host that reads the module manifest and
 // the sibling repositories itself, which is the second implementation this
 // export exists to prevent. It writes and never throws on a manifest
-// problem -- the same rule the recording commands rely on, so a broken
-// declaration leaves the last good projection standing rather than
-// emptying the view.
-export { tryWriteProjection } from "./workflow/project.ts";
+// problem, so a broken declaration leaves the last good projection standing
+// rather than emptying the view.
+export { tryWriteProjection } from "./projection.ts";

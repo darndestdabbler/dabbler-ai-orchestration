@@ -5,9 +5,9 @@
 // driveable from the unit suite. This class converts descriptors into TreeItems
 // and owns the platform lifecycle.
 //
-// It reads a projection written by the router (`workflow/project.ts`, called
-// from every mutating `dabbler workflow` command); it never folds the event
-// log itself.
+// It reads a projection written by the router (`projection.ts`, written by
+// every command that moves a declaration); it never reads the module
+// manifest itself.
 
 import * as fs from "fs";
 import * as path from "path";
@@ -63,9 +63,9 @@ export class SolutionTreeProvider
     this.watch(PROJECTION_GLOB, () => this.refresh());
     // And the declarations it is derived from. A change to one of these
     // makes the projection stale without touching it, which is why the tree
-    // spent a whole session showing what was true when the last workflow
-    // event was recorded: refreshing over a file nothing rewrote re-reads
-    // the same bytes.
+    // spent a whole session showing what was true when the last declaration
+    // was recorded: refreshing over a file nothing rewrote re-reads the
+    // same bytes.
     for (const glob of PROJECTION_SOURCE_GLOBS) {
       this.watch(glob, () => this.rederive());
     }
@@ -168,18 +168,22 @@ export class SolutionTreeProvider
     }
     if (element.kind === "contract" && d.contextValue === "dabblerContract") {
       const target = contractTarget(
-        p.components.find((c) => c.name === element.name),
+        p.modules.find((m) => m.slug === element.slug),
       );
+      // The folder is the router's finding; the notes page inside it is
+      // what an editor can open, and only when it is there.
       if (target && this.workspaceRoot) {
-        item.command = {
-          command: "vscode.open",
-          title: "Open contract",
-          // An editor tab, not a popup: this is the one row that serves the
-          // component's consumers, and they read it beside their own code.
-          arguments: [
-            vscode.Uri.file(path.join(this.workspaceRoot, target)),
-          ],
-        };
+        const file = path.join(this.workspaceRoot, target);
+        if (fs.existsSync(file)) {
+          item.command = {
+            command: "vscode.open",
+            title: "Open contract",
+            // An editor tab, not a popup: this is the one row that serves
+            // the module's consumers, and they read it beside their own
+            // code.
+            arguments: [vscode.Uri.file(file)],
+          };
+        }
       }
     }
     return item;

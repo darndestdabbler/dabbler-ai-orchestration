@@ -131,7 +131,9 @@ suite("new module flow", () => {
   }
 
   test("creates the module and tells the operator how to use it", async () => {
-    const { ui, infos } = moduleUi(["greeter", "Greeter"], "D:\\ws");
+    // Slug, title, kind and depends-on; Enter past the last two takes the
+    // manifest's defaults, a library that depends on nothing.
+    const { ui, infos } = moduleUi(["greeter", "Greeter", "", ""], "D:\\ws");
     const created = await runNewModuleFlow(ui, fakeRouter(0).router);
     assert.strictEqual(created, true);
     assert.ok(infos[0].includes("greeter"));
@@ -150,7 +152,7 @@ suite("new module flow", () => {
   });
 
   test("a duplicate-slug refusal from the CLI surfaces as an error", async () => {
-    const { ui, errors } = moduleUi(["dupe", ""], "D:\\ws");
+    const { ui, errors } = moduleUi(["dupe", "", "", ""], "D:\\ws");
     assert.strictEqual(
       await runNewModuleFlow(ui, fakeRouter(1, 'module "dupe" already exists').router),
       false,
@@ -805,12 +807,8 @@ suite("commandFlows: cancel at planning time", () => {
 
 suite("placing a repository the Explorer cannot reach", () => {
   const PROJECTION = {
-    solution: {
-      name: "csv", title: "CSV", step: "contracts", stepTitle: "Contracts",
-      stepNumber: 3, stepCount: 6,
-    },
-    components: [],
-    needsYou: [],
+    solution: { name: "csv", title: "CSV", multi: false, implicit: true, moduleCount: 1 },
+    modules: [],
     external: [
       {
         id: "Dabbler.Csv.Model",

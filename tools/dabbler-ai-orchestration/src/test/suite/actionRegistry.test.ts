@@ -160,7 +160,7 @@ suite("ActionRegistry: package.json menu registry", () => {
     // view shows, and who is affected when one of those things changes.
     // "solution" alone would pass on the view's own name, which is the
     // sentence the item called unclear in the first place.
-    for (const promise of [/built FROM/i, /components/i, /promises|breaks|changes/i]) {
+    for (const promise of [/built FROM/i, /modules/i, /promises|breaks|changes/i]) {
       assert.ok(
         promise.test(solution.contents),
         `the welcome does not say what the view is for (${promise})`,

@@ -22,7 +22,7 @@
 // is the UI's thread, so what the extension asks for is a design
 // constraint rather than a taste: the projection is a few file reads and
 // is polled, and `session cancel` is a click the operator is watching. The
-// verbs that buy a model or run a suite -- `verify`, `workflow` -- are
+// verbs that buy a model or run a suite -- `verify`, `session next` -- are
 // engine-facing, and belong in the terminal `dabbler` is on, which is
 // where the framework's own lifecycle runs them.
 
@@ -66,9 +66,6 @@ import {
   type VerifyRoundOptions,
   type VerifyStepOptions,
   type VerifyVerbs,
-  type WorkflowOptions,
-  type WorkflowStepOptions,
-  type WorkflowVerbs,
 } from "./contracts/router.ts";
 import type { ApprovedPlan } from "./generated/approved-plan.ts";
 import type { ProgressProjection } from "./generated/progress-projection.ts";
@@ -346,6 +343,10 @@ export class InProcessRouter implements Router {
       optional(args, "--plan-path", o.planPath);
       optional(args, "--code-root", o.codeRoot);
       optional(args, "--spec-section", o.specSection);
+      optional(args, "--kind", o.kind);
+      for (const dependency of o.dependsOn ?? []) args.push("--depends-on", dependency);
+      optional(args, "--package", o.package);
+      optional(args, "--contract", o.contract);
       return this.text("modules", args, o.workspaceRoot);
     },
   };
@@ -411,45 +412,6 @@ export class InProcessRouter implements Router {
       optional(args, "--reason", o.reason);
     }
     return this.text("verify", args, o.repoRoot);
-  }
-
-  // --- the six-step workflow --------------------------------------------------
-
-  public readonly workflow: WorkflowVerbs = {
-    enter: (o: WorkflowStepOptions) => this.workflowStep("enter", o),
-    review: (o: WorkflowStepOptions) => this.workflowStep("review", o),
-    approve: (o: WorkflowStepOptions) => this.workflowStep("approve", o),
-    authorTests: (o: WorkflowStepOptions) => this.workflowStep("author-tests", o),
-    test: (o: WorkflowStepOptions) => this.workflowStep("test", o),
-    suite: (o: WorkflowStepOptions) => this.workflowStep("suite", o),
-    fix: (o: WorkflowStepOptions) => this.workflowStep("fix", o),
-    sendBack: (o: WorkflowOptions & { readonly to: string; readonly reason: string }) => {
-      const args = ["send-back", "--workspace-root", o.workspaceRoot];
-      optional(args, "--component", o.component);
-      args.push("--to", o.to, "--reason", o.reason);
-      return this.text("workflow", args, o.workspaceRoot);
-    },
-    status: (o: WorkflowOptions) => {
-      const args = ["status", "--workspace-root", o.workspaceRoot];
-      optional(args, "--component", o.component);
-      return this.text("workflow", args, o.workspaceRoot);
-    },
-  };
-
-  private workflowStep(
-    cmd: string,
-    o: WorkflowStepOptions,
-  ): Promise<RouterResult<RouterText>> {
-    const args = [cmd];
-    // `enter` takes the step id positionally and every other subcommand
-    // reads it from the log, so it is sent to the one that asks for it.
-    if (cmd === "enter" && o.step) args.push(o.step);
-    args.push("--workspace-root", o.workspaceRoot);
-    optional(args, "--component", o.component);
-    optional(args, "--author-provider", o.authorProvider);
-    optional(args, "--transport", o.transport);
-    for (const path of o.artifact ?? []) args.push("--artifact", path);
-    return this.text("workflow", args, o.workspaceRoot);
   }
 
   // --- what is owed a person ---------------------------------------------------

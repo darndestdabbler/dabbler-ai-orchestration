@@ -50,7 +50,7 @@ import {
   reconcile,
 } from "../solutionDeps.ts";
 import { dumps } from "../pythonJson.ts";
-import { tryWriteProjection } from "../workflow/project.ts";
+import { tryWriteProjection } from "../projection.ts";
 import { writeErr, writeOut } from "./output.ts";
 
 const EXIT_OK = 0;

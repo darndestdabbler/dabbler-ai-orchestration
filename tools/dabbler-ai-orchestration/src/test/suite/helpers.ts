@@ -258,17 +258,6 @@ export function fakeRouter(
         stepStatus: text("verify step status"),
         stepAmend: text("verify step amend"),
       },
-      workflow: {
-        enter: text("workflow enter"),
-        review: text("workflow review"),
-        approve: text("workflow approve"),
-        authorTests: text("workflow author-tests"),
-        test: text("workflow test"),
-        suite: text("workflow suite"),
-        fix: text("workflow fix"),
-        sendBack: text("workflow send-back"),
-        status: text("workflow status"),
-      },
       owed: {
         answer: (options: OwedAnswerOptions) => {
           owedAnswers.push(options);

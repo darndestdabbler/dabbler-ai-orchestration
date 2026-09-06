@@ -2,63 +2,42 @@
 // can drive it.
 //
 // This file renders; it never decides. The projection is written by the
-// router (`workflow/project.ts`), and folding the event log stays there —
-// two implementations of one rule disagree eventually, and the disagreement
-// surfaces as a status nobody can explain.
+// router (`projection.ts`) from the module manifest and the sibling
+// repositories' declarations, and every derived fact -- dependency order,
+// who uses whom, whether a contract folder exists -- is derived there. Two
+// implementations of one rule disagree eventually, and the disagreement
+// surfaces as a row nobody can explain.
 
 export interface ProjectionSolution {
   name: string;
   title: string;
-  step: string;
-  stepTitle: string;
-  stepNumber: number;
-  stepCount: number;
-  waitingOn?: string | null;
-  returns?: number;
-  /**
-   * Whether the component workflow has been entered at all.
-   *
-   * The step is DECLARED in `solution.yaml` and projected whether or not any
-   * event has been recorded against it, so a step number alone cannot tell a
-   * default from a position — step 1 is exactly what an entered workflow
-   * looks like on its first day. Optional because a projection written
-   * before this field existed carries none, and the honest reading of its
-   * absence is the behaviour that projection was rendered under.
-   */
-  entered?: boolean;
-}
-
-export interface ProjectionComponent {
-  name: string;
-  kind: string;
-  title: string;
-  version?: string | null;
-  step: string;
-  stepTitle: string;
-  stepNumber: number;
-  owner?: string | null;
-  contract?: string | null;
-  contractDoc?: string | null;
-  dependsOn: string[];
-  usedBy: string[];
-  waitingOn?: string | null;
-  returns?: number;
-  /** As on the solution: has this component entered the workflow at all. */
-  entered?: boolean;
+  /** More than one module declared: the shape in which the module machinery is on. */
+  multi: boolean;
+  /** No manifest at all: the repository is taken to be the one module. */
+  implicit: boolean;
+  moduleCount: number;
 }
 
 /**
- * A component this solution consumes from another repository.
+ * One module, as the manifest declares it and the router derives the rest.
  *
- * Derived by the router from `solution-dependencies.json`, and the manifest
- * gains no vocabulary for it: the manifest says what this repository builds,
- * the dependency file says what it takes, and two tracked homes for one edge
- * is the drift `usedBy` is derived to avoid.
- *
- * `root` is where the producing repository is on THIS machine, or null. That
- * is what makes the row navigable, and its absence is a reported state rather
- * than a defect in the declaration.
+ * `usedBy` is derived from every other module's `dependsOn` and written
+ * nowhere; `contractDir` is reported only when the tree has the folder and
+ * the module declares a seam, so the Contract row can say "open" without
+ * guessing.
  */
+export interface ProjectionModule {
+  slug: string;
+  title: string;
+  kind: string;
+  package?: string | null;
+  contract?: string | null;
+  codeRoots: string[];
+  dependsOn: string[];
+  usedBy: string[];
+  contractDir?: string | null;
+}
+
 export interface ProjectionExternal {
   id: string;
   producedBy: string;
@@ -129,50 +108,32 @@ export interface ProjectionMember {
 
 export interface Projection {
   solution: ProjectionSolution;
-  components: ProjectionComponent[];
-  needsYou: string[];
+  /** In dependency order, as the router projects them. */
+  modules: ProjectionModule[];
   external?: ProjectionExternal[];
   members?: ProjectionMember[];
 }
 
 /**
- * Which file the Contract row opens. The readable rendering when there is
- * one, the source otherwise. A consumer reading a contract wants the tables,
- * not the YAML that generates them; Python derives both paths, so this only
- * picks between them.
+ * Which file the Contract row opens: the notes page inside the module's
+ * contract folder, when the router reported the folder. The router derives
+ * the folder; this only names the page inside it.
  */
-export function contractTarget(
-  c: ProjectionComponent | undefined,
-): string | undefined {
-  if (!c) return undefined;
-  return c.contractDoc || c.contract || undefined;
-}
-
-/**
- * Whether a row may speak about the component workflow's steps.
- *
- * One rule, read by the three places that render a step: the solution's
- * `step N/6`, a component's `N/6` and its progress bar, and the Contract
- * row's "it is written at step 3". A projection that predates the field says
- * nothing about it, and the honest reading of silence is the behaviour that
- * projection was rendered under — not a repository suddenly going quiet
- * because it has not been re-projected yet.
- */
-export function showsWorkflowStep(
-  row: Pick<ProjectionComponent, "entered"> | Pick<ProjectionSolution, "entered"> | undefined,
-): boolean {
-  return row?.entered !== false;
+export function contractTarget(m: ProjectionModule | undefined): string | undefined {
+  if (!m || !m.contractDir) return undefined;
+  return `${m.contractDir}/README.md`;
 }
 
 export type IconSpec = { id: string; tone?: "attention" | "done" | "muted" };
 
 export type SolutionNode =
   | { kind: "solution" }
-  | { kind: "component"; name: string }
-  | { kind: "contract"; name: string }
-  | { kind: "usedBy"; name: string }
-  | { kind: "consumer"; name: string; consumer: string }
-  | { kind: "progress"; name: string }
+  | { kind: "module"; slug: string }
+  | { kind: "contract"; slug: string }
+  | { kind: "dependsOn"; slug: string }
+  | { kind: "dependency"; slug: string; dependency: string }
+  | { kind: "usedBy"; slug: string }
+  | { kind: "consumer"; slug: string; consumer: string }
   | { kind: "externalGroup" }
   | { kind: "external"; id: string }
   | { kind: "externalUsedBy"; id: string }
@@ -191,15 +152,8 @@ export interface RowDescriptor {
   contextValue?: string;
 }
 
-function find(p: Projection, name: string): ProjectionComponent | undefined {
-  return p.components.find((c) => c.name === name);
-}
-
-/** Components first, integration last — it is what the others compose into. */
-export function orderedComponents(p: Projection): ProjectionComponent[] {
-  const libs = p.components.filter((c) => c.kind !== "integration");
-  const integrations = p.components.filter((c) => c.kind === "integration");
-  return [...libs, ...integrations];
+function find(p: Projection, slug: string): ProjectionModule | undefined {
+  return p.modules.find((m) => m.slug === slug);
 }
 
 export function rootNodes(): SolutionNode[] {
@@ -214,19 +168,22 @@ function members(p: Projection): ProjectionMember[] {
   return p.members ?? [];
 }
 
+/** What the solution row says under its title when it has no module rows to show. */
+export const NO_MODULES_YET = "no modules yet — session 1 writes the solution plan";
+
 /** The document the tree renders, relative to a repository root. */
 export const PROJECTION_RELPATH = ".dabbler/solution/projection.json";
 
 /**
  * Every file whose change can change what this tree shows.
  *
- * The projection is DERIVED, and it is written by four commands: the
- * `workflow` verbs that record an event, the `deps` verbs that place a
- * repository, `bootstrap`, and the driver when a plan asks for one. Nothing
- * rewrites it when the declarations underneath it move -- a component added
- * to the manifest by hand, a sibling cloned, a version bumped in a build
- * file -- so the view spent a whole session showing what was true when the
- * last event was recorded.
+ * The projection is DERIVED, and it is written by the commands that move a
+ * declaration: `modules create`, the `deps` verbs that place a repository,
+ * `bootstrap`, and the driver when a plan asks for one. Nothing rewrites it
+ * when the declarations underneath it move by hand -- a module added to the
+ * manifest in an editor, a sibling cloned, a version bumped in a build file
+ * -- so the view spent a whole session showing what was true when the last
+ * event was recorded.
  *
  * Watching only the projection cannot fix that: an event on a file nothing
  * rewrote re-reads the same bytes. These are the inputs, and a change to one
@@ -234,11 +191,10 @@ export const PROJECTION_RELPATH = ".dabbler/solution/projection.json";
  *
  * Repository-relative glob patterns, because that is what the watcher takes:
  *
- * - `solution.yaml` -- what this repository builds, and every component row.
+ * - `docs/modules.yaml` -- what this repository builds: every module row,
+ *   the dependency order and who uses whom.
  * - `solution-dependencies.json` -- who produces what it consumes, and the
  *   membership rows, which come from nowhere else.
- * - the workflow event log -- the step, the loop counters and who each
- *   component is waiting on are a fold of it.
  * - the build files -- the PIN is read from them on every projection rather
  *   than copied, so the drift rows change when they do.
  *
@@ -246,9 +202,8 @@ export const PROJECTION_RELPATH = ".dabbler/solution/projection.json";
  * and re-deriving on it would be a loop.
  */
 export const PROJECTION_SOURCE_GLOBS: readonly string[] = [
-  "solution.yaml",
+  "docs/modules.yaml",
   "solution-dependencies.json",
-  ".dabbler/solution/events.jsonl",
   "**/*.csproj",
   "**/pom.xml",
 ];
@@ -304,9 +259,11 @@ function locationNote(e: ProjectionExternal, at: ExternalLocation): string {
 export function childrenOf(node: SolutionNode, p: Projection): SolutionNode[] {
   switch (node.kind) {
     case "solution": {
-      const own: SolutionNode[] = orderedComponents(p).map((c) => ({
-        kind: "component" as const,
-        name: c.name,
+      // The router's order is dependency order: a module after everything
+      // it depends on, the application that composes the others last.
+      const own: SolutionNode[] = p.modules.map((m) => ({
+        kind: "module" as const,
+        slug: m.slug,
       }));
       // Only when there is something to say. An empty folder is a row the
       // reader has to open to learn nothing.
@@ -342,25 +299,34 @@ export function childrenOf(node: SolutionNode, p: Projection): SolutionNode[] {
         repository,
       })));
     }
-    case "component": {
-      const c = find(p, node.name);
-      if (!c) return [];
-      const out: SolutionNode[] = [{ kind: "contract", name: c.name }];
-      // Only rendered when there is something to say. An empty folder is a
-      // row the reader has to open to learn nothing.
-      if (c.usedBy.length > 0) out.push({ kind: "usedBy", name: c.name });
-      // Same rule as the description: a progress bar for a workflow nothing
-      // has entered draws one filled square forever, which reads as progress
-      // and is a default.
-      if (showsWorkflowStep(c)) out.push({ kind: "progress", name: c.name });
+    case "module": {
+      const m = find(p, node.slug);
+      if (!m) return [];
+      const out: SolutionNode[] = [];
+      // Each child only when there is something to say. A single-module
+      // solution -- the repository as the module, no seam declared -- shows
+      // one row and nothing under it, which is the shape in which nothing
+      // module-shaped has switched on.
+      if (m.contract) out.push({ kind: "contract", slug: m.slug });
+      if (m.dependsOn.length > 0) out.push({ kind: "dependsOn", slug: m.slug });
+      if (m.usedBy.length > 0) out.push({ kind: "usedBy", slug: m.slug });
       return out;
     }
+    case "dependsOn": {
+      const m = find(p, node.slug);
+      if (!m) return [];
+      return m.dependsOn.map((dependency) => ({
+        kind: "dependency" as const,
+        slug: node.slug,
+        dependency,
+      }));
+    }
     case "usedBy": {
-      const c = find(p, node.name);
-      if (!c) return [];
-      return c.usedBy.map((consumer) => ({
+      const m = find(p, node.slug);
+      if (!m) return [];
+      return m.usedBy.map((consumer) => ({
         kind: "consumer" as const,
-        name: node.name,
+        slug: node.slug,
         consumer,
       }));
     }
@@ -369,6 +335,12 @@ export function childrenOf(node: SolutionNode, p: Projection): SolutionNode[] {
   }
 }
 
+const KIND_ICONS: Record<string, string> = {
+  application: "layers",
+  "shared-types": "symbol-structure",
+  library: "package",
+};
+
 export function descriptorFor(
   node: SolutionNode,
   p: Projection,
@@ -376,89 +348,87 @@ export function descriptorFor(
   switch (node.kind) {
     case "solution": {
       const s = p.solution;
-      const waiting = p.needsYou.length > 0;
-      const stepped = showsWorkflowStep(s);
+      const count = p.modules.length;
       return {
         id: `solution:${s.name}`,
         label: s.title,
-        ...(stepped
-          ? { description: `step ${s.stepNumber}/${s.stepCount} · ${s.stepTitle}` }
-          : {}),
-        tooltip: waiting
-          ? `Waiting on you: ${p.needsYou.join(", ")}`
-          : stepped
-            ? `${s.stepTitle} — nothing is waiting on you`
-            : "Nothing is waiting on you.",
-        icon: { id: "project", tone: waiting ? "attention" : undefined },
+        description:
+          count === 0 ? NO_MODULES_YET : s.multi ? `${count} modules` : "one module",
+        tooltip:
+          count === 0
+            ? "Nothing is declared yet. Session 1 writes the solution plan, and the " +
+              "modules appear here from docs/modules.yaml."
+            : s.multi
+              ? "What this solution is built from, in dependency order."
+              : "The repository is the module. A second entry in docs/modules.yaml is " +
+                "what switches the module machinery on.",
+        icon: { id: "project" },
         expandable: true,
         contextValue: "dabblerSolution",
       };
     }
-    case "component": {
-      const c = find(p, node.name);
-      if (!c) {
-        return { id: `component:${node.name}`, label: node.name, expandable: false };
+    case "module": {
+      const m = find(p, node.slug);
+      if (!m) {
+        return { id: `module:${node.slug}`, label: node.slug, expandable: false };
       }
-      const bits: string[] = [];
-      if (c.version) bits.push(`v${c.version}`);
-      // Silent rather than `1/6 Plan and design` on a component that has
-      // never entered the workflow: nothing in the session lifecycle
-      // advances it, so that reading never changed and was not a state.
-      if (showsWorkflowStep(c)) bits.push(`${c.stepNumber}/6 ${c.stepTitle}`);
-      if (c.owner) bits.push(c.owner);
-      if (c.returns && c.returns > 0) {
-        bits.push(`${c.returns}× sent back`);
-      }
-      const attention = c.waitingOn === "developer";
+      const bits: string[] = [m.kind];
+      bits.push(m.package ? `package: ${m.package}` : "no package");
       return {
-        id: `component:${c.name}`,
-        label: c.name,
+        id: `module:${m.slug}`,
+        label: m.slug,
         description: bits.join(" · "),
-        tooltip: attention
-          ? "Waiting on you"
-          : c.waitingOn === "author"
-            ? "Back with the author"
-            : c.title,
-        icon: {
-          id: c.kind === "integration" ? "layers" : "package",
-          tone: attention
-            ? "attention"
-            : showsWorkflowStep(c) && c.stepNumber === 6
-              ? "done"
-              : undefined,
-        },
-        expandable: true,
-        contextValue: `dabblerComponent:${c.kind}`,
+        tooltip: m.title,
+        icon: { id: KIND_ICONS[m.kind] ?? "package" },
+        expandable: childrenOf(node, p).length > 0,
+        contextValue: `dabblerModule:${m.kind}`,
       };
     }
     case "contract": {
-      const c = find(p, node.name);
-      const has = Boolean(contractTarget(c));
+      const m = find(p, node.slug);
+      const has = Boolean(contractTarget(m));
       return {
-        id: `contract:${node.name}`,
+        id: `contract:${node.slug}`,
         label: "Contract",
         description: has ? "open" : "not written yet",
         tooltip: has
-          ? "What this component promises. Opens in an editor tab."
-          : showsWorkflowStep(c)
-            ? "No contract yet — it is written at step 3."
-            : // Naming a step of a workflow this component has not entered
-              // sends the reader looking for a step nothing will reach.
-              "No contract yet — what this component promises, once someone writes it.",
+          ? "What this module promises. Opens the notes page in an editor tab."
+          : "No contract yet — what this module promises, once someone writes it " +
+            "under modules/<slug>/contract/.",
         icon: { id: "file-text", tone: has ? undefined : "muted" },
         expandable: false,
         contextValue: has ? "dabblerContract" : "dabblerContractMissing",
       };
     }
-    case "usedBy": {
-      const c = find(p, node.name);
-      const n = c ? c.usedBy.length : 0;
+    case "dependsOn": {
+      const m = find(p, node.slug);
+      const n = m ? m.dependsOn.length : 0;
       return {
-        id: `usedBy:${node.name}`,
+        id: `dependsOn:${node.slug}`,
+        label: "Depends on",
+        description: `${n}`,
+        tooltip: "What this module consumes, as its manifest entry declares.",
+        icon: { id: "arrow-down" },
+        expandable: n > 0,
+      };
+    }
+    case "dependency":
+      return {
+        id: `dependency:${node.slug}:${node.dependency}`,
+        label: node.dependency,
+        icon: { id: "arrow-small-right", tone: "muted" },
+        expandable: false,
+      };
+    case "usedBy": {
+      const m = find(p, node.slug);
+      const n = m ? m.usedBy.length : 0;
+      return {
+        id: `usedBy:${node.slug}`,
         label: "Used by",
         description: `${n}`,
         // The line nobody can get anywhere else, and the reason people are
-        // willing to change a component instead of adding one beside it.
+        // willing to change a module instead of adding one beside it.
+        // Derived from every other module's dependsOn, never declared.
         tooltip: "These break if this contract changes.",
         icon: { id: "references" },
         expandable: n > 0,
@@ -466,7 +436,7 @@ export function descriptorFor(
     }
     case "consumer":
       return {
-        id: `consumer:${node.name}:${node.consumer}`,
+        id: `consumer:${node.slug}:${node.consumer}`,
         label: node.consumer,
         icon: { id: "arrow-small-right", tone: "muted" },
         expandable: false,
@@ -636,18 +606,6 @@ export function descriptorFor(
         // in a file manager, and carving out an exception would mean a
         // second rule saying where a row's repository is.
         contextValue: LOCATION_CONTEXT[externalLocation(m)],
-      };
-    }
-    case "progress": {
-      const c = find(p, node.name);
-      const step = c ? c.stepNumber : 1;
-      return {
-        id: `progress:${node.name}`,
-        label: "Progress",
-        description: `${"■".repeat(step)}${"□".repeat(6 - step)}`,
-        tooltip: c ? `Step ${step} of 6 — ${c.stepTitle}` : undefined,
-        icon: { id: "graph" },
-        expandable: false,
       };
     }
   }

@@ -388,7 +388,7 @@
           {
             "id": "startSession",
             "title": "Start session 1",
-            "description": "Session 1 authors the project plan; session 2 breaks it into numbered sessions. Session 1 asks you what the project is -- the plan's substance is yours, and it does not guess it.\n[Open the Work Explorer](command:workbench.view.extension.dabblerSessionSetsContainer)",
+            "description": "Session 1 authors the solution plan and declares the modules (one module is a fine answer); session 2 challenges the cuts and breaks the plan into numbered sessions, one module each. Session 1 asks you what the solution is -- the plan's substance is yours, and it does not guess it.\n[Open the Work Explorer](command:workbench.view.extension.dabblerSessionSetsContainer)",
             "media": {
               "markdown": "media/walkthrough-session.md"
             }
@@ -399,7 +399,7 @@
     "viewsWelcome": [
       {
         "view": "dabblerSolutionTree",
-        "contents": "This shows what the project is being built FROM: its components, what each one promises, and who breaks when one of them changes.\n\nIt fills in once the repository declares a solution.\n[Set Up New Project](command:dabbler.setupNewProject)",
+        "contents": "This shows what the project is being built FROM: its modules, what each one promises, and who breaks when one of them changes.\n\nIt fills in once the repository is set up. Session 1 writes the solution plan, and the modules appear here from docs/modules.yaml.\n[Set Up New Project](command:dabbler.setupNewProject)",
         "when": "true"
       },
       {

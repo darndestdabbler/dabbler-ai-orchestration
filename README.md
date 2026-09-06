@@ -10,8 +10,8 @@ machine-written: no code path accepts a hand-written verdict.
 There is one implementation, in TypeScript, and it runs two ways:
 
 - **`dabbler` — the command** an orchestrating engine runs from a terminal:
-  the session lifecycle, the verification loop, the record, the six-step
-  workflow. It ships inside the extension — there is nothing to install
+  the session lifecycle, the verification loop, the record, the module
+  manifest. It ships inside the extension — there is nothing to install
   beside it and no package to fetch.
 - **VS Code extension "Dabbler AI Orchestration"** — the Work Explorer
   tree: one row per repository, its numbered sessions beneath it, and the

@@ -183,6 +183,14 @@ export interface ModuleCreateOptions {
   readonly planPath?: string;
   readonly codeRoot?: string;
   readonly specSection?: string;
+  /** `shared-types`, `library` (the default) or `application`. */
+  readonly kind?: string;
+  /** Slugs this module consumes; who consumes it is derived, never declared. */
+  readonly dependsOn?: readonly string[];
+  /** The artifact id a sibling consumes. */
+  readonly package?: string;
+  /** `designed`, `package` or `generated`. */
+  readonly contract?: string;
 }
 
 /**
@@ -308,39 +316,6 @@ export interface BootstrapOptions {
   readonly noTransportDetect?: boolean;
 }
 
-export interface WorkflowOptions {
-  readonly workspaceRoot: string;
-  readonly component?: string;
-}
-
-export interface WorkflowStepOptions extends WorkflowOptions {
-  /**
-   * The step id. Only `enter` takes one -- it is that subcommand's
-   * positional argument -- and every other step reads it back from the
-   * event log, which is why it is optional here rather than on `enter`
-   * alone: one options type per subcommand would be nine.
-   */
-  readonly step?: string;
-  /** Repeatable; a step's outputs, as the review and the tests read them. */
-  readonly artifact?: readonly string[];
-  readonly authorProvider?: string;
-  readonly transport?: string;
-}
-
-export interface WorkflowVerbs {
-  enter(options: WorkflowStepOptions): Promise<RouterResult<RouterText>>;
-  review(options: WorkflowStepOptions): Promise<RouterResult<RouterText>>;
-  approve(options: WorkflowStepOptions): Promise<RouterResult<RouterText>>;
-  authorTests(options: WorkflowStepOptions): Promise<RouterResult<RouterText>>;
-  test(options: WorkflowStepOptions): Promise<RouterResult<RouterText>>;
-  suite(options: WorkflowStepOptions): Promise<RouterResult<RouterText>>;
-  fix(options: WorkflowStepOptions): Promise<RouterResult<RouterText>>;
-  sendBack(
-    options: WorkflowOptions & { readonly to: string; readonly reason: string },
-  ): Promise<RouterResult<RouterText>>;
-  status(options: WorkflowOptions): Promise<RouterResult<RouterText>>;
-}
-
 /**
  * `unresolved` -- every session whose loop stopped without a clean verdict
  * -- was declared here before either router grew it, and the cutover found
@@ -420,7 +395,6 @@ export interface Router {
   readonly session: SessionVerbs;
   readonly modules: ModuleVerbs;
   readonly verify: VerifyVerbs;
-  readonly workflow: WorkflowVerbs;
   readonly owed: OwedVerbs;
   readonly ledger: LedgerVerbs;
   readonly testEvidence: TestEvidenceVerbs;

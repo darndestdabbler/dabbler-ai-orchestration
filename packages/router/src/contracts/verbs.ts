@@ -141,11 +141,6 @@ export const VERBS: readonly VerbSpec[] = [
     summary: "pack, then push to the declared feed",
   },
   {
-    verb: "workflow",
-    extensionFacing: true,
-    summary: "the six-step driver: enter, review, approve, test, suite, fix",
-  },
-  {
     // The operator's inbox. Extension-facing because the answer is a
     // decision, and a decision reserved to a person should not require a
     // terminal -- the Explorer renders these rows and the framework acts on
@@ -163,11 +158,6 @@ export const VERBS: readonly VerbSpec[] = [
     verb: "triage",
     extensionFacing: false,
     summary: "classify a stopped session on a provider that is not the engine's",
-  },
-  {
-    verb: "solution",
-    extensionFacing: false,
-    summary: "the solution view over a workspace's modules",
   },
   {
     verb: "contractdoc",

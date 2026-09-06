@@ -28,6 +28,17 @@ function defaultUi(): NewModuleUi {
   };
 }
 
+/** The manifest's kinds, as `dabbler modules create --kind` accepts them. */
+const MODULE_KINDS = ["shared-types", "library", "application"];
+
+/** `a, b` -> `["a", "b"]`; blanks dropped. */
+function splitSlugs(text: string): string[] {
+  return text
+    .split(",")
+    .map((s) => s.trim())
+    .filter((s) => s !== "");
+}
+
 export function describeCreateFailure(result: RouterRefusal): string {
   const detail = result.message.trim() || `exit ${result.exitCode}`;
   return `New module failed: ${detail}`;
@@ -64,12 +75,43 @@ export async function runNewModuleFlow(
   if (slug === undefined || slug.trim() === "") return false;
 
   const title = await ui.showInputBox({
-    title: "New module (2/2): display title",
+    title: "New module (2/4): display title",
     prompt: `Human-readable name for the module. Press Enter to use "${slug.trim()}".`,
     placeHolder: slug.trim(),
     ignoreFocusOut: true,
   });
   if (title === undefined) return false; // Esc cancels; empty = default to slug
+
+  // The module vocabulary, each with the manifest's own default: a library
+  // that depends on nothing. Who depends on THIS module is derived by the
+  // router from every other entry's dependsOn and is never asked for.
+  const kind = await ui.showInputBox({
+    title: "New module (3/4): kind",
+    prompt: "shared-types, library or application. Press Enter for library.",
+    placeHolder: "library",
+    ignoreFocusOut: true,
+    validateInput: (v) =>
+      v.trim() === "" || MODULE_KINDS.includes(v.trim())
+        ? null
+        : `One of ${MODULE_KINDS.join(", ")}.`,
+  });
+  if (kind === undefined) return false;
+
+  const dependsOn = await ui.showInputBox({
+    title: "New module (4/4): depends on",
+    prompt:
+      "Slugs this module consumes, comma-separated. Press Enter for none." +
+      (existingSlugs.length > 0 ? ` Declared: ${existingSlugs.join(", ")}.` : ""),
+    placeHolder: existingSlugs.join(", "),
+    ignoreFocusOut: true,
+    validateInput: (v) => {
+      const unknown = splitSlugs(v).filter((s) => !existingSlugs.includes(s));
+      return unknown.length === 0
+        ? null
+        : `Not declared in docs/modules.yaml: ${unknown.join(", ")}.`;
+    },
+  });
+  if (dependsOn === undefined) return false;
 
   // The workspace root is the CLI's positional argument as well as the
   // spawn cwd; `PythonSpawnRouter` passes both. A router that could not
@@ -81,6 +123,8 @@ export async function runNewModuleFlow(
       workspaceRoot: root,
       slug: slug.trim(),
       title: title.trim() || undefined,
+      kind: kind.trim() || undefined,
+      dependsOn: splitSlugs(dependsOn),
     });
   } catch (err) {
     ui.showErrorMessage(

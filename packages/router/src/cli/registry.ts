@@ -22,12 +22,10 @@ import { packagingVerb } from "./packaging.ts";
 import { statusVerb } from "./status.ts";
 import { seatCostVerb } from "./seatCost.ts";
 import { sessionVerb } from "./session.ts";
-import { solutionVerb } from "./solution.ts";
 import { testEvidenceVerb } from "./testEvidence.ts";
 import { triageVerb } from "./triage.ts";
 import { verifyVerb } from "./verify.ts";
 import { versionVerb } from "./version.ts";
-import { workflowVerb } from "./workflow.ts";
 
 /** argv after the verb; the process's exit code comes back. */
 export type VerbHandler = (argv: string[]) => Promise<number>;
@@ -49,11 +47,9 @@ export const HANDLERS: Readonly<Record<string, VerbHandler>> = {
   packaging: packagingVerb,
   "seat-cost": seatCostVerb,
   session: sessionVerb,
-  solution: solutionVerb,
   status: statusVerb,
   "test-evidence": testEvidenceVerb,
   triage: triageVerb,
   verify: verifyVerb,
   version: versionVerb,
-  workflow: workflowVerb,
 };

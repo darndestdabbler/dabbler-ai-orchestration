@@ -1,6 +1,6 @@
 # Project work plan — sessions
 
-**Written by `ai_router.writers` as a fold of `activity-log.json`.**
+**Written by `dabbler` as a fold of `activity-log.json`.**
 Hand edits are overwritten by the next append. The record is the log;
 this page is one view of it.
 
@@ -137,6 +137,15 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 97 | An ACP client, wired to nothing | no | 2026-09-05 |
 | 98 | What the csv-model notes found | no | 2026-09-06 |
 | 99 | What csv-model's last two sessions found, and session 98's papercuts | no | 2026-09-06 |
+| 100 | The solution plan and the module manifest; the six-step workflow deleted | no | 2026-09-06 |
+| 101 | Module configuration, the exception schema and the test-impact vocabulary | — | not declared |
+| 102 | Designed contracts and contract-test source | — | not declared |
+| 103 | Committed immutable packages | — | not declared |
+| 104 | The focused checkout, and the Windows preflight | — | not declared |
+| 105 | Module-scoped sessions, the hard verifier scope, the exposure manifest and grants | — | not declared |
+| 106 | The impact plan and the selected run of record | — | not declared |
+| 107 | The atomic land | — | not declared |
+| 108 | Maven parity, and the hardened profiles designed against a named customer | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -1909,3 +1918,9 @@ Fix what the csv-model test repository's framework-notes found on router 2.0.1, 
 **Releasable: no.**
 
 Session 99: Fix what the csv-model test repository's sessions 5 and 6 found on routers 2.0.1 and 2.0.2, and the papercuts session 98's own close recorded, each confirmed in this tree: the packaging detector reads a root solution file and names the one packable project below it instead of saying a pack would fail; `dabbler packaging --dry-run` says 'no gate was asked' beside a releasability refusal rather than that every gate passes, exits 0 when the declaration loads and releasability is the only obstacle, and its help and the scaffolded packaging comment say a folder feed takes no credential; the selector treats the framework-installed `.claude/settings.json` as mapped to no test and `session start` says the file lands with the session's commit; `dabbler bootstrap` runs `git init` where there is no repository and says a remote is needed before the first close, and the sessions-root error names `git init` rather than `--sessions-dir`; the agency record checks the disk before the framing (a missing file is recorded as missing), records a `view` of a directory as a listing, and says when a shown line is the disk line cut short; the synthesised fix step stops promising the affected tests, the projection note names `dabbler`, candidate mode reads the trunk from the receipt's branch rather than the literal `origin/master`, and the atomic write retries a rename once on a Windows EPERM or EBUSY; the run-of-record wait takes its `retry_after_seconds` from the suite's last recorded duration (a quarter over, floor ten seconds, ceiling sixty); and the guide and the plan ask say what the code does -- four instruction kinds under the pull and `interrupt` only from `drive`, a check's built environment sees no credential while a job inherits the shell, when a plan names `repositories`, that ignored build output does not move the tree, that the registration write is in the change set `affected` measures, and that `retry_after_seconds` is advice the driver does not hold anyone to. At most nine router tests, one per behaviour; the managed body does not change. Not releasable.
+
+### Session 100 — The solution plan and the module manifest; the six-step workflow deleted
+
+**Releasable: no.**
+
+Extend the module manifest (docs/modules.yaml, modules.ts) with kind, dependsOn, package and contract, derive consumers transitively, and make one module the default shape through one function, solutionShape, that every later session asks: an absent manifest or one entry is a single-module solution whose repository IS the module, so csv-model and every repository bootstrapped so far keep working unchanged; the manifest verb gains the new flags and a `show` subcommand. Replace the six-step workflow's projection with one over modules (projection.ts: dependency order, dependsOn and derived usedBy, the secondary mode's external and members kept) and point the driver, deps and bootstrap at it. Bootstrap writes a valid one-module manifest by default and its two setup sessions are rewritten around the solution plan (docs/planning/solution-plan.md, one module a fine answer, session 2 challenging the cuts and naming one module per session), carrying the plan, decompose and contracts deliverables the workflow held. Delete the six-step component workflow -- solution.ts, cli/workflow.ts, cli/solution.ts, workflow/*, stepreview.ts, testphase.ts, fixloop.ts, their tests, the workflow and solution verbs, the solution.yaml scaffold and this repository's own solution.yaml, the selection rules naming the deleted tests -- with contractdoc standing alone until session 102. The Solution Explorer renders modules from the projection: rows in dependency order with depends-on and used-by children, one row for a single-module solution, the empty state naming session 1, and New Module offering kind and dependsOn. About five router tests and three extension tests, one per behaviour; the walkthrough test is unchanged. Not releasable.

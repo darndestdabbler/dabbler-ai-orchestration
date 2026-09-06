@@ -12,8 +12,18 @@ import { statSync } from "node:fs";
 
 import { parse as parseYaml } from "yaml";
 
-import { type Component, componentNamed, type Solution } from "./solution.ts";
 import { readText } from "./textfile.ts";
+
+/**
+ * Where a contract's module sits in the graph: what it depends on and who
+ * uses it. Derived from `docs/modules.yaml` by the caller (`dependsOn` as
+ * declared, `usedBy` as derived) and never written into the contract, for
+ * the reason `usedBy` is derived everywhere: two homes for one edge drift.
+ */
+export interface ContractGraph {
+  readonly dependsOn: readonly string[];
+  readonly usedBy: readonly string[];
+}
 
 export const EXIT_OK = 0;
 export const EXIT_REFUSED = 1;
@@ -115,36 +125,36 @@ function proof(clauses: unknown, tests: unknown): string {
   return list.map((t) => `\`${String(t)}\``).join("<br>");
 }
 
-/** Where this component sits. Generated, so it cannot drift. */
+/**
+ * Where this module sits. Generated from the graph, so it cannot drift; a
+ * module with no edges, or none the manifest knows, gets no diagram -- an
+ * arrowless diagram is noise.
+ */
 export function diagram(
   contract: Record<string, unknown>,
-  solution: Solution | null = null,
+  graph: ContractGraph | null = null,
 ): string {
+  if (graph === null || (graph.dependsOn.length === 0 && graph.usedBy.length === 0)) {
+    return "";
+  }
   const name = String(contract.component);
   const lines = ["```mermaid", "graph LR"];
   const safe = (s: string): string => s.split("-").join("_");
   lines.push(`  ${safe(name)}["${name}"]`);
-  if (solution !== null) {
-    const comp: Component | undefined = componentNamed(solution, name);
-    if (comp !== undefined) {
-      for (const dep of comp.dependsOn) {
-        lines.push(`  ${safe(name)} --> ${safe(dep)}["${dep}"]`);
-      }
-      for (const user of comp.usedBy) {
-        lines.push(`  ${safe(user)}["${user}"] --> ${safe(name)}`);
-      }
-      lines.push(`  style ${safe(name)} stroke-width:3px`);
-    }
+  for (const dep of graph.dependsOn) {
+    lines.push(`  ${safe(name)} --> ${safe(dep)}["${dep}"]`);
   }
+  for (const user of graph.usedBy) {
+    lines.push(`  ${safe(user)}["${user}"] --> ${safe(name)}`);
+  }
+  lines.push(`  style ${safe(name)} stroke-width:3px`);
   lines.push("```");
-  // Nothing to show; an arrowless diagram is noise.
-  if (solution !== null && lines.length === 4) return "";
   return lines.join("\n");
 }
 
 export function render(
   contract: Record<string, unknown>,
-  solution: Solution | null = null,
+  graph: ContractGraph | null = null,
 ): string {
   const name = String(contract.component);
   const out: string[] = [`# Contract — \`${name}\``, ""];
@@ -154,20 +164,11 @@ export function render(
   if (truthy(contract.summary)) out.push(String(contract.summary));
   out.push("");
 
-  const d = diagram(contract, solution);
-  if (d) {
+  const d = diagram(contract, graph);
+  if (d && graph !== null) {
     out.push("## Where it sits", "", d, "");
-    if (solution !== null) {
-      const comp = componentNamed(solution, name);
-      if (comp !== undefined) {
-        const users =
-          comp.usedBy.map((u) => `\`${u}\``).join(", ") || "nothing yet";
-        out.push(
-          `**Used by:** ${users} — these break if this contract changes.`,
-          "",
-        );
-      }
-    }
+    const users = graph.usedBy.map((u) => `\`${u}\``).join(", ") || "nothing yet";
+    out.push(`**Used by:** ${users} — these break if this contract changes.`, "");
   }
 
   out.push("## What it promises", "");

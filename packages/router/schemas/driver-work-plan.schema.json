@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "driver/plan.json (the engine's answer to \"plan this session\")",
+  "description": "The work plan a driven session runs, under .dabbler/runs/s<N>/driver/plan.json: what the session will do, whether it may publish, and the ordered steps -- each with an id, the files it expects to touch, and at least one check that proves it. The driver declares the session from `task` and `releasable`, then issues the steps one at a time and measures each report against its step. A check is argv, never a shell string, and the driver runs it rather than reading it: code and tests are compiled and run, never interpreted. Validated before it is written; a file that fails validation on read is refused.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "session_number", "task", "releasable", "steps", "recorded_at"],
+  "properties": {
+    "schema_version": {
+      "const": 1,
+      "description": "Frozen at v1. A reader that finds any other value refuses the file rather than interpreting it."
+    },
+    "session_number": { "type": "integer", "minimum": 1 },
+    "task": {
+      "type": "string",
+      "minLength": 1,
+      "description": "What this session will do -- the text `session declare` records."
+    },
+    "releasable": {
+      "type": "boolean",
+      "description": "Whether the session may publish, decided here before any edit -- the same rule `session declare` enforces on a typed session."
+    },
+    "repositories": {
+      "type": "array",
+      "uniqueItems": true,
+      "description": "Other repositories of this SOLUTION that the plan needs to exist. Each is placed when the plan is accepted -- created beside this one with a `solution-dependencies.json` declaring which solution it is in and its own id, and nothing else -- so that finishing this repository leaves the next one visible in the Solution Explorer instead of leaving the operator to remember it. One that already declares itself is left exactly as it is. It declares no dependency: what this repository takes is declared on the edge that takes it, and placing a repository never invents one. Optional, and absent in the ordinary single-repository session.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_.-]+$",
+            "description": "Its stable repository id -- the name a `producedBy` uses for it."
+          },
+          "path": {
+            "type": "string",
+            "pattern": "^(?![A-Za-z]:)(?!/)[^\\\\]+$",
+            "description": "Where to place it, relative to this repository's root. Defaults to the first declared search path, which is where the assembly already looks."
+          }
+        }
+      }
+    },
+    "steps": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "ask", "files", "checks"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9-]+$",
+            "description": "Unique within the plan; the reader refuses a duplicate."
+          },
+          "ask": {
+            "type": "string",
+            "minLength": 1,
+            "description": "What the step does, in words the driver hands back as the instruction's `ask`."
+          },
+          "files": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "pattern": "^(?![A-Za-z]:)(?!/)(?![\\s\\S]*(^|/)\\.\\.?(/|$))[^\\\\]+$"
+            },
+            "description": "The files the step expects to create or change, repository-relative. A report for the step must list each of them."
+          },
+          "checks": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["argv"],
+              "properties": {
+                "argv": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": { "type": "string", "minLength": 1 },
+                  "description": "The program and its arguments, spawned with no shell. Exit 0 proves the step."
+                }
+              }
+            },
+            "description": "What proves the step, and at least one: a step with no check is a step the driver would close on the engine's word. A step whose product is prose still has a mechanical check -- that the file exists and is not empty, that a link resolves, that a generator agrees."
+          }
+        }
+      }
+    },
+    "recorded_at": { "type": "string", "minLength": 1 }
+  }
+}

@@ -4,6 +4,39 @@
 
 > ## THE NEXT BLOCK, DECIDED 2026-09-06 — one repository, one module per session, a solution plan first
 >
+> **Amended again by consult round 8
+> (`docs/design/consults/round8-synthesis.md`), on the operator's three
+> objectives: convenient for the developer, fewer unnecessary reads, and a
+> testing surface that does not run whole suites when a module is a
+> compiled library.** Both advisors converged, and Sol corrected round 7
+> in five places, each checked in the tree: the contract is **designed**
+> (an abstractions package, a separate `<Module>.ContractTests` package
+> the implementer's tests inherit, consumer-owned compatibility tests, a
+> notes page) with generation only as a marked fallback; the candidate
+> package and contract are generated **before** the run of record so the
+> tested bytes are the landed bytes; the focused checkout carries each
+> consumer's contract-test assets, never their implementation; the direct
+> push is the team-of-one shape and the existing candidate gate the team
+> shape; and **the run of record changes** — one impact plan shared by
+> `dabbler affected` and the driver runs only the changed module's unit
+> and provider-contract suites plus each transitive consumer's
+> consumer-contract suite against the candidate package, with per-suite
+> freshness (which already exists over `covers`); a shared-types change
+> runs all transitive consumers, never "everything"; the integration lane
+> is trunk CI and the release session. `selection.rules[].select` names
+> test files today, so selection gains a module form from
+> `docs/modules.yaml`; "required for close" becomes its own word beside
+> `expensive`. Debugging across the seam is `dabbler module grant <sibling>
+> --reason … --debug` / `revoke` with a temporary project-reference
+> overlay outside committed files and Source Link off in engine sessions.
+> The session checkout is a **disposable filtered clone per session**
+> (Sol), never a worktree of the full checkout; Gemini's Windows cost
+> (antivirus, restore) is measured in a preflight before rollout, with a
+> persistent per-module clone as the fallback. Encryption is a hardened
+> custody profile designed only for a named customer, and never a one-time
+> pad. Nine sessions now; session 100 is still the solution plan and
+> module manifest.
+>
 > **Amended the same day by consult round 7
 > (`docs/design/consults/round7-synthesis.md`), on the operator's
 > reframing: "we want to prevent AI from reading more code than it needs

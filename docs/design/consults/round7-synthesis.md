@@ -1,5 +1,7 @@
 # Design consult, round 7 — synthesis and decision: the wall is what is on the disk, and the contract is what gets read
 
+> **Amended by round 8 (same day).** Five corrections, all verified: the contract is designed (abstractions + a separate contract-test package) with generation as a marked fallback; the candidate package and contract are generated BEFORE the run of record; the focused checkout carries consumers' contract-test assets; direct push is the solo shape, the candidate gate the team shape; and the run of record runs only the suites the change reaches, by one impact plan shared with `dabbler affected`. The session list is replaced by `round8-synthesis.md`.
+
 **Decided 2026-09-06 by the orchestrator under the standing unattended-work
 directive**, after `round7-brief.md` was answered by Sol (`gpt-5.6-sol`,
 `round7-sol.md`) and Gemini (`gemini-3.1-pro-preview`, `round7-gemini.md`).

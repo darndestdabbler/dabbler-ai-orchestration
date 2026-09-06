@@ -243,12 +243,20 @@ export function pendingStartStore(
 
 export function registerBootstrapProjectCommand(
   context: vscode.ExtensionContext,
+  options: { refreshView?: () => void } = {},
 ): void {
   const pending = pendingStartStore(context);
   context.subscriptions.push(
-    vscode.commands.registerCommand("dabbler.setupNewProject", () =>
-      runSetUpProjectFlow(defaultUi(pending)),
-    ),
+    vscode.commands.registerCommand("dabbler.setupNewProject", async () => {
+      // The Explorer is told, rather than left to its watchers. The files
+      // this writes are the first the sessions root has ever had, and the
+      // Explorer's reading of a repository with nothing in flight is what a
+      // session starting is judged against: a scan that first saw the
+      // repository with session 1 already running saw no start at all.
+      const done = await runSetUpProjectFlow(defaultUi(pending));
+      if (done) options.refreshView?.();
+      return done;
+    }),
   );
   // The other half of the create-a-folder path. This window may BE the one
   // that replaced the one that ran the command, and if it is, it owes the

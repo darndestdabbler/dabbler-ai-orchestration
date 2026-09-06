@@ -1,7 +1,7 @@
 // The Dabbler terminal: the framework's background work, and nothing else.
 //
 // What is asserted is what reaches the pty -- the framework's own lines
-// under their band, and a job's bytes exactly as the runner wrote them.
+// in their outline, and a job's bytes exactly as the runner wrote them.
 
 import * as assert from "assert";
 import * as fs from "fs";
@@ -9,17 +9,17 @@ import * as path from "path";
 import * as vscode from "vscode";
 
 import {
-  BAND_DARK,
-  BAND_LIGHT,
   DabblerTerminal,
+  HANGING_INDENT,
   TONES,
+  type Span,
   type Tone,
-  bandedLine,
   disposeDabblerTerminals,
   ensureDabblerTerminal,
   forgetClosedTerminal,
   frameworkTerminalLocation,
   isSessionStart,
+  layout,
   openDabblerTerminal,
   revealDabblerTerminal,
   revealOnSessionStart,
@@ -129,20 +129,20 @@ suite("the Dabbler terminal", () => {
     assert.strictEqual(terminal.indicator, "working");
     assert.ok(written.some((t) => plain(t).includes("job-started name=verification round")));
     // Said, not merely held: a getter no surface renders answers nobody.
-    assert.strictEqual(written.filter((t) => plain(t).includes("] working")).length, 1);
+    assert.strictEqual(written.filter((t) => plain(t).includes("14:30:05 working")).length, 1);
     // And not repeated on every look while nothing has changed.
     written.length = 0;
     terminal.poll();
-    assert.deepStrictEqual(written.filter((t) => plain(t).includes("] working")), []);
+    assert.deepStrictEqual(written.filter((t) => plain(t).includes("14:30:05 working")), []);
 
     written.length = 0;
     writeRun(driver, { session_number: 62, phase: "land", stop: null, job: null });
     terminal.poll();
     assert.strictEqual(terminal.indicator, "waiting");
     assert.ok(written.some((t) => plain(t).includes("job-collected")));
-    assert.strictEqual(written.filter((t) => plain(t).includes("] waiting")).length, 1);
+    assert.strictEqual(written.filter((t) => plain(t).includes("14:30:05 waiting")).length, 1);
     // The record moving is an event of its own, in the framework's shape.
-    assert.ok(written.some((t) => plain(t).includes("dabbler [14:30:05] phase session=062 phase=land")));
+    assert.ok(written.some((t) => plain(t).includes("14:30:05 phase session=062 phase=land")));
 
     terminal.dispose();
     rmrf(root);
@@ -184,15 +184,15 @@ suite("the Dabbler terminal", () => {
     );
     terminal.poll();
     assert.strictEqual(terminal.indicator, "uncollected");
-    const said = written.filter((t) => plain(t).includes("] uncollected"));
+    const said = written.filter((t) => plain(t).includes("14:30:05 uncollected"));
     assert.strictEqual(said.length, 1);
     assert.ok(plain(said[0]).includes("'verification' finished at 2026-08-31T14:05:00.000Z (exit 4)"));
     assert.ok(plain(said[0]).includes("`dabbler session next`"));
-    assert.ok(!written.some((t) => plain(t).includes("] working")));
+    assert.ok(!written.some((t) => plain(t).includes("14:30:05 working")));
     // Said once, not on every look.
     written.length = 0;
     terminal.poll();
-    assert.deepStrictEqual(written.filter((t) => plain(t).includes("] uncollected")), []);
+    assert.deepStrictEqual(written.filter((t) => plain(t).includes("14:30:05 uncollected")), []);
     // A tick while nothing runs draws no frame: the two glyphs the
     // indicator spins with never reach the writer.
     written.length = 0;
@@ -232,10 +232,12 @@ suite("the Dabbler terminal", () => {
     rmrf(root);
   });
 
-  test("re-reads the theme when it changes rather than painting the old band", () => {
+  test("re-reads the theme when it changes rather than painting the old palette", () => {
+    useTheme(vscode.ColorThemeKind.Dark);
     const { root, driver, terminal, written } = drivenRepo(RUNNING);
     terminal.open();
-    assert.ok(written.some((t) => t.includes(bandOf(BAND_DARK))));
+    // The first look says `phase=verify`, a milestone, in the dark palette.
+    assert.ok(written.some((t) => t.includes(toneOf("milestone", "dark"))));
 
     written.length = 0;
     (vscode.window as unknown as { __setColorTheme: (kind: number) => void }).__setColorTheme(
@@ -243,8 +245,11 @@ suite("the Dabbler terminal", () => {
     );
     writeRun(driver, { session_number: 62, phase: "close", stop: null, job: null });
     terminal.poll();
-    assert.ok(written.some((t) => t.includes(bandOf(BAND_LIGHT))));
-    assert.ok(!written.some((t) => t.includes(bandOf(BAND_DARK))));
+    assert.ok(written.some((t) => t.includes(toneOf("milestone", "light"))));
+    assert.ok(!written.some((t) => t.includes(toneOf("milestone", "dark"))));
+    // Nothing is painted behind a line in either theme: the clock and the
+    // indent are what set the framework's lines apart from a job's.
+    assert.ok(!written.some((t) => t.includes(`${ESC}[48;`)));
 
     terminal.dispose();
     rmrf(root);
@@ -283,12 +288,12 @@ suite("the Dabbler terminal", () => {
     rmrf(root);
   });
 
-  test("bands every line of a multi-line reason and leaves no bare LF", () => {
+  test("indents every continuation line of a multi-line reason and leaves no bare LF", () => {
     useTheme(vscode.ColorThemeKind.Dark);
     // git writes several lines to stderr and the driver carries them into
     // the stop's reason. A bare LF moves a pty DOWN without returning to
-    // column 0, so this used to staircase across the terminal -- and the
-    // band, set once, ended at the first newline and left the rest bare.
+    // column 0, so this used to staircase across the terminal -- and a
+    // continuation that started at column 0 would read as a second entry.
     const { root, driver, terminal, written } = drivenRepo(RUNNING);
     writeRun(driver, {
       session_number: 62,
@@ -305,8 +310,13 @@ suite("the Dabbler terminal", () => {
     assert.ok(stop !== undefined);
     // Not one bare LF anywhere in it: every newline is a full CRLF.
     assert.strictEqual(stop.split("\n").length - 1, stop.split("\r\n").length - 1);
-    // And each of the three physical lines carries a band of its own.
-    assert.strictEqual(stop.split(bandOf(BAND_DARK)).length - 1, 3);
+    // Three physical lines: the clock at the edge of the first, and the
+    // other two under the text, where a continuation belongs.
+    const lines = plain(stop).split("\r\n").filter((line) => line !== "");
+    assert.strictEqual(lines.length, 3);
+    assert.ok(lines[0]?.startsWith("14:30:05 paused"));
+    assert.ok(lines[1]?.startsWith(`${" ".repeat(HANGING_INDENT)}remote: permission denied`));
+    assert.ok(lines[2]?.startsWith(`${" ".repeat(HANGING_INDENT)}remote: contact an owner`));
 
     terminal.dispose();
     rmrf(root);
@@ -442,15 +452,20 @@ suite("the Dabbler terminal", () => {
     // Two palettes, one vocabulary. A tone that resolved to one colour in
     // both themes would be unreadable in one of them, which is the failure
     // the light and dark pair exists to prevent.
-    for (const tone of ["milestone", "good", "warn", "bad", "muted", "plain"] as const) {
+    for (const tone of ["milestone", "good", "warn", "bad", "muted"] as const) {
       assert.ok(TONES.dark[tone].startsWith("#"));
       assert.ok(TONES.light[tone].startsWith("#"));
       assert.notStrictEqual(TONES.dark[tone], TONES.light[tone]);
     }
+    // `plain` is the terminal's own foreground and paints nothing.
+    assert.strictEqual(paint("text", "plain", "dark"), "text");
     // And a milestone phase is a milestone while an ordinary one is not:
-    // the operator reads this terminal to know where the session got to.
+    // the operator reads this terminal to know where the session got to,
+    // and the plan and the work beginning are two of the places it gets to.
     assert.strictEqual(lineTone("phase", { phase: "close" }), "milestone");
-    assert.strictEqual(lineTone("phase", { phase: "steps" }), "plain");
+    assert.strictEqual(lineTone("phase", { phase: "plan" }), "milestone");
+    assert.strictEqual(lineTone("phase", { phase: "steps" }), "milestone");
+    assert.strictEqual(lineTone("phase", { phase: "preverify" }), "plain");
     // A pause is amber and a deadlock is red: the one word that says
     // "running this again reaches this exact point" keeps its colour.
     assert.strictEqual(lineTone("paused", {}), "warn");
@@ -461,6 +476,97 @@ suite("the Dabbler terminal", () => {
     // An unrecognised verdict warns rather than passing as clean, because
     // that is exactly the case where guessing "fine" is worst.
     assert.strictEqual(lineTone("verify", { verdict: "SOMETHING_NEW" }), "warn");
+  });
+});
+
+suite("the outline", () => {
+  const indent = " ".repeat(HANGING_INDENT);
+  const words = (lines: Span[][]) => lines.map((physical) => physical.map((s) => s.text).join(""));
+
+  test("lays a line out with the clock at the edge and everything after it under the text", () => {
+    const spans: Span[] = [
+      { text: "12:00:00", tone: "muted", bold: false },
+      { text: " ", tone: "plain", bold: false },
+      { text: "paused", tone: "warn", bold: true },
+      { text: " ", tone: "plain", bold: false },
+      { text: "reason=", tone: "muted", bold: false },
+      { text: "one two three four five six", tone: "bad", bold: false },
+    ];
+    // Thirty columns: twenty-nine usable, twenty after the indent.
+    const wrapped = layout(spans, 30);
+    assert.deepStrictEqual(words(wrapped), [
+      "12:00:00 paused reason=one",
+      `${indent}two three four five`,
+      `${indent}six`,
+    ]);
+    // The tone crosses the break with the text: a value is one colour on
+    // every line it takes.
+    assert.strictEqual(wrapped[1]?.[1]?.tone, "bad");
+    // A token wider than the line is cut rather than left to the terminal,
+    // which would wrap it without the indent.
+    const long = layout([{ text: "x".repeat(50), tone: "plain", bold: false }], 30);
+    assert.deepStrictEqual(words(long).map((line) => line.length), [29, 29, 10]);
+    // The text's own newlines are continuation lines too, and an unknown
+    // width breaks nothing else.
+    const reason = layout([{ text: "git push failed:\nremote: denied", tone: "plain", bold: false }], null);
+    assert.deepStrictEqual(words(reason), ["git push failed:", `${indent}remote: denied`]);
+  });
+
+  test("wraps its own lines at the terminal's width, and lays them out again when it is resized", async () => {
+    useTheme(vscode.ColorThemeKind.Dark);
+    const root = makeTempDir("dabbler-outline-");
+    const driver = path.join(root, ".dabbler", "runs", "s62", "driver");
+    fs.mkdirSync(path.join(driver, "jobs"), { recursive: true });
+    writeRun(driver, {
+      session_number: 62,
+      phase: "steps",
+      job: null,
+      stop: {
+        kind: "budget",
+        reason:
+          "the loop met driver.max_invocations (24), and whether to raise it or to " +
+          "cancel is the operator's to say",
+      },
+    });
+    const written: string[] = [];
+    const terminal = new DabblerTerminal({
+      repoRoot: root,
+      now: () => new Date(2026, 7, 31, 14, 30, 5),
+      pollMs: 60_000,
+      resizeMs: 1,
+    });
+    terminal.onDidWrite((text: string) => written.push(text));
+    const clear = `${ESC}[H${ESC}[2J${ESC}[3J`;
+    const physical = (text: string) =>
+      plain(text.split(clear).join("")).split("\r\n").filter((line) => line !== "");
+
+    terminal.open({ columns: 60, rows: 20 });
+    terminal.poll();
+    const narrow = written.flatMap(physical);
+    // Every physical line fits, and every one that is not a line's first
+    // begins under the text.
+    assert.ok(narrow.every((line) => line.length <= 59), narrow.join("|"));
+    assert.ok(narrow.some((line) => line.startsWith(indent)));
+    assert.ok(narrow.every((line) => line.startsWith("14:30:05 ") || line.startsWith(indent)));
+
+    // Widened: the terminal is cleared and everything is said again at the
+    // new width, with the same words on fewer lines.
+    written.length = 0;
+    // Wide enough that nothing wraps: the stop's rendering runs past 400.
+    terminal.setDimensions({ columns: 1000, rows: 20 });
+    await new Promise((resolve) => setTimeout(resolve, 40));
+    const stream = written.join("");
+    assert.ok(stream.includes(clear));
+    const wide = physical(stream);
+    assert.ok(wide.length < narrow.length, `${wide.length} vs ${narrow.length}`);
+    assert.ok(wide.every((line) => line.startsWith("14:30:05 ")), wide.join("|"));
+    assert.strictEqual(
+      wide.join(" ").replace(/\s+/g, " "),
+      narrow.join(" ").replace(/\s+/g, " "),
+    );
+
+    terminal.dispose();
+    rmrf(root);
   });
 });
 
@@ -704,6 +810,49 @@ suite("a session starting brings the framework's terminal into view", () => {
     disposeDabblerTerminals().dispose();
     rmrf(root);
   });
+
+  test("shows itself when a run begins after it was built, from the run record and without the Explorer", () => {
+    // The Explorer's scan runs only while the view is visible, and a
+    // session started in the person's own CLI while it was collapsed was
+    // never seen to start. The terminal reads the run record itself, twice
+    // a second, and the first `next` writes one.
+    const root = makeTempDir("dabbler-runstart-");
+    const older = path.join(root, ".dabbler", "runs", "s62", "driver");
+    fs.mkdirSync(older, { recursive: true });
+    writeRun(older, {
+      session_number: 62,
+      phase: "complete",
+      job: null,
+      stop: null,
+      started_at: "2026-08-31T13:00:00.000Z",
+    });
+    openDabblerTerminal(root);
+    const terminal = lastTerminal();
+    const pty = terminal.options.pty as DabblerTerminal;
+    pty.poll();
+    // Already there when the terminal was built: the state of the world,
+    // not a start, and the startup noise activation avoids.
+    assert.strictEqual(terminal.shown, 0);
+
+    const newer = path.join(root, ".dabbler", "runs", "s63", "driver");
+    fs.mkdirSync(newer, { recursive: true });
+    writeRun(newer, {
+      session_number: 63,
+      phase: "plan",
+      job: null,
+      stop: null,
+      started_at: new Date().toISOString(),
+    });
+    pty.poll();
+    assert.strictEqual(terminal.shown, 1);
+    assert.strictEqual(terminal.preserveFocus, true);
+    // Once: every later look is the same run.
+    pty.poll();
+    assert.strictEqual(terminal.shown, 1);
+
+    disposeDabblerTerminals().dispose();
+    rmrf(root);
+  });
 });
 
 suite("the way back to the framework terminal", () => {
@@ -738,11 +887,6 @@ suite("the way back to the framework terminal", () => {
 /** The foreground one tone renders as, without the text around it. */
 function toneOf(tone: Tone, kind: "dark" | "light"): string {
   return paint("", tone, kind).split("m")[0] + "m";
-}
-
-/** The SGR background one band renders as, without the line around it. */
-function bandOf(hex: string): string {
-  return bandedLine("", hex === BAND_DARK ? "dark" : "light").split("m")[0] + "m";
 }
 
 /** The stub's configuration, set for one test and cleared after it. */

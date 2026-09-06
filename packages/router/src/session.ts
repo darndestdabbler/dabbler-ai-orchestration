@@ -1702,7 +1702,10 @@ export function close(sessionsDir: string, options: CloseCliOptions = {}): numbe
       // reports SKIP: it does not block, and it does not claim to have proved
       // anything either.
       const mark = row.inapplicable ? "SKIP" : row.passed ? "PASS" : "FAIL";
-      let line = `  ${row.name.padEnd(width)}  ${mark}`;
+      // One bullet per gate, a level in from the close's own sentences: the
+      // rows are the detail under the close, and in the framework's terminal
+      // they sit under the line that announced the close job.
+      let line = `    - ${row.name.padEnd(width)}  ${mark}`;
       if (row.remediation) line += `  ${row.remediation}`;
       writeOut(`${line}\n`);
     }

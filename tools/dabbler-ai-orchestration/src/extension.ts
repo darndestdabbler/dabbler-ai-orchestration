@@ -344,7 +344,7 @@ export function activate(context: vscode.ExtensionContext): void {
     registerNewModuleCommand(context, { refreshView: refreshAll }),
   );
   safeRegister("bootstrapProjectCommand", () =>
-    registerBootstrapProjectCommand(context),
+    registerBootstrapProjectCommand(context, { refreshView: refreshAll }),
   );
   safeRegister("troubleshootCommand", () => registerTroubleshootCommand(context));
   // The integrated terminal gets `dabbler` on PATH, run on the extension

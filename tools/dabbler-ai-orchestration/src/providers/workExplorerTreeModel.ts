@@ -822,17 +822,18 @@ export function humanizeStepKey(key: string): string {
  * improve a label would be renaming the record to improve the view. This is
  * the operator's own vocabulary over them (csv-model feedback item 16).
  *
- * Two of the six say something the humanized id did not. `Plan declared`
- * rather than `Plan`, because the row ends when the declaration is appended
- * — the plan is not carried out at that point, only stated, and a label may
- * not claim more than the record it is folded from. `Test` rather than `Run
- * of record`, because what the row is waiting for is the suite; "run of
- * record" is what the evidence is CALLED, which is a thing the record needs
- * to say and a reader does not.
+ * Two of the six say something the humanized id did not. `Plan` rather
+ * than `Declare`, because that is what the row asks for and what a
+ * developer looks for; it was `Plan declared` for a while, on the argument
+ * that the row ends when the declaration is appended, and the operator
+ * ruled (2026-09-06) that the precision confused more than it told. `Test`
+ * rather than `Run of record`, because what the row is waiting for is the
+ * suite; "run of record" is what the evidence is CALLED, which is a thing
+ * the record needs to say and a reader does not.
  */
 const LIFECYCLE_ROW_LABELS: Record<string, string> = {
   register: "Register",
-  declare: "Plan declared",
+  declare: "Plan",
   work: "Work",
   verify: "Verify",
   "run-of-record": "Test",

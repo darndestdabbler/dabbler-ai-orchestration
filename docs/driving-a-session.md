@@ -481,25 +481,28 @@ session is yours: your scrollback, your chat, your Esc.
 
 ### The Dabbler terminal
 
-Start opens a second terminal beside your CLI, named *Dabbler*, split off
-the same panel and shown without taking the caret from what you are
-typing. It shows what the framework is doing — the phase the run moved to,
-the background job it started, and that job's own output as it arrives.
-This is what that terminal printed on the walk:
+Start opens a second terminal beside your CLI, named *Dabbler — <your
+repository>*, and shown without taking the caret from what you are typing.
+A session started from your own CLI brings it into view too, the moment the
+first `next` writes the run record. It shows what the framework is doing —
+the phase the run moved to, the background job it started, and that job's
+own output as it arrives. This is what that terminal printed on the walk:
 
 ```
-dabbler [14:21:30] terminal-opened repository=s62-walk
-dabbler [14:21:30] phase session=001 phase=preverify
-dabbler [14:21:30] job-started name=affected tests: unit log=.dabbler/runs/s1/driver/jobs/affected-tests-unit.log
+14:21:30 terminal-opened repository=s62-walk
+14:21:30 phase session=001 phase=preverify
+14:21:30 job-started name=affected tests: unit log=.dabbler/runs/s1/driver/jobs/affected-tests-unit.log
 running unit: node tests/run.mjs tests/test_widget.mjs
 recorded unit [preverify-targeted]: passed in 1s (timed here)
-dabbler [14:21:30] working
+14:21:30 working
 ```
 
-The framework's own lines carry a band behind them; the job's lines do
-not, because they arrive exactly as the runner wrote them — colours,
-checkmarks and spinner included. That is the whole reason it is a terminal
-and not an output channel.
+The framework's own lines are an outline: the clock stands at the left
+edge, and a line that wraps — or carries git's own newlines in a stop's
+reason — continues under the text rather than under the clock, at whatever
+width the terminal has now. The job's lines arrive exactly as the runner
+wrote them — colours, checkmarks and spinner included. That is the whole
+reason it is a terminal and not an output channel.
 
 `working` and `waiting` are the indicator: it says `working` while a
 background job is running and `waiting` when there is none and the session

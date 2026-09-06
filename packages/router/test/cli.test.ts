@@ -76,6 +76,8 @@ describe("dabbler session, the whole surface", () => {
     const result = await run(() => sessionVerb(["close", "--dry-run", "--sessions-dir", sessionsDir]));
     assert.equal(result.code, 1);
     assert.match(result.out, /gates pass; nothing written\./);
+    // One bullet per gate, indented under the close's own sentences.
+    assert.match(result.out, /^ {4}- verification_clean +(PASS|FAIL|SKIP)/m);
     const record = (readRawSessionState(sessionsDir)?.["sessions"] as Record<string, unknown>[])[0];
     assert.equal(record?.["status"], "in-progress");
   });

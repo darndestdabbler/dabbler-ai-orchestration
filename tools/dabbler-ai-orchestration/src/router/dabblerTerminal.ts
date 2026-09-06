@@ -32,9 +32,23 @@
 // alone moves down without returning to column 0 and staircases every line
 // after it. Every escape, every colour and every glyph survives untouched.
 //
+// **The framework's own lines are an outline.** Each begins with the clock
+// at column 0 and everything after it -- a wrapped tail, a reason that
+// carries git's own newlines -- continues under the text, not under the
+// clock, so a reader scanning the left edge sees one entry per event
+// however long the entry is. The terminal knows its own width (`open` and
+// `setDimensions` are told it), wraps to it, and when the width changes it
+// clears and lays every line out again at the new one, job output replayed
+// byte for byte between them. A hanging indent that the terminal's own
+// reflow undid on the first resize would be a promise the layout does not
+// keep.
+//
 // Colour is this file's own, and it says what a line IS rather than naming
 // a colour: see `Tone`, `lineTone` and `fieldTone`. Two palettes, resolved
-// from the editor's theme kind and re-read when it changes.
+// from the editor's theme kind and re-read when it changes. There is no
+// background behind the framework's lines: the clock and the indent are
+// what separate them from a job's output, and a band did that at the cost
+// of competing with the line it was behind.
 
 import * as fs from "fs";
 import * as path from "path";
@@ -51,74 +65,43 @@ import {
 
 import { RUNS_REL } from "../utils/projection";
 
-/**
- * What the band is painted with, and why it is gray.
- *
- * It was teal (`#165044` / `#87decd`) and the operator found it too loud to
- * read a session through: a saturated band behind every framework line
- * competes with the line itself, and what the band is FOR is separating the
- * framework's own voice from a test runner's output -- which a neutral gray
- * just off the terminal background does with a fraction of the noise.
- *
- * The dark value is slightly LIGHTER than a dark editor background rather
- * than darker, which is the one place this departs from "a shade darker
- * than the background". Darker than `#1e1e1e` reads as a hole punched in
- * the terminal, not as a band. Lighter reads as a raised row, which is the
- * intent. The light value is the shade darker it says it is.
- *
- * These are fixed per theme kind rather than sampled: a pseudoterminal is
- * handed no colour from the editor and cannot ask what the terminal
- * background actually is, so the two values are the best pair for the
- * default light and dark backgrounds and are stated as such.
- */
-export const BAND_DARK = "#2b2b2b";
-export const BAND_LIGHT = "#e6e6e6";
-
-/**
- * The foreground the band restores to, explicitly, in both themes.
- *
- * The dark band used to take whatever foreground the theme happened to be
- * using. That worked while nothing else was coloured; it stops working the
- * moment a token inside the line has a colour of its own, because there is
- * then no sequence that says "back to normal" without also dropping the
- * band. Naming both ends makes the restore exact.
- */
-export const TEXT_DARK = "#d4d4d4";
-export const TEXT_LIGHT = "#1a1a1a";
-
 export type ThemeKind = "dark" | "light";
 
 /**
  * What a line, or a value inside one, IS -- which is the only thing that
  * decides its colour. No event names a colour; it names what it is, and the
- * palette answers in the theme at hand.
+ * palette answers in the theme at hand. `plain` is the terminal's own
+ * foreground and is painted with nothing.
  */
 export type Tone = "milestone" | "good" | "warn" | "bad" | "muted" | "plain";
+
+/** The tones that carry a colour of their own. */
+export type PaintedTone = Exclude<Tone, "plain">;
 
 /**
  * The two palettes, one per theme kind.
  *
- * They are the editor's own default token colours rather than invented
- * ones, so a session read in either theme looks like the editor it is
- * running in. `plain` is the restore target and is the same value the band
- * opens with.
+ * The dark values are the operator's, chosen on 2026-09-06 against the
+ * editor's defaults: the milestone blue rather than a teal that read as a
+ * second green, and a green and an amber each a step less saturated than
+ * the token colours they replaced. The light values are the darker
+ * relatives that stay readable on a white terminal; the same hex on both
+ * backgrounds would be unreadable on one of them.
  */
-export const TONES: Readonly<Record<ThemeKind, Readonly<Record<Tone, string>>>> = {
+export const TONES: Readonly<Record<ThemeKind, Readonly<Record<PaintedTone, string>>>> = {
   dark: {
-    milestone: "#4ec9b0",
-    good: "#6a9955",
-    warn: "#d7ba7d",
+    milestone: "#3874db",
+    good: "#54a33b",
+    warn: "#b79427",
     bad: "#f14c4c",
     muted: "#8c8c8c",
-    plain: TEXT_DARK,
   },
   light: {
-    milestone: "#00695c",
+    milestone: "#2a5db0",
     good: "#256029",
     warn: "#8a6100",
     bad: "#a31515",
     muted: "#6b6b6b",
-    plain: TEXT_LIGHT,
   },
 };
 
@@ -126,12 +109,14 @@ export const TONES: Readonly<Record<ThemeKind, Readonly<Record<Tone, string>>>> 
  * The phases that are a lifecycle milestone rather than a step of one.
  *
  * The operator reads this terminal to know where the session has GOT to,
- * and these are the answers worth looking up for: the verification, the
- * suite that is the run of record, the commit and push, the close, and the
- * end. `steps`, `preverify`, `dispositions` and `fix` are the ordinary
- * traffic between them.
+ * and these are the answers worth looking up for: the plan being asked
+ * for, the work beginning, the verification, the suite that is the run of
+ * record, the commit and push, the close, and the end. `preverify`,
+ * `dispositions` and `fix` are the ordinary traffic between them.
  */
 const MILESTONE_PHASES = new Set([
+  "plan",
+  "steps",
   "verify",
   "run-of-record",
   "land",
@@ -260,6 +245,8 @@ interface RunRecord {
   readonly engine?: string;
   /** The seq of the instruction last issued: which silence is being watched. */
   readonly seq?: number;
+  /** When the run began, as the driver stamped it: what says whether it began while this terminal watched. */
+  readonly started_at?: string;
   readonly stop?: {
     kind?: string;
     reason?: string;
@@ -276,8 +263,27 @@ interface RunRecord {
 
 export interface DabblerTerminalOptions {
   readonly repoRoot: string;
-  /** The clock the `dabbler [hh:mm:ss]` prefix reads. */
+  /** The clock the `hh:mm:ss` prefix reads. */
   readonly now?: () => Date;
+  /**
+   * The instant this terminal came to exist, as `Date.now()` counts it.
+   *
+   * A run whose record says it started before this is not news -- it was
+   * already running when the terminal was built, and a terminal that took
+   * the screen for it would be the startup noise activation avoids. One
+   * that started after it is a session beginning while this terminal
+   * watched, and `onDidStartRun` says so.
+   */
+  readonly since?: number;
+  /**
+   * How long a resize is allowed to settle before the lines are laid out
+   * again.
+   *
+   * A drag on the panel divider reports a new width many times a second,
+   * and a full replay on each would fight the drag for the screen. The
+   * replay follows the LAST width, once the reports stop.
+   */
+  readonly resizeMs?: number;
   /** The editor's theme, re-read rather than cached across a change. */
   readonly themeKind?: () => ThemeKind;
   /** How often the run record and the running job's log are looked at. */
@@ -292,7 +298,7 @@ export interface DabblerTerminalOptions {
   readonly spinMs?: number;
 }
 
-/** `#165044` as the three numbers an SGR truecolour sequence takes. */
+/** `#3874db` as the three numbers an SGR truecolour sequence takes. */
 function rgb(hex: string): [number, number, number] {
   return [
     Number.parseInt(hex.slice(1, 3), 16),
@@ -329,12 +335,12 @@ function fg(hex: string): string {
 }
 
 /**
- * One token in a tone, and the exact restore that follows it.
+ * One token in a tone, and the reset that follows it.
  *
- * A full reset would end the band as well as the colour, so the restore is
- * spelled out: weight off, foreground back to the band's own. Nothing here
- * touches the background, which is what lets a coloured token sit inside a
- * banded line without punching a hole in it.
+ * `plain` is painted with nothing at all: it is the terminal's own
+ * foreground, and naming a colour for it would override a theme the
+ * operator chose. Everything else opens its colour and closes with a full
+ * reset, which is exact now that nothing behind the text has to survive it.
  */
 export function paint(
   text: string,
@@ -342,43 +348,175 @@ export function paint(
   kind: ThemeKind,
   bold = false,
 ): string {
-  const palette = TONES[kind];
-  return (
-    `${bold ? `${ESC}[1m` : ""}${fg(palette[tone])}${text}` +
-    `${ESC}[22m${fg(palette.plain)}`
-  );
+  if (tone === "plain" && !bold) return text;
+  const colour = tone === "plain" ? "" : fg(TONES[kind][tone]);
+  return `${bold ? `${ESC}[1m` : ""}${colour}${text}${ESC}[0m`;
+}
+
+/** One run of text in one tone: what a framework line is made of before it is laid out. */
+export interface Span {
+  readonly text: string;
+  readonly tone: Tone;
+  readonly bold: boolean;
 }
 
 /**
- * One of the framework's own lines, with the band behind it.
- *
- * The band goes here and only here: a job's own output keeps whatever
- * colours it came with, and painting a background behind it would fight
- * the runner for the same cells.
- *
- * **The band is re-opened on every physical line.** A background set once
- * ends at the first newline, so a line whose text carries newlines of its
- * own -- a stop reason holding git's multi-line stderr, which is the case
- * that exposed this -- painted its first line and left the rest bare. The
- * newline inside it was also a bare LF, and a pseudoterminal moves DOWN on
- * LF without returning to column 0, so every following line started under
- * the end of the one above it and the whole stop staircased across the
- * terminal. Normalising and splitting here fixes both at once: each piece
- * gets its own band and its own CRLF.
- *
- * A tone that spans a newline ends at it. That is deliberate -- the first
- * line of a stop carries the colour that says what it is, and its
- * continuation is the detail, which reads better plain than shouted.
+ * Where every continuation line begins: under the first character after
+ * the clock. The clock is `hh:mm:ss` and one space follows it.
  */
-export function bandedLine(text: string, kind: ThemeKind): string {
-  const [r, g, b] = rgb(kind === "dark" ? BAND_DARK : BAND_LIGHT);
-  const open = `${ESC}[48;2;${r};${g};${b}m${fg(TONES[kind].plain)}`;
+export const HANGING_INDENT = "hh:mm:ss ".length;
+
+/** One character of a line, carrying the tone of the span it came from. */
+interface Cell {
+  readonly ch: string;
+  readonly tone: Tone;
+  readonly bold: boolean;
+}
+
+/**
+ * The physical lines one framework line occupies at a given width.
+ *
+ * The first physical line starts at column 0 with the clock; every other
+ * one -- a wrapped tail, or a line the text itself carried after a newline
+ * -- begins at `HANGING_INDENT`, so the clock is the only thing that ever
+ * stands at the left edge. Wrapping breaks at spaces and drops the spaces
+ * it broke at; a single token wider than the line is cut rather than left
+ * to the terminal, which would wrap it without the indent. A null width
+ * means the width is not known yet, and only the text's own newlines break
+ * it then.
+ *
+ * Widths are counted in characters. The framework's lines are ASCII with
+ * the occasional glyph, and a column-exact count of every grapheme would
+ * be a table nobody here maintains for a difference nobody would see.
+ */
+export function layout(spans: readonly Span[], columns: number | null): Span[][] {
+  const cells: Cell[] = [];
+  for (const span of spans) {
+    for (const ch of span.text.replace(/\r/g, "")) {
+      cells.push({ ch, tone: span.tone, bold: span.bold });
+    }
+  }
+  const paragraphs: Cell[][] = [[]];
+  for (const cell of cells) {
+    if (cell.ch === "\n") paragraphs.push([]);
+    else (paragraphs[paragraphs.length - 1] as Cell[]).push(cell);
+  }
+  // One column is left free at the right edge: a line that fills the width
+  // exactly leaves the cursor in the pending-wrap state, and the CRLF that
+  // follows it lands differently across terminals.
+  const usable = columns === null ? Number.POSITIVE_INFINITY : Math.max(1, columns - 1);
+  const rest = columns === null ? usable : Math.max(1, usable - HANGING_INDENT);
+  const indent: Span = { text: " ".repeat(HANGING_INDENT), tone: "plain", bold: false };
+  const lines: Span[][] = [];
+  paragraphs.forEach((paragraph, index) => {
+    const wrapped = wrapCells(paragraph, index === 0 ? usable : rest, rest);
+    wrapped.forEach((physical, position) => {
+      const spans = toSpans(physical);
+      lines.push(index === 0 && position === 0 ? spans : [indent, ...spans]);
+    });
+  });
+  return lines;
+}
+
+/** Greedy word wrap over cells: `first` columns for the first line, `rest` after it. */
+function wrapCells(cells: readonly Cell[], first: number, rest: number): Cell[][] {
+  const lines: Cell[][] = [];
+  let line: Cell[] = [];
+  let avail = first;
+  let gap: Cell[] = [];
+  let i = 0;
+  while (i < cells.length) {
+    const cell = cells[i] as Cell;
+    if (cell.ch === " ") {
+      gap.push(cell);
+      i += 1;
+      continue;
+    }
+    let j = i;
+    while (j < cells.length && (cells[j] as Cell).ch !== " ") j += 1;
+    let word = cells.slice(i, j);
+    i = j;
+    if (line.length === 0) {
+      // Spaces that open a paragraph are the text's own indentation and
+      // survive; spaces at a break are the break.
+      line.push(...gap);
+    } else if (line.length + gap.length + word.length > avail) {
+      lines.push(line);
+      line = [];
+      avail = rest;
+    } else {
+      line.push(...gap);
+    }
+    gap = [];
+    while (word.length > avail - line.length) {
+      const room = avail - line.length;
+      if (room > 0) {
+        line.push(...word.slice(0, room));
+        word = word.slice(room);
+      }
+      lines.push(line);
+      line = [];
+      avail = rest;
+    }
+    line.push(...word);
+  }
+  lines.push(line);
+  return lines;
+}
+
+/** Consecutive cells in one tone, folded back into spans. */
+function toSpans(cells: readonly Cell[]): Span[] {
+  const spans: Span[] = [];
+  for (const cell of cells) {
+    const last = spans[spans.length - 1];
+    if (last && last.tone === cell.tone && last.bold === cell.bold) {
+      spans[spans.length - 1] = { ...last, text: last.text + cell.ch };
+    } else {
+      spans.push({ text: cell.ch, tone: cell.tone, bold: cell.bold });
+    }
+  }
+  return spans;
+}
+
+/**
+ * One framework line as the bytes the pty receives: laid out at `columns`,
+ * each span painted, every physical line ended with CRLF.
+ */
+export function renderSpans(
+  spans: readonly Span[],
+  columns: number | null,
+  kind: ThemeKind,
+): string {
   return (
-    forTerminal(text)
-      .split(CRLF)
-      .map((line) => `${open}${line}${ESC}[0m`)
+    layout(spans, columns)
+      .map((physical) => physical.map((span) => paint(span.text, span.tone, kind, span.bold)).join(""))
       .join(CRLF) + CRLF
   );
+}
+
+/** Clear the screen and the scrollback, and put the cursor at the top. */
+const CLEAR_ALL = `${ESC}[H${ESC}[2J${ESC}[3J`;
+
+/**
+ * How much of what was written this terminal keeps for a re-layout.
+ *
+ * Job output is kept byte for byte so a resize replays it as the runner
+ * wrote it; a session's suite runs come to a few megabytes at most, and a
+ * window that has watched many sessions drops the oldest. What is dropped
+ * is said once at the top of the replay rather than silently absent.
+ */
+const HISTORY_CAP_BYTES = 4 * 1024 * 1024;
+
+/** Everything this terminal has said or passed through, in order. */
+type HistoryEntry =
+  | { readonly kind: "line"; readonly at: Date; readonly event: string; readonly fields: Record<string, string> }
+  | { readonly kind: "raw"; readonly bytes: string };
+
+/** Whether a run record's `started_at` is at or after `since`. Unparseable is never. */
+function startedAfter(startedAt: string | undefined, since: number): boolean {
+  if (!startedAt) return false;
+  const at = Date.parse(startedAt);
+  return !Number.isNaN(at) && at >= since;
 }
 
 /** A pseudoterminal only accepts CRLF; nothing else about the bytes changes. */
@@ -497,14 +635,40 @@ export class DabblerTerminal implements vscode.Pseudoterminal {
   private readonly writer = new vscode.EventEmitter<string>();
   readonly onDidWrite: vscode.Event<string> = this.writer.event;
 
+  /**
+   * A run beginning for this repository after this terminal was built.
+   *
+   * Carries the session number. It is the terminal's own reading of the
+   * run record it already polls twice a second, which is why it fires
+   * whether or not the Work Explorer is visible: the Explorer's scan runs
+   * only while the view is, and a session started in the person's own CLI
+   * while the view was collapsed was never seen to start.
+   */
+  private readonly started = new vscode.EventEmitter<number>();
+  readonly onDidStartRun: vscode.Event<number> = this.started.event;
+
   private readonly repoRoot: string;
   private readonly now: () => Date;
+  private readonly since: number;
   private readonly readTheme: () => ThemeKind;
   private readonly pollMs: number;
+  private readonly resizeMs: number;
 
   private theme: ThemeKind;
   private timer: ReturnType<typeof setInterval> | undefined;
+  private resizeTimer: ReturnType<typeof setTimeout> | undefined;
   private themeSubscription: vscode.Disposable | undefined;
+
+  /** The width the editor last reported, or null before it has said. */
+  private columns: number | null = null;
+
+  /** What has been written, kept so a resize can lay it out again. */
+  private readonly history: HistoryEntry[] = [];
+  private historyBytes = 0;
+  private trimmed = false;
+
+  /** The session whose run record was last read; undefined before any. */
+  private lastSession: number | undefined = undefined;
 
   private phase: string | null = null;
   private jobName: string | null = null;
@@ -591,6 +755,8 @@ export class DabblerTerminal implements vscode.Pseudoterminal {
           : "dark");
     this.pollMs = options.pollMs ?? 500;
     this.spinMs = options.spinMs ?? 120;
+    this.resizeMs = options.resizeMs ?? 150;
+    this.since = options.since ?? Date.now();
     this.theme = this.readTheme();
   }
 
@@ -606,10 +772,74 @@ export class DabblerTerminal implements vscode.Pseudoterminal {
    */
   private say(text: string): void {
     this.erase();
+    this.emit(text);
+    this.draw();
+  }
+
+  /** One write, and where it left the cursor. */
+  private emit(text: string): void {
     this.writer.fire(text);
     // Where the cursor is left, which is the only thing that decides
     // whether the indicator may be drawn at all. See `atLineStart`.
     this.atLineStart = text.endsWith(CRLF) || text.endsWith("\n");
+  }
+
+  /**
+   * Keep what was written, within the cap, so a resize can lay it out again.
+   *
+   * The oldest entries go first, whole, and the replay says once that they
+   * went: a scrollback that began mid-line with no word about why would
+   * read as a terminal that lost something.
+   */
+  private remember(entry: HistoryEntry): void {
+    this.history.push(entry);
+    this.historyBytes += entry.kind === "raw" ? Buffer.byteLength(entry.bytes) : 0;
+    while (this.historyBytes > HISTORY_CAP_BYTES && this.history.length > 1) {
+      const dropped = this.history.shift() as HistoryEntry;
+      this.historyBytes -= dropped.kind === "raw" ? Buffer.byteLength(dropped.bytes) : 0;
+      this.trimmed = true;
+    }
+  }
+
+  /**
+   * The editor's word on how wide this terminal is now.
+   *
+   * A changed width lays every line out again, after the resize settles:
+   * the hanging indent is this terminal's own wrapping, and a terminal that
+   * kept the old physical lines would show the indent honoured at one width
+   * and broken at every other.
+   */
+  setDimensions(dimensions: vscode.TerminalDimensions): void {
+    if (dimensions.columns === this.columns) return;
+    this.columns = dimensions.columns;
+    if (this.resizeTimer !== undefined) clearTimeout(this.resizeTimer);
+    this.resizeTimer = setTimeout(() => {
+      this.resizeTimer = undefined;
+      this.replay();
+    }, this.resizeMs);
+    (this.resizeTimer as { unref?: () => void }).unref?.();
+  }
+
+  /**
+   * Clear the terminal and write everything again at the current width.
+   *
+   * Framework lines are rendered afresh -- at this width, in this theme,
+   * with the clock they were first said at -- and job output is replayed
+   * as the bytes the runner wrote, which is the only rendering of it there
+   * is. The indicator comes back below it all if there is still something
+   * to indicate.
+   */
+  private replay(): void {
+    this.erase();
+    this.emit(CLEAR_ALL);
+    this.atLineStart = true;
+    if (this.trimmed) {
+      this.emit(this.render(this.now(), "history-trimmed", { kept: "the most recent 4 MB" }));
+    }
+    for (const entry of this.history) {
+      if (entry.kind === "line") this.emit(this.render(entry.at, entry.event, entry.fields));
+      else this.emit(forTerminal(entry.bytes));
+    }
     this.draw();
   }
 
@@ -657,7 +887,10 @@ export class DabblerTerminal implements vscode.Pseudoterminal {
     return this.activity;
   }
 
-  open(): void {
+  open(initialDimensions?: vscode.TerminalDimensions): void {
+    // The width first, so the first line is laid out at it rather than
+    // at an unknown width and replayed a moment later.
+    if (initialDimensions) this.columns = initialDimensions.columns;
     this.line("terminal-opened", { repository: path.basename(this.repoRoot) });
     // A theme switched mid-session repaints from the next line rather than
     // staying wrong. Re-read rather than recomputed: the kind is the
@@ -688,8 +921,11 @@ export class DabblerTerminal implements vscode.Pseudoterminal {
     this.timer = undefined;
     if (this.spinTimer !== undefined) clearInterval(this.spinTimer);
     this.spinTimer = undefined;
+    if (this.resizeTimer !== undefined) clearTimeout(this.resizeTimer);
+    this.resizeTimer = undefined;
     this.themeSubscription?.dispose();
     this.themeSubscription = undefined;
+    this.started.dispose();
     this.writer.dispose();
   }
 
@@ -704,6 +940,15 @@ export class DabblerTerminal implements vscode.Pseudoterminal {
     if (runPath === null) return;
     const run = readRun(runPath);
     if (run === null) return;
+
+    // A run record for a session this terminal has not read before. One
+    // that began after the terminal did is a session starting while it
+    // watched, and is said so whoever's CLI started it; one that was
+    // already running is the state of the world at the first look.
+    if (typeof run.session_number === "number" && run.session_number !== this.lastSession) {
+      this.lastSession = run.session_number;
+      if (startedAfter(run.started_at, this.since)) this.started.fire(run.session_number);
+    }
 
     if (run.phase !== undefined && run.phase !== this.phase) {
       this.phase = run.phase;
@@ -1018,7 +1263,9 @@ export class DabblerTerminal implements vscode.Pseudoterminal {
     } catch {
       return;
     }
-    if (appended !== "") this.say(forTerminal(appended));
+    if (appended === "") return;
+    this.remember({ kind: "raw", bytes: appended });
+    this.say(forTerminal(appended));
   }
 
   private sessionLabel(run: RunRecord): string {
@@ -1028,36 +1275,46 @@ export class DabblerTerminal implements vscode.Pseudoterminal {
   }
 
   /**
-   * One `dabbler [hh:mm:ss] event key=value` line, in the framework's shape
-   * and in the colours that say what it is.
+   * One `hh:mm:ss event key=value` line, kept for a re-layout and said
+   * in the colours that say what it is.
+   */
+  private line(event: string, fields: Record<string, string> = {}): void {
+    const at = this.now();
+    this.remember({ kind: "line", at, event, fields });
+    this.say(this.render(at, event, fields));
+  }
+
+  /**
+   * The bytes for one framework line at the width and theme in hand.
    *
    * The clock and the `key=` of every field are muted, because they are
    * scaffolding: the operator is scanning for the event and for the values.
    * The event takes the line's own tone, and each value takes whatever tone
    * that key's value earns -- which is how a verdict and a test outcome
    * come out green or red without this method knowing what either one is.
+   * The clock stands alone at the left edge: it is the outline's marker,
+   * and a word before it was one more thing to read past on every line.
    */
-  private line(event: string, fields: Record<string, string> = {}): void {
-    const at = this.now();
+  private render(at: Date, event: string, fields: Record<string, string>): string {
     const clock = [at.getHours(), at.getMinutes(), at.getSeconds()]
       .map((part) => String(part).padStart(2, "0"))
       .join(":");
     const tone = lineTone(event, fields);
-    const parts = [
-      paint(`dabbler [${clock}]`, "muted", this.theme),
-      " ",
-      paint(event, tone, this.theme, tone !== "muted" && tone !== "plain"),
+    const spans: Span[] = [
+      { text: clock, tone: "muted", bold: false },
+      { text: " ", tone: "plain", bold: false },
+      { text: event, tone, bold: tone !== "muted" && tone !== "plain" },
     ];
     for (const [key, value] of Object.entries(fields)) {
       if (value === "") continue;
       const valueTone = fieldTone(event, key, value);
-      parts.push(
-        " ",
-        paint(`${key}=`, "muted", this.theme),
-        paint(value, valueTone, this.theme, valueTone !== "muted" && valueTone !== "plain"),
+      spans.push(
+        { text: " ", tone: "plain", bold: false },
+        { text: `${key}=`, tone: "muted", bold: false },
+        { text: value, tone: valueTone, bold: valueTone !== "muted" && valueTone !== "plain" },
       );
     }
-    this.say(bandedLine(parts.join(""), this.theme));
+    return renderSpans(spans, this.columns, this.theme);
   }
 }
 
@@ -1129,6 +1386,13 @@ export function frameworkTerminalLocation(
 
 function build(repoRoot: string, beside?: vscode.Terminal): void {
   const pty = new DabblerTerminal({ repoRoot });
+  // A run beginning after this terminal was built brings it into view,
+  // focus preserved: the person is typing in the CLI that began it. This
+  // is the terminal's own reading of the run record, and it does not wait
+  // on the Work Explorer's scan -- see `revealOnSessionStart` for the
+  // Explorer's, which fires at registration when the view is there to see
+  // it, and this one, which fires at the first `next` whether or not it is.
+  pty.onDidStartRun(() => open.get(repoRoot)?.terminal.show(true));
   const where = terminalLocation();
   const location = frameworkTerminalLocation(where, beside);
   const terminal = vscode.window.createTerminal({

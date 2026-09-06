@@ -690,9 +690,9 @@ suite("workExplorerTreeModel: task rows", () => {
     assert.strictEqual(labelFor("verify"), "Verify");
     assert.strictEqual(labelFor("close"), "Close");
     // The two that say something the humanized id did not. The declare row
-    // ends when the declaration is appended -- the plan is stated there,
-    // not carried out -- so the label may not say more than that.
-    assert.strictEqual(labelFor("declare"), "Plan declared");
+    // is what a developer looks for as the plan, and is called that; the
+    // more exact "Plan declared" confused the readers it was exact for.
+    assert.strictEqual(labelFor("declare"), "Plan");
     // "Run of record" is what the evidence is called; what the row waits
     // for is the suite.
     assert.strictEqual(labelFor("run-of-record"), "Test");

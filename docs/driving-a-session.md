@@ -489,20 +489,37 @@ the phase the run moved to, the background job it started, and that job's
 own output as it arrives. This is what that terminal printed on the walk:
 
 ```
+────────────────────────── framework ──────────────────────────
 14:21:30 terminal-opened repository=s62-walk
-14:21:30 phase session=001 phase=preverify
+14:21:30 phase session=001 now=preverify
 14:21:30 job-started name=affected tests: unit log=.dabbler/runs/s1/driver/jobs/affected-tests-unit.log
+14:21:30 working
+──────────────────── affected-tests-unit ──────────────────────
 running unit: node tests/run.mjs tests/test_widget.mjs
 recorded unit [preverify-targeted]: passed in 1s (timed here)
-14:21:30 working
+────────────────────────── framework ──────────────────────────
+14:21:31 tests suite=unit stage=preverify-targeted outcome=passed
+14:21:31 job-collected name=affected tests: unit
 ```
 
-The framework's own lines are an outline: the clock stands at the left
-edge, and a line that wraps — or carries git's own newlines in a stop's
-reason — continues under the text rather than under the clock, at whatever
-width the terminal has now. The job's lines arrive exactly as the runner
-wrote them — colours, checkmarks and spinner included. That is the whole
-reason it is a terminal and not an output channel.
+(The lines are the walk's; the layout is the current one.) Two voices
+speak here, and a rule with the voice's name in it is drawn wherever one
+gives way to the other: `framework` over the framework's own lines, the
+job's name over its output. The framework's lines are an outline: the
+clock stands at the left edge, and a line that wraps — or carries git's own
+newlines in a stop's reason — continues under the text rather than under
+the clock. Both the rules and the wrapping follow the terminal's width,
+and a resize lays the whole scrollback out again. The job's lines arrive
+exactly as the runner wrote them — colours, checkmarks and spinner
+included. That is the whole reason it is a terminal and not an output
+channel.
+
+A terminal opened part-way through a session, or after one, does not
+replay the job logs. It says what the records say happened, one dated line
+each in the order it happened — the verification rounds, this session's
+test runs, and each job log already on disk as `earlier-job` with its exit
+and where the log is — and then where the run is now. Only bytes a job
+writes after that pass through.
 
 `working` and `waiting` are the indicator: it says `working` while a
 background job is running and `waiting` when there is none and the session

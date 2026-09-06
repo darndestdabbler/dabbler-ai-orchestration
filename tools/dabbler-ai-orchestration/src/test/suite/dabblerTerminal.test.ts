@@ -91,6 +91,8 @@ const RUNNING = {
 suite("the Dabbler terminal", () => {
   test("passes a job's log through byte for byte, escapes included", () => {
     const { root, driver, written, terminal } = drivenRepo(RUNNING);
+    // The first look is history; the job starts writing after it.
+    terminal.poll();
     const log = path.join(driver, "jobs", "verification-round.log");
     // What a real runner writes: a colour opened, a glyph, a reset.
     const runnerOutput = `${ESC}[32m✓${ESC}[0m 214 passed\n`;
@@ -142,7 +144,9 @@ suite("the Dabbler terminal", () => {
     assert.ok(written.some((t) => plain(t).includes("job-collected")));
     assert.strictEqual(written.filter((t) => plain(t).includes("14:30:05 waiting")).length, 1);
     // The record moving is an event of its own, in the framework's shape.
-    assert.ok(written.some((t) => plain(t).includes("14:30:05 phase session=062 phase=land")));
+    // The session was named on the first phase line and is not repeated.
+    assert.ok(written.some((t) => plain(t).includes("14:30:05 phase now=land")));
+    assert.ok(!written.some((t) => plain(t).includes("session=062 now=land")));
 
     terminal.dispose();
     rmrf(root);
@@ -206,6 +210,7 @@ suite("the Dabbler terminal", () => {
 
   test("keeps a job's last bytes when the record drops it, and a whole job it never saw", () => {
     const { root, driver, terminal, written } = drivenRepo(RUNNING);
+    terminal.poll();
     const log = path.join(driver, "jobs", "verification-round.log");
     fs.writeFileSync(log, "round 1 starting\n", "utf8");
     terminal.poll();
@@ -336,16 +341,20 @@ suite("the Dabbler terminal", () => {
     );
     fs.writeFileSync(
       path.join(root, ".dabbler", "runs", "test-runs.jsonl"),
-      JSON.stringify({ suite: "typescript", stage: "final-full", outcome: "passed" }) + "\n",
+      JSON.stringify({ suite: "typescript", stage: "final-full", outcome: "passed" }) +
+        "\n" +
+        JSON.stringify({ suite: "dotnet", stage: "preverify-targeted", outcome: "passed", sessionNumber: 62 }) +
+        "\n",
       "utf8",
     );
 
     terminal.poll();
     const said = written.map(plain).join("");
     assert.ok(said.includes("verify round=1 verdict=VERIFIED"));
-    // The repository-wide record is not replayed: the row that was already
-    // there when this terminal first looked is history, not news.
+    // The repository-wide record is replayed for THIS session only: a row
+    // another session recorded is history, and this session's is its own.
     assert.ok(!said.includes("tests suite=typescript"));
+    assert.ok(said.includes("tests suite=dotnet stage=preverify-targeted outcome=passed"));
 
     written.length = 0;
     fs.appendFileSync(
@@ -462,10 +471,10 @@ suite("the Dabbler terminal", () => {
     // And a milestone phase is a milestone while an ordinary one is not:
     // the operator reads this terminal to know where the session got to,
     // and the plan and the work beginning are two of the places it gets to.
-    assert.strictEqual(lineTone("phase", { phase: "close" }), "milestone");
-    assert.strictEqual(lineTone("phase", { phase: "plan" }), "milestone");
-    assert.strictEqual(lineTone("phase", { phase: "steps" }), "milestone");
-    assert.strictEqual(lineTone("phase", { phase: "preverify" }), "plain");
+    assert.strictEqual(lineTone("phase", { now: "close" }), "milestone");
+    assert.strictEqual(lineTone("phase", { now: "plan" }), "milestone");
+    assert.strictEqual(lineTone("phase", { now: "steps" }), "milestone");
+    assert.strictEqual(lineTone("phase", { now: "preverify" }), "plain");
     // A pause is amber and a deadlock is red: the one word that says
     // "running this again reaches this exact point" keeps its colour.
     assert.strictEqual(lineTone("paused", {}), "warn");
@@ -537,8 +546,11 @@ suite("the outline", () => {
     });
     terminal.onDidWrite((text: string) => written.push(text));
     const clear = `${ESC}[H${ESC}[2J${ESC}[3J`;
+    // The rule between voices is a line of its own and not a framework line.
     const physical = (text: string) =>
-      plain(text.split(clear).join("")).split("\r\n").filter((line) => line !== "");
+      plain(text.split(clear).join(""))
+        .split("\r\n")
+        .filter((line) => line !== "" && !line.includes("─"));
 
     terminal.open({ columns: 60, rows: 20 });
     terminal.poll();
@@ -564,6 +576,102 @@ suite("the outline", () => {
       wide.join(" ").replace(/\s+/g, " "),
       narrow.join(" ").replace(/\s+/g, " "),
     );
+
+    terminal.dispose();
+    rmrf(root);
+  });
+});
+
+suite("the first look, and the rule between voices", () => {
+  test("says the session's history in time order, dumps no log, and rules a voice in when it changes", async () => {
+    useTheme(vscode.ColorThemeKind.Dark);
+    // A terminal opened after the fact used to replay every job log whole
+    // and in filename order: the close before the run of record before the
+    // verification. The records say what happened and when.
+    const root = makeTempDir("dabbler-firstlook-");
+    const runDir = path.join(root, ".dabbler", "runs", "s62");
+    const driver = path.join(runDir, "driver");
+    const jobs = path.join(driver, "jobs");
+    fs.mkdirSync(jobs, { recursive: true });
+    writeRun(driver, { session_number: 62, phase: "complete", job: null, stop: null });
+    fs.writeFileSync(
+      path.join(runDir, "rounds.jsonl"),
+      JSON.stringify({ round: 1, verdict: "VERIFIED", verifier_model: "gpt-5.4", recorded_at: "2026-08-31T14:00:00.000Z" }) + "\n",
+      "utf8",
+    );
+    fs.writeFileSync(
+      path.join(root, ".dabbler", "runs", "test-runs.jsonl"),
+      JSON.stringify({ suite: "dotnet", stage: "final-full", outcome: "passed", sessionNumber: 62, recordedAt: "2026-08-31T14:10:00.000Z" }) +
+        "\n" +
+        JSON.stringify({ suite: "dotnet", stage: "final-full", outcome: "passed", sessionNumber: 61, recordedAt: "2026-08-31T14:05:00.000Z" }) +
+        "\n",
+      "utf8",
+    );
+    const at = (iso: string) => new Date(iso);
+    fs.writeFileSync(path.join(jobs, "verification.log"), "verify: round 1 -- VERIFIED\n".repeat(50), "utf8");
+    fs.writeFileSync(path.join(jobs, "verification.status.json"), JSON.stringify({ exit: 0 }), "utf8");
+    fs.utimesSync(path.join(jobs, "verification.log"), at("2026-08-31T13:55:00.000Z"), at("2026-08-31T13:55:00.000Z"));
+    fs.writeFileSync(path.join(jobs, "close.log"), "close: session 062 closed\n", "utf8");
+    fs.utimesSync(path.join(jobs, "close.log"), at("2026-08-31T14:20:00.000Z"), at("2026-08-31T14:20:00.000Z"));
+
+    const written: string[] = [];
+    const terminal = new DabblerTerminal({
+      repoRoot: root,
+      now: () => new Date(2026, 7, 31, 14, 30, 5),
+      pollMs: 60_000,
+      resizeMs: 1,
+    });
+    terminal.onDidWrite((text: string) => written.push(text));
+    terminal.open({ columns: 100, rows: 20 });
+    terminal.poll();
+
+    const said = plain(written.join(""));
+    // One dated line per thing that happened, in the order it happened,
+    // and then where the run is now.
+    const order = [
+      "earlier-job name=verification log=.dabbler/runs/s62/driver/jobs/verification.log exit=0",
+      "verify round=1 verdict=VERIFIED verifier=gpt-5.4",
+      "tests suite=dotnet stage=final-full outcome=passed",
+      "earlier-job name=close log=.dabbler/runs/s62/driver/jobs/close.log",
+      "phase session=062 now=complete",
+      "session-closed session=062",
+    ];
+    const positions = order.map((line) => said.indexOf(line));
+    assert.ok(positions.every((position) => position >= 0), said);
+    assert.deepStrictEqual([...positions].sort((a, b) => a - b), positions, said);
+    // Another session's test run is not this session's history.
+    assert.strictEqual(said.split("tests suite=dotnet").length - 1, 1);
+    // Not one byte of either log was replayed.
+    assert.ok(!said.includes("verify: round 1 -- VERIFIED"), said);
+    assert.ok(!said.includes("close: session 062 closed"), said);
+    // Everything so far is one voice under one rule, with the name in it.
+    assert.strictEqual(said.split("─── framework ───").length - 1, 1, said);
+
+    // Bytes a job writes from now on pass through, under a rule of its own,
+    // and the framework's next line comes back under its rule.
+    written.length = 0;
+    fs.appendFileSync(path.join(jobs, "close.log"), "close: pushed 1 round ref(s)\n", "utf8");
+    terminal.poll();
+    writeRun(driver, {
+      session_number: 62,
+      phase: "complete",
+      job: null,
+      stop: { kind: "land", reason: "the push was refused" },
+    });
+    terminal.poll();
+    const after = plain(written.join(""));
+    assert.match(after, /─ close ─+\r\nclose: pushed 1 round ref\(s\)\r\n/, after);
+    assert.match(after, /─ framework ─+\r\n14:30:05 paused/, after);
+    // The rule spans the terminal's width, one column short, and follows it
+    // through a resize because it is drawn again with everything else.
+    const rule = after.split("\r\n").find((line) => line.includes("─ close ─")) ?? "";
+    assert.strictEqual(rule.length, 99, rule);
+    written.length = 0;
+    terminal.setDimensions({ columns: 40, rows: 20 });
+    await new Promise((resolve) => setTimeout(resolve, 40));
+    const narrow = plain(written.join("")).split("\r\n").filter((line) => line.includes("─ close ─"));
+    assert.strictEqual(narrow.length, 1);
+    assert.strictEqual(narrow[0]?.length, 39, narrow[0]);
 
     terminal.dispose();
     rmrf(root);

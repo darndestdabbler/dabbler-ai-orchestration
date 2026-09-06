@@ -43,6 +43,22 @@
 // reflow undid on the first resize would be a promise the layout does not
 // keep.
 //
+// **Two voices, and a rule between them.** The framework's own lines and a
+// job's output are different things, and where one gives way to the other
+// a rule is drawn across the terminal with the name of the voice that
+// follows set into it -- `framework`, or the job's name. The scrollback
+// then reads as titled groups, and a job's bytes inside its group are the
+// runner's own, untouched. Nothing is drawn between two framework lines.
+//
+// **The first look says history, and dumps nothing.** A terminal opened
+// mid-session, or after one, used to replay every job log on disk whole
+// and in filename order -- the close before the run of record before the
+// verification, with a thousand lines of runner output between two
+// framework lines. Now it says what the records say happened, one dated
+// line each in time order: this session's verification rounds, this
+// session's test runs, and each job log already on disk, named with where
+// it is. Only bytes appended after the terminal opened pass through.
+//
 // Colour is this file's own, and it says what a line IS rather than naming
 // a colour: see `Tone`, `lineTone` and `fieldTone`. Two palettes, resolved
 // from the editor's theme kind and re-read when it changes. There is no
@@ -139,10 +155,10 @@ const ROUNDS_FILENAME = "rounds.jsonl";
 /**
  * Every test run this repository has recorded, across every session.
  *
- * Repository-wide, which is why it is NOT replayed: a terminal opened today
- * would otherwise recite months of other sessions' runs before saying
- * anything about this one. It is read forward from wherever it stood when
- * this terminal first looked.
+ * Repository-wide, which is why only THIS session's rows are said at the
+ * first look: a terminal opened today would otherwise recite months of
+ * other sessions' runs before saying anything about this one. After the
+ * first look it is read forward, and every new row is news.
  */
 const TEST_RUNS_FILENAME = "test-runs.jsonl";
 
@@ -199,10 +215,15 @@ export function lineTone(event: string, fields: Record<string, string> = {}): To
   if (event === "verify") return verdictTone(fields["verdict"] ?? "");
   if (event === "tests") return (fields["outcome"] ?? "") === "passed" ? "good" : "bad";
   if (event === "phase") {
-    return MILESTONE_PHASES.has(fields["phase"] ?? "") ? "milestone" : "plain";
+    return MILESTONE_PHASES.has(fields["now"] ?? "") ? "milestone" : "plain";
   }
   if (event === "session-closed") return "milestone";
   return "muted";
+}
+
+/** A job's exit code as a tone: zero is good, anything else is bad. */
+function exitTone(exit: string): Tone {
+  return exit === "0" ? "good" : "bad";
 }
 
 /**
@@ -216,7 +237,10 @@ export function lineTone(event: string, fields: Record<string, string> = {}): To
 export function fieldTone(event: string, key: string, value: string): Tone {
   if (key === "verdict") return verdictTone(value);
   if (key === "outcome") return value === "passed" ? "good" : "bad";
-  if (key === "phase") return MILESTONE_PHASES.has(value) ? "milestone" : "plain";
+  if (key === "exit") return exitTone(value);
+  // `now` is the phase line's own word for where the run is; `phase` is the
+  // same value wherever another line carries it.
+  if (key === "now" || key === "phase") return MILESTONE_PHASES.has(value) ? "milestone" : "plain";
   // On a pause the kind is amber and a deadlock class is red; the words
   // themselves stay plain, because prose painted whole is a wall.
   if (event === "paused" && key === "kind") return "warn";
@@ -494,6 +518,31 @@ export function renderSpans(
   );
 }
 
+/** The voice the framework's own lines are in, as the rule names it. */
+export const FRAMEWORK_VOICE = "framework";
+
+/** How wide a rule is drawn before the terminal has said how wide it is. */
+const DEFAULT_RULE_COLUMNS = 60;
+
+/**
+ * The rule between two voices: a line across the terminal with the name of
+ * the voice that follows set into the middle of it, the line muted and the
+ * name in the terminal's own foreground, bold, so it reads as a heading
+ * over the group beneath. One column short of the width, for the same
+ * reason a framework line is.
+ */
+export function divider(label: string, columns: number | null, kind: ThemeKind): string {
+  const width = Math.max(label.length + 6, (columns ?? DEFAULT_RULE_COLUMNS) - 1);
+  const dashes = width - label.length - 2;
+  const left = Math.floor(dashes / 2);
+  return (
+    paint("─".repeat(left), "muted", kind) +
+    ` ${paint(label, "plain", kind, true)} ` +
+    paint("─".repeat(dashes - left), "muted", kind) +
+    CRLF
+  );
+}
+
 /** Clear the screen and the scrollback, and put the cursor at the top. */
 const CLEAR_ALL = `${ESC}[H${ESC}[2J${ESC}[3J`;
 
@@ -510,7 +559,37 @@ const HISTORY_CAP_BYTES = 4 * 1024 * 1024;
 /** Everything this terminal has said or passed through, in order. */
 type HistoryEntry =
   | { readonly kind: "line"; readonly at: Date; readonly event: string; readonly fields: Record<string, string> }
-  | { readonly kind: "raw"; readonly bytes: string };
+  | { readonly kind: "raw"; readonly label: string; readonly bytes: string };
+
+/** The name a job log's bytes are labelled with: the file's own, without its suffix. */
+function jobLabel(logPath: string): string {
+  return path.basename(logPath).replace(/\.log$/, "");
+}
+
+/** A record's own timestamp as a Date, or null when it will not parse. */
+function recordedAt(value: unknown): Date | null {
+  if (typeof value !== "string" || value === "") return null;
+  const at = new Date(value);
+  return Number.isNaN(at.getTime()) ? null : at;
+}
+
+/** The fields a verification round is said with. */
+function roundFields(row: Record<string, unknown>): Record<string, string> {
+  return {
+    round: String(row["round"] ?? "?"),
+    verdict: String(row["verdict"] ?? "?"),
+    verifier: String(row["verifier_model"] ?? ""),
+  };
+}
+
+/** The fields a test run is said with. */
+function testRunFields(row: Record<string, unknown>): Record<string, string> {
+  return {
+    suite: String(row["suite"] ?? "?"),
+    stage: String(row["stage"] ?? ""),
+    outcome: String(row["outcome"] ?? "?"),
+  };
+}
 
 /** Whether a run record's `started_at` is at or after `since`. Unparseable is never. */
 function startedAfter(startedAt: string | undefined, since: number): boolean {
@@ -670,6 +749,19 @@ export class DabblerTerminal implements vscode.Pseudoterminal {
   /** The session whose run record was last read; undefined before any. */
   private lastSession: number | undefined = undefined;
 
+  /** Whether a run record has been read at all: the first look says history. */
+  private looked = false;
+
+  /** The session the last phase line named, so the next names it only on a change. */
+  private saidSession: number | null = null;
+
+  /**
+   * Who spoke last -- the framework, or a job by name -- so a change of
+   * voice gets its rule. Null before anything has been written, and again
+   * after a replay clears the screen.
+   */
+  private speaker: string | null = null;
+
   private phase: string | null = null;
   private jobName: string | null = null;
   /**
@@ -770,18 +862,41 @@ export class DabblerTerminal implements vscode.Pseudoterminal {
    * as the runner wrote them -- which is the rule this file exists under --
    * and the indicator reappears below them.
    */
-  private say(text: string): void {
+  private say(text: string, speaker: string): void {
     this.erase();
-    this.emit(text);
+    this.emit(text, speaker);
     this.draw();
   }
 
-  /** One write, and where it left the cursor. */
-  private emit(text: string): void {
+  /**
+   * One write, in one voice, and where it left the cursor.
+   *
+   * A change of voice gets its rule first, on a line of its own, so the
+   * framework's lines and a job's output read as titled groups. A job that
+   * left its line unfinished has that line ended before the rule, because
+   * the rule and the framework's next line must start at the edge and
+   * never on the tail of a runner's.
+   */
+  private emit(text: string, speaker: string): void {
+    if (this.speaker !== speaker) {
+      this.writer.fire(`${this.atLineStart ? "" : CRLF}${divider(speaker, this.columns, this.theme)}`);
+      this.speaker = speaker;
+      this.atLineStart = true;
+    }
     this.writer.fire(text);
     // Where the cursor is left, which is the only thing that decides
     // whether the indicator may be drawn at all. See `atLineStart`.
     this.atLineStart = text.endsWith(CRLF) || text.endsWith("\n");
+  }
+
+  /** A replay once the resize that asks for it has settled. */
+  private scheduleReplay(): void {
+    if (this.resizeTimer !== undefined) clearTimeout(this.resizeTimer);
+    this.resizeTimer = setTimeout(() => {
+      this.resizeTimer = undefined;
+      this.replay();
+    }, this.resizeMs);
+    (this.resizeTimer as { unref?: () => void }).unref?.();
   }
 
   /**
@@ -812,12 +927,7 @@ export class DabblerTerminal implements vscode.Pseudoterminal {
   setDimensions(dimensions: vscode.TerminalDimensions): void {
     if (dimensions.columns === this.columns) return;
     this.columns = dimensions.columns;
-    if (this.resizeTimer !== undefined) clearTimeout(this.resizeTimer);
-    this.resizeTimer = setTimeout(() => {
-      this.resizeTimer = undefined;
-      this.replay();
-    }, this.resizeMs);
-    (this.resizeTimer as { unref?: () => void }).unref?.();
+    this.scheduleReplay();
   }
 
   /**
@@ -831,14 +941,21 @@ export class DabblerTerminal implements vscode.Pseudoterminal {
    */
   private replay(): void {
     this.erase();
-    this.emit(CLEAR_ALL);
+    this.writer.fire(CLEAR_ALL);
     this.atLineStart = true;
+    this.speaker = null;
     if (this.trimmed) {
-      this.emit(this.render(this.now(), "history-trimmed", { kept: "the most recent 4 MB" }));
+      this.emit(
+        this.render(this.now(), "history-trimmed", { kept: "the most recent 4 MB" }),
+        FRAMEWORK_VOICE,
+      );
     }
     for (const entry of this.history) {
-      if (entry.kind === "line") this.emit(this.render(entry.at, entry.event, entry.fields));
-      else this.emit(forTerminal(entry.bytes));
+      if (entry.kind === "line") {
+        this.emit(this.render(entry.at, entry.event, entry.fields), FRAMEWORK_VOICE);
+      } else {
+        this.emit(forTerminal(entry.bytes), entry.label);
+      }
     }
     this.draw();
   }
@@ -950,9 +1067,24 @@ export class DabblerTerminal implements vscode.Pseudoterminal {
       if (startedAfter(run.started_at, this.since)) this.started.fire(run.session_number);
     }
 
+    // The first look at a run says what the records say already happened,
+    // before it says where the run is now.
+    if (!this.looked) {
+      this.looked = true;
+      this.sayEarlier(run, runPath);
+    }
+
     if (run.phase !== undefined && run.phase !== this.phase) {
       this.phase = run.phase;
-      this.line("phase", { session: this.sessionLabel(run), phase: run.phase });
+      // The session is named when it changes and not on every phase: one
+      // session's phases are read under its first line, and the number on
+      // each of them was the same number every time.
+      const session = run.session_number ?? null;
+      this.line("phase", {
+        ...(session !== this.saidSession ? { session: this.sessionLabel(run) } : {}),
+        now: run.phase,
+      });
+      this.saidSession = session;
       // The end of the session, said as the end rather than as one more
       // phase. What the NEXT session's number is stays unsaid here: the
       // sequence skips cancelled numbers, that rule lives in the router's
@@ -1150,37 +1282,82 @@ export class DabblerTerminal implements vscode.Pseudoterminal {
   }
 
   /**
-   * This session's verification rounds, each said once.
+   * What the records say has already happened in this run's session, one
+   * dated line each, in the order it happened.
    *
-   * Replayed from the first row, because the file is this session's own and
-   * a terminal rebuilt mid-session should show the rounds it has already
-   * had -- the same reason the job logs are replayed.
+   * Three sources, each read once here and forward-only afterwards: this
+   * session's verification rounds, this session's rows of the repository's
+   * test runs, and every job log already in the run's directory -- named,
+   * with its exit if the job's status file says one, and NOT replayed. Its
+   * size is where reading starts, so only bytes a job writes from now on
+   * pass through. The job the record is carrying is left to `job-started`,
+   * which says it in the present tense.
+   *
+   * Each line carries the record's own clock rather than the moment this
+   * terminal happened to open: a verdict recorded at 21:06 is said at 21:06.
    */
-  private drainRounds(file: string): void {
-    for (const row of this.newRows(file, true)) {
-      this.line("verify", {
-        round: String(row["round"] ?? "?"),
-        verdict: String(row["verdict"] ?? "?"),
-        verifier: String(row["verifier_model"] ?? ""),
+  private sayEarlier(run: RunRecord, runPath: string): void {
+    const now = this.now();
+    const runDir = path.dirname(path.dirname(runPath));
+    const earlier: Array<{ at: Date; event: string; fields: Record<string, string> }> = [];
+    for (const row of this.newRows(path.join(runDir, ROUNDS_FILENAME), true)) {
+      earlier.push({ at: recordedAt(row["recorded_at"]) ?? now, event: "verify", fields: roundFields(row) });
+    }
+    for (const row of this.newRows(path.join(this.repoRoot, RUNS_REL, TEST_RUNS_FILENAME), true)) {
+      if (row["sessionNumber"] !== run.session_number) continue;
+      earlier.push({ at: recordedAt(row["recordedAt"]) ?? now, event: "tests", fields: testRunFields(row) });
+    }
+    const current = run.job?.log ? path.join(this.repoRoot, ...run.job.log.split("/")) : null;
+    const dir = path.join(path.dirname(runPath), JOBS_DIRNAME);
+    let names: string[] = [];
+    try {
+      names = fs.readdirSync(dir);
+    } catch {
+      // No jobs yet: nothing has run.
+    }
+    for (const name of names) {
+      if (!name.endsWith(".log")) continue;
+      const full = path.join(dir, name);
+      let size: number;
+      let at: Date;
+      try {
+        const stat = fs.statSync(full);
+        size = stat.size;
+        at = stat.mtime;
+      } catch {
+        continue;
+      }
+      this.logOffsets.set(full, size);
+      this.announced.add(full);
+      const base = jobLabel(full);
+      if (full === current) continue;
+      let exit = "";
+      try {
+        const status: unknown = JSON.parse(fs.readFileSync(path.join(dir, `${base}.status.json`), "utf8"));
+        if (status !== null && typeof status === "object" && "exit" in status) {
+          exit = String((status as { exit: unknown }).exit ?? "");
+        }
+      } catch {
+        // No status: the job did not finish, or nothing recorded that it did.
+      }
+      earlier.push({
+        at,
+        event: "earlier-job",
+        fields: { name: base, log: relativeToRoot(this.repoRoot, full), exit },
       });
     }
+    earlier.sort((left, right) => left.at.getTime() - right.at.getTime());
+    for (const item of earlier) this.line(item.event, item.fields, item.at);
   }
 
-  /**
-   * Test runs, from wherever the file stood when this terminal first looked.
-   *
-   * NOT replayed: the file is the repository's, not the session's, and it
-   * holds every run of every session. What a terminal opened now should say
-   * is what happens now.
-   */
+  /** This session's verification rounds, each said once, as they land. */
+  private drainRounds(file: string): void {
+    for (const row of this.newRows(file, true)) this.line("verify", roundFields(row));
+  }
+
+  /** Test runs as they are recorded; the first look already said this session's. */
   private drainTestRuns(file: string): void {
-    for (const row of this.newRows(file, false)) {
-      this.line("tests", {
-        suite: String(row["suite"] ?? "?"),
-        stage: String(row["stage"] ?? ""),
-        outcome: String(row["outcome"] ?? "?"),
-      });
-    }
+    for (const row of this.newRows(file, false)) this.line("tests", testRunFields(row));
   }
 
   /**
@@ -1264,8 +1441,9 @@ export class DabblerTerminal implements vscode.Pseudoterminal {
       return;
     }
     if (appended === "") return;
-    this.remember({ kind: "raw", bytes: appended });
-    this.say(forTerminal(appended));
+    const label = jobLabel(logPath);
+    this.remember({ kind: "raw", label, bytes: appended });
+    this.say(forTerminal(appended), label);
   }
 
   private sessionLabel(run: RunRecord): string {
@@ -1278,10 +1456,9 @@ export class DabblerTerminal implements vscode.Pseudoterminal {
    * One `hh:mm:ss event key=value` line, kept for a re-layout and said
    * in the colours that say what it is.
    */
-  private line(event: string, fields: Record<string, string> = {}): void {
-    const at = this.now();
+  private line(event: string, fields: Record<string, string> = {}, at: Date = this.now()): void {
     this.remember({ kind: "line", at, event, fields });
-    this.say(this.render(at, event, fields));
+    this.say(this.render(at, event, fields), FRAMEWORK_VOICE);
   }
 
   /**

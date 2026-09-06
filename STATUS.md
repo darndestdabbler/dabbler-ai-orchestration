@@ -1,6 +1,226 @@
-# STATUS — 99 closed VERIFIED: csv-model's last two sessions answered, and the solution-layout decision is on the record; the next block is the monorepo-first module work
+# STATUS — HANDOFF to session 100: plan the modules block and start building it; single-module solutions stay the default and must work unchanged
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
+
+> ## HANDOFF, 2026-09-06 — what the next session is asked to do, and everything it needs
+>
+> **The ask.** Plan the modules block as numbered sessions appended to
+> `docs/sessions/session-plan.md` (session 100 onward), then start
+> implementing it with session 100 under the pull loop. The design is
+> decided and recorded; do not re-open it. **One requirement the design
+> records were written without and that governs every session: a
+> solution with ONE module must keep working exactly as today, with
+> nothing new asked of its developer.** csv-model is such a solution, and
+> so is every repository bootstrapped so far. Multi-module behaviour
+> switches on when `docs/modules.yaml` declares more than one module;
+> with one, the repository *is* the module — no focused clone, no
+> packages folder, no contracts, the run of record is the module's own
+> suites, the Solution Explorer shows one module row. Bootstrap must
+> therefore write a valid one-module manifest by default (one entry,
+> its `codeRoots` the repository) so that nothing changes for the
+> existing shape, and a single-module repository may still be one member
+> of a many-repository solution through the secondary mode.
+>
+> **Read first, in this order.** `docs/design/consults/round8-synthesis.md`
+> (the decision as it stands; it amends round 7, which amends round 6 —
+> read those two for the reasoning, not for the design),
+> `docs/design/developer-walkthrough-modules.md` (the developer's day,
+> step by step, with what exists and what the block adds),
+> `docs/design/module-checkout-poc.md` (the compile story, proven in 16 s
+> at `C:\temp\modules-poc`). The advisors' full answers are beside the
+> syntheses (`round6-*`, `round7-*`, `round8-*`); Sol's round 8 is the
+> most concrete on the testing surface.
+>
+> **The design in ten lines.** A trunk monorepo, `modules/<slug>/`. A
+> solution plan first (`docs/planning/solution-plan.md`) as a reviewed
+> hypothesis, written by session 001 and challenged by 002. Sibling
+> modules are consumed as **committed packages** from one tracked folder
+> (`packages/`, relative path in `nuget.config`, pins in
+> `Directory.Packages.props`, immutable sortable dev versions, a size
+> ceiling with LFS above it). Each module's **contract is designed**: an
+> abstractions package, a separate `<Module>.ContractTests` package the
+> implementer's tests inherit, consumer-owned compatibility tests, and a
+> notes page under `modules/<slug>/contract/`; generation from the built
+> assembly is a marked fallback. A session runs in a **disposable
+> blob-filtered sparse clone** holding its module, the root build files,
+> every dependency's contract and package, and the reverse consumers'
+> contract-test assets — no sibling implementation on disk or in the
+> object store. The engine's working directory is that clone (Claude
+> Code also gets `permissions.blockReadsOutsideWorkingDirectories`). A
+> sibling's source is reached only by a **grant** (`dabbler module grant
+> <sibling> --reason … [--debug]`, an owed decision the operator answers;
+> `revoke` narrows; a temporary project-reference overlay lives outside
+> committed files; Source Link is off in engine sessions). Cross-module
+> work is `modules: [a, b]` with a reason. The **candidate package and
+> contract are generated before the run of record**, and the run of
+> record is **one impact plan** shared with `dabbler affected`: the
+> changed module's unit and provider-contract suites plus each transitive
+> consumer's consumer-contract suite against the candidate, per-suite
+> freshness as it exists today; the land commits the tested bytes
+> unchanged, by direct push for a team of one or the existing candidate
+> gate for a team. The verifier **refuses** out-of-scope reads; an
+> **exposure manifest** (sibling implementation bytes present, target
+> zero; grants; files changed outside scope) is recorded at start and
+> close. Bundling is recorded in `release/<bundle>/bundle.yaml`, never
+> executed; module-keyed `packaging` blocks under `modules:` in the one
+> root `dabbler.yaml`. Encryption of sibling source is a hardened custody
+> profile designed only for a named customer. Containers likewise.
+>
+> **What exists in this tree to build on — extend these, do not build
+> beside them.**
+> - `docs/modules.yaml` and `packages/router/src/modules.ts`
+>   (`ModuleEntry {slug, title, planPath, codeRoots, touches,
+>   specSections, contextAssets}`, unknown keys refused), written by
+>   `dabbler modules create` and the extension's **New Module**
+>   (`tools/dabbler-ai-orchestration/src/commands/newModule.ts`), read by
+>   `approvedPlan.ts` to flag `integration-module` risk from `codeRoots`.
+>   The block adds `dependsOn`, `package`, `contract`, `kind`
+>   (`shared-types` | `library` | `application`) and reverse consumers
+>   derived, never declared.
+> - The verifier's scope and record: `agency.ts` `sessionScope`,
+>   `inScope`, `recordForRound` (counts today; must refuse), the
+>   exposure fields go beside `fidelity_measurable` in
+>   `schemas/rounds.schema.json` + `src/generated/rounds.ts`.
+> - Test evidence: `testEvidence.ts` — per-suite freshness over `covers`
+>   (`enumerateSurface`, `evaluateFreshness`) exists; the run of record
+>   in `drive.ts` (`expensiveSuites()`, ~line 2373) runs every expensive
+>   suite whole and is what the impact plan replaces; `checks.ts`
+>   `selectTests` selects by test FILE (`isTestFile` over
+>   `test_roots`/`test_glob`) — selection needs a module form derived
+>   from the manifest; "required for close" needs its own word beside
+>   `expensive` (a non-expensive suite is skipped by the close gate,
+>   ~line 305).
+> - The land: `drive.ts` `phaseLand` (direct push) and candidate mode
+>   (`release.gate: candidate` in `dabbler.yaml`, `candidateTrunk`,
+>   `phaseGateWait`) — the two team shapes, both kept.
+> - Owed decisions: `owedDecisions.ts`, `dabbler owed`, the extension's
+>   **Answer Owed Decision** — the grant is a new subject for them.
+> - Packaging: `packaging.ts` (`loadDeclaration`, `feedTakesCredential`,
+>   the `declared` field from session 99), `cli/packaging.ts`;
+>   `bootstrap/detect.ts` `detectPackaging` now reads a root solution
+>   file. Module-keyed blocks are an extension of this, not a rewrite.
+> - Contracts: `contractdoc.ts` and `dabbler contractdoc` ("render a
+>   module's contract from its declaration") — repoint to the designed
+>   contract bundle.
+> - The secondary mode, kept as is: `solutionDeps.ts`
+>   (`solution-dependencies.json`), `dabbler deps
+>   check/show/feeds/source/restore/locate/clone/scaffold`,
+>   `resolution.ts` (source mode; keep, it is the debugging hatch), the
+>   plan's `repositories` member (`drive.ts` ~line 1624), `dabbler
+>   workspace`.
+> - The Solution Explorer: `tools/dabbler-ai-orchestration/src/providers/
+>   solutionTreeModel.ts` (node kinds `solution`, `component`,
+>   `contract`, `usedBy`, `consumer`, `progress`, `external*`,
+>   `member*`; drift kinds `behind`/`ahead`/`feed`/`split`), rendering
+>   `.dabbler/solution/projection.json` written by
+>   `packages/router/src/workflow/project.ts`. Components become modules;
+>   `progress` goes; new rows: package + version, contract, run-of-record
+>   status, who pins it, grants, bundles, *shipped in*.
+>
+> **What to delete, and when.** The six-step component workflow:
+> `packages/router/src/solution.ts`, `cli/workflow.ts`,
+> `workflow/commands.ts`, `workflow/log.ts`, `workflow/terminal.ts`,
+> `stepreview.ts`, `testphase.ts`, their tests, the `solution.yaml`
+> scaffold in `bootstrap/`, and the extension's rendering of its step
+> state — after its decompose/contracts prompts are moved into the
+> session 001/002 templates. **Keep `workflow/project.ts`** (the
+> projection writer the Explorer reads) or move it; keep
+> `contractdoc.ts`. About 3,600 lines go; this is session 100's largest
+> single change and the one that makes room.
+>
+> **The nine sessions (round 8's list; → marks a real dependency).**
+> 1. Solution plan and module manifest: the manifest extension with the
+>    single-module default; bootstrap's 001/002 rewritten around the
+>    solution plan; the six-step workflow deleted and its prompts moved.
+> 2. Module configuration, exception schema, test-impact declarations
+>    → 1: `modules:` in the root `dabbler.yaml` (per-module packaging,
+>    tests, contracts, allowed shared files), `modules: [a, b]` + reason,
+>    "required for close", module-form selection.
+> 3. Designed contracts and contract-test source → 1: abstractions,
+>    `ContractTests` packages, consumer compatibility tests, the notes
+>    page; `contractdoc` repointed; generation as the marked fallback
+>    (.NET first).
+> 4. Committed immutable packages → 3: the tracked feed folder, sortable
+>    dev versions, the ceiling and LFS above it, restore that refuses to
+>    rebuild an absent sibling, exact source/contract/package
+>    correspondence.
+> 5. The focused checkout → 1–4: `dabbler module open <slug>` (the
+>    disposable filtered clone, `.slnf`, working directory, the Claude
+>    Code block), reverse-consumer contract assets in the cone, and the
+>    **Windows preflight** (clone, restore, antivirus timing on the
+>    operator's machine; a persistent per-module clone reset at open is
+>    the fallback if a clone per session is too slow).
+> 6. Module-scoped sessions, hard verifier scope, exposure manifest,
+>    grants → 5: `grant`/`revoke` with the overlay; the Work Explorer
+>    grouped by module again.
+> 7. The impact plan and the selected run of record → 2, 4, 5: one plan
+>    for `affected` and the driver; candidate bytes first; reached suites
+>    only.
+> 8. The atomic land → 7: tested bytes are the landed bytes; drift; the
+>    exposure ceiling; direct push or the candidate gate per the
+>    manifest; bundles recorded.
+> 9. Maven parity and the hardened profiles → 1–4, 7.
+>
+> Each session ends as every session does: verification, the run of
+> record, the land, the close. The single-module requirement is a test
+> in every one of them: csv-model's shape (one module, `dotnet test`
+> whole) must pass through unchanged, and the walkthrough test
+> (`walk-session.test.ts`) is that repository's stand-in here.
+>
+> **How to plan it.** Append the sessions to `docs/sessions/session-plan.md`
+> in the shape of sessions 90–99 (a header `### Session 100 of 108: …`,
+> an italic preamble saying what is confirmed in the tree, numbered
+> steps with one test per behaviour, "Affected; verify; full suite as
+> `final-full`; close" last, and a test-budget paragraph). Commit the
+> plan with a plain message, then `dabbler session start --sessions-dir
+> docs/sessions --engine claude-code --provider anthropic`, then `dabbler
+> session next` until `done`. Run the router from this tree
+> (`node packages/router/dist/dabbler.cjs`), which is 2.0.3.
+>
+> **Operating notes learned in session 99, so they cost nothing twice.**
+> - The land prefixes `Session N:` onto the plan's `task` paragraph; a
+>   task that begins "Session N:" lands as "Session N: Session N: …".
+>   Start the task with the work.
+> - A step's report names only files that changed; a file whose only
+>   change was line endings is *unchanged* to the driver (git normalises
+>   them), whatever `git status` shows.
+> - `dabbler session plan amend --step X --files … --checks-file …
+>   --reason … --approver …` widens a step mid-session; a schema change
+>   drags `schemas/*.json` + `src/generated/*.ts` into the step
+>   (regenerate with `node packages/router/scripts/run-ts.mjs
+>   packages/router/scripts/generate-types.ts`; the `compile` control
+>   checks freshness).
+> - A `wait` is answered by a later `next`; the honest thing to wait on
+>   is the job's `<job>.status.json` mtime under
+>   `.dabbler/runs/s<N>/driver/jobs/`, not repeated `next` calls. The
+>   run-of-record wait now derives its number from the suite's last
+>   duration.
+> - Nothing may touch the tree between a report and the `next` that
+>   judges it, nor after the last step until the close.
+> - A version bump is `version.json` → `npm run stamp:version`, never the
+>   manifests (the run of record went red on exactly this). After the
+>   session: bump, `npm run build`, `npm run package -w
+>   dabbler-ai-orchestration`, `code --install-extension <vsix> --force`,
+>   commit "Version X: …". The framework runs the DIST.
+> - `docs/design/consults/` holds briefs and answers; the consult script
+>   is one `route()` call with `transport: "api"` (see any round's
+>   header for the model and tokens).
+>
+> **Owed, small, for session 100 to sweep or defer explicitly.**
+> `cli/packaging.ts` `explain()` prints "Using the credential named" with
+> nothing after it for a folder feed without a secret; `FIDELITY_UNREADABLE`
+> could say "missing" alone now that a directory is a listing; the
+> doubled `Session N:` prefix (the land could refuse to double it);
+> `job-finished-stale` after a cap-clean settle (from 98); csv-model's own
+> re-bootstrap onto 2.0.3 is one command the operator runs there.
+>
+> **Rules in force.** The unattended-work directive (decide by the six
+> rules, record which decided it, do not wait); no-skip cross-provider
+> verification every session; state files and `.dabbler/runs/` are
+> router-written only; the ground rules at the top of `AGENTS.md` are
+> what returns when the replacement works — no new module without
+> deleting one is easy this block, the six-step workflow pays for all of
+> them.
 
 > ## THE NEXT BLOCK, DECIDED 2026-09-06 — one repository, one module per session, a solution plan first
 >

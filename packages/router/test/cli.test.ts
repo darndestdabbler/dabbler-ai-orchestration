@@ -11,6 +11,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it } from "node:test";
 
+import { moduleVerb } from "../src/cli/module.ts";
 import { modulesVerb } from "../src/cli/modules.ts";
 import { packagingVerb } from "../src/cli/packaging.ts";
 import { HANDLERS } from "../src/cli/registry.ts";
@@ -314,6 +315,19 @@ describe("dabbler modules", () => {
     );
     assert.equal(result.code, 2);
     assert.match(result.err, /not a directory/);
+  });
+});
+
+describe("dabbler module", () => {
+  it("refuses a subcommand it does not have, and a contract in a single-module solution", async () => {
+    const unknown = await run(() => moduleVerb(["pack", tempDir("cli-")]));
+    assert.equal(unknown.code, 2);
+    assert.match(unknown.err, /is not a subcommand/);
+    // The repository is the module: there is no seam to scaffold.
+    const single = tempDir("cli-");
+    const refused = await run(() => moduleVerb(["contract", "whole", "--workspace-root", single]));
+    assert.equal(refused.code, 1);
+    assert.match(refused.err, /single-module solution/);
   });
 });
 

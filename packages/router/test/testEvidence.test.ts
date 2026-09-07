@@ -162,6 +162,33 @@ describe("the suite declaration", () => {
     );
     assert.equal(single.ok, true);
   });
+
+  it("puts a module's contract bundle under its suites' covers by derivation, in a multi-module shape only", () => {
+    const shape = {
+      multi: true,
+      implicit: false,
+      modules: [{ slug: "model", codeRoots: ["modules/model"], dependsOn: [] }],
+    } as unknown as NonNullable<Parameters<typeof loadSuitesChecked>[1]>["shape"];
+    const declared = { name: "model-unit", command: "dotnet test", covers: ["modules/model/src/"], expensive: true, module: "model" };
+    const multi = loadSuitesChecked({ testing: { suites: [declared] } }, { shape });
+    assert.deepEqual(multi.suites[0]?.covers, ["modules/model/src/", "modules/model/contract/"]);
+    // Declared already: not doubled. Single-module: not derived.
+    const already = loadSuitesChecked(
+      { testing: { suites: [{ ...declared, covers: ["modules/model/"] , module: "model" }] } },
+      { shape },
+    );
+    assert.deepEqual(already.suites[0]?.covers, ["modules/model/", "modules/model/contract/"]);
+    const explicit = loadSuitesChecked(
+      { testing: { suites: [{ ...declared, covers: ["modules/model/src/", "modules/model/contract/"] }] } },
+      { shape },
+    );
+    assert.deepEqual(explicit.suites[0]?.covers, ["modules/model/src/", "modules/model/contract/"]);
+    const single = loadSuitesChecked(
+      { testing: { suites: [declared] } },
+      { shape: { ...(shape as object), multi: false } as typeof shape },
+    );
+    assert.deepEqual(single.suites[0]?.covers, ["modules/model/src/"]);
+  });
 });
 
 describe("which suites a change affects", () => {

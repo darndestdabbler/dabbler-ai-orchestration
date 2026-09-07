@@ -1,12 +1,13 @@
 // Contract rendering: the sections a reader needs, and the refusals.
 
 import assert from "node:assert/strict";
-import { writeFileSync } from "node:fs";
+import { rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it } from "node:test";
 
-import { type ContractGraph, ContractError, load, render } from "../src/contractdoc.ts";
-import { tempDir } from "./support/answers.ts";
+import { CONTRACT_BEGIN, type ContractGraph, ContractError, load, render, renderModuleContract } from "../src/contractdoc.ts";
+import { solutionShape } from "../src/modules.ts";
+import { seed, tempDir } from "./support/answers.ts";
 
 const CONTRACT: Record<string, unknown> = {
   component: "csv-parser",
@@ -76,6 +77,130 @@ describe("rendering", () => {
 
   it("says not to hand-edit it", () => {
     assert.ok(render(CONTRACT).includes("Do not edit by hand"));
+  });
+});
+
+describe("the module form", () => {
+  /** A persister with a designed seam and a model whose package is its own abstraction. */
+  function solution(contract: string, withNotes = true): { root: string; shape: ReturnType<typeof solutionShape> } {
+    const root = tempDir("bundle-");
+    seed(root, {
+      "docs/modules.yaml": [
+        "modules:",
+        "- slug: model",
+        "  package: CsvModel",
+        "  codeRoots: [modules/model]",
+        "- slug: persister",
+        "  package: CsvPersister",
+        `  contract: ${contract}`,
+        "  dependsOn: [model]",
+        "  codeRoots: [modules/persister]",
+        "",
+      ].join("\n"),
+      "modules/persister/src/CsvPersister.Abstractions/CsvPersister.Abstractions.csproj": "<Project />\n",
+      "modules/persister/src/CsvPersister.Abstractions/IPersister.cs": [
+        "namespace CsvPersister.Abstractions;",
+        "",
+        "/// <summary>Keeps persons; a later save of the same name replaces the earlier one.</summary>",
+        "public interface IPersister",
+        "{",
+        "    /// <summary>Saves or replaces.</summary>",
+        "    void Save(Person person);",
+        "    /// <summary>The person by name, or null.</summary>",
+        "    [Pure]",
+        "    public Person? Find(string firstName, string lastName);",
+        "    public int Count { get; }",
+        "}",
+        "",
+      ].join("\n"),
+      "modules/persister/src/CsvPersister/CsvPersister.csproj": "<Project />\n",
+      "modules/persister/src/CsvPersister/InMemoryPersister.cs": "public sealed class InMemoryPersister {}\n",
+      "modules/persister/tests/CsvPersister.Tests/PersisterTests.cs": "public class PersisterTests {}\n",
+      ...(withNotes
+        ? {
+            "modules/persister/contract/README.md": "# CsvPersister — what it promises\n\nSaving twice keeps one.\n",
+            "modules/persister/contract/contract.yaml": "component: persister\noperations:\n  - name: Save\n    postconditions: [\"the person is findable by name\"]\n",
+          }
+        : {}),
+    });
+    return { root, shape: solutionShape(root) };
+  }
+
+  it("reads a designed surface from the abstractions project's source, with its summaries, and marks it designed", () => {
+    const { root, shape } = solution("designed");
+    const bundle = renderModuleContract(root, shape, "persister");
+    assert.equal(bundle.mode, "designed");
+    assert.equal(bundle.apiPath, "modules/persister/contract/CsvPersister.api.md");
+    // The notes page keeps the author's prose and carries the rendering of
+    // the contract.yaml beside it between markers -- the file form's
+    // renderer, with the module's place in the graph -- regenerated in
+    // place rather than appended twice; without a yaml, the page is the
+    // author's alone.
+    assert.equal(bundle.notesPath, "modules/persister/contract/README.md");
+    assert.equal(bundle.notesRendered, true);
+    assert.match(bundle.notes, /Saving twice keeps one/);
+    assert.match(bundle.notes, /the person is findable by name/);
+    assert.match(bundle.notes, /persister --> model/);
+    assert.ok(bundle.notes.indexOf("Saving twice keeps one") < bundle.notes.indexOf(CONTRACT_BEGIN));
+    writeFileSync(join(root, "modules/persister/contract/README.md"), bundle.notes, "utf8");
+    const again = renderModuleContract(root, shape, "persister");
+    assert.equal(again.notes.split(CONTRACT_BEGIN).length, 2);
+    assert.equal(again.notes, bundle.notes);
+    const handWritten = solution("designed");
+    rmSync(join(handWritten.root, "modules/persister/contract/contract.yaml"));
+    const kept = renderModuleContract(handWritten.root, handWritten.shape, "persister");
+    assert.equal(kept.notesRendered, false);
+    assert.match(kept.notes, /Saving twice keeps one/);
+    assert.doesNotMatch(kept.notes, /dabbler:contract/);
+    const api = bundle.api ?? "";
+    assert.match(api, /^# CsvPersister — contract surface/);
+    assert.match(api, /\*Designed: read from the abstractions project's source/);
+    assert.match(api, /`public interface IPersister` — Keeps persons; a later save of the same name replaces the earlier one\./);
+    // An interface member is public without saying so, and is read with
+    // its summary; an attribute between the two keeps the summary.
+    assert.match(api, /`void Save\(Person person\);` — Saves or replaces\./);
+    assert.match(api, /`public Person\? Find\(string firstName, string lastName\);` — The person by name, or null\./);
+    assert.match(api, /`public int Count`/);
+    // The implementation and the tests are not the surface.
+    assert.doesNotMatch(api, /InMemoryPersister|PersisterTests/);
+    // A declared seam with no notes page is refused by path -- with or
+    // without a contract.yaml beside where the page should be, because a
+    // definition renders INTO the page and is not one.
+    const bare = solution("designed", false);
+    assert.throws(
+      () => renderModuleContract(bare.root, bare.shape, "persister"),
+      /no notes page at modules\/persister\/contract\/README\.md/,
+    );
+    const yamlAlone = solution("designed");
+    rmSync(join(yamlAlone.root, "modules/persister/contract/README.md"));
+    assert.throws(
+      () => renderModuleContract(yamlAlone.root, yamlAlone.shape, "persister"),
+      /no notes page at modules\/persister\/contract\/README\.md.*not one/,
+    );
+  });
+
+  it("marks a generated surface as shape rather than behaviour, and refuses without a generator", () => {
+    const { root, shape } = solution("generated");
+    assert.throws(
+      () => renderModuleContract(root, shape, "persister"),
+      /names no modules\.persister\.contract\.generate/,
+    );
+    const ran: string[][] = [];
+    const bundle = renderModuleContract(root, shape, "persister", {
+      generate: ["dotnet", "genapi", "modules/persister"],
+      runGenerate: (argv) => {
+        ran.push([...argv]);
+        return "public interface IPersister {}\n";
+      },
+    });
+    assert.deepEqual(ran, [["dotnet", "genapi", "modules/persister"]]);
+    assert.match(bundle.api ?? "", /\*Generated from the built assembly — shape, not behaviour\./);
+    assert.match(bundle.api ?? "", /public interface IPersister \{\}/);
+    // A package contract is its notes page and nothing else.
+    const plain = solution("package");
+    const notesOnly = renderModuleContract(plain.root, plain.shape, "persister");
+    assert.equal(notesOnly.api, null);
+    assert.equal(notesOnly.apiPath, null);
   });
 });
 

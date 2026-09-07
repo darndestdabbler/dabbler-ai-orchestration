@@ -441,6 +441,12 @@ testing:
         select:
           - packages/router/test/projection.test.ts
           - packages/router/test/bootstrap.test.ts
+      # The ecosystem seam: which of .NET and Maven a module is, and every
+      # decision that depends on it.
+      - when: packages/router/src/ecosystem.ts
+        select:
+          - packages/router/test/ecosystem.test.ts
+          - packages/router/test/contractdoc.test.ts
       - when: packages/router/src/pythonJson.ts
         select:
           - packages/router/test/lockfile.test.ts

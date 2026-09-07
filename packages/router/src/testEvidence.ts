@@ -379,10 +379,22 @@ export function loadSuitesChecked(
         }
       }
     }
+    // A module's contract bundle -- the notes page and the surface -- is
+    // part of what its suites prove, so a change to it moves the suites'
+    // freshness the way a source change does. Derived here for a
+    // multi-module shape only; a single-module repository has no bundle
+    // and is handed nothing.
+    const derivedCovers: string[] = [];
+    if (shape !== null && shape.multi && moduleSlug !== null) {
+      const bundle = `modules/${moduleSlug}/contract/`;
+      if (!(covers as string[]).some((cover) => normaliseRel(cover) === normaliseRel(bundle))) {
+        derivedCovers.push(bundle);
+      }
+    }
     suites.push({
       name: name.trim(),
       command: command.trim(),
-      covers: covers as string[],
+      covers: [...(covers as string[]), ...derivedCovers],
       expensive,
       runsWhole: Boolean(entry["runs_whole"]),
       requiredForClose: typeof required === "boolean" ? required : expensive,

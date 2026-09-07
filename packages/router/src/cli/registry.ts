@@ -16,6 +16,7 @@ import { releaseVerb } from "./release.ts";
 import { discoveryVerb } from "./discovery.ts";
 import { factsVerb } from "./facts.ts";
 import { metricsVerb } from "./metrics.ts";
+import { moduleVerb } from "./module.ts";
 import { modulesVerb } from "./modules.ts";
 import { owedVerb } from "./owed.ts";
 import { packagingVerb } from "./packaging.ts";
@@ -42,6 +43,7 @@ export const HANDLERS: Readonly<Record<string, VerbHandler>> = {
   discovery: discoveryVerb,
   facts: factsVerb,
   metrics: metricsVerb,
+  module: moduleVerb,
   modules: modulesVerb,
   owed: owedVerb,
   packaging: packagingVerb,

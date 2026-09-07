@@ -8,10 +8,14 @@
 // box with drifted documentation is worse than one with none, because people
 // trust it.
 
-import { statSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { existsSync, statSync } from "node:fs";
+import { join } from "node:path";
 
 import { parse as parseYaml } from "yaml";
 
+import { EcosystemError, ecosystemOf, type SurfaceEntry } from "./ecosystem.ts";
+import { consumersOf, type ModuleEntry, type SolutionShape } from "./modules.ts";
 import { readText } from "./textfile.ts";
 
 /**
@@ -211,4 +215,212 @@ export function render(
       "regenerate with `dabbler contractdoc`.*",
   );
   return `${out.join("\n")}\n`;
+}
+
+// --- The module form ------------------------------------------------------------
+
+/** Where a module's contract bundle lives, relative to the root. */
+export function contractDirOf(slug: string): string {
+  return `modules/${slug}/contract`;
+}
+
+/** The notes page: the human half of the bundle, always. */
+export function notesPageOf(slug: string): string {
+  return `${contractDirOf(slug)}/README.md`;
+}
+
+/** The surface page, for a designed or generated contract. */
+export function apiPageOf(slug: string, packageId: string): string {
+  return `${contractDirOf(slug)}/${packageId}.api.md`;
+}
+
+/**
+ * The markers around the part of the notes page that is rendered from
+ * `contract.yaml`. Everything outside them is the author's -- the
+ * examples, what callers must not depend on, the prose a definition cannot
+ * carry -- and is kept across every regeneration; the block between them
+ * is replaced whole.
+ */
+export const CONTRACT_BEGIN =
+  "<!-- dabbler:contract begin -- rendered from contract.yaml beside this page; edit the yaml, not this block -->";
+export const CONTRACT_END = "<!-- dabbler:contract end -->";
+
+/**
+ * The notes page with the rendering of `contract.yaml` composed into it:
+ * between the markers when the page already carries them, appended once
+ * when it does not. The page itself is the author's and must exist -- a
+ * definition alone is not a notes page.
+ */
+export function composeNotes(existing: string, rendered: string): string {
+  const block = `${CONTRACT_BEGIN}\n${rendered.trimEnd()}\n${CONTRACT_END}`;
+  const begin = existing.indexOf(CONTRACT_BEGIN);
+  const end = existing.indexOf(CONTRACT_END);
+  if (begin >= 0 && end > begin) {
+    return `${existing.slice(0, begin)}${block}${existing.slice(end + CONTRACT_END.length)}`;
+  }
+  return `${existing.trimEnd()}\n\n${block}\n`;
+}
+
+export interface ModuleContractOptions {
+  /** `modules.<slug>.contract.generate` from dabbler.yaml, for the generated fallback. */
+  readonly generate?: readonly string[] | null;
+  /** How the generator runs; a test hands in a scripted one. */
+  readonly runGenerate?: (argv: readonly string[], cwd: string) => string;
+}
+
+export interface ModuleContract {
+  readonly slug: string;
+  readonly mode: "designed" | "package" | "generated";
+  /**
+   * The notes page. Rendered from a `contract.yaml` beside it when the
+   * module keeps one -- the file form's renderer, so the page cannot drift
+   * from its definition -- and read as written otherwise.
+   */
+  readonly notes: string;
+  readonly notesPath: string;
+  /** True when `notes` was rendered from `contract.yaml` and is to be written back. */
+  readonly notesRendered: boolean;
+  /** The surface page, for `designed` and `generated`; null for `package`. */
+  readonly api: string | null;
+  readonly apiPath: string | null;
+}
+
+function runGenerator(argv: readonly string[], cwd: string): string {
+  const [program, ...args] = argv;
+  const result = spawnSync(program as string, args, { cwd, encoding: "utf8", windowsHide: true });
+  if (result.error || result.status !== 0) {
+    throw new ContractError(
+      `the surface generator '${argv.join(" ")}' failed` +
+        (result.status !== null && result.status !== undefined ? ` (exit ${result.status})` : "") +
+        (result.error ? `: ${result.error.message}` : "") +
+        (result.stderr ? `\n${result.stderr.trim()}` : ""),
+    );
+  }
+  return result.stdout;
+}
+
+function surfacePage(packageId: string, marker: string, body: string): string {
+  return [`# ${packageId} — contract surface`, "", marker, "", body.trimEnd(), ""].join("\n");
+}
+
+function renderSurface(entries: readonly SurfaceEntry[]): string {
+  if (entries.length === 0) return "*No public declaration was found.*";
+  const out: string[] = [];
+  let current = "";
+  for (const entry of entries) {
+    if (entry.file !== current) {
+      current = entry.file;
+      if (out.length > 0) out.push("");
+      out.push(`## \`${entry.file}\``, "");
+    }
+    out.push(`- \`${entry.declaration}\`${entry.summary ? ` — ${entry.summary}` : ""}`);
+  }
+  return out.join("\n");
+}
+
+/**
+ * A module's contract bundle, rendered from what the tree holds.
+ *
+ * The notes page is the human half and must exist for any declared
+ * contract -- a module that declares a seam and has no page is refused by
+ * path, because the page is what the block's other sessions read instead
+ * of a sibling's source. A `contract.yaml` beside it is rendered through
+ * the file form and appended. The surface page is the machine half:
+ * `designed` reads the abstractions project's source through the
+ * ecosystem seam and says so; `generated` runs the declared generator and
+ * says what a generated surface is -- shape, not behaviour; `package`
+ * has no surface page, the package being its own abstraction.
+ */
+export function renderModuleContract(
+  root: string,
+  shape: SolutionShape,
+  slug: string,
+  options: ModuleContractOptions = {},
+): ModuleContract {
+  const entry = shape.modules.find((module) => module.slug === slug);
+  if (entry === undefined) {
+    throw new ContractError(`docs/modules.yaml declares no module '${slug}'`);
+  }
+  const mode = entry.contract;
+  if (mode === null) {
+    throw new ContractError(
+      `module '${slug}' declares no contract; give it \`contract: designed\`, \`package\` or ` +
+        "`generated` in docs/modules.yaml",
+    );
+  }
+  const notesPath = notesPageOf(slug);
+  const yamlPath = join(root, contractDirOf(slug), "contract.yaml");
+  const packageId = entry.package ?? slug;
+  // The notes page is the author's and must exist: a declared seam with no
+  // page is refused by path, whatever else sits beside it. When the module
+  // keeps a contract.yaml, the definition's rendering is composed into the
+  // page between markers -- the author's prose stays, the block is
+  // regenerated.
+  if (!existsSync(join(root, notesPath))) {
+    throw new ContractError(
+      `module '${slug}' declares contract: ${mode} and has no notes page at ${notesPath}; ` +
+        `write it, or scaffold it with \`dabbler module contract ${slug}\`` +
+        (existsSync(yamlPath) ? " (a contract.yaml beside it is rendered into the page, and is not one)" : ""),
+    );
+  }
+  const existing = readText(join(root, notesPath));
+  let notes = existing;
+  let notesRendered = false;
+  if (existsSync(yamlPath)) {
+    const graph: ContractGraph = {
+      dependsOn: [...entry.dependsOn],
+      usedBy: consumersOf(shape.modules, slug),
+    };
+    notes = composeNotes(existing, render(load(yamlPath), graph));
+    notesRendered = true;
+  }
+  const base = { slug, notes, notesPath, notesRendered };
+  if (mode === "package") {
+    return { ...base, mode, api: null, apiPath: null };
+  }
+  const apiPath = apiPageOf(slug, packageId);
+  if (mode === "designed") {
+    let surface: SurfaceEntry[];
+    try {
+      surface = ecosystemOf(root, entry).readSurface(root, entry, packageId);
+    } catch (error) {
+      if (error instanceof EcosystemError) throw new ContractError(error.message);
+      throw error;
+    }
+    return {
+      ...base,
+      mode,
+      apiPath,
+      api: surfacePage(
+        packageId,
+        "*Designed: read from the abstractions project's source, with its doc comments. " +
+          "What a consumer compiles against; the behaviour it may rely on is on the notes page.*",
+        renderSurface(surface),
+      ),
+    };
+  }
+  const generate = options.generate ?? null;
+  if (generate === null || generate.length === 0) {
+    throw new ContractError(
+      `module '${slug}' declares contract: generated and dabbler.yaml names no ` +
+        `modules.${slug}.contract.generate to run`,
+    );
+  }
+  const produced = (options.runGenerate ?? runGenerator)(generate, root);
+  return {
+    ...base,
+    mode,
+    apiPath,
+    api: surfacePage(
+      packageId,
+      "*Generated from the built assembly — shape, not behaviour. A generated surface " +
+        "proves what exists, never what it promises; the notes page carries the promises.*",
+      produced,
+    ),
+  };
+}
+
+/** The entry's graph, for a caller that renders the file form for a module. */
+export function graphOf(shape: SolutionShape, entry: ModuleEntry): ContractGraph {
+  return { dependsOn: [...entry.dependsOn], usedBy: consumersOf(shape.modules, entry.slug) };
 }

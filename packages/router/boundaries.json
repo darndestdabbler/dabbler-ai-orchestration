@@ -59,7 +59,8 @@
         "discovery",
         "modules",
         "solutionDeps",
-        "contractdoc"
+        "contractdoc",
+        "ecosystem"
       ]
     },
     "workflow-instruction": {

@@ -147,7 +147,7 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 107 | The atomic land | no | 2026-09-07 |
 | 108 | Maven parity, and the hardened profiles designed against a named customer | no | 2026-09-07 |
 | 109 | Layer 3 runs, and the Solution Explorer fills itself in | no | 2026-09-07 |
-| 110 | The operator's walk, driven by a browser | — | not declared |
+| 110 | The operator's walk, driven by a browser | no | 2026-09-07 |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -1980,3 +1980,9 @@ Maven parity through the ecosystem seam, and the hardened profiles designed agai
 **Releasable: no.**
 
 Fix three measured defects: register GPT Terra as the router's preferred verifier ($2.00/$12.00 per 1M tokens vs Sol's $5.00/$30.00) so this session's own verification runs on it; make the Solution Explorer derive its projection once at construction when none is on disk yet, so a fresh clone of an already-set-up multi-module repository does not sit on the welcome text until a manifest or build file happens to change; and correct the Layer 3 Playwright harness's two stale selectors (the activity-bar icon and the pane header) that have kept the electron suite from ever going green, then run the suite for real.
+
+### Session 110 — The operator's walk, driven by a browser
+
+**Releasable: no.**
+
+Land the CSV four-module walkthrough as a browser-driven check: a committed corpus stager for the model/deserializer/persister/app decomposition (siblings consumed as packages, never a spanning solution file), a single WALK_STEPS list under the Playwright layer that a new spec drives end to end (container, Solution Explorer decomposition, Work Explorer grouped by module, the two side-by-side idle-CLI/Dabbler-terminal editor tabs) with a screenshot per step, a tutorial document rendered from that same list so prose and automation cannot drift, and the fix to work-explorer-tree.spec.ts's stale per-plan-step task-row assertions so the whole Layer 3 suite matches the six fixed lifecycle rows (Register, Plan, Work, Verify, Test, Close) the unit suite already covers.

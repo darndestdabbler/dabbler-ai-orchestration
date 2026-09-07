@@ -32,6 +32,16 @@ export const RUNS_REL = path.join(".dabbler", "runs");
  * root, and they must be in the cache key: a step opening or a round
  * landing changes only these, and a key that ignored them would serve the
  * stale payload back to the watcher tick the write fired.
+ *
+ * `driver/run.json` and `driver/plan.json` are the pulled-session pair:
+ * `buildTaskRows`'s six lifecycle rows read `run.json` for the driver's
+ * phase and `accepted_steps`, and the Work row's own nested steps read
+ * `plan.json` for the engine's steps and `run.json` again for which of them
+ * is accepted -- a cache key blind to either would leave a step's row
+ * showing stale state after the extension's own watcher (which fires on
+ * both, in extension.ts) asked for a fresh one. Measured: `dabbler session
+ * next` accepting a step moved nothing in the Work Explorer until the
+ * cache aged out on its own.
  */
 export function taskRecordInputs(
   repositoryRoot: string,
@@ -44,6 +54,8 @@ export function taskRecordInputs(
     inputs.push(path.join(runs, entry, "step-execution.jsonl"));
     inputs.push(path.join(runs, entry, "approved-plan.json"));
     inputs.push(path.join(runs, entry, "rounds.jsonl"));
+    inputs.push(path.join(runs, entry, "driver", "run.json"));
+    inputs.push(path.join(runs, entry, "driver", "plan.json"));
   }
   return inputs.sort();
 }

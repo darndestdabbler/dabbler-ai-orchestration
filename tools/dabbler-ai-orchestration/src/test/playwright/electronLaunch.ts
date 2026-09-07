@@ -18,7 +18,14 @@ import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
 import { pathToFileURL } from "url";
-import { _electron, ElectronApplication, Page, expect } from "@playwright/test";
+import { _electron, expect } from "@playwright/test";
+// Type-only: Node's own erasable-syntax stripping (the generator script,
+// scripts/render-csv-walkthrough.mjs, imports csvWalkSteps.ts -- and so,
+// transitively, this file -- with `--experimental-strip-types` and no
+// build step) cannot erase a value import it does not know is unused at
+// runtime; a plain `import { Page }` alongside `_electron` broke exactly
+// that import with "does not provide an export named 'Page'".
+import type { ElectronApplication, Page } from "@playwright/test";
 
 const EXTENSION_ROOT = path.resolve(__dirname, "..", "..", "..");
 const REPO_ROOT = path.resolve(EXTENSION_ROOT, "..", "..");
@@ -53,15 +60,25 @@ const manifest = JSON.parse(
 /** The activity-bar icon's contributed title, e.g. "AI Orchestration". */
 const CONTAINER_TITLE = manifest.contributes.viewsContainers.activitybar[0]!.title;
 
+/** One contributed view's own name, e.g. "Work Explorer", by its id. */
+function viewName(id: string): string {
+  const view = Object.values(manifest.contributes.views)
+    .flat()
+    .find((entry) => entry.id === id);
+  if (!view) throw new Error(`package.json contributes no view '${id}'`);
+  return view.name;
+}
+
 /**
  * The Work Explorer view's contributed name, e.g. "Work Explorer". The
  * editor renders a pane header's `aria-label` as `"<name> Section"` -- that
  * suffix is the editor's own convention and is not something the manifest
  * declares, so it stays a literal where it is appended below.
  */
-const WORK_EXPLORER_VIEW_NAME = Object.values(manifest.contributes.views)
-  .flat()
-  .find((view) => view.id === "dabblerWorkExplorerTree")!.name;
+const WORK_EXPLORER_VIEW_NAME = viewName("dabblerWorkExplorerTree");
+
+/** The Solution Explorer view's contributed name, e.g. "Solution Explorer". */
+const SOLUTION_EXPLORER_VIEW_NAME = viewName("dabblerSolutionTree");
 
 /**
  * The `dabbler` command the extension under test ships, which is what a
@@ -155,84 +172,126 @@ export function writeSessionsRoot(
 }
 
 /**
- * Write the in-flight session's approved plan through the router's own
- * writer, then open its first step.
+ * A throwaway git repository over *workspaceRoot*, with everything
+ * currently on disk committed -- idempotent, so a caller may call it again
+ * after writing more fixture files.
  *
- * `write_plan` is used rather than a hand-written file ON PURPOSE: a
- * plan whose content is not backed by a sanctioned write is refused on
- * read, so a fixture that wrote the JSON itself would exercise the
- * refusal path and never reach the task rows.
+ * `writers.declareSessionTask` (below) refuses outside a git repository and
+ * refuses while the tree carries uncommitted work: the declaration comes
+ * before the work, and the framework enforces the order rather than asking
+ * for it. A fixture workspace starts as a plain directory, so this is what
+ * makes the declaration writable at all.
  */
-export function writeApprovedPlan(
+function commitFixtureTree(workspaceRoot: string): void {
+  const git = (...args: string[]) =>
+    cp.spawnSync("git", args, { cwd: workspaceRoot, stdio: "ignore", windowsHide: true });
+  if (!fs.existsSync(path.join(workspaceRoot, ".git"))) {
+    git("init", "-b", "master");
+    git("config", "user.name", "Playwright fixture");
+    git("config", "user.email", "fixture@example.com");
+  }
+  git("add", "-A");
+  git("commit", "-m", "fixture", "--allow-empty");
+}
+
+/**
+ * Declare the in-flight session's task list through the router's own
+ * writer -- this is what makes the Work Explorer's Declare (Plan) row read
+ * as done, so Work becomes the session's open lifecycle row rather than
+ * Declare itself.
+ *
+ * Commits the fixture tree first (see `commitFixtureTree`): the writer
+ * refuses to declare over uncommitted work.
+ */
+export function writeTaskDeclaration(
   workspaceRoot: string,
   sessionNumber: number,
-  steps: readonly { stepId: string; intent: string }[],
+  options: { task: string; releasable: boolean; modules?: readonly string[] },
 ): void {
+  commitFixtureTree(workspaceRoot);
   runRouter(
     workspaceRoot,
     [
-      `import { mkdirSync } from "node:fs";`,
-      `const plan = await import("${moduleUrl("approvedPlan.ts")}");`,
-      `const ledger = await import("${moduleUrl("ledger.ts")}");`,
-      // The LAST two argv entries, not argv[2:] -- whether node inserts an
-      // "[eval]" placeholder before the "--" arguments varies by Node
-      // version (this Node no longer does), and counting from the end is
-      // right either way.
-      `const [stepsJson, root] = process.argv.slice(-2);`,
-      `const run = ledger.sessionRunDir(root, ${sessionNumber});`,
-      `mkdirSync(run, { recursive: true });`,
-      `plan.writePlan(run, plan.newPlan(${sessionNumber}, "fixture", JSON.parse(stepsJson)));`,
+      `import { join } from "node:path";`,
+      `const writers = await import("${moduleUrl("writers.ts")}");`,
+      `const [optionsJson, root] = process.argv.slice(-2);`,
+      `writers.declareSessionTask(join(root, "docs", "sessions"), JSON.parse(optionsJson));`,
     ].join("\n"),
-    [
-      JSON.stringify(
-        steps.map((s) => ({
-          step_id: s.stepId,
-          intent: s.intent,
-          file_envelope: [`src/${s.stepId}.py`],
-          evidence_contract: [
-            { description: "the targeted tests", kind: "deterministic" },
-          ],
-          risk_flags: [],
-        })),
-      ),
-      workspaceRoot,
-    ],
+    [JSON.stringify({ sessionNumber, ...options }), workspaceRoot],
   );
 }
 
-/** Append one `opened` or `closed` row through the router's own writer. */
-export function writeStepEvent(
+/**
+ * Write the in-flight session's driver work plan (`driver/plan.json`) --
+ * the engine's own answer to "plan this session", through the router's own
+ * writer. Its `steps` are what render nested under the Work row, each as
+ * `work:<id>`; nothing else in the tree reads this file.
+ */
+export function writeDriverWorkPlan(
   workspaceRoot: string,
   sessionNumber: number,
-  event: "opened" | "closed",
-  stepId: string,
+  options: {
+    task: string;
+    releasable: boolean;
+    steps: readonly { id: string; ask: string }[];
+  },
 ): void {
-  const base = "a".repeat(40);
-  const row: Record<string, unknown> = {
-    schema_version: 1,
-    event,
-    recorded_at: new Date().toISOString(),
-    session_number: sessionNumber,
-    step_id: stepId,
-    base_commit: base,
-  };
-  if (event === "closed") {
-    row.closed_tree = "b".repeat(40);
-    row.envelope = { inside: [`src/${stepId}.py`], outside: [] };
-    row.deterministic = [
-      { kind: "targeted-tests", status: "pass", required: true },
-    ];
-  }
   runRouter(
     workspaceRoot,
     [
-      `const ledger = await import("${moduleUrl("ledger.ts")}");`,
-      // See the matching comment in `writeApprovedPlan`: the last two argv
-      // entries, counted from the end, not from a fixed offset.
-      `const [rowJson, root] = process.argv.slice(-2);`,
-      `ledger.appendStepEvent(root, ${sessionNumber}, JSON.parse(rowJson));`,
+      `const driver = await import("${moduleUrl("driver.ts")}");`,
+      `const [bodyJson, root] = process.argv.slice(-2);`,
+      `const body = JSON.parse(bodyJson);`,
+      `driver.writeWorkPlan(root, ${sessionNumber}, {`,
+      `  schema_version: 1,`,
+      `  session_number: ${sessionNumber},`,
+      `  task: body.task,`,
+      `  releasable: body.releasable,`,
+      `  steps: body.steps.map((s) => ({ id: s.id, ask: s.ask, files: [\`src/\${s.id}.ts\`], checks: [{ argv: ["true"] }] })),`,
+      `  recorded_at: new Date().toISOString(),`,
+      `});`,
     ].join("\n"),
-    [JSON.stringify(row), workspaceRoot],
+    [JSON.stringify(options), workspaceRoot],
+  );
+}
+
+/**
+ * Write (or rewrite) the in-flight session's driver run (`driver/run.json`)
+ * through the router's own writer. `acceptedSteps` is what a driver work
+ * plan's own steps fold as done; `phase` "steps" is what makes the first
+ * step not yet in `acceptedSteps` read as the one open now -- this is the
+ * file the extension's watcher fires on, and the one `workStepRows` reads
+ * for done/open state. `step-execution.jsonl` is written by nothing that
+ * reaches this fixture: no row's state is read from it any more.
+ */
+export function writeDriverRun(
+  workspaceRoot: string,
+  sessionNumber: number,
+  options: { phase: string; acceptedSteps: readonly string[] },
+): void {
+  runRouter(
+    workspaceRoot,
+    [
+      `const driver = await import("${moduleUrl("driver.ts")}");`,
+      `const [bodyJson, root] = process.argv.slice(-2);`,
+      `const body = JSON.parse(bodyJson);`,
+      `const now = new Date().toISOString();`,
+      `driver.writeRun(root, ${sessionNumber}, {`,
+      `  schema_version: 1,`,
+      `  session_number: ${sessionNumber},`,
+      `  engine: "fixture",`,
+      `  phase: body.phase,`,
+      `  seq: 1,`,
+      `  invocations: 1,`,
+      `  max_invocations: 24,`,
+      `  accepted_steps: body.acceptedSteps,`,
+      `  baseline_tree: null,`,
+      `  stop: null,`,
+      `  started_at: now,`,
+      `  updated_at: now,`,
+      `});`,
+    ].join("\n"),
+    [JSON.stringify(options), workspaceRoot],
   );
 }
 
@@ -427,49 +486,79 @@ export async function closeVSCode(launch: LaunchedVSCode): Promise<void> {
 // Driving the workbench
 // ---------------------------------------------------------------------------
 
-/** Trigger the hard refresh via the command palette. */
-export async function triggerRefresh(page: Page): Promise<void> {
+/**
+ * Type *text* into the palette and press Enter, verbatim -- this helper adds
+ * no ">" of its own. F1 opens the palette already in command-search mode on
+ * some builds, with ">" pre-filled; `.fill()` replaces the whole box, so a
+ * caller that needs command mode explicitly includes the ">" (e.g.
+ * `>Some Command`). Existing callers pass the bare label unprefixed, exactly
+ * as before this helper existed, so their behavior does not move.
+ */
+export async function runCommand(page: Page, text: string, settleMs = 1_500): Promise<void> {
   await page.keyboard.press("F1");
   const palette = page.locator(".quick-input-widget input");
   await palette.waitFor({ state: "visible", timeout: 10_000 });
-  await palette.fill("Dabbler: Refresh Work Explorer");
+  await palette.fill(text);
+  await page.waitForTimeout(300);
   await page.keyboard.press("Enter");
-  // Settle window for the async scan and repaint.
-  await page.waitForTimeout(1_500);
+  await page.waitForTimeout(settleMs);
+}
+
+/** Trigger the hard refresh via the command palette. */
+export async function triggerRefresh(page: Page): Promise<void> {
+  await runCommand(page, "Dabbler: Refresh Work Explorer", 1_500);
 }
 
 /**
- * Reveal the Dabbler container — IDEMPOTENTLY guarded by callers.
- * Activity-bar icons TOGGLE: clicking one whose container is already
- * active hides the sidebar.
+ * Reveal the Dabbler container, genuinely idempotently: an activity-bar icon
+ * TOGGLES, so clicking one whose container is already active hides the
+ * sidebar instead of doing nothing. The extension reveals its own container
+ * on activation for a repository that is already set up (it opens the
+ * Dabbler terminal at the same moment), so a caller cannot assume the
+ * sidebar starts closed -- this checks whether either of the container's own
+ * panes is already showing before it clicks at all.
  */
 export async function openDabblerContainer(page: Page): Promise<void> {
+  const alreadyShowing = page.locator(
+    `.pane-header[aria-label="${WORK_EXPLORER_VIEW_NAME} Section"], ` +
+      `.pane-header[aria-label="${SOLUTION_EXPLORER_VIEW_NAME} Section"]`,
+  );
+  if (await alreadyShowing.first().isVisible().catch(() => false)) return;
+
   const activityIcon = page.locator(
     `.activitybar .action-label[aria-label*="${CONTAINER_TITLE}"]`,
   );
   await activityIcon.waitFor({ state: "visible", timeout: 30_000 });
   await activityIcon.click();
   await page.waitForTimeout(250);
+  // The click can still land as a toggle-CLOSE, if the container became
+  // active between the check above and this click (the extension's own
+  // startup reveal is asynchronous). One corrective click undoes it.
+  if (!(await alreadyShowing.first().isVisible().catch(() => false))) {
+    await activityIcon.click();
+    await page.waitForTimeout(250);
+  }
 }
 
 /**
- * The Work Explorer's own pane, expanded, WITHOUT waiting for any row.
+ * One contributed view's own pane, expanded, WITHOUT waiting for any row.
  * Use for emptiness or TreeView.message assertions.
  *
- * Selected by the pane's OWN heading. The container holds two views and
- * "the first pane with a list" silently resolves to the Solution
- * Explorer whenever that one happens to render a list first — which
- * makes a passing emptiness assertion mean nothing at all.
+ * Selected by the pane's OWN heading. The container holds more than one view
+ * and "the first pane with a list" silently resolves to whichever one
+ * happens to render a list first — which makes a passing emptiness
+ * assertion mean nothing at all.
  */
-export async function workExplorerPane(
+export async function paneNamed(
   page: Page,
+  viewName: string,
   opts: { reveal?: boolean } = {},
 ): Promise<import("@playwright/test").Locator> {
   if (opts.reveal !== false) await openDabblerContainer(page);
   const pane = page
     .locator(".pane")
     .filter({
-      has: page.locator(`.pane-header[aria-label="${WORK_EXPLORER_VIEW_NAME} Section"]`),
+      has: page.locator(`.pane-header[aria-label="${viewName} Section"]`),
     })
     .first();
   await pane.waitFor({ state: "visible", timeout: 30_000 });
@@ -479,6 +568,82 @@ export async function workExplorerPane(
     await page.waitForTimeout(250);
   }
   return pane;
+}
+
+/**
+ * The Work Explorer's own pane, expanded, WITHOUT waiting for any row.
+ * Use for emptiness or TreeView.message assertions.
+ */
+export async function workExplorerPane(
+  page: Page,
+  opts: { reveal?: boolean } = {},
+): Promise<import("@playwright/test").Locator> {
+  return paneNamed(page, WORK_EXPLORER_VIEW_NAME, opts);
+}
+
+/** The Solution Explorer's own pane, expanded, WITHOUT waiting for any row. */
+export async function solutionExplorerPane(
+  page: Page,
+  opts: { reveal?: boolean } = {},
+): Promise<import("@playwright/test").Locator> {
+  return paneNamed(page, SOLUTION_EXPLORER_VIEW_NAME, opts);
+}
+
+/**
+ * Collapse or expand a named pane's header, IDEMPOTENTLY: a no-op when it is
+ * already in the requested state. Two panes share the container's vertical
+ * space, so a shot meant to show one tree in full collapses the other one
+ * first -- a virtualized list only renders the rows on screen.
+ */
+export async function setPaneExpanded(page: Page, viewName: string, expanded: boolean): Promise<void> {
+  const pane = await paneNamed(page, viewName, { reveal: false });
+  const header = pane.locator(".pane-header");
+  const isExpanded = (await header.getAttribute("aria-expanded")) === "true";
+  if (isExpanded !== expanded) {
+    await header.click();
+    await page.waitForTimeout(400);
+  }
+}
+
+/**
+ * Expand every collapsed row in *pane*, one at a time, until none are left.
+ *
+ * Each iteration re-queries the FIRST still-collapsed row rather than
+ * indexing into a batch counted up front: expanding one row inserts its
+ * children into the list and shifts every row after it, so a batch of
+ * `nth(i)` clicks taken against a count from before the first click landed
+ * on the wrong rows from the second click on -- silently skipping some
+ * (measured: a four-sibling tree left the last sibling collapsed) rather
+ * than failing loudly. *maxClicks* bounds the loop rather than running it to
+ * a fixed point, since a row that can never expand (or a very deep tree)
+ * would otherwise spin forever.
+ */
+export async function expandAllRows(
+  pane: import("@playwright/test").Locator,
+  maxClicks = 60,
+): Promise<void> {
+  const page = pane.page();
+  for (let i = 0; i < maxClicks; i++) {
+    const next = pane.locator('.monaco-list-row[aria-expanded="false"]').first();
+    if ((await next.count()) === 0) return;
+    try {
+      await next.locator(".monaco-tl-twistie").click({ timeout: 2_500 });
+      await page.waitForTimeout(200);
+    } catch {
+      // Could not expand this one (e.g. it scrolled out from under the
+      // click); stop rather than loop on the same row forever.
+      return;
+    }
+  }
+}
+
+/** Every rendered row's trimmed text. A virtualized list only renders what is on screen. */
+export async function rowTexts(pane: import("@playwright/test").Locator): Promise<string[]> {
+  return pane
+    .locator(".monaco-list-row")
+    .evaluateAll((elements) =>
+      elements.map((element) => (element.textContent || "").replace(/\s+/g, " ").trim()).filter(Boolean),
+    );
 }
 
 /** The pane with at least one painted row. */

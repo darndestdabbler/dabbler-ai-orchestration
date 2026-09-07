@@ -1,0 +1,33 @@
+# Dependabot — the bump path for SHA-pinned actions (Set 111 S4).
+#
+# Every `uses:` in .github/workflows/ is pinned to a full 40-character
+# commit SHA rather than a tag, per GitHub's supply-chain hardening
+# guidance: a tag is MUTABLE, so `actions/checkout@v4` can be repointed at
+# arbitrary code and a compromise of the action reaches every workflow that
+# references it. A SHA cannot be repointed.
+#
+# The cost of a SHA pin is that it does not float, so it needs a
+# maintainer. Dependabot understands SHA pins natively: it opens a PR that
+# rewrites the SHA *and* the trailing `# vX.Y.Z` comment together, so the
+# comment never drifts from the pin it annotates. Without this file the
+# pins would silently rot, which is a worse failure than the tags they
+# replaced — a stale pin is invisible, whereas a stale tag at least keeps
+# receiving upstream fixes.
+#
+# Reviewing one of these PRs: check that the new SHA belongs to the named
+# version in the upstream repo's releases, and that the release notes carry
+# nothing that changes the step's contract. The pin is only as good as that
+# check.
+
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "ci"
+    labels:
+      - dependencies
+      - github-actions

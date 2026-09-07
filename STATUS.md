@@ -1,4 +1,4 @@
-# STATUS — the modules block (sessions 100–108), PAUSED after session 103 (closed VERIFIED); session 104 next, on the operator's word
+# STATUS — the modules block (sessions 100–108) is running unattended; session 104 closed VERIFIED, session 105 next
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
 
@@ -18,15 +18,72 @@
 > | 101 | module configuration, the exception schema, the test-impact vocabulary | CLOSED VERIFIED, landed 33557781 |
 > | 102 | designed contracts and contract-test source; the ecosystem seam | CLOSED VERIFIED, landed 594bca00 |
 > | 103 | committed immutable packages | CLOSED VERIFIED, landed 6e2b9b73 |
-> | 104 | the focused checkout and the Windows preflight | next |
-> | 105 | module-scoped sessions, the hard verifier scope, exposure, grants | planned |
+> | 104 | the focused checkout and the Windows preflight | CLOSED VERIFIED, landed 706eb2af |
+> | 105 | module-scoped sessions, the hard verifier scope, exposure, grants | next |
 > | 106 | the impact plan and the selected run of record | planned |
 > | 107 | the atomic land | planned |
 > | 108 | Maven parity and the hardened profiles | planned |
 >
 > One operating failure on the record: session 101's second round finished at 17:18 and the loop idled until 20:06, because the background waiter's completion never woke the orchestrator. The rule since: every framework wait is driven from a foreground loop that polls the job's status file, and the run state is checked at the start of every turn.
 >
-> PAUSED after session 103 on the operator's instruction (2026-09-06, 21:15): the next chat session continues with `dabbler session start --sessions-dir docs/sessions --engine claude-code --provider anthropic` for session 104, whose plan section is in place; the router and extension on this machine are 2.0.7, built from the tree session 103 landed. Every framework wait is driven from a foreground loop (the scratchpad's drive-waits.sh pattern), never from a background waiter.
+> Paused after session 103 on the operator's instruction (2026-09-06, 21:15) and resumed in a new chat at 21:27 with session 104; the router and extension on this machine are rebuilt after each close. Every framework wait is driven from a foreground loop (the scratchpad's drive-waits.sh pattern), never from a background waiter. A session driven from the chat with the CLI shows nothing in the Dabbler Terminal, which is expected: that terminal renders a run the extension launched.
+
+> ## SESSION 104 CLOSED, 2026-09-06, VERIFIED (rounds 1 and 2, gpt-5.4 over the seat, no findings in either; landed 706eb2af) -- the focused checkout and the Windows preflight
+>
+> Three steps, nothing asked of a single-module solution. **The cone is
+> derived** (`checkout.ts`, a new module): `checkoutCone(shape, slug,
+> sharedFiles)` names the module's `codeRoots`, `packages/`, `docs/`, the
+> `modules/<x>/contract/` folder of every transitive dependency and every
+> transitive consumer, and the folder of each shared file, as cone-mode
+> directories; the root build files are not listed because cone mode
+> delivers every root-level file with any cone, which is also what lets the
+> convenience file and the engine's settings sit at the clone's root without
+> widening it. `modules.checkout.parent` is read by `checkoutParent`.
+> **`dabbler module open <slug>`** refuses a single-module solution (open
+> the repository itself), makes the origin a `file://` URL when it is a
+> path (git ignores `--filter` on a local-path clone), clones
+> `--filter=blob:none --no-checkout --sparse` under the parent (default
+> `<repo>.<slug>` beside the repository), narrows with `sparse-checkout set
+> --cone`, checks out the trunk (origin's HEAD) or `--branch` (created from
+> the trunk when origin has none), writes the seam's convenience file --
+> `<slug>.slnf` filtering the root's one solution file, `<slug>.slnx`
+> listing the module's projects otherwise; both shapes built with the real
+> SDK -- and `.claude/settings.local.json` with
+> `permissions.blockReadsOutsideWorkingDirectories` (the project-local file:
+> this repository tracks `.claude/settings.json`), excludes both in the
+> clone's `.git/info/exclude`, and reports whether the clone is really
+> filtered (`rev-list --missing=print`). `--reset` fetches, resets hard,
+> re-narrows and keeps ignored build output. The Router contract gains
+> `module.open`; the extension gains **Open Module** on a module row of a
+> multi-module solution (`;focused` on the row's contextValue), a new window
+> at the router's answered path. **The preflight** (`dabbler module
+> preflight <slug>`) measured on the POC copy with a filter-capable bare
+> origin: fresh clone 1.4 s, cold restore/build/test 8.3 s; `--reset` 1.5 s,
+> warm toolchain 3.7 s; five sequential clones 1.3-1.6 s; Defender's
+> real-time protection was OFF on this machine, recorded as a floor.
+> Decision: **a fresh clone per session** (`EXISTING_CLONE = "fresh"`; a
+> clone holding changes is refused; `--reset` stays the persistent path),
+> because the saving is seconds against a session of minutes and only a
+> fresh clone restores the wall (a grant's fetched blobs stay in a reset
+> clone's object store). `docs/design/module-checkout-preflight.md`. Three
+> router tests (the walkthrough `walk-checkout.test.ts` over a local bare
+> origin with `uploadpack.allowFilter`), one extension test.
+>
+> **Two things the run itself found.** The run of record failed once on
+> `walk-session`'s "every phase once" milestone -- `next` printed no
+> instruction under the twenty-worker load and the walk hid its stderr;
+> green on re-run, so the walk now puts `next`'s exit code and stderr in
+> the assertion's message. Judging that fix then crashed the driver: the
+> .NET compiler server the preflight's build started outlived the check and
+> held the check's scratch TEMP, and `checks.execute`'s cleanup threw EPERM
+> out of `next`. Every .NET toolchain spawn now runs with node reuse and the
+> build server off (`DOTNET_TOOLCHAIN_ENV`, `-p:UseSharedCompilation=false`
+> on build, test and pack) and the executor leaves a held scratch directory
+> to the OS with a note. Two traps for the record: a file under `.dabbler/`
+> is ignored and so is not a tree change, and a report naming one is
+> refused; `dotnet build-server shutdown` does not stop an MSBuild
+> node-reuse worker, only `Stop-Process` does. Router suite 1,101 tests
+> (1,097 passing, 4 skipped), extension 197.
 
 > ## SESSION 103 CLOSED, 2026-09-06, VERIFIED (round 3, gpt-5.4 over the seat, one dispute withdrawn; landed 6e2b9b73) -- committed immutable packages
 >

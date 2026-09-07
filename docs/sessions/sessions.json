@@ -2129,9 +2129,9 @@
     {
       "number": 108,
       "title": "Maven parity, and the hardened profiles designed against a named customer",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-07T01:22:44.274000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-09-07T01:54:52.085000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

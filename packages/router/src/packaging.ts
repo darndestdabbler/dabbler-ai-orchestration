@@ -44,6 +44,13 @@ export const PLACEHOLDER_OUTPUT = "{output}";
 export const PLACEHOLDER_ARTIFACT = "{artifact}";
 export const PLACEHOLDER_FEED = "{feed}";
 export const PLACEHOLDER_SECRET = "{secret}";
+/**
+ * The version a module's pack is given (session 103 computes it: an
+ * immutable dev version from the module's tree). A pack that names it and
+ * runs where no version is known is refused rather than run with the
+ * placeholder left in.
+ */
+export const PLACEHOLDER_VERSION = "{version}";
 
 /**
  * What stands in the record where the value was. Deliberately the
@@ -104,6 +111,8 @@ export interface PackStep {
   readonly argv: readonly string[];
   readonly cwd: string;
   readonly timeoutSeconds: number;
+  /** The argv names `{version}`, so the caller must supply one. */
+  readonly usesVersion: boolean;
 }
 
 export interface PushStep {
@@ -344,6 +353,16 @@ export function feedTakesCredential(feed: string): boolean {
   return true;
 }
 
+/** The `packaging` block under `modules.<slug>`, or null when the slug has none. */
+function moduleBlock(config: RouterConfig | null, module: string): unknown {
+  const modules = asRecord((config ?? {})["modules"]);
+  if (modules === null) return null;
+  const entry = asRecord(modules[module]);
+  if (entry === null) return null;
+  const block = entry["packaging"];
+  return block === undefined ? null : block;
+}
+
 function requirePlaceholders(
   argv: readonly string[],
   required: readonly string[],
@@ -369,12 +388,21 @@ function requirePlaceholders(
  */
 export function loadDeclaration(
   config: RouterConfig | null,
+  module: string | null = null,
 ): Declaration | null {
-  const block = (config ?? {})["packaging"];
+  // A module's own block, when the root `modules:` mapping carries one for
+  // its slug, answers for that module; the root block answers otherwise --
+  // so a solution with one feed declares it once, and a module with its
+  // own feed says so beside its slug. `moduleConfigs` (modules.ts) is what
+  // holds the mapping to the manifest; here only the shape is read.
+  const perModule = module === null ? null : moduleBlock(config, module);
+  const block = perModule ?? (config ?? {})["packaging"];
   if (block === undefined || block === null) return null;
   const packaging = asRecord(block);
   if (packaging === null) {
-    throw new PackagingConfigError("packaging must be a mapping");
+    throw new PackagingConfigError(
+      `${perModule === null ? "packaging" : `modules.${module}.packaging`} must be a mapping`,
+    );
   }
 
   const packBlock = asRecord(packaging["pack"]);
@@ -435,6 +463,7 @@ export function loadDeclaration(
       argv: packArgv,
       cwd: String(pack["cwd"] ?? ""),
       timeoutSeconds: timeoutOf(pack, "packaging.pack"),
+      usesVersion: packArgv.join(" ").includes(PLACEHOLDER_VERSION),
     },
     push: {
       argv: pushArgv,
@@ -680,6 +709,8 @@ function refusal(
 export interface PackageOptions {
   readonly config?: RouterConfig | null;
   readonly dryRun?: boolean;
+  /** The version substituted for `{version}`; a pack that names it is refused without one. */
+  readonly version?: string | null;
 }
 
 /**
@@ -807,7 +838,7 @@ export function packageSession(
 
   // Narrowed here rather than above: the guard proves a declared credential
   // resolved, and an undeclared one is the empty string by construction.
-  return execute(root, sessionNumber, declaration, secretValue ?? "", gates);
+  return execute(root, sessionNumber, declaration, secretValue ?? "", gates, options.version ?? null);
 }
 
 function execute(
@@ -816,6 +847,7 @@ function execute(
   declaration: Declaration,
   secretValue: string,
   gates: readonly GateResult[],
+  versionGiven: string | null = null,
 ): PackagingRun {
   const treeDigest = snapshotWorktreeTree(root);
   const outputDir = prepareOutputDir(root, sessionNumber);
@@ -864,7 +896,21 @@ function execute(
 
   const pack = declaration.pack;
   const packCwd = pack.cwd ? join(root, pack.cwd) : root;
-  const packArgv = substitute(pack.argv, { [PLACEHOLDER_OUTPUT]: outputDir });
+  const version = String(versionGiven ?? "").trim();
+  if (pack.usesVersion && version === "") {
+    return refusal(
+      sessionNumber,
+      true,
+      `the pack names ${PLACEHOLDER_VERSION} and this run has no version to give it; ` +
+        "a module pack supplies one, and a repository-wide publish declares a pack " +
+        "that does not take it.",
+      gates,
+    );
+  }
+  const packArgv = substitute(pack.argv, {
+    [PLACEHOLDER_OUTPUT]: outputDir,
+    ...(version === "" ? {} : { [PLACEHOLDER_VERSION]: version }),
+  });
   steps.push(
     runStep(STEP_PACK, packArgv, packArgv, {
       cwd: packCwd,

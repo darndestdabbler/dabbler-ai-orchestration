@@ -18,6 +18,7 @@ import {
   type SuiteSpec,
   type TestRunRecord,
 } from "../src/testEvidence.ts";
+import { judgeFreshness } from "../src/gates.ts";
 import { gitAnswers, tempDir } from "./support/answers.ts";
 
 const UNIT: SuiteSpec = { name: "unit", command: "npm test", covers: ["src/"], expensive: true, runsWhole: false };
@@ -100,6 +101,67 @@ describe("the suite declaration", () => {
     assert.equal(beside.ok, true, beside.errors.join("; "));
     assert.deepEqual(beside.suites.map((suite) => suite.name), ["full", "quick"]);
   });
+
+  it("reads the module vocabulary, defaults it, and refuses by suite what the role or the manifest cannot bear", () => {
+    const multi = {
+      multi: true,
+      implicit: false,
+      modules: [
+        { slug: "model", codeRoots: ["modules/model"], dependsOn: [] },
+        { slug: "listener", codeRoots: ["modules/listener"], dependsOn: ["model"] },
+      ],
+    } as unknown as Parameters<typeof loadSuitesChecked>[1] extends { shape?: infer S } ? NonNullable<S> : never;
+    const loaded = loadSuitesChecked(
+      {
+        testing: {
+          suites: [
+            { name: "model-unit", command: "dotnet test m", covers: ["modules/model/"], expensive: true, module: "model" },
+            { name: "listener-model", command: "dotnet test c", covers: ["modules/listener/contract/"], expensive: true, module: "listener", role: "consumer-contract", against: "model", required_for_close: false },
+            { name: "integration", command: "dotnet test i", covers: ["modules/listener/"], expensive: true, module: "listener", required_for_close: false },
+          ],
+        },
+      },
+      { shape: multi },
+    );
+    assert.equal(loaded.ok, true, loaded.errors.join("; "));
+    const [unit, consumer, integration] = loaded.suites;
+    // Defaults: a unit suite, demanded by the close because it is expensive.
+    assert.equal(unit?.role, "unit");
+    assert.equal(unit?.requiredForClose, true);
+    assert.equal(unit?.against, null);
+    assert.equal(consumer?.role, "consumer-contract");
+    assert.equal(consumer?.against, "model");
+    assert.equal(consumer?.requiredForClose, false);
+    assert.equal(integration?.requiredForClose, false);
+
+    const refused = loadSuitesChecked(
+      {
+        testing: {
+          suites: [
+            { name: "a", command: "x", covers: ["."], expensive: true, role: "consumer-contract" },
+            { name: "b", command: "x", covers: ["."], expensive: true, against: "model" },
+            { name: "c", command: "x", covers: ["."], expensive: true, module: "ghost" },
+            { name: "d", command: "x", covers: ["."], expensive: true, role: "smoke" },
+          ],
+        },
+      },
+      { shape: multi },
+    );
+    assert.deepEqual(refused.errors, [
+      "testing.suites[0] ('a') is a consumer-contract suite and must say which provider it runs against",
+      "testing.suites[1] ('b') names 'against', which only a consumer-contract suite does",
+      "testing.suites[2] ('c') names module 'ghost', which docs/modules.yaml does not declare",
+      "testing.suites[3].role must be one of unit, provider-contract, consumer-contract",
+    ]);
+
+    // A single-module solution is not asked about a vocabulary it does not
+    // use: the same undeclared slug loads, unconsulted.
+    const single = loadSuitesChecked(
+      { testing: { suites: [{ name: "c", command: "x", covers: ["."], expensive: true, module: "ghost" }] } },
+      { shape: { multi: false, implicit: true, modules: [] } as unknown as typeof multi },
+    );
+    assert.equal(single.ok, true);
+  });
 });
 
 describe("which suites a change affects", () => {
@@ -155,6 +217,19 @@ describe("judging a suite's freshness", () => {
   it("passes a fresh green record and says when it was recorded, judging by the latest of the suite's records", () => {
     const verdict = freshnessVerdict(UNIT, facts([record({ surfaceDigest: "old" }), record({ recordedAt: "later" })]));
     assert.deepEqual(verdict, { suite: "unit", required: true, passed: true, reason: "fresh, green, recorded later", changedInputs: ["src/a.ts"] });
+  });
+
+  it("judges a suite run for information and never demands it", () => {
+    // `required_for_close: false` on an expensive suite: it runs as the run
+    // of record and its verdict is on the record, but a stale or red one
+    // refuses nothing. The one flag used to mean both.
+    const information: SuiteSpec = { ...UNIT, name: "integration", requiredForClose: false };
+    const verdict = freshnessVerdict(information, facts([]));
+    assert.equal(verdict.passed, false);
+    assert.equal(verdict.required, false);
+    assert.deepEqual(judgeFreshness([verdict]), [true, ""]);
+    // Absent, the word means what `expensive` meant.
+    assert.equal(freshnessVerdict(UNIT, facts([])).required, true);
   });
 });
 

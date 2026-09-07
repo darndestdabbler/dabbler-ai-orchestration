@@ -69,7 +69,9 @@ import {
   writeReport,
   writeWorkPlan,
   appendSupervision,
+  judgeModulesForShape,
 } from "./driver.ts";
+import { solutionShape } from "./modules.ts";
 import { SET_BOOKKEEPING_COMMIT_BASENAMES, governingConfig, runGates } from "./gates.ts";
 import { refuseIfResolvingFromSource } from "./resolution.ts";
 import { detectEcosystems } from "./bootstrap/detect.ts";
@@ -958,6 +960,10 @@ export interface DeclareCliOptions {
   readonly taskFile?: string | null;
   readonly releasable: boolean;
   readonly sessionNumber?: number | null;
+  /** The module(s) the session works in; given only for a multi-module solution. */
+  readonly modules?: readonly string[] | null;
+  /** Why the session must change more than one module; required with two or more. */
+  readonly reason?: string | null;
 }
 
 /** Declare the session's task list and whether it may publish. */
@@ -990,6 +996,20 @@ export function declare(sessionsDir: string, options: DeclareCliOptions): number
     return EXIT_USAGE;
   }
 
+  // The typed path is held to the solution's shape by the same judge the
+  // driven plan meets at acceptance, so neither can persist a module the
+  // other would refuse: an undeclared slug, two modules with no reason, a
+  // module named in a single-module repository.
+  const shapeReasons = judgeModulesForShape(
+    options.modules ?? [],
+    options.reason ?? null,
+    solutionShape(repoRootFromSessionsDir(sessionsDir)),
+  );
+  if (shapeReasons.length > 0) {
+    writeErr(`declare: refused -- ${shapeReasons.join("; ")}\n`);
+    return EXIT_USAGE;
+  }
+
   let lock: string;
   try {
     lock = acquireLockWithTimeout(sessionsDir, `declare/${process.pid}`);
@@ -1003,6 +1023,7 @@ export function declare(sessionsDir: string, options: DeclareCliOptions): number
       sessionNumber: target,
       task: text,
       releasable: options.releasable,
+      modules: options.modules ?? null,
     });
   } catch (error) {
     if (!(error instanceof SanctionedWriteError)) throw error;
@@ -1011,9 +1032,11 @@ export function declare(sessionsDir: string, options: DeclareCliOptions): number
   } finally {
     releaseLock(lock);
   }
+  const modules = (options.modules ?? []).filter((slug) => slug.trim() !== "");
   writeOut(
     `declare: session ${sessionDisplayNumber(target)} declared; releasable=` +
-      `${options.releasable ? "yes" : "no"}.\n`,
+      `${options.releasable ? "yes" : "no"}` +
+      `${modules.length > 0 ? `; modules=${modules.join(",")}` : ""}.\n`,
   );
   return EXIT_OK;
 }

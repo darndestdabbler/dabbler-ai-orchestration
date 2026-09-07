@@ -28,6 +28,7 @@ import {
   validateInstruction,
   validateReport,
   validateWorkPlan,
+  judgeWorkPlanModules,
   watcherReading,
   writeDispositions,
   writeInstruction,
@@ -203,6 +204,30 @@ describe("the four answer schemas", () => {
         }),
       /declares step 'widget' twice/,
     );
+  });
+
+  it("a plan's modules are judged against the solution's shape: declared slugs, a reason for two, nothing for one", () => {
+    const shape = (multi: boolean, ...slugs: string[]) =>
+      ({ multi, implicit: false, modules: slugs.map((slug) => ({ slug })) }) as unknown as Parameters<
+        typeof judgeWorkPlanModules
+      >[1];
+    const many = shape(true, "model", "persister", "listener");
+    const plan = validateWorkPlan(PLAN);
+    // Two modules without a reason is refused; with one, accepted.
+    const two = { ...plan, modules: ["model", "persister"] };
+    assert.match(judgeWorkPlanModules(two, many)[0] ?? "", /names 2 modules .* and gives no reason/);
+    assert.deepEqual(judgeWorkPlanModules({ ...two, reason: "the model's contract changed" }, many), []);
+    // An undeclared slug is refused by name; one module needs no reason.
+    assert.match(judgeWorkPlanModules({ ...plan, modules: ["ghost"] }, many)[0] ?? "", /module 'ghost', which docs\/modules\.yaml does not declare/);
+    assert.deepEqual(judgeWorkPlanModules({ ...plan, modules: ["persister"] }, many), []);
+    // A multi-module solution's plan says which module it works in.
+    assert.match(judgeWorkPlanModules(plan, many)[0] ?? "", /names no module/);
+    // A single-module solution: absent is right, its own module is
+    // tolerated, another name is refused.
+    const one = shape(false, "csv-model");
+    assert.deepEqual(judgeWorkPlanModules(plan, one), []);
+    assert.deepEqual(judgeWorkPlanModules({ ...plan, modules: ["csv-model"] }, one), []);
+    assert.match(judgeWorkPlanModules({ ...plan, modules: ["other"] }, one)[0] ?? "", /single-module/);
   });
 
   it("a disposition fixes or rejects, and a rejection carries its evidence", () => {

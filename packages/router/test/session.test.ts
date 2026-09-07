@@ -19,6 +19,7 @@ import {
   findEntry,
   loadEntries,
   loadManifest,
+  moduleConfigs,
   parseEntries,
   solutionShape,
 } from "../src/modules.ts";
@@ -37,12 +38,13 @@ import {
   judgeCancellation,
   judgeRestoration,
   judgeStartBoundary,
+  declare,
   plan,
   restore,
   start,
   type SequenceFacts,
 } from "../src/session.ts";
-import { registerSessionStart } from "../src/writers.ts";
+import { readTaskDeclaration, registerSessionStart } from "../src/writers.ts";
 import { cleanRepoAnswers, seed, tempDir } from "./support/answers.ts";
 
 /** One verb's exit code and everything it wrote, so a refusal can be read. */
@@ -450,6 +452,28 @@ describe("recording the plan prose", () => {
       state.restore();
     }
   });
+
+  it("holds a typed declaration's modules to the solution's shape, as the driven plan is held", async () => {
+    // `session declare --module` could otherwise persist a module the plan
+    // judge would refuse. This repository has no manifest: it is the one
+    // module, and naming another is refused before anything is written.
+    const state = stateDir();
+    try {
+      registerSessionStart(state.sessionsDir, 1, { engine: "claude-code" });
+      const refused = await run(() =>
+        declare(state.sessionsDir, { task: "Do it.", releasable: false, modules: ["ghost"] }),
+      );
+      assert.equal(refused.code, EXIT_USAGE);
+      assert.match(refused.err, /names module 'ghost'.*single-module/);
+      assert.equal(readTaskDeclaration(state.sessionsDir, 1), null);
+      const accepted = await run(() =>
+        declare(state.sessionsDir, { task: "Do it.", releasable: false }),
+      );
+      assert.equal(accepted.code, EXIT_OK);
+    } finally {
+      state.restore();
+    }
+  });
 });
 
 // --- The module manifest ------------------------------------------------------
@@ -593,6 +617,39 @@ describe("the module manifest", () => {
     assert.deepEqual(consumersOf(entries, "persister"), ["listener"]);
     assert.deepEqual(consumersOf(entries, "listener"), []);
     assert.deepEqual(dependenciesOf(entries, "listener"), ["model", "persister", "deserializer"]);
+  });
+
+  it("reads the per-module declarations of dabbler.yaml and refuses one for a module nobody declared", () => {
+    const entries = parseEntries({
+      modules: [{ slug: "model", package: "CsvModel" }, { slug: "persister", dependsOn: ["model"] }],
+    });
+    const configs = moduleConfigs(
+      {
+        modules: {
+          persister: {
+            sharedFiles: ["Directory.Packages.props", "packages/"],
+            contract: { generate: ["dotnet", "genapi", "modules/persister"] },
+          },
+          model: { packaging: { pack: { argv: ["x", "{output}"] } } },
+        },
+      },
+      entries,
+    );
+    assert.deepEqual(configs.get("persister")?.sharedFiles, ["Directory.Packages.props", "packages/"]);
+    assert.deepEqual(configs.get("persister")?.contractGenerate, ["dotnet", "genapi", "modules/persister"]);
+    assert.equal(configs.get("persister")?.packaging, null);
+    assert.deepEqual(configs.get("model")?.sharedFiles, []);
+    assert.ok(configs.get("model")?.packaging);
+    // Nothing declared is the single-module state, and yields nothing.
+    assert.equal(moduleConfigs({}, entries).size, 0);
+    assert.throws(
+      () => moduleConfigs({ modules: { ghost: {} } }, entries),
+      /modules\.ghost names a module that docs\/modules\.yaml does not declare/,
+    );
+    assert.throws(
+      () => moduleConfigs({ modules: { model: { feed: "x" } } }, entries),
+      /modules\.model has unknown key\(s\) feed/,
+    );
   });
 
   it("reads an absent manifest as one implicit module, one entry as single, and two as many", () => {

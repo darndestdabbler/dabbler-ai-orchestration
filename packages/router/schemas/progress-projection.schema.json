@@ -308,6 +308,12 @@
         "startedAt": { "type": ["string", "null"] },
         "completedAt": { "type": ["string", "null"] },
         "verificationVerdict": { "type": ["string", "null"] },
+        "modules": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string" },
+          "description": "The module(s) the session's declaration named, by slug. Present only for a session of a multi-module solution; a single-module row carries no member, so nothing changes in what it projects."
+        },
         "tasks": { "type": "array", "items": { "$ref": "#/$defs/task" } },
         "tasksRefused": {
           "type": ["string", "null"],

@@ -273,6 +273,8 @@ function buildSessionsArray(
       // session with the version running today, which would make every
       // row claim the framework that last touched the file.
       "frameworkVersion",
+      // The declaration's modules, written once by the declaring writer.
+      "modules",
     ]) {
       if (prior[key] !== null && prior[key] !== undefined) record[key] = prior[key];
     }
@@ -765,6 +767,12 @@ export function declareSessionTask(
     readonly sessionNumber: number;
     readonly task: string;
     readonly releasable: boolean;
+    /**
+     * The module(s) the session works in. Given for a multi-module solution
+     * and written onto the declaration and the session record; absent or
+     * empty for a single-module one, which persists nothing module-shaped.
+     */
+    readonly modules?: readonly string[] | null;
   },
 ): Entry {
   const number = requireSessionNumber(options.sessionNumber);
@@ -810,15 +818,30 @@ export function declareSessionTask(
     );
   }
 
+  const modules = [...new Set((options.modules ?? []).map((slug) => slug.trim()).filter(Boolean))];
   const entry: Entry = {
     kind: KIND_TASK_DECLARATION,
     sessionNumber: number,
     dateTime: nowIsoFull(),
     task,
     releasable: options.releasable,
+    ...(modules.length > 0 ? { modules } : {}),
   };
   pushEntry(log, entry);
   writeActivityLog(sessionsDir, log);
+  if (modules.length > 0) {
+    // The record carries the modules too, so a reader of the ledger -- the
+    // Work Explorer grouping sessions by module, `dabbler status` -- does
+    // not have to fold the activity log to learn them. Written here, by
+    // the declaring writer, and by nothing else.
+    const raw = readRawSessionState(sessionsDir);
+    if (isRecord(raw) && Array.isArray(raw["sessions"])) {
+      for (const record of raw["sessions"]) {
+        if (isRecord(record) && record["number"] === number) record["modules"] = modules;
+      }
+      validateAndWriteState(sessionsDir, raw);
+    }
+  }
   renderProjectWorkPlan(sessionsDir);
   return entry;
 }

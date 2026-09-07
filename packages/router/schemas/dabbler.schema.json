@@ -19,6 +19,10 @@
       "type": "object",
       "description": "Step (f) of the session lifecycle: pack, then push to the feed. Validated in full by ai_router.packaging. A repository that declares nothing here publishes nothing, which is a declaration rather than an omission."
     },
+    "modules": {
+      "type": "object",
+      "description": "Per-module declarations, keyed by a slug docs/modules.yaml declares: `packaging` (the root block's shape, used for that module's publish), `sharedFiles` (repository-relative paths outside the module's roots a session on it may change), and `contract` ({generate: argv} for the generated-surface fallback). Validated in full by the module manifest reader (modules.ts), which refuses a slug the manifest does not declare; the shape is left open here for the same reason the testing block is. Absent in a single-module repository, where nothing module-shaped is consulted."
+    },
     "driver": {
       "type": "object",
       "additionalProperties": false,

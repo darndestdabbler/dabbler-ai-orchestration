@@ -150,6 +150,33 @@ describe("the declaration", () => {
     });
   }
 
+  it("answers a module's own packaging block for its slug, and the root block for a slug without one", () => {
+    // One feed declared once at the root; a module with its own feed says
+    // so beside its slug under `modules:`. `{version}` is the pack's to
+    // name, and a pack that names it says so on the declaration.
+    const root = packagingConfig("log.json");
+    const config = makeConfig({
+      packaging: root["packaging"],
+      modules: {
+        persister: {
+          packaging: {
+            pack: { argv: ["dotnet", "pack", "modules/persister", "-o", "{output}", "-p:PackageVersion={version}"] },
+            push: { argv: ["dotnet", "nuget", "push", "{artifact}", "--source", "{feed}"], feed: "D:\\feeds\\local" },
+          },
+        },
+        model: {},
+      },
+    });
+    const own = loadDeclaration(config, "persister");
+    assert.deepEqual(own?.pack.argv.slice(0, 3), ["dotnet", "pack", "modules/persister"]);
+    assert.equal(own?.pack.usesVersion, true);
+    assert.equal(own?.push.feed, "D:\\feeds\\local");
+    const inherited = loadDeclaration(config, "model");
+    assert.deepEqual(inherited?.push.feed, FEED);
+    assert.equal(inherited?.pack.usesVersion, false);
+    assert.deepEqual(loadDeclaration(config, null)?.push.feed, FEED);
+  });
+
   it("refuses a block that declares one half and not the other", () => {
     // A pack nobody pushes is a build, and a push with nothing to send is a
     // typo; neither is a publication, so neither is accepted alone.

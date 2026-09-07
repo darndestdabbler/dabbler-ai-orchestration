@@ -42,6 +42,7 @@ import {
   sessionRunDir,
 } from "./ledger.ts";
 import { loadSchemaFile, schemaFailure, tolerantSchemaFailure } from "./schema/validate.ts";
+import type { SolutionShape } from "./modules.ts";
 
 export const DRIVER_DIRNAME = "driver";
 export const DRIVER_SCHEMA_VERSION = 1;
@@ -271,6 +272,68 @@ export function validateWorkPlan(
     seen.add(step.id);
   }
   return plan;
+}
+
+/**
+ * What a plan's `modules` may say, judged against the solution's shape.
+ *
+ * The schema can say the list is non-empty and unique; it cannot say the
+ * slugs exist, that a cross-module session gives its reason, or that a
+ * single-module repository names nothing. Those are the shape's rules, and
+ * they are judged here, at acceptance, in the words a rejection carries. A
+ * single-module solution accepts an absent list and refuses a named module
+ * that is not its own; nothing module-shaped is asked of it.
+ */
+export function judgeWorkPlanModules(plan: DriverWorkPlan, shape: SolutionShape): string[] {
+  return judgeModulesForShape(plan.modules ?? [], plan.reason ?? null, shape, "the plan");
+}
+
+/**
+ * The same judgment for any declaration of modules -- the driven plan and
+ * the typed `session declare --module` alike, so neither path can persist a
+ * module the other would refuse. `who` names the declaration in the words
+ * a refusal carries.
+ */
+export function judgeModulesForShape(
+  modules: readonly string[],
+  reason: string | null,
+  shape: SolutionShape,
+  who = "the declaration",
+): string[] {
+  const named = modules.map((slug) => slug.trim()).filter((slug) => slug !== "");
+  const declared = new Set(shape.modules.map((module) => module.slug));
+  const reasons: string[] = [];
+  if (!shape.multi) {
+    for (const slug of named) {
+      if (!declared.has(slug)) {
+        reasons.push(
+          `${who} names module '${slug}', and this repository is a single-module ` +
+            "solution whose one module is " +
+            `'${shape.modules[0]?.slug ?? ""}'; a single-module declaration names none`,
+        );
+      }
+    }
+    return reasons;
+  }
+  if (named.length === 0) {
+    reasons.push(
+      `${who} names no module, and docs/modules.yaml declares ${declared.size}: a session ` +
+        "in a multi-module solution says which module(s) it works in",
+    );
+    return reasons;
+  }
+  for (const slug of named) {
+    if (!declared.has(slug)) {
+      reasons.push(`${who} names module '${slug}', which docs/modules.yaml does not declare`);
+    }
+  }
+  if (named.length > 1 && !(reason ?? "").trim()) {
+    reasons.push(
+      `${who} names ${named.length} modules (${named.join(", ")}) and gives no reason; ` +
+        "a cross-module session says why in `reason`",
+    );
+  }
+  return reasons;
 }
 
 /**

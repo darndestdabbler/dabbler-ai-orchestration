@@ -322,6 +322,30 @@ describe("declaring a session's task list", () => {
     assert.throws(() => declareSessionTask(sessionsDir, declaration), /already declared/);
   });
 
+  it("writes the modules it is given onto the declaration and the record, and no member when given none", () => {
+    // A multi-module solution's session names its module(s); a
+    // single-module one persists nothing module-shaped, so its row is
+    // exactly the row it always was.
+    const named = makeSessionsDir();
+    registerSessionStart(named.sessionsDir, 1, { engine: "claude-code" });
+    const entry = declareSessionTask(named.sessionsDir, {
+      sessionNumber: 1, task: "Persist it.", releasable: false, modules: ["persister", "persister", " "],
+    });
+    assert.deepEqual(entry["modules"], ["persister"]);
+    const record = (JSON.parse(readFileSync(join(named.sessionsDir, "sessions.json"), "utf8")) as { sessions: Record<string, unknown>[] }).sessions[0]!;
+    assert.deepEqual(record["modules"], ["persister"]);
+    // A later registration carries it, like the verdict and the version.
+    const carried = registerSessionStart(named.sessionsDir, 2, { engine: "claude-code" })["sessions"] as Record<string, unknown>[];
+    assert.deepEqual(carried[0]!["modules"], ["persister"]);
+
+    const plain = makeSessionsDir();
+    registerSessionStart(plain.sessionsDir, 1, { engine: "claude-code" });
+    const bare = declareSessionTask(plain.sessionsDir, { sessionNumber: 1, task: "Do it.", releasable: false });
+    assert.equal("modules" in bare, false);
+    const row = (JSON.parse(readFileSync(join(plain.sessionsDir, "sessions.json"), "utf8")) as { sessions: Record<string, unknown>[] }).sessions[0]!;
+    assert.equal("modules" in row, false);
+  });
+
   it("refuses once the tree carries the session's work, and does not count the run ledger or editor droppings as work", () => {
     const { sessionsDir } = makeSessionsDir();
     registerSessionStart(sessionsDir, 1, { engine: "claude-code" });

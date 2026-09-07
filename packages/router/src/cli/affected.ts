@@ -14,6 +14,7 @@ import {
   upstreamRemote,
 } from "../evidence.ts";
 import { loadSelectionConfig, selectTests } from "../checks.ts";
+import { moduleConfigs, solutionShape } from "../modules.ts";
 import { loadSuitesChecked } from "../testEvidence.ts";
 import { preverifyBaseline, runnableCommands, workingTreeChanges } from "../affected.ts";
 import { dumps } from "../pythonJson.ts";
@@ -128,7 +129,25 @@ export async function affectedVerb(argv: string[]): Promise<number> {
     return EXIT_USAGE;
   }
 
-  const result = selectTests(repoRoot, changed, loaded.config);
+  // The module form, when the manifest declares more than one module: the
+  // shape, the suites with their module fields, and each module's shared
+  // files. A single-module repository hands the selector nothing extra and
+  // gets the file form it always had.
+  const shape = solutionShape(repoRoot);
+  const declaredSuites = loadSuitesChecked(config, { shape }).suites;
+  const moduleContext = shape.multi
+    ? {
+        shape,
+        suites: declaredSuites,
+        sharedFiles: new Map(
+          [...moduleConfigs(config, shape.modules).values()].map((entry) => [
+            entry.slug,
+            entry.sharedFiles,
+          ]),
+        ),
+      }
+    : null;
+  const result = selectTests(repoRoot, changed, loaded.config, moduleContext);
   if (json) {
     writeOut(dumps(result.toDict(), { indent: 2 }) + "\n");
     return EXIT_OK;
@@ -142,7 +161,7 @@ export async function affectedVerb(argv: string[]): Promise<number> {
   // different: a repository with no suite at all and one whose suite is
   // simply not expensive need opposite advice, and only the count before
   // the filter can tell them apart.
-  const declared = loadSuitesChecked(config).suites;
+  const declared = declaredSuites;
   const suites = declared.filter((suite) => suite.expensive);
   const commands = (): string =>
     "\n" + runnableCommands(suites, result, declared.length).join("\n") + "\n";
@@ -152,11 +171,20 @@ export async function affectedVerb(argv: string[]): Promise<number> {
     writeOut(lines.join(""));
     return EXIT_OK;
   }
+  // The modules the change reached, and the suites it selects whole --
+  // each with why: the module's own change, or a consumer's contract
+  // against it.
+  if (result.modules.length > 0) lines.push(`modules: ${result.modules.join(", ")}\n`);
+  for (const suite of result.suites) {
+    lines.push(
+      `  ${pad(suite.reason, 22)} suite ${suite.name} (${suite.module})  <- ${suite.selectedBy}\n`,
+    );
+  }
   for (const risk of result.risks) lines.push(`  RISK ${risk.kind}: ${risk.path}\n`);
   for (const choice of result.selected) {
     lines.push(`  ${pad(choice.reason, 22)} ${choice.path}  <- ${choice.selectedBy}\n`);
   }
-  if (result.selected.length === 0) {
+  if (result.selected.length === 0 && result.suites.length === 0) {
     lines.push("no tests affected by this change set\n");
     writeOut(lines.join(""));
     return EXIT_OK;

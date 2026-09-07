@@ -1548,6 +1548,12 @@ export function buildProjection(
       startedAt: entry["startedAt"] ?? null,
       completedAt: entry["completedAt"] ?? null,
       verificationVerdict: entry["verificationVerdict"] ?? null,
+      // Present only on a session whose declaration named modules -- a
+      // multi-module solution's -- so a single-module row projects exactly
+      // what it always has.
+      ...(Array.isArray(entry["modules"]) && entry["modules"].length > 0
+        ? { modules: [...(entry["modules"] as string[])] }
+        : {}),
       tasks: [] as unknown[],
       tasksRefused: null as string | null,
       // The rounds ledger folded for reading at planning time, for every

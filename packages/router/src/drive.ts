@@ -32,7 +32,7 @@
 // nothing: the session stays in flight, `run.json` says why, and a re-run
 // continues from the phase it reached.
 
-import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 
 import {
@@ -65,6 +65,8 @@ import {
   readRun,
   readWatcher,
   readWorkPlan,
+  judgeWorkPlanModules,
+  planPath,
   takeInterrupt,
   transcriptPath,
   writeInstruction,
@@ -91,6 +93,7 @@ import type {
 import { type Job, endJob, jobLogTail, pollJob, selfArgv, startJob } from "./jobs.ts";
 import { SolutionDepsError, placeMember } from "./solutionDeps.ts";
 import { tryWriteProjection } from "./projection.ts";
+import { solutionShape } from "./modules.ts";
 import {
   changedPathsBetween,
   nowIso,
@@ -470,6 +473,8 @@ const RULE = {
   filesChangedOmits: "files-changed-omits",
   checkFailed: "check-failed",
   noWorkPlan: "no-work-plan",
+  /** The plan's modules do not fit the solution's shape. */
+  planModules: "plan-modules",
 } as const;
 
 /** One refusal, carrying the name of the rule that refused it. */
@@ -1702,14 +1707,25 @@ ${this.stopArtifacts()}`,
         answer_command: this.answerCommand("file"),
       });
       plan = readWorkPlan(this.repoRoot, this.sessionNumber);
-      if (plan !== null) break;
-      reasons = [
-        refusal(
-          RULE.noWorkPlan,
-          `no work plan was written for instruction ${instruction.seq}; the answer is ` +
-            `\`${instruction.answer_command}\``,
-        ),
-      ];
+      if (plan !== null) {
+        // The schema accepted it; the solution's shape may not. A plan that
+        // names an undeclared module, or two modules with no reason, is
+        // handed back with the shape's own words, and the file is removed
+        // so the next answer is judged afresh rather than re-read.
+        const shapeReasons = judgeWorkPlanModules(plan, solutionShape(this.repoRoot));
+        if (shapeReasons.length === 0) break;
+        unlinkSync(planPath(this.repoRoot, this.sessionNumber));
+        plan = null;
+        reasons = shapeReasons.map((reason) => refusal(RULE.planModules, reason));
+      } else {
+        reasons = [
+          refusal(
+            RULE.noWorkPlan,
+            `no work plan was written for instruction ${instruction.seq}; the answer is ` +
+              `\`${instruction.answer_command}\``,
+          ),
+        ];
+      }
       this.setRejections(this.rejections + 1);
       this.log("plan-rejected", { seq: instruction.seq, rejection: this.rejections, reasons });
       if (this.rejections >= MAX_REJECTIONS) {
@@ -1725,10 +1741,14 @@ ${this.stopArtifacts()}`,
     this.placePlannedRepositories(plan);
 
     if (readTaskDeclaration(this.sessionsDir, this.sessionNumber) === null) {
+      // The modules reach the record only in a multi-module solution; a
+      // single-module plan carries none, and the judge above saw to it.
+      const shape = solutionShape(this.repoRoot);
       const code = declare(this.sessionsDir, {
         task: plan.task,
         releasable: plan.releasable,
         sessionNumber: this.sessionNumber,
+        modules: shape.multi ? (plan.modules ?? null) : null,
       });
       if (code !== EXIT_OK) {
         throw new Stop(

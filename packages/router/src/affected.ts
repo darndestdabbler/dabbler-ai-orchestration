@@ -247,11 +247,17 @@ export function runnableCommands(
         "that runs it, and the paths it covers.",
     ];
   }
+  // A suite the module form selected whole is its bare command: a compiled
+  // library is proved by its suite run entire, and there is no subset to
+  // name. The file form narrows as before.
+  const whole = new Set(result.suiteNames);
   return suites
     .map((suite) =>
-      targetedCommand(suite.command, result.forSuite(suite.name), {
-        runsWhole: suite.runsWhole,
-      }),
+      whole.has(suite.name)
+        ? suite.command
+        : targetedCommand(suite.command, result.forSuite(suite.name), {
+            runsWhole: suite.runsWhole,
+          }),
     )
     .filter((command) => command !== "");
 }

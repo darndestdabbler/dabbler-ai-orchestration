@@ -56,4 +56,12 @@ export type DriverWorkPlan = {
     }[];
   }[];
   recorded_at: string;
+  /**
+   * The module(s) this session works in, by slug from docs/modules.yaml. Judged at acceptance against the solution's shape: in a multi-module solution the plan names at least one declared module and, when it names more than one, says why in `reason`; a single-module solution leaves it out, because its repository is the module. Absent in every session of a single-module repository.
+   */
+  modules?: string[];
+  /**
+   * Why this session must change more than one module, recorded verbatim on the declaration. Required exactly when `modules` names two or more: a cross-module session is rare, and the reason is what makes it reviewable.
+   */
+  reason?: string;
 };

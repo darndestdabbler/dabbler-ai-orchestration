@@ -188,6 +188,10 @@ export type ProgressProjectionSession = {
   startedAt: string | null;
   completedAt: string | null;
   verificationVerdict: string | null;
+  /**
+   * The module(s) the session's declaration named, by slug. Present only for a session of a multi-module solution; a single-module row carries no member, so nothing changes in what it projects.
+   */
+  modules?: string[];
   tasks: ProgressProjectionTask[];
   /**
    * Why the execution record could not be read. A refusal is not an empty task list: the view must say it cannot tell which step is open rather than render the last row it could read.

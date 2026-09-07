@@ -13,6 +13,7 @@ import {
   namesATest,
   selectTests,
   selectionTestRoots,
+  type ModuleSelection,
   type SelectionConfig,
 } from "../src/checks.ts";
 import { seed, tempDir } from "./support/answers.ts";
@@ -72,6 +73,106 @@ describe("what the selector calls a test", () => {
     assert.deepEqual(installed.unknownPaths, []);
     assert.deepEqual(installed.risks, []);
     assert.deepEqual(installed.testPaths, []);
+  });
+});
+
+describe("the module form", () => {
+  // The CSV pipeline: a shared model, two libraries on it, one application
+  // on all three. Suites per module, with the listener's compatibility
+  // suites against the two libraries it consumes.
+  const shape = {
+    multi: true,
+    implicit: false,
+    modules: [
+      { slug: "model", codeRoots: ["modules/model"], dependsOn: [] },
+      { slug: "deserializer", codeRoots: ["modules/deserializer"], dependsOn: ["model"] },
+      { slug: "persister", codeRoots: ["modules/persister"], dependsOn: ["model"] },
+      { slug: "listener", codeRoots: ["modules/listener"], dependsOn: ["model", "deserializer", "persister"] },
+    ],
+  } as unknown as ModuleSelection["shape"];
+  const suites: ModuleSelection["suites"] = [
+    { name: "model-unit", module: "model", role: "unit" },
+    { name: "deserializer-unit", module: "deserializer", role: "unit" },
+    { name: "deserializer-provider", module: "deserializer", role: "provider-contract" },
+    { name: "persister-unit", module: "persister", role: "unit" },
+    { name: "persister-provider", module: "persister", role: "provider-contract" },
+    { name: "listener-unit", module: "listener", role: "unit" },
+    { name: "listener-vs-persister", module: "listener", role: "consumer-contract", against: "persister" },
+    { name: "listener-vs-deserializer", module: "listener", role: "consumer-contract", against: "deserializer" },
+    { name: "integration", module: "listener", role: "unit" },
+  ];
+  const context: ModuleSelection = {
+    shape,
+    suites,
+    // The central pins are shared by both libraries: a change to them is
+    // each one's change.
+    sharedFiles: new Map([
+      ["deserializer", ["Directory.Packages.props"]],
+      ["persister", ["Directory.Packages.props"]],
+    ]),
+  };
+  const config: SelectionConfig = { scopes: [], smoke: ["tests/test_smoke.py"], repoWide: [], rules: [] };
+
+  it("selects a changed module's suites whole and its transitive consumers' contract suites against it, and nothing else", () => {
+    const result = selectTests(tree(), ["modules/persister/src/Persister.cs"], config, context);
+    assert.deepEqual(result.modules, ["persister"]);
+    assert.deepEqual(
+      result.suites.map((s) => [s.name, s.reason]),
+      [
+        ["persister-unit", "module-changed"],
+        ["persister-provider", "module-changed"],
+        ["listener-vs-persister", "consumer-contract"],
+      ],
+    );
+    // No file-form tests and no unknown path: the module owns it.
+    assert.deepEqual(result.testPaths, []);
+    assert.deepEqual(result.risks, []);
+    // A shared file is EVERY naming module's change, not the first one's;
+    // a path in no module still falls through to the rules and then to
+    // selection_unknown.
+    const shared = selectTests(tree(), ["Directory.Packages.props"], config, context);
+    assert.deepEqual(shared.modules, ["deserializer", "persister"]);
+    assert.ok(shared.suiteNames.includes("deserializer-unit") && shared.suiteNames.includes("persister-unit"));
+    const stray = selectTests(tree(), ["scripts/deploy.rb"], config, context);
+    assert.deepEqual(stray.unknownPaths, ["scripts/deploy.rb"]);
+    assert.deepEqual(stray.suites, []);
+    // The shared-types module at the bottom reaches every consumer's
+    // contract suite against it -- here none declares one against the
+    // model, so its own suite is the whole of it -- and the modules reached
+    // are listed in dependency order.
+    const model = selectTests(tree(), ["modules/model/Person.cs", "modules/listener/Job.cs"], config, context);
+    assert.deepEqual(model.modules, ["model", "listener"]);
+    // A single-module context is the file form unchanged.
+    const single = selectTests(tree(), ["modules/persister/x.cs"], config, { ...context, shape: { ...shape, multi: false } });
+    assert.deepEqual(single.suites, []);
+    assert.deepEqual(single.unknownPaths, ["modules/persister/x.cs"]);
+  });
+
+  it("lets a rule select a module, which expands to that module's suites", () => {
+    const loaded = loadSelectionConfig({
+      testing: {
+        selection: {
+          rules: [{ when: "shared/schema.json", select: [{ module: "deserializer" }, "tests/test_smoke.py"] }],
+        },
+      },
+    });
+    assert.equal(loaded.ok, true, loaded.errors.join("; "));
+    assert.deepEqual(loaded.config.rules, [["shared/schema.json", ["tests/test_smoke.py"], ["deserializer"]]]);
+    const result = selectTests(tree(), ["shared/schema.json"], loaded.config, context);
+    assert.deepEqual(result.modules, ["deserializer"]);
+    assert.deepEqual(
+      result.suites.map((s) => [s.name, s.reason, s.selectedBy]),
+      [
+        ["deserializer-unit", "configured-rule", "shared/schema.json"],
+        ["deserializer-provider", "configured-rule", "shared/schema.json"],
+        ["listener-vs-deserializer", "consumer-contract", "shared/schema.json"],
+      ],
+    );
+    assert.deepEqual(result.testPaths, ["tests/test_smoke.py"]);
+    assert.match(
+      loadSelectionConfig({ testing: { selection: { rules: [{ when: "x", select: [{ modul: "a" }] }] } } }).errors[0] ?? "",
+      /must be a list of test paths or \{module: <slug>\} entries/,
+    );
   });
 });
 

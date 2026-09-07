@@ -521,6 +521,90 @@ export function create(
   return EXIT_OK;
 }
 
+// --- The per-module declarations in dabbler.yaml -----------------------------
+
+/**
+ * One module's entry under `modules:` in the root `dabbler.yaml`: how it
+ * publishes, which shared files a session on it may change, and how its
+ * surface is generated when its contract is the generated fallback. Every
+ * member optional; the manifest says what the modules ARE, this says what
+ * the repository declares about each.
+ */
+export interface ModuleConfig {
+  readonly slug: string;
+  /** The root `packaging` block's shape; validated by `packaging.ts` when used. */
+  readonly packaging: Record<string, unknown> | null;
+  /** Repository-relative paths outside the module's roots a session on it may change. */
+  readonly sharedFiles: readonly string[];
+  /** argv for the generated-surface fallback (`contract: generated`). */
+  readonly contractGenerate: readonly string[] | null;
+}
+
+const KNOWN_CONFIG_KEYS: readonly string[] = ["packaging", "sharedFiles", "contract"];
+
+/**
+ * The `modules:` mapping of a loaded configuration, held to the manifest.
+ *
+ * A slug the manifest does not declare is refused by name -- a block for a
+ * module nobody declared is a typo that would otherwise sit silent -- and so
+ * is an unknown key inside an entry. An absent mapping is the ordinary
+ * single-module state and yields nothing.
+ */
+export function moduleConfigs(
+  config: unknown,
+  entries: readonly ModuleEntry[],
+): Map<string, ModuleConfig> {
+  const out = new Map<string, ModuleConfig>();
+  if (!isRecord(config)) return out;
+  const raw = config["modules"];
+  if (raw === null || raw === undefined) return out;
+  if (!isRecord(raw)) {
+    throw new ManifestError("dabbler.yaml: 'modules' must be a mapping keyed by module slug");
+  }
+  const declared = new Set(entries.map((entry) => entry.slug));
+  for (const [slug, value] of Object.entries(raw)) {
+    const where = `dabbler.yaml: modules.${slug}`;
+    if (!declared.has(slug)) {
+      throw new ManifestError(
+        `${where} names a module that docs/modules.yaml does not declare`,
+      );
+    }
+    if (!isRecord(value)) throw new ManifestError(`${where} must be a mapping`);
+    const unknown = Object.keys(value)
+      .filter((key) => !KNOWN_CONFIG_KEYS.includes(key))
+      .sort();
+    if (unknown.length > 0) {
+      throw new ManifestError(
+        `${where} has unknown key(s) ${unknown.join(", ")}. ` +
+          `Known keys: ${KNOWN_CONFIG_KEYS.join(", ")}.`,
+      );
+    }
+    const packaging = value["packaging"];
+    if (packaging !== null && packaging !== undefined && !isRecord(packaging)) {
+      throw new ManifestError(`${where}.packaging must be a mapping`);
+    }
+    let contractGenerate: string[] | null = null;
+    const contract = value["contract"];
+    if (contract !== null && contract !== undefined) {
+      if (!isRecord(contract)) throw new ManifestError(`${where}.contract must be a mapping`);
+      const generate = contract["generate"];
+      if (generate !== null && generate !== undefined) {
+        contractGenerate = stringList(generate, where, "contract.generate");
+        if (contractGenerate.length === 0) {
+          throw new ManifestError(`${where}.contract.generate must name a program`);
+        }
+      }
+    }
+    out.set(slug, {
+      slug,
+      packaging: isRecord(packaging) ? packaging : null,
+      sharedFiles: stringList(value["sharedFiles"], where, "sharedFiles"),
+      contractGenerate,
+    });
+  }
+  return out;
+}
+
 /** What `dabbler modules show` prints: the shape, with `usedBy` derived per module. */
 export function shown(workspaceRoot: string): Record<string, unknown> {
   const shape = solutionShape(workspaceRoot);

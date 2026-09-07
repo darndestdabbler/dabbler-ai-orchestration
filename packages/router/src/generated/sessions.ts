@@ -36,6 +36,10 @@ export type SessionsSessionRecord = {
    * The router version that registered this session, as its own manifest declares it. Additive and absent on every row written before it existed: a record cannot be back-filled with a version nobody can check, and 'written before the stamp' is a fact the absence states exactly. It answers the question a reader of an old ledger cannot otherwise ask -- which implementation produced this -- and it is the one place that question is answerable, because the orchestrator block names the ENGINE and not the framework.
    */
   frameworkVersion?: string;
+  /**
+   * The module(s) the accepted work plan named, by slug, written by the declaring writer for a multi-module solution only. Absent on every session of a single-module repository and on every row written before the vocabulary existed: nothing module-shaped is persisted for that shape.
+   */
+  modules?: string[];
 };
 
 /**

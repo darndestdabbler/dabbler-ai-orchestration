@@ -19,6 +19,10 @@ export type Dabbler = {
    */
   packaging?: Record<string, unknown>;
   /**
+   * Per-module declarations, keyed by a slug docs/modules.yaml declares: `packaging` (the root block's shape, used for that module's publish), `sharedFiles` (repository-relative paths outside the module's roots a session on it may change), and `contract` ({generate: argv} for the generated-surface fallback). Validated in full by the module manifest reader (modules.ts), which refuses a slug the manifest does not declare; the shape is left open here for the same reason the testing block is. Absent in a single-module repository, where nothing module-shaped is consulted.
+   */
+  modules?: Record<string, unknown>;
+  /**
    * How far `dabbler session drive` may go on this repository's behalf. Repository-owned like the testing block, and for the same reason: a bound a gitignored overlay could raise is not a bound.
    */
   driver?: {

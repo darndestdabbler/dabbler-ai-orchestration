@@ -33,6 +33,7 @@ import {
   runGit,
 } from "./journal.ts";
 import { LIFECYCLE_WRITTEN_FILES, RUNS_DIRNAME } from "./ledger.ts";
+import type { SolutionShape } from "./modules.ts";
 import { PythonFloat, dumps, pythonFloatRepr, pythonRepr } from "./pythonJson.ts";
 
 export { matchingPrefixes } from "./checks.ts";
@@ -147,6 +148,15 @@ export const SESSION_BOOKKEEPING_BASENAMES: ReadonlySet<string> = new Set([
   ".lifecycle.lock",
 ]);
 
+/**
+ * What a suite is to the module it proves. `unit` is the module's own
+ * tests; `provider-contract` is the contract-test package run against the
+ * module's abstractions; `consumer-contract` is a consumer's compatibility
+ * suite, run against the provider it names in `against`.
+ */
+export const SUITE_ROLES = ["unit", "provider-contract", "consumer-contract"] as const;
+export type SuiteRole = (typeof SUITE_ROLES)[number];
+
 export interface SuiteSpec {
   readonly name: string;
   readonly command: string;
@@ -154,6 +164,34 @@ export interface SuiteSpec {
   readonly expensive: boolean;
   /** The runner takes no subset, so a run of it is the complete suite. */
   readonly runsWhole: boolean;
+  /**
+   * Whether the close demands a fresh green record of this suite. Absent
+   * means "the same as `expensive`", which is what the one flag used to
+   * mean; `false` on an expensive suite is a suite that runs and is recorded
+   * as information without being the close's obligation.
+   */
+  readonly requiredForClose?: boolean;
+  /** The module this suite proves, by slug; null for a repository-wide suite. */
+  readonly module?: string | null;
+  readonly role?: SuiteRole;
+  /** For a consumer-contract suite: the provider it runs against, by slug. */
+  readonly against?: string | null;
+}
+
+/** The close's obligation, read through the one rule for the absent field. */
+export function suiteRequiredForClose(suite: SuiteSpec): boolean {
+  return suite.requiredForClose ?? suite.expensive;
+}
+
+/** What the loader is told about the solution, when the caller knows it. */
+export interface SuiteLoadOptions {
+  /**
+   * The solution's shape. When it is multi-module, a suite's `module` and
+   * `against` must name declared modules; for a single-module solution the
+   * module fields are not consulted at all, so nothing changes for a
+   * repository that declares none.
+   */
+  readonly shape?: SolutionShape | null;
 }
 
 export interface SuiteLoadResult {
@@ -245,7 +283,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  * whether a suite may be argv at all, which is a design question rather than
  * a translation. It is recorded as owed rather than repaired on one side.
  */
-export function loadSuitesChecked(config: unknown): SuiteLoadResult {
+export function loadSuitesChecked(
+  config: unknown,
+  options: SuiteLoadOptions = {},
+): SuiteLoadResult {
   const done = (
     suites: readonly SuiteSpec[],
     errors: readonly string[],
@@ -285,12 +326,69 @@ export function loadSuitesChecked(config: unknown): SuiteLoadResult {
       errors.push(`${label}.covers must be a list of path prefixes`);
       return;
     }
+    const expensive = Boolean(entry["expensive"]);
+    const roleRaw = entry["role"] ?? "unit";
+    if (typeof roleRaw !== "string" || !(SUITE_ROLES as readonly string[]).includes(roleRaw)) {
+      errors.push(`${label}.role must be one of ${SUITE_ROLES.join(", ")}`);
+      return;
+    }
+    const role = roleRaw as SuiteRole;
+    const slugOf = (key: string): string | null | undefined => {
+      const value = entry[key];
+      if (value === null || value === undefined) return null;
+      if (typeof value !== "string" || value.trim() === "") {
+        errors.push(`${label}.${key} must name a module by its slug`);
+        return undefined;
+      }
+      return value.trim();
+    };
+    const moduleSlug = slugOf("module");
+    const against = slugOf("against");
+    if (moduleSlug === undefined || against === undefined) return;
+    if (role === "consumer-contract" && against === null) {
+      errors.push(
+        `${label} ('${name.trim()}') is a consumer-contract suite and must say which ` +
+          "provider it runs against",
+      );
+      return;
+    }
+    if (role !== "consumer-contract" && against !== null) {
+      errors.push(
+        `${label} ('${name.trim()}') names 'against', which only a consumer-contract suite does`,
+      );
+      return;
+    }
+    const required = entry["required_for_close"];
+    if (required !== undefined && required !== null && typeof required !== "boolean") {
+      errors.push(`${label}.required_for_close must be true or false`);
+      return;
+    }
+    // The module fields are held to the manifest only where the manifest
+    // has more than one module to name; a single-module repository is not
+    // asked about a vocabulary it does not use.
+    const shape = options.shape ?? null;
+    if (shape !== null && shape.multi) {
+      const declared = new Set(shape.modules.map((module) => module.slug));
+      for (const [key, slug] of [["module", moduleSlug], ["against", against]] as const) {
+        if (slug !== null && !declared.has(slug)) {
+          errors.push(
+            `${label} ('${name.trim()}') names ${key} '${slug}', which docs/modules.yaml ` +
+              "does not declare",
+          );
+          return;
+        }
+      }
+    }
     suites.push({
       name: name.trim(),
       command: command.trim(),
       covers: covers as string[],
-      expensive: Boolean(entry["expensive"]),
+      expensive,
       runsWhole: Boolean(entry["runs_whole"]),
+      requiredForClose: typeof required === "boolean" ? required : expensive,
+      module: moduleSlug,
+      role,
+      against,
     });
   });
   // A suite that is not expensive is never the run of record, and the
@@ -806,9 +904,12 @@ export interface FreshnessFacts {
  */
 export function freshnessVerdict(suite: SuiteSpec, facts: FreshnessFacts): FreshnessVerdict {
   const { changed, current, records } = facts;
+  // Judged for every expensive suite, demanded only for the ones the close
+  // requires: a suite run for information gets its verdict on the record
+  // and never refuses the close.
   const verdict = (passed: boolean, reason: string): FreshnessVerdict => ({
     suite: suite.name,
-    required: true,
+    required: suiteRequiredForClose(suite),
     passed,
     reason,
     changedInputs: changed,

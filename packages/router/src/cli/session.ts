@@ -96,6 +96,10 @@ const OPTIONS: Record<string, readonly string[]> = {
     "  --task-file PATH         the task list, read from a file",
     "  --releasable             this session may publish",
     "  --not-releasable         it may not; one of the two is required",
+    "  --module SLUG            the module this session works in (repeatable);",
+    "                           for a multi-module solution only",
+    "  --reason TEXT            why the session must change more than one module;",
+    "                           required with two or more --module",
   ],
   next: [
     "  --transport T            the verification transport, as `dabbler verify` takes it;",
@@ -224,9 +228,12 @@ interface Parsed {
   readonly values: Map<string, string>;
   readonly switches: Set<string>;
   readonly positional: string[];
+  /** `--module <slug>`, repeatable; the declaration's modules. */
+  readonly modules: string[];
 }
 
 const SWITCHES = new Set(["--releasable", "--not-releasable", "--dry-run", "--force", "--stop"]);
+const REPEATABLE_MODULE = "--module";
 
 /**
  * Why a driving call refuses `--max-rounds` instead of accepting it.
@@ -247,6 +254,7 @@ function parseArgs(argv: readonly string[]): Parsed | string {
   const values = new Map<string, string>();
   const switches = new Set<string>();
   const positional: string[] = [];
+  const modules: string[] = [];
   for (let index = 0; index < argv.length; index += 1) {
     const token = argv[index];
     if (!token.startsWith("--")) {
@@ -255,7 +263,9 @@ function parseArgs(argv: readonly string[]): Parsed | string {
     }
     const equals = token.indexOf("=");
     if (equals !== -1) {
-      values.set(token.slice(0, equals), token.slice(equals + 1));
+      const flag = token.slice(0, equals);
+      if (flag === REPEATABLE_MODULE) modules.push(token.slice(equals + 1));
+      else values.set(flag, token.slice(equals + 1));
       continue;
     }
     if (SWITCHES.has(token)) {
@@ -266,10 +276,13 @@ function parseArgs(argv: readonly string[]): Parsed | string {
     if (next === undefined || next.startsWith("--")) {
       return `argument ${token}: expected one argument`;
     }
-    values.set(token, next);
+    // The one repeatable flag: a session in a multi-module solution names
+    // the module(s) it works in on `declare`, once each.
+    if (token === REPEATABLE_MODULE) modules.push(next);
+    else values.set(token, next);
     index += 1;
   }
-  return { values, switches, positional };
+  return { values, switches, positional, modules };
 }
 
 function integer(raw: string | undefined, flag: string): number | null | string {
@@ -681,6 +694,8 @@ export async function sessionVerb(argv: string[]): Promise<number> {
     taskFile: taskFile ?? null,
     releasable,
     sessionNumber,
+    modules: parsed.modules,
+    reason: values.get("--reason") ?? null,
   });
 }
 

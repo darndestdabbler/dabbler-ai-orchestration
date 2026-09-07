@@ -33,6 +33,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { hiddenSpawn, snapshotWorktreeTree } from "./journal.ts";
+import { consumersOf, type SolutionShape } from "./modules.ts";
 import { pythonRepr } from "./pythonJson.ts";
 
 export const STAGE_TARGETED = "targeted";
@@ -59,6 +60,13 @@ export const CONTROL_KINDS: ReadonlySet<string> = new Set([
 export const SUITE_FIELDS: ReadonlySet<string> = new Set([
   "name", "command", "argv", "covers", "cwd", "expensive", "small",
   "timeout_seconds", "test_roots", "test_glob", "runs_whole",
+  // The module vocabulary (session 101): which module a suite proves, what
+  // it is (unit, provider-contract, consumer-contract), which provider a
+  // consumer-contract suite runs against, and whether the close demands it
+  // -- a word of its own beside `expensive`, which had meant both "the run
+  // of record" and "required for close". Consulted only in a multi-module
+  // solution; a single-module repository declares none of them.
+  "module", "role", "against", "required_for_close",
 ]);
 export const CONTROL_FIELDS: ReadonlySet<string> = new Set([
   "name", "kind", "command", "argv", "covers", "cwd", "required",
@@ -80,6 +88,16 @@ export const CONTROL_FIELDS: ReadonlySet<string> = new Set([
 export const REASON_CHANGED_TEST = "changed-test";
 export const REASON_CONFIGURED_RULE = "configured-rule";
 export const REASON_SMOKE = "selection-unknown-smoke";
+/**
+ * The module form (session 101). A change under a module's roots selects
+ * that module's suites whole -- `module-changed` -- and each transitive
+ * consumer's consumer-contract suite against it -- `consumer-contract`.
+ * Suites, not test files: a compiled library is proved by its suites run
+ * whole, and the consumers' contract suites are found by the manifest's
+ * reverse edges, never hand-listed.
+ */
+export const REASON_MODULE_CHANGED = "module-changed";
+export const REASON_CONSUMER_CONTRACT = "consumer-contract";
 
 /**
  * Strongest first. A test selected by several routes is recorded once, under
@@ -284,6 +302,42 @@ export interface SelectionRisk {
   readonly detail: string;
 }
 
+/** A suite selected whole, by the module form. */
+export interface SelectedSuite {
+  readonly name: string;
+  readonly reason: string;
+  /** The changed path, or the rule, that reached it. */
+  readonly selectedBy: string;
+  /** The module the suite proves. */
+  readonly module: string;
+}
+
+/**
+ * What the module form needs to know of a suite: which module it proves,
+ * what it is, and which provider a consumer-contract suite runs against.
+ * Structural rather than imported, because the evidence module that
+ * declares the full suite spec imports this one.
+ */
+export interface ModuleSuite {
+  readonly name: string;
+  readonly module?: string | null;
+  readonly role?: string;
+  readonly against?: string | null;
+}
+
+/**
+ * The module context a caller hands the selector in a multi-module
+ * solution: the shape, the suites with their module fields, and each
+ * module's shared files (paths outside its roots a change to which is that
+ * module's change). Absent, or single-module, selection is the file form
+ * unchanged.
+ */
+export interface ModuleSelection {
+  readonly shape: SolutionShape;
+  readonly suites: readonly ModuleSuite[];
+  readonly sharedFiles?: ReadonlyMap<string, readonly string[]>;
+}
+
 /**
  * One suite's answer to "what is a test here": where they live and what this
  * repository calls them. Both are declared, because guessing either one is
@@ -305,8 +359,12 @@ export interface SelectionConfig {
   readonly scopes: readonly SuiteScope[];
   readonly smoke: readonly string[];
   readonly repoWide: readonly string[];
-  /** `[whenPrefix, [testPath, ...]]` pairs. */
-  readonly rules: ReadonlyArray<readonly [string, readonly string[]]>;
+  /**
+   * `[whenPrefix, [testPath, ...], [moduleSlug, ...]?]` -- a rule selects
+   * test files, and may also select a module, which expands to that
+   * module's suites so the rule never hand-lists suites that go stale.
+   */
+  readonly rules: ReadonlyArray<readonly [string, readonly string[], (readonly string[])?]>;
 }
 
 export function emptySelectionConfig(): SelectionConfig {
@@ -343,6 +401,10 @@ export class SelectionResult {
   readonly risks: readonly SelectionRisk[];
   readonly allTestsAffected: boolean;
   readonly allAffectedReason: string;
+  /** Suites selected whole by the module form; empty in the file form. */
+  readonly suites: readonly SelectedSuite[];
+  /** The modules the change reached, in the manifest's dependency order. */
+  readonly modules: readonly string[];
 
   constructor(
     fields: {
@@ -350,12 +412,21 @@ export class SelectionResult {
       risks?: readonly SelectionRisk[];
       allTestsAffected?: boolean;
       allAffectedReason?: string;
+      suites?: readonly SelectedSuite[];
+      modules?: readonly string[];
     } = {},
   ) {
     this.selected = fields.selected ?? [];
     this.risks = fields.risks ?? [];
     this.allTestsAffected = fields.allTestsAffected ?? false;
     this.allAffectedReason = fields.allAffectedReason ?? "";
+    this.suites = fields.suites ?? [];
+    this.modules = fields.modules ?? [];
+  }
+
+  /** The names of the suites selected whole, in selection order. */
+  get suiteNames(): string[] {
+    return [...new Set(this.suites.map((entry) => entry.name))];
   }
 
   get testPaths(): string[] {
@@ -385,6 +456,8 @@ export class SelectionResult {
       risks: this.risks,
       allTestsAffected: this.allTestsAffected,
       allAffectedReason: this.allAffectedReason,
+      suites: this.suites.filter((entry) => entry.name === name),
+      modules: this.modules,
     });
   }
 
@@ -403,6 +476,19 @@ export class SelectionResult {
       })),
       allTestsAffected: this.allTestsAffected,
       allAffectedReason: this.allAffectedReason,
+      // Present only in the module form, so a single-module payload is
+      // exactly the payload it always was.
+      ...(this.suites.length > 0
+        ? {
+            suites: this.suites.map((entry) => ({
+              name: entry.name,
+              reason: entry.reason,
+              selectedBy: entry.selectedBy,
+              module: entry.module,
+            })),
+          }
+        : {}),
+      ...(this.modules.length > 0 ? { modules: [...this.modules] } : {}),
     };
   }
 }
@@ -543,7 +629,7 @@ export function loadSelectionConfig(config: unknown): SelectionConfigResult {
   const smoke = strList(raw["smoke"], "testing.selection.smoke");
   const repoWide = strList(raw["repo_wide"], "testing.selection.repo_wide");
 
-  const rules: Array<readonly [string, readonly string[]]> = [];
+  const rules: Array<readonly [string, readonly string[], (readonly string[])?]> = [];
   let rawRules = raw["rules"];
   if (rawRules !== null && rawRules !== undefined && !Array.isArray(rawRules)) {
     errors.push("testing.selection.rules must be a list");
@@ -567,20 +653,34 @@ export function loadSelectionConfig(config: unknown): SelectionConfigResult {
     }
     const select = entry["select"];
     // An explicit empty list is the declaration "this path affects no test",
-    // which is different from "unmapped" and must stay expressible.
+    // which is different from "unmapped" and must stay expressible. An entry
+    // may be a test path, or `{module: <slug>}` -- the module's suites,
+    // resolved when the selection runs, so the rule never lists suites that
+    // go stale.
+    const isModuleTarget = (value: unknown): value is { module: string } =>
+      isRecord(value) &&
+      Object.keys(value).length === 1 &&
+      typeof value["module"] === "string" &&
+      value["module"].trim() !== "";
     if (
       select === null ||
       select === undefined ||
       !Array.isArray(select) ||
-      !select.every((value) => typeof value === "string")
+      !select.every((value) => typeof value === "string" || isModuleTarget(value))
     ) {
-      errors.push(`${label}.select must be a list of test paths`);
+      errors.push(`${label}.select must be a list of test paths or {module: <slug>} entries`);
       return;
     }
-    rules.push([
-      when.trim(),
-      (select as string[]).map((value) => value.trim()).filter((v) => v !== ""),
-    ]);
+    const paths = (select as unknown[])
+      .filter((value): value is string => typeof value === "string")
+      .map((value) => value.trim())
+      .filter((v) => v !== "");
+    const moduleTargets = (select as unknown[])
+      .filter(isModuleTarget)
+      .map((value) => value.module.trim());
+    rules.push(
+      moduleTargets.length > 0 ? [when.trim(), paths, moduleTargets] : [when.trim(), paths],
+    );
   });
 
   return result({ scopes, smoke, repoWide, rules }, errors);
@@ -665,10 +765,62 @@ export function selectTests(
   repoRoot: string,
   changedPaths: readonly string[],
   selection: SelectionConfig,
+  modules: ModuleSelection | null = null,
 ): SelectionResult {
   const changed = changedPaths
     .filter((path) => String(path).trim() !== "")
     .map((path) => posixPath(path));
+
+  // The module form, on only in a multi-module solution: a suite is offered
+  // whole, once, under the first reason that reached it; the modules a
+  // change reaches are kept in the manifest's dependency order.
+  const moduleForm = modules !== null && modules.shape.multi ? modules : null;
+  const suiteOffers = new Map<string, SelectedSuite>();
+  const reachedModules = new Set<string>();
+  const offerSuite = (name: string, reason: string, selectedBy: string, module: string): void => {
+    if (!suiteOffers.has(name)) suiteOffers.set(name, { name, reason, selectedBy, module });
+  };
+  const offerModule = (slug: string, selectedBy: string, reason: string): void => {
+    if (moduleForm === null) return;
+    reachedModules.add(slug);
+    for (const suite of moduleForm.suites) {
+      if (suite.module === slug) offerSuite(suite.name, reason, selectedBy, slug);
+    }
+    // Each transitive consumer's compatibility suite against this module,
+    // found by the manifest's reverse edges and declared nowhere.
+    for (const consumer of consumersOf(moduleForm.shape.modules, slug)) {
+      for (const suite of moduleForm.suites) {
+        if (
+          suite.module === consumer &&
+          suite.role === "consumer-contract" &&
+          suite.against === slug
+        ) {
+          offerSuite(suite.name, REASON_CONSUMER_CONTRACT, selectedBy, consumer);
+        }
+      }
+    }
+  };
+  /**
+   * The modules a changed path belongs to: the one whose roots hold it, and
+   * every one whose shared files name it. A shared file is shared -- the
+   * central pins, the packages folder -- so a change to it is every naming
+   * module's change, and each of them is reached.
+   */
+  const modulesOf = (rel: string): string[] => {
+    if (moduleForm === null) return [];
+    const owners: string[] = [];
+    for (const entry of moduleForm.shape.modules) {
+      const roots = entry.codeRoots.map((root) => (root === "." ? "" : root));
+      const shared = moduleForm.sharedFiles?.get(entry.slug) ?? [];
+      if (
+        roots.some((root) => root === "" || matchingPrefixes(rel, [root]).length > 0) ||
+        (shared.length > 0 && matchingPrefixes(rel, shared).length > 0)
+      ) {
+        owners.push(entry.slug);
+      }
+    }
+    return owners;
+  };
 
   const repoWideHits =
     selection.repoWide.length > 0
@@ -708,13 +860,21 @@ export function selectTests(
     // mapped would return clean targeted evidence for a change that can break
     // any test using it.
 
-    for (const [when, targets] of selection.rules) {
+    for (const [when, targets, moduleTargets] of selection.rules) {
       if (matchingPrefixes(rel, [when]).length > 0) {
         // An empty target list is a declaration that this path affects no
         // test -- mapped, deliberately selecting nothing.
         matched = true;
         for (const target of targets) offer(target, REASON_CONFIGURED_RULE, rel);
+        for (const slug of moduleTargets ?? []) offerModule(slug, rel, REASON_CONFIGURED_RULE);
       }
+    }
+
+    // The module form: a path under a module's roots, or among its shared
+    // files, is that module's change and selects its suites whole.
+    for (const owner of modulesOf(rel)) {
+      matched = true;
+      offerModule(owner, rel, REASON_MODULE_CHANGED);
     }
 
     // A file the framework itself installed at registration is not the
@@ -757,7 +917,18 @@ export function selectTests(
         (left.path < right.path ? -1 : left.path > right.path ? 1 : 0),
     );
 
-  return new SelectionResult({ selected, risks });
+  const orderedModules =
+    moduleForm === null
+      ? []
+      : moduleForm.shape.modules
+          .map((entry) => entry.slug)
+          .filter((slug) => reachedModules.has(slug));
+  return new SelectionResult({
+    selected,
+    risks,
+    suites: [...suiteOffers.values()],
+    modules: orderedModules,
+  });
 }
 
 /**

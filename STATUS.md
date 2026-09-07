@@ -1,4 +1,4 @@
-# STATUS — the modules block (sessions 100–108) is running unattended; session 107 closed VERIFIED, session 108 next
+# STATUS — the modules block (sessions 100–108) is COMPLETE; all nine sessions closed VERIFIED, session 108 landed 6d06461a, router and extension 2.0.12
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
 
@@ -22,11 +22,65 @@
 > | 105 | module-scoped sessions, the hard verifier scope, exposure, grants | CLOSED VERIFIED, landed 8ef7dd8d |
 > | 106 | the impact plan and the selected run of record | CLOSED VERIFIED, landed 2873f493 |
 > | 107 | the atomic land | CLOSED VERIFIED, landed 5c456da8 |
-> | 108 | Maven parity and the hardened profiles | next |
+> | 108 | Maven parity and the hardened profiles | CLOSED VERIFIED, landed 6d06461a |
 >
 > One operating failure on the record: session 101's second round finished at 17:18 and the loop idled until 20:06, because the background waiter's completion never woke the orchestrator. The rule since: every framework wait is driven from a foreground loop that polls the job's status file, and the run state is checked at the start of every turn.
 >
 > Paused after session 103 on the operator's instruction (2026-09-06, 21:15) and resumed in a new chat at 21:27 with session 104; the router and extension on this machine are rebuilt after each close. Every framework wait is driven from a foreground loop (the scratchpad's drive-waits.sh pattern), never from a background waiter. A session driven from the chat with the CLI shows nothing in the Dabbler Terminal, which is expected: that terminal renders a run the extension launched.
+>
+> **The block completed on 2026-09-07 at 01:55.** Nine sessions, every one closed VERIFIED by a cross-provider round (gpt-5.4 over the Copilot seat), none skipped, none forced; the round cap was raised on the record twice (102, 106). Two things the operator decides next, neither started here: whether the ground rules set aside for the rebuild (`AGENTS.md`, superseded 2026-08-23) come back into force now that the replacement works; and whether the Maven side gets the walk the .NET side had, since no test runs `mvn` and no Maven repository was driven end to end (the .NET POC under `C:\temp\modules-poc` was; a Maven twin of it is the honest next check). Owed from the block, on the record: the Windows clone preflight numbers are a floor (Defender real-time was off on this machine); a re-measurement with it on is owed before a customer reads them.
+
+> ## SESSION 108 CLOSED, 2026-09-07, VERIFIED (round 3, gpt-5.4 over the seat; rounds 1 and 2 each found one Major in the Java surface reader, fixed; landed 6d06461a) -- Maven parity, and the hardened profiles
+>
+> Two steps, nothing asked of a single-module solution. **The Maven side of
+> the ecosystem seam** (`ecosystem.ts`), which had refused by name since
+> session 102, is filled the way a Maven team already works: the root files
+> are a parent `pom.xml` (the modules it aggregates, the CI-friendly
+> `${revision}`, a `<repository>` of `file:///${maven.multiModuleProjectDirectory}/packages`,
+> the deploy and flatten plugins managed) plus the packages folder's
+> attributes and README; a module is built from its own POM (`mvn -f
+> modules/<slug>/pom.xml`, the parent reached by `relativePath`), which is
+> what a focused clone can do without the siblings the parent lists; the
+> pack default is one reactor `deploy` per module into the file repository
+> under the dev version (`-Drevision`, `-DaltDeploymentRepository`, tests
+> skipped), the artifact looked for at its repository-layout path; the pin
+> is one managed `<dependency>` in the parent's `<dependencyManagement>`,
+> replaced in place, and a consumer's `<dependency>` carries no version;
+> the contract scaffold is an `<artifact>-api` module and an
+> `<artifact>-contract-tests` module with an abstract JUnit 5 class, wired
+> into the module's aggregator and its implementation, and a
+> `<provider>-compatibility` module against a provider's artifact; the
+> surface reader reads public declarations with their Javadoc from the api
+> module (interface members at the interface's own depth, `default` and
+> `static` ones included, `private` ones not); the focused checkout's
+> convenience file is `.mvn/maven.config` naming the module's POM; and the
+> grant has no overlay -- Maven loads no external profile -- so a granted
+> sibling with `--debug` is rebuilt from its source into the file
+> repository by `module pack`, handed in by the two callers that settle a
+> grant. **Everything .NET-specific that was still outside the seam moved
+> behind it**: the base version, the packaged artifact's path, the LFS
+> pattern, the central pins and their writer, a consumer's references and
+> the debugging overlay are seam methods, and `packages.ts`, `land.ts`,
+> `gates.ts`, `exposure.ts` and the candidate job know no ecosystem. A
+> Maven package id is `groupId:artifactId`; a record or page name writes
+> the colon as `+`, which no NuGet id carries, so the name decodes one
+> way. **The hardened profiles, designed and not built**
+> (`docs/design/hardened-profiles.md`): what a customer who needs sibling
+> source hidden from a machine rather than from a model is asking for, the
+> two profiles (encrypted custody under an external key with authenticated
+> encryption, never a one-time pad; a container per session), what each
+> costs an ordinary .NET team, the trigger (a named customer with the
+> requirement in writing), and the seams by path; its check
+> (`packages/router/scripts/doc-paths.mjs`) is that every path it names
+> exists, and 17 do. Three router tests over seeded trees and a scripted
+> pack; no test runs `mvn`.
+>
+> The two Majors were the Java surface reader's: round 1 found it dropped
+> an interface's `default` and `static` members, round 2 that the fix read
+> a multi-line method's body lines as members; both readers (C# too) now
+> read members only at the interface's own brace depth. The block's test
+> budget (48 router, 12 extension) closes with 26 router and 5 extension
+> tests added across the nine sessions.
 
 > ## SESSION 107 CLOSED, 2026-09-07, VERIFIED (round 2, gpt-5.4 over the seat; round 1 found one Major and two minors, all fixed; landed 5c456da8) -- the atomic land
 >

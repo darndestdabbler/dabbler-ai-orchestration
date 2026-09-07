@@ -2233,9 +2233,9 @@
     {
       "number": 113,
       "title": "What the Maven dogfooding found \u2014 the pin the message misnames, and the JDK the scaffold assumes",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-07T14:32:00.431000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-09-07T14:48:48.198000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

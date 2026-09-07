@@ -241,32 +241,81 @@ function suiteBlock(eco: Ecosystem): string {
   return lines.join("\n");
 }
 
+/** What answering the suite decision did to `dabbler.yaml`. */
+export interface SuitesWritten {
+  /** The file, repository-absolute. */
+  readonly path: string;
+  /** It did not exist and this call wrote it whole. */
+  readonly created: boolean;
+  /** The suites this call added, by name. */
+  readonly added: readonly string[];
+  /** The suites the file already declared, by name; not written twice. */
+  readonly alreadyDeclared: readonly string[];
+}
+
+/** Whether the config text already declares a suite of this name. */
+function declaresSuiteNamed(text: string, name: string): boolean {
+  return new RegExp(`^\\s*-\\s*name:\\s*["']?${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}["']?\\s*$`, "m").test(text);
+}
+
 /**
- * Insert a `testing.suites` block into a `dabbler.yaml` that has none.
+ * Insert a `testing.suites` block into `dabbler.yaml`, whatever state the
+ * file is in.
  *
  * The narrow half of scaffolding: `scaffoldProjectConfig` writes a whole file
  * and refuses an existing one, which is right at setup and useless later --
  * a repository that grew code after setup has a config file and no suite, and
  * that is the case an answered owed decision has to be able to act on.
  *
- * Returns null when there is nothing to do or the file already declares
- * `testing:` -- appending a second mapping key would produce a document whose
- * later key silently wins, which is a worse outcome than declining.
+ * Two states the Java walk met, and both are answered here rather than
+ * refused. A repository with NO `dabbler.yaml` gets one written: the
+ * recommended answer to the suite decision could otherwise not be taken at
+ * all in a fresh project, which is where it is asked. And a file that
+ * already declares a suite of that name is left as it is and said so: the
+ * same answer given twice appended a second, identical `maven` suite.
+ *
+ * Returns null only when there is genuinely nothing to do -- no ecosystem
+ * to declare -- or when the file could not be read or written.
  */
 export function appendSuitesToProjectConfig(
   projectDir: string,
   ecosystems: readonly Ecosystem[],
-): string | null {
+): SuitesWritten | null {
   if (ecosystems.length === 0) return null;
   const path = join(projectDir, PROJECT_CONFIG_FILENAME);
-  if (!existsSync(path)) return null;
+  if (!existsSync(path)) {
+    // No file at all: the whole scaffold, with these suites in it. The
+    // decision is asked in a fresh project more often than anywhere else.
+    try {
+      writeFileSync(path, renderProjectConfig(ecosystems), "utf8");
+    } catch {
+      return null;
+    }
+    return { path, created: true, added: ecosystems.map((eco) => eco.key), alreadyDeclared: [] };
+  }
   let existing: string;
   try {
     existing = readText(path);
   } catch {
     return null;
   }
-  const suites = ecosystems.map(suiteBlock).join("\n") + "\n";
+  const alreadyDeclared = ecosystems.filter((eco) => declaresSuiteNamed(existing, eco.key));
+  const missing = ecosystems.filter((eco) => !declaresSuiteNamed(existing, eco.key));
+  if (missing.length === 0) {
+    return {
+      path,
+      created: false,
+      added: [],
+      alreadyDeclared: alreadyDeclared.map((eco) => eco.key),
+    };
+  }
+  const written: SuitesWritten = {
+    path,
+    created: false,
+    added: missing.map((eco) => eco.key),
+    alreadyDeclared: alreadyDeclared.map((eco) => eco.key),
+  };
+  const suites = missing.map(suiteBlock).join("\n") + "\n";
   let next: string;
   const suitesKey = existing
     .split(/\r?\n/)
@@ -323,7 +372,7 @@ export function appendSuitesToProjectConfig(
     } catch {
       return null;
     }
-    return path;
+    return written;
   }
   if (/^testing:/m.test(existing)) {
     // The ordinary shape for a repository configured at setup and grown
@@ -348,7 +397,7 @@ export function appendSuitesToProjectConfig(
   } catch {
     return null;
   }
-  return path;
+  return written;
 }
 
 /**

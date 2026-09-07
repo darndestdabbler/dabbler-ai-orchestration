@@ -15,15 +15,17 @@ item type, the store, and the loader that puts them together.
 
 This matters for judging what you find.
 
-**Proven by running it on this machine on 7 September 2026**, with the output
-below copied from what actually came back: the prerequisites, declaring the
-modules, ecosystem detection, the root build files, packing a module, and
-opening a focused checkout. Those steps are steps 1, 2, 5, 7 and 9.
+**Walked end to end on this machine on 7 September 2026**, steps 1 to 9,
+with the output below copied from what actually came back — including the AI
+session loop, which had never been run against Maven before that walk. It
+found six defects in the framework and three in this document; all nine were
+fixed in sessions 113, 115 and 116, and what you are reading is the
+corrected version.
 
-**Not yet proven for Java:** the AI session loop itself — steps 6 and 8. Those
-steps are identical to the .NET walkthrough, where they were run four times
-end to end, and nothing in them is ecosystem-specific. They are very likely
-fine, but you are the first to run them against Maven.
+**Where your findings are worth most now:** step 10 — the second and third
+modules, a module consuming a sibling as a package, and running the loader
+twice. The walk of 7 September proved one module end to end; the consumer
+side of a Maven solution has still never been driven by a session.
 
 **Two defects were found while preparing this, and both are now fixed** — the
 pack message that named a .NET file whatever the ecosystem, and the root POM
@@ -108,6 +110,30 @@ is why the next step comes before anything else.**
 
 ---
 
+## Step 2b — Set the repository up
+
+```
+dabbler bootstrap --no-transport-detect
+```
+
+**Expect** it to write, and to say so: `AGENTS.md`, `CLAUDE.md` and
+`GEMINI.md` (the instructions an AI reads), `dabbler.yaml` (the file step 7
+adds to, with a `maven` suite already in it), a `.gitignore` rule for
+`.dabbler/`, a commit hook, and the git refspecs that carry verification
+rounds with a push. It also says Maven publishes through its own lifecycle,
+which is true and is not a problem.
+
+**Do this before the first session, and commit what it wrote.** A session's
+declaration is refused while the working tree carries changes, so leaving
+these uncommitted stops session 1 before it starts:
+
+```
+git add -A
+git commit -m "Bootstrap: the framework's own files"
+```
+
+---
+
 ## Step 3 — Write the first module's POM
 
 Create `modules\model\pom.xml` with exactly this:
@@ -148,9 +174,12 @@ com/example/json-model/0.1.0-dev.../json-model-0.1.0-dev....jar in packages/
 
 which is Maven building the version you wrote rather than the one asked for.
 
-Also write a small `Item` class under
-`modules\model\src\main\java\com\example\model\Item.java` with `id`, `sku`,
-`name` and `quantity` and their getters and setters.
+**That is the whole step: the POM and nothing else.** A Maven module with no
+Java source packs perfectly well, and the `Item` class is what session 1
+writes — its plan says so. Writing it here instead means session 1's own diff
+contains no `Item`, and the model that checks the session's work reads the
+diff: on the reference run it reported the session's only deliverable
+missing, as a blocking fault, and the round was spent disputing it.
 
 ---
 

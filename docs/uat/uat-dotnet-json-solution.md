@@ -97,6 +97,33 @@ has `"usedBy": ["store", "app"]` — **which you never typed.** You wrote only
 
 ---
 
+## Step 2b — Set the repository up
+
+```
+dabbler bootstrap --no-transport-detect
+```
+
+**Expect** it to write, and to say so: `AGENTS.md`, `CLAUDE.md` and
+`GEMINI.md` (the instructions an AI reads), `dabbler.yaml` (the file step 7
+adds to, with a `dotnet` suite already in it), a `.gitignore` rule for
+`.dabbler/`, a commit hook, and the git refspecs that carry verification
+rounds with a push.
+
+**Do this before the first session, and commit what it wrote.** A session's
+declaration is refused while the working tree carries changes, so leaving
+these uncommitted stops session 1 before it starts:
+
+```
+git add -A
+git commit -m "Bootstrap: the framework's own files"
+```
+
+`--no-transport-detect` keeps it from changing your machine's
+`DABBLER_TRANSPORT` preference; leave it off if you want a detected Copilot
+seat to be remembered.
+
+---
+
 ## Step 3 — Write the session plan
 
 Create `docs\sessions\session-plan.md` with this exact content:
@@ -147,9 +174,11 @@ abstraction" as faults and the session argues with itself for several rounds.
 With the rule stated, none of the four sessions in the reference run was asked
 to add anything.
 
-Also create `docs\sessions\sessions.json` listing the three sessions as
-`not-started`, and an `items.json` at the top with three items having `sku`,
-`name` and `quantity`. Commit everything and push:
+Also create an `items.json` at the top with three items having `sku`, `name`
+and `quantity`. **Do not write `docs\sessions\sessions.json` yourself** —
+`dabbler session start` writes the ledger, and every state file under
+`docs\sessions\` is the router's to write. A hand-written one is the one
+thing this framework refuses outright. Commit everything and push:
 
 ```
 git add -A

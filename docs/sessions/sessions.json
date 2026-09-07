@@ -2282,6 +2282,26 @@
         "identityProvenance": "direct"
       },
       "verificationVerdict": "VERIFIED",
+      "verification": {
+        "rounds": 1,
+        "verifierModel": "gpt-5-6-terra",
+        "verifierProvider": "openai",
+        "transport": "api"
+      },
+      "frameworkVersion": "2.0.12"
+    },
+    {
+      "number": 116,
+      "title": "What the Java walk found \u2014 the first ten minutes",
+      "status": "in-progress",
+      "startedAt": "2026-09-07T15:38:14.038000-04:00",
+      "completedAt": null,
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": "VERIFIED",
       "frameworkVersion": "2.0.12",
       "verification": {
         "rounds": 1,
@@ -2289,15 +2309,6 @@
         "verifierProvider": "openai",
         "transport": "api"
       }
-    },
-    {
-      "number": 116,
-      "title": "What the Java walk found \u2014 the first ten minutes",
-      "status": "not-started",
-      "startedAt": null,
-      "completedAt": null,
-      "orchestrator": null,
-      "verificationVerdict": null
     }
   ]
 }

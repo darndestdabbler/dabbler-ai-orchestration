@@ -204,14 +204,26 @@ function run(argv: string[]): number {
     const written = appendSuitesToProjectConfig(root, detectEcosystems(root));
     if (written === null) {
       writeErr(
-        "owed: refused -- the suite block could not be written, so the " +
-          `answer is not recorded and '${id}' is still open. Either ` +
-          `${PROJECT_CONFIG_FILENAME} already declares suites, or it could ` +
-          "not be read. Nothing was changed.\n",
+        "owed: refused -- no suite could be declared, so the answer is not " +
+          `recorded and '${id}' is still open. Either this repository's build ` +
+          `files name no test runner, or ${PROJECT_CONFIG_FILENAME} could not ` +
+          "be written. Nothing was changed.\n",
       );
       return EXIT_REFUSED;
     }
-    acted = written;
+    // Three states, all of them answers: the file was written whole, suites
+    // were added to one that stood, or the suite was already declared and
+    // this call left it exactly as it was rather than writing a second copy
+    // of it -- which is what answering twice used to do.
+    acted = written.created
+      ? `wrote ${PROJECT_CONFIG_FILENAME} declaring ${written.added.join(", ")}`
+      : written.added.length > 0
+        ? `declared ${written.added.join(", ")} in ${PROJECT_CONFIG_FILENAME}` +
+          (written.alreadyDeclared.length > 0
+            ? `; ${written.alreadyDeclared.join(", ")} already stood and was left as it was`
+            : "")
+        : `${written.alreadyDeclared.join(", ")} already declared in ${PROJECT_CONFIG_FILENAME}; ` +
+          "nothing written, and the decision is answered";
   }
   // Both packaging answers are executed, not returned as instructions: the
   // operator decides where the release goes and what the credential is
@@ -346,7 +358,7 @@ function run(argv: string[]): number {
     return EXIT_OK;
   }
   if (acted) {
-    writeOut(`owed: wrote the suite declaration into ${acted}.\n`);
+    writeOut(`owed: ${acted}.\n`);
     writeOut(
       "Check the command it declares before the next run of record -- a " +
         "detected command is a reading of the repository, not a promise.\n",

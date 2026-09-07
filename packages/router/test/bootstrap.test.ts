@@ -14,6 +14,7 @@ import { bootstrapVerb } from "../src/cli/bootstrap.ts";
 import {
   MANAGED_END,
   MANAGED_START,
+  appendSuitesToProjectConfig,
   SCOPE_MACHINE,
   SCOPE_USER,
   detectEcosystems,
@@ -37,7 +38,7 @@ import {
 } from "../src/owedDecisions.ts";
 import { capture } from "../src/output.ts";
 import { solutionShape } from "../src/modules.ts";
-import { registerSessionStart } from "../src/writers.ts";
+import { declareSessionTask, registerSessionStart } from "../src/writers.ts";
 import { makeAnsweredRepo, makeAnsweredSandbox, seed, tempDir } from "./support/answers.ts";
 
 const savedTransport = process.env[TRANSPORT_ENV_VAR];
@@ -368,6 +369,30 @@ describe("the scaffolded setup sessions", () => {
 });
 
 describe("what a repository declares about its tests", () => {
+  it("answers the suite decision in a repository with no config, and never declares the same suite twice", () => {
+    // Both states the Java walk met. The recommended answer refused in a
+    // fresh Maven repository because there was no dabbler.yaml to write
+    // into; then, once bootstrap had written one WITH a maven suite,
+    // answering again appended a second, identical suite.
+    const project = tempDir("suite-answer-");
+    seed(project, { "pom.xml": "<project/>\n" });
+    const ecosystems = detectEcosystems(project);
+    const created = appendSuitesToProjectConfig(project, ecosystems);
+    assert.deepEqual([created?.created, [...(created?.added ?? [])]], [true, ["maven"]]);
+    const written = readFileSync(join(project, "dabbler.yaml"), "utf8");
+    assert.match(written, /name: maven/);
+
+    const again = appendSuitesToProjectConfig(project, ecosystems);
+    assert.deepEqual([again?.created, [...(again?.added ?? [])], [...(again?.alreadyDeclared ?? [])]], [
+      false,
+      [],
+      ["maven"],
+    ]);
+    // The file is byte-for-byte what it was: one suite, not two.
+    assert.equal(readFileSync(join(project, "dabbler.yaml"), "utf8"), written);
+    assert.equal((written.match(/name: maven/g) ?? []).length, 1);
+  });
+
   it("gives each detected ecosystem its own suite", () => {
     const project = tempDir("bootstrap-");
     seed(project, { "pytest.ini": "[pytest]\n", "pom.xml": "<project/>\n" });
@@ -477,8 +502,20 @@ describe("what setup does about the operator's typing", () => {
     assert.equal(run.value, 0, run.stderr);
     assert.ok(existsSync(join(repo, "AGENTS.md")));
     assert.ok(!calls.some((argv) => argv[0] === "commit" || argv[0] === "add"), "git was asked to commit");
-    assert.match(run.stdout, /left them uncommitted: session 1 is in flight/);
+    // Before the declaration, the land is NOT what commits them: the
+    // declaration refuses a tree carrying changes, and refuses it again,
+    // which is a deadlock. The Java walk sat in exactly that.
+    assert.match(run.stdout, /has not declared its task yet/);
+    assert.match(run.stdout, /git add -A && git commit/);
     assert.doesNotMatch(run.stdout, /committed \d+ file/);
+
+    // Once it has declared, the land is what commits them, and the message
+    // says so again.
+    declareSessionTask(sessionsDir, { sessionNumber: 1, task: "the work", releasable: false });
+    const after = await capture(() =>
+      bootstrapVerb(["--project-dir", repo, "--no-transport-detect"]),
+    );
+    assert.match(after.stdout, /its land is what commits them/);
   });
 
   it("asks where the repository pushes rather than printing a push command", async () => {

@@ -153,7 +153,7 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 113 | What the Maven dogfooding found — the pin the message misnames, and the JDK the scaffold assumes | no | 2026-09-07 |
 | 114 | The deployables block, built | no | 2026-09-07 |
 | 115 | What the Java walk found — a Maven module session that can close | no | 2026-09-07 |
-| 116 | What the Java walk found — the first ten minutes | — | not declared |
+| 116 | What the Java walk found — the first ten minutes | no | 2026-09-07 |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -2022,3 +2022,9 @@ Build the deployables: block docs/design/deployables.md designed and deliberatel
 **Releasable: no.**
 
 Fix the three defects the Java/Maven walk measured on 2026-09-07, none of which a test in this repository could have caught because no test runs mvn. (1) A Maven module session cannot close: mvn deploy leaves a POM and a .md5/.sha1 beside every artifact, packModule records only the one artifact the seam went looking for, and the close then refuses both verification_clean (the tree moved after verification) and exposure_within_ceiling (paths outside the session's scope). The candidate becomes what the pack LEFT -- the packages folder snapshotted before and after -- and a module session's scope carries the packages folder, while the framework's own .dabbler/ state is never counted as the session's change. (2) A module session's run of record ran nothing: reachSuites reaches a suite only when it names the changed module, and the suite bootstrap scaffolds for Maven names none, so the driver skipped it and the close's freshness gate demanded nothing. A suite that names no module is repository-wide and is reached by any change. (3) A pack of an unchanged Maven module mints a new version every time, because mvn writes target/ and .flattened-pom.xml inside the module's own code root and nothing ignores them; the Maven root scaffold writes the .gitignore that stops it.
+
+### Session 116 — What the Java walk found — the first ten minutes
+
+**Releasable: no.**
+
+Fix the four things the Java/Maven walk hit before a line of code was written, and correct the two UAT documents where the walk proved them wrong. (1) The driver's plan instruction lists the members a work plan carries and never mentions `modules`, which driver.ts refuses the declaration without in a multi-module solution -- so an engine following the instruction it was given is refused every time, and a second identical refusal is a deadlock. (2) `dabbler bootstrap` run while a session is in flight but undeclared says its files are left for the land to commit; the declaration then refuses the dirty tree, twice, which is a deadlock -- before the declaration the operator is who commits them, and the message must say so. (3) The recommended answer to the testing-suites decision could not be taken in a repository with no dabbler.yaml (it refused, naming two causes and not the real one), and once bootstrap had written the file WITH a maven suite in it, answering again appended a second identical suite. (4) The documents: neither says to run `dabbler bootstrap`, the .NET one tells the reader to hand-write a state file the router owns, and the Java one has the reader write Item.java two steps before the session whose plan says to write it -- which cost that session a blocking Major and a dispute.

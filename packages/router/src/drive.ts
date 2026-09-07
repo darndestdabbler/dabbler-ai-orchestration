@@ -245,6 +245,30 @@ export const MAX_REJECTIONS = 3;
  * saving repeatedly -- and a disk epoch behind the caller's cannot happen
  * without the file having been rewound, which is not this fence's to judge.
  */
+/**
+ * The `modules` paragraph the plan instruction carries in a multi-module
+ * solution, and nothing at all in a single-module one.
+ *
+ * `driver.ts` refuses a declaration that names no module when the manifest
+ * declares more than one, and the instruction listed the members a plan
+ * carries without ever mentioning it -- so an engine answering exactly what
+ * it was asked for was refused, every time, in the shape the modules block
+ * exists for. Measured on the Java walk, 2026-09-07, where the second
+ * identical refusal was a deadlock.
+ */
+export function planModulesMember(shape: SolutionShape): string {
+  if (!shape.multi) return "";
+  const slugs = shape.modules.map((entry) => entry.slug).join(", ");
+  return (
+    "This solution declares more than one module, so one further member is required:\n" +
+    '  modules     the module(s) this session works in, by slug from docs/modules.yaml: ' +
+    `["<slug>"]. Declared here: ${slugs}. The declaration is refused without it.\n` +
+    "  reason      why this session must change more than one module -- required exactly " +
+    "when `modules` names two or more, because a cross-module session is rare and the " +
+    "reason is what makes it reviewable.\n"
+  );
+}
+
 export function judgeLease(mine: number, onDisk: number): { readonly refusal: string | null } {
   if (onDisk <= mine) return { refusal: null };
   return {
@@ -1752,6 +1776,12 @@ ${this.stopArtifacts()}`,
       "a check. A step whose product is prose still has a mechanical " +
       "check. Keep steps small, one concern each; the files a step lists are exactly the " +
       "files it will touch, because its report is measured against them.\n" +
+      // The member a multi-module solution's declaration is refused
+      // without. It went unsaid until the Java walk met it: an engine
+      // answering exactly what it was asked for was refused every time, and
+      // the second identical refusal is a deadlock. Said only where it is
+      // required, because a single-module repository IS the module.
+      this.modulesMember() +
       "One member is optional and is left out of a single-repository session:\n" +
       '  repositories  other repositories of this SOLUTION the plan needs to exist: [{"id": ' +
       '"<repository id>", "path": "<optional, relative to this root>"}]. Each is placed when ' +
@@ -1763,6 +1793,15 @@ ${this.stopArtifacts()}`,
       "solution leaves it out.\n" +
       "Do not include schema_version, session_number or recorded_at: the framework stamps them."
     );
+  }
+
+  /** The `modules` paragraph for this repository's shape, or nothing. */
+  private modulesMember(): string {
+    try {
+      return planModulesMember(solutionShape(this.repoRoot));
+    } catch {
+      return "";
+    }
   }
 
   private async phasePlan(): Promise<void> {

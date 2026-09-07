@@ -19,6 +19,7 @@ import {
   REGISTER_START,
   idleInstruction,
   judgeRegistration,
+  planModulesMember,
   judgeReportFiles,
   judgeReportShape,
   candidateTrunk,
@@ -31,6 +32,7 @@ import {
   type StepSpec,
 } from "../src/drive.ts";
 import type { DriverInstruction, DriverReport } from "../src/generated/index.ts";
+import { dependencyOrder, impliedDeployables, parseEntries } from "../src/modules.ts";
 import { gitAnswers } from "./support/answers.ts";
 
 const INSTRUCTION = {
@@ -402,5 +404,36 @@ describe("what the local gate receipt names", () => {
     } finally {
       detached();
     }
+  });
+});
+
+describe("what the plan instruction asks for", () => {
+  it("names the modules member in a multi-module solution, and nothing in a single-module one", () => {
+    // The Java walk: driver.ts refuses a declaration that names no module,
+    // and the instruction listing the members a plan carries never
+    // mentioned it. An engine answering what it was asked for was refused,
+    // and the second identical refusal is a deadlock.
+    const entries = parseEntries({
+      modules: [
+        { slug: "model", kind: "shared-types" },
+        { slug: "store" },
+        { slug: "app", kind: "application", dependsOn: ["store"] },
+      ],
+    });
+    const many = planModulesMember({
+      multi: true,
+      implicit: false,
+      modules: dependencyOrder(entries),
+      deployables: impliedDeployables(entries),
+    });
+    assert.match(many, /modules {5}the module\(s\) this session works in/);
+    assert.match(many, /Declared here: model, store, app/);
+    assert.match(many, /reason {6}why this session must change more than one module/);
+
+    const one = parseEntries({ modules: [{ slug: "only" }] });
+    assert.equal(
+      planModulesMember({ multi: false, implicit: false, modules: one, deployables: impliedDeployables(one) }),
+      "",
+    );
   });
 });

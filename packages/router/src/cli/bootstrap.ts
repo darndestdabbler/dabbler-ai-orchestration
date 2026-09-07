@@ -19,6 +19,7 @@ import { raisePackagingDecisions, raiseRemoteDecision } from "../owedDecisions.t
 import { STATUS_IN_PROGRESS } from "../progress.ts";
 import { readRawSessionState } from "../sessionState.ts";
 import { writeProjection } from "../projection.ts";
+import { readTaskDeclaration } from "../writers.ts";
 import {
   DECOMPOSITION_PROMPT,
   IGNORE_RULE,
@@ -371,9 +372,20 @@ export async function bootstrapVerb(argv: string[]): Promise<number> {
       ? commitOwnScaffold(project, written)
       : { committed: false, reason: "" };
   if (inFlight !== null && written.length > 0) {
+    // Which is true only AFTER the session has declared its task. Before
+    // that the declaration refuses a tree carrying changes -- and refuses
+    // it twice, which is a deadlock -- so the operator is who commits
+    // them, and saying otherwise sent the Java walk into exactly that.
+    // Bootstrap still commits nothing itself: session 94's rule stands.
+    const declared = readTaskDeclaration(join(project, "docs", SESSIONS_DIRNAME), inFlight) !== null;
     writeOut(
-      `bootstrap: wrote ${written.length} file(s) and left them uncommitted: ` +
-        `session ${inFlight} is in flight, and its land is what commits them.\n`,
+      declared
+        ? `bootstrap: wrote ${written.length} file(s) and left them uncommitted: ` +
+            `session ${inFlight} is in flight, and its land is what commits them.\n`
+        : `bootstrap: wrote ${written.length} file(s) and left them uncommitted: ` +
+            `session ${inFlight} is in flight and has not declared its task yet, and a ` +
+            "declaration is refused while the tree carries changes. Commit them first:\n" +
+            '  git add -A && git commit -m "Bootstrap: the framework\'s own files"\n',
     );
   } else if (commit.committed) {
     writeOut(

@@ -10462,6 +10462,13 @@
       "dateTime": "2026-09-07T03:38:52.300000-04:00",
       "task": "Land the CSV four-module walkthrough as a browser-driven check: a committed corpus stager for the model/deserializer/persister/app decomposition (siblings consumed as packages, never a spanning solution file), a single WALK_STEPS list under the Playwright layer that a new spec drives end to end (container, Solution Explorer decomposition, Work Explorer grouped by module, the two side-by-side idle-CLI/Dabbler-terminal editor tabs) with a screenshot per step, a tutorial document rendered from that same list so prose and automation cannot drift, and the fix to work-explorer-tree.spec.ts's stale per-plan-step task-row assertions so the whole Layer 3 suite matches the six fixed lifecycle rows (Register, Plan, Work, Verify, Test, Close) the unit suite already covers.",
       "releasable": false
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 111,
+      "dateTime": "2026-09-07T06:29:14.099000-04:00",
+      "task": "Fix candidateSubcommand in packages/router/src/cli/module.ts so an application module's bundle record is written only when the session that asked for the candidate declared itself releasable, mirroring drive.ts's bundleCandidates (which already calls sessionIsReleasable before naming any application to bundle). module pack only ever writes dev-versioned pins and nothing in this repository releases a user's module, so the ungated write refused every not-releasable session that touched an application module, forever. The package-less skip (an application with no package has nothing to pack or contract) now applies unconditionally, outside the releasability gate, so a not-releasable application session's candidate still succeeds and simply writes no bundle. Add two tests to packages/router/test/cli.test.ts: a not-releasable session's candidate succeeds with no bundle record, and a releasable session's candidate still writes the bundle for a released dependency and still refuses a dev-versioned one.",
+      "releasable": false
     }
   ]
 }

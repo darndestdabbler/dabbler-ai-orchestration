@@ -26,6 +26,7 @@ import { ManifestError, moduleConfigs, solutionShape } from "../modules.ts";
 import { readSessionState } from "../progress.ts";
 import { PackagesError, packModule, readRecords } from "../packages.ts";
 import { PackagingConfigError } from "../packaging.ts";
+import { sessionIsReleasable } from "../writers.ts";
 import { writeErr, writeOut } from "./output.ts";
 
 const EXIT_OK = 0;
@@ -170,8 +171,18 @@ function candidateSubcommand(rest: readonly string[]): number {
       // at the versions the central pins name -- written into the tree
       // before the run of record so the land carries it, whether or not the
       // application also packs. Refused, and the candidate with it, while a
-      // pin is a dev version.
-      if (entry !== undefined && entry.kind === "application") {
+      // pin is a dev version. Only a releasable session ships anything, so
+      // only a releasable session's candidate is asked to name released
+      // versions: `module pack` writes nothing else, and a solution that
+      // never publishes to a feed would otherwise refuse every session that
+      // touches an application module, forever. Mirrors bundleCandidates in
+      // drive.ts, which the run of record gates the same way.
+      if (
+        entry !== undefined &&
+        entry.kind === "application" &&
+        session !== null &&
+        sessionIsReleasable(sessionsDirFor(workspaceRoot), session)
+      ) {
         const ecosystem = ecosystemOf(workspaceRoot, entry);
         const project = ecosystem.projectFiles(workspaceRoot, entry)[0];
         const record = bundleRecord(shape, entry, ecosystem.centralPins(workspaceRoot), readRecords(workspaceRoot), project === undefined ? "0.1.0" : ecosystem.baseVersion(workspaceRoot, project), {
@@ -181,8 +192,8 @@ function candidateSubcommand(rest: readonly string[]): number {
         const path = writeBundleRecord(workspaceRoot, record);
         written.add(path);
         writeOut(`bundled ${slug} ${record.version}: ${path} (${record.dependencies.map((d) => `${d.package} ${d.version}`).join(", ") || "no dependencies"})\n`);
-        if (entry.package === null) continue;
       }
+      if (entry !== undefined && entry.kind === "application" && entry.package === null) continue;
       // The contract page first, then the pack: the pack's record digests
       // the contract folder, and the land holds the tree to that digest, so
       // the page the record covers must be the page that lands.

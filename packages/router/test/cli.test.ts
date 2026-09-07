@@ -21,10 +21,25 @@ import { extensionAbove, versionVerb } from "../src/cli/version.ts";
 import { VERBS } from "../src/contracts/verbs.ts";
 import { VERSION } from "../src/version.ts";
 import { writeInstruction } from "../src/driver.ts";
+import { readBundleRecord } from "../src/land.ts";
 import { capture } from "../src/output.ts";
 import { readRawSessionState } from "../src/progress.ts";
 import { declareSessionTask, registerSessionStart } from "../src/writers.ts";
 import { makeAnsweredSandbox, tempDir } from "./support/answers.ts";
+
+/** A two-module manifest: a library an application depends on, no package of its own. */
+const APPLICATION_MANIFEST = [
+  "modules:",
+  "  - slug: lib",
+  "    kind: library",
+  "    codeRoots: [modules/lib]",
+  "    package: SomeLib",
+  "  - slug: app",
+  "    kind: application",
+  "    codeRoots: [modules/app]",
+  "    dependsOn: [lib]",
+  "",
+].join("\n");
 
 async function run(
   verb: () => Promise<number> | number,
@@ -328,6 +343,52 @@ describe("dabbler module", () => {
     const refused = await run(() => moduleVerb(["contract", "whole", "--workspace-root", single]));
     assert.equal(refused.code, 1);
     assert.match(refused.err, /single-module solution/);
+  });
+
+  it("packs a not-releasable session's application module and writes no bundle", async () => {
+    // `module pack` only ever writes dev versions, and a bundle names
+    // released ones; a solution that never publishes to a feed must still
+    // be able to close a session that only touches an application module.
+    const { repo, sessionsDir } = makeAnsweredSandbox({ "docs/modules.yaml": APPLICATION_MANIFEST });
+    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
+    declareSessionTask(sessionsDir, { sessionNumber: 1, task: "touch the app", releasable: false });
+    const result = await run(() =>
+      moduleVerb(["candidate", "--session", "1", "--workspace-root", repo, "app"]),
+    );
+    assert.equal(result.code, 0, result.err);
+    assert.doesNotMatch(result.out, /bundled/);
+    assert.equal(readBundleRecord(repo, "app"), null);
+  });
+
+  it("bundles a releasable session's application module, and still refuses a dev-versioned dependency", async () => {
+    const { repo, sessionsDir } = makeAnsweredSandbox({
+      "docs/modules.yaml": APPLICATION_MANIFEST,
+      "modules/app/App.sln": "",
+      "Directory.Packages.props":
+        '<Project><ItemGroup><PackageVersion Include="SomeLib" ' +
+        'Version="1.0.0-dev.20260907.1.gabc1234" /></ItemGroup></Project>\n',
+    });
+    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
+    declareSessionTask(sessionsDir, { sessionNumber: 1, task: "ship the app", releasable: true });
+    const devPinned = await run(() =>
+      moduleVerb(["candidate", "--session", "1", "--workspace-root", repo, "app"]),
+    );
+    assert.equal(devPinned.code, 1);
+    assert.match(devPinned.err, /SomeLib is pinned at 1\.0\.0-dev\.20260907\.1\.gabc1234, a dev version/);
+    assert.equal(readBundleRecord(repo, "app"), null);
+
+    writeFileSync(
+      join(repo, "Directory.Packages.props"),
+      '<Project><ItemGroup><PackageVersion Include="SomeLib" Version="1.0.0" /></ItemGroup></Project>\n',
+      "utf8",
+    );
+    const released = await run(() =>
+      moduleVerb(["candidate", "--session", "1", "--workspace-root", repo, "app"]),
+    );
+    assert.equal(released.code, 0, released.err);
+    assert.match(released.out, /bundled app/);
+    assert.equal(readBundleRecord(repo, "app")?.dependencies[0]?.package, "SomeLib");
+    assert.equal(readBundleRecord(repo, "app")?.dependencies[0]?.version, "1.0.0");
   });
 });
 

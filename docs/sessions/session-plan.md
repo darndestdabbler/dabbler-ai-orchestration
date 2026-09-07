@@ -5574,3 +5574,69 @@ Three defects, each measured rather than supposed.
 The AI CLI is opened **idle and never handed a prompt**. The claim under test
 is where the tabs sit; sending a prompt would start a paid session that has
 nothing to do with the layout.
+
+## Why session 111 exists
+
+Sessions 100–108 built the modules feature and 110 walked it, but **no session
+had ever run inside a module of a solution the framework did not itself
+build**. On 2026-09-07 three live sessions built a small JSON-to-SQLite
+solution in `C:\temp\json-solution`, driven by Sonnet 5 and verified by Terra.
+The first two closed. The third could not, and the reason is a defect that
+blocks the feature's central use.
+
+### Session 111 of 111: The application module that can never close
+
+**Measured, not supposed.** Session 3 of that solution declared itself
+`releasable: false`, worked in module `app` (`kind: application`), passed
+verification at round 1, and then paused in the run of record:
+
+```
+stop: {"kind":"tests","class":"deadlock",
+       "reason":"the candidate of app could not be made (exit 1)"}
+module candidate: refused -- JsonModel is pinned at 0.1.0-dev.20260907.2.gb264ed4,
+a dev version; a bundle names released packages, so release the module first
+```
+
+**The defect.** `candidateSubcommand` in `packages/router/src/cli/module.ts`
+writes a bundle record for **any** module whose `kind` is `application`:
+
+```ts
+if (entry !== undefined && entry.kind === "application") {
+```
+
+Nothing there consults the session's releasability. Both of the other places
+that reason about bundles do:
+
+- `land.ts`'s own header: "**A releasable application session** records what
+  it ships as a bundle, and a bundle names released packages only."
+- `drive.ts:2512`, in `bundleCandidates`:
+  `if (!sessionIsReleasable(this.sessionsDir, this.sessionNumber)) return [];`
+
+So the guard exists and is bypassed: a changed application module is already
+in the impact plan's ordinary candidates, and `module candidate` bundles it
+from there regardless of what the session declared.
+
+**Why it is blocking rather than cosmetic.** `module pack` only ever writes
+`-dev.` versions, and there is no command that produces a released one —
+`dabbler release` tags this repository's own router and extension, not a
+user's module. A solution that does not publish to a feed therefore can never
+have released packages, and **every** session touching an application module
+refuses forever. That is the flow the modules feature exists for: a developer
+building an application out of libraries.
+
+**The fix.** Gate the bundle record in `candidateSubcommand` on the session's
+releasability, exactly as `bundleCandidates` already does, so a
+not-releasable session packs an application like any other module and writes
+no bundle. A releasable one must still bundle, and must still refuse a dev
+pin — that refusal is correct where it applies.
+
+**Two tests, one per direction.** A not-releasable application session's
+candidate succeeds and writes no bundle record; a releasable one still writes
+the bundle and still refuses a dev-versioned dependency.
+
+**Out of scope, and deliberately so.** Two other things that live run found
+were the corpus's fault rather than the product's — a suite declared with
+`covers:` and no `testing.selection` rules selects nothing, and a root
+solution file cannot build inside a focused checkout because a sibling's
+source is absent by design. Both belong in the walkthrough's documentation,
+not in this fix.

@@ -2089,9 +2089,9 @@
     {
       "number": 106,
       "title": "The impact plan and the selected run of record",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-06T23:07:48.052000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-09-07T00:29:43.764000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

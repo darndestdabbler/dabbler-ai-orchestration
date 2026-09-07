@@ -1,4 +1,4 @@
-# STATUS — the modules block (sessions 100–108) is running unattended; session 100 closed VERIFIED, session 101 next
+# STATUS — the modules block (sessions 100–108) is running unattended; session 101 closed VERIFIED, session 102 next
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
 
@@ -15,14 +15,51 @@
 > | session | what | state |
 > | --- | --- | --- |
 > | 100 | solution plan and module manifest; the six-step workflow deleted | CLOSED VERIFIED, landed 19d621c5 |
-> | 101 | module configuration, the exception schema, the test-impact vocabulary | next |
-> | 102 | designed contracts and contract-test source; the ecosystem seam | planned |
+> | 101 | module configuration, the exception schema, the test-impact vocabulary | CLOSED VERIFIED, landed 33557781 |
+> | 102 | designed contracts and contract-test source; the ecosystem seam | next |
 > | 103 | committed immutable packages | planned |
 > | 104 | the focused checkout and the Windows preflight | planned |
 > | 105 | module-scoped sessions, the hard verifier scope, exposure, grants | planned |
 > | 106 | the impact plan and the selected run of record | planned |
 > | 107 | the atomic land | planned |
 > | 108 | Maven parity and the hardened profiles | planned |
+>
+> One operating failure on the record: session 101's second round finished at 17:18 and the loop idled until 20:06, because the background waiter's completion never woke the orchestrator. The rule since: every framework wait is driven from a foreground loop that polls the job's status file, and the run state is checked at the start of every turn.
+
+> ## SESSION 101 CLOSED, 2026-09-06, VERIFIED (round 2, gpt-5.4 over the seat, one dispute withdrawn; landed 33557781) -- module configuration, the exception schema and the test-impact vocabulary
+>
+> Four steps, every one inert for a single-module solution. **A suite says
+> which module it proves** (`module`), what it is (`role`: `unit` |
+> `provider-contract` | `consumer-contract`) and, for a consumer-contract
+> suite, which provider it runs `against`; **`required_for_close`** is its
+> own word beside `expensive` (default the same value), so a suite can run
+> as the run of record and be recorded as information without being the
+> close's obligation (`freshnessVerdict` marks `required` by it, and
+> `judgeFreshness` demands only those). `module` and `against` are held to
+> the manifest only when the loader is handed a multi-module shape. **The
+> work plan gains `modules` and `reason`**: `judgeWorkPlanModules`
+> (`driver.ts`) refuses at acceptance an undeclared slug by name, two
+> modules without a reason, a multi-module plan naming no module, and a
+> single-module plan naming anything but its own module -- the plan file is
+> removed and the instruction comes back as a rejection under
+> `[plan-modules]`; in a multi-module solution the modules go on the
+> declaration entry and the session record (`sessions.schema.json`,
+> `progress-projection.schema.json`, so `dabbler status` prints them) and a
+> single-module record carries no member; `session declare --module` is the
+> typed form. **`modules:` in the root `dabbler.yaml`** (`moduleConfigs`,
+> `modules.ts`): per-slug `packaging`, `sharedFiles`, `contract.generate`,
+> unknown keys and undeclared slugs refused by name; `loadDeclaration(config,
+> slug)` answers the module's packaging block or the root's; `{version}` is a
+> recognised placeholder and a pack that names it with no version to give is
+> refused. **Selection gains the module form** (`checks.ts`): a changed path
+> under a module's roots, or among its shared files, selects that module's
+> suites whole (`module-changed`) and each transitive consumer's
+> consumer-contract suite against it (`consumer-contract`, found by the
+> manifest's reverse edges); a rule may `select: [{module: <slug>}]`;
+> `SelectionResult` carries `suites` and `modules`; `dabbler affected` prints
+> them and hands a whole-selected suite its bare command. Seven router tests.
+>
+> **Round 1 found two blocking findings and a nit.** A shared file reached only the first module whose `sharedFiles` named it (fixed: every naming module is reached, and the test's central pins are shared by two); the typed `session declare --module` bypassed the judge the driven plan meets (fixed: one judge, `judgeModulesForShape`, for both paths, and `--reason` on the typed form); and a claim that the module form had to be wired into the preverification gate -- disputed with evidence, because that phase runs nothing by design since the session 70s and the run of record runs every expensive suite whole until session 106 replaces it with the impact plan -- which round 2 withdrew. Router suite 1,085 tests (1,081 passing, 4 skipped), extension 196.
 
 > ## SESSION 100 CLOSED, 2026-09-06, VERIFIED (round 2, gpt-5.4 over the seat; landed 19d621c5) -- the solution plan and the module manifest; the six-step workflow deleted
 >

@@ -403,6 +403,45 @@ suite("solutionTreeModel: what other repositories build", () => {
     assert.ok(target.reason.includes("not on this machine"));
   });
 
+  test("the bundles node renders each bundle record with its dependencies, and a module reads where it shipped", () => {
+    const rows = modules().map((m) =>
+      m.slug === "model" || m.slug === "persister" || m.slug === "listener" ? { ...m, shippedIn: ["listener"] } : { ...m, shippedIn: [] },
+    );
+    const p = projection({
+      modules: rows,
+      bundles: [
+        {
+          bundle: "listener",
+          version: "2.0.0",
+          baseCommit: "abc123def456",
+          date: "2026-09-07",
+          session: 12,
+          dependencies: [
+            { module: "model", package: "CsvModel", version: "1.2.0", digest: "m-120" },
+            { module: "persister", package: "CsvPersister", version: "0.4.1", digest: null },
+          ],
+        },
+      ],
+    });
+    // Under the solution, after the modules: a bundles node with one row per record.
+    const top = childrenOf({ kind: "solution" }, p);
+    assert.ok(top.some((n) => n.kind === "bundleGroup"));
+    const group = descriptorFor({ kind: "bundleGroup" }, p);
+    assert.strictEqual(group.label, "Bundles");
+    assert.strictEqual(group.description, "1");
+    const bundles = childrenOf({ kind: "bundleGroup" }, p);
+    assert.deepStrictEqual(bundles, [{ kind: "bundle", bundle: "listener" }]);
+    const row = descriptorFor({ kind: "bundle", bundle: "listener" }, p);
+    assert.strictEqual(row.description, "2.0.0 · 2026-09-07");
+    assert.ok(row.tooltip?.includes("abc123def456"));
+    const deps = childrenOf({ kind: "bundle", bundle: "listener" }, p);
+    assert.deepStrictEqual(deps.map((n) => (n as { pkg: string }).pkg), ["CsvModel", "CsvPersister"]);
+    assert.strictEqual(descriptorFor({ kind: "bundleDependency", bundle: "listener", pkg: "CsvModel" }, p).description, "1.2.0 (model)");
+    // The module row says where it shipped; a solution with no record has no bundles node.
+    assert.ok(descriptorFor({ kind: "module", slug: "model" }, p).description?.includes("shipped in: listener"));
+    assert.ok(!childrenOf({ kind: "solution" }, projection()).some((n) => n.kind === "bundleGroup"));
+  });
+
   test("renders the consumers of a package as derived rows", () => {
     // `usedBy` is a reading of who declares what, and it is why nothing is
     // allowed to state it in a file.

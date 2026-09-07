@@ -10,7 +10,7 @@
 
 import { statSync } from "node:fs";
 
-import { mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 import { CheckoutError, openModule, preflight, readCloneMarker } from "../checkout.ts";
@@ -20,10 +20,11 @@ import { EcosystemError, ecosystemOf, ensureRootFiles } from "../ecosystem.ts";
 import { sessionsDirFor } from "../evidence.ts";
 import { ExposureError, raiseGrantDecision, revokeGrant } from "../exposure.ts";
 import { writeCandidateRecord } from "../impact.ts";
-import { platformNewlines } from "../journal.ts";
+import { platformNewlines, runGit } from "../journal.ts";
+import { LandError, bundleRecord, centralPins, writeBundleRecord } from "../land.ts";
 import { ManifestError, moduleConfigs, solutionShape } from "../modules.ts";
 import { readSessionState } from "../progress.ts";
-import { PackagesError, packModule } from "../packages.ts";
+import { PackagesError, packModule, readRecords } from "../packages.ts";
 import { PackagingConfigError } from "../packaging.ts";
 import { writeErr, writeOut } from "./output.ts";
 
@@ -164,6 +165,51 @@ function candidateSubcommand(rest: readonly string[]): number {
     // not a change to it.
     const written = new Set<string>(["Directory.Packages.props"]);
     for (const slug of slugs) {
+      const entry = shape.modules.find((module) => module.slug === slug);
+      // An application's candidate is the bundle record -- what it ships,
+      // at the versions the central pins name -- written into the tree
+      // before the run of record so the land carries it, whether or not the
+      // application also packs. Refused, and the candidate with it, while a
+      // pin is a dev version.
+      if (entry !== undefined && entry.kind === "application") {
+        const propsPath = join(workspaceRoot, "Directory.Packages.props");
+        const props = existsSync(propsPath) ? readFileSync(propsPath, "utf8") : "";
+        const project = ecosystemOf(workspaceRoot, entry).projectFiles(workspaceRoot, entry)[0];
+        const record = bundleRecord(shape, entry, centralPins(props), readRecords(workspaceRoot), project === undefined ? "" : readFileSync(join(workspaceRoot, project), "utf8"), {
+          session,
+          baseCommit: runGit(workspaceRoot, ["rev-parse", "HEAD"]).stdout || null,
+        });
+        const path = writeBundleRecord(workspaceRoot, record);
+        written.add(path);
+        writeOut(`bundled ${slug} ${record.version}: ${path} (${record.dependencies.map((d) => `${d.package} ${d.version}`).join(", ") || "no dependencies"})\n`);
+        if (entry.package === null) continue;
+      }
+      // The contract page first, then the pack: the pack's record digests
+      // the contract folder, and the land holds the tree to that digest, so
+      // the page the record covers must be the page that lands.
+      if (entry?.contract === null) {
+        writeOut(`no contract page: module '${slug}' declares no contract\n`);
+      } else {
+        const bundle = renderModuleContract(workspaceRoot, shape, slug, {
+          generate: configs.get(slug)?.contractGenerate ?? null,
+        });
+        if (bundle.notesRendered) {
+          const target = join(workspaceRoot, bundle.notesPath);
+          mkdirSync(dirname(target), { recursive: true });
+          writeFileSync(target, platformNewlines(bundle.notes), { encoding: "utf8" });
+          writeOut(`wrote ${bundle.notesPath} (from contract.yaml)\n`);
+          written.add(bundle.notesPath);
+        }
+        if (bundle.api !== null && bundle.apiPath !== null) {
+          const target = join(workspaceRoot, bundle.apiPath);
+          mkdirSync(dirname(target), { recursive: true });
+          writeFileSync(target, platformNewlines(bundle.api), { encoding: "utf8" });
+          writeOut(`wrote ${bundle.apiPath} (${bundle.mode})\n`);
+          written.add(bundle.apiPath);
+        } else {
+          writeOut(`kept ${bundle.notesPath}; a ${bundle.mode} contract has no surface page\n`);
+        }
+      }
       const packed = packModule(workspaceRoot, shape, slug, { session, config });
       writeOut(`packed ${packed.slug} ${packed.version}\n`);
       for (const artifact of packed.artifacts) {
@@ -175,30 +221,6 @@ function candidateSubcommand(rest: readonly string[]): number {
         writeOut(`recorded ${record}\n`);
         written.add(record);
       }
-      const entry = shape.modules.find((module) => module.slug === slug);
-      if (entry?.contract === null) {
-        writeOut(`no contract page: module '${slug}' declares no contract\n`);
-        continue;
-      }
-      const bundle = renderModuleContract(workspaceRoot, shape, slug, {
-        generate: configs.get(slug)?.contractGenerate ?? null,
-      });
-      if (bundle.notesRendered) {
-        const target = join(workspaceRoot, bundle.notesPath);
-        mkdirSync(dirname(target), { recursive: true });
-        writeFileSync(target, platformNewlines(bundle.notes), { encoding: "utf8" });
-        writeOut(`wrote ${bundle.notesPath} (from contract.yaml)\n`);
-        written.add(bundle.notesPath);
-      }
-      if (bundle.api !== null && bundle.apiPath !== null) {
-        const target = join(workspaceRoot, bundle.apiPath);
-        mkdirSync(dirname(target), { recursive: true });
-        writeFileSync(target, platformNewlines(bundle.api), { encoding: "utf8" });
-        writeOut(`wrote ${bundle.apiPath} (${bundle.mode})\n`);
-        written.add(bundle.apiPath);
-      } else {
-        writeOut(`kept ${bundle.notesPath}; a ${bundle.mode} contract has no surface page\n`);
-      }
     }
     if (session !== null) writeCandidateRecord(workspaceRoot, session, [...written].sort());
   } catch (error) {
@@ -208,7 +230,8 @@ function candidateSubcommand(rest: readonly string[]): number {
       error instanceof ManifestError ||
       error instanceof PackagingConfigError ||
       error instanceof ConfigError ||
-      error instanceof ContractError
+      error instanceof ContractError ||
+      error instanceof LandError
     ) {
       writeErr(`module candidate: refused -- ${error.message}\n`);
       return EXIT_REFUSED;

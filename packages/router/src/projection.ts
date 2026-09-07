@@ -20,7 +20,8 @@ import { sessionsDirFor } from "./evidence.ts";
 import { readExposure } from "./exposure.ts";
 import { platformNewlines } from "./journal.ts";
 import { dumps } from "./pythonJson.ts";
-import { type SolutionShape, consumersOf, ManifestError, solutionShape } from "./modules.ts";
+import { readBundleRecords } from "./land.ts";
+import { type ModuleEntry, type SolutionShape, consumersOf, ManifestError, solutionShape } from "./modules.ts";
 import { readRawSessionState } from "./sessionState.ts";
 import {
   OUTCOME_PASSED,
@@ -127,6 +128,17 @@ export function project(root: string): Record<string, unknown> {
   const name = basename(resolve(root)) || "solution";
   const granted = grantedSiblings(root);
   const runs = runsOfRecord(root, shape);
+  // What ships: every bundle record under release/, and per module the
+  // bundles that pin its package or are its own.
+  const bundles = readBundleRecords(root);
+  const shippedIn = (entry: ModuleEntry): string[] =>
+    bundles
+      .filter(
+        (bundle) =>
+          bundle.bundle === entry.slug ||
+          (entry.package !== null && bundle.dependencies.some((dependency) => dependency.package === entry.package)),
+      )
+      .map((bundle) => bundle.bundle);
   const modules: Node[] = shape.modules.map((entry) => {
     const contractDir = contractDirFor(entry.slug);
     return {
@@ -151,6 +163,7 @@ export function project(root: string): Record<string, unknown> {
       // whose contract suite against it is red.
       runOfRecord: runs.get(entry.slug)?.state ?? "none",
       blocking: [...(runs.get(entry.slug)?.blocking ?? [])],
+      shippedIn: shippedIn(entry),
     } satisfies Node;
   });
   const doc: Node = {
@@ -162,6 +175,16 @@ export function project(root: string): Record<string, unknown> {
       moduleCount: modules.length,
     },
     modules,
+    // What ships, as the bundle records under release/ say it; recorded,
+    // never executed, and read here rather than restated.
+    bundles: bundles.map((bundle) => ({
+      bundle: bundle.bundle,
+      version: bundle.version,
+      baseCommit: bundle.baseCommit,
+      date: bundle.date,
+      session: bundle.session,
+      dependencies: bundle.dependencies.map((dependency) => ({ ...dependency })),
+    })),
   };
   // One assembly for both halves of the cross-repository graph. It reads
   // sibling directories and every member's build files, and the projection

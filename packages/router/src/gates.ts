@@ -36,13 +36,24 @@
 // and no repository; the readers are exercised once, in the git-states
 // walkthrough.
 
-import { existsSync, realpathSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { existsSync, readFileSync, realpathSync } from "node:fs";
+import { join, relative, resolve } from "node:path";
 
 import { isFrameworkInstalledPath } from "./checks.ts";
 import type { RouterConfig } from "./config.ts";
 import { PROJECT_CONFIG_FILENAME, loadConfig, projectRoot } from "./config.ts";
+import { walkFiles } from "./ecosystem.ts";
 import { changedPathsBetween, detectOutOfBandWrite } from "./evidence.ts";
+import { readExposure } from "./exposure.ts";
+import {
+  type PackageReferenceFact,
+  candidatesFromRecord,
+  centralPins,
+  judgeExposure,
+  judgePins,
+  packageReferencesOf,
+} from "./land.ts";
+import { ManifestError, type ModuleEntry, consumersOf, solutionShape } from "./modules.ts";
 import {
   type ImpactPlan,
   candidatePathsAsWritten,
@@ -130,6 +141,9 @@ export const EVIDENCE_GATES: ReadonlySet<string> = new Set([
   "verification_clean",
   "verdict_vocabulary",
   GATE_PUBLISHED_WHEN_RELEASABLE,
+  // The wall and the pins are evidence of what landed, not bookkeeping.
+  "pins_current",
+  "exposure_within_ceiling",
 ]);
 
 /** One gate's row: the name, the answer, and what to do about a `false`. */
@@ -805,6 +819,84 @@ function planForGate(sessionsDir: string): ImpactPlan | null {
   return readImpactPlan(root, current);
 }
 
+// --- pins_current and exposure_within_ceiling ---------------------------------------
+
+/**
+ * Every consumer on the candidate's pin, and pinning nowhere else. Read for
+ * the changed modules the session's impact plan names that carry a package
+ * and were packed this session; a single-module solution, or a session that
+ * packed nothing, has no pin to hold and the row says so rather than
+ * passing in silence.
+ */
+export function checkPinsCurrent(sessionsDir: string): Check {
+  const root = repoRootFor(sessionsDir);
+  const current = currentSession(sessionsDir);
+  if (root === null || typeof current !== "number") return [true, "no session in flight: no pins to hold", true];
+  let shape;
+  try {
+    shape = solutionShape(root);
+  } catch (error) {
+    if (!(error instanceof ManifestError)) throw error;
+    return [false, `docs/modules.yaml is refused: ${error.message}`];
+  }
+  if (!shape.multi) return [true, "single-module solution: the repository is the module, and there is no pin to hold", true];
+  const plan = readImpactPlan(root, current);
+  if (plan === null || !plan.multi) return [true, "no impact plan on the record: nothing was packed this session", true];
+  // What this session packed, from the candidate job's own record of what
+  // it wrote: the correspondence records under packages/ name the version.
+  const packed = candidatesFromRecord(readCandidateRecord(root, current).paths.map((entry) => entry.path));
+  const candidates = plan.changedModules
+    .map((slug) => shape.modules.find((entry) => entry.slug === slug))
+    .filter((entry): entry is ModuleEntry => entry !== undefined && entry.package !== null)
+    .map((entry) => {
+      const record = packed.filter((row) => row.package === entry.package).at(-1);
+      return record === undefined ? null : { package: entry.package as string, version: record.version, slug: entry.slug };
+    })
+    .filter((candidate): candidate is { package: string; version: string; slug: string } => candidate !== null);
+  if (candidates.length === 0) return [true, "this session packed no candidate: no pin to hold", true];
+  const propsPath = join(root, "Directory.Packages.props");
+  const pins = centralPins(existsSync(propsPath) ? readFileSync(propsPath, "utf8") : "");
+  const references: PackageReferenceFact[] = [];
+  for (const candidate of candidates) {
+    for (const consumer of consumersOf(shape.modules, candidate.slug)) {
+      const entry = shape.modules.find((module) => module.slug === consumer);
+      if (entry === undefined) continue;
+      for (const codeRoot of entry.codeRoots.length > 0 ? entry.codeRoots : ["."]) {
+        for (const file of walkFiles(join(root, codeRoot))) {
+          if (!file.toLowerCase().endsWith(".csproj")) continue;
+          const project = relative(root, file).split("\\").join("/");
+          try {
+            references.push(...packageReferencesOf(project, readFileSync(file, "utf8")));
+          } catch {
+            // A project file that cannot be read pins nothing this gate can see.
+          }
+        }
+      }
+    }
+  }
+  const refusal = judgePins({ candidates, pins, references });
+  return refusal === null ? [true, ""] : [false, refusal];
+}
+
+/**
+ * The wall held: the closing exposure manifest shows nothing of a sibling
+ * that nobody signed for, and nothing changed outside the scope. Read for a
+ * module session's manifest; a session with none -- a single-module
+ * solution, or a session not started on a module -- has no wall to measure
+ * and the row says so.
+ */
+export function checkExposureWithinCeiling(sessionsDir: string): Check {
+  const root = repoRootFor(sessionsDir);
+  const current = currentSession(sessionsDir);
+  if (root === null || typeof current !== "number") return [true, "no session in flight: no exposure to measure", true];
+  const manifest = readExposure(root, current);
+  if (manifest === null) {
+    return [true, "no exposure manifest: not a module session, so there is no wall to measure", true];
+  }
+  const refusal = judgeExposure(manifest);
+  return refusal === null ? [true, ""] : [false, refusal];
+}
+
 // --- owed_decisions -----------------------------------------------------------
 
 /** The owed-decision row, from the blocking rows alone. */
@@ -999,6 +1091,8 @@ export const GATE_CHECKS: readonly (readonly [string, Predicate])[] = [
   ["working_tree_clean", checkWorkingTreeClean],
   ["pushed_to_remote", checkPushedToRemote],
   ["test_run_fresh", checkTestRunFresh],
+  ["pins_current", checkPinsCurrent],
+  ["exposure_within_ceiling", checkExposureWithinCeiling],
   ["owed_decisions", checkOwedDecisions],
   [GATE_PUBLISHED_WHEN_RELEASABLE, checkPublishedWhenReleasable],
   ["verdict_vocabulary", checkVerdictVocabulary],

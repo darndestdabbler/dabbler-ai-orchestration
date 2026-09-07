@@ -363,16 +363,24 @@ describe("the driver", () => {
     assert.equal(row.inapplicable, true);
   });
 
-  it("keeps the evidence gates to exactly the three that read the record", () => {
-    assert.deepEqual([...EVIDENCE_GATES].sort(), ["published_when_releasable", "verdict_vocabulary", "verification_clean"]);
+  it("keeps the evidence gates to exactly the five that read the record", () => {
+    // The wall and the pins joined the three in session 107: what a module
+    // session's checkout exposed and what its consumers pin are evidence of
+    // what landed, and --force bypasses bookkeeping, never evidence.
+    assert.deepEqual(
+      [...EVIDENCE_GATES].sort(),
+      ["exposure_within_ceiling", "pins_current", "published_when_releasable", "verdict_vocabulary", "verification_clean"],
+    );
   });
 
-  it("runs the seven in the order the close prints them", () => {
+  it("runs the nine in the order the close prints them", () => {
     assert.deepEqual(GATE_CHECKS.map(([name]) => name), [
       "verification_clean",
       "working_tree_clean",
       "pushed_to_remote",
       "test_run_fresh",
+      "pins_current",
+      "exposure_within_ceiling",
       "owed_decisions",
       "published_when_releasable",
       "verdict_vocabulary",

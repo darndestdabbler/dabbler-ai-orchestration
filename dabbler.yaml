@@ -471,6 +471,11 @@ testing:
           - packages/router/test/impact.test.ts
           - packages/router/test/checks.test.ts
           - packages/router/test/walk-impact.test.ts
+      # The atomic land: the judges the land and the close's module gates
+      # read, and the bundle record.
+      - when: packages/router/src/land.ts
+        select:
+          - packages/router/test/land.test.ts
       - when: packages/router/src/pythonJson.ts
         select:
           - packages/router/test/lockfile.test.ts

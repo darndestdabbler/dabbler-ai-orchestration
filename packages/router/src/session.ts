@@ -75,6 +75,8 @@ import { ManifestError, type SolutionShape, moduleConfigs, solutionShape } from 
 import { moduleScope } from "./agency.ts";
 import { CheckoutError, openModule, readCloneMarker, writeModuleSessionMarker } from "./checkout.ts";
 import { writeExposure } from "./exposure.ts";
+import { candidatePathsAsWritten, readCandidateRecord } from "./impact.ts";
+import { isFrameworkInstalledPath } from "./checks.ts";
 import {
   SET_BOOKKEEPING_COMMIT_BASENAMES,
   governingConfig,
@@ -91,7 +93,7 @@ import {
   raiseOwed,
   refreshOwedDecisions,
 } from "./owedDecisions.ts";
-import { loadSuitesChecked } from "./testEvidence.ts";
+import { isSessionBookkeeping, loadSuitesChecked } from "./testEvidence.ts";
 import { nowIso, platformNewlines, repoRootFor, runGit } from "./journal.ts";
 import { LedgerError, RUNS_DIRNAME, type Row, latestRound } from "./ledger.ts";
 import {
@@ -658,7 +660,18 @@ function writeCloseExposure(sessionsDir: string, repoRoot: string, current: numb
     if (!shape.multi) return;
     const run = readRun(repoRoot, current);
     const baseline = run?.baseline_tree ?? null;
-    const changed = baseline === null ? [] : (changedPathsBetween(repoRoot, String(baseline), "HEAD") ?? []);
+    // The session's own changes: not the candidate the framework packed (its
+    // paths as written, by digest), not the engine's settings the
+    // registration installed, and not the session's bookkeeping -- none of
+    // those is work the session was scoped to or could have been.
+    const candidate = candidatePathsAsWritten(repoRoot, readCandidateRecord(repoRoot, current));
+    const setRel = relative(repoRoot, resolve(sessionsDir)).split("\\").join("/");
+    const changed = (baseline === null ? [] : (changedPathsBetween(repoRoot, String(baseline), "HEAD") ?? [])).filter(
+      (path) => {
+        const rel = path.split("\\").join("/");
+        return !candidate.has(rel) && !isFrameworkInstalledPath(rel) && !isSessionBookkeeping(rel, setRel);
+      },
+    );
     writeExposure(repoRoot, shape, current, {
       modules,
       phase: "close",
@@ -1913,6 +1926,14 @@ export function close(sessionsDir: string, options: CloseCliOptions = {}): numbe
       writeErr(`close: refused -- ${switched}\n`);
       return EXIT_GATE_FAILED;
     }
+    // The closing exposure manifest, before the gates: what the clone held
+    // of its siblings at the end and what the session changed outside its
+    // scope is the evidence `exposure_within_ceiling` reads, so it is the
+    // tree being closed that it describes.
+    {
+      const root = repoRootFor(sessionsDir);
+      if (root) writeCloseExposure(sessionsDir, root, current as number);
+    }
     const results = runGates(sessionsDir, { forced });
     const width = Math.max(...results.map((row) => row.name.length));
     for (const row of results) {
@@ -1945,9 +1966,6 @@ export function close(sessionsDir: string, options: CloseCliOptions = {}): numbe
     if (repoRoot) {
       const row = latestRound(repoRoot, current);
       if (row) verdict = row["verdict"] ?? null;
-      // What the clone held of its siblings at the end, and what the session
-      // changed outside its scope: the second half of the exposure record.
-      writeCloseExposure(sessionsDir, repoRoot, current as number);
     }
 
     flipStateToClosed(sessionsDir, {

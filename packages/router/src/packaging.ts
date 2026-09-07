@@ -757,14 +757,16 @@ export function packageSession(
     // credential's name are what they should be. A malformed block throws
     // the same way it would on the real run.
     return options.dryRun === true
-      ? { ...refused, declared: loadDeclaration(config) !== null }
+      ? { ...refused, declared: loadDeclaration(config, moduleOfSession(sessionsDir, sessionNumber)) !== null }
       : refused;
   }
 
   const switched = refuseIfResolvingFromSource(repoRootFor(sessionsDir), "packaging");
   if (switched !== null) return refusal(sessionNumber, true, switched);
 
-  const declaration = loadDeclaration(config);
+  // The session's module's own block answers for a module session, the root
+  // block otherwise -- the same rule `module pack` reads by.
+  const declaration = loadDeclaration(config, moduleOfSession(sessionsDir, sessionNumber));
   if (declaration === null) {
     return refusal(
       sessionNumber,
@@ -839,6 +841,29 @@ export function packageSession(
   // Narrowed here rather than above: the guard proves a declared credential
   // resolved, and an undeclared one is the empty string by construction.
   return execute(root, sessionNumber, declaration, secretValue ?? "", gates, options.version ?? null);
+}
+
+/**
+ * The module a session is on, from its ledger row: the focused checkout's
+ * module, else the declaration's first, else none -- the same reading the
+ * run of record and the land make.
+ */
+function moduleOfSession(sessionsDir: string, sessionNumber: number): string | null {
+  const rows = readSessionState(sessionsDir)?.["sessions"];
+  for (const row of Array.isArray(rows) ? rows : []) {
+    if (typeof row !== "object" || row === null || Array.isArray(row)) continue;
+    const record = row as Record<string, unknown>;
+    if (Number(record["number"]) !== sessionNumber) continue;
+    const checkout = record["checkout"];
+    if (typeof checkout === "object" && checkout !== null && !Array.isArray(checkout)) {
+      const module = (checkout as Record<string, unknown>)["module"];
+      if (typeof module === "string" && module.trim() !== "") return module.trim();
+    }
+    const modules = record["modules"];
+    const first = Array.isArray(modules) ? modules.map(String).find((slug) => slug.trim() !== "") : undefined;
+    return first ?? null;
+  }
+  return null;
 }
 
 function execute(

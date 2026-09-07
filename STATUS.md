@@ -1,4 +1,4 @@
-# STATUS — the modules block (sessions 100–108) is running unattended; session 105 closed VERIFIED, session 106 next
+# STATUS — the modules block (sessions 100–108) is running unattended; session 106 closed VERIFIED, session 107 next
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
 
@@ -20,13 +20,66 @@
 > | 103 | committed immutable packages | CLOSED VERIFIED, landed 6e2b9b73 |
 > | 104 | the focused checkout and the Windows preflight | CLOSED VERIFIED, landed 706eb2af |
 > | 105 | module-scoped sessions, the hard verifier scope, exposure, grants | CLOSED VERIFIED, landed 8ef7dd8d |
-> | 106 | the impact plan and the selected run of record | next |
-> | 107 | the atomic land | planned |
+> | 106 | the impact plan and the selected run of record | CLOSED VERIFIED, landed 2873f493 |
+> | 107 | the atomic land | next |
 > | 108 | Maven parity and the hardened profiles | planned |
 >
 > One operating failure on the record: session 101's second round finished at 17:18 and the loop idled until 20:06, because the background waiter's completion never woke the orchestrator. The rule since: every framework wait is driven from a foreground loop that polls the job's status file, and the run state is checked at the start of every turn.
 >
 > Paused after session 103 on the operator's instruction (2026-09-06, 21:15) and resumed in a new chat at 21:27 with session 104; the router and extension on this machine are rebuilt after each close. Every framework wait is driven from a foreground loop (the scratchpad's drive-waits.sh pattern), never from a background waiter. A session driven from the chat with the CLI shows nothing in the Dabbler Terminal, which is expected: that terminal renders a run the extension launched.
+
+> ## SESSION 106 CLOSED, 2026-09-07, VERIFIED (round 4, gpt-5.4 over the seat; round 1 found two Majors and a minor, fixed; the cap raised from 3 to 5 for this run on the record; landed 2873f493) -- the impact plan and the selected run of record
+>
+> Three steps, nothing asked of a single-module solution. **One impact
+> plan** (`impact.ts`, new): `planImpact` derives from the manifest, the
+> suites and the changed paths the modules reached (roots and shared files),
+> each one's own suites (`module-changed`), each transitive consumer's
+> consumer-contract suite against a changed module (`consumer-contract`),
+> every suite of every transitive consumer of a changed shared-types module
+> (`shared-types`; the sharper reason wins), the candidates (changed modules
+> with a package) and the unowned paths; single-module: every required
+> suite. The selector's module form takes its whole-suite offers from it and
+> `dabbler affected` prints candidates and unowned paths, so nothing computes
+> it twice. **Candidate bytes before the run of record**: `dabbler module
+> candidate --session N <slug>...` packs each module and regenerates its
+> contract page, recording what it wrote with a sha256 per path
+> (`candidate.json`); in a module session `phaseRunOfRecord` plans from the
+> material worktree changes, writes `impact.json`, runs the candidate job
+> first and only the plan's suites, whole, as final-full; the plan and the
+> candidate stand once written after the latest round (a re-entry reads them
+> back, since the candidate moves the shared files a recomputed plan would
+> reach, and a re-pack would move the tree under a green run); the close
+> gate demands the plan's suites and no other, and `verification_clean` sets
+> a candidate path aside only while its bytes are the candidate's. **The
+> Explorer**: the module row reads *run of record: green | red | none* from
+> the latest final-full records of its suites, a consumer whose contract
+> suite against a producer is red reads *blocking* under used-by, and Show
+> Impact plans a hypothetical change under the module's roots (`dabbler
+> affected --path`) and shows the plan. Four router tests (two of them
+> `walk-impact` milestones over scripted suites and a scripted pack, driving
+> a module session end to end) and two extension tests.
+>
+> **What the walkthrough found in the framework, all fixed in the diff.**
+> The worktree snapshot (`journal.snapshotWorktreeTree`) failed in a sparse
+> clone: an index read from HEAD carries no skip-worktree bits, so `add -A`
+> staged every sibling's file as deleted (or refused the engine's settings
+> outside the cone); it now copies the bits entry by entry from `git
+> ls-files -v` and adds with `--sparse` (never by copying the index file,
+> which a concurrent rewrite tears -- the run of record found that too). The
+> land adds with `--sparse` for the same reason. A `start --module` no longer
+> asks the suites question of a clone it does not stand in. And **session
+> 104's flake is diagnosed and fixed**: the close took the lifecycle lock in
+> a single attempt while the driver's polling saves hold it for a moment, so
+> a close landing in that moment refused at once and paused the session; the
+> close now waits like every other lifecycle verb, and both walkthroughs put
+> their jobs' logs in the assertion when `next` prints no instruction.
+> **Round 1** found the plan recomputed over the candidate's own writes and
+> the exemption covering an edited candidate path; both are what "stands
+> once written after the latest round" and "as written, by digest" answer.
+> Two run-of-record failures under the full suite's load, each a framework
+> fix, spent rounds 3 and 4; the cap was raised to 5 with the reason on
+> `amendments.jsonl`. Router suite 1,112 tests (1,108 passing, 4 skipped),
+> extension 201.
 
 > ## SESSION 105 CLOSED, 2026-09-06, VERIFIED (round 2, gpt-5.4 over the seat; round 1 found one Major, fixed; landed 8ef7dd8d) -- module-scoped sessions, the disk as the wall, the exposure manifest, grants
 >

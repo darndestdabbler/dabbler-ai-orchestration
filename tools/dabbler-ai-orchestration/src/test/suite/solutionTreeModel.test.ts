@@ -97,6 +97,41 @@ suite("solutionTreeModel: modules", () => {
     assert.ok(descriptorFor({ kind: "solution" }, p).description?.includes("4 modules"));
   });
 
+  test("the module row reads its run of record, and a consumer whose contract suite against it is red reads blocking", () => {
+    // Both are readings of the records beside the run, projected by the
+    // router; the row restates them and computes nothing.
+    const rows = modules().map((m) =>
+      m.slug === "model"
+        ? { ...m, runOfRecord: "green" as const, blocking: ["persister"] }
+        : m.slug === "persister"
+          ? { ...m, runOfRecord: "red" as const, blocking: [] }
+          : { ...m, runOfRecord: "none" as const, blocking: [] },
+    );
+    const p = projection({ modules: rows });
+    const model = descriptorFor({ kind: "module", slug: "model" }, p);
+    assert.ok(model.description?.includes("run of record: green"), model.description);
+    assert.strictEqual(model.icon?.tone, "done");
+    const persister = descriptorFor({ kind: "module", slug: "persister" }, p);
+    assert.ok(persister.description?.includes("run of record: red"));
+    assert.strictEqual(persister.icon?.tone, "attention");
+    assert.ok(descriptorFor({ kind: "module", slug: "listener" }, p).description?.includes("run of record: none"));
+
+    // Under the model's used-by, the persister is blocked; the deserializer is not.
+    const blocked = descriptorFor({ kind: "consumer", slug: "model", consumer: "persister" }, p);
+    assert.strictEqual(blocked.description, "blocking");
+    assert.strictEqual(blocked.icon?.tone, "attention");
+    const fine = descriptorFor({ kind: "consumer", slug: "model", consumer: "deserializer" }, p);
+    assert.strictEqual(fine.description, undefined);
+
+    // A single-module solution's row says nothing of a run of record: the
+    // repository is the module, and the Work Explorer is where its runs read.
+    const single = descriptorFor({ kind: "module", slug: "csv-model" }, {
+      solution: { name: "csv-model", title: "csv-model", multi: false, implicit: true, moduleCount: 1 },
+      modules: [{ slug: "csv-model", title: "csv-model", kind: "application", package: null, contract: null, codeRoots: ["."], dependsOn: [], usedBy: [], contractDir: null, runOfRecord: "none" }],
+    });
+    assert.ok(!single.description?.includes("run of record"));
+  });
+
   test("a single-module solution is one row with nothing under it", () => {
     // The repository is the module. Nothing module-shaped has switched on,
     // and the tree says so by having nothing to expand.

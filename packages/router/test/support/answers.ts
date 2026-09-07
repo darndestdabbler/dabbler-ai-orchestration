@@ -162,6 +162,9 @@ export function setProviderKeys(): void {
 export function cleanRepoAnswers(repo: string): () => void {
   return gitAnswers([
     [["rev-parse", "--show-toplevel"], { stdout: repo.split("\\").join("/") }],
+    // The worktree snapshot asks which index entries a sparse cone keeps off
+    // disk (skip-worktree); an answered checkout is not sparse and has none.
+    [["ls-files", "-v", "-z"], { stdout: "" }],
     [["status", "--porcelain", "-uall"], { stdout: "" }],
     [["status", "--porcelain"], { stdout: "" }],
     [(args) => args[0] === "cat-file" && args[1] === "-e", { code: 0 }],
@@ -271,6 +274,9 @@ export function makeAnsweredRepo(
     [["rev-parse", "--show-toplevel"], { stdout: posixRepo }],
     [["rev-parse", "--verify", "HEAD"], { stdout: HEAD_COMMIT }],
     [["rev-parse", "--short", "HEAD"], { stdout: HEAD_COMMIT.slice(0, 7) }],
+    // The worktree snapshot asks which index entries a sparse cone keeps off
+    // disk (skip-worktree); this checkout is not sparse and has none.
+    [["ls-files", "-v", "-z"], { stdout: "" }],
     [
       ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"],
       withOrigin ? { stdout: "origin/main" } : { code: 128, stderr: "fatal: no upstream configured for branch 'main'" },

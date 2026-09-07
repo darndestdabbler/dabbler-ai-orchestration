@@ -10,12 +10,18 @@
 
 import { statSync } from "node:fs";
 
+import { mkdirSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+
 import { CheckoutError, openModule, preflight, readCloneMarker } from "../checkout.ts";
 import { ConfigError, loadConfig } from "../config.ts";
+import { ContractError, renderModuleContract } from "../contractdoc.ts";
 import { EcosystemError, ecosystemOf, ensureRootFiles } from "../ecosystem.ts";
 import { sessionsDirFor } from "../evidence.ts";
 import { ExposureError, raiseGrantDecision, revokeGrant } from "../exposure.ts";
-import { ManifestError, solutionShape } from "../modules.ts";
+import { writeCandidateRecord } from "../impact.ts";
+import { platformNewlines } from "../journal.ts";
+import { ManifestError, moduleConfigs, solutionShape } from "../modules.ts";
 import { readSessionState } from "../progress.ts";
 import { PackagesError, packModule } from "../packages.ts";
 import { PackagingConfigError } from "../packaging.ts";
@@ -35,6 +41,7 @@ function usage(): string {
     "       dabbler module preflight [-h] [--clones N] [--workspace-root WORKSPACE_ROOT] slug",
     "       dabbler module grant [-h] --reason TEXT [--debug] [--workspace-root WORKSPACE_ROOT] sibling",
     "       dabbler module revoke [-h] [--workspace-root WORKSPACE_ROOT] sibling",
+    "       dabbler module candidate [-h] [--session N] [--workspace-root WORKSPACE_ROOT] slug [slug ...]",
     "",
     "the things done to one module: its designed seam, its committed package,",
     "its focused checkout, what that checkout costs on this machine, and the",
@@ -98,7 +105,117 @@ function usage(): string {
     "revoke: end a grant -- refused while the sibling's roots hold changes; removes the",
     "overlay, narrows the cone again and records it.",
     "",
+    "candidate: what the run of record tests against -- each named module packed (its",
+    "declared pack or the ecosystem's default) with the pin moved and the record written,",
+    "then its contract page regenerated. The framework runs it as one job before the",
+    "suites of a module session; every refusal prints as one line.",
+    "",
   ].join("\n");
+}
+
+function candidateSubcommand(rest: readonly string[]): number {
+  const slugs: string[] = [];
+  let workspaceRoot = ".";
+  let session: number | null = null;
+  for (let index = 0; index < rest.length; index += 1) {
+    const token = rest[index] as string;
+    if (token === "--help" || token === "-h") {
+      writeOut(usage());
+      return EXIT_OK;
+    }
+    if (token === "--session" || token === "--workspace-root") {
+      const value = rest[index + 1];
+      if (value === undefined || value.startsWith("--")) {
+        writeErr(`dabbler module candidate: argument ${token}: expected one argument\n`);
+        return EXIT_USAGE;
+      }
+      if (token === "--workspace-root") workspaceRoot = value;
+      else {
+        session = Number.parseInt(value, 10);
+        if (!Number.isInteger(session) || session < 1) {
+          writeErr(`dabbler module candidate: argument --session: invalid int value: '${value}'\n`);
+          return EXIT_USAGE;
+        }
+      }
+      index += 1;
+      continue;
+    }
+    if (token.startsWith("--")) {
+      writeErr(`dabbler module candidate: unrecognized argument: ${token}\n`);
+      return EXIT_USAGE;
+    }
+    slugs.push(token);
+  }
+  if (slugs.length === 0) {
+    writeErr("dabbler module candidate: the following arguments are required: slug\n");
+    return EXIT_USAGE;
+  }
+  if (!isDirectory(workspaceRoot)) {
+    writeErr(`module: not a directory: ${workspaceRoot}\n`);
+    return EXIT_USAGE;
+  }
+  try {
+    const shape = solutionShape(workspaceRoot);
+    const config = loadConfig(undefined, workspaceRoot);
+    const configs = moduleConfigs(config, shape.modules);
+    // Everything the candidate writes is recorded beside the run: the gate
+    // that refuses a tree moved after verification reads it, because these
+    // paths are the framework's own derivation of the verified source and
+    // not a change to it.
+    const written = new Set<string>(["Directory.Packages.props"]);
+    for (const slug of slugs) {
+      const packed = packModule(workspaceRoot, shape, slug, { session, config });
+      writeOut(`packed ${packed.slug} ${packed.version}\n`);
+      for (const artifact of packed.artifacts) {
+        writeOut(`  ${artifact}\n`);
+        written.add(artifact);
+      }
+      writeOut(`pinned ${packed.pins.join(", ")} in Directory.Packages.props\n`);
+      for (const record of packed.records) {
+        writeOut(`recorded ${record}\n`);
+        written.add(record);
+      }
+      const entry = shape.modules.find((module) => module.slug === slug);
+      if (entry?.contract === null) {
+        writeOut(`no contract page: module '${slug}' declares no contract\n`);
+        continue;
+      }
+      const bundle = renderModuleContract(workspaceRoot, shape, slug, {
+        generate: configs.get(slug)?.contractGenerate ?? null,
+      });
+      if (bundle.notesRendered) {
+        const target = join(workspaceRoot, bundle.notesPath);
+        mkdirSync(dirname(target), { recursive: true });
+        writeFileSync(target, platformNewlines(bundle.notes), { encoding: "utf8" });
+        writeOut(`wrote ${bundle.notesPath} (from contract.yaml)\n`);
+        written.add(bundle.notesPath);
+      }
+      if (bundle.api !== null && bundle.apiPath !== null) {
+        const target = join(workspaceRoot, bundle.apiPath);
+        mkdirSync(dirname(target), { recursive: true });
+        writeFileSync(target, platformNewlines(bundle.api), { encoding: "utf8" });
+        writeOut(`wrote ${bundle.apiPath} (${bundle.mode})\n`);
+        written.add(bundle.apiPath);
+      } else {
+        writeOut(`kept ${bundle.notesPath}; a ${bundle.mode} contract has no surface page\n`);
+      }
+    }
+    if (session !== null) writeCandidateRecord(workspaceRoot, session, [...written].sort());
+  } catch (error) {
+    if (
+      error instanceof PackagesError ||
+      error instanceof EcosystemError ||
+      error instanceof ManifestError ||
+      error instanceof PackagingConfigError ||
+      error instanceof ConfigError ||
+      error instanceof ContractError
+    ) {
+      writeErr(`module candidate: refused -- ${error.message}\n`);
+      return EXIT_REFUSED;
+    }
+    throw error;
+  }
+  return EXIT_OK;
 }
 
 /** The clone and the session a grant verb acts in, or the refusal. */
@@ -430,6 +547,7 @@ export async function moduleVerb(argv: string[]): Promise<number> {
   if (subcommand === "open") return openSubcommand(rest);
   if (subcommand === "preflight") return preflightSubcommand(rest);
   if (subcommand === "grant" || subcommand === "revoke") return grantSubcommand(subcommand, rest);
+  if (subcommand === "candidate") return candidateSubcommand(rest);
   if (subcommand !== "contract") {
     writeErr(`dabbler module: '${subcommand}' is not a subcommand\n\n${usage()}`);
     return EXIT_USAGE;

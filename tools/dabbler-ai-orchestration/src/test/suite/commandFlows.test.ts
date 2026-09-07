@@ -8,6 +8,7 @@ import {
 } from "../../commands/cancelLifecycleCommands";
 import { NewModuleUi, runNewModuleFlow } from "../../commands/newModule";
 import { OpenModuleUi, openModule } from "../../commands/openModule";
+import { ShowImpactUi, showImpact } from "../../commands/showImpact";
 import {
   cloneRepository,
   createRepository,
@@ -956,5 +957,36 @@ suite("Open Module", () => {
     await openModule(refused.router, { node: { kind: "module", slug: "persister" }, projection: multi }, bad.ui);
     assert.deepStrictEqual(bad.opened, []);
     assert.deepStrictEqual(bad.warnings, ["module open: refused -- D:\\ws\\csv-pipeline.persister already exists: pass --reset"]);
+  });
+
+  test("Show Impact plans a hypothetical change under the module's roots and shows the router's plan, or its refusal", async () => {
+    const plan =
+      "scope: a hypothetical change of modules/persister\n" +
+      "modules: persister\n" +
+      "candidates: persister (packed before the run of record)\n" +
+      "  module-changed         suite persister-unit (persister)  <- modules/persister\n";
+    const answered = fakeRouter(0, plan);
+    const logged: string[] = [];
+    const infos: string[] = [];
+    const warnings: string[] = [];
+    const ui: ShowImpactUi = {
+      showInformationMessage: (m: string) => infos.push(m),
+      showWarningMessage: (m: string) => warnings.push(m),
+      log: (text: string) => logged.push(text),
+      workspaceRoot: () => "D:\\ws\\csv-pipeline",
+    };
+    await showImpact(answered.router, { node: { kind: "module", slug: "persister" }, projection: multi }, ui);
+    // The router was asked for the module's roots, and its answer is shown whole and in brief.
+    assert.deepStrictEqual(answered.affectedOptions.map((o) => o.paths), [["modules/persister"]]);
+    assert.strictEqual(logged.length, 1);
+    assert.ok(logged[0].includes("module-changed         suite persister-unit"));
+    assert.strictEqual(infos.length, 1);
+    assert.ok(infos[0].startsWith("persister: modules: persister · candidates: persister"));
+    assert.deepStrictEqual(warnings, []);
+
+    const refused = fakeRouter(1, "affected: testing.selection is malformed: rules[0] names no test");
+    await showImpact(refused.router, { node: { kind: "module", slug: "persister" }, projection: multi }, ui);
+    assert.deepStrictEqual(warnings, ["affected: testing.selection is malformed: rules[0] names no test"]);
+    assert.strictEqual(infos.length, 1);
   });
 });

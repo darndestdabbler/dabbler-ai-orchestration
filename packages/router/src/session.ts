@@ -1000,7 +1000,11 @@ export function start(sessionsDir: string, options: StartOptions): number {
     // that would trip over it begins. Idempotent, and best-effort: a
     // registration must not fail because a brief could not be written.
     try {
-      const raised = raiseSuiteDecisionIfOwed(registerIn, requested);
+      // Not for a module session registered from the full checkout: the
+      // governing configuration is read where the command stands, and the
+      // clone is not where it stands, so the question would be asked of a
+      // declaration nobody read. The close asks it again, in the clone.
+      const raised = moduleStart === null ? raiseSuiteDecisionIfOwed(registerIn, requested) : null;
       if (raised !== null) {
         writeOut(
           `start: raised owed decision '${String(raised["id"])}' -- ` +
@@ -1860,7 +1864,13 @@ export function close(sessionsDir: string, options: CloseCliOptions = {}): numbe
   }
   let lock: string;
   try {
-    lock = acquireLock(sessionsDir, `close_session/${process.pid}`);
+    // With the timeout, not a single attempt: a driven close runs as a job
+    // while the driver keeps polling, and every poll saves the run under
+    // this same lock for a moment. A close that met that moment refused at
+    // once and paused the session at its last phase -- once in a hundred
+    // walks on a loaded machine, and undiagnosable until the walk showed
+    // the job's log. A close can wait the seconds the other verbs wait.
+    lock = acquireLockWithTimeout(sessionsDir, `close_session/${process.pid}`);
   } catch (error) {
     if (!(error instanceof LockContentionError)) throw error;
     writeErr(`close: refused -- ${error.message}\n`);

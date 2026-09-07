@@ -41,6 +41,7 @@ import {
 } from "./commands/openRepository";
 import { openModule } from "./commands/openModule";
 import { endGrant, widenForDebugging } from "./commands/moduleGrant";
+import { showImpact } from "./commands/showImpact";
 import { WorkExplorerTreeProvider } from "./providers/WorkExplorerTreeProvider";
 import { productionRouter } from "./router/host";
 
@@ -305,6 +306,11 @@ export function activate(context: vscode.ExtensionContext): void {
       await endGrant(productionRouter(), { node, projection: solutionProvider.currentProjection() });
       solutionProvider.refresh();
     }),
+    // What a change under the module would reach: the router's impact plan
+    // for a hypothetical change, shown rather than computed here.
+    vscode.commands.registerCommand("dabblerSolution.showImpact", (node?: SolutionNode) =>
+      showImpact(productionRouter(), { node, projection: solutionProvider.currentProjection() }),
+    ),
     // The four an ABSENT row has: a row that could only say "not on this
     // machine" is where this journey used to end. Each writes through the
     // router -- the extension never authors the declaration itself -- and

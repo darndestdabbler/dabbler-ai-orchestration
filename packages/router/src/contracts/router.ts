@@ -421,6 +421,11 @@ export interface ApprovedPlanVerbs {
 
 export interface AffectedOptions extends RepositoryTarget {
   readonly json?: boolean;
+  /**
+   * Plan a hypothetical change of these repository-relative paths instead of
+   * the working tree's: what the Explorer's Show Impact asks for a module.
+   */
+  readonly paths?: readonly string[];
 }
 
 /**

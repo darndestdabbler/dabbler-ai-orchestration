@@ -84,7 +84,12 @@ import { BUILT_IN_ENGINES, builtInEngine } from "./engines.ts";
 import type { Engine, EngineOutput } from "./engines.ts";
 import { clip, stripEscapes } from "./engines.ts";
 import { SESSION_PLAN_FILENAME } from "./evidence.ts";
-import { SET_BOOKKEEPING_COMMIT_BASENAMES, checkVerificationClean } from "./gates.ts";
+import {
+  SET_BOOKKEEPING_COMMIT_BASENAMES,
+  checkVerificationClean,
+  materialPaths,
+  readWorktreeStatus,
+} from "./gates.ts";
 import type {
   DriverInstruction,
   DriverReport,
@@ -95,7 +100,15 @@ import type {
 import { type Job, endJob, jobLogTail, pollJob, selfArgv, startJob } from "./jobs.ts";
 import { SolutionDepsError, placeMember } from "./solutionDeps.ts";
 import { tryWriteProjection } from "./projection.ts";
-import { solutionShape } from "./modules.ts";
+import { ManifestError, type SolutionShape, moduleConfigs, solutionShape } from "./modules.ts";
+import {
+  type ImpactPlan,
+  planImpact,
+  readCandidateRecord,
+  readImpactPlan,
+  standsSince,
+  writeImpactPlan,
+} from "./impact.ts";
 import {
   changedPathsBetween,
   nowIso,
@@ -704,6 +717,21 @@ export function judgeRegistration(facts: RegistrationFacts): RegistrationOutcome
  * row, or null for a session that was not started with `--module`. The
  * plan is judged against it: the checkout holds that module and no other.
  */
+/** The module(s) a session is on: the checkout's, else the declaration's, else none. */
+function sessionModulesOf(sessionsDir: string, sessionNumber: number): string[] {
+  const checkout = checkoutModuleOf(sessionsDir, sessionNumber);
+  if (checkout !== null) return [checkout];
+  const rows = readSessionState(sessionsDir)?.["sessions"];
+  for (const row of Array.isArray(rows) ? rows : []) {
+    if (typeof row !== "object" || row === null || Array.isArray(row)) continue;
+    const record = row as Record<string, unknown>;
+    if (Number(record["number"]) !== sessionNumber) continue;
+    const modules = record["modules"];
+    return Array.isArray(modules) ? modules.map(String).filter((slug) => slug.trim() !== "") : [];
+  }
+  return [];
+}
+
 function checkoutModuleOf(sessionsDir: string, sessionNumber: number): string | null {
   const rows = readSessionState(sessionsDir)?.["sessions"];
   for (const row of Array.isArray(rows) ? rows : []) {
@@ -2418,8 +2446,114 @@ ${this.stopArtifacts()}`,
    * that owned it. Deterministic, and invisible while a repository had one
    * suite.
    */
+  /**
+   * The impact plan of a module session, or null for every other session:
+   * a single-module solution, or a session whose row names no module. The
+   * changed paths are the session's whole diff, HEAD to the working tree.
+   */
+  private impactPlanForSession(): ImpactPlan | null {
+    let shape: SolutionShape;
+    try {
+      shape = solutionShape(this.repoRoot);
+    } catch (error) {
+      if (error instanceof ManifestError) return null;
+      throw error;
+    }
+    if (!shape.multi) return null;
+    const modules = sessionModulesOf(this.sessionsDir, this.sessionNumber);
+    if (modules.length === 0) return null;
+    const loaded = loadSuitesChecked(this.config, { shape });
+    if (loaded.errors.length > 0) {
+      throw new Stop("tests", `testing.suites is malformed: ${loaded.errors.join("; ")}`);
+    }
+    // The session's changed paths are its material worktree changes: the
+    // work, and not the ledger it wrote, the machine state under .dabbler/,
+    // or the engine's settings the registration installed. A driven session
+    // commits only at the land, so at the run of record its whole change is
+    // still on the worktree.
+    const status = readWorktreeStatus(this.repoRoot);
+    if (status.error !== "") throw new Stop("tests", `could not read the working tree: ${status.error}`);
+    const changed = materialPaths(
+      status.text,
+      relative(this.repoRoot, this.sessionsDir).split("\\").join("/"),
+      { beforeWork: true },
+    );
+    return planImpact(
+      shape,
+      loaded.suites,
+      changed,
+      new Map(
+        [...moduleConfigs(this.config, shape.modules).values()].map((module) => [module.slug, module.sharedFiles]),
+      ),
+    );
+  }
+
   private async phaseRunOfRecord(): Promise<void> {
+    // A module session tests against candidate bytes: each changed module
+    // is packed and its contract page regenerated first, as one job on the
+    // record, and only the suites the plan reached run. The plan is written
+    // beside the run so the close gate demands the same suites. Every other
+    // session runs every expensive suite, exactly as before.
+    // One plan and one candidate per verified tree. Both stand once written
+    // after the latest round: the phase re-entered -- after a stop, or
+    // while a suite's job runs -- reads them back rather than recomputing,
+    // because the candidate job moves the shared files it writes (the
+    // central pins, the feed) and a plan recomputed over them would reach
+    // modules the change never touched, and a re-pack would rewrite the
+    // record and move the tree under the suite's green run.
+    const verifiedAt = String(latestRound(this.repoRoot, this.sessionNumber)?.["recorded_at"] ?? "");
+    const recorded = readImpactPlan(this.repoRoot, this.sessionNumber);
+    const plan =
+      recorded !== null && standsSince(recorded.writtenAt, verifiedAt)
+        ? recorded
+        : this.impactPlanForSession();
+    if (plan !== null) {
+      if (plan === recorded) {
+        this.log("impact-plan-standing", { written: plan.writtenAt ?? null });
+      } else {
+        writeImpactPlan(this.repoRoot, this.sessionNumber, plan);
+        this.log("impact-plan", {
+          modules: plan.changedModules,
+          suites: plan.suites.map((suite) => suite.name),
+          candidates: plan.candidates,
+          unowned: plan.unowned,
+        });
+      }
+      const standing = readCandidateRecord(this.repoRoot, this.sessionNumber).writtenAt;
+      const candidateStands = standsSince(standing, verifiedAt);
+      if (plan.candidates.length > 0 && candidateStands) {
+        this.log("candidate-standing", { modules: plan.candidates, written: standing });
+      } else if (plan.candidates.length > 0) {
+        const code = await this.longWork({
+          name: `candidate: ${plan.candidates.join(", ")}`,
+          argv: [
+            ...selfArgv(),
+            "module",
+            "candidate",
+            "--session",
+            String(this.sessionNumber),
+            "--workspace-root",
+            this.repoRoot,
+            ...plan.candidates,
+          ],
+          retryAfterSeconds: 30,
+          stopKind: "tests",
+        });
+        if (code !== EXIT_OK) {
+          throw new Stop(
+            "tests",
+            `the candidate of ${plan.candidates.join(", ")} could not be packed (exit ${code}); ` +
+              "the job's log says why",
+          );
+        }
+      }
+    }
+    const reached = plan === null ? null : new Set(plan.suites.map((suite) => suite.name));
     for (const suite of this.expensiveSuites()) {
+      if (reached !== null && !reached.has(suite.name)) {
+        this.log("run-of-record-skipped", { suite: suite.name, reason: "not reached by the impact plan" });
+        continue;
+      }
       const jobName = `run of record: ${suite.name}`;
       const standing = evaluateFreshness(this.sessionsDir, null, [suite], {
         repoRoot: this.repoRoot,
@@ -2492,7 +2626,10 @@ ${this.stopArtifacts()}`,
 
   private phaseLand(): void {
     const task = this.requirePlan().task.split("\n")[0]?.trim() || "driven session";
-    runGit(this.repoRoot, ["add", "-A", "--", "."]);
+    // `--sparse`, so a focused checkout lands what the full checkout would:
+    // a file outside the cone (the engine's settings under `.claude/`) is
+    // otherwise left behind untracked, and the clone stays dirty.
+    runGit(this.repoRoot, ["add", "-A", "--sparse", "--", "."]);
     const committed = runGit(this.repoRoot, [
       "commit", "-m", `Session ${this.sessionNumber}: ${task}`,
     ]);

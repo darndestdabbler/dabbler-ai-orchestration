@@ -544,6 +544,7 @@ export class InProcessRouter implements Router {
   public affected(o: AffectedOptions): Promise<RouterResult<RouterText>> {
     const args = targetArgs(o);
     if (o.json) args.push("--json");
+    for (const path of o.paths ?? []) args.push("--path", path);
     return this.text("affected", args, o.repoRoot);
   }
 

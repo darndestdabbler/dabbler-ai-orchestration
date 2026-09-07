@@ -15,12 +15,21 @@
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 
+import { loadConfig } from "./config.ts";
 import { sessionsDirFor } from "./evidence.ts";
 import { readExposure } from "./exposure.ts";
 import { platformNewlines } from "./journal.ts";
 import { dumps } from "./pythonJson.ts";
-import { consumersOf, ManifestError, solutionShape } from "./modules.ts";
+import { type SolutionShape, consumersOf, ManifestError, solutionShape } from "./modules.ts";
 import { readRawSessionState } from "./sessionState.ts";
+import {
+  OUTCOME_PASSED,
+  STAGE_FINAL_FULL,
+  type SuiteSpec,
+  type TestRunRecord,
+  loadSuitesChecked,
+  readRecords,
+} from "./testEvidence.ts";
 import {
   assembleSolution,
   locateProducer,
@@ -65,10 +74,59 @@ function grantedSiblings(root: string): Set<string> {
   }
 }
 
+export type RunOfRecordState = "green" | "red" | "none";
+
+/**
+ * Each module's run of record and who it blocks, from the latest final-full
+ * record of every suite the module declares. Green when every expensive
+ * suite of the module has a passed latest record; red when any latest is
+ * not passed; none where a suite has no record, or the module declares no
+ * suite. A consumer is blocked by a producer when its consumer-contract
+ * suite against that producer is red. Nothing here is declared: it is a
+ * reading of the records beside the run.
+ */
+function runsOfRecord(
+  root: string,
+  shape: SolutionShape,
+): Map<string, { readonly state: RunOfRecordState; readonly blocking: string[] }> {
+  const out = new Map<string, { state: RunOfRecordState; blocking: string[] }>();
+  for (const entry of shape.modules) out.set(entry.slug, { state: "none", blocking: [] });
+  if (!shape.multi) return out;
+  let suites: readonly SuiteSpec[];
+  let records: readonly TestRunRecord[];
+  try {
+    suites = loadSuitesChecked(loadConfig(undefined, root), { shape }).suites;
+    records = readRecords(root);
+  } catch {
+    return out;
+  }
+  const latest = (suite: string): TestRunRecord | null =>
+    records.filter((row) => row.suite === suite && row.stage === STAGE_FINAL_FULL).at(-1) ?? null;
+  for (const entry of shape.modules) {
+    const own = suites.filter((suite) => suite.expensive && suite.module === entry.slug);
+    if (own.length === 0) continue;
+    const latests = own.map((suite) => latest(suite.name));
+    const state: RunOfRecordState = latests.some((row) => row !== null && row.outcome !== OUTCOME_PASSED)
+      ? "red"
+      : latests.every((row) => row !== null && row.outcome === OUTCOME_PASSED)
+        ? "green"
+        : "none";
+    out.get(entry.slug)!.state = state;
+  }
+  for (const suite of suites) {
+    if (suite.role !== "consumer-contract" || !suite.against || !suite.module) continue;
+    const row = latest(suite.name);
+    if (row !== null && row.outcome !== OUTCOME_PASSED) out.get(suite.against)?.blocking.push(suite.module);
+  }
+  for (const value of out.values()) value.blocking.sort();
+  return out;
+}
+
 export function project(root: string): Record<string, unknown> {
   const shape = solutionShape(root);
   const name = basename(resolve(root)) || "solution";
   const granted = grantedSiblings(root);
+  const runs = runsOfRecord(root, shape);
   const modules: Node[] = shape.modules.map((entry) => {
     const contractDir = contractDirFor(entry.slug);
     return {
@@ -89,6 +147,10 @@ export function project(root: string): Record<string, unknown> {
       // A grant in force for this module in the in-flight session: the
       // Explorer badges the row, and offers to end it.
       granted: granted.has(entry.slug),
+      // The latest run of record of the module's suites, and the consumers
+      // whose contract suite against it is red.
+      runOfRecord: runs.get(entry.slug)?.state ?? "none",
+      blocking: [...(runs.get(entry.slug)?.blocking ?? [])],
     } satisfies Node;
   });
   const doc: Node = {

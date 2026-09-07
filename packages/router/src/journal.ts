@@ -283,7 +283,31 @@ export function snapshotWorktreeTree(repoRoot: string): string | null {
         return null;
       }
     }
-    if (runGit(repoRoot, ["add", "-A"], { env }).code !== 0) return null;
+    // In a focused checkout (a sparse cone) the real index carries the
+    // skip-worktree bit on every entry outside the cone, and an index read
+    // from HEAD does not -- so `add -A` over it would stage every sibling's
+    // file as deleted, and a tree diff would report the whole solution as
+    // this session's change. The bits are copied onto the throwaway index
+    // entry by entry, never by copying the index file: another process may
+    // be rewriting that file, and a torn copy is a corrupt index. With the
+    // bits in place `add -A --sparse` leaves those entries alone and admits
+    // the one thing a plain add refuses with exit 1: an untracked path
+    // outside the cone, which is where an engine's settings under `.claude/`
+    // sit -- a root-level directory, not a root-level file.
+    const flagged = runGit(repoRoot, ["ls-files", "-v", "-z"]);
+    if (flagged.code === 0) {
+      const outside = flagged.stdout
+        .split("\0")
+        .filter((entry) => entry.startsWith("S "))
+        .map((entry) => entry.slice(2));
+      for (let index = 0; index < outside.length; index += 100) {
+        const chunk = outside.slice(index, index + 100);
+        if (runGit(repoRoot, ["update-index", "--skip-worktree", "--", ...chunk], { env }).code !== 0) {
+          return null;
+        }
+      }
+    }
+    if (runGit(repoRoot, ["add", "-A", "--sparse"], { env }).code !== 0) return null;
     // After the add, so it also clears entries inherited from HEAD. The
     // exit code is ignored: `--ignore-unmatch` makes "nothing to drop"
     // the normal case.

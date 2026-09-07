@@ -38,6 +38,10 @@ export interface ProjectionModule {
   contractDir?: string | null;
   /** A grant of this module's source is in force in the in-flight session's checkout. */
   granted?: boolean;
+  /** The latest run of record of the module's suites: green, red, or none recorded. */
+  runOfRecord?: "green" | "red" | "none";
+  /** Consumers whose contract suite against this module is red. */
+  blocking?: string[];
 }
 
 export interface ProjectionExternal {
@@ -376,9 +380,18 @@ export function descriptorFor(
       }
       const bits: string[] = [m.kind];
       bits.push(m.package ? `package: ${m.package}` : "no package");
+      // The run of record reads on the row, from the records and never from
+      // a claim: green, red, or none where nothing has been recorded.
+      if (m.runOfRecord !== undefined && p.solution.multi) bits.push(`run of record: ${m.runOfRecord}`);
       // A grant in force reads on the row: this checkout holds the module's
       // source, which the wall says it should not, and somebody signed for it.
       if (m.granted === true) bits.push("widened");
+      const tone =
+        m.granted === true || m.runOfRecord === "red"
+          ? ("attention" as const)
+          : m.runOfRecord === "green"
+            ? ("done" as const)
+            : undefined;
       return {
         id: `module:${m.slug}`,
         label: m.slug,
@@ -386,8 +399,10 @@ export function descriptorFor(
         tooltip:
           m.granted === true
             ? `${m.title} — a grant widened this checkout to its source; End grant narrows it again.`
-            : m.title,
-        icon: { id: KIND_ICONS[m.kind] ?? "package", ...(m.granted === true ? { tone: "attention" as const } : {}) },
+            : m.runOfRecord === "red"
+              ? `${m.title} — its latest run of record is red.`
+              : m.title,
+        icon: { id: KIND_ICONS[m.kind] ?? "package", ...(tone === undefined ? {} : { tone }) },
         expandable: childrenOf(node, p).length > 0,
         // `;focused` is what Open Module and Widen for debugging are gated
         // on: only a module of a multi-module solution has a focused
@@ -449,13 +464,18 @@ export function descriptorFor(
         expandable: n > 0,
       };
     }
-    case "consumer":
+    case "consumer": {
+      // A consumer whose contract suite against this producer is red is
+      // blocked by the producer's candidate, and says so on the row.
+      const blocked = (find(p, node.slug)?.blocking ?? []).includes(node.consumer);
       return {
         id: `consumer:${node.slug}:${node.consumer}`,
         label: node.consumer,
-        icon: { id: "arrow-small-right", tone: "muted" },
+        ...(blocked ? { description: "blocking", tooltip: `${node.consumer}'s contract suite against ${node.slug} is red.` } : {}),
+        icon: { id: blocked ? "warning" : "arrow-small-right", tone: blocked ? "attention" : "muted" },
         expandable: false,
       };
+    }
     case "externalGroup": {
       const rows = externals(p);
       const drifting = rows.filter((e) => e.driftKind !== null && e.driftKind !== undefined);

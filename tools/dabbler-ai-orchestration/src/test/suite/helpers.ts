@@ -8,6 +8,7 @@ import * as path from "path";
 import { outcomeForExitCode } from "dabbler-ai-router";
 import type {
   BootstrapOptions,
+  AffectedOptions,
   DepsRepositoryOptions,
   OwedAnswerOptions,
   Router,
@@ -207,6 +208,8 @@ export function fakeRouter(
   owedAnswers: OwedAnswerOptions[];
   /** Which repository each writing `deps` verb was asked about. */
   depsCalls: { verb: string; options: DepsRepositoryOptions }[];
+  /** What `affected` was asked to plan: the hypothetical paths, when any. */
+  affectedOptions: AffectedOptions[];
 } {
   const asked: string[] = [];
   // Recorded, because what bootstrap is ASKED to do is the behaviour some
@@ -219,6 +222,7 @@ export function fakeRouter(
   // is the whole behaviour a surface that offers them has.
   const owedAnswers: OwedAnswerOptions[] = [];
   const depsCalls: { verb: string; options: DepsRepositoryOptions }[] = [];
+  const affectedOptions: AffectedOptions[] = [];
   const answer = <T,>(verb: string, value: T): Promise<RouterResult<T>> => {
     asked.push(verb);
     const outcome = outcomeForExitCode(exitCode);
@@ -234,6 +238,7 @@ export function fakeRouter(
     interruptOptions,
     owedAnswers,
     depsCalls,
+    affectedOptions,
     router: {
       session: {
         start: text("session start"),
@@ -294,7 +299,10 @@ export function fakeRouter(
         bootstrapOptions.push(options);
         return answer("bootstrap", { stdout: message });
       },
-      affected: text("affected"),
+      affected: (options: AffectedOptions) => {
+        affectedOptions.push(options);
+        return answer("affected", { stdout: message });
+      },
     },
     asked,
   };

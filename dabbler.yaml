@@ -258,6 +258,7 @@ testing:
       - when: packages/router/src/drive.ts
         select:
           - packages/router/test/drive.test.ts
+          - packages/router/test/walk-impact.test.ts
       # How the loop reaches an engine: the measured argv shapes, the
       # renderers and the adapters are their own file; the loop's test
       # drives through the command adapter and the interrupt.
@@ -463,6 +464,13 @@ testing:
       - when: packages/router/src/exposure.ts
         select:
           - packages/router/test/exposure.test.ts
+      # The impact plan: what a change reaches, computed once for the
+      # selector, the run of record and the close gate.
+      - when: packages/router/src/impact.ts
+        select:
+          - packages/router/test/impact.test.ts
+          - packages/router/test/checks.test.ts
+          - packages/router/test/walk-impact.test.ts
       - when: packages/router/src/pythonJson.ts
         select:
           - packages/router/test/lockfile.test.ts

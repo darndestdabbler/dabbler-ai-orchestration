@@ -12,7 +12,7 @@
 // answers come from the verbs an engine would run, and the verifier answers
 // from files the config names.
 import assert from "node:assert/strict";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { after, describe, it } from "node:test";
 
@@ -323,13 +323,21 @@ describe("one session, walked from next to done", () => {
         `the framework asked for ${instruction.kind} ${String(instruction.step_id)} after the step was done`,
       );
     }
-    // A `next` that printed no instruction exited with its reason on stderr;
-    // a failure here that hid it was undiagnosable once (session 104's run of
-    // record, on a twenty-worker machine), so the reason is the message.
+    // A `next` that printed no instruction exited with its reason on stderr,
+    // and the framework's own jobs say why they stopped in their logs; a
+    // failure here that hid both was undiagnosable once (session 104's run
+    // of record, on a twenty-worker machine), so both are the message.
+    const jobsDir = join(repo, ".dabbler", "runs", "s1", "driver", "jobs");
+    const jobLogs = existsSync(jobsDir)
+      ? readdirSync(jobsDir)
+          .filter((name) => name.endsWith(".log"))
+          .map((name) => `--- ${name}\n${readFileSync(join(jobsDir, name), "utf8").split("\n").slice(-12).join("\n")}`)
+          .join("\n")
+      : "";
     assert.equal(
       instruction?.kind,
       "done",
-      `next printed no instruction (exit ${last.code}); stderr:\n${last.err}`,
+      `next printed no instruction (exit ${last.code}); stderr:\n${last.err}\n${jobLogs}`,
     );
     milestones.push("done");
 
@@ -443,7 +451,18 @@ describe("a red run of record, fixed, verified again, then run again", () => {
         const move = await next(sessionsDir);
         observe();
         const instruction = move.instruction;
-        if (instruction === null || until(instruction)) return instruction;
+        if (instruction === null) {
+          // The reason is on stderr and in the jobs' own logs; both are the message.
+          const jobsDir = join(repo, ".dabbler", "runs", "s1", "driver", "jobs");
+          const logs = existsSync(jobsDir)
+            ? readdirSync(jobsDir)
+                .filter((name) => name.endsWith(".log"))
+                .map((name) => `--- ${name}\n${readFileSync(join(jobsDir, name), "utf8").split("\n").slice(-12).join("\n")}`)
+                .join("\n")
+            : "";
+          assert.fail(`next printed no instruction (exit ${move.code}); stderr:\n${move.err}\n${logs}`);
+        }
+        if (until(instruction)) return instruction;
         if (instruction.kind !== "wait") {
           assert.fail(`the framework asked for ${instruction.kind} ${String(instruction.step_id)}`);
         }

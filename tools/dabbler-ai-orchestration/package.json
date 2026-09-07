@@ -173,6 +173,12 @@
         "icon": "$(lock)"
       },
       {
+        "command": "dabblerSolution.showImpact",
+        "title": "Show Impact",
+        "category": "Dabbler",
+        "icon": "$(list-tree)"
+      },
+      {
         "command": "dabblerSolution.revealRepository",
         "title": "Reveal in File Explorer",
         "category": "Dabbler",
@@ -255,6 +261,10 @@
           "when": "false"
         },
         {
+          "command": "dabblerSolution.showImpact",
+          "when": "false"
+        },
+        {
           "command": "dabblerWorkExplorer.activateSession",
           "when": "false"
         },
@@ -323,6 +333,11 @@
           "command": "dabblerSolution.openModule",
           "when": "view == dabblerSolutionTree && viewItem =~ /;focused/",
           "group": "1_open@1"
+        },
+        {
+          "command": "dabblerSolution.showImpact",
+          "when": "view == dabblerSolutionTree && viewItem =~ /;focused/ && viewItem =~ /^dabblerModule:/",
+          "group": "1_open@2"
         },
         {
           "command": "dabblerSolution.grantModule",

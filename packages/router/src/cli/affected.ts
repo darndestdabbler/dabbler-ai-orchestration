@@ -25,13 +25,15 @@ const EXIT_USAGE = 2;
 
 function usage(): string {
   return [
-    "usage: dabbler affected [-h] [--json] [--sessions-dir SESSIONS_DIR]",
+    "usage: dabbler affected [-h] [--json] [--path PATH] [--sessions-dir SESSIONS_DIR]",
     "",
     "the tests this working tree makes necessary, and why",
     "",
     "options:",
     "  -h, --help            show this help message and exit",
     "  --json",
+    "  --path PATH           plan a hypothetical change of this repository-relative",
+    "                        path instead of the working tree's (repeatable)",
     "  --sessions-dir SESSIONS_DIR",
     "                        the repository's sessions root; derived from the",
     "                        working directory when omitted",
@@ -47,6 +49,7 @@ function pad(value: string, width: number): string {
 export async function affectedVerb(argv: string[]): Promise<number> {
   let json = false;
   let sessionsDirArg: string | undefined;
+  const hypothetical: string[] = [];
   for (let index = 0; index < argv.length; index += 1) {
     const token = argv[index] as string;
     if (token === "-h" || token === "--help") {
@@ -55,6 +58,20 @@ export async function affectedVerb(argv: string[]): Promise<number> {
     }
     if (token === "--json") {
       json = true;
+      continue;
+    }
+    if (token.startsWith("--path=")) {
+      hypothetical.push(token.slice("--path=".length));
+      continue;
+    }
+    if (token === "--path") {
+      const next = argv[index + 1];
+      if (next === undefined || next.startsWith("--")) {
+        writeErr(`dabbler affected: argument ${token}: expected one argument\n`);
+        return EXIT_USAGE;
+      }
+      hypothetical.push(next);
+      index += 1;
       continue;
     }
     if (token.startsWith("--sessions-dir=")) {
@@ -100,9 +117,10 @@ export async function affectedVerb(argv: string[]): Promise<number> {
 
   // Selection is scoped the way verification will scope it: once a round
   // exists, a remediation is measured against that round's snapshot rather
-  // than HEAD.
-  const baseline = preverifyBaseline(repoRoot, sessionsDir);
-  const changed = workingTreeChanges(repoRoot, baseline);
+  // than HEAD. A hypothetical change (`--path`) is planned as given, and
+  // git is not asked.
+  const baseline = hypothetical.length > 0 ? null : preverifyBaseline(repoRoot, sessionsDir);
+  const changed = hypothetical.length > 0 ? hypothetical : workingTreeChanges(repoRoot, baseline);
   if (changed === null) {
     // "git could not answer" is not a useful thing to be told. The one cause
     // that is not a broken repository is a baseline object this store does not
@@ -156,7 +174,9 @@ export async function affectedVerb(argv: string[]): Promise<number> {
   // Which baseline produced this, always: a selection measured against HEAD
   // and one measured against the last round look identical as a list of files,
   // and only one of them is what verification will require.
-  const lines: string[] = [`scope: ${baseline ? "the last round" : "HEAD"}\n`];
+  const lines: string[] = [
+    `scope: ${hypothetical.length > 0 ? `a hypothetical change of ${hypothetical.join(", ")}` : baseline ? "the last round" : "HEAD"}\n`,
+  ];
   // Both numbers, because the filter is what makes the two empty cases
   // different: a repository with no suite at all and one whose suite is
   // simply not expensive need opposite advice, and only the count before
@@ -175,6 +195,14 @@ export async function affectedVerb(argv: string[]): Promise<number> {
   // each with why: the module's own change, or a consumer's contract
   // against it.
   if (result.modules.length > 0) lines.push(`modules: ${result.modules.join(", ")}\n`);
+  // The rest of the plan: the candidates packed before the run of record,
+  // and the paths no module owns, which the plan reaches nothing for.
+  if (result.impact !== null && result.impact.candidates.length > 0) {
+    lines.push(`candidates: ${result.impact.candidates.join(", ")} (packed before the run of record)\n`);
+  }
+  if (result.impact !== null && result.impact.unowned.length > 0) {
+    lines.push(`unowned: ${result.impact.unowned.join(", ")} (no module's roots or shared files hold these)\n`);
+  }
   for (const suite of result.suites) {
     lines.push(
       `  ${pad(suite.reason, 22)} suite ${suite.name} (${suite.module})  <- ${suite.selectedBy}\n`,

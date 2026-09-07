@@ -82,7 +82,8 @@
       "members": [
         "testEvidence",
         "affected",
-        "facts"
+        "facts",
+        "impact"
       ]
     },
     "workflow-verification": {

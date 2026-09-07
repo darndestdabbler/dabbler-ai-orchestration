@@ -44,6 +44,13 @@ import type { RouterConfig } from "./config.ts";
 import { PROJECT_CONFIG_FILENAME, loadConfig, projectRoot } from "./config.ts";
 import { changedPathsBetween, detectOutOfBandWrite } from "./evidence.ts";
 import {
+  type ImpactPlan,
+  candidatePathsAsWritten,
+  demandedByPlan,
+  readCandidateRecord,
+  readImpactPlan,
+} from "./impact.ts";
+import {
   isMachineStatePath,
   repoRelativePath,
   repoRootFor,
@@ -295,11 +302,18 @@ export function readVerificationFacts(sessionsDir: string): VerificationFacts {
   // is shown, and fatal here, where the question is whether the tree still IS
   // the verified one. Without that object there is no answer, and the diff
   // fails closed rather than substituting a tree nobody verified.
-  facts.changedSinceLatest = changedPathsBetween(
-    root,
-    pythonStr(latest["completion_tree"]),
-    facts.currentTree,
-  );
+  const changed = changedPathsBetween(root, pythonStr(latest["completion_tree"]), facts.currentTree);
+  // The candidate a module session's run of record tested against -- the
+  // packages, their records, the central pins, the contract pages -- is
+  // written after verification by design and recorded beside the run by
+  // the job that wrote it. Those paths are the framework's derivation of
+  // the verified source, not a change to it, and the land binds them to
+  // the run of record; everything else that moved is still a move.
+  // Only while its bytes are the candidate's: a candidate path edited since
+  // is a change to the verified tree like any other, and is not set aside.
+  const candidate = candidatePathsAsWritten(root, readCandidateRecord(root, facts.current as number));
+  facts.changedSinceLatest =
+    changed === null ? null : changed.filter((path) => !candidate.has(path.split("\\").join("/")));
   return facts;
 }
 
@@ -775,7 +789,20 @@ export function checkTestRunFresh(
   const loaded = loadSuitesChecked(governing);
   const declared = judgeSuiteDeclaration(loaded);
   if (declared !== null) return declared;
-  return judgeFreshness(evaluateFreshness(sessionsDir, null, loaded.suites));
+  // A module session's run of record ran the suites its impact plan reached
+  // and no other; the gate demands the same ones, from the same plan. A
+  // session with no plan -- a single-module solution -- is demanded every
+  // required suite, as it always was.
+  return judgeFreshness(
+    demandedByPlan(evaluateFreshness(sessionsDir, null, loaded.suites), planForGate(sessionsDir)),
+  );
+}
+
+function planForGate(sessionsDir: string): ImpactPlan | null {
+  const root = repoRootFor(sessionsDir);
+  const current = currentSession(sessionsDir);
+  if (root === null || typeof current !== "number") return null;
+  return readImpactPlan(root, current);
 }
 
 // --- owed_decisions -----------------------------------------------------------

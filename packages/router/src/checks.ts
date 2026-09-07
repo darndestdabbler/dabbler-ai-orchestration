@@ -32,8 +32,9 @@ import { existsSync, mkdtempSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { REACH_MODULE_CHANGED, type ImpactPlan, modulesReachedBy, planImpact, reachModules } from "./impact.ts";
 import { hiddenSpawn, snapshotWorktreeTree } from "./journal.ts";
-import { consumersOf, type SolutionShape } from "./modules.ts";
+import type { SolutionShape } from "./modules.ts";
 import { pythonRepr } from "./pythonJson.ts";
 
 export const STAGE_TARGETED = "targeted";
@@ -405,6 +406,8 @@ export class SelectionResult {
   readonly suites: readonly SelectedSuite[];
   /** The modules the change reached, in the manifest's dependency order. */
   readonly modules: readonly string[];
+  /** The impact plan the module form computed; null in the file form. */
+  readonly impact: ImpactPlan | null;
 
   constructor(
     fields: {
@@ -414,6 +417,7 @@ export class SelectionResult {
       allAffectedReason?: string;
       suites?: readonly SelectedSuite[];
       modules?: readonly string[];
+      impact?: ImpactPlan | null;
     } = {},
   ) {
     this.selected = fields.selected ?? [];
@@ -422,6 +426,7 @@ export class SelectionResult {
     this.allAffectedReason = fields.allAffectedReason ?? "";
     this.suites = fields.suites ?? [];
     this.modules = fields.modules ?? [];
+    this.impact = fields.impact ?? null;
   }
 
   /** The names of the suites selected whole, in selection order. */
@@ -458,6 +463,7 @@ export class SelectionResult {
       allAffectedReason: this.allAffectedReason,
       suites: this.suites.filter((entry) => entry.name === name),
       modules: this.modules,
+      impact: this.impact,
     });
   }
 
@@ -489,6 +495,16 @@ export class SelectionResult {
           }
         : {}),
       ...(this.modules.length > 0 ? { modules: [...this.modules] } : {}),
+      ...(this.impact !== null
+        ? {
+            impact: {
+              changedModules: [...this.impact.changedModules],
+              candidates: [...this.impact.candidates],
+              unowned: [...this.impact.unowned],
+              suites: this.impact.suites.map((suite) => ({ ...suite })),
+            },
+          }
+        : {}),
     };
   }
 }
@@ -780,47 +796,27 @@ export function selectTests(
   const offerSuite = (name: string, reason: string, selectedBy: string, module: string): void => {
     if (!suiteOffers.has(name)) suiteOffers.set(name, { name, reason, selectedBy, module });
   };
+  // What a module reaches is the impact plan's to say, and only its: the
+  // module's own suites and each transitive consumer's compatibility suite
+  // against it (and, for shared types, every consumer's). A rule that names
+  // a module reaches the same, under the rule's reason.
   const offerModule = (slug: string, selectedBy: string, reason: string): void => {
     if (moduleForm === null) return;
     reachedModules.add(slug);
-    for (const suite of moduleForm.suites) {
-      if (suite.module === slug) offerSuite(suite.name, reason, selectedBy, slug);
-    }
-    // Each transitive consumer's compatibility suite against this module,
-    // found by the manifest's reverse edges and declared nowhere.
-    for (const consumer of consumersOf(moduleForm.shape.modules, slug)) {
-      for (const suite of moduleForm.suites) {
-        if (
-          suite.module === consumer &&
-          suite.role === "consumer-contract" &&
-          suite.against === slug
-        ) {
-          offerSuite(suite.name, REASON_CONSUMER_CONTRACT, selectedBy, consumer);
-        }
-      }
+    for (const suite of reachModules(moduleForm.shape, moduleForm.suites, [slug])) {
+      offerSuite(
+        suite.name,
+        suite.reason === REACH_MODULE_CHANGED ? reason : suite.reason,
+        selectedBy,
+        suite.module ?? slug,
+      );
     }
   };
-  /**
-   * The modules a changed path belongs to: the one whose roots hold it, and
-   * every one whose shared files name it. A shared file is shared -- the
-   * central pins, the packages folder -- so a change to it is every naming
-   * module's change, and each of them is reached.
-   */
-  const modulesOf = (rel: string): string[] => {
-    if (moduleForm === null) return [];
-    const owners: string[] = [];
-    for (const entry of moduleForm.shape.modules) {
-      const roots = entry.codeRoots.map((root) => (root === "." ? "" : root));
-      const shared = moduleForm.sharedFiles?.get(entry.slug) ?? [];
-      if (
-        roots.some((root) => root === "" || matchingPrefixes(rel, [root]).length > 0) ||
-        (shared.length > 0 && matchingPrefixes(rel, shared).length > 0)
-      ) {
-        owners.push(entry.slug);
-      }
-    }
-    return owners;
-  };
+  /** The modules a changed path belongs to, by the one rule the plan uses. */
+  const modulesOf = (rel: string): string[] =>
+    moduleForm === null ? [] : modulesReachedBy(moduleForm.shape, rel, moduleForm.sharedFiles);
+  /** The first changed path that reached each module: what a suite's selection is attributed to. */
+  const reachedVia = new Map<string, string>();
 
   const repoWideHits =
     selection.repoWide.length > 0
@@ -871,10 +867,10 @@ export function selectTests(
     }
 
     // The module form: a path under a module's roots, or among its shared
-    // files, is that module's change and selects its suites whole.
+    // files, is that module's change; the plan below says what it selects.
     for (const owner of modulesOf(rel)) {
       matched = true;
-      offerModule(owner, rel, REASON_MODULE_CHANGED);
+      if (!reachedVia.has(owner)) reachedVia.set(owner, rel);
     }
 
     // A file the framework itself installed at registration is not the
@@ -917,6 +913,20 @@ export function selectTests(
         (left.path < right.path ? -1 : left.path > right.path ? 1 : 0),
     );
 
+  // The plan, computed once from the changed paths: its suites are the
+  // module form's whole-suite offers, each attributed to the first changed
+  // path that reached its module. A rule's module targets were offered
+  // above under the rule's own reason and keep it.
+  const impact =
+    moduleForm === null
+      ? null
+      : planImpact(moduleForm.shape, moduleForm.suites, changed, moduleForm.sharedFiles);
+  if (impact !== null) {
+    for (const slug of impact.changedModules) reachedModules.add(slug);
+    for (const suite of impact.suites) {
+      offerSuite(suite.name, suite.reason, reachedVia.get(suite.via) ?? suite.via, suite.module ?? suite.via);
+    }
+  }
   const orderedModules =
     moduleForm === null
       ? []
@@ -928,6 +938,7 @@ export function selectTests(
     risks,
     suites: [...suiteOffers.values()],
     modules: orderedModules,
+    impact,
   });
 }
 

@@ -1,4 +1,4 @@
-# STATUS — the modules block (sessions 100–108) is running unattended; session 104 closed VERIFIED, session 105 next
+# STATUS — the modules block (sessions 100–108) is running unattended; session 105 closed VERIFIED, session 106 next
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
 
@@ -19,14 +19,73 @@
 > | 102 | designed contracts and contract-test source; the ecosystem seam | CLOSED VERIFIED, landed 594bca00 |
 > | 103 | committed immutable packages | CLOSED VERIFIED, landed 6e2b9b73 |
 > | 104 | the focused checkout and the Windows preflight | CLOSED VERIFIED, landed 706eb2af |
-> | 105 | module-scoped sessions, the hard verifier scope, exposure, grants | next |
-> | 106 | the impact plan and the selected run of record | planned |
+> | 105 | module-scoped sessions, the hard verifier scope, exposure, grants | CLOSED VERIFIED, landed 8ef7dd8d |
+> | 106 | the impact plan and the selected run of record | next |
 > | 107 | the atomic land | planned |
 > | 108 | Maven parity and the hardened profiles | planned |
 >
 > One operating failure on the record: session 101's second round finished at 17:18 and the loop idled until 20:06, because the background waiter's completion never woke the orchestrator. The rule since: every framework wait is driven from a foreground loop that polls the job's status file, and the run state is checked at the start of every turn.
 >
 > Paused after session 103 on the operator's instruction (2026-09-06, 21:15) and resumed in a new chat at 21:27 with session 104; the router and extension on this machine are rebuilt after each close. Every framework wait is driven from a foreground loop (the scratchpad's drive-waits.sh pattern), never from a background waiter. A session driven from the chat with the CLI shows nothing in the Dabbler Terminal, which is expected: that terminal renders a run the extension launched.
+
+> ## SESSION 105 CLOSED, 2026-09-06, VERIFIED (round 2, gpt-5.4 over the seat; round 1 found one Major, fixed; landed 8ef7dd8d) -- module-scoped sessions, the disk as the wall, the exposure manifest, grants
+>
+> Five steps, nothing asked of a single-module solution. **The module form
+> of the verifier's scope** (`moduleScope` in `agency.ts`): the module's
+> `codeRoots`, its own and its transitive dependencies' `contract/` folders,
+> the root build files and the solution file present at the root, its
+> `sharedFiles` and the sessions directory -- never a sibling's source; the
+> round takes it when the shape is multi and the session's row names a
+> module, and `sessionScope` as today otherwise. **The plan's step 3 was
+> amended on the record**: neither transport executes the verifier's reads
+> (the Copilot CLI runs its own tools and reports them afterwards; the API
+> transport sends none), so no executor of the framework's can answer a read
+> with a refusal. The focused clone can: a sibling's implementation is
+> absent from it, and an out-of-scope read that found no file is recorded
+> `refused` (the wall holding) apart from a delivered out-of-scope read (the
+> wall leaking); `rounds.jsonl` and the projection carry `refused_reads`,
+> and the briefing tells the verifier a refusal is not a finding. **The
+> exposure manifest** (`exposure.ts`, new): `.dabbler/runs/s<N>/exposure.json`
+> with, per sibling, the implementation bytes under its roots in the working
+> directory (contract folder and build output excluded; target zero), the
+> grants in force with their reasons from `grants.jsonl`, and the paths
+> changed outside the scope; written at `session start --module` and at the
+> close, projected as `repository.exposure` so `dabbler status` prints it.
+> **`session start --module <slug>`** in the full checkout refuses material
+> changes or unpushed commits, makes the fresh clone (which carries
+> `.dabbler/checkout.json` so a start inside it registers there), registers
+> the session in the clone's own sessions root with `checkout: {module,
+> path}` on its row, writes the manifest, and leaves
+> `.dabbler/module-session.json` in the full checkout so `next` there is
+> refused naming the clone until the clone's session closes. **Grants**:
+> `dabbler module grant <sibling> --reason ... [--debug]` raises
+> `module-grant:<sibling>` (value-tradeoff, `deny` recommended); `dabbler
+> owed answer` acts on the answer -- `sparse-checkout add` over the
+> sibling's roots, the untracked `.dabbler/overlay.targets` regenerated from
+> the grants in force (a `PackageReference Remove` and a `ProjectReference`
+> per packable project), the manifest refreshed -- and says the window
+> reloads; `revoke` refuses while the sibling's roots hold changes, then
+> drops the overlay block and re-narrows to the derived cone plus the other
+> grants; `next --request-grant <sibling> --reason ...` raises the decision
+> and answers a `wait` on it, applying an answered grant before advancing.
+> **The Explorers**: the Work Explorer groups a bucket's sessions under
+> module rows when the record names one (single-module untouched) and a
+> grant request renders on the session that asked, with grant and deny as
+> the answer flow's options (the projected decision carries
+> `sessionNumber`); the Solution Explorer's module row reads *widened* while
+> a grant is in force and offers Widen for Debugging and End Grant. Eight
+> router tests (four of them walkthrough milestones over the local bare
+> origin), two extension tests.
+>
+> **Round 1's Major**: a session started in one module's clone could be
+> declared over two modules, and the scope, the manifest and the grouping
+> would have followed the declaration rather than the checkout. Fixed by
+> making the checkout the authority: the driver judges the plan against the
+> row's `checkout.module` (a plan naming no module, another or a second is
+> refused; a two-module session runs in the full checkout without
+> `--module`), and the round's scope and the close-time manifest read
+> `checkout.module` first. Router suite 1,108 tests (1,104 passing, 4
+> skipped), extension 199.
 
 > ## SESSION 104 CLOSED, 2026-09-06, VERIFIED (rounds 1 and 2, gpt-5.4 over the seat, no findings in either; landed 706eb2af) -- the focused checkout and the Windows preflight
 >

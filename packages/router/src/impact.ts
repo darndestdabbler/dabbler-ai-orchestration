@@ -36,6 +36,16 @@ export const REACH_MODULE_CHANGED = "module-changed";
 export const REACH_CONSUMER_CONTRACT = "consumer-contract";
 export const REACH_SHARED_TYPES = "shared-types";
 export const REACH_REQUIRED = "required";
+/**
+ * The suite names no module, so it answers for the repository and every
+ * change reaches it. Measured on the Java walk: the suite `dabbler
+ * bootstrap` scaffolds covers "." and names no module, so a module session
+ * reached no suite at all, ran nothing as its run of record, and closed with
+ * a freshness gate that demanded nothing. The failure direction the
+ * scaffold's own comment states is the one taken here -- run a suite you did
+ * not need rather than skip one you did.
+ */
+export const REACH_REPOSITORY_WIDE = "repository-wide";
 
 /** What the plan needs to know of a suite; the declared spec satisfies it. */
 export interface ImpactSuite {
@@ -143,6 +153,11 @@ export function reachModules(
     });
   };
   const candidates = suites.filter(planned);
+  // A suite that binds itself to no module answers for the whole
+  // repository, whatever changed.
+  for (const suite of candidates) {
+    if ((suite.module ?? null) === null) reach(suite, REACH_REPOSITORY_WIDE, "");
+  }
   for (const entry of ordered) {
     for (const suite of candidates) {
       if (suite.module === entry.slug && suite.role !== "consumer-contract") {

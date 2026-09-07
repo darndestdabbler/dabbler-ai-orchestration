@@ -15,7 +15,7 @@
 // with a consumer's `PackageReference` carrying no version of its own.
 
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { type Dirent, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
 
 import { resolveProgram } from "./checks.ts";
@@ -216,6 +216,19 @@ export interface PackResult {
    * and a caller that names either one is wrong on the other ecosystem.
    */
   readonly pinFile: string | null;
+  /**
+   * Everything the pack LEFT in the feed, repository-relative and sorted --
+   * a superset of `artifacts`, measured by snapshotting the folder before
+   * and after rather than by asking what the package should be called.
+   *
+   * `mvn deploy` writes a POM and a `.md5`/`.sha1` beside every artifact and
+   * a metadata file per version; only the jar is a package this framework
+   * went looking for, and the rest are still bytes the run of record must
+   * account for. A candidate record naming only the artifact leaves them as
+   * a tree that moved after verification, which is what kept a Maven module
+   * session from closing at all.
+   */
+  readonly left: readonly string[];
   /** The correspondence records written, repository-relative. */
   readonly records: readonly string[];
 }
@@ -337,6 +350,11 @@ export function packModule(
     declared !== null
       ? [substitute(declared.pack.argv, { [PLACEHOLDER_OUTPUT]: outputDir, [PLACEHOLDER_VERSION]: version })]
       : distinct(targets.map((target) => ecosystem.packArgv(target.via ?? target.project, outputDir, version)));
+  // What the feed held before the pack, so that what the pack left can be
+  // measured rather than predicted: an ecosystem's own tooling writes files
+  // this framework never asked for, and every one of them is a byte the run
+  // of record has to account for.
+  const before = feedSnapshot(outputDir);
   for (const argv of commands) {
     const run = runPack(argv, root);
     if (run.code !== 0) {
@@ -345,6 +363,12 @@ export function packModule(
       );
     }
   }
+
+  const after = feedSnapshot(outputDir);
+  const left = [...after]
+    .filter(([path, stamp]) => before.get(path) !== stamp)
+    .map(([path]) => `${PACKAGES_DIR}/${path}`)
+    .sort();
 
   const artifacts: string[] = [];
   const ceiling = packagesCeiling(options.config ?? null);
@@ -408,7 +432,7 @@ export function packModule(
     );
     written.push(relative(root, path).split("\\").join("/"));
   }
-  return { slug, version, artifacts, pins, pinFile, records: written };
+  return { slug, version, artifacts, pins, pinFile, left, records: written };
 }
 
 /** Whether a `packages/.gitattributes` puts the packages under LFS, by the ecosystem's pattern. */
@@ -437,6 +461,36 @@ function distinct(commands: readonly string[][]): string[][] {
  * folder, matched segment by segment without regard to case (a pack may
  * lower-case a name), as it is actually spelled; null when absent.
  */
+/**
+ * Every file under the feed, by path relative to it, with a stamp that
+ * changes when its bytes do (size and mtime). A folder that is not there
+ * yet is an empty snapshot, which is what makes the first pack's whole
+ * output new.
+ */
+function feedSnapshot(outputDir: string, prefix = ""): Map<string, string> {
+  const out = new Map<string, string>();
+  let entries: Dirent[];
+  try {
+    entries = readdirSync(join(outputDir, prefix), { withFileTypes: true });
+  } catch {
+    return out;
+  }
+  for (const entry of entries) {
+    const rel = prefix === "" ? entry.name : `${prefix}/${entry.name}`;
+    if (entry.isDirectory()) {
+      for (const [path, stamp] of feedSnapshot(outputDir, rel)) out.set(path, stamp);
+      continue;
+    }
+    try {
+      const stat = statSync(join(outputDir, rel));
+      out.set(rel, `${stat.size}:${stat.mtimeMs}`);
+    } catch {
+      // Gone between the listing and the stat: not something the pack left.
+    }
+  }
+  return out;
+}
+
 function findProduced(outputDir: string, rel: string): string | null {
   const actual: string[] = [];
   let dir = outputDir;

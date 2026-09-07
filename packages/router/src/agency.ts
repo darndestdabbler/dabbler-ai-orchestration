@@ -39,6 +39,7 @@ import { mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "n
 import { dirname, isAbsolute, join, relative } from "node:path";
 
 import { ROOT_BUILD_FILES, SOLUTION_FILE, contractDir } from "./checkout.ts";
+import { PACKAGES_DIR } from "./ecosystem.ts";
 import {
   type SelectionConfig,
   type SuiteScope,
@@ -312,6 +313,11 @@ export function moduleScope(
     for (const shared of sharedFiles.get(slug) ?? []) scope.add(posix(shared));
   }
   for (const name of ROOT_BUILD_FILES) if (isFile(join(repoRoot, name))) scope.add(name);
+  // The committed feed: where this module's own package lands when the run
+  // of record packs its candidate, and what the focused checkout's cone
+  // already carries. A pack of the session's own module is the session's
+  // work, not a change outside it.
+  scope.add(PACKAGES_DIR);
   try {
     for (const name of readdirSync(repoRoot)) {
       if (SOLUTION_FILE.test(name) && isFile(join(repoRoot, name))) scope.add(name);

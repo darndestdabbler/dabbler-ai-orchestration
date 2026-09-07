@@ -118,11 +118,30 @@ describe("the Maven side of the seam", () => {
     assert.equal(javaReleaseOf("no java here"), null);
   });
 
+  it("ignores Maven's own output, which lands inside the module it built, and leaves an existing ignore file alone", () => {
+    // Measured on the Java walk: mvn writes modules/<slug>/target/ and
+    // .flattened-pom.xml under the module's own code roots, so the source
+    // digest moved with the build and the same source packed to a new dev
+    // version every time.
+    const { root, shape } = mavenSolution();
+    ensureRootFiles(root, shape);
+    const ignore = readFileSync(join(root, ".gitignore"), "utf8");
+    assert.match(ignore, /^target\/$/m);
+    assert.match(ignore, /^\.flattened-pom\.xml$/m);
+
+    const own = mavenSolution();
+    const theirs = "# ours\nbuild/\n";
+    seed(own.root, { ".gitignore": theirs });
+    const second = ensureRootFiles(own.root, own.shape);
+    assert.ok(second?.skipped.includes(".gitignore"), second?.skipped.join(", "));
+    assert.equal(readFileSync(join(own.root, ".gitignore"), "utf8"), theirs);
+  });
+
   it("lays the root files, packs one reactor per module into the file repository under the dev version, and manages the one pin in the parent POM", () => {
     const { root, shape } = mavenSolution();
     const maven = ecosystemNamed("maven");
     const written = ensureRootFiles(root, shape);
-    assert.deepEqual(written?.written, ["pom.xml", "packages/.gitattributes", "packages/README.md"]);
+    assert.deepEqual(written?.written, ["pom.xml", "packages/.gitattributes", "packages/README.md", ".gitignore"]);
     const pom = readFileSync(join(root, "pom.xml"), "utf8");
     // The parent lists the modules, takes the CI-friendly revision, declares
     // the committed file repository and manages the deploy and flatten plugins.

@@ -215,6 +215,51 @@ describe("the pack", () => {
     const single = { ...shape, multi: false };
     assert.throws(() => packModule(root, single, "persister", { digestOf: () => "x" }), /single-module solution/);
   });
+
+  it("carries everything the pack left in the feed, not only the packages it went looking for", () => {
+    // `mvn deploy` writes a POM and a .md5/.sha1 beside every artifact. Only
+    // the jar is a package this framework asked for; the rest are bytes the
+    // run of record has to account for, and a candidate record that named
+    // none of them left a Maven module session unable to close at all.
+    const { root, shape } = solution();
+    const withSidecars = (argv: readonly string[]): { code: number; output: string } => {
+      const output = argv[argv.indexOf("-o") + 1] as string;
+      const version = (argv.find((a) => a.startsWith("-p:PackageVersion=")) ?? "").slice("-p:PackageVersion=".length);
+      const id = String(argv[2]).split("/").pop()!.replace(/\.csproj$/, "");
+      mkdirSync(output, { recursive: true });
+      writeFileSync(join(output, `${id}.${version}.nupkg`), "bytes", "utf8");
+      for (const extension of ["nupkg.md5", "nupkg.sha1", "pom"]) {
+        writeFileSync(join(output, `${id}.${version}.${extension}`), "beside it", "utf8");
+      }
+      return { code: 0, output: "" };
+    };
+    const result = packModule(root, shape, "persister", {
+      now: new Date("2026-09-07T21:00:00Z"),
+      runPack: withSidecars,
+      digestOf: () => "abcdef0123",
+      baseCommit: null,
+    });
+    // `artifacts` still names the packages and nothing else, so every reader
+    // of it is unchanged; `left` is what the folder actually gained.
+    assert.deepEqual(
+      result.artifacts.map((path) => path.split("/").pop()),
+      [
+        `CsvPersister.${result.version}.nupkg`,
+        `CsvPersister.Abstractions.${result.version}.nupkg`,
+        `CsvPersister.ContractTests.${result.version}.nupkg`,
+      ],
+    );
+    for (const artifact of result.artifacts) assert.ok(result.left.includes(artifact), artifact);
+    for (const extension of ["nupkg.md5", "nupkg.sha1", "pom"]) {
+      assert.ok(
+        result.left.includes(`packages/CsvPersister.${result.version}.${extension}`),
+        `${extension} missing from ${result.left.join(", ")}`,
+      );
+    }
+    // The pin file and the records are the caller's to add; the feed's own
+    // untouched contents are not this pack's.
+    assert.ok(!result.left.some((path) => path.endsWith(".json")));
+  });
 });
 
 describe("the central pin and the record", () => {

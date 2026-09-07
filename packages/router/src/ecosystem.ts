@@ -1811,6 +1811,25 @@ function rootFilesMaven(root: string, shape: SolutionShape): ScaffoldResult {
     ].join("\n"),
     result,
   );
+  // Maven writes its output inside the module it built -- `target/` and,
+  // with the flatten plugin the parent manages, `.flattened-pom.xml` -- and
+  // both sit under the module's own code roots. A source digest taken over
+  // those roots then moves with the BUILD, so packing an unchanged module
+  // twice gave it two dev versions, which is the one thing the immutable
+  // version exists to prevent. Written once, like every root file here.
+  writeIfAbsent(
+    root,
+    ".gitignore",
+    [
+      "# Maven's own output, which lands inside the module it built. A module's",
+      "# source digest is taken over its code roots, so an unignored target/ makes",
+      "# the same source pack to a new dev version every time.",
+      "target/",
+      ".flattened-pom.xml",
+      "",
+    ].join("\n"),
+    result,
+  );
   if (moduleDirs.length === 0) result.notes.push("no module holds a pom.xml yet, so the parent POM lists none; add each as it gets one");
   // Only when the parent POM is this scaffold's: an existing one carries
   // whatever release its team chose, and saying anything about it here

@@ -248,6 +248,11 @@ function candidateSubcommand(rest: readonly string[]): number {
         writeOut(`pinned ${packed.pins.join(", ")} in ${packed.pinFile}\n`);
         written.add(packed.pinFile);
       }
+      // Everything the pack left in the feed, not only the packages this
+      // framework went looking for: Maven writes a POM and a checksum pair
+      // beside each artifact, and a record that names none of them leaves
+      // them looking like a tree that moved after verification.
+      for (const path of packed.left) written.add(path);
       for (const record of packed.records) {
         writeOut(`recorded ${record}\n`);
         written.add(record);

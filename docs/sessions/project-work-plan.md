@@ -152,6 +152,8 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 112 | The UAT walkthroughs, and what a solution ships | no | 2026-09-07 |
 | 113 | What the Maven dogfooding found — the pin the message misnames, and the JDK the scaffold assumes | no | 2026-09-07 |
 | 114 | The deployables block, built | no | 2026-09-07 |
+| 115 | What the Java walk found — a Maven module session that can close | no | 2026-09-07 |
+| 116 | What the Java walk found — the first ten minutes | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -2014,3 +2016,9 @@ Fix the two defects the Java/Maven dogfooding found and correct the walkthrough 
 **Releasable: no.**
 
 Build the deployables: block docs/design/deployables.md designed and deliberately left unbuilt. The manifest reader gains a top-level deployables: list (slug, title, kind service|job|cli, from, runtime container|archive|installer, publish) with the same refuse-by-name discipline modules[] already has, plus two refusals of its own: a from naming a module the manifest does not declare, and a from naming a module whose kind is not application. Which deployables a module feeds is derived and never declared, exactly as usedBy is derived from dependsOn; a manifest with no block reduces to today's bundles, one implied deployable per application module named after it, so a solution that ships what it ships today declares nothing new. The bundle record is keyed by the deployable rather than by the application module, its dependency list the union of the transitive dependencies of every module in from -- safe because a package has exactly one central pin -- and it carries the modules it was built from; a deployable whose from modules declare different versions is refused by name rather than silently taking one, and a deployable with an empty from writes no record at all. `dabbler modules show`, `dabbler affected`, the Solution Explorer's projection and its bundles node say what ships and what nothing ships yet. No build orchestration, no artefact hosting, no push of a deployable, and no inference of kind or runtime from a project file.
+
+### Session 115 — What the Java walk found — a Maven module session that can close
+
+**Releasable: no.**
+
+Fix the three defects the Java/Maven walk measured on 2026-09-07, none of which a test in this repository could have caught because no test runs mvn. (1) A Maven module session cannot close: mvn deploy leaves a POM and a .md5/.sha1 beside every artifact, packModule records only the one artifact the seam went looking for, and the close then refuses both verification_clean (the tree moved after verification) and exposure_within_ceiling (paths outside the session's scope). The candidate becomes what the pack LEFT -- the packages folder snapshotted before and after -- and a module session's scope carries the packages folder, while the framework's own .dabbler/ state is never counted as the session's change. (2) A module session's run of record ran nothing: reachSuites reaches a suite only when it names the changed module, and the suite bootstrap scaffolds for Maven names none, so the driver skipped it and the close's freshness gate demanded nothing. A suite that names no module is repository-wide and is reached by any change. (3) A pack of an unchanged Maven module mints a new version every time, because mvn writes target/ and .flattened-pom.xml inside the module's own code root and nothing ignores them; the Maven root scaffold writes the .gitignore that stops it.

@@ -12,7 +12,8 @@ import {
   readExposure,
   writeExposure,
 } from "../src/exposure.ts";
-import { type SolutionShape, dependencyOrder, implicitModule, parseEntries, impliedDeployables } from "../src/modules.ts";
+import { moduleScope } from "../src/agency.ts";
+import { type SolutionShape, dependencyOrder, impliedDeployables, implicitModule, parseEntries } from "../src/modules.ts";
 import { seed, tempDir } from "./support/answers.ts";
 
 function twoModules(): SolutionShape {
@@ -90,5 +91,32 @@ describe("the exposure manifest", () => {
       { sibling: "model", reason: "debugging the mapper", debug: true, grantedAt: granted.at },
     ]);
     assert.deepEqual(written.outsideScope, ["modules/model/src/CsvModel/Person.cs"]);
+  });
+
+  it("counts neither the committed feed nor the framework's own state as changed outside the scope", () => {
+    // Measured on the Java walk: a module session packed its own candidate
+    // and the close refused, naming the packages the pack left and the
+    // projection the framework itself had rewritten.
+    const root = tempDir("feed-");
+    seed(root, {
+      "modules/model/contract/README.md": "# CsvModel\n",
+      "modules/persister/src/CsvPersister/Store.cs": "public sealed class Store {}\n",
+    });
+    const shape = twoModules();
+    const scope = moduleScope(root, null, shape, ["persister"]);
+    assert.ok(scope.includes("packages"), scope.join(", "));
+    const written = writeExposure(root, shape, 5, {
+      modules: ["persister"],
+      phase: "close",
+      scope,
+      changedPaths: [
+        "packages/com/example/json-store/0.1.0-dev.20260907.1.gabc1234/json-store-0.1.0-dev.20260907.1.gabc1234.jar.sha1",
+        ".dabbler/solution/projection.json",
+        "modules/persister/src/CsvPersister/Store.cs",
+        "modules/model/src/CsvModel/Person.cs",
+      ],
+    });
+    // Only the sibling's source, which is the one thing the gate is for.
+    assert.deepEqual(written?.outsideScope, ["modules/model/src/CsvModel/Person.cs"]);
   });
 });

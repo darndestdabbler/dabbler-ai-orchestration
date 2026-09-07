@@ -4,7 +4,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { REACH_CONSUMER_CONTRACT, REACH_MODULE_CHANGED, REACH_REQUIRED, REACH_SHARED_TYPES, planImpact } from "../src/impact.ts";
+import { REACH_CONSUMER_CONTRACT, REACH_MODULE_CHANGED, REACH_REPOSITORY_WIDE, REACH_REQUIRED, REACH_SHARED_TYPES, planImpact } from "../src/impact.ts";
 import { type SolutionShape, dependencyOrder, implicitModule, parseEntries, impliedDeployables } from "../src/modules.ts";
 
 function threeModules(): SolutionShape {
@@ -85,5 +85,22 @@ describe("the impact plan", () => {
     assert.deepEqual(own.suites.map((suite) => [suite.name, suite.reason]), [["unit", REACH_REQUIRED]]);
     assert.deepEqual(own.candidates, []);
     assert.deepEqual(own.unowned, []);
+  });
+
+  it("reaches a suite that names no module from any change, and still not another module's own", () => {
+    // Measured on the Java walk: the maven suite `dabbler bootstrap`
+    // scaffolds covers "." and names no module, so a module session's plan
+    // reached nothing, the driver skipped the run of record, and the close
+    // asked for freshness of nothing at all.
+    const suites = [...SUITES, { name: "maven", module: null, expensive: true }];
+    const plan = planImpact(threeModules(), suites, ["modules/persister/src/Store.cs"]);
+    assert.deepEqual(
+      plan.suites.filter((suite) => suite.module === null).map((suite) => [suite.name, suite.reason, suite.via]),
+      [["maven", REACH_REPOSITORY_WIDE, ""]],
+    );
+    // A suite that names a module is still reached only through it.
+    assert.ok(!plan.suites.some((suite) => suite.name === "model-unit"));
+    // And a suite nobody would run as a run of record is still not planned.
+    assert.ok(!plan.suites.some((suite) => suite.name === "lint"));
   });
 });

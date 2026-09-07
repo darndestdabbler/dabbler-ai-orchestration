@@ -106,6 +106,8 @@ describe("scope", () => {
       "modules/model/contract",
       "modules/persister",
       "modules/persister/contract",
+      // The committed feed: where this module's own package lands.
+      "packages",
     ]);
   });
 });

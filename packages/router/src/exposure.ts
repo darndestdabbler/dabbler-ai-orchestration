@@ -220,6 +220,11 @@ export function writeExposure(
     grants: grantsInForce(readGrants(root, session)),
     outsideScope: (input.changedPaths ?? [])
       .map(posix)
+      // The framework's own machine-side state -- the projection, the run
+      // ledger -- is written BY the framework while the session runs, is
+      // gitignored, and is never the session's work. Counting it made a
+      // module session's close refuse for a file the session never touched.
+      .filter((path) => path !== ".dabbler" && !path.startsWith(".dabbler/"))
       .filter((path) => !inScope(input.scope, path))
       .sort(),
   };

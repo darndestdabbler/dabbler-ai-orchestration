@@ -5499,3 +5499,78 @@ tests asserting exact markdown strings. Two additions: **no test asserts the
 wording of a brief** — the five parts are structure and are asserted as
 structure — and **no test asserts a projection's rendered layout**, which is the
 extension's business and is covered there.
+
+## Why sessions 109–110 exist
+
+The modules feature shipped across sessions 100–108 and **nothing has ever
+driven it as a person drives it**. The unit suites assert the router's answers
+and the tree models' shapes; neither one opens a window. The layer that does —
+Playwright against a real VS Code — has been present since Set 027 and, by
+`STATUS.md`'s own account, "is ported and has not been run… One Layer-3 run on
+a machine with the VSIX installed is what would close this."
+
+It was run on 2026-09-07, against a staged four-module .NET solution, and it
+found both of the defects below on its first pass. That is the argument for
+this block: a walk that opens the product finds what a walk that does not
+open it cannot.
+
+### Session 109 of 110: Layer 3 runs, and the Solution Explorer fills itself in
+
+Three defects, each measured rather than supposed.
+
+1. **The Layer 3 harness names a container and a pane that do not exist.**
+   `openDabblerContainer` waits for an activity icon whose `aria-label`
+   contains "AI Work Explorer"; the contributed container is titled **"AI
+   Orchestration"**. `workExplorerPane` selects a pane header labelled "AI Work
+   Explorer Section"; the view is named **"Work Explorer"**. Every spec that
+   opens the container therefore fails on its first wait, which is why the
+   suite has never been green. Correct both selectors and run the suite.
+
+2. **The Solution Explorer never derives its projection at startup.**
+   `SolutionTreeProvider` reaches `reprojectSolution` only through
+   `rederive()`, and only a watcher event on `docs/modules.yaml`,
+   `solution-dependencies.json`, `**/*.csproj` or `**/pom.xml` calls it. Open a
+   multi-module repository that already has those files and does not yet have
+   `.dabbler/solution/projection.json` — which is every fresh clone — and the
+   view renders its welcome text, *"It fills in once the repository is set
+   up"*, over a repository that is set up. It stays that way until somebody
+   happens to touch a manifest or a project file. Derive once when the
+   provider is constructed and the projection is absent. The error must stay
+   swallowed: a background derivation is not where a person learns of a
+   manifest fault, and `dabbler status` already says it plainly.
+
+3. **The model registry has no Terra.** It carries `gpt-5-6-sol` and
+   `gpt-5-6-luna`, and the `verifier` role prefers Sol. Sol is **$5.00 in /
+   $30.00 out** per million tokens; Terra is **$2.00 / $12.00** and is a
+   verification-grade model. Register `gpt-5.6-terra` with its published
+   prices and put it at the head of the verifier preference, so the default
+   verifier costs less than half of what it costs today.
+
+### Session 110 of 110: The operator's walk, driven by a browser
+
+1. **Stage the solution the walk is driven against**: the CSV pipeline the
+   operator builds — a folder watched for CSV files, each read into `Person`
+   objects and stored in a database — decomposed as the four modules the
+   feature is for. `model` holds the type every sibling references,
+   `deserializer` turns CSV text into it, `persister` stores it, and `app`
+   composes the three. Siblings are consumed as **packages**, never project
+   references, so there is deliberately no solution file spanning all four.
+
+2. **Walk it as the operator does.** Open the container; read the Solution
+   Explorer's four modules with their dependency structure; read the Work
+   Explorer's sessions grouped by module; open the AI CLI and the Dabbler
+   terminal and confirm they are the two side-by-side editor tabs the
+   extension already opens by default.
+
+3. **Capture each surface and assert what it must show.** A screenshot cannot
+   fail, so the assertions are what make this a check rather than a picture;
+   the images are the evidence a person reads when one of them does fail.
+
+4. **Emit the operator's steps as a document generated from the same list the
+   spec drives**, so the tutorial and the automation cannot drift apart. The
+   existing `examples/csv-walkthrough/` is Python, is built on the six-step
+   component workflow session 100 deleted, and is superseded by it.
+
+The AI CLI is opened **idle and never handed a prompt**. The claim under test
+is where the tabs sit; sending a prompt would start a paid session that has
+nothing to do with the layout.

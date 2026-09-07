@@ -5640,3 +5640,86 @@ were the corpus's fault rather than the product's — a suite declared with
 solution file cannot build inside a focused checkout because a sibling's
 source is absent by design. Both belong in the walkthrough's documentation,
 not in this fix.
+
+### Session 112 of 112: The UAT walkthroughs, and what a solution ships
+
+Two deliverables, one written and one designed.
+
+**1. Land the two UAT walkthroughs** under `docs/uat/`, from
+`C:\temp\uat\uat-dotnet-json-solution.md` and
+`C:\temp\uat\uat-java-json-solution.md`. They are complete and were dogfooded
+before writing: every expected output in them is real output captured on this
+machine, and where a value varies the invariant is stated instead.
+
+They are written to the operator's own UAT bar — literal copy-pasteable
+commands, literal expected strings, and an explicit note in the Java one
+saying which steps have never been run against Maven so the reader knows where
+their findings are worth most.
+
+Add them to whatever index the repository keeps for operator-facing documents,
+and check the two commands each document opens with still behave as written.
+Do not rewrite the documents; they are the artefact under test.
+
+**2. Write `docs/design/deployables.md`** — the design, not the
+implementation.
+
+The question it answers: *when a developer wants to package the solution into
+one or more deployable artefacts — say a REST service and a command-line
+application — what do they declare, and when?*
+
+**What exists today, and it is less than it looks.** A module declares
+`kind: application`, and a releasable session writes
+`release/<slug>/bundle.yaml` naming every package that application ships, each
+with the version pinned centrally and the source digest its correspondence
+record carries. That is a genuine provenance record: you can point at a
+deployed thing and name the source that produced it.
+
+**What is missing.** Three things.
+
+- **Shape and destination are unsaid.** `packaging.pack` and `packaging.push`
+  are argv for producing and pushing a *package*. Nothing says this deployable
+  is a container image bound for a registry while that one is an archive on a
+  share.
+- **Deployables cannot be planned before the modules exist.** The manifest
+  describes code ownership; a deployable is implied, after the fact, by a
+  module having `kind: application`.
+- **One application module is exactly one deployable.** A REST service and a
+  CLI over the same code force two application modules, which cuts the code by
+  how it ships rather than by who owns it. Those are different questions and
+  the manifest currently conflates them.
+
+**The proposal.** A `deployables:` block, declared during decomposition and
+allowed to be incomplete:
+
+```yaml
+deployables:
+  - slug: api
+    title: Ingest REST service
+    kind: service          # service | job | cli
+    from: [app]            # the application modules it ships; may be empty
+    runtime: container     # container | archive | installer
+    publish: acr           # names a target; never holds a credential
+```
+
+Four rules, each following a principle the framework already holds.
+
+1. **`from` is the only direction written by hand.** Which deployables a
+   module ends up in is derived, exactly as `usedBy` is derived from
+   `dependsOn`. Two directions kept by hand disagree eventually, and silently.
+2. **`from: []` is legal.** That is the delayed planning the operator asked
+   for: name the deployable while the shape of the solution is still being
+   argued, and let the impact plan say plainly that no module ships it yet.
+3. **The credential is named, never held**, matching the existing rule for
+   `packaging.push`.
+4. **The bundle record becomes per deployable, not per application module**,
+   which generalises what already exists rather than replacing it.
+
+**Say what this is not.** It is not build orchestration and not artefact
+hosting; `docs/solution-decomposition-direction.md` rules both out and this
+does not reopen them. A deployable declaration says *what ships and where it
+goes*, and leaves the shipping to the tools that already do it.
+
+**No implementation this session.** The manifest reader must keep refusing
+unknown keys, so `deployables:` cannot be added to a real manifest until it is
+built. The document records the design and the reasoning; a later session
+builds it.

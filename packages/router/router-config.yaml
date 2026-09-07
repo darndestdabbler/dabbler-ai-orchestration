@@ -75,7 +75,7 @@ roles:
     # wrong place to economise. Entries the registry marks
     # is_enabled_as_verifier: false are refused on both transports, so this
     # order never names one.
-    prefer: [gpt-5.6-sol, gpt-5.4, claude-sonnet-4.6]
+    prefer: [gpt-5.6-terra, gpt-5.6-sol, gpt-5.4, claude-sonnet-4.6]
     require_provider_in: [anthropic, openai, google]
   plan-review:
     prefer: [gpt-5.4-mini, gemini-2.5-flash, claude-haiku-4.5]
@@ -238,6 +238,21 @@ models:
     max_output_tokens: 32000
     system_prompt_file: prompt-templates/system-prompts.md
     notes: "GPT-5.6 'Sol' — the most capable of the 5.6 variants."
+    generation_params:
+      reasoning_effort: high
+
+  gpt-5-6-terra:
+    provider: openai
+    model_id: gpt-5.6-terra
+    is_enabled: true
+    is_enabled_as_verifier: true
+    max_context_tokens: 272000
+    max_output_tokens: 32000
+    system_prompt_file: prompt-templates/system-prompts.md
+    # Published per-1M-token price, recorded in notes because the model
+    # schema (src/generated/router-config.ts) has no structured pricing
+    # field: $2.00 in / $12.00 out, against Sol's $5.00 / $30.00.
+    notes: "GPT-5.6 'Terra' -- verification-grade at less than half Sol's price."
     generation_params:
       reasoning_effort: high
 

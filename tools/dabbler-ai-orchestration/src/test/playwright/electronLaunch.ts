@@ -36,6 +36,33 @@ const _launch = require("../../../scripts/vscode-launch.js") as {
 /** The router's own source, which the two sanctioned writes below run. */
 const ROUTER_SRC = path.join(REPO_ROOT, "packages", "router", "src");
 
+// The activity-bar container and the Work Explorer view's own contributed
+// names, read from the manifest rather than retyped here: a selector built
+// from a second copy of the title is exactly what went stale the first
+// time (the container was contributed as "AI Orchestration", not "AI Work
+// Explorer") and would go stale the same way on the next rename.
+const manifest = JSON.parse(
+  fs.readFileSync(path.join(EXTENSION_ROOT, "package.json"), "utf8"),
+) as {
+  contributes: {
+    viewsContainers: { activitybar: Array<{ id: string; title: string }> };
+    views: Record<string, Array<{ id: string; name: string }>>;
+  };
+};
+
+/** The activity-bar icon's contributed title, e.g. "AI Orchestration". */
+const CONTAINER_TITLE = manifest.contributes.viewsContainers.activitybar[0]!.title;
+
+/**
+ * The Work Explorer view's contributed name, e.g. "Work Explorer". The
+ * editor renders a pane header's `aria-label` as `"<name> Section"` -- that
+ * suffix is the editor's own convention and is not something the manifest
+ * declares, so it stays a literal where it is appended below.
+ */
+const WORK_EXPLORER_VIEW_NAME = Object.values(manifest.contributes.views)
+  .flat()
+  .find((view) => view.id === "dabblerWorkExplorerTree")!.name;
+
 /**
  * The `dabbler` command the extension under test ships, which is what a
  * spec spawns when it needs the router to WRITE through its command line.
@@ -147,7 +174,11 @@ export function writeApprovedPlan(
       `import { mkdirSync } from "node:fs";`,
       `const plan = await import("${moduleUrl("approvedPlan.ts")}");`,
       `const ledger = await import("${moduleUrl("ledger.ts")}");`,
-      `const [stepsJson, root] = process.argv.slice(2);`,
+      // The LAST two argv entries, not argv[2:] -- whether node inserts an
+      // "[eval]" placeholder before the "--" arguments varies by Node
+      // version (this Node no longer does), and counting from the end is
+      // right either way.
+      `const [stepsJson, root] = process.argv.slice(-2);`,
       `const run = ledger.sessionRunDir(root, ${sessionNumber});`,
       `mkdirSync(run, { recursive: true });`,
       `plan.writePlan(run, plan.newPlan(${sessionNumber}, "fixture", JSON.parse(stepsJson)));`,
@@ -196,7 +227,9 @@ export function writeStepEvent(
     workspaceRoot,
     [
       `const ledger = await import("${moduleUrl("ledger.ts")}");`,
-      `const [rowJson, root] = process.argv.slice(2);`,
+      // See the matching comment in `writeApprovedPlan`: the last two argv
+      // entries, counted from the end, not from a fixed offset.
+      `const [rowJson, root] = process.argv.slice(-2);`,
       `ledger.appendStepEvent(root, ${sessionNumber}, JSON.parse(rowJson));`,
     ].join("\n"),
     [JSON.stringify(row), workspaceRoot],
@@ -412,7 +445,7 @@ export async function triggerRefresh(page: Page): Promise<void> {
  */
 export async function openDabblerContainer(page: Page): Promise<void> {
   const activityIcon = page.locator(
-    '.activitybar .action-label[aria-label*="AI Work Explorer"]',
+    `.activitybar .action-label[aria-label*="${CONTAINER_TITLE}"]`,
   );
   await activityIcon.waitFor({ state: "visible", timeout: 30_000 });
   await activityIcon.click();
@@ -436,7 +469,7 @@ export async function workExplorerPane(
   const pane = page
     .locator(".pane")
     .filter({
-      has: page.locator('.pane-header[aria-label="AI Work Explorer Section"]'),
+      has: page.locator(`.pane-header[aria-label="${WORK_EXPLORER_VIEW_NAME} Section"]`),
     })
     .first();
   await pane.waitFor({ state: "visible", timeout: 30_000 });

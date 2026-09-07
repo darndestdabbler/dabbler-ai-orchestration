@@ -69,6 +69,15 @@ export class SolutionTreeProvider
     for (const glob of PROJECTION_SOURCE_GLOBS) {
       this.watch(glob, () => this.rederive());
     }
+    // A fresh clone of a repository that is already set up has every
+    // declaration on disk but no projection yet -- nothing has touched a
+    // manifest or a build file since the clone, so none of the watchers
+    // above will ever fire. Derive once, now, rather than leaving the
+    // welcome text standing over a repository the operator can already work
+    // in.
+    if (!fs.existsSync(path.join(workspaceRoot, PROJECTION_RELPATH))) {
+      this.rederive();
+    }
   }
 
   private watch(glob: string, onEvent: () => void): void {

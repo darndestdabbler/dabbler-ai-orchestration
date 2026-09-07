@@ -1,4 +1,4 @@
-# STATUS — the modules block (sessions 100–108) is running unattended; session 101 closed VERIFIED, session 102 next
+# STATUS — the modules block (sessions 100–108) is running unattended; session 102 closed VERIFIED, session 103 next
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
 
@@ -16,8 +16,8 @@
 > | --- | --- | --- |
 > | 100 | solution plan and module manifest; the six-step workflow deleted | CLOSED VERIFIED, landed 19d621c5 |
 > | 101 | module configuration, the exception schema, the test-impact vocabulary | CLOSED VERIFIED, landed 33557781 |
-> | 102 | designed contracts and contract-test source; the ecosystem seam | next |
-> | 103 | committed immutable packages | planned |
+> | 102 | designed contracts and contract-test source; the ecosystem seam | CLOSED VERIFIED, landed 594bca00 |
+> | 103 | committed immutable packages | next |
 > | 104 | the focused checkout and the Windows preflight | planned |
 > | 105 | module-scoped sessions, the hard verifier scope, exposure, grants | planned |
 > | 106 | the impact plan and the selected run of record | planned |
@@ -25,6 +25,57 @@
 > | 108 | Maven parity and the hardened profiles | planned |
 >
 > One operating failure on the record: session 101's second round finished at 17:18 and the loop idled until 20:06, because the background waiter's completion never woke the orchestrator. The rule since: every framework wait is driven from a foreground loop that polls the job's status file, and the run state is checked at the start of every turn.
+
+> ## SESSION 102 CLOSED, 2026-09-06, VERIFIED (round 5, gpt-5.4 over the seat, cap raised to 5 on the record; landed 594bca00) -- designed contracts and contract-test source, and the ecosystem seam
+>
+> Four steps. **The ecosystem seam** (`ecosystem.ts`): `ecosystemOf(root,
+> entry)` chooses `dotnet` or `maven` from what a module's roots contain (a
+> `.csproj` or solution file; a `pom.xml`; neither and both refused by
+> name), and every ecosystem-specific decision of the block is a method of
+> it -- contract project names, the surface reader, the contract scaffold
+> now; the root files, the pack default, the focused-checkout convenience
+> file and the grant mechanism as the block adds them -- with the Maven side
+> refusing by name until session 108. **The contract bundle** has one shape:
+> `modules/<slug>/contract/README.md` is the author's notes page (five
+> sections plus examples and what callers must not depend on), and for a
+> `designed` or `generated` contract `<Package>.api.md` is the public
+> surface. `dabbler contractdoc --module <slug>` renders it: the .NET
+> reader takes every `public` declaration with its `///` summary from the
+> abstractions project's source (interface members are read as the public
+> declarations they are, tracked by braces; an attribute between summary and
+> declaration keeps the summary) and marks the page *designed*; `generated`
+> runs `modules.<slug>.contract.generate` and marks the page *shape, not
+> behaviour*; `package` has no surface page; a declared seam with no notes
+> page is refused by path, and a `contract.yaml` beside the page renders
+> into it between markers, the author's prose kept and the block
+> regenerated in place. **`dabbler module contract <slug>`** (a new verb,
+> `module`, for the things done to one module) scaffolds the designed seam
+> for a .NET module only where absent, naming each file: `<Package>.
+> Abstractions` (a placeholder interface with a doc comment),
+> `<Package>.ContractTests` (an abstract xunit class, `OutputType Library`
+> over `xunit.v3.extensibility.core` -- xunit v3 refuses a library that
+> references the runner core, which the real build found), the
+> implementation's test project wired to it with a subclass, and the notes
+> page; `--against <provider>` writes a compatibility test project with an
+> unversioned `PackageReference` to the provider's package and never a
+> `ProjectReference`; the central pins the new references need are added
+> where missing. The real toolchain was the step's own check: a copy of the
+> POC repository, scaffolded, built both projects with `dotnet build`.
+> **A module's contract bundle sits under its suites' covers** by derivation
+> in a multi-module shape, so a change to it moves the suites' freshness;
+> single-module derives nothing. Six router tests.
+>
+> **Five rounds, four of them on one sentence of the plan.** Round 1: the
+> module form wrote no notes page (fixed), the reader dropped interface
+> members (fixed), the Maven side returned guessed project names (now
+> refuses). Rounds 2-4 turned on what "renders the notes page from a
+> `contract.yaml` beside it" means: a third file was refused (round 2),
+> overwriting the author's page was refused (round 3), creating the page
+> from the yaml alone was refused (round 4); the resolution is the one
+> above -- the page is the author's and must exist, and the definition
+> renders into it between markers. The round cap was raised from 3 to 5 for
+> this run with the reason and the approver on `amendments.jsonl`. Router
+> suite 1,092 tests (1,088 passing, 4 skipped), extension 196.
 
 > ## SESSION 101 CLOSED, 2026-09-06, VERIFIED (round 2, gpt-5.4 over the seat, one dispute withdrawn; landed 33557781) -- module configuration, the exception schema and the test-impact vocabulary
 >

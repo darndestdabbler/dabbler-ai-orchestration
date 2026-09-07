@@ -5723,3 +5723,170 @@ goes*, and leaves the shipping to the tools that already do it.
 unknown keys, so `deployables:` cannot be added to a real manifest until it is
 built. The document records the design and the reasoning; a later session
 builds it.
+
+### Session 113 of 114: What the Maven dogfooding found — the pin the message misnames, and the JDK the scaffold assumes
+
+Two defects, both found while dogfooding `docs/uat/uat-java-json-solution.md`
+on this machine on 2026-09-07, both listed in that document under "Known
+issues", and both called cosmetic when they were found. One of them is not.
+
+**1. The pack message names a .NET file whatever the ecosystem.** On the
+Maven solution, `dabbler module pack model` prints
+
+```
+pinned com.example:json-model in Directory.Packages.props
+```
+
+and there is no `Directory.Packages.props` in that repository at all: the pin
+really went into the root `pom.xml`'s `<dependencyManagement>`, which is where
+the Maven side of the seam puts it and where the walkthrough then tells the
+reader to go and look. Three places hold the literal, all in
+`packages/router/src/cli/module.ts`: the message in `packSubcommand`
+(line 556), the same message in `candidateSubcommand` (line 229), and that
+function's `written` set, seeded `new Set<string>(["Directory.Packages.props"])`
+(line 167).
+
+**The third is not cosmetic, and it blocks.** That set is what
+`writeCandidateRecord` records as the paths the candidate job wrote —
+"the framework's derivation of the verified source, not a change to it" —
+and `judgeVerification` reads it through `candidatePathsAsWritten` to know a
+derived path from a tree that moved after verification. On Maven the pin
+moves the root `pom.xml`, the record names a file that does not exist (so it
+is not even set aside — its digest is null), and the land therefore sees
+`pom.xml` changed since the verified tree with nothing accounting for it. No
+test runs `mvn` and no Maven module session has ever reached a land, so
+nothing has met this yet; the walk queued behind this session is what would
+have met it first.
+
+**The fix is to stop throwing away a fact the seam already returns.**
+`Ecosystem.writeCentralPin` returns the repository-relative file it wrote,
+and `packModule` (`packages/router/src/packages.ts`) drops the return value
+on the floor. Carry it on `PackResult` as `pinFile`, print that in both
+messages, and seed the candidate's `written` set with it instead of the
+literal. Nothing new is decided anywhere: one caller stops assuming what the
+seam is there to answer.
+
+**2. The scaffolded root POM targets Java 21 on every machine.**
+`rootFilesMaven` writes `<maven.compiler.release>21</maven.compiler.release>`
+(`packages/router/src/ecosystem.ts:1648`) as a constant, so every solution
+scaffolded on a JDK older than 21 fails to build until the developer finds
+that line and edits it — which is exactly what step 4 of the walkthrough
+currently has to tell them to do, on a machine whose JDK is 17.
+
+**The fix.** Ask the JDK that is doing the scaffolding: `java -version`
+writes `openjdk version "17.0.9" 2023-10-17 LTS` to stderr, and the major
+version is the number the release should be. Write that. When `java` cannot
+be run at all, write a stated default of 17 — the oldest LTS anybody is
+still starting a project on, so the scaffold errs towards a file that
+compiles rather than one that cannot — and say which of the two happened in
+the scaffold's `notes`, and in a comment in the POM itself. The root files
+are written only where absent and never rewritten, so a team that wants a
+different target edits one line of their own build file, as they would for
+any other build decision.
+
+**3. The walkthrough is corrected.** `docs/uat/uat-java-json-solution.md` is
+the artefact those two defects were found in, and it currently instructs the
+reader around both of them. Step 4's "fix one line" becomes a check that the
+release matches their JDK; step 5's expected output names the ecosystem's
+pin file; the two "Known issues" entries for these defects go, and the Chat
+panel one stays. Nothing else in the document is rewritten — it is still the
+artefact under test, and the walk that follows this session is what tests it.
+
+**Tests.** Three, one per behaviour, in `packages/router/test`: a pack of a
+Maven module reports the pin file the seam wrote and a .NET one still reports
+`Directory.Packages.props`; a candidate's record names the ecosystem's pin
+file rather than the literal; and the Maven root scaffold writes the release
+the detector returns, with the fallback taken and noted when it returns
+nothing. No test runs `java` or `mvn`: the detector is handed in, as
+`runPack` and `digestOf` already are.
+
+### Session 114 of 114: The deployables block, built
+
+`docs/design/deployables.md` (session 112) is the design, and it says plainly
+that nothing in it is built: `deployables:` is an unknown key the manifest
+reader refuses, and the page is "the record a later session builds against".
+This is that session. The design is not reopened here — what is written
+below is how each of its four rules lands in this tree.
+
+**The reader.** A top-level `deployables:` list in `docs/modules.yaml`, each
+entry `slug`, `title`, `kind` (`service` | `job` | `cli`), `from` (module
+slugs), `runtime` (`container` | `archive` | `installer`) and `publish` (a
+string that names a target). Refused by name, the way `modules[]` entries
+already are: an unknown key, a duplicate slug, a `from` naming a module the
+manifest does not declare, and a `from` naming a module whose `kind` is not
+`application` — a deployable ships applications, and a library named there is
+a decomposition mistake worth catching at load rather than at a land.
+
+**The deriver, and rule 1.** `SolutionShape` gains `deployables`, and
+`deployablesOf(shape, slug)` computes which deployables a module feeds. That
+direction is derived and never declared, exactly as `usedBy` is derived from
+`dependsOn` by `consumersOf` — and the manifest reader's unknown-key refusal
+is already what stops anybody adding the reverse key to a module by hand.
+
+**The reduction, and what a solution that declares nothing sees.** With no
+`deployables:` block the implied deployables are exactly today's bundles: one
+per application module, its slug and title the module's own, `from` the one
+module, and `kind`, `runtime` and `publish` null. A record on disk is marked
+for whether it came from a declaration or from the reduction, so a reader can
+tell a decision from a default. A solution that ships what it ships today is
+asked to declare nothing new, and its `release/<slug>/bundle.yaml` is written
+to the same path with the same key it has now.
+
+**Rule 2, `from: []`.** Legal, and it writes no bundle record: a deployable
+nobody ships yet has nothing to name. `dabbler modules show` and the
+Solution Explorer's projection say so plainly, and `dabbler affected` names
+the declared deployables its change set reaches and the declared deployables
+no module feeds yet. That is a true statement about the solution's shape
+during decomposition, not an error in it, and nothing gates on it.
+
+**Rule 3, the credential.** `publish` is carried as the string it is,
+printed where the deployable is shown, and never resolved, read from the
+environment, or written anywhere the framework stores a value —
+`packaging.push.secret`'s rule, applied to the one new key that could
+otherwise tempt somebody into holding a credential.
+
+**Rule 4, the bundle keyed by the deployable.** `bundleRecord` in
+`packages/router/src/land.ts` takes a deployable rather than an application
+module, and its dependency list is the union of the transitive dependencies
+of every module in `from`, deduplicated by module and left in dependency
+order. The union is safe precisely because the pins are central: a package
+has exactly one pin in the solution, so two applications in one deployable
+cannot disagree about the version of something they share. The refusal for a
+dev-versioned pin stays exactly where it is.
+
+**The one thing the design leaves open, decided here: the version.** A
+deployable with one `from` module takes that module's base version, which is
+today's behaviour unchanged. A deployable with several takes their version
+when they agree, and is refused by name — both modules and both versions —
+when they do not, rather than the framework silently picking one. Two
+applications shipped as one artefact at two different versions is a question
+only the developer can answer, and the answer belongs in their build files.
+
+**The record gains `from`.** `release/<deployable>/bundle.yaml` carries the
+module slugs it was built from, so `projection.ts`'s `shippedIn` can say a
+module ships in a deployable without re-reading the manifest, and so a record
+written before this session still reads — a missing `from` is an empty list,
+as every other tolerated absence in `readBundleRecord` already is.
+
+**The callers.** `candidateSubcommand` in `packages/router/src/cli/module.ts`
+writes one record per deployable that the session's changed application
+modules feed, deduplicated, still only for a releasable session (session
+111's gate, unchanged) and still refusing a dev pin. `drive.ts`'s
+`bundleCandidates` names the same set. `receiptBundles` is keyed by the
+record and needs nothing. The projection's `shippedIn` matches a module named
+in a bundle's `from` as well as by package, and the Explorer's bundles node
+names the deployable and the modules it ships.
+
+**Not in scope, and named so the verifier does not ask for it.** No build
+orchestration, no artefact hosting, no push of a deployable, and no
+inference of `kind` or `runtime` from what a project file looks like:
+`docs/solution-decomposition-direction.md` rules the first two out for the
+whole manifest and the design page for this block does not reopen them.
+
+**Tests.** Five in `packages/router/test`: the reader accepts a declared
+block; the reader refuses each of its four bad shapes by name; the implied
+deployables of a manifest with no block are one per application module and
+the bundle path is unchanged; a deployable with two `from` modules unions
+their dependencies and refuses their disagreeing versions by name; and a
+declared deployable with `from: []` writes no record and is named by `modules
+show` and by `affected`.

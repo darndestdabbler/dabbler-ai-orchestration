@@ -76,8 +76,9 @@ function usage(): string {
     "under modules/<slug>/contract/. Each is written only where absent and named.",
     "",
     "pack: every packable project under the module's roots into packages/ under one",
-    "immutable dev version (<base>-dev.<yyyymmdd>.<n>.g<digest>), the pin moved in",
-    "Directory.Packages.props, and a record beside each package naming the source",
+    "immutable dev version (<base>-dev.<yyyymmdd>.<n>.g<digest>), the pin moved where",
+    "the ecosystem keeps it (Directory.Packages.props for .NET, the root pom.xml's",
+    "dependencyManagement for Maven), and a record beside each package naming the source",
     "and contract it was built from. Refused where the module's source is not on",
     "this disk: in a focused checkout a sibling is a package, and the grant is the",
     "way to its source.",
@@ -163,8 +164,11 @@ function candidateSubcommand(rest: readonly string[]): number {
     // Everything the candidate writes is recorded beside the run: the gate
     // that refuses a tree moved after verification reads it, because these
     // paths are the framework's own derivation of the verified source and
-    // not a change to it.
-    const written = new Set<string>(["Directory.Packages.props"]);
+    // not a change to it. The central pin file is one of them and is added
+    // as each pack reports it -- .NET moves `Directory.Packages.props` and
+    // Maven the root `pom.xml`, and a seeded literal names the wrong one
+    // half the time, leaving the file that really moved unaccounted for.
+    const written = new Set<string>();
     for (const slug of slugs) {
       const entry = shape.modules.find((module) => module.slug === slug);
       // An application's candidate is the bundle record -- what it ships,
@@ -226,7 +230,10 @@ function candidateSubcommand(rest: readonly string[]): number {
         writeOut(`  ${artifact}\n`);
         written.add(artifact);
       }
-      writeOut(`pinned ${packed.pins.join(", ")} in Directory.Packages.props\n`);
+      if (packed.pinFile !== null) {
+        writeOut(`pinned ${packed.pins.join(", ")} in ${packed.pinFile}\n`);
+        written.add(packed.pinFile);
+      }
       for (const record of packed.records) {
         writeOut(`recorded ${record}\n`);
         written.add(record);
@@ -553,7 +560,7 @@ function packSubcommand(rest: readonly string[]): number {
   }
   writeOut(`packed ${result.slug} ${result.version}\n`);
   for (const artifact of result.artifacts) writeOut(`  ${artifact}\n`);
-  writeOut(`pinned ${result.pins.join(", ")} in Directory.Packages.props\n`);
+  if (result.pinFile !== null) writeOut(`pinned ${result.pins.join(", ")} in ${result.pinFile}\n`);
   for (const record of result.records) writeOut(`recorded ${record}\n`);
   return EXIT_OK;
 }

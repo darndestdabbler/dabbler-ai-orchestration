@@ -10476,6 +10476,13 @@
       "dateTime": "2026-09-07T14:00:29.181000-04:00",
       "task": "Land the two dogfooded UAT walkthroughs (.NET and Java) verbatim under docs/uat/, link them from README.md the same way docs/quick-start.md and docs/driving-a-session.md already are, confirm the .NET document's two opening commands still behave as written, and write docs/design/deployables.md recording the design for a deployables: block -- what it would declare, the four rules it would hold to, and what it explicitly is not -- with no change to the manifest reader or any other implementation.",
       "releasable": false
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 113,
+      "dateTime": "2026-09-07T14:33:35.180000-04:00",
+      "task": "Fix the two defects the Java/Maven dogfooding found and correct the walkthrough that currently instructs the reader around them. (1) The pin file: Ecosystem.writeCentralPin already returns the repository-relative file it wrote and packModule throws it away, so cli/module.ts prints 'pinned <ids> in Directory.Packages.props' on a Maven solution -- where the pin really moved the root pom.xml -- and, worse, seeds candidateSubcommand's written set with that same literal, so the candidate record names a file that does not exist and the land's verification gate sees the root pom.xml as a tree that moved after verification with nothing accounting for it. Carry the seam's answer on PackResult as pinFile, print it in both messages, and record it as the path the candidate wrote. (2) The scaffolded root POM hardcodes maven.compiler.release 21, so every Maven solution scaffolded on an older JDK fails to build until the developer finds and edits that line; derive it from the JDK doing the scaffolding through a settable source, fall back to a stated 17 when java cannot be run, and say which happened in the scaffold's notes and in the POM's own comment. (3) Correct docs/uat/uat-java-json-solution.md where it works around both, leaving the rest of the document as the artefact under test.",
+      "releasable": false
     }
   ]
 }

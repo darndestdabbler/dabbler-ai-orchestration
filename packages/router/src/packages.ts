@@ -207,8 +207,15 @@ export interface PackResult {
   readonly version: string;
   /** Repository-relative paths of the packages produced, in target order. */
   readonly artifacts: readonly string[];
-  /** The package ids pinned in `Directory.Packages.props`. */
+  /** The package ids pinned centrally. */
   readonly pins: readonly string[];
+  /**
+   * The central pin file the ecosystem wrote them to, repository-relative;
+   * null when nothing was pinned. Asked of the seam rather than assumed:
+   * .NET pins in `Directory.Packages.props` and Maven in the root `pom.xml`,
+   * and a caller that names either one is wrong on the other ecosystem.
+   */
+  readonly pinFile: string | null;
   /** The correspondence records written, repository-relative. */
   readonly records: readonly string[];
 }
@@ -373,9 +380,10 @@ export function packModule(
   }
 
   const pins: string[] = [];
+  let pinFile: string | null = null;
   try {
     for (const target of targets) {
-      ecosystem.writeCentralPin(root, target.packageId, version);
+      pinFile = ecosystem.writeCentralPin(root, target.packageId, version);
       pins.push(target.packageId);
     }
   } catch (error) {
@@ -400,7 +408,7 @@ export function packModule(
     );
     written.push(relative(root, path).split("\\").join("/"));
   }
-  return { slug, version, artifacts, pins, records: written };
+  return { slug, version, artifacts, pins, pinFile, records: written };
 }
 
 /** Whether a `packages/.gitattributes` puts the packages under LFS, by the ecosystem's pattern. */

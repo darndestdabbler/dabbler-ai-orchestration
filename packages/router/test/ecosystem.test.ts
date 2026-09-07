@@ -8,7 +8,7 @@ import { join } from "node:path";
 import { describe, it } from "node:test";
 import { pathToFileURL } from "node:url";
 
-import { EcosystemError, ecosystemNamed, ecosystemOf, ensureRootFiles, layDebugGrants } from "../src/ecosystem.ts";
+import { EcosystemError, ecosystemNamed, ecosystemOf, ensureRootFiles, javaReleaseOf, layDebugGrants, setJavaSource } from "../src/ecosystem.ts";
 import { type SolutionShape, dependencyOrder, parseEntries } from "../src/modules.ts";
 import { seed, tempDir } from "./support/answers.ts";
 
@@ -88,6 +88,35 @@ describe("the Maven side of the seam", () => {
     });
     return { root, shape: { multi: true, implicit: false, modules: dependencyOrder(entries) } };
   }
+
+  it("targets the release of the JDK that scaffolded it, and says so", () => {
+    // A constant 21 here failed every build on a machine whose JDK was
+    // older, on a line the developer had to find and edit first.
+    const { root, shape } = mavenSolution();
+    const restore = setJavaSource(() => 'openjdk version "17.0.9" 2023-10-17 LTS\n');
+    try {
+      const result = ensureRootFiles(root, shape);
+      assert.match(readFileSync(join(root, "pom.xml"), "utf8"), /<maven\.compiler\.release>17<\/maven\.compiler\.release>/);
+      assert.ok(result?.notes.some((note) => /targets Java 17, the JDK that scaffolded it/.test(note)), result?.notes.join(" | "));
+    } finally {
+      restore();
+    }
+  });
+
+  it("takes the stated default, and names it as one, when no JDK answers", () => {
+    const { root, shape } = mavenSolution();
+    const restore = setJavaSource(() => null);
+    try {
+      const result = ensureRootFiles(root, shape);
+      assert.match(readFileSync(join(root, "pom.xml"), "utf8"), /<maven\.compiler\.release>17<\/maven\.compiler\.release>/);
+      assert.ok(result?.notes.some((note) => /the stated default/.test(note)), result?.notes.join(" | "));
+    } finally {
+      restore();
+    }
+    // The 1.x scheme every JDK before 9 printed, and a line nobody recognises.
+    assert.equal(javaReleaseOf('java version "1.8.0_392"'), 8);
+    assert.equal(javaReleaseOf("no java here"), null);
+  });
 
   it("lays the root files, packs one reactor per module into the file repository under the dev version, and manages the one pin in the parent POM", () => {
     const { root, shape } = mavenSolution();

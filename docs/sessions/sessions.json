@@ -2222,6 +2222,26 @@
         "identityProvenance": "direct"
       },
       "verificationVerdict": "VERIFIED",
+      "verification": {
+        "rounds": 1,
+        "verifierModel": "gpt-5-6-terra",
+        "verifierProvider": "openai",
+        "transport": "api"
+      },
+      "frameworkVersion": "2.0.12"
+    },
+    {
+      "number": 113,
+      "title": "What the Maven dogfooding found \u2014 the pin the message misnames, and the JDK the scaffold assumes",
+      "status": "in-progress",
+      "startedAt": "2026-09-07T14:32:00.431000-04:00",
+      "completedAt": null,
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": "VERIFIED",
       "frameworkVersion": "2.0.12",
       "verification": {
         "rounds": 1,
@@ -2229,6 +2249,15 @@
         "verifierProvider": "openai",
         "transport": "api"
       }
+    },
+    {
+      "number": 114,
+      "title": "The deployables block, built",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
     }
   ]
 }

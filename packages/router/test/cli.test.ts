@@ -21,6 +21,7 @@ import { extensionAbove, versionVerb } from "../src/cli/version.ts";
 import { VERBS } from "../src/contracts/verbs.ts";
 import { VERSION } from "../src/version.ts";
 import { writeInstruction } from "../src/driver.ts";
+import { readCandidateRecord } from "../src/impact.ts";
 import { readBundleRecord } from "../src/land.ts";
 import { capture } from "../src/output.ts";
 import { readRawSessionState } from "../src/progress.ts";
@@ -40,6 +41,91 @@ const APPLICATION_MANIFEST = [
   "    dependsOn: [lib]",
   "",
 ].join("\n");
+
+/** The same two modules as a Maven solution: the model as a jar, an application over it. */
+const MAVEN_MANIFEST = [
+  "modules:",
+  "  - slug: model",
+  "    kind: shared-types",
+  "    codeRoots: [modules/model]",
+  "    package: com.example:json-model",
+  "  - slug: app",
+  "    kind: application",
+  "    codeRoots: [modules/app]",
+  "    dependsOn: [model]",
+  "",
+].join("\n");
+
+const DOTNET_MANIFEST = [
+  "modules:",
+  "  - slug: model",
+  "    kind: shared-types",
+  "    codeRoots: [modules/model]",
+  "    package: JsonModel",
+  "  - slug: app",
+  "    kind: application",
+  "    codeRoots: [modules/app]",
+  "    dependsOn: [model]",
+  "",
+].join("\n");
+
+const MAVEN_PARENT_POM = [
+  "<project>",
+  "  <groupId>com.example</groupId>",
+  "  <artifactId>solution-parent</artifactId>",
+  "  <version>${revision}</version>",
+  "  <packaging>pom</packaging>",
+  "  <dependencyManagement>",
+  "    <dependencies>",
+  "    </dependencies>",
+  "  </dependencyManagement>",
+  "</project>",
+  "",
+].join("\n");
+
+const mavenModulePom = (artifactId: string): string =>
+  [
+    "<project>",
+    "  <parent>",
+    "    <groupId>com.example</groupId>",
+    "    <artifactId>solution-parent</artifactId>",
+    "    <version>${revision}</version>",
+    "    <relativePath>../../pom.xml</relativePath>",
+    "  </parent>",
+    `  <artifactId>${artifactId}</artifactId>`,
+    "</project>",
+    "",
+  ].join("\n");
+
+/**
+ * A pack that leaves exactly the artifact the ecosystem looks for, so the
+ * CLI's own path can be exercised on a machine with neither dotnet nor mvn:
+ * the third argument is where to write it, under the output folder.
+ */
+const FAKE_PACK = [
+  "import { mkdirSync, writeFileSync } from 'node:fs';",
+  "import { dirname, join } from 'node:path';",
+  "const [output, version, template] = process.argv.slice(2);",
+  "const artifact = join(output, ...template.split('{v}').join(version).split('/'));",
+  "mkdirSync(dirname(artifact), { recursive: true });",
+  "writeFileSync(artifact, 'bytes');",
+  "",
+].join("\n");
+
+/** `modules.<slug>.packaging` naming that pack, and the push it is never without. */
+const packDeclaration = (slug: string, artifact: string): string =>
+  [
+    "schema_version: 1",
+    "modules:",
+    `  ${slug}:`,
+    "    packaging:",
+    "      pack:",
+    `        argv: [node, tools/fake-pack.mjs, "{output}", "{version}", "${artifact}"]`,
+    "      push:",
+    '        argv: [node, tools/fake-pack.mjs, "{artifact}", "{feed}"]',
+    "        feed: /feeds/local",
+    "",
+  ].join("\n");
 
 async function run(
   verb: () => Promise<number> | number,
@@ -389,6 +475,54 @@ describe("dabbler module", () => {
     assert.match(released.out, /bundled app/);
     assert.equal(readBundleRecord(repo, "app")?.dependencies[0]?.package, "SomeLib");
     assert.equal(readBundleRecord(repo, "app")?.dependencies[0]?.version, "1.0.0");
+  });
+
+  it("names the pin file the Maven seam wrote, and records it as the candidate's", async () => {
+    // The message and the candidate record used to hold the literal
+    // `Directory.Packages.props`, which does not exist in a Maven solution:
+    // the pin moves the root pom.xml, so the record named a file that was
+    // never written and left the one that was unaccounted for -- and the
+    // land's verification gate reads that record to tell the framework's
+    // own derivation from a tree that moved.
+    const { repo, sessionsDir } = makeAnsweredSandbox({
+      "docs/modules.yaml": MAVEN_MANIFEST,
+      "pom.xml": MAVEN_PARENT_POM,
+      "modules/model/pom.xml": mavenModulePom("json-model"),
+      "modules/model/contract/README.md": "# json-model\n",
+      "modules/app/pom.xml": mavenModulePom("json-app"),
+      "dabbler.yaml": packDeclaration("model", "com/example/json-model/{v}/json-model-{v}.jar"),
+      "tools/fake-pack.mjs": FAKE_PACK,
+    });
+    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
+    declareSessionTask(sessionsDir, { sessionNumber: 1, task: "pack the model", releasable: false });
+    const result = await run(() =>
+      moduleVerb(["candidate", "--session", "1", "--workspace-root", repo, "model"]),
+    );
+    assert.equal(result.code, 0, result.err);
+    assert.match(result.out, /pinned com\.example:json-model in pom\.xml/);
+    assert.doesNotMatch(result.out, /Directory\.Packages\.props/);
+    const recorded = readCandidateRecord(repo, 1).paths.map((entry) => entry.path);
+    assert.ok(recorded.includes("pom.xml"), recorded.join(", "));
+    assert.ok(!recorded.includes("Directory.Packages.props"), recorded.join(", "));
+  });
+
+  it("names Directory.Packages.props for a .NET module, and records that", async () => {
+    const { repo, sessionsDir } = makeAnsweredSandbox({
+      "docs/modules.yaml": DOTNET_MANIFEST,
+      "modules/model/JsonModel/JsonModel.csproj": '<Project Sdk="Microsoft.NET.Sdk" />\n',
+      "modules/model/contract/README.md": "# JsonModel\n",
+      "modules/app/App/App.csproj": '<Project Sdk="Microsoft.NET.Sdk" />\n',
+      "dabbler.yaml": packDeclaration("model", "JsonModel.{v}.nupkg"),
+      "tools/fake-pack.mjs": FAKE_PACK,
+    });
+    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
+    declareSessionTask(sessionsDir, { sessionNumber: 1, task: "pack the model", releasable: false });
+    const result = await run(() =>
+      moduleVerb(["candidate", "--session", "1", "--workspace-root", repo, "model"]),
+    );
+    assert.equal(result.code, 0, result.err);
+    assert.match(result.out, /pinned JsonModel in Directory\.Packages\.props/);
+    assert.ok(readCandidateRecord(repo, 1).paths.some((entry) => entry.path === "Directory.Packages.props"));
   });
 });
 

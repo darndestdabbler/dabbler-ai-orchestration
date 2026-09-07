@@ -25,8 +25,12 @@ steps are identical to the .NET walkthrough, where they were run four times
 end to end, and nothing in them is ecosystem-specific. They are very likely
 fine, but you are the first to run them against Maven.
 
-**Two defects were already found while preparing this**, both listed under
-"Known issues" at the bottom. Do not report them again.
+**Two defects were found while preparing this, and both are now fixed** — the
+pack message that named a .NET file whatever the ecosystem, and the root POM
+that targeted Java 21 on every machine. Steps 4 and 5 below were re-run
+against the fixed build on 7 September 2026 and the output shown is that
+run's. If you see either of the old behaviours, you are on a router built
+before session 113 — check `dabbler version` and say which one you have.
 
 ---
 
@@ -150,7 +154,7 @@ Also write a small `Item` class under
 
 ---
 
-## Step 4 — Let the root build files appear, then fix one line
+## Step 4 — Let the root build files appear, and check the one line that matters
 
 Run:
 
@@ -169,15 +173,20 @@ wrote packages/README.md
 **Now open the root `pom.xml` it just wrote and find this line:**
 
 ```xml
-<maven.compiler.release>21</maven.compiler.release>
+<maven.compiler.release>17</maven.compiler.release>
 ```
 
-**If your JDK is older than 21, change that number to your JDK version** (17
-on this machine). Otherwise every build fails on a version you cannot compile
-to. Dabbler writes this file only once and never rewrites it, so your edit is
-safe.
+**The number must be your own JDK's** — the one `java -version` printed in the
+prerequisites, 17 on this machine — and above it a comment saying it came from
+that JDK. Dabbler asks the JDK doing the scaffolding, because a release your
+compiler cannot produce fails every build afterwards.
 
-Then run the pack again — see the next step for what to expect.
+A number that is not your JDK's is worth reporting. If no JDK could be run at
+all the comment says so instead, and the file takes a stated default of 17.
+Either way this file is written once and never rewritten, so raising it later
+is your edit to make.
+
+The pack carries straight on from there — see the next step for what to expect.
 
 ---
 
@@ -192,7 +201,7 @@ dabbler module pack model
 ```
 packed model 0.1.0-dev.20260907.1.g493fcc4
   packages/com/example/json-model/0.1.0-dev.20260907.1.g493fcc4/json-model-0.1.0-dev.20260907.1.g493fcc4.jar
-pinned com.example:json-model in Directory.Packages.props
+pinned com.example:json-model in pom.xml
 recorded packages/com.example+json-model.0.1.0-dev.20260907.1.g493fcc4.json
 ```
 
@@ -204,16 +213,15 @@ recorded packages/com.example+json-model.0.1.0-dev.20260907.1.g493fcc4.json
   because a colon is not allowed in a Windows filename.
 - Running the same command twice unchanged gives the **same version back**.
 
-**Line three is wrong and is a known defect.** It names
-`Directory.Packages.props`, which is a .NET file that does not exist in your
-solution. Check where the pin actually went:
+**Line three names the file the pin really moved.** Check that it did:
 
 ```
 findstr /C:"json-model" pom.xml
 ```
 
-**Expect** to find it inside `<dependencyManagement>` in the root `pom.xml`.
-The behaviour is right; only the message is wrong.
+**Expect** to find it inside `<dependencyManagement>` in the root `pom.xml`,
+at the version line two printed. A message naming any other file — the .NET
+`Directory.Packages.props`, say — is worth reporting.
 
 ---
 
@@ -353,10 +361,9 @@ detail there is worth most.
 
 ## Known issues — do not report these as new
 
-- **The pack message names a .NET file.** It says "pinned … in
-  Directory.Packages.props" whatever the ecosystem; for Maven the pin really
-  goes into the root `pom.xml`. Message only.
-- **The generated root POM targets Java 21.** Step 4 tells you to change it if
-  your JDK is older.
 - **The Chat panel** takes the right-hand side of the window. Close it with
   **View: Close Secondary Side Bar**; it is not part of Dabbler.
+
+The two defects this document used to list here — the pack message naming a
+.NET file, and the root POM targeting Java 21 on every machine — were fixed in
+session 113 and are checks in steps 4 and 5 now. Report them if you see them.

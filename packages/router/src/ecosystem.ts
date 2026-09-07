@@ -13,6 +13,7 @@
 // declaration, because a declaration that disagreed with the tree would
 // have to be wrong about one of them.
 
+import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, relative } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -1384,6 +1385,53 @@ const JUNIT_VERSION = "5.13.4";
 const DEPLOY_PLUGIN_VERSION = "3.1.4";
 const FLATTEN_PLUGIN_VERSION = "1.7.0";
 
+/**
+ * What the scaffolded root POM targets when no JDK answers: the oldest LTS
+ * a team still starts a project on, so the file that is written once errs
+ * towards one that compiles rather than one that cannot.
+ */
+const FALLBACK_JAVA_RELEASE = 17;
+
+/**
+ * What `java -version` printed, or null when java could not be run. The
+ * version is on stderr, so both streams are handed to the parser.
+ *
+ * A source rather than a call so a test states the JDK instead of taking
+ * whichever one the machine happens to have -- `setGitSource` in journal.ts
+ * is the same shape, for the same reason.
+ */
+export type JavaVersionSource = () => string | null;
+
+function spawnJavaVersion(): string | null {
+  const result = spawnSync("java", ["-version"], { encoding: "utf8", windowsHide: true });
+  if (result.error !== undefined || result.status !== 0) return null;
+  return `${result.stderr ?? ""}${result.stdout ?? ""}`;
+}
+
+let javaVersionSource: JavaVersionSource = spawnJavaVersion;
+
+/** Install a java-version source; the returned function restores the real one. */
+export function setJavaSource(source: JavaVersionSource): () => void {
+  const previous = javaVersionSource;
+  javaVersionSource = source;
+  return () => {
+    javaVersionSource = previous;
+  };
+}
+
+/**
+ * The major release a `java -version` line names: 17 from `openjdk version
+ * "17.0.9"`, 8 from `java version "1.8.0_392"` (the 1.x scheme every JDK
+ * before 9 printed), null from anything this does not recognise.
+ */
+export function javaReleaseOf(output: string | null): number | null {
+  const match = /version\s+"(\d+)(?:\.(\d+))?/.exec(output ?? "");
+  if (match === null) return null;
+  const major = Number(match[1]);
+  if (major === 1) return match[2] === undefined ? null : Number(match[2]);
+  return Number.isInteger(major) && major > 1 ? major : null;
+}
+
 function dependencyXml(packageId: string, options: { version?: string | null; scope?: string } = {}): string[] {
   const { groupId, artifactId } = mavenCoordinates(packageId);
   return [
@@ -1630,6 +1678,22 @@ function rootFilesMaven(root: string, shape: SolutionShape): ScaffoldResult {
     groupId ??= pom.groupId;
   }
   const parentArtifact = `${basename(root).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "solution"}-parent`;
+  // The release the JDK doing the scaffolding can actually compile to. A
+  // constant here targeted a version half the machines that run this do not
+  // have, and every build then failed on a line the developer had to find
+  // and edit before anything worked.
+  const detected = javaReleaseOf(javaVersionSource());
+  const release = detected ?? FALLBACK_JAVA_RELEASE;
+  const releaseComment =
+    detected === null
+      ? [
+          "    <!-- No JDK answered `java -version` where this was scaffolded, so this is the",
+          `         stated default. Change it to the release your team builds against. -->`,
+        ]
+      : [
+          "    <!-- The JDK that scaffolded this solution (`java -version`). Written once and",
+          "         never rewritten: raise it when your team's JDK does. -->",
+        ];
   writeIfAbsent(
     root,
     "pom.xml",
@@ -1645,7 +1709,8 @@ function rootFilesMaven(root: string, shape: SolutionShape): ScaffoldResult {
       "         a tracked file; dabbler module pack builds each package under its dev version this way. -->",
       "    <revision>0.1.0-SNAPSHOT</revision>",
       "    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>",
-      "    <maven.compiler.release>21</maven.compiler.release>",
+      ...releaseComment,
+      `    <maven.compiler.release>${release}</maven.compiler.release>`,
       "  </properties>",
       "",
       "  <!-- A module is built from its own POM (mvn -f modules/<slug>/pom.xml), reaching this",
@@ -1747,6 +1812,18 @@ function rootFilesMaven(root: string, shape: SolutionShape): ScaffoldResult {
     result,
   );
   if (moduleDirs.length === 0) result.notes.push("no module holds a pom.xml yet, so the parent POM lists none; add each as it gets one");
+  // Only when the parent POM is this scaffold's: an existing one carries
+  // whatever release its team chose, and saying anything about it here
+  // would be a claim about a file nothing wrote.
+  if (result.written.includes("pom.xml")) {
+    result.notes.push(
+      detected === null
+        ? `pom.xml targets Java ${release}, the stated default: no JDK answered \`java -version\` here. ` +
+            "Change it to the release your team builds against."
+        : `pom.xml targets Java ${release}, the JDK that scaffolded it. It is written once and never ` +
+            "rewritten, so raise it when your team's JDK does.",
+    );
+  }
   return result;
 }
 

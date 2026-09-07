@@ -277,6 +277,15 @@ export function makeAnsweredRepo(
     // The worktree snapshot asks which index entries a sparse cone keeps off
     // disk (skip-worktree); this checkout is not sparse and has none.
     [["ls-files", "-v", "-z"], { stdout: "" }],
+    // The tracked files a surface digest enumerates: everything seeded, the
+    // same listing `ls-tree` answers with, so a digest over this repository
+    // is a digest over what the test wrote.
+    [
+      ["-c", "core.quotepath=false", "ls-files", "-z"],
+      () => ({ stdout: treeListing(repo).join("\0") }),
+    ],
+    // Everything seeded is tracked, so nothing is untracked-but-not-ignored.
+    [["-c", "core.quotepath=false", "ls-files", "--others"], { stdout: "" }],
     [
       ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"],
       withOrigin ? { stdout: "origin/main" } : { code: 128, stderr: "fatal: no upstream configured for branch 'main'" },

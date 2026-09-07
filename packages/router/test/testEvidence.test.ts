@@ -1,0 +1,315 @@
+// Test evidence: the suite declaration, the digest of a covered surface,
+// the run records and the freshness judgement, all from literal inputs.
+// The enumeration of a surface (git) and the record's digest against a
+// real tree are walked in walk-record.test.ts.
+import assert from "node:assert/strict";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { describe, it } from "node:test";
+
+import {
+  RecordError,
+  affectedSuites,
+  digestOfEntries,
+  freshnessVerdict,
+  loadSuitesChecked,
+  readRecords,
+  recordRun,
+  type SuiteSpec,
+  type TestRunRecord,
+} from "../src/testEvidence.ts";
+import { judgeFreshness } from "../src/gates.ts";
+import { gitAnswers, tempDir } from "./support/answers.ts";
+
+const UNIT: SuiteSpec = { name: "unit", command: "npm test", covers: ["src/"], expensive: true, runsWhole: false };
+
+describe("the digest of a covered surface", () => {
+  it("tracks content rather than order or time, and every byte counts", () => {
+    const a = digestOfEntries([["b.txt", Buffer.from("two")], ["a.txt", Buffer.from("one")]]);
+    assert.equal(a, digestOfEntries([["a.txt", Buffer.from("one")], ["b.txt", Buffer.from("two")]]));
+    assert.notEqual(a, digestOfEntries([["a.txt", Buffer.from("one ")], ["b.txt", Buffer.from("two")]]));
+    assert.notEqual(a, digestOfEntries([["a.txt", Buffer.from("one")]]));
+  });
+
+  it("is a function of the entries that remain, so a deletion moves it once and a marker could never move it again", () => {
+    // D170: `ls-files` still names a deleted tracked file; the reader omits
+    // it, and the digest of what remains is the digest an untouched tree of
+    // those same files would carry -- there is nothing for a later commit of
+    // the deletion to remove.
+    const both = digestOfEntries([["a.txt", Buffer.from("one")], ["b.txt", Buffer.from("two")]]);
+    const afterDeletingB = digestOfEntries([["a.txt", Buffer.from("one")]]);
+    assert.notEqual(afterDeletingB, both);
+    assert.equal(afterDeletingB, digestOfEntries([["a.txt", Buffer.from("one")]]));
+  });
+});
+
+describe("the suite declaration", () => {
+  it("reports every declaration error while still loading the suites that parse", () => {
+    const loaded = loadSuitesChecked({
+      testing: {
+        suites: [
+          { name: "unit", command: "npm test", covers: ["src/"], expensive: true },
+          { name: "", command: "x", covers: [] },
+          { name: "lint", covers: ["."] },
+          { name: "e2e", command: "npx e2e", covers: "not a list" },
+          { name: "extra", command: "x", covers: ["."], surprise: 1 },
+          "not a mapping",
+        ],
+      },
+    });
+    assert.equal(loaded.ok, false);
+    assert.deepEqual(loaded.suites.map((suite) => suite.name), ["unit", "extra"]);
+    assert.deepEqual(loaded.errors, [
+      "testing.suites[1].name must be a non-empty string",
+      "testing.suites[2].command must be a non-empty string",
+      "testing.suites[3].covers must be a list of path prefixes",
+      "testing.suites[4] has unknown key(s) ['surprise']",
+      "testing.suites[5] must be a mapping",
+      // `extra` parses, is not expensive, and covers the whole repository,
+      // which `unit`'s src/ does not reach.
+      "testing.suites 'extra' is not expensive and covers '.', which no expensive suite covers: " +
+        "its run would never be the run of record, and nothing would notice the run was missing. " +
+        "Declare it expensive, or cover '.' from a suite that is.",
+    ]);
+  });
+
+  it("reads no suites from no declaration and refuses one that is not a list", () => {
+    assert.deepEqual(loadSuitesChecked({}), { suites: [], errors: [], ok: true });
+    assert.deepEqual(loadSuitesChecked({ testing: { suites: {} } }).errors, ["testing.suites must be a list"]);
+  });
+
+  it("refuses a cheap suite alone over a path, by name, and accepts one beside an expensive suite that reaches it", () => {
+    // The flag gates the run of record AND the gate that would notice the
+    // run was missing: sessions 90 and 91 closed green over 1117 tests
+    // nobody ran because the router's suite had kept `expensive: false`
+    // from a tier session 88 retired.
+    const alone = loadSuitesChecked({
+      testing: { suites: [{ name: "quick", command: "npm run quick", covers: ["src/"] }] },
+    });
+    assert.equal(alone.ok, false);
+    assert.equal(alone.errors.length, 1);
+    assert.match(alone.errors[0] ?? "", /^testing\.suites 'quick' is not expensive and covers 'src\/'/);
+    assert.match(alone.errors[0] ?? "", /never be the run of record/);
+    const beside = loadSuitesChecked({
+      testing: {
+        suites: [
+          { name: "full", command: "npm test", covers: ["src/", "tests/"], expensive: true },
+          { name: "quick", command: "npm run quick", covers: ["src/lib/", "tests/"] },
+        ],
+      },
+    });
+    assert.equal(beside.ok, true, beside.errors.join("; "));
+    assert.deepEqual(beside.suites.map((suite) => suite.name), ["full", "quick"]);
+  });
+
+  it("reads the module vocabulary, defaults it, and refuses by suite what the role or the manifest cannot bear", () => {
+    const multi = {
+      multi: true,
+      implicit: false,
+      modules: [
+        { slug: "model", codeRoots: ["modules/model"], dependsOn: [] },
+        { slug: "listener", codeRoots: ["modules/listener"], dependsOn: ["model"] },
+      ],
+    } as unknown as Parameters<typeof loadSuitesChecked>[1] extends { shape?: infer S } ? NonNullable<S> : never;
+    const loaded = loadSuitesChecked(
+      {
+        testing: {
+          suites: [
+            { name: "model-unit", command: "dotnet test m", covers: ["modules/model/"], expensive: true, module: "model" },
+            { name: "listener-model", command: "dotnet test c", covers: ["modules/listener/contract/"], expensive: true, module: "listener", role: "consumer-contract", against: "model", required_for_close: false },
+            { name: "integration", command: "dotnet test i", covers: ["modules/listener/"], expensive: true, module: "listener", required_for_close: false },
+          ],
+        },
+      },
+      { shape: multi },
+    );
+    assert.equal(loaded.ok, true, loaded.errors.join("; "));
+    const [unit, consumer, integration] = loaded.suites;
+    // Defaults: a unit suite, demanded by the close because it is expensive.
+    assert.equal(unit?.role, "unit");
+    assert.equal(unit?.requiredForClose, true);
+    assert.equal(unit?.against, null);
+    assert.equal(consumer?.role, "consumer-contract");
+    assert.equal(consumer?.against, "model");
+    assert.equal(consumer?.requiredForClose, false);
+    assert.equal(integration?.requiredForClose, false);
+
+    const refused = loadSuitesChecked(
+      {
+        testing: {
+          suites: [
+            { name: "a", command: "x", covers: ["."], expensive: true, role: "consumer-contract" },
+            { name: "b", command: "x", covers: ["."], expensive: true, against: "model" },
+            { name: "c", command: "x", covers: ["."], expensive: true, module: "ghost" },
+            { name: "d", command: "x", covers: ["."], expensive: true, role: "smoke" },
+          ],
+        },
+      },
+      { shape: multi },
+    );
+    assert.deepEqual(refused.errors, [
+      "testing.suites[0] ('a') is a consumer-contract suite and must say which provider it runs against",
+      "testing.suites[1] ('b') names 'against', which only a consumer-contract suite does",
+      "testing.suites[2] ('c') names module 'ghost', which docs/modules.yaml does not declare",
+      "testing.suites[3].role must be one of unit, provider-contract, consumer-contract",
+    ]);
+
+    // A single-module solution is not asked about a vocabulary it does not
+    // use: the same undeclared slug loads, unconsulted.
+    const single = loadSuitesChecked(
+      { testing: { suites: [{ name: "c", command: "x", covers: ["."], expensive: true, module: "ghost" }] } },
+      { shape: { multi: false, implicit: true, modules: [] } as unknown as typeof multi },
+    );
+    assert.equal(single.ok, true);
+  });
+
+  it("puts a module's contract bundle under its suites' covers by derivation, in a multi-module shape only", () => {
+    const shape = {
+      multi: true,
+      implicit: false,
+      modules: [{ slug: "model", codeRoots: ["modules/model"], dependsOn: [] }],
+    } as unknown as NonNullable<Parameters<typeof loadSuitesChecked>[1]>["shape"];
+    const declared = { name: "model-unit", command: "dotnet test", covers: ["modules/model/src/"], expensive: true, module: "model" };
+    const multi = loadSuitesChecked({ testing: { suites: [declared] } }, { shape });
+    assert.deepEqual(multi.suites[0]?.covers, ["modules/model/src/", "modules/model/contract/"]);
+    // Declared already: not doubled. Single-module: not derived.
+    const already = loadSuitesChecked(
+      { testing: { suites: [{ ...declared, covers: ["modules/model/"] , module: "model" }] } },
+      { shape },
+    );
+    assert.deepEqual(already.suites[0]?.covers, ["modules/model/", "modules/model/contract/"]);
+    const explicit = loadSuitesChecked(
+      { testing: { suites: [{ ...declared, covers: ["modules/model/src/", "modules/model/contract/"] }] } },
+      { shape },
+    );
+    assert.deepEqual(explicit.suites[0]?.covers, ["modules/model/src/", "modules/model/contract/"]);
+    const single = loadSuitesChecked(
+      { testing: { suites: [declared] } },
+      { shape: { ...(shape as object), multi: false } as typeof shape },
+    );
+    assert.deepEqual(single.suites[0]?.covers, ["modules/model/src/"]);
+  });
+});
+
+describe("which suites a change affects", () => {
+  it("intersects the change with each suite's covers and drops the session's own bookkeeping", () => {
+    const docs: SuiteSpec = { ...UNIT, name: "docs", covers: ["docs/"] };
+    const affected = affectedSuites(["src/a.ts", "docs/sessions/sessions.json", "docs/guide.md"], [UNIT, docs], {
+      sessionsRel: "docs/sessions",
+    });
+    assert.deepEqual([...affected.entries()], [["unit", ["src/a.ts"]], ["docs", ["docs/guide.md"]]]);
+  });
+});
+
+function record(overrides: Partial<TestRunRecord>): TestRunRecord {
+  return {
+    suite: "unit", command: "npm test", outcome: "passed", surfaceDigest: "d1", recordedAt: "2026-01-01T00:00:00+00:00",
+    stage: "final-full", treeDigest: "", policy: "", policyReason: "", selectedTests: [], sessionNumber: null,
+    detail: "", durationSeconds: 1, ...overrides,
+  };
+}
+
+describe("judging a suite's freshness", () => {
+  const facts = (records: TestRunRecord[], current: string | null = "d1", tree = "t1"): Parameters<typeof freshnessVerdict>[1] => ({
+    changed: ["src/a.ts"], current, records, currentTree: () => tree,
+  });
+
+  it("fails closed when the surfaces could not be digested", () => {
+    assert.match(freshnessVerdict(UNIT, facts([], null)).reason, /could not digest/);
+  });
+
+  it("refuses when no run of record exists, naming the command and the record to make, and never accepts a targeted run instead", () => {
+    const none = freshnessVerdict(UNIT, facts([]));
+    assert.equal(none.passed, false);
+    assert.match(none.reason, /no final-full run of record exists; run `npm test` after your last code change/);
+    assert.match(none.reason, /--suite unit --stage final-full --outcome passed/);
+    const targeted = freshnessVerdict(UNIT, facts([record({ stage: "preverify-targeted" })]));
+    assert.match(targeted.reason, /1 preverify-targeted record\(s\) are present; a targeted run precedes verification/);
+  });
+
+  it("refuses a record that predates a change to the surfaces it covers", () => {
+    assert.match(freshnessVerdict(UNIT, facts([record({ surfaceDigest: "old" })])).reason, /PREDATES a change/);
+  });
+
+  it("refuses a fresh record whose outcome was red", () => {
+    assert.match(freshnessVerdict(UNIT, facts([record({ outcome: "failed" })])).reason, /outcome is 'failed'/);
+  });
+
+  it("refuses a green record the tree moved under, and binds only when the record named a tree", () => {
+    assert.match(freshnessVerdict(UNIT, facts([record({ treeDigest: "t0" })])).reason, /the tree moved under it/);
+    assert.equal(freshnessVerdict(UNIT, facts([record({ treeDigest: "t1" })])).passed, true);
+    assert.equal(freshnessVerdict(UNIT, facts([record({})])).passed, true);
+  });
+
+  it("passes a fresh green record and says when it was recorded, judging by the latest of the suite's records", () => {
+    const verdict = freshnessVerdict(UNIT, facts([record({ surfaceDigest: "old" }), record({ recordedAt: "later" })]));
+    assert.deepEqual(verdict, { suite: "unit", required: true, passed: true, reason: "fresh, green, recorded later", changedInputs: ["src/a.ts"] });
+  });
+
+  it("judges a suite run for information and never demands it", () => {
+    // `required_for_close: false` on an expensive suite: it runs as the run
+    // of record and its verdict is on the record, but a stale or red one
+    // refuses nothing. The one flag used to mean both.
+    const information: SuiteSpec = { ...UNIT, name: "integration", requiredForClose: false };
+    const verdict = freshnessVerdict(information, facts([]));
+    assert.equal(verdict.passed, false);
+    assert.equal(verdict.required, false);
+    assert.deepEqual(judgeFreshness([verdict]), [true, ""]);
+    // Absent, the word means what `expensive` meant.
+    assert.equal(freshnessVerdict(UNIT, facts([])).required, true);
+  });
+});
+
+describe("the run record", () => {
+  // The writer digests the covered surfaces through git: an empty listing
+  // answers every question here.
+  gitAnswers([
+    [["-c", "core.quotepath=false", "ls-files"], { stdout: "" }],
+    [["rev-parse", "--show-toplevel"], (_args, root) => ({ stdout: root.split("\\").join("/") })],
+  ]);
+  const options = { stage: "preverify-targeted", durationSeconds: 1.5, command: "npm test -- a", policy: "targeted" };
+
+  it("is strict at the write boundary about outcome, stage and duration", () => {
+    const root = tempDir();
+    assert.throws(() => recordRun(root, UNIT, "green", { ...options, repoRoot: root }), /outcome must be one of/);
+    assert.throws(() => recordRun(root, UNIT, "passed", { ...options, stage: "sometime", repoRoot: root }), /stage must be one of/);
+    assert.throws(() => recordRun(root, UNIT, "passed", { ...options, durationSeconds: 0, repoRoot: root }), /duration_seconds must be a positive finite number, got 0\.0/);
+  });
+
+  it("requires a targeted record to name its command and its policy, and a final-full one to name neither", () => {
+    const root = tempDir();
+    assert.throws(() => recordRun(root, UNIT, "passed", { ...options, command: " ", repoRoot: root }), /must name the command that ran/);
+    assert.throws(() => recordRun(root, UNIT, "passed", { ...options, policy: "whim", repoRoot: root }), /policy must be one of/);
+    assert.throws(() => recordRun(root, UNIT, "passed", { stage: "final-full", durationSeconds: 1, command: "npm test", repoRoot: root }), /caller-supplied command does not apply/);
+  });
+
+  it("records that the selector ran and chose nothing without claiming a run, and refuses that as a run of record", () => {
+    const root = tempDir();
+    assert.throws(() => recordRun(root, UNIT, "none-selected", { ...options, repoRoot: root }), /names no command, because nothing ran/);
+    assert.throws(
+      () => recordRun(root, UNIT, "none-selected", { stage: "final-full", durationSeconds: 1, repoRoot: root }),
+      /cannot be a run that did not happen/,
+    );
+    const row = recordRun(root, UNIT, "none-selected", { stage: "preverify-targeted", durationSeconds: 1, policy: "none-selected", repoRoot: root });
+    assert.equal(row.outcome, "none-selected");
+    assert.equal(readRecords(root).length, 1);
+  });
+
+  it("writes the duration as the float it is, and reads back leniently, dropping a stage or policy it does not recognise", () => {
+    const root = tempDir();
+    recordRun(root, UNIT, "passed", { ...options, durationSeconds: 2, repoRoot: root });
+    const path = join(root, ".dabbler", "runs", "test-runs.jsonl");
+    mkdirSync(join(root, ".dabbler", "runs"), { recursive: true });
+    writeFileSync(
+      path,
+      '{"suite": "unit", "surfaceDigest": "x", "stage": "someday", "policy": "whim", "durationSeconds": 2.0}\n{ not json\n{"suite": 3}\n',
+      "utf8",
+    );
+    const [row] = readRecords(root);
+    assert.equal(readRecords(root).length, 1);
+    assert.equal(row.stage, "");
+    assert.equal(row.policy, "");
+    assert.equal(row.durationSeconds, 2);
+    assert.ok(RecordError.name);
+  });
+});

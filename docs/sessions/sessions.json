@@ -2253,9 +2253,9 @@
     {
       "number": 114,
       "title": "The deployables block, built",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-07T14:49:09.646000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-09-07T15:14:41.908000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

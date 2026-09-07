@@ -2069,9 +2069,9 @@
     {
       "number": 105,
       "title": "Module-scoped sessions, the hard verifier scope, the exposure manifest and grants",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-06T22:19:41.833000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-09-06T23:03:10.525000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

@@ -2313,9 +2313,9 @@
     {
       "number": 117,
       "title": "Session 117",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-07T15:53:19.353000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-09-07T16:03:21.150000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

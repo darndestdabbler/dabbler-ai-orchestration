@@ -195,6 +195,7 @@ export async function modulesVerb(argv: string[]): Promise<number> {
     try {
       const files = ensureRootFiles(workspaceRoot, solutionShape(workspaceRoot));
       for (const path of files?.written ?? []) writeOut(`wrote ${path}\n`);
+      for (const path of files?.changed ?? []) writeOut(`updated ${path}\n`);
       for (const note of files?.notes ?? []) writeOut(`note: ${note}\n`);
     } catch (error) {
       if (!(error instanceof EcosystemError)) throw error;

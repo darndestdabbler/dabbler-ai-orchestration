@@ -53,6 +53,14 @@ export interface SurfaceEntry {
 export interface ScaffoldResult {
   readonly written: readonly string[];
   readonly skipped: readonly string[];
+  /**
+   * Files that already existed and gained something -- only `.gitignore`,
+   * which is a list of rules rather than a document this framework authors.
+   * A file created from nothing is `written`; saying "wrote .gitignore" of
+   * a file bootstrap wrote and this scaffold appended two lines to would be
+   * a claim about who owns it.
+   */
+  readonly changed?: readonly string[];
   /** Anything the scaffold could not place and says so about. */
   readonly notes: readonly string[];
 }
@@ -815,6 +823,43 @@ function dotnetProjects(root: string, entry: ModuleEntry, packageId: string): {
     null;
   const tests = projects.find((file) => isTest(file) && !/\.Compatibility\.csproj$/.test(file)) ?? null;
   return { implementation, tests };
+}
+
+/**
+ * Ensure each rule is in the repository's `.gitignore`, appending the ones
+ * that are missing and leaving everything else exactly as it is.
+ *
+ * A rule, not a file. Every other root file here is a whole document this
+ * framework authors, and `writeIfAbsent` is right for those: a parent POM
+ * somebody else wrote is theirs. A `.gitignore` is a list of independent
+ * lines with no owner, and `dabbler bootstrap` has already written one by
+ * the time a module is packed -- so write-once meant these rules were never
+ * written at all, which is exactly how they were measured missing on the
+ * second walk of the Java walkthrough.
+ */
+function ensureIgnoreRules(
+  root: string,
+  rules: readonly string[],
+  why: string,
+  result: { written: string[]; skipped: string[]; changed: string[] },
+): void {
+  const path = join(root, ".gitignore");
+  const existing = existsSync(path) ? readFileSync(path, "utf8") : null;
+  // Trailing whitespace and the carriage return are not part of a pattern;
+  // LEADING whitespace is, so a line of `  target/` does not ignore
+  // `target/` and must not be read as though it did.
+  const lines = (existing ?? "").split("\n").map((line) => line.replace(/\s+$/, ""));
+  const missing = rules.filter((rule) => !lines.includes(rule));
+  if (missing.length === 0) {
+    result.skipped.push(".gitignore");
+    return;
+  }
+  const separator = existing === null || existing === "" ? "" : existing.endsWith("\n") ? "\n" : "\n\n";
+  writeFileSync(path, `${existing ?? ""}${separator}${why}\n${missing.join("\n")}\n`, "utf8");
+  // Created, or somebody else's file that gained two lines. The second is
+  // the ordinary case -- bootstrap writes `.gitignore` before any module is
+  // packed -- and calling it "wrote" would misreport the normal path.
+  (existing === null ? result.written : result.changed).push(".gitignore");
 }
 
 function writeIfAbsent(root: string, rel: string, text: string, result: { written: string[]; skipped: string[] }): void {
@@ -1667,7 +1712,12 @@ const MAVEN: Ecosystem = {
  * plugins managed), and the packages folder's attributes and README.
  */
 function rootFilesMaven(root: string, shape: SolutionShape): ScaffoldResult {
-  const result = { written: [] as string[], skipped: [] as string[], notes: [] as string[] };
+  const result = {
+    written: [] as string[],
+    skipped: [] as string[],
+    changed: [] as string[],
+    notes: [] as string[],
+  };
   const moduleDirs: string[] = [];
   let groupId: string | null = null;
   for (const entry of shape.modules) {
@@ -1816,18 +1866,13 @@ function rootFilesMaven(root: string, shape: SolutionShape): ScaffoldResult {
   // both sit under the module's own code roots. A source digest taken over
   // those roots then moves with the BUILD, so packing an unchanged module
   // twice gave it two dev versions, which is the one thing the immutable
-  // version exists to prevent. Written once, like every root file here.
-  writeIfAbsent(
+  // version exists to prevent.
+  ensureIgnoreRules(
     root,
-    ".gitignore",
-    [
-      "# Maven's own output, which lands inside the module it built. A module's",
-      "# source digest is taken over its code roots, so an unignored target/ makes",
-      "# the same source pack to a new dev version every time.",
-      "target/",
-      ".flattened-pom.xml",
-      "",
-    ].join("\n"),
+    ["target/", ".flattened-pom.xml"],
+    "# Maven's own output, which lands inside the module it built. A module's " +
+      "source\n# digest is taken over its code roots, so an unignored target/ makes the same\n" +
+      "# source pack to a new dev version every time.",
     result,
   );
   if (moduleDirs.length === 0) result.notes.push("no module holds a pom.xml yet, so the parent POM lists none; add each as it gets one");

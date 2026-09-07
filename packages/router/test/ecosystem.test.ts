@@ -118,23 +118,35 @@ describe("the Maven side of the seam", () => {
     assert.equal(javaReleaseOf("no java here"), null);
   });
 
-  it("ignores Maven's own output, which lands inside the module it built, and leaves an existing ignore file alone", () => {
-    // Measured on the Java walk: mvn writes modules/<slug>/target/ and
-    // .flattened-pom.xml under the module's own code roots, so the source
-    // digest moved with the build and the same source packed to a new dev
-    // version every time.
+  it("adds Maven's output to an ignore file somebody else already wrote, keeping what it says", () => {
+    // Measured twice on the Java walkthrough. First: mvn writes
+    // modules/<slug>/target/ and .flattened-pom.xml under the module's own
+    // code roots, so the source digest moved with the build and the same
+    // source packed to a new dev version every time. Then, after the fix:
+    // `dabbler bootstrap` writes .gitignore before any module is packed, so
+    // a write-once scaffold skipped the file and the rules never appeared.
     const { root, shape } = mavenSolution();
-    ensureRootFiles(root, shape);
+    const bootstrapped = "# machine-side state\n.dabbler/\n";
+    seed(root, { ".gitignore": bootstrapped });
+    const first = ensureRootFiles(root, shape);
+    // Somebody else's file that gained two lines is CHANGED, not written:
+    // bootstrap wrote it, and this scaffold does not claim it.
+    assert.ok(first?.changed?.includes(".gitignore"), (first?.changed ?? []).join(", "));
+    assert.ok(!first?.written.includes(".gitignore"));
     const ignore = readFileSync(join(root, ".gitignore"), "utf8");
     assert.match(ignore, /^target\/$/m);
     assert.match(ignore, /^\.flattened-pom\.xml$/m);
+    // Theirs is still there, and still first.
+    assert.ok(ignore.startsWith(bootstrapped), ignore);
+  });
 
-    const own = mavenSolution();
-    const theirs = "# ours\nbuild/\n";
-    seed(own.root, { ".gitignore": theirs });
-    const second = ensureRootFiles(own.root, own.shape);
+  it("adds nothing the second time, and says the file was skipped", () => {
+    const { root, shape } = mavenSolution();
+    ensureRootFiles(root, shape);
+    const written = readFileSync(join(root, ".gitignore"), "utf8");
+    const second = ensureRootFiles(root, shape);
     assert.ok(second?.skipped.includes(".gitignore"), second?.skipped.join(", "));
-    assert.equal(readFileSync(join(own.root, ".gitignore"), "utf8"), theirs);
+    assert.equal(readFileSync(join(root, ".gitignore"), "utf8"), written);
   });
 
   it("lays the root files, packs one reactor per module into the file repository under the dev version, and manages the one pin in the parent POM", () => {

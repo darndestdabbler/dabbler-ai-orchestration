@@ -557,6 +557,7 @@ function packSubcommand(rest: readonly string[]): number {
   try {
     const rootFiles = ensureRootFiles(workspaceRoot, shape);
     for (const path of rootFiles?.written ?? []) writeOut(`wrote ${path}\n`);
+    for (const path of rootFiles?.changed ?? []) writeOut(`updated ${path}\n`);
     result = packModule(workspaceRoot, shape, slug, {
       session,
       config: loadConfig(undefined, workspaceRoot),
@@ -701,6 +702,7 @@ function contract(root: string, slug: string, against: string | null): number {
     // packages centrally, and the central pins live in one of them.
     const rootFiles = ensureRootFiles(root, shape);
     for (const path of rootFiles?.written ?? []) writeOut(`wrote ${path}\n`);
+    for (const path of rootFiles?.changed ?? []) writeOut(`updated ${path}\n`);
     result = ecosystemOf(root, entry).scaffoldContract(root, entry, provider);
   } catch (error) {
     if (!(error instanceof EcosystemError)) throw error;

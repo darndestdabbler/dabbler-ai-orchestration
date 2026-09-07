@@ -6045,3 +6045,52 @@ bootstrap's message before a declaration names the commit and after it names
 the land; and the suite writer creates an absent `dabbler.yaml` and refuses
 to duplicate a suite that already stands. The document corrections are
 checked as the UAT documents already are, by a script that reads them.
+
+### Session 117 of 117: The ignore rule that never fires
+
+Session 115 made the Maven root scaffold write a `.gitignore` for `target/`
+and `.flattened-pom.xml`, and the walk that follows session 116 proved the
+fix does not reach the flow it was written for.
+
+**Measured, 2026-09-07, in `C:\temp\uat-java2`, on the router built from
+session 116.** The corrected walkthrough now runs `dabbler bootstrap` before
+the first session — which is the point of the correction — and bootstrap
+writes `.gitignore` itself, carrying the one rule it cares about:
+
+```
+# Dabbler router machine-side state: ...
+.dabbler/
+```
+
+`rootFilesMaven` then calls `writeIfAbsent(root, ".gitignore", ...)`, which
+skips a file that exists. So the two Maven rules are never written, and the
+defect session 115 set out to fix stands exactly as it was:
+
+```
+packed model 0.1.0-dev.20260907.1.ga6aac5f
+packed model 0.1.0-dev.20260907.2.g6bf2ac2   <- the same tree, packed again
+?? modules/model/.flattened-pom.xml
+?? modules/model/target/
+```
+
+**The fix, and it is the one the framework already uses on itself.**
+`ensureGitignore` in `packages/router/src/bootstrap/detect.ts` does not write
+a file, it ensures a RULE: it appends when the rule is missing, leaves an
+equivalent rule alone, and creates the file when there is none. The Maven
+scaffold needs that, not write-once. Give the ignore rules their own helper
+beside `writeIfAbsent` — ensure each named rule is present, append the ones
+that are not, create the file when absent — and report the file as written
+when it was created, as changed when a rule was added, and as skipped when
+every rule already stood.
+
+**Why this is not a special case of `writeIfAbsent`.** Every other root file
+is a whole document this framework authors: a parent POM somebody else wrote
+is theirs, and overwriting it would be vandalism. A `.gitignore` is a list of
+independent lines with no owner, which is exactly why bootstrap treats it as
+one and why session 95's rule for it — add the rule, never rewrite the file —
+is the right one here too.
+
+**Tests.** Two in `packages/router/test/ecosystem.test.ts`, replacing the
+write-once pair added in session 115: a `.gitignore` carrying only
+`.dabbler/` gains both Maven rules and keeps its own line, and a second
+scaffold over the result adds nothing and reports the file skipped.

@@ -149,6 +149,7 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 109 | Layer 3 runs, and the Solution Explorer fills itself in | no | 2026-09-07 |
 | 110 | The operator's walk, driven by a browser | no | 2026-09-07 |
 | 111 | The application module that can never close | no | 2026-09-07 |
+| 112 | The UAT walkthroughs, and what a solution ships | no | 2026-09-07 |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -1993,3 +1994,9 @@ Land the CSV four-module walkthrough as a browser-driven check: a committed corp
 **Releasable: no.**
 
 Fix candidateSubcommand in packages/router/src/cli/module.ts so an application module's bundle record is written only when the session that asked for the candidate declared itself releasable, mirroring drive.ts's bundleCandidates (which already calls sessionIsReleasable before naming any application to bundle). module pack only ever writes dev-versioned pins and nothing in this repository releases a user's module, so the ungated write refused every not-releasable session that touched an application module, forever. The package-less skip (an application with no package has nothing to pack or contract) now applies unconditionally, outside the releasability gate, so a not-releasable application session's candidate still succeeds and simply writes no bundle. Add two tests to packages/router/test/cli.test.ts: a not-releasable session's candidate succeeds with no bundle record, and a releasable session's candidate still writes the bundle for a released dependency and still refuses a dev-versioned one.
+
+### Session 112 — The UAT walkthroughs, and what a solution ships
+
+**Releasable: no.**
+
+Land the two dogfooded UAT walkthroughs (.NET and Java) verbatim under docs/uat/, link them from README.md the same way docs/quick-start.md and docs/driving-a-session.md already are, confirm the .NET document's two opening commands still behave as written, and write docs/design/deployables.md recording the design for a deployables: block -- what it would declare, the four rules it would hold to, and what it explicitly is not -- with no change to the manifest reader or any other implementation.

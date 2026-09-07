@@ -50,6 +50,12 @@ for the driven one — what happens when you press **Start Session** in the
 Work Explorer and the framework runs the session itself, calling the engine
 once per step.
 
+Two UAT walkthroughs build a small multi-module solution end to end, from an
+empty folder to a running program, with every expected output captured from
+a real run: [docs/uat/uat-dotnet-json-solution.md](docs/uat/uat-dotnet-json-solution.md)
+(.NET) and [docs/uat/uat-java-json-solution.md](docs/uat/uat-java-json-solution.md)
+(Java, Maven and Spring).
+
 ## Install
 
 Install the VS Code extension and a project needs nothing else:

@@ -1,4 +1,4 @@
-# STATUS — the modules block (sessions 100–108) is running unattended; session 102 closed VERIFIED, session 103 next
+# STATUS — the modules block (sessions 100–108), PAUSED after session 103 (closed VERIFIED); session 104 next, on the operator's word
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
 
@@ -17,14 +17,70 @@
 > | 100 | solution plan and module manifest; the six-step workflow deleted | CLOSED VERIFIED, landed 19d621c5 |
 > | 101 | module configuration, the exception schema, the test-impact vocabulary | CLOSED VERIFIED, landed 33557781 |
 > | 102 | designed contracts and contract-test source; the ecosystem seam | CLOSED VERIFIED, landed 594bca00 |
-> | 103 | committed immutable packages | next |
-> | 104 | the focused checkout and the Windows preflight | planned |
+> | 103 | committed immutable packages | CLOSED VERIFIED, landed 6e2b9b73 |
+> | 104 | the focused checkout and the Windows preflight | next |
 > | 105 | module-scoped sessions, the hard verifier scope, exposure, grants | planned |
 > | 106 | the impact plan and the selected run of record | planned |
 > | 107 | the atomic land | planned |
 > | 108 | Maven parity and the hardened profiles | planned |
 >
 > One operating failure on the record: session 101's second round finished at 17:18 and the loop idled until 20:06, because the background waiter's completion never woke the orchestrator. The rule since: every framework wait is driven from a foreground loop that polls the job's status file, and the run state is checked at the start of every turn.
+>
+> PAUSED after session 103 on the operator's instruction (2026-09-06, 21:15): the next chat session continues with `dabbler session start --sessions-dir docs/sessions --engine claude-code --provider anthropic` for session 104, whose plan section is in place; the router and extension on this machine are 2.0.7, built from the tree session 103 landed. Every framework wait is driven from a foreground loop (the scratchpad's drive-waits.sh pattern), never from a background waiter.
+
+> ## SESSION 103 CLOSED, 2026-09-06, VERIFIED (round 3, gpt-5.4 over the seat, one dispute withdrawn; landed 6e2b9b73) -- committed immutable packages
+>
+> Four steps, .NET first through the ecosystem seam, nothing asked of a
+> single-module solution. **The root build files appear with the second
+> module** (`ensureRootFiles`, called by `modules create` after the write
+> and by `module contract` and `module pack` before their work), each
+> written only where absent: `nuget.config` with the `packages` source by
+> relative path, `Directory.Packages.props` with central management on,
+> `Directory.Build.props` with Source Link off under `DABBLER_DRIVEN`,
+> `Directory.Build.targets` importing the untracked `.dabbler/overlay.targets`
+> when it exists (a *targets* file: props load before a project's items),
+> `packages/.gitattributes` with the LFS line commented for the ceiling to
+> turn on, and `packages/README.md`; a solution whose modules are still
+> empty folders is told the files wait for the first project file. **The
+> dev version** (`packages.ts`) is `<base>-dev.<yyyymmdd>.<n>.g<digest7>`:
+> the same tree answers with its own version, a moved tree takes the next
+> number for the day and sorts after by NuGet's numeric ordering; the
+> **correspondence record** `packages/<Package>.<version>.json` carries the
+> source digest, the contract digest, the session and the *base* commit;
+> **the pin** is the one unconditioned `PackageVersion` in
+> `Directory.Packages.props`, replaced in place, added under the `Modules`
+> group, a conditioned or duplicated entry refused by name. **`dabbler
+> module pack <slug>`** refuses a single-module solution, a module without
+> a package and a module whose source is not on this disk (naming the
+> grant); digests the roots and the contract folder; runs the module's
+> declared pack once with `{output}` and `{version}` (a declared pack that
+> cannot take `{version}` is refused by name, never passed over) or the
+> ecosystem's default per packable project (`dotnet pack ... -o packages
+> -p:PackageVersion=<v>`; test projects, compatibility suites and
+> `IsPackable=false` projects excluded); refuses a target that left no
+> package; pins each id and records each. **The ceiling**
+> (`modules.packages.ceilingBytes`, default 5 MiB) refuses a package over it
+> unless the feed is under LFS, names both ways out, and leaves no pin, no
+> record and no artifact. Six router tests over a scripted `dotnet`.
+>
+> **The real toolchain was the pack step's own check** (`.dabbler/scratch/
+> check-module-pack.mjs`): a copy of the POC repository, `module pack
+> model` with the router run from source, the pin moved, `dotnet restore`
+> and `dotnet build` of the persister's tests against the package just
+> committed, then `module pack persister` -- and it found the scaffolded
+> `Directory.Build.targets` carrying `--debug` inside an XML comment, which
+> MSBuild refuses; fixed before the step was reported.
+>
+> **Three rounds.** Round 1: a declared pack without `{version}` was
+> silently ignored (now refused by name); the test did not assert what a
+> consumer's restore reads (it does: the feed `nuget.config` names, the pin,
+> the artifact under that id and version); `module pack` let a
+> configuration error escape as a stack trace (every refusal prints as one
+> line). Round 2 asked for a test that runs a real consumer restore, which
+> the block's committed test budget forbids ("no test runs `dotnet` or
+> `mvn`; the real toolchains are exercised by a step's own check"); disputed
+> with the budget and the check on the record, and withdrawn in round 3.
+> Router suite 1,098 tests (1,094 passing, 4 skipped), extension 196.
 
 > ## SESSION 102 CLOSED, 2026-09-06, VERIFIED (round 5, gpt-5.4 over the seat, cap raised to 5 on the record; landed 594bca00) -- designed contracts and contract-test source, and the ecosystem seam
 >

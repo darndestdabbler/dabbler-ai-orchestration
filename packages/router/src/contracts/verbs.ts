@@ -53,7 +53,7 @@ export const VERBS: readonly VerbSpec[] = [
     // grants as the block adds them.
     verb: "module",
     extensionFacing: false,
-    summary: "one module's seam: scaffold its designed contract",
+    summary: "one module: scaffold its designed contract, pack its committed package",
   },
   {
     verb: "affected",

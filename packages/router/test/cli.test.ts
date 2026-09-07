@@ -320,7 +320,7 @@ describe("dabbler modules", () => {
 
 describe("dabbler module", () => {
   it("refuses a subcommand it does not have, and a contract in a single-module solution", async () => {
-    const unknown = await run(() => moduleVerb(["pack", tempDir("cli-")]));
+    const unknown = await run(() => moduleVerb(["retire", tempDir("cli-")]));
     assert.equal(unknown.code, 2);
     assert.match(unknown.err, /is not a subcommand/);
     // The repository is the module: there is no seam to scaffold.

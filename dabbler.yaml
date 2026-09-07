@@ -447,6 +447,11 @@ testing:
         select:
           - packages/router/test/ecosystem.test.ts
           - packages/router/test/contractdoc.test.ts
+      # Committed immutable packages: the dev version, the central pin and
+      # the correspondence record.
+      - when: packages/router/src/packages.ts
+        select:
+          - packages/router/test/packages.test.ts
       - when: packages/router/src/pythonJson.ts
         select:
           - packages/router/test/lockfile.test.ts

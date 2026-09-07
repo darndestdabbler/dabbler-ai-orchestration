@@ -2,11 +2,11 @@
 // contain, and the refusals -- neither, both, and Maven until session 108.
 
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it } from "node:test";
 
-import { EcosystemError, ecosystemNamed, ecosystemOf } from "../src/ecosystem.ts";
+import { EcosystemError, ecosystemNamed, ecosystemOf, ensureRootFiles } from "../src/ecosystem.ts";
 import { parseEntries } from "../src/modules.ts";
 import { seed, tempDir } from "./support/answers.ts";
 
@@ -54,6 +54,50 @@ describe("the ecosystem seam", () => {
     );
     assert.throws(() => ecosystemNamed("maven").contractProjectNames("com.example:reports"), /session 108/);
     assert.throws(() => ecosystemNamed("maven").readSurface(root, reports!, "reports"), /session 108/);
+  });
+});
+
+describe("the root build files", () => {
+  it("appear with the second module, are never rewritten, and never appear for one", () => {
+    const root = tempDir("roots-");
+    seed(root, {
+      "modules/model/src/CsvModel/CsvModel.csproj": "<Project />\n",
+      "modules/persister/README.md": "an empty module folder, no project yet\n",
+    });
+    const entries = (slugs: string[]) =>
+      ({
+        multi: slugs.length > 1,
+        implicit: false,
+        modules: slugs.map((slug) => ({ slug, codeRoots: [`modules/${slug}`], dependsOn: [] })),
+      }) as unknown as Parameters<typeof ensureRootFiles>[1];
+    // One module: nothing, ever.
+    assert.equal(ensureRootFiles(root, entries(["model"])), null);
+    // Two: the six files, from the ecosystem of the first module that holds
+    // a project file; the empty folder does not decide anything.
+    const second = ensureRootFiles(root, entries(["persister", "model"]));
+    assert.deepEqual(second?.written, [
+      "nuget.config",
+      "Directory.Packages.props",
+      "Directory.Build.props",
+      "Directory.Build.targets",
+      "packages/.gitattributes",
+      "packages/README.md",
+    ]);
+    assert.match(readFileSync(join(root, "nuget.config"), "utf8"), /value="packages"/);
+    assert.match(readFileSync(join(root, "Directory.Build.targets"), "utf8"), /\.dabbler\/overlay\.targets/);
+    assert.match(readFileSync(join(root, "Directory.Build.props"), "utf8"), /EnableSourceLink Condition="'\$\(DABBLER_DRIVEN\)' != ''">false/);
+    // A third entry rewrites nothing: an edited props file stays edited.
+    writeFileSync(join(root, "Directory.Packages.props"), "<Project><!-- mine --></Project>\n", "utf8");
+    const third = ensureRootFiles(root, entries(["persister", "model", "listener"]));
+    assert.deepEqual(third?.written, []);
+    assert.equal(third?.skipped.length, 6);
+    assert.match(readFileSync(join(root, "Directory.Packages.props"), "utf8"), /mine/);
+    // Two modules that are still empty folders: the files wait, and say so.
+    const bare = tempDir("roots-");
+    seed(bare, { "modules/a/README.md": "\n", "modules/b/README.md": "\n" });
+    const waiting = ensureRootFiles(bare, entries(["a", "b"]));
+    assert.deepEqual(waiting?.written, []);
+    assert.match(waiting?.notes[0] ?? "", /wait for the first one that does/);
   });
 });
 

@@ -563,6 +563,8 @@ export function moduleConfigs(
   }
   const declared = new Set(entries.map((entry) => entry.slug));
   for (const [slug, value] of Object.entries(raw)) {
+    // `modules.packages` is the feed's own block, not a module's.
+    if (slug === "packages") continue;
     const where = `dabbler.yaml: modules.${slug}`;
     if (!declared.has(slug)) {
       throw new ManifestError(
@@ -603,6 +605,30 @@ export function moduleConfigs(
     });
   }
   return out;
+}
+
+/** Five MiB: a committed package larger than this goes under LFS or is refused. */
+export const DEFAULT_PACKAGES_CEILING_BYTES = 5 * 1024 * 1024;
+
+/**
+ * `modules.packages.ceilingBytes` from the configuration: the largest
+ * package the committed feed takes without LFS. Absent is the default; a
+ * value that is not a positive integer is refused by name rather than
+ * read as zero or as no ceiling at all.
+ */
+export function packagesCeiling(config: unknown): number {
+  if (!isRecord(config)) return DEFAULT_PACKAGES_CEILING_BYTES;
+  const modules = config["modules"];
+  if (!isRecord(modules)) return DEFAULT_PACKAGES_CEILING_BYTES;
+  const packages = modules["packages"];
+  if (packages === null || packages === undefined) return DEFAULT_PACKAGES_CEILING_BYTES;
+  if (!isRecord(packages)) throw new ManifestError("dabbler.yaml: modules.packages must be a mapping");
+  const ceiling = packages["ceilingBytes"];
+  if (ceiling === null || ceiling === undefined) return DEFAULT_PACKAGES_CEILING_BYTES;
+  if (typeof ceiling !== "number" || !Number.isInteger(ceiling) || ceiling < 1) {
+    throw new ManifestError("dabbler.yaml: modules.packages.ceilingBytes must be a positive integer");
+  }
+  return ceiling;
 }
 
 /** What `dabbler modules show` prints: the shape, with `usedBy` derived per module. */

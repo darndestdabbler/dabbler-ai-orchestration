@@ -8,7 +8,8 @@
 // the shape, the entries in dependency order, and `usedBy` derived. Rename,
 // delete and reorganization stay manual edits to the manifest.
 
-import { EXIT_OK as CREATED, create, show } from "../modules.ts";
+import { EcosystemError, ensureRootFiles } from "../ecosystem.ts";
+import { EXIT_OK as CREATED, create, show, solutionShape } from "../modules.ts";
 import { tryWriteProjection } from "../projection.ts";
 import { writeErr, writeOut } from "./output.ts";
 import { statSync } from "node:fs";
@@ -186,6 +187,19 @@ export async function modulesVerb(argv: string[]): Promise<number> {
   // declaration-moving verb follows. The extension also re-derives on a
   // manifest change it watches, but a verb run from a terminal has no
   // extension to do it for it.
-  if (code === CREATED) tryWriteProjection(workspaceRoot);
+  if (code === CREATED) {
+    tryWriteProjection(workspaceRoot);
+    // The second entry is what makes the solution multi-module, and the
+    // root build files appear with it -- the committed feed, the central
+    // pins, the build properties and targets -- where absent.
+    try {
+      const files = ensureRootFiles(workspaceRoot, solutionShape(workspaceRoot));
+      for (const path of files?.written ?? []) writeOut(`wrote ${path}\n`);
+      for (const note of files?.notes ?? []) writeOut(`note: ${note}\n`);
+    } catch (error) {
+      if (!(error instanceof EcosystemError)) throw error;
+      writeErr(`modules create: the root build files were not written -- ${error.message}\n`);
+    }
+  }
   return code;
 }

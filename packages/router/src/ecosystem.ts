@@ -16,7 +16,7 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 
-import type { ModuleEntry } from "./modules.ts";
+import type { ModuleEntry, SolutionShape } from "./modules.ts";
 
 export type EcosystemKey = "dotnet" | "maven";
 
@@ -60,6 +60,12 @@ export interface Ecosystem {
   /** The seam's project names for a package id. */
   contractProjectNames(packageId: string): ContractProjectNames;
   /**
+   * The root build files a multi-module solution of this ecosystem needs,
+   * each written only where absent and never rewritten: the committed feed
+   * folder, the central pins, the build properties and targets.
+   */
+  rootFiles(root: string): ScaffoldResult;
+  /**
    * The module's public surface with its doc comments, read from source:
    * the abstractions project when the module has one, its roots outside
    * tests otherwise, in file order.
@@ -75,6 +81,22 @@ export interface Ecosystem {
     entry: ModuleEntry,
     against: ModuleEntry | null,
   ): ScaffoldResult;
+  /**
+   * Every project under the module's roots that produces a package: the
+   * implementation, the abstractions, the contract tests -- never a test
+   * project, never one that says it is not packable.
+   */
+  packableProjects(root: string, entry: ModuleEntry): PackTarget[];
+  /** The argv that packs one project into `output` under `version`. */
+  packArgv(project: string, output: string, version: string): string[];
+}
+
+/** One project a pack produces a package from. */
+export interface PackTarget {
+  /** Repository-relative path to the project file. */
+  readonly project: string;
+  /** The package id it produces, as the project declares it or its file name says. */
+  readonly packageId: string;
 }
 
 const SKIPPED_DIRS: ReadonlySet<string> = new Set([
@@ -151,6 +173,37 @@ export function ecosystemNamed(key: EcosystemKey): Ecosystem {
   return key === "dotnet" ? DOTNET : MAVEN;
 }
 
+/**
+ * The root build files a multi-module solution needs, written where absent
+ * by whichever verb first finds the solution in that shape: `modules
+ * create` as the second entry lands, `module contract` and `module pack`
+ * as they touch a module. The ecosystem is the first module's whose roots
+ * hold a project file; a solution whose modules are still empty folders
+ * gets nothing yet and is told so, and a single-module solution gets
+ * nothing ever.
+ */
+export function ensureRootFiles(root: string, shape: SolutionShape): ScaffoldResult | null {
+  if (!shape.multi) return null;
+  for (const entry of shape.modules) {
+    let ecosystem: Ecosystem;
+    try {
+      ecosystem = ecosystemOf(root, entry);
+    } catch (error) {
+      if (error instanceof EcosystemError) continue;
+      throw error;
+    }
+    return ecosystem.rootFiles(root);
+  }
+  return {
+    written: [],
+    skipped: [],
+    notes: [
+      "no module holds a project file yet, so the root build files wait for the first " +
+        "one that does",
+    ],
+  };
+}
+
 // --- .NET -------------------------------------------------------------------
 
 const DOTNET: Ecosystem = {
@@ -161,6 +214,9 @@ const DOTNET: Ecosystem = {
       contractTests: `${packageId}.ContractTests`,
       compatibility: (providerPackage: string) => `${providerPackage}.Compatibility`,
     };
+  },
+  rootFiles(root: string): ScaffoldResult {
+    return rootFilesDotnet(root);
   },
   readSurface(root: string, entry: ModuleEntry, packageId: string): SurfaceEntry[] {
     const names = this.contractProjectNames(packageId);
@@ -185,7 +241,153 @@ const DOTNET: Ecosystem = {
   scaffoldContract(root: string, entry: ModuleEntry, against: ModuleEntry | null): ScaffoldResult {
     return scaffoldDotnet(root, entry, against);
   },
+  packableProjects(root: string, entry: ModuleEntry): PackTarget[] {
+    const roots = entry.codeRoots.length > 0 ? entry.codeRoots : ["."];
+    const out: PackTarget[] = [];
+    for (const codeRoot of roots) {
+      for (const file of walkFiles(join(root, codeRoot))) {
+        if (!file.toLowerCase().endsWith(".csproj")) continue;
+        const rel = relative(root, file).split("\\").join("/");
+        // A test project, a compatibility suite and a project that says
+        // IsPackable=false produce no package.
+        if (/\.Tests?\.csproj$/i.test(rel) || /\.Compatibility\.csproj$/.test(rel)) continue;
+        if (/[\\/]tests?[\\/]/i.test(rel)) continue;
+        const text = readFileSync(file, "utf8");
+        if (/<IsPackable>\s*false\s*<\/IsPackable>/i.test(text)) continue;
+        const declared = /<PackageId>\s*([^<\s]+)\s*<\/PackageId>/.exec(text);
+        const packageId = declared ? (declared[1] as string) : rel.split("/").pop()!.replace(/\.csproj$/i, "");
+        out.push({ project: rel, packageId });
+      }
+    }
+    return out;
+  },
+  packArgv(project: string, output: string, version: string): string[] {
+    return ["dotnet", "pack", project, "-c", "Release", "-o", output, `-p:PackageVersion=${version}`, "--nologo"];
+  },
 };
+
+// --- The .NET root files ----------------------------------------------------------
+
+/** Where the committed packages live, relative to the root. */
+export const PACKAGES_DIR = "packages";
+/** The untracked overlay a debugging grant lays; imported by the tracked targets when it exists. */
+export const OVERLAY_TARGETS = ".dabbler/overlay.targets";
+
+/**
+ * The six files a multi-module .NET solution needs at its root, written only
+ * where absent. The feed is a relative path so a clone on any machine
+ * resolves it; the pins are central so a consumer's project says
+ * `<PackageReference Include="X" />` and nothing else; Source Link is off
+ * in a driven session because it fetches source from the host and an
+ * engine could too; the overlay import sits in the TARGETS file because
+ * props load before a project's items exist and the overlay rewrites
+ * items; LFS for the packages folder is declared and left for the ceiling
+ * to turn on.
+ */
+function rootFilesDotnet(root: string): ScaffoldResult {
+  const result = { written: [] as string[], skipped: [] as string[], notes: [] as string[] };
+  writeIfAbsent(
+    root,
+    "nuget.config",
+    [
+      '<?xml version="1.0" encoding="utf-8"?>',
+      "<configuration>",
+      "  <packageSources>",
+      "    <!-- The solution's own modules, as committed packages; a relative path, so a",
+      "         clone on any machine resolves it. -->",
+      `    <add key="modules" value="${PACKAGES_DIR}" />`,
+      '    <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />',
+      "  </packageSources>",
+      "</configuration>",
+      "",
+    ].join("\n"),
+    result,
+  );
+  writeIfAbsent(
+    root,
+    "Directory.Packages.props",
+    [
+      "<Project>",
+      "  <PropertyGroup>",
+      "    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>",
+      "  </PropertyGroup>",
+      "",
+      "  <!-- Sibling modules, consumed as packages from the committed ./packages folder.",
+      "       The pin is the module's current dev version; `dabbler module pack` moves it",
+      "       in the same commit as the new package. -->",
+      '  <ItemGroup Label="Modules">',
+      "  </ItemGroup>",
+      "</Project>",
+      "",
+    ].join("\n"),
+    result,
+  );
+  writeIfAbsent(
+    root,
+    "Directory.Build.props",
+    [
+      "<Project>",
+      "  <PropertyGroup>",
+      "    <Nullable>enable</Nullable>",
+      "    <ImplicitUsings>enable</ImplicitUsings>",
+      "    <!-- Source Link fetches source from the host, and an engine in a driven",
+      "         session could too; the wall is what is on the disk. -->",
+      "    <EnableSourceLink Condition=\"'$(DABBLER_DRIVEN)' != ''\">false</EnableSourceLink>",
+      "  </PropertyGroup>",
+      "</Project>",
+      "",
+    ].join("\n"),
+    result,
+  );
+  writeIfAbsent(
+    root,
+    "Directory.Build.targets",
+    [
+      "<Project>",
+      // No double hyphen inside the comment: XML refuses it, and the real
+      // build was the one that said so.
+      "  <!-- A debugging grant (dabbler module grant, with debug) lays an untracked overlay",
+      "       that turns a sibling's PackageReference into a ProjectReference for this",
+      "       clone only. Imported here, after a project's items exist, and only when the",
+      "       file does: nothing in a committed project file changes. -->",
+      `  <Import Project="$(MSBuildThisFileDirectory)${OVERLAY_TARGETS}" Condition="Exists('$(MSBuildThisFileDirectory)${OVERLAY_TARGETS}')" />`,
+      "</Project>",
+      "",
+    ].join("\n"),
+    result,
+  );
+  writeIfAbsent(
+    root,
+    `${PACKAGES_DIR}/.gitattributes`,
+    [
+      "# Committed packages are small by the ceiling (`modules.packages.ceilingBytes`,",
+      "# 5 MiB unless dabbler.yaml says otherwise). A package over it is refused until",
+      "# this line is uncommented, which puts every package here under Git LFS:",
+      "# *.nupkg filter=lfs diff=lfs merge=lfs -text",
+      "",
+    ].join("\n"),
+    result,
+  );
+  writeIfAbsent(
+    root,
+    `${PACKAGES_DIR}/README.md`,
+    [
+      "# packages",
+      "",
+      "The solution's own modules, as committed packages. A module consumes a sibling",
+      "from here -- `<PackageReference Include=\"Sibling\" />`, pinned once in",
+      "`Directory.Packages.props` -- and never from its source, so a focused checkout",
+      "holding one module builds against exactly the bytes its siblings landed.",
+      "",
+      "`dabbler module pack <slug>` writes a module's packages here under an immutable",
+      "dev version and records, beside each, the source and contract it was built",
+      "from. Nothing here is edited by hand.",
+      "",
+    ].join("\n"),
+    result,
+  );
+  return result;
+}
 
 // --- The .NET scaffold ----------------------------------------------------------
 
@@ -622,6 +824,15 @@ const MAVEN: Ecosystem = {
     // Not guessed here either: session 108 lays the api and contract-test
     // modules out the way Maven projects are, and names them then.
     throw mavenRefusal("contract project names");
+  },
+  rootFiles(): ScaffoldResult {
+    throw mavenRefusal("root build files");
+  },
+  packableProjects(): PackTarget[] {
+    throw mavenRefusal("packable projects");
+  },
+  packArgv(): string[] {
+    throw mavenRefusal("pack command");
   },
   readSurface(): SurfaceEntry[] {
     throw mavenRefusal("surface reader");

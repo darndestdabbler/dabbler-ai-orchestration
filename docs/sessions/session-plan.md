@@ -5890,3 +5890,158 @@ the bundle path is unchanged; a deployable with two `from` modules unions
 their dependencies and refuses their disagreeing versions by name; and a
 declared deployable with `from: []` writes no record and is named by `modules
 show` and by `affected`.
+
+### Session 115 of 116: What the Java walk found — a Maven module session that can close
+
+The Java/Maven walkthrough (`docs/uat/uat-java-json-solution.md`) was run end
+to end on this machine on 2026-09-07, in `C:\temp\uat-java`, against the
+router built from session 114. Its first AI session — one module, two steps,
+verified at round 2 by gpt-5-6-terra over the API transport — **landed and
+then could not close**, and two more defects were measured on the way. All
+three are Maven-side, and none could have been caught by a test in this
+repository: no test runs `mvn`.
+
+**1. A Maven module session cannot close at all.** The close refused two
+gates on a session whose work was one test and one contract page:
+
+```
+- verification_clean       FAIL  the working tree changed after verification round 2:
+    packages/com/example/json-model/0.1.0-dev.../json-model-0.1.0-dev....jar.md5,
+    ....jar.sha1, ....pom, ....pom.md5, ....pom.sha1 (+3 more)
+- exposure_within_ceiling  FAIL  9 path(s) changed outside the session's scope:
+    .dabbler/solution/projection.json, packages/.../json-model-....jar.md5, ...
+```
+
+`mvn deploy` into the file repository writes the POM and a `.md5`/`.sha1`
+beside every artifact, plus `maven-metadata-local.xml`; `packModule` records
+only the one artifact the seam looked for (`packages.ts`, `artifacts`), so
+`writeCandidateRecord` names the `.jar` and nothing else. Every sidecar is
+then a path that moved after verification with nothing accounting for it —
+the same shape session 113 fixed for the pin file, one layer further out.
+NuGet writes exactly one file per package, which is why .NET never met it.
+
+**The fix.** The candidate is what the pack LEFT, not what the seam went
+looking for: snapshot the packages folder before the pack and after it, and
+carry every new or changed path on `PackResult` (`artifacts` keeps naming the
+package proper, so nothing that reads it changes). The candidate record then
+names them, and both gates see the framework's own derivation rather than a
+tree that moved. `.dabbler/` is the framework's own state and gitignored, so
+the exposure manifest must not count `.dabbler/solution/projection.json` as
+a change outside the session's scope either.
+
+**2. A module session's run of record ran nothing, and the close did not
+mind.** `impact.json` for that session:
+
+```json
+{ "multi": true, "changedModules": ["model"], "suites": [], "candidates": ["model"] }
+```
+
+`reachSuites` in `packages/router/src/impact.ts` reaches a suite only when
+`suite.module === entry.slug`. The suite `dabbler bootstrap` scaffolds for a
+Maven repository names no module and covers `.`, so in a multi-module
+solution **no change reaches it**: the driver logged
+`run-of-record-skipped suite=maven reason=not reached by the impact plan`
+twice and landed. `test_run_fresh` then passed, because the plan it is
+measured against demanded nothing.
+
+**The fix.** A declared suite that names no module is repository-wide and is
+reached by any change, with its own reason (`repository-wide`) beside
+`module-changed` and the rest. That is the failure direction the scaffold
+already states for `covers` — run a suite you did not need rather than skip
+one you did — and it is what a reader of `covers: ["."]` expects. A suite
+that names a module keeps today's rule exactly.
+
+**3. A pack of an unchanged Maven module mints a new version every time.**
+The walkthrough promises "running the same command twice unchanged gives the
+same version back". Measured: `0.1.0-dev.20260907.1.g902ae09` then
+`0.1.0-dev.20260907.2.g9b8bb3f`. `mvn` writes `modules/<slug>/target/` and
+`modules/<slug>/.flattened-pom.xml` inside the module's own code root, and
+nothing ignores them, so the source digest moves with the build output. With
+those two paths in `.gitignore` the same tree packs to the same version
+twice, back to `...1.g902ae09` — which is the proof the build output was the
+only thing moving.
+
+**The fix.** `rootFilesMaven` writes a `.gitignore` beside the parent POM,
+write-once like every other root file, ignoring `target/` and
+`.flattened-pom.xml`. A repository that already has one is left alone, and
+the scaffold says what it wrote.
+
+**Tests.** Four in `packages/router/test`, none of which runs `mvn`: a
+scripted pack that leaves sidecar files has all of them on its result and in
+the candidate record; an exposure manifest ignores `.dabbler/`; a suite with
+no module is reached by a change to any module and one that names a module
+still is not reached by another module's change; and the Maven root scaffold
+writes the ignore file.
+
+### Session 116 of 116: What the Java walk found — the first ten minutes
+
+The same run's other findings, all in the path a person walks before any code
+is written. None is exotic: every one of them was met by following the
+walkthrough as written, in order.
+
+**1. The plan instruction never mentions the member a multi-module solution
+requires.** The driver's plan step says the file "carries exactly these
+members and no other: task, releasable, steps", plus `repositories` as the
+one optional. `driver-work-plan.schema.json` also defines `modules` (and
+`reason` for two or more), and `driver.ts` refuses the declaration without
+it: *"the declaration names no module, and docs/modules.yaml declares 3"*. An
+engine that follows the instruction it was given is refused, every time, in
+exactly the solution shape the modules block exists for — and a second
+identical refusal is a deadlock.
+
+**The fix.** The plan instruction names `modules` and `reason` when the
+manifest declares more than one module, and says nothing about them when it
+declares one — the same shape the `repositories` sentence already has.
+
+**2. `dabbler bootstrap` during an undeclared session deadlocks the
+declaration.** Bootstrap wrote five files and said "left them uncommitted:
+session 1 is in flight, and its land is what commits them". The declaration
+then refused: *"the working tree already carries 5 change(s) (.gitignore,
+AGENTS.md, CLAUDE.md, GEMINI.md, dabbler.yaml)"*, twice, which is a deadlock.
+Bootstrap must not commit mid-session (session 95 made sure of that), so the
+message is what is wrong: before the declaration, the land is not what
+commits them — the operator is.
+
+**The fix.** When a session is in flight and has not declared its task,
+bootstrap says so and names the commit to make; after the declaration, it
+says what it says today.
+
+**3. The recommended answer to the suite decision cannot be taken in a fresh
+repository, and taken twice it duplicates the suite.** `session start` raised
+`testing-suites`, whose recommended option is `declare`. With no `dabbler.yaml`
+on disk it refused — *"Either dabbler.yaml already declares suites, or it
+could not be read"* — which names two causes and not the real one. After
+`dabbler bootstrap` wrote the file WITH a maven suite in it, answering
+`declare` succeeded and appended a **second, identical** suite block, so the
+repository now declares `maven` twice.
+
+**The fix.** The writer creates `dabbler.yaml` when it is absent (a
+`schema_version: 1` file with the suite in it), and when the file already
+declares a suite for that ecosystem it records the answer without writing a
+duplicate, saying which suite already stood.
+
+**4. Both UAT documents are corrected where the walk proved them wrong.**
+Three corrections, and nothing else touched:
+
+- Neither document says to run `dabbler bootstrap`, which is what creates
+  `dabbler.yaml` — so the .NET document's step 7 ("add to `dabbler.yaml`
+  under `testing:`") has no file to add to, and the Java one hits the
+  refusal above. Both gain the step, before the first session.
+- The .NET document tells the reader to hand-write
+  `docs/sessions/sessions.json`. That is a state file the router owns —
+  `session start` writes it — and hand-writing one is what the hard rules
+  forbid. The instruction goes.
+- The Java document's step 3 has the reader write `Item.java` before session
+  1, whose plan then says "write `Item`". The verifier reads the session's
+  diff, finds no `Item`, and reports the session's only deliverable missing:
+  a blocking Major that cost a round and was withdrawn on a dispute naming
+  the committed file. Step 3 writes the POM and no Java source (a Maven
+  module with no sources packs; the walk proved the rest of the flow from
+  there), and session 1 writes the class the plan says it writes.
+
+**Tests.** Three in `packages/router/test`: the plan instruction names
+`modules` for a multi-module manifest and does not for a single-module one;
+bootstrap's message before a declaration names the commit and after it names
+the land; and the suite writer creates an absent `dabbler.yaml` and refuses
+to duplicate a suite that already stands. The document corrections are
+checked as the UAT documents already are, by a script that reads them.

@@ -23,6 +23,7 @@
 import {
   applyWrites,
   grantForTransport,
+  moduleScope,
   recordForRound,
   recordRow,
   sessionScope,
@@ -30,6 +31,7 @@ import {
   DEFAULT_READ_BUDGET,
   type AgencyGrant,
 } from "../agency.ts";
+import { ManifestError, type SolutionShape, moduleConfigs, solutionShape } from "../modules.ts";
 import {
   loadSelectionConfig,
   workingTreeChanges,
@@ -445,6 +447,39 @@ export interface RoundOptions {
  * A round never opens on unproved work: the affected tests come first, and a
  * full-suite run is not a substitute for them.
  */
+/**
+ * The module(s) the session is scoped to: the focused checkout's module
+ * when the row records one -- the clone holds that module and no other, so
+ * the checkout is the authority -- and otherwise what the declaration
+ * named, or nothing.
+ */
+function modulesOfSession(state: Record<string, unknown> | null, current: number): string[] {
+  const sessions = Array.isArray(state?.["sessions"]) ? (state?.["sessions"] as unknown[]) : [];
+  for (const row of sessions) {
+    if (typeof row !== "object" || row === null || Array.isArray(row)) continue;
+    const record = row as Record<string, unknown>;
+    if (Number(record["number"]) !== current) continue;
+    const checkout = record["checkout"];
+    if (typeof checkout === "object" && checkout !== null && !Array.isArray(checkout)) {
+      const module = (checkout as Record<string, unknown>)["module"];
+      if (typeof module === "string" && module.trim() !== "") return [module.trim()];
+    }
+    const modules = record["modules"];
+    return Array.isArray(modules) ? modules.map(String).filter((slug) => slug.trim() !== "") : [];
+  }
+  return [];
+}
+
+/** The solution's shape, or null where the manifest refuses: the round is not the place to refuse it. */
+function solutionShapeOrNull(repoRoot: string): SolutionShape | null {
+  try {
+    return solutionShape(repoRoot);
+  } catch (error) {
+    if (error instanceof ManifestError) return null;
+    throw error;
+  }
+}
+
 export async function runRound(
   sessionsDir: string,
   options: RoundOptions = {},
@@ -562,22 +597,42 @@ export async function runRound(
   }
 
   const disputes = readDisputes(repoRoot, current);
-  const scope = sessionScope(
-    repoRoot,
-    sessionsDir,
-    workingTreeChanges(
-      repoRoot,
-      roundNumber === 1
-        ? null
-        : String(
-            effectiveBaseline(
-              repoRoot,
-              current,
-              priorRounds[priorRounds.length - 1] as Row,
-            ),
+  // A session that names its module(s) in a multi-module solution is scoped
+  // to them -- what it may change is what the verifier may read, and a
+  // sibling is a package to both. Every other session keeps the scope it
+  // always had: its changed files, what they import, and the sessions root.
+  const sessionModules = modulesOfSession(state, current);
+  const shape = sessionModules.length > 0 ? solutionShapeOrNull(repoRoot) : null;
+  const scope =
+    shape !== null && shape.multi
+      ? moduleScope(
+          repoRoot,
+          sessionsDir,
+          shape,
+          sessionModules,
+          new Map(
+            [...moduleConfigs(config, shape.modules).values()].map((module) => [
+              module.slug,
+              module.sharedFiles,
+            ]),
           ),
-    ) ?? [],
-  );
+        )
+      : sessionScope(
+          repoRoot,
+          sessionsDir,
+          workingTreeChanges(
+            repoRoot,
+            roundNumber === 1
+              ? null
+              : String(
+                  effectiveBaseline(
+                    repoRoot,
+                    current,
+                    priorRounds[priorRounds.length - 1] as Row,
+                  ),
+                ),
+          ) ?? [],
+        );
   const verificationSettings = settingsBlock(config);
   const readBudget =
     (verificationSettings["read_budget"] as number | undefined) ||

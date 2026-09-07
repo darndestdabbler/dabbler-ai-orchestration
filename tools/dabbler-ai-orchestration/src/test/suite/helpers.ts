@@ -248,7 +248,11 @@ export function fakeRouter(
         },
       },
       modules: { create: text("modules create") },
-      module: { open: text("module open") },
+      module: {
+        open: text("module open"),
+        grant: text("module grant"),
+        revoke: text("module revoke"),
+      },
       verify: {
         round: text("verify"),
         dispute: text("verify dispute"),

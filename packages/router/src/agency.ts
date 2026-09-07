@@ -35,9 +35,10 @@
 // two are compared directly. Only the lines actually shown are compared, so a
 // truncated or ranged read is not slandered as a transform.
 
-import { mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, join, relative } from "node:path";
 
+import { ROOT_BUILD_FILES, SOLUTION_FILE, contractDir } from "./checkout.ts";
 import {
   type SelectionConfig,
   type SuiteScope,
@@ -47,6 +48,7 @@ import {
   selectionTestRoots,
 } from "./checks.ts";
 import { canonicalPath } from "./journal.ts";
+import { type SolutionShape, dependenciesOf } from "./modules.ts";
 import { pythonRepr } from "./pythonJson.ts";
 
 /** The round could look at the tree through tools. */
@@ -283,6 +285,46 @@ export function sessionScope(
 }
 
 /**
+ * The module form of the scope, for a session that names its module(s) in a
+ * multi-module solution: each named module's `codeRoots`, its own contract
+ * folder and every transitive dependency's, the root build files and the
+ * solution file present at the root, its shared files, and the sessions
+ * directory. Never a sibling's `codeRoots`: what the session may change is
+ * what the verifier may read, and a sibling is a package to both.
+ */
+export function moduleScope(
+  repoRoot: string,
+  sessionsDir: string | null,
+  shape: SolutionShape,
+  slugs: readonly string[],
+  sharedFiles: ReadonlyMap<string, readonly string[]> = new Map(),
+): string[] {
+  const scope = new Set<string>();
+  for (const slug of slugs) {
+    const entry = shape.modules.find((module) => module.slug === slug);
+    if (entry === undefined) continue;
+    for (const codeRoot of entry.codeRoots.length > 0 ? entry.codeRoots : ["."]) {
+      const rel = posix(codeRoot).replace(/^\.\/+/, "").replace(/\/+$/, "");
+      if (rel !== "" && rel !== ".") scope.add(rel);
+    }
+    scope.add(contractDir(slug));
+    for (const dependency of dependenciesOf(shape.modules, slug)) scope.add(contractDir(dependency));
+    for (const shared of sharedFiles.get(slug) ?? []) scope.add(posix(shared));
+  }
+  for (const name of ROOT_BUILD_FILES) if (isFile(join(repoRoot, name))) scope.add(name);
+  try {
+    for (const name of readdirSync(repoRoot)) {
+      if (SOLUTION_FILE.test(name) && isFile(join(repoRoot, name))) scope.add(name);
+    }
+  } catch {
+    // No root to list is no solution file to add.
+  }
+  const setRel = sessionsDir ? relativePosix(repoRoot, sessionsDir) : null;
+  if (setRel) scope.add(setRel);
+  return [...scope].sort();
+}
+
+/**
  * The absolute path `path` names inside the repository, or null.
  *
  * An absolute path is placed against the repository; a relative one is already
@@ -480,6 +522,11 @@ function readBriefing(grant: AgencyGrant): string[] {
       "\n\n" +
       "**Scope** — what this round is confined to, not the " +
       `repository:\n\n${listed}\n\n` +
+      "A path outside the scope may not be in this checkout at all: a " +
+      "sibling module is present as its package and its contract folder, " +
+      "never as source, and a read of its source is refused by the disk. " +
+      "A refused read is recorded as such and is not a finding against " +
+      "the tree; do not report what you could not open as a defect.\n\n" +
       `**Budget** — at most ${grant.readBudget} reads this round.\n\n` +
       "**Log** — every list, search and read is recorded on the round, " +
       "confined to the scope or not. Confine a search or a listing by " +
@@ -602,7 +649,17 @@ export interface AgencyOperation {
   readonly inScope: boolean;
   readonly fidelity: string | null;
   readonly detail: string | null;
+  /**
+   * A read outside the scope that found no bytes: the path is not a file in
+   * this checkout. In a focused clone that is the wall holding -- a sibling's
+   * implementation is absent, not hidden -- and it is recorded apart from an
+   * out-of-scope read that was delivered, which is the wall leaking.
+   */
+  readonly refused?: boolean;
 }
+
+/** What the record says of a read the checkout could not deliver. */
+export const REFUSED_DETAIL = "refused: outside the scope, and not a file in this checkout";
 
 export function operationRow(operation: AgencyOperation): Record<string, unknown> {
   const row: Record<string, unknown> = {
@@ -612,6 +669,7 @@ export function operationRow(operation: AgencyOperation): Record<string, unknown
   };
   if (operation.fidelity) row["fidelity"] = operation.fidelity;
   if (operation.detail) row["detail"] = operation.detail;
+  if (operation.refused === true) row["refused"] = true;
   return row;
 }
 
@@ -660,6 +718,11 @@ export function recordOutOfScope(record: AgencyRecord): number {
   return record.operations.filter((operation) => !operation.inScope).length;
 }
 
+/** Out-of-scope reads the checkout could not deliver: counted inside `out_of_scope`, and named. */
+export function recordRefusedReads(record: AgencyRecord): number {
+  return record.operations.filter((operation) => operation.refused === true).length;
+}
+
 export function recordOverBudget(record: AgencyRecord): number {
   return Math.max(0, recordReads(record) - record.grant.readBudget);
 }
@@ -700,6 +763,7 @@ export function recordRow(record: AgencyRecord): Record<string, unknown> {
     listings: countKind(record, OP_LIST),
     searches: countKind(record, OP_SEARCH),
     out_of_scope: recordOutOfScope(record),
+    refused_reads: recordRefusedReads(record),
     over_budget: recordOverBudget(record),
     transformed_reads: recordTransformedReads(record),
     // Said once for the round when the tool framed nothing, so a transport
@@ -922,10 +986,18 @@ export function recordForRound(
       detail = `unconfined: no path limited this ${kind} to the scope`;
     }
     let fidelity: string | null = null;
+    let refused = false;
     if (kind === OP_READ) {
       const [value, readDetail] = readFidelity(repoRoot, rel, call["result"]);
       fidelity = value;
       detail = readDetail ?? detail;
+      // Outside the scope and nothing on disk to have shown: the checkout
+      // refused it, whatever the tool said. A path inside the scope that is
+      // missing is the verifier's guess and stays graded as unreadable.
+      if (!scoped && readDetail === FIDELITY_UNREADABLE) {
+        refused = true;
+        detail = REFUSED_DETAIL;
+      }
     }
     operations.push({
       kind,
@@ -933,6 +1005,7 @@ export function recordForRound(
       inScope: scoped,
       fidelity,
       detail,
+      ...(refused ? { refused: true } : {}),
     });
   }
   return { mode: MODE_TOOLS, grant, operations, writes: [...writes] };

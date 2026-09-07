@@ -17,7 +17,9 @@ import {
 import { PROJECT_CONFIG_FILENAME } from "../config.ts";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { ExposureError, GRANT_DECISION_PREFIX, settleAnsweredGrants } from "../exposure.ts";
 import { runGit } from "../journal.ts";
+import { ManifestError, solutionShape } from "../modules.ts";
 import {
   ID_GIT_REMOTE,
   ID_PACKAGING_FEED,
@@ -319,6 +321,26 @@ function run(argv: string[]): number {
     return EXIT_REFUSED;
   }
   writeOut(`owed: '${id}' answered '${choice}'.\n`);
+  if (id.startsWith(GRANT_DECISION_PREFIX) && typeof current === "number") {
+    // The framework acts on a grant here, at the answer: the cone widens,
+    // the overlay is laid, the manifest says so. A denial is recorded.
+    try {
+      const settled = settleAnsweredGrants(root, solutionShape(root), current);
+      for (const grant of settled.applied) {
+        writeOut(
+          `owed: granted -- the checkout now holds module '${grant.sibling}'s source` +
+            `${grant.debug ? " and builds it as a project reference (overlay laid)" : ""}. ` +
+            "Reload the window (Developer: Reload Window) so the editor and the build see it.\n",
+        );
+      }
+      for (const decision of settled.denied) writeOut(`owed: denied -- ${decision}; the cone stays narrow.\n`);
+    } catch (error) {
+      if (!(error instanceof ExposureError) && !(error instanceof ManifestError)) throw error;
+      writeErr(`owed: the answer is recorded, but acting on it failed -- ${error.message}\n`);
+      return EXIT_REFUSED;
+    }
+    return EXIT_OK;
+  }
   if (acted) {
     writeOut(`owed: wrote the suite declaration into ${acted}.\n`);
     writeOut(

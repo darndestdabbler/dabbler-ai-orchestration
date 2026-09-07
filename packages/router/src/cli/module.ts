@@ -10,10 +10,13 @@
 
 import { statSync } from "node:fs";
 
-import { CheckoutError, openModule, preflight } from "../checkout.ts";
+import { CheckoutError, openModule, preflight, readCloneMarker } from "../checkout.ts";
 import { ConfigError, loadConfig } from "../config.ts";
 import { EcosystemError, ecosystemOf, ensureRootFiles } from "../ecosystem.ts";
+import { sessionsDirFor } from "../evidence.ts";
+import { ExposureError, raiseGrantDecision, revokeGrant } from "../exposure.ts";
 import { ManifestError, solutionShape } from "../modules.ts";
+import { readSessionState } from "../progress.ts";
 import { PackagesError, packModule } from "../packages.ts";
 import { PackagingConfigError } from "../packaging.ts";
 import { writeErr, writeOut } from "./output.ts";
@@ -30,9 +33,12 @@ function usage(): string {
     "       dabbler module open [-h] [--branch BRANCH] [--reset]",
     "                           [--workspace-root WORKSPACE_ROOT] slug",
     "       dabbler module preflight [-h] [--clones N] [--workspace-root WORKSPACE_ROOT] slug",
+    "       dabbler module grant [-h] --reason TEXT [--debug] [--workspace-root WORKSPACE_ROOT] sibling",
+    "       dabbler module revoke [-h] [--workspace-root WORKSPACE_ROOT] sibling",
     "",
     "the things done to one module: its designed seam, its committed package,",
-    "its focused checkout, and what that checkout costs on this machine",
+    "its focused checkout, what that checkout costs on this machine, and the",
+    "grants that widen it",
     "",
     "positional arguments:",
     "  slug                  the module, as docs/modules.yaml declares it",
@@ -48,6 +54,10 @@ function usage(): string {
     "                        trunk and re-narrowed instead of refused",
     "  --clones N            preflight: how many further fresh clones to time in",
     "                        sequence (default 5)",
+    "  --reason TEXT         grant: why the session needs the sibling's source; recorded",
+    "  --debug               grant: also build the sibling from source in this clone",
+    "                        (an untracked overlay turns its PackageReference into a",
+    "                        ProjectReference)",
     "  --workspace-root WORKSPACE_ROOT",
     "                        the repository root (default: the working directory)",
     "",
@@ -79,7 +89,115 @@ function usage(): string {
     "Defender's real-time protection is on. A recorded run, not a test: the numbers",
     "decide whether a session gets a fresh clone or the per-module clone reset.",
     "",
+    "grant: in a module session's focused checkout, ask the operator to widen it to a",
+    "sibling's source. Raises the owed decision module-grant:<sibling> (deny is the",
+    "recommendation); answered grant through `dabbler owed answer` or the Work",
+    "Explorer, the framework widens the cone, lays the overlay when --debug was asked,",
+    "and records the grant in the exposure manifest.",
+    "",
+    "revoke: end a grant -- refused while the sibling's roots hold changes; removes the",
+    "overlay, narrows the cone again and records it.",
+    "",
   ].join("\n");
+}
+
+/** The clone and the session a grant verb acts in, or the refusal. */
+function grantContext(
+  verb: string,
+  workspaceRoot: string,
+): { readonly root: string; readonly session: number } | number {
+  if (readCloneMarker(workspaceRoot) === null) {
+    writeErr(
+      `module ${verb}: refused -- ${workspaceRoot} is not a module's focused checkout; a grant ` +
+        "widens the clone a module session works in, and this is not one\n",
+    );
+    return EXIT_REFUSED;
+  }
+  const current = readSessionState(sessionsDirFor(workspaceRoot))?.["currentSession"];
+  if (typeof current !== "number") {
+    writeErr(`module ${verb}: refused -- no session is in flight in this checkout\n`);
+    return EXIT_REFUSED;
+  }
+  return { root: workspaceRoot, session: current };
+}
+
+function grantSubcommand(verb: "grant" | "revoke", rest: readonly string[]): number {
+  let slug: string | null = null;
+  let workspaceRoot = ".";
+  let reason: string | null = null;
+  let debug = false;
+  for (let index = 0; index < rest.length; index += 1) {
+    const token = rest[index] as string;
+    if (token === "--help" || token === "-h") {
+      writeOut(usage());
+      return EXIT_OK;
+    }
+    if (token === "--debug" && verb === "grant") {
+      debug = true;
+      continue;
+    }
+    if ((token === "--reason" && verb === "grant") || token === "--workspace-root") {
+      const value = rest[index + 1];
+      if (value === undefined || value.startsWith("--")) {
+        writeErr(`dabbler module ${verb}: argument ${token}: expected one argument\n`);
+        return EXIT_USAGE;
+      }
+      if (token === "--workspace-root") workspaceRoot = value;
+      else reason = value;
+      index += 1;
+      continue;
+    }
+    if (token.startsWith("--") || slug !== null) {
+      writeErr(`dabbler module ${verb}: unrecognized argument: ${token}\n`);
+      return EXIT_USAGE;
+    }
+    slug = token;
+  }
+  if (slug === null) {
+    writeErr(`dabbler module ${verb}: the following arguments are required: sibling\n`);
+    return EXIT_USAGE;
+  }
+  if (verb === "grant" && (reason === null || reason.trim() === "")) {
+    writeErr("dabbler module grant: the following arguments are required: --reason\n");
+    return EXIT_USAGE;
+  }
+  if (!isDirectory(workspaceRoot)) {
+    writeErr(`module: not a directory: ${workspaceRoot}\n`);
+    return EXIT_USAGE;
+  }
+  const context = grantContext(verb, workspaceRoot);
+  if (typeof context === "number") return context;
+  try {
+    const shape = solutionShape(context.root);
+    if (verb === "grant") {
+      const decision = raiseGrantDecision(context.root, shape, context.session, slug, reason ?? "", debug);
+      writeOut(
+        `module grant: raised owed decision '${decision}' for session ${context.session}. ` +
+          `Answer it with \`dabbler owed answer --id ${decision} --choice grant\` (or deny), or in the ` +
+          "Work Explorer; on grant the framework widens the checkout" +
+          `${debug ? " and lays the overlay" : ""}.\n`,
+      );
+    } else {
+      revokeGrant(context.root, shape, context.session, slug);
+      writeOut(
+        `module revoke: module '${slug}'s source is out of this checkout again; the overlay and the ` +
+          "exposure manifest say so. Reload the window so the editor and the build see it.\n",
+      );
+    }
+  } catch (error) {
+    if (
+      error instanceof ExposureError ||
+      error instanceof ManifestError ||
+      error instanceof EcosystemError ||
+      error instanceof ConfigError ||
+      error instanceof CheckoutError
+    ) {
+      writeErr(`module ${verb}: refused -- ${error.message}\n`);
+      return EXIT_REFUSED;
+    }
+    throw error;
+  }
+  return EXIT_OK;
 }
 
 function preflightSubcommand(rest: readonly string[]): number {
@@ -311,6 +429,7 @@ export async function moduleVerb(argv: string[]): Promise<number> {
   if (subcommand === "pack") return packSubcommand(rest);
   if (subcommand === "open") return openSubcommand(rest);
   if (subcommand === "preflight") return preflightSubcommand(rest);
+  if (subcommand === "grant" || subcommand === "revoke") return grantSubcommand(subcommand, rest);
   if (subcommand !== "contract") {
     writeErr(`dabbler module: '${subcommand}' is not a subcommand\n\n${usage()}`);
     return EXIT_USAGE;

@@ -62,6 +62,10 @@ export type Rounds = {
     listings?: number;
     searches?: number;
     out_of_scope?: number;
+    /**
+     * Of the out-of-scope reads, those the checkout could not deliver: the path is not a file in the working directory. In a focused clone a sibling's implementation is absent rather than hidden, so a refused read is the wall holding, and an out-of-scope read that was delivered is the wall leaking. A refusal is not a finding against the tree.
+     */
+    refused_reads?: number;
     over_budget?: number;
     transformed_reads?: number;
     /**
@@ -73,6 +77,10 @@ export type Rounds = {
       kind: "list" | "search" | "read" | "handoff";
       target: string;
       in_scope: boolean;
+      /**
+       * Present and true for a read outside the scope that found no file in this checkout.
+       */
+      refused?: boolean;
       fidelity?: "verbatim" | "transformed" | "unverified";
       detail?: string;
     }>;

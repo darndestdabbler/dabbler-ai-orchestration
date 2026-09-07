@@ -120,6 +120,10 @@
                 "description": "Each choice with what follows from it, as the brief states them. A surface that offered the labels alone would be asking the operator to decide from a menu with no prices."
               },
               "recommendation": { "type": ["string", "null"] },
+              "sessionNumber": {
+                "type": ["integer", "null"],
+                "description": "The session the decision was raised for, when one was: a grant request renders on its session's row. Null, or absent, for a repository-wide question."
+              },
               "confidence": { "type": ["string", "null"], "enum": ["high", "medium", "low", null] }
             }
           }
@@ -140,7 +144,52 @@
         "invariantViolation": {
           "type": ["string", "null"],
           "description": "Two sessions in flight, or another state the ledger may not be in. Rendered, never repaired."
+        },
+        "exposure": {
+          "description": "The in-flight session's exposure manifest -- what its working directory holds of its sibling modules, the grants in force and what changed outside its scope -- or null for a single-module repository, a session with none, or nothing in flight.",
+          "oneOf": [{ "$ref": "#/$defs/exposure" }, { "type": "null" }]
         }
+      }
+    },
+    "exposure": {
+      "description": "One session's exposure manifest, as .dabbler/runs/s<N>/exposure.json carries it. siblings lists every module the session does not name with the implementation bytes its roots hold in the working directory (the contract folder excluded; the target is zero); grants are those in force with the reason each was given; outsideScope is the session's changed paths that its scope does not cover.",
+      "type": "object",
+      "required": ["schema_version", "session", "modules", "phase", "writtenAt", "siblings", "grants", "outsideScope"],
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": { "type": "integer", "const": 1 },
+        "session": { "type": "integer", "minimum": 1 },
+        "modules": { "type": "array", "items": { "type": "string" } },
+        "phase": { "type": "string", "enum": ["start", "close"] },
+        "writtenAt": { "type": "string" },
+        "siblings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["slug", "bytes", "files"],
+            "additionalProperties": false,
+            "properties": {
+              "slug": { "type": "string" },
+              "bytes": { "type": "integer", "minimum": 0 },
+              "files": { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        },
+        "grants": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["sibling", "reason", "debug", "grantedAt"],
+            "additionalProperties": false,
+            "properties": {
+              "sibling": { "type": "string" },
+              "reason": { "type": "string" },
+              "debug": { "type": "boolean" },
+              "grantedAt": { "type": "string" }
+            }
+          }
+        },
+        "outsideScope": { "type": "array", "items": { "type": "string" } }
       }
     },
     "task": {
@@ -175,7 +224,11 @@
           "type": ["string", "null"],
           "description": "'verbatim' / 'transformed' / 'unverified', or null when the row was written before fidelity was recorded."
         },
-        "inScope": { "type": "boolean" }
+        "inScope": { "type": "boolean" },
+        "refused": {
+          "type": "boolean",
+          "description": "A read outside the scope that found no file in the checkout: the wall holding."
+        }
       }
     },
     "agency": {
@@ -200,6 +253,11 @@
         "listings": { "type": "integer", "minimum": 0 },
         "transformedReads": { "type": "integer", "minimum": 0 },
         "outOfScope": { "type": "integer", "minimum": 0 },
+        "refusedReads": {
+          "description": "Of the out-of-scope reads, those the checkout could not deliver: the wall holding, in a focused clone. Zero for a round recorded before the count existed.",
+          "type": "integer",
+          "minimum": 0
+        },
         "overBudget": { "type": "integer", "minimum": 0 },
         "reason": { "type": ["string", "null"] },
         "operations": {

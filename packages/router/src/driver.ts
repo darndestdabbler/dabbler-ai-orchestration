@@ -284,8 +284,31 @@ export function validateWorkPlan(
  * single-module solution accepts an absent list and refuses a named module
  * that is not its own; nothing module-shaped is asked of it.
  */
-export function judgeWorkPlanModules(plan: DriverWorkPlan, shape: SolutionShape): string[] {
-  return judgeModulesForShape(plan.modules ?? [], plan.reason ?? null, shape, "the plan");
+export function judgeWorkPlanModules(
+  plan: DriverWorkPlan,
+  shape: SolutionShape,
+  checkout: string | null = null,
+): string[] {
+  const reasons = judgeModulesForShape(plan.modules ?? [], plan.reason ?? null, shape, "the plan");
+  // A session started in a module's focused checkout IS that module's: the
+  // clone holds no other module's source, so a plan naming another one
+  // would scope the verifier, the manifest and the Explorer to work the
+  // checkout cannot hold. The checkout is the authority; the plan agrees
+  // with it or is refused. A session that must change two modules runs in
+  // the full checkout, started without --module.
+  if (checkout !== null) {
+    const named = (plan.modules ?? []).map((slug) => slug.trim()).filter((slug) => slug !== "");
+    const others = named.filter((slug) => slug !== checkout);
+    if (named.length === 0 || others.length > 0) {
+      reasons.push(
+        `the plan names ${named.length === 0 ? "no module" : `module(s) ${named.join(", ")}`}, and this ` +
+          `session runs in module '${checkout}'s focused checkout, which holds that module's source ` +
+          `and no other's: the plan names '${checkout}' and nothing else. A session that must change ` +
+          "two modules runs in the full checkout, started without --module.",
+      );
+    }
+  }
+  return reasons;
 }
 
 /**

@@ -56,6 +56,7 @@ import { isRecognizedVerdictToken } from "../utils/verdictTokens";
 export type WorkExplorerNode =
   | RepositoryNode
   | BucketNode
+  | ModuleGroupNode
   | SessionNode
   | VerificationNode
   | FindingNode
@@ -85,6 +86,19 @@ export interface BucketNode {
   readonly bucket: BucketKey;
   readonly sessions: readonly SessionRecord[];
   readonly notes: readonly AttentionNode[];
+}
+
+/**
+ * A module's sessions inside one lifecycle bucket: the level that appears
+ * between a bucket and its sessions once the record names modules, and
+ * never for a single-module solution.
+ */
+export interface ModuleGroupNode {
+  readonly kind: "moduleGroup";
+  readonly repository: SessionsRepository;
+  readonly bucket: BucketKey;
+  readonly module: string;
+  readonly sessions: readonly SessionRecord[];
 }
 
 export interface SessionNode {
@@ -223,6 +237,71 @@ export function sessionNodes(node: BucketNode): SessionNode[] {
 }
 
 /**
+ * A bucket's sessions grouped under their module, when the record names
+ * one -- a multi-module solution, whose sessions are each on a module. The
+ * groups read in order of first appearance within the bucket's own order,
+ * and a session whose row names no module (one that predates the
+ * manifest) sits under the bucket after the groups. A repository whose rows
+ * name none -- a single-module solution -- is grouped by nothing and reads
+ * exactly as it always has.
+ */
+export function moduleGroupNodes(node: BucketNode): (ModuleGroupNode | SessionNode)[] {
+  const moduleOf = (session: SessionRecord): string | null => {
+    const first = session.modules?.[0];
+    return typeof first === "string" && first !== "" ? first : null;
+  };
+  if (!node.sessions.some((session) => moduleOf(session) !== null)) return sessionNodes(node);
+  const groups = new Map<string, SessionRecord[]>();
+  const ungrouped: SessionRecord[] = [];
+  for (const session of node.sessions) {
+    const slug = moduleOf(session);
+    if (slug === null) {
+      ungrouped.push(session);
+      continue;
+    }
+    const members = groups.get(slug);
+    if (members === undefined) groups.set(slug, [session]);
+    else members.push(session);
+  }
+  return [
+    ...[...groups.entries()].map(
+      ([module, sessions]): ModuleGroupNode => ({
+        kind: "moduleGroup",
+        repository: node.repository,
+        bucket: node.bucket,
+        module,
+        sessions,
+      }),
+    ),
+    ...ungrouped.map((session): SessionNode => ({ kind: "session", repository: node.repository, session })),
+  ];
+}
+
+/** A module group's sessions, in the bucket's order. */
+export function moduleGroupSessionNodes(node: ModuleGroupNode): SessionNode[] {
+  return node.sessions.map((session) => ({ kind: "session", repository: node.repository, session }));
+}
+
+/**
+ * The decisions raised for this session -- a grant request, in the block
+ * that introduced them -- rendered on the session that asked, as the
+ * attention rows they are, with their own options as the answers.
+ */
+export function sessionDecisionNodes(node: SessionNode): AttentionNode[] {
+  return (node.repository.owedDecisions ?? [])
+    .filter((owed) => owed.sessionNumber === node.session.number && owed.id.startsWith("module-grant:"))
+    .map((owed) => ({
+      kind: "attention" as const,
+      repository: node.repository,
+      subject: "owed" as const,
+      label: owed.question,
+      detail: owed.blocking ? "Holds the close until you answer it" : owed.onNoAnswer || "Waiting on you",
+      urgent: owed.blocking,
+      decision: owed,
+    }));
+}
+
+/**
  * The third level: the in-flight session's tasks, exactly as the
  * projection lists them. A refusal outranks the list — the projection
  * refuses an unreadable execution record rather than emitting rows, and
@@ -327,11 +406,14 @@ export function childrenOf(node: WorkExplorerNode): WorkExplorerNode[] {
       // reason they opened the view, and it reads first.
       return [...attentionNodes(node), ...bucketNodes(node)];
     case "bucket":
-      return node.bucket === "information" ? [...node.notes] : sessionNodes(node);
+      return node.bucket === "information" ? [...node.notes] : moduleGroupNodes(node);
+    case "moduleGroup":
+      return moduleGroupSessionNodes(node);
     case "session":
-      // What stopped the session reads above what it was doing: the
-      // verification row first, then the tasks.
-      return [...verificationNodes(node), ...taskNodes(node)];
+      // What is asked of the operator for this session reads first; then
+      // what stopped it, above what it was doing: the verification row,
+      // then the tasks.
+      return [...sessionDecisionNodes(node), ...verificationNodes(node), ...taskNodes(node)];
     case "verification":
       return findingNodes(node);
     case "task":
@@ -405,6 +487,7 @@ export function hasToken(contextValue: string, token: string): boolean {
 export const NODE_TOKEN = {
   repository: "dabblerRepository",
   bucket: "dabblerBucket",
+  moduleGroup: "dabblerModuleGroup",
   session: "dabblerSession",
   verification: "dabblerVerification",
   finding: "dabblerFinding",
@@ -965,6 +1048,8 @@ export function descriptorFor(node: WorkExplorerNode): RowDescriptor {
       return repositoryDescriptor(node);
     case "bucket":
       return bucketDescriptor(node);
+    case "moduleGroup":
+      return moduleGroupDescriptor(node);
     case "attention":
       return attentionDescriptor(node);
     case "session":
@@ -1202,6 +1287,22 @@ export function bucketDescriptor(node: BucketNode): RowDescriptor {
         : { kind: "file", slug: ICON_FILES[node.bucket] },
     contextValue: tokenString([NODE_TOKEN.bucket, `bucket-${node.bucket}`]),
     // Never a leaf: an empty bucket is not rendered at all (bucketNodes).
+    collapsible: node.bucket === "in-progress" ? "expanded" : "collapsed",
+  };
+}
+
+/** A module's sessions in a bucket: the slug, and how many of them. */
+export function moduleGroupDescriptor(node: ModuleGroupNode): RowDescriptor {
+  const count = node.sessions.length;
+  return {
+    id: `module:${node.repository.root}/${node.bucket}/${node.module}`,
+    label: node.module,
+    description: String(count),
+    tooltip: `**${node.module}**\n\n${count} session${count === 1 ? "" : "s"} on this module`,
+    icon: { kind: "theme", id: "package" },
+    contextValue: tokenString([NODE_TOKEN.moduleGroup, `module-${node.module}`]),
+    // Open where the work is: the live bucket's groups read expanded, as
+    // the bucket itself does; a finished module folds.
     collapsible: node.bucket === "in-progress" ? "expanded" : "collapsed",
   };
 }

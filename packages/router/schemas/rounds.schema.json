@@ -204,6 +204,11 @@
           "type": "integer",
           "minimum": 0
         },
+        "refused_reads": {
+          "description": "Of the out-of-scope reads, those the checkout could not deliver: the path is not a file in the working directory. In a focused clone a sibling's implementation is absent rather than hidden, so a refused read is the wall holding, and an out-of-scope read that was delivered is the wall leaking. A refusal is not a finding against the tree.",
+          "type": "integer",
+          "minimum": 0
+        },
         "over_budget": {
           "type": "integer",
           "minimum": 0
@@ -242,6 +247,10 @@
                 "type": "string"
               },
               "in_scope": {
+                "type": "boolean"
+              },
+              "refused": {
+                "description": "Present and true for a read outside the scope that found no file in this checkout.",
                 "type": "boolean"
               },
               "fidelity": {

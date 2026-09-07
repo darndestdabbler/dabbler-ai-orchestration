@@ -71,6 +71,10 @@ export type ProgressProjectionRepository = {
       consequence: string;
     }[];
     recommendation?: string | null;
+    /**
+     * The session the decision was raised for, when one was: a grant request renders on its session's row. Null, or absent, for a repository-wide question.
+     */
+    sessionNumber?: number | null;
     confidence?: "high" | "medium" | "low" | null;
   }>;
   /**
@@ -87,6 +91,33 @@ export type ProgressProjectionRepository = {
    * Two sessions in flight, or another state the ledger may not be in. Rendered, never repaired.
    */
   invariantViolation: string | null;
+  /**
+   * The in-flight session's exposure manifest -- what its working directory holds of its sibling modules, the grants in force and what changed outside its scope -- or null for a single-module repository, a session with none, or nothing in flight.
+   */
+  exposure?: ProgressProjectionExposure | null;
+};
+
+/**
+ * One session's exposure manifest, as .dabbler/runs/s<N>/exposure.json carries it. siblings lists every module the session does not name with the implementation bytes its roots hold in the working directory (the contract folder excluded; the target is zero); grants are those in force with the reason each was given; outsideScope is the session's changed paths that its scope does not cover.
+ */
+export type ProgressProjectionExposure = {
+  schema_version: 1;
+  session: number;
+  modules: string[];
+  phase: "start" | "close";
+  writtenAt: string;
+  siblings: {
+    slug: string;
+    bytes: number;
+    files: string[];
+  }[];
+  grants: {
+    sibling: string;
+    reason: string;
+    debug: boolean;
+    grantedAt: string;
+  }[];
+  outsideScope: string[];
 };
 
 /**
@@ -116,6 +147,10 @@ export type ProgressProjectionAgencyOperation = {
    */
   fidelity: string | null;
   inScope: boolean;
+  /**
+   * A read outside the scope that found no file in the checkout: the wall holding.
+   */
+  refused?: boolean;
 };
 
 /**
@@ -128,6 +163,10 @@ export type ProgressProjectionAgency = {
   listings: number;
   transformedReads: number;
   outOfScope: number;
+  /**
+   * Of the out-of-scope reads, those the checkout could not deliver: the wall holding, in a focused clone. Zero for a round recorded before the count existed.
+   */
+  refusedReads?: number;
   overBudget: number;
   reason: string | null;
   operations: ProgressProjectionAgencyOperation[];

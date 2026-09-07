@@ -71,8 +71,17 @@ import {
   appendSupervision,
   judgeModulesForShape,
 } from "./driver.ts";
-import { solutionShape } from "./modules.ts";
-import { SET_BOOKKEEPING_COMMIT_BASENAMES, governingConfig, runGates } from "./gates.ts";
+import { ManifestError, type SolutionShape, moduleConfigs, solutionShape } from "./modules.ts";
+import { moduleScope } from "./agency.ts";
+import { CheckoutError, openModule, readCloneMarker, writeModuleSessionMarker } from "./checkout.ts";
+import { writeExposure } from "./exposure.ts";
+import {
+  SET_BOOKKEEPING_COMMIT_BASENAMES,
+  governingConfig,
+  materialPaths,
+  readWorktreeStatus,
+  runGates,
+} from "./gates.ts";
 import { refuseIfResolvingFromSource } from "./resolution.ts";
 import { detectEcosystems } from "./bootstrap/detect.ts";
 import { installStopGate } from "./bootstrap/index.ts";
@@ -115,6 +124,7 @@ import {
   onDiskState,
   recordProjectPlan,
   WORK_PLAN_FILENAME,
+  recordSessionCheckout,
   registerSessionStart,
   validateAndWriteState,
 } from "./writers.ts";
@@ -529,6 +539,135 @@ export interface StartOptions {
   readonly effort?: string | null;
   readonly sessionNumber?: number | null;
   readonly totalSessions?: number | null;
+  /** The module the session works in: registered in its focused clone. Multi-module only. */
+  readonly module?: string | null;
+}
+
+/** Where a module session is registered: the clone, and the clone's sessions root. */
+interface ModuleStart {
+  readonly slug: string;
+  readonly root: string;
+  readonly sessionsDir: string;
+  readonly shape: SolutionShape;
+  /** True when `start` stood in the full checkout and made the clone; false inside the clone itself. */
+  readonly fullCheckout: boolean;
+}
+
+/**
+ * The focused clone a `start --module` registers in.
+ *
+ * Inside a clone that already is the module's, the session registers here.
+ * In the full checkout the clone is made from the origin, so the checkout
+ * must have nothing the origin lacks: a dirty tree or unpushed commits are
+ * refused by name rather than silently left out of the session's base.
+ */
+function prepareModuleStart(sessionsDir: string, slug: string): ModuleStart {
+  const repoRoot = repoRootFromSessionsDir(sessionsDir);
+  const shape = solutionShape(repoRoot);
+  if (!shape.multi) {
+    throw new CheckoutError(
+      "this repository is a single-module solution: the repository is the module, so " +
+        "start without --module",
+    );
+  }
+  if (!shape.modules.some((entry) => entry.slug === slug)) {
+    throw new CheckoutError(`docs/modules.yaml declares no module '${slug}'`);
+  }
+  const marker = readCloneMarker(repoRoot);
+  if (marker !== null) {
+    if (marker.slug !== slug) {
+      throw new CheckoutError(
+        `this checkout is module '${marker.slug}'s focused clone; a session on '${slug}' ` +
+          "starts from the full checkout, which makes its own clone",
+      );
+    }
+    return { slug, root: repoRoot, sessionsDir, shape, fullCheckout: false };
+  }
+  // Material changes only: the lifecycle lock this start holds, the run
+  // ledger and an engine's own install are machine state, not work.
+  const status = readWorktreeStatus(repoRoot);
+  const setRel = relative(repoRoot, resolve(sessionsDir)).split("\\").join("/");
+  const material = status.error === "" ? materialPaths(status.text, setRel, { beforeWork: true }) : [];
+  if (material.length > 0) {
+    throw new CheckoutError(
+      `the working tree carries ${material.length} change(s) (${material.slice(0, 3).join(", ")}); ` +
+        "the module's clone is made from the origin, so commit and push them (or stash them) " +
+        "before starting the session",
+    );
+  }
+  const ahead = runGit(repoRoot, ["rev-list", "--count", "@{upstream}..HEAD"]);
+  if (ahead.code === 0 && Number.parseInt(ahead.stdout.trim(), 10) > 0) {
+    throw new CheckoutError(
+      `HEAD is ${ahead.stdout.trim()} commit(s) ahead of its upstream; the module's clone ` +
+        "is made from the origin, so push first",
+    );
+  }
+  const opened = openModule(repoRoot, shape, slug, { config: loadConfig(undefined, repoRoot) });
+  const cloneSessionsDir = join(opened.path, relative(repoRoot, resolve(sessionsDir)));
+  return {
+    slug,
+    root: opened.path,
+    sessionsDir: cloneSessionsDir,
+    shape: solutionShape(opened.path),
+    fullCheckout: true,
+  };
+}
+
+/** The module scope of a session's row, for the exposure manifest; null where the session names no module. */
+function moduleScopeOfSession(
+  repoRoot: string,
+  sessionsDir: string,
+  shape: SolutionShape,
+  modules: readonly string[],
+): string[] {
+  const shared = new Map(
+    [...moduleConfigs(loadConfig(undefined, repoRoot), shape.modules).values()].map((module) => [
+      module.slug,
+      module.sharedFiles,
+    ]),
+  );
+  return moduleScope(repoRoot, sessionsDir, shape, modules, shared);
+}
+
+/**
+ * The exposure manifest at the close of a module session: what the clone
+ * held of its siblings, and what the session changed outside its scope.
+ * Best-effort, like every other record the close adds beside the gates: a
+ * close must not fail because a manifest could not be written.
+ */
+function writeCloseExposure(sessionsDir: string, repoRoot: string, current: number): void {
+  try {
+    const raw = readRawSessionState(sessionsDir);
+    const row = raw === null ? null : sessionRecord(raw, current);
+    // The checkout is the authority for what the session is scoped to; the
+    // declaration, held to it at acceptance, is the fallback for a module
+    // session that predates the checkout on the row.
+    const checkout = row?.["checkout"];
+    const checkoutModule =
+      typeof checkout === "object" && checkout !== null && !Array.isArray(checkout)
+        ? (checkout as Record<string, unknown>)["module"]
+        : null;
+    const modules =
+      typeof checkoutModule === "string" && checkoutModule.trim() !== ""
+        ? [checkoutModule.trim()]
+        : Array.isArray(row?.["modules"])
+          ? (row?.["modules"] as unknown[]).map(String)
+          : [];
+    if (modules.length === 0) return;
+    const shape = solutionShape(repoRoot);
+    if (!shape.multi) return;
+    const run = readRun(repoRoot, current);
+    const baseline = run?.baseline_tree ?? null;
+    const changed = baseline === null ? [] : (changedPathsBetween(repoRoot, String(baseline), "HEAD") ?? []);
+    writeExposure(repoRoot, shape, current, {
+      modules,
+      phase: "close",
+      scope: moduleScopeOfSession(repoRoot, sessionsDir, shape, modules),
+      changedPaths: changed,
+    });
+  } catch {
+    // Deliberately silent: see above.
+  }
 }
 
 /** Who is working, as the four fields the orchestrator block carries. */
@@ -788,17 +927,57 @@ export function start(sessionsDir: string, options: StartOptions): number {
       writeErr(`start: refused -- ${error.message}\n`);
       return EXIT_USAGE;
     }
-    registerSessionStart(sessionsDir, requested, {
+    // A module session is registered in the module's focused clone, made
+    // here from the origin when `start` stands in the full checkout. The
+    // clone's sessions root is the session's from now on; the full checkout
+    // keeps only a marker saying where the work went.
+    let moduleStart: ModuleStart | null = null;
+    if (options.module !== null && options.module !== undefined && options.module.trim() !== "") {
+      try {
+        moduleStart = prepareModuleStart(sessionsDir, options.module.trim());
+      } catch (error) {
+        if (error instanceof CheckoutError || error instanceof ManifestError) {
+          writeErr(`start: refused -- ${error.message}\n`);
+          return EXIT_USAGE;
+        }
+        throw error;
+      }
+    }
+    const registerIn = moduleStart === null ? sessionsDir : moduleStart.sessionsDir;
+    registerSessionStart(registerIn, requested, {
       engine: identity.engine,
       provider: identity.provider,
       model: identity.model,
       effort: identity.effort,
       totalSessions: options.totalSessions,
     });
-    writeOut(
-      `start: session ${sessionDisplayNumber(requested)} of ` +
-        `${basename(sessionsDir)} registered (${options.engine}).\n`,
-    );
+    if (moduleStart !== null) {
+      recordSessionCheckout(registerIn, requested, { module: moduleStart.slug, path: moduleStart.root });
+      writeExposure(moduleStart.root, moduleStart.shape, requested, {
+        modules: [moduleStart.slug],
+        phase: "start",
+        scope: moduleScopeOfSession(moduleStart.root, registerIn, moduleStart.shape, [moduleStart.slug]),
+      });
+      if (moduleStart.fullCheckout) {
+        writeModuleSessionMarker(repoRootFromSessionsDir(sessionsDir), {
+          session: requested,
+          module: moduleStart.slug,
+          path: moduleStart.root,
+          sessionsDir: registerIn,
+          startedAt: nowIso("seconds"),
+        });
+      }
+      writeOut(
+        `start: session ${sessionDisplayNumber(requested)} of ${basename(registerIn)} registered ` +
+          `(${options.engine}) in module '${moduleStart.slug}'s focused checkout at ` +
+          `${moduleStart.root}; the exposure manifest is written there.\n`,
+      );
+    } else {
+      writeOut(
+        `start: session ${sessionDisplayNumber(requested)} of ` +
+          `${basename(sessionsDir)} registered (${options.engine}).\n`,
+      );
+    }
     for (const line of discoveryWarnings()) writeOut(`${line}\n`);
     // The stop gate is installed for the engine that needs it, here, where
     // the engine is known -- not by bootstrap, which knows only the shell it
@@ -806,7 +985,7 @@ export function start(sessionsDir: string, options: StartOptions): number {
     // because a settings file could not be written.
     if (identity.engine === "claude-code") {
       try {
-        const hooked = installStopGate(repoRootFromSessionsDir(sessionsDir));
+        const hooked = installStopGate(repoRootFromSessionsDir(registerIn));
         if (hooked !== null) {
           writeOut(
             `start: installed the stop gate in ${hooked} -- the framework's own ` +
@@ -821,7 +1000,7 @@ export function start(sessionsDir: string, options: StartOptions): number {
     // that would trip over it begins. Idempotent, and best-effort: a
     // registration must not fail because a brief could not be written.
     try {
-      const raised = raiseSuiteDecisionIfOwed(sessionsDir, requested);
+      const raised = raiseSuiteDecisionIfOwed(registerIn, requested);
       if (raised !== null) {
         writeOut(
           `start: raised owed decision '${String(raised["id"])}' -- ` +
@@ -838,7 +1017,7 @@ export function start(sessionsDir: string, options: StartOptions): number {
     // four sessions of one test repository were told to run verbs the pull
     // forbids. The declaration is the plan step's answer; the tests are the
     // framework's.
-    writeOut(`Next: dabbler session next --sessions-dir ${sessionsDir}\n`);
+    writeOut(`Next: dabbler session next --sessions-dir ${registerIn}\n`);
     return EXIT_OK;
   } finally {
     releaseLock(lock);
@@ -1756,6 +1935,9 @@ export function close(sessionsDir: string, options: CloseCliOptions = {}): numbe
     if (repoRoot) {
       const row = latestRound(repoRoot, current);
       if (row) verdict = row["verdict"] ?? null;
+      // What the clone held of its siblings at the end, and what the session
+      // changed outside its scope: the second half of the exposure record.
+      writeCloseExposure(sessionsDir, repoRoot, current as number);
     }
 
     flipStateToClosed(sessionsDir, {

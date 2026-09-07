@@ -5265,12 +5265,20 @@ Explorer groups sessions by status bucket.*
    scope is the module's `codeRoots`, its `contract/`, its dependencies'
    `contract/` folders, the root build files and `sharedFiles` — never a
    sibling's source. Single-module: `sessionScope` as today. One test.
-3. **The verifier refuses, and the round records it.** On the API and
-   Copilot transports the tool executor answers a read outside the scope
-   with a refusal naming the scope instead of the bytes, the operation is
-   recorded `refused`, and `rounds.jsonl` gains `refused_reads` beside
-   `out_of_scope` (schema and generated type). A refusal is not a finding
-   against the tree. One test over a scripted round.
+3. **The wall is the disk, and the round records it.** *(Amended in
+   session 105: neither transport executes the verifier's reads — the
+   Copilot CLI runs its own tools and reports them afterwards, and the
+   API transport sends none — so no executor of the framework's can
+   answer a read with a refusal. The focused clone can: a sibling's
+   implementation is absent from it, not hidden.)* A read outside the
+   scope that found no file in the working directory is recorded
+   `refused` — the wall holding — apart from an out-of-scope read that was
+   delivered, which is the wall leaking; `rounds.jsonl` gains
+   `refused_reads` beside `out_of_scope` (schema and generated type), the
+   projection carries `refusedReads`, and the briefing tells the verifier
+   that a path outside the scope may not be in this checkout and that a
+   refusal is not a finding against the tree. One test over a scripted
+   round.
 4. **The exposure manifest.** `.dabbler/runs/s<N>/exposure.json`, written
    at `session start` and again at the close: for each sibling module,
    the implementation bytes present under its `codeRoots` in the session's

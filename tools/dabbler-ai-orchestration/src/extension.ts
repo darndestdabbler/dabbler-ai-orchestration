@@ -40,6 +40,7 @@ import {
   revealRepository,
 } from "./commands/openRepository";
 import { openModule } from "./commands/openModule";
+import { endGrant, widenForDebugging } from "./commands/moduleGrant";
 import { WorkExplorerTreeProvider } from "./providers/WorkExplorerTreeProvider";
 import { productionRouter } from "./router/host";
 
@@ -293,6 +294,17 @@ export function activate(context: vscode.ExtensionContext): void {
       (node?: SolutionNode) =>
         openModule(productionRouter(), { node, projection: solutionProvider.currentProjection() }),
     ),
+    // A grant is asked for on the sibling's row and answered on the Work
+    // Explorer; ending one is the router's refusal to honour while the
+    // sibling's roots hold changes. Both refresh the tree: the badge moves.
+    vscode.commands.registerCommand("dabblerSolution.grantModule", async (node?: SolutionNode) => {
+      await widenForDebugging(productionRouter(), { node, projection: solutionProvider.currentProjection() });
+      solutionProvider.refresh();
+    }),
+    vscode.commands.registerCommand("dabblerSolution.revokeModule", async (node?: SolutionNode) => {
+      await endGrant(productionRouter(), { node, projection: solutionProvider.currentProjection() });
+      solutionProvider.refresh();
+    }),
     // The four an ABSENT row has: a row that could only say "not on this
     // machine" is where this journey used to end. Each writes through the
     // router -- the extension never authors the declaration itself -- and

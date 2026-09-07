@@ -43,7 +43,9 @@ import {
   type BootstrapOptions,
   type LedgerVerbs,
   type ModuleCreateOptions,
+  type ModuleGrantOptions,
   type ModuleOpenOptions,
+  type ModuleRevokeOptions,
   type ModuleVerbs,
   type OneModuleVerbs,
   type OwedAnswerOptions,
@@ -258,6 +260,7 @@ export class InProcessRouter implements Router {
       const args = ["start", "--engine", o.engine, "--provider", o.provider];
       optional(args, "--model", o.model);
       optional(args, "--effort", o.effort);
+      optional(args, "--module", o.module);
       return this.text("session", [...args, ...targetArgs(o)], o.repoRoot);
     },
     declare: (o: SessionDeclareOptions) =>
@@ -363,6 +366,13 @@ export class InProcessRouter implements Router {
       if (o.reset === true) args.push("--reset");
       return this.text("module", args, o.workspaceRoot);
     },
+    grant: (o: ModuleGrantOptions) => {
+      const args = ["grant", o.slug, "--reason", o.reason, "--workspace-root", o.workspaceRoot];
+      if (o.debug === true) args.push("--debug");
+      return this.text("module", args, o.workspaceRoot);
+    },
+    revoke: (o: ModuleRevokeOptions) =>
+      this.text("module", ["revoke", o.slug, "--workspace-root", o.workspaceRoot], o.workspaceRoot),
   };
 
   // --- verify ----------------------------------------------------------------

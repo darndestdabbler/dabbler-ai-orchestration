@@ -113,6 +113,11 @@ export interface SessionStartOptions extends RepositoryTarget {
   /** Required for a seat whose label does not resolve an identity. */
   readonly model?: string;
   readonly effort?: string;
+  /**
+   * The module the session works in, for a multi-module solution: the
+   * session is registered in the module's focused clone and works there.
+   */
+  readonly module?: string;
 }
 
 export interface SessionDeclareOptions extends RepositoryTarget {
@@ -225,8 +230,26 @@ export interface ModuleOpenOptions {
  * because the extension's next move is to open a window at that path, and a
  * path parsed out of prose is a path that eventually parses wrong.
  */
+export interface ModuleGrantOptions {
+  readonly workspaceRoot: string;
+  /** The sibling whose source the session asks for. */
+  readonly slug: string;
+  readonly reason: string;
+  /** Lay the overlay that builds the sibling from source in this clone. */
+  readonly debug?: boolean;
+}
+
+export interface ModuleRevokeOptions {
+  readonly workspaceRoot: string;
+  readonly slug: string;
+}
+
 export interface OneModuleVerbs {
   open(options: ModuleOpenOptions): Promise<RouterResult<RouterText>>;
+  /** Raise the owed decision that widens the checkout to a sibling's source. */
+  grant(options: ModuleGrantOptions): Promise<RouterResult<RouterText>>;
+  /** End a grant: narrow the checkout again. */
+  revoke(options: ModuleRevokeOptions): Promise<RouterResult<RouterText>>;
 }
 
 export interface VerifyRoundOptions extends RepositoryTarget {

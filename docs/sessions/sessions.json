@@ -2058,22 +2058,33 @@
         "identityProvenance": "direct"
       },
       "verificationVerdict": "VERIFIED",
-      "frameworkVersion": "2.0.7",
+      "verification": {
+        "rounds": 2,
+        "verifierModel": "gpt-5.4",
+        "verifierProvider": "openai",
+        "transport": "copilot-cli"
+      },
+      "frameworkVersion": "2.0.7"
+    },
+    {
+      "number": 105,
+      "title": "Module-scoped sessions, the hard verifier scope, the exposure manifest and grants",
+      "status": "in-progress",
+      "startedAt": "2026-09-06T22:19:41.833000-04:00",
+      "completedAt": null,
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": "VERIFIED",
+      "frameworkVersion": "2.0.8",
       "verification": {
         "rounds": 2,
         "verifierModel": "gpt-5.4",
         "verifierProvider": "openai",
         "transport": "copilot-cli"
       }
-    },
-    {
-      "number": 105,
-      "title": "Module-scoped sessions, the hard verifier scope, the exposure manifest and grants",
-      "status": "not-started",
-      "startedAt": null,
-      "completedAt": null,
-      "orchestrator": null,
-      "verificationVerdict": null
     },
     {
       "number": 106,

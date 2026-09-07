@@ -40,6 +40,13 @@ export type SessionsSessionRecord = {
    * The module(s) the accepted work plan named, by slug, written by the declaring writer for a multi-module solution only. Absent on every session of a single-module repository and on every row written before the vocabulary existed: nothing module-shaped is persisted for that shape.
    */
   modules?: string[];
+  /**
+   * The focused checkout a module session runs in: the module, and the clone's absolute path on the machine that registered it. Written by `session start --module` for a multi-module solution only; absent on every other row. A path is machine state and this is the one place the ledger carries one, because the clone is where the session's own record lives.
+   */
+  checkout?: {
+    module: string;
+    path: string;
+  };
 };
 
 /**

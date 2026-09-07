@@ -15,9 +15,12 @@
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 
+import { sessionsDirFor } from "./evidence.ts";
+import { readExposure } from "./exposure.ts";
 import { platformNewlines } from "./journal.ts";
 import { dumps } from "./pythonJson.ts";
 import { consumersOf, ManifestError, solutionShape } from "./modules.ts";
+import { readRawSessionState } from "./sessionState.ts";
 import {
   assembleSolution,
   locateProducer,
@@ -45,9 +48,27 @@ export function contractDirFor(slug: string): string {
 }
 
 /** What the Explorer reads: the manifest, joined to the tree. */
+/**
+ * The siblings a grant has widened the in-flight session's checkout to, from
+ * that session's exposure manifest in this root. Empty where nothing is in
+ * flight, or the session is not a module session, or this is not a clone.
+ */
+function grantedSiblings(root: string): Set<string> {
+  try {
+    const raw = readRawSessionState(sessionsDirFor(root));
+    const sessions = Array.isArray(raw?.["sessions"]) ? (raw?.["sessions"] as Record<string, unknown>[]) : [];
+    const current = sessions.find((row) => row["status"] === "in-progress");
+    if (current === undefined || typeof current["number"] !== "number") return new Set();
+    return new Set((readExposure(root, current["number"])?.grants ?? []).map((grant) => grant.sibling));
+  } catch {
+    return new Set();
+  }
+}
+
 export function project(root: string): Record<string, unknown> {
   const shape = solutionShape(root);
   const name = basename(resolve(root)) || "solution";
+  const granted = grantedSiblings(root);
   const modules: Node[] = shape.modules.map((entry) => {
     const contractDir = contractDirFor(entry.slug);
     return {
@@ -65,6 +86,9 @@ export function project(root: string): Record<string, unknown> {
       // not declared a seam.
       contractDir:
         entry.contract !== null && existsSync(join(root, contractDir)) ? contractDir : null,
+      // A grant in force for this module in the in-flight session: the
+      // Explorer badges the row, and offers to end it.
+      granted: granted.has(entry.slug),
     } satisfies Node;
   });
   const doc: Node = {

@@ -458,6 +458,11 @@ testing:
         select:
           - packages/router/test/checkout.test.ts
           - packages/router/test/walk-checkout.test.ts
+      # The exposure manifest: what a module session's checkout holds of its
+      # siblings, the grants in force, and what changed outside the scope.
+      - when: packages/router/src/exposure.ts
+        select:
+          - packages/router/test/exposure.test.ts
       - when: packages/router/src/pythonJson.ts
         select:
           - packages/router/test/lockfile.test.ts

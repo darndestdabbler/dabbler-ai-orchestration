@@ -161,6 +161,18 @@
         "icon": "$(empty-window)"
       },
       {
+        "command": "dabblerSolution.grantModule",
+        "title": "Widen for Debugging",
+        "category": "Dabbler",
+        "icon": "$(unlock)"
+      },
+      {
+        "command": "dabblerSolution.revokeModule",
+        "title": "End Grant",
+        "category": "Dabbler",
+        "icon": "$(lock)"
+      },
+      {
         "command": "dabblerSolution.revealRepository",
         "title": "Reveal in File Explorer",
         "category": "Dabbler",
@@ -235,6 +247,14 @@
           "when": "false"
         },
         {
+          "command": "dabblerSolution.grantModule",
+          "when": "false"
+        },
+        {
+          "command": "dabblerSolution.revokeModule",
+          "when": "false"
+        },
+        {
           "command": "dabblerWorkExplorer.activateSession",
           "when": "false"
         },
@@ -301,8 +321,18 @@
         },
         {
           "command": "dabblerSolution.openModule",
-          "when": "view == dabblerSolutionTree && viewItem =~ /;focused$/",
+          "when": "view == dabblerSolutionTree && viewItem =~ /;focused/",
           "group": "1_open@1"
+        },
+        {
+          "command": "dabblerSolution.grantModule",
+          "when": "view == dabblerSolutionTree && viewItem =~ /;focused/ && viewItem =~ /^dabblerModule:/",
+          "group": "2_grant@1"
+        },
+        {
+          "command": "dabblerSolution.revokeModule",
+          "when": "view == dabblerSolutionTree && viewItem =~ /;granted/",
+          "group": "2_grant@2"
         },
         {
           "command": "dabblerSolution.openRepository",

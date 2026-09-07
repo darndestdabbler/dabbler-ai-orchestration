@@ -20,16 +20,19 @@ import {
   FIDELITY_NOT_FRAMED,
   FIDELITY_UNREADABLE,
   OP_HANDOFF,
+  REFUSED_DETAIL,
   applyWrites,
   briefing,
   declaredDependencies,
   grantForTransport,
+  moduleScope,
   readFidelity,
   recordForRound,
   recordRow,
   sessionScope,
   summaryLine,
 } from "../src/agency.ts";
+import { dependencyOrder, parseEntries } from "../src/modules.ts";
 import { seed, tempDir } from "./support/answers.ts";
 
 const scopes = [{ suite: "unit", roots: ["tests/"], glob: "test_*.py" }];
@@ -73,6 +76,38 @@ describe("scope", () => {
     assert.deepEqual([...declaredDependencies(repo, ["pkg/a.py"])], ["pkg/b.py"]);
     assert.deepEqual(sessionScope(repo, null, ["pkg/c.py"]), ["pkg/c.py"]);
   });
+
+  it("in the module form takes the module's roots, its and its dependency's contract folders, the root files and the sessions directory, and nothing of the sibling's source", () => {
+    const repo = tempDir();
+    seed(repo, {
+      "global.json": "{}\n",
+      "Directory.Packages.props": "<Project />\n",
+      "Pipeline.sln": "",
+      "modules/model/src/CsvModel/Person.cs": "public sealed class Person {}\n",
+      "modules/model/contract/README.md": "# CsvModel\n",
+      "modules/persister/src/CsvPersister/Store.cs": "public sealed class Store {}\n",
+      "build/common.props": "<Project />\n",
+    });
+    mkdirSync(join(repo, "docs", "sessions"), { recursive: true });
+    const entries = parseEntries({
+      modules: [
+        { slug: "model", codeRoots: ["modules/model"], package: "CsvModel" },
+        { slug: "persister", codeRoots: ["modules/persister"], dependsOn: ["model"], package: "CsvPersister" },
+      ],
+    });
+    const shape = { multi: true, implicit: false, modules: dependencyOrder(entries) };
+    const scope = moduleScope(repo, join(repo, "docs", "sessions"), shape, ["persister"], new Map([["persister", ["build/common.props"]]]));
+    assert.deepEqual(scope, [
+      "Directory.Packages.props",
+      "Pipeline.sln",
+      "build/common.props",
+      "docs/sessions",
+      "global.json",
+      "modules/model/contract",
+      "modules/persister",
+      "modules/persister/contract",
+    ]);
+  });
 });
 
 describe("what the round did", () => {
@@ -90,6 +125,37 @@ describe("what the round did", () => {
     assert.equal(row["reads"], 2);
     assert.equal(row["over_budget"], 1);
     assert.equal(row["out_of_scope"], 1);
+  });
+
+  it("records an out-of-scope read the checkout could not deliver as refused, and a delivered one as out of scope only", () => {
+    // The wall is the disk: in a focused clone the sibling's implementation
+    // is absent. A read of it finds no file and is refused; a read of an
+    // out-of-scope file that IS on disk was delivered, and says so.
+    const repo = tempDir();
+    seed(repo, { "src/a.py": "x = 1\n", "elsewhere/present.py": "y = 2\n" });
+    const record = recordForRound(repo, grantForTransport("copilot-cli", { scope: ["src"], readBudget: 10 }), {
+      tool_calls: [
+        { tool: "view", arguments: { path: "modules/model/src/CsvModel/Person.cs" }, result: { content: "" } },
+        { tool: "view", arguments: { path: "elsewhere/present.py" }, result: { content: "1. y = 2" } },
+        { tool: "view", arguments: { path: "src/a.py" }, result: { content: "1. x = 1" } },
+      ],
+    });
+    assert.deepEqual(
+      record.operations.map((operation) => [operation.inScope, operation.refused === true]),
+      [
+        [false, true],
+        [false, false],
+        [true, false],
+      ],
+    );
+    assert.equal(record.operations[0]?.detail, REFUSED_DETAIL);
+    const row = recordRow(record);
+    assert.equal(row["out_of_scope"], 2);
+    assert.equal(row["refused_reads"], 1);
+    assert.deepEqual(
+      (row["operations"] as Record<string, unknown>[]).map((operation) => operation["refused"] ?? false),
+      [true, false, false],
+    );
   });
 
   it("records a read of the transport's own handoff file as plumbing: neither a read nor an excursion", () => {

@@ -36,7 +36,7 @@ import {
   PACKAGES_DIR,
   ecosystemOf,
 } from "./ecosystem.ts";
-import { runGit } from "./journal.ts";
+import { nowIso, runGit } from "./journal.ts";
 import {
   type ModuleEntry,
   type SolutionShape,
@@ -75,6 +75,58 @@ const RECORD_DIR = "docs";
 
 /** The project-local settings file Claude Code reads and keeps out of git. */
 export const CLAUDE_LOCAL_SETTINGS = ".claude/settings.local.json";
+
+/** What a focused clone says about itself, under its own machine state. */
+export const CLONE_MARKER = ".dabbler/checkout.json";
+
+/** Left in the full checkout while a module session runs in its clone. */
+export const MODULE_SESSION_MARKER = ".dabbler/module-session.json";
+
+export interface CloneMarker {
+  readonly slug: string;
+  readonly origin: string;
+  readonly cone: readonly string[];
+  readonly madeAt: string;
+}
+
+export interface ModuleSessionMarker {
+  readonly session: number;
+  readonly module: string;
+  /** The clone, absolute. */
+  readonly path: string;
+  /** The clone's sessions root, absolute: where `next` must be run. */
+  readonly sessionsDir: string;
+  readonly startedAt: string;
+}
+
+function readJsonFile<T>(path: string): T | null {
+  if (!existsSync(path)) return null;
+  try {
+    const parsed: unknown = JSON.parse(readFileSync(path, "utf8"));
+    return parsed !== null && typeof parsed === "object" && !Array.isArray(parsed) ? (parsed as T) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** The clone's own marker, or null where this root is not a focused clone. */
+export function readCloneMarker(root: string): CloneMarker | null {
+  return readJsonFile<CloneMarker>(join(root, ...CLONE_MARKER.split("/")));
+}
+
+export function readModuleSessionMarker(root: string): ModuleSessionMarker | null {
+  return readJsonFile<ModuleSessionMarker>(join(root, ...MODULE_SESSION_MARKER.split("/")));
+}
+
+export function writeModuleSessionMarker(root: string, marker: ModuleSessionMarker): void {
+  const path = join(root, ...MODULE_SESSION_MARKER.split("/"));
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, `${JSON.stringify(marker, null, 2)}\n`, "utf8");
+}
+
+export function clearModuleSessionMarker(root: string): void {
+  rmSync(join(root, ...MODULE_SESSION_MARKER.split("/")), { force: true });
+}
 
 /**
  * What `module open` does with a clone that already exists when `--reset`
@@ -405,7 +457,17 @@ export function openModule(
     }
   }
   writeEngineSettings(clone);
-  excludeInClone(clone, [CLAUDE_LOCAL_SETTINGS, ...(convenienceFile === null ? [] : [convenienceFile])]);
+  // The clone says what it is, so a `session start --module` run inside it
+  // registers here rather than cloning again; machine state, never tracked.
+  const markerPath = join(clone, ...CLONE_MARKER.split("/"));
+  mkdirSync(dirname(markerPath), { recursive: true });
+  const marker: CloneMarker = { slug, origin: url, cone, madeAt: nowIso("seconds") };
+  writeFileSync(markerPath, `${JSON.stringify(marker, null, 2)}\n`, "utf8");
+  excludeInClone(clone, [
+    CLAUDE_LOCAL_SETTINGS,
+    ".dabbler/",
+    ...(convenienceFile === null ? [] : [convenienceFile]),
+  ]);
 
   return { slug, path: clone, branch, trunk, cone, convenienceFile, filtered, reset, notes };
 }

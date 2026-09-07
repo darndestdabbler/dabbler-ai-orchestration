@@ -36,6 +36,8 @@ export interface ProjectionModule {
   dependsOn: string[];
   usedBy: string[];
   contractDir?: string | null;
+  /** A grant of this module's source is in force in the in-flight session's checkout. */
+  granted?: boolean;
 }
 
 export interface ProjectionExternal {
@@ -374,17 +376,27 @@ export function descriptorFor(
       }
       const bits: string[] = [m.kind];
       bits.push(m.package ? `package: ${m.package}` : "no package");
+      // A grant in force reads on the row: this checkout holds the module's
+      // source, which the wall says it should not, and somebody signed for it.
+      if (m.granted === true) bits.push("widened");
       return {
         id: `module:${m.slug}`,
         label: m.slug,
         description: bits.join(" · "),
-        tooltip: m.title,
-        icon: { id: KIND_ICONS[m.kind] ?? "package" },
+        tooltip:
+          m.granted === true
+            ? `${m.title} — a grant widened this checkout to its source; End grant narrows it again.`
+            : m.title,
+        icon: { id: KIND_ICONS[m.kind] ?? "package", ...(m.granted === true ? { tone: "attention" as const } : {}) },
         expandable: childrenOf(node, p).length > 0,
-        // `;focused` is what Open Module is gated on: only a module of a
-        // multi-module solution has a focused checkout to open. A
+        // `;focused` is what Open Module and Widen for debugging are gated
+        // on: only a module of a multi-module solution has a focused
+        // checkout. `;granted` is what End grant is gated on. A
         // single-module repository is its module, and this window is it.
-        contextValue: `dabblerModule:${m.kind}${p.solution.multi ? ";focused" : ""}`,
+        contextValue:
+          `dabblerModule:${m.kind}` +
+          (p.solution.multi ? ";focused" : "") +
+          (m.granted === true ? ";granted" : ""),
       };
     }
     case "contract": {

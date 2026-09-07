@@ -349,6 +349,27 @@ export function registerSessionStart(
 }
 
 /**
+ * The focused checkout a module session runs in, written onto its row by
+ * `session start --module` and by nothing else. The path is the clone's,
+ * on this machine: the one place the ledger carries machine state, because
+ * the clone is where the session's own record lives from here on.
+ */
+export function recordSessionCheckout(
+  sessionsDir: string,
+  sessionNumber: number,
+  checkout: { readonly module: string; readonly path: string },
+): void {
+  const raw = readRawSessionState(sessionsDir);
+  if (!isRecord(raw) || !Array.isArray(raw["sessions"])) return;
+  for (const record of raw["sessions"]) {
+    if (isRecord(record) && record["number"] === sessionNumber) {
+      record["checkout"] = { module: checkout.module, path: checkout.path };
+    }
+  }
+  validateAndWriteState(sessionsDir, raw);
+}
+
+/**
  * The pure half of a session start: the state file as it will read once
  * `sessionNumber` is registered, from the state as read, the plan's titles,
  * and the clock. Refuses to re-open a closed session.

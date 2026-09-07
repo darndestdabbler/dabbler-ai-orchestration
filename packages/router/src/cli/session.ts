@@ -80,6 +80,10 @@ const OPTIONS: Record<string, readonly string[]> = {
     "                           the model registry rather than the seat label",
     "  --effort EFFORT          optional reasoning effort, recorded with the identity",
     "  --total-sessions N       optional; the ledger otherwise grows to the plan",
+    "  --module SLUG            for a multi-module solution: register the session in",
+    "                           the module's focused clone, made from the origin, and",
+    "                           work there; the plan then names that module and no",
+    "                           other (a two-module session runs in the full checkout)",
   ],
   decision: [
     "  --decider WHO            required: operator | orchestrator | verifier | framework",
@@ -104,6 +108,9 @@ const OPTIONS: Record<string, readonly string[]> = {
   next: [
     "  --transport T            the verification transport, as `dabbler verify` takes it;",
     "                           kept on the run, so naming it again changes it",
+    "  --request-grant SLUG     in a module session: ask the operator for the sibling's",
+    "                           source (with --reason); answers a wait on the decision",
+    "  --reason TEXT            why the session needs it; recorded with the request",
     "",
     "  `session start --engine ... --provider ...` registers a session; `next` never",
     "  does. It advances the one in flight, carrying no identity -- the record holds",
@@ -451,6 +458,14 @@ export async function sessionVerb(argv: string[]): Promise<number> {
       writeErr(`dabbler session start: ${totalSessions}\n`);
       return EXIT_USAGE;
     }
+    if (parsed.modules.length > 1) {
+      writeErr(
+        "dabbler session start: one --module per start -- a session runs in ONE module's " +
+          "focused clone, and its plan names that module and no other; a session that must " +
+          "change two modules runs in the full checkout, started without --module\n",
+      );
+      return EXIT_USAGE;
+    }
     return start(sessionsDir, {
       engine,
       provider: values.get("--provider") ?? null,
@@ -458,6 +473,7 @@ export async function sessionVerb(argv: string[]): Promise<number> {
       effort: values.get("--effort") ?? null,
       sessionNumber,
       totalSessions,
+      module: parsed.modules[0] ?? null,
     });
   }
 
@@ -466,12 +482,19 @@ export async function sessionVerb(argv: string[]): Promise<number> {
       writeErr(`dabbler session next: ${CAP_NOT_TYPEABLE}\n`);
       return EXIT_USAGE;
     }
+    const requestGrant = values.get("--request-grant") ?? null;
+    if (requestGrant !== null && (values.get("--reason") ?? "").trim() === "") {
+      writeErr("dabbler session next: --request-grant needs --reason; the reason is recorded\n");
+      return EXIT_USAGE;
+    }
     return sessionNext(sessionsDir, {
       engine: values.get("--engine") ?? null,
       provider: values.get("--provider") ?? null,
       model: values.get("--model") ?? null,
       effort: values.get("--effort") ?? null,
       transport: values.get("--transport") ?? null,
+      requestGrant,
+      reason: values.get("--reason") ?? null,
     });
   }
 

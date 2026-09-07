@@ -62,7 +62,8 @@
         "contractdoc",
         "ecosystem",
         "packages",
-        "checkout"
+        "checkout",
+        "exposure"
       ]
     },
     "workflow-instruction": {

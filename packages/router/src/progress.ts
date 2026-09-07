@@ -44,6 +44,7 @@ import {
   ROW_REMEDIATED_AT_CAP,
   readRounds,
 } from "./ledger.ts";
+import { readExposure } from "./exposure.ts";
 import { openDecisions } from "./owedDecisions.ts";
 import { pythonRepr, pythonStr } from "./pythonJson.ts";
 import {
@@ -1291,6 +1292,7 @@ function agencyView(roundRow: Record<string, unknown>): Record<string, unknown> 
       target: pyStr(operation["target"]),
       fidelity: operation["fidelity"] ?? null,
       inScope: Boolean(operation["in_scope"] ?? true),
+      refused: operation["refused"] === true,
     });
   }
   return {
@@ -1300,6 +1302,7 @@ function agencyView(roundRow: Record<string, unknown>): Record<string, unknown> 
     listings: pyInt(agency["listings"]),
     transformedReads: pyInt(agency["transformed_reads"]),
     outOfScope: pyInt(agency["out_of_scope"]),
+    refusedReads: pyInt(agency["refused_reads"]),
     overBudget: pyInt(agency["over_budget"]),
     reason: pyStr(agency["reason"]) || null,
     operations,
@@ -1674,9 +1677,22 @@ export function buildProjection(
       forceClosed: Boolean(view["forceClosed"]),
       orchestrator: view["orchestrator"] ?? null,
       invariantViolation,
+      // What the in-flight session's checkout holds of its siblings. Null
+      // is the ordinary answer: a single-module repository has no siblings,
+      // and a session that has not started has no manifest.
+      exposure: exposureForProjection(repoRoot, view["currentSession"] ?? null),
     },
     sessions: sessionsOut,
   };
+}
+
+function exposureForProjection(repoRoot: string | null, current: unknown): unknown {
+  if (repoRoot === null || typeof current !== "number") return null;
+  try {
+    return readExposure(repoRoot, current);
+  } catch {
+    return null;
+  }
 }
 
 // `repr(x)` for the values that reach an invariant message. It lives beside
@@ -1856,6 +1872,7 @@ function owedForProjection(repoRoot: string | null): Record<string, unknown>[] {
         : [],
       recommendation: (row["recommendation"] as string | null) ?? null,
       confidence: (row["confidence"] as string | null) ?? null,
+      sessionNumber: typeof row["sessionNumber"] === "number" ? row["sessionNumber"] : null,
     }));
   } catch {
     return [];

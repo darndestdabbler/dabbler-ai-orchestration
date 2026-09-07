@@ -222,6 +222,16 @@ describe("the four answer schemas", () => {
     assert.deepEqual(judgeWorkPlanModules({ ...plan, modules: ["persister"] }, many), []);
     // A multi-module solution's plan says which module it works in.
     assert.match(judgeWorkPlanModules(plan, many)[0] ?? "", /names no module/);
+    // A session in a module's focused checkout names that module and no
+    // other: the checkout is the authority, whatever reason a second module
+    // is given.
+    assert.deepEqual(judgeWorkPlanModules({ ...plan, modules: ["persister"] }, many, "persister"), []);
+    assert.match(
+      judgeWorkPlanModules({ ...two, reason: "the model's contract changed" }, many, "persister")[0] ?? "",
+      /runs in module 'persister's focused checkout.*names 'persister' and nothing else/,
+    );
+    assert.match(judgeWorkPlanModules({ ...plan, modules: ["model"] }, many, "persister")[0] ?? "", /focused checkout/);
+    assert.match(judgeWorkPlanModules(plan, many, "persister").join(" "), /focused checkout/);
     // A single-module solution: absent is right, its own module is
     // tolerated, another name is refused.
     const one = shape(false, "csv-model");

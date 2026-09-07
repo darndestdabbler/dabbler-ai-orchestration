@@ -68,6 +68,87 @@ suite("workExplorerTreeModel: nodes", () => {
     assert.ok(hasToken(done.contextValue, NODE_TOKEN.bucket));
   });
 
+  test("a bucket groups its sessions under their module when the record names one, and a single-module repository stays ungrouped", () => {
+    const multi = makeRepository({
+      sessions: [
+        makeSession({ number: 1, status: "complete", completedAt: "2026-09-01T10:00:00Z", modules: ["model"] }),
+        makeSession({ number: 2, status: "in-progress", iconKey: "in-progress", modules: ["persister"] }),
+        makeSession({ number: 3, status: "not-started", iconKey: "not-started", modules: ["model"] }),
+        makeSession({ number: 4, status: "not-started", iconKey: "not-started" }),
+      ],
+    });
+    const [repository] = repositoryNodes([multi]);
+    const [live, queued] = bucketNodes(repository);
+    // The in-flight session sits under its module; a group's children are its sessions.
+    const liveChildren = childrenOf(live);
+    assert.deepStrictEqual(
+      liveChildren.map((n) => (n.kind === "moduleGroup" ? ["moduleGroup", n.module, childrenOf(n).map((s) => s.kind === "session" ? s.session.number : null)] : [n.kind])),
+      [["moduleGroup", "persister", [2]]],
+    );
+    // A session naming no module reads under the bucket, after the groups.
+    assert.deepStrictEqual(
+      childrenOf(queued).map((n) => (n.kind === "moduleGroup" ? ["moduleGroup", n.module] : n.kind === "session" ? ["session", n.session.number] : [n.kind])),
+      [["moduleGroup", "model"], ["session", 4]],
+    );
+    const group = liveChildren[0];
+    assert.ok(group.kind === "moduleGroup");
+    const row = descriptorFor(group);
+    assert.strictEqual(row.label, "persister");
+    assert.strictEqual(row.collapsible, "expanded");
+    assert.ok(hasToken(row.contextValue, NODE_TOKEN.moduleGroup));
+
+    // A single-module repository: no row names a module, so nothing groups.
+    const single = makeRepository({
+      sessions: [
+        makeSession({ number: 1, status: "complete" }),
+        makeSession({ number: 2, status: "in-progress", iconKey: "in-progress" }),
+      ],
+    });
+    const [singleRepository] = repositoryNodes([single]);
+    for (const bucket of bucketNodes(singleRepository)) {
+      assert.deepStrictEqual(childrenOf(bucket).map((n) => n.kind), ["session"]);
+    }
+  });
+
+  test("a grant request renders on the session that asked, as the decision it is, with grant and deny as the answers", () => {
+    const decision = {
+      id: "module-grant:model",
+      question: "Widen session 2's focused checkout to module 'model's source?",
+      severity: "advisory" as const,
+      blocking: false,
+      determined: "The engine asked for its source: stepping through the mapper.",
+      recommendation: "deny",
+      onNoAnswer: "The cone stays narrow.",
+      sessionNumber: 2,
+      options: [
+        { label: "grant", consequence: "The cone widens to modules/model." },
+        { label: "deny", consequence: "The cone stays narrow." },
+      ],
+    };
+    const repository = makeRepository({
+      owedDecisions: [decision],
+      sessions: [
+        makeSession({ number: 1, status: "complete", modules: ["model"] }),
+        makeSession({ number: 2, status: "in-progress", iconKey: "in-progress", modules: ["persister"] }),
+      ],
+    });
+    const [node] = repositoryNodes([repository]);
+    const sessions = bucketNodes(node).flatMap((bucket) => childrenOf(bucket)).flatMap((n) => (n.kind === "moduleGroup" ? childrenOf(n) : [n]));
+    const asking = sessions.find((n) => n.kind === "session" && n.session.number === 2);
+    const quiet = sessions.find((n) => n.kind === "session" && n.session.number === 1);
+    assert.ok(asking && quiet);
+    const [first] = childrenOf(asking);
+    assert.ok(first.kind === "attention" && first.decision?.id === "module-grant:model");
+    const row = descriptorFor(first);
+    assert.strictEqual(row.command?.command, "dabbler.answerOwedDecision");
+    assert.deepStrictEqual(row.command?.arguments, [{ repository, decision: repository.owedDecisions[0] }]);
+    assert.ok(row.tooltip?.includes("**grant**"));
+    assert.ok(row.tooltip?.includes("**deny**"));
+    assert.ok(row.tooltip?.includes("recommended"));
+    // Not on the session that did not ask.
+    assert.deepStrictEqual(childrenOf(quiet).filter((n) => n.kind === "attention"), []);
+  });
+
   test("a closed session that stopped at the cap is an Information note, not an attention row", () => {
     // Flagging every closed REMEDIATED_AT_CAP session at the top of the tree
     // read as a standing fault and invited reopening work that later

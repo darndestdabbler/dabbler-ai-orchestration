@@ -78,6 +78,8 @@ import {
 } from "./driver.ts";
 import { readRawSessionState } from "./sessionState.ts";
 import { repoRootFromSessionsDir } from "./evidence.ts";
+import { clearModuleSessionMarker, readCloneMarker, readModuleSessionMarker } from "./checkout.ts";
+import { ExposureError, raiseGrantDecision, settleAnsweredGrants } from "./exposure.ts";
 import { BUILT_IN_ENGINES, builtInEngine } from "./engines.ts";
 import type { Engine, EngineOutput } from "./engines.ts";
 import { clip, stripEscapes } from "./engines.ts";
@@ -113,6 +115,7 @@ import {
 import {
   CLASS_VALUE_TRADEOFF,
   openDecisions,
+  owedPath,
   raiseOwed,
   supersedeOwed,
 } from "./owedDecisions.ts";
@@ -181,6 +184,9 @@ export interface NextOptions {
   readonly model?: string | null;
   readonly effort?: string | null;
   readonly transport?: string | null;
+  /** In a module session: ask the operator for this sibling's source, and wait on the answer. */
+  readonly requestGrant?: string | null;
+  readonly reason?: string | null;
 }
 
 /**
@@ -693,6 +699,25 @@ export function judgeRegistration(facts: RegistrationFacts): RegistrationOutcome
  * a real one; this is the only instruction that can honestly name none, and a
  * reader that treats 0 as a session will find no record for it.
  */
+/**
+ * The module whose focused checkout the session runs in, from its ledger
+ * row, or null for a session that was not started with `--module`. The
+ * plan is judged against it: the checkout holds that module and no other.
+ */
+function checkoutModuleOf(sessionsDir: string, sessionNumber: number): string | null {
+  const rows = readSessionState(sessionsDir)?.["sessions"];
+  for (const row of Array.isArray(rows) ? rows : []) {
+    if (typeof row !== "object" || row === null || Array.isArray(row)) continue;
+    const record = row as Record<string, unknown>;
+    if (Number(record["number"]) !== sessionNumber) continue;
+    const checkout = record["checkout"];
+    if (typeof checkout !== "object" || checkout === null || Array.isArray(checkout)) return null;
+    const module = (checkout as Record<string, unknown>)["module"];
+    return typeof module === "string" && module.trim() !== "" ? module.trim() : null;
+  }
+  return null;
+}
+
 export function idleInstruction(now: string): DriverInstruction {
   return {
     schema_version: DRIVER_SCHEMA_VERSION,
@@ -1712,7 +1737,11 @@ ${this.stopArtifacts()}`,
         // names an undeclared module, or two modules with no reason, is
         // handed back with the shape's own words, and the file is removed
         // so the next answer is judged afresh rather than re-read.
-        const shapeReasons = judgeWorkPlanModules(plan, solutionShape(this.repoRoot));
+        const shapeReasons = judgeWorkPlanModules(
+          plan,
+          solutionShape(this.repoRoot),
+          checkoutModuleOf(this.sessionsDir, this.sessionNumber),
+        );
         if (shapeReasons.length === 0) break;
         unlinkSync(planPath(this.repoRoot, this.sessionNumber));
         plan = null;
@@ -2941,6 +2970,66 @@ export async function driveSession(sessionsDir: string, options: DriveOptions): 
  * that one is about an answer that is not getting better.
  */
 export async function sessionNext(sessionsDir: string, options: NextOptions): Promise<number> {
+  // A module session works in its focused clone, and the full checkout it
+  // was started from keeps a marker saying so. While that session is in
+  // flight there, a `next` here would advance nothing and register nothing
+  // -- it is refused by name, with the place to run it. A marker whose
+  // session has closed, or whose clone is gone, has said all it had to.
+  const fullCheckout = repoRootFromSessionsDir(sessionsDir);
+  const marker = readModuleSessionMarker(fullCheckout);
+  if (marker !== null) {
+    const inFlight =
+      existsSync(marker.path) &&
+      readSessionState(marker.sessionsDir)?.["currentSession"] === marker.session;
+    if (inFlight) {
+      writeErr(
+        `next: refused -- session ${sessionDisplayNumber(marker.session)} works in module ` +
+          `'${marker.module}'s focused checkout at ${marker.path}; run it there: ` +
+          `dabbler session next --sessions-dir ${marker.sessionsDir}\n`,
+      );
+      return EXIT_BOUNDARY;
+    }
+    clearModuleSessionMarker(fullCheckout);
+  }
+  // In a module session's clone, the grants the operator has answered are
+  // acted on before the session moves, and a request the engine makes here
+  // -- or one still standing -- is answered with a wait on the decision:
+  // nothing is owed but another `next`, once a person has said.
+  const current = readSessionState(sessionsDir)?.["currentSession"];
+  if (typeof current === "number" && readCloneMarker(fullCheckout) !== null) {
+    try {
+      const shape = solutionShape(fullCheckout);
+      if (options.requestGrant) {
+        raiseGrantDecision(fullCheckout, shape, current, options.requestGrant, options.reason ?? "", false);
+      }
+      const settled = settleAnsweredGrants(fullCheckout, shape, current);
+      for (const grant of settled.applied) {
+        writeErr(`dabbler: granted -- the checkout now holds module '${grant.sibling}'s source\n`);
+      }
+      if (settled.open.length > 0) {
+        const waiting: DriverInstruction = {
+          schema_version: DRIVER_SCHEMA_VERSION,
+          seq: readRun(fullCheckout, current)?.seq ?? 0,
+          session_number: current,
+          issued_at: nowIso(),
+          kind: "wait",
+          ask:
+            `Waiting on the operator to answer ${settled.open.join(", ")} -- a grant of a sibling's ` +
+            "source. Nothing is owed but another `next` once it is answered; the work goes on " +
+            "against the sibling's package and contract meanwhile.",
+          retry_after_seconds: 60,
+          log: relative(fullCheckout, owedPath(fullCheckout)).split("\\").join("/"),
+          answer_command: `dabbler session next --sessions-dir ${sessionsDir}`,
+        };
+        writeOut(`${JSON.stringify(waiting, null, 2)}\n`);
+        return EXIT_OK;
+      }
+    } catch (error) {
+      if (!(error instanceof ExposureError)) throw error;
+      writeErr(`next: refused -- ${error.message}\n`);
+      return EXIT_BOUNDARY;
+    }
+  }
   let instruction: DriverInstruction | null = null;
   const code = await divertOut(() =>
     withDriver(

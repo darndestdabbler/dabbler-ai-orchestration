@@ -563,8 +563,9 @@ export function moduleConfigs(
   }
   const declared = new Set(entries.map((entry) => entry.slug));
   for (const [slug, value] of Object.entries(raw)) {
-    // `modules.packages` is the feed's own block, not a module's.
-    if (slug === "packages") continue;
+    // `modules.packages` is the feed's own block and `modules.checkout` the
+    // focused checkout's; neither is a module's.
+    if (slug === "packages" || slug === "checkout") continue;
     const where = `dabbler.yaml: modules.${slug}`;
     if (!declared.has(slug)) {
       throw new ManifestError(
@@ -629,6 +630,26 @@ export function packagesCeiling(config: unknown): number {
     throw new ManifestError("dabbler.yaml: modules.packages.ceilingBytes must be a positive integer");
   }
   return ceiling;
+}
+
+/**
+ * `modules.checkout.parent` from the configuration: the directory a module's
+ * focused clone is made under. Absent means beside the repository; anything
+ * but a non-empty string is refused by name rather than read as a path.
+ */
+export function checkoutParent(config: unknown): string | null {
+  if (!isRecord(config)) return null;
+  const modules = config["modules"];
+  if (!isRecord(modules)) return null;
+  const checkout = modules["checkout"];
+  if (checkout === null || checkout === undefined) return null;
+  if (!isRecord(checkout)) throw new ManifestError("dabbler.yaml: modules.checkout must be a mapping");
+  const parent = checkout["parent"];
+  if (parent === null || parent === undefined) return null;
+  if (typeof parent !== "string" || parent.trim() === "") {
+    throw new ManifestError("dabbler.yaml: modules.checkout.parent must be a non-empty string");
+  }
+  return parent.trim();
 }
 
 /** What `dabbler modules show` prints: the shape, with `usedBy` derived per module. */

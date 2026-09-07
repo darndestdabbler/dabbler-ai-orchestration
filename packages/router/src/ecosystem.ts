@@ -89,6 +89,20 @@ export interface Ecosystem {
   packableProjects(root: string, entry: ModuleEntry): PackTarget[];
   /** The argv that packs one project into `output` under `version`. */
   packArgv(project: string, output: string, version: string): string[];
+  /**
+   * Every project file under the module's roots, tests included,
+   * repository-relative with forward slashes: what the convenience file
+   * lists, and what a focused checkout builds and tests.
+   */
+  projectFiles(root: string, entry: ModuleEntry): string[];
+  /**
+   * Write the file a developer opens to build and test the module alone at
+   * the root of its focused checkout, and return its repository-relative
+   * path. .NET: `<slug>.slnf` filtering the root's solution file to the
+   * module's projects, or `<slug>.slnx` listing them when the root has no
+   * solution to filter.
+   */
+  convenienceFile(root: string, entry: ModuleEntry, projects: readonly string[]): string;
 }
 
 /** One project a pack produces a package from. */
@@ -262,14 +276,71 @@ const DOTNET: Ecosystem = {
     return out;
   },
   packArgv(project: string, output: string, version: string): string[] {
-    return ["dotnet", "pack", project, "-c", "Release", "-o", output, `-p:PackageVersion=${version}`, "--nologo"];
+    return ["dotnet", "pack", project, "-c", "Release", "-o", output, `-p:PackageVersion=${version}`, NO_SHARED_COMPILATION, "--nologo"];
+  },
+  projectFiles(root: string, entry: ModuleEntry): string[] {
+    const roots = entry.codeRoots.length > 0 ? entry.codeRoots : ["."];
+    const out = new Set<string>();
+    for (const codeRoot of roots) {
+      for (const file of walkFiles(join(root, codeRoot))) {
+        if (file.toLowerCase().endsWith(".csproj")) out.add(relative(root, file).split("\\").join("/"));
+      }
+    }
+    return [...out].sort();
+  },
+  convenienceFile(root: string, entry: ModuleEntry, projects: readonly string[]): string {
+    return convenienceFileDotnet(root, entry, projects);
   },
 };
+
+/**
+ * `<slug>.slnf` when the root holds exactly one solution file -- a filter
+ * over it, which is what Visual Studio and `dotnet` open as "this part of
+ * the solution" -- and `<slug>.slnx` otherwise: a filter needs one solution
+ * to filter, and a solution of the module's own projects is what a
+ * repository without one (or with several) can be given instead. Written
+ * every time, because the module's projects are what it lists and they
+ * move; excluded in the clone's own `.git/info/exclude`, never tracked.
+ */
+function convenienceFileDotnet(root: string, entry: ModuleEntry, projects: readonly string[]): string {
+  const solutions = readdirSync(root).filter((name) => /\.slnx?$/i.test(name) && !/\.slnf$/i.test(name));
+  if (solutions.length === 1) {
+    const file = `${entry.slug}.slnf`;
+    const filter = { solution: { path: solutions[0], projects: [...projects] } };
+    writeFileSync(join(root, file), `${JSON.stringify(filter, null, 2)}\n`, "utf8");
+    return file;
+  }
+  const file = `${entry.slug}.slnx`;
+  const lines = ["<Solution>"];
+  for (const project of projects) lines.push(`  <Project Path="${project}" />`);
+  lines.push("</Solution>", "");
+  writeFileSync(join(root, file), lines.join("\n"), "utf8");
+  return file;
+}
 
 // --- The .NET root files ----------------------------------------------------------
 
 /** Where the committed packages live, relative to the root. */
 export const PACKAGES_DIR = "packages";
+
+/**
+ * The environment every .NET toolchain command is spawned with. MSBuild's
+ * node reuse and the compiler server keep processes alive after the command
+ * returns, and they hold files under TEMP open; a check whose TEMP is a
+ * scratch directory then cannot remove it, and once that crashed the
+ * driver mid-`next`. With both off, nothing outlives the command. The
+ * compiler server is also refused per command (`-p:UseSharedCompilation=
+ * false` in the argv), because no environment variable turns it off.
+ */
+export const DOTNET_TOOLCHAIN_ENV: Readonly<Record<string, string>> = {
+  MSBUILDDISABLENODEREUSE: "1",
+  DOTNET_CLI_USE_MSBUILD_SERVER: "0",
+  DOTNET_CLI_TELEMETRY_OPTOUT: "1",
+  DOTNET_NOLOGO: "1",
+};
+
+/** The MSBuild property that keeps a build from starting the compiler server. */
+export const NO_SHARED_COMPILATION = "-p:UseSharedCompilation=false";
 /** The untracked overlay a debugging grant lays; imported by the tracked targets when it exists. */
 export const OVERLAY_TARGETS = ".dabbler/overlay.targets";
 
@@ -839,5 +910,11 @@ const MAVEN: Ecosystem = {
   },
   scaffoldContract(): ScaffoldResult {
     throw mavenRefusal("contract scaffold");
+  },
+  projectFiles(): string[] {
+    throw mavenRefusal("project listing");
+  },
+  convenienceFile(): string {
+    throw mavenRefusal("convenience file (a reactor over the module's poms)");
   },
 };

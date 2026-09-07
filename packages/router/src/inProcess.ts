@@ -43,7 +43,9 @@ import {
   type BootstrapOptions,
   type LedgerVerbs,
   type ModuleCreateOptions,
+  type ModuleOpenOptions,
   type ModuleVerbs,
+  type OneModuleVerbs,
   type OwedAnswerOptions,
   type OwedVerbs,
   type RepositoryTarget,
@@ -348,6 +350,18 @@ export class InProcessRouter implements Router {
       optional(args, "--package", o.package);
       optional(args, "--contract", o.contract);
       return this.text("modules", args, o.workspaceRoot);
+    },
+  };
+
+  // --- module ----------------------------------------------------------------
+
+  public readonly module: OneModuleVerbs = {
+    /** The focused clone; its JSON is the verb's stdout, handed through whole. */
+    open: (o: ModuleOpenOptions) => {
+      const args = ["open", o.slug, "--workspace-root", o.workspaceRoot];
+      optional(args, "--branch", o.branch);
+      if (o.reset === true) args.push("--reset");
+      return this.text("module", args, o.workspaceRoot);
     },
   };
 

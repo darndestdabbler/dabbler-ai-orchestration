@@ -452,6 +452,12 @@ testing:
       - when: packages/router/src/packages.ts
         select:
           - packages/router/test/packages.test.ts
+      # The focused checkout: the cone derived from the manifest, and the
+      # disposable clone narrowed to it.
+      - when: packages/router/src/checkout.ts
+        select:
+          - packages/router/test/checkout.test.ts
+          - packages/router/test/walk-checkout.test.ts
       - when: packages/router/src/pythonJson.ts
         select:
           - packages/router/test/lockfile.test.ts

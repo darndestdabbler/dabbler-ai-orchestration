@@ -20,7 +20,7 @@ import { join, relative } from "node:path";
 
 import { resolveProgram } from "./checks.ts";
 import type { RouterConfig } from "./config.ts";
-import { type Ecosystem, EcosystemError, PACKAGES_DIR, ecosystemOf } from "./ecosystem.ts";
+import { DOTNET_TOOLCHAIN_ENV, type Ecosystem, EcosystemError, PACKAGES_DIR, ecosystemOf } from "./ecosystem.ts";
 import { nowIso, platformNewlines, runGit } from "./journal.ts";
 import { type ModuleEntry, type SolutionShape, packagesCeiling } from "./modules.ts";
 import {
@@ -256,6 +256,7 @@ function runPackDefault(argv: readonly string[], cwd: string): { code: number; o
     encoding: "utf8",
     windowsHide: true,
     shell: resolved.isBatch,
+    env: { ...process.env, ...DOTNET_TOOLCHAIN_ENV },
   });
   return {
     code: result.status ?? 1,

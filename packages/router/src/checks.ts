@@ -1660,7 +1660,18 @@ export async function execute(
       });
     }
   } finally {
-    rmSync(scratch, { recursive: true, force: true, maxRetries: 3 });
+    // A program the check started can outlive it and hold the scratch
+    // directory open -- the .NET compiler server did, and the driver died
+    // of it in the middle of a `next`. The check's result is what matters
+    // here; a directory under TEMP is the OS's to reclaim, and is said so.
+    try {
+      rmSync(scratch, { recursive: true, force: true, maxRetries: 3 });
+    } catch (error) {
+      process.stderr.write(
+        `dabbler: scratch ${scratch} is still held by a program the check started and is left ` +
+          `for the OS: ${error instanceof Error ? error.message : String(error)}\n`,
+      );
+    }
   }
 
   const duration = (performance.now() - started) / 1000;

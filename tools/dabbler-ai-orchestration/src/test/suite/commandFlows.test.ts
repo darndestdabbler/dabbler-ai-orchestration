@@ -7,6 +7,7 @@ import {
   runRestoreSessionFlow,
 } from "../../commands/cancelLifecycleCommands";
 import { NewModuleUi, runNewModuleFlow } from "../../commands/newModule";
+import { OpenModuleUi, openModule } from "../../commands/openModule";
 import {
   cloneRepository,
   createRepository,
@@ -912,5 +913,48 @@ suite("placing a repository the Explorer cannot reach", () => {
     } finally {
       restore();
     }
+  });
+});
+
+suite("Open Module", () => {
+  const multi: Projection = {
+    solution: { name: "csv-pipeline", title: "csv-pipeline", multi: true, implicit: false, moduleCount: 2 },
+    modules: [
+      { slug: "model", title: "model", kind: "shared-types", package: "CsvModel", contract: "package", codeRoots: ["modules/model"], dependsOn: [], usedBy: ["persister"], contractDir: null },
+      { slug: "persister", title: "persister", kind: "library", package: "CsvPersister", contract: "package", codeRoots: ["modules/persister"], dependsOn: ["model"], usedBy: [], contractDir: null },
+    ],
+  };
+  function ui(): { ui: OpenModuleUi; opened: string[]; warnings: string[] } {
+    const opened: string[] = [];
+    const warnings: string[] = [];
+    return {
+      opened,
+      warnings,
+      ui: {
+        openFolder: (path: string) => {
+          opened.push(path);
+          return Promise.resolve(undefined);
+        },
+        showWarningMessage: (m: string) => warnings.push(m),
+        workspaceRoot: () => "D:\\ws\\csv-pipeline",
+      },
+    };
+  }
+
+  test("opens the path the router answered in a new window, and shows a refusal in the router's sentence", async () => {
+    // The router's JSON is the source of the path; nothing here derives it.
+    const answered = fakeRouter(0, JSON.stringify({ slug: "persister", path: "D:\\ws\\csv-pipeline.persister", branch: "main" }));
+    const good = ui();
+    await openModule(answered.router, { node: { kind: "module", slug: "persister" }, projection: multi }, good.ui);
+    assert.deepStrictEqual(answered.asked, ["module open"]);
+    assert.deepStrictEqual(good.opened, ["D:\\ws\\csv-pipeline.persister"]);
+    assert.deepStrictEqual(good.warnings, []);
+
+    // Refused: the router's own words, and no window.
+    const refused = fakeRouter(1, "module open: refused -- D:\\ws\\csv-pipeline.persister already exists: pass --reset");
+    const bad = ui();
+    await openModule(refused.router, { node: { kind: "module", slug: "persister" }, projection: multi }, bad.ui);
+    assert.deepStrictEqual(bad.opened, []);
+    assert.deepStrictEqual(bad.warnings, ["module open: refused -- D:\\ws\\csv-pipeline.persister already exists: pass --reset"]);
   });
 });

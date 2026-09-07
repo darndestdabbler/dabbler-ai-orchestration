@@ -5221,10 +5221,14 @@ convenience file (session 102's seam).*
    `modules.checkout.parent` (default: beside the repository, as
    `<repo>.<slug>`), it clones the repository's `origin` blob-filtered,
    sparse and unchecked-out, sets the cone, checks out the trunk (or the
-   session branch when `--branch` names one), writes `<slug>.slnf` at the
-   clone's root listing the module's projects, writes the engine's
-   working-directory block for Claude Code (`.claude/settings.json`,
-   untracked) and prints the path as JSON. `--reset` on an existing clone
+   session branch when `--branch` names one), writes the ecosystem's
+   convenience file at the clone's root — `<slug>.slnf` filtering the
+   root's solution file to the module's projects, or `<slug>.slnx` listing
+   them when the root has no solution to filter — writes the engine's
+   working-directory block for Claude Code (`.claude/settings.local.json`,
+   the project-local file Claude Code keeps out of git; a repository may
+   track `.claude/settings.json`), keeps both out of the clone's tracked
+   files through `.git/info/exclude`, and prints the path as JSON. `--reset` on an existing clone
    fetches, resets to the trunk and re-narrows the cone (the persistent
    fallback the preflight may choose). A single-module solution refuses:
    the repository is the module, and the message says to open it. The

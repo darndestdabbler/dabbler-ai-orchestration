@@ -381,7 +381,10 @@ export function descriptorFor(
         tooltip: m.title,
         icon: { id: KIND_ICONS[m.kind] ?? "package" },
         expandable: childrenOf(node, p).length > 0,
-        contextValue: `dabblerModule:${m.kind}`,
+        // `;focused` is what Open Module is gated on: only a module of a
+        // multi-module solution has a focused checkout to open. A
+        // single-module repository is its module, and this window is it.
+        contextValue: `dabblerModule:${m.kind}${p.solution.multi ? ";focused" : ""}`,
       };
     }
     case "contract": {

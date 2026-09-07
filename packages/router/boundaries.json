@@ -61,7 +61,8 @@
         "solutionDeps",
         "contractdoc",
         "ecosystem",
-        "packages"
+        "packages",
+        "checkout"
       ]
     },
     "workflow-instruction": {

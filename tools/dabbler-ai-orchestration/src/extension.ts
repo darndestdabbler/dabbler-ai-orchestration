@@ -39,6 +39,7 @@ import {
   openSolutionWorkspace,
   revealRepository,
 } from "./commands/openRepository";
+import { openModule } from "./commands/openModule";
 import { WorkExplorerTreeProvider } from "./providers/WorkExplorerTreeProvider";
 import { productionRouter } from "./router/host";
 
@@ -284,6 +285,13 @@ export function activate(context: vscode.ExtensionContext): void {
       "dabblerSolution.revealRepository",
       (node?: SolutionNode) =>
         revealRepository({ node, projection: solutionProvider.currentProjection() }),
+    ),
+    // A module row of a multi-module solution: the focused checkout, in a
+    // new window. The router makes the clone and names the path.
+    vscode.commands.registerCommand(
+      "dabblerSolution.openModule",
+      (node?: SolutionNode) =>
+        openModule(productionRouter(), { node, projection: solutionProvider.currentProjection() }),
     ),
     // The four an ABSENT row has: a row that could only say "not on this
     // machine" is where this journey used to end. Each writes through the

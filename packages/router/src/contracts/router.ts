@@ -210,6 +210,25 @@ export interface ModuleVerbs {
   create(options: ModuleCreateOptions): Promise<RouterResult<RouterText>>;
 }
 
+export interface ModuleOpenOptions {
+  readonly workspaceRoot: string;
+  readonly slug: string;
+  /** The session branch; the trunk when absent. */
+  readonly branch?: string;
+  /** Fetch, reset to the trunk and re-narrow an existing clone. */
+  readonly reset?: boolean;
+}
+
+/**
+ * The things done TO one module, beside the manifest it is declared in.
+ * `open` answers with JSON on stdout -- the clone's path, branch and cone --
+ * because the extension's next move is to open a window at that path, and a
+ * path parsed out of prose is a path that eventually parses wrong.
+ */
+export interface OneModuleVerbs {
+  open(options: ModuleOpenOptions): Promise<RouterResult<RouterText>>;
+}
+
 export interface VerifyRoundOptions extends RepositoryTarget {
   readonly maxRounds?: number;
   readonly transport?: string;
@@ -394,6 +413,8 @@ export interface AffectedOptions extends RepositoryTarget {
 export interface Router {
   readonly session: SessionVerbs;
   readonly modules: ModuleVerbs;
+  /** One module of a multi-module solution: its focused checkout. */
+  readonly module: OneModuleVerbs;
   readonly verify: VerifyVerbs;
   readonly owed: OwedVerbs;
   readonly ledger: LedgerVerbs;

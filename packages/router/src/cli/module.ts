@@ -3,12 +3,14 @@
 // `contract <slug>` scaffolds the designed seam through the ecosystem seam,
 // writing only where absent and naming what it wrote; `contract <slug>
 // --against <provider>` scaffolds the consumer's compatibility suite against
-// the provider's package. Later sessions add `pack`, `open`, `grant` and
+// the provider's package; `pack <slug>` makes the committed package; `open
+// <slug>` makes the focused checkout. Later sessions add `grant` and
 // `revoke` here: one verb for the things done TO a module, beside `modules`
 // for the manifest they are declared in.
 
 import { statSync } from "node:fs";
 
+import { CheckoutError, openModule, preflight } from "../checkout.ts";
 import { ConfigError, loadConfig } from "../config.ts";
 import { EcosystemError, ecosystemOf, ensureRootFiles } from "../ecosystem.ts";
 import { ManifestError, solutionShape } from "../modules.ts";
@@ -25,8 +27,12 @@ function usage(): string {
     "usage: dabbler module contract [-h] [--against PROVIDER]",
     "                               [--workspace-root WORKSPACE_ROOT] slug",
     "       dabbler module pack [-h] [--session N] [--workspace-root WORKSPACE_ROOT] slug",
+    "       dabbler module open [-h] [--branch BRANCH] [--reset]",
+    "                           [--workspace-root WORKSPACE_ROOT] slug",
+    "       dabbler module preflight [-h] [--clones N] [--workspace-root WORKSPACE_ROOT] slug",
     "",
-    "the things done to one module: its designed seam, its committed package",
+    "the things done to one module: its designed seam, its committed package,",
+    "its focused checkout, and what that checkout costs on this machine",
     "",
     "positional arguments:",
     "  slug                  the module, as docs/modules.yaml declares it",
@@ -36,6 +42,12 @@ function usage(): string {
     "  --against PROVIDER    contract: scaffold this module's compatibility suite",
     "                        against PROVIDER's package instead of its own seam",
     "  --session N           pack: the session the record names",
+    "  --branch BRANCH       open: check out this session branch instead of the",
+    "                        trunk (created from the trunk when origin has none)",
+    "  --reset               open: an existing clone is fetched, reset hard to the",
+    "                        trunk and re-narrowed instead of refused",
+    "  --clones N            preflight: how many further fresh clones to time in",
+    "                        sequence (default 5)",
     "  --workspace-root WORKSPACE_ROOT",
     "                        the repository root (default: the working directory)",
     "",
@@ -51,7 +63,151 @@ function usage(): string {
     "this disk: in a focused checkout a sibling is a package, and the grant is the",
     "way to its source.",
     "",
+    "open: a disposable, blob-filtered, sparse clone of the repository's origin under",
+    "modules.checkout.parent (default: beside the repository, as <repo>.<slug>),",
+    "narrowed to the module's roots, packages/, docs/, its dependencies' and consumers'",
+    "contract folders and its shared files -- never a sibling's source -- on the trunk",
+    "or the branch --branch names, with the ecosystem's convenience file and Claude",
+    "Code's working-directory block (.claude/settings.local.json) at its root. Prints",
+    "the result as JSON. Refused for a single-module solution: the repository is the",
+    "module, so open it.",
+    "",
+    "preflight: what the focused checkout costs on this machine, as JSON -- a fresh",
+    "clone and sparse checkout, then dotnet restore, build and test of the convenience",
+    "file in it; a --reset of that clone and the same three again; then N more fresh",
+    "clones in sequence -- with the git and dotnet versions, the CPU count and whether",
+    "Defender's real-time protection is on. A recorded run, not a test: the numbers",
+    "decide whether a session gets a fresh clone or the per-module clone reset.",
+    "",
   ].join("\n");
+}
+
+function preflightSubcommand(rest: readonly string[]): number {
+  let slug: string | null = null;
+  let workspaceRoot = ".";
+  let clones: number | undefined;
+  for (let index = 0; index < rest.length; index += 1) {
+    const token = rest[index] as string;
+    if (token === "--help" || token === "-h") {
+      writeOut(usage());
+      return EXIT_OK;
+    }
+    if (token === "--clones" || token === "--workspace-root") {
+      const value = rest[index + 1];
+      if (value === undefined || value.startsWith("--")) {
+        writeErr(`dabbler module preflight: argument ${token}: expected one argument\n`);
+        return EXIT_USAGE;
+      }
+      if (token === "--workspace-root") workspaceRoot = value;
+      else {
+        clones = Number.parseInt(value, 10);
+        if (!Number.isInteger(clones) || clones < 0) {
+          writeErr(`dabbler module preflight: argument --clones: invalid int value: '${value}'\n`);
+          return EXIT_USAGE;
+        }
+      }
+      index += 1;
+      continue;
+    }
+    if (token.startsWith("--") || slug !== null) {
+      writeErr(`dabbler module preflight: unrecognized argument: ${token}\n`);
+      return EXIT_USAGE;
+    }
+    slug = token;
+  }
+  if (slug === null) {
+    writeErr("dabbler module preflight: the following arguments are required: slug\n");
+    return EXIT_USAGE;
+  }
+  if (!isDirectory(workspaceRoot)) {
+    writeErr(`module: not a directory: ${workspaceRoot}\n`);
+    return EXIT_USAGE;
+  }
+  let result;
+  try {
+    const shape = solutionShape(workspaceRoot);
+    result = preflight(workspaceRoot, shape, slug, {
+      ...(clones === undefined ? {} : { clones }),
+      config: loadConfig(undefined, workspaceRoot),
+    });
+  } catch (error) {
+    if (
+      error instanceof CheckoutError ||
+      error instanceof ManifestError ||
+      error instanceof ConfigError ||
+      error instanceof EcosystemError
+    ) {
+      writeErr(`module preflight: refused -- ${error.message}\n`);
+      return EXIT_REFUSED;
+    }
+    throw error;
+  }
+  writeOut(`${JSON.stringify(result, null, 2)}\n`);
+  return EXIT_OK;
+}
+
+function openSubcommand(rest: readonly string[]): number {
+  let slug: string | null = null;
+  let workspaceRoot = ".";
+  let branch: string | null = null;
+  let reset = false;
+  for (let index = 0; index < rest.length; index += 1) {
+    const token = rest[index] as string;
+    if (token === "--help" || token === "-h") {
+      writeOut(usage());
+      return EXIT_OK;
+    }
+    if (token === "--reset") {
+      reset = true;
+      continue;
+    }
+    if (token === "--branch" || token === "--workspace-root") {
+      const value = rest[index + 1];
+      if (value === undefined || value.startsWith("--")) {
+        writeErr(`dabbler module open: argument ${token}: expected one argument\n`);
+        return EXIT_USAGE;
+      }
+      if (token === "--workspace-root") workspaceRoot = value;
+      else branch = value;
+      index += 1;
+      continue;
+    }
+    if (token.startsWith("--") || slug !== null) {
+      writeErr(`dabbler module open: unrecognized argument: ${token}\n`);
+      return EXIT_USAGE;
+    }
+    slug = token;
+  }
+  if (slug === null) {
+    writeErr("dabbler module open: the following arguments are required: slug\n");
+    return EXIT_USAGE;
+  }
+  if (!isDirectory(workspaceRoot)) {
+    writeErr(`module: not a directory: ${workspaceRoot}\n`);
+    return EXIT_USAGE;
+  }
+  let result;
+  try {
+    const shape = solutionShape(workspaceRoot);
+    result = openModule(workspaceRoot, shape, slug, {
+      branch,
+      reset,
+      config: loadConfig(undefined, workspaceRoot),
+    });
+  } catch (error) {
+    if (
+      error instanceof CheckoutError ||
+      error instanceof ManifestError ||
+      error instanceof ConfigError ||
+      error instanceof EcosystemError
+    ) {
+      writeErr(`module open: refused -- ${error.message}\n`);
+      return EXIT_REFUSED;
+    }
+    throw error;
+  }
+  writeOut(`${JSON.stringify(result, null, 2)}\n`);
+  return EXIT_OK;
 }
 
 function packSubcommand(rest: readonly string[]): number {
@@ -153,6 +309,8 @@ export async function moduleVerb(argv: string[]): Promise<number> {
     return EXIT_OK;
   }
   if (subcommand === "pack") return packSubcommand(rest);
+  if (subcommand === "open") return openSubcommand(rest);
+  if (subcommand === "preflight") return preflightSubcommand(rest);
   if (subcommand !== "contract") {
     writeErr(`dabbler module: '${subcommand}' is not a subcommand\n\n${usage()}`);
     return EXIT_USAGE;

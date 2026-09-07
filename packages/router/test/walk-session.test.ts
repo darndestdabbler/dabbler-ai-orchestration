@@ -301,10 +301,12 @@ describe("one session, walked from next to done", () => {
     // whose every phase was fine. The framework owns the clock; the walk
     // waits a moment and asks again, and gives up loudly on a deadline.
     let instruction: DriverInstruction | null = null;
+    let last = { code: EXIT_OK, err: "" };
     const deadline = Date.now() + 180_000;
     for (;;) {
       const move = await next(sessionsDir);
       instruction = move.instruction;
+      last = { code: move.code, err: move.err };
       if (instruction === null) break;
       if (instruction.kind === "done") break;
       if (instruction.kind === "wait") {
@@ -321,7 +323,14 @@ describe("one session, walked from next to done", () => {
         `the framework asked for ${instruction.kind} ${String(instruction.step_id)} after the step was done`,
       );
     }
-    assert.equal(instruction?.kind, "done");
+    // A `next` that printed no instruction exited with its reason on stderr;
+    // a failure here that hid it was undiagnosable once (session 104's run of
+    // record, on a twenty-worker machine), so the reason is the message.
+    assert.equal(
+      instruction?.kind,
+      "done",
+      `next printed no instruction (exit ${last.code}); stderr:\n${last.err}`,
+    );
     milestones.push("done");
 
     // --- and what each phase left behind ------------------------------------

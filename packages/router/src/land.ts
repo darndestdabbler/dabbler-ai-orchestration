@@ -16,8 +16,13 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 
 import { dirname, join } from "node:path";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 
-import { type ModuleEntry, type SolutionShape, dependenciesOf } from "./modules.ts";
+import { type PackageReferenceFact, fileStem, packageIdOfStem } from "./ecosystem.ts";
 import type { ExposureManifest } from "./exposure.ts";
+import { type ModuleEntry, type SolutionShape, dependenciesOf } from "./modules.ts";
+
+// The pure parsers of the .NET pin and reference files live on the seam;
+// the judges here take their facts and know no ecosystem.
+export { type PackageReferenceFact, centralPinsOfProps as centralPins, packageReferencesOf } from "./ecosystem.ts";
 
 /**
  * A correspondence record as the judges need it: structural, so the
@@ -160,24 +165,16 @@ export function receiptCorrespondence(
       version: record.version,
       sourceDigest: record.sourceDigest,
       contractDigest: record.contractDigest,
-      record: `packages/${record.package}.${record.version}.json`,
+      record: `packages/${fileStem(record.package)}.${record.version}.json`,
     }));
 }
 
 // --- pins_current -----------------------------------------------------------------
 
-/** One consuming project's reference to a package, as its project file says it. */
-export interface PackageReferenceFact {
-  readonly project: string;
-  readonly packageId: string;
-  /** A `Version` or `VersionOverride` the reference carries, or null when it relies on the central pin. */
-  readonly ownVersion: string | null;
-}
-
 export interface PinFacts {
   /** The packages this session packed, with the version each record names. */
   readonly candidates: readonly { readonly package: string; readonly version: string }[];
-  /** The central pins, by package id, as Directory.Packages.props declares them. */
+  /** The central pins, by package id, as the root declares them (the seam reads them). */
   readonly pins: ReadonlyMap<string, string>;
   readonly references: readonly PackageReferenceFact[];
 }
@@ -219,49 +216,7 @@ export function candidatesFromRecord(paths: readonly string[]): { package: strin
   const out: { package: string; version: string }[] = [];
   for (const path of paths) {
     const match = /^packages\/(.+?)\.(\d+\.\d+\.\d+[^/]*)\.json$/.exec(path.split("\\").join("/"));
-    if (match !== null) out.push({ package: match[1] as string, version: match[2] as string });
-  }
-  return out;
-}
-
-/**
- * Every `<Element ...>` of one name in an MSBuild file, self-closing or with
- * a body, as its attributes and its body: MSBuild takes an item's metadata
- * as attributes or as child elements, and a reader that saw only one form
- * would be evaded by the other.
- */
-function msbuildItems(text: string, element: string): { attributes: string; body: string }[] {
-  const pattern = new RegExp(`<${element}\\b([^>]*?)(?:/>|>([\\s\\S]*?)</${element}>)`, "g");
-  return [...text.matchAll(pattern)].map((match) => ({ attributes: match[1] ?? "", body: match[2] ?? "" }));
-}
-
-/** An attribute, or the same-named child element, of one item. */
-function metadata(item: { attributes: string; body: string }, name: string): string | null {
-  const attribute = new RegExp(`\\b${name}="([^"]*)"`).exec(item.attributes);
-  if (attribute !== null) return attribute[1] as string;
-  const child = new RegExp(`<${name}>\\s*([^<]*?)\\s*</${name}>`).exec(item.body);
-  return child === null ? null : (child[1] as string);
-}
-
-/** The central pins a Directory.Packages.props declares, as attributes or as child elements. */
-export function centralPins(propsText: string): Map<string, string> {
-  const pins = new Map<string, string>();
-  for (const item of msbuildItems(propsText, "PackageVersion")) {
-    const include = metadata(item, "Include");
-    const version = metadata(item, "Version");
-    if (include !== null && version !== null) pins.set(include, version);
-  }
-  return pins;
-}
-
-/** Every package reference in a project file, with any version it carries itself, as attribute or child. */
-export function packageReferencesOf(project: string, projectText: string): PackageReferenceFact[] {
-  const out: PackageReferenceFact[] = [];
-  for (const item of msbuildItems(projectText, "PackageReference")) {
-    const include = metadata(item, "Include");
-    if (include === null) continue;
-    const own = metadata(item, "Version") ?? metadata(item, "VersionOverride");
-    out.push({ project, packageId: include, ownVersion: own });
+    if (match !== null) out.push({ package: packageIdOfStem(match[1] as string), version: match[2] as string });
   }
   return out;
 }
@@ -322,13 +277,6 @@ export function bundlePath(root: string, slug: string): string {
 }
 
 /** `<Version>` or `<VersionPrefix>` of a project file, 0.1.0 when it says neither. */
-function versionOf(projectText: string): string {
-  const version = /<Version>\s*([^<\s]+)\s*<\/Version>/.exec(projectText);
-  if (version !== null) return (version[1] as string).replace(/-.*$/, "");
-  const prefix = /<VersionPrefix>\s*([^<\s]+)\s*<\/VersionPrefix>/.exec(projectText);
-  return prefix === null ? "0.1.0" : (prefix[1] as string);
-}
-
 export interface BundleOptions {
   readonly session?: number | null;
   /** `HEAD` at record time; the landed commit is the receipt's to name. */
@@ -350,7 +298,7 @@ export function bundleRecord(
   entry: ModuleEntry,
   pins: ReadonlyMap<string, string>,
   records: readonly CorrespondenceLike[],
-  projectText: string,
+  version: string,
   options: BundleOptions = {},
 ): BundleRecord {
   if (entry.kind !== "application") {
@@ -375,7 +323,7 @@ export function bundleRecord(
   }
   return {
     bundle: entry.slug,
-    version: versionOf(projectText),
+    version,
     baseCommit: options.baseCommit ?? null,
     date: (options.now ?? new Date()).toISOString().slice(0, 10),
     session: options.session ?? null,

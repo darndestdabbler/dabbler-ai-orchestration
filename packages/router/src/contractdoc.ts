@@ -14,7 +14,7 @@ import { join } from "node:path";
 
 import { parse as parseYaml } from "yaml";
 
-import { EcosystemError, ecosystemOf, type SurfaceEntry } from "./ecosystem.ts";
+import { EcosystemError, ecosystemOf, fileStem, type SurfaceEntry } from "./ecosystem.ts";
 import { consumersOf, type ModuleEntry, type SolutionShape } from "./modules.ts";
 import { readText } from "./textfile.ts";
 
@@ -231,7 +231,7 @@ export function notesPageOf(slug: string): string {
 
 /** The surface page, for a designed or generated contract. */
 export function apiPageOf(slug: string, packageId: string): string {
-  return `${contractDirOf(slug)}/${packageId}.api.md`;
+  return `${contractDirOf(slug)}/${fileStem(packageId)}.api.md`;
 }
 
 /**

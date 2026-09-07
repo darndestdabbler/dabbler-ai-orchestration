@@ -10,7 +10,7 @@
 
 import { statSync } from "node:fs";
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 import { CheckoutError, openModule, preflight, readCloneMarker } from "../checkout.ts";
@@ -21,7 +21,7 @@ import { sessionsDirFor } from "../evidence.ts";
 import { ExposureError, raiseGrantDecision, revokeGrant } from "../exposure.ts";
 import { writeCandidateRecord } from "../impact.ts";
 import { platformNewlines, runGit } from "../journal.ts";
-import { LandError, bundleRecord, centralPins, writeBundleRecord } from "../land.ts";
+import { LandError, bundleRecord, writeBundleRecord } from "../land.ts";
 import { ManifestError, moduleConfigs, solutionShape } from "../modules.ts";
 import { readSessionState } from "../progress.ts";
 import { PackagesError, packModule, readRecords } from "../packages.ts";
@@ -172,10 +172,9 @@ function candidateSubcommand(rest: readonly string[]): number {
       // application also packs. Refused, and the candidate with it, while a
       // pin is a dev version.
       if (entry !== undefined && entry.kind === "application") {
-        const propsPath = join(workspaceRoot, "Directory.Packages.props");
-        const props = existsSync(propsPath) ? readFileSync(propsPath, "utf8") : "";
-        const project = ecosystemOf(workspaceRoot, entry).projectFiles(workspaceRoot, entry)[0];
-        const record = bundleRecord(shape, entry, centralPins(props), readRecords(workspaceRoot), project === undefined ? "" : readFileSync(join(workspaceRoot, project), "utf8"), {
+        const ecosystem = ecosystemOf(workspaceRoot, entry);
+        const project = ecosystem.projectFiles(workspaceRoot, entry)[0];
+        const record = bundleRecord(shape, entry, ecosystem.centralPins(workspaceRoot), readRecords(workspaceRoot), project === undefined ? "0.1.0" : ecosystem.baseVersion(workspaceRoot, project), {
           session,
           baseCommit: runGit(workspaceRoot, ["rev-parse", "HEAD"]).stdout || null,
         });

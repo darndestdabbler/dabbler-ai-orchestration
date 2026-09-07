@@ -165,7 +165,8 @@ describe("the bundle record", () => {
     const released = centralPins(
       '<Project><ItemGroup><PackageVersion Include="CsvModel" Version="1.2.0" /><PackageVersion Include="CsvPersister" Version="0.4.1" /></ItemGroup></Project>',
     );
-    const project = "<Project><PropertyGroup><Version>2.0.0</Version></PropertyGroup></Project>";
+    // The application's version is the seam's reading of its project; the record takes it as a fact.
+    const project = "2.0.0";
     const record = bundleRecord(shape, listener, released, records, project, {
       session: 12,
       baseCommit: "abc123",

@@ -261,8 +261,8 @@ describe("the central pin and the record", () => {
     writeFileSync(join(root, "packages", "CsvModel.0.1.0-dev.20260906.1.ga1b2c3d.nupkg"), "bytes", "utf8");
     writeFileSync(join(root, "packages", "notes.json"), '{"hello": 1}', "utf8");
     assert.deepEqual(readRecords(root), [record]);
-    assert.equal(packagesUnderLfs(root), false);
+    assert.equal(packagesUnderLfs(root, "*.nupkg"), false);
     writeFileSync(join(root, "packages", ".gitattributes"), "*.nupkg filter=lfs diff=lfs merge=lfs -text\n", "utf8");
-    assert.equal(packagesUnderLfs(root), true);
+    assert.equal(packagesUnderLfs(root, "*.nupkg"), true);
   });
 });

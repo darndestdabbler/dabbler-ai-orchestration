@@ -20,7 +20,16 @@ import { join, relative } from "node:path";
 
 import { resolveProgram } from "./checks.ts";
 import type { RouterConfig } from "./config.ts";
-import { DOTNET_TOOLCHAIN_ENV, type Ecosystem, EcosystemError, PACKAGES_DIR, ecosystemOf } from "./ecosystem.ts";
+import {
+  DOTNET_TOOLCHAIN_ENV,
+  type Ecosystem,
+  EcosystemError,
+  PACKAGES_DIR,
+  type PackTarget,
+  ecosystemOf,
+  fileStem,
+  pinPackageVersion as pinInProps,
+} from "./ecosystem.ts";
 import { nowIso, platformNewlines, runGit } from "./journal.ts";
 import { type ModuleEntry, type SolutionShape, packagesCeiling } from "./modules.ts";
 import {
@@ -56,7 +65,7 @@ export interface CorrespondenceRecord {
 const RECORD_KEYS = ["package", "version", "sourceDigest", "contractDigest", "session", "baseCommit", "recordedAt"] as const;
 
 export function recordPath(root: string, packageId: string, version: string): string {
-  return join(root, PACKAGES_DIR, `${packageId}.${version}.json`);
+  return join(root, PACKAGES_DIR, `${fileStem(packageId)}.${version}.json`);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -159,67 +168,23 @@ function escapeRegExp(text: string): string {
   return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-/**
- * The release base a project declares: `<Version>` or `<VersionPrefix>`,
- * with any prerelease suffix stripped, `0.1.0` when it declares none. The
- * dev version is formed on the base, never on a dev version already there.
- */
-export function baseVersionOf(projectText: string): string {
-  const match =
-    /<VersionPrefix>\s*([^<\s]+)\s*<\/VersionPrefix>/.exec(projectText) ??
-    /<Version>\s*([^<\s]+)\s*<\/Version>/.exec(projectText);
-  const raw = match ? (match[1] as string) : "0.1.0";
-  return raw.split("-")[0] ?? "0.1.0";
-}
+// The release base a project declares is the seam's reading; the .NET one
+// keeps its name here for the callers that had it.
+export { baseVersionOfProject as baseVersionOf } from "./ecosystem.ts";
 
 // --- The pin --------------------------------------------------------------------
 
-const PIN_RE = /<PackageVersion\s+Include="([^"]+)"([^>]*?)\/>/g;
-
 /**
- * `Directory.Packages.props` with `id` pinned to `version`: the one
- * unconditioned `PackageVersion` for the id replaced in place and the XML
- * around it preserved, or a new entry added under the `Modules` group (or
- * a new group before `</Project>`) when there is none. An entry under a
- * `Condition` -- on the element or its item group -- or one that appears
- * twice is refused by name: a consumer must resolve one pin, and "which
- * one" is the question central management exists to remove.
+ * `Directory.Packages.props` with `id` pinned to `version`, as the seam
+ * writes it; a conditioned or duplicated pin is this module's refusal.
  */
 export function pinPackageVersion(propsText: string, id: string, version: string): string {
-  const matches = [...propsText.matchAll(PIN_RE)].filter((match) => match[1] === id);
-  if (matches.length > 1) {
-    throw new PackagesError(
-      `Directory.Packages.props pins '${id}' ${matches.length} times; a consumer must ` +
-        "resolve one pin, so the duplicate is refused rather than chosen between",
-    );
+  try {
+    return pinInProps(propsText, id, version);
+  } catch (error) {
+    if (error instanceof EcosystemError) throw new PackagesError(error.message);
+    throw error;
   }
-  if (matches.length === 1) {
-    const match = matches[0] as RegExpMatchArray;
-    const attributes = match[2] ?? "";
-    const at = match.index ?? 0;
-    const groupStart = propsText.lastIndexOf("<ItemGroup", at);
-    const groupTag = groupStart >= 0 ? propsText.slice(groupStart, propsText.indexOf(">", groupStart) + 1) : "";
-    if (/\bCondition\s*=/.test(attributes) || /\bCondition\s*=/.test(groupTag)) {
-      throw new PackagesError(
-        `Directory.Packages.props pins '${id}' under a Condition; the module's pin is ` +
-          "one unconditioned entry, so it is refused rather than moved",
-      );
-    }
-    const replaced = /\bVersion="[^"]*"/.test(attributes)
-      ? attributes.replace(/\bVersion="[^"]*"/, `Version="${version}"`)
-      : `${attributes.replace(/\s*$/, "")} Version="${version}" `;
-    return `${propsText.slice(0, at)}<PackageVersion Include="${id}"${replaced}/>${propsText.slice(at + match[0].length)}`;
-  }
-  const line = `    <PackageVersion Include="${id}" Version="${version}" />`;
-  const modulesGroup = /<ItemGroup\s+Label="Modules"\s*>/.exec(propsText);
-  if (modulesGroup) {
-    const insertAt = (modulesGroup.index ?? 0) + modulesGroup[0].length;
-    return `${propsText.slice(0, insertAt)}\n${line}${propsText.slice(insertAt)}`;
-  }
-  const end = propsText.lastIndexOf("</Project>");
-  const group = `  <ItemGroup Label="Modules">\n${line}\n  </ItemGroup>\n`;
-  if (end < 0) return `${propsText}\n${group}`;
-  return `${propsText.slice(0, end)}${group}${propsText.slice(end)}`;
 }
 
 // --- The pack -------------------------------------------------------------------
@@ -334,7 +299,7 @@ export function packModule(
     throw new PackagesError(`module '${slug}' has no packable project under ${entry.codeRoots.join(", ")}`);
   }
   const main = targets.find((target) => target.packageId === entry.package) ?? targets[0]!;
-  const base = baseVersionOf(readFileSync(join(root, main.project), "utf8"));
+  const base = ecosystem.baseVersion(root, main.project);
   const records = readRecords(root);
   const version = devVersion(entry.package, base, options.now ?? new Date(), sourceDigest, records);
 
@@ -359,10 +324,12 @@ export function packModule(
         "(for .NET, -p:PackageVersion={version}) or remove the declaration to take the default",
     );
   }
+  // Targets built by one project (a Maven module's aggregator) share one
+  // command, run once.
   const commands: string[][] =
     declared !== null
       ? [substitute(declared.pack.argv, { [PLACEHOLDER_OUTPUT]: outputDir, [PLACEHOLDER_VERSION]: version })]
-      : targets.map((target) => ecosystem.packArgv(target.project, outputDir, version));
+      : distinct(targets.map((target) => ecosystem.packArgv(target.via ?? target.project, outputDir, version)));
   for (const argv of commands) {
     const run = runPack(argv, root);
     if (run.code !== 0) {
@@ -373,17 +340,16 @@ export function packModule(
   }
 
   const artifacts: string[] = [];
-  const producedNames = readdirSync(outputDir);
-  const produced = new Map(producedNames.map((name) => [name.toLowerCase(), name] as const));
   const ceiling = packagesCeiling(options.config ?? null);
-  const lfs = packagesUnderLfs(root);
+  const lfs = packagesUnderLfs(root, ecosystem.lfsPattern);
+  const producedOf = (target: PackTarget): string | null =>
+    findProduced(outputDir, ecosystem.packagedArtifact(target.packageId, version));
   for (const target of targets) {
-    const name = `${target.packageId}.${version}.nupkg`;
-    const actual = produced.get(name.toLowerCase());
-    if (actual === undefined) {
+    const actual = producedOf(target);
+    if (actual === null) {
       throw new PackagesError(
-        `the pack of ${target.project} left no ${name} in ${PACKAGES_DIR}/; nothing is pinned ` +
-          "and nothing is recorded for a package that was not produced",
+        `the pack of ${target.project} left no ${ecosystem.packagedArtifact(target.packageId, version)} in ` +
+          `${PACKAGES_DIR}/; nothing is pinned and nothing is recorded for a package that was not produced`,
       );
     }
     // The ceiling: a committed package must stay small enough for the
@@ -393,27 +359,29 @@ export function packModule(
     const size = statSync(join(outputDir, actual)).size;
     if (size > ceiling && !lfs) {
       for (const stale of targets) {
-        const own = produced.get(`${stale.packageId}.${version}.nupkg`.toLowerCase());
-        if (own !== undefined) rmSync(join(outputDir, own), { force: true });
+        const own = producedOf(stale);
+        if (own !== null) rmSync(join(outputDir, own), { force: true });
       }
       throw new PackagesError(
         `${PACKAGES_DIR}/${actual} is ${size} bytes, over the ceiling of ${ceiling} for a committed ` +
           "package. Two ways out: raise `modules.packages.ceilingBytes` in dabbler.yaml, or put " +
-          `the feed under Git LFS by uncommenting the \`*.nupkg filter=lfs\` line in ${PACKAGES_DIR}/.gitattributes. ` +
+          `the feed under Git LFS by uncommenting the \`${ecosystem.lfsPattern} filter=lfs\` line in ${PACKAGES_DIR}/.gitattributes. ` +
           "Nothing was pinned or recorded.",
       );
     }
     artifacts.push(`${PACKAGES_DIR}/${actual}`);
   }
 
-  const propsPath = join(root, "Directory.Packages.props");
-  let props = existsSync(propsPath) ? readFileSync(propsPath, "utf8") : "<Project>\n  <PropertyGroup>\n    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>\n  </PropertyGroup>\n</Project>\n";
   const pins: string[] = [];
-  for (const target of targets) {
-    props = pinPackageVersion(props, target.packageId, version);
-    pins.push(target.packageId);
+  try {
+    for (const target of targets) {
+      ecosystem.writeCentralPin(root, target.packageId, version);
+      pins.push(target.packageId);
+    }
+  } catch (error) {
+    if (error instanceof EcosystemError) throw new PackagesError(error.message);
+    throw error;
   }
-  writeFileSync(propsPath, props, "utf8");
 
   const baseCommit =
     options.baseCommit !== undefined ? options.baseCommit : (runGit(root, ["rev-parse", "HEAD"]).stdout || null);
@@ -435,11 +403,46 @@ export function packModule(
   return { slug, version, artifacts, pins, records: written };
 }
 
-/** Whether a `packages/.gitattributes` puts the packages under LFS. */
-export function packagesUnderLfs(root: string): boolean {
+/** Whether a `packages/.gitattributes` puts the packages under LFS, by the ecosystem's pattern. */
+export function packagesUnderLfs(root: string, pattern: string): boolean {
   const path = join(root, PACKAGES_DIR, ".gitattributes");
   if (!existsSync(path)) return false;
+  const line = new RegExp(`^\\s*${escapeRegExp(pattern)}\\b.*filter=lfs`);
   return readFileSync(path, "utf8")
     .split(/\r?\n/)
-    .some((line) => /^\s*\*\.nupkg\b.*filter=lfs/.test(line));
+    .some((text) => line.test(text));
+}
+
+/** The commands once each, in first-seen order. */
+function distinct(commands: readonly string[][]): string[][] {
+  const seen = new Set<string>();
+  return commands.filter((argv) => {
+    const key = argv.join(" ");
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+/**
+ * The produced artifact at a repository-layout path under the output
+ * folder, matched segment by segment without regard to case (a pack may
+ * lower-case a name), as it is actually spelled; null when absent.
+ */
+function findProduced(outputDir: string, rel: string): string | null {
+  const actual: string[] = [];
+  let dir = outputDir;
+  for (const segment of rel.split("/")) {
+    let names: string[];
+    try {
+      names = readdirSync(dir);
+    } catch {
+      return null;
+    }
+    const found = names.find((name) => name.toLowerCase() === segment.toLowerCase());
+    if (found === undefined) return null;
+    actual.push(found);
+    dir = join(dir, found);
+  }
+  return actual.join("/");
 }

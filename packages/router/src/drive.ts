@@ -88,7 +88,7 @@ import {
   receiptBundles,
   receiptCorrespondence,
 } from "./land.ts";
-import { readRecords as readCorrespondence } from "./packages.ts";
+import { packModule, readRecords as readCorrespondence } from "./packages.ts";
 import { ExposureError, raiseGrantDecision, settleAnsweredGrants } from "./exposure.ts";
 import { BUILT_IN_ENGINES, builtInEngine } from "./engines.ts";
 import type { Engine, EngineOutput } from "./engines.ts";
@@ -3272,7 +3272,9 @@ export async function sessionNext(sessionsDir: string, options: NextOptions): Pr
       if (options.requestGrant) {
         raiseGrantDecision(fullCheckout, shape, current, options.requestGrant, options.reason ?? "", false);
       }
-      const settled = settleAnsweredGrants(fullCheckout, shape, current);
+      const settled = settleAnsweredGrants(fullCheckout, shape, current, (slug) => {
+        packModule(fullCheckout, shape, slug, { session: current });
+      });
       for (const grant of settled.applied) {
         writeErr(`dabbler: granted -- the checkout now holds module '${grant.sibling}'s source\n`);
       }

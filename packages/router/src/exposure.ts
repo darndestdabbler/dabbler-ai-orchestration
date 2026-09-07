@@ -15,13 +15,13 @@
 // request, then the operator's grant or denial, then the revoke -- and the
 // grants in force are folded from them, never edited in place.
 
-import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
-import { dirname, join, relative } from "node:path";
+import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { join, relative } from "node:path";
 
 import { inScope, moduleScope } from "./agency.ts";
 import { checkoutCone, contractDir } from "./checkout.ts";
 import { loadConfig } from "./config.ts";
-import { EcosystemError, OVERLAY_TARGETS, ecosystemOf, walkFiles } from "./ecosystem.ts";
+import { EcosystemError, layDebugGrants, walkFiles } from "./ecosystem.ts";
 import { sessionsDirFor } from "./evidence.ts";
 import { atomicWriteJson, nowIso, runGit } from "./journal.ts";
 import { sessionRunDir } from "./ledger.ts";
@@ -288,44 +288,23 @@ function refreshExposure(root: string, shape: SolutionShape, session: number): E
   });
 }
 
+/** How a debugging grant rebuilds a sibling from source: the seam's to say, given a pack. */
+export type GrantPack = (slug: string) => void;
+
 /**
- * The untracked overlay a debugging grant lays: for each sibling granted
- * with `debug`, its package reference removed and its project(s) referenced
- * by path, for this clone only. The tracked `Directory.Build.targets`
- * imports it when it exists; regenerated whole from the grants in force,
- * and removed when none is a debugging one.
+ * What the debugging grants in force do to this clone, through the seam:
+ * .NET lays (or removes) the untracked overlay the tracked targets import;
+ * Maven rebuilds the sibling just granted into the file repository with
+ * the pack handed in, and refuses when none was.
  */
-function writeOverlay(root: string, shape: SolutionShape, grants: readonly GrantInForce[]): void {
-  const path = join(root, ...OVERLAY_TARGETS.split("/"));
-  const debugging = grants.filter((grant) => grant.debug);
-  if (debugging.length === 0) {
-    rmSync(path, { force: true });
-    return;
+function layGrants(root: string, shape: SolutionShape, grants: readonly GrantInForce[], granted: string | null, pack: GrantPack | null): void {
+  const debugging = grants.filter((grant) => grant.debug).map((grant) => entryOf(shape, grant.sibling));
+  try {
+    layDebugGrants(root, shape, debugging, granted === null ? null : entryOf(shape, granted), pack);
+  } catch (error) {
+    if (error instanceof EcosystemError) throw new ExposureError(error.message);
+    throw error;
   }
-  const lines = [
-    "<Project>",
-    "  <!-- Laid by dabbler module grant (debug) for this clone only: the granted",
-    "       sibling is built from its source rather than restored as its package.",
-    "       Untracked; dabbler module revoke removes it. -->",
-  ];
-  for (const grant of debugging) {
-    const entry = entryOf(shape, grant.sibling);
-    let projects: { project: string; packageId: string }[] = [];
-    try {
-      projects = ecosystemOf(root, entry).packableProjects(root, entry);
-    } catch (error) {
-      if (!(error instanceof EcosystemError)) throw error;
-    }
-    lines.push(`  <ItemGroup Label="dabbler-grant:${grant.sibling}">`);
-    for (const target of projects) {
-      lines.push(`    <PackageReference Remove="${target.packageId}" />`);
-      lines.push(`    <ProjectReference Include="$(MSBuildThisFileDirectory)../${target.project}" />`);
-    }
-    lines.push("  </ItemGroup>");
-  }
-  lines.push("</Project>", "");
-  mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, lines.join("\n"), "utf8");
 }
 
 /**
@@ -401,7 +380,7 @@ export function applyGrant(
   shape: SolutionShape,
   session: number,
   sibling: string,
-  options: { readonly reason: string; readonly debug: boolean; readonly decision: string },
+  options: { readonly reason: string; readonly debug: boolean; readonly decision: string; readonly pack?: GrantPack | null },
 ): GrantInForce {
   const entry = entryOf(shape, sibling);
   const widened = runGit(root, ["sparse-checkout", "add", ...rootsOf(entry)]);
@@ -415,7 +394,7 @@ export function applyGrant(
     debug: options.debug,
     decision: options.decision,
   });
-  writeOverlay(root, shape, grantsInForce(readGrants(root, session)));
+  layGrants(root, shape, grantsInForce(readGrants(root, session)), sibling, options.pack ?? null);
   refreshExposure(root, shape, session);
   return { sibling, reason: row.reason, debug: row.debug, grantedAt: row.at };
 }
@@ -451,7 +430,7 @@ export function revokeGrant(root: string, shape: SolutionShape, session: number,
     decision: rows.findLast((row) => row.event === "granted" && row.sibling === sibling)?.decision ?? "",
   });
   const remaining = grantsInForce(readGrants(root, session));
-  writeOverlay(root, shape, remaining);
+  layGrants(root, shape, remaining, null, null);
   const modules = modulesOfSession(root, session);
   const cone = new Set<string>();
   for (const slug of modules) {
@@ -476,7 +455,7 @@ export interface GrantSettlement {
  * answered yet is reported open. Idempotent: a request already settled is
  * left alone.
  */
-export function settleAnsweredGrants(root: string, shape: SolutionShape, session: number): GrantSettlement {
+export function settleAnsweredGrants(root: string, shape: SolutionShape, session: number, pack: GrantPack | null = null): GrantSettlement {
   const rows = readGrants(root, session);
   const decisions = foldOwed(readOwed(root));
   const settled = new Set(
@@ -498,6 +477,7 @@ export function settleAnsweredGrants(root: string, shape: SolutionShape, session
           reason: request.reason,
           debug: request.debug,
           decision: request.decision,
+          pack,
         }),
       );
     } else {

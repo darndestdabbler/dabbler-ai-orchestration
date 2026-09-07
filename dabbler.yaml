@@ -448,6 +448,10 @@ testing:
         select:
           - packages/router/test/ecosystem.test.ts
           - packages/router/test/contractdoc.test.ts
+          - packages/router/test/packages.test.ts
+          - packages/router/test/exposure.test.ts
+          - packages/router/test/land.test.ts
+          - packages/router/test/gates.test.ts
       # Committed immutable packages: the dev version, the central pin and
       # the correspondence record.
       - when: packages/router/src/packages.ts

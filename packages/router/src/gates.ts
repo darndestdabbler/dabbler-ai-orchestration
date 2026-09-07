@@ -36,23 +36,16 @@
 // and no repository; the readers are exercised once, in the git-states
 // walkthrough.
 
-import { existsSync, readFileSync, realpathSync } from "node:fs";
-import { join, relative, resolve } from "node:path";
+import { existsSync, realpathSync } from "node:fs";
+import { join, resolve } from "node:path";
 
 import { isFrameworkInstalledPath } from "./checks.ts";
 import type { RouterConfig } from "./config.ts";
 import { PROJECT_CONFIG_FILENAME, loadConfig, projectRoot } from "./config.ts";
-import { walkFiles } from "./ecosystem.ts";
+import { EcosystemError, ecosystemOf } from "./ecosystem.ts";
 import { changedPathsBetween, detectOutOfBandWrite } from "./evidence.ts";
 import { readExposure } from "./exposure.ts";
-import {
-  type PackageReferenceFact,
-  candidatesFromRecord,
-  centralPins,
-  judgeExposure,
-  judgePins,
-  packageReferencesOf,
-} from "./land.ts";
+import { type PackageReferenceFact, candidatesFromRecord, judgeExposure, judgePins } from "./land.ts";
 import { ManifestError, type ModuleEntry, consumersOf, solutionShape } from "./modules.ts";
 import {
   type ImpactPlan,
@@ -854,22 +847,31 @@ export function checkPinsCurrent(sessionsDir: string): Check {
     })
     .filter((candidate): candidate is { package: string; version: string; slug: string } => candidate !== null);
   if (candidates.length === 0) return [true, "this session packed no candidate: no pin to hold", true];
-  const propsPath = join(root, "Directory.Packages.props");
-  const pins = centralPins(existsSync(propsPath) ? readFileSync(propsPath, "utf8") : "");
+  // The pins and the references through the seam of the candidate's own
+  // ecosystem: where the pin lives and what a consumer's reference looks
+  // like are its to say, and a consumer's project files are listed by the
+  // same seam whether or not the consumer's source is on this disk.
+  const pins = new Map<string, string>();
   const references: PackageReferenceFact[] = [];
   for (const candidate of candidates) {
+    const packed = shape.modules.find((module) => module.slug === candidate.slug);
+    if (packed === undefined) continue;
+    let ecosystem;
+    try {
+      ecosystem = ecosystemOf(root, packed);
+    } catch (error) {
+      if (!(error instanceof EcosystemError)) throw error;
+      return [false, `the ecosystem of module '${candidate.slug}' cannot be told: ${error.message}`];
+    }
+    for (const [id, version] of ecosystem.centralPins(root)) pins.set(id, version);
     for (const consumer of consumersOf(shape.modules, candidate.slug)) {
       const entry = shape.modules.find((module) => module.slug === consumer);
       if (entry === undefined) continue;
-      for (const codeRoot of entry.codeRoots.length > 0 ? entry.codeRoots : ["."]) {
-        for (const file of walkFiles(join(root, codeRoot))) {
-          if (!file.toLowerCase().endsWith(".csproj")) continue;
-          const project = relative(root, file).split("\\").join("/");
-          try {
-            references.push(...packageReferencesOf(project, readFileSync(file, "utf8")));
-          } catch {
-            // A project file that cannot be read pins nothing this gate can see.
-          }
+      for (const project of ecosystem.projectFiles(root, entry)) {
+        try {
+          references.push(...ecosystem.packageReferences(root, project));
+        } catch {
+          // A project file that cannot be read pins nothing this gate can see.
         }
       }
     }

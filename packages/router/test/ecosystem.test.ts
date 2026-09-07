@@ -1,13 +1,15 @@
 // The ecosystem seam: which ecosystem a module is, from what its roots
-// contain, and the refusals -- neither, both, and Maven until session 108.
+// contain, the refusals -- neither, both -- and the Maven side beside the
+// .NET one.
 
 import assert from "node:assert/strict";
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it } from "node:test";
+import { pathToFileURL } from "node:url";
 
-import { EcosystemError, ecosystemNamed, ecosystemOf, ensureRootFiles } from "../src/ecosystem.ts";
-import { parseEntries } from "../src/modules.ts";
+import { EcosystemError, ecosystemNamed, ecosystemOf, ensureRootFiles, layDebugGrants } from "../src/ecosystem.ts";
+import { type SolutionShape, dependencyOrder, parseEntries } from "../src/modules.ts";
 import { seed, tempDir } from "./support/answers.ts";
 
 function solution(): { root: string; entries: ReturnType<typeof parseEntries> } {
@@ -46,14 +48,186 @@ describe("the ecosystem seam", () => {
         /module 'notes' has no project file .* a \.csproj or a solution file for \.NET, or a pom\.xml for Maven/.test(error.message),
     );
     assert.throws(() => ecosystemOf(root, mixed!), /module 'mixed' holds both/);
-    // The seam's names follow the ecosystem, and the Maven side refuses by
-    // name until its session, rather than guessing a shape.
+    // The seam's names follow the ecosystem: .NET's dotted projects, Maven's
+    // hyphenated modules; and a Maven package is groupId:artifactId.
     assert.deepEqual(
       [ecosystemNamed("dotnet").contractProjectNames("CsvPersister").abstractions, ecosystemNamed("dotnet").contractProjectNames("CsvPersister").contractTests],
       ["CsvPersister.Abstractions", "CsvPersister.ContractTests"],
     );
-    assert.throws(() => ecosystemNamed("maven").contractProjectNames("com.example:reports"), /session 108/);
-    assert.throws(() => ecosystemNamed("maven").readSurface(root, reports!, "reports"), /session 108/);
+    assert.deepEqual(
+      [ecosystemNamed("maven").contractProjectNames("com.example:reports").abstractions, ecosystemNamed("maven").contractProjectNames("com.example:reports").contractTests],
+      ["reports-api", "reports-contract-tests"],
+    );
+    assert.throws(
+      () => ecosystemNamed("maven").packagedArtifact("reports", "1.0.0"),
+      (error: unknown) => error instanceof EcosystemError && /a Maven module's package is groupId:artifactId/.test(error.message),
+    );
+  });
+});
+
+describe("the Maven side of the seam", () => {
+  /** A two-module Maven solution: the model as one jar, the reports as an aggregator of a core and an api. */
+  function mavenSolution(): { root: string; shape: SolutionShape } {
+    const root = tempDir("maven-");
+    const parent = (relativePath: string): string =>
+      `  <parent>\n    <groupId>com.example</groupId>\n    <artifactId>solution-parent</artifactId>\n    <version>\${revision}</version>\n    <relativePath>${relativePath}</relativePath>\n  </parent>\n`;
+    seed(root, {
+      "modules/model/pom.xml": `<project>\n${parent("../../pom.xml")}  <artifactId>model</artifactId>\n  <dependencies>\n  </dependencies>\n</project>\n`,
+      "modules/reports/pom.xml": `<project>\n${parent("../../pom.xml")}  <artifactId>reports-parent</artifactId>\n  <packaging>pom</packaging>\n  <modules>\n    <module>reports-core</module>\n    <module>reports-api</module>\n  </modules>\n</project>\n`,
+      "modules/reports/reports-core/pom.xml":
+        "<project>\n  <parent>\n    <groupId>com.example</groupId>\n    <artifactId>reports-parent</artifactId>\n    <version>${revision}</version>\n  </parent>\n  <artifactId>reports</artifactId>\n" +
+        "  <dependencies>\n    <dependency>\n      <groupId>com.example</groupId>\n      <artifactId>model</artifactId>\n    </dependency>\n    <dependency>\n      <groupId>org.junit.jupiter</groupId>\n      <artifactId>junit-jupiter</artifactId>\n      <version>5.13.4</version>\n      <scope>test</scope>\n    </dependency>\n  </dependencies>\n</project>\n",
+      "modules/reports/reports-api/pom.xml":
+        "<project>\n  <parent>\n    <groupId>com.example</groupId>\n    <artifactId>reports-parent</artifactId>\n    <version>${revision}</version>\n  </parent>\n  <artifactId>reports-api</artifactId>\n</project>\n",
+    });
+    const entries = parseEntries({
+      modules: [
+        { slug: "model", codeRoots: ["modules/model"], package: "com.example:model" },
+        { slug: "reports", codeRoots: ["modules/reports"], package: "com.example:reports", dependsOn: ["model"] },
+      ],
+    });
+    return { root, shape: { multi: true, implicit: false, modules: dependencyOrder(entries) } };
+  }
+
+  it("lays the root files, packs one reactor per module into the file repository under the dev version, and manages the one pin in the parent POM", () => {
+    const { root, shape } = mavenSolution();
+    const maven = ecosystemNamed("maven");
+    const written = ensureRootFiles(root, shape);
+    assert.deepEqual(written?.written, ["pom.xml", "packages/.gitattributes", "packages/README.md"]);
+    const pom = readFileSync(join(root, "pom.xml"), "utf8");
+    // The parent lists the modules, takes the CI-friendly revision, declares
+    // the committed file repository and manages the deploy and flatten plugins.
+    assert.match(pom, /<module>modules\/model<\/module>\s*<module>modules\/reports<\/module>/);
+    assert.match(pom, /<version>\$\{revision\}<\/version>/);
+    assert.match(pom, /<revision>0\.1\.0-SNAPSHOT<\/revision>/);
+    assert.match(pom, /<url>file:\/\/\/\$\{maven\.multiModuleProjectDirectory\}\/packages<\/url>/);
+    assert.match(pom, /maven-deploy-plugin/);
+    assert.match(pom, /flatten-maven-plugin/);
+    assert.match(readFileSync(join(root, "packages/.gitattributes"), "utf8"), /# \*\.jar filter=lfs/);
+
+    // The module's packable projects are its jars, built through its aggregator in one command.
+    const reports = shape.modules.find((entry) => entry.slug === "reports")!;
+    const targets = maven.packableProjects(root, reports);
+    assert.deepEqual(targets, [
+      { project: "modules/reports/reports-api/pom.xml", packageId: "com.example:reports-api", via: "modules/reports/pom.xml" },
+      { project: "modules/reports/reports-core/pom.xml", packageId: "com.example:reports", via: "modules/reports/pom.xml" },
+    ]);
+    const version = "0.1.0-dev.20260907.1.gabc1234";
+    const output = join(root, "packages");
+    assert.deepEqual(maven.packArgv("modules/reports/pom.xml", output, version), [
+      "mvn", "-B", "-f", "modules/reports/pom.xml", "-DskipTests", `-Drevision=${version}`,
+      `-DaltDeploymentRepository=modules::${pathToFileURL(output).href}`, "deploy",
+    ]);
+    // The artifact lands in repository layout; the base version resolves
+    // through ${revision} up to the root's property.
+    assert.equal(maven.packagedArtifact("com.example:reports", version), `com/example/reports/${version}/reports-${version}.jar`);
+    assert.equal(maven.baseVersion(root, "modules/reports/reports-core/pom.xml"), "0.1.0");
+
+    // One managed dependency per id in the parent POM, replaced in place.
+    maven.writeCentralPin(root, "com.example:model", "0.1.0-dev.20260907.1.g1111111");
+    maven.writeCentralPin(root, "com.example:model", "0.1.0-dev.20260907.2.g2222222");
+    assert.equal(maven.centralPins(root).get("com.example:model"), "0.1.0-dev.20260907.2.g2222222");
+    assert.equal((readFileSync(join(root, "pom.xml"), "utf8").match(/<artifactId>model<\/artifactId>/g) ?? []).length, 1);
+    // A consumer's dependency takes the managed version; one carrying its own is a fact the gate names.
+    assert.deepEqual(maven.packageReferences(root, "modules/reports/reports-core/pom.xml"), [
+      { project: "modules/reports/reports-core/pom.xml", packageId: "com.example:model", ownVersion: null },
+      { project: "modules/reports/reports-core/pom.xml", packageId: "org.junit.jupiter:junit-jupiter", ownVersion: "5.13.4" },
+    ]);
+    // The focused checkout's convenience file names the module's own POM.
+    assert.equal(maven.convenienceFile(root, reports, maven.projectFiles(root, reports)), ".mvn/maven.config");
+    assert.equal(readFileSync(join(root, ".mvn/maven.config"), "utf8"), "-f\nmodules/reports/pom.xml\n");
+  });
+
+  it("reads a public declaration with its Javadoc from the api module and skips what is not public", () => {
+    const { root, shape } = mavenSolution();
+    seed(root, {
+      "modules/reports/reports-api/src/main/java/com/example/reports/api/Reports.java": [
+        "package com.example.reports.api;",
+        "",
+        "/**",
+        " * What reports promises.",
+        " * @since 1.0",
+        " */",
+        "public interface Reports {",
+        "    /** Renders one report by name. */",
+        "    String render(String name);",
+        "",
+        "    /** Renders with the default name; part of the promise, though it says default and not public. */",
+        "    default String render() { return render(\"default\"); }",
+        "",
+        "    /** The empty reports; a static factory is public too, and its body is not. */",
+        "    static Reports none() {",
+        "        String empty = \"\";",
+        "        return name -> empty;",
+        "    }",
+        "",
+        "    private String hidden() { return \"\"; }",
+        "}",
+        "",
+      ].join("\n"),
+      "modules/reports/reports-api/src/main/java/com/example/reports/api/ReportName.java": [
+        "package com.example.reports.api;",
+        "",
+        "/** A report's name, validated once. */",
+        "public final class ReportName {",
+        "    private final String value;",
+        "",
+        "    /** Wraps a name. */",
+        "    public ReportName(String value) { this.value = value; }",
+        "",
+        "    @Override",
+        "    public String toString() { return value; }",
+        "}",
+        "",
+      ].join("\n"),
+      "modules/reports/reports-core/src/main/java/com/example/reports/HtmlReports.java":
+        "package com.example.reports;\n\n/** The implementation, which is not the surface. */\npublic final class HtmlReports implements com.example.reports.api.Reports {\n}\n",
+    });
+    const reports = shape.modules.find((entry) => entry.slug === "reports")!;
+    const surface = ecosystemNamed("maven").readSurface(root, reports, "com.example:reports");
+    assert.deepEqual(
+      surface.map((entry) => [entry.declaration, entry.summary]),
+      [
+        ["public final class ReportName", "A report's name, validated once."],
+        ["public ReportName(String value)", "Wraps a name."],
+        ["public String toString()", ""],
+        ["public interface Reports", "What reports promises."],
+        ["String render(String name)", "Renders one report by name."],
+        ["default String render()", "Renders with the default name; part of the promise, though it says default and not public."],
+        ["static Reports none()", "The empty reports; a static factory is public too, and its body is not."],
+      ],
+    );
+    assert.ok(surface.every((entry) => entry.file.startsWith("modules/reports/reports-api/")));
+  });
+
+  it("packs a Maven sibling under a debugging grant through the pack handed in and lays no overlay, where .NET lays the overlay and packs nothing", () => {
+    const root = tempDir("grants-");
+    seed(root, {
+      "modules/model/pom.xml": "<project>\n  <groupId>com.example</groupId>\n  <artifactId>model</artifactId>\n  <version>1.0.0</version>\n</project>\n",
+      "modules/persister/src/CsvPersister/CsvPersister.csproj": "<Project />\n",
+    });
+    const entries = parseEntries({
+      modules: [
+        { slug: "model", codeRoots: ["modules/model"], package: "com.example:model" },
+        { slug: "persister", codeRoots: ["modules/persister"], package: "CsvPersister" },
+      ],
+    });
+    const shape: SolutionShape = { multi: true, implicit: false, modules: dependencyOrder(entries) };
+    const [model, persister] = shape.modules;
+    const packed: string[] = [];
+    const overlay = join(root, ".dabbler/overlay.targets");
+
+    layDebugGrants(root, shape, [model!], model!, (slug) => packed.push(slug));
+    assert.deepEqual(packed, ["model"]);
+    assert.equal(existsSync(overlay), false);
+    assert.throws(() => layDebugGrants(root, shape, [model!], model!, null), /no pack was handed in/);
+
+    layDebugGrants(root, shape, [model!, persister!], persister!, (slug) => packed.push(slug));
+    assert.deepEqual(packed, ["model"]);
+    assert.match(readFileSync(overlay, "utf8"), /PackageReference Remove="CsvPersister"/);
+    // A revoke regenerates from what remains: nothing, so no overlay.
+    layDebugGrants(root, shape, [], null, null);
+    assert.equal(existsSync(overlay), false);
   });
 });
 

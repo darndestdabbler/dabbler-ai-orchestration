@@ -1,4 +1,4 @@
-# STATUS — the modules block (sessions 100–108) is running unattended; session 106 closed VERIFIED, session 107 next
+# STATUS — the modules block (sessions 100–108) is running unattended; session 107 closed VERIFIED, session 108 next
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
 
@@ -21,12 +21,52 @@
 > | 104 | the focused checkout and the Windows preflight | CLOSED VERIFIED, landed 706eb2af |
 > | 105 | module-scoped sessions, the hard verifier scope, exposure, grants | CLOSED VERIFIED, landed 8ef7dd8d |
 > | 106 | the impact plan and the selected run of record | CLOSED VERIFIED, landed 2873f493 |
-> | 107 | the atomic land | next |
-> | 108 | Maven parity and the hardened profiles | planned |
+> | 107 | the atomic land | CLOSED VERIFIED, landed 5c456da8 |
+> | 108 | Maven parity and the hardened profiles | next |
 >
 > One operating failure on the record: session 101's second round finished at 17:18 and the loop idled until 20:06, because the background waiter's completion never woke the orchestrator. The rule since: every framework wait is driven from a foreground loop that polls the job's status file, and the run state is checked at the start of every turn.
 >
 > Paused after session 103 on the operator's instruction (2026-09-06, 21:15) and resumed in a new chat at 21:27 with session 104; the router and extension on this machine are rebuilt after each close. Every framework wait is driven from a foreground loop (the scratchpad's drive-waits.sh pattern), never from a background waiter. A session driven from the chat with the CLI shows nothing in the Dabbler Terminal, which is expected: that terminal renders a run the extension launched.
+
+> ## SESSION 107 CLOSED, 2026-09-07, VERIFIED (round 2, gpt-5.4 over the seat; round 1 found one Major and two minors, all fixed; landed 5c456da8) -- the atomic land
+>
+> Three steps, nothing asked of a single-module solution. **The land judges
+> from facts** (`land.ts`, new): `judgeLandReadiness` refuses when the tree
+> about to be committed is not the tree the last green run of record ran
+> against, naming the paths that moved; when a changed module's
+> correspondence record (source digest, contract digest) no longer matches
+> the tree; or when any suite the impact plan reached is stale or red or
+> has no run -- `phaseLand` reads the facts from the record and stops with
+> the refusal, and the gate receipt maps the landed commit to each
+> correspondence record this session made. **Two gates join the close**:
+> `pins_current` (every consumer's pin of a changed module is the one
+> central `PackageVersion` naming the candidate this session packed, and no
+> consuming `PackageReference` carries a `Version` or `VersionOverride` of
+> its own, read as attributes or as child elements) and
+> `exposure_within_ceiling` (the closing manifest shows zero sibling
+> implementation bytes outside a recorded grant and no file changed
+> outside the session's scope); both are single-module no-ops that say so
+> in the close log. **The bundle record**: the candidate job writes
+> `release/<slug>/bundle.yaml` for every application module, packaged or
+> not -- the application's version, each transitive dependency's package
+> id, version and digest as pinned, the session, the date and `baseCommit`
+> (the `HEAD` it was built on; the landed commit does not exist until the
+> land, so the gate receipt carries it under `bundles`, as it carries the
+> packages under `correspondence`) -- refusing while any pin is a `-dev`
+> version; bundling is recorded, never executed. A releasable session on a
+> module publishes through its own `modules.<slug>.packaging`
+> (`moduleOfSession`). The Solution Explorer gains a bundles node and each
+> module's *shipped in*, derived from the records. Four router tests, one
+> extension test.
+>
+> Round 1's Major was that the record named the pre-land `HEAD` as the
+> commit that ships; the fix is the `baseCommit` field and the receipt's
+> mapping above. Round 2's one minor (a reader that only knows the new
+> field name) needs nothing: no record was ever written under the old
+> name outside a test. One driving slip: `session report --step` requires
+> `--notes`, and a report refused for it leaves the previous report file
+> in place, which the next `next` then judges as a stale answer -- a
+> harmless rejection that only bumps the sequence.
 
 > ## SESSION 106 CLOSED, 2026-09-07, VERIFIED (round 4, gpt-5.4 over the seat; round 1 found two Majors and a minor, fixed; the cap raised from 3 to 5 for this run on the record; landed 2873f493) -- the impact plan and the selected run of record
 >

@@ -1,6 +1,99 @@
-# STATUS — the modules block (sessions 100–108) is COMPLETE; all nine sessions closed VERIFIED, session 108 landed 6d06461a, router and extension 2.0.12
+# STATUS — sessions 113–117 CLOSED, all VERIFIED: the deployables block built, the Java/Maven walk run end to end, and the nine defects it found fixed and re-proven
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
+
+> ## SESSIONS 113–117 CLOSED, 2026-09-07 — the queued work, and what the Java walk found
+>
+> Three things were queued and none started: the `deployables:` block the
+> design specified, the Java run with its UAT script, and two Maven defects
+> found while dogfooding it. All three are done, and the walk that was the
+> third item turned into six more product defects and three documentation
+> errors — every one of them found by following the walkthrough as written,
+> and none of them findable by a test in this repository, because no test
+> runs `mvn`.
+>
+> | session | what | state |
+> | --- | --- | --- |
+> | 113 | the two Maven papercuts (one of them blocking) | CLOSED VERIFIED, landed 3c11838d |
+> | 114 | the `deployables:` block, built | CLOSED VERIFIED (round 2), landed 103a1ed9 |
+> | 115 | what the walk found: a Maven session that can close | CLOSED VERIFIED, landed 2c2e2ecd |
+> | 116 | what the walk found: the first ten minutes | CLOSED VERIFIED, landed c04df4a8 |
+> | 117 | the ignore rule that never fired | CLOSED VERIFIED (round 2), landed 0d7620f9 |
+>
+> **113 — the pin file, and the JDK.** `module pack` printed `pinned <id> in
+> Directory.Packages.props` on a Maven solution, where the pin really moves
+> the root `pom.xml`; the same literal seeded the candidate record, so the
+> file that moved was unaccounted for and the land's verification gate would
+> have refused it. `PackResult` now carries the seam's `pinFile`. The
+> scaffolded root POM hardcoded `maven.compiler.release 21`; it now asks the
+> JDK that is scaffolding (`java -version`, through a settable source) and
+> falls back to a stated 17.
+>
+> **114 — `deployables:`.** The manifest reads a top-level `deployables:`
+> list (slug, title, kind, from, runtime, publish), refusing an unknown key,
+> a duplicate slug, a `from` naming an undeclared module and a `from` naming
+> a non-application. Which deployables a module feeds is derived, never
+> declared. A manifest with no block implies one deployable per application
+> module, so a solution that ships what it already ships declares nothing
+> new. `bundleRecord` is keyed by the deployable, unions its `from` modules'
+> dependencies (safe because a package has one central pin), refuses two
+> `from` modules at different versions by name, and the record carries
+> `from`. `modules show`, `affected`, the projection and the Explorer's
+> bundle row all say what ships.
+>
+> **The walk, 2026-09-07, `C:\temp\uat-java`.** One AI session on the model
+> module, verified at round 2 by gpt-5-6-terra, landed — and then could not
+> close. `mvn deploy` writes a POM and a `.md5`/`.sha1` beside every
+> artifact; `packModule` recorded only the artifact it went looking for, so
+> `verification_clean` saw a tree that moved and `exposure_within_ceiling`
+> saw nine paths outside the session's scope. Two more measured on the way:
+> the module session's `impact.json` was `"suites": []`, so the run of record
+> ran **nothing** and `test_run_fresh` still passed; and a pack of an
+> unchanged module minted a new version every time, because `mvn` writes
+> `target/` inside the module's own code roots.
+>
+> **115 and 117 fixed those.** The candidate is now what the pack LEFT (the
+> feed snapshotted before and after), a module session's scope carries
+> `packages/`, `.dabbler/` is never counted as a change outside it, a
+> declared suite that names no module is repository-wide and reached by any
+> change, and the Maven scaffold ENSURES its two ignore rules rather than
+> writing a file — 117 exists because 115's write-once version never fired:
+> `dabbler bootstrap` writes `.gitignore` first, which is 116's own
+> correction to the walkthrough.
+>
+> **116 — the first ten minutes.** The plan instruction listed the members a
+> work plan carries and never mentioned `modules`, which the declaration is
+> refused without in a multi-module solution: an engine answering what it was
+> asked for was refused every time, and the second identical refusal is a
+> deadlock. Bootstrap told a session that had not declared yet that "its land
+> is what commits them", when the declaration refuses a tree carrying
+> changes. The recommended answer to the `testing-suites` decision refused in
+> a repository with no `dabbler.yaml` (and named two wrong causes), then
+> appended a **second, identical** suite once one existed. Both UAT documents
+> now run `dabbler bootstrap` before the first session; the .NET one stops
+> telling the reader to hand-write `sessions.json`; the Java one leaves
+> `Item.java` to the session whose plan says to write it, which is what cost
+> the walk a blocking Major and a dispute.
+>
+> **Proven on the fixed build, `C:\temp\uat-java3`.** The same tree packs to
+> the same version twice (`0.1.0-dev.20260907.1.ga6aac5f`, both times);
+> `updated .gitignore` appends the two Maven rules under bootstrap's own; the
+> plan instruction says "Declared here: model, store, app"; the suite answer
+> declares `maven` once and does not duplicate it; `impact-plan
+> modules=["model"] suites=["maven"]`; the maven suite ran as the run of
+> record; and the close passed **all nine gates**, `verification_clean` and
+> `exposure_within_ceiling` among them.
+>
+> **Owed, and not done here.** (1) The same deadlock 116 fixed for bootstrap
+> also exists for the owed answer: `dabbler owed answer --choice declare`
+> writes `dabbler.yaml`, and a session that has not declared is then refused
+> until the operator commits it. The fix is the same shape — say who commits
+> it, before the declaration. (2) Step 10 of the Java walkthrough — the
+> `store` and `app` modules, a module consuming a sibling as a package, and
+> running the loader — has still never been walked; the walk of 2026-09-07
+> proved one module end to end. (3) The router and extension are still
+> stamped 2.0.12: sessions 113–117 are landed but not versioned or rebuilt
+> into the VSIX.
 
 > ## THE MODULES BLOCK, RUNNING UNATTENDED FROM 2026-09-06 — where it stands
 >

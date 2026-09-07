@@ -2212,9 +2212,9 @@
     {
       "number": 112,
       "title": "The UAT walkthroughs, and what a solution ships",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-07T13:51:29.006000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-09-07T14:08:16.306000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

@@ -12,7 +12,7 @@ import {
   readExposure,
   writeExposure,
 } from "../src/exposure.ts";
-import { type SolutionShape, dependencyOrder, implicitModule, parseEntries } from "../src/modules.ts";
+import { type SolutionShape, dependencyOrder, implicitModule, parseEntries, impliedDeployables } from "../src/modules.ts";
 import { seed, tempDir } from "./support/answers.ts";
 
 function twoModules(): SolutionShape {
@@ -22,7 +22,7 @@ function twoModules(): SolutionShape {
       { slug: "persister", codeRoots: ["modules/persister"], dependsOn: ["model"], package: "CsvPersister" },
     ],
   });
-  return { multi: true, implicit: false, modules: dependencyOrder(entries) };
+  return { multi: true, implicit: false, modules: dependencyOrder(entries), deployables: impliedDeployables(entries) };
 }
 
 const SCOPE = ["modules/persister", "modules/model/contract", "docs/sessions"];
@@ -44,7 +44,7 @@ describe("the exposure manifest", () => {
     assert.deepEqual(readExposure(root, 4), written);
 
     const single = tempDir("single-");
-    const shape: SolutionShape = { multi: false, implicit: true, modules: [implicitModule(single)] };
+    const shape: SolutionShape = { multi: false, implicit: true, modules: [implicitModule(single)], deployables: [] };
     assert.equal(writeExposure(single, shape, 1, { modules: [], phase: "start", scope: [] }), null);
     assert.equal(existsSync(exposurePath(single, 1)), false);
   });

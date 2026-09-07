@@ -9,7 +9,7 @@ import { describe, it } from "node:test";
 import { pathToFileURL } from "node:url";
 
 import { EcosystemError, ecosystemNamed, ecosystemOf, ensureRootFiles, javaReleaseOf, layDebugGrants, setJavaSource } from "../src/ecosystem.ts";
-import { type SolutionShape, dependencyOrder, parseEntries } from "../src/modules.ts";
+import { type SolutionShape, dependencyOrder, parseEntries, impliedDeployables } from "../src/modules.ts";
 import { seed, tempDir } from "./support/answers.ts";
 
 function solution(): { root: string; entries: ReturnType<typeof parseEntries> } {
@@ -86,7 +86,7 @@ describe("the Maven side of the seam", () => {
         { slug: "reports", codeRoots: ["modules/reports"], package: "com.example:reports", dependsOn: ["model"] },
       ],
     });
-    return { root, shape: { multi: true, implicit: false, modules: dependencyOrder(entries) } };
+    return { root, shape: { multi: true, implicit: false, modules: dependencyOrder(entries), deployables: impliedDeployables(entries) } };
   }
 
   it("targets the release of the JDK that scaffolded it, and says so", () => {
@@ -241,7 +241,7 @@ describe("the Maven side of the seam", () => {
         { slug: "persister", codeRoots: ["modules/persister"], package: "CsvPersister" },
       ],
     });
-    const shape: SolutionShape = { multi: true, implicit: false, modules: dependencyOrder(entries) };
+    const shape: SolutionShape = { multi: true, implicit: false, modules: dependencyOrder(entries), deployables: impliedDeployables(entries) };
     const [model, persister] = shape.modules;
     const packed: string[] = [];
     const overlay = join(root, ".dabbler/overlay.targets");

@@ -442,6 +442,37 @@ suite("solutionTreeModel: what other repositories build", () => {
     assert.ok(!childrenOf({ kind: "solution" }, projection()).some((n) => n.kind === "bundleGroup"));
   });
 
+  test("a bundle row names the modules the deployable ships, and one with none reads as before", () => {
+    // A deployable can ship several application modules, so the row says
+    // which -- and a record written before deployables existed names none.
+    const p = projection({
+      modules: modules().map((m) => ({ ...m, shippedIn: m.slug === "listener" ? ["edge"] : [] })),
+      bundles: [
+        {
+          bundle: "edge",
+          from: ["listener", "tool"],
+          version: "3.1.0",
+          baseCommit: "abc123def456",
+          date: "2026-09-07",
+          session: 20,
+          dependencies: [{ module: "model", package: "CsvModel", version: "1.2.0", digest: "m-120" }],
+        },
+        {
+          bundle: "legacy",
+          version: "1.0.0",
+          date: "2026-09-01",
+          dependencies: [],
+        },
+      ],
+    });
+    const shipped = descriptorFor({ kind: "bundle", bundle: "edge" }, p);
+    assert.strictEqual(shipped.description, "3.1.0 · listener, tool");
+    assert.ok(shipped.tooltip?.includes("Ships listener, tool."));
+    const older = descriptorFor({ kind: "bundle", bundle: "legacy" }, p);
+    assert.strictEqual(older.description, "1.0.0 · 2026-09-01");
+    assert.ok(!older.tooltip?.includes("Ships"));
+  });
+
   test("renders the consumers of a package as derived rows", () => {
     // `usedBy` is a reading of who declares what, and it is why nothing is
     // allowed to state it in a file.

@@ -114,9 +114,15 @@ export interface ProjectionMember {
   reason?: string | null;
 }
 
-/** One bundle record under release/: what an application ships, at which pins. */
+/** One bundle record under release/: what a deployable ships, at which pins. */
 export interface ProjectionBundle {
   bundle: string;
+  /**
+   * The application modules the deployable was built from. A record written
+   * before deployables existed names none, and the row reads as it always
+   * did: the bundle IS the application module it is named after.
+   */
+  from?: string[];
   version: string;
   /** The commit the bundle was built on; the landed one is the gate receipt's. */
   baseCommit?: string | null;
@@ -523,11 +529,17 @@ export function descriptorFor(
     case "bundle": {
       const b = (p.bundles ?? []).find((row) => row.bundle === node.bundle);
       if (!b) return { id: `bundle:${node.bundle}`, label: node.bundle, expandable: false };
+      // What a bundle is made of, not only what it pins: a deployable can
+      // ship several application modules, and the row says which.
+      const ships = (b.from ?? []).join(", ");
       return {
         id: `bundle:${b.bundle}`,
         label: b.bundle,
-        description: `${b.version} · ${b.date}`,
-        tooltip: `${b.bundle} ${b.version}, recorded ${b.date}` + (b.baseCommit ? ` on ${b.baseCommit.slice(0, 12)}` : ""),
+        description: ships ? `${b.version} · ${ships}` : `${b.version} · ${b.date}`,
+        tooltip:
+          `${b.bundle} ${b.version}, recorded ${b.date}` +
+          (b.baseCommit ? ` on ${b.baseCommit.slice(0, 12)}` : "") +
+          (ships ? `. Ships ${ships}.` : ""),
         icon: { id: "archive" },
         expandable: b.dependencies.length > 0,
         contextValue: "dabblerBundle",

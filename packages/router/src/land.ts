@@ -18,7 +18,7 @@ import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 
 import { type PackageReferenceFact, fileStem, packageIdOfStem } from "./ecosystem.ts";
 import type { ExposureManifest } from "./exposure.ts";
-import { type ModuleEntry, type SolutionShape, dependenciesOf } from "./modules.ts";
+import { type Deployable, type ModuleEntry, type SolutionShape, dependenciesOf } from "./modules.ts";
 
 // The pure parsers of the .NET pin and reference files live on the seam;
 // the judges here take their facts and know no ecosystem.
@@ -258,7 +258,14 @@ export interface BundleDependency {
 }
 
 export interface BundleRecord {
+  /** The deployable's slug: what ships, which is not always one module. */
   readonly bundle: string;
+  /**
+   * The application modules it was built from, in the order the deployable
+   * names them. A record written before deployables existed carries none,
+   * and reads back as an empty list.
+   */
+  readonly from: readonly string[];
   readonly version: string;
   /**
    * `HEAD` when the record was made: the commit the bundle was built ON,
@@ -276,7 +283,6 @@ export function bundlePath(root: string, slug: string): string {
   return join(root, "release", slug, "bundle.yaml");
 }
 
-/** `<Version>` or `<VersionPrefix>` of a project file, 0.1.0 when it says neither. */
 export interface BundleOptions {
   readonly session?: number | null;
   /** `HEAD` at record time; the landed commit is the receipt's to name. */
@@ -287,43 +293,82 @@ export interface BundleOptions {
 }
 
 /**
- * What an application ships, from the pins: each transitive dependency's
- * package at the version Directory.Packages.props pins, with the source
- * digest its correspondence record of that version carries. Refused while
- * any pin is a dev version, because a bundle names released packages;
- * recorded, never executed.
+ * What a deployable ships, from the pins: for every application module it
+ * is built `from`, each transitive dependency's package at the version the
+ * solution pins centrally, with the source digest that version's
+ * correspondence record carries. Refused while any pin is a dev version,
+ * because a bundle names released packages; recorded, never executed.
+ *
+ * The union over `from` is safe because the pins are central: a package has
+ * exactly one pin in the solution, so two applications in one deployable
+ * cannot disagree about the version of something they share. Their own
+ * versions can disagree, and that is refused rather than guessed at.
+ *
+ * `versionOf` reads a module's base version -- the ecosystem's question,
+ * asked by the caller that knows which ecosystem the module is.
  */
 export function bundleRecord(
   shape: SolutionShape,
-  entry: ModuleEntry,
+  deployable: Deployable,
   pins: ReadonlyMap<string, string>,
   records: readonly CorrespondenceLike[],
-  version: string,
+  versionOf: (module: ModuleEntry) => string,
   options: BundleOptions = {},
 ): BundleRecord {
-  if (entry.kind !== "application") {
-    throw new LandError(`module '${entry.slug}' is a ${entry.kind}; a bundle is what an application ships`);
+  if (deployable.from.length === 0) {
+    throw new LandError(
+      `deployable '${deployable.slug}' names no module in 'from'; nothing ships it yet, so there is ` +
+        "nothing to record",
+    );
+  }
+  const shipped: ModuleEntry[] = [];
+  for (const slug of deployable.from) {
+    const entry = shape.modules.find((module) => module.slug === slug);
+    if (entry === undefined) {
+      throw new LandError(`deployable '${deployable.slug}' ships module '${slug}', which the manifest does not declare`);
+    }
+    if (entry.kind !== "application") {
+      throw new LandError(`module '${slug}' is a ${entry.kind}; a bundle is what an application ships`);
+    }
+    shipped.push(entry);
+  }
+  // One version for the deployable: every application it ships declares it,
+  // and two that disagree is a question only the developer can answer.
+  const versions = new Map(shipped.map((entry) => [entry.slug, versionOf(entry)] as const));
+  const distinct = new Set(versions.values());
+  if (distinct.size > 1) {
+    throw new LandError(
+      `deployable '${deployable.slug}' ships modules at different versions (` +
+        [...versions].map(([slug, version]) => `${slug} ${version}`).join(", ") +
+        "); one artefact carries one version, so settle it in their build files",
+    );
   }
   const dependencies: BundleDependency[] = [];
-  for (const slug of dependenciesOf(shape.modules, entry.slug)) {
-    const dependency = shape.modules.find((module) => module.slug === slug);
-    if (dependency === undefined || dependency.package === null) continue;
-    const version = pins.get(dependency.package);
-    if (version === undefined) {
-      throw new LandError(`${dependency.package} (module '${slug}') has no central pin to bundle`);
+  const named = new Set<string>();
+  for (const entry of shipped) {
+    for (const slug of dependenciesOf(shape.modules, entry.slug)) {
+      if (named.has(slug)) continue;
+      const dependency = shape.modules.find((module) => module.slug === slug);
+      if (dependency === undefined || dependency.package === null) continue;
+      const version = pins.get(dependency.package);
+      if (version === undefined) {
+        throw new LandError(`${dependency.package} (module '${slug}') has no central pin to bundle`);
+      }
+      if (/-dev\./.test(version)) {
+        throw new LandError(
+          `${dependency.package} is pinned at ${version}, a dev version; a bundle names released packages, ` +
+            "so release the module first",
+        );
+      }
+      named.add(slug);
+      const record = records.find((row) => row.package === dependency.package && row.version === version);
+      dependencies.push({ module: slug, package: dependency.package, version, digest: record?.sourceDigest ?? null });
     }
-    if (/-dev\./.test(version)) {
-      throw new LandError(
-        `${dependency.package} is pinned at ${version}, a dev version; a bundle names released packages, ` +
-          "so release the module first",
-      );
-    }
-    const record = records.find((row) => row.package === dependency.package && row.version === version);
-    dependencies.push({ module: slug, package: dependency.package, version, digest: record?.sourceDigest ?? null });
   }
   return {
-    bundle: entry.slug,
-    version,
+    bundle: deployable.slug,
+    from: shipped.map((entry) => entry.slug),
+    version: [...distinct][0] ?? "0.1.0",
     baseCommit: options.baseCommit ?? null,
     date: (options.now ?? new Date()).toISOString().slice(0, 10),
     session: options.session ?? null,
@@ -366,8 +411,12 @@ export function readBundleRecord(root: string, slug: string): BundleRecord | nul
     if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) return null;
     const record = parsed as Record<string, unknown>;
     const dependencies = Array.isArray(record["dependencies"]) ? record["dependencies"] : [];
+    const from = Array.isArray(record["from"]) ? record["from"] : [];
     return {
       bundle: String(record["bundle"] ?? slug),
+      // A record written before deployables existed names no module; the
+      // deployable was the application module it is named after.
+      from: from.filter((name): name is string => typeof name === "string"),
       version: String(record["version"] ?? ""),
       baseCommit: typeof record["baseCommit"] === "string" ? record["baseCommit"] : null,
       date: String(record["date"] ?? ""),

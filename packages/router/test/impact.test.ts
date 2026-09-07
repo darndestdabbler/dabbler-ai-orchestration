@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import { REACH_CONSUMER_CONTRACT, REACH_MODULE_CHANGED, REACH_REQUIRED, REACH_SHARED_TYPES, planImpact } from "../src/impact.ts";
-import { type SolutionShape, dependencyOrder, implicitModule, parseEntries } from "../src/modules.ts";
+import { type SolutionShape, dependencyOrder, implicitModule, parseEntries, impliedDeployables } from "../src/modules.ts";
 
 function threeModules(): SolutionShape {
   const entries = parseEntries({
@@ -15,7 +15,7 @@ function threeModules(): SolutionShape {
       { slug: "listener", kind: "application", codeRoots: ["modules/listener"], dependsOn: ["persister"] },
     ],
   });
-  return { multi: true, implicit: false, modules: dependencyOrder(entries) };
+  return { multi: true, implicit: false, modules: dependencyOrder(entries), deployables: impliedDeployables(entries) };
 }
 
 const SUITES = [
@@ -75,7 +75,7 @@ describe("the impact plan", () => {
       ["persister"],
     );
 
-    const single: SolutionShape = { multi: false, implicit: true, modules: [implicitModule("D:/ws/csv-model")] };
+    const single: SolutionShape = { multi: false, implicit: true, modules: [implicitModule("D:/ws/csv-model")], deployables: [] };
     const own = planImpact(single, [
       { name: "unit", expensive: true },
       { name: "slow", expensive: true, requiredForClose: false },

@@ -55,6 +55,63 @@ describe("the module projection", () => {
     assert.equal(modules[3]?.contractDir, null);
   });
 
+  it("projects the deployables a solution declares, including one nothing ships yet, and reads a module's shipped-in from a bundle's from", () => {
+    const root = tempDir("projection-");
+    seed(root, {
+      "docs/modules.yaml": [
+        "modules:",
+        "- slug: api",
+        "  kind: application",
+        "  dependsOn: [core]",
+        "- slug: tool",
+        "  kind: application",
+        "- slug: core",
+        "  kind: library",
+        "  package: Core",
+        "deployables:",
+        "- slug: edge",
+        "  title: Edge service",
+        "  kind: service",
+        "  from: [api, tool]",
+        "  runtime: container",
+        "  publish: acr",
+        "- slug: installer",
+        "  kind: cli",
+        "  from: []",
+        "",
+      ].join("\n"),
+      // Written by a releasable session's candidate: the record names the
+      // modules it was built from, and the projection reads it rather than
+      // recomputing what shipped.
+      "release/edge/bundle.yaml": [
+        "bundle: edge",
+        "from:",
+        "  - api",
+        "  - tool",
+        "version: 1.0.0",
+        "baseCommit: abc123",
+        "date: '2026-09-07'",
+        "session: 20",
+        "dependencies: []",
+        "",
+      ].join("\n"),
+    });
+    const doc = project(root);
+    const deployables = doc.deployables as { slug: string; from: string[]; kind: string | null; publish: string | null; declared: boolean }[];
+    assert.deepEqual(
+      deployables.map((one) => [one.slug, one.from, one.kind, one.publish, one.declared]),
+      [
+        ["edge", ["api", "tool"], "service", "acr", true],
+        ["installer", [], "cli", null, true],
+      ],
+    );
+    // `tool` has no package and is not the bundle's name; it is shipped in
+    // `edge` because the record says the bundle was built from it.
+    const modules = doc.modules as { slug: string; shippedIn: string[] }[];
+    assert.deepEqual(modules.find((module) => module.slug === "tool")?.shippedIn, ["edge"]);
+    assert.deepEqual(modules.find((module) => module.slug === "core")?.shippedIn, []);
+  });
+
   it("projects an absent manifest as the one implicit module, and writes where the Explorer reads", () => {
     const root = tempDir("projection-");
     const doc = project(root);

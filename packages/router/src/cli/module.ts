@@ -22,7 +22,7 @@ import { ExposureError, raiseGrantDecision, revokeGrant } from "../exposure.ts";
 import { writeCandidateRecord } from "../impact.ts";
 import { platformNewlines, runGit } from "../journal.ts";
 import { LandError, bundleRecord, writeBundleRecord } from "../land.ts";
-import { ManifestError, moduleConfigs, solutionShape } from "../modules.ts";
+import { ManifestError, type ModuleEntry, deployablesOf, moduleConfigs, solutionShape } from "../modules.ts";
 import { readSessionState } from "../progress.ts";
 import { PackagesError, packModule, readRecords } from "../packages.ts";
 import { PackagingConfigError } from "../packaging.ts";
@@ -169,6 +169,7 @@ function candidateSubcommand(rest: readonly string[]): number {
     // Maven the root `pom.xml`, and a seeded literal names the wrong one
     // half the time, leaving the file that really moved unaccounted for.
     const written = new Set<string>();
+    const bundled = new Set<string>();
     for (const slug of slugs) {
       const entry = shape.modules.find((module) => module.slug === slug);
       // An application's candidate is the bundle record -- what it ships,
@@ -187,15 +188,28 @@ function candidateSubcommand(rest: readonly string[]): number {
         session !== null &&
         sessionIsReleasable(sessionsDirFor(workspaceRoot), session)
       ) {
-        const ecosystem = ecosystemOf(workspaceRoot, entry);
-        const project = ecosystem.projectFiles(workspaceRoot, entry)[0];
-        const record = bundleRecord(shape, entry, ecosystem.centralPins(workspaceRoot), readRecords(workspaceRoot), project === undefined ? "0.1.0" : ecosystem.baseVersion(workspaceRoot, project), {
-          session,
-          baseCommit: runGit(workspaceRoot, ["rev-parse", "HEAD"]).stdout || null,
-        });
-        const path = writeBundleRecord(workspaceRoot, record);
-        written.add(path);
-        writeOut(`bundled ${slug} ${record.version}: ${path} (${record.dependencies.map((d) => `${d.package} ${d.version}`).join(", ") || "no dependencies"})\n`);
+        // What ships is a deployable, not a module: one record per
+        // deployable this application feeds -- the one implied by the
+        // module itself when the manifest declares no block -- and each
+        // written once however many of its modules this candidate names.
+        const versionOf = (module: ModuleEntry): string => {
+          const ecosystem = ecosystemOf(workspaceRoot, module);
+          const project = ecosystem.projectFiles(workspaceRoot, module)[0];
+          return project === undefined ? "0.1.0" : ecosystem.baseVersion(workspaceRoot, project);
+        };
+        const pins = ecosystemOf(workspaceRoot, entry).centralPins(workspaceRoot);
+        for (const name of deployablesOf(shape.deployables, slug)) {
+          if (bundled.has(name)) continue;
+          const deployable = shape.deployables.find((one) => one.slug === name)!;
+          const record = bundleRecord(shape, deployable, pins, readRecords(workspaceRoot), versionOf, {
+            session,
+            baseCommit: runGit(workspaceRoot, ["rev-parse", "HEAD"]).stdout || null,
+          });
+          const path = writeBundleRecord(workspaceRoot, record);
+          bundled.add(name);
+          written.add(path);
+          writeOut(`bundled ${name} ${record.version}: ${path} (${record.dependencies.map((d) => `${d.package} ${d.version}`).join(", ") || "no dependencies"})\n`);
+        }
       }
       if (entry !== undefined && entry.kind === "application" && entry.package === null) continue;
       // The contract page first, then the pack: the pack's record digests

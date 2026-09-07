@@ -136,6 +136,7 @@ export function project(root: string): Record<string, unknown> {
       .filter(
         (bundle) =>
           bundle.bundle === entry.slug ||
+          bundle.from.includes(entry.slug) ||
           (entry.package !== null && bundle.dependencies.some((dependency) => dependency.package === entry.package)),
       )
       .map((bundle) => bundle.bundle);
@@ -175,10 +176,24 @@ export function project(root: string): Record<string, unknown> {
       moduleCount: modules.length,
     },
     modules,
+    // What the solution says it ships, from the manifest: a declared
+    // deployable no module feeds yet is here with an empty `from`, because
+    // that is a true statement about the shape of the solution during
+    // decomposition and not a gap in it.
+    deployables: shape.deployables.map((deployable) => ({
+      slug: deployable.slug,
+      title: deployable.title,
+      kind: deployable.kind,
+      from: [...deployable.from],
+      runtime: deployable.runtime,
+      publish: deployable.publish,
+      declared: deployable.declared,
+    })),
     // What ships, as the bundle records under release/ say it; recorded,
     // never executed, and read here rather than restated.
     bundles: bundles.map((bundle) => ({
       bundle: bundle.bundle,
+      from: [...bundle.from],
       version: bundle.version,
       baseCommit: bundle.baseCommit,
       date: bundle.date,

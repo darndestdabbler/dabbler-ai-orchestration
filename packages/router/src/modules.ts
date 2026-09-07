@@ -77,6 +77,55 @@ export const KNOWN_ENTRY_KEYS: readonly string[] = [
 
 const LIST_KEYS = ["codeRoots", "touches", "specSections", "contextAssets", "dependsOn"] as const;
 
+/**
+ * What shape a deployable runs in once it is shipped -- a different axis
+ * from a module's `kind`, which says only that the module has an entry
+ * point at all. Ownership and shipping are different questions.
+ */
+export const DEPLOYABLE_KINDS = ["service", "job", "cli"] as const;
+export type DeployableKind = (typeof DEPLOYABLE_KINDS)[number];
+
+/** What the artefact physically is. */
+export const DEPLOYABLE_RUNTIMES = ["container", "archive", "installer"] as const;
+export type DeployableRuntime = (typeof DEPLOYABLE_RUNTIMES)[number];
+
+export const KNOWN_DEPLOYABLE_KEYS: readonly string[] = [
+  "slug",
+  "title",
+  "kind",
+  "from",
+  "runtime",
+  "publish",
+];
+
+/**
+ * One thing the solution ships, named apart from the modules that own the
+ * code inside it: a REST service and a command-line tool built from the
+ * same code are two deployables, not two application modules.
+ *
+ * `from` is the only direction written by hand; which deployables a module
+ * feeds is derived (`deployablesOf`), exactly as `usedBy` is derived from
+ * `dependsOn`. `declared` is false for the one implied by an application
+ * module in a manifest with no `deployables:` block, so a reader can tell a
+ * decision from a default.
+ */
+export interface Deployable {
+  readonly slug: string;
+  readonly title: string;
+  readonly kind: DeployableKind | null;
+  /** The application modules it ships, in the order written; may be empty. */
+  readonly from: readonly string[];
+  readonly runtime: DeployableRuntime | null;
+  /**
+   * The target it goes to -- a name the deploying tool resolves against its
+   * own configuration, exactly as `packaging.push.secret` names a
+   * credential. This framework never reads, stores or resolves the value
+   * behind it.
+   */
+  readonly publish: string | null;
+  readonly declared: boolean;
+}
+
 /** One validated manifest entry. */
 export interface ModuleEntry {
   readonly slug: string;
@@ -304,6 +353,111 @@ export function loadEntries(workspaceRoot: string): ModuleEntry[] {
 }
 
 /**
+ * The declared `deployables:` block, validated against the modules.
+ *
+ * Refused by name, as `modules[]` already is: an unknown key, a duplicate
+ * slug, a `from` naming a module the manifest does not declare, and a
+ * `from` naming a module that is not an `application` -- a deployable ships
+ * applications, and a library named there is a decomposition mistake worth
+ * catching at load rather than at a land. An empty `from` is legal: a
+ * deployable can be named while the shape of the solution is still being
+ * argued, and the readers say plainly that nothing ships it yet.
+ */
+export function parseDeployables(
+  doc: Record<string, unknown>,
+  entries: readonly ModuleEntry[],
+  source = "docs/modules.yaml",
+): Deployable[] {
+  const raws = doc["deployables"];
+  if (raws === null || raws === undefined) return [];
+  if (!Array.isArray(raws)) throw new ManifestError(`'deployables' in ${source} must be a list`);
+  const byslug = new Map(entries.map((entry) => [entry.slug, entry] as const));
+  const deployables: Deployable[] = [];
+  const seen = new Set<string>();
+  for (const [index, raw] of raws.entries()) {
+    const where = `${source}: deployables[${index}]`;
+    if (!isRecord(raw)) throw new ManifestError(`${where} must be a mapping`);
+    const unknown = Object.keys(raw)
+      .filter((key) => !KNOWN_DEPLOYABLE_KEYS.includes(key))
+      .sort();
+    if (unknown.length > 0) {
+      throw new ManifestError(
+        `${where} has unknown key(s) ${unknown.join(", ")}. ` +
+          `Known keys: ${KNOWN_DEPLOYABLE_KEYS.join(", ")}.`,
+      );
+    }
+    const declaredSlug = raw["slug"];
+    if (typeof declaredSlug !== "string" || !declaredSlug.trim()) {
+      throw new ManifestError(`${where} needs a non-empty string 'slug'`);
+    }
+    const slug = declaredSlug.trim();
+    if (seen.has(slug)) {
+      throw new ManifestError(`${source}: duplicate deployable slug ${pythonRepr(slug)}`);
+    }
+    seen.add(slug);
+    const from = stringList(raw["from"], where, "from");
+    for (const module of from) {
+      const entry = byslug.get(module);
+      if (entry === undefined) {
+        throw new ManifestError(
+          `${where}: 'from' names ${pythonRepr(module)}, which the manifest does not declare`,
+        );
+      }
+      if (entry.kind !== "application") {
+        throw new ManifestError(
+          `${where}: 'from' names ${pythonRepr(module)}, a ${entry.kind}; a deployable ships ` +
+            "application modules, and a library reaches it as one of their dependencies",
+        );
+      }
+    }
+    const title = optionalString(raw["title"], where, "title");
+    deployables.push({
+      slug,
+      title: title ?? slug,
+      kind: oneOf(raw["kind"], DEPLOYABLE_KINDS, where, "kind"),
+      from,
+      runtime: oneOf(raw["runtime"], DEPLOYABLE_RUNTIMES, where, "runtime"),
+      publish: optionalString(raw["publish"], where, "publish"),
+      declared: true,
+    });
+  }
+  return deployables;
+}
+
+/**
+ * What a manifest with no `deployables:` block ships: one deployable per
+ * application module, named after it. That is exactly the bundle this
+ * framework wrote before the block existed, so a solution that ships what
+ * it already ships is asked to declare nothing new.
+ */
+export function impliedDeployables(entries: readonly ModuleEntry[]): Deployable[] {
+  return entries
+    .filter((entry) => entry.kind === "application")
+    .map((entry) => ({
+      slug: entry.slug,
+      title: entry.title,
+      kind: null,
+      from: [entry.slug],
+      runtime: null,
+      publish: null,
+      declared: false,
+    }));
+}
+
+/**
+ * Every deployable `slug` feeds, in declaration order. Derived on every
+ * call and declarable nowhere -- the manifest reader's unknown-key refusal
+ * is what stops the reverse direction being written on a module by hand,
+ * exactly as it does for `usedBy`.
+ */
+export function deployablesOf(
+  deployables: readonly Deployable[],
+  slug: string,
+): string[] {
+  return deployables.filter((deployable) => deployable.from.includes(slug)).map((one) => one.slug);
+}
+
+/**
  * The entry for `slug`, or null when the manifest does not declare it -- an
  * unresolvable slug is the caller's cue to fall back, never to guess at what
  * the module covers.
@@ -395,6 +549,11 @@ export interface SolutionShape {
   readonly implicit: boolean;
   /** In dependency order. Exactly one when `multi` is false. */
   readonly modules: readonly ModuleEntry[];
+  /**
+   * What the solution ships: the declared `deployables:` block, or the one
+   * implied by each application module when the manifest declares none.
+   */
+  readonly deployables: readonly Deployable[];
 }
 
 /** The one module a repository with no manifest is. */
@@ -420,11 +579,25 @@ export function implicitModule(workspaceRoot: string): ModuleEntry {
  * `ManifestError`, as every reader of it does.
  */
 export function solutionShape(workspaceRoot: string): SolutionShape {
-  const entries = loadEntries(workspaceRoot);
+  const path = manifestPath(workspaceRoot);
+  const doc = loadManifest(path);
+  const entries = parseEntries(doc, path);
   if (entries.length === 0) {
-    return { multi: false, implicit: true, modules: [implicitModule(workspaceRoot)] };
+    const implicit = implicitModule(workspaceRoot);
+    return {
+      multi: false,
+      implicit: true,
+      modules: [implicit],
+      deployables: impliedDeployables([implicit]),
+    };
   }
-  return { multi: entries.length > 1, implicit: false, modules: dependencyOrder(entries) };
+  const declared = parseDeployables(doc, entries, path);
+  return {
+    multi: entries.length > 1,
+    implicit: false,
+    modules: dependencyOrder(entries),
+    deployables: declared.length > 0 ? declared : impliedDeployables(entries),
+  };
 }
 
 /**
@@ -667,6 +840,20 @@ export function shown(workspaceRoot: string): Record<string, unknown> {
       codeRoots: [...entry.codeRoots],
       dependsOn: [...entry.dependsOn],
       usedBy: consumersOf(shape.modules, entry.slug),
+      // Derived here, declared nowhere -- as usedBy is.
+      shipsIn: deployablesOf(shape.deployables, entry.slug),
+    })),
+    // What the solution ships. `declared` false is the one implied by an
+    // application module in a manifest with no block: a default, not a
+    // decision. `publish` is the target's name and never a credential.
+    deployables: shape.deployables.map((deployable) => ({
+      slug: deployable.slug,
+      title: deployable.title,
+      kind: deployable.kind,
+      from: [...deployable.from],
+      runtime: deployable.runtime,
+      publish: deployable.publish,
+      declared: deployable.declared,
     })),
   };
 }

@@ -4,7 +4,8 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { RECORD_PLACEHOLDER, commandNamesTest, preverifyRecipe, recordCommand, remediationRecipe } from "../src/affected.ts";
+import { RECORD_PLACEHOLDER, commandNamesTest, deployableLines, preverifyRecipe, recordCommand, remediationRecipe } from "../src/affected.ts";
+import { impliedDeployables, parseDeployables, parseEntries } from "../src/modules.ts";
 import { STAGE_FINAL_FULL, runOfRecordRecipe } from "../src/testEvidence.ts";
 
 describe("what a command names", () => {
@@ -38,5 +39,38 @@ describe("every message that asks for evidence", () => {
     const text = runOfRecordRecipe("docs/sessions", "python", "python -m pytest");
     assert.ok(text.includes("python -m pytest") && text.includes(`--stage ${STAGE_FINAL_FULL}`));
     assert.ok(text.includes("git push") && text.includes("dabbler session close"));
+  });
+});
+
+describe("what the plan says a change ships", () => {
+  it("names the deployables the change reached, and the declared ones nothing ships yet", () => {
+    const entries = parseEntries({
+      modules: [
+        { slug: "core", kind: "library", package: "Core" },
+        { slug: "api", kind: "application", dependsOn: ["core"] },
+        { slug: "tool", kind: "application" },
+      ],
+    });
+    const deployables = parseDeployables(
+      {
+        deployables: [
+          { slug: "edge", kind: "service", from: ["api"] },
+          { slug: "box", kind: "cli", from: ["tool"] },
+          // Named during decomposition, before anything feeds it.
+          { slug: "installer", kind: "cli", from: [] },
+        ],
+      },
+      entries,
+    );
+    // A change under the api module reaches the deployable it feeds and no
+    // other; the unfed one is stated separately, as a fact about the shape.
+    assert.deepEqual(deployableLines(deployables, ["core", "api"]), [
+      "deployables: edge",
+      "declared, nothing ships them yet: installer",
+    ]);
+    // A solution that declares no block has nothing to say here: the
+    // implied deployables are not declarations, and a change that reaches
+    // no module reaches no deployable.
+    assert.deepEqual(deployableLines(impliedDeployables(entries), []), []);
   });
 });

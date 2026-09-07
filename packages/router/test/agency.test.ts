@@ -32,7 +32,7 @@ import {
   sessionScope,
   summaryLine,
 } from "../src/agency.ts";
-import { dependencyOrder, parseEntries } from "../src/modules.ts";
+import { dependencyOrder, parseEntries, impliedDeployables } from "../src/modules.ts";
 import { seed, tempDir } from "./support/answers.ts";
 
 const scopes = [{ suite: "unit", roots: ["tests/"], glob: "test_*.py" }];
@@ -95,7 +95,7 @@ describe("scope", () => {
         { slug: "persister", codeRoots: ["modules/persister"], dependsOn: ["model"], package: "CsvPersister" },
       ],
     });
-    const shape = { multi: true, implicit: false, modules: dependencyOrder(entries) };
+    const shape = { multi: true, implicit: false, modules: dependencyOrder(entries), deployables: impliedDeployables(entries) };
     const scope = moduleScope(repo, join(repo, "docs", "sessions"), shape, ["persister"], new Map([["persister", ["build/common.props"]]]));
     assert.deepEqual(scope, [
       "Directory.Packages.props",

@@ -5,12 +5,12 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import { CheckoutError, checkoutCone, openModule } from "../src/checkout.ts";
-import { type SolutionShape, dependencyOrder, implicitModule, parseEntries } from "../src/modules.ts";
+import { type SolutionShape, dependencyOrder, implicitModule, parseEntries, impliedDeployables } from "../src/modules.ts";
 import { tempDir } from "./support/answers.ts";
 
 function shapeOf(doc: Record<string, unknown>): SolutionShape {
   const entries = parseEntries(doc);
-  return { multi: entries.length > 1, implicit: false, modules: dependencyOrder(entries) };
+  return { multi: entries.length > 1, implicit: false, modules: dependencyOrder(entries), deployables: impliedDeployables(entries) };
 }
 
 describe("the cone", () => {
@@ -42,7 +42,7 @@ describe("the focused clone", () => {
     // Under the no-git preload a spawn of git would throw its own error, so
     // reaching the refusal proves the shape was judged first.
     const root = tempDir("single-");
-    const shape: SolutionShape = { multi: false, implicit: true, modules: [implicitModule(root)] };
+    const shape: SolutionShape = { multi: false, implicit: true, modules: [implicitModule(root)], deployables: [] };
     assert.throws(
       () => openModule(root, shape, "anything"),
       (error: unknown) =>

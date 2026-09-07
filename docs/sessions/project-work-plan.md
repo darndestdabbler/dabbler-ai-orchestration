@@ -151,7 +151,7 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 111 | The application module that can never close | no | 2026-09-07 |
 | 112 | The UAT walkthroughs, and what a solution ships | no | 2026-09-07 |
 | 113 | What the Maven dogfooding found — the pin the message misnames, and the JDK the scaffold assumes | no | 2026-09-07 |
-| 114 | The deployables block, built | — | not declared |
+| 114 | The deployables block, built | no | 2026-09-07 |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -2008,3 +2008,9 @@ Land the two dogfooded UAT walkthroughs (.NET and Java) verbatim under docs/uat/
 **Releasable: no.**
 
 Fix the two defects the Java/Maven dogfooding found and correct the walkthrough that currently instructs the reader around them. (1) The pin file: Ecosystem.writeCentralPin already returns the repository-relative file it wrote and packModule throws it away, so cli/module.ts prints 'pinned <ids> in Directory.Packages.props' on a Maven solution -- where the pin really moved the root pom.xml -- and, worse, seeds candidateSubcommand's written set with that same literal, so the candidate record names a file that does not exist and the land's verification gate sees the root pom.xml as a tree that moved after verification with nothing accounting for it. Carry the seam's answer on PackResult as pinFile, print it in both messages, and record it as the path the candidate wrote. (2) The scaffolded root POM hardcodes maven.compiler.release 21, so every Maven solution scaffolded on an older JDK fails to build until the developer finds and edits that line; derive it from the JDK doing the scaffolding through a settable source, fall back to a stated 17 when java cannot be run, and say which happened in the scaffold's notes and in the POM's own comment. (3) Correct docs/uat/uat-java-json-solution.md where it works around both, leaving the rest of the document as the artefact under test.
+
+### Session 114 — The deployables block, built
+
+**Releasable: no.**
+
+Build the deployables: block docs/design/deployables.md designed and deliberately left unbuilt. The manifest reader gains a top-level deployables: list (slug, title, kind service|job|cli, from, runtime container|archive|installer, publish) with the same refuse-by-name discipline modules[] already has, plus two refusals of its own: a from naming a module the manifest does not declare, and a from naming a module whose kind is not application. Which deployables a module feeds is derived and never declared, exactly as usedBy is derived from dependsOn; a manifest with no block reduces to today's bundles, one implied deployable per application module named after it, so a solution that ships what it ships today declares nothing new. The bundle record is keyed by the deployable rather than by the application module, its dependency list the union of the transitive dependencies of every module in from -- safe because a package has exactly one central pin -- and it carries the modules it was built from; a deployable whose from modules declare different versions is refused by name rather than silently taking one, and a deployable with an empty from writes no record at all. `dabbler modules show`, `dabbler affected`, the Solution Explorer's projection and its bundles node say what ships and what nothing ships yet. No build orchestration, no artefact hosting, no push of a deployable, and no inference of kind or runtime from a project file.

@@ -366,6 +366,8 @@ describe("dabbler modules", () => {
     assert.deepEqual(doc.modules[0], {
       slug: "model", title: "Model", kind: "shared-types", package: "CsvModel",
       contract: "package", codeRoots: ["modules/model"], dependsOn: [], usedBy: ["persister"],
+      // Neither module is an application, so nothing here ships on its own.
+      shipsIn: [],
     });
     assert.equal(doc.modules[1]?.contract, "designed");
     // The verb that moved the manifest rewrote the projection the Solution

@@ -19,7 +19,7 @@ import {
   receiptCorrespondence,
   writeBundleRecord,
 } from "../src/land.ts";
-import { type SolutionShape, dependencyOrder, parseEntries } from "../src/modules.ts";
+import { type SolutionShape, dependencyOrder, impliedDeployables, parseDeployables, parseEntries } from "../src/modules.ts";
 import { tempDir } from "./support/answers.ts";
 
 const GREEN = { outcome: "passed", treeDigest: "tree-a", surfaceDigest: "surface-a", recordedAt: "2026-09-07T00:00:00Z" };
@@ -156,8 +156,10 @@ describe("the bundle record", () => {
         { slug: "listener", kind: "application", codeRoots: ["modules/listener"], dependsOn: ["persister"] },
       ],
     });
-    const shape: SolutionShape = { multi: true, implicit: false, modules: dependencyOrder(entries) };
-    const listener = shape.modules.find((entry) => entry.slug === "listener")!;
+    const shape: SolutionShape = { multi: true, implicit: false, modules: dependencyOrder(entries), deployables: impliedDeployables(entries) };
+    // With no deployables: block declared, what ships is the one implied by
+    // the application module -- named after it, exactly as before the block.
+    const listener = shape.deployables.find((one) => one.slug === "listener")!;
     const records = [
       { package: "CsvModel", version: "1.2.0", sourceDigest: "m-120", contractDigest: "c-120", session: 9 },
       { package: "CsvPersister", version: "0.4.1", sourceDigest: "p-041", contractDigest: null, session: 10 },
@@ -166,7 +168,7 @@ describe("the bundle record", () => {
       '<Project><ItemGroup><PackageVersion Include="CsvModel" Version="1.2.0" /><PackageVersion Include="CsvPersister" Version="0.4.1" /></ItemGroup></Project>',
     );
     // The application's version is the seam's reading of its project; the record takes it as a fact.
-    const project = "2.0.0";
+    const project = (): string => "2.0.0";
     const record = bundleRecord(shape, listener, released, records, project, {
       session: 12,
       baseCommit: "abc123",
@@ -177,6 +179,7 @@ describe("the bundle record", () => {
     // receipt's to name.
     assert.deepEqual(record, {
       bundle: "listener",
+      from: ["listener"],
       version: "2.0.0",
       baseCommit: "abc123",
       date: "2026-09-07",
@@ -199,10 +202,63 @@ describe("the bundle record", () => {
       () => bundleRecord(shape, listener, dev, records, project),
       (error: unknown) => error instanceof LandError && /CsvPersister is pinned at 0\.4\.1-dev\.20260907\.3\.gabc1234, a dev version/.test(error.message),
     );
-    // Only an application ships.
+    // Only an application ships, and a deployable nobody feeds yet has
+    // nothing to record.
+    const ofModel = { slug: "model", title: "model", kind: null, from: ["model"], runtime: null, publish: null, declared: true };
     assert.throws(
-      () => bundleRecord(shape, shape.modules[0]!, released, records, project),
+      () => bundleRecord(shape, ofModel, released, records, project),
       (error: unknown) => error instanceof LandError && /a bundle is what an application ships/.test(error.message),
+    );
+    const unfed = { slug: "edge", title: "Edge", kind: null, from: [], runtime: null, publish: null, declared: true };
+    assert.throws(
+      () => bundleRecord(shape, unfed, released, records, project),
+      (error: unknown) => error instanceof LandError && /names no module in 'from'/.test(error.message),
+    );
+  });
+
+  it("unions what two applications of one deployable ship, and refuses them at two versions", () => {
+    // A REST service and a command-line tool over the same libraries: one
+    // container, two application modules, one bundle -- which is the whole
+    // reason a deployable is not a module.
+    const entries = parseEntries({
+      modules: [
+        { slug: "model", kind: "shared-types", package: "CsvModel" },
+        { slug: "store", dependsOn: ["model"], package: "CsvStore" },
+        { slug: "api", kind: "application", dependsOn: ["store"] },
+        { slug: "tool", kind: "application", dependsOn: ["model"] },
+      ],
+    });
+    const deployables = parseDeployables(
+      { deployables: [{ slug: "edge", title: "Edge", kind: "service", from: ["api", "tool"], runtime: "container", publish: "acr" }] },
+      entries,
+    );
+    const shape: SolutionShape = { multi: true, implicit: false, modules: dependencyOrder(entries), deployables };
+    const pins = centralPins(
+      '<Project><ItemGroup><PackageVersion Include="CsvModel" Version="1.2.0" /><PackageVersion Include="CsvStore" Version="0.4.1" /></ItemGroup></Project>',
+    );
+    const records = [
+      { package: "CsvModel", version: "1.2.0", sourceDigest: "m-120", contractDigest: null, session: 9 },
+      { package: "CsvStore", version: "0.4.1", sourceDigest: "s-041", contractDigest: null, session: 9 },
+    ];
+    const record = bundleRecord(shape, deployables[0]!, pins, records, () => "3.1.0", {
+      session: 20,
+      now: new Date("2026-09-07T12:00:00Z"),
+    });
+    // Keyed by the deployable, naming both modules, and each dependency once
+    // however many of them reach it -- safe because the pin is central.
+    assert.equal(record.bundle, "edge");
+    assert.deepEqual([...record.from], ["api", "tool"]);
+    assert.deepEqual(
+      record.dependencies.map((dependency) => [dependency.module, dependency.version]),
+      [["model", "1.2.0"], ["store", "0.4.1"]],
+    );
+
+    // Two applications at two versions is a question only the developer can
+    // answer: refused by name rather than one of them silently winning.
+    assert.throws(
+      () => bundleRecord(shape, deployables[0]!, pins, records, (module) => (module.slug === "api" ? "3.1.0" : "2.0.0")),
+      (error: unknown) =>
+        error instanceof LandError && /ships modules at different versions \(api 3\.1\.0, tool 2\.0\.0\)/.test(error.message),
     );
   });
 });

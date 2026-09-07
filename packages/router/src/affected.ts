@@ -38,6 +38,7 @@ import {
   targetedCommand,
 } from "./checks.ts";
 import { effectiveBaseline, readRounds } from "./ledger.ts";
+import { type Deployable, deployablesOf } from "./modules.ts";
 import { changedPathsBetween, runGit, snapshotWorktreeTree } from "./journal.ts";
 import { readSessionState } from "./progress.ts";
 import {
@@ -532,4 +533,25 @@ export function preverifyGate(
     );
   }
   return gate(true, "", "", "", accepted);
+}
+
+/**
+ * What the plan says about what ships: the deployables the modules this
+ * change reached feed, and the declared ones no module ships yet.
+ *
+ * Both are statements about the solution's shape, and neither gates
+ * anything -- a deployable named during decomposition with an empty `from`
+ * is the delayed planning the block exists for, not a fault in the change
+ * being planned.
+ */
+export function deployableLines(
+  deployables: readonly Deployable[],
+  modulesReached: readonly string[],
+): string[] {
+  const lines: string[] = [];
+  const reached = [...new Set(modulesReached.flatMap((slug) => deployablesOf(deployables, slug)))].sort();
+  if (reached.length > 0) lines.push(`deployables: ${reached.join(", ")}`);
+  const unfed = deployables.filter((one) => one.declared && one.from.length === 0).map((one) => one.slug);
+  if (unfed.length > 0) lines.push(`declared, nothing ships them yet: ${unfed.join(", ")}`);
+  return lines;
 }

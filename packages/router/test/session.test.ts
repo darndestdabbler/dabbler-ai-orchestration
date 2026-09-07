@@ -16,10 +16,13 @@ import {
   consumersOf,
   create,
   dependenciesOf,
+  deployablesOf,
   findEntry,
+  impliedDeployables,
   loadEntries,
   loadManifest,
   moduleConfigs,
+  parseDeployables,
   parseEntries,
   solutionShape,
 } from "../src/modules.ts";
@@ -509,6 +512,71 @@ describe("the module manifest", () => {
     assert.throws(
       () => parseEntries({ modules: [{ slug: "a" }, { slug: "a" }] }),
       /duplicate slug 'a'/,
+    );
+  });
+
+  it("reads a declared deployables block, derives which deployables a module feeds, and implies one per application otherwise", () => {
+    const entries = parseEntries({
+      modules: [
+        { slug: "core", kind: "library", package: "Core" },
+        { slug: "api", kind: "application", dependsOn: ["core"] },
+        { slug: "tool", kind: "application", dependsOn: ["core"] },
+      ],
+    });
+    const deployables = parseDeployables(
+      {
+        deployables: [
+          { slug: "edge", title: "Ingest service", kind: "service", from: ["api", "tool"], runtime: "container", publish: "acr" },
+          // Legal, and the point of declaring during decomposition: named
+          // while the modules that will feed it are still being argued over.
+          { slug: "installer", kind: "cli", from: [] },
+        ],
+      },
+      entries,
+    );
+    assert.deepEqual(
+      deployables.map((one) => [one.slug, one.title, one.kind, one.runtime, one.publish, [...one.from], one.declared]),
+      [
+        ["edge", "Ingest service", "service", "container", "acr", ["api", "tool"], true],
+        ["installer", "installer", "cli", null, null, [], true],
+      ],
+    );
+    // Derived here and declarable nowhere, exactly as usedBy is.
+    assert.deepEqual(deployablesOf(deployables, "api"), ["edge"]);
+    assert.deepEqual(deployablesOf(deployables, "core"), []);
+    // With no block, what a solution ships is what it shipped before the
+    // block existed: one deployable per application module, named after it.
+    const implied = impliedDeployables(entries);
+    assert.deepEqual(implied.map((one) => [one.slug, [...one.from], one.declared]), [
+      ["api", ["api"], false],
+      ["tool", ["tool"], false],
+    ]);
+  });
+
+  it("refuses a deployable's four bad shapes by name", () => {
+    const entries = parseEntries({
+      modules: [
+        { slug: "core", kind: "library" },
+        { slug: "api", kind: "application" },
+      ],
+    });
+    assert.throws(
+      () => parseDeployables({ deployables: [{ slug: "edge", form: ["api"] }] }, entries),
+      /unknown key\(s\) form/,
+    );
+    assert.throws(
+      () => parseDeployables({ deployables: [{ slug: "edge" }, { slug: "edge" }] }, entries),
+      /duplicate deployable slug 'edge'/,
+    );
+    assert.throws(
+      () => parseDeployables({ deployables: [{ slug: "edge", from: ["ghost"] }] }, entries),
+      /'from' names 'ghost', which the manifest does not declare/,
+    );
+    // A library named here is a decomposition mistake: it reaches the
+    // deployable as an application's dependency, not on its own.
+    assert.throws(
+      () => parseDeployables({ deployables: [{ slug: "edge", from: ["core"] }] }, entries),
+      /'from' names 'core', a library; a deployable ships application modules/,
     );
   });
 

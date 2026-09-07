@@ -16,7 +16,7 @@ import {
 import { loadSelectionConfig, selectTests } from "../checks.ts";
 import { moduleConfigs, solutionShape } from "../modules.ts";
 import { loadSuitesChecked } from "../testEvidence.ts";
-import { preverifyBaseline, runnableCommands, workingTreeChanges } from "../affected.ts";
+import { deployableLines, preverifyBaseline, runnableCommands, workingTreeChanges } from "../affected.ts";
 import { dumps } from "../pythonJson.ts";
 import { writeErr, writeOut } from "./output.ts";
 
@@ -195,6 +195,10 @@ export async function affectedVerb(argv: string[]): Promise<number> {
   // each with why: the module's own change, or a consumer's contract
   // against it.
   if (result.modules.length > 0) lines.push(`modules: ${result.modules.join(", ")}\n`);
+  // What the change reaches on the way out: the deployables the modules it
+  // touched feed, and the declared ones nothing ships yet. Both are
+  // statements about the solution's shape, and neither gates anything.
+  for (const line of deployableLines(shape.deployables, result.modules)) lines.push(`${line}\n`);
   // The rest of the plan: the candidates packed before the run of record,
   // and the paths no module owns, which the plan reaches nothing for.
   if (result.impact !== null && result.impact.candidates.length > 0) {

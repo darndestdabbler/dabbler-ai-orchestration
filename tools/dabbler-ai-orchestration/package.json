@@ -2,7 +2,7 @@
   "name": "dabbler-ai-orchestration",
   "displayName": "Dabbler AI Orchestration",
   "description": "Organize AI-led development like work: modules, session sets and step-by-step session plans in a native tree — plus routed verification before every close, normally cross-provider, recorded as evidence you can check.",
-  "version": "2.0.13",
+  "version": "2.0.14",
   "publisher": "DarndestDabbler",
   "private": true,
   "engines": {
@@ -552,7 +552,7 @@
     "typescript": "^5.3.0"
   },
   "dependencies": {
-    "dabbler-ai-router": "2.0.13",
+    "dabbler-ai-router": "2.0.14",
     "yaml": "^2.7.0"
   }
 }

@@ -1,6 +1,94 @@
-# STATUS — sessions 113–120 CLOSED, all VERIFIED: the deployables block built, the Java/Maven walkthrough walked end to end, and the nine defects it found fixed; version 2.0.13
+# STATUS — sessions 113–123 CLOSED, all VERIFIED: the deployables block, the Java/Maven walk and its nine defects, the suite off the operator's machine, and the principle of who owns a command; sessions 125–129 planned (the wall as a hook); version 2.0.14
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
+
+> ## SESSIONS 121–123 CLOSED, 2026-09-08 — two ways in, the suite that took the machine, and who owns a command; version 2.0.14
+>
+> | session | what | state |
+> | --- | --- | --- |
+> | 121 | two ways in — the seat and the keys (both UAT documents get a Prerequisites section in three parts) | CLOSED VERIFIED, landed e5d304bf |
+> | 122 | the suite that takes the machine | CLOSED VERIFIED, landed a8d5a37b; D257 recorded after the close, da59b0b9 |
+> | 123 | the principle, and the three commands the UI does not have (re-scoped) | CLOSED VERIFIED (round 1, gpt-5-6-terra, three nits), landed 0a02e76f |
+>
+> **122 — two protections had lapsed.** Session 76's below-normal worker
+> priority died with `vitest.config.ts` and nothing replaced it; the
+> walkthrough exemption in `no-git.ts` admitted files by the `walk-*` filename
+> pattern. Both are back — the priority in the `--import` preload, the
+> exemption as an explicit list — and both are audited by a new lint control,
+> `packages/router/scripts/check-suite-cost.ts`, not by tests: **D257**, which
+> the verifier disputed and which was upheld (the suite runs under the preload
+> and cannot observe its own baseline). `docs/design/suite-cost.md` carries the
+> measurement and says plainly that the jump from 40 s to 102 s between
+> sessions 98 and 99 is not explained; the control fails if a later session
+> quietly invents a cause.
+>
+> **123 — the principle, recorded and applied.** `docs/design/command-ownership.md`
+> states the operator's rule (constant or parameterised → the framework when
+> lifecycle-timed, the UI when optional, a person only for judgement) and
+> audits every command the two UAT walkthroughs ask a person to type, each
+> checked against the extension's manifest and implementations. Most were
+> already buttons; the manual commit after `bootstrap` is dead text
+> (`commitOwnScaffold`); three commands failed the principle, and rounds 10
+> and 11 changed two of their fates — Start Session's `--module` goes to
+> **128** beside the clone's deletion, the pull-back is **eliminated** with
+> the clone, and the pack a person could not ask for from a row is **built**:
+> `pack` joined the router's in-process module verbs, and **Pack Module** sits
+> on the module row of a multi-module solution, running `dabbler module pack
+> <slug>` and showing the router's lines or its refusal. Four findings the plan
+> did not list are recorded for 124's walk: New Module asks for four values
+> and a module needs six (no code root, no package); nothing in the UI asks
+> for the remote the land pushes to; a hand-written plan must be committed by
+> hand before session 1; Troubleshoot runs none of the prerequisite checks.
+>
+> **Owed from 123's round 1 (three nits, none blocking).** `packModule` relies
+> on the menu gate (`;focused`) and does not itself check the projection's
+> `multi`, unlike `openModule`; the new test proves the handler and not the
+> menu contribution; and the audit's prerequisites row read as a conflict
+> (fixed after the close, in the same commit as this handoff). The first two
+> go into session 128, which touches the module row anyway.
+>
+> **Queued papercut (operator, 2026-09-08).** The Dabbler terminal's voice rule
+> should carry the session number: `────── S123: framework ──────` rather than
+> `──── framework ────`. `dabblerTerminal.ts` draws the rule and already
+> knows the run's session (`sayBanner`); it is a small change and belongs in
+> the next session's plan as a step of its own.
+>
+> **Version 2.0.14** is stamped, both artefacts rebuilt, the VSIX at
+> `tools/dabbler-ai-orchestration/dabbler-ai-orchestration-2.0.14.vsix` and
+> installed on this machine. Publishing it is the operator's call, as always.
+>
+> ### HANDOFF — what runs next, and how
+>
+> **Sessions 125–129 are planned and in the ledger**: the wall between an
+> engine and a sibling's source moves from the disk to one fail-open hook in
+> front of the CLI's own tools (`docs/design/consults/round11-synthesis.md`;
+> the plan sections under "Session 125 of 129" onward). 125 the policy, 126
+> the hooks installed by bootstrap, 127 reads watched and the self-grant, 128
+> the close that never refuses for coverage plus the clone deleted and Start
+> Session's module pick, 129 Claude Code through its own hooks.
+>
+> **Session 124 (the UAT in three registers) runs after 129**, because it
+> walks buttons 125–129 change — but the ledger registers sessions in numeric
+> order: `judgeStartBoundary` in `packages/router/src/session.ts` refuses a
+> start that is not the next sequential session and skips only *cancelled*
+> numbers, and a session restored after 129 closes would be refused the same
+> way (expected would be 130). So the mechanical path is: cancel 124 with the
+> reason that it moves, and append its section to the plan as session 130
+> (same text, ordering note removed), which the ledger picks up at the next
+> `session start`:
+>
+> ```
+> dabbler session cancel --sessions-dir docs/sessions --session-number 124 --reason "moves to session 130: it walks the buttons sessions 125-129 change"
+> ```
+>
+> The alternative — run 124 now and walk it again after 129 — is the
+> operator's to choose; the recommendation is the move.
+>
+> **Driving a session from chat.** `session start --engine claude-code
+> --provider anthropic`, then `next` in a foreground bounded loop; pass
+> `--transport api` on the first `next` because this machine's
+> `DABBLER_TRANSPORT` is `copilot-cli` and the seat catalog has no 5.6
+> models. Session 123 verified at round 1 on gpt-5-6-terra over the API.
 
 > ## SESSIONS 118–120 CLOSED, 2026-09-07 — the three owed things, and what step 10 found
 >

@@ -2413,9 +2413,9 @@
     {
       "number": 122,
       "title": "The suite that takes the machine",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-08T05:12:46.718000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-09-08T05:36:02.258000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

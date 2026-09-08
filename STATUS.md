@@ -1,6 +1,85 @@
-# STATUS — sessions 113–125 CLOSED, all VERIFIED: the deployables block, the Java/Maven walk and its nine defects, the suite off the operator's machine, the principle of who owns a command, and the policy a module session runs under; the operator's decision after round 12 re-plans 126–127 (focused or global sessions, the module folder kept, no hooks, the basics first, a proof before either); version 2.0.14
+# STATUS — sessions 113–126 CLOSED, all VERIFIED: the deployables block, the Java/Maven walk and its nine defects, the suite off the operator's machine, the principle of who owns a command, the policy a module session runs under, and the basics the operator saw go wrong (the repaint reproduced and fixed, the terminal that tells you, the cap back, no hooks); 127 next; version 2.0.14
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
+
+> ## SESSION 126 CLOSED, 2026-09-08 — it just works: the repaint reproduced then fixed, the terminal that tells you, the cap back at no cost, and no hooks
+>
+> | session | what | state |
+> | --- | --- | --- |
+> | 126 | the basics the operator saw go wrong during 125 | CLOSED VERIFIED (round 1, gpt-5-6-terra over `--transport api`, three nits, none blocking), landed d1a2188b, closed 0bd7b78a |
+>
+> **The repaint, reproduced before it was fixed.** Two harnesses in the
+> scratch directory, neither in the tree, against a disposable bootstrapped
+> repository driven with the real router through a plan step, its report
+> and three work steps. The first stood where `extension.ts` stands (the
+> extension's `ProjectionCache` over the in-process router, the real key, a
+> raw watcher on the same file names): seven scans, every soft refresh
+> agreed with a fresh projection — the plan's suspect, a cached failed
+> projection, was not the cause. The second was VS Code itself through the
+> Layer 3 launch, sampling every row twice a second: `start` repainted in
+> 60 ms, every `next` within 520 ms, and **the plan report not at all** for
+> the 10.3 s until the following `next`. A plan report writes
+> `driver/plan.json` and nothing else; the file was in the cache key but not
+> in any watcher pattern, so the Work row's steps waited for the next record
+> write or the 30 s poll — and a person who refreshes by hand inside that
+> window sees the refresh as what fixed it. The pattern is now
+> `*/driver/{run.json,plan.json}`; the Layer 3 spec that proves the run.json
+> transition proves the plan.json one beside it (it failed its five-second
+> window against the old bundle and passed in 1.3 s with the new); a failed
+> projection is no longer cached, because its reason died when the router
+> went in-process, and a unit test holds that. The whole record is the
+> section "Session 126: the repaint, reproduced" in
+> `docs/design/option-a-poc.md`.
+>
+> **The terminal.** `poll()` reads the ledger's in-progress row and says the
+> `SESSION 126` banner the moment the row appears, before any run record,
+> with the kind line under it — `focused module=persister scope=…` from the
+> row's checkout and `policy.json`, or `global scope=the whole repository`
+> — and in the repository's own window during a focused session one line
+> from the module-session marker. The voice rule reads `S126: framework`
+> while a session is known, and every history line keeps the voice it was
+> said in so a replay draws the right rule. When `run.seq` moves it reads
+> `driver/instruction.json` and says `step <id>` with the first sentence of
+> the ask, or `rejected <id>` with the first reason, once per seq. No
+> extension change was needed: the terminal already polls every 500 ms.
+>
+> **The cap, measured.** `--test-concurrency=4` is back on the typescript
+> suite (D246). Measured once by hand as `dabbler.yaml` runs it: 176 s for
+> 1147 tests — the same wall clock as uncapped the session before, because
+> the floor is the slowest walkthrough. The run of record then took 187 s.
+> The yaml comment and `docs/design/suite-cost.md` say the seam and the cap
+> are different protections; the control check still reads its sentence.
+>
+> **No hooks.** `installStopGate` is `removeStopGate`, run at both places
+> the install ran (`session start` for a claude-code registration, and
+> `bootstrap` under Claude Code); it removes only the framework's own
+> `hook-stop` entries and drops an emptied `Stop` and `hooks`. `hookStop`,
+> `stopGateDecision`, the `hook-stop` verb and the `stop-gate-continued`
+> event are gone; this repository's `.claude/settings.json` is `{}`; the
+> before-work exemption for that file covers it untracked or modified. What
+> tells a person nothing is answering an instruction is the terminal's
+> silence watcher and the Work Explorer's attention row, and both documents
+> say so. **A Claude Code chat opened before this landed still runs the old
+> hook until its window reloads.**
+>
+> **Owed from round 1 (three nits, none blocking), for 127:** the before-work
+> exemption now covers any `.claude/settings.json` change, so an operator's
+> own pre-declaration edit to it would pass as non-work (the verifier
+> suggests recording that the registration removed the hook and exempting
+> only then); the terminal's step-line deduplication is keyed by `seq` alone
+> and should reset when the session changes; the bootstrap path of the
+> removal has no test of its own (the `start` path has one).
+>
+> **Driving notes.** `--transport api` on the first `next`; a foreground
+> bounded loop (`drive-waits.mjs` in the scratchpad: watch the job's status
+> file, call `next` when it ends or the retry is due, stop at the first
+> non-wait) carried verification, both runs of record, the land, the push
+> and the close. One report was refused because its `--notes` text began
+> with `--test-concurrency`, which the parser read as a flag: never start a
+> notes value with a dash. The router dist is rebuilt from the landed tree;
+> the extension bundle under `tools/…/dist` is rebuilt too but the installed
+> VSIX is still 2.0.14 without these changes — no version bump until the
+> block ships. **Next to start: 127.**
 
 > ## SESSION 125 CLOSED, 2026-09-08 — the policy, written once; and round 12 changes what follows it
 >

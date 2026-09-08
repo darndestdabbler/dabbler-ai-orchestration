@@ -2485,9 +2485,9 @@
     {
       "number": 126,
       "title": "It just works \u2014 the terminal that tells you, the Work Explorer that keeps up, the suite that leaves the machine alone, and no hooks",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-08T13:41:41.033000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-09-08T14:27:52.516000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

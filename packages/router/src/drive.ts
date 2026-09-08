@@ -41,6 +41,7 @@ import {
   checkRunGreen,
   loadTestScopes,
   makeCheck,
+  materialPaths,
   timeoutFor,
   execute as executeCheck,
 } from "./checks.ts";
@@ -102,7 +103,6 @@ import {
   SET_BOOKKEEPING_COMMIT_BASENAMES,
   checkVerificationClean,
   hookRemovedFor,
-  materialPaths,
   readWorktreeStatus,
 } from "./gates.ts";
 import type {

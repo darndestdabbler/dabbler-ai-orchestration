@@ -180,6 +180,7 @@ suite("set up new project", () => {
       noGit?: boolean;
       newFolder?: string;
       offerFolder?: boolean;
+      remote?: string;
     } = {},
   ): {
     ui: SetUpProjectUi;
@@ -222,6 +223,10 @@ suite("set up new project", () => {
     if (options.newFolder !== undefined || options.offerFolder) {
       ui.chooseNewProjectFolder = () => Promise.resolve(options.newFolder);
     }
+    // Skipping is the default here, because skipping is a real answer: a
+    // flow that only works when a remote is given would be a required step
+    // wearing an optional one's clothes.
+    ui.askRemote = () => Promise.resolve(options.remote);
     if (!options.noGit) {
       ui.initRepository = () => {
         inits += 1;
@@ -262,11 +267,25 @@ suite("set up new project", () => {
     assert.deepStrictEqual(ran, ["D:\\ws"]);
   });
 
-  test("creates the project when VS Code has no folder open at all", async () => {
+  test("creates the project when VS Code has no folder open at all, and hands bootstrap the remote it asked for", async () => {
     // The one onboarding path this command exists for, and the one it used
-    // to refuse outright.
-    const { ui } = setUpUi(undefined, { newFolder: "D:\\fresh" });
-    assert.strictEqual(await runSetUpProjectFlow(ui, fakeRouter(0).router), true);
+    // to refuse outright. The remote is the one parameter the framework
+    // cannot determine, and set-up never asked for it: the close pushes and
+    // a focused checkout is cloned from the origin, so a project without
+    // one cannot close its first session.
+    const { ui } = setUpUi(undefined, {
+      newFolder: "D:\\fresh",
+      remote: "https://example.invalid/p.git",
+    });
+    const asked = fakeRouter(0);
+    assert.strictEqual(await runSetUpProjectFlow(ui, asked.router), true);
+    assert.strictEqual(asked.bootstrapOptions[0].remote, "https://example.invalid/p.git");
+
+    // And skipping is a real answer: nothing is passed, and nothing refuses.
+    const skipped = setUpUi(undefined, { newFolder: "D:\\fresh" });
+    const second = fakeRouter(0);
+    assert.strictEqual(await runSetUpProjectFlow(skipped.ui, second.router), true);
+    assert.strictEqual(second.bootstrapOptions[0].remote, undefined);
   });
 
   test("opens a folder it created before offering anything about it", async () => {

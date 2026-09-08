@@ -39,7 +39,11 @@
 import { existsSync, realpathSync } from "node:fs";
 import { join, resolve } from "node:path";
 
-import { isFrameworkInstalledPath } from "./checks.ts";
+import {
+  type WorktreeGateOptions,
+  isSetBookkeeping,
+  materialPaths,
+} from "./checks.ts";
 import type { RouterConfig } from "./config.ts";
 import { PROJECT_CONFIG_FILENAME, loadConfig, projectRoot } from "./config.ts";
 import { EcosystemError, ecosystemOf } from "./ecosystem.ts";
@@ -55,7 +59,6 @@ import {
   readImpactPlan,
 } from "./impact.ts";
 import {
-  isMachineStatePath,
   repoRelativePath,
   repoRootFor,
   runGit,
@@ -81,16 +84,6 @@ import {
 } from "./testEvidence.ts";
 import { SESSION_VERDICTS } from "./verdict.ts";
 
-/** Editor and platform droppings, plus the close machinery's own lock. */
-const IGNORE_BASENAME_PATTERNS: readonly string[] = [
-  ".DS_Store",
-  "*.swp",
-  "*~",
-  "Thumbs.db",
-  "desktop.ini",
-  ".lifecycle.lock",
-];
-
 /**
  * Session-directory files the close itself commits after the flip.
  *
@@ -99,15 +92,6 @@ const IGNORE_BASENAME_PATTERNS: readonly string[] = [
  * it leaves every close behind a tracked-deletion dirty tree.
  */
 export const SET_BOOKKEEPING_COMMIT_BASENAMES = LIFECYCLE_WRITTEN_FILES;
-
-/**
- * What may legitimately be dirty in the session directory at close time:
- * the files the close will commit, plus the lock the close is holding.
- */
-const SET_BOOKKEEPING_BASENAMES: ReadonlySet<string> = new Set([
-  ...SET_BOOKKEEPING_COMMIT_BASENAMES,
-  ".lifecycle.lock",
-]);
 
 /**
  * The gate that asks whether packaging has run, named once.
@@ -179,18 +163,6 @@ function pythonInt(text: string): number {
   return /^[+-]?\d+$/.test(text.trim()) ? Number(text.trim()) : 0;
 }
 
-/** `fnmatch` over a basename: `*` and `?`, and nothing else these need. */
-function matchesPattern(basename: string, pattern: string): boolean {
-  const source =
-    "^" +
-    pattern
-      .replace(/[.+^${}()|[\]\\]/g, "\\$&")
-      .replace(/\*/g, ".*")
-      .replace(/\?/g, ".") +
-    "$";
-  return new RegExp(source).test(basename);
-}
-
 /**
  * The sessions root as the repository sees it, and the reason it is not a
  * bare `relative()`.
@@ -227,12 +199,6 @@ function currentSession(sessionsDir: string): unknown {
   if (!state) return null;
   const current = state["currentSession"];
   return current === undefined ? null : current;
-}
-
-/** A session-directory path the close itself will commit, or its lock. */
-function isSetBookkeeping(forwardPath: string, setRel: string): boolean {
-  const basename = forwardPath.split("/").pop() ?? forwardPath;
-  return forwardPath.startsWith(`${setRel}/`) && SET_BOOKKEEPING_BASENAMES.has(basename);
 }
 
 // --- verification_clean -------------------------------------------------------
@@ -452,92 +418,9 @@ export function readWorktreeStatus(root: string): { text: string; error: string 
   return { text: status.stdout, error: "" };
 }
 
-/** One porcelain status line: the two-character code and the path it names. */
-export interface PorcelainEntry {
-  readonly code: string;
-  readonly path: string;
-}
-
-const C_ESCAPES: Readonly<Record<string, number>> = {
-  a: 0x07, b: 0x08, f: 0x0c, n: 0x0a, r: 0x0d, t: 0x09, v: 0x0b,
-  "\\": 0x5c, '"': 0x22,
-};
-
-/**
- * Git's C-style quoting, undone: a path git printed between double quotes
- * carries `\\`, `\"`, the C control escapes and `\ooo` octal BYTES, which
- * are UTF-8 once reassembled. An unquoted path is taken as written.
- */
-export function unquotePorcelainPath(raw: string): string {
-  if (!(raw.length >= 2 && raw.startsWith('"') && raw.endsWith('"'))) return raw;
-  const inner = raw.slice(1, -1);
-  const bytes: number[] = [];
-  for (let index = 0; index < inner.length; index += 1) {
-    const char = inner[index]!;
-    if (char !== "\\") {
-      bytes.push(...Buffer.from(char, "utf8"));
-      continue;
-    }
-    const next = inner[index + 1] ?? "";
-    const octal = /^[0-7]{1,3}/.exec(inner.slice(index + 1, index + 4))?.[0];
-    if (octal !== undefined) {
-      bytes.push(Number.parseInt(octal, 8));
-      index += octal.length;
-    } else if (next in C_ESCAPES) {
-      bytes.push(C_ESCAPES[next]!);
-      index += 1;
-    } else {
-      bytes.push(0x5c);
-    }
-  }
-  return Buffer.from(bytes).toString("utf8");
-}
-
-/**
- * `git status --porcelain` parsed: two characters of code, a space, then
- * the path -- the NEW name of a rename, unquoted where git quoted it. A
- * line too short to carry a path is skipped.
- */
-export function parsePorcelain(porcelain: string): PorcelainEntry[] {
-  const entries: PorcelainEntry[] = [];
-  for (const line of porcelain.split("\n")) {
-    if (line.length < 4) continue;
-    let path = line.slice(3);
-    if (path.includes(" -> ")) path = path.split(" -> ", 2)[1];
-    path = path.trim();
-    // A quoted path is decoded exactly: a backslash inside it is a byte of
-    // the name (POSIX allows one). Git spells every unquoted path with
-    // forward slashes, so a backslash in one came from somewhere else and
-    // is read as a separator.
-    path = path.startsWith('"') ? unquotePorcelainPath(path) : path.replace(/\\/g, "/");
-    entries.push({ code: line.slice(0, 2), path });
-  }
-  return entries;
-}
-
 /** `git rev-list --count` output as a number; anything but an integer is 0. */
 export function parseRevListCount(text: string): number {
   return pythonInt(text);
-}
-
-/** How the worktree gate is being asked. */
-export interface WorktreeGateOptions {
-  /**
-   * The question is "has the work begun?" (the task declaration), asked
-   * right after a registration: `.claude/settings.json` is then the
-   * registration's own doing -- once the install of a Stop hook, now its
-   * removal, which edits a tracked file -- and not work. The close never
-   * passes this: it asks "is everything committed?", and the file counts
-   * there like any other, however it got there.
-   */
-  readonly beforeWork?: boolean;
-  /**
-   * The in-flight row says the registration removed the hook, so the edit
-   * to `.claude/settings.json` is the framework's. Without it the file
-   * counts like any other: an operator's own change to it before the
-   * declaration is work, not the registration's doing.
-   */
-  readonly hookRemoved?: boolean;
 }
 
 /** Whether the in-flight session's row records that its registration removed the hook. */
@@ -556,36 +439,6 @@ export function hookRemovedFor(sessionsDir: string): boolean {
     );
   }
   return false;
-}
-
-/**
- * The paths in a porcelain status that are work: not editor noise, not the
- * session's own bookkeeping under `setRel`, not the run ledger.
- */
-export function materialPaths(
-  porcelain: string,
-  setRel: string,
-  options: WorktreeGateOptions = {},
-): string[] {
-  const blocking: string[] = [];
-  for (const entry of parsePorcelain(porcelain)) {
-    const path = entry.path;
-    const basename = path.split("/").pop() ?? path;
-    if (IGNORE_BASENAME_PATTERNS.some((pattern) => matchesPattern(basename, pattern))) {
-      continue;
-    }
-    if (isSetBookkeeping(path, setRel)) {
-      continue; // the close commits its own bookkeeping after the flip
-    }
-    if (isMachineStatePath(path)) {
-      continue; // the run ledger is the record, not the work
-    }
-    if (options.beforeWork && options.hookRemoved === true && isFrameworkInstalledPath(path)) {
-      continue; // the registration's own edit to the hook file, not work; the land commits it
-    }
-    blocking.push(path);
-  }
-  return blocking;
 }
 
 /**

@@ -12,11 +12,10 @@ import { join } from "node:path";
 import { describe, it, type TestContext } from "node:test";
 
 import { preverifyGate } from "../src/affected.ts";
-import { STAGE_TARGETED, displayCommand, execute, makeCheck } from "../src/checks.ts";
+import { STAGE_TARGETED, displayCommand, execute, makeCheck, materialPaths } from "../src/checks.ts";
 import { sessionRoundRefs, treePaths } from "../src/evidence.ts";
 import {
   judgePushState,
-  materialPaths,
   readPushFacts,
   readWorktreeStatus,
 } from "../src/gates.ts";

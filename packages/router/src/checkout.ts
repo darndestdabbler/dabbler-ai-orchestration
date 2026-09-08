@@ -26,7 +26,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { cpus, tmpdir } from "node:os";
 import { dirname, isAbsolute, join, posix, resolve } from "node:path";
 
-import { resolveProgram } from "./checks.ts";
+import { materialPaths, resolveProgram } from "./checks.ts";
 import type { RouterConfig } from "./config.ts";
 import {
   DOTNET_TOOLCHAIN_ENV,
@@ -36,7 +36,8 @@ import {
   PACKAGES_DIR,
   ecosystemOf,
 } from "./ecosystem.ts";
-import { nowIso, runGit } from "./journal.ts";
+import { sessionsDirFor } from "./evidence.ts";
+import { nowIso, repoRelativePath, runGit } from "./journal.ts";
 import {
   type ModuleEntry,
   type SolutionShape,
@@ -303,12 +304,19 @@ function isFiltered(clone: string): boolean {
   return listed.split("\n").some((line) => line.startsWith("?"));
 }
 
-/** The paths a clone's porcelain status names, in git's spelling; empty when clean. */
+/**
+ * The work in a clone: what the operator would lose if it were reset.
+ *
+ * The framework's own record is not that, and counting it made the second
+ * press of Start Focused Session refuse with `docs/sessions/sessions.json`
+ * -- a file `session start` wrote and a person is told never to touch. The
+ * rule is `materialPaths`, the same one the close and the declaration use;
+ * `-uall` because a collapsed untracked directory arrives as one umbrella
+ * row that no per-path judgement can see inside.
+ */
 function dirtyPaths(clone: string): string[] {
-  return git(clone, ["status", "--porcelain"], "reading the clone's status")
-    .split("\n")
-    .filter((line) => line.trim() !== "")
-    .map((line) => line.slice(3).trim());
+  const porcelain = git(clone, ["status", "--porcelain", "-uall"], "reading the clone's status");
+  return materialPaths(porcelain, repoRelativePath(clone, sessionsDirFor(clone)));
 }
 
 /** Every `.claude/settings.local.json` key kept; the block set. */

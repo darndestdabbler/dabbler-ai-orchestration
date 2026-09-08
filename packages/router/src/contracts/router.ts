@@ -368,6 +368,16 @@ export interface BootstrapOptions {
    * project on the machine routes.
    */
   readonly noTransportDetect?: boolean;
+  /**
+   * Where this project pushes: the one parameter the framework cannot
+   * determine for itself.
+   *
+   * The close pushes, the close pulls the repository forward, and a focused
+   * checkout is CLONED from the origin, so a project with no remote cannot
+   * close its first session. Absent is a real answer -- the project is set
+   * up without one, and the owed decision still asks for it later.
+   */
+  readonly remote?: string;
 }
 
 /**

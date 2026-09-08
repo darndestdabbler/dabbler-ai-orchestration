@@ -23,6 +23,8 @@ import {
   detectPackaging,
 } from "../src/bootstrap/index.ts";
 import { bootstrapVerb } from "../src/cli/bootstrap.ts";
+import { sessionsDirFor } from "../src/evidence.ts";
+import { materialWorktreeChanges } from "../src/gates.ts";
 import { canonicalVersion, packageVersion, releaseVersion, tagsFor } from "../src/cli/release.ts";
 import { capture } from "../src/output.ts";
 import { ID_GIT_REMOTE, openDecisions } from "../src/owedDecisions.ts";
@@ -197,5 +199,52 @@ describe("a project on its first day", () => {
       "setup committed its own work",
       "a release names nothing, because nothing declares a version",
     ]);
+  });
+
+  it("commits the modules manifest the operator declared before running it", async () => {
+    // The order both walkthroughs teach: declare the modules, then set the
+    // project up. The manifest is on disk and untracked when bootstrap
+    // runs, so it is in nothing bootstrap wrote -- and session 1 is then
+    // refused by the very tree this command has just called clean.
+    const repo = makeRepo(PROJECT, { origin: true });
+    writeFiles(repo, {
+      "docs/modules.yaml":
+        "modules:\n- slug: acme-csv\n  title: acme-csv\n  kind: application\n  codeRoots:\n  - '.'\n",
+    });
+    assert.equal(
+      gitOut(repo, "status", "--porcelain", "--", "docs/modules.yaml").trim(),
+      "?? docs/modules.yaml",
+    );
+
+    const setup = await capture(() =>
+      bootstrapVerb(["--project-dir", repo, "--no-transport-detect"]),
+    );
+    assert.equal(setup.value, 0, setup.stderr);
+
+    assert.match(gitOut(repo, "show", "--name-only", "--format=", "HEAD"), /docs\/modules\.yaml/);
+    // And the sentence it prints about session 1 is true of the tree it is
+    // standing in, which is the whole of what was wrong.
+    assert.deepEqual(materialWorktreeChanges(sessionsDirFor(repo)).paths, []);
+  });
+
+  it("records the remote it is given and leaves the branch tracking it", async () => {
+    // The one parameter the framework cannot determine. Nothing in the UI
+    // asked for it, and the close's push, the close's pull-forward and
+    // every focused clone all read it.
+    const folder = scratchDir("remote-");
+    writeFiles(folder, { "README.md": PROJECT["README.md"]! });
+    const bare = join(scratchDir("bare-"), "origin.git");
+    git(folder, "--version"); // pins the suite's git identity for the children
+    git(folder, "init", "-q", "--bare", bare);
+
+    const setup = await capture(() =>
+      bootstrapVerb(["--project-dir", folder, "--no-transport-detect", "--remote", bare]),
+    );
+    assert.equal(setup.value, 0, setup.stderr);
+
+    assert.equal(gitOut(folder, "remote", "get-url", "origin"), bare);
+    const branch = gitOut(folder, "symbolic-ref", "--short", "HEAD");
+    assert.equal(gitOut(folder, "rev-parse", "--abbrev-ref", `${branch}@{upstream}`), `origin/${branch}`);
+    assert.equal(gitOut(bare, "rev-parse", `refs/heads/${branch}`), gitOut(folder, "rev-parse", "HEAD"));
   });
 });

@@ -8,7 +8,7 @@
 // than to any one repository. `--no-transport-detect` is how a caller that
 // must not touch the host opts out of the second.
 
-import { statSync } from "node:fs";
+import { existsSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 import { TRANSPORT_ENV_VAR, VALID_TRANSPORTS, loadConfig } from "../config.ts";
@@ -16,6 +16,7 @@ import { freshnessWarnings } from "../discovery.ts";
 import { SESSIONS_DIRNAME, ensureRoundRefspecs, repoRootFor } from "../evidence.ts";
 import { repoRelativePath, runGit } from "../journal.ts";
 import { raisePackagingDecisions, raiseRemoteDecision } from "../owedDecisions.ts";
+import { MANIFEST_RELPATH } from "../modules.ts";
 import { STATUS_IN_PROGRESS } from "../progress.ts";
 import { readRawSessionState } from "../sessionState.ts";
 import { writeProjection } from "../projection.ts";
@@ -50,7 +51,8 @@ const CHOICES = [...VALID_TRANSPORTS].sort();
 function usage(): string {
   return [
     "usage: dabbler bootstrap [-h] [--project-dir PROJECT_DIR]",
-    "                        [--repo-name REPO_NAME] [--print-plan-prompt]",
+    "                        [--repo-name REPO_NAME] [--remote URL]",
+    "                        [--print-plan-prompt]",
     "                        [--print-decomposition-prompt]",
     `                        [--transport {${CHOICES.join(",")}}]`,
     "                        [--no-transport-detect] [--machine-scope]",
@@ -58,6 +60,12 @@ function usage(): string {
     "options:",
     "  --project-dir PROJECT_DIR",
     "                        consumer project root (default: cwd)",
+    "  --remote URL          where this project pushes: recorded as `origin`,",
+    "                        and the branch is pushed with an upstream so it",
+    "                        tracks. The close pushes and a focused checkout",
+    "                        is cloned from the origin, so a project without",
+    "                        one cannot close its first session. An existing",
+    "                        remote is left exactly as it is.",
     "  --transport {" + CHOICES.join(",") + "}",
     "                        remember this transport in the persistent",
     `                        ${TRANSPORT_ENV_VAR} environment variable.`,
@@ -74,7 +82,7 @@ function usage(): string {
   ].join("\n");
 }
 
-const VALUE_FLAGS = new Set(["--project-dir", "--repo-name", "--transport"]);
+const VALUE_FLAGS = new Set(["--project-dir", "--repo-name", "--remote", "--transport"]);
 const BARE_FLAGS = new Set([
   "--print-plan-prompt",
   "--print-decomposition-prompt",
@@ -85,6 +93,7 @@ const BARE_FLAGS = new Set([
 interface Parsed {
   readonly projectDir: string;
   readonly repoName: string | null;
+  readonly remote: string | null;
   readonly printPlanPrompt: boolean;
   readonly printDecompositionPrompt: boolean;
   readonly transport: string | null;
@@ -117,6 +126,7 @@ function parseArgs(argv: readonly string[]): Parsed | string {
   return {
     projectDir: values.get("--project-dir") ?? ".",
     repoName: values.get("--repo-name") ?? null,
+    remote: values.get("--remote") ?? null,
     printPlanPrompt: flags.has("--print-plan-prompt"),
     printDecompositionPrompt: flags.has("--print-decomposition-prompt"),
     transport: values.get("--transport") ?? null,
@@ -220,6 +230,19 @@ export async function bootstrapVerb(argv: string[]): Promise<number> {
       `bootstrap: initialised a git repository in ${project} -- the framework ` +
         "needs one for its tree hashes, its commit and its push. Add a remote " +
         "before the first close; `dabbler owed list` asks where it should push.\n",
+    );
+  }
+
+  // Where this project pushes, when the caller was given it. Recorded here,
+  // before the owed decision below reads whether this repository has a
+  // remote; the PUSH waits until the scaffold is committed, because until
+  // then there is nothing to push.
+  const remote = parsed.remote === null ? null : addOrigin(project, parsed.remote.trim());
+  if (remote !== null && remote.note) writeOut(`bootstrap: ${remote.note}\n`);
+  if (remote !== null && remote.error) {
+    writeErr(
+      `bootstrap: could not record the remote (${remote.error}). The project is ` +
+        "still set up; add it yourself before the first close, which pushes.\n",
     );
   }
 
@@ -366,10 +389,20 @@ export async function bootstrapVerb(argv: string[]): Promise<number> {
   // phase. With a session in flight the land's `git add -A` is what
   // commits these, and the step's report still passes -- the driver
   // compares trees, not commits.
+  //
+  // The one file bootstrap commits without having written it. The manifest
+  // is the declaration the Solution Explorer renders and every session is
+  // scoped by, and bootstrap writes it itself whenever it is absent -- so
+  // the only way it is missing from `written` is that the operator declared
+  // their modules BEFORE running set-up, which is the order both
+  // walkthroughs teach. Left uncommitted it is precisely the tree that
+  // refuses session 1, underneath a sentence from this command saying it
+  // will not be.
+  const adopted = manifest === null ? untrackedManifest(project) : null;
   const inFlight = sessionInFlight(project);
   const commit =
     inFlight === null
-      ? commitOwnScaffold(project, written)
+      ? commitOwnScaffold(project, adopted === null ? written : [...written, adopted])
       : { committed: false, reason: "" };
   if (inFlight !== null && written.length > 0) {
     // "Its land commits them" is true only AFTER the session has declared
@@ -386,9 +419,14 @@ export async function bootstrapVerb(argv: string[]): Promise<number> {
           : `${commitBeforeDeclaring(undeclared, "them")}\n`),
     );
   } else if (commit.committed) {
+    // The count is of what this command WROTE, and the manifest it adopted
+    // is named rather than folded into it: a person reading "7 files" for a
+    // run that wrote six has been told something false about the one file
+    // that was theirs.
     writeOut(
-      `bootstrap: committed ${written.length} file(s) it wrote; the ` +
-        "declaration a session makes comes before its work, so session 1 " +
+      `bootstrap: committed ${written.length} file(s) it wrote` +
+        (adopted === null ? "" : `, and the ${MANIFEST_RELPATH} it found untracked`) +
+        "; the declaration a session makes comes before its work, so session 1 " +
         "would be refused while they sat uncommitted.\n",
     );
   } else if (commit.reason) {
@@ -397,6 +435,24 @@ export async function bootstrapVerb(argv: string[]): Promise<number> {
         "Commit these files before session 1, which is refused while they " +
         "sit uncommitted.\n",
     );
+  }
+  // The upstream, once there is a commit to carry it. A rejected push is
+  // reported and is not fatal: the remote is recorded either way, and a
+  // half-configured remote an operator can finish beats a set-up that died
+  // after writing the scaffold.
+  if (remote !== null && remote.added) {
+    const pushed = pushUpstream(project);
+    if (pushed.error === "") {
+      writeOut(
+        `bootstrap: pushed ${pushed.branch} to origin and set it to track there, ` +
+          "which is what the close's push and a focused checkout's clone both read.\n",
+      );
+    } else {
+      writeErr(
+        `bootstrap: origin is recorded, but the first push failed (${pushed.error}). ` +
+          `Push it yourself once: git push -u origin ${pushed.branch || "<branch>"}\n`,
+      );
+    }
   }
   if (scaffolded.length > 0) {
     writeOut(
@@ -465,7 +521,69 @@ function sessionInFlight(projectDir: string): number | null {
 }
 
 /**
- * Commit the files bootstrap just wrote, and only those.
+ * Record `origin`, or say why it was left alone.
+ *
+ * An existing remote is never rewritten. It is the operator's statement of
+ * where this repository lives, and set-up is not where that changes -- a
+ * command that silently repointed `origin` would move a project's pushes
+ * somewhere nobody chose.
+ */
+function addOrigin(
+  projectDir: string,
+  url: string,
+): { readonly added: boolean; readonly note: string; readonly error: string } {
+  if (url === "") return { added: false, note: "", error: "" };
+  const root = repoRootFor(projectDir);
+  if (root === null) return { added: false, note: "", error: "not inside a git repository" };
+  const existing = runGit(root, ["remote"]).stdout.trim();
+  if (existing !== "") {
+    return {
+      added: false,
+      note: `this repository already has a remote (${existing.split("\n")[0]}), left as it is`,
+      error: "",
+    };
+  }
+  const added = runGit(root, ["remote", "add", "origin", url]);
+  if (added.code !== 0) {
+    return { added: false, note: "", error: added.stderr.trim() || "git remote add failed" };
+  }
+  return { added: true, note: `recorded origin ${url}`, error: "" };
+}
+
+/** Push the checked-out branch with an upstream, so a bare `git push` works after. */
+function pushUpstream(projectDir: string): { readonly branch: string; readonly error: string } {
+  const root = repoRootFor(projectDir);
+  if (root === null) return { branch: "", error: "not inside a git repository" };
+  const branch = runGit(root, ["symbolic-ref", "--short", "HEAD"]).stdout.trim();
+  if (branch === "") return { branch: "", error: "no branch is checked out" };
+  const pushed = runGit(root, ["push", "-u", "origin", branch]);
+  return {
+    branch,
+    error: pushed.code === 0 ? "" : pushed.stderr.trim() || "git push failed",
+  };
+}
+
+/**
+ * The modules manifest, when it is on disk and git has never seen it.
+ *
+ * Untracked is the whole test. A tracked manifest carrying uncommitted
+ * edits is the operator's own change to their own declaration, and the rule
+ * below holds for it exactly as it holds for a source file: bootstrap
+ * commits what it wrote, plus this one declaration when nothing else ever
+ * will, and never somebody's work.
+ */
+function untrackedManifest(projectDir: string): string | null {
+  const path = join(projectDir, MANIFEST_RELPATH);
+  if (!existsSync(path)) return null;
+  const root = repoRootFor(projectDir);
+  if (root === null) return null;
+  const status = runGit(root, ["status", "--porcelain", "--", repoRelativePath(root, path)]);
+  if (status.code !== 0) return null;
+  return status.stdout.split("\n").some((line) => line.startsWith("??")) ? path : null;
+}
+
+/**
+ * Commit the paths handed to it, and only those.
  *
  * Named paths rather than `git add -A`: setup runs in a directory the
  * operator may already have work in, and folding that into a commit they did

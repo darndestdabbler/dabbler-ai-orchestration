@@ -417,6 +417,12 @@ testing:
           # The seat and the engines spawn through `checks.spawnProgram`.
           - packages/router/test/copilot.test.ts
           - packages/router/test/engines.test.ts
+          # `materialPaths` lives here too -- what in a porcelain status is
+          # the operator's work -- and its readers are walked against real
+          # repositories: the close's states, and the clone the focused
+          # checkout refuses to reset over somebody's changes.
+          - packages/router/test/walk-git-states.test.ts
+          - packages/router/test/walk-checkout.test.ts
       - when: packages/router/src/testEvidence.ts
         select:
           - packages/router/test/testEvidence.test.ts

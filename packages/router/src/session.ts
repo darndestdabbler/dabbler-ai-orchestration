@@ -78,11 +78,10 @@ import { CheckoutError, openModule, readCloneMarker, writeModuleSessionMarker } 
 import { writeExposure } from "./exposure.ts";
 import { readPolicy, sharedFilesOf, writePolicy } from "./policy.ts";
 import { candidatePathsAsWritten, readCandidateRecord } from "./impact.ts";
-import { isFrameworkInstalledPath } from "./checks.ts";
+import { isFrameworkInstalledPath, materialPaths } from "./checks.ts";
 import {
   SET_BOOKKEEPING_COMMIT_BASENAMES,
   governingConfig,
-  materialPaths,
   readWorktreeStatus,
   runGates,
 } from "./gates.ts";

@@ -7,7 +7,7 @@
 // sparse checkout; a scripted git would test the script.
 
 import assert from "node:assert/strict";
-import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { describe, it } from "node:test";
 
@@ -155,6 +155,32 @@ describe("a module opened in its focused checkout", () => {
       ["docs", "modules/model/contract", "modules/persister", "packages"],
     );
     assert.equal(gitOut(clone, "status", "--porcelain"), "");
+  });
+
+  it("re-opens over the ledger the framework itself wrote, and still refuses over the operator's work", () => {
+    // Pressing Start Focused Session twice is what found this: `session
+    // start` writes the ledger INTO the clone, so the second press refused
+    // over `docs/sessions/sessions.json` -- and asked the operator to
+    // commit the one file they are told never to touch. The record is the
+    // framework's; the refusal is for the operator's.
+    const clone = join(scratchDir("reopen-"), "repo.persister");
+    const shape = solutionShape(repo);
+    openModule(repo, shape, "persister", { clonePath: clone });
+
+    const ledger = join(clone, "docs", "sessions", "sessions.json");
+    mkdirSync(dirname(ledger), { recursive: true });
+    writeFileSync(ledger, '{ "sessions": [] }\n', "utf8");
+    mkdirSync(join(clone, ".dabbler", "runs"), { recursive: true });
+    writeFileSync(join(clone, ".dabbler", "runs", "note.json"), "{}\n", "utf8");
+    assert.notEqual(gitOut(clone, "status", "--porcelain", "-uall"), "");
+    assert.equal(openModule(repo, shape, "persister", { clonePath: clone }).reset, true);
+
+    // And a real edit beside it is still refused, by name.
+    writeFileSync(join(clone, "modules", "persister", "notes.md"), "half done\n", "utf8");
+    assert.throws(
+      () => openModule(repo, shape, "persister", { clonePath: clone }),
+      /modules\/persister\/notes\.md/,
+    );
   });
 });
 

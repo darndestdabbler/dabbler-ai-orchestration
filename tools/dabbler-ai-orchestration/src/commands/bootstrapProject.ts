@@ -41,6 +41,17 @@ export interface SetUpProjectUi {
    * a question should do.
    */
   chooseNewProjectFolder?: () => Promise<string | undefined>;
+  /**
+   * Where this project pushes, asked once, here.
+   *
+   * It is the one parameter the framework cannot determine, and set-up used
+   * not to ask for it at all: the close pushes, the close pulls the
+   * repository forward, and a focused checkout is CLONED from the origin,
+   * so a project with no remote cannot close its first session. Skipping is
+   * a real answer -- the project is set up without one, and `dabbler owed
+   * list` still asks for it later.
+   */
+  askRemote?: () => Promise<string | undefined>;
   /** Start session 1 in the project just prepared. */
   startSession?: (root: string) => Promise<unknown>;
   openFolder?: (root: string) => Thenable<unknown>;
@@ -90,6 +101,7 @@ function defaultUi(pending?: PendingStartStore): SetUpProjectUi {
     workspaceRoot: () => vscode.workspace.workspaceFolders?.[0]?.uri.fsPath,
     initRepository: initWithVsCodeGit,
     chooseNewProjectFolder: chooseNewProjectFolder,
+    askRemote: askRemote,
     startSession: startSessionIn,
     openFolder: (root) =>
       vscode.commands.executeCommand("vscode.openFolder", vscode.Uri.file(root)),
@@ -124,13 +136,20 @@ export async function runSetUpProjectFlow(
     created = true;
   }
 
+  // The remote, before the project is written rather than after it is
+  // closed. `bootstrap` records it and pushes the branch with an upstream;
+  // an empty answer sets the project up without one, and nothing here
+  // insists.
+  const remote = ui.askRemote ? ((await ui.askRemote()) ?? "").trim() : "";
+
   // `noTransportDetect`, deliberately. Setting up one project is not a
   // statement about how this machine routes every other one, and a click
   // that quietly persisted a user-scoped environment variable is the kind of
   // side effect somebody finds weeks later while debugging a different repo.
   // A person who wants the preference changed runs `dabbler bootstrap
   // --transport <x>` and means it.
-  let result = await router.bootstrap({ projectDir: root, noTransportDetect: true });
+  const options = { projectDir: root, noTransportDetect: true, ...(remote ? { remote } : {}) };
+  let result = await router.bootstrap(options);
   if (!result.ok && ui.initRepository) {
     // `bootstrap` refuses a directory that is not a git repository. That is
     // a thing the framework can fix, so it fixes it and tries once more
@@ -143,7 +162,7 @@ export async function runSetUpProjectFlow(
       );
       return false;
     }
-    result = await router.bootstrap({ projectDir: root, noTransportDetect: true });
+    result = await router.bootstrap(options);
   }
   if (!result.ok) {
     ui.showErrorMessage(
@@ -274,6 +293,26 @@ export function registerBootstrapProjectCommand(
  * Two questions, because they are two decisions: which parent directory, and
  * what the project is called. Cancelling either cancels the command.
  */
+/**
+ * The remote, asked once and skippable.
+ *
+ * Skipping is a real answer and is why this is an input box with no
+ * validation rather than a required step: a project set up without a remote
+ * is a project that works until its first close, and the owed decision
+ * `dabbler owed list` raises is what asks again.
+ */
+async function askRemote(): Promise<string | undefined> {
+  return vscode.window.showInputBox({
+    title: "New Dabbler project — where does it push? (optional)",
+    prompt:
+      "The URL of an empty repository, recorded as `origin` and pushed to. " +
+      "The close pushes there and a focused checkout is cloned from it. " +
+      "Leave blank to set up without one.",
+    placeHolder: "https://github.com/you/your-project.git",
+    ignoreFocusOut: true,
+  });
+}
+
 async function chooseNewProjectFolder(): Promise<string | undefined> {
   const parent = await vscode.window.showOpenDialog({
     canSelectFiles: false,

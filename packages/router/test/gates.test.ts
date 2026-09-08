@@ -18,12 +18,9 @@ import {
   judgeVerdictTokens,
   judgeVerification,
   judgeWorktree,
-  materialPaths,
-  parsePorcelain,
   parseRevListCount,
   previewPaths,
   runGates,
-  unquotePorcelainPath,
   type PushFacts,
   type VerificationFacts,
 } from "../src/gates.ts";
@@ -31,30 +28,7 @@ import type { SuiteLoadResult } from "../src/testEvidence.ts";
 
 const SESSIONS = "docs/sessions";
 
-describe("working_tree_clean: what counts as work in a porcelain status", () => {
-  it("keeps modified and untracked paths, taking the new name of a rename", () => {
-    const status = " M src/a.ts\n?? new.txt\nR  old.txt -> renamed.txt\n";
-    assert.deepEqual(materialPaths(status, SESSIONS), ["src/a.ts", "new.txt", "renamed.txt"]);
-  });
-
-  it("decodes the C-quoting git puts around a path it had to escape", () => {
-    // Octal bytes reassemble to UTF-8; the control escapes and the escaped
-    // quote and backslash mean themselves.
-    assert.equal(unquotePorcelainPath('"caf\\303\\251.txt"'), "café.txt");
-    assert.equal(unquotePorcelainPath('"tab\\there"'), "tab\there");
-    assert.equal(unquotePorcelainPath('"quo\\"te"'), 'quo"te');
-    assert.equal(unquotePorcelainPath('"back\\\\slash"'), "back\\slash");
-    assert.equal(unquotePorcelainPath("plain name.txt"), "plain name.txt");
-    assert.deepEqual(parsePorcelain('?? "caf\\303\\251.txt"\n M a.txt\n'), [
-      { code: "??", path: "café.txt" },
-      { code: " M", path: "a.txt" },
-    ]);
-  });
-
-  it("keeps a backslash that is part of a quoted name, and reads one in an unquoted path as a separator", () => {
-    assert.deepEqual(materialPaths('?? "back\\\\slash"\n?? docs\\notes.md\n', SESSIONS), ["back\\slash", "docs/notes.md"]);
-  });
-
+describe("working_tree_clean: the judge over a read worktree", () => {
   it("answers the working-tree question from the facts alone", () => {
     assert.deepEqual(judgeWorktree({ root: null, porcelain: "", error: "", setRel: SESSIONS }, SESSIONS), {
       paths: [],
@@ -75,41 +49,6 @@ describe("working_tree_clean: what counts as work in a porcelain status", () => 
     assert.equal(parseRevListCount(" 12\n"), 12);
     assert.equal(parseRevListCount("fatal: bad revision"), 0);
     assert.equal(parseRevListCount(""), 0);
-  });
-
-  it("ignores editor droppings, which are nobody's work", () => {
-    const status =
-      "?? .DS_Store\n?? a.swp\n?? b~\n?? Thumbs.db\n?? desktop.ini\n?? docs/sessions/.lifecycle.lock\n";
-    assert.deepEqual(materialPaths(status, SESSIONS), []);
-  });
-
-  it("ignores the session's own bookkeeping under the sessions root and nowhere else", () => {
-    const status = " M docs/sessions/sessions.json\n M elsewhere/sessions.json\n";
-    assert.deepEqual(materialPaths(status, SESSIONS), ["elsewhere/sessions.json"]);
-  });
-
-  it("ignores the run ledger, which is the record and not the work", () => {
-    assert.deepEqual(materialPaths("?? .dabbler/runs/s1/rounds.jsonl\n", SESSIONS), []);
-    // The hook file `session start` edits for a claude-code registration --
-    // removing the Stop hook an earlier framework installed -- is the
-    // framework's own doing, made before the declaration that would
-    // otherwise refuse a tree already carrying a change. Exempted whether
-    // the framework's action left it untracked (the install once did) or
-    // modified (the removal does), and only when the question is whether
-    // work has begun: at the close the file counts however it got there.
-    // Exempted only when the in-flight row says the registration removed
-    // the hook: an operator's own edit to the file before declaring is work.
-    const removed = { beforeWork: true, hookRemoved: true };
-    assert.deepEqual(materialPaths("?? .claude/settings.json\n", SESSIONS, removed), []);
-    assert.deepEqual(materialPaths(" M .claude/settings.json\n", SESSIONS, removed), []);
-    assert.deepEqual(materialPaths(" M .claude/settings.json\n", SESSIONS, { beforeWork: true }), [".claude/settings.json"]);
-    assert.deepEqual(materialPaths(" M .claude/settings.json\n", SESSIONS), [".claude/settings.json"]);
-    assert.deepEqual(materialPaths("?? .claude/settings.json\n", SESSIONS), [".claude/settings.json"]);
-    assert.deepEqual(materialPaths("?? .claude/other.json\n", SESSIONS, removed), [".claude/other.json"]);
-  });
-
-  it("skips a line too short to carry a path", () => {
-    assert.deepEqual(materialPaths("??\n\n", SESSIONS), []);
   });
 
   it("previews the first five paths and counts the rest", () => {

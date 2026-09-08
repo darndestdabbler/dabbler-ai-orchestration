@@ -75,11 +75,17 @@
 > wording, the `--debug` overlay and Widen for Debugging go; the record,
 > `scope` on the instruction and `session scope` stay; the sibling-bytes
 > clause becomes a line, the changed-path clause stays the gate. **128 and
-> 129 are cancelled** into 127; 130 runs after 127. **Before 126: a proof**
-> — a two-module .NET solution under `C:\temp\optiona-poc`, two hand-written
-> sessions run through today's buttons with the AI told to build the
-> smallest thing, recorded in `docs/design/option-a-poc.md`; it is also
-> 126's reproduction. **Next to start: 126, after the proof.**
+> 129 are cancelled** into 127; 130 runs after 127. **The proof ran the same
+> afternoon** — a two-module .NET solution under `C:\temp\optiona-poc`, two
+> hand-written sessions through today's buttons, recorded in
+> `docs/design/option-a-poc.md`: both closed VERIFIED in one round, about
+> four and a half minutes each; the first attempt deadlocked because the run
+> of record ran app's suite in model's folder (a suite without `module:` is
+> repository-wide, a `shared-types` change reaches consumers whole); Start
+> Session pressed in the wrong window registered session 2 in model's
+> folder and the AI cancelled it with `--force` and drove session 2 from
+> there; the AI's editor tab could not be found. Six findings are on 127's
+> list in the plan. **Next to start: 126.**
 >
 > **Driving notes.** `--transport api` on the first `next`; a foreground
 > bounded loop (next → sleep `retry_after_seconds` → next, budgeted under

@@ -6811,7 +6811,28 @@ gate and stays. The `scoped` paragraph of the first instruction and one
 Hard-rules bullet in the managed body say the same two sentences: the other
 modules are here as packages and contract folders, not source; if the work
 cannot be done without a sibling's source, ask with `--request-grant` and
-a reason. The list is refined by the proof's findings.
+a reason.
+
+**Findings from the proof of 2026-09-08** (`docs/design/option-a-poc.md`),
+each on this session's list. (1) A suite whose covers and tests lie under
+one module's code roots is that module's suite unless it says otherwise,
+so nobody types `module:`; and in a focused folder a reached suite whose
+tests are not on disk is skipped and recorded as owed to that module's own
+session, never run and failed — the run of record ran app's suite in
+model's folder, where app's tests are not, and the AI was handed a fix
+step it could only refuse, twice, into a deadlock. (2) A start in a
+focused folder whose module is not the plan's module is refused by name,
+and Start Session is not offered there — the operator's Start Session in
+the model window registered "The greeter" in model's folder and nothing
+said no. (3) `session cancel --force` is a person's verb — the AI cancelled
+its own registration and drove the other folder's session from the wrong
+window's tab, invisibly. (4) A **Resume Session** command on the in-flight
+session's row, running `session run` — the AI's editor tab could not be
+found, and closing it would have ended the AI with nothing to bring it
+back. (5) The pull at the close, as planned: the main folder's Work
+Explorer showed session 2 as not started while the app folder had closed
+it. (6) `rebaseline`'s repaired-paths list leaves out the framework's own
+bookkeeping and the candidate's files.
 
 **Steps.** (1) The kind from the plan, the flags, the sentences, the global
 session's nothing. (2) The folder kept, the pull at close and at start, the

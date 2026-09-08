@@ -2,7 +2,7 @@
 
 Every decision, human or AI, in order, with who made it and what it was.
 
-**Written by `ai_router.writers` as a fold of `activity-log.json`.**
+**Written by `dabbler` as a fold of `activity-log.json`.**
 Hand edits are overwritten by the next append. The record is the log;
 this page is one view of it.
 
@@ -8515,3 +8515,54 @@ Decision: `WORKERS_LOCAL` stays at 2, on the numbers. The plan item is amended t
 What this decision cannot supply, and says so: the plan asked for the operator's own feel of the machine at the keyboard, and the operator was not at the keyboard during this session. The probe stood in for them. The operator's confirmation -- that two at below-normal priority leaves the host usable, or that another count is preferred -- is owed and is theirs to give; nothing in this decision forecloses it. The session-66 incident (a four-worker run of record that made the host unusable) is the only keyboard evidence on the record, and it points the same way.
 
 Session 77, which attacks the critical path itself by converting scratch-repository tests to recorded git answers, is where the wall clock moves; the count can be re-measured after it and the answer may differ then.
+
+## Session 122 — The suite that takes the machine
+
+### D257 · 2026-09-08 · Orchestrator (claude-opus-5/anthropic) · The suite's two lapsed protections are audited by a lint control, not by tests, because the thing under audit is the test infrastructure itself
+
+Session 122's plan section said "Tests. Two in packages/router/test/". The
+session shipped a control instead -- packages/router/scripts/check-suite-cost.ts,
+run from the lint gate -- and verification round 1 raised that substitution
+as a blocking finding. The dispute was upheld and round 2 passed. This is
+the reasoning, recorded because a substitution that survives a challenge
+should be findable by whoever meets the question next, rather than living
+only in a round's transcript.
+
+Three reasons, in the order they matter.
+
+One, the thing under audit IS the test infrastructure. AGENTS.md states
+"no tests of test infrastructure" as a design principle, and the two checks
+asked for are a check on the preload's own behaviour and a check that the
+preload's declared list matches the filesystem. Reading source and spawning
+probes from a control is what check-selection-map.ts does for the selection
+map and check-boundaries.ts does for the module graph; this is the third of
+the same kind and sits beside them.
+
+Two, coverage is not reduced. The lint control is `required: true` in
+dabbler.yaml, so it runs on every session exactly as the suite does. A
+control and a test have the same cadence here; what differs is only which
+gate reports the failure.
+
+Three, and this is the technical point: the test form would have been
+strictly worse. The suite runs UNDER the preload, so a test inside it
+cannot observe the without-preload baseline -- the test process is already
+priority-lowered before its first line runs. Any honest check must spawn
+child processes and compare what they report, which is exactly what
+probePriority does. Wrapping those same three spawns in a test harness
+would add a layer and prove nothing more.
+
+What the finding was RIGHT about, and what changed because of it: the
+substitution was silent. The plan said tests, the session shipped a
+control, and nothing on the record explained the swap -- which is this
+decision's reason for existing. A reviewer who reads only session-plan.md
+would have been correct to ask.
+
+Round 1 also found two real defects in the control, both fixed: a claim
+that sessions 96 and 121 ran "the same number of tests" when the document's
+own table says 1137 against 1144, and -- the serious one -- a
+double-quote-only regex in declaredWalkthroughs() that returned an empty
+list WITHOUT recording a failure, so a formatting-only change to single
+quotes would have switched both audits off while the control went on
+printing success. That is the same defect as the thing being audited, one
+layer up: a protection that stops protecting without saying so. It now
+accepts either quote style and refuses when it can read no names.

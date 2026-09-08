@@ -2,6 +2,44 @@
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
 
+> ## SESSION 131 CLOSED, 2026-09-08 — the three that stop a first-time operator
+>
+> | session | what | state |
+> | --- | --- | --- |
+> | 131 | D258, D260 and D267: the button-made module, the .NET ignore rule, the suite declared at the first pack | CLOSED VERIFIED (round 2 settled `cap-clean`; round 1's one blocking finding was right), landed `fd072a68`, closed `da5c1ee7` |
+>
+> **What landed.** `create` defaults the two values the four-box New Module
+> flow never asks for — `modules/<slug>` as the code root, and the slug as the
+> package in the casing a sibling's package already uses (a groupId reused for
+> Maven, a namespace and PascalCase for .NET, the slug verbatim when no
+> sibling declares one); the defaulting is in the one writer behind both the
+> button and the command line, and an explicit value still wins. `rootFilesDotnet`
+> appends `bin/` and `obj/` through the same `ensureIgnoreRules` the Maven
+> side uses. And the scaffold declares the ecosystem's suite at the moment the
+> ecosystem becomes known, through the writer bootstrap itself uses.
+>
+> **Two structural rulings this session made, both from a control that
+> refused.** The suite declaration does **not** live in
+> `ecosystem.ensureRootFiles`, where the plan put it: that import closed the
+> cycle `ecosystem → bootstrap → transports → agency → ecosystem` and the lint
+> control refused it. It lives in `bootstrap/detect.ensureRootFilesWithSuite`,
+> which may depend on the ecosystem seam because the dependency runs one way,
+> and the three `module`/`modules` call sites call that. Baselining the six
+> edges was the other option and was not taken.
+>
+> **Owed, and measured rather than guessed: a .NET solution has no root for
+> `dotnet test` to resolve.** `dotnet test` reads the project or solution in
+> the directory it runs in, and a multi-module .NET solution keeps its
+> projects under `modules/` and writes nothing at the root — verified here,
+> `MSB1003: Specify a project or solution file`. So the .NET half of D267 is
+> only half closed: the scaffold now refuses to declare a suite it could not
+> run and says why in a note, where Maven declares one because the parent POM
+> the same call writes is what `mvn -q test` reads. **The remaining half is a
+> root solution file** — the .NET counterpart of that parent POM, which
+> `rootFilesDotnet` does not write. A `.slnx` listing each module's projects
+> was proven to work here (SDK 11 preview; `.slnx` needs 9.0.200+). It is one
+> more root file and belongs to whichever session takes the rest of D258–D267.
+
 > ## SESSION 130 CLOSED, 2026-09-08 — the UAT that tests the UI, walked; ten product defects owed
 >
 > | session | what | state |

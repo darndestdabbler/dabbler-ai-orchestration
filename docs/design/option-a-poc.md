@@ -127,12 +127,12 @@ updated"* — the person watching could not find the row that was moving,
 which is more than the repaint defect of 126's step 1: the in-flight
 session's current step must be visible without expanding anything, and it
 must be obvious which window's Work Explorer is showing the session at all.
-Asked whether a window per module is a day they want their developers to
-have, the operator's first answer was that the phrase itself was not
-understood; the verdict is open, and session 127's changes — the kind said
-in the terminal, the module marked in the Solution Explorer, one click that
-opens the module's window with its AI in it, no pull to remember — are what
-would make the day legible enough to judge.
+Asked, in plain words, whether a window per module is how they want their
+developers to work, the operator answered: *"Yes, a window per module would
+be fine."* The verdict stands: the folder per module is the design, and
+session 127's changes — the kind said in the terminal, the module marked in
+the Solution Explorer, one click that opens the module's window with its AI
+in it, no pull to remember — are what make the day legible.
 
 ## Exit
 

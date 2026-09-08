@@ -9,6 +9,7 @@ import {
 import { NewModuleUi, runNewModuleFlow } from "../../commands/newModule";
 import { OpenModuleUi, openModule } from "../../commands/openModule";
 import { ShowImpactUi, showImpact } from "../../commands/showImpact";
+import { PackModuleUi, packModule } from "../../commands/packModule";
 import {
   cloneRepository,
   createRepository,
@@ -988,5 +989,52 @@ suite("Open Module", () => {
     await showImpact(refused.router, { node: { kind: "module", slug: "persister" }, projection: multi }, ui);
     assert.deepStrictEqual(warnings, ["affected: testing.selection is malformed: rules[0] names no test"]);
     assert.strictEqual(infos.length, 1);
+  });
+
+  test("Pack Module packs the module the row carries and shows the router's lines, or its refusal", async () => {
+    const lines =
+      "packed persister 0.1.0-dev.20260908.1.gabc1234\n" +
+      "  packages/CsvPersister.0.1.0-dev.20260908.1.gabc1234.nupkg\n" +
+      "pinned CsvPersister in Directory.Packages.props\n" +
+      "recorded packages/CsvPersister.0.1.0-dev.20260908.1.gabc1234.json\n";
+    const answered = fakeRouter(0, lines);
+    // The slug and the root the verb is asked for are the whole of what the
+    // row contributes; the fake answers whatever it is asked, so they are
+    // caught on the way through.
+    const packed: { workspaceRoot: string; slug: string }[] = [];
+    const router = {
+      module: {
+        ...answered.router.module,
+        pack: (o: { workspaceRoot: string; slug: string }) => {
+          packed.push({ workspaceRoot: o.workspaceRoot, slug: o.slug });
+          return answered.router.module.pack(o);
+        },
+      },
+    };
+    const logged: string[] = [];
+    const infos: string[] = [];
+    const warnings: string[] = [];
+    const ui: PackModuleUi = {
+      showInformationMessage: (m: string) => infos.push(m),
+      showWarningMessage: (m: string) => warnings.push(m),
+      log: (text: string) => logged.push(text),
+      workspaceRoot: () => "D:\\ws\\csv-pipeline",
+    };
+    await packModule(router, { node: { kind: "module", slug: "persister" }, projection: multi }, ui);
+    assert.deepStrictEqual(packed, [{ workspaceRoot: "D:\\ws\\csv-pipeline", slug: "persister" }]);
+    assert.deepStrictEqual(answered.asked, ["module pack"]);
+    // The whole answer in the channel; the `packed` line as the message.
+    assert.strictEqual(logged.length, 1);
+    assert.ok(logged[0].includes("pinned CsvPersister in Directory.Packages.props"));
+    assert.deepStrictEqual(infos, ["persister: packed persister 0.1.0-dev.20260908.1.gabc1234"]);
+    assert.deepStrictEqual(warnings, []);
+
+    // Refused: the router's own sentence, and no message claiming a pack.
+    const refusal = "module pack: refused -- module 'persister' declares contract: package and has no notes page";
+    const refused = fakeRouter(1, refusal);
+    await packModule(refused.router, { node: { kind: "module", slug: "persister" }, projection: multi }, ui);
+    assert.deepStrictEqual(warnings, [refusal]);
+    assert.strictEqual(infos.length, 1);
+    assert.strictEqual(logged.length, 1);
   });
 });

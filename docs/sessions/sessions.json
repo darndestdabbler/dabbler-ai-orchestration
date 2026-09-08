@@ -2422,17 +2422,37 @@
         "identityProvenance": "direct"
       },
       "verificationVerdict": "VERIFIED",
-      "frameworkVersion": "2.0.13",
       "verification": {
         "rounds": 2,
+        "verifierModel": "gpt-5-6-terra",
+        "verifierProvider": "openai",
+        "transport": "api"
+      },
+      "frameworkVersion": "2.0.13"
+    },
+    {
+      "number": 123,
+      "title": "The principle, and the three commands the UI does not have",
+      "status": "in-progress",
+      "startedAt": "2026-09-08T08:28:11.232000-04:00",
+      "completedAt": null,
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": "VERIFIED",
+      "frameworkVersion": "2.0.13",
+      "verification": {
+        "rounds": 1,
         "verifierModel": "gpt-5-6-terra",
         "verifierProvider": "openai",
         "transport": "api"
       }
     },
     {
-      "number": 123,
-      "title": "The principle, and the three commands the UI does not have",
+      "number": 124,
+      "title": "The UAT that tests the UI, and shows its own machinery",
       "status": "not-started",
       "startedAt": null,
       "completedAt": null,
@@ -2440,8 +2460,44 @@
       "verificationVerdict": null
     },
     {
-      "number": 124,
-      "title": "The UAT that tests the UI, and shows its own machinery",
+      "number": 125,
+      "title": "The policy \u2014 what a module session may touch, written once",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    },
+    {
+      "number": 126,
+      "title": "The hooks \u2014 installed by bootstrap, decided in the shell, failing open",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    },
+    {
+      "number": 127,
+      "title": "Reads watched, not hooked \u2014 the turn-end feedback and the self-grant",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    },
+    {
+      "number": 128,
+      "title": "The close that never refuses for coverage, the clone deleted, and the Copilot walk",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    },
+    {
+      "number": 129,
+      "title": "Claude Code \u2014 the same wall through its own hooks",
       "status": "not-started",
       "startedAt": null,
       "completedAt": null,

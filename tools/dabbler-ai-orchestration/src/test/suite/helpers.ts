@@ -257,6 +257,7 @@ export function fakeRouter(
         open: text("module open"),
         grant: text("module grant"),
         revoke: text("module revoke"),
+        pack: text("module pack"),
       },
       verify: {
         round: text("verify"),

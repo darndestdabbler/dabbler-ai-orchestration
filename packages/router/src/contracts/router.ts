@@ -244,12 +244,26 @@ export interface ModuleRevokeOptions {
   readonly slug: string;
 }
 
+export interface ModulePackOptions {
+  readonly workspaceRoot: string;
+  readonly slug: string;
+  /** The session the package's record names; none when packed out of band. */
+  readonly session?: number;
+}
+
 export interface OneModuleVerbs {
   open(options: ModuleOpenOptions): Promise<RouterResult<RouterText>>;
   /** Raise the owed decision that widens the checkout to a sibling's source. */
   grant(options: ModuleGrantOptions): Promise<RouterResult<RouterText>>;
   /** End a grant: narrow the checkout again. */
   revoke(options: ModuleRevokeOptions): Promise<RouterResult<RouterText>>;
+  /**
+   * Build the module's committed package, move the central pin and write the
+   * record -- the same pack the framework runs at the candidate, asked for
+   * out of band so a sibling's next session can consume it. Its stdout is
+   * the pack's own lines: the version, each artefact, the pin, the record.
+   */
+  pack(options: ModulePackOptions): Promise<RouterResult<RouterText>>;
 }
 
 export interface VerifyRoundOptions extends RepositoryTarget {

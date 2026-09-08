@@ -45,6 +45,7 @@ import {
   type ModuleCreateOptions,
   type ModuleGrantOptions,
   type ModuleOpenOptions,
+  type ModulePackOptions,
   type ModuleRevokeOptions,
   type ModuleVerbs,
   type OneModuleVerbs,
@@ -373,6 +374,12 @@ export class InProcessRouter implements Router {
     },
     revoke: (o: ModuleRevokeOptions) =>
       this.text("module", ["revoke", o.slug, "--workspace-root", o.workspaceRoot], o.workspaceRoot),
+    /** The committed package, out of band; the pack's own lines are the stdout. */
+    pack: (o: ModulePackOptions) => {
+      const args = ["pack", o.slug, "--workspace-root", o.workspaceRoot];
+      optional(args, "--session", o.session === undefined ? undefined : String(o.session));
+      return this.text("module", args, o.workspaceRoot);
+    },
   };
 
   // --- verify ----------------------------------------------------------------

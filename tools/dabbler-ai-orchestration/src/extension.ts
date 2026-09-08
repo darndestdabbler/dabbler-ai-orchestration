@@ -42,6 +42,7 @@ import {
 import { openModule } from "./commands/openModule";
 import { endGrant, widenForDebugging } from "./commands/moduleGrant";
 import { showImpact } from "./commands/showImpact";
+import { packModule } from "./commands/packModule";
 import { WorkExplorerTreeProvider } from "./providers/WorkExplorerTreeProvider";
 import { productionRouter } from "./router/host";
 
@@ -311,6 +312,13 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand("dabblerSolution.showImpact", (node?: SolutionNode) =>
       showImpact(productionRouter(), { node, projection: solutionProvider.currentProjection() }),
     ),
+    // The module's committed package, asked for out of band: the same pack
+    // the framework runs at the candidate, so a sibling's next session can
+    // consume it. The tree refreshes because the pack writes a record.
+    vscode.commands.registerCommand("dabblerSolution.packModule", async (node?: SolutionNode) => {
+      await packModule(productionRouter(), { node, projection: solutionProvider.currentProjection() });
+      solutionProvider.refresh();
+    }),
     // The four an ABSENT row has: a row that could only say "not on this
     // machine" is where this journey used to end. Each writes through the
     // router -- the extension never authors the declaration itself -- and

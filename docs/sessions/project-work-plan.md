@@ -160,8 +160,13 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 120 | What a focused checkout unavoidably holds | no | 2026-09-07 |
 | 121 | Two ways in — the seat and the keys | no | 2026-09-08 |
 | 122 | The suite that takes the machine | no | 2026-09-08 |
-| 123 | The principle, and the three commands the UI does not have | — | not declared |
+| 123 | The principle, and the three commands the UI does not have | no | 2026-09-08 |
 | 124 | The UAT that tests the UI, and shows its own machinery | — | not declared |
+| 125 | The policy — what a module session may touch, written once | — | not declared |
+| 126 | The hooks — installed by bootstrap, decided in the shell, failing open | — | not declared |
+| 127 | Reads watched, not hooked — the turn-end feedback and the self-grant | — | not declared |
+| 128 | The close that never refuses for coverage, the clone deleted, and the Copilot walk | — | not declared |
+| 129 | Claude Code — the same wall through its own hooks | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -2072,3 +2077,9 @@ Give both UAT walkthroughs a Prerequisites section in three parts -- what every 
 **Releasable: no.**
 
 Restore the two protections that kept the test suite off the operator's machine, and record what is not yet explained. Session 76 put every test worker at below-normal OS priority so its git and node grandchildren inherited it; that setup file was deleted with vitest.config.ts when session 88 retired vitest, and nothing replaced it, so the suite has competed with the operator's keyboard ever since. Session 96's git-spawn constraint still holds, but it recognises a walkthrough by the filename pattern walk-*.test.ts, so the exemption that replaced --test-concurrency widened from six files to eight without anyone deciding it should. This session gives no-git.ts an explicit list of the files permitted to build repositories and the priority policy it lost, audits both from a new control run by the lint gate so neither can lapse silently again, corrects dabbler.yaml's two stale claims about the suite, and writes the measurement into a design note that states plainly that the jump from 40s to 102s between sessions 98 and 99 is not explained. No shipped behaviour changes and nothing is published.
+
+### Session 123 — The principle, and the three commands the UI does not have
+
+**Releasable: no.**
+
+Record the operator's principle about who owns a command, audit both UAT walkthroughs against it, and give the module row the one command the audit found missing. The principle, stated 2026-09-08: a command that is constant, or constant with parameters the framework can determine, belongs to the framework when it is lifecycle-timed and to the UI when it is optional or ill-timed, and to a human only when it needs a human's judgement. The audit of docs/uat/uat-dotnet-json-solution.md and docs/uat/uat-java-json-solution.md goes into a design note: most of what the walkthroughs ask a person to type is already a button (Set Up New Project, New Module, Answer Owed Decision, Show Impact), the manual commit after bootstrap is dead text because bootstrap commits its own scaffold when no session is in flight, and three commands genuinely failed the principle -- Start Session without a module (moved to session 128 with the clone's deletion, after design rounds 10 and 11 moved the wall from the disk to a hook), the pull-back of a module session's work (eliminated with the clone), and a pack the operator cannot ask for from a module row, which this session builds: Pack Module on the Solution Explorer's module row, running dabbler module pack <slug> through a pack verb added to the router's in-process contract. No walkthrough is rewritten here -- session 124 does that, after 129, in three registers. Nothing is published.

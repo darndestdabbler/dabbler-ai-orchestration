@@ -2373,9 +2373,9 @@
     {
       "number": 120,
       "title": "What a focused checkout unavoidably holds",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-07T20:41:31.834000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-09-07T21:01:40.776000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

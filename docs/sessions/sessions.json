@@ -2558,13 +2558,72 @@
         "identityProvenance": "direct"
       },
       "verificationVerdict": "VERIFIED",
-      "frameworkVersion": "2.0.14",
       "verification": {
         "rounds": 2,
         "verifierModel": "gpt-5.4",
         "verifierProvider": "openai",
         "transport": "copilot-cli"
-      }
+      },
+      "frameworkVersion": "2.0.14"
+    },
+    {
+      "number": 131,
+      "title": "The three that stop a first-time operator",
+      "status": "in-progress",
+      "startedAt": "2026-09-08T17:18:09.239000-04:00",
+      "completedAt": null,
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": null,
+      "frameworkVersion": "2.0.14"
+    },
+    {
+      "number": 132,
+      "title": "The rest of the first-run path",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    },
+    {
+      "number": 133,
+      "title": "The four papercuts, and the walk's own record closed",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    },
+    {
+      "number": 134,
+      "title": "What the verifier is told, and what it can see",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    },
+    {
+      "number": 135,
+      "title": "The direct-API verifier can ask for a file",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    },
+    {
+      "number": 136,
+      "title": "Codex leaves the documented surface, and the block lands",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
     }
   ]
 }

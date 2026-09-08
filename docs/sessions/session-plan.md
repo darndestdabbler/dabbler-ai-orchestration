@@ -6947,3 +6947,141 @@ in both UAT documents carries the three registers or an explicit statement of
 which are absent and why; every palette command named exists in the
 extension's `contributes.commands`; and no document instructs a manual commit
 after `bootstrap`.
+
+### Session 131 of 133: What the verifier is told, and what it can see
+
+**Three sentences that stopped being true in session 100.** The managed
+body's *What comes back*, the scaffolded `dabbler.yaml`'s testing header and
+`drive.ts`'s `phasePreverify` comment all say the verifier runs its own tests
+inside the round. `testphase.ts` was deleted with the six-step workflow, so no
+verifier has written or run a test since. The managed body is generated, so
+the two template strings in `bootstrap/templates.ts` are where it is fixed and
+`AGENTS.md`, `CLAUDE.md` and `GEMINI.md` are regenerated from them; the third
+is a comment. All three say the same true thing afterwards: the tests that run
+are each step's own checks and the complete suite as the run of record, and
+the verifier reviews without writing or running one.
+
+**The verifier is asked about the tests, and proposes without writing.** A
+paragraph in `prompt-templates/verification.md` asks it to assess the tests
+the session added or changed and, where a behaviour is untested or a case is
+missing, to name that case as concrete inputs and preconditions rather than as
+prose. Scoped to the tests in the diff, because on the API transport it can
+see nothing else. Filed under NITS, because a proposal for another case is an
+improvement and not a defect, and a Minor-only round does not buy another one;
+a genuinely missing spec-promised test stays an Issue exactly as it is now.
+
+**The verifier sees the code around the change.** `assembleEvidence` builds
+the round-1 diff with git's default three lines of context, so a modified file
+arrives as hunks while a new one arrives whole. Measured over sessions
+100-127, the seat verifier -- which can read what it likes -- raised 1.30
+blocking findings a session against the blind API path's 0.53 on a slightly
+higher total, so what blindness costs is not detection but the confidence to
+grade. Widen the context, and narrow it automatically when the rendered bundle
+would exceed the evidence cap rather than failing the round on a large
+session. `assembleFixDeltaEvidence` is built the same way and gets the same
+treatment.
+
+**Steps.** (1) The three sentences. (2) The prompt's paragraph. (3) The diff's
+context, adaptive to the cap.
+
+**Tests.** One, because the first two steps are text and the ground rules
+refuse source-text assertions: an evidence bundle whose wide-context render
+would exceed the cap is rendered at a narrower context and comes back under
+it.
+
+**Not releasable**, and it is the riskiest of the three: it changes the
+evidence every round in every repository is assembled from, and the prompt
+every verifier reads. Holding it unreleased through 132 and 133 buys it two
+more sessions of real verification rounds in this repository before a seat
+ever sees it.
+
+### Session 132 of 133: The direct-API verifier can ask for a file
+
+**Parity with the seat, which has had this all along.** Across sessions
+100-109 the Copilot verifier read 312 files in 26 rounds, twelve to a round,
+and never approached the budget of 40. It listed a directory once and searched
+nothing: it asks for files by path and does not explore. So the parity the API
+path needs is one operation, not three, and no vendor function-calling.
+
+**The request block.** The verifier's answer may carry a fenced block, of its
+own label beside `test-write` and `fix-write`, naming the paths it wants. It
+is parsed by the machinery that already parses write proposals, checked
+against the same scope, counted against the same read budget, and recorded in
+the same agency record. A path outside the scope is refused and recorded, as
+an out-of-scope read is today.
+
+**The second turn, on the OpenAI path.** `api.ts` sends one user message.
+Where the answer carries a request block, the framework reads the paths and
+sends one further turn carrying their contents, and the second answer is the
+verdict. Two turns, not a loop, so the cost is bounded at twice the payload.
+**Behind a setting that defaults off**, so this session is verified by the
+path it is changing, unchanged.
+
+**The record says which kind of round it was.** An API round that read files
+records `mode: tools` with its operations; one that did not keeps `mode:
+none`. Fidelity is verbatim by construction, because the framework reads the
+bytes itself instead of being shown them, so the transformed read that the
+seat records three of cannot arise here.
+
+**Documentation.** `docs/driving-a-session.md` gains what the verifier may ask
+for on the API path, what the record says it asked, and the setting that
+governs it. `docs/schema-reference.md` gains the agency record's shape where
+an API round now fills fields only a seat round filled before.
+
+**Steps.** (1) The request block, its parse and its refusals. (2) The second
+turn on the OpenAI path, behind the setting. (3) The agency record for an API
+round that looked, and the two documents.
+
+**Tests.** Three: a request naming a path outside scope is refused and
+recorded and the round still returns a verdict; with the setting on, a request
+block produces a second turn carrying the file's bytes; with it off, the block
+is recorded and ignored and the round is one turn.
+
+**Not releasable.** The setting defaults off, so nothing changes for anyone
+until it is turned on. One real exposure to name: the proposal parser already
+runs on every round, including the ones granting no write, so a new label
+parsed there is code on the path of every verification. Its refusal case is
+one of the three tests for that reason.
+
+**After it lands**, run sessions with the setting on and compare the blocking
+finding rate against the seat's 1.30 a session and the blind API path's 0.53.
+Turning it on by default is a separate decision that the measurement, not this
+session, settles.
+
+### Session 133 of 133: Codex leaves the documented surface, and the three land
+
+**It cannot be tested here, so it is not claimed.** Codex comes out of the
+engine list in the managed body, the bootstrap templates, the registration
+help and the walkthroughs. It is an authoring engine and never a verification
+path, so nothing in 131 or 132 depends on this and it could run in any order;
+it runs last because it carries the release.
+
+**What a `--engine codex` registration does is the session's one decision.**
+Proposed: still accepted and recorded, and simply undocumented, with the
+documents saying it is untested rather than unsupported. Refusing it strands
+anyone mid-plan for no gain, the identity machinery does not care which engine
+name it records, and keeping `engines.ts` whole is what holds this session to
+documentation rather than code.
+
+**Only the live documents, and this is the session's one trap.** Codex is
+named 74 times in this repository, and 12 of those are in documents a reader
+is meant to act on: `docs/quick-start.md`, `docs/driving-a-session.md`,
+`docs/onboarding/README.md`, `docs/schema-reference.md` and the two UAT
+walkthroughs. Every other mention is in a record of what was decided or done
+-- the decisions log, which is RENDERED from `activity-log.json` and is not a
+source, the framework specification, this plan's own history and the status
+archive. **None of those may be edited.** A session that reads "remove Codex
+from the docs" and rewrites history has damaged the record to tidy a name.
+
+**Steps.** (1) The live documented surface, and the engine list the bootstrap
+templates and the CLI help offer. (2) The registration's behaviour, and the
+decision recorded. (3) The version bump (`version.json`, then `npm run
+stamp:version`) and the release notes for all three sessions.
+
+**Tests.** One: a registration naming the undocumented engine behaves as the
+decision says.
+
+**Releasable**, and it carries 131 and 132 to the seats with it.
+Releasability is declared at `start`, before the work, and the close refuses a
+releasable session with no packaging run on its record, so this is the session
+that must be started with it declared.

@@ -1,6 +1,58 @@
-# STATUS — sessions 113–127 CLOSED, all VERIFIED: the deployables block, the Java/Maven walk and its nine defects, the suite off the operator's machine, the principle of who owns a command, the policy a module session runs under, the basics the operator saw go wrong, and the focused-or-global session the plan decides with one click to start it; 130 next (128 and 129 cancelled, folded into 127); version 2.0.14
+# STATUS — sessions 113–130 CLOSED, all VERIFIED: the deployables block, the Java/Maven walk and its nine defects, the suite off the operator's machine, the principle of who owns a command, the policy a module session runs under, the basics the operator saw go wrong, the focused-or-global session the plan decides with one click to start it, and the UAT walk that found ten product defects in the UI path; the plan declares no more sessions; version 2.0.14
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
+
+> ## SESSION 130 CLOSED, 2026-09-08 — the UAT that tests the UI, walked; ten product defects owed
+>
+> | session | what | state |
+> | --- | --- | --- |
+> | 130 | the UI path walked in two ecosystems, both UAT walkthroughs rewritten in three registers, one new document check | CLOSED VERIFIED (round 2, `gpt-5.4/openai`; round 1 found one blocking defect and was right), landed `272f28d9`, closed `74e3ea50` |
+>
+> **The walk is the finding.** Two scratch solutions outside the tree —
+> `C:\temp\uat130-dotnet` and `C:\temp\uat130-java`, both still on disk —
+> were built by following the walkthroughs with the router verbs each button
+> generates, reading the command implementations for their exact prompts.
+> **Nineteen findings: ten product defects and nine document errors.** The
+> record is `docs/uat/uat-walk-findings.md`; every product defect is owed as
+> a decision, **D258–D267**, with its reproduction and its bucket. What was
+> *not* walked is stated there too: neither walk ran an AI session's own work,
+> because the path under test is the operator's.
+>
+> **The three that stop a first-time operator.** (1) A module made with **New
+> Module** can neither pack nor host a session — the two of six values it does
+> not ask for are exactly the two that matter, and an absent `codeRoots` reads
+> as the repository root (D258). (2) **Nothing ignores .NET build output**, and
+> the Maven side already carries the fix with the reason in its own comment;
+> four consecutive .NET packs gave four versions where three Maven packs gave
+> one, and the same omission refuses the next `session start` and the close's
+> pull-forward (D260). (3) **Neither walkthrough ever declares a test suite**,
+> and `dabbler affected` prints the `configured-rule` pass one line above *"no
+> suite is declared, so there is no command to run"* (D267).
+>
+> **An audit claim falsified.** `docs/design/command-ownership.md` ruled the
+> walkthroughs' commit after bootstrap dead text, on the grounds that it finds
+> nothing to stage. It does not: the modules are declared first, so
+> `docs/modules.yaml` is untracked at that point and bootstrap does not commit
+> it (D259). Deleting the commit as ruled would have left the tree dirty for
+> the declaration. What was dead was the *explanation* beside it, and that is
+> what moved into the first register.
+>
+> **The documents are instruments now.** Both walkthroughs are eleven steps in
+> UI-first order, each carrying **Framework / You / Underneath** — or naming
+> the register it lacks and whose gap that is. `packages/router/scripts/check-uat-registers.mjs`
+> holds them to it: three registers or an answered absence with a bucket,
+> every command title against the extension's `contributes.commands`, and no
+> manual commit inside the bootstrap step. Eight self-test cases; all three
+> rules fired on the documents as they stood.
+>
+> **Also fixed:** two stale `.dabbler/runs/<set>/s<N>/` paths in
+> `docs/quick-start.md`. The csv walkthrough needed no change. The same stale
+> segment survives in `packages/router/src/approvedPlan.ts`'s opening comment
+> and is left for a session that is changing that file.
+>
+> **Next.** The plan declares no more sessions — `close` said so. The ten owed
+> decisions are the work in front of the next plan, and D258, D260 and D267
+> are the three that a first-time operator hits.
 
 > ## SESSION 127 CLOSED, 2026-09-08 — focused or global, the plan says which; one click starts it; the framework pulls
 >

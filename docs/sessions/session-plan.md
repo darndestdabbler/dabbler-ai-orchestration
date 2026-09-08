@@ -6948,7 +6948,131 @@ which are absent and why; every palette command named exists in the
 extension's `contributes.commands`; and no document instructs a manual commit
 after `bootstrap`.
 
-### Session 131 of 133: What the verifier is told, and what it can see
+### Session 131 of 136: The three that stop a first-time operator
+
+**Session 130 walked the UI path and fell into three holes in its first
+twenty minutes.** They are findings 1, 3 and 10 of `docs/uat/uat-walk-findings.md`,
+owed as D258, D260 and D267, and they are here together because they are the
+ones a person meets before they have done anything wrong. The other seven are
+sessions 132 and 133.
+
+**A module made with the button can be packed and can host a session
+(D258).** `runNewModuleFlow` asks four values and `createModule` writes only
+what it is given, so the two it never asks for are absent: an absent
+`codeRoots` reads as the repository root, which makes a button-made module
+indistinguishable from one claiming the whole repository, and `module pack`
+refuses a module that declares no package. The walk offered two fixes and had
+no opinion between them. **This plan picks the defaulting one**, in
+`createModule` rather than in the button: a module created without them takes
+`modules/<slug>` as its code root and the slug in the repository's casing as
+its package. It fixes `dabbler modules create` and the button in one place,
+leaves the flow at four boxes, and an explicit value still wins. The two
+refusals stay exactly as they are, because they are correct and they are what
+made this findable.
+
+**The .NET first pack ignores its own build output (D260).** `ensureRootFiles`
+appends `target/` and `.flattened-pom.xml` to `.gitignore` on the Maven side,
+with the reason in its own comment: a source digest taken over unignored
+build output makes the same source pack to a new dev version every time. The
+.NET side writes five root files and touches `.gitignore` not at all, so
+`bin/` and `obj/` break the pack's idempotence, the next declaration and the
+close's pull-forward. The same rule, written for the other ecosystem, with
+the comment saying why once.
+
+**The first pack declares the suite the ecosystem now names (D267).**
+Bootstrap runs before any project file exists and honestly declares no suite.
+Nothing revisits it, so the run of record has no command while `dabbler
+affected` prints a `configured-rule` pass one line above "no suite is
+declared, so there is no command to run". The lifecycle moment the ecosystem
+becomes known is the first pack, where `ensureRootFiles` already writes that
+ecosystem's root build files and knows what its suite command is. It writes
+the suite too, and never overwrites one already declared.
+
+**Steps.** (1) The two defaults in `createModule`. (2) The .NET ignore rule.
+(3) The suite declared at the first pack.
+
+**Tests.** Three: a module created with slug, title and kind alone takes a
+code root and a package from the slug and passes the pack's own refusal; a
+.NET first pack appends the ignore rule, and a second pack of unchanged
+source returns the version the first one did; a first pack in a repository
+with no declared suite writes one for its ecosystem, and `affected` then
+names a command to run.
+
+**Not releasable.** These are what a first-time operator hits, so they will
+want shipping soon, but the whole block ships once at 136.
+
+### Session 132 of 136: The rest of the first-run path
+
+**Findings 2, 4 and 5, owed as D259, D261 and D262.** None of them stops a
+person outright; each of them stops one operation with a message about
+something they did not do.
+
+**Bootstrap commits a manifest that was written before it (D259).**
+`commitOwnScaffold` commits exactly the files bootstrap wrote, and in the
+walkthroughs' own order the modules are declared first, so `docs/modules.yaml`
+is untracked when bootstrap runs and stays that way, and the declaration
+refuses the dirty tree. Session 130 also falsified the audit's claim that the
+walkthroughs' commit after bootstrap is dead text: it is not, and what was
+dead was the explanation beside it. Bootstrap commits the manifest when it
+finds one untracked, and the walkthroughs keep the commit.
+
+**Re-opening a module does not refuse over the framework's own ledger
+(D261).** `openModule` refuses a dirty clone with raw `dirtyPaths`, and that
+count includes the session ledger the framework itself wrote, so pressing
+Start Focused Session or Open Module a second time on a registered session
+refuses. The ledger's own paths are the framework's, not the operator's, and
+the refusal is for the operator's.
+
+**Set-up asks for a remote (D262).** `runSetUpProjectFlow` asks where the
+project goes and what it is called, initialises the repository and runs
+bootstrap, and never asks for a remote or sets an upstream, which the close's
+push and pull-forward both need. One more question at set-up, skippable, and
+what it records is a remote and a tracking branch.
+
+**Steps.** (1) The manifest committed. (2) The ledger out of the dirty count.
+(3) The remote asked for at set-up.
+
+**Tests.** Three: bootstrap run over an untracked manifest commits it and the
+declaration accepts the tree; a clone whose only dirt is the ledger re-opens;
+set-up given a remote records it and the branch tracks it.
+
+**Not releasable.**
+
+### Session 133 of 136: The four papercuts, and the walk's own record closed
+
+**Findings 6, 7, 8 and 9, owed as D263, D264, D265 and D266.** Each is small
+and each was hit by a walk that was not looking for it.
+
+**Troubleshoot runs the prerequisites it lists (D263).** It offers six items
+and none of them is the toolchain both walkthroughs open with: the SDK, git,
+node and `dabbler` itself. It runs those checks and reports what it found,
+which is the one thing a stuck first-time operator most needs and the one
+thing the command does not do.
+
+**`bootstrap --project-dir` names the target's own `.dabbler` (D264).** One
+discovery line reports the working directory's path rather than the project
+directory's, which sends a reader to a file that was never going to be there.
+
+**New Module's boxes are numbered against the number of boxes (D265).** The
+first is titled `1/2` among four, so a person who reads the first title stops
+expecting the third.
+
+**The Maven pack does not print a node deprecation warning (D266).** A
+deprecated shell spawn lands its warning in the middle of the pack's output,
+on Windows and Maven only.
+
+**Steps.** (1) Troubleshoot's prerequisite checks. (2) The three message and
+spawn fixes. (3) `docs/uat/uat-walk-findings.md` records, against each of the
+ten, the session that answered it, so the walk's record closes with the work
+rather than outliving it.
+
+**Tests.** Two, because the rest are strings: Troubleshoot's prerequisite
+check reports a missing tool and a present one; `bootstrap --project-dir`
+names the project directory's `.dabbler` in the discovery line.
+
+**Not releasable.**
+
+### Session 134 of 136: What the verifier is told, and what it can see
 
 **Three sentences that stopped being true in session 100.** The managed
 body's *What comes back*, the scaffolded `dabbler.yaml`'s testing header and
@@ -6991,11 +7115,11 @@ it.
 
 **Not releasable**, and it is the riskiest of the three: it changes the
 evidence every round in every repository is assembled from, and the prompt
-every verifier reads. Holding it unreleased through 132 and 133 buys it two
+every verifier reads. Holding it unreleased through 135 and 136 buys it two
 more sessions of real verification rounds in this repository before a seat
 ever sees it.
 
-### Session 132 of 133: The direct-API verifier can ask for a file
+### Session 135 of 136: The direct-API verifier can ask for a file
 
 **Parity with the seat, which has had this all along.** Across sessions
 100-109 the Copilot verifier read 312 files in 26 rounds, twelve to a round,
@@ -7048,12 +7172,12 @@ finding rate against the seat's 1.30 a session and the blind API path's 0.53.
 Turning it on by default is a separate decision that the measurement, not this
 session, settles.
 
-### Session 133 of 133: Codex leaves the documented surface, and the three land
+### Session 136 of 136: Codex leaves the documented surface, and the block lands
 
 **It cannot be tested here, so it is not claimed.** Codex comes out of the
 engine list in the managed body, the bootstrap templates, the registration
 help and the walkthroughs. It is an authoring engine and never a verification
-path, so nothing in 131 or 132 depends on this and it could run in any order;
+path, so nothing in 134 or 135 depends on this and it could run in any order;
 it runs last because it carries the release.
 
 **What a `--engine codex` registration does is the session's one decision.**
@@ -7076,12 +7200,13 @@ from the docs" and rewrites history has damaged the record to tidy a name.
 **Steps.** (1) The live documented surface, and the engine list the bootstrap
 templates and the CLI help offer. (2) The registration's behaviour, and the
 decision recorded. (3) The version bump (`version.json`, then `npm run
-stamp:version`) and the release notes for all three sessions.
+stamp:version`) and the release notes for sessions 131 to 136.
 
 **Tests.** One: a registration naming the undocumented engine behaves as the
 decision says.
 
-**Releasable**, and it carries 131 and 132 to the seats with it.
+**Releasable**, and it is the block's one release: sessions 131 to 135 reach
+a seat with it and not before.
 Releasability is declared at `start`, before the work, and the close refuses a
 releasable session with no packaging run on its record, so this is the session
 that must be started with it declared.

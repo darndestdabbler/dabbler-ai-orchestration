@@ -120,10 +120,19 @@ anything else after `--` is greeted too.
 
 ## What the operator saw
 
-To be added from the operator's own words: when the session banner
-appeared in the Dabbler terminal, whether each step was printed, whether
-the Work Explorer moved without a refresh, and the verdict on the
-two-window day.
+In the operator's words, after the run: *"steps were not printed at all"*
+— the Dabbler terminal printed no line for any work step, which is session
+126's step 2; and *"I couldn't tell where the Work Explorer's steps were
+updated"* — the person watching could not find the row that was moving,
+which is more than the repaint defect of 126's step 1: the in-flight
+session's current step must be visible without expanding anything, and it
+must be obvious which window's Work Explorer is showing the session at all.
+Asked whether a window per module is a day they want their developers to
+have, the operator's first answer was that the phrase itself was not
+understood; the verdict is open, and session 127's changes — the kind said
+in the terminal, the module marked in the Solution Explorer, one click that
+opens the module's window with its AI in it, no pull to remember — are what
+would make the day legible enough to judge.
 
 ## Exit
 

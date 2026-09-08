@@ -2505,9 +2505,9 @@
     {
       "number": 127,
       "title": "Focused or global \u2014 the plan says which, one click starts it, the framework pulls",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-08T14:38:07.346000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-09-08T15:58:49.863000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

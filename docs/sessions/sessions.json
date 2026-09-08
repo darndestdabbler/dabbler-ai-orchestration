@@ -2353,9 +2353,9 @@
     {
       "number": 119,
       "title": "The sibling a Maven module cannot consume",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-07T20:24:06.947000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-09-07T20:31:30.277000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

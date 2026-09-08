@@ -1,6 +1,58 @@
-# STATUS — sessions 113–130 CLOSED, all VERIFIED: the deployables block, the Java/Maven walk and its nine defects, the suite off the operator's machine, the principle of who owns a command, the policy a module session runs under, the basics the operator saw go wrong, the focused-or-global session the plan decides with one click to start it, and the UAT walk that found ten product defects in the UI path; the plan declares no more sessions; version 2.0.14
+# STATUS — sessions 113–130 CLOSED, all VERIFIED: the deployables block, the Java/Maven walk and its nine defects, the suite off the operator's machine, the principle of who owns a command, the policy a module session runs under, the basics the operator saw go wrong, the focused-or-global session the plan decides with one click to start it, the UAT walk that found ten product defects in the UI path, and sessions 131–132 answering six of those ten; sessions 133–136 are planned; version 2.0.14
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
+
+> ## SESSION 132 CLOSED, 2026-09-08 — the rest of the first-run path
+>
+> | session | what | state |
+> | --- | --- | --- |
+> | 132 | D259, D261 and D262: the manifest committed, the ledger out of the dirty count, the remote asked for at set-up | CLOSED VERIFIED (round 2; round 1's one blocking finding was WRONG and was disputed — see below), landed `ff9c8f9f`, closed `63911a52` |
+>
+> **What landed.** (1) `bootstrap` adopts an untracked `docs/modules.yaml`
+> into its own commit — the one file it commits without having written it,
+> because it writes that file itself whenever it is absent, and the only way
+> it is missing is that the operator declared their modules first, which is
+> the order both walkthroughs teach. A *tracked* manifest with edits is left
+> alone: that is somebody's work. The count in the printed line still counts
+> only what bootstrap wrote; the adopted file is named beside it. (2) The
+> focused checkout's dirty refusal is now `materialPaths`, so it counts the
+> operator's work and not the framework's record — the second press of Start
+> Focused Session used to refuse over `docs/sessions/sessions.json`, which is
+> the one file a person is told never to touch. (3) `dabbler bootstrap
+> --remote <url>` records `origin` and pushes the branch with an upstream,
+> and Set Up New Project asks for it once, skippably, through the
+> `SetUpProjectUi` seam.
+>
+> **Where `materialPaths` lives now, and why it moved.** It is in
+> `checks.ts`, with `parsePorcelain`, `unquotePorcelainPath`,
+> `isSetBookkeeping` and `WorktreeGateOptions`. `checkout.ts` importing
+> `gates.ts` closes the knot `checkout → gates → exposure → checkout`, which
+> the boundary control refuses, and a second copy of the rule inside the
+> checkout is the one thing that would make the two disagree. `checks.ts` is
+> the only module both sides already import that is legal in both
+> directions — it holds `isFrameworkInstalledPath` and `selectTests` beside
+> it, which are the same kind of judgement about a changed path. The close's
+> own judges (`judgeWorktree`, `materialWorktreeChanges`, `readWorktreeFacts`,
+> `hookRemovedFor`, `readWorktreeStatus`) stayed in `gates.ts`. The
+> `dabbler.yaml` selection rule for `checks.ts` gained the two walkthroughs
+> that now prove it.
+>
+> **The round-1 finding was false, and disputing it was right.** It claimed
+> the new `--remote` walkthrough calls `bootstrapVerb` on a folder that is
+> not a repository, so the test could never reach what it asserts. Bootstrap
+> initialises one itself (`cli/bootstrap.ts:219-234`), and the file's own
+> first test has relied on that since it was written. The dispute cited both,
+> plus the bare repository the new test creates being the push TARGET beside
+> the project rather than the project's own repository. Round 2 withdrew it
+> and returned VERIFIED with no findings. **Both rounds ran on `--transport
+> api`, not the Copilot seat**, which session 131 used: `local-overrides.yaml`
+> asks for `api` and a persisted `DABBLER_TRANSPORT=copilot-cli` outranks it,
+> so the flag is how the operator's own documented choice is honoured.
+>
+> **Still owed from session 130's walk:** D263–D266 are session 133 (the four
+> papercuts, and `docs/uat/uat-walk-findings.md` closed against each of the
+> ten). The .NET root solution file — the other half of D267, session 131's
+> owed item — is still unwritten.
 
 > ## SESSION 131 CLOSED, 2026-09-08 — the three that stop a first-time operator
 >

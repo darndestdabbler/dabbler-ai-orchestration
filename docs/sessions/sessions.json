@@ -2465,9 +2465,9 @@
     {
       "number": 125,
       "title": "The policy \u2014 what a module session may touch, written once",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-08T08:51:58.853000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-09-08T09:30:18.268000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

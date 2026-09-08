@@ -6202,3 +6202,65 @@ so the artefact is the same bytes.
 pack of a Maven module runs the parent deploy as well as the module's own,
 with the same version and the same file repository, and a .NET pack runs
 exactly one command, as it does today.
+
+### Session 120 of 120: What a focused checkout unavoidably holds
+
+Walking the last of step 10 — the `app` module, in the focused checkout a
+module session is meant to run in — the close refused:
+
+```
+- exposure_within_ceiling  FAIL  module 'model' has 1603 byte(s) of implementation
+    in this checkout under no recorded grant; module 'store' has 1223 byte(s) ...
+```
+
+What the clone actually held of those siblings:
+
+```
+modules/model/pom.xml          modules/store/pom.xml
+modules/model/.flattened-pom.xml
+modules/model/contract/README.md   modules/store/contract/README.md
+```
+
+No source at all. Three kinds of file, and the manifest counts all three:
+
+1. **The sibling's build file.** Git's sparse checkout is in CONE mode, and
+   cone mode materialises every file directly under a directory it keeps —
+   so asking for `modules/model/contract/` brings `modules/model/pom.xml`
+   with it, whether anybody wanted it or not. A POM is a manifest, not
+   implementation: it names an artifact and its dependencies, which the
+   contract already says out loud.
+2. **Build output.** `.flattened-pom.xml` is written by the flatten plugin
+   for every module in the reactor when the run of record builds at the
+   root. Session 117 taught the scaffold to ignore it; the exposure
+   manifest measures bytes on disk and counts it anyway.
+3. **The contract folder**, which is already excluded and stays so.
+
+**So no Maven module session can close from a focused checkout either** —
+the gate refuses the very checkout the design says to work in, for files
+the checkout cannot avoid holding. The .NET side is the same shape (cone
+mode brings a sibling's `.csproj`), and the POC never met it because it
+never ran a session in a clone.
+
+**The fix.** `siblingBytes` measures a sibling's SOURCE: it keeps skipping
+the contract folder, and now also skips the ecosystem's build files (the
+seam already knows what a project file is) and anything the repository
+ignores (git answers `check-ignore`, so `target/`, `bin/`, `obj/` and
+`.flattened-pom.xml` stop counting the moment the scaffold's rules are in
+place). What remains is what the gate was written for: a sibling's actual
+implementation, present because somebody widened the cone.
+
+**And the walkthrough is corrected**, because this walk proved its flow
+wrong twice over. A module session in a multi-module solution starts as
+`dabbler session start --sessions-dir docs/sessions --module <slug>`, which
+makes the focused clone and registers the session inside it; `dabbler module
+open` is the manual way to look at one. A session started in the full
+checkout cannot close once a sibling has source: the exposure gate refuses,
+and no grant can help, because a grant widens a focused clone and the full
+checkout is not one. Step 6 gains that, and step 8 becomes the check on the
+checkout the session is already running in.
+
+**Tests.** Two in `packages/router/test/exposure.test.ts`: a sibling
+represented in the checkout by its POM, its flattened build output and its
+contract page exposes zero bytes, and a sibling with one source file under
+its code roots still exposes exactly that file. The walkthrough correction
+is checked as the others are, by a script that reads the document.

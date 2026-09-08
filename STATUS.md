@@ -1,6 +1,102 @@
-# STATUS — sessions 113–126 CLOSED, all VERIFIED: the deployables block, the Java/Maven walk and its nine defects, the suite off the operator's machine, the principle of who owns a command, the policy a module session runs under, and the basics the operator saw go wrong (the repaint reproduced and fixed, the terminal that tells you, the cap back, no hooks); 127 next; version 2.0.14
+# STATUS — sessions 113–127 CLOSED, all VERIFIED: the deployables block, the Java/Maven walk and its nine defects, the suite off the operator's machine, the principle of who owns a command, the policy a module session runs under, the basics the operator saw go wrong, and the focused-or-global session the plan decides with one click to start it; 130 next (128 and 129 cancelled, folded into 127); version 2.0.14
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
+
+> ## SESSION 127 CLOSED, 2026-09-08 — focused or global, the plan says which; one click starts it; the framework pulls
+>
+> | session | what | state |
+> | --- | --- | --- |
+> | 127 | focused or global from the plan, the module folder kept, the one-click start, the Solution Explorer's mark, suites owned by roots, the overlay and the decision function gone, five papercuts | CLOSED VERIFIED (round 2, gpt-5-6-terra over `--transport api`; round 1 found three blocking defects, all fixed), landed 8a3e1210, closed 8b91efb6 |
+>
+> **The kind, from the plan.** `extractSessionKindsFromPlan` reads the first
+> `Module: <slug>` or `Scope: whole repository` line under each session's
+> heading; every projection row carries `kind` and `module` (from the row's
+> checkout where it has one, else the plan), the repository carries
+> `checkoutModule`, and the Work Explorer's yet-to-run rows say `focused:
+> persister` or `global`. `judgeSessionKind` in `session.ts` decides a start:
+> focused when the solution is multi and the plan names one module, global
+> otherwise; `--focused` / `--global` override it (on `start` and `drive`);
+> `--module` must agree with the plan, and against an explicit `Scope: whole
+> repository` it needs `--focused` beside it (round 1's finding); a start in
+> another module's folder, or a global start in any module's folder, is
+> refused by name and the extension withholds Start Session there. A global
+> session in a multi-module solution writes no exposure manifest and no
+> policy, its declaration names any declared modules or none
+> (`judgeModulesForShape` has a global case), and the exposure gate skips
+> saying so. **The walkthrough now starts session 1 from the plan alone.**
+>
+> **The folder kept.** `EXISTING_CLONE = "reset"`: a clean clone is fetched
+> and reset, a dirty one refused naming its paths, and nothing is ever
+> deleted (a window holds it). The clone's marker records the repository it
+> was opened from; `close` in a clone pulls that repository forward after
+> its push (`pullRepositoryForward`: clean tree pulls `--ff-only`, otherwise
+> one line naming `git -C <repository> pull --ff-only`), and a fresh
+> registration pulls its own checkout first when it has an upstream and a
+> clean tree. `docs/design/module-checkout-preflight.md`'s decision section
+> now says why the folder is kept.
+>
+> **One click.** In the repository's window, Start Session (and Start
+> Unattended Session) with a focused next session, or **Start Focused
+> Session** on the one module row the plan names (`;next-session`), pick the
+> engine and model, run `module open` in-process, write
+> `.dabbler/start-request.json` in the clone and open its window; a window
+> activating on a request under ten minutes old runs the start with those
+> choices, so the AI's terminal opens with the sentence typed. In the module's
+> own folder the same button opens the AI there. **Resume Session** on the
+> in-flight row shows the engine's terminal by name or opens `Session NNN`
+> running `dabbler session run`.
+>
+> **The mark.** `project()` adds `inSession` per module (the in-progress row's
+> checkout, else its declared modules, else the module-session marker in the
+> repository); `start` and `close` rewrite the projection; the module row
+> leads with `● session N` in the milestone blue with `;active`; the
+> repository window's Work Explorer row says `focused session NNN running in
+> <folder>` from the marker; the Solution Explorer watches `sessions.json`
+> and the marker.
+>
+> **Suites and folders.** A suite with no `module:` whose covers and test
+> roots all lie under one module's roots or shared files is that module's.
+> In a focused folder a reached suite of another module whose test roots hold
+> no test file is skipped (`run-of-record-skipped reason=tests-not-on-disk`),
+> recorded as an advisory `run-of-record-owed/s<N>/<suite>` decision carrying
+> `module`, and the freshness gate does not demand it while the decision is
+> open **or answered with the owed choice** (round 1's finding: accepting the
+> recommendation used to hand the deadlock back).
+>
+> **Gone.** The debug grant and its overlay (`layDebugGrants`, `writeOverlay`,
+> `OVERLAY_TARGETS`, the targets import line, `--debug`, the pack callbacks,
+> Widen for Debugging); the policy's decision half (`protected`, `writable`,
+> `destructive`, `decide`, `SELF_GRANT_VERB`); `judgeExposure`'s sibling-bytes
+> refusal, now `siblingBytes` lines on the close manifest said beside the
+> gate. The grant brief ends with the permanent form (add the sibling's root
+> to `sharedFiles`), and `checkoutCone` keeps a directory-shaped shared entry
+> whole. The managed body's Hard rules gained the bullet: siblings are here as
+> packages and contract folders; ask with `--request-grant`; `session cancel
+> --force` is a person's verb.
+>
+> **Papercuts.** `repairedPaths` filters rebaseline's list; an engine's
+> `cancel --force` (told by `DABBLER_DRIVEN` or `CLAUDECODE` in the
+> environment, `callerIsEngine`) is **refused** with the person's way named
+> (round 1's finding: recording it as a decision still cancelled); `start`
+> records `hookRemoved` on the row's orchestrator block and the before-work
+> exemption for `.claude/settings.json` holds only then; the terminal's
+> step-line dedup resets per session; bootstrap's removal has its test.
+>
+> **Numbers.** Run of record: typescript 1148 pass, 4 skipped, 179 s at
+> `--test-concurrency=4`; extension 221 pass. Verification: two rounds, about
+> twelve minutes end to end. The router dist and the extension bundle are
+> rebuilt from the landed tree; the installed VSIX is still 2.0.14 without
+> these changes, no version bump until the block ships.
+>
+> **Traps met.** The suite runs under Claude Code with `CLAUDECODE` set, so a
+> test of an engine-only refusal must pin the environment (the CLI cancel
+> test does). A `python - || node -e` chain in Git Bash hands stdin to a
+> Python REPL shim and runs nothing: edit files with the editing tools.
+>
+> **Owed.** Nothing from round 2 (no findings). Still standing from earlier:
+> the operator's UAT walk is session 130 (the UAT that tests the UI), which
+> now walks Start Focused Session, Resume Session and the kept folder.
+> **Next to start: 130.**
 
 > ## SESSION 126 CLOSED, 2026-09-08 — it just works: the repaint reproduced then fixed, the terminal that tells you, the cap back at no cost, and no hooks
 >

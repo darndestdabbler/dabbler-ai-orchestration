@@ -37,6 +37,7 @@ import {
 import type { Row } from "../ledger.ts";
 import { readSessionState } from "../progress.ts";
 import { packModule } from "../packages.ts";
+import { commitBeforeDeclaring, undeclaredSessionInFlight } from "../writers.ts";
 import { writeErr, writeOut } from "./output.ts";
 
 const EXIT_OK = 0;
@@ -197,6 +198,9 @@ function run(argv: string[]): number {
   // that stops being refused without the gap being closed. So: act, and only
   // then write the row that stops the gate refusing.
   let acted = "";
+  // Whether the answer wrote the tracked project config, which decides
+  // whether the undeclared-session sentence applies.
+  let wroteProjectConfig = false;
   const declaresSuite =
     (id === ID_TESTING_SUITES || id === ID_TESTING_SUITES_NOW_TESTS_EXIST) &&
     choice === "declare";
@@ -215,6 +219,7 @@ function run(argv: string[]): number {
     // were added to one that stood, or the suite was already declared and
     // this call left it exactly as it was rather than writing a second copy
     // of it -- which is what answering twice used to do.
+    wroteProjectConfig = written.created || written.added.length > 0;
     acted = written.created
       ? `wrote ${PROJECT_CONFIG_FILENAME} declaring ${written.added.join(", ")}`
       : written.added.length > 0
@@ -289,6 +294,9 @@ function run(argv: string[]): number {
           );
           return EXIT_REFUSED;
         }
+        // The packaging pair writes the same tracked file the suite answer
+        // does, so it lands in the same window.
+        wroteProjectConfig = true;
         acted = written;
       }
     }
@@ -363,6 +371,16 @@ function run(argv: string[]): number {
       "Check the command it declares before the next run of record -- a " +
         "detected command is a reading of the repository, not a promise.\n",
     );
+    // These two answers write dabbler.yaml, which is tracked, and `session
+    // start` raises the suite decision -- so the ordinary way to answer it
+    // is inside the window where the declaration refuses a tree carrying
+    // changes. Say so, as bootstrap does; a grant writes only under the
+    // ignored .dabbler/ and the remote answer writes git config, so
+    // neither reaches this line.
+    const undeclared = wroteProjectConfig ? undeclaredSessionInFlight(sessionsDir) : null;
+    if (undeclared !== null) {
+      writeOut(`owed: ${commitBeforeDeclaring(undeclared, PROJECT_CONFIG_FILENAME)}\n`);
+    }
     return EXIT_OK;
   }
   writeOut(

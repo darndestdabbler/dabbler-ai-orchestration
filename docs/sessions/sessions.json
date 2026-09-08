@@ -2312,7 +2312,7 @@
     },
     {
       "number": 117,
-      "title": "Session 117",
+      "title": "The ignore rule that never fires",
       "status": "complete",
       "startedAt": "2026-09-07T15:53:19.353000-04:00",
       "completedAt": "2026-09-07T16:03:21.150000-04:00",
@@ -2322,9 +2322,29 @@
         "identityProvenance": "direct"
       },
       "verificationVerdict": "VERIFIED",
-      "frameworkVersion": "2.0.12",
       "verification": {
         "rounds": 2,
+        "verifierModel": "gpt-5-6-terra",
+        "verifierProvider": "openai",
+        "transport": "api"
+      },
+      "frameworkVersion": "2.0.12"
+    },
+    {
+      "number": 118,
+      "title": "What the framework writes before a session declares",
+      "status": "in-progress",
+      "startedAt": "2026-09-07T20:10:27.526000-04:00",
+      "completedAt": null,
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": "VERIFIED",
+      "frameworkVersion": "2.0.12",
+      "verification": {
+        "rounds": 1,
         "verifierModel": "gpt-5-6-terra",
         "verifierProvider": "openai",
         "transport": "api"

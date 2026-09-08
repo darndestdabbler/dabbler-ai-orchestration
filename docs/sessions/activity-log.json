@@ -10511,6 +10511,13 @@
       "dateTime": "2026-09-07T15:54:13.635000-04:00",
       "task": "Make session 115's Maven ignore rules reach the flow they were written for. Re-walking the corrected walkthrough on the router built from session 116 showed the fix never fires: the walkthrough now runs `dabbler bootstrap` first (which is session 116's own correction), bootstrap writes .gitignore carrying its .dabbler/ rule, and rootFilesMaven's writeIfAbsent then skips the file -- so target/ and .flattened-pom.xml stay untracked inside the module's code root and the same tree still packs to a new dev version every time (measured: 0.1.0-dev.20260907.1.ga6aac5f, then .2.g6bf2ac2). A .gitignore is a list of independent rules with no owner, not a document this framework authors, so the scaffold ensures the rules the way ensureGitignore already does for bootstrap's own: append what is missing, leave an equivalent rule alone, create the file only when there is none.",
       "releasable": false
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 118,
+      "dateTime": "2026-09-07T20:10:59.395000-04:00",
+      "task": "Say what the framework's own writes mean for a session that has not declared yet, wherever the framework makes them. Session 116 fixed this for dabbler bootstrap; the walk of 2026-09-07 fell into the same hole one verb over, because `dabbler session start` raises the testing-suites decision and answering it writes the tracked dabbler.yaml, after which the declaration refuses the dirty tree with nothing having warned that it would. The predicate bootstrap grew inline -- a session is in flight and has not declared its task -- and the sentence that follows from it move to writers.ts beside readTaskDeclaration and declareSessionTask, which already own what a declaration is; bootstrap reads them instead of its own copy, and `dabbler owed answer` reads them after an answer that wrote a tracked file (the suite declaration and the packaging pair, not a grant and not the git remote). No new gate and no framework commit: the declaration's refusal is right, and session 94 settled that the framework does not commit mid-session.",
+      "releasable": false
     }
   ]
 }

@@ -30,6 +30,7 @@ import {
   SanctionedWriteError,
   appendDecision,
   buildOrchestratorBlock,
+  commitBeforeDeclaring,
   declareSessionTask,
   planStepKey,
   recordProjectPlan,
@@ -37,6 +38,7 @@ import {
   renderDecisionsLog,
   renderProjectWorkPlan,
   stateAfterStart,
+  undeclaredSessionInFlight,
 } from "../src/writers.ts";
 import { gitAnswers, seed, tempDir } from "./support/answers.ts";
 
@@ -356,5 +358,30 @@ describe("declaring a session's task list", () => {
       () => declareSessionTask(sessionsDir, { sessionNumber: 1, task: "Do it.", releasable: true }),
       /already carries 1 change/,
     );
+  });
+});
+
+describe("the window before a session declares", () => {
+  it("names the undeclared session in flight, and nothing once it has declared", () => {
+    // The window in which the framework's own writes are the operator's to
+    // commit: `dabbler bootstrap` writes into it, and so does answering the
+    // testing-suites decision `session start` itself raised. Both have to
+    // say so, because the declaration refuses a tree carrying changes and
+    // the same refusal twice is a deadlock.
+    const { sessionsDir } = makeSessionsDir();
+    assert.equal(undeclaredSessionInFlight(sessionsDir), null);
+
+    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
+    assert.equal(undeclaredSessionInFlight(sessionsDir), 1);
+
+    declareSessionTask(sessionsDir, { sessionNumber: 1, task: "Do it.", releasable: false });
+    assert.equal(undeclaredSessionInFlight(sessionsDir), null);
+  });
+
+  it("says why the declaration is about to refuse, and the commit that clears it", () => {
+    const sentence = commitBeforeDeclaring(1, "them");
+    assert.match(sentence, /session 001 is in flight and has not declared its task yet/);
+    assert.match(sentence, /refused while the tree carries changes/);
+    assert.match(sentence, /git add -A && git commit -m/);
   });
 });

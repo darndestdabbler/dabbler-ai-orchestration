@@ -11,6 +11,7 @@ import { join } from "node:path";
 import { afterEach, describe, it } from "node:test";
 
 import { bootstrapVerb } from "../src/cli/bootstrap.ts";
+import { owedVerb } from "../src/cli/owed.ts";
 import {
   MANAGED_END,
   MANAGED_START,
@@ -32,9 +33,11 @@ import {
 import { TRANSPORT_COPILOT_CLI, TRANSPORT_ENV_VAR } from "../src/config.ts";
 import {
   ID_GIT_REMOTE,
+  ID_TESTING_SUITES,
   blockingDecisions,
   openDecisions,
   raiseRemoteDecision,
+  refreshOwedDecisions,
 } from "../src/owedDecisions.ts";
 import { capture } from "../src/output.ts";
 import { solutionShape } from "../src/modules.ts";
@@ -569,5 +572,36 @@ describe("what the Solution Explorer has to render", () => {
     const repo = emptyRepo();
     await bootstrapVerb(["--project-dir", repo, "--no-transport-detect"]);
     assert.ok(existsSync(join(repo, ".dabbler", "solution", "projection.json")));
+  });
+});
+
+describe("answering a decision that writes the project config", () => {
+  it("names the commit while the session has not declared, and says nothing once it has", async () => {
+    // `session start` raises testing-suites, and the recommended answer
+    // writes the tracked dabbler.yaml -- inside the window where the
+    // declaration refuses a tree carrying changes. The Java walk of
+    // 2026-09-07 met exactly that, one verb over from the bootstrap case
+    // session 116 fixed.
+    const { repo, sessionsDir } = makeAnsweredSandbox({ "pom.xml": "<project/>\n" });
+    registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
+    refreshOwedDecisions(repo, { ecosystems: ["maven"], hasExpensiveSuite: false, configFilename: "dabbler.yaml" });
+    const undeclared = await capture(() =>
+      owedVerb(["answer", "--sessions-dir", sessionsDir, "--id", ID_TESTING_SUITES, "--choice", "declare"]),
+    );
+    assert.equal(undeclared.value, 0, undeclared.stderr);
+    assert.match(undeclared.stdout, /has not declared its task yet/);
+    assert.match(undeclared.stdout, /git add -A && git commit/);
+
+    // Declared: the land commits what the session touched, and there is
+    // nothing to warn about.
+    const second = makeAnsweredSandbox({ "pom.xml": "<project/>\n" });
+    registerSessionStart(second.sessionsDir, 1, { engine: "claude-code" });
+    declareSessionTask(second.sessionsDir, { sessionNumber: 1, task: "the work", releasable: false });
+    refreshOwedDecisions(second.repo, { ecosystems: ["maven"], hasExpensiveSuite: false, configFilename: "dabbler.yaml" });
+    const declared = await capture(() =>
+      owedVerb(["answer", "--sessions-dir", second.sessionsDir, "--id", ID_TESTING_SUITES, "--choice", "declare"]),
+    );
+    assert.equal(declared.value, 0, declared.stderr);
+    assert.doesNotMatch(declared.stdout, /has not declared its task yet/);
   });
 });

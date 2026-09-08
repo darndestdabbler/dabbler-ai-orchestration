@@ -154,7 +154,8 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 114 | The deployables block, built | no | 2026-09-07 |
 | 115 | What the Java walk found — a Maven module session that can close | no | 2026-09-07 |
 | 116 | What the Java walk found — the first ten minutes | no | 2026-09-07 |
-| 117 | Session 117 | no | 2026-09-07 |
+| 117 | The ignore rule that never fires | no | 2026-09-07 |
+| 118 | What the framework writes before a session declares | no | 2026-09-07 |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -2030,8 +2031,14 @@ Fix the three defects the Java/Maven walk measured on 2026-09-07, none of which 
 
 Fix the four things the Java/Maven walk hit before a line of code was written, and correct the two UAT documents where the walk proved them wrong. (1) The driver's plan instruction lists the members a work plan carries and never mentions `modules`, which driver.ts refuses the declaration without in a multi-module solution -- so an engine following the instruction it was given is refused every time, and a second identical refusal is a deadlock. (2) `dabbler bootstrap` run while a session is in flight but undeclared says its files are left for the land to commit; the declaration then refuses the dirty tree, twice, which is a deadlock -- before the declaration the operator is who commits them, and the message must say so. (3) The recommended answer to the testing-suites decision could not be taken in a repository with no dabbler.yaml (it refused, naming two causes and not the real one), and once bootstrap had written the file WITH a maven suite in it, answering again appended a second identical suite. (4) The documents: neither says to run `dabbler bootstrap`, the .NET one tells the reader to hand-write a state file the router owns, and the Java one has the reader write Item.java two steps before the session whose plan says to write it -- which cost that session a blocking Major and a dispute.
 
-### Session 117 — Session 117
+### Session 117 — The ignore rule that never fires
 
 **Releasable: no.**
 
 Make session 115's Maven ignore rules reach the flow they were written for. Re-walking the corrected walkthrough on the router built from session 116 showed the fix never fires: the walkthrough now runs `dabbler bootstrap` first (which is session 116's own correction), bootstrap writes .gitignore carrying its .dabbler/ rule, and rootFilesMaven's writeIfAbsent then skips the file -- so target/ and .flattened-pom.xml stay untracked inside the module's code root and the same tree still packs to a new dev version every time (measured: 0.1.0-dev.20260907.1.ga6aac5f, then .2.g6bf2ac2). A .gitignore is a list of independent rules with no owner, not a document this framework authors, so the scaffold ensures the rules the way ensureGitignore already does for bootstrap's own: append what is missing, leave an equivalent rule alone, create the file only when there is none.
+
+### Session 118 — What the framework writes before a session declares
+
+**Releasable: no.**
+
+Say what the framework's own writes mean for a session that has not declared yet, wherever the framework makes them. Session 116 fixed this for dabbler bootstrap; the walk of 2026-09-07 fell into the same hole one verb over, because `dabbler session start` raises the testing-suites decision and answering it writes the tracked dabbler.yaml, after which the declaration refuses the dirty tree with nothing having warned that it would. The predicate bootstrap grew inline -- a session is in flight and has not declared its task -- and the sentence that follows from it move to writers.ts beside readTaskDeclaration and declareSessionTask, which already own what a declaration is; bootstrap reads them instead of its own copy, and `dabbler owed answer` reads them after an answer that wrote a tracked file (the suite declaration and the packaging pair, not a grant and not the git remote). No new gate and no framework commit: the declaration's refusal is right, and session 94 settled that the framework does not commit mid-session.

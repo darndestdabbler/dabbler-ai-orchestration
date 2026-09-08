@@ -42,6 +42,7 @@ import {
   isRecord,
   pythonRepr,
   readRawSessionState,
+  sessionDisplayNumber,
   sessionHasHistory,
 } from "./progress.ts";
 import { dumps } from "./pythonJson.ts";
@@ -900,6 +901,47 @@ export function readTaskDeclaration(
     if (entry["sessionNumber"] === sessionNumber) return entry;
   }
   return null;
+}
+
+/**
+ * The session in flight that has not declared its task, or null.
+ *
+ * The window in which the framework's own writes are the operator's to
+ * commit. A declaration is refused while the tree carries changes -- work
+ * declared after the fact is a model deciding in hindsight what may be
+ * published -- and the same refusal a second time is a deadlock, so a verb
+ * that writes a tracked file in this window has to say so. After the
+ * declaration the land commits everything, and this answers null.
+ */
+export function undeclaredSessionInFlight(sessionsDir: string): number | null {
+  let state: Record<string, unknown> | null;
+  try {
+    state = readRawSessionState(sessionsDir);
+  } catch {
+    return null;
+  }
+  const rows = Array.isArray(state?.["sessions"])
+    ? (state?.["sessions"] as Array<Record<string, unknown>>)
+    : [];
+  const open = rows.find((row) => canonicalizeStatus(row["status"]) === STATUS_IN_PROGRESS);
+  if (open === undefined) return null;
+  const number = Number(open["number"]);
+  if (!Number.isInteger(number)) return null;
+  return readTaskDeclaration(sessionsDir, number) === null ? number : null;
+}
+
+/**
+ * What to say when the framework has just written a tracked file into that
+ * window: why the declaration is about to refuse, and the commit that
+ * clears it. The framework does not make that commit itself -- session 94
+ * settled that -- so the sentence is the whole of the help it can give.
+ */
+export function commitBeforeDeclaring(session: number, what: string): string {
+  return (
+    `session ${sessionDisplayNumber(session)} is in flight and has not declared its task yet, ` +
+    "and a declaration is refused while the tree carries changes. Commit " +
+    `${what} first:\n  git add -A && git commit -m "Bootstrap: the framework's own files"`
+  );
 }
 
 /**

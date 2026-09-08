@@ -1,14 +1,1 @@
-{
-  "hooks": {
-    "Stop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "dabbler session hook-stop --sessions-dir docs/sessions"
-          }
-        ]
-      }
-    ]
-  }
-}
+{}

@@ -524,10 +524,11 @@ export function parseRevListCount(text: string): number {
 export interface WorktreeGateOptions {
   /**
    * The question is "has the work begun?" (the task declaration), asked
-   * right after a registration: an UNTRACKED stop-gate file is then the
-   * registration's own install, not work. The close never passes this --
-   * it asks "is everything committed?", and the hook file counts there
-   * like any other, install or edit.
+   * right after a registration: `.claude/settings.json` is then the
+   * registration's own doing -- once the install of a Stop hook, now its
+   * removal, which edits a tracked file -- and not work. The close never
+   * passes this: it asks "is everything committed?", and the file counts
+   * there like any other, however it got there.
    */
   readonly beforeWork?: boolean;
 }
@@ -554,8 +555,8 @@ export function materialPaths(
     if (isMachineStatePath(path)) {
       continue; // the run ledger is the record, not the work
     }
-    if (options.beforeWork && entry.code === "??" && isFrameworkInstalledPath(path)) {
-      continue; // the registration's own install, not work; the land commits it
+    if (options.beforeWork && isFrameworkInstalledPath(path)) {
+      continue; // the registration's own edit to the hook file, not work; the land commits it
     }
     blocking.push(path);
   }

@@ -171,6 +171,23 @@ test("a work step's row moves on the driver/run.json watcher, not the 30-second 
   await expectFileIcon(treeRow(pane, "Smooth the edges"), "in-progress.svg");
 });
 
+test("a step added to the plan appears on the driver/plan.json watcher, not the 30-second poll", async () => {
+  // The plan step's report writes driver/plan.json and nothing else, so the
+  // Work row's nested steps have no other event to arrive on. Measured
+  // before plan.json was watched (session 126): the steps waited for the
+  // next record write, ten seconds later, or for the poll.
+  writeDriverWorkPlan(workspace, 3, {
+    task: "Build the thing.",
+    releasable: false,
+    steps: [
+      { id: "build-the-widget", ask: "Build the widget." },
+      { id: "smooth-the-edges", ask: "Smooth the edges." },
+      { id: "paint-it", ask: "Paint it." },
+    ],
+  });
+  await expect(treeRow(pane, "Paint it")).toBeVisible({ timeout: 5_000 });
+});
+
 test("clicking a session row opens the session plan in the editor", async () => {
   await treeRow(pane, "003 · Build the thing").click();
   const tab = vscode.page

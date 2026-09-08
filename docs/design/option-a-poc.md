@@ -140,3 +140,63 @@ Two sessions closed VERIFIED in their module folders, one round each, the
 program printing the greeting from the main folder after the pull. The
 design held; what did not hold was around it, and every item above is on
 session 126's or 127's list.
+
+## Session 126: the repaint, reproduced
+
+Session 126's plan refused a fix without a reproduction, and named a
+suspect: `ProjectionCache.get` caching a failed projection under the same
+key as a good one. Two harnesses ran on 2026-09-08, both in the scratch
+directory and neither in the tree, against a disposable repository made by
+`dabbler bootstrap` and driven with the real router through `session
+start`, the plan step, its report, and three work steps -- the sequence a
+chat-driven session writes.
+
+**The first stood where `extension.ts` stands**: the extension's own
+`ProjectionCache` over the in-process router, `projectionCacheKey` as its
+key, a raw recursive `fs.watch` filtered to the file names the extension's
+three patterns match, and on every event what `treeProvider.refresh()`
+does. After every router call it compared a soft refresh (what the 30 s
+backstop poll renders) with a fresh projection over the same files. Seven
+scans; every comparison agreed; the key moved on every record write. The
+suspect was not seen, and the cache is sound.
+
+**The second was VS Code itself**, launched through the Layer 3 harness
+with the extension on the same repository, the Work Explorer open and every
+row expanded, every rendered row's text and icon sampled twice a second
+while this process drove the router:
+
+| record write | the tree moved after |
+|---|---|
+| `session start` (sessions.json) | 60 ms |
+| `next`, plan step issued (run.json) | nothing to show; nothing changed |
+| the plan report (**driver/plan.json only**) | **not at all** -- the Work row's three steps were absent for the 10.3 s until the next `next` |
+| `next`, step one issued (run.json, activity-log.json) | 6 ms -- and the steps appeared with it |
+| `next`, step two issued (run.json) | 514 ms |
+| `next`, step three issued (run.json) | 522 ms |
+
+**The cause seen.** A plan report writes `driver/plan.json` and nothing
+else. The file was in the cache key -- the key moved, and the poll would
+have re-derived -- but the watcher patterns named `*/driver/run.json`
+alone, so no event asked for the repaint, and the steps waited for the
+next record write or for the backstop poll, whichever came first. During a
+chat-driven session the next write is the engine's next `next`, which can
+be a minute of reading and editing away; a person who refreshes by hand
+inside that minute sees the refresh as what fixed it. The fix is the
+pattern: `*/driver/{run.json,plan.json}`, and the Layer 3 spec that proves
+the run.json transition now proves the plan.json one beside it -- run
+against the bundle without the pattern it failed its five-second window,
+and with the pattern the step row arrived in 1.3 s.
+
+**What was ruled out.** `files.watcherExclude` (none set in the user or the
+workspace settings, and the default excludes nothing under `.dabbler`);
+the cache key (moved on every write, in both harnesses); the tree
+provider's scan memo (cleared on every refresh). The suspect -- a failure
+served back under an unchanged key -- was not the cause and is removed
+anyway: its reason, a failing subprocess spawned on every poll, died when
+the router went in-process, and a unit test now holds that a good answer
+after a failed one is what the cache serves.
+
+**Not proven.** That 125's hand refresh came inside a 30 s window the poll
+would have closed on its own. The record says the tree was stale and the
+refresh fixed it, which every path above bounds at thirty seconds; nothing
+measured says it was longer.

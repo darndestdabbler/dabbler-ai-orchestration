@@ -1,5 +1,6 @@
 import * as assert from "assert";
-import { taskRecordInputs } from "../../utils/projection";
+import { ProjectionCache, taskRecordInputs } from "../../utils/projection";
+import type { ProjectionResult } from "../../utils/projection";
 
 suite("projection: taskRecordInputs", () => {
   test("covers driver/run.json and driver/plan.json for every session entry", () => {
@@ -34,5 +35,34 @@ suite("projection: taskRecordInputs", () => {
       taskRecordInputs("/repo", () => []),
       [],
     );
+  });
+});
+
+suite("projection: ProjectionCache", () => {
+  test("a failed projection then a good one under an unchanged key renders the good one", async () => {
+    // Nothing on disk moves between the two calls (the key is built from
+    // files that do not exist, so it is the same string both times); only
+    // the runner's answer changes. The failure must not be what the second
+    // call serves: the router is in-process, a retry costs a read, and a
+    // cached failure would hold the degraded row until some other record
+    // moved the key.
+    const answers: ProjectionResult[] = [
+      { payload: null, error: "the record could not be read" },
+      { payload: { sessions: [] } as never, error: null },
+    ];
+    let calls = 0;
+    const cache = new ProjectionCache(async () => {
+      calls += 1;
+      return answers[Math.min(calls, answers.length) - 1];
+    });
+    const first = await cache.get("/nowhere/docs/sessions", "/nowhere");
+    assert.strictEqual(first.payload, null);
+    const second = await cache.get("/nowhere/docs/sessions", "/nowhere");
+    assert.ok(second.payload, "the good projection was not served");
+    assert.strictEqual(calls, 2);
+    // And the good one IS kept: a third call under the same key is served
+    // from the cache, not re-derived.
+    await cache.get("/nowhere/docs/sessions", "/nowhere");
+    assert.strictEqual(calls, 2);
   });
 });

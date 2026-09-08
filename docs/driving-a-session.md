@@ -306,14 +306,19 @@ call rather than the work — this is exactly how the driver spike died. A
 `wait` gives the engine its turn back and lets it come to the framework
 when it is ready.
 
-Under Claude Code the stop gate `session start` installs for a
-`claude-code` registration holds the turn once a `wait` is past due — `issued_at` plus `retry_after_seconds` — and hands
-back the same sentence it uses for a step: run the `answer_command`. A
-wait not yet due lets the turn end and notes when it is due. The gate
-matters most here: a `wait` is the one instruction that asks the engine to
-carry an obligation across the end of its turn, and one session lost three
-hours to an engine that answered it by polling `run.json` for a field only
-`next` clears.
+Nothing holds the engine's turn for it: there is no hook. What tells a
+person that nothing is answering an instruction is the Dabbler terminal's
+silence watcher — a line once the engine has been quiet over an unmoved
+tree for longer than the threshold, and again at each multiple of it — and
+the Work Explorer's attention row. A `wait` is the one instruction that
+asks the engine to carry an obligation across the end of its turn, and one
+session lost three hours to an engine that answered it by polling
+`run.json` for a field only `next` clears; the answer to that is the
+engine's own bounded loop and a person who can see the silence, not a hook
+that blocks every end of turn in the repository. (`session start` for a
+`claude-code` registration, and `bootstrap` under Claude Code, remove the
+Stop hook an earlier framework installed: a hook whose verb no longer
+exists would block every turn.)
 
 ## Talking to the engine, and stopping the framework
 

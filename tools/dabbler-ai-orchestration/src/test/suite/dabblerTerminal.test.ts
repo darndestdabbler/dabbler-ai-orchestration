@@ -488,6 +488,125 @@ suite("the Dabbler terminal", () => {
   });
 });
 
+suite("the session from its registration, and each step as it starts", () => {
+  /** A repository whose ledger holds one in-progress row and no run record yet. */
+  function registeredRepo(
+    row: Record<string, unknown>,
+  ): { root: string; written: string[]; terminal: DabblerTerminal } {
+    const root = makeTempDir("dabbler-registered-");
+    fs.mkdirSync(path.join(root, "docs", "sessions"), { recursive: true });
+    fs.writeFileSync(
+      path.join(root, "docs", "sessions", "sessions.json"),
+      JSON.stringify({ sessions: [{ number: 7, status: "in-progress", ...row }] }),
+      "utf8",
+    );
+    const written: string[] = [];
+    const terminal = new DabblerTerminal({
+      repoRoot: root,
+      now: () => new Date(2026, 8, 8, 14, 5, 1),
+      pollMs: 60_000,
+    });
+    terminal.onDidWrite((text: string) => written.push(text));
+    return { root, written, terminal };
+  }
+
+  test("says the banner and the kind line from the in-progress ledger row, before any run record, and once", () => {
+    // A focused session: the row carries the checkout `start --module`
+    // wrote, and the policy says what it may touch.
+    const focused = registeredRepo({ checkout: { module: "persister", path: "C:/work/Shop.persister" } });
+    fs.mkdirSync(path.join(focused.root, ".dabbler", "runs", "s7"), { recursive: true });
+    fs.writeFileSync(
+      path.join(focused.root, ".dabbler", "runs", "s7", "policy.json"),
+      JSON.stringify({ allowed: ["modules/persister", "modules/model/contract", "docs"] }),
+      "utf8",
+    );
+    // Wide enough that the kind line is not wrapped under its indent.
+    focused.terminal.open({ columns: 160, rows: 20 });
+    focused.terminal.poll();
+    const said = plain(focused.written.join(""));
+    assert.ok(said.includes("SESSION 007"), said);
+    assert.ok(
+      said.includes("focused module=persister scope=modules/persister, modules/model/contract, docs"),
+      said,
+    );
+    // The run record arriving for the same session adds no second banner.
+    const driver = path.join(focused.root, ".dabbler", "runs", "s7", "driver");
+    fs.mkdirSync(path.join(driver, "jobs"), { recursive: true });
+    writeRun(driver, { session_number: 7, phase: "plan", job: null, stop: null });
+    focused.terminal.poll();
+    const all = plain(focused.written.join(""));
+    assert.strictEqual(all.split("SESSION 007").length - 1, 1, all);
+    assert.strictEqual(all.split("focused module=persister").length - 1, 1, all);
+    focused.terminal.dispose();
+    rmrf(focused.root);
+
+    // A global session: no checkout on the row, and the whole repository.
+    const global = registeredRepo({});
+    global.terminal.open({ columns: 80, rows: 20 });
+    global.terminal.poll();
+    const globalSaid = plain(global.written.join(""));
+    assert.ok(globalSaid.includes("SESSION 007"), globalSaid);
+    assert.ok(globalSaid.includes("global scope=the whole repository"), globalSaid);
+    global.terminal.dispose();
+    rmrf(global.root);
+  });
+
+  test("says a step once when seq moves onto it, a rejection with its first reason, and nothing for a wait", () => {
+    const { root, driver, written, terminal } = drivenRepo({
+      session_number: 62,
+      phase: "steps",
+      seq: 3,
+      job: null,
+      stop: null,
+    });
+    const instruction = (record: Record<string, unknown>) =>
+      fs.writeFileSync(path.join(driver, "instruction.json"), JSON.stringify(record), "utf8");
+    instruction({ kind: "step", seq: 3, session_number: 62, step_id: "widget", ask: "Build the widget. Then paint it." });
+    terminal.open({ columns: 100, rows: 20 });
+    terminal.poll();
+    terminal.poll();
+    const said = () => plain(written.join(""));
+    assert.strictEqual(said().split("step id=widget ask=Build the widget.").length - 1, 1, said());
+
+    instruction({ kind: "rejection", seq: 4, session_number: 62, step_id: "widget", reasons: ["the check failed: exit 1", "and another"] });
+    writeRun(driver, { session_number: 62, phase: "steps", seq: 4, job: null, stop: null });
+    terminal.poll();
+    terminal.poll();
+    assert.strictEqual(said().split("rejected id=widget reason=the check failed: exit 1").length - 1, 1, said());
+
+    instruction({ kind: "wait", seq: 5, session_number: 62, retry_after_seconds: 60 });
+    writeRun(driver, { session_number: 62, phase: "verify", seq: 5, job: null, stop: null });
+    terminal.poll();
+    assert.ok(!said().includes("seq=5"), said());
+    assert.strictEqual(said().split("\r\n").filter((line) => / (step|rejected) /.test(line)).length, 2, said());
+    terminal.dispose();
+    rmrf(root);
+  });
+
+  test("rules the framework's voice with the session number once a session is known, and without one before", () => {
+    const { root, written, terminal } = drivenRepo({ session_number: 62, phase: "plan", job: null, stop: null });
+    terminal.open({ columns: 80, rows: 20 });
+    // Before the first look nothing is known: the opening line is ruled `framework`.
+    const opened = plain(written.join(""));
+    assert.ok(opened.includes("─ framework ─"), opened);
+    assert.ok(!opened.includes("S62"), opened);
+    written.length = 0;
+    terminal.poll();
+    // A job's bytes change the voice, and the framework's next line comes
+    // back under a rule that carries the number.
+    const driver = path.join(root, ".dabbler", "runs", "s62", "driver");
+    fs.writeFileSync(path.join(driver, "jobs", "close.log"), "closing\n", "utf8");
+    terminal.poll();
+    writeRun(driver, { session_number: 62, phase: "verify", job: null, stop: null });
+    terminal.poll();
+    const after = plain(written.join(""));
+    assert.match(after, /─ S62: framework ─/, after);
+    assert.ok(!/─ framework ─/.test(after), after);
+    terminal.dispose();
+    rmrf(root);
+  });
+});
+
 suite("the outline", () => {
   const indent = " ".repeat(HANGING_INDENT);
   const words = (lines: Span[][]) => lines.map((physical) => physical.map((s) => s.text).join(""));
@@ -668,13 +787,14 @@ suite("the first look, and the rule between voices", () => {
     terminal.poll();
     const after = plain(written.join(""));
     assert.match(after, /─ close ─+\r\nclose: pushed 1 round ref\(s\)\r\n/, after);
-    assert.match(after, /─ framework ─+\r\n14:30:05 paused/, after);
+    // The framework's rule carries the session's number once one is known.
+    assert.match(after, /─ S62: framework ─+\r\n14:30:05 paused/, after);
     // An empty line stands before each rule, so the groups have room
     // between them; the one at the very top has nothing above it. The
     // framework's last line had ended its own line, so one CRLF is the
     // empty line before the close rule; the job's bytes had too.
     assert.ok(after.startsWith("\r\n─"), after.slice(0, 40));
-    assert.match(after, /ref\(s\)\r\n\r\n─+ framework ─/, after);
+    assert.match(after, /ref\(s\)\r\n\r\n─+ S62: framework ─/, after);
     assert.ok(said.startsWith("─"), said.slice(0, 40));
     // The rule spans the terminal's width, one column short, and follows it
     // through a resize because it is drawn again with everything else.

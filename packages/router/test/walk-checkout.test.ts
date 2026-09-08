@@ -199,8 +199,8 @@ describe("a grant, and its revoke", () => {
     assert.match(overlay, /<PackageReference Remove="CsvModel" \/>/);
     assert.match(overlay, /<ProjectReference Include="\$\(MSBuildThisFileDirectory\)\.\.\/modules\/model\/src\/CsvModel\/CsvModel\.csproj" \/>/);
     // The overlay is machine state under .dabbler/, excluded in the clone;
-    // what status shows is the session's own registration (its ledger and
-    // the engine's stop gate), never the overlay.
+    // what status shows is the session's own registration (its ledger),
+    // never the overlay.
     assert.doesNotMatch(gitOut(clone, "status", "--porcelain"), /\.dabbler|overlay/);
     const exposure = readExposure(clone, 1);
     assert.ok((exposure?.siblings[0]?.bytes ?? 0) > 0);

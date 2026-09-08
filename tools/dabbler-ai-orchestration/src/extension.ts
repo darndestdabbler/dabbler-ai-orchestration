@@ -172,8 +172,14 @@ export function activate(context: vscode.ExtensionContext): void {
           "*/{step-execution.jsonl,approved-plan.json,rounds.jsonl}",
         ),
         // A driven session's stop lands on run.json and is the attention
-        // row; a step being accepted moves the same file.
-        new vscode.RelativePattern(path.join(root, RUNS_REL), "*/driver/run.json"),
+        // row; a step being accepted moves the same file. plan.json is the
+        // engine's answer to the plan step and the only file the Work row's
+        // nested steps are read from: the report that writes it touches
+        // nothing else, so it must fire on its own or the steps wait for
+        // the backstop poll. Measured under VS Code (session 126): with
+        // run.json alone watched, the steps appeared only at the next
+        // `next`, ten seconds later.
+        new vscode.RelativePattern(path.join(root, RUNS_REL), "*/driver/{run.json,plan.json}"),
       ];
       const onEvent = () => {
         treeProvider.refresh();

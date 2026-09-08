@@ -302,36 +302,46 @@ export function scaffoldModuleManifest(projectDir: string): string | null {
 }
 
 /**
- * The claude-code stop gate, installed for the engine that needs it.
+ * The Claude Code Stop hook the framework used to install, taken out.
  *
- * Whether the engine is Claude Code is the CALLER's question: a session
- * registering under `--engine claude-code` knows, and bootstrap reads the
- * host it runs under. It used to be decided here from the CLAUDECODE
- * environment marker, which meant the extension's Set Up New Project and a
- * plain-shell bootstrap never installed it -- the gate was absent from
- * exactly the projects the extension creates.
- *
- * Guarded two ways: only into a settings file that does not already carry
- * the hook, and only ever ADDING an entry -- existing hooks are never
- * rewritten, because the settings file is the operator's. Returns the path
- * it wrote, or null when there was nothing to do.
+ * Every repository where a Claude Code session ever registered carries the
+ * entry, and a hook whose verb no longer exists exits 2 -- which Claude
+ * Code reads as a block on every end of turn. So the removal runs at both
+ * places the install ran: a `claude-code` registration and a bootstrap
+ * under Claude Code. Only the framework's own entries go -- the ones whose
+ * command is `dabbler session hook-stop` -- and every other hook and key
+ * is written back exactly as it was, because the settings file is the
+ * operator's. An emptied `Stop` array and an emptied `hooks` object are
+ * dropped rather than left as debris. Returns the path it wrote, or null
+ * when there was nothing to remove. What tells a person nothing is
+ * answering an instruction is the Dabbler terminal's silence watcher and
+ * the Work Explorer's attention row, not a hook.
  */
-export function installStopGate(projectDir: string): string | null {
+export function removeStopGate(projectDir: string): string | null {
   const path = join(projectDir, ".claude", "settings.json");
-  let settings: Record<string, unknown> = {};
+  let settings: Record<string, unknown>;
   try {
-    settings = JSON.parse(readFileSync(path, "utf8"));
+    const parsed: unknown = JSON.parse(readFileSync(path, "utf8"));
+    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+    settings = parsed as Record<string, unknown>;
   } catch {
-    settings = {};
+    return null;
   }
-  const command = "dabbler session hook-stop --sessions-dir docs/sessions";
-  const hooks = (settings["hooks"] ??= {}) as Record<string, unknown>;
-  const stop = (hooks["Stop"] ??= []) as Array<Record<string, unknown>>;
-  const present = JSON.stringify(stop).includes("session hook-stop");
-  if (present) return null;
-  stop.push({ hooks: [{ type: "command", command }] });
+  const hooks = settings["hooks"];
+  if (hooks === null || typeof hooks !== "object" || Array.isArray(hooks)) return null;
+  const stop = (hooks as Record<string, unknown>)["Stop"];
+  if (!Array.isArray(stop)) return null;
+  const ours = (entry: unknown): boolean =>
+    /\bdabbler session hook-stop\b/.test(JSON.stringify(entry ?? null));
+  const kept = stop.filter((entry) => !ours(entry));
+  if (kept.length === stop.length) return null;
+  if (kept.length > 0) {
+    (hooks as Record<string, unknown>)["Stop"] = kept;
+  } else {
+    delete (hooks as Record<string, unknown>)["Stop"];
+    if (Object.keys(hooks as Record<string, unknown>).length === 0) delete settings["hooks"];
+  }
   try {
-    mkdirSync(dirname(path), { recursive: true });
     writeFileSync(path, `${JSON.stringify(settings, null, 2)}\n`, "utf8");
   } catch {
     return null;

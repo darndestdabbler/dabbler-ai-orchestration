@@ -823,8 +823,9 @@ export function declareSessionTask(
     );
   }
 
-  // Asked as "has the work begun?": the stop gate a claude-code registration
-  // just installed is not work, and is the one untracked file this ignores.
+  // Asked as "has the work begun?": the hook file a claude-code registration
+  // just edited (removing the Stop hook) is not work, and is the one path
+  // this ignores.
   const { paths, error } = materialWorktreeChanges(sessionsDir, { beforeWork: true });
   if (error) {
     throw new SanctionedWriteError(

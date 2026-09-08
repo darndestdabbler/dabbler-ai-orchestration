@@ -286,43 +286,65 @@ describe("registering a session", () => {
     }
   });
 
-  it("installs the Claude Code stop gate for a claude-code registration, and nothing for another engine", async () => {
-    // The gate used to be installed only when BOOTSTRAP ran under Claude
-    // Code, which is a fact about the shell that set the project up, not
-    // about the engine that will run it: the extension's Set Up New Project
-    // never installed it.
+  it("removes the Stop hook an earlier framework installed, leaves another hook alone, and installs none", async () => {
+    // Every repository where a Claude Code session ever registered carries
+    // the entry, and a hook whose verb no longer exists exits 2 -- a block
+    // on every end of turn. The removal runs where the install ran; a
+    // registration under another engine touches nothing.
+    const stale = {
+      hooks: {
+        Stop: [
+          { hooks: [{ type: "command", command: "dabbler session hook-stop --sessions-dir docs/sessions" }] },
+          { hooks: [{ type: "command", command: "echo the operator's own" }] },
+        ],
+        PreToolUse: [{ hooks: [{ type: "command", command: "echo keep" }] }],
+      },
+      theme: "dark",
+    };
     const codex = stateDir();
     try {
+      mkdirSync(join(codex.repo, ".claude"), { recursive: true });
+      writeFileSync(join(codex.repo, ".claude", "settings.json"), JSON.stringify(stale), "utf8");
       const registered = await run(() =>
         start(codex.sessionsDir, { engine: "codex", provider: "openai" }),
       );
       assert.equal(registered.code, EXIT_OK);
-      assert.equal(existsSync(join(codex.repo, ".claude")), false);
+      assert.deepEqual(JSON.parse(readFileSync(join(codex.repo, ".claude", "settings.json"), "utf8")), stale);
     } finally {
       codex.restore();
     }
     const claude = stateDir();
     try {
+      mkdirSync(join(claude.repo, ".claude"), { recursive: true });
+      writeFileSync(join(claude.repo, ".claude", "settings.json"), JSON.stringify(stale), "utf8");
       const registered = await run(() =>
         start(claude.sessionsDir, { engine: "claude-code", provider: "anthropic" }),
       );
       assert.equal(registered.code, EXIT_OK);
-      const settings = JSON.parse(
-        readFileSync(join(claude.repo, ".claude", "settings.json"), "utf8"),
-      ) as { hooks: { Stop: unknown[] } };
-      assert.match(JSON.stringify(settings.hooks.Stop), /session hook-stop/);
-      assert.match(registered.out, /installed the stop gate/);
-      // Registering again adds nothing: the hook is present, and the
-      // settings file is the operator's.
+      assert.match(registered.out, /removed the stop gate from/);
+      const settings = JSON.parse(readFileSync(join(claude.repo, ".claude", "settings.json"), "utf8"));
+      // Only the framework's entry went; the operator's hooks and keys are as written.
+      assert.deepEqual(settings, {
+        hooks: {
+          Stop: [{ hooks: [{ type: "command", command: "echo the operator's own" }] }],
+          PreToolUse: stale.hooks.PreToolUse,
+        },
+        theme: "dark",
+      });
+      // Registering again writes nothing: there is nothing left to remove.
       const again = await run(() =>
         start(claude.sessionsDir, { engine: "claude-code", provider: "anthropic" }),
       );
       assert.equal(again.code, EXIT_OK);
-      assert.equal(
-        (JSON.parse(readFileSync(join(claude.repo, ".claude", "settings.json"), "utf8")) as { hooks: { Stop: unknown[] } })
-          .hooks.Stop.length,
-        1,
-      );
+      assert.doesNotMatch(again.out, /stop gate/);
+      // And a repository that never had the entry gets no file at all.
+      const fresh = stateDir();
+      try {
+        await run(() => start(fresh.sessionsDir, { engine: "claude-code", provider: "anthropic" }));
+        assert.equal(existsSync(join(fresh.repo, ".claude")), false);
+      } finally {
+        fresh.restore();
+      }
     } finally {
       claude.restore();
     }

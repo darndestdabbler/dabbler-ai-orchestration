@@ -90,14 +90,16 @@ describe("working_tree_clean: what counts as work in a porcelain status", () => 
 
   it("ignores the run ledger, which is the record and not the work", () => {
     assert.deepEqual(materialPaths("?? .dabbler/runs/s1/rounds.jsonl\n", SESSIONS), []);
-    // The stop gate `session start` installs for a claude-code registration
-    // is the framework's, written before the declaration that would
-    // otherwise refuse a tree already carrying a change -- and that is the
-    // only shape exempted: the untracked file, when the question is whether
-    // work has begun. An edit to a tracked one is work, and at the close
-    // the file counts however it got there.
+    // The hook file `session start` edits for a claude-code registration --
+    // removing the Stop hook an earlier framework installed -- is the
+    // framework's own doing, made before the declaration that would
+    // otherwise refuse a tree already carrying a change. Exempted whether
+    // the framework's action left it untracked (the install once did) or
+    // modified (the removal does), and only when the question is whether
+    // work has begun: at the close the file counts however it got there.
     assert.deepEqual(materialPaths("?? .claude/settings.json\n", SESSIONS, { beforeWork: true }), []);
-    assert.deepEqual(materialPaths(" M .claude/settings.json\n", SESSIONS, { beforeWork: true }), [".claude/settings.json"]);
+    assert.deepEqual(materialPaths(" M .claude/settings.json\n", SESSIONS, { beforeWork: true }), []);
+    assert.deepEqual(materialPaths(" M .claude/settings.json\n", SESSIONS), [".claude/settings.json"]);
     assert.deepEqual(materialPaths("?? .claude/settings.json\n", SESSIONS), [".claude/settings.json"]);
     assert.deepEqual(materialPaths("?? .claude/other.json\n", SESSIONS, { beforeWork: true }), [".claude/other.json"]);
   });

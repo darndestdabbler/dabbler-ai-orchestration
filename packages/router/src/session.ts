@@ -87,7 +87,7 @@ import {
 } from "./gates.ts";
 import { refuseIfResolvingFromSource } from "./resolution.ts";
 import { detectEcosystems } from "./bootstrap/detect.ts";
-import { installStopGate } from "./bootstrap/index.ts";
+import { removeStopGate } from "./bootstrap/index.ts";
 import { PROJECT_CONFIG_FILENAME } from "./config.ts";
 import {
   CLASS_ACCOUNTABILITY_SIGNOFF,
@@ -1004,17 +1004,18 @@ export function start(sessionsDir: string, options: StartOptions): number {
       );
     }
     for (const line of discoveryWarnings()) writeOut(`${line}\n`);
-    // The stop gate is installed for the engine that needs it, here, where
-    // the engine is known -- not by bootstrap, which knows only the shell it
-    // ran under. Idempotent, and best-effort: a registration must not fail
-    // because a settings file could not be written.
+    // The Stop hook the framework used to install for this engine is taken
+    // out here, where the engine is known: a hook whose verb no longer
+    // exists would block every end of turn. Idempotent, and best-effort: a
+    // registration must not fail because a settings file could not be
+    // written.
     if (identity.engine === "claude-code") {
       try {
-        const hooked = installStopGate(repoRootFromSessionsDir(registerIn));
-        if (hooked !== null) {
+        const unhooked = removeStopGate(repoRootFromSessionsDir(registerIn));
+        if (unhooked !== null) {
           writeOut(
-            `start: installed the stop gate in ${hooked} -- the framework's own ` +
-              "file, committed with this session's work; no step needs to name it.\n",
+            `start: removed the stop gate from ${unhooked} -- the framework's own ` +
+              "edit, committed with this session's work; no step needs to name it.\n",
           );
         }
       } catch {
@@ -2532,127 +2533,7 @@ function raiseSuiteDecisionIfOwed(
   });
 }
 
-// --- hook-stop: the claude-code stop gate -------------------------------------
-
-/** What the stop gate does about the outstanding instruction. */
-export interface StopGateDecision {
-  /** Hold the turn open and hand `message` back to the model as its next input. */
-  readonly block: boolean;
-  /**
-   * The words the host reads: the model's next input on a block, a note
-   * shown to the person when the turn is let go with something still
-   * pending, null when the gate has nothing to say.
-   */
-  readonly message: string | null;
-}
-
-/** The instruction members the gate reads; every kind carries the first four. */
-export interface StopGateInstruction {
-  readonly kind: string;
-  readonly seq: number;
-  readonly session_number: number;
-  readonly issued_at: string;
-  readonly retry_after_seconds?: number;
-}
-
-/**
- * The gate's rule, from the instruction alone.
- *
- * A `step` or a `rejection` blocks: an answer is owed and the turn is not
- * over until it is given. A `wait` blocks only once it is DUE -- `issued_at`
- * plus `retry_after_seconds` has passed -- because a wait is the one
- * instruction that asks the engine to carry an obligation across the end
- * of its turn, and it was the one instruction with no enforcement: session
- * 91's engine answered one by polling a field only `next` clears, the job
- * finished with its exit code on disk, and the session sat idle for three
- * hours. A wait not yet due lets the turn end and says when it is due, so
- * whoever reads the note knows what the next call is and roughly when. A
- * wait whose stamp cannot be read is treated as due: the safe side of an
- * unreadable clock is the call, not the silence. `done` and `interrupt`
- * ask for nothing here.
- */
-export function stopGateDecision(
-  instruction: StopGateInstruction,
-  now: Date = new Date(),
-): StopGateDecision {
-  const path = `.dabbler/runs/s${instruction.session_number}/driver/instruction.json`;
-  const run =
-    'RUN the shell command it names as "answer_command" -- running it is the ' +
-    "answer; printing it is not -- and continue until `dabbler session next` says done.";
-  if (instruction.kind === "step" || instruction.kind === "rejection") {
-    return {
-      block: true,
-      message:
-        `Session ${instruction.session_number} has an outstanding instruction (seq ` +
-        `${instruction.seq}). Read ${path} and do exactly what its "ask" says, then ${run}`,
-    };
-  }
-  if (instruction.kind !== "wait") return { block: false, message: null };
-  const issued = Date.parse(instruction.issued_at);
-  const retry = Number(instruction.retry_after_seconds);
-  const due =
-    Number.isFinite(issued) && Number.isFinite(retry) ? issued + Math.max(0, retry) * 1000 : NaN;
-  const left = Number.isFinite(due) ? Math.ceil((due - now.getTime()) / 1000) : 0;
-  if (left > 0) {
-    return {
-      block: false,
-      message:
-        `Session ${instruction.session_number} is waiting on the framework's own work ` +
-        `(seq ${instruction.seq}), due in ${left}s: \`dabbler session next\` is the call ` +
-        "that collects it, and nothing else does.",
-    };
-  }
-  return {
-    block: true,
-    message:
-      `Session ${instruction.session_number}'s wait (seq ${instruction.seq}) was due ` +
-      `${-left}s ago: the framework's work has had its time. Read ${path} and ${run}`,
-  };
-}
-
-/**
- * The Stop-hook half of the guardian: Claude Code runs this as the turn
- * tries to settle, and an outstanding lease turns the settle into the next
- * move. Quiet by design -- an empty answer lets the turn end -- because
- * the hook fires on every stop of every conversation in the repository,
- * and a session that owes nothing must cost nothing.
- *
- * The decision protocol is the host's: a JSON object on stdout with
- * `decision: "block"` keeps the turn alive and hands `reason` back to the
- * model as its next input; one carrying only `systemMessage` lets the turn
- * end and shows the person the note. The reason is the same sentence the
- * push engine has always been given -- read the instruction, do the ask,
- * RUN the answer_command -- because that sentence is the one a less
- * capable engine reads literally, and the stop gate exists for exactly the
- * moment an engine believed it was finished. The rule is
- * `stopGateDecision`; this reads the record and writes the answer.
- */
-export function hookStop(sessionsDir: string): number {
-  const sessionNumber = sessionInFlight(sessionsDir);
-  if (sessionNumber === null) return 0;
-  const repoRoot = repoRootFromSessionsDir(sessionsDir);
-  let instruction;
-  try {
-    instruction = readInstruction(repoRoot, sessionNumber);
-  } catch {
-    return 0;
-  }
-  if (instruction === null) return 0;
-  const decision = stopGateDecision(instruction);
-  if (decision.message === null) return 0;
-  if (!decision.block) {
-    writeOut(`${JSON.stringify({ systemMessage: decision.message })}\n`);
-    return 0;
-  }
-  // A blocked settle is a paid continuation of the host's turn: on the
-  // record like every other supervision spend.
-  appendSupervision(repoRoot, sessionNumber, {
-    event: "stop-gate-continued",
-    seq: instruction.seq,
-  });
-  writeOut(`${JSON.stringify({ decision: "block", reason: decision.message })}\n`);
-  return 0;
-}
+// --- the session in flight, for the verbs that read the ledger alone ----------
 
 /** The number of the session in progress under `sessionsDir`, or null -- an unreadable ledger is nothing in flight. */
 function sessionInFlight(sessionsDir: string): number | null {

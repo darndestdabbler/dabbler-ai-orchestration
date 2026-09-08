@@ -37,7 +37,7 @@ import {
   scaffoldModuleManifest,
   scaffoldProjectConfig,
   writeInstructionFiles,
-  installStopGate,
+  removeStopGate,
 } from "../bootstrap/index.ts";
 import { writeErr, writeOut } from "./output.ts";
 
@@ -237,14 +237,14 @@ export async function bootstrapVerb(argv: string[]): Promise<number> {
     written.push(path);
   }
   {
-    // The claude-code stop gate: the turn-end half of the guardian. Bootstrap
-    // knows only the host it runs under (the CLAUDECODE marker), so it
-    // installs the gate there; a session registering under claude-code
-    // installs it for itself, whatever shell ran the setup.
-    const hooked = process.env["CLAUDECODE"] ? installStopGate(project) : null;
-    if (hooked !== null) {
-      writeOut(`bootstrap: installed the stop gate in ${hooked}\n`);
-      written.push(hooked);
+    // The Claude Code Stop hook the framework used to install is taken out
+    // wherever the install ran: bootstrap knows only the host it runs
+    // under (the CLAUDECODE marker), so it removes the entry there, and a
+    // session registering under claude-code removes it for itself.
+    const unhooked = process.env["CLAUDECODE"] ? removeStopGate(project) : null;
+    if (unhooked !== null) {
+      writeOut(`bootstrap: removed the stop gate from ${unhooked}\n`);
+      written.push(unhooked);
     }
   }
   // Re-run on an existing clone, this is the migration: a clone made before

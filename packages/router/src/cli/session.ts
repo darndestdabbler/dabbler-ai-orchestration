@@ -38,7 +38,6 @@ import {
   report,
   restore,
   start,
-  hookStop,
   sessionScope,
 } from "../session.ts";
 import { writeErr, writeOut } from "./output.ts";
@@ -50,7 +49,6 @@ const SUMMARY: Record<string, string> = {
   declare: "declare the session's task list and releasability",
   next: "advance the session one move and print the instruction to answer",
   run: "drive the in-flight session to done in one command, identity from the record",
-  "hook-stop": "the Claude Code stop gate: block the turn while an instruction is outstanding",
   scope: "print what the session in flight may read and change: its module scope, one path per line",
   drive: "run the next session end to end: the framework drives, the engine answers",
   interrupt: "end the engine's running invocation under a driven session, with a reason",
@@ -504,12 +502,6 @@ export async function sessionVerb(argv: string[]): Promise<number> {
       requestGrant,
       reason: values.get("--reason") ?? null,
     });
-  }
-
-  if (subcommand === "hook-stop") {
-    // Quiet on purpose: the host runs this on every stop, and silence is
-    // the ordinary answer.
-    return hookStop(sessionsDir);
   }
 
   if (subcommand === "scope") {

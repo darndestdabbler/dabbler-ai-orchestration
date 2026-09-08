@@ -756,14 +756,15 @@ export function isTestFile(
 }
 
 /**
- * The one file the framework writes into a repository on a session's behalf
- * and before the session's work: the Claude Code stop gate, installed by
- * `session start` for a claude-code registration. Two readers ask: the
- * declaration gate, which must not refuse a session for it (and ONLY for it,
- * as the untracked file the install created -- a tracked, modified
- * `.claude/settings.json` is the operator's edit and is work; at the close
- * the file counts however it got there), and the selector, which maps it to
- * no test rather than to nobody. Defined here, below both, so there is one.
+ * The one file the framework touches in a repository on a session's behalf
+ * and before the session's work: `.claude/settings.json`, where `session
+ * start` for a claude-code registration removes the Stop hook an earlier
+ * framework installed. Two readers ask: the declaration gate, which must
+ * not refuse a session for it (whether the framework's own action left it
+ * untracked, as the install once did, or modified, as the removal does; at
+ * the close the file counts however it got there), and the selector, which
+ * maps it to no test rather than to nobody. Defined here, below both, so
+ * there is one.
  */
 export function isFrameworkInstalledPath(path: string): boolean {
   return String(path).replace(/\\/g, "/").replace(/^\.\//, "") === ".claude/settings.json";

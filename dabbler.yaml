@@ -60,13 +60,19 @@ testing:
     # the eight `walk-*` files and nowhere else: every other test feeds git's
     # answers through `journal.setGitSource` (test/support/answers.ts), and
     # `test/support/no-git.ts` fails a worker outside a walkthrough the
-    # moment it spawns git, naming the test file. That is the constraint that
-    # replaced `--test-concurrency=4` (D246, restored in session 90): the cap
-    # existed because `node --test` runs one worker per CPU -- 20 on the
-    # operator's machine -- and fifteen files built git repositories, so the
-    # default was 20 concurrent git storms that locked the box and failed a
-    # different file each run. A bounded cap throttled the storm; the seam
-    # removed it, and nothing outside the walkthroughs builds a repository.
+    # moment it spawns git, naming the test file. That seam made each storm
+    # smaller: nothing outside the walkthroughs builds a repository, and a
+    # run no longer fails a different file each time.
+    #
+    # `--test-concurrency=4` (D246) is a different protection and is back
+    # from session 126. `node --test` runs one worker per CPU -- 20 on the
+    # operator's machine -- and each walkthrough boots full CLI children
+    # under its worker, so an uncapped run of record took the machine from
+    # the operator twice a session. The cap keeps the box usable while the
+    # run of record runs; it does not shorten the run (the slowest file is
+    # the floor), and the measured cost is in `docs/design/suite-cost.md`.
+    # Nothing audits the flag: a flag in a command line cannot lapse
+    # silently the way the count below once did.
     #
     # That count is not decoration. It said FIVE from session 96 to 122
     # while the walkthroughs went six, seven, eight -- each admitted by a
@@ -97,7 +103,7 @@ testing:
     # a surface covered only by a non-expensive suite -- is session 95's,
     # and it is the loader's: `loadSuitesChecked` names the suite.
     - name: typescript
-      command: node --test --import ./packages/router/test/support/no-git.ts packages/router/test/**/*.test.ts
+      command: node --test --test-concurrency=4 --import ./packages/router/test/support/no-git.ts packages/router/test/**/*.test.ts
       expensive: true
       covers:
         - packages/router/

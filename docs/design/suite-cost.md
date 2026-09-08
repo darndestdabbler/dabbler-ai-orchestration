@@ -29,6 +29,8 @@ enough to be worth trusting.
 | 110 | 143 s | 1119 | |
 | 120 | 142 s | 1144 | |
 | **121** | **157 s** | 1144 | 7 more tests than session 96, 9× the wall clock |
+| 125 | 176 s | 1147 | uncapped |
+| **126** | **176 s** | 1147 | **`--test-concurrency=4` back (D246)**: the same wall clock as uncapped, measured once by hand as `dabbler.yaml` runs it, before the run of record |
 
 ## Where the time actually goes
 
@@ -49,12 +51,23 @@ From session 121's log, summing each file's top-level suites:
 
 Two things follow from that table, and both are easy to get wrong.
 
-**A concurrency cap would not fix this.** `node --test` parallelises by
-FILE, so the slowest file is the floor: `walk-session.test.ts` alone holds
-about 118 seconds, and no worker count takes the suite below it.
-`--test-concurrency=4` would make the box usable during the run — which is
-worth something — but it would lengthen the run, not shorten it, and
-`dabbler.yaml` records session 96's ruling against putting it back.
+**A concurrency cap does not shorten this, and is not for that.** `node
+--test` parallelises by FILE, so the slowest file is the floor:
+`walk-session.test.ts` alone holds about 118 seconds, and no worker count
+takes the suite below it. What the cap does is keep the operator's machine
+usable while the run of record runs: without one the runner takes a worker
+per CPU — nineteen on the operator's host — and every walkthrough boots
+full CLI children under each of them, which is the saturation session 125's
+operator sat through twice. The git seam (session 96) made each storm
+smaller; it did not make the storms fewer, and the two are different
+protections. `--test-concurrency=4` (D246) is back in `dabbler.yaml` from
+session 126, measured in the table above: 176 s at four workers against
+176 s uncapped the session before, because the floor is the slowest file
+and four workers still keep the eight walkthroughs ahead of it. The box is
+the operator's during the run and the run is no longer. The number becomes
+8 if a session measures more than twice the uncapped wall clock; nothing
+audits the flag, because a flag in a command line cannot lapse silently
+the way a comment's count did.
 
 **The walkthroughs are expensive for a reason that is not git.** They build
 real repositories, which is the visible cost, but they also drive the

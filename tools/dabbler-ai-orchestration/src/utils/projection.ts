@@ -214,11 +214,12 @@ export class ProjectionCache {
     const cached = this.entries.get(sessionsDir);
     if (cached && cached.key === key) return cached.result;
     const result = await this.runner(sessionsDir, repoRoot);
-    // A failed projection is cached too — retrying an uninstallable
-    // router on every 30s poll would spawn a failing process forever.
-    // The mtime key still re-arms it when the ledger changes, and an
-    // explicit refresh clears the cache outright.
-    this.entries.set(sessionsDir, { key, result });
+    // Only an answer is kept. A failure used to be cached as well, so that
+    // an uninstallable router was not spawned afresh on every 30 s poll;
+    // the router is in-process now and a failed derivation costs a read,
+    // while a failure served back under an unchanged key would hold the
+    // degraded row until something else moved the files.
+    if (result.payload !== null) this.entries.set(sessionsDir, { key, result });
     return result;
   }
 

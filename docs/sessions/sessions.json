@@ -2577,8 +2577,14 @@
         "provider": "anthropic",
         "identityProvenance": "direct"
       },
-      "verificationVerdict": null,
-      "frameworkVersion": "2.0.14"
+      "verificationVerdict": "VERIFIED",
+      "frameworkVersion": "2.0.14",
+      "verification": {
+        "rounds": 3,
+        "verifierModel": "gpt-5.4",
+        "verifierProvider": "openai",
+        "transport": "copilot-cli"
+      }
     },
     {
       "number": 132,

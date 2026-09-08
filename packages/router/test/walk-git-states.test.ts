@@ -30,6 +30,9 @@ import {
 } from "../src/journal.ts";
 import { appendRound } from "../src/ledger.ts";
 import { POLICY_TARGETED, loadSuitesChecked, recordRun, type SuiteSpec } from "../src/testEvidence.ts";
+import { ensureRootFiles } from "../src/ecosystem.ts";
+import { solutionShape } from "../src/modules.ts";
+import { packModule } from "../src/packages.ts";
 import { registerSessionStart } from "../src/writers.ts";
 import { git, gitOut, makeRepo, writeFiles } from "./support/repo.ts";
 
@@ -305,5 +308,45 @@ describe("the check executor over a real index", () => {
       timeoutSeconds: 60,
     });
     assert.match(gitOut(project, "status", "--porcelain"), /\?\? untracked\.txt/);
+  });
+});
+
+describe("a module's source digest over a real repository", () => {
+  it("holds still through a build, so the same source packs to the version it packed to before", () => {
+    // The .NET side wrote its root build files and touched .gitignore not at
+    // all, so `bin/` and `obj/` under a module's code root were untracked
+    // and unignored: the digest moved with the BUILD, and the same source
+    // packed to a new dev version every time -- the one thing the immutable
+    // dev version exists to prevent. Real git, because the thing under test
+    // IS git's ignore behaviour feeding the digest; a scripted git would
+    // test the script.
+    const project = makeRepo({
+      ".gitignore": "# machine-side state\n.dabbler/\n",
+      "docs/modules.yaml":
+        "modules:\n- slug: model\n  package: CsvModel\n  codeRoots: [modules/model]\n" +
+        "- slug: persister\n  package: CsvPersister\n  codeRoots: [modules/persister]\n",
+      "modules/model/src/CsvModel/CsvModel.csproj":
+        '<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><Version>0.2.0</Version></PropertyGroup></Project>\n',
+      "modules/model/src/CsvModel/Person.cs": "public sealed class Person {}\n",
+      "modules/persister/README.md": "an empty module folder, no project yet\n",
+    });
+    const shape = solutionShape(project);
+    ensureRootFiles(project, shape);
+    const pack = (): string =>
+      packModule(project, shape, "model", {
+        runPack: (argv: readonly string[]) => {
+          const out = argv[argv.indexOf("-o") + 1] as string;
+          const version = (argv.find((arg) => arg.startsWith("-p:PackageVersion=")) ?? "").split("=")[1];
+          mkdirSync(out, { recursive: true });
+          writeFileSync(join(out, `CsvModel.${version}.nupkg`), "bytes", "utf8");
+          return { code: 0, output: "packed" };
+        },
+      }).version;
+    const before = pack();
+    writeFiles(project, {
+      "modules/model/src/CsvModel/bin/Debug/CsvModel.dll": "MZ\n",
+      "modules/model/src/CsvModel/obj/project.assets.json": "{}\n",
+    });
+    assert.equal(pack(), before);
   });
 });

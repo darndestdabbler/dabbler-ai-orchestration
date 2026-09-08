@@ -11,6 +11,9 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it } from "node:test";
 
+import { checkoutCone } from "../src/checkout.ts";
+import { loadEntries, solutionShape } from "../src/modules.ts";
+import { packModule } from "../src/packages.ts";
 import { moduleVerb } from "../src/cli/module.ts";
 import { modulesVerb } from "../src/cli/modules.ts";
 import { packagingVerb } from "../src/cli/packaging.ts";
@@ -402,6 +405,45 @@ describe("dabbler modules", () => {
     );
     assert.equal(dangling.code, 1);
     assert.match(dangling.err, /does not declare/);
+  });
+
+  it("defaults the code root and the package, so a module made from the button's four answers packs and opens", async () => {
+    // The New Module flow asks slug, title, kind and depends-on. Both
+    // operations a multi-module solution exists for used to refuse what
+    // those four answers produced, and the walk met both in its first
+    // twenty minutes.
+    const root = tempDir("cli-");
+    for (const [slug, title] of [["model", "Model"], ["reports", "Reports"]]) {
+      const made = await run(() =>
+        modulesVerb(["create", root, "--slug", slug, "--title", title, "--kind", "shared-types"]),
+      );
+      assert.equal(made.code, 0);
+    }
+    const entries = loadEntries(root);
+    assert.deepEqual(entries.map((entry) => entry.codeRoots), [["modules/model"], ["modules/reports"]]);
+    assert.deepEqual(entries.map((entry) => entry.package), ["model", "reports"]);
+
+    const shape = solutionShape(root);
+    // The focused checkout: a cone of the module's own root, not the
+    // repository root that an absent codeRoots used to read as.
+    assert.ok(checkoutCone(shape, "model").includes("modules/model"));
+    // The pack: past `declares no package` and past `is not on this disk`,
+    // as far as the ecosystem, which is what an empty module folder is.
+    mkdirSync(join(root, "modules", "model"), { recursive: true });
+    writeFileSync(join(root, "modules", "model", "Item.cs"), "class Item {}\n");
+    assert.throws(
+      () => packModule(root, shape, "model", { digestOf: () => "abc1234" }),
+      /no project file the framework knows/,
+    );
+
+    // The casing is the repository's, taken from a sibling that declares
+    // one: a groupId is shared and the artifactId is the module's.
+    const maven = tempDir("cli-");
+    await run(() =>
+      modulesVerb(["create", maven, "--slug", "model", "--title", "Model", "--package", "com.example:model"]),
+    );
+    await run(() => modulesVerb(["create", maven, "--slug", "reports", "--title", "Reports"]));
+    assert.equal(loadEntries(maven)[1]?.package, "com.example:reports");
   });
 
   it("passes the root positionally and collects each repeatable flag", async () => {

@@ -19,6 +19,8 @@ import { existsSync, readdirSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
 
 import { PROJECT_CONFIG_FILENAME } from "../config.ts";
+import { type EcosystemKey, type ScaffoldResult, ecosystemOfSolution, ensureRootFiles } from "../ecosystem.ts";
+import type { SolutionShape } from "../modules.ts";
 import { readText } from "../textfile.ts";
 import {
   PROJECT_CONFIG_HEADER,
@@ -146,6 +148,72 @@ function detectDotnet(root: string): Ecosystem | null {
     testRoots: ["tests"],
     testGlob: "*Tests.cs",
   };
+}
+
+/**
+ * The suite an ecosystem declares HERE, or null when its command has nothing
+ * to run at this root.
+ *
+ * Knowing the ecosystem is not enough to declare a suite, because a suite
+ * declares a command and no working directory: the command must resolve at
+ * the root or it is a red run of record waiting for the next session. Maven
+ * always resolves, because the parent POM the same scaffold writes is what
+ * `mvn -q test` reads. `dotnet test` resolves the project or solution in the
+ * directory it runs in, and a multi-module .NET solution whose projects live
+ * under `modules/` has none at its root -- measured, MSB1003 -- so the root
+ * detector is exactly the right question to ask for it.
+ */
+export function suiteForEcosystem(root: string, key: string): Ecosystem | null {
+  if (key === "maven") return detectMaven(root);
+  if (key === "dotnet") return detectDotnet(root);
+  return null;
+}
+
+/** Why an ecosystem's suite could not be declared at this root. */
+function whyNoSuite(key: EcosystemKey): string {
+  return key === "dotnet"
+    ? "no test suite is declared: `dotnet test` resolves the project or solution in the " +
+        "directory it runs in, and this root holds none. Add a solution file at the root, " +
+        `or declare the suite yourself under testing.suites in ${PROJECT_CONFIG_FILENAME}`
+    : "no test suite is declared: nothing at this root says how its tests run; declare one " +
+        `under testing.suites in ${PROJECT_CONFIG_FILENAME}`;
+}
+
+/**
+ * The root build files a multi-module solution needs, and the test suite the
+ * ecosystem they belong to names: what a first `module pack` or a second
+ * `modules create` leaves behind.
+ *
+ * The suite is declared HERE, at the moment the ecosystem becomes known,
+ * because there is no later moment. Bootstrap runs before any project file
+ * exists -- it must, since the first session is what writes the code -- so
+ * it honestly declares no suite and says so, and nothing ever came back: the
+ * run of record had no command to run while `dabbler affected` printed a
+ * passing selection rule one line above "no suite is declared, so there is
+ * no command to run".
+ *
+ * It sits on this side of the seam rather than inside `ensureRootFiles`
+ * because the dependency runs one way: the scaffold knows ecosystems, and
+ * `dabbler.yaml` is bootstrap's file. A suite the repository already
+ * declares is left exactly as it is, by the writer bootstrap itself uses.
+ */
+export function ensureRootFilesWithSuite(root: string, shape: SolutionShape): ScaffoldResult | null {
+  const files = ensureRootFiles(root, shape);
+  if (files === null) return null;
+  const key = ecosystemOfSolution(root, shape);
+  if (key === null) return files;
+  const suite = suiteForEcosystem(root, key);
+  // Said out loud rather than left silent: a repository that gets no suite
+  // here is the one whose operator most needs to know why, and the note
+  // rides beside the files this call wrote.
+  if (suite === null) return { ...files, notes: [...files.notes, whyNoSuite(key)] };
+  const declared = appendSuitesToProjectConfig(root, [suite]);
+  if (declared === null) return files;
+  const where = relative(root, declared.path).split("\\").join("/");
+  if (declared.added.length === 0) return { ...files, skipped: [...files.skipped, where] };
+  return declared.created
+    ? { ...files, written: [...files.written, where] }
+    : { ...files, changed: [...(files.changed ?? []), where] };
 }
 
 /**

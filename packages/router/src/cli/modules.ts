@@ -8,7 +8,8 @@
 // the shape, the entries in dependency order, and `usedBy` derived. Rename,
 // delete and reorganization stay manual edits to the manifest.
 
-import { EcosystemError, ensureRootFiles } from "../ecosystem.ts";
+import { ensureRootFilesWithSuite } from "../bootstrap/detect.ts";
+import { EcosystemError } from "../ecosystem.ts";
 import { EXIT_OK as CREATED, create, show, solutionShape } from "../modules.ts";
 import { tryWriteProjection } from "../projection.ts";
 import { writeErr, writeOut } from "./output.ts";
@@ -59,12 +60,13 @@ function usage(): string {
     "                        module plan path, relative to the root",
     "  --code-root CODE_ROOTS",
     "                        repo-relative directory that bounds the module on",
-    "                        disk (repeatable)",
+    "                        disk (repeatable); defaults to modules/<slug>",
     "  --kind KIND           shared-types, library (the default) or application",
     "  --depends-on SLUG     a module this one consumes (repeatable); who",
     "                        depends on a module is derived, never declared",
     "  --package PACKAGE     the artifact id a sibling consumes (a NuGet id, or",
-    "                        Maven's groupId:artifactId)",
+    "                        Maven's groupId:artifactId); defaults to the slug in",
+    "                        the casing this repository's module packages use",
     "  --contract MODE       designed, package (the default when a package is",
     "                        declared) or generated",
     "  --spec-section SPEC_SECTIONS",
@@ -193,7 +195,7 @@ export async function modulesVerb(argv: string[]): Promise<number> {
     // root build files appear with it -- the committed feed, the central
     // pins, the build properties and targets -- where absent.
     try {
-      const files = ensureRootFiles(workspaceRoot, solutionShape(workspaceRoot));
+      const files = ensureRootFilesWithSuite(workspaceRoot, solutionShape(workspaceRoot));
       for (const path of files?.written ?? []) writeOut(`wrote ${path}\n`);
       for (const path of files?.changed ?? []) writeOut(`updated ${path}\n`);
       for (const note of files?.notes ?? []) writeOut(`note: ${note}\n`);

@@ -762,9 +762,13 @@ describe("the module manifest", () => {
     const root = tempDir("manifest-");
     await run(() => create(root, "bare", "Bare"));
     const doc = loadManifest(join(root, "docs", "modules.yaml"));
+    // The two a module cannot work without are defaulted; the scope lists
+    // nobody supplied are still absent rather than empty.
     assert.deepEqual(Object.keys((doc["modules"] as Record<string, unknown>[])[0]!), [
       "slug",
       "title",
+      "codeRoots",
+      "package",
     ]);
     // LF on every platform, because the file is committed.
     assert.ok(!readFileSync(join(root, "docs", "modules.yaml"), "utf8").includes("\r\n"));

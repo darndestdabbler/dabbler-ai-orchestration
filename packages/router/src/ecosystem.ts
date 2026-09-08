@@ -293,6 +293,27 @@ export function ensureRootFiles(root: string, shape: SolutionShape): ScaffoldRes
   };
 }
 
+/**
+ * Which ecosystem this solution's root build files belong to, or null while
+ * no module holds a project file yet.
+ *
+ * `ensureRootFiles` answers this on the way to writing them, and the suite
+ * declaration needs the same answer without the writing. The knowledge is
+ * one function's; asking it twice is cheap and keeps it one.
+ */
+export function ecosystemOfSolution(root: string, shape: SolutionShape): EcosystemKey | null {
+  if (!shape.multi) return null;
+  for (const entry of shape.modules) {
+    try {
+      return ecosystemOf(root, entry).key;
+    } catch (error) {
+      if (error instanceof EcosystemError) continue;
+      throw error;
+    }
+  }
+  return null;
+}
+
 // --- .NET -------------------------------------------------------------------
 
 const DOTNET: Ecosystem = {
@@ -566,7 +587,12 @@ export const NO_SHARED_COMPILATION = "-p:UseSharedCompilation=false";
  * to turn on.
  */
 function rootFilesDotnet(root: string): ScaffoldResult {
-  const result = { written: [] as string[], skipped: [] as string[], notes: [] as string[] };
+  const result = {
+    written: [] as string[],
+    skipped: [] as string[],
+    changed: [] as string[],
+    notes: [] as string[],
+  };
   writeIfAbsent(
     root,
     "nuget.config",
@@ -656,6 +682,20 @@ function rootFilesDotnet(root: string): ScaffoldResult {
       "from. Nothing here is edited by hand.",
       "",
     ].join("\n"),
+    result,
+  );
+  // MSBuild writes its output inside the project it built -- `bin/` and
+  // `obj/` -- and both sit under the module's own code roots. A module's
+  // source digest is taken over those roots, so an unignored bin/ makes the
+  // digest move with the BUILD: the same source packs to a new dev version
+  // every time, which is the one thing the immutable version exists to
+  // prevent. The Maven side has had this rule since the Java walk found it.
+  ensureIgnoreRules(
+    root,
+    ["bin/", "obj/"],
+    "# MSBuild's own output, which lands inside the project it built. A module's " +
+      "source\n# digest is taken over its code roots, so an unignored bin/ makes the same\n" +
+      "# source pack to a new dev version every time.",
     result,
   );
   return result;

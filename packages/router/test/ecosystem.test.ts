@@ -8,8 +8,14 @@ import { join } from "node:path";
 import { describe, it } from "node:test";
 import { pathToFileURL } from "node:url";
 
+import { parse as parseYaml } from "yaml";
+
+import { ensureRootFilesWithSuite } from "../src/bootstrap/detect.ts";
 import { EcosystemError, ecosystemNamed, ecosystemOf, ensureRootFiles, javaReleaseOf, setJavaSource } from "../src/ecosystem.ts";
 import { type SolutionShape, dependencyOrder, parseEntries, impliedDeployables } from "../src/modules.ts";
+import { runnableCommands } from "../src/affected.ts";
+import { SelectionResult } from "../src/checks.ts";
+import { loadSuitesChecked } from "../src/testEvidence.ts";
 import { seed, tempDir } from "./support/answers.ts";
 
 function solution(): { root: string; entries: ReturnType<typeof parseEntries> } {
@@ -287,6 +293,7 @@ describe("the root build files", () => {
       "Directory.Build.targets",
       "packages/.gitattributes",
       "packages/README.md",
+      ".gitignore",
     ]);
     assert.match(readFileSync(join(root, "nuget.config"), "utf8"), /value="packages"/);
     // The targets file imports nothing: a sibling is always its package here.
@@ -296,7 +303,7 @@ describe("the root build files", () => {
     writeFileSync(join(root, "Directory.Packages.props"), "<Project><!-- mine --></Project>\n", "utf8");
     const third = ensureRootFiles(root, entries(["persister", "model", "listener"]));
     assert.deepEqual(third?.written, []);
-    assert.equal(third?.skipped.length, 6);
+    assert.equal(third?.skipped.length, 7);
     assert.match(readFileSync(join(root, "Directory.Packages.props"), "utf8"), /mine/);
     // Two modules that are still empty folders: the files wait, and say so.
     const bare = tempDir("roots-");
@@ -304,6 +311,83 @@ describe("the root build files", () => {
     const waiting = ensureRootFiles(bare, entries(["a", "b"]));
     assert.deepEqual(waiting?.written, []);
     assert.match(waiting?.notes[0] ?? "", /wait for the first one that does/);
+  });
+
+  it("adds MSBuild's output to the ignore file bootstrap wrote, keeping what it says", () => {
+    // The Maven side has had this rule since the Java walk; the .NET side
+    // wrote five root files and touched .gitignore not at all, so bin/ and
+    // obj/ moved the source digest with every build and the same source
+    // packed to a new dev version every time. That the digest then holds
+    // still through a build is walk-git-states', where git is real.
+    const bootstrapped = "# machine-side state\n.dabbler/\n";
+    const root = tempDir("dotnet-roots-");
+    seed(root, {
+      ".gitignore": bootstrapped,
+      "modules/model/src/CsvModel/CsvModel.csproj": "<Project />\n",
+      "modules/persister/README.md": "an empty module folder, no project yet\n",
+    });
+    const shape = {
+      multi: true,
+      implicit: false,
+      modules: ["model", "persister"].map((slug) => ({ slug, codeRoots: [`modules/${slug}`], dependsOn: [] })),
+    } as unknown as Parameters<typeof ensureRootFiles>[1];
+    const first = ensureRootFiles(root, shape);
+    // Bootstrap's file, which gained two lines: changed, not written.
+    assert.ok(first?.changed?.includes(".gitignore"), (first?.changed ?? []).join(", "));
+    assert.ok(!first?.written.includes(".gitignore"));
+    const ignore = readFileSync(join(root, ".gitignore"), "utf8");
+    assert.match(ignore, /^bin\/$/m);
+    assert.match(ignore, /^obj\/$/m);
+    // Theirs is still there, and still first.
+    assert.ok(ignore.startsWith(bootstrapped), ignore);
+  });
+
+  it("declares the ecosystem's suite the moment the ecosystem is known, and never a second one", () => {
+    // Bootstrap ran before any project file existed and honestly declared
+    // no suite; nothing came back to it, so the run of record had no
+    // command while `affected` printed a passing rule one line above "no
+    // suite is declared".
+    const root = tempDir("suite-");
+    seed(root, {
+      "dabbler.yaml": "testing:\n  selection:\n    rules: []\n",
+      "modules/model/pom.xml": "<project />\n",
+      "modules/reports/pom.xml": "<project />\n",
+    });
+    const shape = {
+      multi: true,
+      implicit: false,
+      modules: ["model", "reports"].map((slug) => ({ slug, codeRoots: [`modules/${slug}`], dependsOn: [] })),
+    } as unknown as Parameters<typeof ensureRootFiles>[1];
+    const first = ensureRootFilesWithSuite(root, shape);
+    assert.ok(first?.changed?.includes("dabbler.yaml"), (first?.changed ?? []).join(", "));
+    assert.match(readFileSync(join(root, "dabbler.yaml"), "utf8"), /- name: maven/);
+
+    // And `affected` now names a command rather than the declaration to make.
+    const suites = loadSuitesChecked(parseYaml(readFileSync(join(root, "dabbler.yaml"), "utf8"))).suites;
+    const reached = new SelectionResult({
+      suites: [{ name: "maven", reason: "the module changed", selectedBy: "modules/model", module: "model" }],
+    });
+    assert.deepEqual(runnableCommands(suites, reached, suites.length), ["mvn -q test"]);
+
+    // A suite already declared is left as it is: the second pack adds none.
+    const second = ensureRootFilesWithSuite(root, shape);
+    assert.ok(second?.skipped.includes("dabbler.yaml"), second?.skipped.join(", "));
+    assert.equal(loadSuitesChecked(parseYaml(readFileSync(join(root, "dabbler.yaml"), "utf8"))).suites.length, 1);
+
+    // And it declares nothing it could not run: a .NET solution whose
+    // projects live under modules/ has no root for `dotnet test` to resolve
+    // (MSB1003), so the scaffold says that instead of writing a red suite.
+    const dotnet = tempDir("suite-");
+    seed(dotnet, {
+      "modules/model/src/CsvModel/CsvModel.csproj": "<Project />\n",
+      "modules/store/src/Store/Store.csproj": "<Project />\n",
+    });
+    const written = ensureRootFilesWithSuite(dotnet, {
+      ...shape,
+      modules: ["model", "store"].map((slug) => ({ slug, codeRoots: [`modules/${slug}`], dependsOn: [] })),
+    } as unknown as Parameters<typeof ensureRootFilesWithSuite>[1]);
+    assert.ok(!written?.written.includes("dabbler.yaml"), written?.written.join(", "));
+    assert.match(written?.notes.join(" | ") ?? "", /no test suite is declared: `dotnet test` resolves/);
   });
 });
 

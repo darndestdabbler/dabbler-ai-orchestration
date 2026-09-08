@@ -16,7 +16,8 @@ import { dirname, join } from "node:path";
 import { CheckoutError, openModule, preflight, readCloneMarker } from "../checkout.ts";
 import { ConfigError, loadConfig } from "../config.ts";
 import { ContractError, renderModuleContract } from "../contractdoc.ts";
-import { EcosystemError, ecosystemOf, ensureRootFiles } from "../ecosystem.ts";
+import { ensureRootFilesWithSuite } from "../bootstrap/detect.ts";
+import { EcosystemError, ecosystemOf } from "../ecosystem.ts";
 import { sessionsDirFor } from "../evidence.ts";
 import { ExposureError, raiseGrantDecision, revokeGrant } from "../exposure.ts";
 import { writeCandidateRecord } from "../impact.ts";
@@ -547,7 +548,7 @@ function packSubcommand(rest: readonly string[]): number {
   }
   let result;
   try {
-    const rootFiles = ensureRootFiles(workspaceRoot, shape);
+    const rootFiles = ensureRootFilesWithSuite(workspaceRoot, shape);
     for (const path of rootFiles?.written ?? []) writeOut(`wrote ${path}\n`);
     for (const path of rootFiles?.changed ?? []) writeOut(`updated ${path}\n`);
     result = packModule(workspaceRoot, shape, slug, {
@@ -692,7 +693,7 @@ function contract(root: string, slug: string, against: string | null): number {
   try {
     // The root build files first, where absent: the scaffold pins its
     // packages centrally, and the central pins live in one of them.
-    const rootFiles = ensureRootFiles(root, shape);
+    const rootFiles = ensureRootFilesWithSuite(root, shape);
     for (const path of rootFiles?.written ?? []) writeOut(`wrote ${path}\n`);
     for (const path of rootFiles?.changed ?? []) writeOut(`updated ${path}\n`);
     result = ecosystemOf(root, entry).scaffoldContract(root, entry, provider);

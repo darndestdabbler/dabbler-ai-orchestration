@@ -637,7 +637,58 @@ export interface CreateOptions {
   readonly contract?: string | null;
 }
 
-/** Append one entry, refusing anything that would make the manifest invalid. */
+/** The slug's words joined in PascalCase: `item-model` -> `ItemModel`. */
+function pascalCase(slug: string): string {
+  return slug
+    .split(/[-_.]+/)
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join("");
+}
+
+/** The slug cased the way `leaf` is: PascalCase for a package id that starts upper. */
+function casedLike(slug: string, leaf: string): string {
+  return /^[A-Z]/.test(leaf) ? pascalCase(slug) : slug;
+}
+
+/**
+ * The package id a module takes when nothing declares one: the slug, in the
+ * casing the repository already uses for its module packages.
+ *
+ * A sibling's id says both halves of that. `com.example:reports` is Maven,
+ * so the groupId is the solution's and the artifactId is the module's;
+ * `Acme.Reports` is .NET, so everything before the last dot is the
+ * solution's namespace. The leaf says the casing, because a repository
+ * whose packages are kebab-case does not want one PascalCase entry in the
+ * middle of them. With no sibling package there is nothing to imitate, and
+ * the slug verbatim is what the manifest already calls the module.
+ */
+function defaultPackage(slug: string, existing: readonly ModuleEntry[]): string {
+  const sibling = existing.find((entry) => entry.package !== null)?.package ?? null;
+  if (sibling === null) return slug;
+  const colon = sibling.indexOf(":");
+  if (colon !== -1) {
+    return `${sibling.slice(0, colon)}:${casedLike(slug, sibling.slice(colon + 1))}`;
+  }
+  const dot = sibling.lastIndexOf(".");
+  return dot === -1
+    ? casedLike(slug, sibling)
+    : `${sibling.slice(0, dot)}.${casedLike(slug, sibling.slice(dot + 1))}`;
+}
+
+/**
+ * Append one entry, refusing anything that would make the manifest invalid.
+ *
+ * The two values a module cannot work without are defaulted here rather
+ * than asked for. The extension's New Module flow prompts for four -- slug,
+ * title, kind, depends-on -- and a module missing the other two is refused
+ * by both operations a multi-module solution exists for: an absent
+ * `codeRoots` reads as the repository root, which is the full checkout and
+ * not a focused one, and an absent `package` is what `module pack` refuses.
+ * This verb is the one writer behind both the button and the command line,
+ * so the default belongs here: it fixes both at once, leaves the flow at
+ * four boxes, and an explicit `--code-root` or `--package` still wins.
+ */
 export function create(
   workspaceRoot: string,
   slug: string,
@@ -646,9 +697,10 @@ export function create(
 ): number {
   const path = manifestPath(workspaceRoot);
   let doc: Record<string, unknown>;
+  let declared: ModuleEntry[];
   try {
     doc = loadManifest(path);
-    parseEntries(doc, path);
+    declared = parseEntries(doc, path);
   } catch (error) {
     if (!(error instanceof ManifestError)) throw error;
     writeErr(`modules create: refused -- ${error.message}\n`);
@@ -668,14 +720,17 @@ export function create(
   if (options.planPath) entry["planPath"] = options.planPath;
   if (options.kind) entry["kind"] = options.kind;
   for (const [key, values] of [
-    ["codeRoots", options.codeRoots],
+    // `modules/<slug>` is where every other verb already looks for a
+    // module that declares no root of its own; the default says out loud
+    // what they assume, so a focused checkout can be taken of it.
+    ["codeRoots", options.codeRoots ?? [`modules/${slug}`]],
     ["dependsOn", options.dependsOn],
     ["specSections", options.specSections],
     ["contextAssets", options.contextAssets],
   ] as const) {
     if (values && values.length > 0) entry[key] = [...values];
   }
-  if (options.package) entry["package"] = options.package;
+  entry["package"] = options.package || defaultPackage(slug, declared);
   if (options.contract) entry["contract"] = options.contract;
   modules.push(entry);
   try {

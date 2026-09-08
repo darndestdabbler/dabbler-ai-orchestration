@@ -6264,3 +6264,63 @@ represented in the checkout by its POM, its flattened build output and its
 contract page exposes zero bytes, and a sibling with one source file under
 its code roots still exposes exactly that file. The walkthrough correction
 is checked as the others are, by a script that reads the document.
+
+### Session 121 of 121: Two ways in — the seat and the keys
+
+Both UAT documents assume one way of paying for the models and treat the
+other as a hazard. The .NET one says "you also need the three API keys" and
+then warns that `DABBLER_TRANSPORT=copilot-cli` would spoil the run; the Java
+one says the same in fewer words. **That is backwards for most of the people
+who will run these walkthroughs.** The operator runs direct API keys because
+it is cheaper on their account; their staff have a GitHub Copilot seat and no
+direct keys at all, and the current text tells them their setup is a mistake.
+
+**Both documents get a Prerequisites section in three parts**: what every
+run needs, then the seat, then the keys, with a sentence at the top telling
+the reader which of the two to read and to ignore the other.
+
+**What every run needs** is what is there now minus the model plumbing: the
+toolchain the ecosystem requires (`dotnet --list-sdks` or `java -version`
+plus `mvn -version`), `git`, node 22+, and `dabbler` on PATH.
+
+**A — a GitHub Copilot seat.** Measured facts, not inferences:
+
+- The `copilot` CLI signed in; no `DABBLER_*_API_KEY` is needed or read.
+- `DABBLER_TRANSPORT=copilot-cli`, or `--transport copilot-cli` on the first
+  `dabbler session next` (it is kept on the run from there).
+- The session registers with `--engine copilot --provider <vendor> --model
+  <id>`, and **`--model` is required**: `resolveOrchestratorIdentity` in
+  `identity.ts` resolves the model through the registry and refuses an
+  unresolvable one, because a multi-provider seat's label is not trusted.
+- **Cost is premium requests, and the model decides how many.** From the
+  shipped catalog lockfile (`packages/router/copilot-catalog.lock`,
+  `premium_request_weight`): `gpt-5.4`, `gpt-5.3-codex`, `gpt-5.4-mini` and
+  `gpt-5-mini` are 0; `claude-sonnet-4.6`, `claude-sonnet-4.5` and
+  `claude-fable-5` are 1; `claude-opus-4.5` and `claude-opus-4.6` are 3;
+  `gpt-5.5` is 7.5; `gemini-3.5-flash` is 14 and `claude-opus-4.8` is 15.
+- **The verifier is a different provider from the engine** — that rule does
+  not bend on the seat: `seatLadder` in `route.ts` takes the confirmed
+  catalog minus the engine's provider. So the pairing is what to think
+  about, not the engine alone: an engine on `claude-sonnet-4.6` (1) leaves
+  the verifier free to be a zero-weight GPT, while an engine on a
+  zero-weight GPT forces the verifier onto Anthropic or Google, where the
+  cheapest confirmed entry is 1 and the dearest is 15.
+
+**B — direct API keys.** `DABBLER_ANTHROPIC_API_KEY`,
+`DABBLER_OPENAI_API_KEY` and `DABBLER_GEMINI_API_KEY`; no seat and no
+`copilot` CLI; billing is per token on the vendor accounts. `--transport api`
+on the first `next` when `DABBLER_TRANSPORT` is set to the seat — which is
+the same check the documents make today, now stated as what it is (choosing
+the other path) rather than as a warning about a mistake.
+
+**What must not be written.** No key values, no seat id, and no claim about
+what a run costs in money: the catalog records request weights and this
+repository has no price list for a seat. The .NET document's step 6 and the
+Java document's step 6 keep the `--engine claude-code --provider anthropic`
+they show today as the direct-API example, with one line saying what the
+seat reader substitutes.
+
+**Tests.** One script, as the other document checks are: both documents
+carry the three-part section, name `--transport copilot-cli` and
+`--transport api`, say `--model` is required for a seat, and name no
+`DABBLER_*_API_KEY` inside the seat part.

@@ -1,6 +1,76 @@
-# STATUS — sessions 113–117 CLOSED, all VERIFIED: the deployables block built, the Java/Maven walk run end to end, and the nine defects it found fixed and re-proven
+# STATUS — sessions 113–120 CLOSED, all VERIFIED: the deployables block built, the Java/Maven walkthrough walked end to end, and the nine defects it found fixed; version 2.0.13
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
+
+> ## SESSIONS 118–120 CLOSED, 2026-09-07 — the three owed things, and what step 10 found
+>
+> The three items STATUS left owed are done: the owed-answer deadlock, the
+> Java walkthrough's step 10 (never walked before), and the version stamp.
+> Walking step 10 found the two deepest defects in the modules feature so
+> far — both of them in the path the whole design exists for.
+>
+> | session | what | state |
+> | --- | --- | --- |
+> | 118 | what the framework writes before a session declares | CLOSED VERIFIED, landed 390fdcba |
+> | 119 | the sibling a Maven module cannot consume | CLOSED VERIFIED, landed 3a59fb1a |
+> | 120 | what a focused checkout unavoidably holds | CLOSED VERIFIED (round 3), landed c7b00a19 |
+>
+> **118 — one rule, in one place.** `undeclaredSessionInFlight` and
+> `commitBeforeDeclaring` live in `writers.ts` beside what a declaration is;
+> bootstrap reads them instead of its own copy, and `dabbler owed answer`
+> reads them after an answer that wrote `dabbler.yaml` — which is the case
+> the walk hit, because `session start` raises the suite decision and its
+> recommended answer writes a tracked file inside the window where the
+> declaration refuses a dirty tree.
+>
+> **119 — consuming a sibling as a package had never worked on Maven.** The
+> `store` module declared it the way the design says to (a versionless
+> `<dependency>` taking the parent's managed pin) and Maven refused: *"Could
+> not find artifact com.example:solution-parent:pom:0.1.0-dev... in modules
+> (file:///.../packages)"*. `module pack` deploys the module's jar and POM
+> and never the root parent POM, which the deployed POM still names (flatten
+> in `resolveCiFriendliesOnly` resolves `${revision}` and keeps the parent).
+> The seam gained `feedRootArgv` — what the FEED needs besides a module's own
+> artifacts — which is one non-recursive parent deploy for Maven and nothing
+> for .NET, where a `.nupkg` names no parent.
+>
+> **120 — the exposure gate refused the checkout the design requires.** The
+> `app` session ran in its focused clone, as a module session is meant to,
+> and the close refused for 1603 bytes of `model` and 1223 of `store` — all
+> of it their `pom.xml` files, which git's cone mode materialises beside the
+> contract folders the cone asks for, plus a `.flattened-pom.xml` the reactor
+> wrote. `siblingBytes` now measures SOURCE: not the contract folder, not the
+> ecosystem's build files, not what the repository ignores.
+>
+> **The walkthrough was wrong twice, and is corrected.** A module session
+> starts as `session start --module <slug>`, which makes the clone and
+> registers the session inside it; a session started in the full checkout
+> cannot close once a sibling has source, and no grant can rescue it, because
+> a grant widens a focused clone and the full checkout is not one. Step 8 now
+> checks the checkout the session is already in.
+>
+> **Step 10, walked end to end on the fixed build.** Session 2 (`store`)
+> consumed `json-model` as a package; session 3 (`app`) ran in
+> `C:\temp\uat-java3.app`, where neither sibling's source exists, consumed
+> both as packages, verified at round 1, ran the maven suite as its run of
+> record, landed from the clone and closed with all nine gates green. The
+> full checkout pulled the work, and the built loader printed exactly what
+> the document promises:
+>
+> ```
+> read 3, stored 3
+> read 3, stored 0
+> ```
+>
+> **Version 2.0.13** is stamped and both artefacts rebuilt; the VSIX sits at
+> `tools/dabbler-ai-orchestration/dabbler-ai-orchestration-2.0.13.vsix`.
+> Publishing it is the operator's call, as always.
+>
+> **Owed.** One thing, and it is small: the walk's session 2 was cancelled
+> rather than closed (it had run in the full checkout, where no module
+> session can close), so the `store` module's work is landed but was never
+> carried by a session that closed. Nothing depends on it; a reader of that
+> ledger should know why the row says cancelled.
 
 > ## SESSIONS 113–117 CLOSED, 2026-09-07 — the queued work, and what the Java walk found
 >

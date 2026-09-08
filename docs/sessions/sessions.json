@@ -2393,9 +2393,9 @@
     {
       "number": 121,
       "title": "Two ways in \u2014 the seat and the keys",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-08T04:24:49.353000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-09-08T04:34:15.871000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

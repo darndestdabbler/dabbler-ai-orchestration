@@ -10587,6 +10587,123 @@
       "dateTime": "2026-09-08T14:47:03.093000-04:00",
       "task": "Session 127 makes a session focused or global with the plan saying which, makes the focused folder feel like a module repository, marks the modules in play, and trims what the hook plan and the debug overlay left behind, in the order the plan gives them, adding no module. (1) The kind from the plan: extractSessionTitlesFromPlan also reads the first `Module: <slug>` or `Scope: whole repository` line under each session heading, the planned row and the Work Explorer's planned session row carry it, and session start derives the kind -- focused when the solution is multi and the plan names exactly one module, global otherwise -- with --focused and --global overriding it (--focused refused with a plain reason where it cannot apply, --module accepted and made to agree with the plan), session drive taking the same two flags, a global session in a multi-module solution writing no exposure manifest and no policy, accepting any modules in the declaration and running no exposure gate at the close, said on start's output and the terminal's kind line; and a start in a focused folder whose module is not the plan's module is refused by name, with Start Session not offered there. (2) The folder kept: EXISTING_CLONE becomes reset (kept, fetched and reset when clean, refused when dirty, never deleted); openModule records the repository's path in the clone's marker; close run in a clone pulls the repository forward after its own push with git pull --ff-only, only on a clean tree, never refusing, one line naming the command otherwise; session start in any checkout with an upstream and a clean tree pulls first. (3) One click: Start Session on the repository row when the next session is focused, and Start Focused Session on the module row the plan names, run module open in-process, write the start request to the clone's .dabbler/start-request.json and open the window; an extension activating on a fresh request consumes it and runs runStartSession with those choices; Open Module stays; a Resume Session command on the in-flight session's row runs dabbler session run. (4) The Solution Explorer marks the modules in play: project() adds inSession from the ledger row or the module-session marker, the projection is rewritten at start and close, the module row shows the session number, the milestone colour and ;active, and the repository window's Work Explorer repository row says a focused session is running from the marker. (5) Suites and modules: a suite whose covers and tests lie under one module's code roots is that module's suite unless it says otherwise, and in a focused folder a reached suite whose tests are not on disk is skipped and recorded as owed to that module's own session, never run and failed. (6) The debug grant and its overlay go (layDebugGrants, writeOverlay, OVERLAY_TARGETS, the Maven impl, the pack callbacks, Widen for Debugging, their tests); End Grant and module revoke stay; the grant decision's text ends with the permanent sharedFiles form; checkoutCone keeps a shared entry that names a directory whole. (7) policy.ts keeps the record, its writer and reader, the scope on the first instruction and session scope, and loses protected, writable, destructive, decide and SELF_GRANT_VERB with their test; judgeExposure's sibling-bytes clause becomes a line in the close record and its changed-path clause stays the gate; the scoped paragraph of the first instruction and one Hard-rules bullet of the managed body say that the other modules are here as packages and contract folders and that a sibling's source is asked for with --request-grant and a reason, and the bullet says session cancel --force is a person's verb. (8) Papercuts: rebaseline's repaired paths leave out the framework's bookkeeping and the candidate's files; an engine's cancel --force raises an owed decision; the before-work exemption for .claude/settings.json holds only when the registration recorded removing the hook; the terminal's step-line deduplication resets with the session; the bootstrap path of the hook removal gets its test. Tests one per behaviour: a plan section with Module: persister yields a focused default and --global overrides it while a one-module plan refuses --focused; a close in a clone pulls its repository forward and says so when it cannot; Start Focused Session writes the start request and a window activating on it opens the terminal with the sentence; the solution projection marks the in-flight session's modules from the ledger row and from the marker; judgeExposure records sibling bytes and still fails one changed path outside scope; a suite under one module's roots is that module's, and an absent suite in a focused folder is owed, not failed. No new module, no version bump. Not releasable.",
       "releasable": false
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 130,
+      "dateTime": "2026-09-08T16:16:04.633000-04:00",
+      "task": "Session 130 walks the UI path through a multi-module solution and rewrites the two UAT walkthroughs as instruments rather than prose. The walk comes first and is the test: the .NET path and then the Java path are walked for real in scratch solutions outside this tree, each operation reached the way the operator reaches it -- the extension command that offers it, the router verb that command generates -- with every divergence recorded in a new walk record, docs/uat/uat-walk-findings.md, which also settles the four rows session 123's audit could not close from the code alone (New Module asking for four of a module's six values, the remote and the upstream nothing in the UI asks for, the hand-written plan that must be committed before the first start, and Troubleshoot running none of the prerequisite toolchain checks) and says plainly how many findings the walk produced. Findings that are document errors are fixed in this session's documents; findings that are product defects are recorded with their reproduction in the walk record and raised as decisions on the session's own log, in the operator's terms -- framework, UI, or person. Then docs/uat/uat-dotnet-json-solution.md and docs/uat/uat-java-json-solution.md are rewritten so that every numbered step carries three registers -- what the framework already did and at which lifecycle moment, what the operator does in the UI by exact command title and exact prompt answer, and what that operation runs underneath -- and a step that cannot fill the first two says so as a labelled gap in the operator's terms instead of blending into the shell; the stale manual commit after bootstrap moves into the first register, and docs/quick-start.md and docs/tutorials/csv-solution/csv-multi-module-walkthrough.md are reached in the same pass. One new script, packages/router/scripts/check-uat-registers.mjs, is the mechanical check the way doc-paths.mjs is: it holds every numbered step of the two UAT documents to the three registers or to an explicit statement of which are absent and why, holds every palette command title a document names to the extension's contributes.commands, and refuses a document that instructs a manual commit after bootstrap. No new module, no version bump, not releasable.",
+      "releasable": false
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D258",
+      "ordinal": 258,
+      "sessionNumber": 130,
+      "decidedOn": "2026-09-08",
+      "recordedAt": "2026-09-08T16:48:25.334000-04:00",
+      "decider": "orchestrator",
+      "headline": "Owed: New Module must ask for the code root and the package, or modules create must default them",
+      "body": "Walk finding 1 of session 130 (docs/uat/uat-walk-findings.md). runNewModuleFlow prompts for slug, title, kind and depends-on; createModule writes only what it is given. A module made from those four answers refuses BOTH operations a multi-module solution exists for: \"module pack: refused -- module <slug> declares no package\", and \"start: refused -- module <slug> declares the repository root as a code root\". Bucket: UI (two more prompts) or framework (default modules/<slug> and the slug as the package id). Reproduced 2026-09-08 in C:\\temp\\uat130-dotnet."
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D259",
+      "ordinal": 259,
+      "sessionNumber": 130,
+      "decidedOn": "2026-09-08",
+      "recordedAt": "2026-09-08T16:48:26.257000-04:00",
+      "decider": "orchestrator",
+      "headline": "Owed: bootstrap must leave the tree clean for the first declaration, the modules manifest included",
+      "body": "Walk finding 2 of session 130. commitOwnScaffold commits exactly the files bootstrap wrote. In both walkthroughs the modules are declared first, so docs/modules.yaml is written by modules create and left untracked, and bootstrap still prints \"the declaration a session makes comes before its work, so session 1 would be refused while they sat uncommitted\" over a tree that is not clean. The first session start then refuses. Bucket: framework, at bootstrap. Reproduced 2026-09-08 in both scratch solutions."
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D260",
+      "ordinal": 260,
+      "sessionNumber": 130,
+      "decidedOn": "2026-09-08",
+      "recordedAt": "2026-09-08T16:48:27.325000-04:00",
+      "decider": "orchestrator",
+      "headline": "Owed: the .NET first pack must ignore bin/ and obj/, as the Maven one already ignores target/",
+      "body": "Walk finding 3 of session 130, and the largest. ensureRootFiles appends target/ and .flattened-pom.xml to .gitignore on Maven, with the reason in its own comment: a module source digest is taken over its code roots, so unignored build output makes the same source pack to a new dev version every time. On .NET it appends nothing. Three guarantees break together: module pack stops being idempotent (four consecutive packs gave 0.1.0-dev.20260908.1.gc2a1199, .2.g90deeb9, .3.gc53e704, .4.gb27c782 with no source touched, against three identical Maven packs); the next session start is refused because untracked build output is a change the declaration counts; and pullRepositoryForward refuses at the close, handing the operator back the pull that sessions 125-127 took off them. Bucket: framework. Reproduced 2026-09-08 side by side in C:\\temp\\uat130-dotnet and C:\\temp\\uat130-java."
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D261",
+      "ordinal": 261,
+      "sessionNumber": 130,
+      "decidedOn": "2026-09-08",
+      "recordedAt": "2026-09-08T16:48:42.645000-04:00",
+      "decider": "orchestrator",
+      "headline": "Owed: the clone reset must judge dirt with materialPaths, not raw dirtyPaths",
+      "body": "Walk finding 4 of session 130. openModule refuses a dirty clone over dirtyPaths, which counts docs/sessions/sessions.json -- the ledger session start itself wrote. Pressing Start Focused Session or Open Module on a module whose session is in flight refuses with \"commit, push or discard them there\", asking the operator to touch the one file the hard rules say is the router us alone. Refusing the re-open is right; refusing it in those words over that file is not. materialPaths in gates.ts exists for exactly this distinction and every other caller uses it. Bucket: framework. Reproduced 2026-09-08 in both scratch solutions."
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D262",
+      "ordinal": 262,
+      "sessionNumber": 130,
+      "decidedOn": "2026-09-08",
+      "recordedAt": "2026-09-08T16:48:43.490000-04:00",
+      "decider": "orchestrator",
+      "headline": "Owed: Set Up New Project must ask for the repository remote and set the upstream",
+      "body": "Walk finding 5 of session 130. runSetUpProjectFlow asks where the project goes and what it is called, and never for a remote. The land runs a bare git push, the close reads pushed_to_remote, and a focused checkout is cloned from the origin, so the first session can neither start focused nor close without one; the -u that the bare push needs is nobody us either. Say Where This Repository Is (Remote) is a different command: identifyRemote records a SIBLING repository URL through deps.locate and runs no git remote at all, which makes it a trap for a reader looking for this. The URL is the one parameter the framework cannot determine, so under the principle it is a prompt at set-up. Bucket: framework."
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D263",
+      "ordinal": 263,
+      "sessionNumber": 130,
+      "decidedOn": "2026-09-08",
+      "recordedAt": "2026-09-08T16:48:44.516000-04:00",
+      "decider": "orchestrator",
+      "headline": "Owed: Troubleshoot must run the prerequisite toolchain checks",
+      "body": "Walk finding 6 of session 130, and the fourth row of session 123 audit, confirmed. troubleshoot.ts offers six items: extension not activating, session stuck in In Progress, worktrees not showing, API key not found, cost seems high, file/folder layout wrong. The toolchain versions both UAT walkthroughs open with -- the SDK or JDK, Maven, git, node, dabbler version, the Copilot CLI and DABBLER_TRANSPORT -- are constant, optional and diagnostic, which is the definition of the UI bucket, and they are the first thing a first-time operator gets wrong. Bucket: UI, one more item."
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D264",
+      "ordinal": 264,
+      "sessionNumber": 130,
+      "decidedOn": "2026-09-08",
+      "recordedAt": "2026-09-08T16:49:07.554000-04:00",
+      "decider": "orchestrator",
+      "headline": "Owed: bootstrap --project-dir must carry into the discovery-drift note",
+      "body": "Walk finding 7 of session 130. Minor. Run bootstrap --project-dir C:\\temp\\uat130-dotnet from C:\\temp and every line names the project directory except one: \"discovery: api-enumeration: no record at C:\\temp\\.dabbler\\api-models.lock\". The drift note takes the working directory, so it reports on a folder the command was told not to act on. Bucket: framework."
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D265",
+      "ordinal": 265,
+      "sessionNumber": 130,
+      "decidedOn": "2026-09-08",
+      "recordedAt": "2026-09-08T16:49:08.549000-04:00",
+      "decider": "orchestrator",
+      "headline": "Owed: New Module first prompt is titled 1/2 among four boxes",
+      "body": "Walk finding 8 of session 130. Cosmetic. newModule.ts titles the boxes \"New module (1/2): slug\", then (2/4), (3/4), (4/4). A person who reads the first title stops expecting the third box. If walk finding 1 is answered by prompting for the code root and the package the denominator changes anyway, but it is wrong today either way. Bucket: UI."
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D266",
+      "ordinal": 266,
+      "sessionNumber": 130,
+      "decidedOn": "2026-09-08",
+      "recordedAt": "2026-09-08T16:49:09.616000-04:00",
+      "decider": "orchestrator",
+      "headline": "Owed: the Maven pack must not spawn through a shell node has deprecated",
+      "body": "Walk finding 9 of session 130. packages.ts spawns the ecosystem build with shell: resolved.isBatch; on Windows mvn resolves to mvn.cmd, so node emits DEP0190 -- \"Passing args to a child process with shell option true can lead to security vulnerabilities\" -- into the middle of the pack output, three lines of it, on node 22 or newer. Two costs: a UAT reader is right to report a security warning as a defect, and the deprecation is real, so the day node makes it an error the Maven pack stops working on Windows. The router other spawners already say in their comments that they refuse shell: true for this reason. Bucket: framework. Measured on node v25.8.1, 2026-09-08."
+    },
+    {
+      "kind": "decision",
+      "decisionId": "D267",
+      "ordinal": 267,
+      "sessionNumber": 130,
+      "decidedOn": "2026-09-08",
+      "recordedAt": "2026-09-08T16:49:10.674000-04:00",
+      "decider": "orchestrator",
+      "headline": "Owed: no test suite is ever declared for a solution built by either walkthrough",
+      "body": "Walk finding 10 of session 130. Bootstrap must run before any project file exists, so it declares no suite and says so. Nothing revisits it; the lifecycle moment where the ecosystem becomes known is the first pack, where ensureRootFiles already writes that ecosystem root build files and knows what a maven or dotnet suite command would be. What makes it a defect rather than a nuance: with a selection rule and no suite, dabbler affected prints the configured-rule line the walkthroughs tell the reader to look for, and then says \"no suite is declared, so there is no command to run\" on the next line. The reader check reads as a pass over an empty run of record. This is the .NET reference run \"two sessions closed green having run no tests at all\", diagnosed one level deeper: the missing thing is the suite, not the rule. Bucket: framework."
     }
   ]
 }

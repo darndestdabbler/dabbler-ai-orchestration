@@ -2514,13 +2514,13 @@
         "identityProvenance": "direct"
       },
       "verificationVerdict": "VERIFIED",
-      "frameworkVersion": "2.0.14",
       "verification": {
         "rounds": 2,
         "verifierModel": "gpt-5-6-terra",
         "verifierProvider": "openai",
         "transport": "api"
-      }
+      },
+      "frameworkVersion": "2.0.14"
     },
     {
       "number": 128,
@@ -2549,11 +2549,22 @@
     {
       "number": 130,
       "title": "The UAT that tests the UI, and shows its own machinery",
-      "status": "not-started",
-      "startedAt": null,
+      "status": "in-progress",
+      "startedAt": "2026-09-08T16:12:47.001000-04:00",
       "completedAt": null,
-      "orchestrator": null,
-      "verificationVerdict": null
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": "VERIFIED",
+      "frameworkVersion": "2.0.14",
+      "verification": {
+        "rounds": 2,
+        "verifierModel": "gpt-5.4",
+        "verifierProvider": "openai",
+        "transport": "copilot-cli"
+      }
     }
   ]
 }

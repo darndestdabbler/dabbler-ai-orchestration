@@ -138,7 +138,7 @@ exist yet, never one an engine forgot to tick.
 ### Executing an approved plan, one step at a time
 
 When the session's work is pre-registered as an approved plan
-(`.dabbler/runs/<set>/s<N>/approved-plan.json`), the steps are executed
+(`.dabbler/runs/s<N>/approved-plan.json`), the steps are executed
 through the framework rather than freehand. One step is in flight at a
 time:
 
@@ -200,7 +200,7 @@ dabbler verify
   orchestrator, on either transport; one retry excludes a failed
   provider.
 - Each round appends one row to
-  `.dabbler/runs/<set>/s<N>/rounds.jsonl` — machine-written only, never
+  `.dabbler/runs/s<N>/rounds.jsonl` — machine-written only, never
   edit it — with the raw verifier output saved alongside.
 - On blocking findings (`critical`/`major`): remediate, then re-run the
   same command. The loop suspends at the round cap

@@ -8566,3 +8566,45 @@ quotes would have switched both audits off while the control went on
 printing success. That is the same defect as the thing being audited, one
 layer up: a protection that stops protecting without saying so. It now
 accepts either quote style and refuses when it can read no names.
+
+## Session 130 — The UAT that tests the UI, and shows its own machinery
+
+### D258 · 2026-09-08 · Orchestrator · Owed: New Module must ask for the code root and the package, or modules create must default them
+
+Walk finding 1 of session 130 (docs/uat/uat-walk-findings.md). runNewModuleFlow prompts for slug, title, kind and depends-on; createModule writes only what it is given. A module made from those four answers refuses BOTH operations a multi-module solution exists for: "module pack: refused -- module <slug> declares no package", and "start: refused -- module <slug> declares the repository root as a code root". Bucket: UI (two more prompts) or framework (default modules/<slug> and the slug as the package id). Reproduced 2026-09-08 in C:\temp\uat130-dotnet.
+
+### D259 · 2026-09-08 · Orchestrator · Owed: bootstrap must leave the tree clean for the first declaration, the modules manifest included
+
+Walk finding 2 of session 130. commitOwnScaffold commits exactly the files bootstrap wrote. In both walkthroughs the modules are declared first, so docs/modules.yaml is written by modules create and left untracked, and bootstrap still prints "the declaration a session makes comes before its work, so session 1 would be refused while they sat uncommitted" over a tree that is not clean. The first session start then refuses. Bucket: framework, at bootstrap. Reproduced 2026-09-08 in both scratch solutions.
+
+### D260 · 2026-09-08 · Orchestrator · Owed: the .NET first pack must ignore bin/ and obj/, as the Maven one already ignores target/
+
+Walk finding 3 of session 130, and the largest. ensureRootFiles appends target/ and .flattened-pom.xml to .gitignore on Maven, with the reason in its own comment: a module source digest is taken over its code roots, so unignored build output makes the same source pack to a new dev version every time. On .NET it appends nothing. Three guarantees break together: module pack stops being idempotent (four consecutive packs gave 0.1.0-dev.20260908.1.gc2a1199, .2.g90deeb9, .3.gc53e704, .4.gb27c782 with no source touched, against three identical Maven packs); the next session start is refused because untracked build output is a change the declaration counts; and pullRepositoryForward refuses at the close, handing the operator back the pull that sessions 125-127 took off them. Bucket: framework. Reproduced 2026-09-08 side by side in C:\temp\uat130-dotnet and C:\temp\uat130-java.
+
+### D261 · 2026-09-08 · Orchestrator · Owed: the clone reset must judge dirt with materialPaths, not raw dirtyPaths
+
+Walk finding 4 of session 130. openModule refuses a dirty clone over dirtyPaths, which counts docs/sessions/sessions.json -- the ledger session start itself wrote. Pressing Start Focused Session or Open Module on a module whose session is in flight refuses with "commit, push or discard them there", asking the operator to touch the one file the hard rules say is the router us alone. Refusing the re-open is right; refusing it in those words over that file is not. materialPaths in gates.ts exists for exactly this distinction and every other caller uses it. Bucket: framework. Reproduced 2026-09-08 in both scratch solutions.
+
+### D262 · 2026-09-08 · Orchestrator · Owed: Set Up New Project must ask for the repository remote and set the upstream
+
+Walk finding 5 of session 130. runSetUpProjectFlow asks where the project goes and what it is called, and never for a remote. The land runs a bare git push, the close reads pushed_to_remote, and a focused checkout is cloned from the origin, so the first session can neither start focused nor close without one; the -u that the bare push needs is nobody us either. Say Where This Repository Is (Remote) is a different command: identifyRemote records a SIBLING repository URL through deps.locate and runs no git remote at all, which makes it a trap for a reader looking for this. The URL is the one parameter the framework cannot determine, so under the principle it is a prompt at set-up. Bucket: framework.
+
+### D263 · 2026-09-08 · Orchestrator · Owed: Troubleshoot must run the prerequisite toolchain checks
+
+Walk finding 6 of session 130, and the fourth row of session 123 audit, confirmed. troubleshoot.ts offers six items: extension not activating, session stuck in In Progress, worktrees not showing, API key not found, cost seems high, file/folder layout wrong. The toolchain versions both UAT walkthroughs open with -- the SDK or JDK, Maven, git, node, dabbler version, the Copilot CLI and DABBLER_TRANSPORT -- are constant, optional and diagnostic, which is the definition of the UI bucket, and they are the first thing a first-time operator gets wrong. Bucket: UI, one more item.
+
+### D264 · 2026-09-08 · Orchestrator · Owed: bootstrap --project-dir must carry into the discovery-drift note
+
+Walk finding 7 of session 130. Minor. Run bootstrap --project-dir C:\temp\uat130-dotnet from C:\temp and every line names the project directory except one: "discovery: api-enumeration: no record at C:\temp\.dabbler\api-models.lock". The drift note takes the working directory, so it reports on a folder the command was told not to act on. Bucket: framework.
+
+### D265 · 2026-09-08 · Orchestrator · Owed: New Module first prompt is titled 1/2 among four boxes
+
+Walk finding 8 of session 130. Cosmetic. newModule.ts titles the boxes "New module (1/2): slug", then (2/4), (3/4), (4/4). A person who reads the first title stops expecting the third box. If walk finding 1 is answered by prompting for the code root and the package the denominator changes anyway, but it is wrong today either way. Bucket: UI.
+
+### D266 · 2026-09-08 · Orchestrator · Owed: the Maven pack must not spawn through a shell node has deprecated
+
+Walk finding 9 of session 130. packages.ts spawns the ecosystem build with shell: resolved.isBatch; on Windows mvn resolves to mvn.cmd, so node emits DEP0190 -- "Passing args to a child process with shell option true can lead to security vulnerabilities" -- into the middle of the pack output, three lines of it, on node 22 or newer. Two costs: a UAT reader is right to report a security warning as a defect, and the deprecation is real, so the day node makes it an error the Maven pack stops working on Windows. The router other spawners already say in their comments that they refuse shell: true for this reason. Bucket: framework. Measured on node v25.8.1, 2026-09-08.
+
+### D267 · 2026-09-08 · Orchestrator · Owed: no test suite is ever declared for a solution built by either walkthrough
+
+Walk finding 10 of session 130. Bootstrap must run before any project file exists, so it declares no suite and says so. Nothing revisits it; the lifecycle moment where the ecosystem becomes known is the first pack, where ensureRootFiles already writes that ecosystem root build files and knows what a maven or dotnet suite command would be. What makes it a defect rather than a nuance: with a selection rule and no suite, dabbler affected prints the configured-rule line the walkthroughs tell the reader to look for, and then says "no suite is declared, so there is no command to run" on the next line. The reader check reads as a pass over an empty run of record. This is the .NET reference run "two sessions closed green having run no tests at all", diagnosed one level deeper: the missing thing is the suite, not the rule. Bucket: framework.

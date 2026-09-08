@@ -19,30 +19,92 @@ must still be true is spelled out.
 
 ## Prerequisites
 
+There are two ways to pay for the models this walkthrough runs, and they need
+different setups. **Read part A or part B — whichever matches how your models
+are paid for — and ignore the other.** Everybody reads the first part.
+
+### What every run needs
+
 Run these three. If any fails, stop and fix it before going on.
 
 ```
 dotnet --list-sdks
 git --version
 node --version
+dabbler version
 ```
 
 **Expect:** a line containing `10.` from the first (any 10.x will do), a git
-version, and node 22 or newer.
+version, node 22 or newer, and a `dabbler-ai-router` version. If `dabbler` is
+not found, that is a PATH problem: open a terminal from VS Code with the
+extension installed, or run `node "<extension dir>/dist/dabbler.cjs"` instead.
 
-You also need the three API keys set as environment variables:
-`DABBLER_ANTHROPIC_API_KEY`, `DABBLER_OPENAI_API_KEY`, `DABBLER_GEMINI_API_KEY`.
+### A — you have a GitHub Copilot seat
 
-**One setting matters and is easy to miss.** Check it:
+This is the setup with no API keys of your own: the seat pays, in premium
+requests. Nothing here reads `DABBLER_ANTHROPIC_API_KEY` or its siblings, and
+you do not need them set.
+
+```
+copilot --version
+echo %DABBLER_TRANSPORT%
+```
+
+**Expect** a Copilot CLI version from the first, and `copilot-cli` from the
+second. If the second is empty, either set it, or add `--transport
+copilot-cli` to the **first** `dabbler session next` of each session — the
+transport is kept on the run from there, so once is enough.
+
+**Your session names its model, and that is not optional:**
+
+```
+dabbler session start --sessions-dir docs/sessions --engine copilot --provider openai --model gpt-5.4
+```
+
+Dabbler resolves the model through its registry and refuses one it does not
+know, because a seat's own label does not say which vendor answered. Substitute
+this line wherever the steps below show `--engine claude-code`.
+
+**What it costs, and how to keep it low.** Every call is a premium request,
+weighted by model. What the shipped catalog records:
+
+| weight | models |
+| --- | --- |
+| 0 | `gpt-5.4`, `gpt-5.3-codex`, `gpt-5.4-mini`, `gpt-5-mini` |
+| 1 | `claude-sonnet-4.6`, `claude-sonnet-4.5`, `claude-fable-5` |
+| 3 | `claude-opus-4.5`, `claude-opus-4.6` |
+| 7.5 | `gpt-5.5` |
+| 14 | `gemini-3.5-flash` |
+| 15 | `claude-opus-4.8` |
+
+**Think in pairs, not in single models.** A different provider always checks
+the session's work — that rule does not bend on a seat — so Dabbler picks the
+verifier from the seat's models *excluding your engine's vendor*. An engine on
+`claude-sonnet-4.6` (weight 1) leaves the verifier free to be one of the
+zero-weight GPT models. An engine on a zero-weight GPT does the opposite: it
+forces the verifier onto Anthropic or Google, where the cheapest confirmed
+model is 1 and the dearest is 15.
+
+### B — you have direct API keys
+
+This is the setup with no seat: each vendor bills your own account, per token.
+You need all three keys, because the verifier is always a different vendor
+from the engine:
+
+```
+DABBLER_ANTHROPIC_API_KEY
+DABBLER_OPENAI_API_KEY
+DABBLER_GEMINI_API_KEY
+```
 
 ```
 echo %DABBLER_TRANSPORT%
 ```
 
-**Expect:** `copilot-cli` or empty. If it says `copilot-cli`, add
-`--transport api` to **every** `dabbler session` command below. Without it,
-verification runs on the Copilot seat, which bills per request and cannot
-reach the GPT-5.6 verifier at all.
+**Expect** empty. If it says `copilot-cli`, that machine is set up for part A,
+and you tell each session to use your keys instead by adding `--transport api`
+to the **first** `dabbler session next` of the session — once, not to every
+command. Without it the session runs on the seat, and the seat is billed.
 
 ---
 
@@ -254,6 +316,11 @@ two commands in a terminal at `C:\temp\uat-json.model`:
 dabbler session start --sessions-dir docs/sessions --engine claude-code --provider anthropic
 dabbler session next --sessions-dir docs/sessions
 ```
+
+**On a Copilot seat** (prerequisites, part A), the first line is
+`dabbler session start --sessions-dir docs/sessions --engine copilot --provider openai --model gpt-5.4`
+instead, and the first `next` of the session carries `--transport copilot-cli`
+unless `DABBLER_TRANSPORT` already says so.
 
 Then **keep running `dabbler session next`** and doing what each answer tells
 you, until it answers `done`.

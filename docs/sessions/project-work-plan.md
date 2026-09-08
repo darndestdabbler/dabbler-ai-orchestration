@@ -158,6 +158,7 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 118 | What the framework writes before a session declares | no | 2026-09-07 |
 | 119 | The sibling a Maven module cannot consume | no | 2026-09-07 |
 | 120 | What a focused checkout unavoidably holds | no | 2026-09-07 |
+| 121 | Two ways in — the seat and the keys | no | 2026-09-08 |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -2056,3 +2057,9 @@ Make a Maven module able to consume a sibling as a package, which it never could
 **Releasable: no.**
 
 Stop the exposure gate refusing the checkout a module session is meant to run in, and correct the walkthrough that sends a reader to the wrong one. Walking the app module in its focused clone, the close refused for 1603 bytes of module 'model' and 1223 of 'store' -- and what the clone held of them was two pom.xml files, one .flattened-pom.xml and two contract pages, with no source at all. Git's sparse checkout is in cone mode, which materialises every file directly under a directory it keeps, so asking for modules/model/contract/ brings modules/model/pom.xml along; and the flatten plugin writes .flattened-pom.xml for every module in the reactor when the run of record builds at the root. siblingBytes counts both. So no Maven module session can close from a focused checkout, which is the checkout the design requires. The manifest is taught to measure a sibling's SOURCE: the contract folder as today, and now neither the ecosystem's build files nor anything the repository ignores. The walkthrough gains what this walk proved twice: a module session starts with `session start --module <slug>`, which makes the clone and registers the session in it, and a session started in the full checkout cannot close once a sibling has source, because the exposure gate refuses and no grant can help -- a grant widens a focused clone, and the full checkout is not one.
+
+### Session 121 — Two ways in — the seat and the keys
+
+**Releasable: no.**
+
+Give both UAT walkthroughs a Prerequisites section in three parts -- what every run needs, then a GitHub Copilot seat, then direct API keys -- because the documents currently assume the keys and treat a seat as a mistake, which is backwards for the staff who have a seat and no keys at all. The seat half carries the facts that decide what a run costs, each read out of this repository rather than supposed: --model is required on a seat because resolveOrchestratorIdentity refuses a model the registry cannot resolve and a multi-provider seat's label is not trusted; the premium_request_weight of every confirmed model in packages/router/copilot-catalog.lock; and the fact that seatLadder takes the confirmed catalog minus the engine's provider, so the verifier is always a different provider from the engine and the ENGINE-verifier pairing is what decides the bill. The keys half states the three DABBLER_* variables and per-token vendor billing. Neither half names a key value, a seat id, or a price in money.

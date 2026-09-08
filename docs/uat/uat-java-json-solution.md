@@ -38,34 +38,98 @@ before session 113 — check `dabbler version` and say which one you have.
 
 ## Prerequisites
 
+There are two ways to pay for the models this walkthrough runs, and they need
+different setups. **Read part A or part B — whichever matches how your models
+are paid for — and ignore the other.** Everybody reads the first part.
+
+### What every run needs
+
 ```
 java -version
 mvn -version
 git --version
 node --version
+dabbler version
 ```
 
-**Expect:** a JDK version, Maven 3.9 or newer, a git version, node 22+.
+**Expect:** a JDK version, Maven 3.9 or newer, a git version, node 22+, and a
+`dabbler-ai-router` version. If `dabbler` is not found, that is a PATH
+problem: open a terminal from VS Code with the extension installed, or run
+`node "<extension dir>/dist/dabbler.cjs"` instead.
 
-**Check your JDK version now, because it decides step 2.** On this machine:
+**Note your JDK version, because step 4 checks it.** On this machine:
 
 ```
 openjdk version "17.0.9" 2023-10-17 LTS
 Apache Maven 3.9.2
 ```
 
-You also need `DABBLER_ANTHROPIC_API_KEY`, `DABBLER_OPENAI_API_KEY` and
-`DABBLER_GEMINI_API_KEY` set.
+### A — you have a GitHub Copilot seat
 
-**And check this, it is easy to miss:**
+This is the setup with no API keys of your own: the seat pays, in premium
+requests. Nothing here reads `DABBLER_ANTHROPIC_API_KEY` or its siblings, and
+you do not need them set.
+
+```
+copilot --version
+echo %DABBLER_TRANSPORT%
+```
+
+**Expect** a Copilot CLI version from the first, and `copilot-cli` from the
+second. If the second is empty, either set it, or add `--transport
+copilot-cli` to the **first** `dabbler session next` of each session — the
+transport is kept on the run from there, so once is enough.
+
+**Your session names its model, and that is not optional:**
+
+```
+dabbler session start --sessions-dir docs/sessions --engine copilot --provider openai --model gpt-5.4 --module model
+```
+
+Dabbler resolves the model through its registry and refuses one it does not
+know, because a seat's own label does not say which vendor answered.
+Substitute this line wherever the steps below show `--engine claude-code`.
+
+**What it costs, and how to keep it low.** Every call is a premium request,
+weighted by model. What the shipped catalog records:
+
+| weight | models |
+| --- | --- |
+| 0 | `gpt-5.4`, `gpt-5.3-codex`, `gpt-5.4-mini`, `gpt-5-mini` |
+| 1 | `claude-sonnet-4.6`, `claude-sonnet-4.5`, `claude-fable-5` |
+| 3 | `claude-opus-4.5`, `claude-opus-4.6` |
+| 7.5 | `gpt-5.5` |
+| 14 | `gemini-3.5-flash` |
+| 15 | `claude-opus-4.8` |
+
+**Think in pairs, not in single models.** A different provider always checks
+the session's work — that rule does not bend on a seat — so Dabbler picks the
+verifier from the seat's models *excluding your engine's vendor*. An engine on
+`claude-sonnet-4.6` (weight 1) leaves the verifier free to be one of the
+zero-weight GPT models. An engine on a zero-weight GPT does the opposite: it
+forces the verifier onto Anthropic or Google, where the cheapest confirmed
+model is 1 and the dearest is 15.
+
+### B — you have direct API keys
+
+This is the setup with no seat: each vendor bills your own account, per token.
+You need all three keys, because the verifier is always a different vendor
+from the engine:
+
+```
+DABBLER_ANTHROPIC_API_KEY
+DABBLER_OPENAI_API_KEY
+DABBLER_GEMINI_API_KEY
+```
 
 ```
 echo %DABBLER_TRANSPORT%
 ```
 
-If it says `copilot-cli`, add `--transport api` to **every** `dabbler session`
-command. Otherwise verification runs on the Copilot seat, which bills per
-request and cannot reach the GPT-5.6 verifier at all.
+**Expect** empty. If it says `copilot-cli`, that machine is set up for part A,
+and you tell each session to use your keys instead by adding `--transport api`
+to the **first** `dabbler session next` of the session — once, not to every
+command. Without it the session runs on the seat, and the seat is billed.
 
 ---
 
@@ -273,6 +337,11 @@ inside it:
 ```
 dabbler session start --sessions-dir docs/sessions --engine claude-code --provider anthropic --module model
 ```
+
+**On a Copilot seat** (prerequisites, part A), that line is
+`dabbler session start --sessions-dir docs/sessions --engine copilot --provider openai --model gpt-5.4 --module model`
+instead, and the first `next` of the session carries `--transport copilot-cli`
+unless `DABBLER_TRANSPORT` already says so.
 
 **Expect** it to say the session is registered *in module 'model's focused
 checkout at `C:\temp\uat-java.model`*. **That folder is where you work from

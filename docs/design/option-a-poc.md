@@ -42,7 +42,7 @@ the scaffold's own lesson is below as finding 1.
 | 12:52 | The operator opened `app` (Open Module): `optiona-poc.app` made from the origin, already holding session 1's close. |
 | 12:53 | Start Session was pressed — in the **model** window. That AI registered session 2 in model's folder, read the plan's `Module: app`, cancelled its own registration with `--force`, changed directory into `optiona-poc.app`, and started session 2 there from the model window's tab. |
 | 12:59–13:03 | Session 2 in the app folder: registered, one work step, round 1 VERIFIED, candidate, app suite only, land, close. **4 min 24 s.** The app window never had an AI tab; the operator looked for it there. |
-| 13:2x | The pull by hand in the main folder, and `dotnet run -- Ada` printing `Hello, Ada`. Until the pull, the main folder's Work Explorer showed session 2 as not started. |
+| 13:26 | The pull by hand in the main folder, then `dotnet run --project modules/app/src/PocGreeter -- Ada` printed `Hello, Ada`. Until the pull, the main folder's Work Explorer showed session 2 as not started. The proof's exit condition was met. |
 
 ## Findings
 

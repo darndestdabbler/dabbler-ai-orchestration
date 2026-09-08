@@ -39,6 +39,7 @@ import {
   restore,
   start,
   hookStop,
+  sessionScope,
 } from "../session.ts";
 import { writeErr, writeOut } from "./output.ts";
 
@@ -50,6 +51,7 @@ const SUMMARY: Record<string, string> = {
   next: "advance the session one move and print the instruction to answer",
   run: "drive the in-flight session to done in one command, identity from the record",
   "hook-stop": "the Claude Code stop gate: block the turn while an instruction is outstanding",
+  scope: "print what the session in flight may read and change: its module scope, one path per line",
   drive: "run the next session end to end: the framework drives, the engine answers",
   interrupt: "end the engine's running invocation under a driven session, with a reason",
   rebaseline: "record a repair made while the run was stopped, and move the baseline",
@@ -122,6 +124,12 @@ const OPTIONS: Record<string, readonly string[]> = {
     "  its `ask` says, run its `answer_command`, then call this again -- until it says",
     "  `done`. A `wait` means the framework is running something long: leave it",
     "  `retry_after_seconds`, read its `log` if you like, and call this again.",
+  ],
+  scope: [
+    "  Takes no options. Prints the module scope of the session in flight, one",
+    "  repository-relative path per line: the list the first step instruction carried",
+    "  as `scope`. A sibling module's implementation is not in it and is reached through",
+    "  its contract folder. A session of a single-module solution has none, and says so.",
   ],
   run: [
     "  --show-engine MODE       stream | quiet, for a registered built-in engine",
@@ -502,6 +510,10 @@ export async function sessionVerb(argv: string[]): Promise<number> {
     // Quiet on purpose: the host runs this on every stop, and silence is
     // the ordinary answer.
     return hookStop(sessionsDir);
+  }
+
+  if (subcommand === "scope") {
+    return sessionScope(sessionsDir);
   }
 
   if (subcommand === "run") {

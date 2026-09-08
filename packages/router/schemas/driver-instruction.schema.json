@@ -49,6 +49,11 @@
       "minLength": 1,
       "description": "On a `wait`: the repository-relative path of the running job's log, so a person watching can read what the framework is doing while it does it."
     },
+    "scope": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "description": "On the first `step` of a module session's plan, and on its rejections: the repository-relative paths the session may read and change -- its module's roots, its own contract folder and its dependencies', the root build files, the sessions directory -- as the session's policy states them. A sibling module's implementation is not among them and is reached through its contract folder. Absent on every other instruction and in a single-module solution; `dabbler session scope` prints the same list on demand."
+    },
     "answer_schema": {
       "enum": [
         "driver-report.schema.json",

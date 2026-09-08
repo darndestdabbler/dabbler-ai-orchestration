@@ -90,6 +90,7 @@ import {
 } from "./land.ts";
 import { packModule, readRecords as readCorrespondence } from "./packages.ts";
 import { ExposureError, raiseGrantDecision, settleAnsweredGrants } from "./exposure.ts";
+import { readPolicy } from "./policy.ts";
 import { BUILT_IN_ENGINES, builtInEngine } from "./engines.ts";
 import type { Engine, EngineOutput } from "./engines.ts";
 import { clip, stripEscapes } from "./engines.ts";
@@ -1939,9 +1940,28 @@ ${this.stopArtifacts()}`,
     this.setPhase("preverify");
   }
 
-  private stepAsk(spec: StepSpec, rejected: boolean): string {
+  /**
+   * The allowed list, on the first step of a module session's plan and on
+   * nothing else: handed to the engine before it can hit the wall, because
+   * an engine that knows what it may read rarely meets a denial at all.
+   * Null where the session has no policy -- a one-module solution, or a
+   * declaration that named no module -- and on every later step, which
+   * the engine reaches knowing it.
+   */
+  private scopeForStep(spec: StepSpec): readonly string[] | null {
+    if (!spec.fromPlan || this.requirePlan().steps[0]?.id !== spec.id) return null;
+    return readPolicy(this.repoRoot, this.sessionNumber)?.allowed ?? null;
+  }
+
+  private stepAsk(spec: StepSpec, rejected: boolean, scoped = false): string {
     return (
       spec.ask +
+      (scoped
+        ? "\n\nThis instruction's `scope` member lists what this session may read and change: " +
+          "its module's roots, its contract folder and its dependencies', the root build files " +
+          "and the sessions directory. A sibling module's implementation is reached through its " +
+          "contract folder, never its source; `dabbler session scope` prints the list again."
+        : "") +
       "\n\nWhen the step is done, report with the answer command. --files names every " +
       "file you created, changed or deleted in this step and nothing else -- a deleted " +
       "file is a change to name. Use --status blocked only if the step cannot be done, " +
@@ -2021,11 +2041,13 @@ ${this.stopArtifacts()}`,
       // the step that was refused, forever. Re-read by id; a step the plan
       // no longer declares keeps the spec it was issued with.
       spec = this.amendedSpec(spec);
+      const scope = this.scopeForStep(spec);
       const instruction = await this.converse({
         kind: reasons.length > 0 ? "rejection" : "step",
         step_id: spec.id,
-        ask: this.stepAsk(spec, reasons.length > 0),
+        ask: this.stepAsk(spec, reasons.length > 0, scope !== null),
         ...(reasons.length > 0 ? { reasons } : {}),
+        ...(scope !== null ? { scope } : {}),
         answer_schema: REPORT_SCHEMA,
         answer_command: this.answerCommand("step", spec.id),
       });

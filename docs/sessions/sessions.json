@@ -2442,34 +2442,45 @@
         "identityProvenance": "direct"
       },
       "verificationVerdict": "VERIFIED",
-      "frameworkVersion": "2.0.13",
       "verification": {
         "rounds": 1,
         "verifierModel": "gpt-5-6-terra",
         "verifierProvider": "openai",
         "transport": "api"
-      }
+      },
+      "frameworkVersion": "2.0.13"
     },
     {
       "number": 124,
       "title": "The UAT that tests the UI, and shows its own machinery",
       "status": "cancelled",
-      "startedAt": null,
-      "completedAt": null,
-      "orchestrator": null,
-      "verificationVerdict": null,
       "preCancelStatus": "not-started",
       "cancelledReason": "UAT deferred until later",
-      "cancelledAt": "2026-09-08T08:47:00-04:00"
-    },
-    {
-      "number": 125,
-      "title": "The policy \u2014 what a module session may touch, written once",
-      "status": "not-started",
+      "cancelledAt": "2026-09-08T08:47:00-04:00",
       "startedAt": null,
       "completedAt": null,
       "orchestrator": null,
       "verificationVerdict": null
+    },
+    {
+      "number": 125,
+      "title": "The policy \u2014 what a module session may touch, written once",
+      "status": "in-progress",
+      "startedAt": "2026-09-08T08:51:58.853000-04:00",
+      "completedAt": null,
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": "VERIFIED",
+      "frameworkVersion": "2.0.14",
+      "verification": {
+        "rounds": 2,
+        "verifierModel": "gpt-5-6-terra",
+        "verifierProvider": "openai",
+        "transport": "api"
+      }
     },
     {
       "number": 126,
@@ -2501,6 +2512,15 @@
     {
       "number": 129,
       "title": "Claude Code \u2014 the same wall through its own hooks",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    },
+    {
+      "number": 130,
+      "title": "The UAT that tests the UI, and shows its own machinery",
       "status": "not-started",
       "startedAt": null,
       "completedAt": null,

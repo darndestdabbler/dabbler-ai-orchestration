@@ -63,7 +63,8 @@
         "ecosystem",
         "packages",
         "checkout",
-        "exposure"
+        "exposure",
+        "policy"
       ]
     },
     "workflow-instruction": {

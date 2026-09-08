@@ -71,10 +71,11 @@ import {
   appendSupervision,
   judgeModulesForShape,
 } from "./driver.ts";
-import { ManifestError, type SolutionShape, moduleConfigs, solutionShape } from "./modules.ts";
+import { ManifestError, type SolutionShape, solutionShape } from "./modules.ts";
 import { moduleScope } from "./agency.ts";
 import { CheckoutError, openModule, readCloneMarker, writeModuleSessionMarker } from "./checkout.ts";
 import { writeExposure } from "./exposure.ts";
+import { readPolicy, sharedFilesOf, writePolicy } from "./policy.ts";
 import { candidatePathsAsWritten, readCandidateRecord } from "./impact.ts";
 import { isFrameworkInstalledPath } from "./checks.ts";
 import {
@@ -622,13 +623,23 @@ function moduleScopeOfSession(
   shape: SolutionShape,
   modules: readonly string[],
 ): string[] {
-  const shared = new Map(
-    [...moduleConfigs(loadConfig(undefined, repoRoot), shape.modules).values()].map((module) => [
-      module.slug,
-      module.sharedFiles,
-    ]),
-  );
-  return moduleScope(repoRoot, sessionsDir, shape, modules, shared);
+  return moduleScope(repoRoot, sessionsDir, shape, modules, sharedFilesOf(repoRoot, shape));
+}
+
+/**
+ * The policy of a module session, written at the moment its modules reach
+ * the record. Best-effort, like every derived record beside the ledger: a
+ * declaration must not fail because a file nobody types could not be
+ * written, and a session with no policy is walled by nothing -- allowed,
+ * unobserved -- which is the side the operator chose.
+ */
+function writeDeclaredPolicy(sessionsDir: string, session: number, modules: readonly string[]): void {
+  try {
+    const repoRoot = repoRootFromSessionsDir(sessionsDir);
+    writePolicy(repoRoot, sessionsDir, solutionShape(repoRoot), session, modules);
+  } catch {
+    // Deliberately silent: see above.
+  }
 }
 
 /**
@@ -971,6 +982,7 @@ export function start(sessionsDir: string, options: StartOptions): number {
         phase: "start",
         scope: moduleScopeOfSession(moduleStart.root, registerIn, moduleStart.shape, [moduleStart.slug]),
       });
+      writeDeclaredPolicy(registerIn, requested, [moduleStart.slug]);
       if (moduleStart.fullCheckout) {
         writeModuleSessionMarker(repoRootFromSessionsDir(sessionsDir), {
           session: requested,
@@ -1229,6 +1241,7 @@ export function declare(sessionsDir: string, options: DeclareCliOptions): number
     releaseLock(lock);
   }
   const modules = (options.modules ?? []).filter((slug) => slug.trim() !== "");
+  if (modules.length > 0) writeDeclaredPolicy(sessionsDir, target, modules);
   writeOut(
     `declare: session ${sessionDisplayNumber(target)} declared; releasable=` +
       `${options.releasable ? "yes" : "no"}` +
@@ -2615,20 +2628,9 @@ export function stopGateDecision(
  * `stopGateDecision`; this reads the record and writes the answer.
  */
 export function hookStop(sessionsDir: string): number {
-  let repoRoot: string;
-  let sessionNumber: number;
-  try {
-    const state = readRawSessionState(sessionsDir);
-    const sessions = Array.isArray(state?.["sessions"])
-      ? (state?.["sessions"] as Array<Record<string, unknown>>)
-      : [];
-    const inFlight = sessions.find((row) => row["status"] === "in-progress");
-    if (inFlight === undefined) return 0;
-    sessionNumber = Number(inFlight["number"]);
-    repoRoot = repoRootFromSessionsDir(sessionsDir);
-  } catch {
-    return 0;
-  }
+  const sessionNumber = sessionInFlight(sessionsDir);
+  if (sessionNumber === null) return 0;
+  const repoRoot = repoRootFromSessionsDir(sessionsDir);
   let instruction;
   try {
     instruction = readInstruction(repoRoot, sessionNumber);
@@ -2650,4 +2652,48 @@ export function hookStop(sessionsDir: string): number {
   });
   writeOut(`${JSON.stringify({ decision: "block", reason: decision.message })}\n`);
   return 0;
+}
+
+/** The number of the session in progress under `sessionsDir`, or null -- an unreadable ledger is nothing in flight. */
+function sessionInFlight(sessionsDir: string): number | null {
+  try {
+    const state = readRawSessionState(sessionsDir);
+    const sessions = Array.isArray(state?.["sessions"])
+      ? (state?.["sessions"] as Array<Record<string, unknown>>)
+      : [];
+    const inFlight = sessions.find((row) => row["status"] === "in-progress");
+    if (inFlight === undefined) return null;
+    const number = Number(inFlight["number"]);
+    return Number.isFinite(number) ? number : null;
+  } catch {
+    return null;
+  }
+}
+
+// --- scope: what the session in flight may touch ------------------------------
+
+/**
+ * `dabbler session scope`: the module scope of the session in flight, one
+ * repository-relative path per line -- the policy's allowed list, as the
+ * first step instruction carried it, for an engine that wants it again or
+ * a person who wants to see it. A session with no policy has no module
+ * scope and says so on one line: the repository is the module, or nothing
+ * is in flight. Exit 0 either way: this prints, it never judges.
+ */
+export function sessionScope(sessionsDir: string): number {
+  const sessionNumber = sessionInFlight(sessionsDir);
+  if (sessionNumber === null) {
+    writeOut("scope: no session is in flight, so there is no module scope\n");
+    return EXIT_OK;
+  }
+  const policy = readPolicy(repoRootFromSessionsDir(sessionsDir), sessionNumber);
+  if (policy === null) {
+    writeOut(
+      `scope: session ${sessionDisplayNumber(sessionNumber)} has no module scope -- the ` +
+        "repository is the module, and the session may touch all of it\n",
+    );
+    return EXIT_OK;
+  }
+  writeOut(`${policy.allowed.join("\n")}\n`);
+  return EXIT_OK;
 }

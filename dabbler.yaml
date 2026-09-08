@@ -480,6 +480,11 @@ testing:
       - when: packages/router/src/exposure.ts
         select:
           - packages/router/test/exposure.test.ts
+      # The policy: what a module session may touch, written once when its
+      # modules reach the record, and the decision the hooks read it through.
+      - when: packages/router/src/policy.ts
+        select:
+          - packages/router/test/policy.test.ts
       # The impact plan: what a change reaches, computed once for the
       # selector, the run of record and the close gate.
       - when: packages/router/src/impact.ts

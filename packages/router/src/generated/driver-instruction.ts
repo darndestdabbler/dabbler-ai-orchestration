@@ -42,6 +42,10 @@ export type DriverInstruction = {
    */
   log?: string;
   /**
+   * On the first `step` of a module session's plan, and on its rejections: the repository-relative paths the session may read and change -- its module's roots, its own contract folder and its dependencies', the root build files, the sessions directory -- as the session's policy states them. A sibling module's implementation is not among them and is reached through its contract folder. Absent on every other instruction and in a single-module solution; `dabbler session scope` prints the same list on demand.
+   */
+  scope?: string[];
+  /**
    * Which answer this instruction expects, by the schema it must validate against. Required on `step`, `rejection` and `interrupt`, and refused on `wait` and `done`: an instruction that expects no written answer names no schema.
    */
   answer_schema?: "driver-report.schema.json" | "driver-work-plan.schema.json" | "driver-disposition.schema.json";

@@ -25,6 +25,7 @@
 
 import { spawnSync } from "node:child_process";
 import { readdirSync, readFileSync } from "node:fs";
+import { constants } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -87,11 +88,18 @@ function checkWorkerPriority(): void {
   if (bare === null || preloaded === null || underCi === null) return;
 
   // Higher is lower: Node's scale runs PRIORITY_NORMAL 0 to PRIORITY_LOW 19.
-  if (preloaded <= bare) {
+  // The policy is "at least below normal", not "lower than it was": a
+  // GitHub runner already hands every process priority 10, which IS
+  // below-normal, and the preload can only leave that where it is. What
+  // is held is that a worker with the preload sits at below-normal or
+  // lower, and no higher than a plain node did.
+  const target = Math.max(bare, constants.priority.PRIORITY_BELOW_NORMAL);
+  if (preloaded < target) {
     fail(
-      `the preload did not lower this worker's priority: a plain node reports ${String(bare)} ` +
-        `and one loading test/support/no-git.ts reports ${String(preloaded)}. Session 76's ` +
-        "policy is what keeps the operator's machine usable during a run.",
+      `the preload did not lower this worker's priority to below normal: a plain node reports ${String(bare)} ` +
+        `and one loading test/support/no-git.ts reports ${String(preloaded)}, where ` +
+        `${String(target)} or lower was expected. Session 76's policy is what keeps the operator's ` +
+        "machine usable during a run.",
     );
   }
   if (underCi !== bare) {

@@ -2484,7 +2484,7 @@
     },
     {
       "number": 126,
-      "title": "The hooks \u2014 installed by bootstrap, decided in the shell, failing open",
+      "title": "It just works \u2014 the terminal that tells you, the Work Explorer that keeps up, the suite that leaves the machine alone, and no hooks",
       "status": "not-started",
       "startedAt": null,
       "completedAt": null,
@@ -2493,7 +2493,7 @@
     },
     {
       "number": 127,
-      "title": "Reads watched, not hooked \u2014 the turn-end feedback and the self-grant",
+      "title": "Focused or global \u2014 the plan says which, one click starts it, the framework pulls",
       "status": "not-started",
       "startedAt": null,
       "completedAt": null,
@@ -2503,20 +2503,26 @@
     {
       "number": 128,
       "title": "The close that never refuses for coverage, the clone deleted, and the Copilot walk",
-      "status": "not-started",
+      "status": "cancelled",
       "startedAt": null,
       "completedAt": null,
       "orchestrator": null,
-      "verificationVerdict": null
+      "verificationVerdict": null,
+      "preCancelStatus": "not-started",
+      "cancelledReason": "Folded into session 127 after the operator's decision of 2026-09-08: the module folder stays and is simplified, so there is no clone to delete, and the Copilot day is session 130's walk",
+      "cancelledAt": "2026-09-08T11:18:28-04:00"
     },
     {
       "number": 129,
       "title": "Claude Code \u2014 the same wall through its own hooks",
-      "status": "not-started",
+      "status": "cancelled",
       "startedAt": null,
       "completedAt": null,
       "orchestrator": null,
-      "verificationVerdict": null
+      "verificationVerdict": null,
+      "preCancelStatus": "not-started",
+      "cancelledReason": "Folded into session 127 after design round 12: the wall is a refusal in the framework, the same on every engine, and there is no hook deny left to measure on Claude Code",
+      "cancelledAt": "2026-09-08T09:31:24-04:00"
     },
     {
       "number": 130,

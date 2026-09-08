@@ -6611,207 +6611,242 @@ decision function answers each of the three rules with its reason and
 answers allow-unobserved to a missing policy; the first instruction of a
 module session carries the scope and `session scope` prints the same list.
 
-### Session 126 of 129: The hooks — installed by bootstrap, decided in the shell, failing open
+**Re-scoped 2026-09-08, twice.** Sessions 126–129 as planned that morning
+— the pre-hook in two shells, the canary, the coverage word, the transcript
+scan, the self-grant, a Claude Code measurement session — were read by
+the operator while 125 ran and rejected as weight: *"if the first thing
+that AI does is call a framework command that returns the list of
+permissions for the current session, then I think that would be
+sufficient. If this means that we no longer need hooks that might not be
+reliable anyway, that's fine. As soon as I saw the word 'canary' I
+immediately saw this as overengineering."* Round 12
+(`docs/design/consults/round12-{brief,sol,gemini,synthesis}.md`) put that to
+both advisors, who converged on a wall that refuses at the report and
+nothing inside a tool call. The operator then set the frame that decided
+it, in the afternoon: **the problem is keeping a session's work and tokens
+on its own module, not a guarantee; it does not have to be foolproof;
+stability and developer experience come first; the developer experience to
+match is a repository per module and one for the integration.** That frame
+keeps the folder per module that sessions 100–120 built — it *is* a module
+repository, made from one history — and drops everything around it that
+confused the walk. The two sessions below replace the four; 128 and 129
+are cancelled; 125's work stands.
 
-**The mechanism is the CLI's own, and the framework already uses it.**
-Bootstrap installs a Stop hook into `.claude/settings.json` whose command
-is `dabbler session hook-stop` (`packages/router/src/bootstrap/index.ts`
-~320; the rule is `StopGateDecision` in `session.ts` ~2522). GitHub Copilot
-CLI 1.0.83 has the same shape — `.github/hooks/NAME.json`, events
-`preToolUse`, `postToolUse`, `agentStop`, `sessionStart`; the pre-hook
-receives `{sessionId, timestamp, cwd, toolName, toolArgs}` and answers
-`{permissionDecision, permissionDecisionReason}`; a matcher makes a hook
-fire "only for matching tool names"; a non-zero exit is fail-closed, a
-timeout fail-open. Measured on the operator's machine on 2026-09-08 and
-recorded in the round-11 synthesis: the cost of a hook is the **shell
-Copilot starts to run it** — PowerShell 7 in 0.5–0.7 s, Git Bash in 0.25 s
-— and Node would add 0.8 s more. So the script decides in the shell, from
-125's policy file, and reads are never hooked at all.
+**The design, as a person reads it.** Every session is one of two kinds.
+A **focused session** runs in the module's own folder beside the
+repository — `Shop.persister`, holding persister's code, the other
+modules' contract folders, docs, packages and the root files — in its own
+window; the folder is kept between sessions and refreshed from the server
+at each start. A **global session** runs in the repository itself, in the
+window already open, and sees everything: no wall, no new window, nothing
+to pull. The default is focused when the solution has more than one
+module and the session's plan names exactly one; global for a one-module
+solution and for a session that needs the whole repository. The plan says
+which, one line under the session's heading — `Module: persister` or
+`Scope: whole repository` — written by the planning session or by hand,
+and nobody types `--module` any more. Three ways to start, each a menu
+command and a sentence: *start the next session* (the default), *start the
+next focused session* (refused, plainly, where it cannot apply), *start
+the next global session* (always allowed: the fail-safe). The framework
+pushes from the module folder at the close and **pulls the repository
+forward itself**, and pulls again at any later start. If the AI cannot do
+its work without a sibling's source it asks with a reason, the request is
+a decision on the session's row, a person answers grant or deny, and one
+line in the module's `sharedFiles` makes a grant permanent. The Dabbler
+terminal says the kind and the scope under a header that appears at
+registration, every framework rule carries the session number, every step
+is printed as it starts; the Work Explorer keeps up; the Solution Explorer
+marks the modules in play. **No hooks.**
 
-**What bootstrap writes, tracked with the rest of its scaffold**
-(`cli/bootstrap.ts`, `commitOwnScaffold`): for Copilot,
-`.github/hooks/dabbler.json` with a `preToolUse` hook matched to
-`edit|create|bash|powershell` and an `agentStop` hook, each carrying both
-a `powershell` and a `bash` script; for Claude Code, a `PreToolUse` entry
-matched to `Edit|Write|MultiEdit|Bash` beside the existing Stop hook, every
-other key kept as the Stop installer keeps them. The scripts are small
-and the same in both shells: find the policy file for the session in
-flight; if there is none, or anything at all goes wrong, emit
-`{"permissionDecision":"allow"}` with exit 0 and a reason that says
-`unobserved` — **a bare terminal without `dabbler` on `PATH` must never
-deny every tool**, which is what Copilot's fail-closed rule would do to a
-script that called a missing command. Only on a deny does the script call
-`dabbler session hook-tool --record`, best-effort, so the run record holds
-the decision. `timeoutSec` is set explicitly.
+**Before 126 runs: the proof.** A .NET solution of two modules — `model`,
+one record and one test; `app`, one line of output using `model` as a
+package — under `C:\temp\optiona-poc` with a bare origin, two hand-written
+sessions, run through the buttons that exist today (Open Module, Start
+Session, Pack Module, Answer Owed Decision) on 2.0.14, with the plan's rule
+for every session saying: *this solution exists to test the framework, not
+to be used; build the smallest thing that satisfies the session's sentence;
+no configuration, no README, no error handling, no logging, no extra
+files; the other module is the package the framework gives you; do not
+look for its source; stop when the test passes.* What each button did and
+what the person saw, the pull by hand, whether the Work Explorer and the
+terminal kept up, and every confusion in the operator's words go into
+`docs/design/option-a-poc.md`; findings that are defects go onto 127's
+list. The proof is also 126's reproduction.
 
-**The canary is the attestation, and there is no other.** A multi-module
-session's first instruction asks the engine to run `dabbler session
-canary`; the pre-hook is hardcoded to deny that command. Denied and
-recorded → the session's **coverage** is `observed`. If the verb actually
-runs — because the hook was absent, bypassed by `--allow-all-tools`, or
-failed open — it writes that fact itself, coverage becomes `partial` or
-`unobserved`, and the session continues: coverage is a word on the record,
-never a refusal. Copilot's `session.start` event in
-`~/.copilot/session-state/<id>/events.jsonl` carries `copilotVersion` and
-`selectedModel`, recorded when found; there is no version-keyed lock and no
-eleven-case probe — the round-10 apparatus is dropped by both advisors.
+### Session 126 of 127: It just works — the terminal that tells you, the Work Explorer that keeps up, the suite that leaves the machine alone, and no hooks
 
-**Measured on the real CLI, in this session's own tests**, because the
-brief marked them not measured: the field names in `toolArgs` for `edit`,
-`create`, `bash` and `powershell` on Copilot 1.0.83; whether
-`.github/hooks` is discovered from a subdirectory working directory (until
-it is, "from the repository root" is the instruction); and whether the
-`bash` script is honoured on Windows when Git Bash is present, which
-halves the cost. The findings and the per-call cost go into
-`docs/design/hook-wall.md`.
+**Everything the operator saw go wrong during session 125, first.** The
+Work Explorer had to be refreshed by hand to show the last step; the
+Dabbler terminal printed the banner and phase lines and never the step,
+and the banner only once the AI had already been asked to declare; the
+run of record was nineteen Node workers on a 20-core machine, at least
+twice a session; and a second chat opened in the same folder was blocked by
+the Stop hook at every end of turn, all morning. The operator's list,
+verbatim: *(a) the session number is in the Dabbler section headers, (b)
+the individual tasks are shown in the Dabbler output when they are first
+started, (c) the session header is shown at the very beginning of the
+session — before any AI work is done, (d) the Work Explorer is updated in
+a timely manner.*
 
-**Steps.** (1) The hook files bootstrap writes for both CLIs, idempotently,
-Stop hook preserved. (2) The scripts, deciding from the policy file and
-failing open; `hook-tool --record`. (3) The canary verb, the coverage word
-on the run record, and the measurements.
+**The repaint is reproduced before it is fixed.** `extension.ts` ~162–185
+already binds a watcher to `*/driver/run.json` and calls
+`treeProvider.refresh()` on every event, and the cache key
+(`src/utils/projection.ts` ~46–74) already includes that file — so the miss
+is downstream. `listGitWorktrees` swallows its own timeout and the
+projection is in-process, so those are not it. What is true and still
+suspect: `ProjectionCache.get` (~212–223) caches a **failed** projection
+under the same key as a good one, for a reason that died when the router
+went in-process, and the hard refresh — the one thing that repainted for
+the operator — is what clears that cache. Drive a real session (the proof)
+until the miss is seen, then fix the cause seen; if it is the cached
+failure the fix is one line. A fix without the reproduction is refused by
+the plan: that is how session 110's fix came to need a second one.
 
-**Tests.** Three: the script, given a policy and a call, allows an in-scope
-edit, denies an out-of-scope edit and a destructive command with the
-reason, and answers allow-`unobserved` when the policy is missing; the
-canary sets coverage `observed` when denied and `partial` when it runs;
-bootstrap writes both hook files and rewrites neither the Stop hook nor any
-other key on a second run.
+**The terminal, four changes in one file.** `DabblerTerminal.poll()`
+(`dabblerTerminal.ts` ~1099–1227) learns of a session only from
+`driver/run.json`, which is born at the first `next`. (c) The poll also
+reads the ledger's in-progress row and prints the `SESSION 126` banner the
+moment the row appears, before any run record exists; **the kind line
+follows it** — `focused module=persister scope=modules/persister,
+modules/model/contract, docs, packages, root files` from the row's
+`checkout` and `policy.json`, or `global scope=the whole repository` — and
+in the repository's own window during a focused session, from the marker,
+one line: `focused module=persister folder=Shop.persister`, its output in
+that window's terminal. (a) The voice rule reads `S126: framework` while a
+session is known. (b) When `run.seq` moves, the poll reads
+`driver/instruction.json` as it reads run.json and prints `step <step_id>`
+with the first sentence of the ask, or `rejected <step_id>` with the first
+reason; nothing for `wait` or `done`. The presentation rules stand.
 
-### Session 127 of 129: Reads watched, not hooked — the turn-end feedback and the self-grant
+**The cap returns.** `--test-concurrency=4` (D246) goes back into the
+typescript suite command in `dabbler.yaml`; the comment above it and
+`docs/design/suite-cost.md`'s paragraph against the cap say what is now
+true — the seam made each storm smaller, not the worker count — keeping
+the sentence `check-suite-cost.ts` reads. One full run at 4 is measured
+and written into the table; if it is more than 2× the uncapped 157–179 s
+the number becomes 8 and the table says so. No new control check: a flag
+in a command line cannot lapse silently.
 
-**Reads are the chunked, high-volume calls, and they cost nothing.** Both
-CLIs write a structured per-session log the framework can read: Copilot's
-`events.jsonl` records every `tool.execution_start` with `toolName` and
-`arguments`, and `assistant.turn_start`/`turn_end`; Claude Code's transcript
-under `~/.claude/projects/<repo>/` records every `tool_use`. And the
-turn-end hook — Copilot's `agentStop`, Claude's `Stop`, which the framework
-already owns as `hook-stop` — receives **`transcriptPath`** and may answer
-`block` with a `reason` that becomes the model's next prompt. So the
-sibling read is not prevented; it is *noticed*, once per turn, and answered.
+**No hooks.** `installStopGate` becomes `removeStopGate` and runs at both
+places the install ran — `start` and `bootstrap` — because every
+repository where a Claude Code session ever started has the entry, and a
+hook whose verb no longer exists exits 2, which Claude Code reads as a
+block. `hookStop`, `stopGateDecision`, the `hook-stop` dispatch, the
+`stop-gate-continued` event, this repository's `.claude/settings.json`
+entry, the sentences in `docs/driving-a-session.md` and
+`docs/design/command-ownership.md`, and their tests go. The git pre-commit
+guard is a git hook and stays. What tells a person that nothing is
+answering an instruction is the terminal's silence watcher and the Work
+Explorer's attention row.
 
-**`hook-turn` extends `hook-stop`.** At the end of a turn it reads the
-transcript handed to it, finds every read of a sibling's implementation
-outside the policy's scope (`view`/`glob`/`grep` on Copilot,
-`Read`/`Grep`/`Glob` on Claude Code), records each as a decision event in
-the run record, and — **the first time for that path in this session** —
-blocks once with 125's soft reason naming the module, its contract folder
-and the self-grant verb. Never twice for one path: after that it only
-records. Installing the Copilot `agentStop` hook also gives Copilot what
-only Claude Code has today — the outstanding-instruction gate of
-`hook-stop`, so a `wait` that is due is answered rather than idled on.
+**Steps.** (1) The repaint, reproduced under the proof, then fixed. (2) The
+terminal: the banner at registration, the kind line, the session number on
+the rules, the step and rejection lines. (3) The cap, measured and
+recorded. (4) The hook removed, at both places it was installed.
 
-**The self-grant is the escape hatch, and no human is in it.** `dabbler
-session self-grant-read --path <repo-relative> --reason "<why the contract
-is insufficient>"` appends a session-limited row to `grants.jsonl`
-(`packages/router/src/exposure.ts`) with actor `engine`, the path, the
-reason and the run; it **never** raises an owed decision — the
-`raiseOwed`/`CLASS_VALUE_TRADEOFF` path (~386) and `session next
---request-grant` become opt-in governance for a team that wants a human in
-the loop, and are not the default. A self-granted path is not blocked
-again. Writes outside scope are not self-grantable; if a step cannot be
-done without one, the engine reports it blocked and the plan is wrong, not
-the wall. Hook denials are not step refusals: the "three refusals of one
-step" rule (`AGENTS.md`) is untouched.
+**Tests.** Five, one per behaviour: the tree model, handed a failed
+projection then a good one under an unchanged key, renders the good one;
+the terminal prints the banner and the kind line from an in-progress
+ledger row with no run record; it prints the step line once when `seq`
+moves onto a step and not on the next poll; its rule carries the session
+number while a session is known; bootstrap and `start` remove a Stop entry
+they installed before and write none. Not releasable.
 
-**The human is told, never asked.** The extension already renders the run
-record: the Work Explorer's session row gains the coverage word and the
-counts (denials, self-grants), and the Dabbler terminal prints each flag as
-it is recorded — *read of `modules/model/src/Person.cs` outside scope;
-self-granted: "the contract omits the null case"*. No prompt, no decision
-to make, and a summary a team lead can read at the close.
+### Session 127 of 127: Focused or global — the plan says which, one click starts it, the framework pulls
 
-**Steps.** (1) `hook-turn`: the transcript scan for both CLIs, the
-once-per-path block, the decision events. (2) `session self-grant-read`
-and its row; the owed-decision path demoted to opt-in. (3) The coverage
-word and counts in the Work Explorer row and the Dabbler terminal lines.
+**The kind, from the plan.** `extractSessionTitlesFromPlan`
+(`progress.ts` ~165) also reads, under each session heading, the first line
+of the form `Module: <slug>` or `Scope: whole repository`; a planned row
+and the Work Explorer's planned session row carry it. `session start`
+derives the kind — focused when the solution is multi and the plan names
+exactly one module, global otherwise; `--focused` and `--global` override
+it, `--focused` refused with a plain reason where it cannot apply;
+`--module` still accepted and made to agree with the plan. The three
+opening sentences are the button's; `session drive` takes the same two
+flags. A global session in a multi-module solution writes no exposure
+manifest and no policy, accepts any modules in the declaration, and runs
+no exposure gate at the close — and says so on `start`'s own output and
+in the terminal's kind line.
 
-**Tests.** Three: a Copilot transcript with a sibling read blocks once with
-the reason and, on the next turn with the same path, only records; a
-self-grant row is written by the verb and honoured by `hook-turn`; a
-one-module session's `hook-turn` does nothing beyond `hook-stop`.
+**The focused session made to feel like a module repository.**
+`EXISTING_CLONE` becomes `reset`: the folder is kept, fetched and reset
+when clean, refused when dirty, never deleted under an open window.
+`openModule` records the repository's path in the clone's marker, and
+`close`, run in a clone, pulls that repository forward after its own push
+— `git pull --ff-only`, only on a clean tree, never refusing, one line
+naming the command otherwise; `session start` in any checkout with an
+upstream and a clean tree pulls first. **One click:** Start Session (the
+three variants) on the repository row, and Start Focused Session on the
+module row the next session's plan names, run `module open` in-process,
+write the start request to the clone's `.dabbler/start-request.json`, and
+open the window; the extension activating in a folder that holds a fresh
+request consumes it and runs `runStartSession` with those choices, so the
+AI's terminal opens with the sentence typed. Open Module stays for opening
+without starting. The repository's own window knows a focused session is
+running from the marker: its Work Explorer's repository row says so, and
+its terminal prints the one line.
 
-### Session 128 of 129: The close that never refuses for coverage, the clone deleted, and the Copilot walk
+**The Solution Explorer marks the modules in play** — the operator's
+point (e). `project()` (`projection.ts` ~126) adds `inSession` to each
+module the in-flight session names, from the ledger row in a global
+session or in the clone and from the marker in the repository during a
+focused one; the projection is rewritten at `start` and `close`; the
+module row shows `● session 126`, the milestone colour on its icon, and
+`;active` in its context; both windows' explorers do this.
 
-**The gate keeps the half that was always real.** `judgeExposure` in
-`packages/router/src/land.ts` (231–249) refuses on two clauses: sibling
-bytes under no recorded grant, and paths changed outside the session's
-scope. In a regular checkout the sibling's bytes are simply there, so the
-first clause goes; the second stays exactly as it is, the durable check
-that no wall can replace. **Coverage never blocks the close**: the close
-record carries the coverage word, the evidence that degraded it (hook
-error, policy missing, canary executed, bypass flag seen), the counts of
-denials and self-grants with their reasons, and the changed-path result —
-and claims only what was observed, never isolation, never complete read
-coverage.
+**What the hook plan left behind, and the overlay.** `policy.ts` keeps the
+record with `allowed`, `siblings`, `modules`, `session`, `root`, `writtenAt`,
+its writer and reader, the `scope` on the first instruction and `session
+scope`; `protected`, `writable`, `destructive`, `decide`, `SELF_GRANT_VERB`
+(a verb that does not exist) and their test go. The `--debug` grant and its
+overlay go — `layDebugGrants`, `writeOverlay`, `OVERLAY_TARGETS`, the Maven
+impl, the `pack` callback in `sessionNext`, the extension's **Widen for
+Debugging**, and their test; End Grant and `module revoke` stay. The grant
+decision's text ends with the permanent form — *to keep this for every
+persister session, add `modules/model` to persister's `sharedFiles` in
+dabbler.yaml* — and `checkoutCone` keeps a shared entry that names a
+directory whole. `judgeExposure` turns its sibling-bytes clause into a line
+in the close record rather than a refusal; the changed-path clause is the
+gate and stays. The `scoped` paragraph of the first instruction and one
+Hard-rules bullet in the managed body say the same two sentences: the other
+modules are here as packages and contract folders, not source; if the work
+cannot be done without a sibling's source, ask with `--request-grant` and
+a reason. The list is refined by the proof's findings.
 
-**The clone goes, whole.** Both advisors said drop, not demote, and the
-returning ground rule — no new module without deleting one — is satisfied
-several times over: `packages/router/src/checkout.ts`; the bytes half of
-`exposure.ts` and the module-session marker; `module open`, `module
-preflight`, `module grant`, `module revoke` and `session next
---request-grant` in `cli/module.ts` and `cli/session.ts`; the debugging
-overlay (`layDebugGrants` in `ecosystem.ts`); the moment in `drive.ts`'s
-`sessionNext` that read the marker; and the extension's **Open Module** and
-**Widen for Debugging** commands, with their tests. `docs/design/
-module-checkout-poc.md` and `hardened-profiles.md` stay as the record of
-what a customer who needs a disk-level wall would be given. **Start Session
-picks the module** — the modules from the solution shape in a quick-pick,
-`--module <slug>` in the opening sentence — and opens the engine at the
-repository root, which closes session 123's gap A in the only way that is
-now true.
+**Steps.** (1) The kind from the plan, the flags, the sentences, the global
+session's nothing. (2) The folder kept, the pull at close and at start, the
+one-click start and the start request. (3) The Solution Explorer's mark and
+the Work Explorer's line in the repository window. (4) The trims.
 
-**The walk is the measurement.** A two-module .NET solution on the
-operator's Copilot seat, from a bare `copilot` at the repository root and
-from Start Session: open, work, test, land, review. It records what the
-design promised and the operator budgeted — the per-call cost of the
-matched pre-hook and the turn-end hook against the turn's length (the
-operator's line is 5 % of the session's time; 0.25 s a call is fine) —
-and whether the engine met the wall at all once the scope rode in its
-first instruction. Findings that are defects are fixed here; findings that
-are costs are written down, not argued with.
+**Tests.** Five, one per behaviour: a plan section with `Module: persister`
+yields a focused default and `--global` overrides it, while a one-module
+plan refuses `--focused`; a close in a clone pulls its repository forward
+and says so when it cannot (walk-checkout extended, its selection rules
+edited in the same diff); Start Focused Session on a module row writes the
+start request and a window activating on it opens the terminal with the
+sentence; the solution projection marks the in-flight session's modules
+from the ledger row and from the marker; `judgeExposure` records sibling
+bytes and still fails one changed path outside scope. Not releasable.
 
-**Steps.** (1) The gate and the close record. (2) The deletions, and Start
-Session's module pick at the root. (3) The Copilot walk and its numbers in
-`docs/design/hook-wall.md`.
+### Session 128: cancelled 2026-09-08, folded into 127
 
-**Tests.** Three, one per behaviour: a manifest with sibling bytes and no
-grant passes the gate, and one changed path outside scope still fails it;
-Start Session's opening sentence carries `--module <slug>` and the
-terminal's working directory is the repository root; the walk test.
+The deletion of the clone and the Copilot walk it was to carry: the clone
+is the design now, and the developer's day on a Copilot seat is what
+session 130 walks.
 
-### Session 129 of 129: Claude Code — the same wall through its own hooks
+### Session 129: cancelled 2026-09-08, folded into 127
 
-**Nothing new is designed here; it is measured.** Session 126 wrote the
-`PreToolUse` entry beside the Stop hook, and 127's `hook-turn` reads a
-Claude Code transcript as readily as a Copilot one — this session runs
-both against Claude Code 2.1.263 and records what holds. Two things are
-explicitly unmeasured and decide the driver's flags: whether a hook's
-`deny` is honoured under the `--dangerously-skip-permissions` the headless
-driver passes (`packages/router/src/engines.ts` ~160), and whether `--bare`
-is the only way to lose the hooks. If the deny holds, the driver keeps its
-flags and gains coverage `observed`; if it does not, headless Claude Code
-records `partial`, as headless Copilot does, and nothing hangs.
-`checkout.ts`'s `settings.local.json` writer went with the clone in 128;
-`--restricted` is not used, because it ignores project settings and would
-drop the Stop hook.
-
-**Steps.** (1) The measurements on the real CLI: the pre-hook's deny under
-the driver's flags, the transcript's `tool_use` shape for `hook-turn`, and
-`--bare`. (2) The driver's coverage word from what was measured. (3) The
-Claude Code walk of the same two-module solution — work, test, land —
-with its numbers beside Copilot's in `docs/design/hook-wall.md`.
-
-**Tests.** Two: `hook-turn` finds a sibling read in a Claude Code
-transcript and blocks once; the headless driver's run record carries the
-coverage word the measurement decided.
+The Claude Code measurement session had one job — whether a hook's deny
+held under the headless driver's flags — and there is no hook.
 
 ### Session 130 of 130: The UAT that tests the UI, and shows its own machinery
 
 **This is session 124, moved.** It was planned 2026-09-08 as the third of
-sessions 122–124 and re-ordered the same day to run after 129, because it
-walks the UI path through a multi-module solution and sessions 125–129
-change what that path is: the focused clone goes, Start Session opens at the
-repository root and picks the module, and the wall is a hook. The ledger
+sessions 122–124 and re-ordered the same day to run after 127, because it
+walks the UI path through a multi-module solution and sessions 125–127
+change what that path is: a session is focused or global and the plan says
+which, Start Session on a module row opens the module folder's window in one
+click, and the framework pulls the repository forward at the close. The ledger
 registers sessions in numeric order, so 124 was cancelled and the section
 re-planned here; its text is the same, with the ordering note folded in and
 the four findings of session 123's audit added to what the walk must report
@@ -6821,7 +6856,7 @@ on.
 UI operations against the principle recorded in
 `docs/design/command-ownership.md` — so it must be walked, and it must be
 written so that a failure of the principle is visible in the document rather
-than hidden by it. It runs after 129 so the walk exercises the buttons that
+than hidden by it. It runs after 127 so the walk exercises the buttons that
 will exist; a document written in the same diff as the code it documents has
 been walked by nobody.
 

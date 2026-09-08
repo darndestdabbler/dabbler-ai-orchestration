@@ -1,4 +1,4 @@
-# STATUS — sessions 113–125 CLOSED, all VERIFIED: the deployables block, the Java/Maven walk and its nine defects, the suite off the operator's machine, the principle of who owns a command, and the policy a module session runs under; design round 12 re-plans 126–128 (the wall as a refusal, the basics first); version 2.0.14
+# STATUS — sessions 113–125 CLOSED, all VERIFIED: the deployables block, the Java/Maven walk and its nine defects, the suite off the operator's machine, the principle of who owns a command, and the policy a module session runs under; the operator's decision after round 12 re-plans 126–127 (focused or global sessions, the module folder kept, no hooks, the basics first, a proof before either); version 2.0.14
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
 
@@ -48,24 +48,38 @@
 > terminal printed the banner and two phase lines through three steps; the
 > Work Explorer had to be refreshed by hand; the suite took the machine.
 > A parallel session ran design round 12 the same morning
-> (`docs/design/consults/round12-{brief,sol,gemini,synthesis}.md`) and
-> rewrote the plan for 126–128 — **uncommitted as this block is written, and
-> held by that session until the operator has discussed the re-scope with
-> it; 129 is already cancelled in the ledger (`session cancel 129`, 09:32),
-> and 126–128 keep their old titles there until that commit, because the
-> ledger takes its titles from the plan at the next `session start`.** Do
-> not start 126 before that commit lands. Under round 12: 126 fixes the three basics (the repaint,
-> reproduced before it is fixed; the step line in the terminal;
-> `--test-concurrency=4` back and audited); 127 makes the wall a refusal in
-> `judge()` — a report whose diff touches a sibling's roots or a protected
-> path is refused with the owner and the contract named — trims
-> `policy.ts` to `allowed`, `protected` and `siblings`, drops the
-> sibling-bytes clause, and keys the Stop hook to the driver's recorded
-> `CLAUDE_CODE_SESSION_ID`; 128 deletes the clone, puts Start Session's
-> module pick at the repository root, and walks the Copilot day; 129 is
-> cancelled into 127; 130 is unchanged. So of 125's work, `decide`, the
-> destructive list, the `writable` carve-out and the self-grant wording go
-> in 127; the record, `scope` on the instruction and `session scope` stay.
+> (`docs/design/consults/round12-{brief,sol,gemini,synthesis}.md`); the
+> operator then discussed it and **decided, that afternoon** (the note atop
+> `round12-synthesis.md`; the plan's preamble to 126): the wall exists to
+> keep a session's work and tokens on its own module, it need not be
+> foolproof, stability and developer experience come first, and the
+> experience to match is a repository per module. So **the module folder
+> that sessions 100–120 built stays** and is simplified, and nothing is
+> built inside a tool call. Every session is **focused** (the module's own
+> folder and window, kept between sessions and refreshed from the server)
+> or **global** (the repository itself, no wall); the plan says which under
+> each session's heading (`Module: persister` / `Scope: whole repository`);
+> *start the next session* takes the default, *… focused session* and
+> *… global session* choose; the framework pulls the repository forward
+> at a focused session's close and at any start; the existing grant is the
+> override and one line in `sharedFiles` makes it permanent; **no hooks —
+> the Stop hook goes.** **126** is the basics: the Work Explorer repaint
+> reproduced then fixed, the terminal's banner at registration with the kind
+> and scope, the session number on its rules, a line per step,
+> `--test-concurrency=4` back and measured, the Stop hook removed at both
+> places it was installed. **127** is the kind from the plan and the flags,
+> the folder kept (`EXISTING_CLONE` = reset), the pull at close and start,
+> the one-click start from a module row through a start request the new
+> window consumes, the Solution Explorer marking the modules in play, and
+> the trims: `decide`, the destructive list, `writable`, the self-grant
+> wording, the `--debug` overlay and Widen for Debugging go; the record,
+> `scope` on the instruction and `session scope` stay; the sibling-bytes
+> clause becomes a line, the changed-path clause stays the gate. **128 and
+> 129 are cancelled** into 127; 130 runs after 127. **Before 126: a proof**
+> — a two-module .NET solution under `C:\temp\optiona-poc`, two hand-written
+> sessions run through today's buttons with the AI told to build the
+> smallest thing, recorded in `docs/design/option-a-poc.md`; it is also
+> 126's reproduction. **Next to start: 126, after the proof.**
 >
 > **Driving notes.** `--transport api` on the first `next`; a foreground
 > bounded loop (next → sleep `retry_after_seconds` → next, budgeted under

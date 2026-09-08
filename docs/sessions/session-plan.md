@@ -6324,3 +6324,216 @@ seat reader substitutes.
 carry the three-part section, name `--transport copilot-cli` and
 `--transport api`, say `--model` is required for a seat, and name no
 `DABBLER_*_API_KEY` inside the seat part.
+
+## Why sessions 122–124 exist
+
+Two complaints, one measured and one stated, and they are not related except
+that both are the same kind of mistake: something the framework did for the
+operator once, and stopped doing, without anyone deciding it should stop.
+
+The first is the suite. Session 96 left it at 17 seconds and the machine
+usable; session 121's run of record took 157 seconds for the same number of
+tests, and the operator could not type during it. Two separate protections
+had lapsed — one deleted as collateral, one that erodes by design.
+
+The second is the walkthroughs. Both UAT documents ask a human to type
+twenty-three `dabbler` commands and seventeen `git` ones, and the extension
+already contributes buttons for most of them. That is mostly a documentation
+failure — the walkthroughs were dogfooded from a terminal, which is how the
+operator drives sessions, and the habit went into the text. But auditing the
+command list against the operator's principle turns up three commands the UI
+genuinely does not have, and one of those makes the primary Start button
+unable to produce a closable session in exactly the solution shape the
+modules feature exists for.
+
+**So the third session is a test, not a rewrite.** The revised UAT walks the
+UI path and states, at every step, what the framework did on its own and at
+which lifecycle moment, what the operator does in the UI, and what that
+operation runs underneath. A walkthrough that shows only the third of those
+is the document that produced this complaint.
+
+**The operator's principle, stated 2026-09-08**, which session 123 records
+and the audit applies:
+
+> Any command that is always the same except for parameters the framework can
+> determine should be a framework command. If that command always occurs at a
+> specific point in the lifecycle of a solution, project or session — and the
+> framework could execute it at the appropriate time, perhaps with a user
+> prompt — the framework should execute it, not the human operator. Where the
+> command's timing or optionality precludes that, but the command is either
+> constant or constant-with-parameters, the UI should generate and execute it,
+> prompting for the parameters.
+
+### Session 122 of 124: The suite that takes the machine
+
+`node --test` runs one worker per CPU — nineteen on this host — and the eight
+`walk-*` files each build real git repositories and drive the framework's own
+job runner, which spawns a detached full-CLI child per job through
+`selfArgv` in `jobs.ts`. The run of record for session 121 saturated twenty
+logical cores for two and a half minutes. **The framework's own records are
+the evidence**, and they are unusually clean: `recorded typescript
+[final-full]` in each session's `driver/jobs/run-of-record-typescript.log`
+reads 37 s at session 95, **17 s at 96**, 35 s and 40 s at 97 and 98,
+**102 s at 99**, then a creep to 142 s by session 120 and **157 s at 121** —
+1144 tests against session 96's 1137.
+
+**Two protections lapsed, and this session restores both.**
+
+**One — the worker priority is gone.** Session 76 put every test worker at
+below-normal OS priority so the `git` and `node` grandchildren inherited it;
+that is what let the operator keep typing during a run, and session 67
+recorded the trade explicitly ("a third more wall clock buys a machine the
+operator can still type on"). It lived in a vitest setup file. Session 88
+retired vitest and deleted `vitest.config.ts`, and **nothing replaced it**:
+`setPriority` appears nowhere under `packages/router/` today. It goes into
+`test/support/no-git.ts`, which is already the `--import` preload every
+worker runs — the file reads `process.argv[1]` to identify the test file, so
+it is demonstrably per-worker. Below-normal locally; untouched under CI,
+where there is no operator to yield to and the runner owns the box.
+
+**Two — the walkthrough exemption erodes by design.** `no-git.ts` refuses a
+git spawn outside a walkthrough, which is the constraint that replaced
+`--test-concurrency=4` and let the cap come off. But it recognises a
+walkthrough by the filename pattern `walk-*.test.ts` — a naming convention,
+not a budget. There were six when session 96 wrote it; `walk-checkout`
+arrived 2026-09-06 and `walk-impact` 2026-09-07, each inheriting the
+exemption by being named correctly, and the existing walks grew besides. The
+pattern becomes an explicit list of the files allowed to build repositories,
+so adding a ninth walkthrough is a deliberate edit next to the reason the
+list exists rather than a side effect of choosing a filename.
+
+**The stale claims go with it.** `dabbler.yaml`'s comment on the typescript
+suite says "the five `walk-*` files" — there are eight — and "1117 tests in
+32 seconds", which was true at session 92 and has not been since.
+
+**What this session must not claim.** The jump from 40 s to 102 s between
+sessions 98 and 99 is **not explained**. Session 99's diff was read and
+nothing in it is on a hot path: the rename retry costs 100 ms only on a
+failure, and `suiteRetrySeconds` lowered a wait the walkthroughs never sleep
+(they poll at a fixed 100 ms). It is recorded as an owed question with the
+measurement attached, not guessed at. Neither is Defender a factor — real-time
+protection is off on this host, and the leftover `dabbler-router-tests`
+temp directories total 2 MB across 756 of them.
+
+**Tests.** Two in `packages/router/test/`: the preload lowers this process's
+priority outside CI and leaves it alone under CI, and the list of files
+permitted to build repositories matches the `walk-*` files actually present —
+so a ninth walkthrough fails the suite until it is added deliberately.
+
+### Session 123 of 124: The principle, and the three commands the UI does not have
+
+**The design record first**, because the operator asked why and the answer
+belongs in the repository rather than in a chat: the principle above, and the
+audit of both UAT walkthroughs against it. Most of the audit is a
+documentation finding and should be written as one — `mkdir`/`git init`/`git
+remote add` are **Set Up New Project**, three `dabbler modules create` calls
+are **New Module** (which already prompts for slug, title, kind, roots,
+package and depends-on), `dabbler owed answer` is **Answer Owed Decision**,
+`dabbler affected --path` is **Show Impact**; and the walkthroughs' manual
+`git add -A && git commit` after `dabbler bootstrap` is simply dead text,
+because `bootstrap` commits its own scaffold when no session is in flight
+(`cli/bootstrap.ts`, `commitOwnScaffold`). Writing the POM and running the
+loader stay the human's.
+
+Three commands fail the principle, and they are this session's work.
+
+**A — Start Session cannot start a module session.** `--module` appears
+nowhere in the extension. This is not a missing flag: `openingSentence` in
+`commands/sessionCommands.ts` builds the sentence handed to the engine with a
+hardcoded sessions root, and `engineTerminalFor` opens the terminal at the
+repository root. A module session registers **in its focused clone**, and
+sessions 118–120 proved a session started in the full checkout cannot close
+once a sibling has source — the exposure gate refuses and no grant can help,
+because a grant widens a focused clone and the full checkout is not one. So
+today's button can only produce an unclosable session in a multi-module
+solution, which is the shape the feature exists for. Start offers the modules
+from the solution shape, runs `session start --module <slug>`, and then reads
+**`readModuleSessionMarker(fullCheckout)`** — which already carries `path` and
+`sessionsDir`, written by `session.ts` at registration — to open the engine
+terminal in the clone with the clone's sessions root in the opening sentence.
+The marker is the seam; the prose `start` prints is not to be parsed.
+
+**B — no Pack on a module row.** The framework runs `packModule` itself at
+the candidate, so the operation is the framework's and its parameters are
+determined; what is missing is the operator's way to ask for it out of band,
+which is what the walkthrough types by hand. It joins the module row beside
+**Open Module** and **Widen for Debugging**.
+
+**C — the full checkout never learns the clone landed.** `sessionNext` in
+`drive.ts` reads the module-session marker, finds the clone's session closed,
+and calls `clearModuleSessionMarker` — it is standing at the exact moment the
+principle names, and does nothing with it. It fetches, or offers to. Which of
+those, and whether a fetch may run unasked in a repository the operator may
+have work in, is a decision this session records rather than assumes.
+
+**Tests.** Three, one per behaviour, in the extension's suite and the
+router's: Start's module path builds a terminal rooted at the marker's clone
+with the marker's sessions root in its sentence; the module row offers Pack;
+and the full checkout's post-land behaviour fires once where the marker is
+cleared and not while the clone's session is still in flight.
+
+### Session 124 of 124: The UAT that tests the UI, and shows its own machinery
+
+**The revised UAT is an instrument, not prose.** Its purpose is to test the
+UI operations against the principle — so it must be walked, and it must be
+written so that a failure of the principle is visible in the document rather
+than hidden by it. This session runs after 123 so the walk exercises buttons
+that exist; a document written in the same diff as the code it documents has
+been walked by nobody.
+
+**Every step is written in three registers**, and a step that cannot fill all
+three is telling the reader something true:
+
+1. **What the framework already did, and when.** Named against the lifecycle
+   moment that triggered it — at bootstrap, at registration, at the
+   candidate, at the land, at the close. This is the register the current
+   documents omit entirely, which is why they read as a wall of shell: work
+   the framework does for itself is invisible, so every visible line is a
+   human's.
+2. **What the operator does in the UI.** The exact command title as it
+   appears in the palette or the tree row, and the exact answers to type into
+   each prompt it raises.
+3. **What that operation runs underneath.** The CLI the button generates —
+   which doubles as the fallback for a reader not in VS Code, and as the
+   thing a reader checks when the button does something they did not expect.
+
+**A step with no entry in registers 1 or 2 is a gap the document reports as a
+gap**, in the operator's own terms: constant-or-parameterised and
+lifecycle-timed means the framework should run it; constant-or-parameterised
+but optional or ill-timed means the UI should offer it; genuinely a human's
+judgement means neither, and the document says so. Writing the POM and
+running the loader are the honest third case. **This is the property that
+makes the revised UAT worth having**: the next command that drifts into the
+walkthrough by hand has a labelled place to be wrong, instead of blending
+into the shell.
+
+`docs/uat/uat-dotnet-json-solution.md` and
+`docs/uat/uat-java-json-solution.md` are the required two — 432 and 480 lines,
+twenty-three `dabbler` commands and seventeen `git` ones between them. The
+stale manual commit after `bootstrap` goes, into register 1 where it belongs.
+`docs/quick-start.md` and
+`docs/tutorials/csv-solution/csv-multi-module-walkthrough.md` carry the same
+defect and are reached in the same pass.
+
+**The bar is the operator's, recorded 2026-07: copy-pasteable steps.** A
+UI-first instruction meets it by naming the exact command title and the exact
+prompt answers — "ridiculous for UAT" was said of a wall of shell, and a wall
+of vague clicking would be no better.
+
+**The walk is the test, and it is expected to find defects.** The Java and
+.NET walks of sessions 113–120 found nine product defects and four document
+errors between them, and they were walking documents that only had to be
+accurate. This one walks a path — the UI path through a multi-module
+solution — that no one has walked end to end, because until session 123 the
+Start button could not produce a closable module session at all. Findings
+that are document errors are fixed here. Findings that are product defects
+are raised as owed items with their reproduction, and the session says
+plainly how many it found rather than closing quiet: **a UAT rewrite that
+reports no defects on a first walk of a new path has probably not been
+walked.**
+
+**Tests.** One script, as the other document checks are: every numbered step
+in both UAT documents carries the three registers or an explicit statement of
+which are absent and why; every palette command named exists in the
+extension's `contributes.commands`; and no document instructs a manual commit
+after `bootstrap`.

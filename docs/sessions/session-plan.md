@@ -6094,3 +6094,51 @@ is the right one here too.
 write-once pair added in session 115: a `.gitignore` carrying only
 `.dabbler/` gains both Maven rules and keeps its own line, and a second
 scaffold over the result adds nothing and reports the file skipped.
+
+### Session 118 of 118: What the framework writes before a session declares
+
+Session 116 fixed this for `dabbler bootstrap`: while a session is in flight
+and has not declared its task, the land is NOT what commits the files the
+framework just wrote, because the declaration refuses a tree carrying
+changes — and refuses it a second time, which is a deadlock. Bootstrap now
+says so and names the commit.
+
+**The same hole is one verb over, and the walk of 2026-09-07 fell into it
+after 116 landed.** `dabbler session start` raises the `testing-suites`
+decision. Answering it — with the recommended answer, at the moment it is
+raised — writes `dabbler.yaml`, which is tracked. The declaration then
+refused:
+
+```
+declare: refused -- session 1 cannot declare its task list now: the working
+tree already carries 1 change(s) (dabbler.yaml). The declaration comes before
+the work ... Commit or revert, then declare.
+```
+
+Nothing said that would happen, and nothing said what to do about it. The
+same is true of the packaging pair, which writes the same file.
+
+**The fix, and it is one rule in one place.** The predicate bootstrap grew
+inline in 116 — *a session is in flight and has not declared its task* — and
+the sentence that follows from it belong together and belong to neither CLI:
+put both in `packages/router/src/writers.ts`, beside `readTaskDeclaration`
+and `declareSessionTask`, which already own what a declaration is. Bootstrap
+reads them instead of its own copy. `dabbler owed answer` reads them after
+an answer that wrote a tracked file — the suite declaration and the
+packaging pair, not a grant (`.dabbler/` is ignored) and not the git remote
+(git config is not the tree).
+
+**What it must not become.** Not a new gate, and not a framework commit. The
+declaration's refusal is right: work declared after the fact is a model
+deciding in hindsight what may be published, and session 94 settled that the
+framework does not commit mid-session. The only thing wrong is that the
+framework wrote a file and then said nothing about the refusal it had just
+guaranteed.
+
+**Tests.** Three in `packages/router/test`: the predicate is the session
+number while one is in flight undeclared and null once it has declared (and
+null with no session at all); `dabbler owed answer --id testing-suites
+--choice declare` in an undeclared session prints the commit and does not in
+a declared one; and bootstrap keeps saying what session 116 made it say,
+which its existing test already asserts and which must still pass through
+the shared helper.

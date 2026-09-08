@@ -6142,3 +6142,63 @@ null with no session at all); `dabbler owed answer --id testing-suites
 a declared one; and bootstrap keeps saying what session 116 made it say,
 which its existing test already asserts and which must still pass through
 the shared helper.
+
+### Session 119 of 119: The sibling a Maven module cannot consume
+
+Walking step 10 of `docs/uat/uat-java-json-solution.md` — the part nobody
+had ever run — the `store` module declared the sibling the way the design
+says to, a versionless `<dependency>` on `com.example:json-model` taking the
+parent's managed pin, and Maven refused:
+
+```
+Failed to collect dependencies at com.example:json-model:jar:0.1.0-dev.20260907.2.gd986796:
+Failed to read artifact descriptor: The following artifacts could not be resolved:
+com.example:solution-parent:pom:0.1.0-dev.20260907.2.gd986796 (absent):
+Could not find artifact com.example:solution-parent:pom:... in modules (file:///C:/temp/uat-java3/packages)
+```
+
+**Consuming a sibling as a package has never worked on Maven.** That is the
+whole point of the modules block on the Java side — a focused checkout holds
+one module and resolves its siblings from the committed feed — and no test
+in this repository could have caught it, because no test runs `mvn` and the
+.NET side has no analogue: a `.nupkg` names no parent.
+
+**Why.** `module pack` runs one reactor `deploy` per module
+(`packArgv` in `packages/router/src/ecosystem.ts`), which writes the
+module's jar and POM into `packages/`. The deployed POM still declares
+`<parent>com.example:solution-parent:<the dev version></parent>` — the
+flatten plugin the scaffolded parent manages runs in
+`resolveCiFriendliesOnly` mode, which resolves `${revision}` and
+deliberately keeps the parent — and the parent POM itself is never deployed
+anywhere. A consumer resolving the sibling reads its descriptor, follows the
+parent, and finds nothing.
+
+**The fix, proven by hand in the walk's own repository.** Deploy the root
+parent POM into the feed beside the module, under the same dev version, as
+its own non-recursive deploy:
+
+```
+mvn -B -N -f pom.xml -DskipTests -Drevision=<version> \
+    -DaltDeploymentRepository=modules::file:///<root>/packages deploy
+```
+
+With that one artefact present, the same `mvn -B -f modules/store/pom.xml
+test` that had failed built and passed: `Tests run: 1, Failures: 0`.
+
+It belongs in the Maven side of the seam, beside `packArgv`, and it runs
+once per pack rather than once per target — the parent is one artefact
+whatever the module packed. `.NET` gains nothing and must be asked for
+nothing: the seam answers with no extra command there, exactly as it
+answers with no overlay for a Maven debugging grant.
+
+**What the record must show.** The parent POM is a byte in `packages/` that
+the pack left, so `PackResult.left` carries it (session 115 made that a
+measurement rather than a prediction, so this needs no new bookkeeping) and
+the candidate record names it. A second pack that finds the parent already
+deployed at that version does not need to re-run: the version is immutable,
+so the artefact is the same bytes.
+
+**Tests.** Two in `packages/router/test`, neither running `mvn`: a scripted
+pack of a Maven module runs the parent deploy as well as the module's own,
+with the same version and the same file repository, and a .NET pack runs
+exactly one command, as it does today.

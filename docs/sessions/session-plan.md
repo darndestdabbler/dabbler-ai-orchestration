@@ -6435,42 +6435,35 @@ because `bootstrap` commits its own scaffold when no session is in flight
 (`cli/bootstrap.ts`, `commitOwnScaffold`). Writing the POM and running the
 loader stay the human's.
 
-Three commands fail the principle, and they are this session's work.
+Three commands failed the principle when this session was planned. **Re-scoped
+2026-09-08**, after the decisions of design rounds 10 and 11
+(`docs/design/consults/round10-synthesis.md`, `round11-synthesis.md`): the
+wall between an engine and a sibling's source moves from the disk to
+permissions over a regular checkout, so there is no clone for Start Session
+to open and no full checkout to fall behind. Two of the three commands read
+differently now, and one remains this session's work.
 
-**A — Start Session cannot start a module session.** `--module` appears
-nowhere in the extension. This is not a missing flag: `openingSentence` in
-`commands/sessionCommands.ts` builds the sentence handed to the engine with a
-hardcoded sessions root, and `engineTerminalFor` opens the terminal at the
-repository root. A module session registers **in its focused clone**, and
-sessions 118–120 proved a session started in the full checkout cannot close
-once a sibling has source — the exposure gate refuses and no grant can help,
-because a grant widens a focused clone and the full checkout is not one. So
-today's button can only produce an unclosable session in a multi-module
-solution, which is the shape the feature exists for. Start offers the modules
-from the solution shape, runs `session start --module <slug>`, and then reads
-**`readModuleSessionMarker(fullCheckout)`** — which already carries `path` and
-`sessionsDir`, written by `session.ts` at registration — to open the engine
-terminal in the clone with the clone's sessions root in the opening sentence.
-The marker is the seam; the prose `start` prints is not to be parsed.
+**A — moved to session 128.** Start Session must still pick the module —
+`session start --module <slug>` is how a module session declares its scope —
+but it opens the engine at the repository root, in the only checkout there
+is; the module-session marker and the clone's sessions root have nothing left
+to point at. Session 128 builds that beside the deletions it belongs with,
+so that a button and the code it replaces are never both true at once.
 
 **B — no Pack on a module row.** The framework runs `packModule` itself at
 the candidate, so the operation is the framework's and its parameters are
 determined; what is missing is the operator's way to ask for it out of band,
-which is what the walkthrough types by hand. It joins the module row beside
-**Open Module** and **Widen for Debugging**.
+which is what the walkthrough types by hand. It joins the module row. (Open
+Module and Widen for Debugging, which it was to sit beside, are the clone's
+commands and go in 128.)
 
-**C — the full checkout never learns the clone landed.** `sessionNext` in
-`drive.ts` reads the module-session marker, finds the clone's session closed,
-and calls `clearModuleSessionMarker` — it is standing at the exact moment the
-principle names, and does nothing with it. It fetches, or offers to. Which of
-those, and whether a fetch may run unasked in a repository the operator may
-have work in, is a decision this session records rather than assumes.
+**C — eliminated.** There is one checkout; the engine and the developer are
+in it; nothing lands elsewhere and nothing needs fetching.
+`clearModuleSessionMarker` and the moment in `sessionNext` that reads the
+marker go with the clone in session 128.
 
-**Tests.** Three, one per behaviour, in the extension's suite and the
-router's: Start's module path builds a terminal rooted at the marker's clone
-with the marker's sessions root in its sentence; the module row offers Pack;
-and the full checkout's post-land behaviour fires once where the marker is
-cleared and not while the clone's session is still in flight.
+**Tests.** One, in the extension's suite: the module row offers Pack, and the
+command runs `dabbler module pack <slug>` with the slug the row carries.
 
 ### Session 124 of 124: The UAT that tests the UI, and shows its own machinery
 
@@ -6537,3 +6530,270 @@ in both UAT documents carries the three registers or an explicit statement of
 which are absent and why; every palette command named exists in the
 extension's `contributes.commands`; and no document instructs a manual commit
 after `bootstrap`.
+
+**Ordering, 2026-09-08.** This session walks the UI path through a
+multi-module solution, and sessions 125–129 change what that path is: the
+focused clone goes, Start Session opens at the repository root, and the wall
+is a hook. It therefore runs **after 129**, so the buttons it walks are the
+ones that will exist.
+
+### Session 125 of 129: The policy — what a module session may touch, written once
+
+**The decision this block implements** is recorded in
+`docs/design/consults/round10-synthesis.md` and `round11-synthesis.md`,
+made by the operator on 2026-09-08: the sparse clone per module session
+(sessions 100–120) is not the product's default. A module session runs in
+the regular checkout — one folder, the developer sees everything — and the
+wall between the engine and a sibling's implementation is a **permission
+the framework states**, evaluated by the CLI's own hooks, built to the
+operator's order of priorities: never an impasse, never a burden of
+decisions on the human, simple, and then as much blackboxing as those
+three allow. This session writes the policy; 126 and 127 enforce it; 128
+deletes the clone; 129 brings Claude Code level.
+
+**The policy is derived, never declared.** `moduleScope(repoRoot,
+sessionsDir, shape, slugs)` in `packages/router/src/agency.ts` (~296)
+already says what a module session may touch: the module's `codeRoots`,
+its own contract folder and every transitive dependency's, the root build
+files and solution file, its shared files, and the sessions directory —
+never a sibling's `codeRoots`. The policy is that scope rendered once, at
+`session start` of a multi-module session, into one compact JSON file the
+hook scripts can read without starting Node: the allowed roots; the
+**protected paths** the engine may not write whatever the scope says
+(`docs/sessions/sessions.json`, `activity-log.json`, everything under
+`.dabbler/`, and `docs/modules.yaml` — the scope includes the sessions
+directory because the verifier must read it, so write-protection is a
+separate rule); the sibling roots, each with its owning slug and its
+contract folder so a denial can name them; and the **short destructive
+list** (`git push --force`, `git reset --hard`, `git checkout -- .`, `git
+clean -fd`, recursive deletion of the root). It lives under the session's
+run directory, which the machine already owns, and a one-module solution
+gets no file and no change — round 9's governing requirement, kept by name
+as `checkout.ts` and `exposure.ts` keep it today.
+
+**The decision is one pure function**, so the shell script in 126 and the
+transcript scan in 127 can never disagree with each other: given the policy
+and one call — a tool name, a path or a command — answer allow or deny with
+a structured reason. Three rules and no fourth: a write outside scope or to
+a protected path is denied (it could never pass the close anyway); a
+destructive command is denied; a read of a sibling's implementation is
+denied *softly*, with a reason of the form *"`<path>` is implementation
+owned by module `<slug>`; use `<contract path>` first; if the
+implementation is still needed, run `dabbler session self-grant-read --path
+… --reason …` and retry"*. Everything else is allowed. Every input the
+function cannot read — no policy, a malformed call, an unknown tool — is
+**allow**, marked `unobserved`: the operator would rather the black box
+fail than the engine stop.
+
+**The allowed list is handed to the engine before it can hit the wall.**
+The first `step` instruction of a module session carries the scope as a
+field, and `dabbler session scope` prints it on demand; every denial
+points at the verb. An engine that knows what it may read rarely meets a
+denial at all, which is the cheapest enforcement there is.
+
+**Steps.** (1) The policy record and its writer at `session start`, from
+`moduleScope`, with the protected paths and the destructive list; nothing
+for a one-module shape. (2) The decision function with its reasons and
+its fail-open results. (3) The `scope` field on the first instruction and
+the `session scope` verb.
+
+**Tests.** Three, one per behaviour: a two-module manifest yields a policy
+that excludes the sibling's roots, includes its contract folder, and names
+the protected paths, while a one-module manifest yields no file; the
+decision function answers each of the three rules with its reason and
+answers allow-unobserved to a missing policy; the first instruction of a
+module session carries the scope and `session scope` prints the same list.
+
+### Session 126 of 129: The hooks — installed by bootstrap, decided in the shell, failing open
+
+**The mechanism is the CLI's own, and the framework already uses it.**
+Bootstrap installs a Stop hook into `.claude/settings.json` whose command
+is `dabbler session hook-stop` (`packages/router/src/bootstrap/index.ts`
+~320; the rule is `StopGateDecision` in `session.ts` ~2522). GitHub Copilot
+CLI 1.0.83 has the same shape — `.github/hooks/NAME.json`, events
+`preToolUse`, `postToolUse`, `agentStop`, `sessionStart`; the pre-hook
+receives `{sessionId, timestamp, cwd, toolName, toolArgs}` and answers
+`{permissionDecision, permissionDecisionReason}`; a matcher makes a hook
+fire "only for matching tool names"; a non-zero exit is fail-closed, a
+timeout fail-open. Measured on the operator's machine on 2026-09-08 and
+recorded in the round-11 synthesis: the cost of a hook is the **shell
+Copilot starts to run it** — PowerShell 7 in 0.5–0.7 s, Git Bash in 0.25 s
+— and Node would add 0.8 s more. So the script decides in the shell, from
+125's policy file, and reads are never hooked at all.
+
+**What bootstrap writes, tracked with the rest of its scaffold**
+(`cli/bootstrap.ts`, `commitOwnScaffold`): for Copilot,
+`.github/hooks/dabbler.json` with a `preToolUse` hook matched to
+`edit|create|bash|powershell` and an `agentStop` hook, each carrying both
+a `powershell` and a `bash` script; for Claude Code, a `PreToolUse` entry
+matched to `Edit|Write|MultiEdit|Bash` beside the existing Stop hook, every
+other key kept as the Stop installer keeps them. The scripts are small
+and the same in both shells: find the policy file for the session in
+flight; if there is none, or anything at all goes wrong, emit
+`{"permissionDecision":"allow"}` with exit 0 and a reason that says
+`unobserved` — **a bare terminal without `dabbler` on `PATH` must never
+deny every tool**, which is what Copilot's fail-closed rule would do to a
+script that called a missing command. Only on a deny does the script call
+`dabbler session hook-tool --record`, best-effort, so the run record holds
+the decision. `timeoutSec` is set explicitly.
+
+**The canary is the attestation, and there is no other.** A multi-module
+session's first instruction asks the engine to run `dabbler session
+canary`; the pre-hook is hardcoded to deny that command. Denied and
+recorded → the session's **coverage** is `observed`. If the verb actually
+runs — because the hook was absent, bypassed by `--allow-all-tools`, or
+failed open — it writes that fact itself, coverage becomes `partial` or
+`unobserved`, and the session continues: coverage is a word on the record,
+never a refusal. Copilot's `session.start` event in
+`~/.copilot/session-state/<id>/events.jsonl` carries `copilotVersion` and
+`selectedModel`, recorded when found; there is no version-keyed lock and no
+eleven-case probe — the round-10 apparatus is dropped by both advisors.
+
+**Measured on the real CLI, in this session's own tests**, because the
+brief marked them not measured: the field names in `toolArgs` for `edit`,
+`create`, `bash` and `powershell` on Copilot 1.0.83; whether
+`.github/hooks` is discovered from a subdirectory working directory (until
+it is, "from the repository root" is the instruction); and whether the
+`bash` script is honoured on Windows when Git Bash is present, which
+halves the cost. The findings and the per-call cost go into
+`docs/design/hook-wall.md`.
+
+**Steps.** (1) The hook files bootstrap writes for both CLIs, idempotently,
+Stop hook preserved. (2) The scripts, deciding from the policy file and
+failing open; `hook-tool --record`. (3) The canary verb, the coverage word
+on the run record, and the measurements.
+
+**Tests.** Three: the script, given a policy and a call, allows an in-scope
+edit, denies an out-of-scope edit and a destructive command with the
+reason, and answers allow-`unobserved` when the policy is missing; the
+canary sets coverage `observed` when denied and `partial` when it runs;
+bootstrap writes both hook files and rewrites neither the Stop hook nor any
+other key on a second run.
+
+### Session 127 of 129: Reads watched, not hooked — the turn-end feedback and the self-grant
+
+**Reads are the chunked, high-volume calls, and they cost nothing.** Both
+CLIs write a structured per-session log the framework can read: Copilot's
+`events.jsonl` records every `tool.execution_start` with `toolName` and
+`arguments`, and `assistant.turn_start`/`turn_end`; Claude Code's transcript
+under `~/.claude/projects/<repo>/` records every `tool_use`. And the
+turn-end hook — Copilot's `agentStop`, Claude's `Stop`, which the framework
+already owns as `hook-stop` — receives **`transcriptPath`** and may answer
+`block` with a `reason` that becomes the model's next prompt. So the
+sibling read is not prevented; it is *noticed*, once per turn, and answered.
+
+**`hook-turn` extends `hook-stop`.** At the end of a turn it reads the
+transcript handed to it, finds every read of a sibling's implementation
+outside the policy's scope (`view`/`glob`/`grep` on Copilot,
+`Read`/`Grep`/`Glob` on Claude Code), records each as a decision event in
+the run record, and — **the first time for that path in this session** —
+blocks once with 125's soft reason naming the module, its contract folder
+and the self-grant verb. Never twice for one path: after that it only
+records. Installing the Copilot `agentStop` hook also gives Copilot what
+only Claude Code has today — the outstanding-instruction gate of
+`hook-stop`, so a `wait` that is due is answered rather than idled on.
+
+**The self-grant is the escape hatch, and no human is in it.** `dabbler
+session self-grant-read --path <repo-relative> --reason "<why the contract
+is insufficient>"` appends a session-limited row to `grants.jsonl`
+(`packages/router/src/exposure.ts`) with actor `engine`, the path, the
+reason and the run; it **never** raises an owed decision — the
+`raiseOwed`/`CLASS_VALUE_TRADEOFF` path (~386) and `session next
+--request-grant` become opt-in governance for a team that wants a human in
+the loop, and are not the default. A self-granted path is not blocked
+again. Writes outside scope are not self-grantable; if a step cannot be
+done without one, the engine reports it blocked and the plan is wrong, not
+the wall. Hook denials are not step refusals: the "three refusals of one
+step" rule (`AGENTS.md`) is untouched.
+
+**The human is told, never asked.** The extension already renders the run
+record: the Work Explorer's session row gains the coverage word and the
+counts (denials, self-grants), and the Dabbler terminal prints each flag as
+it is recorded — *read of `modules/model/src/Person.cs` outside scope;
+self-granted: "the contract omits the null case"*. No prompt, no decision
+to make, and a summary a team lead can read at the close.
+
+**Steps.** (1) `hook-turn`: the transcript scan for both CLIs, the
+once-per-path block, the decision events. (2) `session self-grant-read`
+and its row; the owed-decision path demoted to opt-in. (3) The coverage
+word and counts in the Work Explorer row and the Dabbler terminal lines.
+
+**Tests.** Three: a Copilot transcript with a sibling read blocks once with
+the reason and, on the next turn with the same path, only records; a
+self-grant row is written by the verb and honoured by `hook-turn`; a
+one-module session's `hook-turn` does nothing beyond `hook-stop`.
+
+### Session 128 of 129: The close that never refuses for coverage, the clone deleted, and the Copilot walk
+
+**The gate keeps the half that was always real.** `judgeExposure` in
+`packages/router/src/land.ts` (231–249) refuses on two clauses: sibling
+bytes under no recorded grant, and paths changed outside the session's
+scope. In a regular checkout the sibling's bytes are simply there, so the
+first clause goes; the second stays exactly as it is, the durable check
+that no wall can replace. **Coverage never blocks the close**: the close
+record carries the coverage word, the evidence that degraded it (hook
+error, policy missing, canary executed, bypass flag seen), the counts of
+denials and self-grants with their reasons, and the changed-path result —
+and claims only what was observed, never isolation, never complete read
+coverage.
+
+**The clone goes, whole.** Both advisors said drop, not demote, and the
+returning ground rule — no new module without deleting one — is satisfied
+several times over: `packages/router/src/checkout.ts`; the bytes half of
+`exposure.ts` and the module-session marker; `module open`, `module
+preflight`, `module grant`, `module revoke` and `session next
+--request-grant` in `cli/module.ts` and `cli/session.ts`; the debugging
+overlay (`layDebugGrants` in `ecosystem.ts`); the moment in `drive.ts`'s
+`sessionNext` that read the marker; and the extension's **Open Module** and
+**Widen for Debugging** commands, with their tests. `docs/design/
+module-checkout-poc.md` and `hardened-profiles.md` stay as the record of
+what a customer who needs a disk-level wall would be given. **Start Session
+picks the module** — the modules from the solution shape in a quick-pick,
+`--module <slug>` in the opening sentence — and opens the engine at the
+repository root, which closes session 123's gap A in the only way that is
+now true.
+
+**The walk is the measurement.** A two-module .NET solution on the
+operator's Copilot seat, from a bare `copilot` at the repository root and
+from Start Session: open, work, test, land, review. It records what the
+design promised and the operator budgeted — the per-call cost of the
+matched pre-hook and the turn-end hook against the turn's length (the
+operator's line is 5 % of the session's time; 0.25 s a call is fine) —
+and whether the engine met the wall at all once the scope rode in its
+first instruction. Findings that are defects are fixed here; findings that
+are costs are written down, not argued with.
+
+**Steps.** (1) The gate and the close record. (2) The deletions, and Start
+Session's module pick at the root. (3) The Copilot walk and its numbers in
+`docs/design/hook-wall.md`.
+
+**Tests.** Three, one per behaviour: a manifest with sibling bytes and no
+grant passes the gate, and one changed path outside scope still fails it;
+Start Session's opening sentence carries `--module <slug>` and the
+terminal's working directory is the repository root; the walk test.
+
+### Session 129 of 129: Claude Code — the same wall through its own hooks
+
+**Nothing new is designed here; it is measured.** Session 126 wrote the
+`PreToolUse` entry beside the Stop hook, and 127's `hook-turn` reads a
+Claude Code transcript as readily as a Copilot one — this session runs
+both against Claude Code 2.1.263 and records what holds. Two things are
+explicitly unmeasured and decide the driver's flags: whether a hook's
+`deny` is honoured under the `--dangerously-skip-permissions` the headless
+driver passes (`packages/router/src/engines.ts` ~160), and whether `--bare`
+is the only way to lose the hooks. If the deny holds, the driver keeps its
+flags and gains coverage `observed`; if it does not, headless Claude Code
+records `partial`, as headless Copilot does, and nothing hangs.
+`checkout.ts`'s `settings.local.json` writer went with the clone in 128;
+`--restricted` is not used, because it ignores project settings and would
+drop the Stop hook.
+
+**Steps.** (1) The measurements on the real CLI: the pre-hook's deny under
+the driver's flags, the transcript's `tool_use` shape for `hook-turn`, and
+`--bare`. (2) The driver's coverage word from what was measured. (3) The
+Claude Code walk of the same two-module solution — work, test, land —
+with its numbers beside Copilot's in `docs/design/hook-wall.md`.
+
+**Tests.** Two: `hook-turn` finds a sibling read in a Claude Code
+transcript and blocks once; the headless driver's run record carries the
+coverage word the measurement decided.

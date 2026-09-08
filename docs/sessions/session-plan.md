@@ -6467,6 +6467,13 @@ command runs `dabbler module pack <slug>` with the slug the row carries.
 
 ### Session 124 of 124: The UAT that tests the UI, and shows its own machinery
 
+**Cancelled on the ledger 2026-09-08 and re-planned as session 130**, so
+that sessions 125–129 can run first: the ledger registers sessions in
+numeric order and skips only a cancelled number, and a session restored
+after 129 closes would be refused as not the next in sequence. The text
+below is kept as the record of what was planned; the session that runs is
+130, and its section at the end of this plan is the one to read.
+
 **The revised UAT is an instrument, not prose.** Its purpose is to test the
 UI operations against the principle — so it must be walked, and it must be
 written so that a failure of the principle is visible in the document rather
@@ -6797,3 +6804,90 @@ with its numbers beside Copilot's in `docs/design/hook-wall.md`.
 **Tests.** Two: `hook-turn` finds a sibling read in a Claude Code
 transcript and blocks once; the headless driver's run record carries the
 coverage word the measurement decided.
+
+### Session 130 of 130: The UAT that tests the UI, and shows its own machinery
+
+**This is session 124, moved.** It was planned 2026-09-08 as the third of
+sessions 122–124 and re-ordered the same day to run after 129, because it
+walks the UI path through a multi-module solution and sessions 125–129
+change what that path is: the focused clone goes, Start Session opens at the
+repository root and picks the module, and the wall is a hook. The ledger
+registers sessions in numeric order, so 124 was cancelled and the section
+re-planned here; its text is the same, with the ordering note folded in and
+the four findings of session 123's audit added to what the walk must report
+on.
+
+**The revised UAT is an instrument, not prose.** Its purpose is to test the
+UI operations against the principle recorded in
+`docs/design/command-ownership.md` — so it must be walked, and it must be
+written so that a failure of the principle is visible in the document rather
+than hidden by it. It runs after 129 so the walk exercises the buttons that
+will exist; a document written in the same diff as the code it documents has
+been walked by nobody.
+
+**Every step is written in three registers**, and a step that cannot fill all
+three is telling the reader something true:
+
+1. **What the framework already did, and when.** Named against the lifecycle
+   moment that triggered it — at bootstrap, at registration, at the
+   candidate, at the land, at the close. This is the register the current
+   documents omit entirely, which is why they read as a wall of shell: work
+   the framework does for itself is invisible, so every visible line is a
+   human's.
+2. **What the operator does in the UI.** The exact command title as it
+   appears in the palette or the tree row, and the exact answers to type into
+   each prompt it raises.
+3. **What that operation runs underneath.** The CLI the button generates —
+   which doubles as the fallback for a reader not in VS Code, and as the
+   thing a reader checks when the button does something they did not expect.
+
+**A step with no entry in registers 1 or 2 is a gap the document reports as a
+gap**, in the operator's own terms: constant-or-parameterised and
+lifecycle-timed means the framework should run it; constant-or-parameterised
+but optional or ill-timed means the UI should offer it; genuinely a human's
+judgement means neither, and the document says so. Writing the POM and
+running the loader are the honest third case. **This is the property that
+makes the revised UAT worth having**: the next command that drifts into the
+walkthrough by hand has a labelled place to be wrong, instead of blending
+into the shell.
+
+`docs/uat/uat-dotnet-json-solution.md` and
+`docs/uat/uat-java-json-solution.md` are the required two — 432 and 480 lines,
+twenty-three `dabbler` commands and seventeen `git` ones between them. The
+stale manual commit after `bootstrap` goes, into register 1 where it belongs.
+`docs/quick-start.md` and
+`docs/tutorials/csv-solution/csv-multi-module-walkthrough.md` carry the same
+defect and are reached in the same pass.
+
+**Four rows the audit could not settle, and the walk must.** Session 123's
+audit placed every command and found four it could not close from the code
+alone: New Module asks for four of a module's six values and not the code
+root or the package; nothing in the UI asks for the remote the land pushes
+to, or sets the upstream its bare `git push` needs; a hand-written plan must
+be committed by hand before the first `session start`; and Troubleshoot runs
+none of the toolchain checks the prerequisites list. Each becomes a register
+or a labelled gap here, and a gap the walk confirms is raised as an owed
+item in the operator's terms — framework, UI or person.
+
+**The bar is the operator's, recorded 2026-07: copy-pasteable steps.** A
+UI-first instruction meets it by naming the exact command title and the exact
+prompt answers — "ridiculous for UAT" was said of a wall of shell, and a wall
+of vague clicking would be no better.
+
+**The walk is the test, and it is expected to find defects.** The Java and
+.NET walks of sessions 113–120 found nine product defects and four document
+errors between them, and they were walking documents that only had to be
+accurate. This one walks a path — the UI path through a multi-module
+solution — that no one has walked end to end, because until sessions 123 and
+128 the Start button could not produce a closable module session at all.
+Findings that are document errors are fixed here. Findings that are product
+defects are raised as owed items with their reproduction, and the session
+says plainly how many it found rather than closing quiet: **a UAT rewrite
+that reports no defects on a first walk of a new path has probably not been
+walked.**
+
+**Tests.** One script, as the other document checks are: every numbered step
+in both UAT documents carries the three registers or an explicit statement of
+which are absent and why; every palette command named exists in the
+extension's `contributes.commands`; and no document instructs a manual commit
+after `bootstrap`.

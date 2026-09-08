@@ -2453,11 +2453,14 @@
     {
       "number": 124,
       "title": "The UAT that tests the UI, and shows its own machinery",
-      "status": "not-started",
+      "status": "cancelled",
       "startedAt": null,
       "completedAt": null,
       "orchestrator": null,
-      "verificationVerdict": null
+      "verificationVerdict": null,
+      "preCancelStatus": "not-started",
+      "cancelledReason": "UAT deferred until later",
+      "cancelledAt": "2026-09-08T08:47:00-04:00"
     },
     {
       "number": 125,

@@ -67,22 +67,15 @@
 > the close that never refuses for coverage plus the clone deleted and Start
 > Session's module pick, 129 Claude Code through its own hooks.
 >
-> **Session 124 (the UAT in three registers) runs after 129**, because it
-> walks buttons 125–129 change — but the ledger registers sessions in numeric
-> order: `judgeStartBoundary` in `packages/router/src/session.ts` refuses a
-> start that is not the next sequential session and skips only *cancelled*
-> numbers, and a session restored after 129 closes would be refused the same
-> way (expected would be 130). So the mechanical path is: cancel 124 with the
-> reason that it moves, and append its section to the plan as session 130
-> (same text, ordering note removed), which the ledger picks up at the next
-> `session start`:
->
-> ```
-> dabbler session cancel --sessions-dir docs/sessions --session-number 124 --reason "moves to session 130: it walks the buttons sessions 125-129 change"
-> ```
->
-> The alternative — run 124 now and walk it again after 129 — is the
-> operator's to choose; the recommendation is the move.
+> **Session 124 (the UAT in three registers) is cancelled and re-planned as
+> session 130**, done 2026-09-08 by the operator: it walks buttons 125–129
+> change, and the ledger registers sessions in numeric order
+> (`judgeStartBoundary` in `packages/router/src/session.ts` refuses a start
+> that is not the next sequential session and skips only *cancelled* numbers,
+> so a restore after 129 would have been refused as well). The plan's 124
+> section says where it went; the 130 section carries the same text plus the
+> four findings of 123's audit the walk must settle. **Next to start is 125**;
+> the ledger grows to 130 at that start.
 >
 > **Driving a session from chat.** `session start --engine claude-code
 > --provider anthropic`, then `next` in a foreground bounded loop; pass

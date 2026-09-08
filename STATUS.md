@@ -1,6 +1,78 @@
-# STATUS — sessions 113–123 CLOSED, all VERIFIED: the deployables block, the Java/Maven walk and its nine defects, the suite off the operator's machine, and the principle of who owns a command; sessions 125–129 planned (the wall as a hook); version 2.0.14
+# STATUS — sessions 113–125 CLOSED, all VERIFIED: the deployables block, the Java/Maven walk and its nine defects, the suite off the operator's machine, the principle of who owns a command, and the policy a module session runs under; design round 12 re-plans 126–128 (the wall as a refusal, the basics first); version 2.0.14
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
+
+> ## SESSION 125 CLOSED, 2026-09-08 — the policy, written once; and round 12 changes what follows it
+>
+> | session | what | state |
+> | --- | --- | --- |
+> | 125 | the policy — what a module session may touch, written once | CLOSED VERIFIED (round 2, gpt-5-6-terra, two nits, none blocking), landed 96a36399, closed 0a0a6f42 |
+>
+> **What 125 built.** `packages/router/src/policy.ts`: the `ModulePolicy`
+> record — `allowed` (moduleScope's list with the module's shared files),
+> `protected` (the ledger pair under the sessions directory, `docs/modules.yaml`,
+> and `.dabbler` whole), `writable` (`.dabbler/scratch`, carved out of both
+> because the plan instruction itself tells the engine to write its answer
+> there), `siblings` (slug, roots, contract folder) and `destructive` (six
+> regular expressions) — written to `.dabbler/runs/s<N>/policy.json` by
+> `declare` when the declaration names modules and by `start --module`,
+> and never for a one-module shape. `decide(policy, call)` answers
+> protected-path, write-outside-scope, destructive-command and the soft
+> sibling-read that names the contract folder and `dabbler session
+> self-grant-read`; anything it cannot read is allowed and marked
+> `unobserved`, and it fails open on any throw. `scope` joined the
+> instruction schema (type regenerated) and rides on the first plan step
+> and its rejections with one sentence in the ask; `dabbler session scope`
+> prints the same list; `policy` sits in `workflow-startup` in
+> `boundaries.json` with its own selection rule. Three tests; the suite is
+> 1147 tests, 1143 passing, typescript 176 s, extension 10 s.
+>
+> **Measured, for whoever writes a shell reader.** The destructive patterns
+> were run through TypeScript, GNU `grep -Ei` and PowerShell `-match` over
+> 39 commands and agree only once a blank is spelt `[ ]`: a POSIX bracket
+> expression reads `\t` as a backslash and a `t`, so `[ \t]` matched
+> `.\bin` in grep and nowhere else.
+>
+> **The run of record failed once, on the suite's own rule.** `policy.test.ts`
+> reached `loadConfig`, which asks git for the project root, and the
+> `no-git` preload refuses that outside a walkthrough. Fixed in the driver's
+> `fix-run-of-record` step by answering `rev-parse --show-toplevel` through
+> the support table. Round 2 then verified with two nits: the
+> `.dabbler/scratch` carve-out reads as contradicting the plan's "everything
+> under `.dabbler/`" (decided: it stays, the answer must be writable, and it
+> is in the file so a shell reader sees the same exception); and `writable`
+> arrived without a schema bump (no policy was ever written by the earlier
+> shape, so there is nothing to migrate).
+>
+> **What the operator saw while it ran, and what that changed.** The Dabbler
+> terminal printed the banner and two phase lines through three steps; the
+> Work Explorer had to be refreshed by hand; the suite took the machine.
+> A parallel session ran design round 12 the same morning
+> (`docs/design/consults/round12-{brief,sol,gemini,synthesis}.md`) and
+> rewrote the plan for 126–128 — **uncommitted as this block is written, and
+> held by that session until the operator has discussed the re-scope with
+> it; 129 is already cancelled in the ledger (`session cancel 129`, 09:32),
+> and 126–128 keep their old titles there until that commit, because the
+> ledger takes its titles from the plan at the next `session start`.** Do
+> not start 126 before that commit lands. Under round 12: 126 fixes the three basics (the repaint,
+> reproduced before it is fixed; the step line in the terminal;
+> `--test-concurrency=4` back and audited); 127 makes the wall a refusal in
+> `judge()` — a report whose diff touches a sibling's roots or a protected
+> path is refused with the owner and the contract named — trims
+> `policy.ts` to `allowed`, `protected` and `siblings`, drops the
+> sibling-bytes clause, and keys the Stop hook to the driver's recorded
+> `CLAUDE_CODE_SESSION_ID`; 128 deletes the clone, puts Start Session's
+> module pick at the repository root, and walks the Copilot day; 129 is
+> cancelled into 127; 130 is unchanged. So of 125's work, `decide`, the
+> destructive list, the `writable` carve-out and the self-grant wording go
+> in 127; the record, `scope` on the instruction and `session scope` stay.
+>
+> **Driving notes.** `--transport api` on the first `next`; a foreground
+> bounded loop (next → sleep `retry_after_seconds` → next, budgeted under
+> the tool's ten minutes) carried verification, the run of record and the
+> close. The router dist is rebuilt from the landed tree so the next session
+> drives with 125's router; no version bump — 2.0.14 stays until the block
+> ships.
 
 > ## SESSIONS 121–123 CLOSED, 2026-09-08 — two ways in, the suite that took the machine, and who owns a command; version 2.0.14
 >

@@ -10518,6 +10518,13 @@
       "dateTime": "2026-09-07T20:10:59.395000-04:00",
       "task": "Say what the framework's own writes mean for a session that has not declared yet, wherever the framework makes them. Session 116 fixed this for dabbler bootstrap; the walk of 2026-09-07 fell into the same hole one verb over, because `dabbler session start` raises the testing-suites decision and answering it writes the tracked dabbler.yaml, after which the declaration refuses the dirty tree with nothing having warned that it would. The predicate bootstrap grew inline -- a session is in flight and has not declared its task -- and the sentence that follows from it move to writers.ts beside readTaskDeclaration and declareSessionTask, which already own what a declaration is; bootstrap reads them instead of its own copy, and `dabbler owed answer` reads them after an answer that wrote a tracked file (the suite declaration and the packaging pair, not a grant and not the git remote). No new gate and no framework commit: the declaration's refusal is right, and session 94 settled that the framework does not commit mid-session.",
       "releasable": false
+    },
+    {
+      "kind": "task-declaration",
+      "sessionNumber": 119,
+      "dateTime": "2026-09-07T20:24:46.790000-04:00",
+      "task": "Make a Maven module able to consume a sibling as a package, which it never could. `module pack` runs one reactor deploy per module and writes the module's jar and POM into packages/; the deployed POM still names com.example:solution-parent at the same dev version (the flatten plugin the scaffolded parent manages runs in resolveCiFriendliesOnly, which resolves ${revision} and keeps the parent), and that parent POM is deployed nowhere. A consumer resolving the sibling reads its descriptor, follows the parent and finds nothing: 'Could not find artifact com.example:solution-parent:pom:0.1.0-dev... in modules (file:///.../packages)'. The seam gains a way to say what a FEED needs besides a module's own artifacts -- for Maven, one non-recursive deploy of the root parent POM under the same version into the same file repository, proven by hand in the walk's repository to make the failing build pass; for .NET, nothing, because a .nupkg names no parent.",
+      "releasable": false
     }
   ]
 }

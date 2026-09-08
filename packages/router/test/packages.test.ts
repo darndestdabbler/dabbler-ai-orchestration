@@ -260,6 +260,89 @@ describe("the pack", () => {
     // untouched contents are not this pack's.
     assert.ok(!result.left.some((path) => path.endsWith(".json")));
   });
+  describe("what the feed needs besides the module", () => {
+    /** A one-module Maven solution with the parent POM the scaffold writes. */
+    function mavenSolution(): { root: string; shape: ReturnType<typeof solutionShape> } {
+      const root = tempDir("maven-pack-");
+      const parent =
+        "  <parent>\n    <groupId>com.example</groupId>\n    <artifactId>solution-parent</artifactId>\n" +
+        "    <version>${revision}</version>\n    <relativePath>../../pom.xml</relativePath>\n  </parent>\n";
+      seed(root, {
+        "docs/modules.yaml": [
+          "modules:",
+          "- slug: model",
+          "  package: com.example:json-model",
+          "  codeRoots: [modules/model]",
+          "- slug: store",
+          "  package: com.example:json-store",
+          "  dependsOn: [model]",
+          "  codeRoots: [modules/store]",
+          "",
+        ].join("\n"),
+        "pom.xml":
+          "<project>\n  <groupId>com.example</groupId>\n  <artifactId>solution-parent</artifactId>\n" +
+          "  <version>${revision}</version>\n  <packaging>pom</packaging>\n" +
+          "  <dependencyManagement>\n    <dependencies>\n    </dependencies>\n  </dependencyManagement>\n</project>\n",
+        "modules/model/pom.xml": `<project>\n${parent}  <artifactId>json-model</artifactId>\n</project>\n`,
+        "modules/store/pom.xml": `<project>\n${parent}  <artifactId>json-store</artifactId>\n</project>\n`,
+      });
+      return { root, shape: solutionShape(root) };
+    }
+
+    it("deploys the root parent POM before the module's own, so a consumer can read the sibling's descriptor", () => {
+      // Measured on the walk: without the parent in the feed, resolving
+      // com.example:json-model failed with "Could not find artifact
+      // com.example:solution-parent:pom:0.1.0-dev... in modules", so no
+      // Maven module could consume a sibling as a package at all.
+      const { root, shape } = mavenSolution();
+      const calls: string[][] = [];
+      const scriptedMaven = (argv: readonly string[]): { code: number; output: string } => {
+        calls.push([...argv]);
+        const version = (argv.find((token) => token.startsWith("-Drevision=")) ?? "").slice("-Drevision=".length);
+        // Only the module's own deploy leaves a jar; the parent leaves a POM.
+        if (!argv.includes("-N")) {
+          const dir = join(root, "packages", "com", "example", "json-model", version);
+          mkdirSync(dir, { recursive: true });
+          writeFileSync(join(dir, `json-model-${version}.jar`), "bytes", "utf8");
+        }
+        return { code: 0, output: "" };
+      };
+      const result = packModule(root, shape, "model", {
+        runPack: scriptedMaven,
+        digestOf: () => "beefbeefbe",
+        baseCommit: null,
+        now: new Date("2026-09-08T00:00:00Z"),
+      });
+      // The parent first, non-recursively, at the module's own version and
+      // into the same file repository.
+      assert.equal(calls.length, 2);
+      const [first, second] = calls;
+      assert.ok(first?.includes("-N"), first?.join(" "));
+      assert.deepEqual(
+        [first?.[first.indexOf("-f") + 1], first?.includes(`-Drevision=${result.version}`)],
+        ["pom.xml", true],
+      );
+      const repository = (token: string[] | undefined): string =>
+        token?.find((entry) => entry.startsWith("-DaltDeploymentRepository=")) ?? "";
+      assert.equal(repository(first), repository(second));
+      assert.ok(!second?.includes("-N"), second?.join(" "));
+      assert.equal(second?.[second.indexOf("-f") + 1], "modules/model/pom.xml");
+    });
+
+    it("asks .NET for nothing beside the package, because a nupkg names no parent", () => {
+      const { root, shape } = solution();
+      const calls: string[][] = [];
+      packModule(root, shape, "persister", {
+        runPack: scriptedDotnet(calls),
+        digestOf: () => "d1d1d1d1d1",
+        baseCommit: null,
+        now: new Date("2026-09-08T00:00:00Z"),
+      });
+      // Three packable projects, three commands, and nothing else.
+      assert.equal(calls.length, 3);
+      assert.ok(calls.every((argv) => argv[0] === "dotnet" && argv[1] === "pack"));
+    });
+  });
 });
 
 describe("the central pin and the record", () => {

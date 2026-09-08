@@ -349,7 +349,14 @@ export function packModule(
   const commands: string[][] =
     declared !== null
       ? [substitute(declared.pack.argv, { [PLACEHOLDER_OUTPUT]: outputDir, [PLACEHOLDER_VERSION]: version })]
-      : distinct(targets.map((target) => ecosystem.packArgv(target.via ?? target.project, outputDir, version)));
+      : [
+          // What the feed needs before the module's own artifacts mean
+          // anything to a consumer -- for Maven, the root parent POM the
+          // module's deployed POM names. Only on the default path: a
+          // declared pack owns everything it deploys.
+          ...ecosystem.feedRootArgv(root, outputDir, version),
+          ...distinct(targets.map((target) => ecosystem.packArgv(target.via ?? target.project, outputDir, version))),
+        ];
   // What the feed held before the pack, so that what the pack left can be
   // measured rather than predicted: an ecosystem's own tooling writes files
   // this framework never asked for, and every one of them is a byte the run

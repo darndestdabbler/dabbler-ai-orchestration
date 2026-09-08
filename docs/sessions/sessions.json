@@ -2342,6 +2342,26 @@
         "identityProvenance": "direct"
       },
       "verificationVerdict": "VERIFIED",
+      "verification": {
+        "rounds": 1,
+        "verifierModel": "gpt-5-6-terra",
+        "verifierProvider": "openai",
+        "transport": "api"
+      },
+      "frameworkVersion": "2.0.12"
+    },
+    {
+      "number": 119,
+      "title": "The sibling a Maven module cannot consume",
+      "status": "in-progress",
+      "startedAt": "2026-09-07T20:24:06.947000-04:00",
+      "completedAt": null,
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": "VERIFIED",
       "frameworkVersion": "2.0.12",
       "verification": {
         "rounds": 1,

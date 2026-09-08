@@ -146,6 +146,20 @@ export interface Ecosystem {
   /** The argv that packs one project into `output` under `version`. */
   packArgv(project: string, output: string, version: string): string[];
   /**
+   * What the FEED needs besides a module's own artifacts, so that a
+   * consumer resolving the module from it can read what it reads. Run once
+   * per pack, before the module's own commands, and only on this default
+   * path: a declared `packaging.pack` owns everything it deploys.
+   *
+   * Maven needs the root parent POM. A deployed module POM still names the
+   * parent at the same dev version -- the flatten plugin the scaffold
+   * manages resolves `${revision}` and deliberately keeps the parent -- so
+   * a consumer follows that reference out of the feed and finds nothing,
+   * which is why no Maven module could consume a sibling as a package
+   * until this existed. .NET needs nothing: a `.nupkg` names no parent.
+   */
+  feedRootArgv(root: string, output: string, version: string): string[][];
+  /**
    * Every project file under the module's roots, tests included,
    * repository-relative with forward slashes: what the convenience file
    * lists, and what a focused checkout builds and tests.
@@ -404,6 +418,12 @@ const DOTNET: Ecosystem = {
   },
   packArgv(project: string, output: string, version: string): string[] {
     return ["dotnet", "pack", project, "-c", "Release", "-o", output, `-p:PackageVersion=${version}`, NO_SHARED_COMPILATION, "--nologo"];
+  },
+  feedRootArgv(): string[][] {
+    // A `.nupkg` carries its own dependencies and names no parent, so a
+    // consumer reads nothing outside the package it restored. Nothing to
+    // put in the feed beside it.
+    return [];
   },
   projectFiles(root: string, entry: ModuleEntry): string[] {
     const roots = entry.codeRoots.length > 0 ? entry.codeRoots : ["."];
@@ -1689,6 +1709,29 @@ const MAVEN: Ecosystem = {
     // the deploy plugin's `id::url` names the repository the parent POM
     // declares.
     return ["mvn", "-B", "-f", project, "-DskipTests", `-Drevision=${version}`, `-DaltDeploymentRepository=modules::${pathToFileURL(output).href}`, "deploy"];
+  },
+  feedRootArgv(root: string, output: string, version: string): string[][] {
+    // The root parent POM, deployed on its own (`-N`, non-recursive) under
+    // the same version into the same file repository. A module's deployed
+    // POM names this parent -- flatten's resolveCiFriendliesOnly resolves
+    // `${revision}` and keeps the reference -- so without it a consumer
+    // cannot read the sibling's descriptor at all, which is how "consume a
+    // sibling as a package" failed for every Maven solution until it was
+    // walked. Nothing to deploy before the root has a POM.
+    if (!existsSync(join(root, "pom.xml"))) return [];
+    return [
+      [
+        "mvn",
+        "-B",
+        "-N",
+        "-f",
+        "pom.xml",
+        "-DskipTests",
+        `-Drevision=${version}`,
+        `-DaltDeploymentRepository=modules::${pathToFileURL(output).href}`,
+        "deploy",
+      ],
+    ];
   },
   projectFiles(root: string, entry: ModuleEntry): string[] {
     return mavenPoms(root, entry).sort();

@@ -19,6 +19,7 @@ import {
   type TestRunRecord,
 } from "../src/testEvidence.ts";
 import { judgeFreshness } from "../src/gates.ts";
+import type { SolutionShape } from "../src/modules.ts";
 import { gitAnswers, tempDir } from "./support/answers.ts";
 
 const UNIT: SuiteSpec = { name: "unit", command: "npm test", covers: ["src/"], expensive: true, runsWhole: false };
@@ -73,6 +74,40 @@ describe("the suite declaration", () => {
     ]);
   });
 
+  it("gives a suite to the one module whose roots hold its covers and its tests, and leaves a spanning suite repository-wide", () => {
+    // Nobody types `module:` for the ordinary case (the proof of
+    // 2026-09-08 had to): the roots say. A shared file counts as the
+    // module's; a suite over two modules, or over the root, stays wide.
+    const shape = {
+      multi: true,
+      implicit: false,
+      modules: [
+        { slug: "model", codeRoots: ["modules/model"], dependsOn: [], kind: "shared-types" },
+        { slug: "persister", codeRoots: ["modules/persister"], dependsOn: ["model"], kind: "library" },
+      ],
+    } as unknown as SolutionShape;
+    const loaded = loadSuitesChecked(
+      {
+        modules: { persister: { sharedFiles: ["tests/run.mjs"] } },
+        testing: {
+          suites: [
+            { name: "persister-unit", command: "x", expensive: true, covers: ["modules/persister/", "tests/run.mjs"], test_roots: ["modules/persister/tests"], test_glob: "*.cs" },
+            { name: "model-unit", command: "x", expensive: true, covers: ["modules/model/"], test_roots: ["modules/model/tests"], test_glob: "*.cs" },
+            { name: "said", command: "x", expensive: true, module: "model", covers: ["modules/persister/"] },
+            { name: "both", command: "x", expensive: true, covers: ["modules/model/", "modules/persister/"] },
+            { name: "root", command: "x", expensive: true, covers: ["."] },
+          ],
+        },
+      },
+      { shape },
+    );
+    assert.deepEqual(loaded.errors, []);
+    assert.deepEqual(
+      loaded.suites.map((suite) => [suite.name, suite.module ?? null]),
+      [["persister-unit", "persister"], ["model-unit", "model"], ["said", "model"], ["both", null], ["root", null]],
+    );
+  });
+
   it("reads no suites from no declaration and refuses one that is not a list", () => {
     assert.deepEqual(loadSuitesChecked({}), { suites: [], errors: [], ok: true });
     assert.deepEqual(loadSuitesChecked({ testing: { suites: {} } }).errors, ["testing.suites must be a list"]);
@@ -110,7 +145,7 @@ describe("the suite declaration", () => {
         { slug: "model", codeRoots: ["modules/model"], dependsOn: [] },
         { slug: "listener", codeRoots: ["modules/listener"], dependsOn: ["model"] },
       ],
-    } as unknown as Parameters<typeof loadSuitesChecked>[1] extends { shape?: infer S } ? NonNullable<S> : never;
+    } as unknown as SolutionShape;
     const loaded = loadSuitesChecked(
       {
         testing: {

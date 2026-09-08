@@ -148,6 +148,26 @@
         "exposure": {
           "description": "The in-flight session's exposure manifest -- what its working directory holds of its sibling modules, the grants in force and what changed outside its scope -- or null for a single-module repository, a session with none, or nothing in flight.",
           "oneOf": [{ "$ref": "#/$defs/exposure" }, { "type": "null" }]
+        },
+        "checkoutModule": {
+          "type": ["string", "null"],
+          "description": "The module whose focused folder this root is, by slug, or null in the repository itself. A launcher reads it beside the next session's kind: a focused session starts only in its own module's folder, a global one only in the repository, and a start anywhere else is refused by name."
+        },
+        "focusedSession": {
+          "description": "The focused session running in a module's folder while this root is the repository, from the module-session marker: which session, which module, and the folder's name. Null in the module's own folder, in a single-module repository, and when nothing is in flight elsewhere.",
+          "oneOf": [
+            {
+              "type": "object",
+              "required": ["session", "module", "folder"],
+              "additionalProperties": false,
+              "properties": {
+                "session": { "type": "integer" },
+                "module": { "type": "string" },
+                "folder": { "type": "string" }
+              }
+            },
+            { "type": "null" }
+          ]
         }
       }
     },
@@ -179,17 +199,21 @@
           "type": "array",
           "items": {
             "type": "object",
-            "required": ["sibling", "reason", "debug", "grantedAt"],
+            "required": ["sibling", "reason", "grantedAt"],
             "additionalProperties": false,
             "properties": {
               "sibling": { "type": "string" },
               "reason": { "type": "string" },
-              "debug": { "type": "boolean" },
               "grantedAt": { "type": "string" }
             }
           }
         },
-        "outsideScope": { "type": "array", "items": { "type": "string" } }
+        "outsideScope": { "type": "array", "items": { "type": "string" } },
+        "siblingBytes": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "On the close manifest: the ungranted sibling bytes this checkout held, one sentence each. Recorded and said beside the exposure gate's row; never a refusal, because the changed paths are what measure the work."
+        }
       }
     },
     "task": {
@@ -371,6 +395,15 @@
           "minItems": 1,
           "items": { "type": "string" },
           "description": "The module(s) the session's declaration named, by slug. Present only for a session of a multi-module solution; a single-module row carries no member, so nothing changes in what it projects."
+        },
+        "kind": {
+          "type": "string",
+          "enum": ["focused", "global"],
+          "description": "Where the session runs: 'focused' in one module's own folder, 'global' in the repository itself. From the checkout `session start` wrote on the row when there is one, else from the plan's `Module: <slug>` or `Scope: whole repository` line under the session's heading. Absent where neither says -- every row of a single-module repository."
+        },
+        "module": {
+          "type": "string",
+          "description": "The module a focused session runs in, by slug. Present exactly when `kind` is 'focused'."
         },
         "tasks": { "type": "array", "items": { "$ref": "#/$defs/task" } },
         "tasksRefused": {

@@ -405,6 +405,18 @@ suite("workExplorerTreeModel: repository descriptor", () => {
     assert.ok(d.tooltip!.includes("router could not be run"));
   });
 
+  test("the repository row says a focused session is running in a module's folder", () => {
+    // The repository's own ledger has no row in flight then; the marker is
+    // the one thing it knows, and the row is where a person looks.
+    const d = repositoryDescriptor(
+      repositoryNodes([
+        makeRepository({ focusedSession: { session: 7, module: "persister", folder: "shop.persister" } }),
+      ])[0],
+    );
+    assert.ok(d.description?.includes("focused session 007 running in shop.persister"), d.description);
+    assert.ok(d.tooltip?.includes("focused session 007 running in shop.persister"));
+  });
+
   test("the id is the root path, so two worktrees stay two rows", () => {
     const a = repositoryDescriptor(
       repositoryNodes([makeRepository({ root: "D:/ws" })])[0],
@@ -628,6 +640,24 @@ suite("workExplorerTreeModel: session descriptor", () => {
       }),
     });
     assert.strictEqual(d.description, "planned");
+  });
+
+  test("a session yet to run says where it will run, when the plan says", () => {
+    // The projection carries the plan's `Module:` / `Scope:` line as the
+    // row's kind, so a person reads it before the start rather than
+    // learning it from a refusal in the wrong folder.
+    const planned = sessionDescriptor({
+      kind: "session",
+      repository,
+      session: makeSession({ number: 9, status: "planned", iconKey: "not-started", kind: "focused", module: "persister" }),
+    });
+    assert.strictEqual(planned.description, "planned · focused: persister");
+    const registered = sessionDescriptor({
+      kind: "session",
+      repository,
+      session: makeSession({ number: 10, status: "not-started", iconKey: "not-started", kind: "global" }),
+    });
+    assert.strictEqual(registered.description, "global");
   });
 
   test("the label leads with the zero-padded number", () => {

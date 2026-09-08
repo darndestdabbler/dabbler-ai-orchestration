@@ -50,16 +50,24 @@ developer machine that has restored once does; the committed `CsvModel`
 package came from the clone's own `packages/` folder by the relative path in
 `nuget.config`, as the POC showed.
 
-## The decision: a fresh clone per session
+## The decision: the module's folder is kept
 
-`dabbler module open <slug>` on a clone that already exists **discards it
-and clones again** (`EXISTING_CLONE = "fresh"` in `checkout.ts`), refusing
-when the clone holds uncommitted changes. `--reset` remains the persistent
-path -- fetch, reset hard to the trunk, re-narrow, keep the build output --
-for whoever wants it, and session 105's `session start` gets the fresh
-clone.
+`dabbler module open <slug>` on a clone that already exists **keeps it**
+(`EXISTING_CLONE = "reset"` in `checkout.ts`): clean, it is fetched, reset
+hard to the trunk and re-narrowed, and the build output stays; dirty, it is
+refused by the paths it holds; it is never deleted, whatever flag was
+passed. The folder is one a developer works in from a VS Code window of
+its own, kept between sessions and refreshed from the server -- the
+experience a repository per module gives -- and a window holds its folder
+open, so a delete under it fails on this host anyway (the proof of
+2026-09-08, `option-a-poc.md`). The wall after a grant is restored by the
+revoke's narrowing: the fetched blobs may stay in the object store, and the
+session reads the tree, not the store. The `--reset` flag is accepted and
+changes nothing.
 
-Why fresh, when reset is faster:
+The measurements above still hold and still say a fresh clone is cheap;
+what changed is what the folder is for. The case that was made for a
+fresh clone, kept for the record:
 
 1. **The saving is small against the thing it saves.** A reset clone saves
    about 4.5 seconds per session start -- 1.4 s of clone that a reset does
@@ -80,12 +88,11 @@ Why fresh, when reset is faster:
    asks. Disposable state is the simpler thing to reason about, and
    simplicity was the operator's second rule.
 
-What would change the decision: a machine where the fresh path costs
-minutes rather than seconds. That is exactly what real-time antivirus does
-to a build, and exactly what the verb measures; a team that finds the fresh
-toolchain at sixty seconds should set `--reset` as its habit and the
-framework should then offer `modules.checkout.existing: reset` as
-configuration. It is not offered until somebody measures the need.
+What decided it the other way was none of these numbers: it was that the
+folder is somebody's window, and the third point's stale state is what the
+reset's fetch, hard reset, re-narrow and clean already remove. The verb
+still measures both paths, and a team whose fresh toolchain costs a minute
+under real-time antivirus is the team the kept folder was always for.
 
 ## The run, verbatim
 

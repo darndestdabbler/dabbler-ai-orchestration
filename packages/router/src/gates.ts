@@ -72,7 +72,7 @@ import {
 import { sessionIsReleasable } from "./writers.ts";
 import { readSessionState } from "./progress.ts";
 import { pythonRepr, pythonStr } from "./pythonJson.ts";
-import { blockingDecisions } from "./owedDecisions.ts";
+import { blockingDecisions, suitesOwedElsewhere } from "./owedDecisions.ts";
 import {
   evaluateFreshness,
   loadSuitesChecked,
@@ -531,6 +531,31 @@ export interface WorktreeGateOptions {
    * there like any other, however it got there.
    */
   readonly beforeWork?: boolean;
+  /**
+   * The in-flight row says the registration removed the hook, so the edit
+   * to `.claude/settings.json` is the framework's. Without it the file
+   * counts like any other: an operator's own change to it before the
+   * declaration is work, not the registration's doing.
+   */
+  readonly hookRemoved?: boolean;
+}
+
+/** Whether the in-flight session's row records that its registration removed the hook. */
+export function hookRemovedFor(sessionsDir: string): boolean {
+  const current = currentSession(sessionsDir);
+  const rows = readSessionState(sessionsDir)?.["sessions"];
+  for (const row of Array.isArray(rows) ? rows : []) {
+    if (typeof row !== "object" || row === null || Array.isArray(row)) continue;
+    const record = row as Record<string, unknown>;
+    if (record["number"] !== current) continue;
+    const orchestrator = record["orchestrator"];
+    return (
+      typeof orchestrator === "object" &&
+      orchestrator !== null &&
+      (orchestrator as Record<string, unknown>)["hookRemoved"] === true
+    );
+  }
+  return false;
 }
 
 /**
@@ -555,7 +580,7 @@ export function materialPaths(
     if (isMachineStatePath(path)) {
       continue; // the run ledger is the record, not the work
     }
-    if (options.beforeWork && isFrameworkInstalledPath(path)) {
+    if (options.beforeWork && options.hookRemoved === true && isFrameworkInstalledPath(path)) {
       continue; // the registration's own edit to the hook file, not work; the land commits it
     }
     blocking.push(path);
@@ -576,7 +601,10 @@ export function materialWorktreeChanges(
   sessionsDir: string,
   options: WorktreeGateOptions = {},
 ): WorktreeChanges {
-  return judgeWorktree(readWorktreeFacts(sessionsDir), sessionsDir, options);
+  return judgeWorktree(readWorktreeFacts(sessionsDir), sessionsDir, {
+    ...options,
+    ...(options.beforeWork ? { hookRemoved: options.hookRemoved ?? hookRemovedFor(sessionsDir) } : {}),
+  });
 }
 
 /** What the working-tree gate reads: the porcelain, and where the record lives. */
@@ -801,8 +829,14 @@ export function checkTestRunFresh(
   // and no other; the gate demands the same ones, from the same plan. A
   // session with no plan -- a single-module solution -- is demanded every
   // required suite, as it always was.
+  const root = repoRootFor(sessionsDir);
+  const current = currentSession(sessionsDir);
   return judgeFreshness(
-    demandedByPlan(evaluateFreshness(sessionsDir, null, loaded.suites), planForGate(sessionsDir)),
+    demandedByPlan(
+      evaluateFreshness(sessionsDir, null, loaded.suites),
+      planForGate(sessionsDir),
+      root !== null && typeof current === "number" ? suitesOwedElsewhere(root, current) : new Set(),
+    ),
   );
 }
 
@@ -894,10 +928,29 @@ export function checkExposureWithinCeiling(sessionsDir: string): Check {
   if (root === null || typeof current !== "number") return [true, "no session in flight: no exposure to measure", true];
   const manifest = readExposure(root, current);
   if (manifest === null) {
-    return [true, "no exposure manifest: not a module session, so there is no wall to measure", true];
+    // No manifest is either a single-module repository or a global session
+    // of a multi-module one, and the row says which: a global session is
+    // the whole repository, and its close runs no exposure gate.
+    let multi = false;
+    try {
+      multi = solutionShape(root).multi;
+    } catch {
+      multi = false;
+    }
+    return [
+      true,
+      multi
+        ? "a global session: the whole repository, no wall to measure"
+        : "no exposure manifest: not a module session, so there is no wall to measure",
+      true,
+    ];
   }
   const refusal = judgeExposure(manifest);
-  return refusal === null ? [true, ""] : [false, refusal];
+  if (refusal !== null) return [false, refusal];
+  // Held, and what the wall let through is said beside the row: the
+  // manifest records it, the row names it, nothing refuses on it.
+  const noted = manifest.siblingBytes ?? [];
+  return [true, noted.length === 0 ? "" : `held; noted, not refused: ${noted.join("; ")}`];
 }
 
 // --- owed_decisions -----------------------------------------------------------

@@ -289,7 +289,15 @@ export function judgeWorkPlanModules(
   shape: SolutionShape,
   checkout: string | null = null,
 ): string[] {
-  const reasons = judgeModulesForShape(plan.modules ?? [], plan.reason ?? null, shape, "the plan");
+  // No checkout in a multi-module solution is a global session: the whole
+  // repository, which names any declared modules or none.
+  const reasons = judgeModulesForShape(
+    plan.modules ?? [],
+    plan.reason ?? null,
+    shape,
+    "the plan",
+    shape.multi && checkout === null,
+  );
   // A session started in a module's focused checkout IS that module's: the
   // clone holds no other module's source, so a plan naming another one
   // would scope the verifier, the manifest and the Explorer to work the
@@ -322,6 +330,7 @@ export function judgeModulesForShape(
   reason: string | null,
   shape: SolutionShape,
   who = "the declaration",
+  global = false,
 ): string[] {
   const named = modules.map((slug) => slug.trim()).filter((slug) => slug !== "");
   const declared = new Set(shape.modules.map((module) => module.slug));
@@ -338,7 +347,9 @@ export function judgeModulesForShape(
     }
     return reasons;
   }
-  if (named.length === 0) {
+  // A global session is the whole repository and need name no module; a
+  // focused one names its own, and the checkout clause holds it to that.
+  if (named.length === 0 && !global) {
     reasons.push(
       `${who} names no module, and docs/modules.yaml declares ${declared.size}: a session ` +
         "in a multi-module solution says which module(s) it works in",

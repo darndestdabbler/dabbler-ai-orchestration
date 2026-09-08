@@ -87,6 +87,8 @@ export interface CloneMarker {
   readonly origin: string;
   readonly cone: readonly string[];
   readonly madeAt: string;
+  /** The repository this folder was opened from, absolute: the close pulls it forward. */
+  readonly repository?: string;
 }
 
 export interface ModuleSessionMarker {
@@ -129,20 +131,16 @@ export function clearModuleSessionMarker(root: string): void {
 }
 
 /**
- * What `module open` does with a clone that already exists when `--reset`
- * is not given. `refuse` names `--reset` as the way; `reset` treats the
- * existing clone as the persistent per-module clone and resets it; `fresh`
- * discards it and clones again.
- *
- * `fresh`, by the Windows preflight (docs/design/module-checkout-preflight.md):
- * a fresh clone costs about a second and a half and a cold toolchain about
- * five seconds more than a warm one, against a session measured in minutes;
- * and only a fresh clone restores the wall, because a grant's fetched blobs
- * stay in a reset clone's object store. A clone holding changes is still
- * refused rather than discarded, and `--reset` is the persistent path for
- * whoever wants it.
+ * What `module open` does with a clone that already exists: it is the
+ * module's folder, kept between sessions. Clean, it is fetched, reset to
+ * the trunk and re-narrowed; dirty, it is refused by the paths it holds;
+ * it is never deleted, whatever flag was passed -- a VS Code window may be
+ * holding it open, and a folder a developer works in is not disposable
+ * (docs/design/module-checkout-preflight.md). The wall is the disk: a
+ * grant's fetched blobs may stay in the object store, and the revoke's
+ * narrowing takes them off the tree, which is where the session reads.
  */
-export const EXISTING_CLONE: "refuse" | "reset" | "fresh" = "fresh";
+export const EXISTING_CLONE = "reset" as const;
 
 /** `modules/<slug>/contract/`, as the block lays every module's contract bundle. */
 export function contractDir(slug: string): string {
@@ -205,10 +203,20 @@ export function checkoutCone(
   for (const dependency of dependenciesOf(shape.modules, slug)) directories.add(contractDir(dependency));
   for (const consumer of consumersOf(shape.modules, slug)) directories.add(contractDir(consumer));
   for (const shared of sharedFiles) {
-    const dir = coneDirectory(posix.dirname(coneDirectory(shared)));
+    // An entry that names a directory -- a trailing slash, or a last
+    // segment with no extension -- is kept whole: the grant's permanent
+    // form is "add modules/model to sharedFiles", and the cone must then
+    // hold modules/model itself, not its parent. A file keeps its folder.
+    const dir = coneDirectory(isDirectoryEntry(shared) ? shared : posix.dirname(coneDirectory(shared)));
     if (dir !== "" && dir !== ".") directories.add(dir);
   }
   return [...directories].sort();
+}
+
+function isDirectoryEntry(shared: string): boolean {
+  const trimmed = shared.trim().split("\\").join("/");
+  if (trimmed.endsWith("/")) return true;
+  return !posix.basename(trimmed).includes(".");
 }
 
 /** Where the clone of `slug` goes by default: beside the repository, as `<repo>.<slug>`. */
@@ -295,8 +303,12 @@ function isFiltered(clone: string): boolean {
   return listed.split("\n").some((line) => line.startsWith("?"));
 }
 
-function isDirty(clone: string): boolean {
-  return git(clone, ["status", "--porcelain"], "reading the clone's status") !== "";
+/** The paths a clone's porcelain status names, in git's spelling; empty when clean. */
+function dirtyPaths(clone: string): string[] {
+  return git(clone, ["status", "--porcelain"], "reading the clone's status")
+    .split("\n")
+    .filter((line) => line.trim() !== "")
+    .map((line) => line.slice(3).trim());
 }
 
 /** Every `.claude/settings.local.json` key kept; the block set. */
@@ -346,10 +358,11 @@ function excludeInClone(clone: string, paths: readonly string[]): void {
  * session branch, writes the ecosystem's convenience file and the engine's
  * working-directory block at the clone's root -- both excluded in the
  * clone's own `.git/info/exclude`, so the clone stays clean -- and says
- * whether the clone is really filtered. With `reset` an existing clone is
- * fetched, reset hard to the trunk and re-narrowed instead; without it, an
- * existing clone gets what `EXISTING_CLONE` says, and one holding changes
- * is refused rather than discarded.
+ * whether the clone is really filtered. An existing clone is kept: fetched,
+ * reset hard to the trunk and re-narrowed when clean, refused by the paths
+ * it holds when not, and never deleted (`EXISTING_CLONE`). `reset` in the
+ * options is accepted and changes nothing, because that is what happens
+ * either way.
  */
 export function openModule(
   root: string,
@@ -382,25 +395,17 @@ export function openModule(
           "modules.checkout.parent elsewhere",
       );
     }
-    const want = options.reset === true ? "reset" : EXISTING_CLONE;
-    if (want === "refuse") {
+    // Dirty is refused whatever was asked: the folder is somebody's, and
+    // nothing here discards their work or the folder.
+    const dirty = dirtyPaths(clone);
+    if (dirty.length > 0) {
       throw new CheckoutError(
-        `${clone} already exists: pass --reset to fetch, reset it to the trunk and ` +
-          "re-narrow its cone, or remove it for a fresh clone",
+        `${clone} holds ${dirty.length} change(s) (${dirty.slice(0, 3).join(", ")}); commit, push or ` +
+          "discard them there before it is reset to the trunk",
       );
     }
-    if (options.reset !== true && isDirty(clone)) {
-      throw new CheckoutError(
-        `${clone} holds changes; commit or discard them, or pass --reset to discard them ` +
-          "and reset the clone to the trunk",
-      );
-    }
-    if (want === "fresh") {
-      rmSync(clone, { recursive: true, force: true });
-    } else {
-      reset = true;
-      git(clone, ["fetch", "-q", "--prune", "origin"], "fetching the clone's origin");
-    }
+    reset = EXISTING_CLONE === "reset";
+    git(clone, ["fetch", "-q", "--prune", "origin"], "fetching the clone's origin");
   }
 
   if (!existsSync(clone)) {
@@ -461,7 +466,7 @@ export function openModule(
   // registers here rather than cloning again; machine state, never tracked.
   const markerPath = join(clone, ...CLONE_MARKER.split("/"));
   mkdirSync(dirname(markerPath), { recursive: true });
-  const marker: CloneMarker = { slug, origin: url, cone, madeAt: nowIso("seconds") };
+  const marker: CloneMarker = { slug, origin: url, cone, madeAt: nowIso("seconds"), repository: resolve(root) };
   writeFileSync(markerPath, `${JSON.stringify(marker, null, 2)}\n`, "utf8");
   excludeInClone(clone, [
     CLAUDE_LOCAL_SETTINGS,

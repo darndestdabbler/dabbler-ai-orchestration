@@ -3,12 +3,12 @@
 // .NET one.
 
 import assert from "node:assert/strict";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it } from "node:test";
 import { pathToFileURL } from "node:url";
 
-import { EcosystemError, ecosystemNamed, ecosystemOf, ensureRootFiles, javaReleaseOf, layDebugGrants, setJavaSource } from "../src/ecosystem.ts";
+import { EcosystemError, ecosystemNamed, ecosystemOf, ensureRootFiles, javaReleaseOf, setJavaSource } from "../src/ecosystem.ts";
 import { type SolutionShape, dependencyOrder, parseEntries, impliedDeployables } from "../src/modules.ts";
 import { seed, tempDir } from "./support/answers.ts";
 
@@ -260,35 +260,6 @@ describe("the Maven side of the seam", () => {
     assert.ok(surface.every((entry) => entry.file.startsWith("modules/reports/reports-api/")));
   });
 
-  it("packs a Maven sibling under a debugging grant through the pack handed in and lays no overlay, where .NET lays the overlay and packs nothing", () => {
-    const root = tempDir("grants-");
-    seed(root, {
-      "modules/model/pom.xml": "<project>\n  <groupId>com.example</groupId>\n  <artifactId>model</artifactId>\n  <version>1.0.0</version>\n</project>\n",
-      "modules/persister/src/CsvPersister/CsvPersister.csproj": "<Project />\n",
-    });
-    const entries = parseEntries({
-      modules: [
-        { slug: "model", codeRoots: ["modules/model"], package: "com.example:model" },
-        { slug: "persister", codeRoots: ["modules/persister"], package: "CsvPersister" },
-      ],
-    });
-    const shape: SolutionShape = { multi: true, implicit: false, modules: dependencyOrder(entries), deployables: impliedDeployables(entries) };
-    const [model, persister] = shape.modules;
-    const packed: string[] = [];
-    const overlay = join(root, ".dabbler/overlay.targets");
-
-    layDebugGrants(root, shape, [model!], model!, (slug) => packed.push(slug));
-    assert.deepEqual(packed, ["model"]);
-    assert.equal(existsSync(overlay), false);
-    assert.throws(() => layDebugGrants(root, shape, [model!], model!, null), /no pack was handed in/);
-
-    layDebugGrants(root, shape, [model!, persister!], persister!, (slug) => packed.push(slug));
-    assert.deepEqual(packed, ["model"]);
-    assert.match(readFileSync(overlay, "utf8"), /PackageReference Remove="CsvPersister"/);
-    // A revoke regenerates from what remains: nothing, so no overlay.
-    layDebugGrants(root, shape, [], null, null);
-    assert.equal(existsSync(overlay), false);
-  });
 });
 
 describe("the root build files", () => {
@@ -318,7 +289,8 @@ describe("the root build files", () => {
       "packages/README.md",
     ]);
     assert.match(readFileSync(join(root, "nuget.config"), "utf8"), /value="packages"/);
-    assert.match(readFileSync(join(root, "Directory.Build.targets"), "utf8"), /\.dabbler\/overlay\.targets/);
+    // The targets file imports nothing: a sibling is always its package here.
+    assert.doesNotMatch(readFileSync(join(root, "Directory.Build.targets"), "utf8"), /Import|overlay/);
     assert.match(readFileSync(join(root, "Directory.Build.props"), "utf8"), /EnableSourceLink Condition="'\$\(DABBLER_DRIVEN\)' != ''">false/);
     // A third entry rewrites nothing: an edited props file stays edited.
     writeFileSync(join(root, "Directory.Packages.props"), "<Project><!-- mine --></Project>\n", "utf8");

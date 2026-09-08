@@ -112,6 +112,35 @@ describe("the module projection", () => {
     assert.deepEqual(modules.find((module) => module.slug === "core")?.shippedIn, []);
   });
 
+  it("marks the in-flight session's module from the ledger row, and from the marker in the repository", () => {
+    const manifest = "modules:\n- slug: model\n  codeRoots:\n  - modules/model\n- slug: persister\n  dependsOn: [model]\n  codeRoots:\n  - modules/persister\n";
+    // In the module's folder: the ledger's in-progress row carries the checkout.
+    const clone = tempDir("projection-");
+    seed(clone, {
+      "docs/modules.yaml": manifest,
+      "docs/sessions/sessions.json": JSON.stringify({
+        schemaVersion: 5,
+        sessions: [{ number: 7, status: "in-progress", checkout: { module: "persister", path: clone } }],
+      }),
+    });
+    const inClone = project(clone).modules as { slug: string; inSession: number | null }[];
+    assert.deepEqual(inClone.map((m) => [m.slug, m.inSession]), [["model", null], ["persister", 7]]);
+    // In the repository: no row is in flight here, and the marker says where it went.
+    const repo = tempDir("projection-");
+    seed(repo, {
+      "docs/modules.yaml": manifest,
+      ".dabbler/module-session.json": JSON.stringify({
+        session: 7, module: "persister", path: clone, sessionsDir: join(clone, "docs", "sessions"), startedAt: "2026-09-08T15:00:00",
+      }),
+    });
+    const inRepo = project(repo).modules as { slug: string; inSession: number | null }[];
+    assert.deepEqual(inRepo.map((m) => [m.slug, m.inSession]), [["model", null], ["persister", 7]]);
+    // Nothing in flight anywhere: no row is marked.
+    const idle = tempDir("projection-");
+    seed(idle, { "docs/modules.yaml": manifest });
+    assert.ok((project(idle).modules as { inSession: number | null }[]).every((m) => m.inSession === null));
+  });
+
   it("projects an absent manifest as the one implicit module, and writes where the Explorer reads", () => {
     const root = tempDir("projection-");
     const doc = project(root);

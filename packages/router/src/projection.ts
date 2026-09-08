@@ -15,6 +15,7 @@
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 
+import { readModuleSessionMarker } from "./checkout.ts";
 import { loadConfig } from "./config.ts";
 import { sessionsDirFor } from "./evidence.ts";
 import { readExposure } from "./exposure.ts";
@@ -75,6 +76,40 @@ function grantedSiblings(root: string): Set<string> {
   }
 }
 
+/**
+ * The modules the in-flight session names, and which session: from this
+ * root's ledger row (`checkout.module` in a module's folder, the declared
+ * `modules` in a global session), or -- in the repository while a focused
+ * session runs in its module's folder -- from the module-session marker,
+ * which is the only record the repository holds of it. Null when nothing
+ * is in flight here.
+ */
+function modulesInSession(root: string): { readonly session: number; readonly modules: ReadonlySet<string> } | null {
+  try {
+    const raw = readRawSessionState(sessionsDirFor(root));
+    const sessions = Array.isArray(raw?.["sessions"]) ? (raw?.["sessions"] as Record<string, unknown>[]) : [];
+    const current = sessions.find((row) => row["status"] === "in-progress");
+    if (current !== undefined && typeof current["number"] === "number") {
+      const checkout = current["checkout"];
+      const checkoutModule =
+        typeof checkout === "object" && checkout !== null && !Array.isArray(checkout)
+          ? (checkout as Record<string, unknown>)["module"]
+          : null;
+      const named =
+        typeof checkoutModule === "string" && checkoutModule.trim() !== ""
+          ? [checkoutModule.trim()]
+          : Array.isArray(current["modules"])
+            ? (current["modules"] as unknown[]).map(String)
+            : [];
+      return { session: current["number"], modules: new Set(named) };
+    }
+  } catch {
+    // An unreadable ledger marks nothing; the marker below may still.
+  }
+  const marker = readModuleSessionMarker(root);
+  return marker === null ? null : { session: marker.session, modules: new Set([marker.module]) };
+}
+
 export type RunOfRecordState = "green" | "red" | "none";
 
 /**
@@ -127,6 +162,7 @@ export function project(root: string): Record<string, unknown> {
   const shape = solutionShape(root);
   const name = basename(resolve(root)) || "solution";
   const granted = grantedSiblings(root);
+  const inPlay = modulesInSession(root);
   const runs = runsOfRecord(root, shape);
   // What ships: every bundle record under release/, and per module the
   // bundles that pin its package or are its own.
@@ -160,6 +196,9 @@ export function project(root: string): Record<string, unknown> {
       // A grant in force for this module in the in-flight session: the
       // Explorer badges the row, and offers to end it.
       granted: granted.has(entry.slug),
+      // The session working in this module right now, or null: the Explorer
+      // marks the row in both windows, the module's and the repository's.
+      inSession: inPlay !== null && inPlay.modules.has(entry.slug) ? inPlay.session : null,
       // The latest run of record of the module's suites, and the consumers
       // whose contract suite against it is red.
       runOfRecord: runs.get(entry.slug)?.state ?? "none",

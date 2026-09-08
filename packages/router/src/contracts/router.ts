@@ -235,8 +235,6 @@ export interface ModuleGrantOptions {
   /** The sibling whose source the session asks for. */
   readonly slug: string;
   readonly reason: string;
-  /** Lay the overlay that builds the sibling from source in this clone. */
-  readonly debug?: boolean;
 }
 
 export interface ModuleRevokeOptions {

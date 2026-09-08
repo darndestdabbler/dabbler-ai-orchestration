@@ -167,6 +167,11 @@ export function cleanRepoAnswers(repo: string): () => void {
     [["ls-files", "-v", "-z"], { stdout: "" }],
     [["status", "--porcelain", "-uall"], { stdout: "" }],
     [["status", "--porcelain"], { stdout: "" }],
+    // No upstream: a registration pulls first only where there is one.
+    [
+      ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"],
+      { code: 128, stderr: "fatal: no upstream configured for branch 'main'" },
+    ],
     [(args) => args[0] === "cat-file" && args[1] === "-e", { code: 0 }],
     [["commit-tree"], { stdout: "c".repeat(40) }],
     [["update-ref"], { code: 0 }],
@@ -304,6 +309,8 @@ export function makeAnsweredRepo(
       () => (withOrigin ? { stdout: String(state.ahead) } : { code: 128, stderr: "fatal: no upstream configured" }),
     ],
     [["push"], { code: 0 }],
+    // A pushed, clean checkout with an upstream pulls forward to itself.
+    [["pull"], { code: 0 }],
     [["read-tree"], { code: 0 }],
     [["add"], { code: 0 }],
     [["rm", "--cached"], { code: 0 }],

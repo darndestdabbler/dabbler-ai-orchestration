@@ -14,7 +14,7 @@
 // have to be wrong about one of them.
 
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, relative } from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -107,21 +107,6 @@ export interface Ecosystem {
   packageReferences(root: string, projectFile: string): PackageReferenceFact[];
   /**
    * What a debugging grant does for the siblings of this ecosystem:
-   * `debugging` is every sibling under a debugging grant in force and
-   * `granted` the one just granted (null on a revoke). .NET lays or
-   * removes the untracked overlay from the whole list; Maven, which loads
-   * no external profile, rebuilds the granted sibling from its source into
-   * the file repository through `pack`, and refuses when no pack was
-   * handed in.
-   */
-  layDebugGrants(
-    root: string,
-    shape: SolutionShape,
-    debugging: readonly ModuleEntry[],
-    granted: ModuleEntry | null,
-    pack: ((slug: string) => void) | null,
-  ): void;
-  /**
    * The module's public surface with its doc comments, read from source:
    * the abstractions project when the module has one, its roots outside
    * tests otherwise, in file order.
@@ -201,32 +186,6 @@ export function fileStem(packageId: string): string {
 
 export function packageIdOfStem(stem: string): string {
   return stem.replace(/\+/g, ":");
-}
-
-/**
- * What a debugging grant does, across ecosystems: each side acts on the
- * siblings that are its own, and the .NET overlay is regenerated (or
- * removed) from the whole list even when the sibling just granted is not
- * a .NET one.
- */
-export function layDebugGrants(
-  root: string,
-  shape: SolutionShape,
-  debugging: readonly ModuleEntry[],
-  granted: ModuleEntry | null,
-  pack: ((slug: string) => void) | null,
-): void {
-  DOTNET.layDebugGrants(root, shape, debugging, granted, pack);
-  MAVEN.layDebugGrants(root, shape, debugging, granted, pack);
-}
-
-function keyOf(root: string, entry: ModuleEntry): EcosystemKey | null {
-  try {
-    return ecosystemOf(root, entry).key;
-  } catch (error) {
-    if (error instanceof EcosystemError) return null;
-    throw error;
-  }
 }
 
 const SKIPPED_DIRS: ReadonlySet<string> = new Set([
@@ -369,9 +328,6 @@ const DOTNET: Ecosystem = {
   },
   packageReferences(root: string, projectFile: string): PackageReferenceFact[] {
     return packageReferencesOf(projectFile, readFileSync(join(root, projectFile), "utf8"));
-  },
-  layDebugGrants(root: string, shape: SolutionShape, debugging: readonly ModuleEntry[]): void {
-    writeOverlay(root, debugging.filter((entry) => keyOf(root, entry) === "dotnet"));
   },
   readSurface(root: string, entry: ModuleEntry, packageId: string): SurfaceEntry[] {
     const names = this.contractProjectNames(packageId);
@@ -572,37 +528,8 @@ export function pinPackageVersion(propsText: string, id: string, version: string
 }
 
 /**
- * The untracked overlay a debugging grant lays: for each .NET sibling
- * granted with `debug`, its package reference removed and its project(s)
- * referenced by path, for this clone only. The tracked
- * `Directory.Build.targets` imports it when it exists; regenerated whole
- * from the grants in force, and removed when none is a debugging one.
+ * The .NET root files.
  */
-function writeOverlay(root: string, debugging: readonly ModuleEntry[]): void {
-  const path = join(root, ...OVERLAY_TARGETS.split("/"));
-  if (debugging.length === 0) {
-    rmSync(path, { force: true });
-    return;
-  }
-  const lines = [
-    "<Project>",
-    "  <!-- Laid by dabbler module grant (debug) for this clone only: the granted",
-    "       sibling is built from its source rather than restored as its package.",
-    "       Untracked; dabbler module revoke removes it. -->",
-  ];
-  for (const entry of debugging) {
-    lines.push(`  <ItemGroup Label="dabbler-grant:${entry.slug}">`);
-    for (const target of DOTNET.packableProjects(root, entry)) {
-      lines.push(`    <PackageReference Remove="${target.packageId}" />`);
-      lines.push(`    <ProjectReference Include="$(MSBuildThisFileDirectory)../${target.project}" />`);
-    }
-    lines.push("  </ItemGroup>");
-  }
-  lines.push("</Project>", "");
-  mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, lines.join("\n"), "utf8");
-}
-
 // --- The .NET root files ----------------------------------------------------------
 
 /** Where the committed packages live, relative to the root. */
@@ -626,8 +553,6 @@ export const DOTNET_TOOLCHAIN_ENV: Readonly<Record<string, string>> = {
 
 /** The MSBuild property that keeps a build from starting the compiler server. */
 export const NO_SHARED_COMPILATION = "-p:UseSharedCompilation=false";
-/** The untracked overlay a debugging grant lays; imported by the tracked targets when it exists. */
-export const OVERLAY_TARGETS = ".dabbler/overlay.targets";
 
 /**
  * The six files a multi-module .NET solution needs at its root, written only
@@ -698,18 +623,9 @@ function rootFilesDotnet(root: string): ScaffoldResult {
   writeIfAbsent(
     root,
     "Directory.Build.targets",
-    [
-      "<Project>",
-      // No double hyphen inside the comment: XML refuses it, and the real
-      // build was the one that said so.
-      "  <!-- A debugging grant (dabbler module grant, with debug) lays an untracked overlay",
-      "       that turns a sibling's PackageReference into a ProjectReference for this",
-      "       clone only. Imported here, after a project's items exist, and only when the",
-      "       file does: nothing in a committed project file changes. -->",
-      `  <Import Project="$(MSBuildThisFileDirectory)${OVERLAY_TARGETS}" Condition="Exists('$(MSBuildThisFileDirectory)${OVERLAY_TARGETS}')" />`,
-      "</Project>",
-      "",
-    ].join("\n"),
+    // Present so a solution has the one place root-level targets go; it
+    // imports nothing, and a sibling is always its package here.
+    ["<Project>", "</Project>", ""].join("\n"),
     result,
   );
   writeIfAbsent(
@@ -1646,28 +1562,6 @@ const MAVEN: Ecosystem = {
         packageId: `${(item.groupId === "${project.groupId}" ? pom.groupId : item.groupId) ?? ""}:${item.artifactId}`,
         ownVersion: item.version,
       }));
-  },
-  layDebugGrants(
-    root: string,
-    _shape: SolutionShape,
-    debugging: readonly ModuleEntry[],
-    granted: ModuleEntry | null,
-    pack: ((slug: string) => void) | null,
-  ): void {
-    // No overlay: Maven loads no external profile, so the granted sibling
-    // is rebuilt from its source into the file repository, and the consumer
-    // resolves the fresh artifact -- the reactor's own answer to the same
-    // question. Only the sibling just granted; a revoke undoes nothing,
-    // because what was packed is what its source was.
-    if (granted === null || keyOf(root, granted) !== "maven") return;
-    if (!debugging.some((entry) => entry.slug === granted.slug)) return;
-    if (pack === null) {
-      throw new EcosystemError(
-        `a debugging grant of Maven module '${granted.slug}' rebuilds it from its source into ` +
-          "the file repository with module pack, and no pack was handed in",
-      );
-    }
-    pack(granted.slug);
   },
   readSurface(root: string, entry: ModuleEntry, packageId: string): SurfaceEntry[] {
     const names = this.contractProjectNames(packageId);

@@ -28,7 +28,7 @@ import {
   type SpawnOptions,
   type SpawnSyncOptions,
 } from "node:child_process";
-import { existsSync, mkdtempSync, rmSync, statSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -353,6 +353,39 @@ export interface SuiteScope {
 
 export function scopeIsComplete(scope: SuiteScope): boolean {
   return scope.roots.length > 0 && scope.glob !== "";
+}
+
+/**
+ * Whether any file under `dir` matches the suite's test glob, by basename.
+ * The one question the run of record asks of a focused folder: a reached
+ * suite whose tests are not on this disk cannot be run here, whatever its
+ * command says.
+ */
+export function anyTestFileUnder(dir: string, glob: string): boolean {
+  const pattern = new RegExp(
+    `^${glob
+      .split("*")
+      .map((part) => part.split("?").map((piece) => piece.replace(/[.+^${}()|[\]\\]/g, "\\$&")).join("."))
+      .join(".*")}$`,
+  );
+  const walk = (folder: string): boolean => {
+    let entries: import("node:fs").Dirent[];
+    try {
+      entries = readdirSync(folder, { withFileTypes: true });
+    } catch {
+      return false;
+    }
+    for (const entry of entries) {
+      if (entry.isDirectory()) {
+        if (entry.name === "node_modules" || entry.name === ".git") continue;
+        if (walk(join(folder, entry.name))) return true;
+      } else if (pattern.test(entry.name)) {
+        return true;
+      }
+    }
+    return false;
+  };
+  return walk(dir);
 }
 
 export interface SelectionConfig {

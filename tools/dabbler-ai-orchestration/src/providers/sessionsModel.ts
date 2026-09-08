@@ -51,6 +51,18 @@ export function sessionRowLabel(session: SessionRecord): string {
   return `${sessionDisplayNumber(session)} · ${title}`;
 }
 
+/**
+ * Where the session runs, in the row's words: `focused: persister` or
+ * `global`, as the projection carries it from the plan's section or the
+ * row's checkout; null where the projection says nothing, which is every
+ * row of a single-module repository.
+ */
+export function sessionKindLabel(session: SessionRecord): string | null {
+  if (session.kind === "focused") return `focused: ${session.module ?? "?"}`;
+  if (session.kind === "global") return "global";
+  return null;
+}
+
 /** Sessions in ledger order — ascending by number, the order they run. */
 export function sessionsInOrder(
   sessions: readonly SessionRecord[],

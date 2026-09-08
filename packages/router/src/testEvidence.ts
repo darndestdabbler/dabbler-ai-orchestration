@@ -33,7 +33,8 @@ import {
   runGit,
 } from "./journal.ts";
 import { LIFECYCLE_WRITTEN_FILES, RUNS_DIRNAME } from "./ledger.ts";
-import type { SolutionShape } from "./modules.ts";
+import { modulesReachedBy } from "./impact.ts";
+import { type SolutionShape, moduleConfigs } from "./modules.ts";
 import { PythonFloat, dumps, pythonFloatRepr, pythonRepr } from "./pythonJson.ts";
 
 export { matchingPrefixes } from "./checks.ts";
@@ -184,6 +185,34 @@ export function suiteRequiredForClose(suite: SuiteSpec): boolean {
 }
 
 /** What the loader is told about the solution, when the caller knows it. */
+/**
+ * The one module whose code roots (or shared files) hold every cover and
+ * every test root of a suite, or null: none, more than one, or a path no
+ * module owns. Read only for a multi-module shape.
+ */
+function inferSuiteModule(
+  config: unknown,
+  shape: SolutionShape | null,
+  covers: readonly string[],
+  testRoots: unknown,
+): string | null {
+  if (shape === null || !shape.multi) return null;
+  const roots = Array.isArray(testRoots) ? testRoots.filter((root): root is string => typeof root === "string") : [];
+  const paths = [...covers, ...roots].map((path) => path.trim()).filter((path) => path !== "");
+  if (paths.length === 0) return null;
+  const shared = new Map(
+    [...moduleConfigs(config, shape.modules).values()].map((module) => [module.slug, module.sharedFiles]),
+  );
+  let owner: string | null = null;
+  for (const path of paths) {
+    const owners = modulesReachedBy(shape, path, shared);
+    if (owners.length !== 1) return null;
+    if (owner !== null && owners[0] !== owner) return null;
+    owner = owners[0] ?? null;
+  }
+  return owner;
+}
+
 export interface SuiteLoadOptions {
   /**
    * The solution's shape. When it is multi-module, a suite's `module` and
@@ -342,9 +371,15 @@ export function loadSuitesChecked(
       }
       return value.trim();
     };
-    const moduleSlug = slugOf("module");
+    const declaredModule = slugOf("module");
     const against = slugOf("against");
-    if (moduleSlug === undefined || against === undefined) return;
+    if (declaredModule === undefined || against === undefined) return;
+    // A suite that says nothing of its module belongs to the one module
+    // whose roots hold everything it covers and everything it tests, so
+    // nobody types `module:` for the ordinary case; one that spans
+    // modules, or reaches the root, stays repository-wide.
+    const moduleSlug =
+      declaredModule ?? inferSuiteModule(config, options.shape ?? null, covers as string[], entry["test_roots"]);
     if (role === "consumer-contract" && against === null) {
       errors.push(
         `${label} ('${name.trim()}') is a consumer-contract suite and must say which ` +

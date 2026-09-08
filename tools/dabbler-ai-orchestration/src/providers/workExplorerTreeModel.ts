@@ -38,6 +38,7 @@ import {
 import {
   ICON_FILES,
   progressText,
+  sessionKindLabel,
   sessionRowLabel,
   sessionsInOrder,
   verdictIsUnclean,
@@ -569,6 +570,9 @@ export function repositoryTooltip(repository: SessionsRepository): string {
     // the message says which. The label must not claim the first.
     markers.push(`Record fault: ${repository.invariantViolation}`);
   }
+  if (repository.focusedSession) {
+    markers.push(focusedSessionText(repository.focusedSession));
+  }
   if (repository.forceClosed) {
     markers.push("A session here closed via the --force bypass, not the gate.");
   }
@@ -590,6 +594,16 @@ export function repositoryTooltip(repository: SessionsRepository): string {
   return lines.join("\n");
 }
 
+/**
+ * What the repository's own window says of a focused session running in a
+ * module's folder: the session, and the folder to look in. Without it the
+ * repository's rows say nothing is happening, which is what the proof of
+ * 2026-09-08 saw.
+ */
+function focusedSessionText(focused: { session: number; module: string; folder: string }): string {
+  return `focused session ${String(focused.session).padStart(3, "0")} running in ${focused.folder}`;
+}
+
 export function repositoryDescriptor(node: RepositoryNode): RowDescriptor {
   const { repository } = node;
   const tokens: string[] = [NODE_TOKEN.repository];
@@ -601,7 +615,9 @@ export function repositoryDescriptor(node: RepositoryNode): RowDescriptor {
     // two rows, and only the path tells them apart.
     id: `repository:${repository.root}`,
     label: repository.label,
-    description: progressText(repository),
+    description: repository.focusedSession
+      ? `${progressText(repository)} · ${focusedSessionText(repository.focusedSession)}`
+      : progressText(repository),
     tooltip: repositoryTooltip(repository),
     // The repository row is structural. Lifecycle glyphs belong to the
     // session rows rather than competing with the repository's name, and
@@ -673,12 +689,17 @@ export function sessionDescriptor(node: SessionNode): RowDescriptor {
     // distinguishes the two and it has to be on the row. A finished session
     // carries the date it closed, so "when was that done" is read at a
     // glance rather than from the tooltip.
+    // A session yet to run also says where it will run -- `focused:
+    // persister` or `global` -- when the plan says, so the kind is read
+    // from the row before the start rather than discovered by a refusal.
     description:
       session.status === "in-progress"
         ? "in flight"
         : session.status === "planned"
-          ? "planned"
-          : closeDateLabel(session.completedAt),
+          ? ["planned", sessionKindLabel(session)].filter(Boolean).join(" · ")
+          : session.status === "not-started"
+            ? sessionKindLabel(session) ?? closeDateLabel(session.completedAt)
+            : closeDateLabel(session.completedAt),
     tooltip: sessionTooltip(node),
     icon: sessionIcon(session.iconKey),
     contextValue: tokenString(tokens),

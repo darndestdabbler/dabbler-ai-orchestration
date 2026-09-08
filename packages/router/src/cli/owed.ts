@@ -36,7 +36,6 @@ import {
 } from "../owedDecisions.ts";
 import type { Row } from "../ledger.ts";
 import { readSessionState } from "../progress.ts";
-import { packModule } from "../packages.ts";
 import { commitBeforeDeclaring, undeclaredSessionInFlight } from "../writers.ts";
 import { writeErr, writeOut } from "./output.ts";
 
@@ -344,16 +343,13 @@ function run(argv: string[]): number {
   writeOut(`owed: '${id}' answered '${choice}'.\n`);
   if (id.startsWith(GRANT_DECISION_PREFIX) && typeof current === "number") {
     // The framework acts on a grant here, at the answer: the cone widens,
-    // the overlay is laid, the manifest says so. A denial is recorded.
+    // the manifest says so. A denial is recorded.
     try {
       const shape = solutionShape(root);
-      const settled = settleAnsweredGrants(root, shape, current, (slug) => {
-        packModule(root, shape, slug, { session: current });
-      });
+      const settled = settleAnsweredGrants(root, shape, current);
       for (const grant of settled.applied) {
         writeOut(
-          `owed: granted -- the checkout now holds module '${grant.sibling}'s source` +
-            `${grant.debug ? " and builds it from that source (the overlay laid, or the artifact rebuilt)" : ""}. ` +
+          `owed: granted -- the checkout now holds module '${grant.sibling}'s source. ` +
             "Reload the window (Developer: Reload Window) so the editor and the build see it.\n",
         );
       }

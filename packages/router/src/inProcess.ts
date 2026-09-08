@@ -367,11 +367,8 @@ export class InProcessRouter implements Router {
       if (o.reset === true) args.push("--reset");
       return this.text("module", args, o.workspaceRoot);
     },
-    grant: (o: ModuleGrantOptions) => {
-      const args = ["grant", o.slug, "--reason", o.reason, "--workspace-root", o.workspaceRoot];
-      if (o.debug === true) args.push("--debug");
-      return this.text("module", args, o.workspaceRoot);
-    },
+    grant: (o: ModuleGrantOptions) =>
+      this.text("module", ["grant", o.slug, "--reason", o.reason, "--workspace-root", o.workspaceRoot], o.workspaceRoot),
     revoke: (o: ModuleRevokeOptions) =>
       this.text("module", ["revoke", o.slug, "--workspace-root", o.workspaceRoot], o.workspaceRoot),
     /** The committed package, out of band; the pack's own lines are the stdout. */

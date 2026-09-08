@@ -111,6 +111,31 @@ suite("ActionRegistry: session actions", () => {
     }
   });
 
+  test("Start Session is withheld in a module's folder unless the next session is focused on that module", () => {
+    // The proof of 2026-09-08: Start Session in the model window registered
+    // a session whose plan named app, and nothing said no. `session start`
+    // now refuses it by name, and the launcher is not offered for a refusal.
+    const sessions = [
+      makeSession({ number: 1, status: "complete" }),
+      makeSession({ number: 2, status: "not-started", kind: "focused", module: "app" }),
+      makeSession({ number: 3, status: "planned", iconKey: "not-started", kind: "global" }),
+    ];
+    const starts = (repository: ReturnType<typeof makeRepository>) => ({
+      repository: applicableRepositoryActions(repository).map((a) => a.id).includes("dabblerSessionSets.startSession"),
+      row: applicableSessionActions(repository, sessions[1]).map((a) => a.id).includes("dabblerSessionSets.startSession"),
+    });
+    const inApp = makeRepository({ currentSession: null, nextSession: 2, sessions, checkoutModule: "app" });
+    assert.deepStrictEqual(starts(inApp), { repository: true, row: true });
+    const inModel = makeRepository({ currentSession: null, nextSession: 2, sessions, checkoutModule: "model" });
+    assert.deepStrictEqual(starts(inModel), { repository: false, row: false });
+    // The repository itself starts anything; a module's folder never starts
+    // a global session.
+    const inRepository = makeRepository({ currentSession: null, nextSession: 2, sessions, checkoutModule: null });
+    assert.strictEqual(starts(inRepository).repository, true);
+    const globalNext = makeRepository({ currentSession: null, nextSession: 3, sessions, checkoutModule: "app" });
+    assert.strictEqual(starts(globalNext).repository, false);
+  });
+
   test("cancel and restore are mutually exclusive on one row", () => {
     const cancelled = makeSession({ number: 1, status: "cancelled" });
     const ids = applicableSessionActions(

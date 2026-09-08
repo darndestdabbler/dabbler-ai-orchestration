@@ -35,6 +35,25 @@ describe("the cone", () => {
       "packages",
     ]);
   });
+
+  it("keeps a shared entry that names a directory whole, which is the grant's permanent form", () => {
+    // "add modules/a to b's sharedFiles": the cone must hold modules/a
+    // itself, not its parent, which would be every module's source.
+    const shape = shapeOf({
+      modules: [
+        { slug: "a", codeRoots: ["modules/a"], package: "A" },
+        { slug: "b", codeRoots: ["modules/b"], dependsOn: ["a"], package: "B" },
+      ],
+    });
+    assert.deepEqual(checkoutCone(shape, "b", ["modules/a", "tools/scripts/"]), [
+      "docs",
+      "modules/a",
+      "modules/a/contract",
+      "modules/b",
+      "packages",
+      "tools/scripts",
+    ]);
+  });
 });
 
 describe("the focused clone", () => {

@@ -33,6 +33,22 @@ const hasNextSession = (r: SessionsRepository): boolean =>
       s.status === "planned",
   );
 
+/**
+ * Whether the next session may start in THIS folder. In the repository
+ * itself, always. In a module's focused folder, only when the next session
+ * is focused on that module: a global session runs in the repository, and a
+ * focused one runs in its own module's folder -- `session start` refuses
+ * either anywhere else, by name, and the launcher is withheld rather than
+ * offered for a refusal.
+ */
+export const startableHere = (r: SessionsRepository): boolean => {
+  if (r.checkoutModule === null) return true;
+  const next = r.sessions.find((s) => s.number === r.nextSession);
+  return next?.kind === "focused" && next.module === r.checkoutModule;
+};
+
+const canStart = (r: SessionsRepository): boolean => hasNextSession(r) && startableHere(r);
+
 // Ordered list; `group` bands: 1xx Open File submenu, 3xx Copy Prompt
 // submenu, 9xx lifecycle.
 export const REPOSITORY_ACTIONS: RepositoryAction[] = [
@@ -40,7 +56,7 @@ export const REPOSITORY_ACTIONS: RepositoryAction[] = [
   { id: "dabblerSessionSets.openActivityLog", label: "Activity Log", group: 102, when: () => true },
   { id: "dabblerSessionSets.openChangeLog", label: "Change Log", group: 103, when: () => true },
   { id: "dabblerSessionSets.openSessionState", label: "Sessions Ledger", group: 104, when: () => true },
-  { id: "dabblerSessionSets.startSession", label: "Start Session", group: 905, when: hasNextSession },
+  { id: "dabblerSessionSets.startSession", label: "Start Session", group: 905, when: canStart },
   // The unattended half sits beside Start rather than replacing it: one
   // opens the person's own CLI, the other runs the session with nobody
   // watching, and which of those you want is not something a flag on one
@@ -49,7 +65,7 @@ export const REPOSITORY_ACTIONS: RepositoryAction[] = [
     id: "dabbler.startUnattendedSession",
     label: "Start Unattended Session",
     group: 907,
-    when: hasNextSession,
+    when: canStart,
   },
   { id: "dabblerSessionSets.closeSession", label: "Close Session", group: 906,
     when: (r) => r.currentSession !== null },
@@ -95,7 +111,19 @@ export const SESSION_ACTIONS: SessionAction[] = [
     when: (repository, session) =>
       repository.currentSession === null &&
       repository.nextSession !== null &&
-      session.number === repository.nextSession,
+      session.number === repository.nextSession &&
+      startableHere(repository),
+  },
+  {
+    id: "dabblerSessionSets.resumeSession",
+    label: "Resume Session",
+    group: 903,
+    // The AI's terminal back, for the session in flight in this workspace:
+    // the proof of 2026-09-08 lost the engine's editor tab and had no way
+    // to bring it back. Only on the in-flight row, because `session run`
+    // drives the session the record says is in flight and no other.
+    when: (repository, session) =>
+      repository.currentSession === session.number && session.status === "in-progress",
   },
   {
     id: "dabblerSessionSets.cancel",

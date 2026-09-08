@@ -235,14 +235,35 @@ describe("dabbler session, the whole surface", () => {
     assert.equal(record?.["status"], "in-progress");
   });
 
-  it("takes the session number for cancel as a positional", async () => {
+  it("takes the session number for cancel as a positional, and refuses a forced cancel from an engine", async () => {
     const { sessionsDir } = makeAnsweredSandbox();
     registerSessionStart(sessionsDir, 1, { engine: "claude-code" });
-    const result = await run(() =>
-      sessionVerb(["cancel", "1", "--reason", "stop", "--force", "--sessions-dir", sessionsDir]),
-    );
-    assert.equal(result.code, 0);
-    assert.match(result.out, /"status": "cancelled"/);
+    // Who is asking is read from the environment: a person's shell has
+    // neither marker, and the suite may itself be running under one.
+    const saved = { driven: process.env["DABBLER_DRIVEN"], claude: process.env["CLAUDECODE"] };
+    const restoreEnv = () => {
+      for (const [key, value] of [["DABBLER_DRIVEN", saved.driven], ["CLAUDECODE", saved.claude]] as const) {
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      }
+    };
+    try {
+      process.env["DABBLER_DRIVEN"] = "1";
+      delete process.env["CLAUDECODE"];
+      const engine = await run(() =>
+        sessionVerb(["cancel", "1", "--reason", "stop", "--force", "--sessions-dir", sessionsDir]),
+      );
+      assert.equal(engine.code, 3);
+      assert.match(engine.err, /a person's verb, never the engine's/);
+      delete process.env["DABBLER_DRIVEN"];
+      const person = await run(() =>
+        sessionVerb(["cancel", "1", "--reason", "stop", "--force", "--sessions-dir", sessionsDir]),
+      );
+      assert.equal(person.code, 0);
+      assert.match(person.out, /"status": "cancelled"/);
+    } finally {
+      restoreEnv();
+    }
   });
 
   it("requires the reason a cancellation is recorded under", async () => {

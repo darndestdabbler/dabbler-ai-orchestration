@@ -7,11 +7,17 @@
 // sparse checkout; a scripted git would test the script.
 
 import assert from "node:assert/strict";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { describe, it } from "node:test";
 
-import { CLAUDE_LOCAL_SETTINGS, defaultClonePath, openModule, readModuleSessionMarker } from "../src/checkout.ts";
+import {
+  CLAUDE_LOCAL_SETTINGS,
+  defaultClonePath,
+  openModule,
+  readCloneMarker,
+  readModuleSessionMarker,
+} from "../src/checkout.ts";
 import { sessionNext } from "../src/drive.ts";
 import {
   ExposureError,
@@ -21,10 +27,10 @@ import {
   revokeGrant,
   settleAnsweredGrants,
 } from "../src/exposure.ts";
-import { answerOwed } from "../src/owedDecisions.ts";
+import { answerOwed, foldOwed, readOwed } from "../src/owedDecisions.ts";
 import { solutionShape } from "../src/modules.ts";
 import { capture } from "../src/output.ts";
-import { EXIT_OK, start } from "../src/session.ts";
+import { EXIT_OK, pullRepositoryForward, start } from "../src/session.ts";
 import { readRawSessionState } from "../src/sessionState.ts";
 import { setProviderKeys } from "./support/answers.ts";
 import { git, gitOut, makeRepo, scratchDir } from "./support/repo.ts";
@@ -48,7 +54,7 @@ const repo = makeRepo(
   {
     "docs/modules.yaml": MANIFEST,
     "docs/sessions/session-plan.md":
-      "### Session 1 of 2: Persist things\n1. Register.\n2. **Store a person.** Make it real.\n\n" +
+      "### Session 1 of 2: Persist things\nModule: persister\n1. Register.\n2. **Store a person.** Make it real.\n\n" +
       "### Session 2 of 2: More things\n1. Register.\n2. Polish it.\n",
     "dabbler.yaml": "schema_version: 1\n",
     "global.json": "{}\n",
@@ -125,12 +131,22 @@ describe("a module opened in its focused checkout", () => {
     assert.match(exclude, /^\/persister\.slnx$/m);
     assert.equal(gitOut(clone, "status", "--porcelain"), "");
 
-    // Widened by hand (what a grant does), then reset onto a session branch:
-    // the cone is narrow again and the branch is the one asked for.
+    // Widened by hand (what a grant does), then opened again onto a session
+    // branch: the folder is kept -- what was under its own machine state is
+    // still there -- the cone is narrow again and the branch is the one
+    // asked for.
     git(clone, "sparse-checkout", "add", "modules/model/src");
     assert.ok(existsSync(join(clone, "modules", "model", "src", "CsvModel", "Person.cs")));
-    const reset = openModule(repo, shape, "persister", { clonePath: clone, reset: true, branch: "session/5" });
+    writeFileSync(join(clone, ".dabbler", "kept.txt"), "a window holds this folder\n", "utf8");
+    const reset = openModule(repo, shape, "persister", { clonePath: clone, branch: "session/5" });
     assert.equal(reset.reset, true);
+    assert.ok(existsSync(join(clone, ".dabbler", "kept.txt")), "the folder was reset, not replaced");
+    assert.equal(readCloneMarker(clone)?.repository, repo);
+    // Dirty, it is refused by name and still not deleted.
+    writeFileSync(join(clone, "modules", "persister", "notes.md"), "half done\n", "utf8");
+    assert.throws(() => openModule(repo, shape, "persister", { clonePath: clone }), /modules\/persister\/notes\.md/);
+    assert.ok(existsSync(join(clone, "modules", "persister", "notes.md")));
+    rmSync(join(clone, "modules", "persister", "notes.md"));
     assert.equal(reset.branch, "session/5");
     assert.equal(gitOut(clone, "symbolic-ref", "--short", "HEAD"), "session/5");
     assert.equal(existsSync(join(clone, "modules", "model", "src")), false);
@@ -146,8 +162,10 @@ describe("a session started on a module", () => {
   it("registers in the module's fresh clone with the checkout on its row and a zero-exposure manifest, and a next from the full checkout is refused naming the clone", async () => {
     setProviderKeys();
     const sessionsDir = join(repo, "docs", "sessions");
+    // No --module: the plan's `Module: persister` line under session 1's
+    // heading is what makes the session focused, and on that module.
     const started = await capture(() =>
-      Promise.resolve(start(sessionsDir, { engine: "claude-code", provider: "anthropic", module: "persister" })),
+      Promise.resolve(start(sessionsDir, { engine: "claude-code", provider: "anthropic" })),
     );
     assert.equal(started.value, EXIT_OK, started.stderr);
     const clone = defaultClonePath(repo, "persister", null);
@@ -177,15 +195,45 @@ describe("a session started on a module", () => {
     assert.match(refused.stderr, /works in module 'persister's focused checkout at/);
     assert.match(refused.stderr, /run it there/);
   });
+
+  it("pulls the repository forward from the clone once the clone has pushed, and names the command when the repository is dirty", () => {
+    const clone = defaultClonePath(repo, "persister", null);
+    const sessionsDir = join(clone, "docs", "sessions");
+    writeFileSync(join(clone, "modules", "persister", "src", "CsvPersister", "Store.cs"), "class Store {}\n", "utf8");
+    git(clone, "add", "-A");
+    git(clone, "commit", "-q", "-m", "Store a person");
+    git(clone, "push", "-q");
+    const pushed = gitOut(clone, "rev-parse", "HEAD");
+    assert.notEqual(gitOut(repo, "rev-parse", "HEAD"), pushed);
+
+    // Clean: the repository's HEAD moves to what the clone pushed.
+    const line = pullRepositoryForward(clone, sessionsDir);
+    assert.match(String(line), /pulled .* forward \(git pull --ff-only\)/);
+    assert.equal(gitOut(repo, "rev-parse", "HEAD"), pushed);
+    assert.ok(existsSync(join(repo, "modules", "persister", "src", "CsvPersister", "Store.cs")));
+
+    // Dirty: nothing is pulled and nothing refuses; the line names the command.
+    writeFileSync(join(repo, "global.json"), "{ \"sdk\": {} }\n", "utf8");
+    const held = pullRepositoryForward(clone, sessionsDir);
+    assert.match(String(held), /holds 1 change\(s\) \(global\.json\)/);
+    assert.match(String(held), /git -C ".*" pull --ff-only/);
+    git(repo, "checkout", "--", "global.json");
+  });
 });
 
 describe("a grant, and its revoke", () => {
   const clone = defaultClonePath(repo, "persister", null);
 
-  it("answered grant, widens the clone to the sibling's source, lays the overlay where nothing tracks it, and records the bytes and the reason", () => {
+  it("answered grant, widens the clone to the sibling's source, records the bytes and the reason, and the brief ends with the permanent form", () => {
     const shape = solutionShape(clone);
-    const decision = raiseGrantDecision(clone, shape, 1, "model", "debugging the mapper", true);
+    const decision = raiseGrantDecision(clone, shape, 1, "model", "debugging the mapper");
     assert.equal(decision, "module-grant:model");
+    // The brief says how to stop asking: a shared file in the manifest.
+    const brief = foldOwed(readOwed(clone)).get(decision);
+    assert.match(
+      String(brief?.["determined"]),
+      /To keep this for every persister session, add modules\/model to persister's sharedFiles in dabbler\.yaml\./,
+    );
     // Raised, not applied: the request alone changes nothing on disk.
     assert.equal(existsSync(join(clone, "modules", "model", "src")), false);
     assert.deepEqual(settleAnsweredGrants(clone, shape, 1), { applied: [], denied: [], open: [decision] });
@@ -195,13 +243,9 @@ describe("a grant, and its revoke", () => {
     assert.equal(settled.applied.length, 1);
     assert.equal(settled.applied[0]?.sibling, "model");
     assert.ok(existsSync(join(clone, "modules", "model", "src", "CsvModel", "Person.cs")));
-    const overlay = readFileSync(join(clone, ".dabbler", "overlay.targets"), "utf8");
-    assert.match(overlay, /<PackageReference Remove="CsvModel" \/>/);
-    assert.match(overlay, /<ProjectReference Include="\$\(MSBuildThisFileDirectory\)\.\.\/modules\/model\/src\/CsvModel\/CsvModel\.csproj" \/>/);
-    // The overlay is machine state under .dabbler/, excluded in the clone;
-    // what status shows is the session's own registration (its ledger),
-    // never the overlay.
-    assert.doesNotMatch(gitOut(clone, "status", "--porcelain"), /\.dabbler|overlay/);
+    // Nothing untracked appears: what status shows is the session's own
+    // registration (its ledger), never machine state under .dabbler/.
+    assert.doesNotMatch(gitOut(clone, "status", "--porcelain"), /\.dabbler/);
     const exposure = readExposure(clone, 1);
     assert.ok((exposure?.siblings[0]?.bytes ?? 0) > 0);
     // The sibling's SOURCE, which is what the grant widened the cone for.
@@ -210,7 +254,6 @@ describe("a grant, and its revoke", () => {
     // is what the contract folder already says out loud.
     assert.deepEqual(exposure?.siblings[0]?.files, ["modules/model/src/CsvModel/Person.cs"]);
     assert.equal(exposure?.grants[0]?.reason, "debugging the mapper");
-    assert.equal(exposure?.grants[0]?.debug, true);
     // Settled once: a second look applies nothing again.
     assert.deepEqual(settleAnsweredGrants(clone, shape, 1), { applied: [], denied: [], open: [] });
   });
@@ -226,7 +269,6 @@ describe("a grant, and its revoke", () => {
     git(clone, "checkout", "--", "modules/model");
     revokeGrant(clone, shape, 1, "model");
     assert.equal(existsSync(join(clone, "modules", "model", "src")), false);
-    assert.equal(existsSync(join(clone, ".dabbler", "overlay.targets")), false);
     assert.deepEqual(
       gitOut(clone, "sparse-checkout", "list").split("\n").sort(),
       ["docs", "modules/model/contract", "modules/persister", "packages"],

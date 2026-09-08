@@ -73,6 +73,7 @@ import {
 } from "./driver.ts";
 import { ManifestError, type SolutionShape, solutionShape } from "./modules.ts";
 import { moduleScope } from "./agency.ts";
+import { tryWriteProjection } from "./projection.ts";
 import { CheckoutError, openModule, readCloneMarker, writeModuleSessionMarker } from "./checkout.ts";
 import { writeExposure } from "./exposure.ts";
 import { readPolicy, sharedFilesOf, writePolicy } from "./policy.ts";
@@ -112,6 +113,9 @@ import {
   readRawLegacyState,
   readRawSessionState,
   sessionDisplayNumber,
+  checkoutModuleOf,
+  plannedKindOf,
+  type PlannedSessionKind,
 } from "./progress.ts";
 import { dumps, pythonRepr, pythonStr } from "./pythonJson.ts";
 import {
@@ -127,6 +131,7 @@ import {
   onDiskState,
   recordProjectPlan,
   WORK_PLAN_FILENAME,
+  recordHookRemoved,
   recordSessionCheckout,
   registerSessionStart,
   validateAndWriteState,
@@ -544,6 +549,95 @@ export interface StartOptions {
   readonly totalSessions?: number | null;
   /** The module the session works in: registered in its focused clone. Multi-module only. */
   readonly module?: string | null;
+  /** `--focused` / `--global`: overrides the kind the plan states. Null derives it. */
+  readonly kind?: SessionKind | null;
+}
+
+/** Where a session runs: one module's own folder, or the repository itself. */
+export type SessionKind = "focused" | "global";
+
+/** What `judgeSessionKind` reads. Every member is a fact already on disk or on the command line. */
+export interface SessionKindFacts {
+  readonly session: number;
+  readonly shape: SolutionShape;
+  /** What the plan's section says under the session's heading, or null where it says nothing. */
+  readonly planned: PlannedSessionKind | null;
+  /** `--focused` / `--global`, or null. */
+  readonly flag: SessionKind | null;
+  /** `--module`, or null. */
+  readonly module: string | null;
+  /** The module whose focused folder this checkout is, or null in the repository itself. */
+  readonly cloneModule: string | null;
+}
+
+export type SessionKindRuling =
+  | { readonly kind: "global"; readonly module: null }
+  | { readonly kind: "focused"; readonly module: string };
+
+/**
+ * Which kind of session this start registers, and in which module.
+ *
+ * The plan says which: focused when the solution is multi-module and the
+ * session's section names exactly one module, global otherwise. The two
+ * flags override that, and `--module` is accepted where it agrees with the
+ * plan. Every refusal is one plain sentence, because the person reading it
+ * is standing in a folder and the sentence has to say which folder to be
+ * in instead. A single-module solution has nothing to focus on: its
+ * repository is its module, and a `--module` there is refused further down
+ * by the clone, in the words it always used.
+ */
+export function judgeSessionKind(facts: SessionKindFacts): SessionKindRuling | string {
+  const number = sessionDisplayNumber(facts.session);
+  const typed = facts.module?.trim() ?? "";
+  if (!facts.shape.multi) {
+    if (facts.flag === "focused") {
+      return (
+        "this repository is a single-module solution: the repository is the module, so there " +
+        "is nothing to focus on; start without --focused"
+      );
+    }
+    return typed !== "" ? { kind: "focused", module: typed } : { kind: "global", module: null };
+  }
+  const planModule = facts.planned?.kind === "focused" ? facts.planned.module : null;
+  if (typed !== "" && planModule !== null && typed !== planModule) {
+    return (
+      `session ${number}'s plan says \`Module: ${planModule}\` under its heading and --module ` +
+      `names '${typed}'; the plan and the flag must agree -- change the plan, or start without --module`
+    );
+  }
+  // A plan that says global is a plan: --module alone does not overturn it,
+  // only --focused does, and then the two flags together say so out loud.
+  if (typed !== "" && facts.planned?.kind === "global" && facts.flag !== "focused") {
+    return (
+      `session ${number}'s plan says \`Scope: whole repository\` under its heading and --module ` +
+      `names '${typed}'; the plan and the flag must agree -- change the plan, or pass --focused ` +
+      "with --module to override it"
+    );
+  }
+  const chosen = typed !== "" ? typed : planModule;
+  const kind: SessionKind = facts.flag ?? (chosen !== null ? "focused" : "global");
+  if (kind === "focused" && chosen === null) {
+    return (
+      `session ${number} is global by its plan (no \`Module: <slug>\` line under its heading) and ` +
+      "no --module was given, so there is nothing to focus on: add the line, or pass --module"
+    );
+  }
+  if (facts.cloneModule !== null) {
+    if (kind === "global") {
+      return (
+        `this checkout is module '${facts.cloneModule}'s focused folder and session ${number} is ` +
+        `global (${facts.flag === "global" ? "--global" : "its plan names no module"}): a global ` +
+        "session starts in the repository itself"
+      );
+    }
+    if (chosen !== facts.cloneModule) {
+      return (
+        `this checkout is module '${facts.cloneModule}'s focused folder and session ${number}'s plan ` +
+        `names module '${chosen}': start it in ${chosen}'s own folder, or from the repository, which opens it`
+      );
+    }
+  }
+  return kind === "focused" ? { kind, module: chosen as string } : { kind, module: null };
 }
 
 /** Where a module session is registered: the clone, and the clone's sessions root. */
@@ -643,6 +737,77 @@ function writeDeclaredPolicy(sessionsDir: string, session: number, modules: read
 }
 
 /**
+ * The Solution Explorer's projection, rewritten where a session's modules
+ * come into or out of play: the module rows mark the session in flight,
+ * and the start and the close are the two moments that changes. For a
+ * multi-module shape only, and best-effort -- a registration or a close
+ * must not fail because a rendering could not be written.
+ */
+function reprojectSolution(root: string): void {
+  try {
+    if (solutionShape(root).multi) tryWriteProjection(root);
+  } catch {
+    // Deliberately silent: see above.
+  }
+}
+
+/** The first line of a git error, for a one-line message. */
+function firstLine(text: string): string {
+  return text.split("\n").find((line) => line.trim() !== "")?.trim() ?? "no reason given";
+}
+
+/**
+ * A registration pulls its checkout forward first, when there is an
+ * upstream to pull from and a clean tree to pull onto, so a session starts
+ * on what the server has and not on what this folder last saw. One line
+ * either way; a pull that fails is said and the start goes on, because the
+ * refusal for a tree that cannot take the session belongs to the start
+ * itself, not to a courtesy before it.
+ */
+function pullBeforeStart(repoRoot: string, sessionsDir: string): string | null {
+  const upstream = runGit(repoRoot, ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"]);
+  if (upstream.code !== 0 || upstream.stdout.trim() === "") return null;
+  const status = readWorktreeStatus(repoRoot);
+  if (status.error !== "") return null;
+  const setRel = relative(repoRoot, resolve(sessionsDir)).split("\\").join("/");
+  if (materialPaths(status.text, setRel, { beforeWork: true }).length > 0) return null;
+  const pulled = runGit(repoRoot, ["pull", "--ff-only", "-q"]);
+  return pulled.code === 0
+    ? `start: pulled from ${upstream.stdout.trim()} (git pull --ff-only) before registering.`
+    : `start: not pulled from ${upstream.stdout.trim()} (${firstLine(pulled.stderr)}); registering on ` +
+        "what is here -- run `git pull --ff-only` yourself when it can.";
+}
+
+/**
+ * A close run in a module's folder pulls the repository it was opened from
+ * forward, after its own push, so the repository's window sees the session
+ * closed without anyone remembering to pull. Only onto a clean tree, and
+ * never a refusal: the close has already pushed, and what is left is one
+ * line saying it was done or naming the command the person runs.
+ */
+export function pullRepositoryForward(cloneRoot: string, sessionsDir: string): string | null {
+  const marker = readCloneMarker(cloneRoot);
+  const repository = marker?.repository?.trim() ?? "";
+  if (repository === "") return null;
+  const command = `git -C "${repository}" pull --ff-only`;
+  if (!isDirectory(repository)) return `close: ${repository} is not there to pull forward; run: ${command}`;
+  const status = readWorktreeStatus(repository);
+  if (status.error !== "") return `close: ${repository} was not pulled forward (${status.error}); run: ${command}`;
+  const setRel = relative(cloneRoot, resolve(sessionsDir)).split("\\").join("/");
+  const material = materialPaths(status.text, setRel, { beforeWork: true });
+  if (material.length > 0) {
+    return (
+      `close: ${repository} holds ${material.length} change(s) (${material.slice(0, 3).join(", ")}), so it ` +
+      `was not pulled forward; commit or stash them, then run: ${command}`
+    );
+  }
+  const pulled = runGit(repository, ["pull", "--ff-only", "-q"]);
+  return pulled.code === 0
+    ? `close: pulled ${repository} forward (git pull --ff-only), so its window sees this session closed.`
+    : `close: ${repository} was not pulled forward (${firstLine(pulled.stderr)}); run: ${command}`;
+}
+
+/**
  * The exposure manifest at the close of a module session: what the clone
  * held of its siblings, and what the session changed outside its scope.
  * Best-effort, like every other record the close adds beside the gates: a
@@ -650,23 +815,13 @@ function writeDeclaredPolicy(sessionsDir: string, session: number, modules: read
  */
 function writeCloseExposure(sessionsDir: string, repoRoot: string, current: number): void {
   try {
-    const raw = readRawSessionState(sessionsDir);
-    const row = raw === null ? null : sessionRecord(raw, current);
-    // The checkout is the authority for what the session is scoped to; the
-    // declaration, held to it at acceptance, is the fallback for a module
-    // session that predates the checkout on the row.
-    const checkout = row?.["checkout"];
-    const checkoutModule =
-      typeof checkout === "object" && checkout !== null && !Array.isArray(checkout)
-        ? (checkout as Record<string, unknown>)["module"]
-        : null;
-    const modules =
-      typeof checkoutModule === "string" && checkoutModule.trim() !== ""
-        ? [checkoutModule.trim()]
-        : Array.isArray(row?.["modules"])
-          ? (row?.["modules"] as unknown[]).map(String)
-          : [];
-    if (modules.length === 0) return;
+    // The checkout on the row is the authority for what the session is
+    // scoped to, and the only thing that makes it a focused session: a
+    // global session has no checkout, no wall, and no manifest to write,
+    // whatever modules its declaration named.
+    const checkoutModule = checkoutModuleOf(sessionsDir, current);
+    if (checkoutModule === null) return;
+    const modules = [checkoutModule];
     const shape = solutionShape(repoRoot);
     if (!shape.multi) return;
     const run = readRun(repoRoot, current);
@@ -955,10 +1110,36 @@ export function start(sessionsDir: string, options: StartOptions): number {
     // here from the origin when `start` stands in the full checkout. The
     // clone's sessions root is the session's from now on; the full checkout
     // keeps only a marker saying where the work went.
+    // A fresh registration only: re-registering the session in flight is a
+    // continuation, and moving the tree under a session's own work is not.
+    if (current === null || requested !== current) {
+      const pulled = pullBeforeStart(repoRootFromSessionsDir(sessionsDir), sessionsDir);
+      if (pulled !== null) writeOut(`${pulled}\n`);
+    }
     let moduleStart: ModuleStart | null = null;
-    if (options.module !== null && options.module !== undefined && options.module.trim() !== "") {
+    let shape: SolutionShape;
+    try {
+      shape = solutionShape(repoRootFromSessionsDir(sessionsDir));
+    } catch (error) {
+      if (!(error instanceof ManifestError)) throw error;
+      writeErr(`start: refused -- ${error.message}\n`);
+      return EXIT_USAGE;
+    }
+    const ruling = judgeSessionKind({
+      session: requested,
+      shape,
+      planned: plannedKindOf(sessionsDir, requested),
+      flag: options.kind ?? null,
+      module: options.module ?? null,
+      cloneModule: readCloneMarker(repoRootFromSessionsDir(sessionsDir))?.slug ?? null,
+    });
+    if (typeof ruling === "string") {
+      writeErr(`start: refused -- ${ruling}\n`);
+      return EXIT_USAGE;
+    }
+    if (ruling.kind === "focused") {
       try {
-        moduleStart = prepareModuleStart(sessionsDir, options.module.trim());
+        moduleStart = prepareModuleStart(sessionsDir, ruling.module);
       } catch (error) {
         if (error instanceof CheckoutError || error instanceof ManifestError) {
           writeErr(`start: refused -- ${error.message}\n`);
@@ -998,9 +1179,13 @@ export function start(sessionsDir: string, options: StartOptions): number {
           `${moduleStart.root}; the exposure manifest is written there.\n`,
       );
     } else {
+      // A global session in a multi-module solution is the repository with
+      // no wall: it says so here, once, so nobody waits for a manifest or a
+      // gate that will not come.
       writeOut(
         `start: session ${sessionDisplayNumber(requested)} of ` +
-          `${basename(sessionsDir)} registered (${options.engine}).\n`,
+          `${basename(sessionsDir)} registered (${options.engine})` +
+          `${shape.multi ? "; global -- no wall: the whole repository, no exposure manifest, no exposure gate" : ""}.\n`,
       );
     }
     for (const line of discoveryWarnings()) writeOut(`${line}\n`);
@@ -1013,6 +1198,9 @@ export function start(sessionsDir: string, options: StartOptions): number {
       try {
         const unhooked = removeStopGate(repoRootFromSessionsDir(registerIn));
         if (unhooked !== null) {
+          // On the row, so the declaration gate exempts this edit and no
+          // other change to the file.
+          recordHookRemoved(registerIn, requested);
           writeOut(
             `start: removed the stop gate from ${unhooked} -- the framework's own ` +
               "edit, committed with this session's work; no step needs to name it.\n",
@@ -1048,6 +1236,10 @@ export function start(sessionsDir: string, options: StartOptions): number {
     // forbids. The declaration is the plan step's answer; the tests are the
     // framework's.
     writeOut(`Next: dabbler session next --sessions-dir ${registerIn}\n`);
+    // The modules in play changed: where the session registered, and the
+    // repository a focused session was opened from, which holds the marker.
+    reprojectSolution(repoRootFromSessionsDir(registerIn));
+    if (moduleStart?.fullCheckout) reprojectSolution(repoRootFromSessionsDir(sessionsDir));
     return EXIT_OK;
   } finally {
     releaseLock(lock);
@@ -1209,10 +1401,15 @@ export function declare(sessionsDir: string, options: DeclareCliOptions): number
   // driven plan meets at acceptance, so neither can persist a module the
   // other would refuse: an undeclared slug, two modules with no reason, a
   // module named in a single-module repository.
+  const declaredShape = solutionShape(repoRootFromSessionsDir(sessionsDir));
   const shapeReasons = judgeModulesForShape(
     options.modules ?? [],
     options.reason ?? null,
-    solutionShape(repoRootFromSessionsDir(sessionsDir)),
+    declaredShape,
+    "the declaration",
+    // A global session -- multi-module, and no checkout on its row -- is the
+    // whole repository: it names any declared modules or none.
+    declaredShape.multi && checkoutModuleOf(sessionsDir, target) === null,
   );
   if (shapeReasons.length > 0) {
     writeErr(`declare: refused -- ${shapeReasons.join("; ")}\n`);
@@ -1573,6 +1770,33 @@ export interface RebaselineCliOptions {
  * Refused while the run is not stopped: a running loop has steps, and a
  * step is how work is reported.
  */
+/**
+ * The repair, and only the repair, out of everything that moved since the
+ * baseline: not the framework's bookkeeping under the sessions directory
+ * or the machine's directory, not the engine's settings the registration
+ * edited, and not the candidate the framework packed -- so a two-file
+ * repair lists two paths.
+ */
+export function repairedPaths(
+  repoRoot: string,
+  sessionsDir: string,
+  session: number,
+  changed: readonly string[],
+): string[] {
+  const candidate = candidatePathsAsWritten(repoRoot, readCandidateRecord(repoRoot, session));
+  const setRel = relative(repoRoot, resolve(sessionsDir)).split("\\").join("/");
+  return changed.filter((path) => {
+    const rel = path.split("\\").join("/");
+    return (
+      rel !== ".dabbler" &&
+      !rel.startsWith(".dabbler/") &&
+      !candidate.has(rel) &&
+      !isFrameworkInstalledPath(rel) &&
+      !isSessionBookkeeping(rel, setRel)
+    );
+  });
+}
+
 export function rebaseline(sessionsDir: string, options: RebaselineCliOptions): number {
   if (!isDirectory(sessionsDir)) {
     writeErr(`rebaseline: not a directory: ${sessionsDir}\n`);
@@ -1623,9 +1847,12 @@ export function rebaseline(sessionsDir: string, options: RebaselineCliOptions): 
     writeErr("rebaseline: refused -- git could not snapshot the working tree.\n");
     return EXIT_GATE_FAILED;
   }
-  const paths = run.baseline_tree
-    ? (changedPathsBetween(repoRoot, run.baseline_tree, tree) ?? [])
-    : [];
+  const paths = repairedPaths(
+    repoRoot,
+    sessionsDir,
+    target,
+    run.baseline_tree ? (changedPathsBetween(repoRoot, run.baseline_tree, tree) ?? []) : [],
+  );
   const by = (options.by ?? "").trim() || "the operator";
 
   let row;
@@ -2042,7 +2269,14 @@ export function close(sessionsDir: string, options: CloseCliOptions = {}): numbe
               `${ROUND_REF_NAMESPACE}/s${current}/.\n`,
           );
         }
+        // In a module's folder, the repository it was opened from comes
+        // forward too: the push is what made that possible, and this is
+        // the moment the operator used to have to remember.
+        const pulled = pullRepositoryForward(repoRoot, sessionsDir);
+        if (pulled !== null) writeOut(`${pulled}\n`);
       }
+      // The session is out of play: its module's row stops saying so.
+      reprojectSolution(repoRoot);
     }
     writeWhatComesNext(sessionsDir);
     return EXIT_OK;
@@ -2392,14 +2626,37 @@ function sessionRecord(
  * work, and the reason rides on the session record rather than in a marker
  * file beside it.
  */
+/**
+ * Whether the caller is an engine rather than a person at a terminal: a
+ * driver job says so with `DABBLER_DRIVEN`, and a Claude Code turn with
+ * `CLAUDECODE`. A person's shell has neither, and the extension's
+ * in-process calls are a person's clicks.
+ */
+export function callerIsEngine(env: NodeJS.ProcessEnv = process.env): boolean {
+  return Boolean(env["DABBLER_DRIVEN"]) || Boolean(env["CLAUDECODE"]);
+}
+
 export function cancel(
   sessionsDir: string,
   sessionNumber: number,
-  options: { readonly reason: string; readonly force?: boolean },
+  options: { readonly reason: string; readonly force?: boolean; readonly engine?: boolean },
 ): number {
   if (!isDirectory(sessionsDir)) {
     writeErr(`cancel: not a directory: ${sessionsDir}\n`);
     return EXIT_USAGE;
+  }
+  // A forced cancel is a person's verb. The proof of 2026-09-08 saw an
+  // engine cancel its own registration and drive another folder's session
+  // from the wrong window; an engine that asks is refused with the way a
+  // person does it, and nothing is written.
+  if (options.force === true && options.engine === true) {
+    writeErr(
+      "cancel: refused -- `session cancel --force` is a person's verb, never the engine's: it " +
+        "ends a session in flight, and that judgement is not the engine's to make. Report the " +
+        "step blocked and say why; a person cancels from the Work Explorer (Cancel Session) or " +
+        "their own terminal.\n",
+    );
+    return EXIT_BOUNDARY;
   }
   let lock: string;
   try {

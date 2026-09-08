@@ -232,6 +232,11 @@ supposed to ship and did not must not read as one that shipped.
   the extension: it ships inside the VSIX, and a VS Code terminal has it
   on `PATH`. Anywhere else, run `node "<extension dir>/dist/dabbler.cjs"
   <verb>`. "dabbler: command not found" is a PATH problem, not a keys one.
+- In a focused session the other modules are here as packages and
+  contract folders, not source. If the work cannot be done without a
+  sibling's source, ask with `dabbler session next --request-grant <slug>
+  --reason <why>` and wait for the answer; never take it. `session cancel
+  --force` is a person's verb, never the engine's.
 
 ## Writing files
 

@@ -583,6 +583,34 @@ suite("the session from its registration, and each step as it starts", () => {
     rmrf(root);
   });
 
+  test("says a step line again for seq 1 of the next session, though the last session's seq 1 was said", () => {
+    // The deduplication is per session: a new session's seq starts over,
+    // and a step said for the old session's seq must not silence the new one.
+    const { root, driver, written, terminal } = drivenRepo({ session_number: 62, phase: "steps", seq: 1, job: null, stop: null });
+    fs.writeFileSync(
+      path.join(driver, "instruction.json"),
+      JSON.stringify({ kind: "step", seq: 1, session_number: 62, step_id: "widget", ask: "Build the widget." }),
+      "utf8",
+    );
+    terminal.open({ columns: 100, rows: 20 });
+    terminal.poll();
+    const next = path.join(root, ".dabbler", "runs", "s63", "driver");
+    fs.mkdirSync(path.join(next, "jobs"), { recursive: true });
+    fs.writeFileSync(
+      path.join(next, "instruction.json"),
+      JSON.stringify({ kind: "step", seq: 1, session_number: 63, step_id: "gadget", ask: "Build the gadget." }),
+      "utf8",
+    );
+    writeRun(next, { session_number: 63, phase: "steps", seq: 1, job: null, stop: null });
+    terminal.poll();
+    terminal.poll();
+    const said = plain(written.join(""));
+    assert.strictEqual(said.split("step id=widget").length - 1, 1, said);
+    assert.strictEqual(said.split("step id=gadget").length - 1, 1, said);
+    terminal.dispose();
+    rmrf(root);
+  });
+
   test("rules the framework's voice with the session number once a session is known, and without one before", () => {
     const { root, written, terminal } = drivenRepo({ session_number: 62, phase: "plan", job: null, stop: null });
     terminal.open({ columns: 80, rows: 20 });

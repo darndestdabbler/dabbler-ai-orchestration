@@ -65,6 +65,10 @@ export type SessionsOrchestratorBlock = {
    * The seat conversation ids that produced this session, in first-seen order. ACCUMULATES -- start is idempotent and is re-run after a context reset, which starts a new conversation on the same session. Absent (never [] and never null) on a Direct-API run: 'not captured' and 'captured, and there were none' are different claims.
    */
   seatSessionIds?: string[];
+  /**
+   * The registration removed the framework's own Stop hook from .claude/settings.json. Present only when it did: the declaration gate exempts that file's change from 'has the work begun' exactly when this says the registration made it, and never for an edit a person made before declaring.
+   */
+  hookRemoved?: true;
 };
 
 /**

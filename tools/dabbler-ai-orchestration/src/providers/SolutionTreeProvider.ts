@@ -41,6 +41,9 @@ const TONE: Record<string, string> = {
   attention: "charts.yellow",
   done: "charts.green",
   muted: "disabledForeground",
+  // The module a session is working in: the milestone blue the Dabbler
+  // terminal says a lifecycle milestone in, so the two surfaces agree.
+  milestone: "charts.blue",
 };
 
 export class SolutionTreeProvider
@@ -154,10 +157,20 @@ export class SolutionTreeProvider
     return element ? childrenOf(element, p) : rootNodes();
   }
 
+  /** The module the next session's plan names, from the Work Explorer's scan; null when none or not here. */
+  private nextSessionModule: string | null = null;
+
+  /** Told by the Work Explorer on every scan; the module row moves only when the answer does. */
+  public setNextSessionModule(slug: string | null): void {
+    if (slug === this.nextSessionModule) return;
+    this.nextSessionModule = slug;
+    this.onDidChangeEmitter.fire(undefined);
+  }
+
   public getTreeItem(element: SolutionNode): vscode.TreeItem {
     const p = this.projection();
     if (!p) return new vscode.TreeItem("");
-    const d = descriptorFor(element, p);
+    const d = descriptorFor(element, p, { nextSessionModule: this.nextSessionModule });
 
     const item = new vscode.TreeItem(
       d.label,

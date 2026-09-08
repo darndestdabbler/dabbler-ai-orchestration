@@ -39,6 +39,7 @@ import {
   restore,
   start,
   sessionScope,
+  callerIsEngine,
 } from "../session.ts";
 import { writeErr, writeOut } from "./output.ts";
 
@@ -80,10 +81,15 @@ const OPTIONS: Record<string, readonly string[]> = {
     "                           the model registry rather than the seat label",
     "  --effort EFFORT          optional reasoning effort, recorded with the identity",
     "  --total-sessions N       optional; the ledger otherwise grows to the plan",
-    "  --module SLUG            for a multi-module solution: register the session in",
-    "                           the module's focused clone, made from the origin, and",
-    "                           work there; the plan then names that module and no",
-    "                           other (a two-module session runs in the full checkout)",
+    "  --focused                run in one module's own folder; the default when the",
+    "                           plan's section says `Module: <slug>` in a multi-module",
+    "                           solution, and refused where there is nothing to focus on",
+    "  --global                 run in the repository itself, no wall; the default",
+    "                           otherwise. A global session writes no exposure manifest",
+    "                           and no policy, and its close runs no exposure gate",
+    "  --module SLUG            the focused session's module, where the plan does not",
+    "                           say or to agree with what it says; a session that must",
+    "                           change two modules is global",
   ],
   decision: [
     "  --decider WHO            required: operator | orchestrator | verifier | framework",
@@ -143,6 +149,8 @@ const OPTIONS: Record<string, readonly string[]> = {
     "  --provider PROVIDER      anthropic | openai | google; required for a fresh registration",
     "  --model MODEL            required for a Copilot seat",
     "  --effort EFFORT          optional reasoning effort, recorded with the identity",
+    "  --focused | --global     where the session runs, as `session start` takes them;",
+    "                           the plan's section says which when neither is passed",
     '  --engine-argv "PROG A B" the command invoked once per instruction instead of the',
     "                           engine's own CLI; {instruction} in any element is the",
     "                           instruction's path, and DABBLER_DRIVER_INSTRUCTION carries",
@@ -245,7 +253,29 @@ interface Parsed {
   readonly modules: string[];
 }
 
-const SWITCHES = new Set(["--releasable", "--not-releasable", "--dry-run", "--force", "--stop"]);
+const SWITCHES = new Set([
+  "--releasable",
+  "--not-releasable",
+  "--dry-run",
+  "--force",
+  "--stop",
+  "--focused",
+  "--global",
+]);
+
+/**
+ * `--focused` / `--global` as `start` and `drive` take them: one, the other,
+ * or neither -- both is refused, because the plan cannot be overridden two
+ * ways at once.
+ */
+function kindFlag(switches: ReadonlySet<string>, verb: string): "focused" | "global" | null | string {
+  const focused = switches.has("--focused");
+  const global = switches.has("--global");
+  if (focused && global) {
+    return `dabbler session ${verb}: --focused and --global contradict each other; pass one, or neither and let the plan say`;
+  }
+  return focused ? "focused" : global ? "global" : null;
+}
 const REPEATABLE_MODULE = "--module";
 
 /**
@@ -439,7 +469,7 @@ export async function sessionVerb(argv: string[]): Promise<number> {
       writeErr("dabbler session cancel: the following arguments are required: --reason\n");
       return EXIT_USAGE;
     }
-    return cancel(sessionsDir, positional, { reason, force: switches.has("--force") });
+    return cancel(sessionsDir, positional, { reason, force: switches.has("--force"), engine: callerIsEngine() });
   }
 
   if (subcommand === "migrate") {
@@ -468,8 +498,13 @@ export async function sessionVerb(argv: string[]): Promise<number> {
       writeErr(
         "dabbler session start: one --module per start -- a session runs in ONE module's " +
           "focused clone, and its plan names that module and no other; a session that must " +
-          "change two modules runs in the full checkout, started without --module\n",
+          "change two modules is global, started without --module\n",
       );
+      return EXIT_USAGE;
+    }
+    const kind = kindFlag(switches, "start");
+    if (kind !== null && kind !== "focused" && kind !== "global") {
+      writeErr(`${kind}\n`);
       return EXIT_USAGE;
     }
     return start(sessionsDir, {
@@ -480,6 +515,7 @@ export async function sessionVerb(argv: string[]): Promise<number> {
       sessionNumber,
       totalSessions,
       module: parsed.modules[0] ?? null,
+      kind,
     });
   }
 
@@ -567,6 +603,11 @@ export async function sessionVerb(argv: string[]): Promise<number> {
       }
       adapter = built;
     }
+    const kind = kindFlag(switches, "drive");
+    if (kind !== null && kind !== "focused" && kind !== "global") {
+      writeErr(`${kind}\n`);
+      return EXIT_USAGE;
+    }
     return driveSession(sessionsDir, {
       engine,
       provider: values.get("--provider") ?? null,
@@ -576,6 +617,7 @@ export async function sessionVerb(argv: string[]): Promise<number> {
       engineOutput: (showEngine as EngineOutput | undefined) ?? null,
       maxInvocations,
       transport: values.get("--transport") ?? null,
+      kind,
     });
   }
 

@@ -97,11 +97,15 @@ describe("working_tree_clean: what counts as work in a porcelain status", () => 
     // the framework's action left it untracked (the install once did) or
     // modified (the removal does), and only when the question is whether
     // work has begun: at the close the file counts however it got there.
-    assert.deepEqual(materialPaths("?? .claude/settings.json\n", SESSIONS, { beforeWork: true }), []);
-    assert.deepEqual(materialPaths(" M .claude/settings.json\n", SESSIONS, { beforeWork: true }), []);
+    // Exempted only when the in-flight row says the registration removed
+    // the hook: an operator's own edit to the file before declaring is work.
+    const removed = { beforeWork: true, hookRemoved: true };
+    assert.deepEqual(materialPaths("?? .claude/settings.json\n", SESSIONS, removed), []);
+    assert.deepEqual(materialPaths(" M .claude/settings.json\n", SESSIONS, removed), []);
+    assert.deepEqual(materialPaths(" M .claude/settings.json\n", SESSIONS, { beforeWork: true }), [".claude/settings.json"]);
     assert.deepEqual(materialPaths(" M .claude/settings.json\n", SESSIONS), [".claude/settings.json"]);
     assert.deepEqual(materialPaths("?? .claude/settings.json\n", SESSIONS), [".claude/settings.json"]);
-    assert.deepEqual(materialPaths("?? .claude/other.json\n", SESSIONS, { beforeWork: true }), [".claude/other.json"]);
+    assert.deepEqual(materialPaths("?? .claude/other.json\n", SESSIONS, removed), [".claude/other.json"]);
   });
 
   it("skips a line too short to carry a path", () => {

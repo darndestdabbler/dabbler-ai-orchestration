@@ -27,7 +27,10 @@ import {
   solutionShape,
 } from "../src/modules.ts";
 import { capture } from "../src/output.ts";
+import { readExposure } from "../src/exposure.ts";
 import { platformNewlines } from "../src/journal.ts";
+import { readOwed } from "../src/owedDecisions.ts";
+import { readPolicy } from "../src/policy.ts";
 import { readRawSessionState } from "../src/progress.ts";
 import {
   EXIT_BOUNDARY,
@@ -35,14 +38,17 @@ import {
   EXIT_USAGE,
   applyCancellation,
   applyRestoration,
+  callerIsEngine,
   cancel,
   carryForward,
   identityClash,
   judgeCancellation,
   judgeRestoration,
+  judgeSessionKind,
   judgeStartBoundary,
   declare,
   plan,
+  repairedPaths,
   restore,
   start,
   type SequenceFacts,
@@ -322,6 +328,8 @@ describe("registering a session", () => {
       );
       assert.equal(registered.code, EXIT_OK);
       assert.match(registered.out, /removed the stop gate from/);
+      // On the row, so the declaration gate exempts this edit and no other.
+      assert.equal((sessionOf(claude.sessionsDir)["orchestrator"] as Record<string, unknown>)["hookRemoved"], true);
       const settings = JSON.parse(readFileSync(join(claude.repo, ".claude", "settings.json"), "utf8"));
       // Only the framework's entry went; the operator's hooks and keys are as written.
       assert.deepEqual(settings, {
@@ -412,7 +420,50 @@ describe("what a restoration puts back", () => {
   });
 });
 
+describe("a repair made while the run was stopped", () => {
+  it("lists only the repaired files, never the framework's bookkeeping or the candidate", () => {
+    // The proof of 2026-09-08: seven paths for a two-file repair.
+    const state = stateDir();
+    try {
+      const repaired = repairedPaths(state.repo, state.sessionsDir, 1, [
+        "src/widget.ts",
+        "tests/widget.test.ts",
+        ".dabbler/runs/s1/driver/run.json",
+        ".dabbler/scratch/plan.json",
+        "docs/sessions/sessions.json",
+        "docs/sessions/activity-log.json",
+        ".claude/settings.json",
+      ]);
+      assert.deepEqual(repaired, ["src/widget.ts", "tests/widget.test.ts"]);
+    } finally {
+      state.restore();
+    }
+  });
+});
+
 describe("cancelling and restoring through the verb", () => {
+  it("refuses an engine's forced cancel by name and writes nothing, and takes a person's", async () => {
+    // The proof of 2026-09-08: the AI cancelled its own registration with
+    // --force and drove another folder's session from the wrong window.
+    assert.equal(callerIsEngine({}), false);
+    assert.equal(callerIsEngine({ DABBLER_DRIVEN: "1" }), true);
+    assert.equal(callerIsEngine({ CLAUDECODE: "1" }), true);
+    const state = stateDir();
+    try {
+      registerSessionStart(state.sessionsDir, 1, { engine: "claude-code" });
+      const engine = await run(() => cancel(state.sessionsDir, 1, { reason: "wrong window", force: true, engine: true }));
+      assert.equal(engine.code, EXIT_BOUNDARY);
+      assert.match(engine.err, /a person's verb, never the engine's/);
+      assert.equal(sessionOf(state.sessionsDir)["status"], "in-progress");
+      assert.deepEqual(readOwed(state.repo), []);
+      const person = await run(() => cancel(state.sessionsDir, 1, { reason: "stop", force: true, engine: false }));
+      assert.equal(person.code, EXIT_OK);
+      assert.equal(sessionOf(state.sessionsDir)["status"], "cancelled");
+    } finally {
+      state.restore();
+    }
+  });
+
   it("writes the cancellation and answers with the status", async () => {
     const state = stateDir();
     try {
@@ -495,6 +546,84 @@ describe("recording the plan prose", () => {
         declare(state.sessionsDir, { task: "Do it.", releasable: false }),
       );
       assert.equal(accepted.code, EXIT_OK);
+    } finally {
+      state.restore();
+    }
+  });
+});
+
+// --- Focused or global ----------------------------------------------------------
+
+describe("which kind of session a start registers", () => {
+  type Shape = Parameters<typeof judgeSessionKind>[0]["shape"];
+  const shape = (multi: boolean, ...slugs: string[]): Shape =>
+    ({ multi, implicit: false, modules: slugs.map((slug) => ({ slug })) }) as unknown as Shape;
+  const many = shape(true, "model", "persister");
+  const one = shape(false, "csv-model");
+  const facts = (over: Partial<Parameters<typeof judgeSessionKind>[0]>) => ({
+    session: 2,
+    shape: many,
+    planned: { kind: "focused" as const, module: "persister" },
+    flag: null,
+    module: null,
+    cloneModule: null,
+    ...over,
+  });
+  const focused = { kind: "focused", module: "persister" };
+  const global = { kind: "global", module: null };
+
+  it("takes the kind from the plan, lets the flags override it, and refuses what cannot apply by name", () => {
+    assert.deepEqual(judgeSessionKind(facts({})), focused);
+    assert.deepEqual(judgeSessionKind(facts({ flag: "global" })), global);
+    // A plan that names no module is a global session; --focused then has
+    // nothing to focus on, and a single-module solution never has.
+    assert.deepEqual(judgeSessionKind(facts({ planned: null })), global);
+    assert.match(String(judgeSessionKind(facts({ planned: null, flag: "focused" }))), /nothing to focus on/);
+    assert.match(String(judgeSessionKind(facts({ shape: one, flag: "focused" }))), /single-module solution/);
+    // --module agrees with the plan or is refused; alone, it decides.
+    assert.deepEqual(judgeSessionKind(facts({ module: "persister" })), focused);
+    assert.match(String(judgeSessionKind(facts({ module: "model" }))), /plan and the flag must agree/);
+    assert.deepEqual(judgeSessionKind(facts({ planned: null, module: "model" })), { kind: "focused", module: "model" });
+    // A plan that says global is not overturned by --module alone; with
+    // --focused the two flags override it out loud.
+    const wide = { kind: "global" as const, module: null };
+    assert.match(
+      String(judgeSessionKind(facts({ planned: wide, module: "model" }))),
+      /Scope: whole repository.*pass --focused with --module/,
+    );
+    assert.deepEqual(judgeSessionKind(facts({ planned: wide, module: "model", flag: "focused" })), { kind: "focused", module: "model" });
+    // The wrong folder, by name: another module's, or any module's for a
+    // global session.
+    assert.match(
+      String(judgeSessionKind(facts({ cloneModule: "model" }))),
+      /module 'model's focused folder and session 002's plan names module 'persister'/,
+    );
+    assert.match(
+      String(judgeSessionKind(facts({ cloneModule: "persister", flag: "global" }))),
+      /a global session starts in the repository itself/,
+    );
+    assert.deepEqual(judgeSessionKind(facts({ cloneModule: "persister" })), focused);
+  });
+
+  it("registers a global session of a multi-module solution with no manifest and no policy, says so, and accepts a declaration naming no module", async () => {
+    const state = stateDir();
+    seed(state.repo, {
+      "docs/modules.yaml":
+        "modules:\n- slug: model\n  codeRoots:\n  - modules/model\n- slug: persister\n  dependsOn:\n  - model\n  codeRoots:\n  - modules/persister\n",
+      "docs/sessions/session-plan.md":
+        "### Session 1 of 2: First things\nModule: persister\n1. Register.\n\n### Session 2 of 2: Second things\n1. Register.\n",
+    });
+    try {
+      const started = await run(() =>
+        start(state.sessionsDir, { engine: "claude-code", provider: "anthropic", kind: "global" }),
+      );
+      assert.equal(started.code, EXIT_OK, started.err);
+      assert.match(started.out, /global -- no wall: the whole repository, no exposure manifest, no exposure gate/);
+      assert.equal(sessionOf(state.sessionsDir)["checkout"], undefined);
+      assert.equal(readExposure(state.repo, 1), null);
+      assert.equal(readPolicy(state.repo, 1), null);
+      const declared = await run(() => declare(state.sessionsDir, { task: "Do it.", releasable: false }));
+      assert.equal(declared.code, EXIT_OK, declared.err);
     } finally {
       state.restore();
     }

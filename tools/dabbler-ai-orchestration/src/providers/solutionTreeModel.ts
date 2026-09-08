@@ -38,6 +38,8 @@ export interface ProjectionModule {
   contractDir?: string | null;
   /** A grant of this module's source is in force in the in-flight session's checkout. */
   granted?: boolean;
+  /** The session working in this module right now, or null. */
+  inSession?: number | null;
   /** The latest run of record of the module's suites: green, red, or none recorded. */
   runOfRecord?: "green" | "red" | "none";
   /** Consumers whose contract suite against this module is red. */
@@ -151,7 +153,7 @@ export function contractTarget(m: ProjectionModule | undefined): string | undefi
   return `${m.contractDir}/README.md`;
 }
 
-export type IconSpec = { id: string; tone?: "attention" | "done" | "muted" };
+export type IconSpec = { id: string; tone?: "attention" | "done" | "muted" | "milestone" };
 
 export type SolutionNode =
   | { kind: "solution" }
@@ -236,6 +238,11 @@ export const PROJECTION_SOURCE_GLOBS: readonly string[] = [
   "solution-dependencies.json",
   "**/*.csproj",
   "**/pom.xml",
+  // The modules in play: the in-flight row of this root's ledger, and the
+  // marker a focused session leaves in the repository. Both move the
+  // module rows' mark, and neither touches the projection file itself.
+  "docs/sessions/sessions.json",
+  ".dabbler/module-session.json",
 ];
 
 /** Where a producing repository is, as three states rather than two. */
@@ -383,9 +390,20 @@ const KIND_ICONS: Record<string, string> = {
   library: "package",
 };
 
+/**
+ * What the Work Explorer knows that the solution projection does not: the
+ * module the next session's plan names, when that session is focused and
+ * this window is the repository's. The module's row is where one click
+ * starts it, so the row carries `;next-session` and nothing else does.
+ */
+export interface SolutionContext {
+  readonly nextSessionModule?: string | null;
+}
+
 export function descriptorFor(
   node: SolutionNode,
   p: Projection,
+  context: SolutionContext = {},
 ): RowDescriptor {
   switch (node.kind) {
     case "solution": {
@@ -414,7 +432,12 @@ export function descriptorFor(
       if (!m) {
         return { id: `module:${node.slug}`, label: node.slug, expandable: false };
       }
-      const bits: string[] = [m.kind];
+      const bits: string[] = [];
+      // The session working here right now leads the row: it is the thing
+      // a person scanning the tree is looking for, in either window.
+      const active = typeof m.inSession === "number";
+      if (active) bits.push(`● session ${m.inSession}`);
+      bits.push(m.kind);
       bits.push(m.package ? `package: ${m.package}` : "no package");
       // The run of record reads on the row, from the records and never from
       // a claim: green, red, or none where nothing has been recorded.
@@ -424,8 +447,9 @@ export function descriptorFor(
       if (m.granted === true) bits.push("widened");
       // Where it shipped, from the bundle records and never from a claim.
       if ((m.shippedIn ?? []).length > 0) bits.push(`shipped in: ${(m.shippedIn ?? []).join(", ")}`);
-      const tone =
-        m.granted === true || m.runOfRecord === "red"
+      const tone = active
+        ? ("milestone" as const)
+        : m.granted === true || m.runOfRecord === "red"
           ? ("attention" as const)
           : m.runOfRecord === "green"
             ? ("done" as const)
@@ -434,8 +458,9 @@ export function descriptorFor(
         id: `module:${m.slug}`,
         label: m.slug,
         description: bits.join(" · "),
-        tooltip:
-          m.granted === true
+        tooltip: active
+          ? `${m.title} — session ${m.inSession} is working here.`
+          : m.granted === true
             ? `${m.title} — a grant widened this checkout to its source; End grant narrows it again.`
             : m.runOfRecord === "red"
               ? `${m.title} — its latest run of record is red.`
@@ -449,7 +474,12 @@ export function descriptorFor(
         contextValue:
           `dabblerModule:${m.kind}` +
           (p.solution.multi ? ";focused" : "") +
-          (m.granted === true ? ";granted" : ""),
+          (m.granted === true ? ";granted" : "") +
+          (active ? ";active" : "") +
+          // `;next-session` is what Start Focused Session is gated on: the
+          // one module the next session's plan names, in the repository's
+          // own window.
+          (p.solution.multi && context.nextSessionModule === m.slug ? ";next-session" : ""),
       };
     }
     case "contract": {

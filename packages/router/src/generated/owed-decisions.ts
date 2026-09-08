@@ -36,6 +36,10 @@ export type OwedDecisions = {
    */
   question?: string;
   /**
+   * The module whose own session owes what this asks about, by slug -- a run of record a focused folder could not run because the tests are not on its disk. Absent for a question no module owes.
+   */
+  module?: string;
+  /**
    * Where the answer lands, repository-relative. Null when the answer is not a file edit. The framework writes it; the operator never does.
    */
   file?: string | null;

@@ -318,6 +318,41 @@ describe("the instruction files", () => {
   });
 });
 
+describe("the Stop hook, at bootstrap", () => {
+  it("removes the entry the framework installed under Claude Code, keeps the operator's, and writes none", async () => {
+    // Bootstrap knows only the host it runs under: the CLAUDECODE marker.
+    // The start path has the same removal and its own case.
+    const { repo } = makeAnsweredSandbox({
+      ".claude/settings.json": JSON.stringify({
+        hooks: {
+          Stop: [
+            { hooks: [{ type: "command", command: "dabbler session hook-stop --sessions-dir docs/sessions" }] },
+            { hooks: [{ type: "command", command: "echo the operator's own" }] },
+          ],
+        },
+        theme: "dark",
+      }),
+    });
+    const saved = process.env["CLAUDECODE"];
+    process.env["CLAUDECODE"] = "1";
+    try {
+      const run = await capture(() => bootstrapVerb(["--project-dir", repo, "--no-transport-detect"]));
+      assert.equal(run.value, 0, run.stderr);
+      assert.match(run.stdout, /removed the stop gate from/);
+      assert.deepEqual(JSON.parse(readFileSync(join(repo, ".claude", "settings.json"), "utf8")), {
+        hooks: { Stop: [{ hooks: [{ type: "command", command: "echo the operator's own" }] }] },
+        theme: "dark",
+      });
+      // Nothing left to remove: the second run says nothing of it.
+      const again = await capture(() => bootstrapVerb(["--project-dir", repo, "--no-transport-detect"]));
+      assert.doesNotMatch(again.stdout, /stop gate/);
+    } finally {
+      if (saved === undefined) delete process.env["CLAUDECODE"];
+      else process.env["CLAUDECODE"] = saved;
+    }
+  });
+});
+
 describe("the commit guard", () => {
   it("installs a hook that invokes the router by name, once", () => {
     // There is no interpreter to bake in: a consumer repository is not

@@ -120,6 +120,8 @@ export function makeRepository(
     sessionsCompleted: 0,
     currentSession: null,
     nextSession: null,
+    checkoutModule: null,
+    focusedSession: null,
     forceClosed: false,
     schemaVersionOnDisk: null,
     sessionsSource: "ledger",

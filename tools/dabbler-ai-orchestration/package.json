@@ -100,6 +100,11 @@
         "category": "Dabbler"
       },
       {
+        "command": "dabblerSessionSets.resumeSession",
+        "title": "Resume Session",
+        "category": "Dabbler"
+      },
+      {
         "command": "dabblerSessionSets.closeSession",
         "title": "Close Session",
         "category": "Dabbler"
@@ -161,10 +166,10 @@
         "icon": "$(empty-window)"
       },
       {
-        "command": "dabblerSolution.grantModule",
-        "title": "Widen for Debugging",
+        "command": "dabblerSolution.startFocusedSession",
+        "title": "Start Focused Session",
         "category": "Dabbler",
-        "icon": "$(unlock)"
+        "icon": "$(play)"
       },
       {
         "command": "dabblerSolution.revokeModule",
@@ -259,7 +264,11 @@
           "when": "false"
         },
         {
-          "command": "dabblerSolution.grantModule",
+          "command": "dabblerSolution.startFocusedSession",
+          "when": "false"
+        },
+        {
+          "command": "dabblerSessionSets.resumeSession",
           "when": "false"
         },
         {
@@ -330,6 +339,11 @@
           "group": "6_session@602"
         },
         {
+          "command": "dabblerSessionSets.resumeSession",
+          "when": "view == dabblerWorkExplorerTree && viewItem =~ /;act-resumeSession;/",
+          "group": "6_session@604"
+        },
+        {
           "command": "dabblerSessionSets.cancel",
           "when": "view == dabblerWorkExplorerTree && viewItem =~ /;act-cancel;/",
           "group": "9_lifecycle@901"
@@ -338,6 +352,11 @@
           "command": "dabblerSessionSets.restore",
           "when": "view == dabblerWorkExplorerTree && viewItem =~ /;act-restore;/",
           "group": "9_lifecycle@902"
+        },
+        {
+          "command": "dabblerSolution.startFocusedSession",
+          "when": "view == dabblerSolutionTree && viewItem =~ /;next-session/",
+          "group": "1_open@0"
         },
         {
           "command": "dabblerSolution.openModule",
@@ -353,11 +372,6 @@
           "command": "dabblerSolution.packModule",
           "when": "view == dabblerSolutionTree && viewItem =~ /;focused/ && viewItem =~ /^dabblerModule:/",
           "group": "1_open@3"
-        },
-        {
-          "command": "dabblerSolution.grantModule",
-          "when": "view == dabblerSolutionTree && viewItem =~ /;focused/ && viewItem =~ /^dabblerModule:/",
-          "group": "2_grant@1"
         },
         {
           "command": "dabblerSolution.revokeModule",

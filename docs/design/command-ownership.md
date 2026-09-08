@@ -129,10 +129,19 @@ proved a module session started in the full checkout cannot close once a
 sibling has source. Under the hook design there is one checkout and the
 engine opens at its root, so the button's working directory is right today;
 what it still lacks is the module, because `session start --module <slug>` is
-how a module session declares its scope. **Session 128** adds the pick, in
-the same diff that deletes the clone, the module-session marker and the
-clone's sessions root — so that a button and the code it replaces are never
-both true at once.
+how a module session declares its scope. **Session 127 closed it without a
+pick**: the plan says which (`Module: <slug>` under the session's heading,
+carried on the Work Explorer's row), `session start` derives the kind from
+it, and Start Session in the repository's window — or **Start Focused
+Session** on the module row the plan names — opens the module's folder
+in-process, leaves the engine and model choices in
+`.dabbler/start-request.json` there, and opens its window; the extension
+activating on a fresh request opens the AI's terminal with the sentence
+typed. In the module's own window the same button opens the AI there. The
+clone stayed (round 12): it is the module's folder, kept between sessions.
+**Resume Session** on the in-flight row shows the engine's terminal by name
+or opens one running `dabbler session run`, which the proof of 2026-09-08
+found missing when the AI's tab could not be found.
 
 **B — no Pack on a module row.** Every mention of *pack* in the extension
 was a comment or a `package` field. The framework runs `packModule`
@@ -144,9 +153,11 @@ session** adds `pack` to the router's in-process module verbs beside `open`,
 `grant` and `revoke`, and **Pack Module** to the module row of a multi-module
 solution, running `dabbler module pack <slug>` with the slug the row carries
 and showing the router's answer — the version, the artefacts, the pin — or
-its refusal, in the router's own sentence. Open Module and Widen for
-Debugging, which it was to sit beside, are the clone's commands and go in
-128.
+its refusal, in the router's own sentence. Open Module stays beside it (the
+clone is the module's folder, kept); Widen for Debugging went in session
+127 with the debug overlay it laid — a grant is asked for by the session
+itself with `--request-grant`, and its brief ends with the permanent form,
+a `sharedFiles` entry.
 
 **C — the pull-back after a module session.** `sessionNext` in
 `packages/router/src/drive.ts` reads the module-session marker, sees the

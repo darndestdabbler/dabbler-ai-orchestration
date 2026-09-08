@@ -371,6 +371,23 @@ export function recordSessionCheckout(
 }
 
 /**
+ * The registration removed the framework's Stop hook from
+ * `.claude/settings.json`: written onto the row's orchestrator block, so
+ * the declaration gate can exempt exactly that edit and no other change
+ * to the file. Absent when nothing was removed.
+ */
+export function recordHookRemoved(sessionsDir: string, sessionNumber: number): void {
+  const raw = readRawSessionState(sessionsDir);
+  if (!isRecord(raw) || !Array.isArray(raw["sessions"])) return;
+  for (const record of raw["sessions"]) {
+    if (isRecord(record) && record["number"] === sessionNumber && isRecord(record["orchestrator"])) {
+      record["orchestrator"] = { ...record["orchestrator"], hookRemoved: true };
+    }
+  }
+  validateAndWriteState(sessionsDir, raw);
+}
+
+/**
  * The pure half of a session start: the state file as it will read once
  * `sessionNumber` is registered, from the state as read, the plan's titles,
  * and the clock. Refuses to re-open a closed session.

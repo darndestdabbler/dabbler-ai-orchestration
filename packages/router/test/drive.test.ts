@@ -27,13 +27,17 @@ import {
   suiteRetrySeconds,
   staleJobDisposition,
   stepChangedPaths,
+  suiteOwedElsewhere,
   unchangedStepFiles,
   type RegistrationFacts,
   type StepSpec,
 } from "../src/drive.ts";
+import { judgeFreshness } from "../src/gates.ts";
 import type { DriverInstruction, DriverReport } from "../src/generated/index.ts";
+import { type ImpactPlan, demandedByPlan } from "../src/impact.ts";
 import { dependencyOrder, impliedDeployables, parseEntries } from "../src/modules.ts";
-import { gitAnswers } from "./support/answers.ts";
+import { answerOwed, raiseRunOfRecordOwed, suitesOwedElsewhere } from "../src/owedDecisions.ts";
+import { gitAnswers, seed, tempDir } from "./support/answers.ts";
 
 const INSTRUCTION = {
   schema_version: 1,
@@ -404,6 +408,65 @@ describe("what the local gate receipt names", () => {
     } finally {
       detached();
     }
+  });
+});
+
+describe("a reached suite whose tests are not in this folder", () => {
+  it("is owed to its module's session rather than run, and the close here is not held to it", () => {
+    // The proof of 2026-09-08: the run of record ran app's suite in model's
+    // folder, where app's tests are not, and handed the AI a fix step it
+    // could only refuse, twice, into a deadlock.
+    const root = tempDir("owed-");
+    seed(root, {
+      ".dabbler/checkout.json": JSON.stringify({ slug: "persister", origin: "../remote.git", cone: [], madeAt: "now" }),
+      "modules/persister/tests/Store.Tests.cs": "",
+    });
+    const plan = {
+      multi: true,
+      changedModules: ["persister"],
+      suites: [
+        { name: "persister-unit", module: "persister", role: "unit", against: null, reason: "module-changed", via: "persister" },
+        { name: "listener-against-persister", module: "listener", role: "consumer-contract", against: "persister", reason: "consumer-contract", via: "persister" },
+      ],
+      candidates: ["persister"],
+      unowned: [],
+    } as unknown as ImpactPlan;
+    const scopes = [
+      { suite: "persister-unit", roots: ["modules/persister/tests"], glob: "*.Tests.cs" },
+      { suite: "listener-against-persister", roots: ["modules/listener/tests"], glob: "*.cs" },
+    ];
+    const own = { name: "persister-unit", module: "persister" };
+    const sibling = { name: "listener-against-persister", module: "listener" };
+    // The folder's own suite runs here; the sibling's, whose tests are not
+    // on this disk, is owed to the sibling's session.
+    assert.equal(suiteOwedElsewhere(root, own, plan, scopes), null);
+    assert.equal(suiteOwedElsewhere(root, sibling, plan, scopes), "listener");
+    // Not in a focused folder, and not a suite that declares no test roots.
+    assert.equal(suiteOwedElsewhere(tempDir("repo-"), sibling, plan, scopes), null);
+    assert.equal(suiteOwedElsewhere(root, sibling, plan, []), null);
+    // With the tests on this disk after all, it runs here.
+    seed(root, { "modules/listener/tests/Compatibility.cs": "" });
+    assert.equal(suiteOwedElsewhere(root, sibling, plan, scopes), null);
+
+    // Recorded as owed, with the module on the row, and the close here does
+    // not demand a record that cannot exist here; without the record it would.
+    const row = raiseRunOfRecordOwed(root, 3, sibling.name, "listener");
+    assert.equal(row?.["module"], "listener");
+    assert.deepEqual([...suitesOwedElsewhere(root, 3)], [sibling.name]);
+    const verdicts = [
+      { suite: own.name, required: true, passed: true, reason: "fresh", changedInputs: [] },
+      { suite: sibling.name, required: true, passed: false, reason: "no record", changedInputs: [] },
+    ];
+    assert.deepEqual(judgeFreshness(demandedByPlan(verdicts, plan, suitesOwedElsewhere(root, 3))), [true, ""]);
+    assert.match(judgeFreshness(demandedByPlan(verdicts, plan))[1], /listener-against-persister/);
+    // Accepting the recommendation keeps the suite owed elsewhere: the
+    // close must not get back the demand the decision was raised to lift.
+    answerOwed(root, String(row?.["id"]), "Owed to listener's session", 3);
+    assert.deepEqual([...suitesOwedElsewhere(root, 3)], [sibling.name]);
+    // The other answer puts it back on this session's close.
+    const other = raiseRunOfRecordOwed(root, 3, "listener-unit", "listener");
+    answerOwed(root, String(other?.["id"]), "Run it in the repository now", 3);
+    assert.deepEqual([...suitesOwedElsewhere(root, 3)], [sibling.name]);
   });
 });
 

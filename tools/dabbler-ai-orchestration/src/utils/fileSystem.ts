@@ -68,6 +68,20 @@ export interface SessionsRepository {
    * offer to start a session the framework would refuse to start.
    */
   nextSession: number | null;
+  /**
+   * The module whose focused folder this root is, or null in the
+   * repository itself. Read beside the next session's kind: a focused
+   * session starts only in its own module's folder, a global one only in
+   * the repository, so the launcher is withheld anywhere else rather than
+   * offering a start the router refuses.
+   */
+  checkoutModule: string | null;
+  /**
+   * The focused session running in a module's folder while this root is
+   * the repository, from the marker the start left here; null otherwise.
+   * The repository row says so, because its own rows would say nothing.
+   */
+  focusedSession: { session: number; module: string; folder: string } | null;
   forceClosed: boolean;
   schemaVersionOnDisk: number | null;
   sessionsSource: SessionsSource;
@@ -224,6 +238,8 @@ function buildRepository(
     sessionsCompleted: p ? p.repository.sessionsCompleted : 0,
     currentSession: p ? p.repository.currentSession : null,
     nextSession: p ? p.repository.nextSession : null,
+    checkoutModule: p ? p.repository.checkoutModule ?? null : null,
+    focusedSession: p ? p.repository.focusedSession ?? null : null,
     lastActivityAt: p ? p.repository.lastActivityAt : null,
     possiblyStalled: p ? p.repository.possiblyStalled : false,
     owedDecisions: p ? p.repository.owedDecisions : [],

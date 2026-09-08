@@ -1069,7 +1069,9 @@ export class DabblerTerminal implements vscode.Pseudoterminal {
     this.sayBanner(`SESSION ${String(number).padStart(3, "0")}`);
     if (ledger === null || ledger.number !== number) return;
     if (ledger.checkout === null) {
-      this.line("global", { scope: "the whole repository" });
+      // The whole repository and no wall: no exposure manifest is written
+      // and no exposure gate runs, which is what `session start` said too.
+      this.line("global", { scope: "the whole repository, no wall" });
     } else {
       this.line("focused", {
         module: ledger.checkout.module,
@@ -1270,6 +1272,9 @@ export class DabblerTerminal implements vscode.Pseudoterminal {
     // already running is the state of the world at the first look.
     if (typeof run.session_number === "number" && run.session_number !== this.lastSession) {
       this.lastSession = run.session_number;
+      // A new session's seq starts over: the step line said for the last
+      // session's seq must not silence this one's.
+      this.saidSeq = undefined;
       // Under its own banner, whether it is starting now or was already
       // there when the terminal first looked: what follows is one session's.
       // Said already if the ledger row named it; not said twice.
@@ -1439,7 +1444,7 @@ export class DabblerTerminal implements vscode.Pseudoterminal {
     const job = run.job;
     const watching = job
       ? `${job.name ?? ""}\0${job.log ?? ""}\0${job.started_at ?? ""}`
-      : `seq:${run.seq ?? ""}`;
+      : `seq:${run.session_number ?? ""}:${run.seq ?? ""}`;
     if (watching !== this.watching) {
       this.watching = watching;
       this.saidMultiple = 0;

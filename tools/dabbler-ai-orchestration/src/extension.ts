@@ -4,7 +4,15 @@ import { registerOpenFileCommands } from "./commands/openFile";
 import { registerTroubleshootCommand } from "./commands/troubleshoot";
 import { registerCancelLifecycleCommands } from "./commands/cancelLifecycleCommands";
 import { registerNewModuleCommand } from "./commands/newModule";
-import { registerSessionCommands, sharedDrives } from "./commands/sessionCommands";
+import {
+  defaultDriveLauncher,
+  defaultSessionRunUi,
+  nextFocusedModule,
+  registerSessionCommands,
+  runStartFocusedSession,
+  sharedDrives,
+  startFromRequest,
+} from "./commands/sessionCommands";
 import { registerBootstrapProjectCommand } from "./commands/bootstrapProject";
 import {
   DecisionAnnouncer,
@@ -25,7 +33,7 @@ import {
   asRepositoryNode,
   registerWorkExplorerTreeCommands,
 } from "./commands/workExplorerTreeCommands";
-import { SESSIONS_REL, discoverRoots, hasSessionsRoot } from "./utils/fileSystem";
+import { SESSIONS_REL, type SessionsRepository, discoverRoots, hasSessionsRoot } from "./utils/fileSystem";
 import { RUNS_REL } from "./utils/projection";
 import { SolutionTreeProvider } from "./providers/SolutionTreeProvider";
 import type { SolutionNode } from "./providers/solutionTreeModel";
@@ -40,7 +48,7 @@ import {
   revealRepository,
 } from "./commands/openRepository";
 import { openModule } from "./commands/openModule";
-import { endGrant, widenForDebugging } from "./commands/moduleGrant";
+import { endGrant } from "./commands/moduleGrant";
 import { showImpact } from "./commands/showImpact";
 import { packModule } from "./commands/packModule";
 import { WorkExplorerTreeProvider } from "./providers/WorkExplorerTreeProvider";
@@ -86,6 +94,14 @@ export function activate(context: vscode.ExtensionContext): void {
   // the command to answer it).
   registerOwedDecisionCommands(context);
   const announcer = new DecisionAnnouncer();
+  // The repository this window is showing, as the last scan read it: what
+  // Start Focused Session starts from, and what the Solution Explorer is
+  // told the next session's module is.
+  const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  const sameRoot = (a: string, b: string): boolean =>
+    path.resolve(a).toLowerCase() === path.resolve(b).toLowerCase();
+  let workspaceRepository: SessionsRepository | undefined;
+  let startRequestConsumed = false;
   treeProvider.onScan((repositories) => {
     treeView.badge = badgeFor(repositories);
     // A session starting anywhere -- the operator's own CLI, most often --
@@ -93,6 +109,22 @@ export function activate(context: vscode.ExtensionContext): void {
     // that knows; the transition rule is the terminal's.
     for (const repository of repositories) {
       revealOnSessionStart(repository.root, repository.currentSession);
+    }
+    workspaceRepository =
+      workspaceRoot === undefined ? undefined : repositories.find((r) => sameRoot(r.root, workspaceRoot));
+    // The module row the one-click start sits on: only in the repository's
+    // own window, and only for the module the next session's plan names.
+    solutionProvider.setNextSessionModule(
+      workspaceRepository && workspaceRepository.checkoutModule === null
+        ? nextFocusedModule(workspaceRepository)
+        : null,
+    );
+    // A focused start in the repository's window left its choices here and
+    // opened this window on them: the AI's terminal opens now, with the
+    // sentence typed. Once per activation; a stale request is dropped.
+    if (workspaceRepository && !startRequestConsumed) {
+      startRequestConsumed = true;
+      void startFromRequest(workspaceRepository, defaultSessionRunUi(), defaultDriveLauncher(), sharedDrives());
     }
     for (const target of announcer.fresh(repositories)) {
       void offerDecision(target, defaultOwedDecisionUi(), productionRouter()).then(
@@ -302,13 +334,17 @@ export function activate(context: vscode.ExtensionContext): void {
       (node?: SolutionNode) =>
         openModule(productionRouter(), { node, projection: solutionProvider.currentProjection() }),
     ),
-    // A grant is asked for on the sibling's row and answered on the Work
-    // Explorer; ending one is the router's refusal to honour while the
-    // sibling's roots hold changes. Both refresh the tree: the badge moves.
-    vscode.commands.registerCommand("dabblerSolution.grantModule", async (node?: SolutionNode) => {
-      await widenForDebugging(productionRouter(), { node, projection: solutionProvider.currentProjection() });
-      solutionProvider.refresh();
+    // The module row the next session's plan names: one click opens the
+    // module's folder with its AI in it. The choices are asked here and
+    // carried to the window that opens; nothing is typed in this one.
+    vscode.commands.registerCommand("dabblerSolution.startFocusedSession", async (node?: SolutionNode) => {
+      if (!node || node.kind !== "module" || !workspaceRepository) return;
+      await runStartFocusedSession(workspaceRepository, node.slug, defaultSessionRunUi(), productionRouter());
     }),
+    // A grant is asked for by the session (`--request-grant`) and answered
+    // on the Work Explorer; ending one is the router's refusal to honour
+    // while the sibling's roots hold changes. The tree refreshes: the badge
+    // moves.
     vscode.commands.registerCommand("dabblerSolution.revokeModule", async (node?: SolutionNode) => {
       await endGrant(productionRouter(), { node, projection: solutionProvider.currentProjection() });
       solutionProvider.refresh();

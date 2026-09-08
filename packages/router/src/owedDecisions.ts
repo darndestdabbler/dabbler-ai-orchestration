@@ -190,6 +190,70 @@ export interface RaiseOptions {
   readonly onNoAnswer?: string | null;
   readonly file?: string | null;
   readonly sessionNumber?: number | null;
+  /** The module whose own session owes what this asks about, when one does. */
+  readonly module?: string | null;
+}
+
+/** The id prefix of a run of record owed to another module's session: `<prefix>/s<N>/<suite>`. */
+export const RUN_OF_RECORD_OWED_PREFIX = "run-of-record-owed";
+
+/**
+ * A reached suite whose tests are not in this folder: recorded as owed to
+ * the module whose session runs it, so the close here is not held to
+ * evidence that cannot exist here. Advisory, because the default -- the
+ * module's own session runs it -- is what the framework does anyway; the
+ * question is whether the person would rather run it in the repository now.
+ */
+export function raiseRunOfRecordOwed(repoRoot: string, session: number, suite: string, module: string): Row | null {
+  return raiseOwed(repoRoot, {
+    id: `${RUN_OF_RECORD_OWED_PREFIX}/s${session}/${suite}`,
+    decisionClass: CLASS_ACCOUNTABILITY_SIGNOFF,
+    question: `Suite '${suite}' was reached by session ${session}'s change, and its tests are not in this folder; module '${module}'s own session runs it. Leave it there?`,
+    determined:
+      `The impact plan reached '${suite}' (module '${module}'), and this checkout holds none of its test ` +
+      "files, so running it here would fail on absence rather than prove anything. The suite was skipped " +
+      "and this session's close does not demand its record.",
+    options: [
+      {
+        label: `Owed to ${module}'s session`,
+        consequence: `The next session on '${module}' runs '${suite}' as its run of record; nothing runs here.`,
+      },
+      {
+        label: "Run it in the repository now",
+        consequence: `Run '${suite}' in the repository's own checkout and record it; until then this session's close demands it.`,
+      },
+    ],
+    recommendation: `Owed to ${module}'s session`,
+    confidence: "high",
+    onNoAnswer: `Owed to ${module}'s session`,
+    sessionNumber: session,
+    module,
+  });
+}
+
+/** The answer that keeps a suite owed elsewhere: the label `raiseRunOfRecordOwed` recommends begins with this. */
+const OWED_ELSEWHERE_ANSWER = "Owed to ";
+
+/**
+ * The suites session `session` recorded as owed to another module's
+ * session, by name: while the question stands, and once it is answered
+ * with the owed choice -- accepting the recommendation must not hand the
+ * close back the demand it was raised to lift. Only the other answer, run
+ * it in the repository, puts the suite back on this session's close.
+ */
+export function suitesOwedElsewhere(repoRoot: string, session: number): Set<string> {
+  const prefix = `${RUN_OF_RECORD_OWED_PREFIX}/s${session}/`;
+  const owed = new Set<string>();
+  for (const row of foldOwed(readOwed(repoRoot)).values()) {
+    const id = String(row["id"] ?? "");
+    if (!id.startsWith(prefix)) continue;
+    const state = row["state"];
+    const stillOwed =
+      state === STATE_OPEN ||
+      (state === STATE_ANSWERED && String(row["answer"] ?? "").startsWith(OWED_ELSEWHERE_ANSWER));
+    if (stillOwed) owed.add(id.slice(prefix.length));
+  }
+  return owed;
 }
 
 /**
@@ -280,6 +344,7 @@ export function raiseDisposition(
     recommendation: options.recommendation ?? null,
     confidence: options.confidence ?? null,
     onNoAnswer: options.onNoAnswer ?? null,
+    ...(typeof options.module === "string" && options.module !== "" ? { module: options.module } : {}),
   };
   return { supersede, row };
 }

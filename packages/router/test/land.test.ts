@@ -133,7 +133,17 @@ describe("the close's module gates", () => {
       judgeExposure({
         ...clean,
         siblings: [{ slug: "model", bytes: 512, files: ["modules/model/src/CsvModel/Person.cs"] }],
-        grants: [{ sibling: "model", reason: "debugging the mapper", debug: true, grantedAt: "2026-09-07T00:00:00Z" }],
+        grants: [{ sibling: "model", reason: "debugging the mapper", grantedAt: "2026-09-07T00:00:00Z" }],
+      }),
+      null,
+    );
+    // Ungranted bytes are recorded on the manifest and said beside the row,
+    // never refused: the changed paths are the gate.
+    assert.equal(
+      judgeExposure({
+        ...clean,
+        siblings: [{ slug: "model", bytes: 512, files: ["modules/model/src/CsvModel/Person.cs"] }],
+        siblingBytes: ["module 'model' has 512 byte(s) of implementation in this checkout under no recorded grant"],
       }),
       null,
     );
@@ -142,7 +152,7 @@ describe("the close's module gates", () => {
       siblings: [{ slug: "model", bytes: 512, files: ["modules/model/src/CsvModel/Person.cs"] }],
       outsideScope: ["README.md"],
     }) ?? "";
-    assert.match(leaking, /module 'model' has 512 byte\(s\) of implementation in this checkout under no recorded grant/);
+    assert.doesNotMatch(leaking, /under no recorded grant/);
     assert.match(leaking, /1 path\(s\) changed outside the session's scope: README\.md/);
   });
 });

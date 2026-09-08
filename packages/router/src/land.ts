@@ -224,29 +224,22 @@ export function candidatesFromRecord(paths: readonly string[]): { package: strin
 // --- exposure_within_ceiling -------------------------------------------------------
 
 /**
- * Nothing of a sibling that nobody signed for, and nothing changed outside
- * the scope. A sibling with bytes under no grant in force is the wall
- * leaking; a path outside the scope is work the session was not scoped to.
+ * Nothing changed outside the scope: a path outside it is work the session
+ * was not scoped to, and that is the gate. A sibling's bytes under no
+ * grant are recorded on the close manifest (`siblingBytes`) and said
+ * beside the row, not refused: the wall exists to keep a session's work on
+ * its own module, not to be foolproof, and the changed paths are what
+ * measure the work.
  */
 export function judgeExposure(manifest: ExposureManifest): string | null {
-  const granted = new Set(manifest.grants.map((grant) => grant.sibling));
-  const reasons: string[] = [];
-  for (const sibling of manifest.siblings) {
-    if (sibling.bytes > 0 && !granted.has(sibling.slug)) {
-      reasons.push(
-        `module '${sibling.slug}' has ${sibling.bytes} byte(s) of implementation in this checkout under no recorded grant`,
-      );
-    }
-  }
-  if (manifest.outsideScope.length > 0) {
-    reasons.push(
-      `${manifest.outsideScope.length} path(s) changed outside the session's scope: ` +
-        manifest.outsideScope.slice(0, 5).join(", ") +
-        (manifest.outsideScope.length > 5 ? ` (+${manifest.outsideScope.length - 5} more)` : ""),
-    );
-  }
-  return reasons.length === 0 ? null : reasons.join("; ");
+  if (manifest.outsideScope.length === 0) return null;
+  return (
+    `${manifest.outsideScope.length} path(s) changed outside the session's scope: ` +
+    manifest.outsideScope.slice(0, 5).join(", ") +
+    (manifest.outsideScope.length > 5 ? ` (+${manifest.outsideScope.length - 5} more)` : "")
+  );
 }
+
 
 // --- The bundle record ----------------------------------------------------------------
 

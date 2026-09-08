@@ -41,7 +41,7 @@ function usage(): string {
     "       dabbler module open [-h] [--branch BRANCH] [--reset]",
     "                           [--workspace-root WORKSPACE_ROOT] slug",
     "       dabbler module preflight [-h] [--clones N] [--workspace-root WORKSPACE_ROOT] slug",
-    "       dabbler module grant [-h] --reason TEXT [--debug] [--workspace-root WORKSPACE_ROOT] sibling",
+    "       dabbler module grant [-h] --reason TEXT [--workspace-root WORKSPACE_ROOT] sibling",
     "       dabbler module revoke [-h] [--workspace-root WORKSPACE_ROOT] sibling",
     "       dabbler module candidate [-h] [--session N] [--workspace-root WORKSPACE_ROOT] slug [slug ...]",
     "",
@@ -59,14 +59,12 @@ function usage(): string {
     "  --session N           pack: the session the record names",
     "  --branch BRANCH       open: check out this session branch instead of the",
     "                        trunk (created from the trunk when origin has none)",
-    "  --reset               open: an existing clone is fetched, reset hard to the",
-    "                        trunk and re-narrowed instead of refused",
+    "  --reset               open: accepted, and what happens either way -- an existing",
+    "                        clone is kept, fetched and reset to the trunk when clean,",
+    "                        refused when dirty, and never deleted",
     "  --clones N            preflight: how many further fresh clones to time in",
     "                        sequence (default 5)",
     "  --reason TEXT         grant: why the session needs the sibling's source; recorded",
-    "  --debug               grant: also build the sibling from source in this clone",
-    "                        (an untracked overlay turns its PackageReference into a",
-    "                        ProjectReference)",
     "  --workspace-root WORKSPACE_ROOT",
     "                        the repository root (default: the working directory)",
     "",
@@ -102,11 +100,11 @@ function usage(): string {
     "grant: in a module session's focused checkout, ask the operator to widen it to a",
     "sibling's source. Raises the owed decision module-grant:<sibling> (deny is the",
     "recommendation); answered grant through `dabbler owed answer` or the Work",
-    "Explorer, the framework widens the cone, lays the overlay when --debug was asked,",
-    "and records the grant in the exposure manifest.",
+    "Explorer, the framework widens the cone and records the grant in the exposure",
+    "manifest; the brief says how to keep it for every session (sharedFiles).",
     "",
-    "revoke: end a grant -- refused while the sibling's roots hold changes; removes the",
-    "overlay, narrows the cone again and records it.",
+    "revoke: end a grant -- refused while the sibling's roots hold changes; narrows the",
+    "cone again and records it.",
     "",
     "candidate: what the run of record tests against -- each named module packed (its",
     "declared pack or the ecosystem's default) with the pin moved and the record written,",
@@ -301,16 +299,11 @@ function grantSubcommand(verb: "grant" | "revoke", rest: readonly string[]): num
   let slug: string | null = null;
   let workspaceRoot = ".";
   let reason: string | null = null;
-  let debug = false;
   for (let index = 0; index < rest.length; index += 1) {
     const token = rest[index] as string;
     if (token === "--help" || token === "-h") {
       writeOut(usage());
       return EXIT_OK;
-    }
-    if (token === "--debug" && verb === "grant") {
-      debug = true;
-      continue;
     }
     if ((token === "--reason" && verb === "grant") || token === "--workspace-root") {
       const value = rest[index + 1];
@@ -346,18 +339,17 @@ function grantSubcommand(verb: "grant" | "revoke", rest: readonly string[]): num
   try {
     const shape = solutionShape(context.root);
     if (verb === "grant") {
-      const decision = raiseGrantDecision(context.root, shape, context.session, slug, reason ?? "", debug);
+      const decision = raiseGrantDecision(context.root, shape, context.session, slug, reason ?? "");
       writeOut(
         `module grant: raised owed decision '${decision}' for session ${context.session}. ` +
           `Answer it with \`dabbler owed answer --id ${decision} --choice grant\` (or deny), or in the ` +
-          "Work Explorer; on grant the framework widens the checkout" +
-          `${debug ? " and lays the overlay" : ""}.\n`,
+          "Work Explorer; on grant the framework widens the checkout.\n",
       );
     } else {
       revokeGrant(context.root, shape, context.session, slug);
       writeOut(
-        `module revoke: module '${slug}'s source is out of this checkout again; the overlay and the ` +
-          "exposure manifest say so. Reload the window so the editor and the build see it.\n",
+        `module revoke: module '${slug}'s source is out of this checkout again; the exposure ` +
+          "manifest says so. Reload the window so the editor and the build see it.\n",
       );
     }
   } catch (error) {

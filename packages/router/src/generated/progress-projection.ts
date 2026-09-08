@@ -95,6 +95,18 @@ export type ProgressProjectionRepository = {
    * The in-flight session's exposure manifest -- what its working directory holds of its sibling modules, the grants in force and what changed outside its scope -- or null for a single-module repository, a session with none, or nothing in flight.
    */
   exposure?: ProgressProjectionExposure | null;
+  /**
+   * The module whose focused folder this root is, by slug, or null in the repository itself. A launcher reads it beside the next session's kind: a focused session starts only in its own module's folder, a global one only in the repository, and a start anywhere else is refused by name.
+   */
+  checkoutModule?: string | null;
+  /**
+   * The focused session running in a module's folder while this root is the repository, from the module-session marker: which session, which module, and the folder's name. Null in the module's own folder, in a single-module repository, and when nothing is in flight elsewhere.
+   */
+  focusedSession?: {
+    session: number;
+    module: string;
+    folder: string;
+  } | null;
 };
 
 /**
@@ -114,10 +126,13 @@ export type ProgressProjectionExposure = {
   grants: {
     sibling: string;
     reason: string;
-    debug: boolean;
     grantedAt: string;
   }[];
   outsideScope: string[];
+  /**
+   * On the close manifest: the ungranted sibling bytes this checkout held, one sentence each. Recorded and said beside the exposure gate's row; never a refusal, because the changed paths are what measure the work.
+   */
+  siblingBytes?: string[];
 };
 
 /**
@@ -231,6 +246,14 @@ export type ProgressProjectionSession = {
    * The module(s) the session's declaration named, by slug. Present only for a session of a multi-module solution; a single-module row carries no member, so nothing changes in what it projects.
    */
   modules?: string[];
+  /**
+   * Where the session runs: 'focused' in one module's own folder, 'global' in the repository itself. From the checkout `session start` wrote on the row when there is one, else from the plan's `Module: <slug>` or `Scope: whole repository` line under the session's heading. Absent where neither says -- every row of a single-module repository.
+   */
+  kind?: "focused" | "global";
+  /**
+   * The module a focused session runs in, by slug. Present exactly when `kind` is 'focused'.
+   */
+  module?: string;
   tasks: ProgressProjectionTask[];
   /**
    * Why the execution record could not be read. A refusal is not an empty task list: the view must say it cannot tell which step is open rather than render the last row it could read.

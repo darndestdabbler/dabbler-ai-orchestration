@@ -220,8 +220,9 @@ describe("the four answer schemas", () => {
     // An undeclared slug is refused by name; one module needs no reason.
     assert.match(judgeWorkPlanModules({ ...plan, modules: ["ghost"] }, many)[0] ?? "", /module 'ghost', which docs\/modules\.yaml does not declare/);
     assert.deepEqual(judgeWorkPlanModules({ ...plan, modules: ["persister"] }, many), []);
-    // A multi-module solution's plan says which module it works in.
-    assert.match(judgeWorkPlanModules(plan, many)[0] ?? "", /names no module/);
+    // No checkout in a multi-module solution is a global session -- the
+    // whole repository -- whose plan names any declared modules or none.
+    assert.deepEqual(judgeWorkPlanModules(plan, many), []);
     // A session in a module's focused checkout names that module and no
     // other: the checkout is the authority, whatever reason a second module
     // is given.

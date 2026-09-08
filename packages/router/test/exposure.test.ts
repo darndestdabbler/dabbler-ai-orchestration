@@ -69,14 +69,12 @@ describe("the exposure manifest", () => {
       event: "requested",
       sibling: "model",
       reason: "debugging the mapper",
-      debug: true,
       decision: grantDecisionId("model"),
     });
     const granted = appendGrant(root, 4, {
       event: "granted",
       sibling: "model",
       reason: "debugging the mapper",
-      debug: true,
       decision: grantDecisionId("model"),
     });
     const written = writeExposure(root, twoModules(), 4, {
@@ -97,7 +95,7 @@ describe("the exposure manifest", () => {
       },
     ]);
     assert.deepEqual(written.grants, [
-      { sibling: "model", reason: "debugging the mapper", debug: true, grantedAt: granted.at },
+      { sibling: "model", reason: "debugging the mapper", grantedAt: granted.at },
     ]);
     assert.deepEqual(written.outsideScope, ["modules/model/src/CsvModel/Person.cs"]);
   });

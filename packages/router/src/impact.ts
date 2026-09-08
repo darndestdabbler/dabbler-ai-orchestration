@@ -370,16 +370,28 @@ export function candidatePathsAsWritten(root: string, record: CandidateRecord): 
 export function demandedByPlan<T extends DemandableVerdict>(
   verdicts: readonly T[],
   plan: ImpactPlan | null,
+  owedElsewhere: ReadonlySet<string> = new Set(),
 ): T[] {
   if (plan === null || !plan.multi) return [...verdicts];
   const reached = new Set(plan.suites.map((suite) => suite.name));
-  return verdicts.map((verdict) =>
-    reached.has(verdict.suite) || !verdict.required
+  return verdicts.map((verdict) => {
+    if (!verdict.required) return verdict;
+    // A reached suite whose tests are not in this folder was recorded as
+    // owed to its module's own session; demanding evidence that cannot
+    // exist here is the deadlock the proof of 2026-09-08 met.
+    if (owedElsewhere.has(verdict.suite)) {
+      return {
+        ...verdict,
+        required: false,
+        reason: `${verdict.reason} (its tests are not in this folder; owed to its module's own session)`,
+      };
+    }
+    return reached.has(verdict.suite)
       ? verdict
       : {
           ...verdict,
           required: false,
           reason: `${verdict.reason} (not reached by this session's impact plan, so not demanded)`,
-        },
-  );
+        };
+  });
 }

@@ -21,7 +21,7 @@ import { join, relative } from "node:path";
 import { inScope, moduleScope } from "./agency.ts";
 import { checkoutCone, contractDir } from "./checkout.ts";
 import { loadConfig } from "./config.ts";
-import { EcosystemError, ecosystemOf, layDebugGrants, walkFiles } from "./ecosystem.ts";
+import { EcosystemError, ecosystemOf, walkFiles } from "./ecosystem.ts";
 import { sessionsDirFor } from "./evidence.ts";
 import { atomicWriteJson, nowIso, runGit } from "./journal.ts";
 import { sessionRunDir } from "./ledger.ts";
@@ -45,8 +45,6 @@ export interface GrantRow {
   readonly event: GrantEvent;
   readonly sibling: string;
   readonly reason: string;
-  /** Whether the grant lays the debugging overlay (sibling as a project reference). */
-  readonly debug: boolean;
   readonly at: string;
   /** The owed decision the row belongs to. */
   readonly decision: string;
@@ -62,7 +60,6 @@ export interface SiblingExposure {
 export interface GrantInForce {
   readonly sibling: string;
   readonly reason: string;
-  readonly debug: boolean;
   readonly grantedAt: string;
 }
 
@@ -78,6 +75,11 @@ export interface ExposureManifest {
   readonly grants: readonly GrantInForce[];
   /** The session's changed paths that its scope does not cover. */
   readonly outsideScope: readonly string[];
+  /**
+   * On the close manifest: the ungranted sibling bytes this checkout held,
+   * one line each. Recorded and said beside the gate, never a refusal.
+   */
+  readonly siblingBytes?: readonly string[];
 }
 
 export function exposurePath(root: string, session: number): string {
@@ -145,7 +147,6 @@ export function grantsInForce(rows: readonly GrantRow[]): GrantInForce[] {
       standing.set(row.sibling, {
         sibling: row.sibling,
         reason: row.reason,
-        debug: row.debug === true,
         grantedAt: row.at,
       });
     } else if (row.event === "revoked") {
@@ -259,14 +260,17 @@ export function writeExposure(
   input: ExposureInput,
 ): ExposureManifest | null {
   if (!shape.multi) return null;
+  const siblings = siblingBytes(root, shape, input.modules);
+  const grants = grantsInForce(readGrants(root, session));
+  const granted = new Set(grants.map((grant) => grant.sibling));
   const manifest: ExposureManifest = {
     schema_version: 1,
     session,
     modules: [...input.modules],
     phase: input.phase,
     writtenAt: nowIso("seconds"),
-    siblings: siblingBytes(root, shape, input.modules),
-    grants: grantsInForce(readGrants(root, session)),
+    siblings,
+    grants,
     outsideScope: (input.changedPaths ?? [])
       .map(posix)
       // The framework's own machine-side state -- the projection, the run
@@ -276,6 +280,18 @@ export function writeExposure(
       .filter((path) => path !== ".dabbler" && !path.startsWith(".dabbler/"))
       .filter((path) => !inScope(input.scope, path))
       .sort(),
+    // The close records what the wall let through, in words, and the gate
+    // says them beside its row without refusing on them.
+    ...(input.phase === "close"
+      ? {
+          siblingBytes: siblings
+            .filter((sibling) => sibling.bytes > 0 && !granted.has(sibling.slug))
+            .map(
+              (sibling) =>
+                `module '${sibling.slug}' has ${sibling.bytes} byte(s) of implementation in this checkout under no recorded grant`,
+            ),
+        }
+      : {}),
   };
   mkdirSync(sessionRunDir(root, session), { recursive: true });
   atomicWriteJson(exposurePath(root, session), manifest);
@@ -342,31 +358,14 @@ function refreshExposure(root: string, shape: SolutionShape, session: number): E
   });
 }
 
-/** How a debugging grant rebuilds a sibling from source: the seam's to say, given a pack. */
-export type GrantPack = (slug: string) => void;
-
-/**
- * What the debugging grants in force do to this clone, through the seam:
- * .NET lays (or removes) the untracked overlay the tracked targets import;
- * Maven rebuilds the sibling just granted into the file repository with
- * the pack handed in, and refuses when none was.
- */
-function layGrants(root: string, shape: SolutionShape, grants: readonly GrantInForce[], granted: string | null, pack: GrantPack | null): void {
-  const debugging = grants.filter((grant) => grant.debug).map((grant) => entryOf(shape, grant.sibling));
-  try {
-    layDebugGrants(root, shape, debugging, granted === null ? null : entryOf(shape, granted), pack);
-  } catch (error) {
-    if (error instanceof EcosystemError) throw new ExposureError(error.message);
-    throw error;
-  }
-}
-
 /**
  * Ask the operator to widen the session's checkout to a sibling's source.
  *
  * An owed decision with `deny` recommended: the wall is the design, and a
  * grant is the exception somebody signs for. The request is recorded even
  * before it is answered, so the manifest can say a grant was asked for.
+ * The brief ends with the permanent form, because a grant every session
+ * of this module asks for is a shared file the manifest should declare.
  */
 export function raiseGrantDecision(
   root: string,
@@ -374,7 +373,6 @@ export function raiseGrantDecision(
   session: number,
   sibling: string,
   reason: string,
-  debug: boolean,
 ): string {
   entryOf(shape, sibling);
   const modules = modulesOfSession(root, session);
@@ -383,27 +381,23 @@ export function raiseGrantDecision(
   }
   if (reason.trim() === "") throw new ExposureError("a grant needs a reason (--reason); it is recorded");
   const decision = grantDecisionId(sibling, nextGrantSequence(readGrants(root, session), sibling));
+  const own = modules[0] ?? "";
+  const roots = rootsOf(entryOf(shape, sibling));
   raiseOwed(root, {
     id: decision,
     decisionClass: CLASS_VALUE_TRADEOFF,
-    question:
-      `Widen session ${session}'s focused checkout to module '${sibling}'s source` +
-      `${debug ? ", built as a project reference" : ""}?`,
+    question: `Widen session ${session}'s focused checkout to module '${sibling}'s source?`,
     determined:
       `Session ${session} works in module ${modules.map((slug) => `'${slug}'`).join(", ")}'s focused ` +
       `checkout, where '${sibling}' is present as its package and its contract folder and never ` +
       `as source. The engine asked for its source: ${reason.trim()}. A grant fetches the sibling's ` +
-      "blobs into this clone's object store, which only discarding the clone undoes; the exposure " +
-      "manifest records the grant and the bytes it exposes.",
+      "blobs into this clone's object store and widens the cone to them; the exposure manifest " +
+      `records the grant and the bytes it exposes. To keep this for every ${own} session, add ` +
+      `${roots.join(", ")} to ${own}'s sharedFiles in dabbler.yaml.`,
     options: [
       {
         label: GRANT,
-        consequence:
-          `The cone widens to ${rootsOf(entryOf(shape, sibling)).join(", ")}` +
-          (debug
-            ? ", and an untracked overlay makes the sibling a project reference for this clone"
-            : "") +
-          ". Recorded in the exposure manifest with this reason.",
+        consequence: `The cone widens to ${roots.join(", ")}. Recorded in the exposure manifest with this reason.`,
       },
       {
         label: DENY,
@@ -415,7 +409,7 @@ export function raiseGrantDecision(
     onNoAnswer: "The cone stays narrow: the session proceeds against the sibling's package and contract.",
     sessionNumber: session,
   });
-  appendGrant(root, session, { event: "requested", sibling, reason: reason.trim(), debug, decision });
+  appendGrant(root, session, { event: "requested", sibling, reason: reason.trim(), decision });
   return decision;
 }
 
@@ -425,16 +419,16 @@ export function nextGrantSequence(rows: readonly GrantRow[], sibling: string): n
 }
 
 /**
- * Widen the clone to the sibling's roots, lay the overlay when the grant is
- * a debugging one, record the grant and rewrite the manifest. The framework
- * does this on the operator's `grant`, never on the request.
+ * Widen the clone to the sibling's roots, record the grant and rewrite the
+ * manifest. The framework does this on the operator's `grant`, never on
+ * the request.
  */
 export function applyGrant(
   root: string,
   shape: SolutionShape,
   session: number,
   sibling: string,
-  options: { readonly reason: string; readonly debug: boolean; readonly decision: string; readonly pack?: GrantPack | null },
+  options: { readonly reason: string; readonly decision: string },
 ): GrantInForce {
   const entry = entryOf(shape, sibling);
   const widened = runGit(root, ["sparse-checkout", "add", ...rootsOf(entry)]);
@@ -445,19 +439,17 @@ export function applyGrant(
     event: "granted",
     sibling,
     reason: options.reason,
-    debug: options.debug,
     decision: options.decision,
   });
-  layGrants(root, shape, grantsInForce(readGrants(root, session)), sibling, options.pack ?? null);
   refreshExposure(root, shape, session);
-  return { sibling, reason: row.reason, debug: row.debug, grantedAt: row.at };
+  return { sibling, reason: row.reason, grantedAt: row.at };
 }
 
 /**
  * Narrow the clone again: refused while the sibling's roots hold changes,
- * because a revoke discards what is on disk under them. The overlay loses
- * the sibling's block, the cone goes back to the derived one plus the other
- * grants in force, and the manifest says so.
+ * because a revoke discards what is on disk under them. The cone goes back
+ * to the derived one plus the other grants in force, and the manifest says
+ * so.
  */
 export function revokeGrant(root: string, shape: SolutionShape, session: number, sibling: string): void {
   const entry = entryOf(shape, sibling);
@@ -480,11 +472,9 @@ export function revokeGrant(root: string, shape: SolutionShape, session: number,
     event: "revoked",
     sibling,
     reason: standing.reason,
-    debug: standing.debug,
     decision: rows.findLast((row) => row.event === "granted" && row.sibling === sibling)?.decision ?? "",
   });
   const remaining = grantsInForce(readGrants(root, session));
-  layGrants(root, shape, remaining, null, null);
   const modules = modulesOfSession(root, session);
   const cone = new Set<string>();
   for (const slug of modules) {
@@ -509,7 +499,7 @@ export interface GrantSettlement {
  * answered yet is reported open. Idempotent: a request already settled is
  * left alone.
  */
-export function settleAnsweredGrants(root: string, shape: SolutionShape, session: number, pack: GrantPack | null = null): GrantSettlement {
+export function settleAnsweredGrants(root: string, shape: SolutionShape, session: number): GrantSettlement {
   const rows = readGrants(root, session);
   const decisions = foldOwed(readOwed(root));
   const settled = new Set(
@@ -529,9 +519,7 @@ export function settleAnsweredGrants(root: string, shape: SolutionShape, session
       applied.push(
         applyGrant(root, shape, session, request.sibling, {
           reason: request.reason,
-          debug: request.debug,
           decision: request.decision,
-          pack,
         }),
       );
     } else {
@@ -539,7 +527,6 @@ export function settleAnsweredGrants(root: string, shape: SolutionShape, session
         event: "denied",
         sibling: request.sibling,
         reason: request.reason,
-        debug: request.debug,
         decision: request.decision,
       });
       denied.push(request.decision);

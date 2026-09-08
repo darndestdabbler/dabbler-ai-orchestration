@@ -26,16 +26,23 @@ import {
   DEFAULT_STOP_REASON,
   Drives,
   ENGINES,
+  START_REQUEST_REL,
   type DriveLauncher,
+  type EngineTerminal,
   type SessionRunUi,
   defaultSessionRunUi,
   engineOutputChannel,
   repositoryOf,
+  runResumeSession,
   runSendToEngine,
+  runStartFocusedSession,
   runStartSession,
   runStartUnattendedSession,
   runStopDrive,
+  startFromRequest,
+  writeStartRequest,
 } from "../../commands/sessionCommands";
+import * as fs from "fs";
 import type { DriveHandle } from "../../router/driveProcess";
 import { openDabblerTerminal } from "../../router/dabblerTerminal";
 import { cancellableSessionOf } from "../../commands/cancelLifecycleCommands";
@@ -416,11 +423,21 @@ function driveUi(overrides: Partial<SessionRunUi> = {}): {
   errors: string[];
   infos: string[];
   engine: string[];
+  /** Every folder the UI was asked to open in a new window. */
+  opened: string[];
+  /** Every terminal the UI was asked to open. */
+  terminals: EngineTerminal[];
 } {
   const errors: string[] = [];
   const infos: string[] = [];
   const engine: string[] = [];
+  const opened: string[] = [];
+  const terminals: EngineTerminal[] = [];
   const ui: SessionRunUi = {
+    showTerminalNamed: () => false,
+    openFolder: async (folder) => {
+      opened.push(folder);
+    },
     pickEngine: async () => ENGINES[0],
     askModel: async () => "haiku",
     askText: async (_title, _prompt, value) => value ?? "look at src/widget.py again",
@@ -429,12 +446,15 @@ function driveUi(overrides: Partial<SessionRunUi> = {}): {
     showErrorMessage: (m: string) => errors.push(m),
     showInformationMessage: (m: string) => infos.push(m),
     engineLine: (line) => engine.push(line),
-    openTerminal: () => undefined,
+    openTerminal: (terminal) => {
+      terminals.push(terminal);
+      return undefined;
+    },
     showFrameworkTerminal: () => undefined,
     withProgress: (_title, work) => work(),
     ...overrides,
   };
-  return { ui, errors, infos, engine };
+  return { ui, errors, infos, engine, opened, terminals };
 }
 
 function launcherOf(drives: Map<string, FakeDrive>): DriveLauncher & { launched: Array<{ root: string; args: string[] }> } {
@@ -915,6 +935,114 @@ suite("placing a repository the Explorer cannot reach", () => {
     } finally {
       restore();
     }
+  });
+});
+
+suite("one click starts a focused session", () => {
+  const focusedNext = (root: string, checkoutModule: string | null) =>
+    makeRepository({
+      root,
+      currentSession: null,
+      nextSession: 2,
+      checkoutModule,
+      sessions: [
+        makeSession({ number: 1, status: "complete" }),
+        makeSession({ number: 2, status: "not-started", kind: "focused", module: "persister" }),
+      ],
+    });
+
+  test("Start Focused Session on a module row opens the module and writes the start request, and Start Session in the repository does the same", async () => {
+    const clone = makeTempDir("focused-clone-");
+    try {
+      const repository = focusedNext("D:\\ws\\csv-pipeline", null);
+      const answered = fakeRouter(0, JSON.stringify({ slug: "persister", path: clone, branch: "main" }));
+      const row = driveUi({ askModel: async () => "haiku" });
+      assert.strictEqual(await runStartFocusedSession(repository, "persister", row.ui, answered.router), true);
+      assert.deepStrictEqual(answered.asked, ["module open"]);
+      assert.deepStrictEqual(row.opened, [clone]);
+      // Nothing typed here: the window that opens on the clone does that.
+      assert.deepStrictEqual(row.terminals, []);
+      const request = JSON.parse(fs.readFileSync(path.join(clone, START_REQUEST_REL), "utf8")) as Record<string, unknown>;
+      assert.strictEqual(request.engine, "claude-code");
+      assert.strictEqual(request.provider, "anthropic");
+      assert.strictEqual(request.model, "haiku");
+      assert.strictEqual(request.unattended, false);
+      assert.strictEqual(typeof request.writtenAt, "string");
+
+      // The repository row's Start Session routes the same way when the next
+      // session is focused and this is the repository -- and not in the
+      // module's own folder, where it opens the AI here.
+      const button = driveUi();
+      assert.strictEqual(await runStartSession(repository, button.ui, answered.router), true);
+      assert.deepStrictEqual(button.opened, [clone]);
+      const inFolder = driveUi();
+      assert.strictEqual(await runStartSession(focusedNext(clone, "persister"), inFolder.ui, answered.router), true);
+      assert.deepStrictEqual(inFolder.opened, []);
+      assert.strictEqual(inFolder.terminals.length, 1);
+    } finally {
+      rmrf(clone);
+    }
+  });
+
+  test("a window activating on a fresh request opens the AI's terminal with the sentence, and a stale one is dropped", async () => {
+    const clone = makeTempDir("focused-clone-");
+    try {
+      const repository = focusedNext(clone, "persister");
+      const launcher = launcherOf(new Map());
+      writeStartRequest(clone, {
+        engine: "claude-code",
+        provider: "anthropic",
+        model: "",
+        unattended: false,
+        writtenAt: new Date().toISOString(),
+      });
+      const fresh = driveUi({ pickEngine: async () => undefined, askModel: async () => undefined });
+      assert.strictEqual(await startFromRequest(repository, fresh.ui, launcher, new Drives()), true);
+      assert.strictEqual(fresh.terminals.length, 1);
+      assert.strictEqual(fresh.terminals[0].program, "claude");
+      assert.match(fresh.terminals[0].args[0] ?? "", /dabbler session start .* --engine claude-code --provider anthropic/);
+      assert.strictEqual(fs.existsSync(path.join(clone, START_REQUEST_REL)), false, "consumed");
+
+      writeStartRequest(clone, {
+        engine: "claude-code",
+        provider: "anthropic",
+        model: "",
+        unattended: false,
+        writtenAt: new Date(Date.now() - 11 * 60 * 1000).toISOString(),
+      });
+      const stale = driveUi();
+      assert.strictEqual(await startFromRequest(repository, stale.ui, launcher, new Drives()), false);
+      assert.strictEqual(stale.terminals.length, 0);
+      assert.strictEqual(fs.existsSync(path.join(clone, START_REQUEST_REL)), false, "dropped");
+      assert.strictEqual(await startFromRequest(repository, stale.ui, launcher, new Drives()), false);
+    } finally {
+      rmrf(clone);
+    }
+  });
+
+  test("Resume Session shows the engine's terminal by name, or opens one running session run on the in-flight row", async () => {
+    const repository = makeRepository({
+      root: "D:\\ws\\csv-pipeline",
+      currentSession: 2,
+      nextSession: 2,
+      sessions: [makeSession({ number: 2, status: "in-progress" })],
+    });
+    const shown: string[][] = [];
+    const found = driveUi({ showTerminalNamed: (names) => { shown.push([...names]); return true; } });
+    assert.strictEqual(await runResumeSession(repository, found.ui, "D:\\ext\\dabbler.cjs"), true);
+    assert.ok(shown[0].includes("Claude Code"));
+    assert.strictEqual(found.terminals.length, 0);
+
+    const gone = driveUi();
+    assert.strictEqual(await runResumeSession(repository, gone.ui, "D:\\ext\\dabbler.cjs"), true);
+    assert.strictEqual(gone.terminals.length, 1);
+    assert.strictEqual(gone.terminals[0].name, "Session 002");
+    assert.strictEqual(gone.terminals[0].cwd, repository.root);
+    assert.deepStrictEqual(gone.terminals[0].args.slice(1), ["session", "run", "--sessions-dir", "docs/sessions"]);
+
+    const idle = driveUi();
+    assert.strictEqual(await runResumeSession({ ...repository, currentSession: null }, idle.ui, "D:\\ext\\dabbler.cjs"), false);
+    assert.strictEqual(idle.terminals.length, 0);
   });
 });
 

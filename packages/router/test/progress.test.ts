@@ -23,6 +23,7 @@ import {
   buildProjection,
   buildTaskRows,
   buildVerificationView,
+  extractSessionKindsFromPlan,
   healStaleTitles,
   lastActivityAt,
   ledgerExists,
@@ -262,6 +263,41 @@ describe("the source of a projection's sessions", () => {
     const rows = sessions(sessionsDir);
     assert.equal(rows[0]["title"], "First things");
     assert.equal(rows[1]["title"], "Second things renamed");
+  });
+
+  it("reads where each session runs from the first Module: or Scope: line under its heading, and the rows carry it", () => {
+    const { sessionsDir } = makeStateDirs();
+    start(sessionsDir);
+    writeFileSync(
+      join(sessionsDir, "session-plan.md"),
+      [
+        "### Session 1 of 3: First things",
+        "1. Register.",
+        "",
+        "### Session 2 of 3: Persist things",
+        "",
+        "**Module:** `persister`",
+        "",
+        "Scope: whole repository -- a later line does not override the first.",
+        "1. Store a person.",
+        "",
+        "### Session 3 of 3: Wire it all",
+        "Scope: whole repository",
+        "1. Assemble.",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+    const kinds = extractSessionKindsFromPlan(join(sessionsDir, "session-plan.md"));
+    assert.equal(kinds.has(1), false, "a section that says neither states no kind");
+    assert.deepEqual(kinds.get(2), { kind: "focused", module: "persister" });
+    assert.deepEqual(kinds.get(3), { kind: "global", module: null });
+    // The registered row and the planned row both carry it; the first
+    // section's row carries nothing, as every single-module row does.
+    const rows = sessions(sessionsDir);
+    assert.equal(rows[0]["kind"], undefined);
+    assert.deepEqual([rows[1]["kind"], rows[1]["module"]], ["focused", "persister"]);
+    assert.deepEqual([rows[2]["status"], rows[2]["kind"], rows[2]["module"]], ["planned", "global", undefined]);
   });
 });
 

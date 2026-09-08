@@ -36,7 +36,10 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync, unlinkSync, writeF
 import { dirname, join, relative } from "node:path";
 
 import {
+  type SuiteScope,
+  anyTestFileUnder,
   checkRunGreen,
+  loadTestScopes,
   makeCheck,
   timeoutFor,
   execute as executeCheck,
@@ -88,7 +91,7 @@ import {
   receiptBundles,
   receiptCorrespondence,
 } from "./land.ts";
-import { packModule, readRecords as readCorrespondence } from "./packages.ts";
+import { readRecords as readCorrespondence } from "./packages.ts";
 import { ExposureError, raiseGrantDecision, settleAnsweredGrants } from "./exposure.ts";
 import { readPolicy } from "./policy.ts";
 import { BUILT_IN_ENGINES, builtInEngine } from "./engines.ts";
@@ -98,6 +101,7 @@ import { SESSION_PLAN_FILENAME } from "./evidence.ts";
 import {
   SET_BOOKKEEPING_COMMIT_BASENAMES,
   checkVerificationClean,
+  hookRemovedFor,
   materialPaths,
   readWorktreeStatus,
 } from "./gates.ts";
@@ -142,9 +146,10 @@ import {
   openDecisions,
   owedPath,
   raiseOwed,
+  raiseRunOfRecordOwed,
   supersedeOwed,
 } from "./owedDecisions.ts";
-import { readSessionState, sessionDisplayNumber, stalledAfterSeconds } from "./progress.ts";
+import { checkoutModuleOf, readSessionState, sessionDisplayNumber, stalledAfterSeconds } from "./progress.ts";
 import { TriageError, type TriageOutcome, collectArtifacts, triage } from "./triage.ts";
 import {
   EXIT_BOUNDARY,
@@ -207,6 +212,8 @@ export interface DriveOptions {
   /** Overrides `driver.max_invocations`; a re-run past a budget stop passes a larger one. */
   readonly maxInvocations?: number | null;
   readonly transport?: string | null;
+  /** `--focused` / `--global`, handed to the registration; null lets the plan say. */
+  readonly kind?: "focused" | "global" | null;
 }
 
 /** What `dabbler session next` takes: no adapter, because there is no engine to invoke. */
@@ -776,18 +783,27 @@ function sessionModulesOf(sessionsDir: string, sessionNumber: number): string[] 
   return [];
 }
 
-function checkoutModuleOf(sessionsDir: string, sessionNumber: number): string | null {
-  const rows = readSessionState(sessionsDir)?.["sessions"];
-  for (const row of Array.isArray(rows) ? rows : []) {
-    if (typeof row !== "object" || row === null || Array.isArray(row)) continue;
-    const record = row as Record<string, unknown>;
-    if (Number(record["number"]) !== sessionNumber) continue;
-    const checkout = record["checkout"];
-    if (typeof checkout !== "object" || checkout === null || Array.isArray(checkout)) return null;
-    const module = (checkout as Record<string, unknown>)["module"];
-    return typeof module === "string" && module.trim() !== "" ? module.trim() : null;
-  }
-  return null;
+/**
+ * Which module's session owes a reached suite instead of this checkout, or
+ * null when the suite runs here. Only in a focused folder, only for a
+ * suite of another module, and only when none of that suite's test roots
+ * holds a test file on this disk -- a suite that declares no test roots
+ * cannot be judged and runs as it always did.
+ */
+export function suiteOwedElsewhere(
+  repoRoot: string,
+  suite: { readonly name: string; readonly module?: string | null },
+  plan: ImpactPlan | null,
+  scopes: readonly SuiteScope[],
+): string | null {
+  if (plan === null || !plan.multi) return null;
+  const marker = readCloneMarker(repoRoot);
+  if (marker === null) return null;
+  const owner = suite.module ?? null;
+  if (owner === null || owner === marker.slug) return null;
+  const scope = scopes.find((entry) => entry.suite === suite.name);
+  if (scope === undefined || scope.roots.length === 0) return null;
+  return scope.roots.some((root) => anyTestFileUnder(join(repoRoot, root), scope.glob)) ? null : owner;
 }
 
 export function idleInstruction(now: string): DriverInstruction {
@@ -1028,6 +1044,7 @@ class Driver {
         provider: this.options.provider ?? null,
         model: this.options.model ?? null,
         effort: this.options.effort ?? null,
+        kind: this.options.kind ?? null,
       });
       if (code !== EXIT_OK) return code;
     }
@@ -1959,8 +1976,10 @@ ${this.stopArtifacts()}`,
       (scoped
         ? "\n\nThis instruction's `scope` member lists what this session may read and change: " +
           "its module's roots, its contract folder and its dependencies', the root build files " +
-          "and the sessions directory. A sibling module's implementation is reached through its " +
-          "contract folder, never its source; `dabbler session scope` prints the list again."
+          "and the sessions directory; `dabbler session scope` prints the list again. The other " +
+          "modules are here as packages and contract folders, not source. If the work cannot be " +
+          "done without a sibling's source, ask with `dabbler session next --request-grant <slug> " +
+          "--reason <why>` and wait for the answer; never take it."
         : "") +
       "\n\nWhen the step is done, report with the answer command. --files names every " +
       "file you created, changed or deleted in this step and nothing else -- a deleted " +
@@ -2556,7 +2575,7 @@ ${this.stopArtifacts()}`,
     const changed = materialPaths(
       status.text,
       relative(this.repoRoot, this.sessionsDir).split("\\").join("/"),
-      { beforeWork: true },
+      { beforeWork: true, hookRemoved: hookRemovedFor(this.sessionsDir) },
     );
     return planImpact(
       shape,
@@ -2651,9 +2670,19 @@ ${this.stopArtifacts()}`,
       }
     }
     const reached = plan === null ? null : new Set(plan.suites.map((suite) => suite.name));
+    const scopes = loadTestScopes(this.config).scopes;
     for (const suite of this.expensiveSuites()) {
       if (reached !== null && !reached.has(suite.name)) {
         this.log("run-of-record-skipped", { suite: suite.name, reason: "not reached by the impact plan" });
+        continue;
+      }
+      // A focused folder holds its own module's tests and no sibling's: a
+      // reached suite whose tests are not here is owed to its module's own
+      // session, never run and failed into a fix step nobody can do.
+      const owedTo = suiteOwedElsewhere(this.repoRoot, suite, plan, scopes);
+      if (owedTo !== null) {
+        this.log("run-of-record-skipped", { suite: suite.name, reason: "tests-not-on-disk", module: owedTo });
+        raiseRunOfRecordOwed(this.repoRoot, this.sessionNumber, suite.name, owedTo);
         continue;
       }
       const jobName = `run of record: ${suite.name}`;
@@ -3331,11 +3360,9 @@ export async function sessionNext(sessionsDir: string, options: NextOptions): Pr
     try {
       const shape = solutionShape(fullCheckout);
       if (options.requestGrant) {
-        raiseGrantDecision(fullCheckout, shape, current, options.requestGrant, options.reason ?? "", false);
+        raiseGrantDecision(fullCheckout, shape, current, options.requestGrant, options.reason ?? "");
       }
-      const settled = settleAnsweredGrants(fullCheckout, shape, current, (slug) => {
-        packModule(fullCheckout, shape, slug, { session: current });
-      });
+      const settled = settleAnsweredGrants(fullCheckout, shape, current);
       for (const grant of settled.applied) {
         writeErr(`dabbler: granted -- the checkout now holds module '${grant.sibling}'s source\n`);
       }

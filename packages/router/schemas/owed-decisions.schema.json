@@ -45,6 +45,11 @@
       "type": "string",
       "description": "One sentence, in the operator's language rather than the framework's."
     },
+    "module": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The module whose own session owes what this asks about, by slug -- a run of record a focused folder could not run because the tests are not on its disk. Absent for a question no module owes."
+    },
     "file": {
       "type": ["string", "null"],
       "description": "Where the answer lands, repository-relative. Null when the answer is not a file edit. The framework writes it; the operator never does."

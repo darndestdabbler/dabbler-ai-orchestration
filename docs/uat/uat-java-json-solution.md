@@ -266,15 +266,31 @@ reports "no error handling" and "no abstraction" as faults and the session
 argues with itself for rounds. With it, none of the four sessions in the .NET
 reference run was asked to add anything.
 
-Then start the session and drive it:
+Then start the session. **A session that works on a module names it**, and
+the framework makes that module's own checkout and registers the session
+inside it:
 
 ```
-dabbler session start --sessions-dir docs/sessions --engine claude-code --provider anthropic
+dabbler session start --sessions-dir docs/sessions --engine claude-code --provider anthropic --module model
+```
+
+**Expect** it to say the session is registered *in module 'model's focused
+checkout at `C:\temp\uat-java.model`*. **That folder is where you work from
+now on** — open it, and run every `next` there:
+
+```
+cd C:\temp\uat-java.model
 dabbler session next --sessions-dir docs/sessions
 ```
 
 Keep running `dabbler session next` and doing what each answer says, until it
 answers `done`.
+
+**Do not run a module session in the full checkout.** It will work right up
+to the close, and then refuse: the exposure gate finds the other modules'
+source sitting beside the one you are working on, and no grant can help you
+— a grant widens a focused checkout, and the full one is not a focused
+checkout. The clone is not a nicety; it is what makes the close possible.
 
 **The one thing that trips everybody.** When the answer's `"kind"` is
 `"wait"`, that means *run `next` again yourself*. Nothing notifies you and no
@@ -310,27 +326,20 @@ dabbler affected --path modules/store/src/main/java/com/example/store/ItemStore.
 
 ---
 
-## Step 8 — Open a module and work in it
+## Step 8 — Check the checkout you are already working in
+
+Step 6 put you in it. **Check the two things that make it worth having**, from
+inside `C:\temp\uat-java.store`:
 
 ```
-dabbler module open store
-```
-
-**Expect** JSON containing `"convenienceFile": ".mvn/maven.config"` and a
-`"cone"` listing `docs`, `modules/store`, `packages` and the *contract*
-folders of the siblings — not their source.
-
-Open the new folder in VS Code. **This is where you work now.**
-
-**Check the two things that make a focused checkout worth having:**
-
-```
-dir C:\temp\uat-java.store\modules
+dir C:\temp\uat-java.store\modules\model
 type C:\temp\uat-java.store\.mvn\maven.config
 mvn -B test
 ```
 
-**Expect:** only `store` in the first; the second to contain exactly
+**Expect:** the first to show `contract` and `pom.xml` and **no `src`** — the
+sibling is here as its contract and its package, never as source; the second
+to contain exactly
 
 ```
 -f
@@ -338,7 +347,11 @@ modules/store/pom.xml
 ```
 
 and the third to build and exit `0` — a plain `mvn` with no arguments builds
-the right module, because that config file tells it which POM to use.
+the right module, because that config file tells it which POM to use, and it
+resolves `com.example:json-model` out of `packages\` rather than compiling it.
+
+`dabbler module open <slug>` is the same checkout without a session, for
+when you want to look at a module rather than work in one.
 
 ---
 

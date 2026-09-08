@@ -21,7 +21,7 @@ import { join, relative } from "node:path";
 import { inScope, moduleScope } from "./agency.ts";
 import { checkoutCone, contractDir } from "./checkout.ts";
 import { loadConfig } from "./config.ts";
-import { EcosystemError, layDebugGrants, walkFiles } from "./ecosystem.ts";
+import { EcosystemError, ecosystemOf, layDebugGrants, walkFiles } from "./ecosystem.ts";
 import { sessionsDirFor } from "./evidence.ts";
 import { atomicWriteJson, nowIso, runGit } from "./journal.ts";
 import { sessionRunDir } from "./ledger.ts";
@@ -155,11 +155,44 @@ export function grantsInForce(rows: readonly GrantRow[]): GrantInForce[] {
   return [...standing.values()];
 }
 
+/** The sibling's build files, or none when the module has no ecosystem to ask. */
+function projectFilesOf(root: string, entry: ModuleEntry): string[] {
+  try {
+    return ecosystemOf(root, entry).projectFiles(root, entry);
+  } catch (error) {
+    if (error instanceof EcosystemError) return [];
+    throw error;
+  }
+}
+
 /**
- * For every module the session does not name, the implementation bytes its
- * roots hold in the working directory. The contract folder is a sibling's
- * promise and is meant to be there; everything else under its roots is
- * exposure. Build output is not counted, because it is not source.
+ * Every path under the module roots that this repository ignores, asked of
+ * git once. Build output is not a sibling's source, and a checkout that has
+ * run a suite is full of it.
+ */
+function ignoredPaths(root: string): Set<string> {
+  const answer = runGit(root, ["ls-files", "--others", "--ignored", "--exclude-standard", "-z"]);
+  if (answer.code !== 0) return new Set();
+  return new Set(
+    answer.stdout
+      .split("\0")
+      .map((path) => posix(path.trim()))
+      .filter((path) => path !== ""),
+  );
+}
+
+/**
+ * For every module the session does not name, the SOURCE its roots hold in
+ * the working directory.
+ *
+ * Three things under a sibling's roots are not exposure and are not
+ * counted: its contract folder, which is the promise it is meant to
+ * publish; its build file, which is a manifest naming an artifact, and
+ * which a focused checkout holds whether anybody asked or not (cone mode
+ * materialises every file beside a directory it keeps); and anything the
+ * repository ignores, which is where build output lives. What is left is
+ * what the gate was written for -- a sibling's implementation, present
+ * because somebody widened the cone.
  */
 export function siblingBytes(
   root: string,
@@ -168,15 +201,31 @@ export function siblingBytes(
 ): SiblingExposure[] {
   const named = new Set(slugs);
   const out: SiblingExposure[] = [];
+  const ignored = ignoredPaths(root);
   for (const entry of shape.modules) {
     if (named.has(entry.slug)) continue;
     const contract = `${contractDir(entry.slug)}/`;
+    // What the sibling's build files are called, asked of the seam. A
+    // module with no project file anywhere has no ecosystem to ask, and
+    // counts what it walks, as before.
+    const buildFiles = new Set<string>(projectFilesOf(root, entry));
     const files = new Set<string>();
     let bytes = 0;
     for (const codeRoot of entry.codeRoots.length > 0 ? entry.codeRoots : ["."]) {
       for (const file of walkFiles(join(root, codeRoot))) {
         const rel = posix(relative(root, file));
         if (rel.startsWith(contract) || files.has(rel)) continue;
+        // A build file is a manifest, not implementation -- and a focused
+        // checkout holds the sibling's whether or not anybody wanted it:
+        // git's sparse checkout is in cone mode, which materialises every
+        // file directly under a directory it keeps, so asking for the
+        // sibling's contract folder brings its pom.xml or .csproj along.
+        if (buildFiles.has(rel)) continue;
+        // And what the repository ignores is not source either: the
+        // reactor writes .flattened-pom.xml beside every module it builds,
+        // and target/, bin/ and obj/ fill up with output the moment a
+        // suite runs.
+        if (ignored.has(rel)) continue;
         files.add(rel);
         try {
           bytes += statSync(file).size;

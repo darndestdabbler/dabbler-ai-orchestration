@@ -157,6 +157,7 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 117 | The ignore rule that never fires | no | 2026-09-07 |
 | 118 | What the framework writes before a session declares | no | 2026-09-07 |
 | 119 | The sibling a Maven module cannot consume | no | 2026-09-07 |
+| 120 | What a focused checkout unavoidably holds | no | 2026-09-07 |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -2049,3 +2050,9 @@ Say what the framework's own writes mean for a session that has not declared yet
 **Releasable: no.**
 
 Make a Maven module able to consume a sibling as a package, which it never could. `module pack` runs one reactor deploy per module and writes the module's jar and POM into packages/; the deployed POM still names com.example:solution-parent at the same dev version (the flatten plugin the scaffolded parent manages runs in resolveCiFriendliesOnly, which resolves ${revision} and keeps the parent), and that parent POM is deployed nowhere. A consumer resolving the sibling reads its descriptor, follows the parent and finds nothing: 'Could not find artifact com.example:solution-parent:pom:0.1.0-dev... in modules (file:///.../packages)'. The seam gains a way to say what a FEED needs besides a module's own artifacts -- for Maven, one non-recursive deploy of the root parent POM under the same version into the same file repository, proven by hand in the walk's repository to make the failing build pass; for .NET, nothing, because a .nupkg names no parent.
+
+### Session 120 — What a focused checkout unavoidably holds
+
+**Releasable: no.**
+
+Stop the exposure gate refusing the checkout a module session is meant to run in, and correct the walkthrough that sends a reader to the wrong one. Walking the app module in its focused clone, the close refused for 1603 bytes of module 'model' and 1223 of 'store' -- and what the clone held of them was two pom.xml files, one .flattened-pom.xml and two contract pages, with no source at all. Git's sparse checkout is in cone mode, which materialises every file directly under a directory it keeps, so asking for modules/model/contract/ brings modules/model/pom.xml along; and the flatten plugin writes .flattened-pom.xml for every module in the reactor when the run of record builds at the root. siblingBytes counts both. So no Maven module session can close from a focused checkout, which is the checkout the design requires. The manifest is taught to measure a sibling's SOURCE: the contract folder as today, and now neither the ecosystem's build files nor anything the repository ignores. The walkthrough gains what this walk proved twice: a module session starts with `session start --module <slug>`, which makes the clone and registers the session in it, and a session started in the full checkout cannot close once a sibling has source, because the exposure gate refuses and no grant can help -- a grant widens a focused clone, and the full checkout is not one.

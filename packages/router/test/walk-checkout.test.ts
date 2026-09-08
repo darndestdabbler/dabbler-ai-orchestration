@@ -204,10 +204,11 @@ describe("a grant, and its revoke", () => {
     assert.doesNotMatch(gitOut(clone, "status", "--porcelain"), /\.dabbler|overlay/);
     const exposure = readExposure(clone, 1);
     assert.ok((exposure?.siblings[0]?.bytes ?? 0) > 0);
-    assert.deepEqual(exposure?.siblings[0]?.files, [
-      "modules/model/src/CsvModel/CsvModel.csproj",
-      "modules/model/src/CsvModel/Person.cs",
-    ]);
+    // The sibling's SOURCE, which is what the grant widened the cone for.
+    // Its project file is not exposure: cone mode puts one in every
+    // focused checkout, granted or not, and a manifest naming an artifact
+    // is what the contract folder already says out loud.
+    assert.deepEqual(exposure?.siblings[0]?.files, ["modules/model/src/CsvModel/Person.cs"]);
     assert.equal(exposure?.grants[0]?.reason, "debugging the mapper");
     assert.equal(exposure?.grants[0]?.debug, true);
     // Settled once: a second look applies nothing again.

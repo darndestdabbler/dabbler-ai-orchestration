@@ -10,11 +10,12 @@ import {
   exposurePath,
   grantDecisionId,
   readExposure,
+  siblingBytes,
   writeExposure,
 } from "../src/exposure.ts";
 import { moduleScope } from "../src/agency.ts";
 import { type SolutionShape, dependencyOrder, impliedDeployables, implicitModule, parseEntries } from "../src/modules.ts";
-import { seed, tempDir } from "./support/answers.ts";
+import { gitAnswers, seed, tempDir } from "./support/answers.ts";
 
 function twoModules(): SolutionShape {
   const entries = parseEntries({
@@ -27,6 +28,11 @@ function twoModules(): SolutionShape {
 }
 
 const SCOPE = ["modules/persister", "modules/model/contract", "docs/sessions"];
+
+// Measuring a sibling's source asks git what this repository ignores, and
+// these trees are temp directories with no repository under them: nothing is
+// ignored anywhere. A test that needs a different answer installs its own.
+gitAnswers([[["ls-files", "--others", "--ignored", "--exclude-standard", "-z"], { stdout: "" }]]);
 
 describe("the exposure manifest", () => {
   it("records zero bytes for every sibling and no grant in a clean focused clone, and nothing at all for a single-module solution", () => {
@@ -83,8 +89,11 @@ describe("the exposure manifest", () => {
     assert.deepEqual(written.siblings, [
       {
         slug: "model",
-        bytes: "public sealed class Person {}\n".length + "<Project />\n".length,
-        files: ["modules/model/src/CsvModel/CsvModel.csproj", "modules/model/src/CsvModel/Person.cs"],
+        // The .csproj is a manifest, not implementation, and a focused
+        // checkout holds a sibling's whether anybody asked or not: cone
+        // mode materialises every file beside a directory it keeps.
+        bytes: "public sealed class Person {}\n".length,
+        files: ["modules/model/src/CsvModel/Person.cs"],
       },
     ]);
     assert.deepEqual(written.grants, [
@@ -105,18 +114,81 @@ describe("the exposure manifest", () => {
     const shape = twoModules();
     const scope = moduleScope(root, null, shape, ["persister"]);
     assert.ok(scope.includes("packages"), scope.join(", "));
-    const written = writeExposure(root, shape, 5, {
-      modules: ["persister"],
-      phase: "close",
-      scope,
-      changedPaths: [
-        "packages/com/example/json-store/0.1.0-dev.20260907.1.gabc1234/json-store-0.1.0-dev.20260907.1.gabc1234.jar.sha1",
-        ".dabbler/solution/projection.json",
-        "modules/persister/src/CsvPersister/Store.cs",
-        "modules/model/src/CsvModel/Person.cs",
-      ],
-    });
+    // Measuring a sibling's source asks git what this repository ignores.
+    const restore = gitAnswers([
+      [["ls-files", "--others", "--ignored", "--exclude-standard", "-z"], { stdout: "" }],
+    ]);
+    let written;
+    try {
+      written = writeExposure(root, shape, 5, {
+        modules: ["persister"],
+        phase: "close",
+        scope,
+        changedPaths: [
+          "packages/com/example/json-store/0.1.0-dev.20260907.1.gabc1234/json-store-0.1.0-dev.20260907.1.gabc1234.jar.sha1",
+          ".dabbler/solution/projection.json",
+          "modules/persister/src/CsvPersister/Store.cs",
+          "modules/model/src/CsvModel/Person.cs",
+        ],
+      });
+    } finally {
+      restore();
+    }
     // Only the sibling's source, which is the one thing the gate is for.
     assert.deepEqual(written?.outsideScope, ["modules/model/src/CsvModel/Person.cs"]);
+  });
+});
+
+describe("what a focused checkout unavoidably holds", () => {
+  it("exposes nothing for a sibling present as its build file, its build output and its contract", () => {
+    // Measured on the walk: the app's focused clone held the model's and
+    // the store's pom.xml (cone mode brings them beside the contract
+    // folders the cone asks for) and a .flattened-pom.xml the reactor
+    // wrote, with no source at all -- and the close refused for 2826 bytes
+    // of "implementation" that was nothing of the kind.
+    const root = tempDir("cone-");
+    seed(root, {
+      "modules/model/pom.xml": "<project><artifactId>json-model</artifactId></project>\n",
+      "modules/model/.flattened-pom.xml": "<project><artifactId>json-model</artifactId></project>\n",
+      "modules/model/contract/README.md": "# json-model\n",
+      "modules/persister/pom.xml": "<project><artifactId>json-store</artifactId></project>\n",
+      ".gitignore": "target/\n.flattened-pom.xml\n",
+    });
+    const restore = gitAnswers([
+      [
+        ["ls-files", "--others", "--ignored", "--exclude-standard", "-z"],
+        { stdout: "modules/model/.flattened-pom.xml\0" },
+      ],
+    ]);
+    try {
+      const exposure = siblingBytes(root, twoModules(), ["persister"]);
+      assert.deepEqual(exposure, [{ slug: "model", bytes: 0, files: [] }]);
+    } finally {
+      restore();
+    }
+  });
+
+  it("still exposes a sibling's source, which is the one thing the gate is for", () => {
+    const root = tempDir("cone-source-");
+    seed(root, {
+      "modules/model/pom.xml": "<project><artifactId>json-model</artifactId></project>\n",
+      "modules/model/src/main/java/com/example/model/Item.java": "public class Item {}\n",
+      "modules/model/contract/README.md": "# json-model\n",
+    });
+    const restore = gitAnswers([
+      [["ls-files", "--others", "--ignored", "--exclude-standard", "-z"], { stdout: "" }],
+    ]);
+    try {
+      const exposure = siblingBytes(root, twoModules(), ["persister"]);
+      assert.deepEqual(exposure, [
+        {
+          slug: "model",
+          bytes: "public class Item {}\n".length,
+          files: ["modules/model/src/main/java/com/example/model/Item.java"],
+        },
+      ]);
+    } finally {
+      restore();
+    }
   });
 });

@@ -159,6 +159,9 @@ The numbered sessions are declared from `session-plan.md`; each one's task is wh
 | 119 | The sibling a Maven module cannot consume | no | 2026-09-07 |
 | 120 | What a focused checkout unavoidably holds | no | 2026-09-07 |
 | 121 | Two ways in — the seat and the keys | no | 2026-09-08 |
+| 122 | The suite that takes the machine | no | 2026-09-08 |
+| 123 | The principle, and the three commands the UI does not have | — | not declared |
+| 124 | The UAT that tests the UI, and shows its own machinery | — | not declared |
 
 ### Session 5 — The two files, framework-written (plan A4)
 
@@ -2063,3 +2066,9 @@ Stop the exposure gate refusing the checkout a module session is meant to run in
 **Releasable: no.**
 
 Give both UAT walkthroughs a Prerequisites section in three parts -- what every run needs, then a GitHub Copilot seat, then direct API keys -- because the documents currently assume the keys and treat a seat as a mistake, which is backwards for the staff who have a seat and no keys at all. The seat half carries the facts that decide what a run costs, each read out of this repository rather than supposed: --model is required on a seat because resolveOrchestratorIdentity refuses a model the registry cannot resolve and a multi-provider seat's label is not trusted; the premium_request_weight of every confirmed model in packages/router/copilot-catalog.lock; and the fact that seatLadder takes the confirmed catalog minus the engine's provider, so the verifier is always a different provider from the engine and the ENGINE-verifier pairing is what decides the bill. The keys half states the three DABBLER_* variables and per-token vendor billing. Neither half names a key value, a seat id, or a price in money.
+
+### Session 122 — The suite that takes the machine
+
+**Releasable: no.**
+
+Restore the two protections that kept the test suite off the operator's machine, and record what is not yet explained. Session 76 put every test worker at below-normal OS priority so its git and node grandchildren inherited it; that setup file was deleted with vitest.config.ts when session 88 retired vitest, and nothing replaced it, so the suite has competed with the operator's keyboard ever since. Session 96's git-spawn constraint still holds, but it recognises a walkthrough by the filename pattern walk-*.test.ts, so the exemption that replaced --test-concurrency widened from six files to eight without anyone deciding it should. This session gives no-git.ts an explicit list of the files permitted to build repositories and the priority policy it lost, audits both from a new control run by the lint gate so neither can lapse silently again, corrects dabbler.yaml's two stale claims about the suite, and writes the measurement into a design note that states plainly that the jump from 40s to 102s between sessions 98 and 99 is not explained. No shipped behaviour changes and nothing is published.

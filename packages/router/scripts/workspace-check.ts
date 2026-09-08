@@ -104,6 +104,22 @@ function lint(): number {
     process.stderr.write("workspace-check: selection-map check failed\n");
     worst = Math.max(worst, selection);
   }
+  // What the suite costs the operator rides here too
+  // (`check-suite-cost.ts`). Two protections that keep `node --test` off
+  // the operator's machine had both lapsed by session 121 -- one deleted
+  // with the runner it was written for, one that widened itself every time
+  // a file was named `walk-*` -- and neither lapse was visible to anything
+  // until somebody measured. A protection with no auditor is a protection
+  // with a date on it.
+  const suiteCost = run(
+    [join(REPO_ROOT, "packages", "router", "scripts", "run-ts.mjs"),
+     join(REPO_ROOT, "packages", "router", "scripts", "check-suite-cost.ts")],
+    REPO_ROOT,
+  );
+  if (suiteCost !== 0) {
+    process.stderr.write("workspace-check: suite-cost check failed\n");
+    worst = Math.max(worst, suiteCost);
+  }
   return worst;
 }
 

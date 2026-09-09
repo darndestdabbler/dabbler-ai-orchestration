@@ -1,6 +1,58 @@
-# STATUS — sessions 113–138 CLOSED, all VERIFIED: the deployables block, the Java/Maven walk and its nine defects, the suite off the operator's machine, the principle of who owns a command, the policy a module session runs under, the basics the operator saw go wrong, the focused-or-global session the plan decides with one click to start it, the UAT walk that found ten product defects in the UI path, sessions 131–133 answering all ten of them, session 134 fixing what the verifier is told and widening what it can see, session 135 letting the direct-API verifier ask for a file and giving .NET a root, session 136 measuring what the run of record does to the operator's machine and cutting the load, session 137 shipping the release and paying for four defects on the way, and session 138 repairing all four; session 139 is planned and carries the release; version 2.0.18
+# STATUS — sessions 113–139 CLOSED, all VERIFIED: the deployables block, the Java/Maven walk and its nine defects, the suite off the operator's machine, the principle of who owns a command, the policy a module session runs under, the basics the operator saw go wrong, the focused-or-global session the plan decides with one click to start it, the UAT walk that found ten product defects in the UI path, sessions 131–133 answering all ten of them, session 134 fixing what the verifier is told and widening what it can see, session 135 letting the direct-API verifier ask for a file and giving .NET a root, session 136 measuring what the run of record does to the operator's machine and cutting the load, session 137 shipping the release and paying for four defects on the way, and session 138 repairing all four, and session 139 preparing 2.0.19 and putting its publication to the operator, who held it for session 140; version 2.0.19, unpublished
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
+
+> ## SESSION 139 CLOSED, 2026-09-09 — the release that asked, and the operator who said not yet
+>
+> | session | what | state |
+> | --- | --- | --- |
+> | 139 | 2.0.19 prepared and its publication put to the operator; held for 140 and the releasability withdrawn on the record | CLOSED VERIFIED (round 2; round 1's one blocking Major was DISPUTED and the dispute was UPHELD — the finding was withdrawn), landed `b468abda`, closed `2f36e81b` |
+>
+> **The version is 2.0.19 and it is NOT published.** `version.json` moved
+> and the stamper wrote it into both manifests, the extension's dependency
+> on the router and the lock file's workspace entries; the extension's
+> `CHANGELOG.md` carries the 2.0.19 section that says what 138 changed in
+> an operator's terms and names the two commands it gives them. All of that
+> is landed and pushed. **No tag was made and the Marketplace still serves
+> the version it served yesterday.** Session 140 is the next release and
+> ships this version — or bumps past it, which is 140's call; either way
+> 2.0.19's number is unspent and its notes are already written.
+>
+> **Session 138's four repairs were exercised rather than asserted, and
+> three of them held.**
+>
+> - **(2) held, and this was the plan's own acceptance test.** `dabbler
+>   release` refused to tag and raised a brief keyed `publication:2.0.19`,
+>   not the bare `publication`. Had it tagged without asking, the plan said
+>   that was a finding against 138; it asked.
+> - **(4) held, and it is what let this session close.** The operator
+>   answered `not yet`, which leaves a session declared releasable with no
+>   packaging row — the state that used to leave `cancel` as the only exit.
+>   `dabbler session withdraw-release` recorded the withdrawal with its
+>   reason and approver, and `published_when_releasable` then PASSED while
+>   **naming who withdrew it and why**, so the close's account of this
+>   session differs from its account of one that never was releasable.
+> - **(1) held as far as it was reached.** The publish refusal was quoted
+>   from the packaging run's own log — the eight gate rows and the sentence
+>   about `vsix-v2.0.19` not being on origin — not a string literal. One
+>   refusal only, so the classifier was never asked to tell two apart.
+> - **(3) was not reached.** Every gate the publish reads passed;
+>   `verification_clean`, `test_run_fresh`, `working_tree_clean` and
+>   `pushed_to_remote` were all PASS, so there was no earlier phase's
+>   evidence to go back for. The rewind is still untested by a real run.
+>
+> **Round 1's Major asked for evidence the phase order makes impossible.**
+> It wanted an answered publication decision, a `published` packaging row
+> and a Marketplace install check — at the verification round, which runs
+> before land and publish. The dispute cited the phase enum, the driver
+> loop, `tagReleaseRun`'s requirement that the tag be on origin and name
+> HEAD (which only the land can produce), and `published_when_releasable`,
+> which is where that criterion is actually enforced. Round 2 withdrew it
+> and verified. **A verifier asking a release session to prove it shipped,
+> before the phase that ships, is a shape worth expecting again.**
+>
+> **Owed:** nothing from this session. The advisory
+> `repair-outside-a-step-137` item is settled and the owed list is empty.
 
 > ## SESSION 138 CLOSED, 2026-09-09 — the deadlocks that were not deadlocks, and the consent that was not asked for
 >

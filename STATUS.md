@@ -1,6 +1,55 @@
-# STATUS — sessions 113–130 CLOSED, all VERIFIED: the deployables block, the Java/Maven walk and its nine defects, the suite off the operator's machine, the principle of who owns a command, the policy a module session runs under, the basics the operator saw go wrong, the focused-or-global session the plan decides with one click to start it, the UAT walk that found ten product defects in the UI path, and sessions 131–132 answering six of those ten; sessions 133–136 are planned; version 2.0.14
+# STATUS — sessions 113–133 CLOSED, all VERIFIED: the deployables block, the Java/Maven walk and its nine defects, the suite off the operator's machine, the principle of who owns a command, the policy a module session runs under, the basics the operator saw go wrong, the focused-or-global session the plan decides with one click to start it, the UAT walk that found ten product defects in the UI path, and sessions 131–133 answering all ten of them; sessions 134–136 are planned; version 2.0.14
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
+
+> ## SESSION 133 CLOSED, 2026-09-08 — the four papercuts, and the walk's record closed
+>
+> | session | what | state |
+> | --- | --- | --- |
+> | 133 | D263, D264, D265 and D266, and `uat-walk-findings.md` closed against all ten | CLOSED VERIFIED (rounds 1 and 2, no findings in either), landed `29d6a174`, closed `80cb0298` |
+>
+> **What landed.** (1) **Dabbler: Troubleshoot** has a seventh item that runs
+> the toolchain both walkthroughs open with — git, node, dotnet, java, mvn,
+> copilot — and reports what answered. `prerequisiteReport(probe, env)` is
+> exported and pure: the probing is a `ToolProbe` seam, so the report is a
+> function of what was found rather than of whatever the suite's host has
+> installed. `DABBLER_TRANSPORT` is printed **by value**, because which one is
+> set is the question; the three API keys are printed **present or absent and
+> never by value**, because this channel is one an operator pastes into an
+> issue, and the test asserts exactly that. (2) `bootstrap --project-dir`
+> names the target's own `.dabbler`: an optional `projectDir` threads through
+> `freshnessWarnings` → `checkFreshness` → `resolveRecordPath`, and
+> `absentRecordNotices` now loads the config for the project it was told to
+> act on. (3) New Module's first box is titled `1/4`. (4) `spawnSyncProgram`
+> in `checks.ts` is the synchronous twin of `spawnProgram`, and
+> `runPackDefault` and `timedSpawn` use it — measured on this host, `mvn
+> --version` through it exits 0 with an empty stderr where `shell: true`
+> printed DEP0190. (5) The walk's owed table gains an *answered* column for
+> all ten; the findings themselves are not revised, because the walk is
+> evidence and evidence is not edited to agree with the code.
+>
+> **The one file outside the plan.** `ROUTER_VERSION` is exported from
+> `packages/router/src/index.ts`. The prerequisite report has to name the
+> router the extension is *running*, and `dabbler version` on a terminal's
+> PATH answers a different question — the extension bundles the router, so a
+> PATH lookup can report the wrong program or none.
+>
+> **The run of record failed once, and the cause was the operator's own
+> machine.** Three tests in `config.test.ts` asserted a *layer's*
+> `transport.profile` by reading it through `resolveTransport`, which answers
+> the whole precedence chain — flag, then `DABBLER_TRANSPORT`, then the
+> layer. The operator's HKCU now persists `DABBLER_TRANSPORT=api`, so the
+> complete suite failed on the one host that runs it while every targeted
+> check stayed green; the run of record inherits the shell by design, which is
+> why a suite may not read one. One `withoutTransportEnv()` helper isolates
+> the four describes that touch it, proven green with the variable set to
+> `api`, set to `copilot-cli`, and unset. **Both rounds ran on `--transport
+> api`** with `gpt-5-6-terra` as verifier.
+>
+> **Still owed:** the .NET root solution file, the other half of D267 and
+> session 131's owed item — without it a scaffolded .NET solution declares a
+> suite whose `dotnet test` has no root to resolve (MSB1003). Sessions 134,
+> 135 and 136 are planned and unchanged; 136 carries the release.
 
 > ## SESSION 132 CLOSED, 2026-09-08 — the rest of the first-run path
 >

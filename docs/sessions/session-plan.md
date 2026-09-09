@@ -7172,7 +7172,7 @@ finding rate against the seat's 1.30 a session and the blind API path's 0.53.
 Turning it on by default is a separate decision that the measurement, not this
 session, settles.
 
-### Session 136 of 136: Codex leaves the documented surface, and the block lands
+### Session 136 of 136: Codex undocumented, three the operator asked for, and the block lands
 
 **It cannot be tested here, so it is not claimed.** Codex comes out of the
 engine list in the managed body, the bootstrap templates, the registration
@@ -7197,13 +7197,70 @@ source, the framework specification, this plan's own history and the status
 archive. **None of those may be edited.** A session that reads "remove Codex
 from the docs" and rewrites history has damaged the record to tidy a name.
 
+**Every voice rule carries its session number, and the job rules carry none
+at all.** The *Dabbler* terminal draws a rule between two voices with the
+name of the voice that follows set into it, and a scrollback that has held
+several sessions is read back one group at a time -- so the heading is where
+the session number belongs. `voice()` already puts it on the framework's own
+rule as `S134: framework`, from session 126; the operator's form is `134 –
+framework`, and `jobLabel()` -- the log's basename with `.log` stripped --
+puts nothing on a job's rule at all, so `verify-round-1` heads a group that
+could belong to any session on the scrollback. One function draws every rule,
+`divider(label, columns, kind)`, so what changes is the label both callers
+hand it and not the drawing.
+
+**The activity bar says what the marketplace says.** The extension's
+`displayName` is already *Dabbler AI Orchestration*; the activity-bar
+container and the settings section are contributed as *AI Orchestration*, and
+those two titles are the name a person actually reads. The container **id**
+stays `dabblerSessionSetsContainer` -- a title is a label and a rename of the
+id would lose every operator's activity-bar position. The Playwright harness
+reads the title out of the manifest already, deliberately (`electronLaunch.ts`
+says a retyped copy is what went stale on the last rename), so the selectors
+follow on their own; the one hard-coded copy is a step's operator text in
+`csvWalkSteps.ts`, and the tutorial is **re-rendered** from it with
+`scripts/render-csv-walkthrough.mjs` rather than hand-edited, because a check
+compares the committed document to that generator's exact output. **The
+records that name the old title are not touched** -- `docs/field-trial-50.md`,
+`docs/field-trial-70.md`, this plan's own history and the work plan -- for the
+same reason the Codex trap above exists.
+
+**The other half of D267: a .NET solution has no root for `dotnet test` to
+resolve.** Session 131 measured it rather than guessing -- a multi-module .NET
+solution keeps its projects under `modules/` and writes nothing at the root,
+so `dotnet test` answers `MSB1003: Specify a project or solution file` -- and
+closed the honest half: `suiteForEcosystem` asks the root detector, and
+`whyNoSuite` says out loud why nothing was declared. The remaining half is the
+root solution file itself, the counterpart of the parent POM that makes Maven's
+side resolve, which `rootFilesDotnet` does not write. **It needs no new rule.**
+`ensureRootFilesWithSuite` writes the root files first and asks the detector
+second, so a solution file written by `rootFilesDotnet` is found by
+`detectDotnet` in the same call and the suite declares itself; a repository
+that reaches the note now stops reaching it. **Two things this session
+decides.** The format: `.slnx`, which is plain XML a scaffold can write and a
+person can read, against `.sln`, which carries GUIDs no generator should be
+inventing -- proposed `.slnx`, with its SDK floor (9.0.200+) stated in the note
+beside the file, where the operator meets it. And upkeep, which is Maven's
+exactly: the parent POM lists the modules holding a POM when it is written and
+notes *"add each as it gets one"*, so the root `.slnx` lists the project files
+under `modules/` on the same terms and gets the same note. A second aggregator
+that maintains itself while the first does not is two rules for one job.
+
 **Steps.** (1) The live documented surface, and the engine list the bootstrap
 templates and the CLI help offer. (2) The registration's behaviour, and the
-decision recorded. (3) The version bump (`version.json`, then `npm run
-stamp:version`) and the release notes for sessions 131 to 136.
+decision recorded. (3) The session number on every terminal voice rule, the
+framework's and each job's. (4) The activity-bar and settings titles, and the
+tutorial re-rendered. (5) The root solution file `rootFilesDotnet` writes, and
+the suite that now declares itself with it. (6) The version bump
+(`version.json`, then `npm run stamp:version`) and the release notes for
+sessions 131 to 136.
 
-**Tests.** One: a registration naming the undocumented engine behaves as the
-decision says.
+**Tests.** Four. A registration naming the undocumented engine behaves as the
+decision says. A voice rule is headed with the session number, and a job's rule
+is too. A scaffolded .NET root writes the solution file, and the suite is
+declared in the same call because the detector now finds one. The labels get
+none: the manifest is the only copy, and the harness already reads it from
+there.
 
 **Releasable**, and it is the block's one release: sessions 131 to 135 reach
 a seat with it and not before.

@@ -88,6 +88,20 @@ export type DriverRun = {
     step_id?: DriverRunStopStepId;
   }[];
   /**
+   * The rewinds this run has already made: a later phase refused on an earlier phase's evidence, and the loop went back and remade it. Here for the same reason `stop_history` is, and it is NOT the same list -- a rewind is not a stop, throws nothing, and is therefore invisible to the deadlock classifier. One rewind per distinct refusal is the bound: a refusal already in this list means going back did not fix it, and the loop stops instead of remaking the same evidence forever.
+   */
+  rewinds?: {
+    /**
+     * The phase the run was sent back to.
+     */
+    to: string;
+    /**
+     * The refusal that sent it there, undecorated, as the next rewind is compared against.
+     */
+    reason: string;
+    at: string;
+  }[];
+  /**
    * The stop the run resumed past, until the phase moves on. Set by the resume that clears `stop`, and cleared by the first phase change after it -- the one honest 'progress resumed', said exactly once -- or by a new stop landing first, which is spoken as its own pause. On the record rather than in memory because under the pull every `next` is a fresh process, and the process that resumes is never the one that advances. Optional: a run written before this member is a run this reader opens, and its absence means nothing was resumed past.
    */
   resumed_from?: {

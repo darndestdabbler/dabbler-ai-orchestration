@@ -101,9 +101,11 @@ import { clip, stripEscapes } from "./engines.ts";
 import { SESSION_PLAN_FILENAME } from "./evidence.ts";
 import {
   SET_BOOKKEEPING_COMMIT_BASENAMES,
+  type EvidencePhase,
   checkVerificationClean,
   hookRemovedFor,
   readWorktreeStatus,
+  rewindPhaseFor,
 } from "./gates.ts";
 import type {
   DriverInstruction,
@@ -139,6 +141,7 @@ import {
   type Row,
   latestRound,
   readDisputes,
+  readPackaging,
   readRounds,
 } from "./ledger.ts";
 import {
@@ -526,6 +529,14 @@ const SENT_PREFIX = "sent: ";
 const STOP_HISTORY_CAP = 8;
 
 /**
+ * How many rewinds a run remembers, and the reason it is the same number as
+ * the stop history: both are read to see the loop going nowhere, and both
+ * are state rather than history -- the transcripts are where a run's whole
+ * account lives.
+ */
+const REWIND_HISTORY_CAP = 8;
+
+/**
  * The rules a refusal can come from, by name.
  *
  * Every reason a judge produces says which rule produced it, and the slug
@@ -591,6 +602,106 @@ It calls this a ${outcome.answer.classification}: ${outcome.answer.reasoning}
 ` +
     "It is an opinion. The framework has applied none of it."
   );
+}
+
+/**
+ * What identifies one impasse: the bound, the step, and the reason met
+ * there. Loose in `step_id` because the run's own history writes the field
+ * as absent where a phase has no step, and a stop is compared against rows
+ * read back off disk as readily as against one just made.
+ */
+export interface StopKey {
+  readonly kind: string;
+  readonly reason: string;
+  readonly step_id?: string | null;
+}
+
+/**
+ * The same bound, on the same step, for the same reason as last time: the
+ * loop is not making progress, and the next re-run reaches here again.
+ *
+ * Pure, and exported, because the whole of it is a comparison and because
+ * what it compares has been wrong twice. It reads the UNDECORATED reason
+ * the history keeps, so a third identical stop is recognised as readily as
+ * the second -- a reason carrying its own note would never match again.
+ *
+ * **A phase that throws a string literal makes this true by construction.**
+ * `previous.reason === entry.reason` reduces to `constant === constant`,
+ * and every refusal after the first is an impasse whatever it was about.
+ * Verification carried that bug and was fixed; publish and close carried it
+ * until session 138, where session 137's record showed what it costs -- six
+ * distinct publish refusals, seven of them labelled deadlock, while running
+ * it again was exactly what moved it every time. The defence is not here:
+ * it is that every phase's stop names the refusal it met.
+ */
+export function judgeStopClass(
+  previous: StopKey | null | undefined,
+  entry: StopKey,
+): "first" | "deadlock" {
+  if (previous === undefined || previous === null) return "first";
+  const same =
+    previous.kind === entry.kind &&
+    (previous.step_id ?? null) === (entry.step_id ?? null) &&
+    previous.reason === entry.reason;
+  return same ? "deadlock" : "first";
+}
+
+/**
+ * Whether this impasse has already been taken to an adviser.
+ *
+ * Keyed on the same pair the class is, and for the same reason: a re-run
+ * that reaches the same impasse must not pay for the same answer twice,
+ * and two unlike refusals must not share one triage. `climbLadder` runs
+ * once per impasse, so a constant reason spends the session's only triage
+ * on the first refusal and logs `triage-skipped` for every later one.
+ */
+export function alreadyTriaged(
+  triage: { readonly for_reason?: string; readonly for_step?: string | null } | null | undefined,
+  entry: StopKey,
+): boolean {
+  if (!triage) return false;
+  return triage.for_reason === entry.reason && (triage.for_step ?? null) === (entry.step_id ?? null);
+}
+
+/**
+ * Where a refused publish sends the run back to, read off the record rather
+ * than out of the refusal's prose.
+ *
+ * `packageSession` runs the close's gates as its own preconditions and
+ * writes their rows into the refused packaging row, so the answer is
+ * structured and the driver never parses a sentence. Only the LAST row is
+ * read: a session may be refused, fixed and refused again, and what is to
+ * be remade is what failed this time.
+ *
+ * Null where the refusal is not about an earlier phase's evidence -- a
+ * missing credential, a feed that would not take the artifact, a tag that
+ * names the wrong commit -- because no phase remakes any of those, and a
+ * rewind that could not fix anything would be a loop.
+ */
+export function rewindFromPackaging(rows: readonly Row[]): EvidencePhase | null {
+  const last = rows.length > 0 ? rows[rows.length - 1] : null;
+  if (last === null || last === undefined) return null;
+  const gates = last["gates"];
+  if (!Array.isArray(gates)) return null;
+  return rewindPhaseFor(gates as { name: string; passed?: boolean }[]);
+}
+
+/**
+ * Whether the run has already been sent back for this exact refusal.
+ *
+ * The bound on the rewind, and it is the classifier's bound rather than a
+ * new one: the same refusal met twice is a loop going nowhere. It has to be
+ * asked separately because a rewind throws nothing -- no `Stop` is
+ * constructed, so `stop_history` gains no row and `judgeStopClass` never
+ * sees it. Compared against the UNDECORATED refusal, for the reason the
+ * stop history keeps one.
+ */
+export function alreadyRewoundFor(
+  rewinds: readonly { readonly reason: string }[] | null | undefined,
+  refusal: string,
+): boolean {
+  if (!rewinds) return false;
+  return rewinds.some((row) => row.reason === refusal);
 }
 
 /** What a `deadlock` adds to the stop's reason, for a reader who knows no field names. */
@@ -1285,8 +1396,8 @@ ${this.stopArtifacts()}`,
    */
   private async climbLadder(entry: StopEntry): Promise<Ladder | null> {
     const already = this.run.triage ?? null;
-    if (already && already.for_reason === entry.reason && (already.for_step ?? null) === entry.step_id) {
-      this.log("triage-skipped", { why: "this impasse has already been triaged", rungs: already.rungs });
+    if (alreadyTriaged(already, entry)) {
+      this.log("triage-skipped", { why: "this impasse has already been triaged", rungs: already?.rungs });
       return null;
     }
     const excluded: string[] = [];
@@ -3052,15 +3163,75 @@ ${this.stopArtifacts()}`,
       stopKind: "publish",
     });
     if (code !== EXIT_OK) {
-      // Every refusal packaging can raise is already written to its own log
-      // and to the packaging record, in its own words -- a gate that did not
-      // pass, a credential that is not set, a feed that would not take the
-      // artifact. Restating it here would be a second, worse copy.
+      // A stop, and it says WHICH refusal -- read from the publish job's own
+      // log, the way `phaseVerify` reads verification's.
+      //
+      // What stood here was a string literal, on the reasoning that
+      // packaging had already written its refusal to its own log and its own
+      // record, so restating it would be a second copy that drifts. The
+      // reasoning is sound about AUTHORING a second sentence and wrong about
+      // this: quoting the one source at throw time is not a copy of it.
+      //
+      // The cost of the literal was not the wording. `judgeStopClass`
+      // compares kind, step and reason, so a constant reason made every
+      // publish refusal after the first identical to the one before it --
+      // and `climbLadder` is keyed on that same reason, so the first
+      // refusal consumed the session's one triage and every later,
+      // genuinely different one was logged `triage-skipped` and reached no
+      // adviser at all. Both follow from the reason being real; neither
+      // needed its own fix. Session 137 met six distinct refusals here and
+      // was told seven times that running it again would change nothing,
+      // while running it again was what moved it every time.
+      const refused = jobLogTail(this.repoRoot, this.sessionNumber, "publish");
+
+      // Refused on an earlier phase's evidence: go back and make it, rather
+      // than stopping and handing the operator the five verbs the managed
+      // body says are not theirs to run. `gates.ts` states which phase makes
+      // which gate's evidence; this reads that, and states it nowhere.
+      //
+      // **A rewind is not a stop, and that is what has to be bounded here.**
+      // It throws nothing, so `stop_history` never sees it and
+      // `judgeStopClass` cannot classify it: a rewind that fixes nothing
+      // would come back to this line unchanged, rewind again, and go round
+      // for as long as anyone kept calling `next` -- paying for a
+      // verification round or a whole suite each time. The deadlock
+      // classifier is no defence against it, because it never gets a row.
+      //
+      // So the run remembers what it has already gone back for, and the
+      // bound is the same one the classifier uses: one rewind per distinct
+      // refusal. A refusal already in `rewinds` means going back did not fix
+      // it, and going back again would not either -- so the loop stops, with
+      // that refusal in the stop, where a person and the triage ladder can
+      // see it. A refusal not in the list is a different problem, and going
+      // back for it is progress by the same definition the classifier reads.
+      const rewind = rewindFromPackaging(readPackaging(this.repoRoot, this.sessionNumber));
+      const rewound = this.run.rewinds ?? [];
+      if (rewind !== null && !alreadyRewoundFor(rewound, refused)) {
+        this.log("publish-rewound", { to: rewind, why: refused.slice(0, 300) });
+        this.run = {
+          ...this.run,
+          rewinds: [...rewound, { to: rewind, reason: refused, at: nowIso() }].slice(
+            -REWIND_HISTORY_CAP,
+          ),
+        };
+        this.setPhase(rewind);
+        return;
+      }
+      if (rewind !== null) {
+        throw new Stop(
+          "publish",
+          `the packaging run did not publish, and the run has already been sent back to ` +
+            `'${rewind}' once for this refusal without clearing it: ${refused}`,
+        );
+      }
+
       throw new Stop(
         "publish",
-        "the packaging run did not publish; its reasons are in the publish " +
-          "job's own log and in the session's packaging record, and nothing " +
-          "here can answer them",
+        `the packaging run did not publish: ${
+          refused ||
+          "it wrote no reason; its log is under the run's jobs directory and " +
+            "the attempt is in the session's packaging record"
+        }`,
       );
     }
     this.log("published", { session: sessionDisplayNumber(this.sessionNumber) });
@@ -3075,10 +3246,17 @@ ${this.stopArtifacts()}`,
       stopKind: "close",
     });
     if (code !== EXIT_OK) {
+      // The same literal, in the same place, for the same reason as publish's
+      // -- and the same fix. The close prints its gate rows and their
+      // remediations before it refuses, so its log tail is the list of what
+      // failed; carrying it makes two unlike close refusals two stops rather
+      // than one impasse, and gives each its own triage.
+      const refused = jobLogTail(this.repoRoot, this.sessionNumber, "close");
       throw new Stop(
         "close",
-        "the close refused; its gate rows are in the close's own log, and nothing " +
-          "here can answer them",
+        `the close refused: ${
+          refused || "it wrote no reason; its log is under the run's jobs directory"
+        }`,
       );
     }
     this.issue({ kind: "done" });
@@ -3186,17 +3364,7 @@ ${this.stopArtifacts()}`,
       };
       const history = this.run.stop_history ?? [];
       const previous = history.length > 0 ? history[history.length - 1] : null;
-      // The same bound, on the same step, for the same reason as last time:
-      // the loop is not making progress, and the next re-run reaches here
-      // again. The comparison is against the UNDECORATED reason the history
-      // keeps, so a third identical stop is recognised as readily as this
-      // one -- a reason that carried its own note would never match again.
-      const deadlock =
-        previous !== undefined &&
-        previous !== null &&
-        previous.kind === entry.kind &&
-        (previous.step_id ?? null) === entry.step_id &&
-        previous.reason === entry.reason;
+      const deadlock = judgeStopClass(previous, entry) === "deadlock";
       const reason = deadlock ? `${error.message}${DEADLOCK_NOTE}` : error.message;
       this.run = {
         ...this.run,

@@ -26,9 +26,9 @@
 import { repoRootFor, resolveSessionsDir, SessionsRootNotFoundError } from "../evidence.ts";
 import { runGit } from "../journal.ts";
 import {
-  ID_PUBLICATION,
   OwedDecisionError,
   currentDecisions,
+  publicationDecisionId,
   raisePublicationDecision,
 } from "../owedDecisions.ts";
 import { releaseVersion, tagsFor } from "../packaging.ts";
@@ -121,7 +121,10 @@ async function run(argv: string[]): Promise<number> {
     if (!(error instanceof OwedDecisionError)) throw error;
   }
 
-  const answer = answerTo(root, ID_PUBLICATION);
+  // The id names the version, so what is read here is the answer given for
+  // THIS release and never one carried over from an earlier one.
+  const decisionId = publicationDecisionId(version);
+  const answer = answerTo(root, decisionId);
   if (answer === null) {
     writeOut(
       `release: dabbler-ai-orchestration ${version} is built and unpublished.\n` +
@@ -129,8 +132,9 @@ async function run(argv: string[]): Promise<number> {
         "taken back, so it waits for an answer rather than a default. " +
         "`dabbler owed list` has the brief -- what ships, where, and what a " +
         "wrong answer costs -- and `dabbler owed answer --id " +
-        `${ID_PUBLICATION} --choice <...>` +
-        "` settles it. The framework does the tagging from there.\n",
+        `${decisionId} --choice <...>` +
+        "` settles it, for this version and no other. The framework does the " +
+        "tagging from there.\n",
     );
     return EXIT_OK;
   }

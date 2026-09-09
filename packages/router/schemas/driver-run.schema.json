@@ -112,6 +112,21 @@
       },
       "description": "The stops this run has already met, oldest first and capped -- the oldest is dropped rather than the newest, because what a deadlock is read from is the recent end. It is here, and short, because `run.json` is state: the history of a run is its transcripts, and this is only enough of it to see the loop going nowhere."
     },
+    "rewinds": {
+      "type": "array",
+      "maxItems": 8,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["to", "reason", "at"],
+        "properties": {
+          "to": { "type": "string", "minLength": 1, "description": "The phase the run was sent back to." },
+          "reason": { "type": "string", "minLength": 1, "description": "The refusal that sent it there, undecorated, as the next rewind is compared against." },
+          "at": { "type": "string", "minLength": 1 }
+        }
+      },
+      "description": "The rewinds this run has already made: a later phase refused on an earlier phase's evidence, and the loop went back and remade it. Here for the same reason `stop_history` is, and it is NOT the same list -- a rewind is not a stop, throws nothing, and is therefore invisible to the deadlock classifier. One rewind per distinct refusal is the bound: a refusal already in this list means going back did not fix it, and the loop stops instead of remaking the same evidence forever."
+    },
     "resumed_from": {
       "type": ["object", "null"],
       "additionalProperties": false,

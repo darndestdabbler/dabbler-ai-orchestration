@@ -32,6 +32,7 @@ import {
   decision,
   interrupt,
   rebaseline,
+  withdrawRelease,
   migrate,
   plan,
   planAmend,
@@ -54,6 +55,7 @@ const SUMMARY: Record<string, string> = {
   drive: "run the next session end to end: the framework drives, the engine answers",
   interrupt: "end the engine's running invocation under a driven session, with a reason",
   rebaseline: "record a repair made while the run was stopped, and move the baseline",
+  "withdraw-release": "withdraw a releasable session's releasability, with a reason and an approver",
   report: "answer the driver's outstanding instruction",
   plan: "record the plan prose in project-work-plan.md; `plan amend` changes a driven step",
   close: "run gates and close the session",
@@ -172,6 +174,18 @@ const OPTIONS: Record<string, readonly string[]> = {
   rebaseline: [
     "  --reason TEXT            required: what was repaired while the loop was halted",
     "  --by WHO                 who made it; defaults to the operator",
+  ],
+  "withdraw-release": [
+    "  --reason TEXT            required: why the artifact this session was declared to",
+    "                           ship must not ship",
+    "  --approver WHO           required: who decided it",
+    "",
+    "  Releasability is declared at step (a) and `published_when_releasable` is an",
+    "  evidence gate, so `close --force` cannot answer it and a releasable session that",
+    "  must not ship had no exit but `cancel`. This is that exit. The declaration is not",
+    "  rewritten: it stands on the record and the withdrawal stands beside it, so the",
+    "  close reports a session that was supposed to ship and did not, and on whose word.",
+    "  One per session, ever, and nothing else about the session's judgement moves.",
   ],
   report: [
     "  --seq N                  required: the seq of the instruction being answered",
@@ -639,6 +653,22 @@ export async function sessionVerb(argv: string[]): Promise<number> {
       return EXIT_USAGE;
     }
     return rebaseline(sessionsDir, { reason, by: values.get("--by") ?? null, sessionNumber });
+  }
+
+  if (subcommand === "withdraw-release") {
+    const missing = ["--reason", "--approver"].filter((flag) => !values.has(flag));
+    if (missing.length > 0) {
+      writeErr(
+        "dabbler session withdraw-release: the following arguments are required: " +
+          `${missing.join(", ")}\n`,
+      );
+      return EXIT_USAGE;
+    }
+    return withdrawRelease(sessionsDir, {
+      reason: values.get("--reason") ?? "",
+      approver: values.get("--approver") ?? "",
+      sessionNumber,
+    });
   }
 
   if (subcommand === "report") {

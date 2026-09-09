@@ -17,9 +17,13 @@ import {
   REGISTER_IDLE,
   REGISTER_REFUSE_START,
   REGISTER_START,
+  alreadyRewoundFor,
+  alreadyTriaged,
   idleInstruction,
   judgeRegistration,
+  judgeStopClass,
   planModulesMember,
+  rewindFromPackaging,
   judgeReportFiles,
   judgeReportShape,
   candidateTrunk,
@@ -31,8 +35,9 @@ import {
   unchangedStepFiles,
   type RegistrationFacts,
   type StepSpec,
+  type StopKey,
 } from "../src/drive.ts";
-import { judgeFreshness } from "../src/gates.ts";
+import { judgeFreshness, rewindPhaseFor } from "../src/gates.ts";
 import type { DriverInstruction, DriverReport } from "../src/generated/index.ts";
 import { type ImpactPlan, demandedByPlan } from "../src/impact.ts";
 import { dependencyOrder, impliedDeployables, parseEntries } from "../src/modules.ts";
@@ -497,6 +502,174 @@ describe("what the plan instruction asks for", () => {
     assert.equal(
       planModulesMember({ multi: false, implicit: false, modules: one, deployables: impliedDeployables(one) }),
       "",
+    );
+  });
+});
+
+describe("what makes two stops one impasse", () => {
+  it("holds unlike publish refusals apart, and takes each of them to triage", () => {
+    // Session 137, from its own record. Its `stop_history` is eight rows
+    // whose reasons are byte-identical, because `phasePublish` threw a
+    // string literal; its packaging record, over the same eight attempts,
+    // carries seven refusals with six distinct causes. The classifier was
+    // reading the first list while the second was what actually happened.
+    const stop = (reason: string): StopKey => ({ kind: "publish", reason, step_id: null });
+    // The literal, as it stood: two attempts about entirely different
+    // things arrive here as the same stop.
+    const literal = stop(
+      "the packaging run did not publish; its reasons are in the publish job's own log " +
+        "and in the session's packaging record, and nothing here can answer them",
+    );
+    assert.equal(judgeStopClass(literal, literal), "deadlock");
+
+    // The refusals the record actually holds, in the order 137 met them.
+    const noBlock = stop(
+      "the packaging run did not publish: this repository declares no packaging block, " +
+        "so it publishes nothing.",
+    );
+    const staleEvidence = stop(
+      "the packaging run did not publish: step (f) runs after (e), and the evidence for " +
+        "the earlier steps is not there: verification_clean: the working tree changed " +
+        "after verification round 2",
+    );
+    const tagAbsent = stop(
+      "the packaging run did not publish: this repository releases by tag, and " +
+        "vsix-v2.0.15 is not on origin, so nothing has been published.",
+    );
+    for (const [previous, next] of [
+      [noBlock, staleEvidence],
+      [staleEvidence, tagAbsent],
+    ] as const) {
+      assert.equal(judgeStopClass(previous, next), "first");
+    }
+    // And the classifier has not simply stopped saying deadlock: the same
+    // refusal twice in a row still is one, which is the case the label is for.
+    assert.equal(judgeStopClass(tagAbsent, tagAbsent), "deadlock");
+    // A first stop has nothing to be identical to.
+    assert.equal(judgeStopClass(null, noBlock), "first");
+    // Same reason, different step: two steps failing the same way are two
+    // problems, and the step is part of the key.
+    assert.equal(
+      judgeStopClass({ ...staleEvidence, step_id: "widget" }, { ...staleEvidence, step_id: "gadget" }),
+      "first",
+    );
+
+    // The second-order cost, and the reason this is one fix rather than two:
+    // `climbLadder` is keyed on the same reason. Under the literal the first
+    // refusal consumed the session's only triage and every later one was
+    // skipped; under the real refusals each impasse is its own.
+    const triagedFor = (entry: StopKey) => ({ for_reason: entry.reason, for_step: entry.step_id ?? null });
+    assert.equal(alreadyTriaged(triagedFor(literal), literal), true);
+    assert.equal(alreadyTriaged(triagedFor(noBlock), staleEvidence), false);
+    assert.equal(alreadyTriaged(triagedFor(staleEvidence), tagAbsent), false);
+    // A re-run reaching the impasse it was already triaged for still pays nothing.
+    assert.equal(alreadyTriaged(triagedFor(tagAbsent), tagAbsent), true);
+    assert.equal(alreadyTriaged(null, tagAbsent), false);
+  });
+});
+
+describe("a publish refused on an earlier phase's evidence", () => {
+  it("goes back to the phase that makes it, and stops when no phase can", () => {
+    // Session 137's own packaging record, both shapes it holds. The second
+    // attempt was refused with verification_clean, working_tree_clean and
+    // test_run_fresh all false; the third with every gate green and the tag
+    // simply not on origin. The driver stayed at `publish` for both, and the
+    // recovery from the first was done by hand -- verify, both suites,
+    // test-evidence record twice, commit, push -- which is exactly the set
+    // the managed body tells an engine are not its to run.
+    const staleEvidence = [
+      {
+        outcome: "refused",
+        gates: [
+          { name: "verification_clean", passed: false },
+          { name: "working_tree_clean", passed: false },
+          { name: "pushed_to_remote", passed: true },
+          { name: "test_run_fresh", passed: false },
+          { name: "owed_decisions", passed: true },
+          { name: "verdict_vocabulary", passed: true },
+        ],
+      },
+    ];
+    // The EARLIEST of the three, not the last one read: a tree that moved
+    // after verification invalidates the suite and the push as well, and
+    // rewinding only to the land would carry the stale round into the close.
+    assert.equal(rewindFromPackaging(staleEvidence), "verify");
+    assert.equal(rewindPhaseFor(staleEvidence[0]?.gates ?? []), "verify");
+
+    // Every gate green and the refusal about the tag: no phase remakes that,
+    // so there is nothing to rewind to and the run stops.
+    const tagAbsent = [
+      {
+        outcome: "refused",
+        gates: [
+          { name: "verification_clean", passed: true },
+          { name: "working_tree_clean", passed: true },
+          { name: "pushed_to_remote", passed: true },
+          { name: "test_run_fresh", passed: true },
+        ],
+      },
+    ];
+    assert.equal(rewindFromPackaging(tagAbsent), null);
+
+    // Nor do the gates no phase owns: an owed decision is a person's to
+    // answer and a verdict's vocabulary is the verifier's, so a publish
+    // refused on either stops rather than looping through a phase that
+    // cannot change them.
+    assert.equal(
+      rewindFromPackaging([
+        { outcome: "refused", gates: [{ name: "owed_decisions", passed: false }] },
+      ]),
+      null,
+    );
+
+    // The LAST row, because a session may be refused, fixed and refused
+    // again, and what is to be remade is what failed this time.
+    assert.equal(rewindFromPackaging([...staleEvidence, ...tagAbsent]), null);
+    assert.equal(rewindFromPackaging([...tagAbsent, ...staleEvidence]), "verify");
+
+    // A record with nothing in it, and a row from before gates were written
+    // into it, are both "nothing to rewind to" rather than a crash.
+    assert.equal(rewindFromPackaging([]), null);
+    assert.equal(rewindFromPackaging([{ outcome: "refused" }]), null);
+
+    // The suite alone sends it to the run of record, and the tree or the
+    // push alone to the land.
+    assert.equal(rewindPhaseFor([{ name: "test_run_fresh", passed: false }]), "run-of-record");
+    assert.equal(rewindPhaseFor([{ name: "pushed_to_remote", passed: false }]), "land");
+    assert.equal(rewindPhaseFor([{ name: "working_tree_clean", passed: false }]), "land");
+    // And a gate that passed is not a reason to go anywhere.
+    assert.equal(rewindPhaseFor([{ name: "verification_clean", passed: true }]), null);
+  });
+
+  it("goes back once per refusal, and stops rather than remaking the same evidence forever", () => {
+    // A rewind throws no Stop, so `stop_history` gains no row and
+    // `judgeStopClass` never sees it: the deadlock classifier is no defence
+    // against a rewind that fixes nothing. Without this bound the loop
+    // would return to the publish phase unchanged and go round for as long
+    // as anyone kept calling `next`, paying for a verification round or a
+    // whole suite each time.
+    const stale =
+      "the packaging run did not publish: step (f) runs after (e), and the evidence " +
+      "for the earlier steps is not there: verification_clean: the working tree changed";
+    const tag =
+      "the packaging run did not publish: vsix-v2.0.15 is on origin but names an " +
+      "earlier commit";
+
+    // Nothing gone back for yet.
+    assert.equal(alreadyRewoundFor([], stale), false);
+    assert.equal(alreadyRewoundFor(null, stale), false);
+    assert.equal(alreadyRewoundFor(undefined, stale), false);
+
+    // Once the run has been sent back for it, going back again would not
+    // fix what going back did not fix.
+    const rewinds = [{ to: "verify", reason: stale, at: "2026-09-09T11:00:00-04:00" }];
+    assert.equal(alreadyRewoundFor(rewinds, stale), true);
+    // A different refusal is a different problem, and going back for it is
+    // progress by the same definition the classifier reads.
+    assert.equal(alreadyRewoundFor(rewinds, tag), false);
+    assert.equal(
+      alreadyRewoundFor([...rewinds, { to: "land", reason: tag, at: "later" }], tag),
+      true,
     );
   });
 });

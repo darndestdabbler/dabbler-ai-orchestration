@@ -7,6 +7,7 @@ import { describe, it } from "node:test";
 import {
   EVIDENCE_GATES,
   GATE_CHECKS,
+  GATE_EVIDENCE_PHASE,
   classifyPushFailure,
   judgeFreshness,
   judgeLatestRound,
@@ -328,6 +329,33 @@ describe("the driver", () => {
       "pins_current",
       "exposure_within_ceiling",
       "owed_decisions",
+      "published_when_releasable",
+      "verdict_vocabulary",
+    ]);
+  });
+});
+
+describe("which phase makes a gate's evidence", () => {
+  it("names only gates that exist, and leaves the ones no phase can remake unmapped", () => {
+    // The map is what lets a refused publish send the run back to the phase
+    // that makes the evidence it was refused on, instead of handing the
+    // operator verify, both suites, test-evidence record, the commit and the
+    // push -- which is what session 137's recovery actually cost. A rule
+    // keyed to a gate name drifts the moment a gate is renamed, exactly as
+    // the selection map did, so it is held to the registry.
+    const registered = new Set(GATE_CHECKS.map(([name]) => name));
+    for (const name of GATE_EVIDENCE_PHASE.keys()) {
+      assert.ok(registered.has(name), `${name} is mapped to a phase and is not a gate`);
+    }
+    // The unmapped ones are unmapped deliberately: an owed decision is a
+    // person's to answer, a verdict's vocabulary is the verifier's, and the
+    // remaining three are about what landed rather than about evidence a
+    // phase remakes. A publish refused on any of them stops.
+    const unmapped = [...registered].filter((name) => !GATE_EVIDENCE_PHASE.has(name));
+    assert.deepEqual(unmapped.sort(), [
+      "exposure_within_ceiling",
+      "owed_decisions",
+      "pins_current",
       "published_when_releasable",
       "verdict_vocabulary",
     ]);

@@ -144,6 +144,14 @@ export function validateReopen(record: Row): Row {
   return validateAgainst(record, "verification-reopen.schema.json", "verification reopen");
 }
 
+export function validateWithdrawal(record: Row): Row {
+  return validateAgainst(
+    record,
+    "releasability-withdrawal.schema.json",
+    "releasability withdrawal",
+  );
+}
+
 export function validateStepEvent(record: Row): Row {
   return validateAgainst(record, "step-execution.schema.json", "step execution");
 }
@@ -589,6 +597,72 @@ export function standingReopen(repoRoot: string, sessionNumber: number): ReopenG
     terminal: String(newest["terminal"]),
     reason: String(newest["reason"]),
     approver: String(newest["approver"]),
+  };
+}
+
+// --- releasability-withdrawals.jsonl -----------------------------------------
+
+export function withdrawalsPath(repoRoot: string, sessionNumber: number): string {
+  return join(sessionRunDir(repoRoot, sessionNumber), "releasability-withdrawals.jsonl");
+}
+
+export function readWithdrawals(repoRoot: string, sessionNumber: number): Row[] {
+  return readJsonl(withdrawalsPath(repoRoot, sessionNumber), validateWithdrawal);
+}
+
+/**
+ * Append one validated withdrawal of a session's declared releasability.
+ * One per session, ever.
+ *
+ * Immutable for the reason the reopen grant is: the record has to say who
+ * decided that the artifact would not ship and why, and a row that can be
+ * rewritten says neither. A second withdrawal is an operator arguing with
+ * their own last answer; there is nothing further to withdraw, and the
+ * honest form of a changed mind is that the session ships after all, which
+ * this row does not stand in the way of -- it is read by the close, and the
+ * publish phase runs before it.
+ */
+export function appendWithdrawal(
+  repoRoot: string,
+  sessionNumber: number,
+  record: Row,
+): Row {
+  validateWithdrawal(record);
+  if (readWithdrawals(repoRoot, sessionNumber).length > 0) {
+    throw new LedgerError(
+      `session ${sessionNumber}'s releasability has already been withdrawn; a ` +
+        "withdrawal is immutable, and the record says who withdrew it and why",
+    );
+  }
+  appendJsonl(withdrawalsPath(repoRoot, sessionNumber), record);
+  return record;
+}
+
+/** One operator withdrawal, as the gate and the publish phase read it. */
+export interface ReleasabilityWithdrawn {
+  readonly reason: string;
+  readonly approver: string;
+  readonly recordedAt: string;
+}
+
+/**
+ * The withdrawal in force, or null.
+ *
+ * Read rather than folded, because there is at most one: `appendWithdrawal`
+ * refuses a second, so the first row is the answer and a file holding more
+ * than one has been hand-edited, which is not this reader's to repair.
+ */
+export function standingWithdrawal(
+  repoRoot: string,
+  sessionNumber: number,
+): ReleasabilityWithdrawn | null {
+  const rows = readWithdrawals(repoRoot, sessionNumber);
+  const row = rows.length > 0 ? rows[0] : null;
+  if (row === null || row === undefined) return null;
+  return {
+    reason: String(row["reason"]),
+    approver: String(row["approver"]),
+    recordedAt: String(row["recorded_at"]),
   };
 }
 

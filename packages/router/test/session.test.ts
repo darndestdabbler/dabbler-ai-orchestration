@@ -30,6 +30,8 @@ import { capture } from "../src/output.ts";
 import { readExposure } from "../src/exposure.ts";
 import { platformNewlines } from "../src/journal.ts";
 import { readOwed } from "../src/owedDecisions.ts";
+import { checkPublishedWhenReleasable, runGates } from "../src/gates.ts";
+import { appendPackaging, appendWithdrawal, standingWithdrawal } from "../src/ledger.ts";
 import { readPolicy } from "../src/policy.ts";
 import { readRawSessionState } from "../src/progress.ts";
 import {
@@ -51,9 +53,10 @@ import {
   repairedPaths,
   restore,
   start,
+  withdrawRelease,
   type SequenceFacts,
 } from "../src/session.ts";
-import { readTaskDeclaration, registerSessionStart } from "../src/writers.ts";
+import { readTaskDeclaration, registerSessionStart, sessionIsReleasable } from "../src/writers.ts";
 import { cleanRepoAnswers, seed, tempDir } from "./support/answers.ts";
 
 /** One verb's exit code and everything it wrote, so a refusal can be read. */
@@ -921,5 +924,152 @@ describe("the module manifest", () => {
     const many = solutionShape(two);
     assert.equal(many.multi, true);
     assert.deepEqual(many.modules.map((m) => m.slug), ["lib", "app"]);
+  });
+});
+
+// --- Withdrawing a declared releasability ---------------------------------------
+
+describe("the exit a releasable session had none of", () => {
+  it("records the withdrawal, and the close reports it instead of absorbing it", async () => {
+    // `published_when_releasable` is an evidence gate, so `close --force`
+    // cannot answer it, and releasability is declared at step (a) and never
+    // re-decided. A releasable session that must not ship was closable only
+    // by `cancel`, which throws away work that verified and landed; session
+    // 137 would have had nowhere to go if the Marketplace had refused it.
+    const state = stateDir();
+    try {
+      registerSessionStart(state.sessionsDir, 1, { engine: "claude-code" });
+      const declared = await run(() =>
+        declare(state.sessionsDir, { task: "Ship the extension.", releasable: true }),
+      );
+      assert.equal(declared.code, EXIT_OK);
+      // Declared and not withdrawn: the publish phase runs and the gate
+      // demands a packaging run.
+      assert.equal(sessionIsReleasable(state.sessionsDir, 1), true);
+      assert.equal(checkPublishedWhenReleasable(state.sessionsDir)[0], false);
+
+      // A withdrawal by nobody, for no reason, is the silent skip this row
+      // replaces, so it is refused before anything is written.
+      const bare = await run(() =>
+        withdrawRelease(state.sessionsDir, { reason: "  ", approver: "operator" }),
+      );
+      assert.equal(bare.code, EXIT_USAGE);
+      assert.equal(standingWithdrawal(state.repo, 1), null);
+
+      const withdrawn = await run(() =>
+        withdrawRelease(state.sessionsDir, {
+          reason: "the Marketplace refused the artifact and the fix is a session away",
+          approver: "operator",
+        }),
+      );
+      assert.equal(withdrawn.code, EXIT_OK);
+
+      // Read back off the record, not off the return value: `packageSession`
+      // answered `published` while the append refused the row, and two
+      // versions shipped unrecorded because a test stopped at the answer.
+      const row = standingWithdrawal(state.repo, 1);
+      assert.equal(row?.approver, "operator");
+      assert.match(String(row?.reason), /Marketplace refused/);
+
+      // The publish phase now passes straight through...
+      assert.equal(sessionIsReleasable(state.sessionsDir, 1), false);
+      // ...and the gate PASSES while saying what happened. Absorbing it --
+      // passing the way a not-releasable session passes, with nothing to
+      // say -- would make the close's account of a session that was supposed
+      // to ship and did not identical to one that never was.
+      const gate = checkPublishedWhenReleasable(state.sessionsDir);
+      assert.equal(gate[0], true);
+      assert.match(gate[1], /WITHDRAWN by operator/);
+      assert.match(gate[1], /Marketplace refused/);
+
+      // Through the close's own gate runner, not only the predicate: what
+      // the close prints and records is a row out of `runGates`, and this
+      // is the row. It passes, and it carries the approver and the reason,
+      // so a reader of the close sees a session that was declared
+      // releasable, did not ship, and on whose word.
+      const gateRow = runGates(state.sessionsDir).find(
+        (entry) => entry.name === "published_when_releasable",
+      );
+      assert.equal(gateRow?.passed, true);
+      assert.equal(gateRow?.inapplicable, false);
+      assert.match(String(gateRow?.remediation), /WITHDRAWN by operator/);
+      assert.match(String(gateRow?.remediation), /Marketplace refused/);
+      // And the declaration is not rewritten by any of it.
+      assert.equal(readTaskDeclaration(state.sessionsDir, 1)?.["releasable"], true);
+
+      // One per session, ever.
+      const again = await run(() =>
+        withdrawRelease(state.sessionsDir, { reason: "again", approver: "operator" }),
+      );
+      assert.equal(again.code, EXIT_BOUNDARY);
+      assert.match(again.err, /already been withdrawn/);
+    } finally {
+      state.restore();
+    }
+  });
+
+  it("refuses a withdrawal after the session has already published, and never reports both", async () => {
+    // A Marketplace version slot is never reusable, so a row saying the
+    // artifact will not ship, filed after it shipped, is a record that
+    // contradicts itself -- and the close would then report "nothing was
+    // published" over a packaging record that says a version reached the
+    // feed. What follows a release that should not have gone out is another
+    // release, not a withdrawal.
+    const state = stateDir();
+    try {
+      registerSessionStart(state.sessionsDir, 1, { engine: "claude-code" });
+      await run(() => declare(state.sessionsDir, { task: "Ship it.", releasable: true }));
+      appendPackaging(state.repo, 1, {
+        outcome: "published",
+        session_number: 1,
+        releasable: true,
+        recorded_at: "2026-01-01T00:00:00+00:00",
+        tree_mutated: false,
+        feed: "marketplace",
+        secret_name: "VSCE_PAT",
+        steps: [],
+        artifacts: ["dabbler-2.0.19.vsix"],
+      });
+
+      const refused = await run(() =>
+        withdrawRelease(state.sessionsDir, { reason: "too late", approver: "operator" }),
+      );
+      assert.equal(refused.code, EXIT_BOUNDARY);
+      assert.match(refused.err, /has already published/);
+      assert.equal(standingWithdrawal(state.repo, 1), null);
+
+      // And the gate reads the record before it reports a withdrawal, so
+      // even a row written past this verb cannot make the close claim the
+      // opposite of what shipped.
+      appendWithdrawal(state.repo, 1, {
+        schema_version: 1,
+        session_number: 1,
+        reason: "written past the verb",
+        approver: "somebody",
+        recorded_at: "2026-01-02T00:00:00+00:00",
+      });
+      const gate = checkPublishedWhenReleasable(state.sessionsDir);
+      assert.equal(gate[0], true);
+      assert.doesNotMatch(gate[1], /WITHDRAWN/);
+      assert.doesNotMatch(gate[1], /Nothing was published/);
+    } finally {
+      state.restore();
+    }
+  });
+
+  it("refuses a session that declared itself not-releasable, which has nothing to withdraw", async () => {
+    const state = stateDir();
+    try {
+      registerSessionStart(state.sessionsDir, 1, { engine: "claude-code" });
+      await run(() => declare(state.sessionsDir, { task: "Do it.", releasable: false }));
+      const refused = await run(() =>
+        withdrawRelease(state.sessionsDir, { reason: "no", approver: "operator" }),
+      );
+      assert.equal(refused.code, EXIT_BOUNDARY);
+      assert.match(refused.err, /did not declare itself releasable/);
+      assert.equal(standingWithdrawal(state.repo, 1), null);
+    } finally {
+      state.restore();
+    }
   });
 });

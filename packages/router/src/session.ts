@@ -95,8 +95,17 @@ import {
   refreshOwedDecisions,
 } from "./owedDecisions.ts";
 import { isSessionBookkeeping, loadSuitesChecked } from "./testEvidence.ts";
+import { VERSION } from "./version.ts";
 import { nowIso, platformNewlines, repoRootFor, runGit } from "./journal.ts";
-import { LedgerError, RUNS_DIRNAME, type Row, latestRound } from "./ledger.ts";
+import {
+  LedgerError,
+  OUTCOME_PUBLISHED,
+  RUNS_DIRNAME,
+  type Row,
+  appendWithdrawal,
+  latestRound,
+  readPackaging,
+} from "./ledger.ts";
 import {
   SCHEMA_VERSION,
   STATUS_CANCELLED,
@@ -133,6 +142,7 @@ import {
   recordHookRemoved,
   recordSessionCheckout,
   registerSessionStart,
+  releasabilityOf,
   validateAndWriteState,
 } from "./writers.ts";
 import { writeErr, writeOut } from "./output.ts";
@@ -1909,6 +1919,139 @@ export function rebaseline(sessionsDir: string, options: RebaselineCliOptions): 
       "accountability-signoff decision raised. The stop is untouched -- re-run to " +
       "carry on from it.\n" +
       `${dumps({ paths: row["paths"], reason })}\n`,
+  );
+  return EXIT_OK;
+}
+
+// --- withdraw-release ---------------------------------------------------------
+
+export interface WithdrawReleaseCliOptions {
+  readonly reason: string;
+  readonly approver: string;
+  readonly sessionNumber?: number | null;
+}
+
+/**
+ * Withdraw a session's declared releasability, on the record.
+ *
+ * **The state this leaves is the one that had no exit.** Releasability is
+ * declared at step (a), before the work; `published_when_releasable` is an
+ * EVIDENCE gate, so `close --force` cannot answer it; and there is no
+ * re-declaration, because a session that could decide afterwards whether it
+ * was supposed to ship could always decide it had not been. A releasable
+ * session that must not ship after all was therefore closable only by
+ * `cancel`, which throws away work that verified and landed. Session 137
+ * would have had nowhere to go if the Marketplace had refused it.
+ *
+ * So it is a row, and every property of the row is about keeping it a
+ * withdrawal rather than a bypass. It carries a reason and an approver
+ * forever. It is immutable and there is one per session. It does not touch
+ * the declaration, which stands beside it -- the close REPORTS both, so the
+ * record of a session that was supposed to ship and did not is different
+ * from the record of one that never was. And it buys nothing else: no gate
+ * but this one reads it, and a withdrawn session is verified or not on
+ * exactly the evidence it would have been.
+ */
+export function withdrawRelease(
+  sessionsDir: string,
+  options: WithdrawReleaseCliOptions,
+): number {
+  if (!isDirectory(sessionsDir)) {
+    writeErr(`withdraw-release: not a directory: ${sessionsDir}\n`);
+    return EXIT_USAGE;
+  }
+  const reason = options.reason.trim();
+  const approver = options.approver.trim();
+  if (reason === "" || approver === "") {
+    writeErr(
+      "withdraw-release: refused -- a withdrawal carries a reason and an approver. " +
+        "An artifact that was declared and then not shipped, by nobody, for no stated " +
+        "reason, is the silent skip this row exists to replace.\n",
+    );
+    return EXIT_USAGE;
+  }
+  const target = resolveTargetSession(sessionsDir, options.sessionNumber ?? null);
+  if (target === null) {
+    writeErr(`withdraw-release: refused -- no session has been started under ${sessionsDir}.\n`);
+    return EXIT_BOUNDARY;
+  }
+  const repoRoot = repoRootFromSessionsDir(sessionsDir);
+  const number = sessionDisplayNumber(target);
+
+  // Not declared releasable is not a state to withdraw from: there would be
+  // nothing on the record for the row to stand beside, and a withdrawal
+  // that could be written against any session would be a note rather than
+  // an act.
+  const releasability = releasabilityOf(sessionsDir, target);
+  if (!releasability.declared) {
+    writeErr(
+      `withdraw-release: refused -- session ${number} did not declare itself releasable, ` +
+        "so it publishes nothing and there is nothing to withdraw. Releasability is " +
+        "declared at step (a), and a session that never declared it is already the " +
+        "session this verb would make it.\n",
+    );
+    return EXIT_BOUNDARY;
+  }
+
+  // Nothing published can be un-published, and a row saying an artifact
+  // will not ship, filed after it shipped, is a record that contradicts
+  // itself: the close would then report "nothing was published" over a
+  // packaging record that says a version reached the feed. A Marketplace
+  // version slot is never reusable, so this is not a state the framework
+  // may describe two ways. The predicate is packaging's own, so what counts
+  // as published is still stated once.
+  let published = false;
+  try {
+    published = readPackaging(repoRoot, target).some(
+      (row) => row["outcome"] === OUTCOME_PUBLISHED,
+    );
+  } catch (error) {
+    if (!(error instanceof LedgerError)) throw error;
+    writeErr(
+      `withdraw-release: refused -- session ${number}'s packaging record could not be ` +
+        `read, so whether it has already shipped cannot be established: ${error.message}\n`,
+    );
+    return EXIT_BOUNDARY;
+  }
+  if (published) {
+    writeErr(
+      `withdraw-release: refused -- session ${number} has already published. A version ` +
+        "that reached the feed is public from that moment and a Marketplace version slot " +
+        "is never reusable, so there is nothing left to withdraw and a row saying " +
+        "otherwise would make the close report the opposite of the packaging record. " +
+        "What follows a release that should not have gone out is another release, not a " +
+        "withdrawal.\n",
+    );
+    return EXIT_BOUNDARY;
+  }
+
+  const record: Row = {
+    schema_version: 1,
+    session_number: target,
+    reason,
+    approver,
+    recorded_at: nowIso(),
+    framework_version: VERSION,
+  };
+  const tree = snapshotWorktreeTree(repoRoot);
+  if (tree !== null) record["tree_at_withdrawal"] = tree;
+
+  try {
+    appendWithdrawal(repoRoot, target, record);
+  } catch (error) {
+    if (!(error instanceof LedgerError)) throw error;
+    writeErr(`withdraw-release: refused -- ${error.message}\n`);
+    return EXIT_BOUNDARY;
+  }
+
+  writeOut(
+    `withdraw-release: session ${number} will publish nothing.\n` +
+      `  Approved by: ${approver}\n` +
+      `  Reason: ${reason}\n` +
+      "\nThe declaration stands on the record and this stands beside it, so the close " +
+      "reports a session that was declared releasable and did not ship, rather than one " +
+      "that never was. Nothing else moves: the verification round, the run of record and " +
+      "every other gate judge this session exactly as they would have.\n",
   );
   return EXIT_OK;
 }

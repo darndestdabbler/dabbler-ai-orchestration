@@ -308,6 +308,27 @@ testing:
       - when: packages/router/src/acp.ts
         select:
           - packages/router/test/acp.test.ts
+      # How the driver starts work that outlasts a tool call: the job, its
+      # log, its status file and the OS priority it hands the runner. Its own
+      # walkthrough spawns the real thing and is the only test that does;
+      # nothing else here mapped to it at all, so a change fell through to
+      # the smoke test. Owed since session 136, which measured the priority
+      # policy this module carries.
+      - when: packages/router/src/jobs.ts
+        select:
+          - packages/router/test/walk-jobs.test.ts
+      # The questions a machine may not answer: how one is raised, when a
+      # brief that changed supersedes an open row, and the one answer that
+      # cannot be taken back. Its own test is the rules; `release` is the
+      # publication decision, which is keyed to the version it authorises;
+      # the close's gate refuses on a blocking one; and the walkthrough sees
+      # the rows land in a real record.
+      - when: packages/router/src/owedDecisions.ts
+        select:
+          - packages/router/test/owedDecisions.test.ts
+          - packages/router/test/release.test.ts
+          - packages/router/test/gates.test.ts
+          - packages/router/test/walk-record.test.ts
       # The package's export surface. No test imports it directly -- it is a
       # re-export file -- so what answers for it is what exercises the two
       # things it hands out: the in-process router, and the contracts.

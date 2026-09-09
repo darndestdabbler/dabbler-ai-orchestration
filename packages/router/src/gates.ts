@@ -73,7 +73,7 @@ import {
   readRounds,
   standingReopen,
 } from "./ledger.ts";
-import { sessionIsReleasable } from "./writers.ts";
+import { releasabilityOf } from "./writers.ts";
 import { readSessionState } from "./progress.ts";
 import { pythonRepr, pythonStr } from "./pythonJson.ts";
 import { blockingDecisions, suitesOwedElsewhere } from "./owedDecisions.ts";
@@ -948,7 +948,14 @@ export function checkPublishedWhenReleasable(sessionsDir: string): Check {
   if (root === null) return [true, ""];
   const current = currentSession(sessionsDir);
   if (typeof current !== "number") return [true, ""];
-  if (!sessionIsReleasable(sessionsDir, current)) return [true, ""];
+  const releasability = releasabilityOf(sessionsDir, current);
+  // A session that declared `not-releasable` passes with nothing to say.
+  if (!releasability.declared) return [true, ""];
+  // A withdrawn one passes and is REPORTED. Absorbing it -- passing the way
+  // a not-releasable session passes -- would make the close's account of a
+  // session that was supposed to ship and did not identical to its account
+  // of one that never was, which is the whole thing this gate exists to
+  // keep apart.
   let rows;
   try {
     rows = readPackaging(root, current);
@@ -960,6 +967,23 @@ export function checkPublishedWhenReleasable(sessionsDir: string): Check {
       `the packaging record could not be read: ${
         error instanceof Error ? error.message : String(error)
       }`,
+    ];
+  }
+  // The record is read BEFORE the withdrawal is reported, so this gate can
+  // never say "nothing was published" over a record that says a version
+  // shipped. `withdraw-release` refuses after a publication for the same
+  // reason, and the two together mean the contradiction has to be
+  // hand-written into the ledger to exist at all -- at which point what the
+  // close reports is the packaging record, which is the one that describes
+  // something that actually left this machine.
+  const withdrawn = releasability.withdrawn;
+  if (withdrawn !== null && !rows.some((row) => row["outcome"] === OUTCOME_PUBLISHED)) {
+    return [
+      true,
+      `declared releasable, and its releasability was WITHDRAWN by ${withdrawn.approver} ` +
+        `on ${withdrawn.recordedAt}: ${withdrawn.reason}. Nothing was published, and the ` +
+        "declaration stands on the record beside the withdrawal rather than being " +
+        "rewritten by it.",
     ];
   }
   return judgePackagingRecord(rows);
@@ -1036,6 +1060,63 @@ export const GATE_CHECKS: readonly (readonly [string, Predicate])[] = [
   [GATE_PUBLISHED_WHEN_RELEASABLE, checkPublishedWhenReleasable],
   ["verdict_vocabulary", checkVerdictVocabulary],
 ];
+
+/**
+ * Which phase of the driven lifecycle MAKES each gate's evidence.
+ *
+ * Stated here, beside the gates, because it is a property of the gate and
+ * not of the loop -- the loop reads it, and a second copy of it there would
+ * be the same one-rule-twice this session exists to close.
+ *
+ * The driver uses it to rewind. `packageSession` runs the close's gates as
+ * its own preconditions, so a publish can be refused for evidence made five
+ * phases earlier; before session 138 the driver stayed at `publish` from
+ * there, `rebaseline` moved the baseline and explicitly not the phase, and
+ * no verb returned a stopped run to verification. Session 137 was recovered
+ * by hand -- `verify`, both suites, `test-evidence record` twice, commit,
+ * push -- which is precisely the set of things the managed body tells an
+ * engine are not its to run. Either the framework owns those phases or the
+ * guidance is wrong about whose they are; this map is the framework owning
+ * them.
+ *
+ * A gate absent from this map is one no phase can remake -- an owed
+ * decision is a person's to answer, a verdict's vocabulary is the
+ * verifier's -- and a publish refused on one of those stops, correctly.
+ */
+export type EvidencePhase = "verify" | "run-of-record" | "land";
+
+/** The phases in the order the loop runs them, which is the rewind's order too. */
+const EVIDENCE_PHASE_ORDER: readonly EvidencePhase[] = ["verify", "run-of-record", "land"];
+
+export const GATE_EVIDENCE_PHASE: ReadonlyMap<string, EvidencePhase> = new Map([
+  ["verification_clean", "verify"],
+  ["test_run_fresh", "run-of-record"],
+  ["working_tree_clean", "land"],
+  ["pushed_to_remote", "land"],
+]);
+
+/**
+ * The earliest phase among the gates that failed, or null when none of them
+ * is a phase's to remake.
+ *
+ * Earliest, because the phases run in order and re-entering the earliest
+ * one runs the others after it: a tree that moved after verification also
+ * invalidates the suite and the push, and rewinding only as far as the land
+ * would carry the stale round forward into the close.
+ */
+export function rewindPhaseFor(
+  gates: readonly { readonly name: string; readonly passed?: boolean }[],
+): EvidencePhase | null {
+  let earliest: number | null = null;
+  for (const gate of gates) {
+    if (gate.passed === true) continue;
+    const phase = GATE_EVIDENCE_PHASE.get(gate.name);
+    if (phase === undefined) continue;
+    const rank = EVIDENCE_PHASE_ORDER.indexOf(phase);
+    if (earliest === null || rank < earliest) earliest = rank;
+  }
+  return earliest === null ? null : (EVIDENCE_PHASE_ORDER[earliest] as EvidencePhase);
+}
 
 export interface RunGatesOptions {
   readonly forced?: boolean;

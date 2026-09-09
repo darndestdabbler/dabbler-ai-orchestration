@@ -14,6 +14,7 @@ import {
   appendPackaging,
   appendReanchor,
   appendRound,
+  appendWithdrawal,
   closedStepIds,
   effectiveBaseline,
   lastClosedTree,
@@ -26,6 +27,7 @@ import {
   readRounds,
   roundToAppend,
   sessionRunDir,
+  standingWithdrawal,
   validateRound,
 } from "../src/ledger.ts";
 import { dumps } from "../src/pythonJson.ts";
@@ -251,5 +253,54 @@ describe("the critique subtree", () => {
       /quarantined at/,
     );
     assert.equal(existsSync(quarantineDir(repo, 1)), true);
+  });
+});
+
+describe("withdrawing a session's releasability", () => {
+  it("writes the row, reads it back, and refuses a second", () => {
+    // Written down and read back, never asserted off the return value.
+    // `packageSession` answered `published` and its test asserted exactly
+    // that, while the append was refusing the row for want of `steps` --
+    // so two versions reached the Marketplace unrecorded and session 137
+    // could not close. A record-writing path is proved by the record.
+    const repo = tempDir();
+    const row = {
+      schema_version: 1,
+      session_number: 4,
+      reason: "the feed will not take this artifact and the fix is a session away",
+      approver: "operator",
+      recorded_at: "2026-01-01T00:00:00+00:00",
+      framework_version: VERSION,
+    };
+    appendWithdrawal(repo, 4, { ...row });
+
+    const onDisk = readJsonl(
+      join(sessionRunDir(repo, 4), "releasability-withdrawals.jsonl"),
+      (r) => r,
+    );
+    assert.equal(onDisk.length, 1);
+    assert.equal(onDisk[0]?.["approver"], "operator");
+    assert.match(String(onDisk[0]?.["reason"]), /will not take this artifact/);
+
+    // And what the gate and the publish phase actually read.
+    const standing = standingWithdrawal(repo, 4);
+    assert.equal(standing?.approver, "operator");
+    assert.equal(standing?.recordedAt, "2026-01-01T00:00:00+00:00");
+
+    // Immutable, for the reason a reopen grant is: a row that can be
+    // rewritten says neither who decided nor why.
+    assert.throws(() => appendWithdrawal(repo, 4, { ...row }), /already been withdrawn/);
+    assert.equal(
+      readJsonl(join(sessionRunDir(repo, 4), "releasability-withdrawals.jsonl"), (r) => r).length,
+      1,
+    );
+
+    // A reason or an approver the schema will not take is refused before
+    // anything is written, so the file a reader finds is never half a row.
+    assert.throws(
+      () => appendWithdrawal(repo, 5, { ...row, session_number: 5, approver: "" }),
+      /releasability withdrawal/,
+    );
+    assert.equal(standingWithdrawal(repo, 5), null);
   });
 });

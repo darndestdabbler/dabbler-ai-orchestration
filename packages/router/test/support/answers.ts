@@ -164,7 +164,15 @@ export function cleanRepoAnswers(repo: string): () => void {
     [["rev-parse", "--show-toplevel"], { stdout: repo.split("\\").join("/") }],
     // The worktree snapshot asks which index entries a sparse cone keeps off
     // disk (skip-worktree); an answered checkout is not sparse and has none.
+    // The rest of the snapshot is answered too -- it reads HEAD into a
+    // throwaway index, stages the disk over it and writes the tree -- so a
+    // verb that records which tree a decision was taken against gets a
+    // digest that moves with the files, the way the sandbox's does.
     [["ls-files", "-v", "-z"], { stdout: "" }],
+    [["read-tree"], { code: 0 }],
+    [["add"], { code: 0 }],
+    [["rm", "--cached"], { code: 0 }],
+    [["write-tree"], () => ({ stdout: diskTree(repo) })],
     [["status", "--porcelain", "-uall"], { stdout: "" }],
     [["status", "--porcelain"], { stdout: "" }],
     // No upstream: a registration pulls first only where there is one.

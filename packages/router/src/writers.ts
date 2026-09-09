@@ -23,8 +23,10 @@ import {
   SESSION_PLAN_FILENAME,
   STATE_FILENAME,
   recordStateWrite,
+  repoRootFor,
 } from "./evidence.ts";
 import { materialWorktreeChanges, previewPaths } from "./gates.ts";
+import { type ReleasabilityWithdrawn, standingWithdrawal } from "./ledger.ts";
 import { nowIso, platformNewlines } from "./journal.ts";
 import {
   KIND_TASK_DECLARATION,
@@ -963,15 +965,53 @@ export function commitBeforeDeclaring(session: number, what: string): string {
 }
 
 /**
+ * What the session was declared to be, and what an operator has since said
+ * about it -- both, because the close reports the second rather than
+ * absorbing it.
+ *
+ * The declaration is made at step (a), before the work, and is never
+ * decided afterwards; that is what makes a releasable session's close
+ * demand a packaging run. A withdrawal does not rewrite it. It stands
+ * beside it, so the record says a session that was supposed to ship did
+ * not, and on whose word -- which is exactly what a session silently
+ * re-declared not-releasable would not say.
+ */
+export function releasabilityOf(
+  sessionsDir: string,
+  sessionNumber: number,
+): { readonly declared: boolean; readonly withdrawn: ReleasabilityWithdrawn | null } {
+  const declaration = readTaskDeclaration(sessionsDir, sessionNumber);
+  const declared = Boolean(declaration && declaration["releasable"] === true);
+  if (!declared) return { declared, withdrawn: null };
+  const root = repoRootFor(sessionsDir);
+  if (root === null) return { declared, withdrawn: null };
+  let withdrawn: ReleasabilityWithdrawn | null = null;
+  try {
+    withdrawn = standingWithdrawal(root, sessionNumber);
+  } catch {
+    // An unreadable withdrawal is not a withdrawal. The gate reads the same
+    // record and refuses on it, which is where an unreadable one is a fault
+    // rather than an absence; here it must not turn into a silent skip of
+    // the publish phase.
+    withdrawn = null;
+  }
+  return { declared, withdrawn };
+}
+
+/**
+ * Whether this session still ships something.
+ *
  * Fails closed. Packaging asks this question, and the absence of a
- * declaration is a refusal, never a default yes.
+ * declaration is a refusal, never a default yes. A withdrawn declaration
+ * answers no as well: the publish phase passes straight through, and the
+ * close says why rather than saying nothing.
  */
 export function sessionIsReleasable(
   sessionsDir: string,
   sessionNumber: number,
 ): boolean {
-  const declaration = readTaskDeclaration(sessionsDir, sessionNumber);
-  return Boolean(declaration && declaration["releasable"] === true);
+  const releasability = releasabilityOf(sessionsDir, sessionNumber);
+  return releasability.declared && releasability.withdrawn === null;
 }
 
 // --- The two rendered files ---------------------------------------------------

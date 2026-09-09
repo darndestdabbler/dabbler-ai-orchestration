@@ -14,10 +14,10 @@ import { describe, it } from "node:test";
 import { servedVersions } from "../src/cli/release.ts";
 import { canonicalVersion, packageVersion, releaseVersion, tagsFor } from "../src/packaging.ts";
 import {
-  ID_PUBLICATION,
   answerOwed,
   blockingDecisions,
   currentDecisions,
+  publicationDecisionId,
   raisePublicationDecision,
 } from "../src/owedDecisions.ts";
 import { makeAnsweredSandbox, tempDir } from "./support/answers.ts";
@@ -211,9 +211,44 @@ describe("the brief the operator answers", () => {
     // model can write is a verdict a model can be wrong about.
     const { repo } = makeAnsweredSandbox();
     raisePublicationDecision(repo, { version: "2.0.0" });
-    answerOwed(repo, ID_PUBLICATION, "not yet");
-    const row = currentDecisions(repo).find((r) => String(r["id"]) === ID_PUBLICATION);
+    answerOwed(repo, publicationDecisionId("2.0.0"), "not yet");
+    const row = currentDecisions(repo).find(
+      (r) => String(r["id"]) === publicationDecisionId("2.0.0"),
+    );
     assert.equal(row?.["answer"], "not yet");
     assert.equal(row?.["answeredBy"], "operator");
+  });
+
+  it("settles the version it names, and leaves the next release to ask again", () => {
+    // The loop, not the single refusal. `raiseDisposition` returns null for
+    // an id whose row is answered -- answered is settled -- so under one id
+    // for every release the first answer settles them all. The answer this
+    // repository holds was given on 2026-09-02 for 2.8.0, to npm and the
+    // Marketplace, and npm was retired that same day; it went on to
+    // authorise vsix-v2.0.15, 2.0.16, 2.0.17 and 2.0.18 with nobody asked.
+    const { repo } = makeAnsweredSandbox();
+    raisePublicationDecision(repo, { version: "2.0.0" });
+    answerOwed(repo, publicationDecisionId("2.0.0"), "publish");
+
+    // Read back off disk, never off a return value: the row is the record.
+    const decided = () =>
+      currentDecisions(repo).filter((r) => String(r["id"]).startsWith("publication:"));
+    const first = decided().find((r) => String(r["id"]) === publicationDecisionId("2.0.0"));
+    assert.equal(first?.["answer"], "publish");
+
+    // The next version is a new question. It is raised rather than folded
+    // away, it is open, and nothing has authorised it.
+    const next = raisePublicationDecision(repo, { version: "2.0.1" });
+    assert.equal(next?.["id"], publicationDecisionId("2.0.1"));
+    const onDisk = decided().find((r) => String(r["id"]) === publicationDecisionId("2.0.1"));
+    assert.equal(onDisk?.["state"], "open");
+    assert.equal(onDisk?.["answer"], undefined);
+    // The brief says which version this answer settles, so the reader is not
+    // relying on the id to know it.
+    assert.match(String(onDisk?.["determined"]), /This answer settles 2\.0\.1 and nothing else/);
+    // And the first version's answer is untouched by any of it.
+    assert.equal(decided().find((r) => String(r["id"]) === publicationDecisionId("2.0.0"))?.["answer"], "publish");
+    // Still asked once per version, however often the verb runs.
+    assert.equal(raisePublicationDecision(repo, { version: "2.0.1" }), null);
   });
 });

@@ -882,7 +882,27 @@ export function raisePackagingDecisions(
   return raised;
 }
 
-export const ID_PUBLICATION = "publication";
+/**
+ * The id a publication decision is keyed under: one per version, because
+ * that is what it consents to.
+ *
+ * It was the bare string `publication`, and `raiseDisposition` returns null
+ * for an id whose current row is answered -- answered is settled, which is
+ * right, and which under one id for every release means the first answer
+ * settles them all. The standing answer on this repository was given on
+ * 2026-09-02, for 2.8.0, to npm and the Marketplace, and npm was retired
+ * the same day; it went on to authorise `vsix-v2.0.15`, `2.0.16`, `2.0.17`
+ * and `2.0.18` without a person being asked about any of them. **A decision
+ * keyed to nothing is consent for everything.**
+ *
+ * Keying it to the version is the whole fix: the id names what was agreed
+ * to, so the next release finds no answer, raises its own brief and waits.
+ * Nothing else about the decision changes -- it is still not blocking, and
+ * still not the working AI's to take.
+ */
+export function publicationDecisionId(version: string): string {
+  return `publication:${version}`;
+}
 
 /**
  * Ask whether to publish, with the whole of what a wrong answer costs.
@@ -906,7 +926,7 @@ export function raisePublicationDecision(
   },
 ): Row | null {
   return raiseOwed(repoRoot, {
-    id: ID_PUBLICATION,
+    id: publicationDecisionId(options.version),
     decisionClass: CLASS_EXTERNAL_CONSEQUENCE,
     question:
       `Publish dabbler-ai-orchestration ${options.version} to the VS Code ` +
@@ -924,7 +944,9 @@ export function raisePublicationDecision(
       "asks a person to approve the job before it runs.\n\nWhat a wrong " +
       "answer costs: a published version is public from that moment and " +
       "cannot be recalled -- a Marketplace version slot is never reusable, " +
-      "so a number cannot be spent twice.",
+      `so a number cannot be spent twice.\n\nThis answer settles ${options.version} ` +
+      "and nothing else. The decision is keyed to the version it authorises, so " +
+      "the next release raises its own brief and waits for its own answer.",
     options: [
       {
         label: "publish",

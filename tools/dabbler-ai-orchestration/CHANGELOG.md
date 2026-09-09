@@ -16,6 +16,18 @@ Everything in `2.0.15` below, plus the fix that supersedes it. **Install
 this one:** `2.0.15` was tagged from the commit before the fix, so its
 publish machinery refuses every annotated tag — nothing else differs.
 
+### Added
+
+- **A verification loop the cap ended can be reopened, by a person.**
+  When the round cap stops a loop with the work still needing review,
+  there was no way forward: raising the cap afterwards did nothing, and
+  the close's verification gate correctly refused to let unreviewed work
+  read as verified. `dabbler verify reopen --rounds N --reason TEXT
+  --approver WHO` buys a named number of further rounds past that one
+  stopping point. It buys the *review*, never the verdict — an unspent
+  grant makes the close **stricter**, not weaker, until a round has
+  actually run — and the reason and the approver stay on the record.
+
 ### Fixed
 
 - **A repository can declare that its release is a tag.** Some repositories

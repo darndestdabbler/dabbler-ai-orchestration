@@ -1,6 +1,116 @@
-# STATUS — sessions 113–134 CLOSED, all VERIFIED: the deployables block, the Java/Maven walk and its nine defects, the suite off the operator's machine, the principle of who owns a command, the policy a module session runs under, the basics the operator saw go wrong, the focused-or-global session the plan decides with one click to start it, the UAT walk that found ten product defects in the UI path, sessions 131–133 answering all ten of them, and session 134 fixing what the verifier is told and widening what it can see; sessions 135–136 are planned; version 2.0.14
+# STATUS — sessions 113–135 CLOSED, all VERIFIED: the deployables block, the Java/Maven walk and its nine defects, the suite off the operator's machine, the principle of who owns a command, the policy a module session runs under, the basics the operator saw go wrong, the focused-or-global session the plan decides with one click to start it, the UAT walk that found ten product defects in the UI path, sessions 131–133 answering all ten of them, session 134 fixing what the verifier is told and widening what it can see, and session 135 letting the direct-API verifier ask for a file and giving .NET a root; session 136 is planned and carries the release; version 2.0.14
 
 **Branch: `master`.** Trunk-based; nothing lives anywhere else.
+
+> ## SESSION 135 CLOSED, 2026-09-09 — the direct-API verifier can ask for a file, and .NET gets a root
+>
+> | session | what | state |
+> | --- | --- | --- |
+> | 135 | the `file-request` block, the one further turn behind a setting, the agency record and its two documents, and the root `.slnx` | CLOSED VERIFIED (round 2; round 1 raised one blocking Major that was RIGHT — see below), landed `098d3824`, closed `3df4ccf8` |
+>
+> **What landed.** (1) **A verifier on the direct-API path may ask for a
+> file.** It emits a fenced `` ```file-request `` block naming
+> repository-relative paths, one per line, and the framework opens the ones
+> the grant allows. The block is parsed by the *same* fence walk the write
+> proposals use — `labelledBlocks` was factored out of `parseProposals` so
+> there is one rule about what a fenced block is — and every path is
+> confined by `deliverFileRequests`, outermost boundary inward: no read
+> granted, outside the repository, outside the scope, past the read budget,
+> a directory, not a file here. **The budget is enforced, not counted.**
+> On the seat it can only ever be measured after the fact because the CLI
+> runs its own tools; here the framework is what opens the file, so nothing
+> past the budget is opened at all.
+>
+> (2) **One further turn, on the same candidate.** `RouteOptions.followUp`
+> is called once with the first answer and returns the message to send back
+> or null. `routeLive` dispatches it against the candidate the escalation
+> ladder already settled on — same model, provider, transport and generation
+> params — and that second answer is the result; tokens and elapsed seconds
+> are summed so the recorded call says what the round actually cost. It is
+> straight-line code, not a loop: `followUp` never sees the second answer,
+> so the ceiling of two dispatches is a property of the shape rather than of
+> a counter. A failed second dispatch raises `DispatchError` and does **not**
+> fall back to the first answer, which was given before the files arrived.
+>
+> (3) **Behind `verification.settings.api_file_requests`, which defaults
+> off.** This session was therefore verified by the path it changed,
+> unchanged. With it off a request block is still parsed, refused and
+> recorded — a request that vanishes silently looks exactly like one that
+> was never made.
+>
+> (4) **The root `.slnx`, the other half of D267.** `rootFilesDotnet` now
+> takes the `SolutionShape` its interface always passed it and writes a
+> seventh root file listing every `*.csproj`/`*.fsproj` under the modules'
+> code roots. `ensureRootFilesWithSuite` writes the root files *before* it
+> asks the detector, so the file it just wrote is what `detectDotnet` finds
+> and the dotnet suite declares itself in the same call. `whyNoSuite` lost
+> its .NET branch: it is now unreachable, and "this root holds none" would
+> name a file the scaffold had just written.
+>
+> **Round 1's Major was right, and the fix is better than the plan's
+> wording.** The finding: with the setting on, every round recorded
+> `mode: tools` because the grant said so, whether or not a file was ever
+> delivered — which would put a round that saw only the evidence bundle on
+> the same side of the ledger as one that read source, destroying the very
+> comparison the setting exists to enable. The naive fix (mode follows the
+> operation count) would have destroyed the seat's own
+> *granted-but-looked-at-nothing* signal. The rule that satisfies both is
+> one rule, not two: **`mode` says what the round HAD IN FRONT OF IT.** The
+> grant carries `toolsSent` — true only on the seat, where the tools travel
+> with the request and the round had the tree whether or not it looked. On
+> the API path the read is an *offer*, realised only by delivery, so `tools`
+> means a file arrived. `operations_granted` is where the declined offer is
+> recorded, which is what separates a setting-on round that asked for
+> nothing from a repository that never turned the setting on. `AgencyGrant`
+> lost its `mode` field entirely — it was written and never read, and a
+> grant field the record can contradict is a trap.
+>
+> **Two nits from round 1 were taken too**, and one was a real correctness
+> bug: `deliveredFilesMessage` trimmed trailing newlines, so a file ending
+> in blank lines was collapsed. It no longer trims; a final newline is added
+> only where a file has none, because a fenced block cannot express its
+> absence, and the briefing, `driving-a-session.md` and the schema all say
+> exactly that rather than claiming a fidelity the format does not have.
+>
+> **Round 2 came back VERIFIED with three nits, all on one residual
+> point** — **owed**: a file with *no* final LF still arrives with one while
+> its read is recorded `fidelity: "verbatim"`, which the schema defines as
+> the shown lines matching the disk bytes. The prose now says so in three
+> places, but the *token* still claims more than it should. The honest
+> options are a fourth fidelity value for "verbatim but for a terminating
+> newline the format cannot carry", or narrowing the schema's definition of
+> `verbatim`. Not urgent — it can only mislead about a file's last byte, and
+> only on a path that is off by default.
+>
+> **Tests: four, as planned, plus one the fix required.** `route.test.ts`
+> drives `route` over the wire seam with a request block and asserts two
+> requests, the same model on both, the file's bytes and the first answer in
+> the second body, and the summed tokens. `walk-verify.test.ts` gains three
+> real rounds: session 4 (setting on, out-of-scope path — refused, recorded,
+> one dispatch, `mode: none`), session 5 (setting off — recorded, ignored,
+> one dispatch), and session 6, added for the fix, which drives `runRound`
+> over `setHttpSource` with the setting read from the config on disk and
+> asserts two dispatches, the untrimmed contents in the second, and
+> `mode: tools` with a `verbatim` read. `ecosystem.test.ts`'s existing .NET
+> assertion was inverted: it now asserts the `.slnx`, its projects, its SDK
+> floor and the declared suite. Run of record green on both suites — 232 s
+> TypeScript, 11 s extension.
+>
+> **Three notes for whoever is next.** The `.slnx` is named
+> `<directory>.slnx` **verbatim**, not through the parent POM's
+> lowercase-hyphen sanitiser: `dotnet new sln` keeps the directory's case,
+> and Maven's artifactId convention is not .NET's. A **fifth** copy of
+> session 134's false *"the verifier runs its own tests inside the round"*
+> sentence was found and fixed in `docs/driving-a-session.md` — 134 fixed
+> four and this was the fifth; grep before assuming there are no more. And
+> **`docs/schema-reference.md` had never documented the `agency` block at
+> all**; it does now, every field.
+>
+> **After it lands, the measurement is the point.** Run sessions with
+> `api_file_requests: true` and compare the blocking-finding rate against
+> the seat's measured 1.30 a session and the blind API path's 0.53. Turning
+> it on by default is a separate decision that the measurement settles, not
+> this session.
 
 > ## SESSION 134 CLOSED, 2026-09-09 — what the verifier is told, and what it can see
 >

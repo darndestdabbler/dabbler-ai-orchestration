@@ -2710,9 +2710,9 @@
     {
       "number": 138,
       "title": "The deadlocks that were not deadlocks, and the consent that was not asked for",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-09T11:05:59.462000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-09-09T11:49:49.704000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

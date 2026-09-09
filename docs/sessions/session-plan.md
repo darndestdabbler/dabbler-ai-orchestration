@@ -7436,14 +7436,16 @@ that must be started with it declared.
 
 ### Session 138 of 139: The deadlocks that were not deadlocks, and the consent that was not asked for
 
-**Session 137 was told it was deadlocked nine times and was making progress
-almost every time.** Its publish refused for a sequence of different
-reasons -- no packaging block declared, then red gates, then a tag absent
-from origin, then a tag naming an earlier commit, then a published row the
-ledger's own schema refused -- and each was diagnosed and answered before
-the next arrived. `run.json` records `class: "deadlock"` from the second
-stop onward, and the owed decision said "running it again unchanged reaches
-this exact point again" while running it again was exactly what moved it.
+**Session 137 stopped at publish eight times, was called deadlocked for
+seven of them, and was making progress through nearly all of it.** Its
+seven refusals carry six distinct causes -- no packaging block declared,
+then the earlier steps' evidence missing (three times, for three different
+sets of evidence), then a tag absent from origin, then a tag naming an
+earlier commit, then twice more for the tag -- and each was diagnosed and
+answered before the next arrived. `run.json` records `class: "deadlock"`
+from the second stop onward without exception, and the owed decision said
+"running it again unchanged reaches this exact point again" while running
+it again was exactly what moved it. The eighth attempt published.
 
 **The cause is that the classifier is fed a constant.** `drive.ts` compares
 kind, step and reason; for `publish` the reason is a string literal, so the
@@ -7486,6 +7488,12 @@ and there is no verb that returns a stopped run to verification. Session
 things the managed body tells an engine are not its to run. Either the
 driver rewinds when a later phase refuses on an earlier phase's evidence,
 or the guidance is wrong about who runs them; it cannot be both.
+**Decided here, so the session does not have to stop and ask: the driver
+rewinds.** "None of them is yours to run" is the product's promise and the
+reason an operator trusts the record; a driver that quietly hands those
+five verbs back at the one phase where they are hardest to get right is the
+defect, and rewriting the guidance to match the defect would be conceding
+that the framework owns the lifecycle only while nothing goes wrong.
 
 **A smaller one, met four times in one recovery.** A `next` that finds a
 finished job collects its result and stops, and a second `next` is needed
@@ -7520,10 +7528,24 @@ back where the evidence is made; a withdrawn releasable session closes and
 its record says who withdrew it and why. Session 137's record is the
 fixture for the first two.
 
-**Not releasable.** Nothing ships until 139 carries it. **The trap is that
-this session edits the stop machinery it is itself driven by**, so a change
-that makes its own stops unreadable is not caught by a green suite -- step
-(1) is proved by its tests and by 139's driving, and by nothing in between.
+**And one rule over all four, because 137 paid for it twice.** A test of a
+path that writes to the record proves it by **writing the row and reading
+it back**, never by the return value alone. `packageSession` answered
+`published` and its test asserted exactly that, while the append refused
+the row for want of `steps` -- so two versions reached the Marketplace
+unrecorded, and the session that shipped them could not close. Step (4)
+carries the same exposure in the same shape: the withdrawal is a new
+record-writing path whose first real use will be a session that needs it,
+and a test that stops at the return value would find out then.
+
+**Not releasable, and the reason is structural rather than habit.** This
+session rewrites the consent that gates a release; a releasable 138 would
+ship itself through its own new consent code, first use and only use at
+once, which is the shape that made 137 hard. It ships in 139, driven by a
+session that did not write it. **The trap is that this session edits the
+stop machinery it is itself driven by**, so a change that makes its own
+stops unreadable is not caught by a green suite -- step (1) is proved by
+its tests and by 139's driving, and by nothing in between.
 
 ### Session 139 of 139: The release that carries the deadlock work
 
@@ -7557,6 +7579,16 @@ green workflow and a served extension are the same fact.
 **Tests.** None new. The proof is a `published` packaging row and what the
 Marketplace answers; a test asserting the publish path here would assert
 the thing the session is for.
+
+**One version is the expectation and not the rule.** Session 137 shipped
+three, because each publish exposed the defect the last one had hidden, and
+the framework was right every time it refused. That is what a first driving
+of a repaired path looks like, and a plan that treats a second version as a
+failure teaches the next session to work around a refusal rather than read
+it. If this session's publish exposes a defect in 138's work, it fixes it,
+bumps, and ships again, on the record, within itself -- deferring it to a
+later session would leave a release nobody can install behind a fix nobody
+has shipped.
 
 **Releasable.** If it reaches the close with no packaging run on its
 record, the close refuses -- and after 138 there is an exit from that which

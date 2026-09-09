@@ -7547,7 +7547,7 @@ stop machinery it is itself driven by**, so a change that makes its own
 stops unreadable is not caught by a green suite -- step (1) is proved by
 its tests and by 139's driving, and by nothing in between.
 
-### Session 139 of 139: The release that carries the deadlock work
+### Session 139 of 140: The release that carries the deadlock work
 
 **This is the block's release and the first driving of the repaired
 publish path.** Session 137 shipped `2.0.16`, `2.0.17` and `2.0.18` in one
@@ -7593,3 +7593,98 @@ has shipped.
 **Releasable.** If it reaches the close with no packaging run on its
 record, the close refuses -- and after 138 there is an exit from that which
 is not `cancel`.
+
+### Session 140 of 140: The phase an operator can read, the step they can see, and the second release
+
+**Two surfaces claim to say where a session is, and only one of them is
+saying it.** The Dabbler terminal under a session banner reads, whole:
+
+    11:06:05 phase session=138 now=plan
+    11:11:32 phase now=steps
+
+Nothing between those two lines, through every step of the work. The Work
+Explorer shows the steps; the terminal shows that a phase changed and then
+goes quiet for the length of the session. An operator watching the terminal
+cannot tell a session doing its work from one that has stopped.
+
+**The step line is not missing. It is written, and it does not fire.**
+`dabblerTerminal.ts` emits `step` with the instruction's id and the first
+sentence of its ask, in the milestone blue a step's beginning deserves,
+once per `seq`. So this session's first job is to find out why an operator
+never sees it, and the likeliest answer is sitting in the same block: the
+seq is marked as said BEFORE the instruction is read, so a read that
+returns nothing, or an instruction whose seq has not caught up, drops the
+line **permanently** -- the guard that would retry it has already been
+satisfied. That is the read-once-drop-silently shape, and it is a
+diagnosis to confirm rather than a fix to assume: the write order in
+`drive.ts` is instruction-then-run, which is the safe order, so the cause
+may be elsewhere and the measurement comes first. `docs/` already records
+that a chat-driven session shows only phase lines and that the Work
+Explorer needs a manual refresh; that note is the symptom, and this session
+is where it stops being one.
+
+**The phase is called `steps` and should be called `work`, and that is a
+schema change rather than a label.** The terminal prints `now: run.phase`
+directly -- the operator's word and the record's word are one string, which
+is the property to keep -- so renaming the display alone would put two
+names on one thing and is exactly the drift ground rule 3 forbids. The
+`driver-run` schema's phase enum carries `steps`, and every `run.json` this
+repository has ever written carries it too, so a straight substitution
+makes a hundred historical runs unreadable by their own reader.
+
+**The framework already has the shape for this and it is used elsewhere.**
+`ROW_WAIVE` is retired: no writer emits it, and readers still recognise it
+because historical ledgers carry it. The phase does the same -- the enum
+gains `work`, writers emit `work`, readers accept `steps` from any run
+written before this session, and nothing rewrites a record that already
+exists. The terminal's `MILESTONE_PHASES` follows the writer, and a run
+recorded last week still opens.
+
+**Parity is the point, not decoration.** The two surfaces are fed by one
+record, and when they disagree the operator has no way to tell which is
+lying. So the test is not that each renders something: it is that the step
+the Work Explorer shows and the step the terminal announces are the same
+step, from the same `instruction.json`, at the same `seq`.
+
+**And the headings are painted two ways for one job.** `banner` draws the
+session heading with its rule and its label both in the milestone tone;
+`divider` draws every other heading with the line `muted` and the name in
+the plain foreground. The comment on `divider` states that choice
+deliberately -- the line quiet, the name bold over the group beneath -- and
+the operator has decided against it: the headings are one family and read
+as one, so `divider` takes the banner's tone. It is a presentation
+decision, which is the operator's to make and not a defect to argue with,
+and it is recorded here so the session changes the tone rather than
+rediscovering the reasoning in the comment and leaving it alone.
+
+**And a VSIX built locally at the end, before anything is trusted.** This
+session changes what an operator sees and nothing an assertion can fully
+judge; the extension is installed from a locally built package and the
+terminal is watched through one real session's steps. A rename that reads
+correctly in a test and wrongly on a screen is the failure this step
+exists to catch.
+
+**Steps.** (1) Measure why the `step` line does not reach the terminal,
+record the finding, and fix the cause -- including the seq marked before
+the read, whether or not it proves to be the cause. (2) The phase enum
+gains `work`; writers emit it, readers still accept `steps`, and no
+existing record is rewritten. (3) The terminal and the Work Explorer are
+proved to name the same step at the same seq from the same instruction.
+(4) `divider` takes the banner's milestone tone, so every heading in this
+terminal is one family. (5) Build the VSIX locally, install it, and drive
+one session's steps through the real terminal.
+
+**Tests.** Three, plus a walk that is not a test. A run written with
+`steps` still opens under the new reader and one written today says `work`
+-- the historical record is the fixture, not a hand-built row. The step
+line survives an instruction that is not readable on the first look, which
+is the assertion whose absence let the line vanish silently. And the two
+surfaces answer with one step id for one seq. **The tone gets no test of
+its own**: the assertion would restate the constant, and Layer 3 is what
+catches a heading that reads wrong on a screen. Step (5) is a walk, and it
+produces a note rather than an assertion.
+
+**Releasable.** This is the release after 139 and the second driving of
+the repaired publish path -- the first one that carries no change to the
+publish machinery at all, which is what makes it the honest test of it. If
+this session's publish is boring, the work of 138 and 139 is done.

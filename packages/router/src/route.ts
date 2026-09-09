@@ -733,6 +733,18 @@ export interface RouteOptions {
   readonly sessionNumber?: number | null;
   readonly excludeProviders?: readonly string[] | null;
   readonly transport?: string | null;
+  /**
+   * One further turn, decided from the first answer. Return the text to send
+   * back, or null to send nothing and let the first answer stand.
+   *
+   * It is called once and the ceiling is two dispatches per call: the
+   * follow-up's own answer is never offered to it again, so there is no loop
+   * to bound and no cost to predict beyond twice the payload. The second turn
+   * goes to the candidate the first one settled on -- same model, same
+   * provider, same transport -- because a continuation that changed models
+   * would be a different opinion wearing the first one's record.
+   */
+  readonly followUp?: ((answer: string) => string | null) | null;
 }
 
 /**
@@ -837,6 +849,43 @@ async function routeLive(
       continue;
     }
     break;
+  }
+
+  // The one further turn. Straight-line code rather than another loop,
+  // because the ceiling is a property of the shape and not of a counter
+  // somebody has to keep correct: `followUp` is asked once, about the first
+  // answer, and is never shown the second.
+  const continuation = options.followUp ? options.followUp(result.content) : null;
+  if (continuation !== null && continuation !== undefined) {
+    const [systemPrompt, userMessage] = buildPrompt(
+      `${content}\n\n---\n\n## Your previous answer\n\n${result.content}\n\n---\n\n${continuation}`,
+      context,
+      taskType,
+      path.modelConfig(current),
+      config,
+    );
+    await path.rateLimit(current);
+    const start = Date.now();
+    const second = await path.dispatch(current, systemPrompt, userMessage, genParams);
+    elapsed += (Date.now() - start) / 1000;
+    if (!isOk(second)) {
+      // No falling back to the first answer: it was given before the files
+      // arrived, so it is not the answer the second turn was asked for.
+      const stderrTail = String(second.metadata["stderr_tail"] ?? "");
+      throw new DispatchError(
+        `the follow-up turn of '${current.model_id}' over ${transportName} ` +
+          `failed: ${String(second.metadata["error_class"])} ` +
+          `(${stderrTail.slice(-300)})`,
+        current.provider,
+        current.alias,
+      );
+    }
+    // What the call cost is both turns; what it said is the second one.
+    result = {
+      ...second,
+      input_tokens: result.input_tokens + second.input_tokens,
+      output_tokens: result.output_tokens + second.output_tokens,
+    };
   }
 
   const outcome: DispatchOutcome = {

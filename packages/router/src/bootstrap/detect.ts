@@ -19,7 +19,7 @@ import { existsSync, readdirSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
 
 import { PROJECT_CONFIG_FILENAME } from "../config.ts";
-import { type EcosystemKey, type ScaffoldResult, ecosystemOfSolution, ensureRootFiles } from "../ecosystem.ts";
+import { type ScaffoldResult, ecosystemOfSolution, ensureRootFiles } from "../ecosystem.ts";
 import type { SolutionShape } from "../modules.ts";
 import { readText } from "../textfile.ts";
 import {
@@ -160,8 +160,10 @@ function detectDotnet(root: string): Ecosystem | null {
  * always resolves, because the parent POM the same scaffold writes is what
  * `mvn -q test` reads. `dotnet test` resolves the project or solution in the
  * directory it runs in, and a multi-module .NET solution whose projects live
- * under `modules/` has none at its root -- measured, MSB1003 -- so the root
- * detector is exactly the right question to ask for it.
+ * under `modules/` used to have none there -- measured, MSB1003 -- until the
+ * same scaffold started writing the root `.slnx` that `detectDotnet` finds.
+ * The detector is still the question asked, because it is the command's own
+ * question and not a claim about what the scaffold did.
  */
 export function suiteForEcosystem(root: string, key: string): Ecosystem | null {
   if (key === "maven") return detectMaven(root);
@@ -169,14 +171,21 @@ export function suiteForEcosystem(root: string, key: string): Ecosystem | null {
   return null;
 }
 
-/** Why an ecosystem's suite could not be declared at this root. */
-function whyNoSuite(key: EcosystemKey): string {
-  return key === "dotnet"
-    ? "no test suite is declared: `dotnet test` resolves the project or solution in the " +
-        "directory it runs in, and this root holds none. Add a solution file at the root, " +
-        `or declare the suite yourself under testing.suites in ${PROJECT_CONFIG_FILENAME}`
-    : "no test suite is declared: nothing at this root says how its tests run; declare one " +
-        `under testing.suites in ${PROJECT_CONFIG_FILENAME}`;
+/**
+ * Why an ecosystem's suite could not be declared at this root.
+ *
+ * There is no .NET wording here any more, and there is nothing for it to
+ * say: `ensureRootFilesWithSuite` writes the root files before it asks the
+ * detector, and the solution file it writes is what `detectDotnet` then
+ * finds, so a .NET solution declares its suite in the same call. A message
+ * telling the operator that "this root holds none" would name a file the
+ * scaffold had just written.
+ */
+function whyNoSuite(): string {
+  return (
+    "no test suite is declared: nothing at this root says how its tests run; declare one " +
+    `under testing.suites in ${PROJECT_CONFIG_FILENAME}`
+  );
 }
 
 /**
@@ -206,7 +215,7 @@ export function ensureRootFilesWithSuite(root: string, shape: SolutionShape): Sc
   // Said out loud rather than left silent: a repository that gets no suite
   // here is the one whose operator most needs to know why, and the note
   // rides beside the files this call wrote.
-  if (suite === null) return { ...files, notes: [...files.notes, whyNoSuite(key)] };
+  if (suite === null) return { ...files, notes: [...files.notes, whyNoSuite()] };
   const declared = appendSuitesToProjectConfig(root, [suite]);
   if (declared === null) return files;
   const where = relative(root, declared.path).split("\\").join("/");

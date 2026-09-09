@@ -143,10 +143,53 @@ Row fields (required: `round`, `verdict`, `blocking`, `findings`,
 | `recorded_at` | string | timestamp |
 | `framework_version` | string | the router version that recorded this round. Additive and absent on rows written before it existed; **snake_case**, because every other key on this row is — the session record spells the same fact `frameworkVersion`, because every key on THAT record is camelCase |
 | `transport` | string | `api` or `copilot-cli` |
+| `agency` | object | the verifier's read surface for this round — see below |
 | `type` | enum | absent on plain rounds; `adjudication` or `remediated_at_cap` — both terminal, so no later round may open. `waive` is retired and readable only |
 
 Raw verifier output is saved beside the ledger as
 `round-<N>-verifier-output.md`, byte-identical to the response.
+
+**The `agency` block** — what the round was granted, and what it did with
+it. A finding rests on what the verifier looked at, so the record says what
+that was:
+
+| Field | Type | Meaning |
+|---|---|---|
+| `mode` | enum | `tools` — the round had the tree in front of it; `none` — it had only the evidence bundle, and is never reported as equivalent to one that could look. On the seat the tools travel with the request, so a seat round is `tools` whether or not it used them (`operations` then being empty is itself the signal). On the API path the read is an offer rather than a channel, so `tools` means a file was actually delivered |
+| `operations_granted` | array | of `list`, `search`, `read`, `write`. The seat holds all three reads; the direct-API path holds `read` alone, and only where the setting below turns it on |
+| `read_budget` | integer | how many files this round may open |
+| `scope`, `scope_size` | array, integer | what the round was confined to (the list is truncated at 200; `scope_size` is the true count) |
+| `reads`, `listings`, `searches` | integer | operations by kind |
+| `out_of_scope` | integer | operations not confined to the scope |
+| `refused_reads` | integer | of those, the ones the checkout could not deliver — a sibling's source is absent in a focused clone, which is the wall holding rather than a defect in the tree |
+| `over_budget` | integer | reads past `read_budget`. On the seat this is reads *performed*, which is all it can be: the CLI executes its own tools. On the API path it is paths *asked for*, because there the budget is enforced and nothing past it is opened |
+| `transformed_reads` | integer | reads whose shown lines did not match the bytes on disk |
+| `fidelity_measurable` | boolean | present once the round read anything: whether the comparison could be made at all |
+| `reason` | string | present on `mode: none` — why the round could not look |
+| `operations` | array | each: `kind`, `target`, `in_scope`, optional `fidelity`, `detail`, `refused` (truncated at 200) |
+| `writes`, `writes_applied`, `writes_refused` | array, integer, integer | every proposed file write and what the framework did about it — **never** truncated |
+
+**What an API round fills in that only a seat round used to.** With
+`verification.settings.api_file_requests` on, a verifier holding no tools may
+still ask for a file: it names paths in a `file-request` block in its own
+answer, the framework opens the ones the grant allows and sends them back on
+**one** further turn, and the answer to that turn is the verdict. Such a round
+records `operations_granted: ["read"]`, a `scope`, a `read_budget` and one
+`read` operation per path — delivered, or refused with the boundary it met in
+`detail`. A delivered read's `fidelity` is always `verbatim`: the process that
+opened the file is the process that sent it, so nothing sits in between to
+rewrite a line, and `transformed` cannot arise.
+
+**`mode` says what the round saw, not what it was offered.** A round that
+asked for nothing, or for nothing the framework could deliver, records
+`mode: none` — it saw the evidence bundle and no more, which is precisely
+what a blind round sees, and the comparison this surface exists to be
+measured by depends on the two not being conflated. `operations_granted`
+is where the offer is recorded, and it distinguishes such a round from one
+in a repository that never turned the setting on. The setting is **off by
+default**, so every round elsewhere records `mode: none` with no granted
+operations exactly as before — and a request block sent to a round that was
+granted no read is still recorded, refused, and ignored.
 
 **The adjudication row** (`type: "adjudication"`, written by
 `dabbler verify adjudicate`, one per session ever) additionally

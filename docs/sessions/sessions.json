@@ -2639,26 +2639,37 @@
         "identityProvenance": "direct"
       },
       "verificationVerdict": "VERIFIED",
-      "frameworkVersion": "2.0.14",
       "verification": {
         "rounds": 1,
+        "verifierModel": "gpt-5-6-terra",
+        "verifierProvider": "openai",
+        "transport": "api"
+      },
+      "frameworkVersion": "2.0.14"
+    },
+    {
+      "number": 135,
+      "title": "The direct-API verifier can ask for a file, and .NET gets a root",
+      "status": "in-progress",
+      "startedAt": "2026-09-09T01:20:06.311000-04:00",
+      "completedAt": null,
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": "VERIFIED",
+      "frameworkVersion": "2.0.14",
+      "verification": {
+        "rounds": 2,
         "verifierModel": "gpt-5-6-terra",
         "verifierProvider": "openai",
         "transport": "api"
       }
     },
     {
-      "number": 135,
-      "title": "The direct-API verifier can ask for a file",
-      "status": "not-started",
-      "startedAt": null,
-      "completedAt": null,
-      "orchestrator": null,
-      "verificationVerdict": null
-    },
-    {
       "number": 136,
-      "title": "Codex leaves the documented surface, and the block lands",
+      "title": "Codex undocumented, two labels the operator reads, and the block lands",
       "status": "not-started",
       "startedAt": null,
       "completedAt": null,

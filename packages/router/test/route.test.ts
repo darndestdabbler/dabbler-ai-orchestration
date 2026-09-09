@@ -13,6 +13,7 @@ import { afterEach, beforeEach, describe, it } from "node:test";
 
 import { stringify } from "yaml";
 
+import { deliverFileRequests, grantForTransport } from "../src/agency.ts";
 import { CONFIG_ENV_VAR } from "../src/config.ts";
 import { loadMetrics } from "../src/metrics.ts";
 import {
@@ -618,6 +619,66 @@ describe("dispatching over the direct-API transport", () => {
       () => route("say hi", { excludeProviders: ["google", "openai", "anthropic"] }),
       NoCandidateError,
     );
+  });
+
+  it("sends one further turn carrying the bytes of the file the answer asked for, on the same model, and bills both", async () => {
+    // The seat has read files since it existed; this is the direct-API
+    // path's version of it, and the whole of the mechanism is here: a
+    // fenced request block in an ordinary answer, the framework opening
+    // what the grant allows, and ONE more turn whose answer is the verdict.
+    configOnDisk();
+    const tree = tempDir("requested-");
+    seed(tree, { "src/widget.py": "def widget():\n    return 2\n" });
+    const grant = grantForTransport("api", {
+      scope: ["src"],
+      readBudget: 5,
+      allowFileRequests: true,
+    });
+
+    const bodies: Array<Record<string, unknown>> = [];
+    restoreHttp = setHttpSource((url, init) => {
+      bodies.push(JSON.parse(String(init.body ?? "{}")) as Record<string, unknown>);
+      const first = bodies.length === 1;
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({
+            output_text: first
+              ? "Before I grade this I need the source.\n\n```file-request\nsrc/widget.py\n```\n"
+              : "VERIFIED. ".repeat(10),
+            usage: { input_tokens: first ? 100 : 400, output_tokens: first ? 100 : 60 },
+            status: "completed",
+            model: "o-gpt",
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        ),
+      );
+    });
+
+    // Only the OpenAI candidate survives, so both turns are its own and the
+    // ladder has no step to take: what the wire sees is the two turns.
+    const result = await route("review this", {
+      excludeProviders: ["google", "anthropic"],
+      followUp: (answer) => {
+        const outcome = deliverFileRequests(tree, grant, answer);
+        if (outcome.files.length === 0) return null;
+        return `## The files you asked for\n\n${outcome.files
+          .map((file) => `### ${file.path}\n\n${file.content}`)
+          .join("\n\n")}`;
+      },
+    });
+
+    assert.equal(result.provider, "openai");
+    assert.deepEqual(result.escalation_history, [], "the two calls are the two turns, not a ladder step");
+    assert.equal(bodies.length, 2, "the request block bought exactly one further turn");
+    // The same model answered both turns: a continuation that changed
+    // models would be a second opinion wearing the first one's record.
+    assert.equal(bodies[0]?.["model"], bodies[1]?.["model"]);
+    const second = String(bodies[1]?.["input"] ?? "");
+    assert.match(second, /def widget\(\):\n {4}return 2/, "the file's bytes travelled");
+    assert.match(second, /Before I grade this I need the source/, "so did its own first answer");
+    // The second answer is the verdict, and the bill is both turns.
+    assert.match(result.content, /^VERIFIED\./);
+    assert.deepEqual([result.input_tokens, result.output_tokens], [500, 160]);
   });
 });
 

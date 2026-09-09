@@ -52,13 +52,18 @@ import { canonicalPath } from "./journal.ts";
 import { type SolutionShape, dependenciesOf } from "./modules.ts";
 import { pythonRepr } from "./pythonJson.ts";
 
-/** The round could look at the tree through tools. */
+/**
+ * The round had the tree in front of it: the seat, whose tools travel with
+ * the request, or an API round that asked for a file and was given one.
+ */
 export const MODE_TOOLS = "tools";
 /**
- * The round could not. The direct-API path sends no tools at all, and a round
- * that could not look is never reported as equivalent to one that could --
- * that is gap 1 re-opened, acceptable as a fallback and unacceptable as a
- * silent one.
+ * It did not, and saw the evidence bundle and nothing else. The direct-API
+ * path sends no tools, and where it is offered the file request instead, a
+ * round that asked for nothing -- or for nothing the framework could deliver
+ * -- saw exactly what a blind round sees and is recorded as one. A round that
+ * could not look is never reported as equivalent to one that could: that is
+ * gap 1 re-opened, acceptable as a fallback and unacceptable as a silent one.
  */
 export const MODE_NONE = "none";
 
@@ -145,6 +150,15 @@ export const ACTION_MODIFIED = "modified";
  */
 export const WRITE_LABEL_TEST = "test-write";
 export const WRITE_LABEL_FIX = "fix-write";
+
+/**
+ * The label a round asks for files under. It is a read where the other two
+ * are writes, and it carries paths where they carry a file's contents, but it
+ * is the same shape of thing -- the model describes what it wants and the
+ * framework is what touches the filesystem -- so it is parsed by the same
+ * fence walk and bounded by the same scope.
+ */
+export const READ_LABEL_REQUEST = "file-request";
 
 // Ledger rows are read by humans and by the unresolved-session view; an
 // unbounded scope list or operation log helps neither.
@@ -384,7 +398,6 @@ export function inScope(scope: readonly string[], rel: string): boolean {
 // --- The grant ---------------------------------------------------------------
 
 export interface AgencyGrant {
-  readonly mode: string;
   readonly scope: readonly string[];
   readonly readBudget: number;
   /**
@@ -413,16 +426,40 @@ export interface AgencyGrant {
    * another's is not silently honoured.
    */
   readonly writeLabel: string;
+  /**
+   * The read operations this round holds. The seat holds all three, because
+   * the CLI carries all three. The direct-API path holds `read` alone or
+   * nothing: measured over sessions 100-109 the seat verifier listed a
+   * directory once and searched nothing across 26 rounds, so what it does
+   * with its surface is ask for files by path, and a surface offered wider
+   * than that is offered for no observed use.
+   */
+  readonly readOperations: readonly string[];
+  /**
+   * Whether the read surface is a CHANNEL rather than an offer.
+   *
+   * The seat's tools travel with the request, so a seat round had the tree in
+   * front of it whether or not it looked -- and a granted surface with no
+   * recorded call is a state worth seeing, because it is the shape a round
+   * takes when the grant never reached the model. A request block is not a
+   * channel: it is an offer, and the round has a file in front of it only if
+   * it asked and the framework delivered. The recorded `mode` follows this,
+   * so the ledger separates the rounds that saw source from the ones that saw
+   * only the evidence bundle -- which is the whole of the comparison this
+   * surface exists to be measured by.
+   */
+  readonly toolsSent: boolean;
 }
 
 /**
- * What this round could do. Reads need a transport that carries the tools; the
- * write does not, because no tool performs it -- the model describes a file
- * and the framework opens one, which works over any transport that returns
- * text.
+ * What this round could do. Which reads it holds is the grant's to say -- the
+ * transport decides it, and two transports reach the same file by different
+ * means. The write is on neither list of tools, because no tool performs it:
+ * the model describes a file and the framework opens one, which works over
+ * any transport that returns text.
  */
 export function grantOperations(grant: AgencyGrant): string[] {
-  const reads = grant.mode === MODE_TOOLS ? [...READ_OPERATIONS] : [];
+  const reads = [...grant.readOperations];
   return grant.allowWrite ? [...reads, OP_WRITE] : reads;
 }
 
@@ -446,20 +483,32 @@ export interface GrantOptions {
   readonly allowWrite?: boolean;
   readonly writeEnvelope?: readonly string[];
   readonly writeLabel?: string;
+  /**
+   * Whether a transport that carries no tools may still ask for a file, by
+   * naming paths in its answer for the framework to open. Inert on the seat,
+   * which already reads through its own tools.
+   */
+  readonly allowFileRequests?: boolean;
 }
 
 /**
  * Only the seat path is agentic. Naming the transport here keeps the two paths
  * from being recorded as the same kind of review.
  *
- * **The write does not depend on the transport, and the reads do.** The tool
- * surface is the seat's, because giving it to the direct-API path means a
- * tool-use loop written three times against three vendors' function-calling
- * protocols. The write costs none of that: it is a fenced block in an ordinary
- * answer. Confining it to the seat as well would put the tests phase -- which
- * the lifecycle requires of every session -- out of reach of the configuration
- * this package ships as its default, and the round that authored without tools
- * already says so in `mode`.
+ * **The write does not depend on the transport, and the tool surface does.**
+ * The three tools are the seat's, because giving them to the direct-API path
+ * means a tool-use loop written three times against three vendors'
+ * function-calling protocols. The write costs none of that: it is a fenced
+ * block in an ordinary answer. Confining it to the seat as well would put the
+ * tests phase -- which the lifecycle requires of every session -- out of reach
+ * of the configuration this package ships as its default, and the round that
+ * authored without tools already says so in `mode`.
+ *
+ * **The request block costs none of it either**, and that is why the API path
+ * can hold one read. A block of paths in an ordinary answer needs no vendor
+ * protocol; the framework opens the files and sends them on one further turn.
+ * It is granted only where `allowFileRequests` says so, so the default shape
+ * of an API round -- no tools, `mode: none` -- is exactly what it was.
  */
 export function grantForTransport(
   transport: string,
@@ -471,23 +520,37 @@ export function grantForTransport(
   const writeLabel = options.writeLabel ?? WRITE_LABEL_TEST;
   if (transport === "copilot-cli") {
     return {
-      mode: MODE_TOOLS,
       scope: [...(options.scope ?? [])],
       readBudget: options.readBudget ?? DEFAULT_READ_BUDGET,
       testScopes,
       allowWrite,
       writeEnvelope,
       writeLabel,
+      readOperations: [...READ_OPERATIONS],
+      toolsSent: true,
+    };
+  }
+  if (options.allowFileRequests === true) {
+    return {
+      scope: [...(options.scope ?? [])],
+      readBudget: options.readBudget ?? DEFAULT_READ_BUDGET,
+      testScopes,
+      allowWrite,
+      writeEnvelope,
+      writeLabel,
+      readOperations: [OP_READ],
+      toolsSent: false,
     };
   }
   return {
-    mode: MODE_NONE,
     scope: [],
     readBudget: 0,
     testScopes,
     allowWrite,
     writeEnvelope,
     writeLabel,
+    readOperations: [],
+    toolsSent: false,
   };
 }
 
@@ -500,8 +563,10 @@ export function grantForTransport(
  */
 export function briefing(grant: AgencyGrant): string {
   const parts: string[] = [];
-  if (grant.mode === MODE_TOOLS) {
+  if (grant.readOperations.includes(OP_LIST)) {
     parts.push(...readBriefing(grant));
+  } else if (grant.readOperations.includes(OP_READ)) {
+    parts.push(requestBriefing(grant));
   } else if (grant.allowWrite) {
     parts.push(
       "## What you can look at\n\n" +
@@ -548,6 +613,57 @@ function readBriefing(grant: AgencyGrant): string[] {
       "the difference. Do not raise a hardcoded-secret finding from a " +
       "read alone.",
   ];
+}
+
+/**
+ * What a round is told when it may ask for a file and hold no tool.
+ *
+ * One operation is described because one is granted. The seat's own measured
+ * behaviour is the argument for that: over 26 rounds it read 312 files, listed
+ * a directory once and searched nothing, so a verifier that can ask by path is
+ * a verifier that has what it uses.
+ */
+function requestBriefing(grant: AgencyGrant): string {
+  const listed = grant.scope
+    .slice(0, MAX_RECORDED_SCOPE)
+    .map((path) => `- ${path}`)
+    .join("\n");
+  return (
+    "## What you can look at\n\n" +
+    "**Only what is in this message, and any file you ask for.** You hold " +
+    "no tools on this transport — no way to list a directory or search the " +
+    "tree. What you can do is name files, and the framework opens them for " +
+    "you: emit one block of exactly this form, anywhere in your answer, " +
+    "one repository-relative path per line.\n\n" +
+    "````text\n" +
+    "```" +
+    READ_LABEL_REQUEST +
+    "\n" +
+    (grant.scope[0] ?? "path/to/file") +
+    "\n" +
+    "```\n" +
+    "````\n\n" +
+    "**You get one such turn.** The files come back to you and your next " +
+    "answer is the verdict, so ask for everything you need at once and " +
+    "then decide. If you need nothing, emit no block and answer now.\n\n" +
+    "What comes back is **the contents on disk**, read by the framework " +
+    "itself: nothing rewrites them on the way to you, so what you are shown " +
+    "is what is there. The one exception is a file with no final newline, " +
+    "which arrives with one, because a fenced block cannot show its " +
+    "absence.\n\n" +
+    "**Scope** — what this round is confined to, not the " +
+    `repository:\n\n${listed}\n\n` +
+    "A path outside it is refused before any file is opened, and the " +
+    "refusal is recorded on the round. This is a boundary, not a request. " +
+    "A path outside the scope may also not be in this checkout at all: a " +
+    "sibling module is present as its package and its contract folder, " +
+    "never as source. A refused path is not a finding against the tree.\n\n" +
+    `**Budget** — at most ${grant.readBudget} files this round; anything ` +
+    "past that is refused and recorded.\n\n" +
+    "**Log** — every path you name is recorded, delivered or refused. " +
+    "Asking for nothing is recorded too: a finding asserted about a file " +
+    "you did not open is a finding without evidence."
+  );
 }
 
 function writeBriefing(grant: AgencyGrant): string {
@@ -786,10 +902,14 @@ export function recordRow(record: AgencyRecord): Record<string, unknown> {
     writes_refused: recordWritesRefused(record),
   };
   if (record.mode === MODE_NONE) {
-    row["reason"] =
-      "this transport sends no tools; the verifier could not look " +
-      "at the tree and this round is not equivalent to one that " +
-      "could";
+    row["reason"] = grantOperations(record.grant).includes(OP_READ)
+      ? "this round could have asked for a file and was given none — it " +
+        "asked for nothing, or for nothing that could be delivered, so it " +
+        "saw the evidence bundle and no more; not equivalent to a round " +
+        "that looked"
+      : "this transport sends no tools; the verifier could not look " +
+        "at the tree and this round is not equivalent to one that " +
+        "could";
   }
   return row;
 }
@@ -923,19 +1043,37 @@ function toolCalls(metadata: unknown): unknown[] {
  *
  * `writes` are the framework's own decisions from `applyWrites`, which is why
  * they are passed in rather than recovered from metadata: no transport reports
- * them, because no transport performed them.
+ * them, because no transport performed them. `requested` is the same kind of
+ * thing for reads the framework performed itself, and it is carried whatever
+ * the mode: a round that was granted no read still asked, and the refusal is
+ * the record of a boundary holding.
  */
 export function recordForRound(
   repoRoot: string,
   grant: AgencyGrant,
   metadata: unknown,
   writes: readonly TestWrite[] = [],
+  requested: readonly AgencyOperation[] = [],
 ): AgencyRecord {
-  if (grant.mode !== MODE_TOOLS) {
-    return { mode: MODE_NONE, grant, operations: [], writes: [...writes] };
+  if (!grant.toolsSent) {
+    // No tools travelled with the request, so this round saw the evidence
+    // bundle and whatever it asked for and was given. `tools` only where a
+    // file was actually delivered: a round that was offered the request and
+    // took nothing saw exactly what a blind round sees, and recording it as
+    // tool-capable would put the two on the same side of the one comparison
+    // this surface exists to be measured by.
+    const looked = requested.some(
+      (operation) => operation.fidelity === FIDELITY_VERBATIM,
+    );
+    return {
+      mode: looked ? MODE_TOOLS : MODE_NONE,
+      grant,
+      operations: [...requested],
+      writes: [...writes],
+    };
   }
 
-  const operations: AgencyOperation[] = [];
+  const operations: AgencyOperation[] = [...requested];
   for (const call of toolCalls(metadata)) {
     if (!isRecordValue(call)) continue;
     const tool = String(call["tool"] ?? "");
@@ -1025,6 +1163,11 @@ export function summaryLine(record: AgencyRecord): string {
   const parts: string[] = [];
   if (record.mode !== MODE_TOOLS) {
     parts.push("agency: none — this round's verifier could not look at the tree");
+    if (record.operations.length > 0) {
+      parts.push(
+        `it asked for ${record.operations.length} file(s) anyway, all refused`,
+      );
+    }
   } else {
     parts.push(
       `agency: ${recordReads(record)} read(s), ` +
@@ -1098,10 +1241,57 @@ function escapeForRegExp(text: string): string {
  * skipped in the same way an ordinary fence is.
  */
 function parseProposals(text: unknown, label: string = WRITE_LABEL_TEST): Proposal[] {
+  const proposals: Proposal[] = [];
+  for (const block of labelledBlocks(text, label)) {
+    const pathMatch = WRITE_PATH.exec(block.info);
+    if (!pathMatch) {
+      proposals.push({
+        path: "",
+        content: "",
+        malformed: "the block named no path=<file> to write",
+      });
+    } else if (!block.closed) {
+      proposals.push({
+        path: pathMatch[1],
+        content: "",
+        malformed: "the block was never closed, so its contents are incomplete",
+      });
+    } else {
+      proposals.push({
+        path: pathMatch[1],
+        content: block.body.join("\n"),
+        malformed: null,
+      });
+    }
+  }
+  return proposals;
+}
+
+/** One fenced block carrying a round's label. */
+interface LabelledBlock {
+  /** Whatever followed the label on the fence's info line. */
+  readonly info: string;
+  readonly body: readonly string[];
+  readonly closed: boolean;
+}
+
+/**
+ * The blocks in `text` opened under `label`, in the order they appear.
+ *
+ * The walk is shared by every label a round can carry -- the two writes and
+ * the read request -- because it is one rule about how a block is found, and
+ * a second copy of it is how the two would come to disagree about what a
+ * fence is.
+ *
+ * Ordinary fenced blocks are skipped whole, so a review that quotes the
+ * format inside a code sample does not accidentally ask for anything, and a
+ * block under some other round's label is skipped the same way.
+ */
+function labelledBlocks(text: unknown, label: string): LabelledBlock[] {
   if (typeof text !== "string" || !text.includes(label)) return [];
   const marker = new RegExp(`^${escapeForRegExp(label)}\\b[ \\t]*(.*)$`);
   const lines = text.replace(/\r\n/g, "\n").split("\n");
-  const proposals: Proposal[] = [];
+  const found: LabelledBlock[] = [];
   let index = 0;
   while (index < lines.length) {
     const opening = FENCE.exec(lines[index]);
@@ -1114,28 +1304,37 @@ function parseProposals(text: unknown, label: string = WRITE_LABEL_TEST): Propos
     const consumed = consumeBlock(lines, index + 1, ticks);
     index = consumed.indexAfter;
     if (!matched) continue;
-    const pathMatch = WRITE_PATH.exec(matched[1].trim());
-    if (!pathMatch) {
-      proposals.push({
-        path: "",
-        content: "",
-        malformed: "the block named no path=<file> to write",
-      });
-    } else if (!consumed.closed) {
-      proposals.push({
-        path: pathMatch[1],
-        content: "",
-        malformed: "the block was never closed, so its contents are incomplete",
-      });
-    } else {
-      proposals.push({
-        path: pathMatch[1],
-        content: consumed.body.join("\n"),
-        malformed: null,
-      });
+    found.push({
+      info: matched[1].trim(),
+      body: consumed.body,
+      closed: consumed.closed,
+    });
+  }
+  return found;
+}
+
+/**
+ * The repository-relative paths a round's answer asked for, first mention
+ * first.
+ *
+ * One path per line; a blank line and a `#` comment are ignored, because a
+ * model asked for a list will sometimes annotate it. An unclosed block keeps
+ * the lines it has: a path cut off mid-way is not a file in this checkout and
+ * is refused and recorded as one, which is a better account of what happened
+ * than dropping it and leaving the record silent.
+ */
+export function parseFileRequests(text: unknown): string[] {
+  const paths: string[] = [];
+  const seen = new Set<string>();
+  for (const block of labelledBlocks(text, READ_LABEL_REQUEST)) {
+    for (const line of block.body) {
+      const entry = line.trim();
+      if (entry === "" || entry.startsWith("#") || seen.has(entry)) continue;
+      seen.add(entry);
+      paths.push(entry);
     }
   }
-  return proposals;
+  return paths;
 }
 
 /**
@@ -1304,4 +1503,142 @@ function writeFile(rel: string, target: string, content: string): TestWrite {
     bytesWritten: data.length,
     reason: null,
   };
+}
+
+// --- The read request --------------------------------------------------------
+//
+// The seat reads through its own tools and this module can only measure what
+// it did. Here the framework is the thing that opens the file, so the same
+// surface is a boundary rather than a measurement: a path outside the scope
+// never reaches `readFileSync`, and the budget is enforced instead of counted
+// after the fact.
+//
+// Fidelity needs no comparison on this path and never can be `transformed`.
+// The bytes are read off the disk by the same process that sends them, so
+// there is nothing in between to rewrite a credential-shaped line -- which is
+// the one thing the seat's fidelity machinery exists to catch.
+
+/** One file the framework opened, and what was in it. */
+export interface DeliveredFile {
+  readonly path: string;
+  readonly content: string;
+}
+
+/** What one round's request block asked for, and what came of each path. */
+export interface FileRequestOutcome {
+  readonly operations: readonly AgencyOperation[];
+  readonly files: readonly DeliveredFile[];
+}
+
+/** The refusal a path met, or null when it may be opened. */
+function refuseRead(
+  repoRoot: string,
+  grant: AgencyGrant,
+  rel: string | null,
+  delivered: number,
+): [string, boolean] | null {
+  if (rel === null) return ["the path resolves outside the repository", false];
+  if (!inScope(grant.scope, rel)) {
+    // Out of scope AND absent is the wall holding: in a focused checkout a
+    // sibling's source is not there to have been shown. Out of scope and
+    // present is the boundary doing its own work, and the two must stay
+    // distinguishable -- the seat's record draws exactly this line.
+    return isFile(join(repoRoot, rel))
+      ? ["outside the scope: refused before the file was opened", false]
+      : [REFUSED_DETAIL, true];
+  }
+  if (delivered >= grant.readBudget) {
+    return [
+      `past the read budget of ${grant.readBudget}: refused before the ` +
+        "file was opened",
+      false,
+    ];
+  }
+  if (isDirectory(join(repoRoot, rel))) {
+    return ["the path is a directory; this round may open files only", false];
+  }
+  // In scope and not on disk is the verifier's guess about the tree, not the
+  // wall: graded unreadable, as the seat grades the same case.
+  if (!isFile(join(repoRoot, rel))) return [FIDELITY_UNREADABLE, false];
+  return null;
+}
+
+/**
+ * Open what `text` asked for, within `grant`, and report every decision.
+ *
+ * The paths are resolved exactly once, here, and the resolved form is what
+ * gets opened: deciding about one spelling and handing another to `open` is
+ * how a boundary fails open, which is the same reason `confine` resolves a
+ * write path once.
+ *
+ * A round holding no read operation still records what it was asked for. That
+ * is the whole of the setting-off case: the block is refused and the refusal
+ * is on the record, because a request that vanishes silently looks exactly
+ * like one that was never made.
+ */
+export function deliverFileRequests(
+  repoRoot: string,
+  grant: AgencyGrant,
+  text: unknown,
+): FileRequestOutcome {
+  const requested = parseFileRequests(text);
+  if (requested.length === 0) return { operations: [], files: [] };
+  const granted = grantOperations(grant).includes(OP_READ);
+  const operations: AgencyOperation[] = [];
+  const files: DeliveredFile[] = [];
+  let delivered = 0;
+  for (const rawPath of requested) {
+    const rel = relativePosix(repoRoot, rawPath);
+    const shown = rel ?? posix(rawPath);
+    if (!granted) {
+      operations.push({
+        kind: OP_READ,
+        target: shown,
+        inScope: false,
+        fidelity: null,
+        detail:
+          "this round granted no read operation; the direct-API path asks " +
+          "for a file only where the repository turns file requests on",
+      });
+      continue;
+    }
+    const refusal = refuseRead(repoRoot, grant, rel, delivered);
+    if (refusal !== null) {
+      const [detail, wall] = refusal;
+      operations.push({
+        kind: OP_READ,
+        target: shown,
+        inScope: rel !== null && inScope(grant.scope, rel),
+        fidelity: null,
+        detail,
+        ...(wall ? { refused: true } : {}),
+      });
+      continue;
+    }
+    let content: string;
+    try {
+      content = readFileSync(join(repoRoot, rel as string), "utf8");
+    } catch (error) {
+      operations.push({
+        kind: OP_READ,
+        target: shown,
+        inScope: true,
+        fidelity: null,
+        detail: `the file could not be opened: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      });
+      continue;
+    }
+    delivered += 1;
+    operations.push({
+      kind: OP_READ,
+      target: shown,
+      inScope: true,
+      fidelity: FIDELITY_VERBATIM,
+      detail: null,
+    });
+    files.push({ path: shown, content });
+  }
+  return { operations, files };
 }

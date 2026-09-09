@@ -418,6 +418,14 @@ verification:
       refactoring: flag
     tiebreaker_model: opus
     prompt_template_file: prompt-templates/verification.md
+    # Whether a verifier on the direct-API path may ask for a file. It holds
+    # no tools there, so it asks by naming paths in its answer; the framework
+    # opens them, confined to the round's scope and counted against
+    # read_budget, and sends ONE further turn carrying their bytes. The
+    # answer to that turn is the verdict, so the cost ceiling is twice the
+    # payload. Off by default: it doubles what a round can cost, and what it
+    # buys is measured by running with it on rather than asserted here.
+    api_file_requests: false
 
 metrics:
   enabled: true

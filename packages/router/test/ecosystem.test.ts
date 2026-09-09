@@ -3,8 +3,8 @@
 // .NET one.
 
 import assert from "node:assert/strict";
-import { readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { basename, join } from "node:path";
 import { describe, it } from "node:test";
 import { pathToFileURL } from "node:url";
 
@@ -283,8 +283,8 @@ describe("the root build files", () => {
       }) as unknown as Parameters<typeof ensureRootFiles>[1];
     // One module: nothing, ever.
     assert.equal(ensureRootFiles(root, entries(["model"])), null);
-    // Two: the six files, from the ecosystem of the first module that holds
-    // a project file; the empty folder does not decide anything.
+    // Two: the seven files, from the ecosystem of the first module that
+    // holds a project file; the empty folder does not decide anything.
     const second = ensureRootFiles(root, entries(["persister", "model"]));
     assert.deepEqual(second?.written, [
       "nuget.config",
@@ -293,6 +293,7 @@ describe("the root build files", () => {
       "Directory.Build.targets",
       "packages/.gitattributes",
       "packages/README.md",
+      `${basename(root)}.slnx`,
       ".gitignore",
     ]);
     assert.match(readFileSync(join(root, "nuget.config"), "utf8"), /value="packages"/);
@@ -303,7 +304,7 @@ describe("the root build files", () => {
     writeFileSync(join(root, "Directory.Packages.props"), "<Project><!-- mine --></Project>\n", "utf8");
     const third = ensureRootFiles(root, entries(["persister", "model", "listener"]));
     assert.deepEqual(third?.written, []);
-    assert.equal(third?.skipped.length, 7);
+    assert.equal(third?.skipped.length, 8);
     assert.match(readFileSync(join(root, "Directory.Packages.props"), "utf8"), /mine/);
     // Two modules that are still empty folders: the files wait, and say so.
     const bare = tempDir("roots-");
@@ -374,9 +375,12 @@ describe("the root build files", () => {
     assert.ok(second?.skipped.includes("dabbler.yaml"), second?.skipped.join(", "));
     assert.equal(loadSuitesChecked(parseYaml(readFileSync(join(root, "dabbler.yaml"), "utf8"))).suites.length, 1);
 
-    // And it declares nothing it could not run: a .NET solution whose
-    // projects live under modules/ has no root for `dotnet test` to resolve
-    // (MSB1003), so the scaffold says that instead of writing a red suite.
+    // And the .NET side declares its suite in the same call, because the
+    // same call gave it a root to declare it against. `dotnet test` resolves
+    // the project or solution in the directory it runs in, and a solution
+    // whose projects all live under modules/ used to have none there
+    // (MSB1003): the root files are written FIRST and the detector asked
+    // second, so the .slnx this call wrote is what the detector finds.
     const dotnet = tempDir("suite-");
     seed(dotnet, {
       "modules/model/src/CsvModel/CsvModel.csproj": "<Project />\n",
@@ -386,8 +390,18 @@ describe("the root build files", () => {
       ...shape,
       modules: ["model", "store"].map((slug) => ({ slug, codeRoots: [`modules/${slug}`], dependsOn: [] })),
     } as unknown as Parameters<typeof ensureRootFilesWithSuite>[1]);
-    assert.ok(!written?.written.includes("dabbler.yaml"), written?.written.join(", "));
-    assert.match(written?.notes.join(" | ") ?? "", /no test suite is declared: `dotnet test` resolves/);
+    const slnx = readdirSync(dotnet).find((name) => name.endsWith(".slnx"));
+    assert.ok(slnx, readdirSync(dotnet).join(", "));
+    const solution = readFileSync(join(dotnet, slnx as string), "utf8");
+    assert.match(solution, /<Project Path="modules\/model\/src\/CsvModel\/CsvModel\.csproj" \/>/);
+    assert.match(solution, /<Project Path="modules\/store\/src\/Store\/Store\.csproj" \/>/);
+    // The SDK floor is where the operator meets it: a solution file their
+    // SDK cannot open is worse than none.
+    assert.match(written?.notes.join(" | ") ?? "", /9\.0\.200/);
+    // And the suite is declared, not deferred with a note about why not.
+    assert.ok(written?.written.includes("dabbler.yaml"), written?.written.join(", "));
+    assert.match(readFileSync(join(dotnet, "dabbler.yaml"), "utf8"), /- name: dotnet/);
+    assert.ok(!/no test suite is declared/.test(written?.notes.join(" | ") ?? ""));
   });
 });
 

@@ -40,12 +40,17 @@ const scopes = [{ suite: "unit", roots: ["tests/"], glob: "test_*.py" }];
 describe("the agency grant", () => {
   it("grants the read tools only on the seat, and the write on either", () => {
     const seat = grantForTransport("copilot-cli", { scope: ["src/a.py"], allowWrite: true });
-    assert.equal(seat.mode, MODE_TOOLS);
+    assert.equal(seat.toolsSent, true);
     assert.equal(seat.readBudget, DEFAULT_READ_BUDGET);
+    // The seat's surface exists whether or not it is used, so a round that
+    // called nothing still records `tools` -- an empty operation list is the
+    // signal that the grant may never have reached the model.
+    assert.equal(recordForRound("/nowhere", seat, { tool_calls: [] }).mode, MODE_TOOLS);
     const api = grantForTransport("api", { scope: ["src/a.py"], allowWrite: true });
-    assert.equal(api.mode, MODE_NONE);
+    assert.equal(api.toolsSent, false);
     assert.deepEqual(api.scope, []);
     assert.equal(api.readBudget, 0);
+    assert.equal(recordForRound("/nowhere", api, {}).mode, MODE_NONE);
   });
 
   it("describes nothing it did not grant, and never quotes a credential-shaped example", () => {

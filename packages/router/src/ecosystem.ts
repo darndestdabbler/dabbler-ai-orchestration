@@ -325,8 +325,8 @@ const DOTNET: Ecosystem = {
       compatibility: (providerPackage: string) => `${providerPackage}.Compatibility`,
     };
   },
-  rootFiles(root: string): ScaffoldResult {
-    return rootFilesDotnet(root);
+  rootFiles(root: string, shape: SolutionShape): ScaffoldResult {
+    return rootFilesDotnet(root, shape);
   },
   baseVersion(root: string, project: string): string {
     return baseVersionOfProject(readFileSync(join(root, project), "utf8"));
@@ -575,8 +575,33 @@ export const DOTNET_TOOLCHAIN_ENV: Readonly<Record<string, string>> = {
 /** The MSBuild property that keeps a build from starting the compiler server. */
 export const NO_SHARED_COMPILATION = "-p:UseSharedCompilation=false";
 
+/** The SDK release that reads `.slnx`; below it the file is not a solution. */
+const SLNX_SDK_FLOOR = "9.0.200";
+
 /**
- * The six files a multi-module .NET solution needs at its root, written only
+ * Every .NET project under the solution's modules, root-relative and sorted.
+ *
+ * The projects are found rather than declared, because the module folder is
+ * where they are and a second list of them is a second thing to keep true.
+ */
+function dotnetProjectFiles(root: string, shape: SolutionShape): string[] {
+  const found = new Set<string>();
+  for (const entry of shape.modules) {
+    const roots = entry.codeRoots.length > 0 ? entry.codeRoots : [`modules/${entry.slug}`];
+    for (const codeRoot of roots) {
+      for (const file of walkFiles(join(root, codeRoot))) {
+        const lowered = file.toLowerCase();
+        if (lowered.endsWith(".csproj") || lowered.endsWith(".fsproj")) {
+          found.add(posix(relative(root, file)));
+        }
+      }
+    }
+  }
+  return [...found].sort();
+}
+
+/**
+ * The seven files a multi-module .NET solution needs at its root, written only
  * where absent. The feed is a relative path so a clone on any machine
  * resolves it; the pins are central so a consumer's project says
  * `<PackageReference Include="X" />` and nothing else; Source Link is off
@@ -585,8 +610,17 @@ export const NO_SHARED_COMPILATION = "-p:UseSharedCompilation=false";
  * props load before a project's items exist and the overlay rewrites
  * items; LFS for the packages folder is declared and left for the ceiling
  * to turn on.
+ *
+ * The seventh is the solution file, and it is here because `dotnet test`
+ * resolves the project or solution in the directory it runs in: a solution
+ * whose projects all live under `modules/` had nothing at its root, so the
+ * suite this scaffold declares answered `MSB1003: Specify a project or
+ * solution file`. It is the counterpart of the parent POM that makes Maven's
+ * side resolve, and its upkeep is the parent POM's exactly -- it lists the
+ * projects that exist when it is written, says to add each as it gets one,
+ * and is never rewritten afterwards.
  */
-function rootFilesDotnet(root: string): ScaffoldResult {
+function rootFilesDotnet(root: string, shape: SolutionShape): ScaffoldResult {
   const result = {
     written: [] as string[],
     skipped: [] as string[],
@@ -684,6 +718,41 @@ function rootFilesDotnet(root: string): ScaffoldResult {
     ].join("\n"),
     result,
   );
+  // The directory's own name, case and all, which is what `dotnet new sln`
+  // does. It is NOT the parent POM's rule: an artifactId is lowercase and
+  // hyphenated by Maven convention, and a solution file has no such
+  // convention to obey.
+  const solution = `${basename(root)}.slnx`;
+  const projects = dotnetProjectFiles(root, shape);
+  // `.slnx`, not `.sln`: it is plain XML a scaffold can write and a person
+  // can read and edit, where `.sln` carries a per-project GUID that no
+  // generator has any business inventing.
+  writeIfAbsent(
+    root,
+    solution,
+    [
+      "<Solution>",
+      "  <!-- The solution's projects. `dotnet test` resolves the solution in the directory",
+      "       it runs in, so this file is what gives the root suite something to run. A module",
+      "       still builds from its own project file, so a focused checkout holding one module",
+      "       needs none of the others this lists. Add a project here when a module gets one. -->",
+      ...projects.map((path) => `  <Project Path="${path}" />`),
+      "</Solution>",
+      "",
+    ].join("\n"),
+    result,
+  );
+  if (result.written.includes(solution)) {
+    result.notes.push(
+      `${solution} is an XML solution file, which the .NET SDK reads from ` +
+        `${SLNX_SDK_FLOOR} onward; below that release it is not a solution file at all.`,
+    );
+    if (projects.length === 0) {
+      result.notes.push(
+        `no module holds a project file yet, so ${solution} lists none; add each as it gets one`,
+      );
+    }
+  }
   // MSBuild writes its output inside the project it built -- `bin/` and
   // `obj/` -- and both sit under the module's own code roots. A module's
   // source digest is taken over those roots, so an unignored bin/ makes the

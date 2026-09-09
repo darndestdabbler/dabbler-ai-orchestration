@@ -242,13 +242,55 @@ again. The step the framework is waiting on is written on `run.json` as
 `pending_step` until its report is accepted, which is what lets the call
 that resumes the session judge it before the phase's own work.
 
+### What the verifier can see, and what it may ask for
+
+A round on the **Copilot seat** holds three tools — list, search, read —
+and the CLI runs them in its own process, so the framework can only
+measure what was done. A round on the **direct-API path** holds none:
+what it sees is the evidence bundle in front of it, and nothing else.
+
+That second case has one opening, and it is off unless your repository
+turns it on. With `verification.settings.api_file_requests: true`, an
+API verifier may **ask for files by path** — it emits a fenced
+`file-request` block naming them, and the framework is what opens them.
+Four things follow from the framework doing the opening rather than the
+model:
+
+- The request is **confined to the round's scope** and **counted against
+  the same read budget** as a seat round's reads. A path outside either
+  never reaches the filesystem: it is refused before a file is opened,
+  and the refusal — with the boundary it met — is written onto the
+  round's `agency` block. Nothing is dropped silently.
+- What comes back is **the contents on disk**. There is no scrubbing
+  layer between the file and the model on this path, so a read here is
+  verbatim by construction and can never be recorded as `transformed`.
+  The one thing a fenced block cannot express is a missing final
+  newline, so a file without one arrives with one; nothing else is
+  altered, and a file ending in blank lines keeps them.
+- There is **exactly one further turn**. The files go back, and the
+  answer to that turn is the verdict — not a loop, so a round costs at
+  most twice its payload. A request the framework refused entirely buys
+  no second turn at all: the first answer stands.
+- The round records `mode: tools` **only if a file was actually
+  delivered**. `operations_granted` says what was offered — `["read"]`
+  where the setting is on — and `mode` says what the round had in front
+  of it, so a verifier that asked for nothing, or for nothing the
+  framework could give it, records `mode: none` exactly as a blind round
+  does. That is the distinction the measurement rests on: a round that
+  saw only the evidence bundle is one of those, whatever it was offered.
+
+`dabbler status` and the round's ledger row carry the whole account.
+None of this is yours to drive: the framework decides, reads and records
+it inside the verification job.
+
 ## `wait`: the framework's own long work
 
 Three things take longer than a tool call: a verification round, the
 complete suite as the run of record, and the close — four, for a session
 that declared itself releasable, whose publish runs between the push and
-the close. (The preverify phase runs nothing: the tests that run are the
-verifier's own inside the round, and the complete suite after it.) None
+the close. (The preverify phase runs nothing: the tests that run are each
+step's own checks and the complete suite as the run of record, and the
+verifier reviews without writing or running one.) None
 of them runs inside a `next` call. The framework starts each one detached
 and comes straight back:
 

@@ -22,6 +22,7 @@
 
 import {
   applyWrites,
+  deliverFileRequests,
   grantForTransport,
   moduleScope,
   recordForRound,
@@ -30,6 +31,8 @@ import {
   summaryLine,
   DEFAULT_READ_BUDGET,
   type AgencyGrant,
+  type AgencyOperation,
+  type DeliveredFile,
 } from "../agency.ts";
 import { ManifestError, type SolutionShape, moduleConfigs, solutionShape } from "../modules.ts";
 import {
@@ -112,6 +115,7 @@ export async function dispatchVerification(
     excludeProviders: readonly string[];
     sessionNumber: number | null;
     transport?: string | null;
+    followUp?: ((answer: string) => string | null) | null;
   },
 ): Promise<RouteResult> {
   const { DispatchError, route } = await import("../route.ts");
@@ -127,6 +131,7 @@ export async function dispatchVerification(
         sessionNumber: options.sessionNumber,
         excludeProviders: excluded,
         transport: options.transport ?? null,
+        followUp: options.followUp ?? null,
       });
     } catch (error) {
       if (!(error instanceof DispatchError)) throw error;
@@ -643,15 +648,37 @@ export async function runRound(
   // where the verifier authors tests, and a surface offered in every round
   // is a surface used in every round -- a review that quietly edits the tree
   // it is reviewing is not a review.
+  // Off unless the repository says otherwise, and off is what every
+  // repository says until an operator changes it: a verifier that can ask
+  // for a file is a second turn nobody has measured yet.
+  const apiFileRequests = verificationSettings["api_file_requests"] === true;
   const grantFor = (forTransport: string): AgencyGrant =>
     grantForTransport(forTransport, {
       scope,
       readBudget,
       testScopes: selection.scopes,
       allowWrite: false,
+      allowFileRequests: apiFileRequests,
     });
 
   const grant = grantFor(resolveTransport(config, options.transport ?? null));
+
+  // The reads happen exactly once, inside the dispatch, and what they
+  // produced is what the round records: a second pass over the same answer
+  // would open the same files again and could disagree with the first about
+  // a tree that moved in between.
+  //
+  // The grant here is the predicted one, because the follow-up is decided
+  // before any answer says which transport served it. That is safe in both
+  // directions -- a briefing that described tools does not produce a request
+  // block, and one that described the block does not produce a tool call --
+  // and the RECORD below is built from the transport that actually answered.
+  let requested: readonly AgencyOperation[] = [];
+  const followUp = (answer: string): string | null => {
+    const outcome = deliverFileRequests(repoRoot, grant, answer);
+    requested = outcome.operations;
+    return outcome.files.length === 0 ? null : deliveredFilesMessage(outcome.files);
+  };
 
   const promptBody = buildVerificationPrompt(
     String(config["_verification_template"] ?? ""),
@@ -675,6 +702,7 @@ export async function runRound(
       excludeProviders: exclude,
       sessionNumber: current,
       transport: options.transport ?? null,
+      followUp,
     });
   } catch (error) {
     if (error instanceof NoCandidateError) {
@@ -758,6 +786,7 @@ export async function runRound(
     actualGrant,
     result.metadata,
     writes,
+    requested,
   );
 
   const row: Row = {
@@ -853,6 +882,51 @@ export async function runRound(
       "\n",
   );
   return EXIT_OK;
+}
+
+/**
+ * A fence long enough to hold `body` whole.
+ *
+ * A source file that itself contains a fence would otherwise close the block
+ * around it early, and the verifier would be shown a file that appears to end
+ * where it does not.
+ */
+function fenceFor(body: string): string {
+  const longest = [...body.matchAll(/`+/g)].reduce(
+    (most, run) => Math.max(most, run[0].length),
+    0,
+  );
+  return "`".repeat(Math.max(3, longest + 1));
+}
+
+/**
+ * The one further turn's message: the files the framework opened, and the
+ * instruction that this turn is the verdict.
+ *
+ * Said plainly rather than implied, because the alternative to "answer now"
+ * is a verifier that asks again into a turn that does not exist.
+ */
+function deliveredFilesMessage(files: readonly DeliveredFile[]): string {
+  const parts = files.map((file) => {
+    const fence = fenceFor(file.content);
+    // The contents as they are, and never trimmed: a file that ends in two
+    // blank lines ends in two here. The one thing a fenced block cannot
+    // express is the absence of a final newline, so one is added where the
+    // file has none -- and the briefing says so rather than claiming a
+    // fidelity the format does not have.
+    const body = file.content.endsWith("\n") ? file.content : `${file.content}\n`;
+    return `### ${file.path}\n\n${fence}\n${body}${fence}`;
+  });
+  return (
+    `## The files you asked for\n\n${files.length} file(s), read from disk ` +
+    "by the framework: the contents as they are on disk, with a final " +
+    "newline added where a file had none, because a fenced block cannot " +
+    "show its absence.\n\n" +
+    `${parts.join("\n\n")}\n\n---\n\n` +
+    "That is the whole of what you asked for. **This turn is your verdict** " +
+    "— there is no further turn, and another request block will not be " +
+    "answered. Reply in the response format the instructions above give."
+  );
 }
 
 function settingsBlock(config: RouterConfig): Record<string, unknown> {

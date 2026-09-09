@@ -2750,9 +2750,9 @@
     {
       "number": 140,
       "title": "The phase an operator can read, the step they can see, and the second release",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-09T12:34:00.157000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-09-09T14:11:01.867000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

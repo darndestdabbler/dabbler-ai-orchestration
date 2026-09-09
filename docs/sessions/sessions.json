@@ -2599,6 +2599,26 @@
         "hookRemoved": true
       },
       "verificationVerdict": "VERIFIED",
+      "verification": {
+        "rounds": 2,
+        "verifierModel": "gpt-5-6-terra",
+        "verifierProvider": "openai",
+        "transport": "api"
+      },
+      "frameworkVersion": "2.0.14"
+    },
+    {
+      "number": 133,
+      "title": "The four papercuts, and the walk's own record closed",
+      "status": "in-progress",
+      "startedAt": "2026-09-08T19:38:12.774000-04:00",
+      "completedAt": null,
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": "VERIFIED",
       "frameworkVersion": "2.0.14",
       "verification": {
         "rounds": 2,
@@ -2606,15 +2626,6 @@
         "verifierProvider": "openai",
         "transport": "api"
       }
-    },
-    {
-      "number": 133,
-      "title": "The four papercuts, and the walk's own record closed",
-      "status": "not-started",
-      "startedAt": null,
-      "completedAt": null,
-      "orchestrator": null,
-      "verificationVerdict": null
     },
     {
       "number": 134,

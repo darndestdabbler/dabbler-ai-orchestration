@@ -14,11 +14,10 @@
 // `PackageVersion` per id in `Directory.Packages.props`, replaced in place,
 // with a consumer's `PackageReference` carrying no version of its own.
 
-import { spawnSync } from "node:child_process";
 import { type Dirent, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
 
-import { resolveProgram } from "./checks.ts";
+import { spawnSyncProgram } from "./checks.ts";
 import type { RouterConfig } from "./config.ts";
 import {
   DOTNET_TOOLCHAIN_ENV,
@@ -234,13 +233,9 @@ export interface PackResult {
 }
 
 function runPackDefault(argv: readonly string[], cwd: string): { code: number; output: string } {
-  const [program, ...args] = argv;
-  const resolved = resolveProgram(String(program));
-  const result = spawnSync(resolved.path, args, {
+  const result = spawnSyncProgram(argv, {
     cwd,
     encoding: "utf8",
-    windowsHide: true,
-    shell: resolved.isBatch,
     env: { ...process.env, ...DOTNET_TOOLCHAIN_ENV },
   });
   return {

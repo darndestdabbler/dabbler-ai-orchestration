@@ -26,7 +26,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { cpus, tmpdir } from "node:os";
 import { dirname, isAbsolute, join, posix, resolve } from "node:path";
 
-import { materialPaths, resolveProgram } from "./checks.ts";
+import { materialPaths, spawnSyncProgram } from "./checks.ts";
 import type { RouterConfig } from "./config.ts";
 import {
   DOTNET_TOOLCHAIN_ENV,
@@ -530,14 +530,10 @@ export interface PreflightResult {
 }
 
 function timedSpawn(argv: readonly string[], cwd: string): TimedRun {
-  const [program, ...args] = argv;
-  const resolved = resolveProgram(String(program));
   const started = Date.now();
-  const result = spawnSync(resolved.path, args, {
+  const result = spawnSyncProgram(argv, {
     cwd,
     encoding: "utf8",
-    windowsHide: true,
-    shell: resolved.isBatch,
     maxBuffer: 64 * 1024 * 1024,
     env: { ...process.env, ...DOTNET_TOOLCHAIN_ENV },
   });

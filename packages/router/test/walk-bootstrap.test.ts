@@ -247,4 +247,28 @@ describe("a project on its first day", () => {
     assert.equal(gitOut(folder, "rev-parse", "--abbrev-ref", `${branch}@{upstream}`), `origin/${branch}`);
     assert.equal(gitOut(bare, "rev-parse", `refs/heads/${branch}`), gitOut(folder, "rev-parse", "HEAD"));
   });
+
+  it("names the project directory's own .dabbler in the discovery line, not the working directory's", async () => {
+    // Every other line of a `--project-dir` run names the project. This one
+    // took the working directory instead, so it reported on a folder the
+    // command had been told not to act on -- and sent a reader looking for a
+    // file that was never going to be there. Walk finding 7, D264.
+    const repo = makeRepo(PROJECT, { origin: true });
+
+    const setup = await capture(() =>
+      bootstrapVerb(["--project-dir", repo, "--no-transport-detect"]),
+    );
+    assert.equal(setup.value, 0, setup.stderr);
+
+    const line = setup.stdout
+      .split(/\r?\n/)
+      .find((each) => each.startsWith("discovery: api-enumeration:"));
+    assert.ok(line !== undefined, `no api-enumeration line in:\n${setup.stdout}`);
+    assert.ok(
+      line.includes(join(repo, ".dabbler", "api-models.lock")),
+      `the line names another project's record: ${line}`,
+    );
+    // And not this suite's own working directory, which is what it named.
+    assert.ok(!line.includes(join(process.cwd(), ".dabbler", "api-models.lock")), line);
+  });
 });

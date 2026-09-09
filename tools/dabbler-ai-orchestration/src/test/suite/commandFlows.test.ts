@@ -43,6 +43,8 @@ import {
   writeStartRequest,
 } from "../../commands/sessionCommands";
 import * as fs from "fs";
+import { ROUTER_VERSION } from "dabbler-ai-router";
+import { prerequisiteReport, type ToolProbe } from "../../commands/troubleshoot";
 import type { DriveHandle } from "../../router/driveProcess";
 import { openDabblerTerminal } from "../../router/dabblerTerminal";
 import { cancellableSessionOf } from "../../commands/cancelLifecycleCommands";
@@ -1183,5 +1185,45 @@ suite("Open Module", () => {
     assert.deepStrictEqual(warnings, [refusal]);
     assert.strictEqual(infos.length, 1);
     assert.strictEqual(logged.length, 1);
+  });
+});
+
+suite("Troubleshoot's prerequisite report", () => {
+  test("names a present tool with its version, a missing one as missing, and never a key's value", async () => {
+    // The probe is what makes this a test of the report rather than of the
+    // machine: git answers, everything else does not, whatever is installed
+    // on the host running the suite.
+    const asked: string[][] = [];
+    const probe: ToolProbe = {
+      probe: async (argv) => {
+        asked.push([...argv]);
+        return argv[0] === "git" ? "git version 2.51.0.windows.2" : null;
+      },
+    };
+    const report = await prerequisiteReport(probe, {
+      DABBLER_TRANSPORT: "copilot-cli",
+      DABBLER_ANTHROPIC_API_KEY: "sk-ant-shouldneverbeprinted",
+    });
+    const text = report.join("\n");
+
+    // Every prerequisite is asked, git among them.
+    assert.ok(asked.some((argv) => argv[0] === "git"));
+    assert.ok(asked.some((argv) => argv[0] === "mvn"));
+
+    // Present: the tool's own answer. Missing: said so, with what it is for.
+    assert.ok(/git\s+git version 2\.51\.0\.windows\.2/.test(text));
+    assert.ok(/mvn\s+not found/.test(text));
+
+    // The router is answered from the extension's own bundle, not from PATH.
+    assert.ok(text.includes(`dabbler-ai-router ${ROUTER_VERSION}`));
+
+    // The transport by value, because which one is set is the question.
+    assert.ok(text.includes("DABBLER_TRANSPORT=copilot-cli"));
+
+    // The keys by presence only. This is the assertion the section exists for:
+    // the channel is one an operator pastes into an issue.
+    assert.ok(text.includes("DABBLER_ANTHROPIC_API_KEY is set"));
+    assert.ok(text.includes("DABBLER_OPENAI_API_KEY is not set"));
+    assert.ok(!text.includes("sk-ant-shouldneverbeprinted"));
   });
 });

@@ -73,20 +73,39 @@ in three places, and the UI path they now document has three holes in it that
 the walk fell into in its first twenty minutes.
 
 **Each product defect is owed on the session log**, so that follow-up
-planning reads it from the structured record and not only from this page:
+planning reads it from the structured record and not only from this page.
 
-| finding | decision |
-| --- | --- |
-| 1 New Module asks four of six values | D258 |
-| 2 bootstrap leaves the manifest uncommitted | D259 |
-| 3 no `bin/`/`obj/` ignore on .NET | D260 |
-| 4 the clone reset counts the ledger | D261 |
-| 5 no remote and no upstream in the UI | D262 |
-| 6 Troubleshoot runs no toolchain checks | D263 |
-| 7 `bootstrap --project-dir` and the drift note | D264 |
-| 8 New Module's `1/2` title | D265 |
-| 9 the deprecated shell spawn in the Maven pack | D266 |
-| 10 no test suite is ever declared | D267 |
+**All ten were answered in the three sessions after this one**, and the
+column saying so is the whole of what this page gained afterwards. Nothing
+above or below it is revised: this is an instrument's reading, taken on 8
+September 2026, and a reading with the repairs recorded against it is worth
+more than one edited until it agrees with the code. Every finding's own
+section therefore still describes what the walk saw, in the past tense it was
+written in — findings 3 and 10 above all, which describe a .NET walk that no
+longer behaves that way.
+
+| finding | decision | answered |
+| --- | --- | --- |
+| 1 New Module asks four of six values | D258 | session 131 |
+| 2 bootstrap leaves the manifest uncommitted | D259 | session 132 |
+| 3 no `bin/`/`obj/` ignore on .NET | D260 | session 131 |
+| 4 the clone reset counts the ledger | D261 | session 132 |
+| 5 no remote and no upstream in the UI | D262 | session 132 |
+| 6 Troubleshoot runs no toolchain checks | D263 | session 133 |
+| 7 `bootstrap --project-dir` and the drift note | D264 | session 133 |
+| 8 New Module's `1/2` title | D265 | session 133 |
+| 9 the deprecated shell spawn in the Maven pack | D266 | session 133 |
+| 10 no test suite is ever declared | D267 | session 131, one half owed |
+
+**One half is still open, and it is finding 10's.** Session 131 made the
+first pack declare the ecosystem's suite, which is the missing thing the
+finding diagnosed. On .NET that declaration names a command with no root to
+resolve — `dotnet test` at a repository whose projects live under
+`modules/<slug>/` answers MSB1003 — so the root solution file that gives it
+one is session 131's owed item and is still unwritten. Until it is, a .NET
+solution built this way declares a suite that cannot run, which is a
+different defect from declaring none and a smaller one: the command is there
+to be read and to fail loudly.
 
 The document errors are not owed: they were fixed in this session, in the
 documents themselves.

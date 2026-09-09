@@ -88,7 +88,35 @@ function refusal(run: () => unknown): string {
   assert.fail("expected the config to be refused");
 }
 
+/**
+ * The transport environment variable, out of the way for a whole describe.
+ *
+ * `resolveTransport` answers the WHOLE precedence chain -- flag, then env,
+ * then `transport.profile` -- so a test that asserts what a LAYER says by
+ * reading it through that function is asking a question about the machine it
+ * is running on. Three did, and they passed everywhere until the operator's
+ * own machine persisted `DABBLER_TRANSPORT=api`, at which point the complete
+ * suite failed on the one host that runs it while every targeted check
+ * stayed green. The run of record inherits the shell by design, which is why
+ * a suite may not read one.
+ *
+ * The precedence describe below uses the same helper and then sets the
+ * variable itself: cleared before each test is exactly what a test about
+ * precedence needs too.
+ */
+function withoutTransportEnv(): void {
+  const saved = process.env[TRANSPORT_ENV_VAR];
+  beforeEach(() => {
+    delete process.env[TRANSPORT_ENV_VAR];
+  });
+  afterEach(() => {
+    if (saved === undefined) delete process.env[TRANSPORT_ENV_VAR];
+    else process.env[TRANSPORT_ENV_VAR] = saved;
+  });
+}
+
 describe("where the three layers come from", () => {
+  withoutTransportEnv();
   const NONE: ReadonlySet<string> = new Set();
   const BOTH: ReadonlySet<string> = new Set([
     PROJECT_CONFIG_FILENAME,
@@ -240,6 +268,8 @@ describe("loading a config", () => {
 });
 
 describe("the machine-local overlay", () => {
+  withoutTransportEnv();
+
   it("merges over the base, partially", () => {
     const config = loadConfigFrom(
       sources({ overrides: { transport: { profile: "copilot-cli" } } }),
@@ -291,6 +321,8 @@ describe("the machine-local overlay", () => {
 });
 
 describe("the tracked project config", () => {
+  withoutTransportEnv();
+
   it("lets the repository declare its own suites", () => {
     const config = loadConfigFrom(
       sources({
@@ -337,14 +369,7 @@ describe("the tracked project config", () => {
 });
 
 describe("resolving the transport", () => {
-  const saved = process.env[TRANSPORT_ENV_VAR];
-  beforeEach(() => {
-    delete process.env[TRANSPORT_ENV_VAR];
-  });
-  afterEach(() => {
-    if (saved === undefined) delete process.env[TRANSPORT_ENV_VAR];
-    else process.env[TRANSPORT_ENV_VAR] = saved;
-  });
+  withoutTransportEnv();
 
   it("defaults to the API", () => {
     assert.equal(resolveTransport(makeConfig()), "api");

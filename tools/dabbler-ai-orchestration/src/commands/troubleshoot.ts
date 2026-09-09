@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import * as fs from "fs";
 import * as path from "path";
 import * as cp from "child_process";
+import { ROUTER_VERSION, spawnProgram } from "dabbler-ai-router";
 import { SESSIONS_REL, hasSessionsRoot } from "../utils/fileSystem";
 import { RouterCommands, productionCommands, productionRouter } from "../router/host";
 
@@ -179,6 +180,151 @@ function checkLayout(): void {
   ch.show();
 }
 
+// --- Prerequisites ---------------------------------------------------------
+//
+// The toolchain both UAT walkthroughs open with, run rather than listed.
+//
+// It belongs to the UI and not to the framework: constant, optional and
+// without a fixed lifecycle moment is the UI's bucket in
+// `docs/design/command-ownership.md`, and nothing in a session's lifecycle is
+// the right time to ask whether Maven is installed. Both walkthroughs said in
+// as many words that these are "the one diagnostic Dabbler does not run for
+// you" — walk finding 6, D263 — which is the sentence this section deletes.
+//
+// It reports and never grades. A machine that has no JDK is a machine doing
+// .NET work, so an absent tool is a fact about this project rather than a
+// fault, and the reading is the operator's.
+
+/** One prerequisite: what answers for it, and what it is needed for. */
+interface Prerequisite {
+  readonly name: string;
+  readonly argv: readonly string[];
+  readonly why: string;
+}
+
+const PREREQUISITES: readonly Prerequisite[] = [
+  { name: "git", argv: ["git", "--version"], why: "every session commits, pushes and clones through it" },
+  { name: "node", argv: ["node", "--version"], why: "the router is a Node program; 22 or newer" },
+  { name: "dotnet", argv: ["dotnet", "--version"], why: "the .NET walkthrough's SDK" },
+  { name: "java", argv: ["java", "-version"], why: "the JDK the Maven walkthrough's scaffold is pinned from" },
+  { name: "mvn", argv: ["mvn", "--version"], why: "the Maven walkthrough's build; 3.9 or newer" },
+  { name: "copilot", argv: ["copilot", "--version"], why: "only for a Copilot seat; part A of the walkthroughs" },
+];
+
+/**
+ * The environment the walkthroughs' parts A and B split on.
+ *
+ * The transport is reported BY VALUE, because which one is set is the whole
+ * question and a persisted `copilot-cli` is what silently bills a seat. The
+ * three keys are reported PRESENT or ABSENT and never by value: this channel
+ * is the one an operator pastes into an issue, and a diagnostic that prints
+ * a credential has created the problem it was opened to solve.
+ */
+const TRANSPORT_VAR = "DABBLER_TRANSPORT";
+const KEY_VARS = [
+  "DABBLER_ANTHROPIC_API_KEY",
+  "DABBLER_OPENAI_API_KEY",
+  "DABBLER_GEMINI_API_KEY",
+] as const;
+
+/**
+ * Running one prerequisite's argv, as a seam.
+ *
+ * The seam is what makes the report testable: with the probe injected, what
+ * the lines say is a function of what was found, not of whichever toolchain
+ * the machine running the suite happens to have installed.
+ */
+export interface ToolProbe {
+  /** What the tool answered, or null when it could not be run at all. */
+  probe(argv: readonly string[]): Promise<string | null>;
+}
+
+/** The first non-empty line, which is where every one of these puts its version. */
+function firstLine(output: string): string {
+  return output.split(/\r?\n/).map((line) => line.trim()).find((line) => line !== "") ?? "";
+}
+
+/**
+ * The real probe: the router's own spawn, so a `.cmd` shim is reached the one
+ * way this framework reaches one. `mvn` on Windows IS a batch shim, and a
+ * probe that spawned it directly would report the tool missing on exactly the
+ * machines the Maven walkthrough is written for.
+ *
+ * Output is taken from both streams, because `java -version` writes its
+ * version to stderr; a non-zero exit is a tool that did not answer.
+ */
+export function defaultToolProbe(timeoutMs = 10_000): ToolProbe {
+  return {
+    probe: (argv) =>
+      new Promise<string | null>((resolve) => {
+        let output = "";
+        let child: ReturnType<typeof spawnProgram>;
+        try {
+          child = spawnProgram(argv, { stdio: ["ignore", "pipe", "pipe"] });
+        } catch {
+          resolve(null);
+          return;
+        }
+        const timer = setTimeout(() => { child.kill(); resolve(null); }, timeoutMs);
+        const settle = (value: string | null): void => { clearTimeout(timer); resolve(value); };
+        child.stdout?.on("data", (chunk: Buffer) => { output += chunk.toString(); });
+        child.stderr?.on("data", (chunk: Buffer) => { output += chunk.toString(); });
+        child.on("error", () => settle(null));
+        child.on("close", (code) => settle(code === 0 && firstLine(output) !== "" ? firstLine(output) : null));
+      }),
+  };
+}
+
+/**
+ * What the toolchain looks like from here, as lines.
+ *
+ * `env` is passed rather than read so that the two things this must never do
+ * — print a key, and depend on the developer's own shell — are both decided
+ * by the caller and provable by the suite.
+ */
+export async function prerequisiteReport(
+  probe: ToolProbe,
+  env: Readonly<Record<string, string | undefined>> = process.env,
+): Promise<string[]> {
+  const lines: string[] = [
+    "The toolchain both UAT walkthroughs open with, as this machine answers it.",
+    "An absent tool is not a fault: a project that builds no Java needs no JDK.",
+    "",
+  ];
+  for (const item of PREREQUISITES) {
+    const answer = await probe.probe(item.argv);
+    lines.push(
+      answer === null
+        ? `  ✗ ${item.name.padEnd(8)} not found — ${item.why}`
+        : `  ✓ ${item.name.padEnd(8)} ${answer}`,
+    );
+  }
+  // Asked of the router the extension is actually running, not of a `dabbler`
+  // on PATH: "dabbler: command not found" is a PATH problem in a terminal and
+  // says nothing about which router this window would use.
+  lines.push(`  ✓ ${"router".padEnd(8)} dabbler-ai-router ${ROUTER_VERSION} (in this extension)`);
+  lines.push("");
+  const transport = env[TRANSPORT_VAR];
+  lines.push(
+    transport === undefined || transport === ""
+      ? `  ${TRANSPORT_VAR} is unset — the API transport, unless a config or a --transport flag says otherwise`
+      : `  ${TRANSPORT_VAR}=${transport}`,
+  );
+  for (const key of KEY_VARS) {
+    const value = env[key];
+    lines.push(`  ${key} ${value === undefined || value === "" ? "is not set" : "is set"}`);
+  }
+  lines.push("");
+  lines.push("Values are never printed for the three keys: this channel is one you may paste into an issue.");
+  return lines;
+}
+
+async function checkPrerequisites(): Promise<void> {
+  const ch = outputChannel();
+  for (const line of await prerequisiteReport(defaultToolProbe())) ch.appendLine(line);
+  ch.show();
+}
+
 export function registerTroubleshootCommand(
   context: vscode.ExtensionContext,
   commands: RouterCommands = productionCommands(),
@@ -215,6 +361,11 @@ export function registerTroubleshootCommand(
           label: "$(folder) File/folder layout wrong",
           detail: "Compare expected layout vs. actual workspace state",
           run: checkLayout,
+        },
+        {
+          label: "$(tools) Prerequisites / toolchain",
+          detail: "Run the checks both walkthroughs open with and report what is here",
+          run: checkPrerequisites,
         },
       ];
 

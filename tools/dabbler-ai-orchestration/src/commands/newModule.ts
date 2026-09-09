@@ -64,7 +64,7 @@ export async function runNewModuleFlow(
   const existingSlugs = readModuleSlugs(root);
 
   const slug = await ui.showInputBox({
-    title: "New module (1/2): slug",
+    title: "New module (1/4): slug",
     prompt:
       "Machine identity for the module (kebab-case). A module bounds part " +
       "of the repository's code: its roots, its spec sections, its assets.",

@@ -478,22 +478,28 @@ export async function bootstrapVerb(argv: string[]): Promise<number> {
   // bootstrap is run on machines with no keys, behind proxies and in tests.
   // A setup verb that fails, or hangs, because a provider is down would be
   // a worse defect than the one this replaces.
-  for (const line of absentRecordNotices()) writeOut(`${line}\n`);
+  for (const line of absentRecordNotices(project)) writeOut(`${line}\n`);
   return EXIT_OK;
 }
 
 /**
  * The discovery records this project has never made, if any.
  *
+ * `projectDir` is the project bootstrap was TOLD to act on, and both the
+ * config's layers and the record's path are read for it. Neither was, and
+ * the one line this function prints then named the working directory's
+ * `.dabbler` while every other line of the same run named the project
+ * (D264) -- a reader sent to a file that was never going to be there.
+ *
  * Best-effort and silent on failure: a configuration this cannot read is
  * not a reason to fail a setup, and there is nothing here a project needs
  * in order to run a session.
  */
-function absentRecordNotices(): string[] {
+function absentRecordNotices(projectDir: string): string[] {
   try {
-    const config = loadConfig();
-    const stale = freshnessWarnings(config, Date.now(), true);
-    const existing = new Set(freshnessWarnings(config, Date.now(), false));
+    const config = loadConfig(undefined, projectDir);
+    const stale = freshnessWarnings(config, Date.now(), true, projectDir);
+    const existing = new Set(freshnessWarnings(config, Date.now(), false, projectDir));
     return stale.filter((line) => !existing.has(line));
   } catch {
     return [];

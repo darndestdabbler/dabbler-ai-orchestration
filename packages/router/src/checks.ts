@@ -27,6 +27,8 @@ import {
   type ChildProcess,
   type SpawnOptions,
   type SpawnSyncOptions,
+  type SpawnSyncOptionsWithStringEncoding,
+  type SpawnSyncReturns,
 } from "node:child_process";
 import { existsSync, mkdtempSync, readdirSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -1785,6 +1787,41 @@ export function spawnProgram(argv: readonly string[], options: SpawnOptions): Ch
     );
   }
   return track(spawn(resolved.path, rest, grouped));
+}
+
+/**
+ * The synchronous twin, and the same rule: an executable with no shell, or a
+ * batch shim handed to `cmd.exe` with every argument quoted here.
+ *
+ * `shell: resolved.isBatch` is not available to a router that declares argv.
+ * Node deprecated passing arguments with `shell: true` (DEP0190) because the
+ * arguments are concatenated rather than escaped, and the concatenation is
+ * the same defect an argv declaration exists to prevent -- so the branch a
+ * `.cmd` needs is the OS rule for a batch file, spelled out, and not a
+ * preference for a shell. It was the two synchronous callers -- the pack's
+ * default build and the checkout's timings -- that still carried it, and on
+ * Windows `mvn` is `mvn.cmd`, so the pack printed a deprecation warning
+ * about a security vulnerability into the middle of its own four lines.
+ *
+ * No `detached`: a synchronous child is waited for by definition, so there
+ * is no tree for `terminateTree` to reach afterwards.
+ */
+export function spawnSyncProgram(
+  argv: readonly string[],
+  options: SpawnSyncOptionsWithStringEncoding,
+): SpawnSyncReturns<string> {
+  const [program, ...rest] = argv;
+  const resolved = resolveProgram(String(program));
+  const hidden = hiddenSpawn(options);
+  if (resolved.isBatch) {
+    const line = `"${[resolved.path, ...rest].map(quoteForCmd).join(" ")}"`;
+    return spawnSync(
+      process.env["COMSPEC"] ?? "cmd.exe",
+      ["/d", "/s", "/v:off", "/c", line],
+      { ...hidden, windowsVerbatimArguments: true },
+    );
+  }
+  return spawnSync(resolved.path, rest, hidden);
 }
 
 export function emptySelection(): Record<string, unknown> {

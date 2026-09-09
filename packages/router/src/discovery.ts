@@ -38,7 +38,7 @@
 // maintenance signals get suppressed.
 
 import { existsSync, readFileSync, statSync } from "node:fs";
-import { isAbsolute, join } from "node:path";
+import { isAbsolute, join, resolve as resolvePath } from "node:path";
 
 import { parse as parseToml } from "smol-toml";
 
@@ -850,12 +850,26 @@ export function discoverySettings(config: RouterConfig): DiscoverySettings {
  * belongs to the distribution; this record is derived from whichever key set
  * happens to be present, so a build that swept it up would publish one
  * checkout's credentials-shaped view of the world to every consumer.
+ *
+ * `projectDir` names WHICH project, for a caller that was told to act
+ * somewhere other than where it is standing. `dabbler bootstrap
+ * --project-dir X` run from elsewhere reported the working directory's
+ * `.dabbler` in the one discovery line while every other line of the same
+ * run named X, which sent a reader to a file that was never going to be
+ * there (D264). Omitting it keeps the working directory, which is the right
+ * project for `session start` and for `dabbler discovery`.
  */
-export function resolveRecordPath(config: RouterConfig): string {
+export function resolveRecordPath(config: RouterConfig, projectDir?: string): string {
   const value = discoverySettings(config).record;
   if (isAbsolute(value)) return value;
-  const root = projectRoot();
-  return join(root ?? workingDirectory(), ...value.split("/"));
+  // The project's git toplevel where it has one, and the named directory
+  // itself where it does not: bootstrap prints this line for a folder that
+  // may have been `git init`ed one second ago or not at all, and reporting
+  // the working directory for a project outside a repository is the same
+  // defect one step along.
+  const root = projectRoot(projectDir);
+  const base = root ?? (projectDir === undefined ? workingDirectory() : resolvePath(projectDir));
+  return join(base, ...value.split("/"));
 }
 
 // --- Freshness --------------------------------------------------------------
@@ -1098,12 +1112,18 @@ export function apiRecordAge(
 export function checkFreshness(
   config: RouterConfig,
   now: number = Date.now(),
+  projectDir?: string,
 ): FreshnessRow[] {
   const settings = discoverySettings(config);
   const rows = [
-    apiFreshness(config, resolveRecordPath(config), settings.max_age_hours, now),
+    apiFreshness(config, resolveRecordPath(config, projectDir), settings.max_age_hours, now),
   ];
 
+  // `projectDir` reaches the API record's row and not this one, and that is
+  // the distinction rather than an omission: the seat catalog resolves
+  // against the config that names it because it belongs to the distribution
+  // and to the operator's seat, while the API record belongs to whichever
+  // project derived it.
   let seatPath = "(no transports.copilot-cli.lockfile configured)";
   let seatPresent = false;
   let seatDated: string | null = null;
@@ -1149,8 +1169,9 @@ export function freshnessWarnings(
   config: RouterConfig,
   now: number = Date.now(),
   includeAbsent = true,
+  projectDir?: string,
 ): string[] {
-  return checkFreshness(config, now)
+  return checkFreshness(config, now, projectDir)
     .filter(isStale)
     .filter((row) => includeAbsent || row.present)
     .map((row) => `discovery: ${freshnessMessage(row)}`);

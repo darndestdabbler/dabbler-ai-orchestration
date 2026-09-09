@@ -28,6 +28,12 @@ export {
 // shell, a `.cmd` shim quoted, its own process group on POSIX) rather than
 // restating it.
 export { spawnProgram, terminateTree } from "./checks.ts";
+// Which router this is, for a host that has to say so. The extension bundles
+// the router rather than finding it on PATH, so "run `dabbler version`" is a
+// question about a terminal's PATH and not about the router this window is
+// using -- and a diagnostic that answered it that way would report the wrong
+// program, or none. One string, read from the manifest that declares it.
+export { VERSION as ROUTER_VERSION } from "./version.ts";
 // The watcher rule, for the same reason: the Dabbler terminal is what
 // renders "an instruction is outstanding and nothing has answered it", and
 // a renderer that decided it for itself would be a second statement of a

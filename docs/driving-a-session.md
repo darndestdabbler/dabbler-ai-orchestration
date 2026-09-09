@@ -1,0 +1,875 @@
+# Driving a session
+
+This is for the person about to run a session with an AI engine for the
+first time. It says what to type, what comes back, what to do with it, how
+to interrupt, and what to do when the framework stops.
+
+Every example line below came from one walk on a scratch repository on
+2026-08-31 — a single-step session taken from `session next` through to
+`done`, with one refused report, one message sent mid-session and one halt
+— and the lines are as they were printed. Nothing here is illustrative.
+
+**"Starting from the Work Explorer" below came from a second walk**, on
+2026-08-31 after session 62, on a scratch repository at `C:\temp\s62-walk`
+with the Copilot seat named as the engine: a session registered, one step
+done, a `wait` while the affected tests ran, a halt from `session
+interrupt --stop`, and the decision that halt raised — answered, after
+which the session resumed. Its lines are as they were printed too.
+
+## The shape of it
+
+A session is a numbered block of work in `docs/sessions/session-plan.md`
+with a lifecycle around it: register, declare, work (each step proved by
+its own checks), verify with a different provider, run the whole suite,
+commit and push, close. Following that list in prose is what an engine is
+worst at — it wanders, and a less capable engine wanders further.
+
+So the framework owns the list, and the engine asks it what to do next:
+
+```
+dabbler session next --sessions-dir docs/sessions
+```
+
+One call, one move. It judges whatever answer is outstanding, advances the
+session by one step, and prints the next instruction on stdout. You do
+what the instruction says, run the command it names, and call `next`
+again — until it says `done`.
+
+**The engine stays in its own CLI.** Nothing spawns Claude Code or Gemini
+CLI or a Copilot seat; you are already talking to one, in the terminal you
+like, with your own context, your own scrollback and your own interrupt
+key. The whole instruction an engine needs is one sentence: *call `dabbler
+session next` and do what it says until it says `done`.*
+
+## Before the first call
+
+- The repository has a `docs/sessions/session-plan.md` with a
+  `### Session N of M:` block for the next session, and a `dabbler.yaml`
+  at the root. (`dabbler bootstrap` makes both; see `quick-start.md`.)
+- The verifier needs a provider key in the environment —
+  `DABBLER_ANTHROPIC_API_KEY`, `DABBLER_OPENAI_API_KEY` or
+  `DABBLER_GEMINI_API_KEY` — for a provider *other* than the engine's.
+  Verification is cross-provider and there is no way to skip it.
+- `session start` registers the session, and it is the one call that
+  carries who is working:
+
+  ```
+  dabbler session start --sessions-dir docs/sessions \
+      --engine claude-code --provider anthropic
+  ```
+
+  `next` never registers. Every `next` carries no identity — the session
+  is in flight and its identity is on the record — and a `next` that names
+  an engine with nothing in flight is refused rather than starting work
+  nobody asked for. With nothing in flight, `next` answers `done`.
+
+- `--transport`, if you want it, goes on the first `next`. It is the
+  *run's*, not the call's: the call that eventually starts verification is
+  whichever `next` happens to reach that phase, following an
+  `answer_command` that names it, so it is kept on `run.json` and used when
+  the round is finally started. Naming it again on a later call changes it.
+
+- **The round cap is not typeable on a driving call.** It is
+  `verification.settings.max_rounds` in the configuration, and `next` and
+  `drive` refuse `--max-rounds` rather than accepting it. It moved in both
+  directions and recorded nothing: a cap at or below the rounds already run
+  ends verification on the spot, which is a verification-reducing act
+  reachable by anyone who typed a command and attributable to nobody.
+
+  For one run it moves through one verb, `session plan amend --max-rounds`:
+
+  ```
+  dabbler session plan amend --sessions-dir docs/sessions \
+      --max-rounds 4 --reason "<why this tree is worth another round>" \
+      --approver <who>
+  ```
+
+  which writes the cap to `run.json` and appends the before, the after, the
+  rounds already run, the reason and the approver to `amendments.jsonl`.
+  **State what that buys and no more.** The approver is whatever the engine
+  writes, so the row is a CLAIM and not proof that anybody authorised
+  anything — and no gate reads it, because a gate that trusted an
+  engine-written approver would make the authorisation forgeable, which is
+  worse than absent. What it buys is that the claim exists, next to the
+  rounds it is being spent past, reviewable at the close, instead of a bare
+  number appearing on `run.json` with no reason at all.
+
+  `dabbler verify --max-rounds` is unchanged: that is the verb's own flag,
+  for a round run by hand outside a driven session.
+
+## What comes back
+
+Stdout carries exactly one thing — the instruction, as JSON. Everything
+else the framework says goes to stderr, where you can read it and a
+parser does not have to.
+
+```
+dabbler [11:31:20] run-started session=001 mode=pull
+dabbler [11:31:20] instruction-issued seq=1 kind=step step=plan
+```
+
+```json
+{
+  "schema_version": 1,
+  "seq": 1,
+  "session_number": 1,
+  "kind": "step",
+  "step_id": "plan",
+  "ask": "Plan session 001 of this repository. Its section of the session plan (session-plan.md) follows between the markers...",
+  "answer_schema": "driver-work-plan.schema.json",
+  "answer_command": "dabbler session report --sessions-dir C:\\temp\\pull-walk-61\\repo\\docs\\sessions --seq 1 --answer-file <path to the JSON you wrote>"
+}
+```
+
+Four kinds under the pull, and no fifth — the same four the managed
+body names. A fifth, `interrupt`, exists only under `session drive`, where
+the framework is the one running the engine; a `next` never sends it.
+
+| `kind` | what it means | what you do |
+| --- | --- | --- |
+| `step` | work to do — the plan, or one step of it | do it, run `answer_command`, call `next` |
+| `rejection` | your last answer was refused; `reasons` says why | put them right, answer again with **this** seq |
+| `wait` | the framework is running something long | leave it `retry_after_seconds`, call `next` |
+| `interrupt` | your invocation was ended; the reason is in `reasons`. Only `session drive` sends this — a `next` never does, because nothing but you is running your engine | read it, then answer what was still owed |
+| `done` | the session is closed | stop |
+
+`answer_command` is always literal and always right: run it as printed,
+filling in the placeholders. It carries the seq the answer must name, so
+an answer to a superseded instruction cannot be mistaken for the current
+one.
+
+## Answering
+
+The first instruction asks for a work plan — the task in a paragraph,
+whether the session may publish, and the ordered steps, each with the
+files it will touch and at least one mechanical check that proves it. Write
+it as JSON somewhere outside the tracked tree and hand the file over:
+
+```
+dabbler session report --sessions-dir docs/sessions --seq 1 --answer-file /tmp/plan.json
+report: session 001 seq 1 answered; work plan (1 step(s), releasable=no) written to .dabbler/runs/s1/driver/plan.json; the driver reads it next.
+```
+
+The next call accepts it, declares the session from it, and asks for the
+first step:
+
+```
+dabbler [11:31:21] plan-accepted steps=["widget"] releasable=false
+declare: session 001 declared; releasable=no.
+dabbler [11:31:21] phase phase=work
+dabbler [11:31:22] instruction-issued seq=2 kind=step step=widget
+```
+
+A step is answered with the files you actually changed:
+
+```
+dabbler session report --sessions-dir docs/sessions --seq 3 --step widget \
+    --status done --files "src/widget.mjs" --notes "widget returns 2"
+```
+
+Three facts about how a step is judged, each learned by a session that
+planned without them:
+
+- **A check runs in a built environment and sees no credential.** The
+  framework spawns each check with PATH, HOME, the toolchain roots
+  (`DOTNET_ROOT`, `JAVA_HOME`, …) and a scratch TEMP, and nothing else — a
+  check is repository-declared argv, and inheriting the shell would hand
+  every vendor key and feed PAT to code the framework did not write. A
+  driver *job* (verification, the run of record, the publish) inherits
+  the shell, so a credential set where `next` runs does reach the publish;
+  a check asserting it is refused, correctly.
+- **Ignored build output does not move the tree.** The framework hashes
+  the working tree as a git tree, so what `.gitignore` covers — `bin/`,
+  `obj/`, `node_modules/` — is invisible to it, and a check that compiles
+  is safe. A check that writes a *tracked* file is a check that changed
+  the tree under itself, and the report is refused for it.
+- **The router's own state writes are in the change set.** Registering a
+  session writes `docs/sessions/sessions.json`, and `dabbler affected`
+  measures everything since `HEAD`, so a repository maps `docs/sessions`
+  (or `docs`) to no test — the scaffolded `dabbler.yaml` does, and one
+  that was narrowed by hand must keep doing it. The one file the framework
+  installs at registration, `.claude/settings.json`, is mapped to no test
+  by the framework itself.
+
+The plan's optional `repositories` member is for a plan whose *steps*
+need the solution's other repositories on disk — it places each beside
+this one, declaring only which solution it belongs to. A plan for one
+repository of a many-repository solution leaves it out: the other
+repositories existing is not the same as this plan needing them.
+
+## When an answer is refused
+
+The framework judges every report against the tree, not against your word
+for it. Name a file the tree did not change, omit one it did, or fail the
+step's own check, and the next `next` hands the step back:
+
+```json
+{
+  "seq": 3,
+  "kind": "rejection",
+  "step_id": "widget",
+  "ask": "Change `widget()` in src/widget.mjs to return 2.\n\n...The previous report for this step was refused for the reasons listed under `reasons`. Put them right and report again, with THIS instruction's seq.",
+  "reasons": [
+    "[files-changed-unchanged] files_changed names 'tests/test_widget.mjs', which the tree did not change since the last accepted step"
+  ],
+  "answer_schema": "driver-report.schema.json",
+  "answer_command": "dabbler session report --sessions-dir C:\\temp\\pull-walk-61\\repo\\docs\\sessions --seq 3 --step widget --status done --files ... "
+}
+```
+
+The slug in brackets is the rule that refused it, and it is stable: the
+same name reaches the `reasons` here, the `rejected-thrice` stop that
+quotes the last reasons, and anyone — a person or `dabbler triage` — asked
+to say what went wrong.
+
+Answer it with the new seq. **Three refusals of one step stop the
+session** (`rejected-thrice`) — the last reasons are on the run state.
+Calling `next` again resumes it, and does not simply judge the failed
+answer a fourth time: that answer is left behind, the count starts over,
+and the step is asked afresh under a new seq. A person deciding to carry
+on is the intervention the bound exists to force. If a step genuinely
+cannot be done, say so instead: `--status blocked` with the reason in
+`--notes`.
+
+The same shape carries the verifier's findings. When a round is blocking
+you are asked for a **disposition** per finding — `fix`, or `reject` with
+a reason and evidence paths — as JSON. A `fix` becomes a step named
+`fix-round-<N>`, checked by every plan step's checks; a `reject` becomes a
+dispute the next round must engage. A red run of record comes back the
+same way, as a step named `fix-run-of-record`: your fix is judged and
+checked like any step, verified again, and only then is the suite run
+again. The step the framework is waiting on is written on `run.json` as
+`pending_step` until its report is accepted, which is what lets the call
+that resumes the session judge it before the phase's own work.
+
+### What the verifier can see, and what it may ask for
+
+A round on the **Copilot seat** holds three tools — list, search, read —
+and the CLI runs them in its own process, so the framework can only
+measure what was done. A round on the **direct-API path** holds none:
+what it sees is the evidence bundle in front of it, and nothing else.
+
+That second case has one opening, and it is off unless your repository
+turns it on. With `verification.settings.api_file_requests: true`, an
+API verifier may **ask for files by path** — it emits a fenced
+`file-request` block naming them, and the framework is what opens them.
+Four things follow from the framework doing the opening rather than the
+model:
+
+- The request is **confined to the round's scope** and **counted against
+  the same read budget** as a seat round's reads. A path outside either
+  never reaches the filesystem: it is refused before a file is opened,
+  and the refusal — with the boundary it met — is written onto the
+  round's `agency` block. Nothing is dropped silently.
+- What comes back is **the contents on disk**. There is no scrubbing
+  layer between the file and the model on this path, so a read here is
+  verbatim by construction and can never be recorded as `transformed`.
+  The one thing a fenced block cannot express is a missing final
+  newline, so a file without one arrives with one; nothing else is
+  altered, and a file ending in blank lines keeps them.
+- There is **exactly one further turn**. The files go back, and the
+  answer to that turn is the verdict — not a loop, so a round costs at
+  most twice its payload. A request the framework refused entirely buys
+  no second turn at all: the first answer stands.
+- The round records `mode: tools` **only if a file was actually
+  delivered**. `operations_granted` says what was offered — `["read"]`
+  where the setting is on — and `mode` says what the round had in front
+  of it, so a verifier that asked for nothing, or for nothing the
+  framework could give it, records `mode: none` exactly as a blind round
+  does. That is the distinction the measurement rests on: a round that
+  saw only the evidence bundle is one of those, whatever it was offered.
+
+`dabbler status` and the round's ledger row carry the whole account.
+None of this is yours to drive: the framework decides, reads and records
+it inside the verification job.
+
+## `wait`: the framework's own long work
+
+Three things take longer than a tool call: a verification round, the
+complete suite as the run of record, and the close — four, for a session
+that declared itself releasable, whose publish runs between the push and
+the close. (The preverify phase runs nothing: the tests that run are each
+step's own checks and the complete suite as the run of record, and the
+verifier reviews without writing or running one.) None
+of them runs inside a `next` call. The framework starts each one detached
+and comes straight back:
+
+```
+dabbler [11:31:30] phase phase=preverify
+dabbler [11:31:30] phase phase=verify
+dabbler [11:31:30] job-started name=verification pid=28444 log=.dabbler/runs/s1/driver/jobs/verification.log
+dabbler [11:31:30] instruction-issued seq=4 kind=wait reasons=1
+```
+
+```json
+{
+  "seq": 4,
+  "kind": "wait",
+  "retry_after_seconds": 60,
+  "log": ".dabbler/runs/s1/driver/jobs/verification.log",
+  "answer_command": "dabbler session next --sessions-dir C:\\temp\\pull-walk-61\\repo\\docs\\sessions"
+}
+```
+
+Nothing is owed here. Do something else for `retry_after_seconds`, read
+`log` if you want to watch, and call `next` again; the call after it
+reports progress or collects the result:
+
+```
+dabbler [11:32:05] job-finished name=verification exit=0 log=.dabbler/runs/s1/driver/jobs/verification.log
+dabbler [11:32:05] verification-passed
+dabbler [11:32:05] phase phase=run-of-record
+dabbler [11:32:05] job-started name=run of record: unit pid=49320 log=.dabbler/runs/s1/driver/jobs/run-of-record-unit.log
+```
+
+The log is the job's own output, whole:
+
+```
+running unit: node tests/run.mjs
+widget ok
+recorded unit [final-full]: passed in 1s (timed here)
+```
+
+`retry_after_seconds` is advice, not a floor. The driver judges the job's
+real state on every call, so a `next` made before the number is up is
+answered with progress if the job has finished and with another `wait` if
+it has not — never refused. The number is honest where it can be: a
+run-of-record wait names a quarter over the suite's last recorded
+duration (floor ten seconds, ceiling sixty), and a verification wait names
+sixty. What may be watched, if you must watch something, is the job's
+own status file beside its log (`<job>.status.json`), which the job
+writes at its exit; `run.json` is the driver's state, and only the `next`
+you have not called yet moves it.
+
+**A `wait` is a tool call, not a sleep,** and that is the point of it. An
+engine that blocks for four minutes waiting on a verification round hits
+whatever timeout its harness puts on a command, and the harness kills the
+call rather than the work — this is exactly how the driver spike died. A
+`wait` gives the engine its turn back and lets it come to the framework
+when it is ready.
+
+Nothing holds the engine's turn for it: there is no hook. What tells a
+person that nothing is answering an instruction is the Dabbler terminal's
+silence watcher — a line once the engine has been quiet over an unmoved
+tree for longer than the threshold, and again at each multiple of it — and
+the Work Explorer's attention row. A `wait` is the one instruction that
+asks the engine to carry an obligation across the end of its turn, and one
+session lost three hours to an engine that answered it by polling
+`run.json` for a field only `next` clears; the answer to that is the
+engine's own bounded loop and a person who can see the silence, not a hook
+that blocks every end of turn in the repository. (`session start` for a
+`claude-code` registration, and `bootstrap` under Claude Code, remove the
+Stop hook an earlier framework installed: a hook whose verb no longer
+exists would block every turn.)
+
+## Talking to the engine, and stopping the framework
+
+They are two different things. Your CLI's own Esc or Ctrl+C interrupts the
+engine; `dabbler session interrupt --stop` halts the framework. Neither
+does the other's job.
+
+**Talking to the engine is between you and your CLI.** It is your session:
+press Esc or Ctrl+C, say what you meant, let it carry on. The framework
+is not involved and does not need to be — nothing of yours is lost,
+because the framework's state only moves when `next` is called.
+
+**Stopping the framework** is `session interrupt`. Without `--stop` it is
+a message that travels with the next instruction, so it reaches an engine
+that is working from a script rather than reading your terminal:
+
+```
+dabbler session interrupt --sessions-dir docs/sessions --reason "the release notes want the version bumped too"
+interrupt: requested for session 001 (instruction 3); the driver ends the running invocation and re-invokes the engine with the reason.
+```
+
+```
+dabbler [11:31:29] interrupt-deferred reason=the release notes want the version bumped too why=no invocation was running; it travels with the next instruction
+```
+
+and it arrives first among the next instruction's `reasons`:
+
+```json
+  "reasons": [
+    "sent: the release notes want the version bumped too"
+  ]
+```
+
+With `--stop` it halts the session instead:
+
+```
+dabbler session interrupt --sessions-dir docs/sessions --reason "I want to look at the diff first" --stop
+interrupt: stop requested for session 001 (instruction 5); the driver ends the running invocation and halts -- the session stays in flight, and `session drive` re-runs it.
+```
+
+The stop lands on the next call, which prints no instruction and exits 1:
+
+```
+dabbler [11:31:38] run-resumed session=001 phase=verify mode=pull
+dabbler: Session 001 paused (interrupted) in phase 'verify' after 0 invocation(s).
+Somebody asked it to stop. I want to look at the diff first.
+The dabbler command that met it has ended; session 001 remains in flight. Next: you. `dabbler session drive` resumes it from 'verify'; `dabbler session cancel` ends it instead.
+```
+
+**A Send reaches a stopped run too.** There is no invocation to end, so
+the request is held and handed to the instruction that resumes the
+session — which is exactly where you want a "and while you're at it"
+to land. Only two things are refused: a session nothing ever drove, and
+one whose drive completed, because a message queued for a closed session
+would never be read and "Sent" would be a promise the framework broke.
+
+## When the framework stops
+
+A stop closes nothing and loses nothing. The phase, the accepted steps,
+the tree the next report is measured against and any job still running are
+on `.dabbler/runs/s<N>/driver/run.json`, and `stop` says in words which
+bound was met. **The same call resumes** — there is no separate resume
+verb, and no flag to remember:
+
+```
+dabbler [11:31:42] run-resumed session=001 phase=verify mode=pull after=interrupted
+dabbler [11:31:42] job-finished name=verification exit=0 log=.dabbler/runs/s1/driver/jobs/verification.log
+dabbler [11:31:42] verification-passed
+```
+
+Note what the second line says: the verification round the stop
+interrupted kept running, and the resuming call collected its result. A
+stop halts the framework's *loop*, not work already in flight.
+
+The stop kinds mean what they say: `rejected-thrice`, `blocked` (a step
+was reported as impossible, with its notes), `tests`, `verification`,
+`land` (the commit or push), `close` (a gate refused; its rows are in the
+close's log), `interrupted` (you asked), `budget` (the invocation bound,
+which only `session drive` below can meet), `engine`.
+
+Beside the kind, `stop.class` says whether this has happened before.
+`deadlock` means the same kind, on the same step, for the same reason as
+the stop immediately before it — the loop is not moving, and running it
+again unchanged arrives back here. The stop says so in its own words too,
+so you do not have to know the field exists. `stop_history` keeps the last
+few stops, oldest first, if you want to see the shape of it.
+
+If a job **vanished** — no process and no recorded result, which is what a
+machine restart leaves — that is a stop too, and deliberately: re-running
+a verification round nobody recorded would spend another round's worth of
+provider calls on a fact that was never written down.
+
+### When you ask your engine for help
+
+Sooner or later you will type "it's stuck — sort it out" into your CLI.
+This is the protocol the engine should follow, in this order, because the
+order is what keeps it honest.
+
+**1. Read the framework's own account first, and never the scrollback.**
+There are four places and they are all files:
+
+```
+dabbler status --sessions-dir docs/sessions
+```
+
+`status` says where the session is. `.dabbler/runs/s<N>/driver/run.json`
+carries the `stop` — its `kind`, its `reason` in words, the step it was on
+and its `class`. The outstanding `instruction.json` carries `reasons` when
+the last answer was refused, each one opening with the rule that refused
+it in brackets. The transcripts, `engine-NN.log` beside them, are what the
+engine actually did. The scrollback is what the engine *remembers*; these
+are what happened, and the two differ exactly when it matters most.
+
+**2. Verify the claim before acting on it.** A stop's reason is a
+symptom. The rule slug it carries — `[files-changed-omits]`,
+`[check-failed]`, `[no-work-plan]` — names a rule that is a readable line
+of code, and the condition it describes can be reproduced. An engine that
+skips this fixes the story it told itself about the failure. Nothing below
+is worth doing until the diagnosis survives being checked.
+
+**3. Then work out whose it is to fix**, because that is the question
+that stalls a session:
+
+- **On this repository, the framework is source in the tree.** The engine
+  may fix it. The fix is ordinary work — it rides in the session's own
+  diff and the verifier reviews it with everything else. Sessions 60 and
+  62 both did exactly that on the operator's word. This is written down
+  because session 62's engine wrote a correct diagnosis of a framework
+  defect and then waited, believing the change was somebody else's to
+  make; the session deadlocked on a gate that one edit would have moved.
+- **On a consumer repository, the framework is an installed package** the
+  session did not write, and editing it there is a fix that vanishes at
+  the next `npm i`. Report the step `blocked` with the diagnosis in
+  `--notes`, and raise an owed item pointing at dabbler. The fix ships as
+  a release, and the session says plainly what it is waiting for.
+
+**4. Four things are never touched, on either.** Anything under
+`.dabbler/runs/`; `sessions.json`; a verification verdict; a gate. These
+are the record and the judgment over it, and a session that edits them has
+stopped being evidence of anything. If a gate is wrong, prove it is wrong
+and say so — do not step around it.
+
+**5. And stopping costs nothing.** If it is late, or the diagnosis needs
+someone who is not at the keyboard, stop calling `next`. Nothing expires.
+The session resumes from the phase it is in, and nothing already accepted
+is asked for again.
+
+### The one stop with no forward exit, and the verb that is one
+
+There is a stop the four steps above cannot answer, because it is not a
+wrong diagnosis — it is two correct refusals pointing at each other.
+
+A session reaches the verification round cap. The loop records a terminal:
+`remediated_at_cap` when the last round's blocking findings were each fixed
+at the site they cited, or a cap-clean end when nothing was outstanding. The
+tree then moves again — a repair to the repair, which is exactly what an
+unreviewed fix tends to need. Now:
+
+- the close's `verification_clean` gate refuses, correctly: this is not the
+  tree that was reviewed, so **re-run `dabbler verify`**;
+- `dabbler verify` refuses, correctly: a terminal row stands, so **close the
+  session**;
+- `session close --force` cannot help either, because `verification_clean`
+  is an *evidence* gate and force bypasses only bookkeeping.
+
+Session 137, 2026-09-09, sat in that loop. Raising the cap does not lift it:
+the terminal is read **before** the cap, so `session plan amend
+--max-rounds` was accepted, written to `amendments.jsonl` — and inert. It
+now refuses instead, and names the verb below.
+
+A cap terminal is a spent **budget**, not a judgment, so the operator may
+buy the review it refused:
+
+```
+dabbler verify reopen --rounds 1 --reason "<why>" --approver <who>
+```
+
+That records a grant in `.dabbler/runs/s<N>/verification-reopens.jsonl` and
+reopens the loop. Read what it is carefully, because it is easy to mistake
+for the waiver this framework does not have:
+
+- **It buys rounds, never a verdict.** Nothing is verified until a round
+  says so, and `verification_clean` refuses while a grant stands that no
+  round has spent — so a session cannot close on the grant itself.
+- **It buys named rounds, never a mode.** Reaching the new cap stops the
+  session again and needs a new grant. There is no state in which the cap
+  is off.
+- **It never reaches an adjudication.** That is a third provider's judgment
+  of the disputes, and no grant buys a different answer to a judged
+  question. A cap reached with findings still *disputed* goes to `dabbler
+  verify adjudicate` instead.
+- **It is refused where nothing is stuck**, so it cannot quietly become the
+  ordinary way a cap is raised. Before the cap is reached, the cap is what
+  moves: `session plan amend --max-rounds`.
+- **The reason and the approver are permanent**, and no gate reads the
+  approver — a gate that trusted an engine-written name would make the
+  authorisation forgeable, which is worse than absent. What the row buys is
+  that the claim exists, beside the rounds it authorised.
+
+### The other stop with no forward exit: a releasable session that must not ship
+
+The same shape, one phase later. A session declares whether it may publish
+at step (a), before the work; `published_when_releasable` refuses a close
+where a releasable session has no packaging run on its record; and that gate
+is *evidence*, so `close --force` does not answer it either. There is no
+re-declaration — a session that could decide afterwards whether it was
+supposed to ship could always decide it had not been — so a releasable
+session whose artifact must not go out had one exit, `cancel`, which throws
+away work that verified and landed.
+
+```
+dabbler session withdraw-release --reason "<why>" --approver <who>
+```
+
+That records a row in
+`.dabbler/runs/s<N>/releasability-withdrawals.jsonl`, and what it does is
+narrow on purpose:
+
+- **It does not rewrite the declaration.** The declaration stands and the
+  withdrawal stands beside it, so the close *reports* a session that was
+  supposed to ship and did not, and on whose word. A session quietly
+  re-declared not-releasable would read like one that was never going to
+  publish, which is the difference the row exists to keep.
+- **It changes nothing else.** No other gate reads it. The verification
+  round, the run of record and the close judge the session on exactly the
+  evidence they would have.
+- **The reason and the approver are permanent**, and one per session, ever.
+
+## The end
+
+```
+dabbler [11:31:48] job-finished name=close exit=0
+dabbler [11:31:48] instruction-issued seq=8 kind=done
+dabbler [11:31:48] phase phase=complete
+dabbler: session 001 complete.
+```
+
+```json
+{
+  "schema_version": 1,
+  "seq": 8,
+  "session_number": 1,
+  "kind": "done"
+}
+```
+
+Behind that, in the close's own log:
+
+```
+  verification_clean  PASS
+  working_tree_clean  PASS
+  pushed_to_remote    PASS
+  test_run_fresh      PASS
+  owed_decisions      PASS
+  verdict_vocabulary  PASS
+close: session 001 of sessions closed (VERIFIED).
+```
+
+## Starting from the Work Explorer
+
+Everything above is what you type. The extension's job is to open the
+right things and to be loud when the framework needs you — it does not
+run the session for you, and it never stands between you and your engine.
+
+### What Start opens
+
+**Start Session** on a repository row asks which engine, then opens a VS
+Code terminal at the repository root running *that engine's own CLI*,
+interactively. Where the CLI takes an opening prompt in its arguments the
+sentence is already there; where it does not, the sentence is typed at the
+prompt for you to press Enter on. From the walk, the two engines whose
+CLIs were measured:
+
+```
+TERMINAL Claude Code
+  cwd:      C:\temp\s62-walk
+  command:  claude "Call `dabbler session next --sessions-dir docs/sessions --engine claude-code --provider anthropic` and do what it says until it says `done`."
+  typed:    (nothing; the sentence is in argv)
+
+TERMINAL GitHub Copilot
+  cwd:      C:\temp\s62-walk
+  command:  copilot
+  typed:    Call `dabbler session next --sessions-dir docs/sessions --engine copilot --provider openai --model gpt-5-6-luna` and do what it says until it says `done`.
+```
+
+Claude Code takes a positional prompt and starts interactive by default.
+The Copilot CLI has no positional prompt — its `-p` is documented as
+non-interactive — so the sentence is typed and left for you. Any engine
+whose CLI has not been measured here is launched the same way, for a
+plainer reason: an argument a CLI does not take is a launch that fails in
+front of you, and a typed sentence costs one keypress instead.
+
+**What Start does not do.** It spawns no driver. It copies nothing to the
+clipboard and pastes nothing into a chat. After it opens the terminal, the
+session is yours: your scrollback, your chat, your Esc.
+
+### The Dabbler terminal
+
+Start opens a second terminal beside your CLI, named *Dabbler — <your
+repository>*, and shown without taking the caret from what you are typing.
+A session started from your own CLI brings it into view too, the moment the
+first `next` writes the run record. It shows what the framework is doing —
+the phase the run moved to, the background job it started, and that job's
+own output as it arrives. This is what that terminal printed on the walk:
+
+```
+────────────────────────── framework ──────────────────────────
+14:21:30 terminal-opened repository=s62-walk
+
+═══════════════════════════════════════════════════════════════
+                          SESSION 001
+═══════════════════════════════════════════════════════════════
+14:21:30 phase session=001 now=preverify
+14:21:30 job-started name=affected tests: unit log=.dabbler/runs/s1/driver/jobs/affected-tests-unit.log
+14:21:30 working
+
+──────────────────── affected-tests-unit ──────────────────────
+running unit: node tests/run.mjs tests/test_widget.mjs
+recorded unit [preverify-targeted]: passed in 1s (timed here)
+
+────────────────────────── framework ──────────────────────────
+14:21:31 tests suite=unit stage=preverify-targeted outcome=passed
+14:21:31 job-collected name=affected tests: unit
+```
+
+(The lines are the walk's; the layout is the current one.) A session
+opens under a banner of its own, whenever the run record moves to a new
+one. Two voices speak beneath it, and a rule with the voice's name in it
+is drawn wherever one gives way to the other, with an empty line before
+it: `framework` over the framework's own lines, the job's name over its
+output. The framework's lines are an outline: the
+clock stands at the left edge, and a line that wraps — or carries git's own
+newlines in a stop's reason — continues under the text rather than under
+the clock. Both the rules and the wrapping follow the terminal's width,
+and a resize lays the whole scrollback out again. The job's lines arrive
+exactly as the runner wrote them — colours, checkmarks and spinner
+included. That is the whole reason it is a terminal and not an output
+channel.
+
+A terminal opened part-way through a session, or after one, does not
+replay the job logs. It says what the records say happened, one dated line
+each in the order it happened — the verification rounds, this session's
+test runs, and each job log already on disk as `earlier-job` with its exit
+and where the log is — and then where the run is now. Only bytes a job
+writes after that pass through.
+
+`working` and `waiting` are the indicator: it says `working` while a
+background job is running and `waiting` when there is none and the session
+is between your calls. It says each of them once, when the state changes.
+
+The two surfaces name the same events differently, and it is worth knowing
+which you are reading. The Dabbler terminal says `job-started` and
+`job-collected`; `dabbler session next` in your own CLI says `job-started`
+and `job-finished … exit=0`, because the CLI is the side that collected the
+exit code. Every block in this section says which of the two it came from.
+
+**It never carries engine chat.** Not one line of it, ever. Under `session
+next` the framework does not see your chat at all — you are reading it in
+your own CLI — and under unattended `drive` the engine's stream goes to
+the "Dabbler: Engine" output channel instead. Chat in the CLI, work in the
+Dabbler terminal; there is no setting to get this wrong.
+
+### Start Unattended Session
+
+**Start Unattended Session** is the other launcher: headless `session
+drive`, as a child process, streaming into "Dabbler: Engine". It is for CI
+and overnight runs — the case where nobody is at a keyboard.
+
+**Stop** and **Send** belong to that and to nothing else. They are
+`session interrupt`, which ends an invocation the *framework* made; when
+your own CLI is the engine there is no such invocation, and the interrupt
+is your own Esc.
+
+### When the framework stops, it says so
+
+A halt is raised as a decision, so one kind of row serves every "waiting
+on you". It appears above the session buckets with a warning glyph, a
+toast offers the recommended answer, and the activity-bar badge carries
+the count. After `session interrupt --stop` on the walk, this is the row
+and the badge the Explorer built — printed here as the model carries them,
+since a screenshot cannot be pasted into a text file:
+
+```
+ROW  Session 001 paused (interrupted) in phase 'preverify'. Run it again, or cancel it?
+     Nothing happens. The session stays in flight and its record stops moving until someone resumes it or cancels it.
+     icon={"kind":"theme","id":"warning","color":"charts.yellow"} command=dabbler.answerOwedDecision
+
+BADGE {"value":1,"tooltip":"Dabbler is waiting on you: Session 001 paused (interrupted) in phase 'preverify'. Run it again, or cancel it?"}
+```
+
+The row's tooltip is the whole brief — the question, what the framework
+already established, and each option with what follows from it:
+
+```
+**Session 001 paused (interrupted) in phase 'preverify'. Run it again, or cancel it?**
+
+Somebody asked it to stop. The widget needs a rethink. The dabbler command that met it has ended; session 001 remains in flight. Next: you. `dabbler session drive` resumes it from 'preverify'; `dabbler session cancel` ends it instead.
+
+- **Run `next` again** — *recommended*: The session resumes from 'preverify'. The steps it has already accepted are not asked for again.
+- **Cancel the session**: `dabbler session cancel` ends it with a reason on the record. What the working tree already carries stays where it is.
+
+If nobody answers: Nothing happens. The session stays in flight and its record stops moving until someone resumes it or cancels it.
+```
+
+The toast offers the recommended option by its own label, *Other…* and
+*Later*. **Later records nothing** — dismissing a toast is not a decision,
+and the row stays. *Other…*, or a click on the row, opens a picker whose
+items carry each consequence:
+
+```
+Run `next` again  ◀ default
+  detail: The session resumes from 'preverify'. The steps it has already accepted are not asked for again. (recommended)
+Cancel the session
+  detail: `dabbler session cancel` ends it with a reason on the record. What the working tree already carries stays where it is.
+```
+
+Choosing records the answer through `dabbler owed answer`, which is the
+same one writer the command line uses:
+
+```
+owed: 'driver-stop-s1' answered 'Run `next` again'.
+```
+
+Answering does not itself resume the session — the next `session next`
+does, from the phase it stopped in, and nothing already accepted is asked
+for again. That call is the one you make in your own CLI, and this is what
+it printed there:
+
+```
+dabbler [14:22:18] run-resumed session=001 phase=preverify invocations=0 max_invocations=24 after=interrupted
+dabbler [14:22:19] job-finished name=affected tests: unit exit=0 log=.dabbler/runs/s1/driver/jobs/affected-tests-unit.log
+dabbler [14:22:19] phase phase=verify
+```
+
+The liveness row beside it says which of the two states the session is in
+— `working` while a job is running, `waiting` between calls:
+
+```
+ROW  Session 001 is in flight — waiting
+     Nothing is running; the session is between calls. Last written less than 2 minutes ago. This is the record moving, not the work.
+```
+
+It reports the record moving, not the thinking. A `waiting` session is one
+the framework is not running something for; it is not a judgment about
+whether the work is going well.
+
+A third state is the one that used to read as `working`: the job the
+record names has exited, its status file holds the exit code, and nothing
+has made the call that collects it. The row, the `dabbler status` task row
+and the Dabbler terminal all say so in the router's one wording:
+
+```
+ROW  Session 001 is in flight — finished, waiting to be collected
+     Session 001: the framework's job 'run of record: unit' finished at 2026-09-05T15:37:41.973Z (exit 0) and its result has not been collected. Nothing is running, and collecting it takes a moment. Next: whoever calls `dabbler session next` -- the engine if its loop is still running, otherwise you; `dabbler session next` collects the result and carries on from 'run-of-record'.
+```
+
+## `session drive`: the same loop, unattended
+
+`dabbler session drive` is this loop with the framework invoking a
+headless engine between the moves instead of waiting for you to call back.
+It is the same code — the same phases, the same judging, the same
+detached jobs — and it exists for the case where nobody is at a keyboard:
+CI, an overnight run.
+
+```
+dabbler session drive --engine claude-code --provider anthropic
+```
+
+It is the only mode with an invocation budget, because it is the only mode
+where the *framework* is spending: `driver.max_invocations` in
+`dabbler.yaml` (default 24), and on a Copilot seat each invocation is one
+premium request. Reaching it is a `budget` stop, and continuing is
+`--max-invocations <larger>` — a person deciding to spend more, which is
+why the bound is in the tracked `dabbler.yaml` and not a per-machine
+overlay.
+
+Under the pull there is no such bound. The engine is your own CLI, and its
+bill is yours.
+
+An engine's conversation is resumed **by its id** — the `session_id`
+Claude Code reports, whatever its own protocol calls the same thing on
+another engine — never by asking for
+the most recent conversation in the directory. Session 60 asked for the
+most recent one and got an interactive session somebody had opened in the
+same working directory since.
+
+A Copilot seat reports no id, so there is nothing to name: every
+invocation of it is a fresh conversation, carrying only what the
+instruction file carries. That costs a re-read per step, and it is the
+right way round — a seat you also use interactively in the same
+repository is exactly where continuing "whatever ran last" goes wrong.
+Resume-by-id for the seat is owed, once one is measured.
+
+## Where the record is
+
+```
+.dabbler/runs/s<N>/driver/
+  run.json            where the loop is, and why it stopped
+  instruction.json    the current ask
+  report.json         your current answer
+  plan.json           the work plan
+  dispositions.json   the answer to the verifier's findings
+  jobs/*.log          what the framework's own long work printed
+  jobs/*.status.json  the exit code it ended on
+  engine-01.log ...   one transcript per invocation, under `session drive`
+```
+
+Machine-owned, like everything under `.dabbler/runs/`: never hand-edited,
+and not the place a verdict can be typed. The lifecycle's own records —
+`docs/sessions/sessions.json`, `activity-log.json`, the rounds ledger —
+are written by the same verbs a typed session uses, so a driven session
+leaves exactly the record a typed one leaves.

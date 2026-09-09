@@ -2630,9 +2630,9 @@
     {
       "number": 134,
       "title": "What the verifier is told, and what it can see",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-09-09T00:47:12.942000-04:00",
-      "completedAt": null,
+      "completedAt": "2026-09-09T01:07:40.147000-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

@@ -112,6 +112,34 @@
 > it on by default is a separate decision that the measurement settles, not
 > this session.
 
+> ## FOR SESSION 136, step 3 — why the operator never saw `S133:`
+>
+> Reported after installing the latest VSIX: no `S133:` appeared on any
+> *Dabbler* terminal voice rule. **The code is there and the bundle carries
+> it** (`voice()` in `router/dabblerTerminal.ts` returns
+> `` `S${this.bannered}: framework` ``, and the built `dist/extension.js`
+> contains it). What is missing is an occasion to draw it.
+>
+> `emit` draws a rule **only when the speaker changes**, and the rule
+> carries the name of the voice that follows. Two consequences:
+>
+> - `sayBanner` deliberately does **not** draw a rule — "a voice rule
+>   directly beneath a banner would be two headings for one group" — but it
+>   *does* set `speaker` to the numbered voice. So after the banner the
+>   framework's voice is already current, and no rule is drawn for it.
+> - A numbered framework rule is therefore drawn **only after a job has
+>   spoken** and the framework speaks again. A session with no job output
+>   on that terminal — which is what a chat-driven session looks like — has
+>   no change of voice at all, and the only rule on the scrollback is the
+>   plain `framework` one drawn before the session was known.
+>
+> **This is session 136's step 3, and it is bigger than a label.** Putting
+> the operator's `133 – framework` form on the rule and a session number on
+> a job's rule does not help if no rule is drawn. Step 3 should decide
+> whether the session's first framework rule is drawn *after* the banner
+> (numbered, one heading for the group) or whether the banner itself is
+> the numbered heading — and say which, because today it is neither.
+
 > ## SESSION 134 CLOSED, 2026-09-09 — what the verifier is told, and what it can see
 >
 > | session | what | state |
